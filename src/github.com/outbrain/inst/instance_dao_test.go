@@ -15,6 +15,10 @@ type TestSuite struct{}
 
 var _ = Suite(&TestSuite{})
 
+// This test suite assumes one master and three direct slaves, as follows;
+// This was setup with mysqlsandbox (using MySQL 5.5.32, not that it matters) via: 
+// $ make_replication_sandbox --how_many_nodes=3 --replication_directory=55orchestrator /path/to/sandboxes/5.5.32
+// modify below to fit your own environment
 var masterKey = inst.InstanceKey{
 	Hostname: "127.0.0.1",
 	Port: 22987,
@@ -31,7 +35,8 @@ var slave3Key = inst.InstanceKey{
 	Hostname: "127.0.0.1",
 	Port: 22990,
 }
-	
+
+// The test also assumes one backend MySQL server.
 func (s *TestSuite) SetUpSuite(c *C) { 
 	config.Config.MySQLTopologyUser = "msandbox"
 	config.Config.MySQLTopologyPassword = "msandbox"
@@ -123,47 +128,55 @@ func (s *TestSuite) TestReadTopologyUnexisting(c *C) {
 
 func (s *TestSuite) TestMoveBelowAndBack(c *C) {
 	// become child
-	instance, _ := inst.MoveBelow(&slave1Key, &slave2Key)
+	slave1, _ := inst.MoveBelow(&slave1Key, &slave2Key)
 	
-	c.Assert(instance.GetMasterInstanceKey().Equals(&slave2Key), Equals, true)
-	c.Assert(instance.SlaveRunning(), Equals, true)
+	c.Assert(slave1.GetMasterInstanceKey().Equals(&slave2Key), Equals, true)
+	c.Assert(slave1.SlaveRunning(), Equals, true)
 	
 	// And back; keep topology intact
-	instance, _ = inst.MoveUp(&slave1Key)
-	sibling, _ := inst.ReadTopologyInstance(&slave2Key)
+	slave1, _ = inst.MoveUp(&slave1Key)
+	slave2, _ := inst.ReadTopologyInstance(&slave2Key)
 	
-	c.Assert(inst.InstancesAreBrothers(instance, sibling), Equals, true)
-	c.Assert(instance.SlaveRunning(), Equals, true)
+	c.Assert(inst.InstancesAreBrothers(slave1, slave2), Equals, true)
+	c.Assert(slave1.SlaveRunning(), Equals, true)
 	
 }
 
 func (s *TestSuite) TestMoveBelowAndBackComplex(c *C) {
 	
 	// become child
-	instance, _ := inst.MoveBelow(&slave1Key, &slave2Key)
+	slave1, _ := inst.MoveBelow(&slave1Key, &slave2Key)
 	
-	c.Assert(instance.GetMasterInstanceKey().Equals(&slave2Key), Equals, true)
-	c.Assert(instance.SlaveRunning(), Equals, true)
+	c.Assert(slave1.GetMasterInstanceKey().Equals(&slave2Key), Equals, true)
+	c.Assert(slave1.SlaveRunning(), Equals, true)
 	
 	// Now let's have fun. Stop slave2 (which is now parent of slave1), execute queries on master,
 	// move s1 back under master, start all, verify queries.
 
-	inst.StopSlave(&slave2Key)
+	_, err := inst.StopSlave(&slave2Key)
+	c.Assert(err, IsNil)
 	
 	randValue := rand.Int()
-	inst.ExecInstance(&masterKey, `replace into orchestrator_test.test_table (name, value) values ('TestMoveBelowAndBackComplex', ?)`, randValue)
-	master, _ := inst.ReadTopologyInstance(&masterKey)
+	_, err = inst.ExecInstance(&masterKey, `replace into orchestrator_test.test_table (name, value) values ('TestMoveBelowAndBackComplex', ?)`, randValue)
+	c.Assert(err, IsNil)
+	master, err := inst.ReadTopologyInstance(&masterKey)
+	c.Assert(err, IsNil)
+
 	// And back; keep topology intact
-	instance, _ = inst.MoveUp(&slave1Key)
-	inst.MasterPosWait(&slave1Key, &master.SelfBinlogCoordinates)
-	sibling, _ := inst.ReadTopologyInstance(&slave2Key)
-	inst.MasterPosWait(&slave2Key, &master.SelfBinlogCoordinates)
+	slave1, err = inst.MoveUp(&slave1Key)
+	c.Assert(err, IsNil)
+	_, err = inst.MasterPosWait(&slave1Key, &master.SelfBinlogCoordinates)
+	c.Assert(err, IsNil)
+	slave2, err := inst.ReadTopologyInstance(&slave2Key)
+	c.Assert(err, IsNil)
+	_, err = inst.MasterPosWait(&slave2Key, &master.SelfBinlogCoordinates)
+	c.Assert(err, IsNil)
 	// Now check for value!
 	var value1, value2 int
 	inst.ScanInstanceRow(&slave1Key, `select value from orchestrator_test.test_table where name='TestMoveBelowAndBackComplex'`, &value1)
 	inst.ScanInstanceRow(&slave2Key, `select value from orchestrator_test.test_table where name='TestMoveBelowAndBackComplex'`, &value2)
 	
-	c.Assert(inst.InstancesAreBrothers(instance, sibling), Equals, true)
+	c.Assert(inst.InstancesAreBrothers(slave1, slave2), Equals, true)
 	c.Assert(value1, Equals, randValue)
 	c.Assert(value2, Equals, randValue)	
 }
