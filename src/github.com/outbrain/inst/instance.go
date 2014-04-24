@@ -4,6 +4,8 @@ import (
 	"strconv"
 	"strings"
 	"net"
+	"log"
+	"encoding/json"
 )
 
 
@@ -71,12 +73,12 @@ type Instance struct {
 	ReadBinlogCoordinates	BinlogCoordinates
 	ExecBinlogCoordinates	BinlogCoordinates
 	SecondsBehindMaster	int
-	SlaveHosts			map[string]string
+	SlaveHosts			map[InstanceKey]bool
 }
 
 func NewInstance() *Instance {
     return &Instance{
-    	SlaveHosts: make(map[string]string),
+    	SlaveHosts: make(map[InstanceKey]bool),
     }
 }
 
@@ -114,8 +116,8 @@ func (this *Instance) SQLThreadUpToDate() bool {
 }
 
 
-func (this *Instance) AddSlaveHost(hostname string) {
-	this.SlaveHosts[hostname] = hostname
+func (this *Instance) AddSlaveKey(slaveKey *InstanceKey) {
+	this.SlaveHosts[*slaveKey] = true
 }
 
 func (this *Instance) GetMasterInstanceKey() *InstanceKey {
@@ -124,11 +126,32 @@ func (this *Instance) GetMasterInstanceKey() *InstanceKey {
 
 func (this *Instance) GetSlaveInstanceKeys() [](*InstanceKey) {
 	res := [](*InstanceKey){}
-	for host, _ := range this.SlaveHosts {
-    	res = append(res, &InstanceKey{Hostname: host, Port: this.Key.Port})
+	for key, _ := range this.SlaveHosts {
+    	res = append(res, &key)
 	}
 	return res
 }
+
+
+func (this *Instance) GetSlaveHostsAsJson() string {
+	keys := this.GetSlaveInstanceKeys()
+	blob, _ := json.Marshal(keys)
+	return string(blob)
+}
+
+
+func (this *Instance) ReadSlaveHostsFromJson(jsonString string) error {
+	var keys []InstanceKey;
+	err := json.Unmarshal([]byte(jsonString), &keys)
+	if err != nil {log.Println(err); return err}
+	
+	this.SlaveHosts = make(map[InstanceKey]bool)
+	for _, key := range keys {
+    	this.AddSlaveKey(&key)
+	}
+	return err
+}
+
 
 func (this *Instance) IsSlaveOf(master *Instance) bool {
 	return this.GetMasterInstanceKey().Equals(&master.Key)

@@ -74,6 +74,16 @@ func (s *TestSuite) TestReadTopologySlave(c *C) {
 }
 
  
+func (s *TestSuite) TestReadTopologyAndInstanceMaster(c *C) {
+	i, _ := inst.ReadTopologyInstance(&masterKey)
+	iRead, _ := inst.ReadInstance(&masterKey)
+	c.Assert(iRead.Key.Hostname, Equals, i.Key.Hostname)
+	c.Assert(iRead.Version, Equals, i.Version)
+	c.Assert(len(iRead.SlaveHosts), Equals, len(i.SlaveHosts))
+}
+
+
+ 
 func (s *TestSuite) TestReadTopologyAndInstanceSlave(c *C) {
 	i, _ := inst.ReadTopologyInstance(&slave1Key)
 	iRead, _ := inst.ReadInstance(&slave1Key)

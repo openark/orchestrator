@@ -80,7 +80,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
         	where 
         		command='Binlog Dump'`, 
         		func(m map[string]string) {
-					instance.AddSlaveHost(GetCNAME(m["slave_hostname"]))
+        			slaveKey := InstanceKey{Hostname: GetCNAME(m["slave_hostname"]), Port: instance.Key.Port}
+					instance.AddSlaveKey(&slaveKey)
 		       	})
 		
         if	err	!=	nil	{log.Println(err); return instance, err}
@@ -101,6 +102,7 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, error) {
 	if	err	!=	nil	{
 		log.Println(err)
 	} else {
+		var slaveHostsJson string
         err = db.QueryRow(`
         	select 
 				version,
@@ -115,7 +117,8 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, error) {
 				read_master_log_pos,
 				relay_master_log_file,
 				exec_master_log_pos,
-				seconds_behind_master
+				seconds_behind_master,
+				slave_hosts
 			 from database_instance 
 			 	where hostname=? and port=?`, 
 			 instanceKey.Hostname, instanceKey.Port).Scan(
@@ -132,8 +135,10 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, error) {
 			 	&instance.ExecBinlogCoordinates.LogFile,
 			 	&instance.ExecBinlogCoordinates.LogPos,
 			 	&instance.SecondsBehindMaster,
+			 	&slaveHostsJson,
 			 	)
         if	err	!=	nil	{log.Println(err); return instance, err}
+        instance.ReadSlaveHostsFromJson(slaveHostsJson)
 	}
 	return instance, err
 }
@@ -160,8 +165,9 @@ func WriteInstance(instance *Instance, lastError error) error {
 				read_master_log_pos,
 				relay_master_log_file,
 				exec_master_log_pos,
-				seconds_behind_master
-			) values (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				seconds_behind_master,
+				slave_hosts
+			) values (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			instance.Key.Hostname, 
 		 	instance.Key.Port,
 		 	instance.Version,
@@ -177,6 +183,7 @@ func WriteInstance(instance *Instance, lastError error) error {
 		 	instance.ExecBinlogCoordinates.LogFile,
 		 	instance.ExecBinlogCoordinates.LogPos,
 		 	instance.SecondsBehindMaster,
+		 	instance.GetSlaveHostsAsJson(),
 		 	)
 	if	err	!=	nil	{log.Println(err); return err}
 	
