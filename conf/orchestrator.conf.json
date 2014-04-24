@@ -1,0 +1,11 @@
+{
+	"InstanceRefreshSeconds": 300,
+	"MySQLTopologyUser": "msandbox",
+	"MySQLTopologyPassword": "msandbox",
+	"MySQLOrchestratorHost": "127.0.0.1",
+	"MySQLOrchestratorPort": 5532,
+	"MySQLOrchestratorDatabase": "orchestrator",
+	"MySQLOrchestratorUser": "msandbox",
+	"MySQLOrchestratorPassword": "msandbox",
+	"SlaveLagQuery": ""
+}
