@@ -13,7 +13,6 @@ import (
 
 func ExecInstance(instanceKey *InstanceKey, query string, args ...interface{}) (sql.Result, error) {
 	db,	err	:=	sqlutils.OpenTopology(instanceKey.Hostname, instanceKey.Port)
-	defer db.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -24,7 +23,6 @@ func ExecInstance(instanceKey *InstanceKey, query string, args ...interface{}) (
 
 func ScanInstanceRow(instanceKey *InstanceKey, query string, dest ...interface{}) error {
 	db,	err	:=	sqlutils.OpenTopology(instanceKey.Hostname, instanceKey.Port)
-	defer db.Close()
 	if err != nil {
 		return err
 	}
@@ -34,13 +32,13 @@ func ScanInstanceRow(instanceKey *InstanceKey, query string, dest ...interface{}
 
 func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	db,	err	:=	sqlutils.OpenTopology(instanceKey.Hostname, instanceKey.Port)
-	defer db.Close()
 
 	instance := NewInstance()
 	if	err	!=	nil	{
 		log.Println(err)
 	} else {
-        err = db.QueryRow("select @@version, @@binlog_format").Scan(&instance.Version, &instance.Binlog_format)
+        err = db.QueryRow("select @@global.server_id, @@global.version, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
+        	&instance.ServerID, &instance.Version, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
         if err != nil && err != sql.ErrNoRows {
         	log.Println(err)
         	return instance, err
@@ -52,7 +50,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
         	instance.ReadBinlogCoordinates.LogPos, _ = strconv.ParseInt(m["Read_Master_Log_Pos"], 10, 0)
         	instance.ExecBinlogCoordinates.LogFile = m["Relay_Master_Log_File"]
         	instance.ExecBinlogCoordinates.LogPos, _ = strconv.ParseInt(m["Exec_Master_Log_Pos"], 10, 0)
-        	instance.Master_Host = GetCNAME(m["Master_Host"])
+        	instance.Master_Host, _ = GetCNAME(m["Master_Host"])
         	instance.Master_Port, _ = strconv.Atoi(m["Master_Port"])
         	if config.Config.SlaveLagQuery == "" {
 	        	instance.SecondsBehindMaster, _ = strconv.Atoi(m["Seconds_Behind_Master"])
@@ -80,7 +78,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
         	where 
         		command='Binlog Dump'`, 
         		func(m map[string]string) {
-        			slaveKey := InstanceKey{Hostname: GetCNAME(m["slave_hostname"]), Port: instance.Key.Port}
+        			cname, _ := GetCNAME(m["slave_hostname"])
+        			slaveKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
 					instance.AddSlaveKey(&slaveKey)
 		       	})
 		
@@ -95,7 +94,6 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 
 func ReadInstance(instanceKey *InstanceKey) (*Instance, error) {
 	db,	err	:=	sqlutils.OpenOrchestrator()
-	defer db.Close()
 
 	instance := NewInstance()
 	instance.Key = *instanceKey
@@ -105,8 +103,11 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, error) {
 		var slaveHostsJson string
         err = db.QueryRow(`
         	select 
+        		server_id,
 				version,
 				binlog_format,
+				log_bin, 
+				log_slave_updates,
 				binary_log_file,
 				binary_log_pos,
 				master_host,
@@ -122,8 +123,11 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, error) {
 			 from database_instance 
 			 	where hostname=? and port=?`, 
 			 instanceKey.Hostname, instanceKey.Port).Scan(
+			 	&instance.ServerID,
 			 	&instance.Version,
 			 	&instance.Binlog_format,
+			 	&instance.LogBinEnabled,
+			 	&instance.LogSlaveUpdatesEnabled,
 			 	&instance.SelfBinlogCoordinates.LogFile,
 			 	&instance.SelfBinlogCoordinates.LogPos,
 			 	&instance.Master_Host,
@@ -145,7 +149,6 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, error) {
 
 func WriteInstance(instance *Instance, lastError error) error {
 	db,	err	:=	sqlutils.OpenOrchestrator()
-	defer db.Close()
 	if	err	!=	nil	{log.Println(err); return err}
 	
 	_, err = sqlutils.Exec(db, `
@@ -153,8 +156,11 @@ func WriteInstance(instance *Instance, lastError error) error {
         		hostname,
         		port,
         		last_checked,
+        		server_id,
 				version,
 				binlog_format,
+				log_bin,
+				log_slave_updates,
 				binary_log_file,
 				binary_log_pos,
 				master_host,
@@ -167,11 +173,14 @@ func WriteInstance(instance *Instance, lastError error) error {
 				exec_master_log_pos,
 				seconds_behind_master,
 				slave_hosts
-			) values (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			) values (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			instance.Key.Hostname, 
 		 	instance.Key.Port,
+		 	instance.ServerID,
 		 	instance.Version,
 		 	instance.Binlog_format,
+		 	instance.LogBinEnabled,
+		 	instance.LogSlaveUpdatesEnabled,
 			instance.SelfBinlogCoordinates.LogFile,
 			instance.SelfBinlogCoordinates.LogPos,
 		 	instance.Master_Host,
@@ -202,7 +211,7 @@ func StopSlaveNicely(instanceKey *InstanceKey) (*Instance, error) {
 	if	err	!=	nil	{log.Println(err); return instance, err}
 	
 	if !instance.IsSlave() {
-		return instance, errors.New(fmt.Sprintf("instance is not a slave: %s:%d", instanceKey.Hostname, instanceKey.Port))
+		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
 	}
 	
 	_, err = ExecInstance(instanceKey, `stop slave io_thread`)
@@ -230,13 +239,13 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 	if	err	!=	nil	{log.Println(err); return instance, err}
 	
 	if !instance.IsSlave() {
-		return instance, errors.New(fmt.Sprintf("instance is not a slave: %s:%d", instanceKey.Hostname, instanceKey.Port))
+		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
 	}
 	_, err = ExecInstance(instanceKey, `stop slave`)
 	if	err	!=	nil	{log.Println(err); return instance, err}
-	log.Println(fmt.Sprintf("Stopped slave on %s:%d", instanceKey.Hostname, instanceKey.Port)) 
-	
 	instance, err = ReadTopologyInstance(instanceKey)
+
+	log.Println(fmt.Sprintf("Stopped slave on %+v, Self:%+v, Exec:%+v", instanceKey, instance.SelfBinlogCoordinates, instance.ExecBinlogCoordinates)) 
 	return instance, err
 }
 
@@ -246,12 +255,12 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	if	err	!=	nil	{log.Println(err); return instance, err}
 	
 	if !instance.IsSlave() {
-		return instance, errors.New(fmt.Sprintf("instance is not a slave: %s:%d", instanceKey.Hostname, instanceKey.Port))
+		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
 	}
 	
 	_, err = ExecInstance(instanceKey, `start slave`)
 	if	err	!=	nil	{log.Println(err); return instance, err}
-	log.Println(fmt.Sprintf("Started slave on %s:%d", instanceKey.Hostname, instanceKey.Port)) 
+	log.Println(fmt.Sprintf("Started slave on %+v", instanceKey)) 
 	
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
@@ -263,11 +272,13 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 	if	err	!=	nil	{log.Println(err); return instance, err}
 	
 	if !instance.IsSlave() {
-		return instance, errors.New(fmt.Sprintf("instance is not a slave: %s:%d", instanceKey.Hostname, instanceKey.Port))
+		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
 	}
 	if instance.SlaveRunning() {
-		return instance, errors.New(fmt.Sprintf("slave already running: %s:%d", instanceKey.Hostname, instanceKey.Port))
+		return instance, errors.New(fmt.Sprintf("slave already running: %+v", instanceKey))
 	}
+
+	log.Println(fmt.Sprintf("Will start slave on %+v until coordinates: %+v", instanceKey, masterCoordinates)) 
 
 	_, err = ExecInstance(instanceKey, fmt.Sprintf("start slave until master_log_file='%s', master_log_pos=%d", 
 		masterCoordinates.LogFile, masterCoordinates.LogPos))
@@ -281,16 +292,13 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 		switch {
 			case instance.ExecBinlogCoordinates.SmallerThan(masterCoordinates): time.Sleep(200 * time.Millisecond)
 			case instance.ExecBinlogCoordinates.Equals(masterCoordinates): up_to_date = true
-			case masterCoordinates.SmallerThan(&instance.ExecBinlogCoordinates): return instance, errors.New(fmt.Sprintf("Start SLAVE UNTIL is past coordinates: %s:%d", instanceKey.Hostname, instanceKey.Port))
+			case masterCoordinates.SmallerThan(&instance.ExecBinlogCoordinates): return instance, errors.New(fmt.Sprintf("Start SLAVE UNTIL is past coordinates: %+v", instanceKey))
 		}
 	}
 		
 	instance, err = StopSlave(instanceKey)
 	if	err	!=	nil	{log.Println(err); return instance, err} 
 	
-	log.Println(fmt.Sprintf("Stopped slave on %s:%d until coordinates: %s:%d", instanceKey.Hostname, instanceKey.Port, masterCoordinates.LogFile, masterCoordinates.LogPos)) 
-	
-	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
 }
 
@@ -300,13 +308,13 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	if	err	!=	nil	{log.Println(err); return instance, err}
 	
 	if instance.SlaveRunning() {
-		return instance, errors.New(fmt.Sprintf("Cannot change master on: %s:%d because slave is running", instanceKey.Hostname, instanceKey.Port))
+		return instance, errors.New(fmt.Sprintf("Cannot change master on: %+v because slave is running", instanceKey))
 	}
 	
 	_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d", 
 		masterKey.Hostname, masterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
 	if	err	!=	nil	{log.Println(err); return instance, err}
-	log.Println(fmt.Sprintf("Changed master on %s:%d to: %s:%d, %s:%d", instanceKey.Hostname, instanceKey.Port, masterKey.Hostname, masterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos)) 
+	log.Println(fmt.Sprintf("Changed master on %+v to: %+v, %+v", instanceKey, masterKey, masterBinlogCoordinates)) 
 	
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
@@ -320,7 +328,7 @@ func MasterPosWait(instanceKey *InstanceKey, binlogCoordinates *BinlogCoordinate
 	_, err = ExecInstance(instanceKey, fmt.Sprintf("select master_pos_wait('%s', %d)", 
 		binlogCoordinates.LogFile, binlogCoordinates.LogPos))
 	if	err	!=	nil	{log.Println(err); return instance, err}
-	log.Println(fmt.Sprintf("Instance %s:%d has reached coordinates: %s:%d", instanceKey.Hostname, instanceKey.Port, binlogCoordinates.LogFile, binlogCoordinates.LogPos)) 
+	log.Println(fmt.Sprintf("Instance %+v has reached coordinates: %+v", instanceKey, binlogCoordinates)) 
 	
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err

@@ -8,17 +8,32 @@ import (
 	"github.com/outbrain/config"
 )
 
+var knownDBs map[string]*sql.DB = make(map[string]*sql.DB)
+
+func getDB(mysql_uri string) (*sql.DB, error) {
+	
+	if _, exists := knownDBs[mysql_uri]; !exists {
+	    if db, err := sql.Open("mysql", mysql_uri); err == nil {
+	    	knownDBs[mysql_uri] = db
+	    } else {
+	    	return db, err
+	    }	    	    
+	}
+	return knownDBs[mysql_uri], nil
+}
+
+
 func OpenTopology(host string, port int) (*sql.DB, error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/", config.Config.MySQLTopologyUser, config.Config.MySQLTopologyPassword, host, port)
-	log.Println("sqlutils.Open", mysql_uri)
-	return sql.Open("mysql", mysql_uri)
+	//log.Println("sqlutils.Open", mysql_uri)
+	return getDB(mysql_uri)
 }
 
 func OpenOrchestrator() (*sql.DB, error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", config.Config.MySQLOrchestratorUser, config.Config.MySQLOrchestratorPassword, 
 		config.Config.MySQLOrchestratorHost, config.Config.MySQLOrchestratorPort, config.Config.MySQLOrchestratorDatabase)
-	log.Println("sqlutils.Open", mysql_uri)
-	return sql.Open("mysql", mysql_uri)
+	//log.Println("sqlutils.Open", mysql_uri)
+	return getDB(mysql_uri)
 }
 
 func RowToArray(rows *sql.Rows, columns []string) []string {

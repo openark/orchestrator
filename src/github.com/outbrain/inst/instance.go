@@ -4,15 +4,20 @@ import (
 	"strconv"
 	"strings"
 	"net"
+	"fmt"
 	"log"
+	"errors"
 	"encoding/json"
 )
 
 
-func GetCNAME(hostName string) string {
-	res, _ := net.LookupCNAME(hostName);
+func GetCNAME(hostName string) (string, error) {
+	res, err := net.LookupCNAME(hostName);
+	if err != nil {
+		return hostName, err
+	}
 	res = strings.TrimRight(res, ".")
-	return res
+	return res, nil
 }
 
 type InstanceKey struct {
@@ -46,6 +51,7 @@ type BinlogCoordinates struct {
 	LogPos	int64
 }
 
+
 func (this *BinlogCoordinates) Equals(other *BinlogCoordinates) bool {
 	return this.LogFile == other.LogFile && this.LogPos == other.LogPos
 }
@@ -63,8 +69,11 @@ func (this *BinlogCoordinates) SmallerThan(other *BinlogCoordinates) bool {
 
 type Instance struct {
 	Key					InstanceKey
+	ServerID			uint
 	Version				string
 	Binlog_format		string
+	LogBinEnabled		bool
+	LogSlaveUpdatesEnabled	bool
 	SelfBinlogCoordinates	BinlogCoordinates
 	Master_Host			string
 	Master_Port			int
@@ -159,5 +168,27 @@ func (this *Instance) IsSlaveOf(master *Instance) bool {
 
 func (this *Instance) IsMasterOf(slave *Instance) bool {
 	return slave.IsSlaveOf(this)
+}
+
+func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
+	if !other.LogBinEnabled {
+		return false, errors.New(fmt.Sprintf("instance does not have binary logs enabled: %+v", other.Key)) 
+	}
+	if !other.LogSlaveUpdatesEnabled {
+		return false, errors.New(fmt.Sprintf("instance does not have log_slave_updates enabled: %+v", other.Key)) 
+	}
+	if this.IsSmallerMajorVersion(other) {
+		return false, errors.New(fmt.Sprintf("instance %+v has version %s, which is lower than %s on %+v ", this.Key, this.Version, other.Version, other.Key)) 
+	}
+	if this.Binlog_format == "STATEMENT" && (other.Binlog_format == "ROW" || other.Binlog_format == "MIXED") {
+		return false, errors.New(fmt.Sprintf("Cannot replicate from ROW/MIXED binlog format on %+v to STATEMENT on %+v", other.Key, this.Key)) 
+	}
+	if this.Binlog_format == "MIXED" && other.Binlog_format == "ROW" {
+		return false, errors.New(fmt.Sprintf("Cannot replicate from ROW binlog format on %+v to MIXED on %+v", other.Key, this.Key)) 
+	}
+	if this.ServerID == other.ServerID {
+		return false, errors.New(fmt.Sprintf("Identical server id: %+v, %+v both have %d", other.Key, this.Key, this.ServerID)) 
+	}
+	return true, nil
 }
 

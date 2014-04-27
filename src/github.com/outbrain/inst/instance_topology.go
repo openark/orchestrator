@@ -53,14 +53,21 @@ func InstancesAreBrothers(instance0, instance1 *Instance) bool {
 func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if !instance.IsSlave() {
-		return instance, errors.New(fmt.Sprintf("instance is not a slave: %s:%d", instanceKey.Hostname, instanceKey.Port))
+		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
 	}
 	master, err := GetInstanceMaster(instance)
 	if	err	!=	nil	{log.Println(err); return instance, err} 
 	
 	if !master.IsSlave() {
-		return instance, errors.New(fmt.Sprintf("master is not a slave itself: %s:%d", master.Key.Hostname, master.Key.Port))
+		return instance, errors.New(fmt.Sprintf("master is not a slave itself: %+v", master.Key))
 	}
+	
+	if canReplicate, err := instance.CanReplicateFrom(master); canReplicate == false {
+		return instance, err
+	}
+	
+	log.Println(fmt.Sprintf("Will move %+v up the topology", instanceKey)) 
+
 	master, err = StopSlave(&master.Key)
 	if	err	!=	nil	{log.Println(err); return instance, err} 
 	
@@ -87,9 +94,14 @@ func MoveBelow(instanceKey, brotherKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	brother, err := ReadTopologyInstance(brotherKey)
 	if !InstancesAreBrothers(instance, brother) {
-		return instance, errors.New(fmt.Sprintf("instances are not brothers: %s:%d, %s:%d", instanceKey.Hostname, instanceKey.Port, brotherKey.Hostname, brotherKey.Port))
+		return instance, errors.New(fmt.Sprintf("instances are not siblings: %+v, %+v", instanceKey, brotherKey))
 	}
-	log.Println(fmt.Sprintf("Will turn %s:%d child of its brother %s:%d", instanceKey.Hostname, instanceKey.Port, brotherKey.Hostname, brotherKey.Port)) 
+	
+	if canReplicate, err := instance.CanReplicateFrom(brother); !canReplicate {
+		return instance, err
+	}
+	log.Println(fmt.Sprintf("Will move %+v below its sibling %+v", instanceKey, brotherKey)) 
+
 	instance, err = StopSlave(instanceKey)
 	if	err	!=	nil	{log.Println(err); return instance, err} 
 	
@@ -103,7 +115,7 @@ func MoveBelow(instanceKey, brotherKey *InstanceKey) (*Instance, error) {
 		brother, err = StartSlaveUntilMasterCoordinates(brotherKey, &instance.ExecBinlogCoordinates)
 		if	err	!=	nil	{log.Println(err); return instance, err} 
 	}  
-	// At this point both brothers have executed exact same statements and are identical
+	// At this point both siblings have executed exact same statements and are identical
 	 
 	instance, err = ChangeMasterTo(instanceKey, &brother.Key, &brother.SelfBinlogCoordinates)
 	if	err	!=	nil	{log.Println(err); return instance, err} 

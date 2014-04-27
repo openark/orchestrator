@@ -93,8 +93,10 @@ func (s *TestSuite) TestReadTopologyAndInstanceSlave(c *C) {
 
 
 func (s *TestSuite) TestGetMasterOfASlave(c *C) {
-	i, _ := inst.ReadTopologyInstance(&slave1Key)
-	master, _ := inst.GetInstanceMaster(i)
+	i, err := inst.ReadTopologyInstance(&slave1Key)
+	c.Assert(err, IsNil)
+	master, err := inst.GetInstanceMaster(i)
+	c.Assert(err, IsNil)
 	c.Assert(master.IsSlave(), Equals, false)
 	c.Assert(master.Key.Port, Equals, 22987)
 }
@@ -189,4 +191,12 @@ func (s *TestSuite) TestMoveBelowAndBackComplex(c *C) {
 	c.Assert(inst.InstancesAreBrothers(slave1, slave2), Equals, true)
 	c.Assert(value1, Equals, randValue)
 	c.Assert(value2, Equals, randValue)	
+}
+
+
+func (s *TestSuite) TestFailMoveBelow(c *C) {	
+	_, _ = inst.ExecInstance(&slave2Key, `set global binlog_format:='ROW'`)
+	_, err := inst.MoveBelow(&slave1Key, &slave2Key)
+	_, _ = inst.ExecInstance(&slave2Key, `set global binlog_format:='STATEMENT'`)
+	c.Assert(err, Not(IsNil))
 }
