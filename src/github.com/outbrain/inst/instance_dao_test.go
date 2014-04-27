@@ -101,16 +101,16 @@ func (s *TestSuite) TestGetMasterOfASlave(c *C) {
 	c.Assert(master.Key.Port, Equals, 22987)
 }
 
-func (s *TestSuite) TestSlavesAreBrothers(c *C) {
+func (s *TestSuite) TestSlavesAreSiblings(c *C) {
 	i0, _ := inst.ReadTopologyInstance(&slave1Key)
 	i1, _ := inst.ReadTopologyInstance(&slave2Key)
-	c.Assert(inst.InstancesAreBrothers(i0, i1), Equals, true)
+	c.Assert(inst.InstancesAreSiblings(i0, i1), Equals, true)
 }
 
-func (s *TestSuite) TestNonBrothers(c *C) {
+func (s *TestSuite) TestNonSiblings(c *C) {
 	i0, _ := inst.ReadTopologyInstance(&masterKey)
 	i1, _ := inst.ReadTopologyInstance(&slave1Key)
-	c.Assert(inst.InstancesAreBrothers(i0, i1), Not(Equals), true)
+	c.Assert(inst.InstancesAreSiblings(i0, i1), Not(Equals), true)
 }
 
 
@@ -149,7 +149,7 @@ func (s *TestSuite) TestMoveBelowAndBack(c *C) {
 	slave1, _ = inst.MoveUp(&slave1Key)
 	slave2, _ := inst.ReadTopologyInstance(&slave2Key)
 	
-	c.Assert(inst.InstancesAreBrothers(slave1, slave2), Equals, true)
+	c.Assert(inst.InstancesAreSiblings(slave1, slave2), Equals, true)
 	c.Assert(slave1.SlaveRunning(), Equals, true)
 	
 }
@@ -188,7 +188,7 @@ func (s *TestSuite) TestMoveBelowAndBackComplex(c *C) {
 	inst.ScanInstanceRow(&slave1Key, `select value from orchestrator_test.test_table where name='TestMoveBelowAndBackComplex'`, &value1)
 	inst.ScanInstanceRow(&slave2Key, `select value from orchestrator_test.test_table where name='TestMoveBelowAndBackComplex'`, &value2)
 	
-	c.Assert(inst.InstancesAreBrothers(slave1, slave2), Equals, true)
+	c.Assert(inst.InstancesAreSiblings(slave1, slave2), Equals, true)
 	c.Assert(value1, Equals, randValue)
 	c.Assert(value2, Equals, randValue)	
 }

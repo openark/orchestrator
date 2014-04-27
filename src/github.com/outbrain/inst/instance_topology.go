@@ -34,8 +34,8 @@ func GetInstanceMaster(instance *Instance) (*Instance, error) {
 }
 
 
-// InstancesAreBrothers checks whether both instances are replicating from same master
-func InstancesAreBrothers(instance0, instance1 *Instance) bool {
+// InstancesAreSiblings checks whether both instances are replicating from same master
+func InstancesAreSiblings(instance0, instance1 *Instance) bool {
 	if !instance0.IsSlave() {
 		return false
 	}
@@ -69,64 +69,68 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	log.Println(fmt.Sprintf("Will move %+v up the topology", instanceKey)) 
 
 	master, err = StopSlave(&master.Key)
-	if	err	!=	nil	{log.Println(err); return instance, err} 
+	if	err	!=	nil	{goto Cleanup} 
 	
 	instance, err = StopSlave(instanceKey)
-	if	err	!=	nil	{log.Println(err); return instance, err} 
+	if	err	!=	nil	{goto Cleanup} 
 	
 	instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &master.SelfBinlogCoordinates)
-	if	err	!=	nil	{log.Println(err); return instance, err} 
+	if	err	!=	nil	{goto Cleanup} 
 	
 	instance, err = ChangeMasterTo(instanceKey, master.GetMasterInstanceKey(), &master.ExecBinlogCoordinates)
-	if	err	!=	nil	{log.Println(err); return instance, err} 
+	if	err	!=	nil	{goto Cleanup} 
 	
 	instance, err = StartSlave(instanceKey)
-	if	err	!=	nil	{log.Println(err); return instance, err} 
+	if	err	!=	nil	{goto Cleanup} 
 	
 	master, err = StartSlave(&master.Key)
-	if	err	!=	nil	{log.Println(err); return instance, err} 
-
+	if	err	!=	nil	{goto Cleanup} 
+	
+	Cleanup:
+	instance, _ = StartSlave(instanceKey)
+	master, _ = StartSlave(&master.Key)
+	if	err	!=	nil	{log.Println(err)} 
+	 
 	return instance, err
 }
 
 
-func MoveBelow(instanceKey, brotherKey *InstanceKey) (*Instance, error) {
+func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
-	brother, err := ReadTopologyInstance(brotherKey)
-	if !InstancesAreBrothers(instance, brother) {
-		return instance, errors.New(fmt.Sprintf("instances are not siblings: %+v, %+v", instanceKey, brotherKey))
+	sibling, err := ReadTopologyInstance(siblingKey)
+	if !InstancesAreSiblings(instance, sibling) {
+		return instance, errors.New(fmt.Sprintf("instances are not siblings: %+v, %+v", instanceKey, siblingKey))
 	}
 	
-	if canReplicate, err := instance.CanReplicateFrom(brother); !canReplicate {
+	if canReplicate, err := instance.CanReplicateFrom(sibling); !canReplicate {
 		return instance, err
 	}
-	log.Println(fmt.Sprintf("Will move %+v below its sibling %+v", instanceKey, brotherKey)) 
+	log.Println(fmt.Sprintf("Will move %+v below its sibling %+v", instanceKey, siblingKey)) 
 
 	instance, err = StopSlave(instanceKey)
-	if	err	!=	nil	{log.Println(err); return instance, err} 
+	if	err	!=	nil	{goto Cleanup} 
 	
-	brother, err = StopSlave(brotherKey)
-	if	err	!=	nil	{log.Println(err); return instance, err} 
+	sibling, err = StopSlave(siblingKey)
+	if	err	!=	nil	{goto Cleanup} 
 	
-	if instance.ExecBinlogCoordinates.SmallerThan(&brother.ExecBinlogCoordinates) {
-		instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &brother.ExecBinlogCoordinates)
-		if	err	!=	nil	{log.Println(err); return instance, err} 
-	} else if brother.ExecBinlogCoordinates.SmallerThan(&instance.ExecBinlogCoordinates) {
-		brother, err = StartSlaveUntilMasterCoordinates(brotherKey, &instance.ExecBinlogCoordinates)
-		if	err	!=	nil	{log.Println(err); return instance, err} 
+	if instance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
+		instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &sibling.ExecBinlogCoordinates)
+		if	err	!=	nil	{goto Cleanup} 
+	} else if sibling.ExecBinlogCoordinates.SmallerThan(&instance.ExecBinlogCoordinates) {
+		sibling, err = StartSlaveUntilMasterCoordinates(siblingKey, &instance.ExecBinlogCoordinates)
+		if	err	!=	nil	{goto Cleanup} 
 	}  
 	// At this point both siblings have executed exact same statements and are identical
 	 
-	instance, err = ChangeMasterTo(instanceKey, &brother.Key, &brother.SelfBinlogCoordinates)
-	if	err	!=	nil	{log.Println(err); return instance, err} 
+	instance, err = ChangeMasterTo(instanceKey, &sibling.Key, &sibling.SelfBinlogCoordinates)
+	if	err	!=	nil	{goto Cleanup} 
 	
 	
-	instance, err = StartSlave(instanceKey)
-	if	err	!=	nil	{log.Println(err); return instance, err} 
-	
-	brother, err = StartSlave(brotherKey)
-	if	err	!=	nil	{log.Println(err); return instance, err} 
-
+	Cleanup:
+	instance, _ = StartSlave(instanceKey)
+	sibling, _ = StartSlave(siblingKey)
+	if	err	!=	nil	{log.Println(err)} 
+	 
 	return instance, err
 }
 
