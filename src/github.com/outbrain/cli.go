@@ -5,6 +5,7 @@ import (
 	"log"
 	"github.com/outbrain/config"
 	"github.com/outbrain/inst"
+	"github.com/outbrain/orch"
 )
 
 func main() {
@@ -41,6 +42,10 @@ func main() {
 			if siblingKey == nil {log.Fatal("Cannot deduce sibling:", *sibling)}
 			_, err := inst.MoveBelow(instanceKey, siblingKey)
 			if err != nil {log.Println(err)}
+		}
+		case "discover": {
+			if instanceKey == nil {log.Fatal("Cannot deduce instance:", *instance)}
+			orchestrator.StartDiscovery(*instanceKey)
 		}
 		default: log.Fatal("Unknown command:", *command) 
 	}

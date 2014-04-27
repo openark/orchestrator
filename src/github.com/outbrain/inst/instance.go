@@ -25,8 +25,17 @@ type InstanceKey struct {
 	Port	 			int
 }
 
+func (this *InstanceKey) Formalize() *InstanceKey {
+	this.Hostname, _ = GetCNAME(this.Hostname) 
+	return this
+}
+
 func (this *InstanceKey) Equals(other *InstanceKey) bool {
 	return this.Hostname == other.Hostname && this.Port == other.Port
+}
+
+func (this *InstanceKey) IsValid() bool {
+	return len(this.Hostname) > 0 && this.Port > 0
 }
 
 
@@ -69,6 +78,7 @@ func (this *BinlogCoordinates) SmallerThan(other *BinlogCoordinates) bool {
 
 type Instance struct {
 	Key					InstanceKey
+	IsLastSeenValid		bool
 	ServerID			uint
 	Version				string
 	Binlog_format		string
@@ -83,6 +93,8 @@ type Instance struct {
 	ExecBinlogCoordinates	BinlogCoordinates
 	SecondsBehindMaster	int
 	SlaveHosts			map[InstanceKey]bool
+	
+	IsUpToDate			bool
 }
 
 func NewInstance() *Instance {
@@ -133,10 +145,10 @@ func (this *Instance) GetMasterInstanceKey() *InstanceKey {
 	return &InstanceKey{Hostname: this.Master_Host, Port: this.Master_Port}
 }
 
-func (this *Instance) GetSlaveInstanceKeys() [](*InstanceKey) {
-	res := [](*InstanceKey){}
+func (this *Instance) GetSlaveInstanceKeys() []InstanceKey {
+	res := []InstanceKey{}
 	for key, _ := range this.SlaveHosts {
-    	res = append(res, &key)
+    	res = append(res, key)
 	}
 	return res
 }

@@ -7,5 +7,7 @@
 	"MySQLOrchestratorDatabase": "orchestrator",
 	"MySQLOrchestratorUser": "msandbox",
 	"MySQLOrchestratorPassword": "msandbox",
-	"SlaveLagQuery": ""
+	"SlaveLagQuery": "",
+	"DiscoverByShowSlaveHosts": true,
+	"InstanceUpToDateSeconds": 60
 }

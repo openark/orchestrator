@@ -8,7 +8,7 @@ import (
 
 
 func RefreshInstance(instance *Instance) (*Instance, error) {
-	instance, err := ReadInstance(&instance.Key)
+	instance, _, err := ReadInstance(&instance.Key)
 	if err != nil {
 		log.Println(err)
 	}

@@ -31,45 +31,60 @@ func ScanInstanceRow(instanceKey *InstanceKey, query string, dest ...interface{}
 }
 
 func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
+	instance := NewInstance()
+    foundBySlaveHosts := false
+
 	db,	err	:=	sqlutils.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 
-	instance := NewInstance()
-	if	err	!=	nil	{
-		log.Println(err)
-	} else {
-        err = db.QueryRow("select @@global.server_id, @@global.version, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
-        	&instance.ServerID, &instance.Version, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
-        if err != nil && err != sql.ErrNoRows {
-        	log.Println(err)
-        	return instance, err
-        }
-        err = sqlutils.QueryRowsMap(db, "show slave status", func(m map[string]string) {
-   			instance.Slave_IO_Running = (m["Slave_IO_Running"] == "Yes")
-        	instance.Slave_SQL_Running = (m["Slave_SQL_Running"] == "Yes")
-        	instance.ReadBinlogCoordinates.LogFile = m["Master_Log_File"]
-        	instance.ReadBinlogCoordinates.LogPos, _ = strconv.ParseInt(m["Read_Master_Log_Pos"], 10, 0)
-        	instance.ExecBinlogCoordinates.LogFile = m["Relay_Master_Log_File"]
-        	instance.ExecBinlogCoordinates.LogPos, _ = strconv.ParseInt(m["Exec_Master_Log_Pos"], 10, 0)
-        	instance.Master_Host, _ = GetCNAME(m["Master_Host"])
-        	instance.Master_Port, _ = strconv.Atoi(m["Master_Port"])
-        	if config.Config.SlaveLagQuery == "" {
-	        	instance.SecondsBehindMaster, _ = strconv.Atoi(m["Seconds_Behind_Master"])
-	        }
-       	})
-       	instance.Key = *instanceKey
-        if	err	!=	nil	{log.Println(err); return instance, err}
+    if err != nil {goto Cleanup}
 
-		if config.Config.SlaveLagQuery != "" {
-			err = db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.Version, &instance.SecondsBehindMaster)
-	        if	err	!=	nil	{log.Println(err); return instance, err}
+   	instance.Key = *instanceKey
+    err = db.QueryRow("select @@global.server_id, @@global.version, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
+       	&instance.ServerID, &instance.Version, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
+    if err != nil {goto Cleanup}
+    err = sqlutils.QueryRowsMap(db, "show slave status", func(m map[string]string) {
+		instance.Slave_IO_Running = (m["Slave_IO_Running"] == "Yes")
+      	instance.Slave_SQL_Running = (m["Slave_SQL_Running"] == "Yes")
+       	instance.ReadBinlogCoordinates.LogFile = m["Master_Log_File"]
+       	instance.ReadBinlogCoordinates.LogPos, _ = strconv.ParseInt(m["Read_Master_Log_Pos"], 10, 0)
+       	instance.ExecBinlogCoordinates.LogFile = m["Relay_Master_Log_File"]
+       	instance.ExecBinlogCoordinates.LogPos, _ = strconv.ParseInt(m["Exec_Master_Log_Pos"], 10, 0)
+       	instance.Master_Host, _ = GetCNAME(m["Master_Host"])
+       	instance.Master_Port, _ = strconv.Atoi(m["Master_Port"])
+       	if config.Config.SlaveLagQuery == "" {
+        	instance.SecondsBehindMaster, _ = strconv.Atoi(m["Seconds_Behind_Master"])
         }
+   	})
+    if err != nil {goto Cleanup}
+
+	if config.Config.SlaveLagQuery != "" {
+		err = db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.Version, &instance.SecondsBehindMaster)
+	    if err != nil {goto Cleanup}
+	}
         
-        err = sqlutils.QueryRowsMap(db, "show master status", func(m map[string]string) {
-        	instance.SelfBinlogCoordinates.LogFile = m["File"]
-        	instance.SelfBinlogCoordinates.LogPos, _ = strconv.ParseInt(m["Position"], 10, 0)
-       	})
-        if	err	!=	nil	{log.Println(err); return instance, err}
+    err = sqlutils.QueryRowsMap(db, "show master status", func(m map[string]string) {
+       	instance.SelfBinlogCoordinates.LogFile = m["File"]
+       	instance.SelfBinlogCoordinates.LogPos, _ = strconv.ParseInt(m["Position"], 10, 0)
+   	})
+    if err != nil {goto Cleanup}
         
+    // Get slaves, either by SHOW SLAVE HOSTS or via PROCESSLIST
+    if config.Config.DiscoverByShowSlaveHosts {
+        err = sqlutils.QueryRowsMap(db, `show slave hosts`, 
+        		func(m map[string]string) {
+        			cname, err := GetCNAME(m["Host"])
+        			port, err := strconv.Atoi(m["Port"])
+        			if err == nil {
+	        			slaveKey := InstanceKey{Hostname: cname, Port: port}
+						instance.AddSlaveKey(&slaveKey)
+						foundBySlaveHosts = true
+					}
+		       	})
+		
+        if err != nil {goto Cleanup}
+    } 
+    if !foundBySlaveHosts {
+       	// Discover by processlist
         err = sqlutils.QueryRowsMap(db, `
         	select 
         		substring_index(host, ':', 1) as slave_hostname 
@@ -82,17 +97,21 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
         			slaveKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
 					instance.AddSlaveKey(&slaveKey)
 		       	})
-		
-        if	err	!=	nil	{log.Println(err); return instance, err}
-        
-        err = WriteInstance(instance, err)
-        if	err	!=	nil	{log.Println(err); return instance, err}
+			
+        if err != nil {goto Cleanup}
 	}
+		        
+    if err != nil {goto Cleanup}
 
+	Cleanup:
+	_ = WriteInstance(instance, err)
+	if err	!=	nil	{
+		log.Println(err)
+	}
 	return instance, err
 }
 
-func ReadInstance(instanceKey *InstanceKey) (*Instance, error) {
+func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 	db,	err	:=	sqlutils.OpenOrchestrator()
 
 	instance := NewInstance()
@@ -119,10 +138,12 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, error) {
 				relay_master_log_file,
 				exec_master_log_pos,
 				seconds_behind_master,
-				slave_hosts
+				slave_hosts,
+				timestampdiff(second, last_seen, now()) <= ? as is_up_to_date,
+				is_last_seen_valid
 			 from database_instance 
 			 	where hostname=? and port=?`, 
-			 instanceKey.Hostname, instanceKey.Port).Scan(
+			 config.Config.InstanceUpToDateSeconds, instanceKey.Hostname, instanceKey.Port).Scan(
 			 	&instance.ServerID,
 			 	&instance.Version,
 			 	&instance.Binlog_format,
@@ -140,11 +161,15 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, error) {
 			 	&instance.ExecBinlogCoordinates.LogPos,
 			 	&instance.SecondsBehindMaster,
 			 	&slaveHostsJson,
+			 	&instance.IsUpToDate,
+			 	&instance.IsLastSeenValid,
 			 	)
-        if	err	!=	nil	{log.Println(err); return instance, err}
+		if err == sql.ErrNoRows {log.Println(err); return instance, false, err}	
+		
+        if	err	!=	nil	{log.Println(err); return instance, true, err}
         instance.ReadSlaveHostsFromJson(slaveHostsJson)
 	}
-	return instance, err
+	return instance, true, err
 }
 
 func WriteInstance(instance *Instance, lastError error) error {
@@ -198,7 +223,7 @@ func WriteInstance(instance *Instance, lastError error) error {
 	
 	if lastError == nil {
 		sqlutils.Exec(db, `
-        	update database_instance set last_seen = NOW() where hostname=? and port=?
+        	update database_instance set last_seen = NOW(), is_last_seen_valid = 1 where hostname=? and port=?
         	`, instance.Key.Hostname, instance.Key.Port,
         )
 	}

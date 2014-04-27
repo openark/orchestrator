@@ -17,6 +17,8 @@ type Configuration struct {
 	MySQLOrchestratorUser		string
 	MySQLOrchestratorPassword	string
 	SlaveLagQuery				string
+	DiscoverByShowSlaveHosts	bool
+	InstanceUpToDateSeconds		uint
 }	
 
 var Config *Configuration = &Configuration{}
