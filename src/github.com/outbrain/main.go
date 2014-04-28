@@ -2,15 +2,17 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"github.com/outbrain/log"
 	"github.com/outbrain/inst"
 	"github.com/outbrain/config"
 )
 
 func main() {
 	config.Read("/etc/orchestrator.conf.json", "conf/orchestrator.conf.json", "orchestrator.conf.json")
-	i := &instance.Instance{}
-	log.Println("I'm running");
-	fmt.Println("I'm running...", i);
-	fmt.Println("config: ", config.Config);
+	i := &inst.Instance{}
+	log.Debug("I'm running");
+	log.Debug("I'm running...", *i);
+	log.Debug("config: ", config.Config);
+	
+	fmt.Println(fmt.Sprintf("the filesi: %s", "/tmp/f.txt"))
 }

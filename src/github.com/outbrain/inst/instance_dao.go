@@ -3,12 +3,12 @@ package inst
 import (
 	"fmt"
 	"errors"
-	"log"
 	"time"
 	"strconv"
 	"database/sql"
 	"github.com/outbrain/sqlutils"
 	"github.com/outbrain/config"
+	"github.com/outbrain/log"
 )
 
 func ExecInstance(instanceKey *InstanceKey, query string, args ...interface{}) (sql.Result, error) {
@@ -106,7 +106,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	Cleanup:
 	_ = WriteInstance(instance, err)
 	if err	!=	nil	{
-		log.Println(err)
+		log.Errore(err)
 	}
 	return instance, err
 }
@@ -117,7 +117,7 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 	instance := NewInstance()
 	instance.Key = *instanceKey
 	if	err	!=	nil	{
-		log.Println(err)
+		log.Errore(err)
 	} else {
 		var slaveHostsJson string
         err = db.QueryRow(`
@@ -164,9 +164,9 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 			 	&instance.IsUpToDate,
 			 	&instance.IsLastSeenValid,
 			 	)
-		if err == sql.ErrNoRows {log.Println("No entry for ", instanceKey); return instance, false, err}	
+		if err == sql.ErrNoRows {log.Info("No entry for ", instanceKey); return instance, false, err}	
 		
-        if	err	!=	nil	{log.Println("error on", instanceKey, err); return instance, true, err}
+        if	err	!=	nil	{log.Error("error on", instanceKey, err); return instance, true, err}
         instance.ReadSlaveHostsFromJson(slaveHostsJson)
 	}
 	return instance, true, err
@@ -174,7 +174,7 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 
 func WriteInstance(instance *Instance, lastError error) error {
 	db,	err	:=	sqlutils.OpenOrchestrator()
-	if	err	!=	nil	{log.Println(err); return err}
+	if err != nil {return log.Errore(err)}
 	
 	_, err = sqlutils.Exec(db, `
         	replace into database_instance (
@@ -219,7 +219,7 @@ func WriteInstance(instance *Instance, lastError error) error {
 		 	instance.SecondsBehindMaster,
 		 	instance.GetSlaveHostsAsJson(),
 		 	)
-	if	err	!=	nil	{log.Println(err); return err}
+	if err != nil {return log.Errore(err)}
 	
 	if lastError == nil {
 		sqlutils.Exec(db, `
@@ -233,7 +233,7 @@ func WriteInstance(instance *Instance, lastError error) error {
 
 func StopSlaveNicely(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
-	if	err	!=	nil	{log.Println(err); return instance, err}
+	if err != nil {return instance, log.Errore(err)}
 	
 	if !instance.IsSlave() {
 		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
@@ -243,7 +243,7 @@ func StopSlaveNicely(instanceKey *InstanceKey) (*Instance, error) {
 	
 	for up_to_date := false; !up_to_date; {
 		instance, err = ReadTopologyInstance(instanceKey)
-		if	err	!=	nil	{log.Println(err); return instance, err}
+		if err != nil {return instance, log.Errore(err)}
 		
 		if instance.SQLThreadUpToDate() {
 			up_to_date = true
@@ -252,7 +252,7 @@ func StopSlaveNicely(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 	_, err = ExecInstance(instanceKey, `stop slave`)
-	if	err	!=	nil	{log.Println(err); return instance, err}
+	if err != nil {return instance, log.Errore(err)}
 	
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
@@ -261,31 +261,31 @@ func StopSlaveNicely(instanceKey *InstanceKey) (*Instance, error) {
 
 func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
-	if	err	!=	nil	{log.Println(err); return instance, err}
+	if err != nil {return instance, log.Errore(err)}
 	
 	if !instance.IsSlave() {
 		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
 	}
 	_, err = ExecInstance(instanceKey, `stop slave`)
-	if	err	!=	nil	{log.Println(err); return instance, err}
+	if err != nil {return instance, log.Errore(err)}
 	instance, err = ReadTopologyInstance(instanceKey)
 
-	log.Println(fmt.Sprintf("Stopped slave on %+v, Self:%+v, Exec:%+v", instanceKey, instance.SelfBinlogCoordinates, instance.ExecBinlogCoordinates)) 
+	log.Infof("Stopped slave on %+v, Self:%+v, Exec:%+v", *instanceKey, instance.SelfBinlogCoordinates, instance.ExecBinlogCoordinates) 
 	return instance, err
 }
 
 
 func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
-	if	err	!=	nil	{log.Println(err); return instance, err}
+	if err != nil {return instance, log.Errore(err)}
 	
 	if !instance.IsSlave() {
 		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
 	}
 	
 	_, err = ExecInstance(instanceKey, `start slave`)
-	if	err	!=	nil	{log.Println(err); return instance, err}
-	log.Println(fmt.Sprintf("Started slave on %+v", instanceKey)) 
+	if err != nil {return instance, log.Errore(err)}
+	log.Infof("Started slave on %+v", instanceKey) 
 	
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
@@ -294,7 +294,7 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 
 func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinates *BinlogCoordinates) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
-	if	err	!=	nil	{log.Println(err); return instance, err}
+	if err != nil {return instance, log.Errore(err)}
 	
 	if !instance.IsSlave() {
 		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
@@ -303,16 +303,16 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 		return instance, errors.New(fmt.Sprintf("slave already running: %+v", instanceKey))
 	}
 
-	log.Println(fmt.Sprintf("Will start slave on %+v until coordinates: %+v", instanceKey, masterCoordinates)) 
+	log.Infof("Will start slave on %+v until coordinates: %+v", instanceKey, masterCoordinates) 
 
 	_, err = ExecInstance(instanceKey, fmt.Sprintf("start slave until master_log_file='%s', master_log_pos=%d", 
 		masterCoordinates.LogFile, masterCoordinates.LogPos))
-	if	err	!=	nil	{log.Println(err); return instance, err}
+	if err != nil {return instance, log.Errore(err)}
 	
 		
 	for up_to_date := false; !up_to_date; {
 		instance, err = ReadTopologyInstance(instanceKey)
-		if	err	!=	nil	{log.Println(err); return instance, err}
+		if err != nil {return instance, log.Errore(err)}
 		
 		switch {
 			case instance.ExecBinlogCoordinates.SmallerThan(masterCoordinates): time.Sleep(200 * time.Millisecond)
@@ -322,7 +322,7 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 	}
 		
 	instance, err = StopSlave(instanceKey)
-	if	err	!=	nil	{log.Println(err); return instance, err} 
+	if err != nil {return instance, log.Errore(err)} 
 	
 	return instance, err
 }
@@ -330,7 +330,7 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 
 func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinlogCoordinates *BinlogCoordinates) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
-	if	err	!=	nil	{log.Println(err); return instance, err}
+	if err != nil {return instance, log.Errore(err)}
 	
 	if instance.SlaveRunning() {
 		return instance, errors.New(fmt.Sprintf("Cannot change master on: %+v because slave is running", instanceKey))
@@ -338,8 +338,8 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	
 	_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d", 
 		masterKey.Hostname, masterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
-	if	err	!=	nil	{log.Println(err); return instance, err}
-	log.Println(fmt.Sprintf("Changed master on %+v to: %+v, %+v", instanceKey, masterKey, masterBinlogCoordinates)) 
+	if err != nil {return instance, log.Errore(err)}
+	log.Infof("Changed master on %+v to: %+v, %+v", instanceKey, masterKey, masterBinlogCoordinates) 
 	
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
@@ -348,12 +348,12 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 
 func MasterPosWait(instanceKey *InstanceKey, binlogCoordinates *BinlogCoordinates) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
-	if	err	!=	nil	{log.Println(err); return instance, err}
+	if err != nil {return instance, log.Errore(err)}
 	
 	_, err = ExecInstance(instanceKey, fmt.Sprintf("select master_pos_wait('%s', %d)", 
 		binlogCoordinates.LogFile, binlogCoordinates.LogPos))
-	if	err	!=	nil	{log.Println(err); return instance, err}
-	log.Println(fmt.Sprintf("Instance %+v has reached coordinates: %+v", instanceKey, binlogCoordinates)) 
+	if err != nil {return instance, log.Errore(err)}
+	log.Infof("Instance %+v has reached coordinates: %+v", instanceKey, binlogCoordinates) 
 	
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err

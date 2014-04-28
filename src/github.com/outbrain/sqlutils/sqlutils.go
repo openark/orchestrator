@@ -2,10 +2,10 @@ package sqlutils
 
 import (
 	"fmt"
-	"log"
 	_ "github.com/go-sql-driver/mysql"
 	"database/sql"
 	"github.com/outbrain/config"
+	"github.com/outbrain/log"	
 )
 
 var knownDBs map[string]*sql.DB = make(map[string]*sql.DB)
@@ -15,6 +15,7 @@ func getDB(mysql_uri string) (*sql.DB, error) {
 	if _, exists := knownDBs[mysql_uri]; !exists {
 	    if db, err := sql.Open("mysql", mysql_uri); err == nil {
 	    	knownDBs[mysql_uri] = db
+			log.Info("sqlutils.getDB", mysql_uri)
 	    } else {
 	    	return db, err
 	    }	    	    
@@ -25,14 +26,12 @@ func getDB(mysql_uri string) (*sql.DB, error) {
 
 func OpenTopology(host string, port int) (*sql.DB, error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/", config.Config.MySQLTopologyUser, config.Config.MySQLTopologyPassword, host, port)
-	//log.Println("sqlutils.Open", mysql_uri)
 	return getDB(mysql_uri)
 }
 
 func OpenOrchestrator() (*sql.DB, error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", config.Config.MySQLOrchestratorUser, config.Config.MySQLOrchestratorPassword, 
 		config.Config.MySQLOrchestratorHost, config.Config.MySQLOrchestratorPort, config.Config.MySQLOrchestratorDatabase)
-	//log.Println("sqlutils.Open", mysql_uri)
 	return getDB(mysql_uri)
 }
 
@@ -70,8 +69,7 @@ func QueryRowsMap(db *sql.DB, query string,  on_row func(map[string]string)) err
 	rows, err := db.Query(query)
 	defer rows.Close()
 	if err != nil && err != sql.ErrNoRows {
-		log.Println(err)
-		return err
+		return log.Errore(err)
 	} 	
 	ScanRowsToMaps(rows, on_row)
 	return nil
@@ -87,7 +85,7 @@ func Exec(db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
 	var res sql.Result
 	res, err = stmt.Exec(args...)
 	if err != nil {
-		log.Println(err)
+		log.Errore(err)
 	}
 	return res, err
 }

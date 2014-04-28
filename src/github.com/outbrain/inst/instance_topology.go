@@ -2,25 +2,25 @@ package inst
 
 import (
 	"fmt"
-	"log"
 	"errors"
+	"github.com/outbrain/log"
 )
 
 
 func RefreshInstance(instance *Instance) (*Instance, error) {
 	instance, _, err := ReadInstance(&instance.Key)
 	if err != nil {
-		log.Println(err)
+		log.Errore(err)		
 	}
 	return instance, err
 }
 
 func RefreshTopologyInstance(instanceKey *InstanceKey) error {
 	instance, err := ReadTopologyInstance(instanceKey)
-	if err != nil {	log.Println(err); return err}
+	if err != nil {	return log.Errore(err)}
 	
 	err = WriteInstance(instance, err)
-	if err != nil {	log.Println(err); return err}
+	if err != nil {	return log.Errore(err)}
 
 	return err
 }
@@ -56,7 +56,7 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
 	}
 	master, err := GetInstanceMaster(instance)
-	if	err	!=	nil	{log.Println(err); return instance, err} 
+	if err != nil {	return instance, log.Errore(err)}
 	
 	if !master.IsSlave() {
 		return instance, errors.New(fmt.Sprintf("master is not a slave itself: %+v", master.Key))
@@ -66,7 +66,7 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, err
 	}
 	
-	log.Println(fmt.Sprintf("Will move %+v up the topology", instanceKey)) 
+	log.Infof("Will move %+v up the topology", *instanceKey) 
 
 	master, err = StopSlave(&master.Key)
 	if	err	!=	nil	{goto Cleanup} 
@@ -89,7 +89,7 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	Cleanup:
 	instance, _ = StartSlave(instanceKey)
 	master, _ = StartSlave(&master.Key)
-	if	err	!=	nil	{log.Println(err)} 
+	if err != nil {	return instance, log.Errore(err)}
 	 
 	return instance, err
 }
@@ -105,7 +105,7 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	if canReplicate, err := instance.CanReplicateFrom(sibling); !canReplicate {
 		return instance, err
 	}
-	log.Println(fmt.Sprintf("Will move %+v below its sibling %+v", instanceKey, siblingKey)) 
+	log.Infof("Will move %+v below its sibling %+v", instanceKey, siblingKey) 
 
 	instance, err = StopSlave(instanceKey)
 	if	err	!=	nil	{goto Cleanup} 
@@ -129,7 +129,7 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	Cleanup:
 	instance, _ = StartSlave(instanceKey)
 	sibling, _ = StartSlave(siblingKey)
-	if	err	!=	nil	{log.Println(err)} 
+	if err != nil {	return instance, log.Errore(err)}
 	 
 	return instance, err
 }

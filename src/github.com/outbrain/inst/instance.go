@@ -5,9 +5,9 @@ import (
 	"strings"
 	"net"
 	"fmt"
-	"log"
 	"errors"
 	"encoding/json"
+	"github.com/outbrain/log"
 )
 
 
@@ -164,7 +164,7 @@ func (this *Instance) GetSlaveHostsAsJson() string {
 func (this *Instance) ReadSlaveHostsFromJson(jsonString string) error {
 	var keys []InstanceKey;
 	err := json.Unmarshal([]byte(jsonString), &keys)
-	if err != nil {log.Println(err); return err}
+	if err != nil {return log.Errore(err)}
 	
 	this.SlaveHosts = make(map[InstanceKey]bool)
 	for _, key := range keys {
