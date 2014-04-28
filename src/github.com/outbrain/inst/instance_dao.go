@@ -139,7 +139,7 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 				exec_master_log_pos,
 				seconds_behind_master,
 				slave_hosts,
-				timestampdiff(second, last_seen, now()) <= ? as is_up_to_date,
+				ifnull(timestampdiff(second, last_seen, now()) <= ?, false) as is_up_to_date,
 				is_last_seen_valid
 			 from database_instance 
 			 	where hostname=? and port=?`, 
@@ -164,9 +164,9 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 			 	&instance.IsUpToDate,
 			 	&instance.IsLastSeenValid,
 			 	)
-		if err == sql.ErrNoRows {log.Println(err); return instance, false, err}	
+		if err == sql.ErrNoRows {log.Println("No entry for ", instanceKey); return instance, false, err}	
 		
-        if	err	!=	nil	{log.Println(err); return instance, true, err}
+        if	err	!=	nil	{log.Println("error on", instanceKey, err); return instance, true, err}
         instance.ReadSlaveHostsFromJson(slaveHostsJson)
 	}
 	return instance, true, err
