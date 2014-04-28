@@ -192,11 +192,13 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	if this.IsSmallerMajorVersion(other) {
 		return false, errors.New(fmt.Sprintf("instance %+v has version %s, which is lower than %s on %+v ", this.Key, this.Version, other.Version, other.Key)) 
 	}
-	if this.Binlog_format == "STATEMENT" && (other.Binlog_format == "ROW" || other.Binlog_format == "MIXED") {
-		return false, errors.New(fmt.Sprintf("Cannot replicate from ROW/MIXED binlog format on %+v to STATEMENT on %+v", other.Key, this.Key)) 
-	}
-	if this.Binlog_format == "MIXED" && other.Binlog_format == "ROW" {
-		return false, errors.New(fmt.Sprintf("Cannot replicate from ROW binlog format on %+v to MIXED on %+v", other.Key, this.Key)) 
+	if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
+		if this.Binlog_format == "STATEMENT" && (other.Binlog_format == "ROW" || other.Binlog_format == "MIXED") {
+			return false, errors.New(fmt.Sprintf("Cannot replicate from ROW/MIXED binlog format on %+v to STATEMENT on %+v", other.Key, this.Key))
+		} 
+		if this.Binlog_format == "MIXED" && other.Binlog_format == "ROW" {
+			return false, errors.New(fmt.Sprintf("Cannot replicate from ROW binlog format on %+v to MIXED on %+v", other.Key, this.Key)) 
+		}
 	}
 	if this.ServerID == other.ServerID {
 		return false, errors.New(fmt.Sprintf("Identical server id: %+v, %+v both have %d", other.Key, this.Key, this.ServerID)) 
