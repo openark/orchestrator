@@ -45,34 +45,44 @@ func RowToArray(rows *sql.Rows, columns []string) []string {
 	return data
 }
 
-func ScanRowsToArrays(rows *sql.Rows, on_row func([]string)) {
+func ScanRowsToArrays(rows *sql.Rows, on_row func([]string) error) error {
     columns, _ := rows.Columns()
     for rows.Next() {
     	arr := RowToArray(rows, columns)
-	    on_row(arr)
+	    
+	    err := on_row(arr)
+	    if err != nil {
+	    	return err
+	    }
     }
+    return nil
 }
 
-func ScanRowsToMaps(rows *sql.Rows, on_row func(map[string]string)) {
+func ScanRowsToMaps(rows *sql.Rows, on_row func(map[string]string) error) error {
 	columns, _ := rows.Columns()
-	ScanRowsToArrays(rows, func(arr []string) {
+	err := ScanRowsToArrays(rows, func(arr []string) error {
     	m := make(map[string]string)	 
 	    for k, data_col := range arr {
 	        m[columns[k]] = data_col
 	    }
-	    on_row(m)
+	    err := on_row(m)
+	    if err != nil {
+	    	return err
+	    }
+	    return nil
 	})
+	return err
 }
 
 
-func QueryRowsMap(db *sql.DB, query string,  on_row func(map[string]string)) error {
+func QueryRowsMap(db *sql.DB, query string, on_row func(map[string]string) error) error {
 	rows, err := db.Query(query)
 	defer rows.Close()
 	if err != nil && err != sql.ErrNoRows {
 		return log.Errore(err)
 	} 	
-	ScanRowsToMaps(rows, on_row)
-	return nil
+	err = ScanRowsToMaps(rows, on_row)
+	return err
 }
 
 

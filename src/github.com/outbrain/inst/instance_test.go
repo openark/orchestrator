@@ -64,3 +64,35 @@ func (s *TestSuite) TestBinlogCoordinates(c *C) {
 	c.Assert(c4.SmallerThan(&c2), Equals, false)
 	c.Assert(c4.SmallerThan(&c3), Equals, false)
 }
+
+
+func (s *TestSuite) TestCanReplicateFrom(c *C) {
+	i55 	:= inst.Instance {Version: "5.5"}
+	i56 	:= inst.Instance {Version: "5.6"}
+	
+	var canReplicate bool
+	canReplicate, _ = i56.CanReplicateFrom(&i55);
+	c.Assert(canReplicate, Equals, false); //binlog not yet enabled
+	
+	i55.LogBinEnabled = true;
+	i55.LogSlaveUpdatesEnabled = true;
+	i56.LogBinEnabled = true;
+	i56.LogSlaveUpdatesEnabled = true;
+
+	canReplicate, _ = i56.CanReplicateFrom(&i55);
+	c.Assert(canReplicate, Equals, false); //serverid not set
+	i55.ServerID = 55
+	i56.ServerID = 56
+
+	canReplicate, _ = i56.CanReplicateFrom(&i55);
+	c.Assert(canReplicate, Equals, true);
+	canReplicate, _ = i55.CanReplicateFrom(&i56);
+	c.Assert(canReplicate, Equals, false);
+
+	iStatement 	:= inst.Instance {Binlog_format: "STATEMENT", ServerID: 1, Version: "5.5", LogBinEnabled: true, LogSlaveUpdatesEnabled: true}
+	iRow 	:= inst.Instance {Binlog_format: "ROW", ServerID: 2, Version: "5.5", LogBinEnabled: true, LogSlaveUpdatesEnabled: true}
+	canReplicate, _ = iRow.CanReplicateFrom(&iStatement);
+	c.Assert(canReplicate, Equals, true);
+	canReplicate, _ = iStatement.CanReplicateFrom(&iRow);
+	c.Assert(canReplicate, Equals, false);
+}

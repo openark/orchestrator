@@ -56,7 +56,7 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
 	}
 	master, err := GetInstanceMaster(instance)
-	if err != nil {	return instance, log.Errore(err)}
+	if err != nil {	return instance, log.Errorf("Cannot GetInstanceMaster() for %+v. error=%+v", instance, err)}
 	
 	if !master.IsSlave() {
 		return instance, errors.New(fmt.Sprintf("master is not a slave itself: %+v", master.Key))
@@ -78,12 +78,6 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	if	err	!=	nil	{goto Cleanup} 
 	
 	instance, err = ChangeMasterTo(instanceKey, master.GetMasterInstanceKey(), &master.ExecBinlogCoordinates)
-	if	err	!=	nil	{goto Cleanup} 
-	
-	instance, err = StartSlave(instanceKey)
-	if	err	!=	nil	{goto Cleanup} 
-	
-	master, err = StartSlave(&master.Key)
 	if	err	!=	nil	{goto Cleanup} 
 	
 	Cleanup:

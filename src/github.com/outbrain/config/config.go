@@ -19,9 +19,19 @@ type Configuration struct {
 	SlaveLagQuery				string
 	DiscoverByShowSlaveHosts	bool
 	InstanceUpToDateSeconds		uint
+	DiscoveryPollSeconds		int
 }	
 
-var Config *Configuration = &Configuration{}
+var Config *Configuration = NewConfiguration()
+
+func NewConfiguration() *Configuration {
+	return &Configuration{
+		InstanceRefreshSeconds:		60,
+		InstanceUpToDateSeconds:	60,
+		DiscoverByShowSlaveHosts:	false,
+		DiscoveryPollSeconds:		5,
+	}
+}
 
 func read(file_name string) (*Configuration, error) {
 	file, err := os.Open(file_name)

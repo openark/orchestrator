@@ -12,14 +12,20 @@ import (
 
 func main() {
 	configFile := flag.String("config", "", "config file name")
-	verbose := flag.Bool("v", false, "verbose")
+
 	command := flag.String("c", "", "command (move-up|make-child-of)")
 	instance := flag.String("i", "", "instance, host:port")
 	sibling := flag.String("s", "", "sibling instance, host:port")
+	verbose := flag.Bool("verbose", false, "verbose")
+	debug := flag.Bool("debug", false, "debug mode (very verbose)")
 	flag.Parse();
 	
-	if !*verbose {
-		log.SetLevel(log.ERROR)
+	log.SetLevel(log.ERROR)
+	if *verbose {
+		log.SetLevel(log.INFO)
+	}
+	if *debug {
+		log.SetLevel(log.DEBUG)
 	}
 	
 	if len(flag.Args()) > 0 {
@@ -53,6 +59,9 @@ func main() {
 		case "discover": {
 			if instanceKey == nil {log.Fatal("Cannot deduce instance:", *instance)}
 			orchestrator.StartDiscovery(*instanceKey)
+		}
+		case "continuous": {
+			orchestrator.ContinuousDiscovery()
 		}
 		default: log.Fatal("Unknown command:", *command) 
 	}

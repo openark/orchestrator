@@ -2,8 +2,9 @@ package orchestrator
 
 import (
 	"fmt"
+	"time"
 	"github.com/outbrain/inst"
-	
+	"github.com/outbrain/config"
 	"github.com/outbrain/log"
 )
 
@@ -13,7 +14,7 @@ const (
 var discoveryInstanceKeys chan inst.InstanceKey = make(chan inst.InstanceKey, maxConcurrency)
 
 
-func runDiscovery(pendingTokens chan bool, completedTokens chan bool) {
+func handleDiscoveryRequests(pendingTokens chan bool, completedTokens chan bool) {
     for instanceKey := range discoveryInstanceKeys {
         AccountedDiscoverInstance(instanceKey, pendingTokens, completedTokens)
     }
@@ -48,7 +49,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	instance, err = inst.ReadTopologyInstance(&instanceKey)
 	if	err	!=	nil	{goto Cleanup}
 
-	fmt.Printf("key: %+v, master: %+v\n", instance.Key, *instance.GetMasterInstanceKey())
+	fmt.Printf("host: %+v, master: %+v\n", instance.Key, *instance.GetMasterInstanceKey())
 
 	// Investigate slaves:
 	for _, slaveKey := range instance.GetSlaveInstanceKeys() {
@@ -59,9 +60,6 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	
 	
 	Cleanup:
-	if	err	!=	nil	{
-		log.Errore(err)
-	}
 }
 
 
@@ -71,7 +69,7 @@ func StartDiscovery(instanceKey inst.InstanceKey) {
 	completedTokens := make(chan bool, 5)
 
 	AccountedDiscoverInstance(instanceKey, pendingTokens, completedTokens) 
-	go runDiscovery(pendingTokens, completedTokens)
+	go handleDiscoveryRequests(pendingTokens, completedTokens)
 	
 	// Block until all are complete
 	for {
@@ -80,6 +78,20 @@ func StartDiscovery(instanceKey inst.InstanceKey) {
 				<- completedTokens
 			default:
 				return
+		}
+	}
+}
+
+
+func ContinuousDiscovery() {
+	log.Infof("Starting continuous discovery")
+	go handleDiscoveryRequests(nil, nil)
+    tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
+    for _ = range tick {
+		instanceKeys, _ := inst.ReadOutdatedInstanceKeys()
+		log.Debugf("outdated keys: %+v", instanceKeys)
+		for _, instanceKey := range instanceKeys {
+			discoveryInstanceKeys <- instanceKey
 		}
 	}
 }
