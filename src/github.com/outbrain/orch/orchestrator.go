@@ -49,14 +49,14 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	instance, err = inst.ReadTopologyInstance(&instanceKey)
 	if	err	!=	nil	{goto Cleanup}
 
-	fmt.Printf("host: %+v, master: %+v\n", instance.Key, *instance.GetMasterInstanceKey())
+	fmt.Printf("host: %+v, master: %+v\n", instance.Key, instance.MasterKey)
 
 	// Investigate slaves:
-	for _, slaveKey := range instance.GetSlaveInstanceKeys() {
+	for _, slaveKey := range instance.SlaveHosts.GetInstanceKeys() {
 		discoveryInstanceKeys <- slaveKey
 	}
 	// Investigate master:
-	discoveryInstanceKeys <- *instance.GetMasterInstanceKey()
+	discoveryInstanceKeys <- instance.MasterKey
 	
 	
 	Cleanup:

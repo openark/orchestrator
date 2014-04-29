@@ -12,7 +12,6 @@ import (
 
 func main() {
 	configFile := flag.String("config", "", "config file name")
-
 	command := flag.String("c", "", "command (move-up|make-child-of)")
 	instance := flag.String("i", "", "instance, host:port")
 	sibling := flag.String("s", "", "sibling instance, host:port")

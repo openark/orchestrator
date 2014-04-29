@@ -62,7 +62,7 @@ func (s *TestSuite) TestReadTopologyMaster(c *C) {
 	c.Assert(i.Key.Hostname, Equals, key.Hostname)
 	c.Assert(i.IsSlave(), Equals, false)
 	c.Assert(len(i.SlaveHosts), Equals, 1)
-	c.Assert(len(i.GetSlaveInstanceKeys()), Equals, len(i.SlaveHosts))
+	c.Assert(len(i.SlaveHosts.GetInstanceKeys()), Equals, len(i.SlaveHosts))
 }
  
 func (s *TestSuite) TestReadTopologySlave(c *C) {
@@ -144,7 +144,7 @@ func (s *TestSuite) TestMoveBelowAndBack(c *C) {
 	// become child
 	slave1, _ := inst.MoveBelow(&slave1Key, &slave2Key)
 	
-	c.Assert(slave1.GetMasterInstanceKey().Equals(&slave2Key), Equals, true)
+	c.Assert(slave1.MasterKey.Equals(&slave2Key), Equals, true)
 	c.Assert(slave1.SlaveRunning(), Equals, true)
 	
 	// And back; keep topology intact
@@ -161,7 +161,7 @@ func (s *TestSuite) TestMoveBelowAndBackComplex(c *C) {
 	// become child
 	slave1, _ := inst.MoveBelow(&slave1Key, &slave2Key)
 	
-	c.Assert(slave1.GetMasterInstanceKey().Equals(&slave2Key), Equals, true)
+	c.Assert(slave1.MasterKey.Equals(&slave2Key), Equals, true)
 	c.Assert(slave1.SlaveRunning(), Equals, true)
 	
 	// Now let's have fun. Stop slave2 (which is now parent of slave1), execute queries on master,

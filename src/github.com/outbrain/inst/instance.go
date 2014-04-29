@@ -54,7 +54,7 @@ func ParseInstanceKey(hostPort string) *InstanceKey {
     }
 }
 
-
+//
 type BinlogCoordinates struct {
 	LogFile	string
 	LogPos	int64
@@ -76,6 +76,23 @@ func (this *BinlogCoordinates) SmallerThan(other *BinlogCoordinates) bool {
 	return false
 }
 
+//
+type InstanceKeyMap map[InstanceKey]bool
+
+
+func (this *InstanceKeyMap) GetInstanceKeys() []InstanceKey {
+	res := []InstanceKey{}
+	for key, _ := range *this {
+    	res = append(res, key)
+	}
+	return res
+}
+
+func (this *InstanceKeyMap) MarshalJSON() ([]byte, error) {
+	return json.Marshal(this.GetInstanceKeys())
+}
+
+
 type Instance struct {
 	Key					InstanceKey
 	IsLastSeenValid		bool
@@ -85,14 +102,13 @@ type Instance struct {
 	LogBinEnabled		bool
 	LogSlaveUpdatesEnabled	bool
 	SelfBinlogCoordinates	BinlogCoordinates
-	Master_Host			string
-	Master_Port			int
+	MasterKey			InstanceKey
 	Slave_SQL_Running	bool
 	Slave_IO_Running	bool
 	ReadBinlogCoordinates	BinlogCoordinates
 	ExecBinlogCoordinates	BinlogCoordinates
 	SecondsBehindMaster	int
-	SlaveHosts			map[InstanceKey]bool
+	SlaveHosts			InstanceKeyMap
 	
 	IsUpToDate			bool
 }
@@ -125,7 +141,7 @@ func (this *Instance) IsSmallerMajorVersion(other *Instance) bool {
 }
 
 func (this *Instance) IsSlave() bool {
-	return this.Master_Host != "" && this.ReadBinlogCoordinates.LogFile != ""
+	return this.MasterKey.Hostname != "" && this.ReadBinlogCoordinates.LogFile != ""
 }
 
 func (this *Instance) SlaveRunning() bool {
@@ -141,22 +157,9 @@ func (this *Instance) AddSlaveKey(slaveKey *InstanceKey) {
 	this.SlaveHosts[*slaveKey] = true
 }
 
-func (this *Instance) GetMasterInstanceKey() *InstanceKey {
-	return &InstanceKey{Hostname: this.Master_Host, Port: this.Master_Port}
-}
-
-func (this *Instance) GetSlaveInstanceKeys() []InstanceKey {
-	res := []InstanceKey{}
-	for key, _ := range this.SlaveHosts {
-    	res = append(res, key)
-	}
-	return res
-}
-
 
 func (this *Instance) GetSlaveHostsAsJson() string {
-	keys := this.GetSlaveInstanceKeys()
-	blob, _ := json.Marshal(keys)
+	blob, _ := this.SlaveHosts.MarshalJSON()
 	return string(blob)
 }
 
@@ -175,7 +178,7 @@ func (this *Instance) ReadSlaveHostsFromJson(jsonString string) error {
 
 
 func (this *Instance) IsSlaveOf(master *Instance) bool {
-	return this.GetMasterInstanceKey().Equals(&master.Key)
+	return this.MasterKey.Equals(&master.Key)
 }
 
 func (this *Instance) IsMasterOf(slave *Instance) bool {

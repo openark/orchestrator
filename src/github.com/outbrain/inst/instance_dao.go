@@ -50,9 +50,9 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
        	instance.ExecBinlogCoordinates.LogFile = m["Relay_Master_Log_File"]
        	instance.ExecBinlogCoordinates.LogPos, _ = strconv.ParseInt(m["Exec_Master_Log_Pos"], 10, 0)
        	var err error
-       	instance.Master_Host, err = GetCNAME(m["Master_Host"])
+       	instance.MasterKey.Hostname, err = GetCNAME(m["Master_Host"])
        	if err != nil {return err}
-       	instance.Master_Port, err = strconv.Atoi(m["Master_Port"])
+       	instance.MasterKey.Port, err = strconv.Atoi(m["Master_Port"])
        	if err != nil {return err}
        	if config.Config.SlaveLagQuery == "" {
         	if m["Seconds_Behind_Master"] != "" {
@@ -163,8 +163,8 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 			 	&instance.LogSlaveUpdatesEnabled,
 			 	&instance.SelfBinlogCoordinates.LogFile,
 			 	&instance.SelfBinlogCoordinates.LogPos,
-			 	&instance.Master_Host,
-			 	&instance.Master_Port,
+			 	&instance.MasterKey.Hostname,
+			 	&instance.MasterKey.Port,
 			 	&instance.Slave_SQL_Running,
 			 	&instance.Slave_IO_Running,
 			 	&instance.ReadBinlogCoordinates.LogFile,
@@ -254,8 +254,8 @@ func WriteInstance(instance *Instance, lastError error) error {
 		 	instance.LogSlaveUpdatesEnabled,
 			instance.SelfBinlogCoordinates.LogFile,
 			instance.SelfBinlogCoordinates.LogPos,
-		 	instance.Master_Host,
-		 	instance.Master_Port,
+		 	instance.MasterKey.Hostname,
+		 	instance.MasterKey.Port,
 		 	instance.Slave_SQL_Running,
 		 	instance.Slave_IO_Running,
 		 	instance.ReadBinlogCoordinates.LogFile,

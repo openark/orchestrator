@@ -28,8 +28,7 @@ func RefreshTopologyInstance(instanceKey *InstanceKey) error {
 // GetInstanceMaster synchronously reaches into the replication topology
 // and retrieves master's data
 func GetInstanceMaster(instance *Instance) (*Instance, error) {
-	masterKey := instance.GetMasterInstanceKey()
-	master, err := ReadTopologyInstance(masterKey)
+	master, err := ReadTopologyInstance(&instance.MasterKey)
 	return master, err
 }
 
@@ -46,7 +45,7 @@ func InstancesAreSiblings(instance0, instance1 *Instance) bool {
 		// same instance...
 		return false
 	}
-	return instance0.GetMasterInstanceKey().Equals(instance1.GetMasterInstanceKey())
+	return instance0.MasterKey.Equals(&instance1.MasterKey)
 }
 
 
@@ -77,7 +76,7 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &master.SelfBinlogCoordinates)
 	if	err	!=	nil	{goto Cleanup} 
 	
-	instance, err = ChangeMasterTo(instanceKey, master.GetMasterInstanceKey(), &master.ExecBinlogCoordinates)
+	instance, err = ChangeMasterTo(instanceKey, &master.MasterKey, &master.ExecBinlogCoordinates)
 	if	err	!=	nil	{goto Cleanup} 
 	
 	Cleanup:
