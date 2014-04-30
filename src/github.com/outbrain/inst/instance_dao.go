@@ -151,6 +151,7 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 				exec_master_log_pos,
 				seconds_behind_master,
 				slave_hosts,
+				cluster_name,
 				ifnull(timestampdiff(second, last_seen, now()) <= ?, false) as is_up_to_date,
 				is_last_seen_valid
 			 from database_instance 
@@ -173,6 +174,7 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 			 	&instance.ExecBinlogCoordinates.LogPos,
 			 	&instance.SecondsBehindMaster,
 			 	&slaveHostsJson,
+			 	&instance.ClusterName,
 			 	&instance.IsUpToDate,
 			 	&instance.IsLastSeenValid,
 			 	)
@@ -195,7 +197,7 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 		where
 			timestampdiff(second, last_checked, now()) >= %d
     		and ifnull(timestampdiff(second, last_seen, now()) <= %d, false) = false `, 
-    		config.Config.InstanceRefreshSeconds, config.Config.InstanceUpToDateSeconds)
+    		config.Config.InstanceReattemptSeconds, config.Config.InstanceUpToDateSeconds)
 	db,	err	:=	sqlutils.OpenOrchestrator()
     if err != nil {goto Cleanup}
     
@@ -243,8 +245,9 @@ func WriteInstance(instance *Instance, lastError error) error {
 				exec_master_log_pos,
 				seconds_behind_master,
 				num_slave_hosts,
-				slave_hosts
-			) values (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+				slave_hosts,
+				cluster_name
+			) values (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			instance.Key.Hostname, 
 		 	instance.Key.Port,
 		 	instance.ServerID,
@@ -265,9 +268,11 @@ func WriteInstance(instance *Instance, lastError error) error {
 		 	instance.SecondsBehindMaster,
 		 	len(instance.SlaveHosts),
 		 	instance.GetSlaveHostsAsJson(),
+		 	instance.ClusterName,
 		 	)
 	if err != nil {return log.Errore(err)}
 	
+    updateClusterNameForInstance(&instance.Key)
 	if lastError == nil {
 		sqlutils.Exec(db, `
         	update database_instance set last_seen = NOW(), is_last_seen_valid = 1 where hostname=? and port=?
@@ -275,6 +280,69 @@ func WriteInstance(instance *Instance, lastError error) error {
         )
 	}
 	return nil
+}
+
+
+func updateClusterNameForInstance(instanceKey *InstanceKey) error {
+	db,	err	:=	sqlutils.OpenOrchestrator()
+	if err != nil {return log.Errore(err)}
+
+	_, err = sqlutils.Exec(db, `
+		update 
+			database_instance as slave_instance
+			left join database_instance as master_instance on (
+				slave_instance.master_host = master_instance.hostname
+				and slave_instance.master_port = master_instance.port)
+		set
+			slave_instance.cluster_name = if (
+				master_instance.server_id is null,
+				concat(slave_instance.hostname, ':', slave_instance.port),
+				master_instance.cluster_name
+			)
+		where 
+			slave_instance.hostname=? and slave_instance.port=?
+        	`, instanceKey.Hostname, instanceKey.Port,
+        )
+	if err != nil {return log.Errore(err)}
+	return err
+}
+
+
+func updateClusterNamesOnce() (sql.Result, error) {
+	db,	err	:=	sqlutils.OpenOrchestrator()
+	if err != nil {return nil, log.Errore(err)}
+	
+	res, err := sqlutils.Exec(db, `
+		update 
+			database_instance as slave_instance
+			left join database_instance as master_instance on (
+				slave_instance.master_host = master_instance.hostname
+				and slave_instance.master_port = master_instance.port)
+		set
+			slave_instance.cluster_name = if (
+				master_instance.server_id is null,
+				concat(slave_instance.hostname, ':', slave_instance.port),
+				master_instance.cluster_name
+			)
+        	`)
+	if err != nil {return nil, log.Errore(err)}
+	return res, err
+}
+
+
+func UpdateClusterNames() error {
+	for depth := 0 ; depth < config.Config.MaxReasonableTopologyDepth ; depth++ {
+		res, err := updateClusterNamesOnce()
+		if err != nil {return err}
+		if affected, _ := res.RowsAffected(); affected == 0 {
+			// Nothing more updated -- we're done!
+			log.Info("--------------- affected is 0")
+			return nil
+		} else {
+			log.Infof("--------------- affected is %d", affected)
+		}
+	}
+	return errors.New("Encountered seemingly infinite depth on UpdateClusterNames")
 }
 
 

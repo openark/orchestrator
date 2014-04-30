@@ -8,7 +8,7 @@ import (
 )
 
 type Configuration struct {
-	InstanceRefreshSeconds	uint
+	InstanceReattemptSeconds	uint		// Minimum number of seconds before re-checking on instance (even if its outdated)
 	MySQLTopologyUser		string
 	MySQLTopologyPassword	string
 	MySQLOrchestratorHost	string
@@ -16,20 +16,22 @@ type Configuration struct {
 	MySQLOrchestratorDatabase	string
 	MySQLOrchestratorUser		string
 	MySQLOrchestratorPassword	string
-	SlaveLagQuery				string
-	DiscoverByShowSlaveHosts	bool
-	InstanceUpToDateSeconds		uint
-	DiscoveryPollSeconds		int
+	SlaveLagQuery				string		// custom query to check on slave lg (e.g. heartbeat table)
+	DiscoverByShowSlaveHosts	bool		// Attempt SHOW SLAVE HOSTS before PROCESSLIST
+	InstanceUpToDateSeconds		uint		// An instance is up to date if seen before this number of seconds
+	DiscoveryPollSeconds		int			// Auto/continuous discovery of instances sleep time between polls
+	MaxReasonableTopologyDepth	int			// M->S->S->S... depth you just don't have in your topology
 }	
 
 var Config *Configuration = NewConfiguration()
 
 func NewConfiguration() *Configuration {
 	return &Configuration{
-		InstanceRefreshSeconds:		60,
+		InstanceReattemptSeconds:		60,
 		InstanceUpToDateSeconds:	60,
 		DiscoverByShowSlaveHosts:	false,
 		DiscoveryPollSeconds:		5,
+		MaxReasonableTopologyDepth:	10,
 	}
 }
 

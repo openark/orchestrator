@@ -109,6 +109,7 @@ type Instance struct {
 	ExecBinlogCoordinates	BinlogCoordinates
 	SecondsBehindMaster	int
 	SlaveHosts			InstanceKeyMap
+	ClusterName			string
 	
 	IsUpToDate			bool
 }
@@ -141,7 +142,7 @@ func (this *Instance) IsSmallerMajorVersion(other *Instance) bool {
 }
 
 func (this *Instance) IsSlave() bool {
-	return this.MasterKey.Hostname != "" && this.ReadBinlogCoordinates.LogFile != ""
+	return this.MasterKey.Hostname != "" && this.MasterKey.Port != 0 && this.ReadBinlogCoordinates.LogFile != ""
 }
 
 func (this *Instance) SlaveRunning() bool {
