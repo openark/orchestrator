@@ -2,11 +2,39 @@ package sqlutils
 
 import (
 	"fmt"
+	"strconv"
 	_ "github.com/go-sql-driver/mysql"
 	"database/sql"
 	"github.com/outbrain/config"
 	"github.com/outbrain/log"	
 )
+
+
+type RowMap map[string]string
+
+func (this *RowMap) GetString(key string) string {
+	return (*this)[key]
+}
+
+func (this *RowMap) GetInt64(key string) int64 {
+	res, _ := strconv.ParseInt((*this)[key], 10, 0)
+	return res
+}
+
+func (this *RowMap) GetInt(key string) int {
+	res, _ := strconv.Atoi((*this)[key])
+	return res
+}
+
+func (this *RowMap) GetUint(key string) uint {
+	res, _ := strconv.Atoi((*this)[key])
+	return uint(res)
+}
+
+func (this *RowMap) GetBool(key string) bool {
+	return (*this)[key] == "1"
+}
+
 
 var knownDBs map[string]*sql.DB = make(map[string]*sql.DB)
 
@@ -58,7 +86,7 @@ func ScanRowsToArrays(rows *sql.Rows, on_row func([]string) error) error {
     return nil
 }
 
-func ScanRowsToMaps(rows *sql.Rows, on_row func(map[string]string) error) error {
+func ScanRowsToMaps(rows *sql.Rows, on_row func(RowMap) error) error {
 	columns, _ := rows.Columns()
 	err := ScanRowsToArrays(rows, func(arr []string) error {
     	m := make(map[string]string)	 
@@ -75,7 +103,7 @@ func ScanRowsToMaps(rows *sql.Rows, on_row func(map[string]string) error) error 
 }
 
 
-func QueryRowsMap(db *sql.DB, query string, on_row func(map[string]string) error) error {
+func QueryRowsMap(db *sql.DB, query string, on_row func(RowMap) error) error {
 	rows, err := db.Query(query)
 	defer rows.Close()
 	if err != nil && err != sql.ErrNoRows {
@@ -84,6 +112,7 @@ func QueryRowsMap(db *sql.DB, query string, on_row func(map[string]string) error
 	err = ScanRowsToMaps(rows, on_row)
 	return err
 }
+
 
 
 func Exec(db *sql.DB, query string, args ...interface{}) (sql.Result, error) {

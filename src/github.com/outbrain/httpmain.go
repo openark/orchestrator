@@ -53,9 +53,6 @@ func main() {
 		r.HTML(200, "hello", map[string]interface{}{"name": "shushu", "PI":3.14, "complex": map[string]string{"title":"rollback"}})
 	})
 
-//	m.Get("/instance/:host/:port", func(params martini.Params, r render.Render) {
-//		r.HTML(200, "hello", map[string]interface{}{"name": params["host"], "PI":params["port"], "complex": map[string]string{"title":"rollback"}})
-//	})
 	http.API.RegisterRequests(m)
 
 	m.Run()
