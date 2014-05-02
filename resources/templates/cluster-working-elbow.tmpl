@@ -1,0 +1,162 @@
+
+<style>
+text {
+	font-family: "Helvetica Neue", Helvetica, sans-serif;
+}
+
+.name {
+	font-weight: bold;
+}
+
+.about {
+	fill: #777;
+	font-size: smaller;
+}
+
+.link {
+	fill: none;
+	stroke: #ccc;
+	shape-rendering: crispEdges;
+}
+</style>
+
+<!-- load the d3.js library -->
+<script src="/js/d3.js"></script>
+
+<script>
+	$(document).ready(
+		function() {
+			$.get("/api/cluster/{{.clusterName}}", function(instances) {
+				visualizeInstances(instances);
+			}, "json");
+
+			function getInstanceId(host, port) {
+				return "instance" + host.replace(/[.]/g, "_") + "__" + port
+			}
+
+			function visualizeInstances(instances) {
+
+				var treeData = [];
+				var nodesList = [];
+
+				instances.forEach(function(instance) {
+					nodesList.push({
+						id : getInstanceId(instance.Key.Hostname,
+								instance.Key.Port),
+						hasMaster : true,
+						parent : getInstanceId(instance.MasterKey.Hostname,
+								instance.MasterKey.Port),
+						hostname : instance.Key.Hostname,
+						port : instance.Key.Port,
+						name : getInstanceId(instance.Key.Hostname,
+								instance.Key.Port),
+						title : instance.Key.Hostname + ":"
+								+ instance.Key.Port,
+						version : instance.Version,
+						binlogFormat : instance.Binlog_format,
+						secondsBehindMaster : instance.SecondsBehindMaster,
+						children : null
+					});
+
+				});
+				var dataMap = nodesList.reduce(function(map, node) {
+					map[node.id] = node;
+					return map;
+				}, {});
+
+				// create the tree array
+
+				nodesList.forEach(function(node) {
+					// add to parent
+					var parent = dataMap[node.parent];
+					if (parent) {
+						// create child array if it doesn't exist
+						(parent.children || (parent.children = []))
+						// add node to child array
+						.push(node);
+						(parent.contents || (parent.contents = []))
+						// add node to child array
+						.push(node);
+					} else {
+						// parent is null or missing
+						node.hasMaster = false;
+						node.parent = null;
+						treeData.push(node);
+					}
+				});
+
+				//console.log(treeData);
+				//~~~ 1111
+
+				var margin = {
+					top : 0,
+					right : 320,
+					bottom : 0,
+					left : 0
+				}, width = 1560 - margin.left - margin.right, height = 800
+						- margin.top - margin.bottom;
+
+				var tree = d3.layout.tree().separation(function(a, b) {
+					return a.parent === b.parent ? 1 : .5;
+				}).children(function(d) {
+					return d.children;
+				}).size([ height, width ]);
+
+				var svg = d3.select("body").append("svg").attr("width",
+						width + margin.left + margin.right).attr("height",
+						height + margin.top + margin.bottom).append("g")
+						.attr(
+								"transform",
+								"translate(" + margin.left + ","
+										+ margin.top + ")");
+
+				var nodes = tree.nodes(treeData[0]);
+				;
+
+				var link = svg.selectAll(".link").data(tree.links(nodes))
+						.enter().append("path").attr("class", "link").attr(
+								"d", elbow);
+
+				var node = svg.selectAll(".node").data(nodes).enter()
+						.append("g").attr("class", "node").attr(
+								"transform",
+								function(d) {
+									return "translate(" + d.y + "," + d.x
+											+ ")";
+								})
+
+				node.append("text").attr("class", "name").attr("x", 8)
+						.attr("y", -36).text(function(d) {
+							return d.title;
+						});
+
+				node.append("text").attr("x", 8).attr("y", -21).attr(
+						"class", "about").text(function(d) {
+					return d.version + ", " + d.binlogFormat;
+				});
+
+				var aaa = node.append("a").attr("xlink:href", "www.aaaa")
+
+				aaa.append("text").attr("x", 8).attr("y", -6).attr("class",
+						"about location").text(function(d) {
+					return "Lag: " + d.secondsBehindMaster + " seconds";
+				});
+
+				//node.append("svg:circle")
+				//    .attr("class", "node-dot")
+				//    .attr("r", 5);
+
+				function elbow(d, i) {
+					return "M" + d.source.y + "," + d.source.x + "H"
+							+ d.target.y + "V" + d.target.x
+							+ (d.target.children ? "" : "h" + 100);
+				}
+
+				$('text.name').click(function() {
+					alert('hello text');
+				});
+
+				//~~~ 2222
+			}
+		});
+</script>

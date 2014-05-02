@@ -136,10 +136,23 @@ func (this *HttpAPI) Cluster(params martini.Params, r render.Render) {
 }
 
 
+func (this *HttpAPI) Clusters(params martini.Params, r render.Render) {
+	clusterNames, err := inst.ReadClusters()
+
+	if err != nil {
+		r.JSON(500, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+
+	r.JSON(200, clusterNames)
+}
+
+
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/instance/:host/:port", this.Instance) 
 	m.Get("/api/discover/:host/:port", this.Discover) 
 	m.Get("/api/move-up/:host/:port", this.MoveUp) 
 	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow) 
 	m.Get("/api/cluster/:clusterName", this.Cluster) 
+	m.Get("/api/clusters", this.Clusters) 
 }

@@ -1,0 +1,76 @@
+<div>
+    clusterName: {{.clusterName}}
+</div>
+<div id="instances">
+</div>
+
+<style type="text/css">
+    #instances div {
+        float: left;
+        height: 100px;
+        width: 100px;
+        border: 1px solid black;
+        margin: 10px;
+    }
+</style>
+<!--
+<script type="text/javascript" src="/js/jquery.jsPlumb-1.5.5.js"></script>
+<script type="text/javascript" src="/js/cluster-topology.js"></script>
+-->
+
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script>
+    $(document).ready(function() {
+        $.get("/api/cluster/{{.clusterName}}", function(instances) {
+            injectClusterInstances(instances);
+        }, "json" );
+        
+        function getInstanceId(host, port) {
+            return "instance" + host.replace(/[.]/g, "_") + "__" + port
+        }
+        
+        function injectClusterInstances(instances) {
+            instances.forEach(function(instance) {
+                jQuery('<div/>', {
+                    id: getInstanceId(instance.Key.Hostname, instance.Key.Port),
+                    class: "window",            
+                    text: instance.Key.Hostname + ":" + instance.Key.Port
+                }).appendTo('#instances');
+            });
+            
+            jsPlumb.bind("ready", function() {
+                instances.forEach(function(instance) {
+                    if (instance.MasterKey.Hostname != "" && instance.MasterKey.Port > 0) {
+                        var masterDivId =  getInstanceId(instance.MasterKey.Hostname, instance.MasterKey.Port);
+                        var currentDivId = getInstanceId(instance.Key.Hostname, instance.Key.Port);
+
+                        var e0 = jsPlumb.addEndpoint(masterDivId),
+                        e1 = jsPlumb.addEndpoint(currentDivId);
+        
+                        jsPlumb.connect({
+                            source:e0, 
+                            target:e1, 
+                            paintStyle:{ lineWidth:10, strokeStyle:'rgba(0, 0, 200, 0.5)' },
+                            anchors:["BottomRight", "TopLeft"],
+                            endpoint:[ "Rectangle", { width:10, height:8 } ]
+                        });
+                    }
+                });
+            });
+            
+            /*
+            initClusterTopology(function(jsPlumbInstance, overlays) {
+                instances.forEach(function(instance) {
+                    if (instance.MasterKey.Hostname != "" && instance.MasterKey.Port > 0) {
+                        var masterDivId =  getInstanceId(instance.MasterKey.Hostname, instance.MasterKey.Port);
+                        var currentDivId = getInstanceId(instance.Key.Hostname, instance.Key.Port);
+                        //alert(currentDivId + "......."+masterDivId);
+                        jsPlumbInstance.connect({uuids:[masterDivId + "-bottom", currentDivId + "-top" ], overlays:overlays});
+                    }
+                });
+            });
+            */
+        }
+    });
+    
+</script>

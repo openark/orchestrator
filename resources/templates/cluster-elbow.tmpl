@@ -1,0 +1,144 @@
+
+<style>
+.node circle {
+	fill: #fff;
+	stroke: steelblue;
+	stroke-width: 1.5px;
+}
+
+.node {
+	font: 10px sans-serif;
+}
+
+.link {
+	fill: none;
+	stroke: #ccc;
+	stroke-width: 1.5px;
+}
+</style>
+
+<!-- load the d3.js library -->
+<script src="/js/d3.js"></script>
+
+<script>
+	treeData = [];
+	$(document).ready(
+		function() {
+			$.get("/api/cluster/{{.clusterName}}", function(instances) {
+				visualizeInstances(instances);
+			}, "json");
+
+			function getInstanceId(host, port) {
+				return "instance" + host.replace(/[.]/g, "_") + "__" + port
+			}
+
+			function visualizeInstances(instances) {
+
+				//var treeData = [];
+				{
+					var nodes = [];
+					var d3links = [];
+
+					instances.forEach(function(instance) {
+						nodes.push({
+							id : getInstanceId(instance.Key.Hostname,
+									instance.Key.Port),
+							hasMaster : true,
+							parent : getInstanceId(
+									instance.MasterKey.Hostname,
+									instance.MasterKey.Port),
+							hostname : instance.Key.Hostname,
+							port : instance.Key.Port,
+							name : getInstanceId(instance.Key.Hostname,
+									instance.Key.Port),
+							title : instance.Key.Hostname + ":"
+									+ instance.Key.Port,
+							version : instance.Version,
+							born : 1919,
+							died : 1920,
+							location : "kansas",
+							children : null,
+							x : 100,
+							y : 100,
+							size : 400
+						});
+						d3links.push({
+							source : getInstanceId(
+									instance.MasterKey.Hostname,
+									instance.MasterKey.Port),
+							target : getInstanceId(instance.Key.Hostname,
+									instance.Key.Port)
+						});
+					});
+					var dataMap = nodes.reduce(function(map, node) {
+						map[node.id] = node;
+						return map;
+					}, {});
+
+					// create the tree array
+
+					nodes.forEach(function(node) {
+						// add to parent
+						var parent = dataMap[node.parent];
+						if (parent) {
+							// create child array if it doesn't exist
+							(parent.children || (parent.children = []))
+							// add node to child array
+							.push(node);
+							(parent.contents || (parent.contents = []))
+							// add node to child array
+							.push(node);
+						} else {
+							// parent is null or missing
+							node.hasMaster = false;
+							node.parent = null;
+							treeData.push(node);
+						}
+					});
+				}
+				console.log(treeData);
+				//~~~ 1111
+
+				var width = 960, height = 2200;
+
+				var cluster = d3.layout.cluster().size(
+						[ height, width - 160 ]);
+
+				var svg = d3.select("body").append("svg").attr("width",
+						width).attr("height", height).append("g").attr(
+						"transform", "translate(40,0)");
+
+				var nodes = cluster.nodes(treeData[0]);
+
+				var link = svg.selectAll("path.link").data(
+						cluster.links(nodes)).enter().append("path").attr(
+						"class", "link").attr("d", elbow);
+
+				var node = svg.selectAll("g.node").data(nodes).enter()
+						.append("g").attr("class", "node").attr(
+								"transform",
+								function(d) {
+									console.log(d);
+									return "translate(" + d.y + "," + d.x
+											+ ")";
+								})
+
+				node.append("circle").attr("r", 4.5);
+
+				node.append("text").attr("dx", function(d) {
+					return d.children ? -8 : 8;
+				}).attr("dy", 3).attr("text-anchor", function(d) {
+					return d.children ? "end" : "start";
+				}).text(function(d) {
+					return d.name;
+				});
+
+				function elbow(d, i) {
+					return "M" + d.source.y + "," + d.source.x + "V"
+							+ d.target.x + "H" + d.target.y;
+				}
+
+				//~~~ 2222
+			}
+		});
+</script>

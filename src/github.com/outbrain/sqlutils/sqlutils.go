@@ -26,6 +26,12 @@ func (this *RowMap) GetInt(key string) int {
 	return res
 }
 
+func (this *RowMap) GetIntD(key string, def int) int {
+	res, err := strconv.Atoi((*this)[key])
+	if err != nil {return def}
+	return res
+}
+
 func (this *RowMap) GetUint(key string) uint {
 	res, _ := strconv.Atoi((*this)[key])
 	return uint(res)

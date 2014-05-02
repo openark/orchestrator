@@ -13,7 +13,12 @@ import (
 func Http(discovery bool) {
 	m := martini.Classic()
 	// render html templates from templates directory
-	m.Use(render.Renderer())
+	m.Use(render.Renderer(render.Options{
+		Directory: "resources",
+		Layout: "templates/layout",	
+		HTMLContentType: "text/html",
+	}))
+	m.Use(martini.Static("resources/public"))
 	
 	log.Info("Started HTTP")
 	
@@ -21,11 +26,9 @@ func Http(discovery bool) {
 		go orchestrator.ContinuousDiscovery()
 	}
 
-	m.Get("/", func(r render.Render) {
-		r.HTML(200, "hello", map[string]interface{}{"name": "shushu", "PI":3.14, "complex": map[string]string{"title":"rollback"}})
-	})
 
 	http.API.RegisterRequests(m)
+	http.Web.RegisterRequests(m)
 
 	m.Run()
 }

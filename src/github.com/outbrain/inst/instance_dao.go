@@ -6,6 +6,7 @@ import (
 	"time"
 	"strconv"
 	"strings"
+	"math"
 	"database/sql"
 	"github.com/outbrain/sqlutils"
 	"github.com/outbrain/config"
@@ -33,6 +34,7 @@ func ScanInstanceRow(instanceKey *InstanceKey, query string, dest ...interface{}
 
 func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	instance := NewInstance()
+	instanceFound := false;
     foundBySlaveHosts := false
 
 	db,	err	:=	sqlutils.OpenTopology(instanceKey.Hostname, instanceKey.Port)
@@ -43,6 +45,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
     err = db.QueryRow("select @@global.server_id, @@global.version, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
        	&instance.ServerID, &instance.Version, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
     if err != nil {goto Cleanup}
+    instanceFound = true
     err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
 		instance.Slave_IO_Running = (m["Slave_IO_Running"] == "Yes")
       	instance.Slave_SQL_Running = (m["Slave_SQL_Running"] == "Yes")
@@ -56,9 +59,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
        	instance.MasterKey.Port, err = strconv.Atoi(m["Master_Port"])
        	if err != nil {return err}
        	if config.Config.SlaveLagQuery == "" {
-        	if m["Seconds_Behind_Master"] != "" {
-	        	instance.SecondsBehindMaster, err = strconv.Atoi(m["Seconds_Behind_Master"])
-	        }
+       		instance.SecondsBehindMaster = m.GetIntD("Seconds_Behind_Master", math.MaxInt32)
         }
        	if err != nil {return err}
        	return err
@@ -117,7 +118,9 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
     if err != nil {goto Cleanup}
 
 	Cleanup:
-	_ = WriteInstance(instance, err)
+	if instanceFound {
+		_ = WriteInstance(instance, err)
+	}
 	if err	!=	nil	{
 		log.Errore(err)
 	}
@@ -252,6 +255,32 @@ func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 }
 
 
+
+func ReadClusters() ([]string, error) {
+	clusterNames := []string{}
+
+	db,	err	:=	sqlutils.OpenOrchestrator()
+	if	err	!=	nil	{
+		return clusterNames, log.Errore(err)
+	}
+
+	query := fmt.Sprintf(`
+		select 
+			cluster_name
+		from 
+			database_instance 
+		group by
+			cluster_name`)
+
+    err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+    	clusterNames = append(clusterNames, m.GetString("cluster_name"))
+    	return nil       	
+   	})
+
+	return clusterNames, err
+}
+
+
 func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 	res := []InstanceKey{}
 	query := fmt.Sprintf(`
@@ -335,9 +364,9 @@ func WriteInstance(instance *Instance, lastError error) error {
 		 	instance.GetSlaveHostsAsJson(),
 		 	instance.ClusterName,
 		 	)
+    _ = updateClusterNameForInstance(&instance.Key)
 	if err != nil {return log.Errore(err)}
 	
-    updateClusterNameForInstance(&instance.Key)
 	if lastError == nil {
 		sqlutils.Exec(db, `
         	update database_instance set last_seen = NOW(), is_last_seen_valid = 1 where hostname=? and port=?
