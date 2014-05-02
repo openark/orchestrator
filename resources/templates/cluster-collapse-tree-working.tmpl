@@ -1,25 +1,5 @@
 
-<style>
-.node {
-	cursor: pointer;
-}
 
-.node circle {
-	fill: #fff;
-	stroke: steelblue;
-	stroke-width: 1.5px;
-}
-
-.node text {
-	font: 10px sans-serif;
-}
-
-.link {
-	fill: none;
-	stroke: #ccc;
-	stroke-width: 1.5px;
-}
-</style>
 
 <!-- load the d3.js library -->
 <script src="/js/d3.js"></script>
@@ -28,8 +8,30 @@
 	$(document).ready(
 			function() {
 				$.get("/api/cluster/{{.clusterName}}", function(instances) {
-					visualizeInstances(instances);
+					nodesList = visualizeInstances(instances);
+                    generateInstanceDivs(nodesList);
 				}, "json");
+				
+				function generateInstanceDivs(nodesList) {
+					$("[data-fo-id]").each(function() {
+                        var id = $(this).attr("data-fo-id");
+                        $(this).html('<div xmlns="http://www.w3.org/1999/xhtml" class="popover right" style="display:block; position:inherit"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"><p></p></div></div>');
+                        
+                    });
+					nodesList.forEach(function(node) {                    	
+                    	$("[data-fo-id='"+node.id+"'] .popover h3").html(node.title);
+                    	$("[data-fo-id='"+node.id+"'] .popover .popover-content p").html(node.version + " "+ node.binlogFormat + "<br/>" + node.secondsBehindMaster + " seconds lag");
+                    });
+                    $("[data-fo-id]").each(function() {
+                    	var id = $(this).attr("data-fo-id");
+                    	var popoverDiv = $("[data-fo-id='"+id+"'] div.popover");
+                        popoverDiv.attr("x", $(this).attr("x"));
+                        popoverDiv.attr("y", $(this).attr("y"));
+                        $(this).attr("y", 0-popoverDiv.height()/2 - 2);                        
+                    });
+                    $("div.popover").popover();
+                    $("div.popover").show();
+				}
 
 				function getInstanceId(host, port) {
 					return "instance" + host.replace(/[.]/g, "_") + "__" + port
@@ -91,9 +93,9 @@
 
 					var margin = {
 						top : 20,
-						right : 120,
+						right : 60,
 						bottom : 20,
-						left : 520
+						left : 60
 					}, width = 1560 - margin.right - margin.left, height = 800
 							- margin.top - margin.bottom;
 
@@ -107,7 +109,7 @@
 
 					var svg = d3.select("body").append("svg").attr("width",
 							width + margin.right + margin.left).attr("height",
-							height + margin.top + margin.bottom).append("g")
+							height + margin.top + margin.bottom).attr("xmlns", "http://www.w3.org/2000/svg").attr("version", "1.1").append("g")
 							.attr(
 									"transform",
 									"translate(" + margin.left + ","
@@ -126,7 +128,7 @@
 						}
 					}
 
-					root.children.forEach(collapse);
+					//root.children.forEach(collapse);
 					update(root);
 
 					d3.select(self.frameElement).style("height", "800px");
@@ -139,7 +141,7 @@
 
 						// Normalize for fixed-depth.
 						nodes.forEach(function(d) {
-							d.y = d.depth * 180;
+							d.y = d.depth * 400;
 						});
 
 						// Update the nodes…
@@ -163,15 +165,27 @@
 									return d._children ? "lightsteelblue"
 											: "#fff";
 								});
-
-						nodeEnter.append("text").attr("x", function(d) {
-							return d.children || d._children ? -10 : 10;
-						}).attr("dy", ".35em").attr("text-anchor", function(d) {
-							return d.children || d._children ? "end" : "start";
-						}).text(function(d) {
-							return d.title;
-						}).style("fill-opacity", 1e-6);
-
+						/*
+                        nodeEnter.append("text").attr("x", function(d) {
+                            return d.children || d._children ? -10 : 10;
+                        }).attr("dy", ".35em").attr("text-anchor", function(d) {
+                            return d.children || d._children ? "end" : "start";
+                        }).attr(
+                            "class", "node_title"
+                        ).attr("title", function(d) {
+                            return d.title;
+                        }).text(function(d) {
+                            return d.title;
+                        }).style("fill-opacity", 1e-6);
+                        */
+                        nodeEnter.append("foreignObject").attr("data-fo-id", function(d) {
+                            return d.id
+                        }).attr("width", "100%").attr("height", "100%").attr("dy", ".35em").attr("text-anchor", function(d) {
+                            return d.children || d._children ? "end" : "start";
+                        }).attr("x", function(d) {
+                            return 8;
+                        }).attr("requiredFeatures", "http://www.w3.org/TR/SVG11/feature#Extensibility");
+                        
 						// Transition nodes to their new position.
 						var nodeUpdate = node.transition().duration(duration)
 								.attr(
@@ -189,7 +203,7 @@
 								});
 
 						nodeUpdate.select("text").style("fill-opacity", 1);
-
+						
 						// Transition exiting nodes to the parent's new position.
 						var nodeExit = node.exit().transition().duration(
 								duration).attr(
@@ -202,6 +216,7 @@
 						nodeExit.select("circle").attr("r", 1e-6);
 
 						nodeExit.select("text").style("fill-opacity", 1e-6);
+						//nodeExit.select("foreignObject").style("fill-opacity", 1e-6);
 
 						// Update the links…
 						var link = svg.selectAll("path.link").data(links,
@@ -256,9 +271,11 @@
 							d._children = null;
 						}
 						update(d);
+						generateInstanceDivs(nodesList);
 					}
 
 					//~~~ 2222
+					return nodesList;
 				}
 			});
 </script>
