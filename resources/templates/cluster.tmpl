@@ -2,13 +2,13 @@
 
 <style type = "text/css">
 .node {
-	cursor: pointer;
 }
 
 .node circle {
 	fill: #fff;
 	stroke: steelblue;
 	stroke-width: 1.5px;
+    cursor: pointer;
 }
 
 .node text {
@@ -30,13 +30,23 @@
 }
 .node .nodeWrapper .popover h3 {
     font-size: 10px;
-    padding: 4px 8px;
+    padding: 2px 8px;
 }
+
+.node .nodeWrapper .popover h3.label-warning {
+  background-color: #f0ad4e;
+}
+
+.node .nodeWrapper .popover h3.label-danger {
+  background-color: #d9534f;
+  color: #ffffff;
+}
+
 .node .nodeWrapper .popover div.popover-content {
     padding: 4px 8px;
 }
 .node .nodeWrapper .popover div.popover-content p {
-    margin-bottom: 4px;
+    margin-bottom: 0px;
 }
 </style>
 
@@ -53,16 +63,20 @@
 				function generateInstanceDivs(nodesList) {
 					$("[data-fo-id]").each(function() {
                         var id = $(this).attr("data-fo-id");
-                        $(this).html('<div xmlns="http://www.w3.org/1999/xhtml" class="popover right" style="display:block; position:inherit"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"><p></p></div></div>');
+                        $(this).html('<div xmlns="http://www.w3.org/1999/xhtml" class="popover right"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"><p></p></div></div>');
                         
                     });
 					nodesList.forEach(function(node) {                    	
                     	$("[data-fo-id='"+node.id+"'] .popover h3").html(node.title);
-                    	$("[data-fo-id='"+node.id+"'] .popover .popover-content p").html(node.version + " "+ node.binlogFormat + "<br/>" + node.secondsBehindMaster + " seconds lag");
+                    	if (node.secondsBehindMaster > 10) {
+                    		$("[data-fo-id='"+node.id+"'] .popover h3").addClass("label-danger");
+                    	}
+                    	$("[data-fo-id='"+node.id+"'] .popover .popover-content p").html(node.version + " "+ node.binlogFormat + '<div class="pull-right">' + node.secondsBehindMaster + ' seconds lag</div>');
                     });
                     $("[data-fo-id]").each(function() {
                     	var id = $(this).attr("data-fo-id");
-                    	var popoverDiv = $("[data-fo-id='"+id+"'] div.popover");
+                        var popoverDiv = $("[data-fo-id='"+id+"'] div.popover");
+                        
                         popoverDiv.attr("x", $(this).attr("x"));
                         popoverDiv.attr("y", $(this).attr("y"));
                         $(this).attr("y", 0-popoverDiv.height()/2 - 2);                        
@@ -130,12 +144,15 @@
 					//~~~ 1111
 
 					var margin = {
-						top : 20,
+						top : 0,
 						right : 60,
-						bottom : 20,
+						bottom : 120,
 						left : 60
-					}, width = 1560 - margin.right - margin.left, height = 800
-							- margin.top - margin.bottom;
+					};
+                    var width = window.innerWidth - margin.right - margin.left;
+                    var height = window.innerHeight - margin.top - margin.bottom;
+                    // width = 1560 - margin.right - margin.left;
+                    // height = 800 - margin.top - margin.bottom;
 
 					var i = 0, duration = 750, root;
 
@@ -179,7 +196,7 @@
 
 						// Normalize for fixed-depth.
 						nodes.forEach(function(d) {
-							d.y = d.depth * 400;
+							d.y = d.depth * 320;
 						});
 
 						// Update the nodes…
@@ -195,33 +212,21 @@
 								function(d) {
 									return "translate(" + source.y0 + ","
 											+ source.x0 + ")";
-								}).on("click", click);
+								});
 
 						nodeEnter.append("circle").attr("r", 1e-6).style(
 								"fill",
 								function(d) {
 									return d._children ? "lightsteelblue"
 											: "#fff";
-								});
-						/*
-                        nodeEnter.append("text").attr("x", function(d) {
-                            return d.children || d._children ? -10 : 10;
-                        }).attr("dy", ".35em").attr("text-anchor", function(d) {
-                            return d.children || d._children ? "end" : "start";
-                        }).attr(
-                            "class", "node_title"
-                        ).attr("title", function(d) {
-                            return d.title;
-                        }).text(function(d) {
-                            return d.title;
-                        }).style("fill-opacity", 1e-6);
-                        */
+								}).on("click", click);
+					
                         nodeEnter.append("foreignObject").attr("class", "nodeWrapper").attr("data-fo-id", function(d) {
                             return d.id
                         }).attr("width", "100%").attr("height", "100%").attr("dy", ".35em").attr("text-anchor", function(d) {
                             return d.children || d._children ? "end" : "start";
                         }).attr("x", function(d) {
-                            return 8;
+                            return 4;
                         }).attr("requiredFeatures", "http://www.w3.org/TR/SVG11/feature#Extensibility");
                         
 						// Transition nodes to their new position.
