@@ -22,15 +22,21 @@
 }
 .node .nodeWrapper {
     font: 10px sans-serif;
+    width: 276px;
 }
 
 .node .nodeWrapper .popover {
     display: block;
     position: inherit;
+    max-width: 276px;
 }
 .node .nodeWrapper .popover h3 {
     font-size: 10px;
     padding: 2px 8px;
+}
+.node .nodeWrapper .popover h3 .glyphicon {
+    position: inherit;
+    cursor: pointer;
 }
 
 .node .nodeWrapper .popover h3.label-warning {
@@ -55,6 +61,32 @@
 <script>
 	$(document).ready(
 			function() {
+				function commonSuffixLength(strings) {
+				    if (strings.length == 0) {
+				    	return 0;
+				    }
+					var longestSuffixLength = 0;
+					var maxLength = 0;
+					strings.forEach(function(s) {
+						maxLength = ((maxLength == 0) ? s.length : Math.min(maxLength, s.length));  
+					});
+                    var suffixLength = 0;
+					while (suffixLength < maxLength) {
+                        suffixLength++
+						var suffixes = strings.map(function(s) {return s.substring(s.length - suffixLength)});
+						var uniqueSuffixes = suffixes.filter(function(elem, pos) {
+						    return suffixes.indexOf(elem) == pos;
+						})
+						if (uniqueSuffixes.length > 1) {
+							// lost it. keep last longestSuffixLength value
+							break;
+						}
+						// we're still good
+						longestSuffixLength = suffixLength;
+					}
+                    return longestSuffixLength;
+				}
+				
 				$.get("/api/cluster/{{.clusterName}}", function(instances) {
 					nodesList = visualizeInstances(instances);
                     generateInstanceDivs(nodesList);
@@ -67,23 +99,29 @@
                         
                     });
 					nodesList.forEach(function(node) {                    	
-                    	$("[data-fo-id='"+node.id+"'] .popover h3").html(node.title);
+                    	$("[data-fo-id='"+node.id+"'] .popover h3").html(node.canonicalTitle +  '<div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog"></span></a></div>');
                     	if (node.secondsBehindMaster > 10) {
                     		$("[data-fo-id='"+node.id+"'] .popover h3").addClass("label-danger");
                     	}
                     	$("[data-fo-id='"+node.id+"'] .popover .popover-content p").html(node.version + " "+ node.binlogFormat + '<div class="pull-right">' + node.secondsBehindMaster + ' seconds lag</div>');
+                        $("[data-fo-id='"+node.id+"'] .popover h3 a").click(function() {
+                            return false;
+                        });
                     });
                     $("[data-fo-id]").each(function() {
                     	var id = $(this).attr("data-fo-id");
                         var popoverDiv = $("[data-fo-id='"+id+"'] div.popover");
                         
                         popoverDiv.attr("x", $(this).attr("x"));
-                        popoverDiv.attr("y", $(this).attr("y"));
                         $(this).attr("y", 0-popoverDiv.height()/2 - 2);                        
+                        popoverDiv.attr("y", $(this).attr("y"));
+                        $(this).attr("width", popoverDiv.width()+20);                        
+                        $(this).attr("height", popoverDiv.height()+20);                        
                     });
                     $("div.popover").popover();
                     $("div.popover").show();
 				}
+				
 
 				function getInstanceId(host, port) {
 					return "instance" + host.replace(/[.]/g, "_") + "__" + port
@@ -114,6 +152,13 @@
 						});
 
 					});
+					// Take canonical host name: strip down longest common suffix of all hosts
+					// (experimental; you may not like it)
+                    var hostNames = nodesList.map(function(node) {return node.title});
+                    var suffixLength = commonSuffixLength(hostNames);
+                    nodesList.forEach(function(node) {
+                        node.canonicalTitle = node.title.substring(0, node.title.length - suffixLength);
+                    });
 					var dataMap = nodesList.reduce(function(map, node) {
 						map[node.id] = node;
 						return map;
@@ -151,6 +196,7 @@
 					};
                     var width = window.innerWidth - margin.right - margin.left;
                     var height = window.innerHeight - margin.top - margin.bottom;
+                    var horizontalSpacing = 320;
                     // width = 1560 - margin.right - margin.left;
                     // height = 800 - margin.top - margin.bottom;
 
@@ -196,7 +242,7 @@
 
 						// Normalize for fixed-depth.
 						nodes.forEach(function(d) {
-							d.y = d.depth * 320;
+							d.y = d.depth * horizontalSpacing;
 						});
 
 						// Update the nodes…
@@ -223,7 +269,7 @@
 					
                         nodeEnter.append("foreignObject").attr("class", "nodeWrapper").attr("data-fo-id", function(d) {
                             return d.id
-                        }).attr("width", "100%").attr("height", "100%").attr("dy", ".35em").attr("text-anchor", function(d) {
+                        }).attr("width", "100%").attr("dy", ".35em").attr("text-anchor", function(d) {
                             return d.children || d._children ? "end" : "start";
                         }).attr("x", function(d) {
                             return 4;

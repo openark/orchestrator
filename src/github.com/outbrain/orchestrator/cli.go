@@ -14,7 +14,7 @@ func Cli(command string, instance string, sibling string) {
 	siblingKey := inst.ParseInstanceKey(sibling)
 	
 	if len(command) == 0 {
-		log.Fatal("expected command (-c)")
+		log.Fatal("expected command (-c) (discover|forget|continuous|move-up|move-below)")
 	}
 	switch command {
 		case "move-up": {
@@ -31,6 +31,10 @@ func Cli(command string, instance string, sibling string) {
 		case "discover": {
 			if instanceKey == nil {log.Fatal("Cannot deduce instance:", instance)}
 			orchestrator.StartDiscovery(*instanceKey)
+		}
+		case "forget": {
+			if instanceKey == nil {log.Fatal("Cannot deduce instance:", instance)}
+			inst.ForgetInstance(instanceKey)
 		}
 		case "continuous": {
 			orchestrator.ContinuousDiscovery()

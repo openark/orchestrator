@@ -67,7 +67,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
     if err != nil {goto Cleanup}
 
 	if config.Config.SlaveLagQuery != "" {
-		err = db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.Version, &instance.SecondsBehindMaster)
+		err = db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SecondsBehindMaster)
 	    if err != nil {goto Cleanup}
 	}
         
@@ -211,7 +211,9 @@ func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 		from 
 			database_instance 
 		where
-			cluster_name = '%s'`, config.Config.InstanceUpToDateSeconds, clusterName)
+			cluster_name = '%s'
+		order by
+			hostname, port`, config.Config.InstanceUpToDateSeconds, clusterName)
 
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
     	instance := NewInstance()
@@ -374,6 +376,22 @@ func WriteInstance(instance *Instance, lastError error) error {
         )
 	}
 	return nil
+}
+
+
+func ForgetInstance(instanceKey *InstanceKey) error {
+	db,	err	:=	sqlutils.OpenOrchestrator()
+	if err != nil {return log.Errore(err)}
+	
+	_, err = sqlutils.Exec(db, `
+			delete 
+				from database_instance 
+			where 
+				hostname = ? and port = ?`,
+			instanceKey.Hostname, 
+		 	instanceKey.Port,
+		 )
+	return err		 
 }
 
 

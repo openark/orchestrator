@@ -4,8 +4,11 @@ import (
 	"testing"
 	"math/rand"
 	"time"
+	"fmt"
 	"github.com/outbrain/inst"
 	"github.com/outbrain/config"
+	"github.com/outbrain/sqlutils"
+	"github.com/outbrain/orch"
 	. "gopkg.in/check.v1"
 )
 
@@ -45,6 +48,12 @@ func (s *TestSuite) SetUpSuite(c *C) {
 	config.Config.MySQLOrchestratorDatabase = "orchestrator"	
 	config.Config.MySQLOrchestratorUser	= "msandbox"
 	config.Config.MySQLOrchestratorPassword	= "msandbox"
+	config.Config.DiscoverByShowSlaveHosts = true
+
+	_, _ = sqlutils.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", masterKey.Hostname, masterKey.Port)
+	_, _ = sqlutils.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave1Key.Hostname, slave1Key.Port)
+	_, _ = sqlutils.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave2Key.Hostname, slave2Key.Port)
+	_, _ = sqlutils.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave3Key.Hostname, slave3Key.Port)
 
 	inst.ExecInstance(&masterKey, "drop database if exists orchestrator_test")
 	inst.ExecInstance(&masterKey, "create database orchestrator_test")
@@ -61,7 +70,7 @@ func (s *TestSuite) TestReadTopologyMaster(c *C) {
 	
 	c.Assert(i.Key.Hostname, Equals, key.Hostname)
 	c.Assert(i.IsSlave(), Equals, false)
-	c.Assert(len(i.SlaveHosts), Equals, 1)
+	c.Assert(len(i.SlaveHosts), Equals, 3)
 	c.Assert(len(i.SlaveHosts.GetInstanceKeys()), Equals, len(i.SlaveHosts))
 }
  
@@ -202,3 +211,39 @@ func (s *TestSuite) TestFailMoveBelow(c *C) {
 	_, _ = inst.ExecInstance(&slave2Key, `set global binlog_format:='STATEMENT'`)
 	c.Assert(err, Not(IsNil))
 }
+
+
+func (s *TestSuite) TestDiscover(c *C) {	
+	var err error
+	_, err = sqlutils.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", masterKey.Hostname, masterKey.Port)
+	_, err = sqlutils.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave1Key.Hostname, slave1Key.Port)
+	_, err = sqlutils.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave2Key.Hostname, slave2Key.Port)
+	_, err = sqlutils.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave3Key.Hostname, slave3Key.Port)
+	_, found, _ := inst.ReadInstance(&masterKey)
+	c.Assert(found, Equals, false)
+	_, _ = inst.ReadTopologyInstance(&slave1Key)
+	orchestrator.StartDiscovery(slave1Key)
+	_, found, err = inst.ReadInstance(&slave1Key)
+	c.Assert(found, Equals, true)
+	c.Assert(err, IsNil)
+}
+
+
+func (s *TestSuite) TestForgetMaster(c *C) {
+	_, _ = inst.ReadTopologyInstance(&masterKey)
+	_, found, _ := inst.ReadInstance(&masterKey)
+	c.Assert(found, Equals, true)
+	inst.ForgetInstance(&masterKey)
+	_, found, _ = inst.ReadInstance(&masterKey)
+	c.Assert(found, Equals, false)
+}
+
+
+
+func (s *TestSuite) TestCluster(c *C) {
+	inst.ReadInstance(&masterKey)
+	orchestrator.StartDiscovery(slave1Key)
+	instances, _ := inst.ReadClusterInstances(fmt.Sprintf("%s:%d", masterKey.Hostname, masterKey.Port))
+	c.Assert(len(instances) > 2, Equals, true)
+}
+
