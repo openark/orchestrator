@@ -98,6 +98,42 @@ func (this *HttpAPI) Forget(params martini.Params, r render.Render) {
 
 
 
+func (this *HttpAPI) BeginMaintenance(params martini.Params, r render.Render) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(500, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+	err = inst.BeginMaintenance(&instanceKey, params["owner"], params["reason"])
+	if err != nil {
+		r.JSON(500, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code:OK, Message: fmt.Sprintf("Maintenance begun: %+v", instanceKey),})
+}
+
+
+
+func (this *HttpAPI) EndMaintenance(params martini.Params, r render.Render) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(500, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+	err = inst.EndMaintenance(&instanceKey)
+	if err != nil {
+		r.JSON(500, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code:OK, Message: fmt.Sprintf("Maintenance ended: %+v", instanceKey),})
+}
+
+
+
 func (this *HttpAPI) MoveUp(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
@@ -161,12 +197,27 @@ func (this *HttpAPI) Clusters(params martini.Params, r render.Render) {
 }
 
 
+func (this *HttpAPI) Maintenance(params martini.Params, r render.Render) {
+	instanceKeys, err := inst.ReadMaintenanceInstanceKeys()
+							  
+	if err != nil {
+		r.JSON(500, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+
+	r.JSON(200, instanceKeys)
+}
+
+
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/instance/:host/:port", this.Instance) 
 	m.Get("/api/discover/:host/:port", this.Discover) 
 	m.Get("/api/forget/:host/:port", this.Forget) 
 	m.Get("/api/move-up/:host/:port", this.MoveUp) 
 	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow) 
+	m.Get("/api/begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance) 
+	m.Get("/api/end-maintenance/:host/:port", this.EndMaintenance) 
 	m.Get("/api/cluster/:clusterName", this.Cluster) 
 	m.Get("/api/clusters", this.Clusters) 
+	m.Get("/api/maintenance", this.Maintenance) 
 }

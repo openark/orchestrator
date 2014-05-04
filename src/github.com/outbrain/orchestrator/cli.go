@@ -8,7 +8,7 @@ import (
 )
 
 
-func Cli(command string, instance string, sibling string) {
+func Cli(command string, instance string, sibling string, owner string, reason string) {
 	
 	instanceKey := inst.ParseInstanceKey(instance)
 	siblingKey := inst.ParseInstanceKey(sibling)
@@ -35,6 +35,18 @@ func Cli(command string, instance string, sibling string) {
 		case "forget": {
 			if instanceKey == nil {log.Fatal("Cannot deduce instance:", instance)}
 			inst.ForgetInstance(instanceKey)
+		}
+		case "begin-maintenance": {
+			if instanceKey == nil {log.Fatal("Cannot deduce instance:", instance)}
+			if owner == "" {log.Fatal("--owner option required")}
+			if reason == "" {log.Fatal("--reason option required")}
+			err := inst.BeginMaintenance(instanceKey, owner, reason)
+			if err != nil {log.Errore(err)}
+		}
+		case "end-maintenance": {
+			if instanceKey == nil {log.Fatal("Cannot deduce instance:", instance)}
+			err := inst.EndMaintenance(instanceKey)
+			if err != nil {log.Errore(err)}
 		}
 		case "continuous": {
 			orchestrator.ContinuousDiscovery()

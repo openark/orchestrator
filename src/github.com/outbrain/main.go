@@ -12,6 +12,8 @@ func main() {
 	command := flag.String("c", "", "command (move-up|make-child-of)")
 	instance := flag.String("i", "", "instance, host:port")
 	sibling := flag.String("s", "", "sibling instance, host:port")
+	owner := flag.String("owner", "", "operation owner")
+	reason := flag.String("reason", "", "operation reason")
 	discovery := flag.Bool("discovery", false, "auto discovery mode")
 	verbose := flag.Bool("verbose", false, "verbose")
 	debug := flag.Bool("debug", false, "debug mode (very verbose)")
@@ -35,7 +37,7 @@ func main() {
 
 	switch {
 		case len(flag.Args()) == 0 || flag.Arg(0) == "cli": 
-			orchestrator.Cli(*command, *instance, *sibling)
+			orchestrator.Cli(*command, *instance, *sibling, *owner, *reason)
 		case flag.Arg(0) == "http": 
 			orchestrator.Http(*discovery)
 		default:

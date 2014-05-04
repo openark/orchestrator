@@ -315,6 +315,43 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 
 }
 
+
+
+func ReadMaintenanceInstanceKeys() ([]InstanceKey, error) {
+	res := []InstanceKey{}
+	query := fmt.Sprintf(`
+		select 
+			hostname, port 
+		from 
+			database_instance_maintenance
+		where
+			maintenance_active
+		order by
+			database_instance_maintenance_id
+		`)
+	db,	err	:=	sqlutils.OpenOrchestrator()
+    if err != nil {goto Cleanup}
+    
+    err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		cname, err := GetCNAME(m["hostname"])
+	    if err != nil {return err}
+		port, err := strconv.Atoi(m["port"])
+	    if err != nil {return err}
+    	instanceKey := InstanceKey{Hostname: cname, Port: port}
+    	res = append(res, instanceKey)
+    	return err       	
+   	})
+	Cleanup:
+
+	if err	!=	nil	{
+		log.Errore(err)
+	}
+	return res, err
+
+}
+
+
+
 func WriteInstance(instance *Instance, lastError error) error {
 	db,	err	:=	sqlutils.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}
@@ -448,13 +485,64 @@ func UpdateClusterNames() error {
 		if err != nil {return err}
 		if affected, _ := res.RowsAffected(); affected == 0 {
 			// Nothing more updated -- we're done!
-			log.Info("--------------- affected is 0")
 			return nil
-		} else {
-			log.Infof("--------------- affected is %d", affected)
 		}
 	}
 	return errors.New("Encountered seemingly infinite depth on UpdateClusterNames")
+}
+
+
+
+func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) error {
+	db,	err	:=	sqlutils.OpenOrchestrator()
+	if err != nil {return log.Errore(err)}
+	
+	res, err := sqlutils.Exec(db, `
+			insert ignore
+				into database_instance_maintenance (
+					hostname, port, maintenance_active, begin_timestamp, end_timestamp, owner, reason
+				) VALUES (
+					?, ?, 1, NOW(), NULL, ?, ?
+				)
+			`,
+			instanceKey.Hostname, 
+		 	instanceKey.Port,
+		 	owner, 
+		 	reason,
+		 )
+	if err != nil {return log.Errore(err)}	
+	
+	if affected, _ := res.RowsAffected(); affected == 0 {
+		err = errors.New(fmt.Sprintf("Cannot begin maintenance for instance: %+v", instanceKey))
+	} 
+	return err		 
+}
+
+
+
+func EndMaintenance(instanceKey *InstanceKey) error {
+	db,	err	:=	sqlutils.OpenOrchestrator()
+	if err != nil {return log.Errore(err)}
+	
+	res, err := sqlutils.Exec(db, `
+			update
+				database_instance_maintenance
+			set  
+				maintenance_active = NULL,
+				end_timestamp = NOW()
+			where
+				hostname = ? 
+				and port = ?
+				and maintenance_active
+			`,
+			instanceKey.Hostname, 
+		 	instanceKey.Port,
+		 )
+	if err != nil {return log.Errore(err)}
+	if affected, _ := res.RowsAffected(); affected == 0 {
+		err = errors.New(fmt.Sprintf("Instance is not in maintenance mode: %+v", instanceKey))
+	} 
+	return err		 
 }
 
 

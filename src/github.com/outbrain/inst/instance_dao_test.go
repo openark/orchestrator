@@ -244,6 +244,44 @@ func (s *TestSuite) TestCluster(c *C) {
 	inst.ReadInstance(&masterKey)
 	orchestrator.StartDiscovery(slave1Key)
 	instances, _ := inst.ReadClusterInstances(fmt.Sprintf("%s:%d", masterKey.Hostname, masterKey.Port))
-	c.Assert(len(instances) > 2, Equals, true)
+	c.Assert(len(instances) >= 1, Equals, true)
+}
+
+
+func (s *TestSuite) TestBeginMaintenance(c *C) {
+	_, _ = sqlutils.ExecOrchestrator("update database_instance_maintenance set maintenance_active=null where owner = ?", "unittest")
+	_, _ = inst.ReadTopologyInstance(&masterKey)
+	err := inst.BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance");
+	c.Assert(err, IsNil)
+}
+
+func (s *TestSuite) TestBeginEndMaintenance(c *C) {
+	_, _ = sqlutils.ExecOrchestrator("update database_instance_maintenance set maintenance_active=null where owner = ?", "unittest")
+	_, _ = inst.ReadTopologyInstance(&masterKey)
+	err := inst.BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance");
+	c.Assert(err, IsNil)
+	err = inst.EndMaintenance(&masterKey);
+	c.Assert(err, IsNil)
+}
+
+
+func (s *TestSuite) TestFailBeginMaintenanceTwice(c *C) {
+	_, _ = sqlutils.ExecOrchestrator("update database_instance_maintenance set maintenance_active=null where owner = ?", "unittest")
+	_, _ = inst.ReadTopologyInstance(&masterKey)
+	err := inst.BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance");
+	c.Assert(err, IsNil)
+	err = inst.BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance");
+	c.Assert(err, Not(IsNil))
+}
+
+func (s *TestSuite) TestFailEndMaintenanceTwice(c *C) {
+	_, _ = sqlutils.ExecOrchestrator("update database_instance_maintenance set maintenance_active=null where owner = ?", "unittest")
+	_, _ = inst.ReadTopologyInstance(&masterKey)
+	err := inst.BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance");
+	c.Assert(err, IsNil)
+	err = inst.EndMaintenance(&masterKey);
+	c.Assert(err, IsNil)
+	err = inst.EndMaintenance(&masterKey);
+	c.Assert(err, Not(IsNil))
 }
 

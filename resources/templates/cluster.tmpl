@@ -1,6 +1,16 @@
-
+<div id="cluster_sidebar" >
+</div>
+<div class="container">
+    <div id="cluster_container" class="container">
+    </div>
+</div>
 
 <style type = "text/css">
+
+#cluster_sidebar {
+    width: 120px;
+}
+
 .node {
 }
 
@@ -54,6 +64,25 @@
 .node .nodeWrapper .popover div.popover-content p {
     margin-bottom: 0px;
 }
+
+.container {
+    width: inherit;
+}
+
+.jumbotron {
+    overflow:auto;
+}
+
+.container .jumbotron {
+    padding-left: 0px;
+    padding-right: 0px;
+}
+
+.jumbotron p {
+    font-size: inherit;
+    font-weight: inherit;
+}
+
 </style>
 
 <script src="/js/d3.js"></script>
@@ -62,9 +91,12 @@
 	$(document).ready(
 			function() {
 				function commonSuffixLength(strings) {
-				    if (strings.length == 0) {
-				    	return 0;
-				    }
+                    if (strings.length == 0) {
+                        return 0;
+                    }
+                    if (strings.length == 1) {
+                        return 0;
+                    }
 					var longestSuffixLength = 0;
 					var maxLength = 0;
 					strings.forEach(function(s) {
@@ -87,10 +119,12 @@
                     return longestSuffixLength;
 				}
 				
-				$.get("/api/cluster/{{.clusterName}}", function(instances) {
-					nodesList = visualizeInstances(instances);
-                    generateInstanceDivs(nodesList);
-				}, "json");
+                $.get("/api/cluster/{{.clusterName}}", function(instances) {
+                    $.get("/api/maintenance", function(maintenanceInstances) {
+						nodesList = visualizeInstances(instances);
+	                    generateInstanceDivs(nodesList);
+                    }, "json");
+                }, "json");
 				
 				function generateInstanceDivs(nodesList) {
 					$("[data-fo-id]").each(function() {
@@ -208,7 +242,7 @@
 						return [ d.y, d.x ];
 					});
 
-					var svg = d3.select("body").append("svg").attr("width",
+					var svg = d3.select("#cluster_container").append("svg").attr("width",
 							width + margin.right + margin.left).attr("height",
 							height + margin.top + margin.bottom).attr("xmlns", "http://www.w3.org/2000/svg").attr("version", "1.1").append("g")
 							.attr(
