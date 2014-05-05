@@ -114,7 +114,9 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			
         if err != nil {goto Cleanup}
 	}
-		        
+    if err != nil {goto Cleanup}
+
+	instance.ClusterName, err = ReadClusterNameByMaster(&instance.Key, &instance.MasterKey)
     if err != nil {goto Cleanup}
 
 	Cleanup:
@@ -125,6 +127,33 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		log.Errore(err)
 	}
 	return instance, err
+}
+
+
+func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (string, error) {
+	db,	err	:=	sqlutils.OpenOrchestrator()
+	if	err	!=	nil	{
+		return "", log.Errore(err)
+	}
+
+	var clusterName string
+    err = db.QueryRow(`
+       	select 
+       		if (
+       			cluster_name != '',
+       			cluster_name,
+	       		ifnull(concat(max(hostname), ':', max(port)), '')
+	       	) as cluster_name
+       	from database_instance 
+		 	where hostname=? and port=?`, 
+		masterKey.Hostname, masterKey.Port).Scan(
+		 	&clusterName,
+		)
+    if err != nil {return "", log.Errore(err)}
+    if clusterName == "" {
+    	return fmt.Sprintf("%s:%d", instanceKey.Hostname, instanceKey.Port), nil
+    }
+  	return clusterName, err
 }
 
 
@@ -403,8 +432,7 @@ func WriteInstance(instance *Instance, lastError error) error {
 		 	instance.GetSlaveHostsAsJson(),
 		 	instance.ClusterName,
 		 	)
-    _ = updateClusterNameForInstance(&instance.Key)
-	if err != nil {return log.Errore(err)}
+    if err != nil {return log.Errore(err)}
 	
 	if lastError == nil {
 		sqlutils.Exec(db, `
@@ -430,67 +458,6 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 		 )
 	return err		 
 }
-
-
-func updateClusterNameForInstance(instanceKey *InstanceKey) error {
-	db,	err	:=	sqlutils.OpenOrchestrator()
-	if err != nil {return log.Errore(err)}
-
-	_, err = sqlutils.Exec(db, `
-		update 
-			database_instance as slave_instance
-			left join database_instance as master_instance on (
-				slave_instance.master_host = master_instance.hostname
-				and slave_instance.master_port = master_instance.port)
-		set
-			slave_instance.cluster_name = if (
-				master_instance.server_id is null,
-				concat(slave_instance.hostname, ':', slave_instance.port),
-				master_instance.cluster_name
-			)
-		where 
-			slave_instance.hostname=? and slave_instance.port=?
-        	`, instanceKey.Hostname, instanceKey.Port,
-        )
-	if err != nil {return log.Errore(err)}
-	return err
-}
-
-
-func updateClusterNamesOnce() (sql.Result, error) {
-	db,	err	:=	sqlutils.OpenOrchestrator()
-	if err != nil {return nil, log.Errore(err)}
-	
-	res, err := sqlutils.Exec(db, `
-		update 
-			database_instance as slave_instance
-			left join database_instance as master_instance on (
-				slave_instance.master_host = master_instance.hostname
-				and slave_instance.master_port = master_instance.port)
-		set
-			slave_instance.cluster_name = if (
-				master_instance.server_id is null,
-				concat(slave_instance.hostname, ':', slave_instance.port),
-				master_instance.cluster_name
-			)
-        	`)
-	if err != nil {return nil, log.Errore(err)}
-	return res, err
-}
-
-
-func UpdateClusterNames() error {
-	for depth := 0 ; depth < config.Config.MaxReasonableTopologyDepth ; depth++ {
-		res, err := updateClusterNamesOnce()
-		if err != nil {return err}
-		if affected, _ := res.RowsAffected(); affected == 0 {
-			// Nothing more updated -- we're done!
-			return nil
-		}
-	}
-	return errors.New("Encountered seemingly infinite depth on UpdateClusterNames")
-}
-
 
 
 func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) error {
