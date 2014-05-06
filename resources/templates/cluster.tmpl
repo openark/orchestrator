@@ -49,12 +49,23 @@
     cursor: pointer;
 }
 
+.node .nodeWrapper .popover h3.label-info {
+  background-color: #5bc0de;
+  color: #ffffff;
+}
+.node .nodeWrapper .popover h3.label-info .glyphicon {
+  color: #ffffff;
+}
+
 .node .nodeWrapper .popover h3.label-warning {
   background-color: #f0ad4e;
 }
 
 .node .nodeWrapper .popover h3.label-danger {
   background-color: #d9534f;
+  color: #ffffff;
+}
+.node .nodeWrapper .popover h3.label-danger .glyphicon {
   color: #ffffff;
 }
 
@@ -85,7 +96,7 @@
 
 </style>
 
-<script src="/js/d3.js"></script>
+<script src="/js/d3.v3.min.js"></script>
 
 <script>
 	$(document).ready(
@@ -121,12 +132,12 @@
 				
                 $.get("/api/cluster/{{.clusterName}}", function(instances) {
                     $.get("/api/maintenance", function(maintenanceInstances) {
-						nodesList = visualizeInstances(instances);
-	                    generateInstanceDivs(nodesList);
+						nodesList = visualizeInstances(instances, maintenanceInstances);
+	                    generateInstanceDivs(nodesList, maintenanceInstances);
                     }, "json");
                 }, "json");
 				
-				function generateInstanceDivs(nodesList) {
+				function generateInstanceDivs(nodesList, maintenanceInstances) {
 					$("[data-fo-id]").each(function() {
                         var id = $(this).attr("data-fo-id");
                         $(this).html('<div xmlns="http://www.w3.org/1999/xhtml" class="popover right"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"><p></p></div></div>');
@@ -141,6 +152,10 @@
                         $("[data-fo-id='"+node.id+"'] .popover h3 a").click(function() {
                             return false;
                         });
+                    });
+					maintenanceInstances.forEach(function(maintenanceInstance) {  
+						var instanceId = getInstanceId(maintenanceInstance.Hostname, maintenanceInstance.Port)
+                        $("[data-fo-id='"+instanceId+"'] .popover h3").removeClass("label-danger").addClass("label-info");
                     });
                     $("[data-fo-id]").each(function() {
                     	var id = $(this).attr("data-fo-id");
@@ -161,7 +176,7 @@
 					return "instance" + host.replace(/[.]/g, "_") + "__" + port
 				}
 
-				function visualizeInstances(instances) {
+				function visualizeInstances(instances, maintenanceInstances) {
 
 					var treeData = [];
 					var nodesList = [];
@@ -394,7 +409,7 @@
 							d._children = null;
 						}
 						update(d);
-						generateInstanceDivs(nodesList);
+						generateInstanceDivs(nodesList, maintenanceInstances);
 					}
 
 					//~~~ 2222
