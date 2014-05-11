@@ -4,7 +4,7 @@ function getInstanceId(host, port) {
 
 function addNodeModalDataAttribute(name, value) {
     $('#modalDataAttributesTable').append(
-        '<tr><td>' + name + '</td><td>' + value + '</td></tr>');
+        '<tr><td>' + name + '</td><td><code>' + value + '</code></td></tr>');
 }
 
 function openNodeModal(node) {
@@ -138,6 +138,9 @@ function moveInstance(node, droppableNode) {
 	if (instancesAreSiblings(node, droppableNode)) {
 		return moveBelow(node, droppableNode);
 	}
+	if (instanceIsGrandchild(node, droppableNode)) {
+		return moveUp(node, droppableNode);
+	}
 	
 	addAlert(
 		"Cannot move <code><strong>" + 
@@ -173,14 +176,48 @@ function moveBelow(node, siblingNode) {
 }
 
 
+function moveUp(node, grandparentNode) {
+	bootbox.confirm("Are you sure you wish to turn <code><strong>" + 
+				node.Key.Hostname + ":" + node.Key.Port +
+				"</strong></code> into a slave of <code><strong>" +
+				grandparentNode.Key.Hostname + ":" + grandparentNode.Key.Port +
+				"</strong></code>?"
+			, function(confirm) {
+				if (confirm) {
+					showLoader();
+					var apiUrl = "/api/move-up/" + node.Key.Hostname + "/" + node.Key.Port;
+				    $.get(apiUrl, function (operationResult) {
+			    			hideLoader();
+			    			if (operationResult.Code == "ERROR") {
+			    				addAlert("<strong>Error</strong>: " + operationResult.Message)
+			    			} else {
+			    				location.reload();
+			    			}	
+			            }, "json");					
+				}
+			}); 
+	return false;
+}
+
+
 function instancesAreSiblings(node1, node2) {
-	if (node1.id == node2.id) {
+	if (node1.id == node2.id) return false;
+	if (node1.parent == null ) return false;
+	if (node2.parent == null ) return false;
+	if (node1.parent.id != node2.parent.id) return false;
+	return true;
+}
+
+
+function instanceIsGrandchild(node, grandparentNode, nodesMap) {
+	if (!node.hasMaster) {
 		return false;
 	}
-	if (node1.MasterKey.Hostname != node2.MasterKey.Hostname) {
+	var parentNode = node.parent;
+	if (!parentNode.hasMaster) {
 		return false;
 	}
-	if (node1.MasterKey.Port != node2.MasterKey.Port) {
+	if (parentNode.parent.id != grandparentNode.id) {
 		return false;
 	}
 	return true;

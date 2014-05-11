@@ -7,12 +7,11 @@ function visualizeInstances(instances, maintenanceInstances) {
         instance.id = getInstanceId(instance.Key.Hostname,
             instance.Key.Port);
         instance.hasMaster = true;
-        instance.parent = getInstanceId(instance.MasterKey.Hostname,
+        instance.masterId = getInstanceId(instance.MasterKey.Hostname,
             instance.MasterKey.Port);
         instance.title = instance.Key.Hostname + ":" + instance.Key.Port;
         instance.children = null;
         instance.inMaintenance = false;
-
     });
     var nodesList = instances;
     // Take canonical host name: strip down longest common suffix of all hosts
@@ -38,7 +37,7 @@ function visualizeInstances(instances, maintenanceInstances) {
     // create the tree array
     nodesList.forEach(function (node) {
         // add to parent
-        var parent = nodesMap[node.parent];
+        var parent = nodesMap[node.masterId];
         if (parent) {
             // create child array if it doesn't exist
             (parent.children || (parent.children = []))
@@ -62,7 +61,7 @@ function visualizeInstances(instances, maintenanceInstances) {
             if (node.parent == null) {
                 node.depth = 0;
             } else {
-                node.depth = getNodeDepth(nodesMap[node.parent]) + 1;
+                node.depth = getNodeDepth(nodesMap[node.masterId]) + 1;
             }
         }
         return node.depth;
