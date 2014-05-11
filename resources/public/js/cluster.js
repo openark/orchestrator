@@ -113,11 +113,14 @@ function generateInstanceDivs(nodesList) {
         	opacity: 0.67,
         	start: function(event, ui) {
         		$(".popover.instance").droppable({
-        			accept: ".popover.instance[data-duplicate-node]",
+        			accept: function(draggable) {
+        				//".popover.instance[data-duplicate-node]",
+        				return moveInstance(nodesMap[draggedNodeId], nodesMap[$(this).attr("data-nodeid")], false);
+        			},
         			hoverClass: "draggable-hovers",
 					drop: function( event, ui ) {
 				        $(".popover.instance[data-duplicate-node]").remove();
-				        moveInstance(nodesMap[draggedNodeId], nodesMap[$(this).attr("data-nodeid")]);
+				        moveInstance(nodesMap[draggedNodeId], nodesMap[$(this).attr("data-nodeid")], true);
 					}
         		});
         	},
@@ -134,22 +137,31 @@ function generateInstanceDivs(nodesList) {
     });
 }
 
-function moveInstance(node, droppableNode) {
+function moveInstance(node, droppableNode, shouldApply) {
 	if (instancesAreSiblings(node, droppableNode)) {
-		return moveBelow(node, droppableNode);
+		if (shouldApply) {
+			moveBelow(node, droppableNode);
+		}
+		return true;
 	}
 	if (instanceIsGrandchild(node, droppableNode)) {
-		return moveUp(node, droppableNode);
+		if (shouldApply) {
+			moveUp(node, droppableNode);
+		}
+		return true;
 	}
 	
-	addAlert(
-		"Cannot move <code><strong>" + 
-			node.Key.Hostname + ":" + node.Key.Port +
-			"</strong></code> under <code><strong>" +
-			droppableNode.Key.Hostname + ":" + droppableNode.Key.Port +
-			"</strong></code>. " +
-		"You may only move a node down below its sibling or up below its grandparent."
-	);
+	if (shouldApply) {
+		addAlert(
+				"Cannot move <code><strong>" + 
+					node.Key.Hostname + ":" + node.Key.Port +
+					"</strong></code> under <code><strong>" +
+					droppableNode.Key.Hostname + ":" + droppableNode.Key.Port +
+					"</strong></code>. " +
+				"You may only move a node down below its sibling or up below its grandparent."
+			);
+	}
+	return false;
 }
 
 function moveBelow(node, siblingNode) {

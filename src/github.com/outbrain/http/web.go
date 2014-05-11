@@ -41,6 +41,17 @@ func (this *HttpWeb) Cluster(params martini.Params, r render.Render) {
 }
 
 
+
+func (this *HttpWeb) Home(params martini.Params, r render.Render) {
+
+	r.HTML(200, "templates/home", map[string]interface{}{
+		"title": "home", 
+		})
+}
+
+
 func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
+	m.Get("/", this.Home) 
+	m.Get("/web", this.Home) 
 	m.Get("/web/cluster/:clusterName", this.Cluster) 
 }
