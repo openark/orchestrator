@@ -25,6 +25,25 @@ type InstanceKey struct {
 	Port	 			int
 }
 
+func NewInstanceKeyFromStrings(hostname string, port string) (*InstanceKey, error) {
+	instanceKey := &InstanceKey{}
+	var err error
+	if instanceKey.Hostname, err = GetCNAME(hostname); err != nil {return instanceKey, err}
+
+	if instanceKey.Port, err = strconv.Atoi(port); err != nil {
+		return instanceKey, errors.New(fmt.Sprintf("Invalid port: %s", port))
+	}
+	return instanceKey, nil
+}
+
+func ParseInstanceKey(hostPort string) (*InstanceKey, error) {
+	tokens := strings.SplitN(hostPort, ":", 2)
+	if len(tokens) != 2 {
+		return nil, errors.New(fmt.Sprintf("Cannpt parse InstanceKey from %s. Expected format is host:port", hostPort))
+	}
+	return NewInstanceKeyFromStrings(tokens[0], tokens[1])
+}
+
 func (this *InstanceKey) Formalize() *InstanceKey {
 	this.Hostname, _ = GetCNAME(this.Hostname) 
 	return this
@@ -39,20 +58,6 @@ func (this *InstanceKey) IsValid() bool {
 }
 
 
-func ParseInstanceKey(hostPort string) *InstanceKey {
-	tokens := strings.SplitN(hostPort, ":", 2)
-	if len(tokens) != 2 {
-		return nil
-	}
-	port, err :=  strconv.Atoi(tokens[1])
-	if err != nil {
-		return nil
-	}
-	
-    return &InstanceKey{
-    	Hostname: tokens[0], Port: port,
-    }
-}
 
 //
 type BinlogCoordinates struct {

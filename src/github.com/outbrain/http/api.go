@@ -1,9 +1,7 @@
 package http
 
 import (
-	"strconv"
 	"fmt"	
-	"errors"
 	"encoding/json"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
@@ -47,25 +45,20 @@ type APIResponse struct {
 
 
 func (this *HttpAPI) getInstanceKey(host string, port string) (inst.InstanceKey, error) {
-	instanceKey := inst.InstanceKey{Hostname: host}
-	var err error
-
-	if instanceKey.Port, err = strconv.Atoi(port); err != nil {
-		return instanceKey, errors.New(fmt.Sprintf("Invalid port: %s", port))
-	}
-	return instanceKey, err
+	instanceKey, err := inst.NewInstanceKeyFromStrings(host, port)
+	return *instanceKey, err
 }
 
 func (this *HttpAPI) Instance(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
-		r.JSON(500, &APIResponse{Code:ERROR, Message: err.Error(),})
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
 	}
 	instance, found, err := inst.ReadInstance(&instanceKey)
-	if instanceKey.Port, err = strconv.Atoi(params["port"]); !found || err != nil {
-		r.JSON(500, &APIResponse{Code:ERROR, Message: fmt.Sprintf("Cannot read instance: %+v", instanceKey),})
+	if (!found) || (err != nil) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("Cannot read instance: %+v", instanceKey),})
 		return
 	}
 	r.JSON(200, instance)
@@ -76,7 +69,7 @@ func (this *HttpAPI) Discover(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
-		r.JSON(500, &APIResponse{Code:ERROR, Message: err.Error(),})
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
 	}
 	go orchestrator.StartDiscovery(instanceKey)
@@ -88,7 +81,7 @@ func (this *HttpAPI) Forget(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
-		r.JSON(500, &APIResponse{Code:ERROR, Message: err.Error(),})
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
 	}
 	inst.ForgetInstance(&instanceKey)
@@ -102,12 +95,12 @@ func (this *HttpAPI) BeginMaintenance(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
-		r.JSON(500, &APIResponse{Code:ERROR, Message: err.Error(),})
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
 	}
 	err = inst.BeginMaintenance(&instanceKey, params["owner"], params["reason"])
 	if err != nil {
-		r.JSON(500, &APIResponse{Code:ERROR, Message: err.Error(),})
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
 	}
 
@@ -120,12 +113,12 @@ func (this *HttpAPI) EndMaintenance(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
-		r.JSON(500, &APIResponse{Code:ERROR, Message: err.Error(),})
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
 	}
 	err = inst.EndMaintenance(&instanceKey)
 	if err != nil {
-		r.JSON(500, &APIResponse{Code:ERROR, Message: err.Error(),})
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
 	}
 
@@ -138,12 +131,12 @@ func (this *HttpAPI) MoveUp(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
-		r.JSON(500, &APIResponse{Code:ERROR, Message: err.Error(),})
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
 	}
 	instance, err := inst.MoveUp(&instanceKey)
 	if err != nil {
-		r.JSON(500, &APIResponse{Code:ERROR, Message: err.Error(),})
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
 	}
 
@@ -154,18 +147,18 @@ func (this *HttpAPI) MoveUp(params martini.Params, r render.Render) {
 func (this *HttpAPI) MoveBelow(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 	if err != nil {
-		r.JSON(500, &APIResponse{Code:ERROR, Message: err.Error(),})
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
 	}
 	siblingKey, err := this.getInstanceKey(params["siblingHost"], params["siblingPort"])
 	if err != nil {
-		r.JSON(500, &APIResponse{Code:ERROR, Message: err.Error(),})
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
 	}
 	
 	instance, err := inst.MoveBelow(&instanceKey, &siblingKey)
 	if err != nil {
-		r.JSON(500, &APIResponse{Code:ERROR, Message: err.Error(),})
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
 	}
 
@@ -177,7 +170,7 @@ func (this *HttpAPI) Cluster(params martini.Params, r render.Render) {
 	instances, err := inst.ReadClusterInstances(params["clusterName"])
 
 	if err != nil {
-		r.JSON(500, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
 		return
 	}
 
@@ -189,7 +182,7 @@ func (this *HttpAPI) Clusters(params martini.Params, r render.Render) {
 	clusterNames, err := inst.ReadClusters()
 
 	if err != nil {
-		r.JSON(500, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
 		return
 	}
 
@@ -201,7 +194,7 @@ func (this *HttpAPI) Maintenance(params martini.Params, r render.Render) {
 	instanceKeys, err := inst.ReadMaintenanceInstanceKeys()
 							  
 	if err != nil {
-		r.JSON(500, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
 		return
 	}
 

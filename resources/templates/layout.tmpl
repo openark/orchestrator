@@ -42,6 +42,7 @@
 			</div>
 			<div class="collapse navbar-collapse">
 				<ul class="nav navbar-nav">
+                    <li><a href="#" id="ajaxLoader"><img src="/images/ajax-loader.gif"/></a></li>
 					<li class="active"><a href="#">Home</a></li>
 					<li><a href="#about">About</a></li>
 		            <li class="dropdown">
@@ -53,9 +54,9 @@
 		            </li>
 		            <form class="navbar-form navbar-left" role="search">
     			        <div class="form-group">
-                            <input type="text" class="form-control" placeholder="Search">
+                            <input type="text" class="form-control input-sm" placeholder="Search">
 			            </div>
-                        <button type="submit" class="btn btn-default">Submit</button>
+                        <button type="submit" class="btn btn-default btn-sm">Submit</button>
                     </form>
 				</ul>
 			</div>
@@ -74,7 +75,17 @@
 			        $("#dropdown-clusters").append('<li><a href="/web/cluster/'+cluster+'">'+cluster+'</a></li>');
 			    });                    
 			}, "json");
+			$("#ajaxLoader").click(function() {
+                return false;
+            });
+			hideLoader();
 		});
+        function showLoader() {
+            $("#ajaxLoader").css('visibility', 'visible');
+        }
+        function hideLoader() {
+            $("#ajaxLoader").css('visibility', 'hidden');
+        }
 	</script>
 </body>
 </html>

@@ -10,8 +10,10 @@ import (
 
 func Cli(command string, instance string, sibling string, owner string, reason string) {
 	
-	instanceKey := inst.ParseInstanceKey(instance)
-	siblingKey := inst.ParseInstanceKey(sibling)
+	instanceKey, err := inst.ParseInstanceKey(instance)
+	if err != nil {log.Fatal("Cannot deduce instance:", instance)}
+	siblingKey, err := inst.ParseInstanceKey(sibling)
+	if err != nil {siblingKey = nil}
 	
 	if len(command) == 0 {
 		log.Fatal("expected command (-c) (discover|forget|continuous|move-up|move-below)")

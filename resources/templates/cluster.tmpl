@@ -1,3 +1,140 @@
+
+<style type = "text/css">
+
+#alerts_container .alert {
+    margin-bottom: 4px;
+}
+
+#cluster_sidebar {
+    width: 120px;
+}
+
+.node {
+}
+
+.node circle {
+    fill: #fff;
+    stroke: steelblue;
+    stroke-width: 1.5px;
+    cursor: pointer;
+}
+
+.link {
+    fill: none;
+    stroke: #ccc;
+    stroke-width: 1.5px;
+}
+.node .nodeWrapper {
+    font: 10px sans-serif;
+    width: 276px;
+}
+
+.popover.instance {
+    font: 10px sans-serif;
+    display: block;
+    position: inherit;
+    max-width: 276px;
+    cursor: move;
+    transition: border-color 0.15s ease-in-out 0s, box-shadow 0.15s ease-in-out 0s;
+    margin-left: 8px;
+}
+
+.popover.instance[data-duplicate-node] {
+    position: absolute;
+}
+  
+.popover.instance h3 {
+    font-size: 10px;
+    padding: 2px 8px;
+}
+.popover.instance h3 .glyphicon {
+    position: inherit;
+    cursor: pointer;
+}
+
+.popover.instance h3.label-info {
+    background-color: #5bc0de;
+    color: #ffffff;
+}
+.popover.instance h3.label-info .glyphicon {
+    color: #ffffff;
+}
+
+.popover.instance h3.label-warning {
+  background-color: #f0ad4e;
+}
+
+.popover.instance h3.label-danger {
+  background-color: #d9534f;
+  color: #ffffff;
+}
+.popover.instance h3.label-danger .glyphicon {
+  color: #ffffff;
+}
+
+.popover.instance h3.label-primary {
+  background-color: #428BCA;
+  color: #ffffff;
+}
+.popover.instance h3.label-primary .glyphicon {
+  color: #ffffff;
+}
+
+.popover.instance div.popover-content {
+    padding: 4px 8px;
+}
+.popover.instance div.popover-content p {
+    margin-bottom: 0px;
+}
+
+.popover.instance.draggable-hovers {
+    background-color: #cccccc;
+}
+.popover.instance.draggable-hovers h3 {
+    color: inherit;
+    background-color: #cccccc;
+}
+
+.container {
+    width: inherit;
+}
+
+.jumbotron {
+    overflow:auto;
+}
+
+.container .jumbotron {
+    padding-left: 0px;
+    padding-right: 0px;
+}
+
+.jumbotron p {
+    font-size: inherit;
+    font-weight: inherit;
+}
+
+.ghostCircle.show{
+    display:block;
+}
+ 
+.ghostCircle, .activeDrag .ghostCircle{
+    display: none;
+}
+
+.bootbox .btn {
+    font-size: 11px;
+    line-height: 16px;
+    padding: 5px 9px;
+}
+
+.bootbox .modal-body {
+    padding: 12px;
+}
+.bootbox .modal-footer {
+    padding: 12px;
+}
+</style>
+
 <div id="cluster_sidebar" >
 </div>
 <div class="container">
@@ -30,437 +167,15 @@
 	<!-- /.modal -->
 </div>
 
-<style type = "text/css">
-
-#alerts_container .alert {
-    margin-bottom: 4px;
-}
-
-#cluster_sidebar {
-    width: 120px;
-}
-
-.node {
-}
-
-.node circle {
-	fill: #fff;
-	stroke: steelblue;
-	stroke-width: 1.5px;
-    cursor: pointer;
-}
-
-.node text {
-    font: 10px sans-serif;
-}
-
-.link {
-	fill: none;
-	stroke: #ccc;
-	stroke-width: 1.5px;
-}
-.node .nodeWrapper {
-    font: 10px sans-serif;
-    width: 276px;
-}
-
-.node .nodeWrapper .popover {
-    display: block;
-    position: inherit;
-    max-width: 276px;
-}
-.node .nodeWrapper .popover h3 {
-    font-size: 10px;
-    padding: 2px 8px;
-}
-.node .nodeWrapper .popover h3 .glyphicon {
-    position: inherit;
-    cursor: pointer;
-}
-
-.node .nodeWrapper .popover h3.label-info {
-  background-color: #5bc0de;
-  color: #ffffff;
-}
-.node .nodeWrapper .popover h3.label-info .glyphicon {
-  color: #ffffff;
-}
-
-.node .nodeWrapper .popover h3.label-warning {
-  background-color: #f0ad4e;
-}
-
-.node .nodeWrapper .popover h3.label-danger {
-  background-color: #d9534f;
-  color: #ffffff;
-}
-.node .nodeWrapper .popover h3.label-danger .glyphicon {
-  color: #ffffff;
-}
-
-.node .nodeWrapper .popover div.popover-content {
-    padding: 4px 8px;
-}
-.node .nodeWrapper .popover div.popover-content p {
-    margin-bottom: 0px;
-}
-
-.container {
-    width: inherit;
-}
-
-.jumbotron {
-    overflow:auto;
-}
-
-.container .jumbotron {
-    padding-left: 0px;
-    padding-right: 0px;
-}
-
-.jumbotron p {
-    font-size: inherit;
-    font-weight: inherit;
-}
-
-</style>
-
-<script src="/js/d3.v3.min.js"></script>
 
 <script>
-	$(document).ready(
-			function() {
-                function booleanString(b) {
-                    return (b ? "true" : "false");
-                }
-				function addAlert(alertText) {
-					$("#alerts_container").append('<div class="alert alert-danger alert-dismissable">'
-							   + '<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>'+alertText+'</div>');
-					$(".alert").alert();
-				}
-				function addNodeModalDataAttribute(name, value) {
-					$('#modalDataAttributesTable').append('<tr><td>'+name+'</td><td>'+value+'</td></tr>');
-				}
-				function openNodeModal(node) {
-					$('#node_modal .modal-title').html(node.title);
-					$('#modalDataAttributesTable').html("");
-					
-					if (node.MasterKey.Hostname) {
-                        addNodeModalDataAttribute("Master", node.MasterKey.Hostname + ":" + node.MasterKey.Port);
-                        addNodeModalDataAttribute("Replication running", booleanString(node.Slave_SQL_Running && node.Slave_IO_Running));
-                        addNodeModalDataAttribute("Replication lag", node.SecondsBehindMaster);
-					}
-                    addNodeModalDataAttribute("Num slaves", node.SlaveHosts.length);
-                    addNodeModalDataAttribute("Server ID", node.ServerID);
-                    addNodeModalDataAttribute("Version", node.Version);
-                    addNodeModalDataAttribute("Binlog format", node.Binlog_format);
-                    addNodeModalDataAttribute("Has binary logs", booleanString(node.LogBinEnabled));
-                    addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
-					$('#node_modal').modal({})
-
-				}
-				function commonSuffixLength(strings) {
-                    if (strings.length == 0) {
-                        return 0;
-                    }
-                    if (strings.length == 1) {
-                        return 0;
-                    }
-					var longestSuffixLength = 0;
-					var maxLength = 0;
-					strings.forEach(function(s) {
-						maxLength = ((maxLength == 0) ? s.length : Math.min(maxLength, s.length));  
-					});
-                    var suffixLength = 0;
-					while (suffixLength < maxLength) {
-                        suffixLength++
-						var suffixes = strings.map(function(s) {return s.substring(s.length - suffixLength)});
-						var uniqueSuffixes = suffixes.filter(function(elem, pos) {
-						    return suffixes.indexOf(elem) == pos;
-						})
-						if (uniqueSuffixes.length > 1) {
-							// lost it. keep last longestSuffixLength value
-							break;
-						}
-						// we're still good
-						longestSuffixLength = suffixLength;
-					}
-                    return longestSuffixLength;
-				}
-				
-                $.get("/api/cluster/{{.clusterName}}", function(instances) {
-                    $.get("/api/maintenance", function(maintenanceInstances) {
-						visualizeInstances(instances, maintenanceInstances);
-	                    generateInstanceDivs(instances);
-                    }, "json");
-                }, "json");
-				
-				function generateInstanceDivs(nodesList) {
-					$("[data-fo-id]").each(function() {
-                        var id = $(this).attr("data-fo-id");
-                        $(this).html('<div xmlns="http://www.w3.org/1999/xhtml" class="popover right"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"><p></p></div></div>');
-                        
-                    });
-					nodesList.forEach(function(node) {                    	
-                    	$("[data-fo-id='"+node.id+"'] .popover h3").html(node.canonicalTitle +  '<div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog"></span></a></div>');
-                    	if (node.inMaintenance) {
-                            $("[data-fo-id='"+node.id+"'] .popover h3").addClass("label-info");
-                        } else if (node.secondsBehindMaster > 10) {
-                    		$("[data-fo-id='"+node.id+"'] .popover h3").addClass("label-danger");
-                    	}
-                    	$("[data-fo-id='"+node.id+"'] .popover .popover-content p").html(node.Version + " "+ node.Binlog_format + '<div class="pull-right">' + node.SecondsBehindMaster + ' seconds lag</div>');
-                        $("[data-fo-id='"+node.id+"'] .popover h3 a").click(function() {
-                        	openNodeModal(node);
-                            return false;
-                        });
-                    });
-                    $("[data-fo-id]").each(function() {
-                    	var id = $(this).attr("data-fo-id");
-                        var popoverDiv = $("[data-fo-id='"+id+"'] div.popover");
-                        
-                        popoverDiv.attr("x", $(this).attr("x"));
-                        $(this).attr("y", 0-popoverDiv.height()/2 - 2);                        
-                        popoverDiv.attr("y", $(this).attr("y"));
-                        $(this).attr("width", popoverDiv.width()+20);                        
-                        $(this).attr("height", popoverDiv.height()+20);                        
-                    });
-                    $("div.popover").popover();
-                    $("div.popover").show();
-				}
-				
-
-				function getInstanceId(host, port) {
-					return "instance" + host.replace(/[.]/g, "_") + "__" + port
-				}
-
-				function visualizeInstances(instances, maintenanceInstances) {
-
-					var treeData = [];
-
-					instances.forEach(function(instance) {
-						instance.id = getInstanceId(instance.Key.Hostname,
-                                instance.Key.Port);
-						instance.hasMaster = true;
-						instance.parent = getInstanceId(instance.MasterKey.Hostname,
-                                instance.MasterKey.Port);
-						instance.title = instance.Key.Hostname + ":" + instance.Key.Port;
-                        instance.children = null;
-                        instance.inMaintenance = false;
-
-					});
-					var nodesList = instances;
-					// Take canonical host name: strip down longest common suffix of all hosts
-					// (experimental; you may not like it)
-                    var hostNames = nodesList.map(function(node) {return node.title});
-                    var suffixLength = commonSuffixLength(hostNames);
-                    nodesList.forEach(function(node) {
-                        node.canonicalTitle = node.title.substring(0, node.title.length - suffixLength);
-                    });
-					var dataMap = nodesList.reduce(function(map, node) {
-						map[node.id] = node;
-						return map;
-					}, {});
-					// mark maintenance instances
-                    maintenanceInstances.forEach(function(maintenanceInstance) {  
-                        var instanceId = getInstanceId(maintenanceInstance.Hostname, maintenanceInstance.Port)
-                        if (instanceId in dataMap) {
-                    	   dataMap[instanceId].inMaintenance = true;
-                        }
-                    });
-					// create the tree array
-					nodesList.forEach(function(node) {
-						// add to parent
-						var parent = dataMap[node.parent];
-						if (parent) {
-							// create child array if it doesn't exist
-							(parent.children || (parent.children = []))
-							// add node to child array
-							.push(node);
-							(parent.contents || (parent.contents = []))
-							// add node to child array
-							.push(node);
-						} else {
-							// parent is null or missing
-							node.hasMaster = false;
-							node.parent = null;
-							treeData.push(node);
-						}
-					});
-
-					var margin = {
-						top : 0,
-						right : 60,
-						bottom : 120,
-						left : 60
-					};
-                    var width = window.innerWidth - margin.right - margin.left;
-                    var height = window.innerHeight - margin.top - margin.bottom;
-                    var horizontalSpacing = 320;
-                    // width = 1560 - margin.right - margin.left;
-                    // height = 800 - margin.top - margin.bottom;
-
-					var i = 0, duration = 750, root;
-
-					var tree = d3.layout.tree().size([ height, width ]);
-
-					var diagonal = d3.svg.diagonal().projection(function(d) {
-						return [ d.y, d.x ];
-					});
-
-					var svg = d3.select("#cluster_container").append("svg").attr("width",
-							width + margin.right + margin.left).attr("height",
-							height + margin.top + margin.bottom).attr("xmlns", "http://www.w3.org/2000/svg").attr("version", "1.1").append("g")
-							.attr(
-									"transform",
-									"translate(" + margin.left + ","
-											+ margin.top + ")");
-
-					var root = treeData[0];
-
-					root.x0 = height / 2;
-					root.y0 = 0;
-
-					function collapse(d) {
-						if (d.children) {
-							d._children = d.children;
-							d._children.forEach(collapse);
-							d.children = null;
-						}
-					}
-
-					//root.children.forEach(collapse);
-					update(root);
-
-					d3.select(self.frameElement).style("height", "800px");
-
-					function update(source) {
-
-						// Compute the new tree layout.
-						var nodes = tree.nodes(root).reverse(), links = tree
-								.links(nodes);
-
-						// Normalize for fixed-depth.
-						nodes.forEach(function(d) {
-							d.y = d.depth * horizontalSpacing;
-						});
-
-						// Update the nodes…
-						var node = svg.selectAll("g.node").data(nodes,
-								function(d) {
-									return d.id || (d.id = ++i);
-								});
-
-						// Enter any new nodes at the parent's previous position.
-						var nodeEnter = node.enter().append("g").attr("class",
-								"node").attr(
-								"transform",
-								function(d) {
-									return "translate(" + source.y0 + ","
-											+ source.x0 + ")";
-								});
-
-						nodeEnter.append("circle").attr("r", 1e-6).style(
-								"fill",
-								function(d) {
-									return d._children ? "lightsteelblue"
-											: "#fff";
-								}).on("click", click);
-					
-                        nodeEnter.append("foreignObject").attr("class", "nodeWrapper").attr("data-fo-id", function(d) {
-                            return d.id
-                        }).attr("width", "100%").attr("dy", ".35em").attr("text-anchor", function(d) {
-                            return d.children || d._children ? "end" : "start";
-                        }).attr("x", function(d) {
-                            return 4;
-                        }).attr("requiredFeatures", "http://www.w3.org/TR/SVG11/feature#Extensibility");
-                        
-						// Transition nodes to their new position.
-						var nodeUpdate = node.transition().duration(duration)
-								.attr(
-										"transform",
-										function(d) {
-											return "translate(" + d.y + ","
-													+ d.x + ")";
-										});
-
-						nodeUpdate.select("circle").attr("r", 4.5).style(
-								"fill",
-								function(d) {
-									return d._children ? "lightsteelblue"
-											: "#fff";
-								});
-
-						nodeUpdate.select("text").style("fill-opacity", 1);
-						
-						// Transition exiting nodes to the parent's new position.
-						var nodeExit = node.exit().transition().duration(
-								duration).attr(
-								"transform",
-								function(d) {
-									return "translate(" + source.y + ","
-											+ source.x + ")";
-								}).remove();
-
-						nodeExit.select("circle").attr("r", 1e-6);
-
-						nodeExit.select("text").style("fill-opacity", 1e-6);
-						//nodeExit.select("foreignObject").style("fill-opacity", 1e-6);
-
-						// Update the links…
-						var link = svg.selectAll("path.link").data(links,
-								function(d) {
-									return d.target.id;
-								});
-
-						// Enter any new links at the parent's previous position.
-						link.enter().insert("path", "g").attr("class", "link")
-								.attr("d", function(d) {
-									var o = {
-										x : source.x0,
-										y : source.y0
-									};
-									return diagonal({
-										source : o,
-										target : o
-									});
-								});
-
-						// Transition links to their new position.
-						link.transition().duration(duration)
-								.attr("d", diagonal);
-
-						// Transition exiting nodes to the parent's new position.
-						link.exit().transition().duration(duration).attr("d",
-								function(d) {
-									var o = {
-										x : source.x,
-										y : source.y
-									};
-									return diagonal({
-										source : o,
-										target : o
-									});
-								}).remove();
-
-						// Stash the old positions for transition.
-						nodes.forEach(function(d) {
-							d.x0 = d.x;
-							d.y0 = d.y;
-						});
-					}
-
-					// Toggle children on click.
-					function click(d) {
-						if (d.children) {
-							d._children = d.children;
-							d.children = null;
-						} else {
-							d.children = d._children;
-							d._children = null;
-						}
-						update(d);
-						generateInstanceDivs(nodesList);
-					}
-				}
-			});
+	function currentClusterName() {
+	    return "{{.clusterName}}";
+	}
 </script>
+<script type="text/javascript" src="/js/jquery-ui-1.10.4.custom.min.js"></script>        
+<script type="text/javascript" src="/js/bootbox.min.js"></script>        
+<script src="/js/d3.v3.min.js"></script>
+<script src="/js/orchestrator.js"></script>
+<script src="/js/cluster.js"></script>
+<script src="/js/cluster-tree.js"></script>

@@ -55,7 +55,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
        	instance.ExecBinlogCoordinates.LogPos, _ = strconv.ParseInt(m["Exec_Master_Log_Pos"], 10, 0)
        	var err error
        	instance.MasterKey.Hostname, err = GetCNAME(m["Master_Host"])
-       	if err != nil {return err}
+       	if err != nil {log.Errore(err)}
        	instance.MasterKey.Port, err = strconv.Atoi(m["Master_Port"])
        	if err != nil {return err}
        	if config.Config.SlaveLagQuery == "" {
@@ -354,7 +354,7 @@ func ReadMaintenanceInstanceKeys() ([]InstanceKey, error) {
 		from 
 			database_instance_maintenance
 		where
-			maintenance_active
+			maintenance_active = 1
 		order by
 			database_instance_maintenance_id
 		`)
@@ -500,7 +500,7 @@ func EndMaintenance(instanceKey *InstanceKey) error {
 			where
 				hostname = ? 
 				and port = ?
-				and maintenance_active
+				and maintenance_active = 1
 			`,
 			instanceKey.Hostname, 
 		 	instanceKey.Port,

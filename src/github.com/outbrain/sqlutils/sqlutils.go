@@ -96,7 +96,6 @@ func getDB(mysql_uri string) (*sql.DB, error) {
 	if _, exists := knownDBs[mysql_uri]; !exists {
 	    if db, err := sql.Open("mysql", mysql_uri); err == nil {
 	    	knownDBs[mysql_uri] = db
-			log.Info("sqlutils.getDB", mysql_uri)
 	    } else {
 	    	return db, err
 	    }	    	    

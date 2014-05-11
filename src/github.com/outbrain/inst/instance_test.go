@@ -71,28 +71,51 @@ func (s *TestSuite) TestCanReplicateFrom(c *C) {
 	i56 	:= inst.Instance {Version: "5.6"}
 	
 	var canReplicate bool
-	canReplicate, _ = i56.CanReplicateFrom(&i55);
+	canReplicate, _ = i56.CanReplicateFrom(&i55)
 	c.Assert(canReplicate, Equals, false); //binlog not yet enabled
 	
-	i55.LogBinEnabled = true;
-	i55.LogSlaveUpdatesEnabled = true;
-	i56.LogBinEnabled = true;
-	i56.LogSlaveUpdatesEnabled = true;
+	i55.LogBinEnabled = true
+	i55.LogSlaveUpdatesEnabled = true
+	i56.LogBinEnabled = true
+	i56.LogSlaveUpdatesEnabled = true
 
-	canReplicate, _ = i56.CanReplicateFrom(&i55);
-	c.Assert(canReplicate, Equals, false); //serverid not set
+	canReplicate, _ = i56.CanReplicateFrom(&i55)
+	c.Assert(canReplicate, Equals, false) //serverid not set
 	i55.ServerID = 55
 	i56.ServerID = 56
 
-	canReplicate, _ = i56.CanReplicateFrom(&i55);
-	c.Assert(canReplicate, Equals, true);
-	canReplicate, _ = i55.CanReplicateFrom(&i56);
-	c.Assert(canReplicate, Equals, false);
+	canReplicate, _ = i56.CanReplicateFrom(&i55)
+	c.Assert(canReplicate, Equals, true)
+	canReplicate, _ = i55.CanReplicateFrom(&i56)
+	c.Assert(canReplicate, Equals, false)
 
 	iStatement 	:= inst.Instance {Binlog_format: "STATEMENT", ServerID: 1, Version: "5.5", LogBinEnabled: true, LogSlaveUpdatesEnabled: true}
 	iRow 	:= inst.Instance {Binlog_format: "ROW", ServerID: 2, Version: "5.5", LogBinEnabled: true, LogSlaveUpdatesEnabled: true}
-	canReplicate, _ = iRow.CanReplicateFrom(&iStatement);
-	c.Assert(canReplicate, Equals, true);
-	canReplicate, _ = iStatement.CanReplicateFrom(&iRow);
-	c.Assert(canReplicate, Equals, false);
+	canReplicate, _ = iRow.CanReplicateFrom(&iStatement)
+	c.Assert(canReplicate, Equals, true)
+	canReplicate, _ = iStatement.CanReplicateFrom(&iRow)
+	c.Assert(canReplicate, Equals, false)
 }
+
+
+func (s *TestSuite) TestNewInstanceKeyFromStrings(c *C) {
+	i, err := inst.NewInstanceKeyFromStrings("127.0.0.1", "3306")
+	c.Assert(err, IsNil)
+	c.Assert(i.Hostname, Equals, "127.0.0.1")
+	c.Assert(i.Port, Equals, 3306)
+}
+
+
+func (s *TestSuite) TestNewInstanceKeyFromStringsFail(c *C) {
+	_, err := inst.NewInstanceKeyFromStrings("127.0.0.1", "3306x")
+	c.Assert(err, Not(IsNil))
+}
+
+func (s *TestSuite) TestParseInstanceKey(c *C) {
+	i, err := inst.ParseInstanceKey("127.0.0.1:3306")
+	c.Assert(err, IsNil)
+	c.Assert(i.Hostname, Equals, "127.0.0.1")
+	c.Assert(i.Port, Equals, 3306)
+}
+
+
