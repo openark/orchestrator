@@ -36,7 +36,6 @@
     max-width: 276px;
     cursor: move;
     transition: border-color 0.15s ease-in-out 0s, box-shadow 0.15s ease-in-out 0s;
-    margin-left: 8px;
 }
 
 .popover.instance[data-duplicate-node] {
@@ -90,37 +89,16 @@
 }
 
 .popover.instance.draggable-hovers {
-    background-color: #cccccc;
+    background-color: #f7f7f7;
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.66);
 }
 .popover.instance.draggable-hovers h3 {
+    background-color: #e0e0e0;
     color: inherit;
-    background-color: #cccccc;
 }
 
 .container {
     width: inherit;
-}
-
-.jumbotron {
-    overflow:auto;
-}
-
-.container .jumbotron {
-    padding-left: 0px;
-    padding-right: 0px;
-}
-
-.jumbotron p {
-    font-size: inherit;
-    font-weight: inherit;
-}
-
-.ghostCircle.show{
-    display:block;
-}
- 
-.ghostCircle, .activeDrag .ghostCircle{
-    display: none;
 }
 
 .modal-content .btn {

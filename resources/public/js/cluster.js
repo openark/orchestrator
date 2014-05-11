@@ -44,7 +44,7 @@ function generateInstanceDivs(nodesList) {
                 var id = $(this).attr("data-fo-id");
                 $(this)
                     .html(
-                        '<div xmlns="http://www.w3.org/1999/xhtml" class="popover instance"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"><p></p></div></div>');
+                        '<div xmlns="http://www.w3.org/1999/xhtml" class="popover right instance"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"><p></p></div></div>');
 
             });
     nodesList
