@@ -3,8 +3,8 @@ package orchestrator
 import (
 	"fmt"
 	"time"
-	"github.com/outbrain/inst"
-	"github.com/outbrain/config"
+	"github.com/outbrain/orchestrator/inst"
+	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/log"
 )
 

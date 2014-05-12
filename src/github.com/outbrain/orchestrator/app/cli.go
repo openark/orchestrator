@@ -1,9 +1,8 @@
-package orchestrator 
+package app 
 
 import (
-	"github.com/outbrain/inst"
-	"github.com/outbrain/orch"
-	
+	"github.com/outbrain/orchestrator/inst"	
+	"github.com/outbrain/orchestrator/logic"
 	"github.com/outbrain/log"
 )
 

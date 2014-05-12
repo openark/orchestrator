@@ -58,7 +58,7 @@ function generateInstanceDivs(nodesList) {
                 $(
                     "[data-fo-id='" + node.id + "'] .popover h3")
                     .addClass("label-info");
-            } else if (node.secondsBehindMaster > 10) {
+            } else if (node.SecondsBehindMaster > 10) {
                 $(
                     "[data-fo-id='" + node.id + "'] .popover h3")
                     .addClass("label-danger");
@@ -112,6 +112,7 @@ function generateInstanceDivs(nodesList) {
         	addClasses: true, 
         	opacity: 0.67,
         	start: function(event, ui) {
+        		//$(this).data("startingScrollTop",$(this).parent().scrollTop());
         		$(".popover.instance").droppable({
         			accept: function(draggable) {
         				//".popover.instance[data-duplicate-node]",
@@ -124,6 +125,10 @@ function generateInstanceDivs(nodesList) {
 					}
         		});
         	},
+	    	drag: function(event, ui) {
+	    		//var st = parseInt($(this).data("startingScrollTop"));
+	    		//ui.position.top -= $(this).parent().scrollTop() - st;
+	    	},
 	    	stop: function(event, ui) {
         		//$(".popover.instance").droppable("disable");
 	    	}

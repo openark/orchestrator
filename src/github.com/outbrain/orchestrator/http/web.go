@@ -7,7 +7,7 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 
-	"github.com/outbrain/inst"
+	"github.com/outbrain/orchestrator/inst"
 )
 
 type HttpWeb struct{}

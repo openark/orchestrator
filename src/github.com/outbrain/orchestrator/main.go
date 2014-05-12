@@ -2,9 +2,9 @@ package main
 
 import (
 	"flag"
-	"github.com/outbrain/config"
+	"github.com/outbrain/orchestrator/app"
+	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/log"
-	"github.com/outbrain/orchestrator"
 )
 
 func main() {
@@ -37,9 +37,9 @@ func main() {
 
 	switch {
 		case len(flag.Args()) == 0 || flag.Arg(0) == "cli": 
-			orchestrator.Cli(*command, *instance, *sibling, *owner, *reason)
+			app.Cli(*command, *instance, *sibling, *owner, *reason)
 		case flag.Arg(0) == "http": 
-			orchestrator.Http(*discovery)
+			app.Http(*discovery)
 		default:
 			log.Error("Usage: orchestrator --options... [cli|http]")
 	}

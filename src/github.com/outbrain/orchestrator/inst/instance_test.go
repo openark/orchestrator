@@ -2,7 +2,7 @@ package inst
 
 import (
 	"testing"
-	"github.com/outbrain/inst"
+	"github.com/outbrain/orchestrator/inst"
 	. "gopkg.in/check.v1"
 )
 

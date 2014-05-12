@@ -5,10 +5,10 @@ import (
 	"math/rand"
 	"time"
 	"fmt"
-	"github.com/outbrain/inst"
-	"github.com/outbrain/config"
-	"github.com/outbrain/sqlutils"
-	"github.com/outbrain/orch"
+	"github.com/outbrain/orchestrator/inst"
+	"github.com/outbrain/orchestrator/config"
+	"github.com/outbrain/orchestrator/db"
+	"github.com/outbrain/orchestrator/logic"
 	. "gopkg.in/check.v1"
 )
 
@@ -50,10 +50,10 @@ func (s *TestSuite) SetUpSuite(c *C) {
 	config.Config.MySQLOrchestratorPassword	= "msandbox"
 	config.Config.DiscoverByShowSlaveHosts = true
 
-	_, _ = sqlutils.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", masterKey.Hostname, masterKey.Port)
-	_, _ = sqlutils.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave1Key.Hostname, slave1Key.Port)
-	_, _ = sqlutils.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave2Key.Hostname, slave2Key.Port)
-	_, _ = sqlutils.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave3Key.Hostname, slave3Key.Port)
+	_, _ = db.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", masterKey.Hostname, masterKey.Port)
+	_, _ = db.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave1Key.Hostname, slave1Key.Port)
+	_, _ = db.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave2Key.Hostname, slave2Key.Port)
+	_, _ = db.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave3Key.Hostname, slave3Key.Port)
 
 	inst.ExecInstance(&masterKey, "drop database if exists orchestrator_test")
 	inst.ExecInstance(&masterKey, "create database orchestrator_test")
@@ -215,10 +215,10 @@ func (s *TestSuite) TestFailMoveBelow(c *C) {
 
 func (s *TestSuite) TestDiscover(c *C) {	
 	var err error
-	_, err = sqlutils.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", masterKey.Hostname, masterKey.Port)
-	_, err = sqlutils.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave1Key.Hostname, slave1Key.Port)
-	_, err = sqlutils.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave2Key.Hostname, slave2Key.Port)
-	_, err = sqlutils.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave3Key.Hostname, slave3Key.Port)
+	_, err = db.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", masterKey.Hostname, masterKey.Port)
+	_, err = db.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave1Key.Hostname, slave1Key.Port)
+	_, err = db.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave2Key.Hostname, slave2Key.Port)
+	_, err = db.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave3Key.Hostname, slave3Key.Port)
 	_, found, _ := inst.ReadInstance(&masterKey)
 	c.Assert(found, Equals, false)
 	_, _ = inst.ReadTopologyInstance(&slave1Key)
@@ -249,14 +249,14 @@ func (s *TestSuite) TestCluster(c *C) {
 
 
 func (s *TestSuite) TestBeginMaintenance(c *C) {
-	_, _ = sqlutils.ExecOrchestrator("update database_instance_maintenance set maintenance_active=null where owner = ?", "unittest")
+	_, _ = db.ExecOrchestrator("update database_instance_maintenance set maintenance_active=null where owner = ?", "unittest")
 	_, _ = inst.ReadTopologyInstance(&masterKey)
 	err := inst.BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance");
 	c.Assert(err, IsNil)
 }
 
 func (s *TestSuite) TestBeginEndMaintenance(c *C) {
-	_, _ = sqlutils.ExecOrchestrator("update database_instance_maintenance set maintenance_active=null where owner = ?", "unittest")
+	_, _ = db.ExecOrchestrator("update database_instance_maintenance set maintenance_active=null where owner = ?", "unittest")
 	_, _ = inst.ReadTopologyInstance(&masterKey)
 	err := inst.BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance");
 	c.Assert(err, IsNil)
@@ -266,7 +266,7 @@ func (s *TestSuite) TestBeginEndMaintenance(c *C) {
 
 
 func (s *TestSuite) TestFailBeginMaintenanceTwice(c *C) {
-	_, _ = sqlutils.ExecOrchestrator("update database_instance_maintenance set maintenance_active=null where owner = ?", "unittest")
+	_, _ = db.ExecOrchestrator("update database_instance_maintenance set maintenance_active=null where owner = ?", "unittest")
 	_, _ = inst.ReadTopologyInstance(&masterKey)
 	err := inst.BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance");
 	c.Assert(err, IsNil)
@@ -275,7 +275,7 @@ func (s *TestSuite) TestFailBeginMaintenanceTwice(c *C) {
 }
 
 func (s *TestSuite) TestFailEndMaintenanceTwice(c *C) {
-	_, _ = sqlutils.ExecOrchestrator("update database_instance_maintenance set maintenance_active=null where owner = ?", "unittest")
+	_, _ = db.ExecOrchestrator("update database_instance_maintenance set maintenance_active=null where owner = ?", "unittest")
 	_, _ = inst.ReadTopologyInstance(&masterKey)
 	err := inst.BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance");
 	c.Assert(err, IsNil)

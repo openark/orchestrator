@@ -9,12 +9,13 @@ import (
 	"math"
 	"database/sql"
 	"github.com/outbrain/sqlutils"
-	"github.com/outbrain/config"
+	"github.com/outbrain/orchestrator/db"
+	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/log"
 )
 
 func ExecInstance(instanceKey *InstanceKey, query string, args ...interface{}) (sql.Result, error) {
-	db,	err	:=	sqlutils.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	db,	err	:=	db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
 		return nil, err
 	}
@@ -24,7 +25,7 @@ func ExecInstance(instanceKey *InstanceKey, query string, args ...interface{}) (
 
 
 func ScanInstanceRow(instanceKey *InstanceKey, query string, dest ...interface{}) error {
-	db,	err	:=	sqlutils.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	db,	err	:=	db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
 		return err
 	}
@@ -37,7 +38,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	instanceFound := false;
     foundBySlaveHosts := false
 
-	db,	err	:=	sqlutils.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	db,	err	:=	db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 
     if err != nil {goto Cleanup}
 
@@ -131,7 +132,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 
 
 func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (string, error) {
-	db,	err	:=	sqlutils.OpenOrchestrator()
+	db,	err	:=	db.OpenOrchestrator()
 	if	err	!=	nil	{
 		return "", log.Errore(err)
 	}
@@ -158,7 +159,7 @@ func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (
 
 
 func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
-	db,	err	:=	sqlutils.OpenOrchestrator()
+	db,	err	:=	db.OpenOrchestrator()
 	if	err	!=	nil	{
 		return nil, false, log.Errore(err)
 	}
@@ -224,7 +225,7 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 	instances := [](*Instance){}
 
-	db,	err	:=	sqlutils.OpenOrchestrator()
+	db,	err	:=	db.OpenOrchestrator()
 	if	err	!=	nil	{
 		return instances, log.Errore(err)
 	}
@@ -290,7 +291,7 @@ func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 func ReadClusters() ([]string, error) {
 	clusterNames := []string{}
 
-	db,	err	:=	sqlutils.OpenOrchestrator()
+	db,	err	:=	db.OpenOrchestrator()
 	if	err	!=	nil	{
 		return clusterNames, log.Errore(err)
 	}
@@ -323,7 +324,7 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 			timestampdiff(second, last_checked, now()) >= %d
     		and ifnull(timestampdiff(second, last_seen, now()) <= %d, false) = false `, 
     		config.Config.InstanceReattemptSeconds, config.Config.InstanceUpToDateSeconds)
-	db,	err	:=	sqlutils.OpenOrchestrator()
+	db,	err	:=	db.OpenOrchestrator()
     if err != nil {goto Cleanup}
     
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
@@ -358,7 +359,7 @@ func ReadMaintenanceInstanceKeys() ([]InstanceKey, error) {
 		order by
 			database_instance_maintenance_id
 		`)
-	db,	err	:=	sqlutils.OpenOrchestrator()
+	db,	err	:=	db.OpenOrchestrator()
     if err != nil {goto Cleanup}
     
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
@@ -382,7 +383,7 @@ func ReadMaintenanceInstanceKeys() ([]InstanceKey, error) {
 
 
 func WriteInstance(instance *Instance, lastError error) error {
-	db,	err	:=	sqlutils.OpenOrchestrator()
+	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}
 	
 	_, err = sqlutils.Exec(db, `
@@ -445,7 +446,7 @@ func WriteInstance(instance *Instance, lastError error) error {
 
 
 func ForgetInstance(instanceKey *InstanceKey) error {
-	db,	err	:=	sqlutils.OpenOrchestrator()
+	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}
 	
 	_, err = sqlutils.Exec(db, `
@@ -461,7 +462,7 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 
 
 func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) error {
-	db,	err	:=	sqlutils.OpenOrchestrator()
+	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}
 	
 	res, err := sqlutils.Exec(db, `
@@ -488,7 +489,7 @@ func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) err
 
 
 func EndMaintenance(instanceKey *InstanceKey) error {
-	db,	err	:=	sqlutils.OpenOrchestrator()
+	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}
 	
 	res, err := sqlutils.Exec(db, `

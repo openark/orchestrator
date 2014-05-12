@@ -1,12 +1,12 @@
 // 
-package orchestrator
+package app
 
 import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	
-	"github.com/outbrain/http"
-	"github.com/outbrain/orch"
+	"github.com/outbrain/orchestrator/logic"
+	"github.com/outbrain/orchestrator/http"
 	"github.com/outbrain/log"
 )
 
@@ -25,7 +25,6 @@ func Http(discovery bool) {
 	if discovery {
 		go orchestrator.ContinuousDiscovery()
 	}
-
 
 	http.API.RegisterRequests(m)
 	http.Web.RegisterRequests(m)
