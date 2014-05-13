@@ -7,6 +7,15 @@ function addNodeModalDataAttribute(name, value) {
         '<tr><td>' + name + '</td><td><code>' + value + '</code></td></tr>');
 }
 
+function addModalAlert(alertText) {
+	$("#node_modal .modal-body").append(
+		'<div class="alert alert-danger alert-dismissable">'
+				+ '<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>'
+				+ alertText + '</div>');
+	$(".alert").alert();
+	return false;
+}
+
 function openNodeModal(node) {
     $('#node_modal .modal-title').html(node.title);
     $('#modalDataAttributesTable').html("");
@@ -29,6 +38,49 @@ function openNodeModal(node) {
         booleanString(node.LogBinEnabled));
     addNodeModalDataAttribute("Logs slave updates",
         booleanString(node.LogSlaveUpdatesEnabled));
+    
+    $('#node_modal button[data-btn=begin-maintenance]').unbind("click");
+    $('#node_modal button[data-btn=end-maintenance]').unbind("click");
+    $('#node_modal button[data-btn=begin-maintenance]').click(function() {
+    	console.log($("#beginMaintenanceReason").val());
+    	if (!$("#beginMaintenanceOwner").val()) {
+    		return addModalAlert("You must fill the owner field");
+    	}
+    	if (!$("#beginMaintenanceReason").val()) {
+    		return addModalAlert("You must fill the reason field");
+    	}
+    	showLoader();
+    	var uri = "/api/begin-maintenance/"+node.Key.Hostname+"/"+node.Key.Port + "/" + $("#beginMaintenanceOwner").val() + "/" + $("#beginMaintenanceReason").val();
+        $.get(uri, function (operationResult) {
+			hideLoader();
+			if (operationResult.Code == "ERROR") {
+				addAlert("<strong>Error</strong>: " + operationResult.Message)
+			} else {
+				location.reload();
+			}	
+        }, "json");	
+    });
+    $('#node_modal button[data-btn=end-maintenance]').click(function(){
+    	showLoader();
+    	console.log(node);
+        $.get("/api/end-maintenance/"+node.Key.Hostname+"/"+node.Key.Port, function (operationResult) {
+			hideLoader();
+			if (operationResult.Code == "ERROR") {
+				addAlert("<strong>Error</strong>: " + operationResult.Message)
+			} else {
+				location.reload();
+			}	
+        }, "json");	
+    });
+
+    if (node.inMaintenance) {
+    	$('#node_modal [data-panel-type=maintenance]').html("In maintenance");
+    	$('#node_modal [data-panel-type=begin-maintenance]').hide();
+    } else {
+    	$('#node_modal [data-panel-type=maintenance]').html("Maintenance");
+    	$('#node_modal [data-panel-type=end-maintenance]').hide();
+    }
+    
     $('#node_modal').modal({})
 }
 

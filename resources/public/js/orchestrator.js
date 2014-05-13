@@ -37,10 +37,10 @@ function commonSuffixLength(strings) {
 
 
 function addAlert(alertText) {
-	$("#alerts_container")
-			.append(
-					'<div class="alert alert-danger alert-dismissable">'
-							+ '<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>'
-							+ alertText + '</div>');
+	$("#alerts_container").append(
+		'<div class="alert alert-danger alert-dismissable">'
+				+ '<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>'
+				+ alertText + '</div>');
 	$(".alert").alert();
+	return false;
 }

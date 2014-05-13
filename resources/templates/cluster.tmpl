@@ -141,12 +141,30 @@
 					<h4 class="modal-title"></h4>
 				</div>
 				<div class="modal-body">
+				    <div class="panel panel-default">
+				        <div class="panel-heading" data-panel-type="maintenance"></div>
+				        <div class="panel-body">
+                            <div class="" data-panel-type="begin-maintenance">
+					            <form class="form-inline" role="form">
+                                    <input type="text" class="form-control" id="beginMaintenanceOwner" placeholder="owner name" />
+                                    <input type="text" class="form-control" id="beginMaintenanceReason" placeholder="reason" />
+			                        <button type="button" class="btn btn-info" data-btn="begin-maintenance">
+			                            <span class="glyphicon glyphicon-wrench"></span> Begin maintenance
+			                        </button>
+		                        </form>
+		                    </div>
+	                        <div class="" data-panel-type="end-maintenance">
+		                        <button type="button" class="btn btn-default" data-btn="end-maintenance">
+		                            <span class="glyphicon glyphicon-wrench"></span> End maintenance
+		                        </button>
+					        </div>
+				        </div>
+				    </div>
 	                <table id="modalDataAttributesTable" class="table">
 	                </table>
 				</div>
 				<div class="modal-footer">
-					<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-					<button type="button" class="btn btn-primary">Save changes</button>
+					<button type="button" class="btn btn-default btn-primary" data-dismiss="modal">Done</button>
 				</div>
 			</div>
 			<!-- /.modal-content -->
