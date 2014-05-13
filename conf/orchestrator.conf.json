@@ -10,4 +10,6 @@
 	"SlaveLagQuery": "",
 	"DiscoverByShowSlaveHosts": true,
 	"InstanceUpToDateSeconds": 60,
+    "HTTPAuthUser": "",
+    "HTTPAuthPassword": ""
 }

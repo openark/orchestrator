@@ -320,7 +320,6 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 		order by
 			cluster_name,
 			hostname, port`, config.Config.InstanceUpToDateSeconds, searchString, searchString, searchString, searchString, searchString)
-	log.Info(query)
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 		instance := ReadInstanceRow(m)
     	instances = append(instances, instance)
