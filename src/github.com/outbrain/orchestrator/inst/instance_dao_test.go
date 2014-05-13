@@ -39,6 +39,10 @@ var slave3Key = inst.InstanceKey{
 	Port: 22990,
 }
 
+func clearTestMaintenance() {
+	_, _ = db.ExecOrchestrator("update database_instance_maintenance set maintenance_active=null, end_timestamp=NOW() where owner = ?", "unittest")
+}
+
 // The test also assumes one backend MySQL server.
 func (s *TestSuite) SetUpSuite(c *C) { 
 	config.Config.MySQLTopologyUser = "msandbox"
@@ -150,8 +154,10 @@ func (s *TestSuite) TestReadTopologyUnexisting(c *C) {
  
 
 func (s *TestSuite) TestMoveBelowAndBack(c *C) {
+	clearTestMaintenance()
 	// become child
-	slave1, _ := inst.MoveBelow(&slave1Key, &slave2Key)
+	slave1, err := inst.MoveBelow(&slave1Key, &slave2Key)
+	c.Assert(err, IsNil)
 	
 	c.Assert(slave1.MasterKey.Equals(&slave2Key), Equals, true)
 	c.Assert(slave1.SlaveRunning(), Equals, true)
@@ -166,6 +172,7 @@ func (s *TestSuite) TestMoveBelowAndBack(c *C) {
 }
 
 func (s *TestSuite) TestMoveBelowAndBackComplex(c *C) {
+	clearTestMaintenance()
 	
 	// become child
 	slave1, _ := inst.MoveBelow(&slave1Key, &slave2Key)
@@ -206,6 +213,7 @@ func (s *TestSuite) TestMoveBelowAndBackComplex(c *C) {
 
 
 func (s *TestSuite) TestFailMoveBelow(c *C) {	
+	clearTestMaintenance()
 	_, _ = inst.ExecInstance(&slave2Key, `set global binlog_format:='ROW'`)
 	_, err := inst.MoveBelow(&slave1Key, &slave2Key)
 	_, _ = inst.ExecInstance(&slave2Key, `set global binlog_format:='STATEMENT'`)
@@ -249,39 +257,40 @@ func (s *TestSuite) TestCluster(c *C) {
 
 
 func (s *TestSuite) TestBeginMaintenance(c *C) {
-	_, _ = db.ExecOrchestrator("update database_instance_maintenance set maintenance_active=null where owner = ?", "unittest")
+	clearTestMaintenance()
 	_, _ = inst.ReadTopologyInstance(&masterKey)
-	err := inst.BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance");
+	_, err := inst.BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance");
+	
 	c.Assert(err, IsNil)
 }
 
 func (s *TestSuite) TestBeginEndMaintenance(c *C) {
-	_, _ = db.ExecOrchestrator("update database_instance_maintenance set maintenance_active=null where owner = ?", "unittest")
+	clearTestMaintenance()
 	_, _ = inst.ReadTopologyInstance(&masterKey)
-	err := inst.BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance");
+	k, err := inst.BeginMaintenance(&masterKey, "unittest", "TestBeginEndMaintenance");
 	c.Assert(err, IsNil)
-	err = inst.EndMaintenance(&masterKey);
+	err = inst.EndMaintenance(k);
 	c.Assert(err, IsNil)
 }
 
 
 func (s *TestSuite) TestFailBeginMaintenanceTwice(c *C) {
-	_, _ = db.ExecOrchestrator("update database_instance_maintenance set maintenance_active=null where owner = ?", "unittest")
+	clearTestMaintenance()
 	_, _ = inst.ReadTopologyInstance(&masterKey)
-	err := inst.BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance");
+	_, err := inst.BeginMaintenance(&masterKey, "unittest", "TestFailBeginMaintenanceTwice");
 	c.Assert(err, IsNil)
-	err = inst.BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance");
+	_, err = inst.BeginMaintenance(&masterKey, "unittest", "TestFailBeginMaintenanceTwice");
 	c.Assert(err, Not(IsNil))
 }
 
 func (s *TestSuite) TestFailEndMaintenanceTwice(c *C) {
-	_, _ = db.ExecOrchestrator("update database_instance_maintenance set maintenance_active=null where owner = ?", "unittest")
+	clearTestMaintenance()
 	_, _ = inst.ReadTopologyInstance(&masterKey)
-	err := inst.BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance");
+	k, err := inst.BeginMaintenance(&masterKey, "unittest", "TestFailEndMaintenanceTwice");
 	c.Assert(err, IsNil)
-	err = inst.EndMaintenance(&masterKey);
+	err = inst.EndMaintenance(k);
 	c.Assert(err, IsNil)
-	err = inst.EndMaintenance(&masterKey);
+	err = inst.EndMaintenance(k);
 	c.Assert(err, Not(IsNil))
 }
 

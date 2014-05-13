@@ -67,6 +67,19 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	
 	log.Infof("Will move %+v up the topology", *instanceKey) 
 
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", "move up"); merr != nil {
+		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
+	if maintenanceToken, merr := BeginMaintenance(&master.Key, "orchestrator", fmt.Sprintf("child %+v moves up", *instanceKey)); merr != nil {
+		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", master.Key))
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
+
 	master, err = StopSlave(&master.Key)
 	if	err	!=	nil	{goto Cleanup} 
 	
@@ -92,13 +105,26 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	sibling, err := ReadTopologyInstance(siblingKey)
 	if !InstancesAreSiblings(instance, sibling) {
-		return instance, errors.New(fmt.Sprintf("instances are not siblings: %+v, %+v", instanceKey, siblingKey))
+		return instance, errors.New(fmt.Sprintf("instances are not siblings: %+v, %+v", *instanceKey, *siblingKey))
 	}
 	
 	if canReplicate, err := instance.CanReplicateFrom(sibling); !canReplicate {
 		return instance, err
 	}
-	log.Infof("Will move %+v below its sibling %+v", instanceKey, siblingKey) 
+	log.Infof("Will move %+v below its sibling %+v", instanceKey, siblingKey)
+	
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("move below %+v", *siblingKey)); merr != nil {
+		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
+	if maintenanceToken, merr := BeginMaintenance(siblingKey, "orchestrator", fmt.Sprintf("%+v moves below this", *instanceKey)); merr != nil {
+		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *siblingKey))
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
 
 	instance, err = StopSlave(instanceKey)
 	if	err	!=	nil	{goto Cleanup} 

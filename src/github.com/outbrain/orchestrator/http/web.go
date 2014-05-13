@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"fmt"	
 	"errors"
+	"net/http"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 
@@ -28,18 +29,23 @@ func (this *HttpWeb) getInstanceKey(host string, port string) (inst.InstanceKey,
 
 
 func (this *HttpWeb) Cluster(params martini.Params, r render.Render) {
-	_, err := inst.ReadClusterInstances(params["clusterName"])
-
-	if err != nil {
-		return
-	}
-
 	r.HTML(200, "templates/cluster", map[string]interface{}{
 		"title": "cluster", 
 		"clusterName": params["clusterName"],
 		})
 }
 
+
+func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Request) {
+	searchString := params["searchString"]
+	if searchString == "" {
+		searchString = req.URL.Query().Get("s");
+	}
+	r.HTML(200, "templates/search", map[string]interface{}{
+		"title": "search", 
+		"searchString": searchString, 
+		})
+}
 
 
 func (this *HttpWeb) Home(params martini.Params, r render.Render) {
@@ -54,4 +60,6 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/", this.Home) 
 	m.Get("/web", this.Home) 
 	m.Get("/web/cluster/:clusterName", this.Cluster) 
+	m.Get("/web/search/:searchString", this.Search) 
+	m.Get("/web/search", this.Search) 
 }

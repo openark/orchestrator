@@ -1,6 +1,7 @@
 package app 
 
 import (
+	"os/user"
 	"github.com/outbrain/orchestrator/inst"	
 	"github.com/outbrain/orchestrator/logic"
 	"github.com/outbrain/log"
@@ -13,7 +14,16 @@ func Cli(command string, instance string, sibling string, owner string, reason s
 	if err != nil {log.Fatal("Cannot deduce instance:", instance)}
 	siblingKey, err := inst.ParseInstanceKey(sibling)
 	if err != nil {siblingKey = nil}
-	
+
+	if len(owner) == 0 {
+		// get os username as owner
+		usr, err := user.Current()
+    	if err != nil {
+        	log.Fatale(err)
+    	}
+    	owner = usr.Username
+	}
+		
 	if len(command) == 0 {
 		log.Fatal("expected command (-c) (discover|forget|continuous|move-up|move-below)")
 	}
@@ -41,12 +51,13 @@ func Cli(command string, instance string, sibling string, owner string, reason s
 			if instanceKey == nil {log.Fatal("Cannot deduce instance:", instance)}
 			if owner == "" {log.Fatal("--owner option required")}
 			if reason == "" {log.Fatal("--reason option required")}
-			err := inst.BeginMaintenance(instanceKey, owner, reason)
+			maintenanceKey, err := inst.BeginMaintenance(instanceKey, owner, reason)
+			if err == nil {log.Infof("Maintenance key: %+v", maintenanceKey)}
 			if err != nil {log.Errore(err)}
 		}
 		case "end-maintenance": {
 			if instanceKey == nil {log.Fatal("Cannot deduce instance:", instance)}
-			err := inst.EndMaintenance(instanceKey)
+			err := inst.EndMaintenanceByKey(instanceKey)
 			if err != nil {log.Errore(err)}
 		}
 		case "continuous": {

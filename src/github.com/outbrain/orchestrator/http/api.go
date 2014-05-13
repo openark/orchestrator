@@ -1,7 +1,9 @@
 package http
 
 import (
-	"fmt"	
+	"net/http"	
+	"fmt"
+	"strconv"	
 	"encoding/json"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
@@ -98,9 +100,9 @@ func (this *HttpAPI) BeginMaintenance(params martini.Params, r render.Render) {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
 	}
-	err = inst.BeginMaintenance(&instanceKey, params["owner"], params["reason"])
+	key, err := inst.BeginMaintenance(&instanceKey, params["owner"], params["reason"])
 	if err != nil {
-		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(), Details: key,})
 		return
 	}
 
@@ -110,13 +112,29 @@ func (this *HttpAPI) BeginMaintenance(params martini.Params, r render.Render) {
 
 
 func (this *HttpAPI) EndMaintenance(params martini.Params, r render.Render) {
+	maintenanceKey, err := strconv.ParseInt(params["maintenanceKey"], 10, 0)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+	err = inst.EndMaintenance(maintenanceKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code:OK, Message: fmt.Sprintf("Maintenance ended: %+v", maintenanceKey),})
+}
+
+
+func (this *HttpAPI) EndMaintenanceByKey(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
 	}
-	err = inst.EndMaintenance(&instanceKey)
+	err = inst.EndMaintenanceByKey(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
@@ -125,6 +143,17 @@ func (this *HttpAPI) EndMaintenance(params martini.Params, r render.Render) {
 	r.JSON(200, &APIResponse{Code:OK, Message: fmt.Sprintf("Maintenance ended: %+v", instanceKey),})
 }
 
+
+func (this *HttpAPI) Maintenance(params martini.Params, r render.Render) {
+	instanceKeys, err := inst.ReadMaintenanceInstanceKeys()
+							  
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+
+	r.JSON(200, instanceKeys)
+}
 
 
 func (this *HttpAPI) MoveUp(params martini.Params, r render.Render) {
@@ -189,16 +218,19 @@ func (this *HttpAPI) Clusters(params martini.Params, r render.Render) {
 	r.JSON(200, clusterNames)
 }
 
+func (this *HttpAPI) Search(params martini.Params, r render.Render, req *http.Request) {
+	searchString := params["searchString"]
+	if searchString == "" {
+		searchString = req.URL.Query().Get("s");
+	}
+	instances, err := inst.SearchInstances(searchString)
 
-func (this *HttpAPI) Maintenance(params martini.Params, r render.Render) {
-	instanceKeys, err := inst.ReadMaintenanceInstanceKeys()
-							  
 	if err != nil {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
 		return
 	}
 
-	r.JSON(200, instanceKeys)
+	r.JSON(200, instances)
 }
 
 
@@ -209,8 +241,11 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/move-up/:host/:port", this.MoveUp) 
 	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow) 
 	m.Get("/api/begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance) 
-	m.Get("/api/end-maintenance/:host/:port", this.EndMaintenance) 
+	m.Get("/api/end-maintenance/:host/:port", this.EndMaintenanceByKey) 
+	m.Get("/api/end-maintenance/:maintenanceKey", this.EndMaintenance)	
+	m.Get("/api/maintenance", this.Maintenance) 
 	m.Get("/api/cluster/:clusterName", this.Cluster) 
 	m.Get("/api/clusters", this.Clusters) 
-	m.Get("/api/maintenance", this.Maintenance) 
+	m.Get("/api/search/:searchString", this.Search) 
+	m.Get("/api/search", this.Search) 
 }

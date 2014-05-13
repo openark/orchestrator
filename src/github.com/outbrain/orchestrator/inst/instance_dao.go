@@ -222,6 +222,43 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 }
 
 
+func ReadInstanceRow(m sqlutils.RowMap) *Instance {
+    instance := NewInstance()
+    	
+    instance.Key.Hostname = m.GetString("hostname")
+    instance.Key.Port = m.GetInt("port")
+	instance.Slave_IO_Running = (m.GetString("Slave_IO_Running") == "Yes")
+   	instance.Slave_SQL_Running = (m.GetString("Slave_SQL_Running") == "Yes")
+   	instance.ReadBinlogCoordinates.LogFile = m.GetString("Master_Log_File")
+   	instance.ReadBinlogCoordinates.LogPos = m.GetInt64("Read_Master_Log_Pos")
+   	instance.ExecBinlogCoordinates.LogFile = m.GetString("Relay_Master_Log_File")
+    instance.ExecBinlogCoordinates.LogPos = m.GetInt64("Exec_Master_Log_Pos")
+    instance.ServerID = m.GetUint("server_id")
+ 	instance.Version = m.GetString("version")
+ 	instance.Binlog_format = m.GetString("binlog_format")
+ 	instance.LogBinEnabled = m.GetBool("log_bin")
+ 	instance.LogSlaveUpdatesEnabled = m.GetBool("log_slave_updates")
+ 	instance.SelfBinlogCoordinates.LogFile = m.GetString("binary_log_file")
+ 	instance.SelfBinlogCoordinates.LogPos = m.GetInt64("binary_log_pos")
+ 	instance.MasterKey.Hostname = m.GetString("master_host")
+ 	instance.MasterKey.Port = m.GetInt("master_port")
+ 	instance.Slave_SQL_Running = m.GetBool("slave_sql_running")
+ 	instance.Slave_IO_Running = m.GetBool("slave_io_running")
+ 	instance.ReadBinlogCoordinates.LogFile = m.GetString("master_log_file")
+ 	instance.ReadBinlogCoordinates.LogPos = m.GetInt64("read_master_log_pos")
+ 	instance.ExecBinlogCoordinates.LogFile = m.GetString("relay_master_log_file")
+ 	instance.ExecBinlogCoordinates.LogPos = m.GetInt64("exec_master_log_pos")
+ 	instance.SecondsBehindMaster = m.GetInt("seconds_behind_master")
+ 	slaveHostsJson := m.GetString("slave_hosts")
+ 	instance.ClusterName = m.GetString("cluster_name")
+ 	instance.IsUpToDate = m.GetBool("is_up_to_date")
+ 	instance.IsLastSeenValid = m.GetBool("is_last_seen_valid")
+ 	
+ 	instance.ReadSlaveHostsFromJson(slaveHostsJson)
+ 	return instance
+}
+
+
 func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 	instances := [](*Instance){}
 
@@ -246,41 +283,48 @@ func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 			hostname, port`, config.Config.InstanceUpToDateSeconds, clusterName)
 
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-    	instance := NewInstance()
-    	
-    	instance.Key.Hostname = m.GetString("hostname")
-    	instance.Key.Port = m.GetInt("port")
-		instance.Slave_IO_Running = (m.GetString("Slave_IO_Running") == "Yes")
-      	instance.Slave_SQL_Running = (m.GetString("Slave_SQL_Running") == "Yes")
-       	instance.ReadBinlogCoordinates.LogFile = m.GetString("Master_Log_File")
-       	instance.ReadBinlogCoordinates.LogPos = m.GetInt64("Read_Master_Log_Pos")
-       	instance.ExecBinlogCoordinates.LogFile = m.GetString("Relay_Master_Log_File")
-       	instance.ExecBinlogCoordinates.LogPos = m.GetInt64("Exec_Master_Log_Pos")
-    	instance.ServerID = m.GetUint("server_id")
-	 	instance.Version = m.GetString("version")
-	 	instance.Binlog_format = m.GetString("binlog_format")
-	 	instance.LogBinEnabled = m.GetBool("log_bin")
-	 	instance.LogSlaveUpdatesEnabled = m.GetBool("log_slave_updates")
-	 	instance.SelfBinlogCoordinates.LogFile = m.GetString("binary_log_file")
-	 	instance.SelfBinlogCoordinates.LogPos = m.GetInt64("binary_log_pos")
-	 	instance.MasterKey.Hostname = m.GetString("master_host")
-	 	instance.MasterKey.Port = m.GetInt("master_port")
-	 	instance.Slave_SQL_Running = m.GetBool("slave_sql_running")
-	 	instance.Slave_IO_Running = m.GetBool("slave_io_running")
-	 	instance.ReadBinlogCoordinates.LogFile = m.GetString("master_log_file")
-	 	instance.ReadBinlogCoordinates.LogPos = m.GetInt64("read_master_log_pos")
-	 	instance.ExecBinlogCoordinates.LogFile = m.GetString("relay_master_log_file")
-	 	instance.ExecBinlogCoordinates.LogPos = m.GetInt64("exec_master_log_pos")
-	 	instance.SecondsBehindMaster = m.GetInt("seconds_behind_master")
-	 	slaveHostsJson := m.GetString("slave_hosts")
-	 	instance.ClusterName = m.GetString("cluster_name")
-	 	instance.IsUpToDate = m.GetBool("is_up_to_date")
-	 	instance.IsLastSeenValid = m.GetBool("is_last_seen_valid")
-	 	
-	 	instance.ReadSlaveHostsFromJson(slaveHostsJson)
-
+		instance := ReadInstanceRow(m)
     	instances = append(instances, instance)
-    	return err       	
+    	return nil       	
+   	})
+
+	return instances, err
+}
+
+
+
+func SearchInstances(searchString string) ([](*Instance), error) {
+	instances := [](*Instance){}
+
+	db,	err	:=	db.OpenOrchestrator()
+	if	err	!=	nil	{
+		return instances, log.Errore(err)
+	}
+	if strings.Index(searchString, "'") >= 0 {
+		return instances, log.Errorf("Invalid searchString: %s", searchString)	
+	}
+
+	query := fmt.Sprintf(`
+		select 
+			*,
+			ifnull(timestampdiff(second, last_seen, now()) <= %d, false) as is_up_to_date,
+			is_last_seen_valid
+		from 
+			database_instance 
+		where
+			hostname like '%%%s%%'
+			or cluster_name like '%%%s%%'
+			or server_id = '%s'
+			or version like '%%%s%%'
+			or port = '%s'
+		order by
+			cluster_name,
+			hostname, port`, config.Config.InstanceUpToDateSeconds, searchString, searchString, searchString, searchString, searchString)
+	log.Info(query)
+    err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		instance := ReadInstanceRow(m)
+    	instances = append(instances, instance)
+    	return nil       	
    	})
 
 	return instances, err
@@ -461,9 +505,10 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 }
 
 
-func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) error {
+func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) (int64, error) {
 	db,	err	:=	db.OpenOrchestrator()
-	if err != nil {return log.Errore(err)}
+	var maintenanceToken int64 = 0
+	if err != nil {return maintenanceToken, log.Errore(err)}
 	
 	res, err := sqlutils.Exec(db, `
 			insert ignore
@@ -478,17 +523,19 @@ func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) err
 		 	owner, 
 		 	reason,
 		 )
-	if err != nil {return log.Errore(err)}	
+	if err != nil {return maintenanceToken, log.Errore(err)}	
 	
 	if affected, _ := res.RowsAffected(); affected == 0 {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance for instance: %+v", instanceKey))
-	} 
-	return err		 
+	} else {
+		maintenanceToken, _ = res.LastInsertId()
+	}
+	return maintenanceToken, err		 
 }
 
 
 
-func EndMaintenance(instanceKey *InstanceKey) error {
+func EndMaintenanceByKey(instanceKey *InstanceKey) error {
 	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}
 	
@@ -509,6 +556,29 @@ func EndMaintenance(instanceKey *InstanceKey) error {
 	if err != nil {return log.Errore(err)}
 	if affected, _ := res.RowsAffected(); affected == 0 {
 		err = errors.New(fmt.Sprintf("Instance is not in maintenance mode: %+v", instanceKey))
+	} 
+	return err		 
+}
+
+
+func EndMaintenance(maintenanceToken int64) error {
+	db,	err	:=	db.OpenOrchestrator()
+	if err != nil {return log.Errore(err)}
+	
+	res, err := sqlutils.Exec(db, `
+			update
+				database_instance_maintenance
+			set  
+				maintenance_active = NULL,
+				end_timestamp = NOW()
+			where
+				database_instance_maintenance_id = ? 
+			`,
+			maintenanceToken,
+		 )
+	if err != nil {return log.Errore(err)}
+	if affected, _ := res.RowsAffected(); affected == 0 {
+		err = errors.New(fmt.Sprintf("Instance is not in maintenance mode; token = %+v", maintenanceToken))
 	} 
 	return err		 
 }
