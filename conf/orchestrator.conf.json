@@ -9,5 +9,5 @@
 	"MySQLOrchestratorPassword": "msandbox",
 	"SlaveLagQuery": "",
 	"DiscoverByShowSlaveHosts": true,
-	"InstanceUpToDateSeconds": 60
+	"InstanceUpToDateSeconds": 60,
 }

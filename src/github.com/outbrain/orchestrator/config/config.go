@@ -21,6 +21,8 @@ type Configuration struct {
 	InstanceUpToDateSeconds		uint		// An instance is up to date if seen before this number of seconds
 	DiscoveryPollSeconds		int			// Auto/continuous discovery of instances sleep time between polls
 	MaxReasonableTopologyDepth	int			// M->S->S->S... depth you just don't have in your topology
+	HTTPAuthUser		string				// Username for HTTP Basic authentication (blank disables authentication)
+	HTTPAuthPassword	string				// Password for HTTP Basic authentication
 }	
 
 var Config *Configuration = NewConfiguration()
@@ -32,6 +34,8 @@ func NewConfiguration() *Configuration {
 		DiscoverByShowSlaveHosts:	false,
 		DiscoveryPollSeconds:		5,
 		MaxReasonableTopologyDepth:	10,
+		HTTPAuthUser		: "",
+		HTTPAuthPassword	: "",
 	}
 }
 
