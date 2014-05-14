@@ -1,5 +1,4 @@
 {
-	"InstanceReattemptSeconds": 30,
 	"MySQLTopologyUser": "msandbox",
 	"MySQLTopologyPassword": "msandbox",
 	"MySQLOrchestratorHost": "127.0.0.1",
@@ -9,7 +8,7 @@
 	"MySQLOrchestratorPassword": "msandbox",
 	"SlaveLagQuery": "",
 	"DiscoverByShowSlaveHosts": true,
-	"InstanceUpToDateSeconds": 60,
+    "InstancePollSeconds": 60,
     "HTTPAuthUser": "",
     "HTTPAuthPassword": ""
 }

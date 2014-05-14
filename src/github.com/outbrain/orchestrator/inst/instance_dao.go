@@ -123,6 +123,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	Cleanup:
 	if instanceFound {
 		_ = WriteInstance(instance, err)
+	} else {
+		_ = UpdateInstanceLastChecked(instanceKey)
 	}
 	if err	!=	nil	{
 		log.Errore(err)
@@ -187,11 +189,11 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 			seconds_behind_master,
 			slave_hosts,
 			cluster_name,
-			ifnull(timestampdiff(second, last_seen, now()) <= ?, false) as is_up_to_date,
+			ifnull(timestampdiff(second, last_checked, now()) <= ?, false) as is_up_to_date,
 			is_last_seen_valid
 		 from database_instance 
 		 	where hostname=? and port=?`, 
-		 config.Config.InstanceUpToDateSeconds, instanceKey.Hostname, instanceKey.Port).Scan(
+		 config.Config.InstancePollSeconds, instanceKey.Hostname, instanceKey.Port).Scan(
 		 	&instance.ServerID,
 		 	&instance.Version,
 		 	&instance.Binlog_format,
@@ -273,14 +275,14 @@ func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 	query := fmt.Sprintf(`
 		select 
 			*,
-			ifnull(timestampdiff(second, last_seen, now()) <= %d, false) as is_up_to_date,
+			ifnull(timestampdiff(second, last_checked, now()) <= %d, false) as is_up_to_date,
 			is_last_seen_valid
 		from 
 			database_instance 
 		where
 			cluster_name = '%s'
 		order by
-			hostname, port`, config.Config.InstanceUpToDateSeconds, clusterName)
+			hostname, port`, config.Config.InstancePollSeconds, clusterName)
 
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 		instance := ReadInstanceRow(m)
@@ -307,7 +309,7 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 	query := fmt.Sprintf(`
 		select 
 			*,
-			ifnull(timestampdiff(second, last_seen, now()) <= %d, false) as is_up_to_date,
+			ifnull(timestampdiff(second, last_checked, now()) <= %d, false) as is_up_to_date,
 			is_last_seen_valid
 		from 
 			database_instance 
@@ -319,7 +321,7 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 			or port = '%s'
 		order by
 			cluster_name,
-			hostname, port`, config.Config.InstanceUpToDateSeconds, searchString, searchString, searchString, searchString, searchString)
+			hostname, port`, config.Config.InstancePollSeconds, searchString, searchString, searchString, searchString, searchString)
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 		instance := ReadInstanceRow(m)
     	instances = append(instances, instance)
@@ -364,9 +366,8 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 		from 
 			database_instance 
 		where
-			timestampdiff(second, last_checked, now()) >= %d
-    		and ifnull(timestampdiff(second, last_seen, now()) <= %d, false) = false `, 
-    		config.Config.InstanceReattemptSeconds, config.Config.InstanceUpToDateSeconds)
+			ifnull(timestampdiff(second, last_checked, now()) <= %d, false) = false`, 
+    		config.Config.InstancePollSeconds)
 	db,	err	:=	db.OpenOrchestrator()
     if err != nil {goto Cleanup}
     
@@ -484,6 +485,29 @@ func WriteInstance(instance *Instance, lastError error) error {
         	`, instance.Key.Hostname, instance.Key.Port,
         )
 	}
+	return nil
+}
+
+
+
+
+func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
+	db,	err	:=	db.OpenOrchestrator()
+	if err != nil {return log.Errore(err)}
+	
+	_, err = sqlutils.Exec(db, `
+        	update 
+        		database_instance 
+        	set
+        		last_checked = NOW()
+			where 
+				hostname = ?
+				and port = ?`,
+			instanceKey.Hostname, 
+		 	instanceKey.Port,
+		 	)
+    if err != nil {return log.Errore(err)}
+
 	return nil
 }
 

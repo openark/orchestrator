@@ -15,15 +15,6 @@ func RefreshInstance(instance *Instance) (*Instance, error) {
 	return instance, err
 }
 
-func RefreshTopologyInstance(instanceKey *InstanceKey) error {
-	instance, err := ReadTopologyInstance(instanceKey)
-	if err != nil {	return log.Errore(err)}
-	
-	err = WriteInstance(instance, err)
-	if err != nil {	return log.Errore(err)}
-
-	return err
-}
 
 // GetInstanceMaster synchronously reaches into the replication topology
 // and retrieves master's data
