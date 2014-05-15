@@ -44,3 +44,115 @@ function addAlert(alertText) {
 	$(".alert").alert();
 	return false;
 }
+
+
+// Modal
+
+function addNodeModalDataAttribute(name, value) {
+    $('#modalDataAttributesTable').append(
+        '<tr><td>' + name + '</td><td><code>' + value + '</code></td></tr>');
+}
+
+function addModalAlert(alertText) {
+	$("#node_modal .modal-body").append(
+		'<div class="alert alert-danger alert-dismissable">'
+				+ '<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>'
+				+ alertText + '</div>');
+	$(".alert").alert();
+	return false;
+}
+
+function openNodeModal(node) {
+    $('#node_modal .modal-title').html(node.title);
+    $('#modalDataAttributesTable').html("");
+
+    if (node.MasterKey.Hostname) {
+        addNodeModalDataAttribute("Master",
+            node.MasterKey.Hostname + ":" + node.MasterKey.Port);
+        addNodeModalDataAttribute("Replication running",
+            booleanString(node.Slave_SQL_Running && node.Slave_IO_Running));
+        addNodeModalDataAttribute("Replication lag",
+            node.SecondsBehindMaster);
+    }
+    addNodeModalDataAttribute("Num slaves",
+        node.SlaveHosts.length);
+    addNodeModalDataAttribute("Server ID", node.ServerID);
+    addNodeModalDataAttribute("Version", node.Version);
+    addNodeModalDataAttribute("Binlog format",
+        node.Binlog_format);
+    addNodeModalDataAttribute("Has binary logs",
+        booleanString(node.LogBinEnabled));
+    addNodeModalDataAttribute("Logs slave updates",
+        booleanString(node.LogSlaveUpdatesEnabled));
+    
+    $('#node_modal button[data-btn=begin-maintenance]').unbind("click");
+    $('#node_modal button[data-btn=end-maintenance]').unbind("click");
+    $('#node_modal button[data-btn=forget-instance]').unbind("click");
+    $('#node_modal button[data-btn=begin-maintenance]').click(function() {
+    	console.log($("#beginMaintenanceReason").val());
+    	if (!$("#beginMaintenanceOwner").val()) {
+    		return addModalAlert("You must fill the owner field");
+    	}
+    	if (!$("#beginMaintenanceReason").val()) {
+    		return addModalAlert("You must fill the reason field");
+    	}
+    	showLoader();
+    	var uri = "/api/begin-maintenance/"+node.Key.Hostname+"/"+node.Key.Port + "/" + $("#beginMaintenanceOwner").val() + "/" + $("#beginMaintenanceReason").val();
+        $.get(uri, function (operationResult) {
+			hideLoader();
+			if (operationResult.Code == "ERROR") {
+				addAlert("<strong>Error</strong>: " + operationResult.Message)
+			} else {
+				location.reload();
+			}	
+        }, "json");	
+    });
+    $('#node_modal button[data-btn=end-maintenance]').click(function(){
+    	showLoader();
+        $.get("/api/end-maintenance/"+node.Key.Hostname+"/"+node.Key.Port, function (operationResult) {
+			hideLoader();
+			if (operationResult.Code == "ERROR") {
+				addAlert("<strong>Error</strong>: " + operationResult.Message)
+			} else {
+				location.reload();
+			}	
+        }, "json");	
+    });
+    $('#node_modal button[data-btn=forget-instance]').click(function(){
+    	var message = "<p>Are you sure you wish to forget <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+			"</strong></code>?" +
+			"<p>It may be re-discovered if accessible from an existing instance through replication topology."
+			;
+    	bootbox.confirm(message, function(confirm) {
+				if (confirm) {
+					showLoader();
+					var apiUrl = "/api/forget/" + node.Key.Hostname + "/" + node.Key.Port;
+				    $.get(apiUrl, function (operationResult) {
+			    			hideLoader();
+			    			if (operationResult.Code == "ERROR") {
+			    				addAlert("<strong>Error</strong>: " + operationResult.Message)
+			    			} else {
+			    				location.reload();
+			    			}	
+			            }, "json");					
+				}
+			}); 
+    	return false;
+    });
+
+    if (node.inMaintenance) {
+    	$('#node_modal [data-panel-type=maintenance]').html("In maintenance");
+    	$('#node_modal [data-description=maintenance-status]').html(
+    			"Started " + node.maintenanceEntry.BeginTimestamp + " by "+node.maintenanceEntry.Owner + ".<br/>Reason: "+node.maintenanceEntry.Reason
+    	);    	
+    	$('#node_modal [data-panel-type=begin-maintenance]').hide();
+    	$('#node_modal [data-panel-type=end-maintenance]').show();
+    } else {
+    	$('#node_modal [data-panel-type=maintenance]').html("Maintenance");
+    	$('#node_modal [data-panel-type=begin-maintenance]').show();
+    	$('#node_modal [data-panel-type=end-maintenance]').hide();
+    }
+    
+    $('#node_modal').modal({})
+}
+

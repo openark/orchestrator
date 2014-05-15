@@ -75,6 +75,51 @@
 	
 	<div class="container" id="main_container">	
 		{{yield}}
+		
+	    <div class="modal fade" id="node_modal" tabindex="-1">
+	        <div class="modal-dialog">
+	            <div class="modal-content">
+	                <div class="modal-header">
+	                    <button type="button" class="close" data-dismiss="modal"
+	                        aria-hidden="true">&times;</button>
+	                    <h4 class="modal-title"></h4>
+	                </div>
+	                <div class="modal-body">
+	                    <div class="panel panel-default">
+	                        <div class="panel-heading" data-panel-type="maintenance"></div>
+	                        <div class="panel-body">
+	                            <div class="" data-panel-type="begin-maintenance">
+	                                <form class="form-inline" role="form">
+	                                    <input type="text" class="form-control" id="beginMaintenanceOwner" placeholder="owner name" />
+	                                    <input type="text" class="form-control" id="beginMaintenanceReason" placeholder="reason" />
+	                                    <button type="button" class="btn btn-info pull-right" data-btn="begin-maintenance">
+	                                        <span class="glyphicon glyphicon-wrench"></span> Begin maintenance
+	                                    </button>
+	                                </form>
+	                            </div>
+	                            <div class="" data-panel-type="end-maintenance">
+	                                <div class="pull-left" data-description="maintenance-status">
+	                                </div>
+	                                <button type="button" class="btn btn-default pull-right" data-btn="end-maintenance">
+	                                    <span class="glyphicon glyphicon-wrench"></span> End maintenance
+	                                </button>
+	                            </div>
+	                        </div>
+	                    </div>
+	                    <table id="modalDataAttributesTable" class="table">
+	                    </table>
+	                </div>
+	                <div class="modal-footer">
+                        <button type="button" class="btn btn-danger" data-btn="forget-instance">Forget</button>
+                        <button type="button" class="btn btn-primary" data-dismiss="modal">Done</button>
+	                </div>
+	            </div>
+	            <!-- /.modal-content -->
+	        </div>
+	        <!-- /.modal-dialog -->
+	    </div>
+	    <!-- /.modal -->
+		
 	</div>
 
     <script src="/bootstrap/js/bootstrap.min.js"></script>

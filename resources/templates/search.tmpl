@@ -21,12 +21,12 @@
         showLoader();
         $.get("/api/search/"+currentSearchString(), function (instances) {
             $.get("/api/maintenance",
-                function (maintenanceInstances) {
+                function (maintenanceList) {
                     displaySearchInstances(instances,
-                        maintenanceInstances);
+                    		maintenanceList);
                 }, "json");
         }, "json");
-        function displaySearchInstances(instances, maintenanceInstances) {
+        function displaySearchInstances(instances, maintenanceList) {
             hideLoader();
         	instances.forEach(function (instance) {
         		$("#searchResults table tbody").append('<tr><td>'
