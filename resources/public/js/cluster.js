@@ -1,6 +1,3 @@
-function getInstanceId(host, port) {
-    return "instance" + host.replace(/[.]/g, "_") + "__" + port
-}
 
 function generateInstanceDivs(nodesList) {
     var nodesMap = nodesList.reduce(function (map, node) {

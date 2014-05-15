@@ -2,6 +2,9 @@ function booleanString(b) {
 	return (b ? "true" : "false");
 }
 
+function getInstanceId(host, port) {
+    return "instance" + host.replace(/[.]/g, "_") + "__" + port
+}
 
 function commonSuffixLength(strings) {
 	if (strings.length == 0) {
