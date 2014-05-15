@@ -528,6 +528,21 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 }
 
 
+func ForgetLongUnseenInstances() error {
+	db,	err	:=	db.OpenOrchestrator()
+	if err != nil {return log.Errore(err)}
+	
+	_, err = sqlutils.Exec(db, `
+			delete 
+				from database_instance 
+			where 
+				last_seen < NOW() - interval ? hour`,
+			config.Config.UnseenInstanceForgetHours,
+		 )
+	return err		 
+}
+
+
 func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) (int64, error) {
 	db,	err	:=	db.OpenOrchestrator()
 	var maintenanceToken int64 = 0

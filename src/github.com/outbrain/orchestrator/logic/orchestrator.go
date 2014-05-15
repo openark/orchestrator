@@ -65,8 +65,8 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 
 func StartDiscovery(instanceKey inst.InstanceKey) {
 	log.Infof("Starting discovery at %+v", instanceKey)
-	pendingTokens := make(chan bool, 5)
-	completedTokens := make(chan bool, 5)
+	pendingTokens := make(chan bool, maxConcurrency)
+	completedTokens := make(chan bool, maxConcurrency)
 
 	AccountedDiscoverInstance(instanceKey, pendingTokens, completedTokens) 
 	go handleDiscoveryRequests(pendingTokens, completedTokens)
@@ -87,11 +87,18 @@ func ContinuousDiscovery() {
 	log.Infof("Starting continuous discovery")
 	go handleDiscoveryRequests(nil, nil)
     tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
+    forgetUnseenTick := time.Tick(time.Duration(config.Config.UnseenInstanceForgetHours) * time.Hour)
     for _ = range tick {
 		instanceKeys, _ := inst.ReadOutdatedInstanceKeys()
 		log.Debugf("outdated keys: %+v", instanceKeys)
 		for _, instanceKey := range instanceKeys {
 			discoveryInstanceKeys <- instanceKey
+		}
+    	// See if we should also forget instances (lower frequency)
+		select {
+			case <- forgetUnseenTick:
+		    	inst.ForgetLongUnseenInstances()
+			default:
 		}
 	}
 }

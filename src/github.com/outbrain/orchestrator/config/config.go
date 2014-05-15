@@ -18,6 +18,7 @@ type Configuration struct {
 	SlaveLagQuery				string		// custom query to check on slave lg (e.g. heartbeat table)
 	DiscoverByShowSlaveHosts	bool		// Attempt SHOW SLAVE HOSTS before PROCESSLIST
 	InstancePollSeconds			uint		// Number of seconds between instance reads
+	UnseenInstanceForgetHours	uint		// Number of hours after which an unseen instance is forgotten
 	DiscoveryPollSeconds		int			// Auto/continuous discovery of instances sleep time between polls
 	MaxReasonableTopologyDepth	int			// M->S->S->S... depth you just don't have in your topology
 	HTTPAuthUser		string				// Username for HTTP Basic authentication (blank disables authentication)
@@ -29,6 +30,7 @@ var Config *Configuration = NewConfiguration()
 func NewConfiguration() *Configuration {
 	return &Configuration {
 		InstancePollSeconds:		60,
+		UnseenInstanceForgetHours:	240,
 		DiscoverByShowSlaveHosts:	false,
 		DiscoveryPollSeconds:		5,
 		MaxReasonableTopologyDepth:	10,

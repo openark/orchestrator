@@ -9,6 +9,7 @@
 	"SlaveLagQuery": "",
 	"DiscoverByShowSlaveHosts": true,
     "InstancePollSeconds": 60,
+    "UnseenInstanceForgetHours": 240,
     "HTTPAuthUser": "",
     "HTTPAuthPassword": ""
 }
