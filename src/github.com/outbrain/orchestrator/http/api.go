@@ -145,7 +145,7 @@ func (this *HttpAPI) EndMaintenanceByKey(params martini.Params, r render.Render)
 
 
 func (this *HttpAPI) Maintenance(params martini.Params, r render.Render) {
-	instanceKeys, err := inst.ReadMaintenanceInstanceKeys()
+	instanceKeys, err := inst.ReadActiveMaintenance()
 							  
 	if err != nil {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})

@@ -1,4 +1,4 @@
-function visualizeInstances(instances, maintenanceInstances) {
+function visualizeInstances(instances, maintenanceList) {
 
     var treeData = [];
 
@@ -12,6 +12,7 @@ function visualizeInstances(instances, maintenanceInstances) {
         instance.title = instance.Key.Hostname + ":" + instance.Key.Port;
         instance.children = null;
         instance.inMaintenance = false;
+        instance.maintenanceEntry = null;
     });
     var nodesList = instances;
     // Take canonical host name: strip down longest common suffix of all hosts
@@ -28,10 +29,11 @@ function visualizeInstances(instances, maintenanceInstances) {
         return map;
     }, {});
     // mark maintenance instances
-    maintenanceInstances.forEach(function (maintenanceInstance) {
-        var instanceId = getInstanceId(maintenanceInstance.Hostname, maintenanceInstance.Port)
+    maintenanceList.forEach(function (maintenanceEntry) {
+        var instanceId = getInstanceId(maintenanceEntry.Key.Hostname, maintenanceEntry.Key.Port)
         if (instanceId in nodesMap) {
             nodesMap[instanceId].inMaintenance = true;
+            nodesMap[instanceId].maintenanceEntry = maintenanceEntry;
         }
     });
     // create the tree array

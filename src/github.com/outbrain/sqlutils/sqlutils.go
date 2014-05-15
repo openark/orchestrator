@@ -35,7 +35,7 @@ func (this *RowMap) GetUint(key string) uint {
 }
 
 func (this *RowMap) GetBool(key string) bool {
-	return (*this)[key] == "1"
+	return this.GetInt(key) != 0
 }
 
 

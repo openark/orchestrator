@@ -9,8 +9,8 @@ type Maintenance struct {
 	MaintenanceId		uint
 	Key					InstanceKey
 	BeginTimestamp		string
-	SecondsSinceBegun	uint
-	maintenance_active	bool
+	SecondsElapsed		uint
+	IsActive			bool
 	Owner				string
 	Reason				string
 }

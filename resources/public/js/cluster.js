@@ -75,9 +75,14 @@ function openNodeModal(node) {
 
     if (node.inMaintenance) {
     	$('#node_modal [data-panel-type=maintenance]').html("In maintenance");
+    	$('#node_modal [data-description=maintenance-status]').html(
+    			"Started " + node.maintenanceEntry.BeginTimestamp + " by "+node.maintenanceEntry.Owner + ".<br/>Reason: "+node.maintenanceEntry.Reason
+    	);    	
     	$('#node_modal [data-panel-type=begin-maintenance]').hide();
+    	$('#node_modal [data-panel-type=end-maintenance]').show();
     } else {
     	$('#node_modal [data-panel-type=maintenance]').html("Maintenance");
+    	$('#node_modal [data-panel-type=begin-maintenance]').show();
     	$('#node_modal [data-panel-type=end-maintenance]').hide();
     }
     
@@ -299,9 +304,9 @@ $(document)
 
             $.get("/api/cluster/"+currentClusterName(), function (instances) {
                 $.get("/api/maintenance",
-                    function (maintenanceInstances) {
+                    function (maintenanceList) {
                         visualizeInstances(instances,
-                            maintenanceInstances);
+                        		maintenanceList);
                         generateInstanceDivs(instances);
                     }, "json");
             }, "json");

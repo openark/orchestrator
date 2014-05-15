@@ -3,18 +3,24 @@ package inst
 import (
 	"fmt"
 	"errors"
-	"strconv"
 	"github.com/outbrain/sqlutils"
 	"github.com/outbrain/orchestrator/db"
 	"github.com/outbrain/log"
 )
 
 
-func ReadMaintenanceInstanceKeys() ([]InstanceKey, error) {
-	res := []InstanceKey{}
+func ReadActiveMaintenance() ([]Maintenance, error) {
+	res := []Maintenance{}
 	query := fmt.Sprintf(`
 		select 
-			hostname, port 
+			database_instance_maintenance_id,
+			hostname,
+			port,
+			begin_timestamp,
+			timestampdiff(second, begin_timestamp, now()) as seconds_elapsed,
+			maintenance_active,
+			owner,
+			reason
 		from 
 			database_instance_maintenance
 		where
@@ -26,12 +32,17 @@ func ReadMaintenanceInstanceKeys() ([]InstanceKey, error) {
     if err != nil {goto Cleanup}
     
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-		cname, err := GetCNAME(m["hostname"])
-	    if err != nil {return err}
-		port, err := strconv.Atoi(m["port"])
-	    if err != nil {return err}
-    	instanceKey := InstanceKey{Hostname: cname, Port: port}
-    	res = append(res, instanceKey)
+    	maintenance := Maintenance{}
+    	maintenance.MaintenanceId = m.GetUint("database_instance_maintenance_id")
+    	maintenance.Key.Hostname = m.GetString("hostname")
+    	maintenance.Key.Port = m.GetInt("port")
+    	maintenance.BeginTimestamp = m.GetString("begin_timestamp") 
+    	maintenance.SecondsElapsed = m.GetUint("seconds_elapsed") 
+    	maintenance.IsActive = m.GetBool("maintenance_active") 
+    	maintenance.Owner = m.GetString("owner") 
+    	maintenance.Reason = m.GetString("reason") 
+
+    	res = append(res, maintenance)
     	return err       	
    	})
 	Cleanup:
