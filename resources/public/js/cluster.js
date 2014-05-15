@@ -149,7 +149,7 @@ function moveBelow(node, siblingNode) {
 				    $.get(apiUrl, function (operationResult) {
 			    			hideLoader();
 			    			if (operationResult.Code == "ERROR") {
-			    				addAlert("<strong>Error</strong>: " + operationResult.Message)
+			    				addAlert(operationResult.Message)
 			    			} else {
 			    				location.reload();
 			    			}	
@@ -173,7 +173,7 @@ function moveUp(node, grandparentNode) {
 				    $.get(apiUrl, function (operationResult) {
 			    			hideLoader();
 			    			if (operationResult.Code == "ERROR") {
-			    				addAlert("<strong>Error</strong>: " + operationResult.Message)
+			    				addAlert(operationResult.Message)
 			    			} else {
 			    				location.reload();
 			    			}	

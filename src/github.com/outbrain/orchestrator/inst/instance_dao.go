@@ -319,9 +319,10 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 			or server_id = '%s'
 			or version like '%%%s%%'
 			or port = '%s'
+			or concat(hostname, ':', port) like '%%%s%%'
 		order by
 			cluster_name,
-			hostname, port`, config.Config.InstancePollSeconds, searchString, searchString, searchString, searchString, searchString)
+			hostname, port`, config.Config.InstancePollSeconds, searchString, searchString, searchString, searchString, searchString, searchString)
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 		instance := ReadInstanceRow(m)
     	instances = append(instances, instance)

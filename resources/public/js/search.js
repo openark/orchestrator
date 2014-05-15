@@ -57,5 +57,8 @@ $(document).ready(function () {
         $("div.popover").popover();
         $("div.popover").show();
 	
+        if (instances.length == 0) {
+        	addAlert("No search results found for "+currentSearchString());
+        }
     }
 });	

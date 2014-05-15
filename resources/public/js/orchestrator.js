@@ -39,13 +39,18 @@ function commonSuffixLength(strings) {
 }
 
 
-function addAlert(alertText) {
+function addAlert(alertText, alertClass="danger") {
 	$("#alerts_container").append(
-		'<div class="alert alert-danger alert-dismissable">'
+		'<div class="alert alert-'+alertClass+' alert-dismissable">'
 				+ '<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>'
 				+ alertText + '</div>');
 	$(".alert").alert();
 	return false;
+}
+
+
+function addInfo(alertText) {
+	return addAlert(alertText, "info");
 }
 
 
@@ -92,7 +97,6 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=end-maintenance]').unbind("click");
     $('#node_modal button[data-btn=forget-instance]').unbind("click");
     $('#node_modal button[data-btn=begin-maintenance]').click(function() {
-    	console.log($("#beginMaintenanceReason").val());
     	if (!$("#beginMaintenanceOwner").val()) {
     		return addModalAlert("You must fill the owner field");
     	}
@@ -104,7 +108,7 @@ function openNodeModal(node) {
         $.get(uri, function (operationResult) {
 			hideLoader();
 			if (operationResult.Code == "ERROR") {
-				addAlert("<strong>Error</strong>: " + operationResult.Message)
+				addAlert(operationResult.Message)
 			} else {
 				location.reload();
 			}	
@@ -115,7 +119,7 @@ function openNodeModal(node) {
         $.get("/api/end-maintenance/"+node.Key.Hostname+"/"+node.Key.Port, function (operationResult) {
 			hideLoader();
 			if (operationResult.Code == "ERROR") {
-				addAlert("<strong>Error</strong>: " + operationResult.Message)
+				addAlert(operationResult.Message)
 			} else {
 				location.reload();
 			}	
@@ -133,7 +137,7 @@ function openNodeModal(node) {
 				    $.get(apiUrl, function (operationResult) {
 			    			hideLoader();
 			    			if (operationResult.Code == "ERROR") {
-			    				addAlert("<strong>Error</strong>: " + operationResult.Message)
+			    				addAlert(operationResult.Message)
 			    			} else {
 			    				location.reload();
 			    			}	

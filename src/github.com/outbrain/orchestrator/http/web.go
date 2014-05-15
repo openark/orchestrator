@@ -48,6 +48,14 @@ func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Re
 }
 
 
+func (this *HttpWeb) Discover(params martini.Params, r render.Render) {
+
+	r.HTML(200, "templates/discover", map[string]interface{}{
+		"title": "discover", 
+		})
+}
+
+
 func (this *HttpWeb) Home(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/home", map[string]interface{}{
@@ -62,4 +70,5 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/cluster/:clusterName", this.Cluster) 
 	m.Get("/web/search/:searchString", this.Search) 
 	m.Get("/web/search", this.Search) 
+	m.Get("/web/discover", this.Discover) 
 }
