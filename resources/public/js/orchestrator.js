@@ -53,7 +53,7 @@ function addAlert(alertText) {
 
 function addNodeModalDataAttribute(name, value) {
     $('#modalDataAttributesTable').append(
-        '<tr><td>' + name + '</td><td><code>' + value + '</code></td></tr>');
+        '<tr><td>' + name + '</td><td><code class="text-primary"><strong>' + value + '</strong></code></td></tr>');
 }
 
 function addModalAlert(alertText) {

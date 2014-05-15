@@ -41,11 +41,11 @@ $(document).ready(function () {
             } else if (instance.SecondsBehindMaster > 10) {
                 $("[data-nodeid='" + instance.id + "'].popover h3").addClass("label-danger");
             }
-            $("[data-nodeid='" + instance.id + "'].popover .popover-content").html(
-           		'<p>' 
+            $("[data-nodeid='" + instance.id + "'].popover .popover-content").html(''
                 	+ '<div class="pull-right">' + instance.SecondsBehindMaster + ' seconds lag</div>'
+           		+ '<p>' 
         			+ instance.Version + " " + instance.Binlog_format 
-                	+ '<br/><br/>Cluster: <a href="/web/cluster/'+instance.ClusterName+'">'+instance.ClusterName+'</a>'
+                	+ '<br/>Cluster: <a href="/web/cluster/'+instance.ClusterName+'">'+instance.ClusterName+'</a>'
                 + '</p>'
             );
             $("[data-nodeid='" + instance.id + "'].popover h3 a").click(function () {
