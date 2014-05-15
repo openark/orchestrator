@@ -87,7 +87,7 @@ func ContinuousDiscovery() {
 	log.Infof("Starting continuous discovery")
 	go handleDiscoveryRequests(nil, nil)
     tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
-    forgetUnseenTick := time.Tick(time.Duration(config.Config.UnseenInstanceForgetHours) * time.Hour)
+    forgetUnseenTick := time.Tick(time.Hour)
     for _ = range tick {
 		instanceKeys, _ := inst.ReadOutdatedInstanceKeys()
 		log.Debugf("outdated keys: %+v", instanceKeys)
