@@ -34,9 +34,16 @@ func ScanInstanceRow(instanceKey *InstanceKey, query string, dest ...interface{}
 }
 
 func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
+    defer func() {
+        if err := recover(); err != nil {
+            log.Errorf("Unexpected error: %+v", err)
+        }
+    }()
+
 	instance := NewInstance()
 	instanceFound := false;
     foundBySlaveHosts := false
+
 
 	db,	err	:=	db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 

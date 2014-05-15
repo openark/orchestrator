@@ -5,7 +5,15 @@
 	        Discover a new instance
 	    </div>
 	    <div class="panel-body">
-		    Enter a MySQL hostname and a port. <i>Orchestrator</i> will try and resolve the CNAME.
+	        <div class="">
+	           <p>
+                    Enter a MySQL hostname and a port. <i>Orchestrator</i> will try and resolve the CNAME.
+                </p>
+                <p>
+                    If running in discovery mode, <i>orchestrator</i> will also attempt to discover the entire 
+                    topology the instance belongs to.
+                </p>		          
+		    </div>
 		    
 			<form role="form" class="form-inline">
 		        <input type="text" class="form-control" id="discoverHostName" placeholder="Enter host name">
