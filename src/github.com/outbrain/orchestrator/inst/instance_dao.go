@@ -366,7 +366,7 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 		from 
 			database_instance 
 		where
-			ifnull(timestampdiff(second, last_checked, now()) <= %d, false) = false`, 
+			last_checked < now() - interval %d second`, 
     		config.Config.InstancePollSeconds)
 	db,	err	:=	db.OpenOrchestrator()
     if err != nil {goto Cleanup}
