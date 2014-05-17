@@ -11,27 +11,29 @@ function generateInstanceDivs(nodesList) {
                 var id = $(this).attr("data-fo-id");
                 $(this)
                     .html(
-                        '<div xmlns="http://www.w3.org/1999/xhtml" class="popover right instance"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"><p></p></div></div>');
+                        '<div xmlns="http://www.w3.org/1999/xhtml" class="popover right instance"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"></div></div>');
 
             });
     nodesList
         .forEach(function (node) {
-            $("[data-fo-id='" + node.id + "'] .popover").attr("data-nodeid", node.id);
-            $("[data-fo-id='" + node.id + "'] .popover h3").html(
+        	var popoverElement = $("[data-fo-id='" + node.id + "'] .popover");
+        	popoverElement.attr("data-nodeid", node.id);
+        	popoverElement.find("h3").html(
             		node.canonicalTitle + '<div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog"></span></a></div>'
             );
             if (node.inMaintenance) {
-            	$("[data-fo-id='" + node.id + "'] .popover h3").addClass("label-info");
+            	popoverElement.find("h3").addClass("label-info");
 	        } else if (!node.IsLastCheckValid) {
-	            $("[data-nodeid='" + node.id + "'].popover h3").addClass("label-fatal");
+	        	popoverElement.find("h3").addClass("label-fatal");
             } else if (!node.isMaster && !node.replicationRunning) {
             	// check slaves only; where not replicating
-                $("[data-nodeid='" + node.id + "'].popover h3").addClass("label-danger");
+            	popoverElement.find("h3").addClass("label-danger");
 	        } else if (!node.replicationLagReasonable) {
-	            $("[data-nodeid='" + node.id + "'].popover h3").addClass("label-warning");
+	        	popoverElement.find("h3").addClass("label-warning");
 	        }
-            $("[data-fo-id='" + node.id + "'] .popover .popover-content p").html(
-                    node.Version + " " + node.Binlog_format + '<div class="pull-right">' + node.SecondsBehindMaster.Int64 + ' seconds lag</div>'
+            popoverElement.find(".popover-content").html(
+            		'<div class="pull-right">' + node.SecondsBehindMaster.Int64 + ' seconds lag</div>'
+            		+ '<p>' + node.Version + " " + node.Binlog_format + '</p>' 
             );
         });
     $("[data-fo-id]").each(
