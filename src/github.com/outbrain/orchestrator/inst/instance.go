@@ -101,7 +101,6 @@ func (this *InstanceKeyMap) MarshalJSON() ([]byte, error) {
 
 type Instance struct {
 	Key					InstanceKey
-	IsLastSeenValid		bool
 	ServerID			uint
 	Version				string
 	Binlog_format		string
@@ -117,6 +116,7 @@ type Instance struct {
 	SlaveHosts			InstanceKeyMap
 	ClusterName			string
 	
+	IsLastCheckValid		bool
 	IsUpToDate			bool
 	SecondsSinceLastSeen	sql.NullInt64
 }

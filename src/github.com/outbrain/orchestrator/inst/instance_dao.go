@@ -192,7 +192,7 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 			slave_hosts,
 			cluster_name,
 			ifnull(timestampdiff(second, last_checked, now()) <= ?, false) as is_up_to_date,
-			is_last_seen_valid,
+			(last_checked <= last_seen) is true as is_last_check_valid,
 			timestampdiff(second, last_seen, now()) as seconds_since_last_seen
 		 from database_instance 
 		 	where hostname=? and port=?`, 
@@ -216,7 +216,7 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 		 	&slaveHostsJson,
 		 	&instance.ClusterName,
 		 	&instance.IsUpToDate,
-		 	&instance.IsLastSeenValid,
+		 	&instance.IsLastCheckValid,
 		 	&instance.SecondsSinceLastSeen,
 		)
 	if err == sql.ErrNoRows {log.Infof("No entry for %+v", instanceKey); return instance, false, err}	
@@ -258,7 +258,7 @@ func ReadInstanceRow(m sqlutils.RowMap) *Instance {
  	slaveHostsJson := m.GetString("slave_hosts")
  	instance.ClusterName = m.GetString("cluster_name")
  	instance.IsUpToDate = m.GetBool("is_up_to_date")
- 	instance.IsLastSeenValid = m.GetBool("is_last_seen_valid")
+ 	instance.IsLastCheckValid = m.GetBool("is_last_check_valid")
  	instance.SecondsSinceLastSeen = m.GetNullInt64("seconds_since_last_seen")
  	
  	instance.ReadSlaveHostsFromJson(slaveHostsJson)
@@ -281,7 +281,7 @@ func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 		select 
 			*,
 			ifnull(timestampdiff(second, last_checked, now()) <= %d, false) as is_up_to_date,
-			is_last_seen_valid,
+			(last_checked <= last_seen) is true as is_last_check_valid,
 			timestampdiff(second, last_seen, now()) as seconds_since_last_seen
 		from 
 			database_instance 
@@ -316,7 +316,7 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 		select 
 			*,
 			ifnull(timestampdiff(second, last_checked, now()) <= %d, false) as is_up_to_date,
-			is_last_seen_valid,
+			(last_checked <= last_seen) is true as is_last_check_valid,
 			timestampdiff(second, last_seen, now()) as seconds_since_last_seen
 		from 
 			database_instance 
@@ -454,7 +454,7 @@ func WriteInstance(instance *Instance, lastError error) error {
 	
 	if lastError == nil {
 		sqlutils.Exec(db, `
-        	update database_instance set last_seen = NOW(), is_last_seen_valid = 1 where hostname=? and port=?
+        	update database_instance set last_seen = NOW() where hostname=? and port=?
         	`, instance.Key.Hostname, instance.Key.Port,
         )
 	}

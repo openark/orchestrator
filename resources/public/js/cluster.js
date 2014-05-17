@@ -22,9 +22,10 @@ function generateInstanceDivs(nodesList) {
             );
             if (node.inMaintenance) {
             	$("[data-fo-id='" + node.id + "'] .popover h3").addClass("label-info");
-	        } else if (!node.isSeenRecently) {
+	        } else if (!node.IsLastCheckValid) {
 	            $("[data-nodeid='" + node.id + "'].popover h3").addClass("label-fatal");
-            } else if (!node.SecondsBehindMaster.Valid) {
+            } else if (!node.isMaster && !node.replicationRunning) {
+            	// check slaves only; where not replicating
                 $("[data-nodeid='" + node.id + "'].popover h3").addClass("label-danger");
 	        } else if (!node.replicationLagReasonable) {
 	            $("[data-nodeid='" + node.id + "'].popover h3").addClass("label-warning");

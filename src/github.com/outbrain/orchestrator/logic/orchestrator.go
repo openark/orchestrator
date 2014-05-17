@@ -41,7 +41,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	
 	instance, found, err := inst.ReadInstance(&instanceKey)
 	
-	if found && instance.IsUpToDate && instance.IsLastSeenValid {
+	if found && instance.IsUpToDate && instance.IsLastCheckValid {
 		// we've already discovered this one. Skip!
 		goto Cleanup
 	}

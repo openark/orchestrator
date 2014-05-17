@@ -33,9 +33,10 @@ $(document).ready(function () {
             		instance.canonicalTitle + '<div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog"></span></a></div>');
             if (instance.inMaintenance) {
                 $("[data-nodeid='" + instance.id + "'].popover h3").addClass("label-info");
-	        } else if (!instance.isSeenRecently) {
+	        } else if (!instance.IsLastCheckValid) {
 	            $("[data-nodeid='" + instance.id + "'].popover h3").addClass("label-fatal");
-            } else if (!instance.SecondsBehindMaster.Valid) {
+            } else if (!instance.isMaster && !instance.replicationRunning) {
+            	// check slaves only; where not replicating
                 $("[data-nodeid='" + instance.id + "'].popover h3").addClass("label-danger");
 	        } else if (!instance.replicationLagReasonable) {
 	            $("[data-nodeid='" + instance.id + "'].popover h3").addClass("label-warning");

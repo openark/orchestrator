@@ -173,6 +173,8 @@ function normalizeInstance(instance) {
     instance.replicationRunning = instance.Slave_SQL_Running && instance.Slave_IO_Running;
     instance.replicationLagReasonable = instance.SecondsBehindMaster.Int64 <= 10;
     instance.isSeenRecently = instance.SecondsSinceLastSeen.Valid && instance.SecondsSinceLastSeen.Int64 <= 3600;
+    
+    instance.isMaster = (instance.title == instance.ClusterName);
 }
 
 function normalizeInstances(instances) {
