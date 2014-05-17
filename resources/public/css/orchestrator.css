@@ -44,8 +44,12 @@
 
 .popover.instance h3.label-warning {
   background-color: #f0ad4e;
+  color: #ffffff;
 }
 
+.popover.instance h3.label-warning .glyphicon {
+  color: #ffffff;
+}
 .popover.instance h3.label-danger {
   background-color: #d9534f;
   color: #ffffff;
@@ -61,6 +65,16 @@
 .popover.instance h3.label-primary .glyphicon {
   color: #ffffff;
 }
+
+.popover.instance h3.label-fatal {
+    background-color: #000000;
+    color: #ffffff;
+}
+
+.popover.instance h3.label-fatal .glyphicon {
+    color: #ffffff;
+}
+
 
 .popover.instance.draggable-hovers {
     background-color: #f7f7f7;

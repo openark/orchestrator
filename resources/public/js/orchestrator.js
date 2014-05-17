@@ -80,7 +80,7 @@ function openNodeModal(node) {
         addNodeModalDataAttribute("Replication running",
             booleanString(node.Slave_SQL_Running && node.Slave_IO_Running));
         addNodeModalDataAttribute("Replication lag",
-            node.SecondsBehindMaster);
+            node.SecondsBehindMaster.Valid? node.SecondsBehindMaster.Int64 : "null");
     }
     addNodeModalDataAttribute("Num slaves",
         node.SlaveHosts.length);

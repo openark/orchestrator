@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"errors"
 	"time"
-	"strconv"
 	"strings"
-	"math"
 	"database/sql"
 	"github.com/outbrain/sqlutils"
 	"github.com/outbrain/orchestrator/db"
@@ -55,19 +53,18 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
     if err != nil {goto Cleanup}
     instanceFound = true
     err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
-		instance.Slave_IO_Running = (m["Slave_IO_Running"] == "Yes")
-      	instance.Slave_SQL_Running = (m["Slave_SQL_Running"] == "Yes")
-       	instance.ReadBinlogCoordinates.LogFile = m["Master_Log_File"]
-       	instance.ReadBinlogCoordinates.LogPos, _ = strconv.ParseInt(m["Read_Master_Log_Pos"], 10, 0)
-       	instance.ExecBinlogCoordinates.LogFile = m["Relay_Master_Log_File"]
-       	instance.ExecBinlogCoordinates.LogPos, _ = strconv.ParseInt(m["Exec_Master_Log_Pos"], 10, 0)
-       	var err error
-       	instance.MasterKey.Hostname, err = GetCNAME(m["Master_Host"])
+		instance.Slave_IO_Running = (m.GetString("Slave_IO_Running") == "Yes")
+      	instance.Slave_SQL_Running = (m.GetString("Slave_SQL_Running") == "Yes")
+       	instance.ReadBinlogCoordinates.LogFile = m.GetString("Master_Log_File")
+       	instance.ReadBinlogCoordinates.LogPos = m.GetInt64("Read_Master_Log_Pos")
+       	instance.ExecBinlogCoordinates.LogFile = m.GetString("Relay_Master_Log_File")
+       	instance.ExecBinlogCoordinates.LogPos = m.GetInt64("Exec_Master_Log_Pos")
+
+       	masterKey, err := NewInstanceKeyFromStrings(m.GetString("Master_Host"), m.GetString("Master_Port")) 
        	if err != nil {log.Errore(err)}
-       	instance.MasterKey.Port, err = strconv.Atoi(m["Master_Port"])
-       	if err != nil {return err}
+       	instance.MasterKey = *masterKey
        	if config.Config.SlaveLagQuery == "" {
-       		instance.SecondsBehindMaster = m.GetIntD("Seconds_Behind_Master", math.MaxInt32)
+       		instance.SecondsBehindMaster = m.GetNullInt64("Seconds_Behind_Master")
         }
        	if err != nil {return err}
        	return err
@@ -81,8 +78,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
         
     err = sqlutils.QueryRowsMap(db, "show master status", func(m sqlutils.RowMap) error {
     	var err error
-       	instance.SelfBinlogCoordinates.LogFile = m["File"]
-       	instance.SelfBinlogCoordinates.LogPos, err = strconv.ParseInt(m["Position"], 10, 0)
+       	instance.SelfBinlogCoordinates.LogFile = m.GetString("File")
+       	instance.SelfBinlogCoordinates.LogPos = m.GetInt64("Position")
        	return err
    	})
     if err != nil {goto Cleanup}
@@ -91,11 +88,9 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
     if config.Config.DiscoverByShowSlaveHosts {
         err = sqlutils.QueryRowsMap(db, `show slave hosts`, 
         		func(m sqlutils.RowMap) error {
-        			cname, err := GetCNAME(m["Host"])
-        			port, err := strconv.Atoi(m["Port"])
+        			slaveKey, err := NewInstanceKeyFromStrings(m.GetString("Host"), m.GetString("Port")) 
         			if err == nil {
-	        			slaveKey := InstanceKey{Hostname: cname, Port: port}
-						instance.AddSlaveKey(&slaveKey)
+						instance.AddSlaveKey(slaveKey)
 						foundBySlaveHosts = true
 					}
 					return err
@@ -113,7 +108,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
         	where 
         		command='Binlog Dump'`, 
         		func(m sqlutils.RowMap) error {
-        			cname, err := GetCNAME(m["slave_hostname"])
+        			cname, err := GetCNAME(m.GetString("slave_hostname"))
         			if err != nil {return err}
         			slaveKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
 					instance.AddSlaveKey(&slaveKey)
@@ -197,7 +192,8 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 			slave_hosts,
 			cluster_name,
 			ifnull(timestampdiff(second, last_checked, now()) <= ?, false) as is_up_to_date,
-			is_last_seen_valid
+			is_last_seen_valid,
+			timestampdiff(second, last_seen, now()) as seconds_since_last_seen
 		 from database_instance 
 		 	where hostname=? and port=?`, 
 		 config.Config.InstancePollSeconds, instanceKey.Hostname, instanceKey.Port).Scan(
@@ -221,6 +217,7 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 		 	&instance.ClusterName,
 		 	&instance.IsUpToDate,
 		 	&instance.IsLastSeenValid,
+		 	&instance.SecondsSinceLastSeen,
 		)
 	if err == sql.ErrNoRows {log.Infof("No entry for %+v", instanceKey); return instance, false, err}	
 		
@@ -257,11 +254,12 @@ func ReadInstanceRow(m sqlutils.RowMap) *Instance {
  	instance.ReadBinlogCoordinates.LogPos = m.GetInt64("read_master_log_pos")
  	instance.ExecBinlogCoordinates.LogFile = m.GetString("relay_master_log_file")
  	instance.ExecBinlogCoordinates.LogPos = m.GetInt64("exec_master_log_pos")
- 	instance.SecondsBehindMaster = m.GetInt("seconds_behind_master")
+ 	instance.SecondsBehindMaster = m.GetNullInt64("seconds_behind_master")
  	slaveHostsJson := m.GetString("slave_hosts")
  	instance.ClusterName = m.GetString("cluster_name")
  	instance.IsUpToDate = m.GetBool("is_up_to_date")
  	instance.IsLastSeenValid = m.GetBool("is_last_seen_valid")
+ 	instance.SecondsSinceLastSeen = m.GetNullInt64("seconds_since_last_seen")
  	
  	instance.ReadSlaveHostsFromJson(slaveHostsJson)
  	return instance
@@ -283,7 +281,8 @@ func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 		select 
 			*,
 			ifnull(timestampdiff(second, last_checked, now()) <= %d, false) as is_up_to_date,
-			is_last_seen_valid
+			is_last_seen_valid,
+			timestampdiff(second, last_seen, now()) as seconds_since_last_seen
 		from 
 			database_instance 
 		where
@@ -317,7 +316,8 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 		select 
 			*,
 			ifnull(timestampdiff(second, last_checked, now()) <= %d, false) as is_up_to_date,
-			is_last_seen_valid
+			is_last_seen_valid,
+			timestampdiff(second, last_seen, now()) as seconds_since_last_seen
 		from 
 			database_instance 
 		where
@@ -380,13 +380,14 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
     if err != nil {goto Cleanup}
     
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-		cname, err := GetCNAME(m["hostname"])
-	    if err != nil {return err}
-		port, err := strconv.Atoi(m["port"])
-	    if err != nil {return err}
-    	instanceKey := InstanceKey{Hostname: cname, Port: port}
-    	res = append(res, instanceKey)
-    	return err       	
+    	instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
+	    if merr != nil {
+	    	log.Errore(merr)
+	    } else {
+	    	res = append(res, *instanceKey)
+	    }
+	    // We don;t return an error because we want to keep filling the outdated instances list.
+    	return nil       	
    	})
 	Cleanup:
 

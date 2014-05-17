@@ -31,25 +31,28 @@ $(document).ready(function () {
             }
         });
     	instances.forEach(function (instance) {
-    		var node=instance;
     		$("#searchResults").append('<div xmlns="http://www.w3.org/1999/xhtml" class="popover instance right" data-nodeid="'+instance.id+'"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"></div></div>');
 
             $("[data-nodeid='" + instance.id + "'].popover h3").html(
             		instance.canonicalTitle + '<div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog"></span></a></div>');
             if (instance.inMaintenance) {
                 $("[data-nodeid='" + instance.id + "'].popover h3").addClass("label-info");
-            } else if (instance.SecondsBehindMaster > 10) {
+	        } else if (!instance.SecondsSinceLastSeen.Valid || instance.SecondsSinceLastSeen.Int64 > 3600) {
+	            $("[data-nodeid='" + instance.id + "'].popover h3").addClass("label-fatal");
+            } else if (!instance.SecondsBehindMaster.Valid) {
                 $("[data-nodeid='" + instance.id + "'].popover h3").addClass("label-danger");
-            }
+	        } else if (instance.SecondsBehindMaster.Valid && instance.SecondsBehindMaster.Int64 > 10) {
+	            $("[data-nodeid='" + instance.id + "'].popover h3").addClass("label-warning");
+	        }
             $("[data-nodeid='" + instance.id + "'].popover .popover-content").html(''
-                	+ '<div class="pull-right">' + instance.SecondsBehindMaster + ' seconds lag</div>'
+                	+ '<div class="pull-right">' + instance.SecondsBehindMaster.Int64 + ' seconds lag</div>'
            		+ '<p>' 
         			+ instance.Version + " " + instance.Binlog_format 
                 	+ '<br/>Cluster: <a href="/web/cluster/'+instance.ClusterName+'">'+instance.ClusterName+'</a>'
                 + '</p>'
             );
             $("[data-nodeid='" + instance.id + "'].popover h3 a").click(function () {
-            	openNodeModal(node);
+            	openNodeModal(instance);
             	return false;
             });
     	});        	

@@ -7,30 +7,39 @@ import (
 	"github.com/outbrain/log"	
 )
 
-type RowMap map[string]string
+type RowMap map[string]sql.NullString
 
 func (this *RowMap) GetString(key string) string {
-	return (*this)[key]
+	return (*this)[key].String
 }
 
 func (this *RowMap) GetInt64(key string) int64 {
-	res, _ := strconv.ParseInt((*this)[key], 10, 0)
+	res, _ := strconv.ParseInt(this.GetString(key), 10, 0)
 	return res
 }
 
+func (this *RowMap) GetNullInt64(key string) sql.NullInt64 {
+	i, err := strconv.ParseInt(this.GetString(key), 10, 0)
+	if err == nil { 
+		return sql.NullInt64{Int64: i, Valid: true,}
+	} else {
+		return sql.NullInt64{Valid: false,} 
+	}
+}
+
 func (this *RowMap) GetInt(key string) int {
-	res, _ := strconv.Atoi((*this)[key])
+	res, _ := strconv.Atoi(this.GetString(key))
 	return res
 }
 
 func (this *RowMap) GetIntD(key string, def int) int {
-	res, err := strconv.Atoi((*this)[key])
+	res, err := strconv.Atoi(this.GetString(key))
 	if err != nil {return def}
 	return res
 }
 
 func (this *RowMap) GetUint(key string) uint {
-	res, _ := strconv.Atoi((*this)[key])
+	res, _ := strconv.Atoi(this.GetString(key))
 	return uint(res)
 }
 
@@ -54,9 +63,9 @@ func GetDB(mysql_uri string) (*sql.DB, error) {
 }
 
 
-func RowToArray(rows *sql.Rows, columns []string) []string {
+func RowToArray(rows *sql.Rows, columns []string) []sql.NullString {
     buff := make([]interface{}, len(columns))
-    data := make([]string, len(columns))
+    data := make([]sql.NullString, len(columns))
     for i, _ := range buff {
         buff[i] = &data[i]
     }
@@ -64,7 +73,7 @@ func RowToArray(rows *sql.Rows, columns []string) []string {
 	return data
 }
 
-func ScanRowsToArrays(rows *sql.Rows, on_row func([]string) error) error {
+func ScanRowsToArrays(rows *sql.Rows, on_row func([]sql.NullString) error) error {
     columns, _ := rows.Columns()
     for rows.Next() {
     	arr := RowToArray(rows, columns)
@@ -79,8 +88,8 @@ func ScanRowsToArrays(rows *sql.Rows, on_row func([]string) error) error {
 
 func ScanRowsToMaps(rows *sql.Rows, on_row func(RowMap) error) error {
 	columns, _ := rows.Columns()
-	err := ScanRowsToArrays(rows, func(arr []string) error {
-    	m := make(map[string]string)	 
+	err := ScanRowsToArrays(rows, func(arr []sql.NullString) error {
+    	m := make(map[string]sql.NullString)	 
 	    for k, data_col := range arr {
 	        m[columns[k]] = data_col
 	    }

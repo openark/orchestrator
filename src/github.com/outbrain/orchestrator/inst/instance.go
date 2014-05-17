@@ -6,6 +6,7 @@ import (
 	"net"
 	"fmt"
 	"errors"
+	"database/sql"
 	"encoding/json"
 	"github.com/outbrain/log"
 )
@@ -112,11 +113,12 @@ type Instance struct {
 	Slave_IO_Running	bool
 	ReadBinlogCoordinates	BinlogCoordinates
 	ExecBinlogCoordinates	BinlogCoordinates
-	SecondsBehindMaster	int
+	SecondsBehindMaster		sql.NullInt64
 	SlaveHosts			InstanceKeyMap
 	ClusterName			string
 	
 	IsUpToDate			bool
+	SecondsSinceLastSeen	sql.NullInt64
 }
 
 func NewInstance() *Instance {
