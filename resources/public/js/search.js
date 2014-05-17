@@ -13,11 +13,7 @@ $(document).ready(function () {
     }, "json");
     function displaySearchInstances(instances, maintenanceList) {
         hideLoader();
-        instances.forEach(function (instance) {
-            instance.id = getInstanceId(instance.Key.Hostname, instance.Key.Port);
-            instance.title= instance.Key.Hostname+':'+instance.Key.Port;
-            instance.canonicalTitle = instance.title;
-        });
+        normalizeInstances(instances);
         var nodesMap = instances.reduce(function (map, node) {
             map[node.id] = node;
             return map;
@@ -37,11 +33,11 @@ $(document).ready(function () {
             		instance.canonicalTitle + '<div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog"></span></a></div>');
             if (instance.inMaintenance) {
                 $("[data-nodeid='" + instance.id + "'].popover h3").addClass("label-info");
-	        } else if (!instance.SecondsSinceLastSeen.Valid || instance.SecondsSinceLastSeen.Int64 > 3600) {
+	        } else if (!instance.isSeenRecently) {
 	            $("[data-nodeid='" + instance.id + "'].popover h3").addClass("label-fatal");
             } else if (!instance.SecondsBehindMaster.Valid) {
                 $("[data-nodeid='" + instance.id + "'].popover h3").addClass("label-danger");
-	        } else if (instance.SecondsBehindMaster.Valid && instance.SecondsBehindMaster.Int64 > 10) {
+	        } else if (!instance.replicationLagReasonable) {
 	            $("[data-nodeid='" + instance.id + "'].popover h3").addClass("label-warning");
 	        }
             $("[data-nodeid='" + instance.id + "'].popover .popover-content").html(''

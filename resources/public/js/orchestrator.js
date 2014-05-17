@@ -75,12 +75,11 @@ function openNodeModal(node) {
     $('#modalDataAttributesTable').html("");
 
     if (node.MasterKey.Hostname) {
-        addNodeModalDataAttribute("Master",
-            node.MasterKey.Hostname + ":" + node.MasterKey.Port);
+        addNodeModalDataAttribute("Master", node.masterTitle);
         addNodeModalDataAttribute("Replication running",
-            booleanString(node.Slave_SQL_Running && node.Slave_IO_Running));
+            booleanString(node.replicationRunning));
         addNodeModalDataAttribute("Replication lag",
-            node.SecondsBehindMaster.Valid? node.SecondsBehindMaster.Int64 : "null");
+            node.SecondsBehindMaster.Valid ? node.SecondsBehindMaster.Int64 : "null");
     }
     addNodeModalDataAttribute("Num slaves",
         node.SlaveHosts.length);
@@ -161,5 +160,24 @@ function openNodeModal(node) {
     }
     
     $('#node_modal').modal({})
+}
+
+function normalizeInstance(instance) {
+    instance.id = getInstanceId(instance.Key.Hostname, instance.Key.Port);
+    instance.title= instance.Key.Hostname+':'+instance.Key.Port;
+    instance.canonicalTitle = instance.title;
+    instance.masterTitle = instance.MasterKey.Hostname + ":" + instance.MasterKey.Port;
+    instance.masterId = getInstanceId(instance.MasterKey.Hostname,
+            instance.MasterKey.Port);
+
+    instance.replicationRunning = instance.Slave_SQL_Running && instance.Slave_IO_Running;
+    instance.replicationLagReasonable = instance.SecondsBehindMaster.Int64 <= 10;
+    instance.isSeenRecently = instance.SecondsSinceLastSeen.Valid && instance.SecondsSinceLastSeen.Int64 <= 3600;
+}
+
+function normalizeInstances(instances) {
+    instances.forEach(function(instance) {
+    	normalizeInstance(instance);
+    });
 }
 

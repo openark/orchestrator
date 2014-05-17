@@ -66,8 +66,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
        	if config.Config.SlaveLagQuery == "" {
        		instance.SecondsBehindMaster = m.GetNullInt64("Seconds_Behind_Master")
         }
-       	if err != nil {return err}
-       	return err
+        // Not breaking the flow even on error
+       	return nil
    	})
     if err != nil {goto Cleanup}
 

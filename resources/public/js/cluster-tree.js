@@ -1,15 +1,8 @@
 function visualizeInstances(instances, maintenanceList) {
 
     var treeData = [];
-
-
     instances.forEach(function (instance) {
-        instance.id = getInstanceId(instance.Key.Hostname,
-            instance.Key.Port);
         instance.hasMaster = true;
-        instance.masterId = getInstanceId(instance.MasterKey.Hostname,
-            instance.MasterKey.Port);
-        instance.title = instance.Key.Hostname + ":" + instance.Key.Port;
         instance.children = null;
         instance.inMaintenance = false;
         instance.maintenanceEntry = null;

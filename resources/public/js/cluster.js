@@ -22,11 +22,11 @@ function generateInstanceDivs(nodesList) {
             );
             if (node.inMaintenance) {
             	$("[data-fo-id='" + node.id + "'] .popover h3").addClass("label-info");
-	        } else if (!node.SecondsSinceLastSeen.Valid || node.SecondsSinceLastSeen.Int64 > 3600) {
+	        } else if (!node.isSeenRecently) {
 	            $("[data-nodeid='" + node.id + "'].popover h3").addClass("label-fatal");
             } else if (!node.SecondsBehindMaster.Valid) {
                 $("[data-nodeid='" + node.id + "'].popover h3").addClass("label-danger");
-	        } else if (node.SecondsBehindMaster.Valid && node.SecondsBehindMaster.Int64 > 10) {
+	        } else if (!node.replicationLagReasonable) {
 	            $("[data-nodeid='" + node.id + "'].popover h3").addClass("label-warning");
 	        }
             $("[data-fo-id='" + node.id + "'] .popover .popover-content p").html(
@@ -213,6 +213,7 @@ $(document)
             $.get("/api/cluster/"+currentClusterName(), function (instances) {
                 $.get("/api/maintenance",
                     function (maintenanceList) {
+                		normalizeInstances(instances);
                         visualizeInstances(instances,
                         		maintenanceList);
                         generateInstanceDivs(instances);
