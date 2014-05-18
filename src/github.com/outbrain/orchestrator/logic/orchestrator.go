@@ -47,7 +47,9 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	}
 	// First we've ever heard of this instance. Continue investigation:
 	instance, err = inst.ReadTopologyInstance(&instanceKey)
-	if	err	!=	nil	{goto Cleanup}
+	// panic can occur (IO stuff). Therefore it may happen
+	// that instance is nil. Check it.
+	if	err	!= nil || instance == nil {goto Cleanup}
 
 	fmt.Printf("host: %+v, master: %+v\n", instance.Key, instance.MasterKey)
 
