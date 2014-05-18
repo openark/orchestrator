@@ -173,13 +173,86 @@ function normalizeInstance(instance) {
     instance.replicationRunning = instance.Slave_SQL_Running && instance.Slave_IO_Running;
     instance.replicationLagReasonable = instance.SecondsBehindMaster.Int64 <= 10;
     instance.isSeenRecently = instance.SecondsSinceLastSeen.Valid && instance.SecondsSinceLastSeen.Int64 <= 3600;
-    
+
+    // used by cluster-tree
+    instance.hasMaster = true;
+    instance.children = null;
+    instance.inMaintenance = false;
+    instance.maintenanceEntry = null;
+
     instance.isMaster = (instance.title == instance.ClusterName);
 }
 
-function normalizeInstances(instances) {
+function normalizeInstances(instances, maintenanceList) {
     instances.forEach(function(instance) {
     	normalizeInstance(instance);
     });
+    // Take canonical host name: strip down longest common suffix of all hosts
+    // (experimental; you may not like it)
+    var hostNames = instances.map(function (instance) {
+        return instance.title
+    });
+    var suffixLength = commonSuffixLength(hostNames);
+    instances.forEach(function (instance) {
+    	instance.canonicalTitle = instance.title.substring(0, instance.title.length - suffixLength);
+    });
+    var instancesMap = instances.reduce(function (map, node) {
+        map[node.id] = node;
+        return map;
+    }, {});
+    // mark maintenance instances
+    maintenanceList.forEach(function (maintenanceEntry) {
+        var instanceId = getInstanceId(maintenanceEntry.Key.Hostname, maintenanceEntry.Key.Port)
+        if (instanceId in instancesMap) {
+        	instancesMap[instanceId].inMaintenance = true;
+        	instancesMap[instanceId].maintenanceEntry = maintenanceEntry;
+        }
+    });
+    // create the tree array
+    instances.forEach(function (node) {
+        // add to parent
+        var parent = instancesMap[node.masterId];
+        if (parent) {
+            // create child array if it doesn't exist
+            (parent.children || (parent.children = [])).push(node);
+            (parent.contents || (parent.contents = [])).push(node);
+        } else {
+            // parent is null or missing
+            node.hasMaster = false;
+            node.parent = null;
+        }
+    });
+    return instancesMap;
 }
 
+function renderInstanceElement(popoverElement, instance, renderType) {
+	popoverElement.attr("data-nodeid", instance.id);
+	popoverElement.find("h3").html(
+    		instance.canonicalTitle + '<div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog"></span></a></div>');
+    if (instance.inMaintenance) {
+    	popoverElement.find("h3").addClass("label-info");
+    } else if (!instance.IsLastCheckValid) {
+    	popoverElement.find(" h3").addClass("label-fatal");
+    } else if (!instance.isMaster && !instance.replicationRunning) {
+    	// check slaves only; where not replicating
+    	popoverElement.find("h3").addClass("label-danger");
+    } else if (!instance.replicationLagReasonable) {
+    	popoverElement.find("h3").addClass("label-warning");
+    }
+    var contentHtml = ''
+        	+ '<div class="pull-right">' + instance.SecondsBehindMaster.Int64 + ' seconds lag</div>'
+   		+ '<p>' 
+			+ instance.Version + " " + instance.Binlog_format 
+        + '</p>';
+    if (renderType == "search") {
+    	contentHtml += '<p>' 
+        	+ 'Cluster: <a href="/web/cluster/'+instance.ClusterName+'">'+instance.ClusterName+'</a>'
+        + '</p>';
+    }    
+    popoverElement.find(".popover-content").html(contentHtml);
+    
+    popoverElement.find("h3 a").click(function () {
+    	openNodeModal(instance);
+    	return false;
+    });	
+}

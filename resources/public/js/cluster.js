@@ -5,37 +5,16 @@ function generateInstanceDivs(nodesList) {
         return map;
     }, {});
 
-    $("[data-fo-id]")
-        .each(
-            function () {
-                var id = $(this).attr("data-fo-id");
-                $(this)
-                    .html(
-                        '<div xmlns="http://www.w3.org/1999/xhtml" class="popover right instance"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"></div></div>');
-
-            });
-    nodesList
-        .forEach(function (node) {
-        	var popoverElement = $("[data-fo-id='" + node.id + "'] .popover");
-        	popoverElement.attr("data-nodeid", node.id);
-        	popoverElement.find("h3").html(
-            		node.canonicalTitle + '<div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog"></span></a></div>'
-            );
-            if (node.inMaintenance) {
-            	popoverElement.find("h3").addClass("label-info");
-	        } else if (!node.IsLastCheckValid) {
-	        	popoverElement.find("h3").addClass("label-fatal");
-            } else if (!node.isMaster && !node.replicationRunning) {
-            	// check slaves only; where not replicating
-            	popoverElement.find("h3").addClass("label-danger");
-	        } else if (!node.replicationLagReasonable) {
-	        	popoverElement.find("h3").addClass("label-warning");
-	        }
-            popoverElement.find(".popover-content").html(
-            		'<div class="pull-right">' + node.SecondsBehindMaster.Int64 + ' seconds lag</div>'
-            		+ '<p>' + node.Version + " " + node.Binlog_format + '</p>' 
-            );
-        });
+    $("[data-fo-id]").each(function () {
+        var id = $(this).attr("data-fo-id");
+        $(this).html(
+        	'<div xmlns="http://www.w3.org/1999/xhtml" class="popover right instance"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"></div></div>'
+        );
+    });
+    nodesList.forEach(function (node) {
+    	var popoverElement = $("[data-fo-id='" + node.id + "'] .popover");
+    	renderInstanceElement(popoverElement, node, "cluster");
+    });
     $("[data-fo-id]").each(
         function () {
             var id = $(this).attr("data-fo-id");
@@ -138,49 +117,49 @@ function moveInstance(node, droppableNode, shouldApply) {
 }
 
 function moveBelow(node, siblingNode) {
-	bootbox.confirm("Are you sure you wish to turn <code><strong>" + 
-				node.Key.Hostname + ":" + node.Key.Port +
-				"</strong></code> into a slave of <code><strong>" +
-				siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
-				"</strong></code>?"
-			, function(confirm) {
-				if (confirm) {
-					showLoader();
-					var apiUrl = "/api/move-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port;
-				    $.get(apiUrl, function (operationResult) {
-			    			hideLoader();
-			    			if (operationResult.Code == "ERROR") {
-			    				addAlert(operationResult.Message)
-			    			} else {
-			    				location.reload();
-			    			}	
-			            }, "json");					
-				}
-			}); 
+	var message = "Are you sure you wish to turn <code><strong>" + 
+		node.Key.Hostname + ":" + node.Key.Port +
+		"</strong></code> into a slave of <code><strong>" +
+		siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
+		"</strong></code>?";
+	bootbox.confirm(message, function(confirm) {
+		if (confirm) {
+			showLoader();
+			var apiUrl = "/api/move-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port;
+		    $.get(apiUrl, function (operationResult) {
+	    			hideLoader();
+	    			if (operationResult.Code == "ERROR") {
+	    				addAlert(operationResult.Message)
+	    			} else {
+	    				location.reload();
+	    			}	
+	            }, "json");					
+		}
+	}); 
 	return false;
 }
 
 
 function moveUp(node, grandparentNode) {
-	bootbox.confirm("Are you sure you wish to turn <code><strong>" + 
-				node.Key.Hostname + ":" + node.Key.Port +
-				"</strong></code> into a slave of <code><strong>" +
-				grandparentNode.Key.Hostname + ":" + grandparentNode.Key.Port +
-				"</strong></code>?"
-			, function(confirm) {
-				if (confirm) {
-					showLoader();
-					var apiUrl = "/api/move-up/" + node.Key.Hostname + "/" + node.Key.Port;
-				    $.get(apiUrl, function (operationResult) {
-			    			hideLoader();
-			    			if (operationResult.Code == "ERROR") {
-			    				addAlert(operationResult.Message)
-			    			} else {
-			    				location.reload();
-			    			}	
-			            }, "json");					
-				}
-			}); 
+	var message = "Are you sure you wish to turn <code><strong>" + 
+		node.Key.Hostname + ":" + node.Key.Port +
+		"</strong></code> into a slave of <code><strong>" +
+		grandparentNode.Key.Hostname + ":" + grandparentNode.Key.Port +
+		"</strong></code>?"
+	bootbox.confirm(message, function(confirm) {
+		if (confirm) {
+			showLoader();
+			var apiUrl = "/api/move-up/" + node.Key.Hostname + "/" + node.Key.Port;
+		    $.get(apiUrl, function (operationResult) {
+	    			hideLoader();
+	    			if (operationResult.Code == "ERROR") {
+	    				addAlert(operationResult.Message)
+	    			} else {
+	    				location.reload();
+	    			}	
+	            }, "json");					
+		}
+	}); 
 	return false;
 }
 
@@ -216,9 +195,8 @@ $(document)
             $.get("/api/cluster/"+currentClusterName(), function (instances) {
                 $.get("/api/maintenance",
                     function (maintenanceList) {
-                		normalizeInstances(instances);
-                        visualizeInstances(instances,
-                        		maintenanceList);
+                		var instancesMap = normalizeInstances(instances, maintenanceList);
+                        visualizeInstances(instances, instancesMap);
                         generateInstanceDivs(instances);
                     }, "json");
             }, "json");

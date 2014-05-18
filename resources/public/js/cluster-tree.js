@@ -1,55 +1,4 @@
-function visualizeInstances(instances, maintenanceList) {
-
-    var treeData = [];
-    instances.forEach(function (instance) {
-        instance.hasMaster = true;
-        instance.children = null;
-        instance.inMaintenance = false;
-        instance.maintenanceEntry = null;
-    });
-    var nodesList = instances;
-    // Take canonical host name: strip down longest common suffix of all hosts
-    // (experimental; you may not like it)
-    var hostNames = nodesList.map(function (node) {
-        return node.title
-    });
-    var suffixLength = commonSuffixLength(hostNames);
-    nodesList.forEach(function (node) {
-        node.canonicalTitle = node.title.substring(0, node.title.length - suffixLength);
-    });
-    var nodesMap = nodesList.reduce(function (map, node) {
-        map[node.id] = node;
-        return map;
-    }, {});
-    // mark maintenance instances
-    maintenanceList.forEach(function (maintenanceEntry) {
-        var instanceId = getInstanceId(maintenanceEntry.Key.Hostname, maintenanceEntry.Key.Port)
-        if (instanceId in nodesMap) {
-            nodesMap[instanceId].inMaintenance = true;
-            nodesMap[instanceId].maintenanceEntry = maintenanceEntry;
-        }
-    });
-    // create the tree array
-    nodesList.forEach(function (node) {
-        // add to parent
-        var parent = nodesMap[node.masterId];
-        if (parent) {
-            // create child array if it doesn't exist
-            (parent.children || (parent.children = []))
-            // add node to child array
-            .push(node);
-            (parent.contents || (parent.contents = []))
-            // add node to child array
-            .push(node);
-        } else {
-            // parent is null or missing
-            node.hasMaster = false;
-            node.parent = null;
-            treeData.push(node);
-        }
-    });
-
-
+function visualizeInstances(nodesList, nodesMap) {
     // Calculate tree dimensions
     function getNodeDepth(node) {
         if (node.depth == null) {
@@ -78,8 +27,6 @@ function visualizeInstances(instances, maintenanceList) {
         maxDepth = Math.max(maxDepth, key);
         maxNodesAtDepth = Math.max(maxNodesAtDepth, value);
     });
-
-
 
     var margin = {
         top: 0,
@@ -112,7 +59,13 @@ function visualizeInstances(instances, maintenanceList) {
             "transform",
             "translate(" + margin.left + "," + margin.top + ")");
 
-    var root = treeData[0];
+    var root = null;
+    nodesList.forEach(function (node) {
+    	if (!node.hasMaster) {
+    		root = node;
+    	} 
+    });
+
 
     root.x0 = svgHeight / 2;
     root.y0 = 0;
@@ -128,15 +81,10 @@ function visualizeInstances(instances, maintenanceList) {
     //root.children.forEach(collapse);
     update(root);
 
-    // Can I delete the following?
-    //~~~ ???? d3.select(self.frameElement).style("height", "800px");
-
     function update(source) {
-
         // Compute the new tree layout.
-        var nodes = tree.nodes(root).reverse(),
-            links = tree
-            .links(nodes);
+        var nodes = tree.nodes(root).reverse();
+        var links = tree.links(nodes);
 
         // Normalize for fixed-depth.
         nodes.forEach(function (d) {
@@ -150,20 +98,15 @@ function visualizeInstances(instances, maintenanceList) {
             });
 
         // Enter any new nodes at the parent's previous position.
-        var nodeEnter = node.enter().append("g").attr("class",
-            "node").attr(
-            "transform",
-            function (d) {
+        var nodeEnter = node.enter().append("g").attr("class", "node").attr("transform", function (d) {
                 return "translate(" + source.y0 + "," + source.x0 + ")";
-            }).each(function(){this.parentNode.insertBefore(this, this.parentNode.firstChild);});
+            }).each(function() {this.parentNode.insertBefore(this, this.parentNode.firstChild);});
 
         nodeEnter.append("circle").attr("data-nodeid", function (d) {
             return d.id;
-        }).attr("r", 1e-6).style(
-                "fill",
-                function (d) {
-                    return d._children ? "lightsteelblue" : "#fff";
-                }).on("click", click);
+        }).attr("r", 1e-6).style("fill", function (d) {
+            return d._children ? "lightsteelblue" : "#fff";
+        }).on("click", click);
 
         nodeEnter.append("foreignObject").attr("class", "nodeWrapper").attr("data-fo-id", function (d) {
             return d.id
@@ -175,28 +118,20 @@ function visualizeInstances(instances, maintenanceList) {
         
         
         // Transition nodes to their new position.
-        var nodeUpdate = node.transition().duration(duration)
-            .attr(
-                "transform",
-                function (d) {
-                    return "translate(" + d.y + "," + d.x + ")";
-                });
+        var nodeUpdate = node.transition().duration(duration).attr("transform", function (d) {
+            return "translate(" + d.y + "," + d.x + ")";
+        });
 
-        nodeUpdate.select("circle").attr("r", 4.5).style(
-            "fill",
-            function (d) {
-                return d._children ? "lightsteelblue" : "#fff";
-            });
+        nodeUpdate.select("circle").attr("r", 4.5).style("fill", function (d) {
+            return d._children ? "lightsteelblue" : "#fff";
+        });
 
         nodeUpdate.select("text").style("fill-opacity", 1);
 
         // Transition exiting nodes to the parent's new position.
-        var nodeExit = node.exit().transition().duration(
-            duration).attr(
-            "transform",
-            function (d) {
-                return "translate(" + source.y + "," + source.x + ")";
-            }).remove();
+        var nodeExit = node.exit().transition().duration(duration).attr("transform", function (d) {
+            return "translate(" + source.y + "," + source.x + ")";
+        }).remove();
 
         nodeExit.select("circle").attr("r", 1e-6);
 
@@ -204,40 +139,36 @@ function visualizeInstances(instances, maintenanceList) {
         //nodeExit.select("foreignObject").style("fill-opacity", 1e-6);
 
         // Update the links…
-        var link = svg.selectAll("path.link").data(links,
-            function (d) {
-                return d.target.id;
-            });
+        var link = svg.selectAll("path.link").data(links, function (d) {
+            return d.target.id;
+        });
 
         // Enter any new links at the parent's previous position.
-        link.enter().insert("path", "g").attr("class", "link")
-            .attr("d", function (d) {
-                var o = {
-                    x: source.x0,
-                    y: source.y0
-                };
-                return diagonal({
-                    source: o,
-                    target: o
-                });
+        link.enter().insert("path", "g").attr("class", "link").attr("d", function (d) {
+            var o = {
+                x: source.x0,
+                y: source.y0
+            };
+            return diagonal({
+                source: o,
+                target: o
             });
+        });
 
         // Transition links to their new position.
-        link.transition().duration(duration)
-            .attr("d", diagonal);
+        link.transition().duration(duration).attr("d", diagonal);
 
         // Transition exiting nodes to the parent's new position.
-        link.exit().transition().duration(duration).attr("d",
-            function (d) {
-                var o = {
-                    x: source.x,
-                    y: source.y
-                };
-                return diagonal({
-                    source: o,
-                    target: o
-                });
-            }).remove();
+        link.exit().transition().duration(duration).attr("d", function (d) {
+            var o = {
+                x: source.x,
+                y: source.y
+            };
+            return diagonal({
+                source: o,
+                target: o
+            });
+        }).remove();
 
         // Stash the old positions for transition.
         nodes.forEach(function (d) {
