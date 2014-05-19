@@ -184,17 +184,23 @@ function normalizeInstance(instance) {
     instance.isMaster = (instance.title == instance.ClusterName);
 
     instance.problem = null;
+    instance.problemOrder = 0;
     if (instance.inMaintenance) {
     	instance.problem = "in_maintenance";
+    	instance.problemOrder = 1;
     } else if (!instance.IsLastCheckValid) {
     	instance.problem = "last_check_invalid";
+    	instance.problemOrder = 2;
     } else if (!instance.IsRecentlyChecked) {
     	instance.problem = "not_recently_checked";
+    	instance.problemOrder = 3;
     } else if (!instance.isMaster && !instance.replicationRunning) {
     	// check slaves only; where not replicating
     	instance.problem = "not_replicating";
+    	instance.problemOrder = 4;
     } else if (!instance.replicationLagReasonable) {
     	instance.problem = "replication_lag";
+    	instance.problemOrder = 5;
     }
     instance.hasProblem = (instance.problem != null) ;
 }
