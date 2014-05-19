@@ -24,10 +24,6 @@
     transition: border-color 0.15s ease-in-out 0s, box-shadow 0.15s ease-in-out 0s;
 }
 
-.popover.instance[data-duplicate-node] {
-    position: absolute;
-}
-
 .popover.instance h3 .glyphicon {
     position: inherit;
     cursor: pointer;
@@ -76,6 +72,7 @@
     color: #ffffff;
 }
 
+/* has to be last so as to override all prior labels*/
 .popover.instance h3.label-primary {
   background-color: #428BCA;
   color: #ffffff;

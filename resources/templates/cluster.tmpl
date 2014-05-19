@@ -8,6 +8,7 @@
 	    cursor: move;
 	}
 	
+
 	#cluster_container .popover.instance div.popover-content {
 	    padding: 4px 8px;
 	}
@@ -21,6 +22,12 @@
 	    padding: 2px 8px;
 	}
 	
+	
+	#cluster_container .popover.instance[data-duplicate-node] {
+	    position: absolute;
+	}
+	
+	
 	#main_container.container, #main_container .container {
 	    width: inherit;
 	}
@@ -29,7 +36,6 @@
 	    overflow: auto;
 	}
 </style>
-
 
 <div id="cluster_container" class="container">
 </div>
