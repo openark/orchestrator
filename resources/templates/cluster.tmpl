@@ -49,15 +49,32 @@
     #instance_problems .popover.instance div.popover-content p {
         margin: 4px 0px;
     }
+    
+    .sidebar .panel-group {
+        margin-bottom: 0px;
+    }
 </style>
 
 <div class="sidebar">
-    <div id="instance_problems" class="sidebar">
-	    <div class="container small">
-	        <p>
-	            Problems:
-	        </p>
-	    </div>
+    <div class="sidebar">
+    
+		<div class="panel-group" id="accordion">
+			<div class="panel panel-default">
+				<div class="panel-heading">
+					<h6 class="panel-title">
+                        <span class="glyphicon glyphicon-chevron-down small"></span>
+						<a class="small" data-toggle="collapse" data-parent="#accordion" href="#instance_problems">
+						   Problems
+						</a>
+					</h6>
+				</div>
+				<div id="instance_problems" class="panel-collapse collapse in">
+					<div class="panel-body">
+					
+					</div>
+				</div>
+			</div>
+		</div>
 	</div>
 </div>
 <div class="container">
