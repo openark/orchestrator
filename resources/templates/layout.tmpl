@@ -80,6 +80,29 @@
 	    <div id="alerts_container" class="container">
 	    </div>
 	
+		<div class="sidebar">
+		    <div id="instance_problems">
+		        
+		        <div class="panel-group" id="accordion">
+		            <div class="panel panel-default">
+		                <div class="panel-heading">
+		                    <h6 class="panel-title">
+		                        <span class="glyphicon glyphicon-chevron-down small"></span>
+		                        <a class="small" data-toggle="collapse" data-parent="#accordion" href="#instance_problems_content">
+		                           Problems
+		                        </a>
+		                    </h6>
+		                </div>
+		                <div id="instance_problems_content" class="panel-collapse collapse">
+		                    <div class="panel-body">
+		                    
+		                    </div>
+		                </div>
+		            </div>
+		        </div>
+		    </div>
+		</div>
+	
 		{{yield}}
 		
 	    <div class="modal fade" id="node_modal" tabindex="-1">
@@ -148,6 +171,7 @@
             $("#ajaxLoader").css('visibility', 'hidden');
         }
 	</script>
+    <script src="/js/instance-problems.js"></script>
 </body>
 </html>
 

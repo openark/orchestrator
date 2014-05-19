@@ -94,6 +94,49 @@
     color: inherit;
 }
 
+    
+.sidebar {
+    width:300px;
+    position: fixed;
+    right: 0px;
+    background-color: #ffffff;
+}
+
+#instance_problems {
+   position: relative;
+}
+
+#instance_problems .popover.instance {
+    font: 10px sans-serif;
+    display: block;
+    position: inherit;
+    max-width: 276px;
+    cursor: move;
+    margin: 10px 0px;
+}
+
+#instance_problems .popover.instance h3 {
+    font-size: 10px;
+    padding: 2px 8px;
+}
+
+
+#instance_problems .popover.instance div.popover-content p {
+    margin: 4px 0px;
+}
+
+#instance_problems .popover.instance div.popover-content {
+    padding: 4px 8px;
+}
+
+#instance_problems .panel-group {
+    margin-bottom: 0px;
+}
+
+#instance_problems .panel-body {
+    overflow: auto;
+}
+
 
 #node_modal .modal-content {
     font-size: 12px;
@@ -104,6 +147,7 @@
     line-height: 16px;
     padding: 5px 9px;
 }
+
 
 .bootbox .modal-body {
     padding: 12px;

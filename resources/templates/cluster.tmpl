@@ -1,6 +1,6 @@
 
 <style type = "text/css">
-	.popover.instance {
+	#cluster_container .popover.instance {
         font: 10px sans-serif;
 	    display: block;
 	    position: inherit;
@@ -8,16 +8,15 @@
 	    cursor: move;
 	}
 	
-
-	.popover.instance div.popover-content {
+	#cluster_container .popover.instance div.popover-content {
 	    padding: 4px 8px;
 	}
 	
-	.popover.instance div.popover-content p {
+	#cluster_container .popover.instance div.popover-content p {
 	    margin-bottom: 0px;
 	}
   
-	.popover.instance h3 {
+	#cluster_container .popover.instance h3 {
 	    font-size: 10px;
 	    padding: 2px 8px;
 	}
@@ -29,61 +28,10 @@
 	#cluster_container {
 	    overflow: auto;
 	}
-	
-	.sidebar {
-	    width:300px;
-	    position: fixed;
-	    right: 0px;
-	    background-color: #ffffff;
-	}
-	
-	#instance_problems {
-	   position: relative;
-	}
-	
-	#instance_problems .popover.instance {
-	   margin: 10px;
-	   cursor: inherit;
-	}
-    
-    #instance_problems .popover.instance div.popover-content p {
-        margin: 4px 0px;
-    }
-    
-    #instance_problems .panel-group {
-        margin-bottom: 0px;
-    }
-
-    #instance_problems .panel-body {
-        overflow: auto;
-    }
 </style>
 
-<div class="sidebar">
-    <div id="instance_problems">
-        
-		<div class="panel-group" id="accordion">
-			<div class="panel panel-default">
-				<div class="panel-heading">
-					<h6 class="panel-title">
-                        <span class="glyphicon glyphicon-chevron-down small"></span>
-						<a class="small" data-toggle="collapse" data-parent="#accordion" href="#instance_problems_content">
-						   Problems
-						</a>
-					</h6>
-				</div>
-				<div id="instance_problems_content" class="panel-collapse collapse">
-					<div class="panel-body">
-					
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
-</div>
-<div class="container">
-    <div id="cluster_container" class="container">
-    </div>
+
+<div id="cluster_container" class="container">
 </div>
 
 
@@ -96,4 +44,3 @@
 <script src="/js/d3.v3.min.js"></script>
 <script src="/js/cluster.js"></script>
 <script src="/js/cluster-tree.js"></script>
-<script src="/js/instance-problems.js"></script>
