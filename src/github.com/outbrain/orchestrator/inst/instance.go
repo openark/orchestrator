@@ -116,8 +116,9 @@ type Instance struct {
 	SlaveHosts			InstanceKeyMap
 	ClusterName			string
 	
-	IsLastCheckValid		bool
+	IsLastCheckValid	bool
 	IsUpToDate			bool
+	IsRecentlyChecked	bool
 	SecondsSinceLastSeen	sql.NullInt64
 }
 

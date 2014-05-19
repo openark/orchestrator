@@ -29,9 +29,36 @@
 	#cluster_container {
 	    overflow: auto;
 	}
+	
+	.sidebar {
+	    width:300px;
+	    position: fixed;
+	    right: 0px;
+	    background-color: #ffffff;
+	}
+	
+	#instance_problems {
+	   position: relative;
+	}
+	
+	#instance_problems .popover.instance {
+	   margin: 10px;
+	   cursor: inherit;
+	}
+    
+    #instance_problems .popover.instance div.popover-content p {
+        margin: 4px 0px;
+    }
 </style>
 
-<div id="cluster_sidebar" >
+<div class="sidebar">
+    <div id="instance_problems" class="sidebar">
+	    <div class="container small">
+	        <p>
+	            Problems:
+	        </p>
+	    </div>
+	</div>
 </div>
 <div class="container">
     <div id="cluster_container" class="container">
@@ -48,3 +75,4 @@
 <script src="/js/d3.v3.min.js"></script>
 <script src="/js/cluster.js"></script>
 <script src="/js/cluster-tree.js"></script>
+<script src="/js/instance-problems.js"></script>

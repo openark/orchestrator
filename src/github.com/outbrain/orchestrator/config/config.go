@@ -20,7 +20,7 @@ type Configuration struct {
 	InstancePollSeconds			uint		// Number of seconds between instance reads
 	UnseenInstanceForgetHours	uint		// Number of hours after which an unseen instance is forgotten
 	DiscoveryPollSeconds		int			// Auto/continuous discovery of instances sleep time between polls
-	MaxReasonableTopologyDepth	int			// M->S->S->S... depth you just don't have in your topology
+	ReasonableReplicationLagSeconds	int		// Abvoe this value is considered a problem
 	HTTPAuthUser		string				// Username for HTTP Basic authentication (blank disables authentication)
 	HTTPAuthPassword	string				// Password for HTTP Basic authentication
 }	
@@ -33,7 +33,7 @@ func NewConfiguration() *Configuration {
 		UnseenInstanceForgetHours:	240,
 		DiscoverByShowSlaveHosts:	false,
 		DiscoveryPollSeconds:		5,
-		MaxReasonableTopologyDepth:	10,
+		ReasonableReplicationLagSeconds: 10,
 		HTTPAuthUser		: "",
 		HTTPAuthPassword	: "",
 	}

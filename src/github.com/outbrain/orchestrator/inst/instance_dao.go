@@ -171,6 +171,7 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 	instance.Key = *instanceKey
 
 	var slaveHostsJson string
+	var secondsSinceLastChecked uint
     err = db.QueryRow(`
        	select 
        		server_id,
@@ -191,12 +192,12 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 			seconds_behind_master,
 			slave_hosts,
 			cluster_name,
-			ifnull(timestampdiff(second, last_checked, now()) <= ?, false) as is_up_to_date,
+			timestampdiff(second, last_checked, now()) as seconds_since_last_checked,
 			(last_checked <= last_seen) is true as is_last_check_valid,
 			timestampdiff(second, last_seen, now()) as seconds_since_last_seen
 		 from database_instance 
 		 	where hostname=? and port=?`, 
-		 config.Config.InstancePollSeconds, instanceKey.Hostname, instanceKey.Port).Scan(
+		 instanceKey.Hostname, instanceKey.Port).Scan(
 		 	&instance.ServerID,
 		 	&instance.Version,
 		 	&instance.Binlog_format,
@@ -215,13 +216,15 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 		 	&instance.SecondsBehindMaster,
 		 	&slaveHostsJson,
 		 	&instance.ClusterName,
-		 	&instance.IsUpToDate,
+		 	&secondsSinceLastChecked,
 		 	&instance.IsLastCheckValid,
 		 	&instance.SecondsSinceLastSeen,
 		)
 	if err == sql.ErrNoRows {log.Infof("No entry for %+v", instanceKey); return instance, false, err}	
-		
+				
     if err != nil {log.Error("error on", instanceKey, err); return instance, false, err}
+	instance.IsUpToDate = (secondsSinceLastChecked <= config.Config.InstancePollSeconds) 
+	instance.IsRecentlyChecked = (secondsSinceLastChecked <= config.Config.InstancePollSeconds * 5) 
     instance.ReadSlaveHostsFromJson(slaveHostsJson)
     
 	return instance, true, err
@@ -257,7 +260,8 @@ func ReadInstanceRow(m sqlutils.RowMap) *Instance {
  	instance.SecondsBehindMaster = m.GetNullInt64("seconds_behind_master")
  	slaveHostsJson := m.GetString("slave_hosts")
  	instance.ClusterName = m.GetString("cluster_name")
- 	instance.IsUpToDate = m.GetBool("is_up_to_date")
+ 	instance.IsUpToDate = (m.GetUint("seconds_since_last_checked") <= config.Config.InstancePollSeconds) 
+	instance.IsRecentlyChecked = (m.GetUint("seconds_since_last_checked") <= config.Config.InstancePollSeconds * 5) 
  	instance.IsLastCheckValid = m.GetBool("is_last_check_valid")
  	instance.SecondsSinceLastSeen = m.GetNullInt64("seconds_since_last_seen")
  	
@@ -280,7 +284,7 @@ func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 	query := fmt.Sprintf(`
 		select 
 			*,
-			ifnull(timestampdiff(second, last_checked, now()) <= %d, false) as is_up_to_date,
+			timestampdiff(second, last_checked, now()) as seconds_since_last_checked,
 			(last_checked <= last_seen) is true as is_last_check_valid,
 			timestampdiff(second, last_seen, now()) as seconds_since_last_seen
 		from 
@@ -288,7 +292,43 @@ func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 		where
 			cluster_name = '%s'
 		order by
-			hostname, port`, config.Config.InstancePollSeconds, clusterName)
+			hostname, port`, clusterName)
+
+    err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		instance := ReadInstanceRow(m)
+    	instances = append(instances, instance)
+    	return nil       	
+   	})
+
+	return instances, err
+}
+
+
+
+func ReadProblemInstances() ([](*Instance), error) {
+	instances := [](*Instance){}
+
+	db,	err	:=	db.OpenOrchestrator()
+	if	err	!=	nil	{
+		return instances, log.Errore(err)
+	}
+
+	query := fmt.Sprintf(`
+		select 
+			*,
+			timestampdiff(second, last_checked, now()) as seconds_since_last_checked,
+			(last_checked <= last_seen) is true as is_last_check_valid,
+			timestampdiff(second, last_seen, now()) as seconds_since_last_seen
+		from 
+			database_instance 
+		where
+			(last_seen < last_checked)
+			or (not ifnull(timestampdiff(second, last_checked, now()) <= %d, false))
+			or (not slave_sql_running)
+			or (not slave_io_running)
+			or (seconds_behind_master > 10)
+		order by
+			hostname, port`, config.Config.InstancePollSeconds)
 
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 		instance := ReadInstanceRow(m)
@@ -315,7 +355,7 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 	query := fmt.Sprintf(`
 		select 
 			*,
-			ifnull(timestampdiff(second, last_checked, now()) <= %d, false) as is_up_to_date,
+			timestampdiff(second, last_checked, now()) as seconds_since_last_checked,
 			(last_checked <= last_seen) is true as is_last_check_valid,
 			timestampdiff(second, last_seen, now()) as seconds_since_last_seen
 		from 
@@ -329,7 +369,7 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 			or concat(hostname, ':', port) like '%%%s%%'
 		order by
 			cluster_name,
-			hostname, port`, config.Config.InstancePollSeconds, searchString, searchString, searchString, searchString, searchString, searchString)
+			hostname, port`, searchString, searchString, searchString, searchString, searchString, searchString)
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 		instance := ReadInstanceRow(m)
     	instances = append(instances, instance)

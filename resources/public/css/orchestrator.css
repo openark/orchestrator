@@ -58,12 +58,13 @@
   color: #ffffff;
 }
 
-.popover.instance h3.label-primary {
-  background-color: #428BCA;
-  color: #ffffff;
+.popover.instance h3.label-stale {
+    background-color: #808080;
+    color: #ffffff;
 }
-.popover.instance h3.label-primary .glyphicon {
-  color: #ffffff;
+
+.popover.instance h3.label-stale .glyphicon {
+    color: #ffffff;
 }
 
 .popover.instance h3.label-fatal {
@@ -73,6 +74,14 @@
 
 .popover.instance h3.label-fatal .glyphicon {
     color: #ffffff;
+}
+
+.popover.instance h3.label-primary {
+  background-color: #428BCA;
+  color: #ffffff;
+}
+.popover.instance h3.label-primary .glyphicon {
+  color: #ffffff;
 }
 
 

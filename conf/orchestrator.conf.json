@@ -10,6 +10,7 @@
 	"DiscoverByShowSlaveHosts": true,
     "InstancePollSeconds": 60,
     "UnseenInstanceForgetHours": 240,
+    "ReasonableReplicationLagSeconds" : 10,
     "HTTPAuthUser": "",
     "HTTPAuthPassword": ""
 }

@@ -39,7 +39,8 @@ function commonSuffixLength(strings) {
 }
 
 
-function addAlert(alertText, alertClass="danger") {
+function addAlert(alertText, alertClass) {
+	if(typeof(alertClass)==='undefined') alertClass = "danger";
 	$("#alerts_container").append(
 		'<div class="alert alert-'+alertClass+' alert-dismissable">'
 				+ '<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>'
@@ -181,6 +182,21 @@ function normalizeInstance(instance) {
     instance.maintenanceEntry = null;
 
     instance.isMaster = (instance.title == instance.ClusterName);
+
+    instance.problem = null;
+    if (instance.inMaintenance) {
+    	instance.problem = "in_maintenance";
+    } else if (!instance.IsLastCheckValid) {
+    	instance.problem = "last_check_invalid";
+    } else if (!instance.IsRecentlyChecked) {
+    	instance.problem = "not_recently_checked";
+    } else if (!instance.isMaster && !instance.replicationRunning) {
+    	// check slaves only; where not replicating
+    	instance.problem = "not_replicating";
+    } else if (!instance.replicationLagReasonable) {
+    	instance.problem = "replication_lag";
+    }
+    instance.hasProblem = (instance.problem != null) ;
 }
 
 function normalizeInstances(instances, maintenanceList) {
@@ -213,6 +229,7 @@ function normalizeInstances(instances, maintenanceList) {
         // add to parent
         var parent = instancesMap[node.masterId];
         if (parent) {
+        	node.parent = parent;
             // create child array if it doesn't exist
             (parent.children || (parent.children = [])).push(node);
             (parent.contents || (parent.contents = [])).push(node);
@@ -233,6 +250,8 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     	popoverElement.find("h3").addClass("label-info");
     } else if (!instance.IsLastCheckValid) {
     	popoverElement.find(" h3").addClass("label-fatal");
+    } else if (!instance.IsRecentlyChecked) {
+    	popoverElement.find(" h3").addClass("label-stale");
     } else if (!instance.isMaster && !instance.replicationRunning) {
     	// check slaves only; where not replicating
     	popoverElement.find("h3").addClass("label-danger");
@@ -248,7 +267,13 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     	contentHtml += '<p>' 
         	+ 'Cluster: <a href="/web/cluster/'+instance.ClusterName+'">'+instance.ClusterName+'</a>'
         + '</p>';
-    }    
+    }  
+    if (renderType == "problems") {
+    	contentHtml += '<p>' 
+        	+ 'Problem: <strong>'+instance.problem.replace(/_/g, ' ') + '</strong>'
+        + '</p>';
+    }  
+    
     popoverElement.find(".popover-content").html(contentHtml);
     
     popoverElement.find("h3 a").click(function () {

@@ -35,9 +35,9 @@ function visualizeInstances(nodesList, nodesMap) {
         left: 60
     };
     var horizontalSpacing = 320;
-    var verticalSpacing = 60;
+    var verticalSpacing = 80;
     var svgWidth = $("#cluster_container").width() - margin.right - margin.left;
-    svgWidth = Math.max(svgWidth, (maxDepth + 1) * horizontalSpacing);
+    svgWidth = Math.min(svgWidth, (maxDepth + 1) * horizontalSpacing);
     var svgHeight = $("#cluster_container").height() - margin.top - margin.bottom;
     svgHeight = Math.max(svgHeight, maxNodesAtDepth * verticalSpacing);
     // svgWidth = 1560 - margin.right - margin.left;

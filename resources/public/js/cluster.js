@@ -60,9 +60,8 @@ function generateInstanceDivs(nodesList) {
         	opacity: 0.67,
         	start: function(event, ui) {
         		//$(this).data("startingScrollTop",$(this).parent().scrollTop());
-        		$(".popover.instance").droppable({
+        		$("#cluster_container .popover.instance").droppable({
         			accept: function(draggable) {
-        				//".popover.instance[data-duplicate-node]",
         				return moveInstance(nodesMap[draggedNodeId], nodesMap[$(this).attr("data-nodeid")], false);
         			},
         			hoverClass: "draggable-hovers",
