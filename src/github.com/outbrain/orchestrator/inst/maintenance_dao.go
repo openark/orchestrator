@@ -80,7 +80,7 @@ func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) (in
 	} else {
 		// success
 		maintenanceToken, _ = res.LastInsertId()
-		AuditOperation("begin-maintenance", instanceKey, fmt.Sprintf("maintenanceToken: %d", maintenanceToken))
+		AuditOperation("begin-maintenance", instanceKey, fmt.Sprintf("maintenanceToken: %d, owner: %s, reason: %s", maintenanceToken, owner, reason))
 	}
 	return maintenanceToken, err		 
 }
