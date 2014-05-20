@@ -246,6 +246,18 @@ func (this *HttpAPI) Problems(params martini.Params, r render.Render, req *http.
 }
 
 
+func (this *HttpAPI) Audit(params martini.Params, r render.Render, req *http.Request) {
+	audits, err := inst.ReadRecentAudit()
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+
+	r.JSON(200, audits)
+}
+
+
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/instance/:host/:port", this.Instance) 
 	m.Get("/api/discover/:host/:port", this.Discover) 
@@ -261,4 +273,5 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/search/:searchString", this.Search) 
 	m.Get("/api/search", this.Search) 
 	m.Get("/api/problems", this.Problems) 
+	m.Get("/api/audit", this.Audit) 
 }

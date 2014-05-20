@@ -87,6 +87,8 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	instance, _ = StartSlave(instanceKey)
 	master, _ = StartSlave(&master.Key)
 	if err != nil {	return instance, log.Errore(err)}
+	// and we're done (pending deferred functions)
+	AuditOperation("move-up", instanceKey, fmt.Sprintf("moved up %+v. Previous master: %+v", *instanceKey, master.Key))
 	 
 	return instance, err
 }
@@ -140,6 +142,8 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	instance, _ = StartSlave(instanceKey)
 	sibling, _ = StartSlave(siblingKey)
 	if err != nil {	return instance, log.Errore(err)}
+	// and we're done (pending deferred functions)
+	AuditOperation("move-below", instanceKey, fmt.Sprintf("moved %+v below %+v", *instanceKey, *siblingKey))	
 	 
 	return instance, err
 }

@@ -14,9 +14,8 @@ var generateSQL = []string{
         CREATE TABLE database_instance (
           hostname varchar(128) CHARACTER SET ascii NOT NULL,
           port smallint(5) unsigned NOT NULL,
-          last_checked timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          last_seen timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
-          is_last_seen_valid tinyint(3) unsigned NOT NULL,
+          last_checked timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          last_seen timestamp NULL DEFAULT NULL,
           server_id int(10) unsigned NOT NULL,
           version varchar(128) CHARACTER SET ascii NOT NULL,
           binlog_format varchar(16) CHARACTER SET ascii NOT NULL,
@@ -40,22 +39,35 @@ var generateSQL = []string{
           KEY cluster_name_idx (cluster_name(128)),
           KEY last_checked_idx (last_checked),
           KEY last_seen_idx (last_seen)
-        ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+        ) ENGINE=InnoDB DEFAULT CHARSET=latin1 
 	`,
 	`
-		CREATE TABLE database_instance_maintenance (
-		  database_instance_maintenance_id int(10) unsigned NOT NULL AUTO_INCREMENT,
-		  hostname varchar(128) NOT NULL,
-		  port smallint(5) unsigned NOT NULL,
-		  maintenance_active tinyint(4) DEFAULT NULL,
-		  begin_timestamp timestamp NULL DEFAULT NULL,
-		  end_timestamp timestamp NULL DEFAULT NULL,
-		  owner varchar(128) CHARACTER SET utf8 NOT NULL,
-		  reason text CHARACTER SET utf8 NOT NULL,
-		  PRIMARY KEY (database_instance_maintenance_id),
-		  UNIQUE KEY maintenance_uidx (maintenance_active,hostname,port)
-		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+        CREATE TABLE database_instance_maintenance (
+          database_instance_maintenance_id int(10) unsigned NOT NULL AUTO_INCREMENT,
+          hostname varchar(128) NOT NULL,
+          port smallint(5) unsigned NOT NULL,
+          maintenance_active tinyint(4) DEFAULT NULL,
+          begin_timestamp timestamp NULL DEFAULT NULL,
+          end_timestamp timestamp NULL DEFAULT NULL,
+          owner varchar(128) CHARACTER SET utf8 NOT NULL,
+          reason text CHARACTER SET utf8 NOT NULL,
+          PRIMARY KEY (database_instance_maintenance_id),
+          UNIQUE KEY maintenance_uidx (maintenance_active,hostname,port)
+        ) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+        CREATE TABLE audit (
+          audit_id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+          audit_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          audit_type varchar(128) CHARACTER SET ascii NOT NULL,
+          hostname varchar(128) CHARACTER SET ascii NOT NULL DEFAULT '',
+          port smallint(5) unsigned NOT NULL,
+          message text CHARACTER SET utf8 NOT NULL,
+          PRIMARY KEY (audit_id),
+          KEY audit_timestamp_idx (audit_timestamp),
+          KEY host_port_idx (hostname,port,audit_timestamp)
+        ) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=latin1 
+	`,	
 }
 
 

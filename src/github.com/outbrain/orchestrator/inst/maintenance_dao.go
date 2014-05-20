@@ -78,7 +78,9 @@ func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) (in
 	if affected, _ := res.RowsAffected(); affected == 0 {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance for instance: %+v", instanceKey))
 	} else {
+		// success
 		maintenanceToken, _ = res.LastInsertId()
+		AuditOperation("begin-maintenance", instanceKey, fmt.Sprintf("maintenanceToken: %d", maintenanceToken))
 	}
 	return maintenanceToken, err		 
 }
@@ -104,9 +106,13 @@ func EndMaintenanceByKey(instanceKey *InstanceKey) error {
 		 	instanceKey.Port,
 		 )
 	if err != nil {return log.Errore(err)}
+	
 	if affected, _ := res.RowsAffected(); affected == 0 {
 		err = errors.New(fmt.Sprintf("Instance is not in maintenance mode: %+v", instanceKey))
-	} 
+	} else {
+		// success
+		AuditOperation("end-maintenance", instanceKey, "")
+	}
 	return err		 
 }
 
@@ -129,7 +135,10 @@ func EndMaintenance(maintenanceToken int64) error {
 	if err != nil {return log.Errore(err)}
 	if affected, _ := res.RowsAffected(); affected == 0 {
 		err = errors.New(fmt.Sprintf("Instance is not in maintenance mode; token = %+v", maintenanceToken))
-	} 
+	} else {
+		// success
+		AuditOperation("end-maintenance", nil, fmt.Sprintf("maintenanceToken: %d", maintenanceToken))
+	}
 	return err		 
 }
 
