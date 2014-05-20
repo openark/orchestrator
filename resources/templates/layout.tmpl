@@ -77,31 +77,16 @@
 	</div>
 	
 	<div class="container" id="main_container">	
-	    <div id="alerts_container" class="container">
+        <div id="alerts_container"></div>
+	    <div class="pull-right" id="instance_problems">
+			<div class="dropdown pull-right">
+				<button type="button" class="btn btn-default btn-sm dropdown-toggle" data-toggle="dropdown">
+   					Problems <span class="caret"></span>
+				</button>
+				<ul class="dropdown-menu" role="menu" aria-labelledby="dLabel">
+				</ul>
+			</div>	    
 	    </div>
-	
-		<div class="sidebar">
-		    <div id="instance_problems">
-		        
-		        <div class="panel-group" id="accordion">
-		            <div class="panel panel-default">
-		                <div class="panel-heading">
-		                    <h6 class="panel-title">
-		                        <span class="glyphicon glyphicon-chevron-down small"></span>
-		                        <a class="small" data-toggle="collapse" data-parent="#accordion" href="#instance_problems_content">
-		                           Problems
-		                        </a>
-		                    </h6>
-		                </div>
-		                <div id="instance_problems_content" class="panel-collapse collapse">
-		                    <div class="panel-body">
-		                    
-		                    </div>
-		                </div>
-		            </div>
-		        </div>
-		    </div>
-		</div>
 	
 		{{yield}}
 		

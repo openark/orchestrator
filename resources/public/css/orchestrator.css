@@ -91,25 +91,13 @@
     color: inherit;
 }
 
-    
-.sidebar {
-    width:300px;
-    position: fixed;
-    right: 0px;
-    background-color: #ffffff;
-}
-
-#instance_problems {
-   position: relative;
-}
-
 #instance_problems .popover.instance {
     font: 10px sans-serif;
     display: block;
     position: inherit;
-    max-width: 276px;
+    width: 276px;
     cursor: move;
-    margin: 10px 0px;
+    margin: 10px;
 }
 
 #instance_problems .popover.instance h3 {
@@ -124,14 +112,6 @@
 
 #instance_problems .popover.instance div.popover-content {
     padding: 4px 8px;
-}
-
-#instance_problems .panel-group {
-    margin-bottom: 0px;
-}
-
-#instance_problems .panel-body {
-    overflow: auto;
 }
 
 
