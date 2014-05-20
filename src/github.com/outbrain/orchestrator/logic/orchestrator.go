@@ -82,6 +82,7 @@ func StartDiscovery(instanceKey inst.InstanceKey) {
 				return
 		}
 	}
+	inst.AuditOperation("start-discovery", &instanceKey, "")
 }
 
 

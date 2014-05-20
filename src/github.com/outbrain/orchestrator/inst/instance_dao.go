@@ -537,6 +537,7 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 			instanceKey.Hostname, 
 		 	instanceKey.Port,
 		 )
+	AuditOperation("forget", instanceKey, "")
 	return err		 
 }
 
@@ -552,6 +553,7 @@ func ForgetLongUnseenInstances() error {
 				last_seen < NOW() - interval ? hour`,
 			config.Config.UnseenInstanceForgetHours,
 		 )
+	AuditOperation("forget-unseen", nil, "")
 	return err		 
 }
 
