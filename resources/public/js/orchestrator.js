@@ -91,7 +91,9 @@ function openNodeModal(node) {
     addNodeModalDataAttribute("Has binary logs",
         booleanString(node.LogBinEnabled));
     addNodeModalDataAttribute("Logs slave updates",
-        booleanString(node.LogSlaveUpdatesEnabled));
+            booleanString(node.LogSlaveUpdatesEnabled));
+    addNodeModalDataAttribute("Cluster",
+            '<a href="/web/cluster/'+node.ClusterName+'">'+node.ClusterName+'</a>');
     
     $('#node_modal button[data-btn=begin-maintenance]').unbind("click");
     $('#node_modal button[data-btn=end-maintenance]').unbind("click");
