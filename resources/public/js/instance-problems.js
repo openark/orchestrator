@@ -20,6 +20,10 @@ $(document).ready(function () {
 
 	    		var popoverElement = $("#instance_problems [data-nodeid='" + instance.id + "'].popover");
 	    		renderInstanceElement(popoverElement, instance, "problems");
+	    	    popoverElement.click(function () {
+	    	    	openNodeModal(instance);
+	    	    	return false;
+	    	    });	
 	    		problemInstancesFound = true;
     		}
     	});        	

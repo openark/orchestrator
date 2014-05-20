@@ -97,6 +97,7 @@
     position: inherit;
     width: 276px;
     margin: 10px;
+    cursor: pointer;
 }
 
 #instance_problems .popover.instance h3 {
