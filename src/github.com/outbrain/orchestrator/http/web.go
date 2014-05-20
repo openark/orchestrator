@@ -32,6 +32,7 @@ func (this *HttpWeb) Cluster(params martini.Params, r render.Render) {
 	r.HTML(200, "templates/cluster", map[string]interface{}{
 		"title": "cluster", 
 		"clusterName": params["clusterName"],
+		"autoshow_problems": true,
 		})
 }
 
@@ -44,6 +45,7 @@ func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Re
 	r.HTML(200, "templates/search", map[string]interface{}{
 		"title": "search", 
 		"searchString": searchString, 
+		"autoshow_problems": false,
 		})
 }
 
@@ -52,6 +54,7 @@ func (this *HttpWeb) Discover(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/discover", map[string]interface{}{
 		"title": "discover", 
+		"autoshow_problems": false,
 		})
 }
 
@@ -60,6 +63,7 @@ func (this *HttpWeb) Audit(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/audit", map[string]interface{}{
 		"title": "audit", 
+		"autoshow_problems": false,
 		})
 }
 
@@ -68,6 +72,7 @@ func (this *HttpWeb) Home(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/home", map[string]interface{}{
 		"title": "home", 
+		"autoshow_problems": false,
 		})
 }
 

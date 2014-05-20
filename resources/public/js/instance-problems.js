@@ -27,7 +27,7 @@ $(document).ready(function () {
 	    		problemInstancesFound = true;
     		}
     	});        	
-    	if (problemInstancesFound) {
+    	if (problemInstancesFound && (autoshowProblems() == "true")) {
     		$("#instance_problems .dropdown-toggle").dropdown('toggle');
     	}
         
