@@ -79,10 +79,10 @@ func StartDiscovery(instanceKey inst.InstanceKey) {
 			case <- pendingTokens:
 				<- completedTokens
 			default:
+				inst.AuditOperation("start-discovery", &instanceKey, "")
 				return
 		}
 	}
-	inst.AuditOperation("start-discovery", &instanceKey, "")
 }
 
 
