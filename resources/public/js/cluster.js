@@ -62,7 +62,9 @@ function generateInstanceDivs(nodesList) {
         		//$(this).data("startingScrollTop",$(this).parent().scrollTop());
         		$("#cluster_container .popover.instance").droppable({
         			accept: function(draggable) {
-        				return moveInstance(nodesMap[draggedNodeId], nodesMap[$(this).attr("data-nodeid")], false);
+        				var draggedNode = nodesMap[draggedNodeId];
+        				var targetNode = nodesMap[$(this).attr("data-nodeid")];
+        				return moveInstance(draggedNode, targetNode, false);
         			},
         			hoverClass: "draggable-hovers",
 					drop: function( event, ui ) {
@@ -90,12 +92,18 @@ function generateInstanceDivs(nodesList) {
 
 function moveInstance(node, droppableNode, shouldApply) {
 	if (instancesAreSiblings(node, droppableNode)) {
+		if (node.hasProblem || droppableNode.hasProblem) {
+			return false;
+		}
 		if (shouldApply) {
 			moveBelow(node, droppableNode);
 		}
 		return true;
 	}
 	if (instanceIsGrandchild(node, droppableNode)) {
+		if (node.hasProblem) {
+			return false;
+		}
 		if (shouldApply) {
 			moveUp(node, droppableNode);
 		}

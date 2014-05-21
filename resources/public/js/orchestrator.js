@@ -185,7 +185,9 @@ function normalizeInstance(instance) {
     instance.maintenanceEntry = null;
 
     instance.isMaster = (instance.title == instance.ClusterName);
+}
 
+function normalizeInstanceProblem(instance) {
     instance.problem = null;
     instance.problemOrder = 0;
     if (instance.inMaintenance) {
@@ -233,7 +235,11 @@ function normalizeInstances(instances, maintenanceList) {
         	instancesMap[instanceId].maintenanceEntry = maintenanceEntry;
         }
     });
-    // create the tree array
+    instances.forEach(function(instance) {
+    	// Now that we also know about maintenance
+    	normalizeInstanceProblem(instance);
+    });
+     // create the tree array
     instances.forEach(function (instance) {
         // add to parent
         var parent = instancesMap[instance.masterId];

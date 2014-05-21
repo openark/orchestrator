@@ -42,8 +42,13 @@ func InstancesAreSiblings(instance0, instance1 *Instance) bool {
 
 func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {	return instance, err}
 	if !instance.IsSlave() {
 		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
+	}
+	rinstance, _, _ := ReadInstance(&instance.Key)
+	if canMove, merr := rinstance.CanMove(); !canMove {
+		return instance, merr
 	}
 	master, err := GetInstanceMaster(instance)
 	if err != nil {	return instance, log.Errorf("Cannot GetInstanceMaster() for %+v. error=%+v", instance, err)}
@@ -96,7 +101,18 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 
 func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {	return instance, err}
 	sibling, err := ReadTopologyInstance(siblingKey)
+	if err != nil {	return instance, err}
+
+	rinstance, _, _ := ReadInstance(&instance.Key)
+	if canMove, merr := rinstance.CanMove(); !canMove {
+		return instance, merr
+	}
+	rinstance, _, _ = ReadInstance(&sibling.Key)
+	if canMove, merr := rinstance.CanMove(); !canMove {
+		return instance, merr
+	}
 	if !InstancesAreSiblings(instance, sibling) {
 		return instance, errors.New(fmt.Sprintf("instances are not siblings: %+v, %+v", *instanceKey, *siblingKey))
 	}

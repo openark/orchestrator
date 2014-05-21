@@ -8,6 +8,7 @@ import (
 	"errors"
 	"database/sql"
 	"encoding/json"
+	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/log"
 )
 
@@ -214,6 +215,29 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	}
 	if this.ServerID == other.ServerID {
 		return false, errors.New(fmt.Sprintf("Identical server id: %+v, %+v both have %d", other.Key, this.Key, this.ServerID)) 
+	}
+	return true, nil
+}
+
+
+func (this *Instance) CanMove() (bool, error) {
+	if !this.IsLastCheckValid {
+		return false, errors.New("last check invalid") 
+	}
+	if !this.IsRecentlyChecked {
+		return false, errors.New("not recently checked") 
+	}
+	if !this.Slave_SQL_Running {
+		return false, errors.New("instance is not replicating") 
+	}
+	if !this.Slave_IO_Running {
+		return false, errors.New("instance is not replicating") 
+	}
+	if !this.SecondsBehindMaster.Valid {
+		return false, errors.New("cannot determine slave lag") 
+	}
+	if this.SecondsBehindMaster.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
+		return false, errors.New("lags too much") 
 	}
 	return true, nil
 }
