@@ -11,6 +11,7 @@
     "InstancePollSeconds": 60,
     "UnseenInstanceForgetHours": 240,
     "ReasonableReplicationLagSeconds" : 10,
+    "SlaveStartPostWaitMilliseconds" : 1000,
     "HTTPAuthUser": "",
     "HTTPAuthPassword": ""
 }

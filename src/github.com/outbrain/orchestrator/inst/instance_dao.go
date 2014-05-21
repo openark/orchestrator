@@ -613,6 +613,9 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	_, err = ExecInstance(instanceKey, `start slave`)
 	if err != nil {return instance, log.Errore(err)}
 	log.Infof("Started slave on %+v", instanceKey) 
+	if config.Config.SlaveStartPostWaitMilliseconds > 0 {
+		time.Sleep(time.Duration(config.Config.SlaveStartPostWaitMilliseconds) * time.Millisecond)
+	}
 	
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
@@ -635,7 +638,6 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 	_, err = ExecInstance(instanceKey, fmt.Sprintf("start slave until master_log_file='%s', master_log_pos=%d", 
 		masterCoordinates.LogFile, masterCoordinates.LogPos))
 	if err != nil {return instance, log.Errore(err)}
-	
 		
 	for up_to_date := false; !up_to_date; {
 		instance, err = ReadTopologyInstance(instanceKey)

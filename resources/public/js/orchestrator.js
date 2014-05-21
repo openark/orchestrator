@@ -178,8 +178,9 @@ function normalizeInstance(instance) {
     instance.isSeenRecently = instance.SecondsSinceLastSeen.Valid && instance.SecondsSinceLastSeen.Int64 <= 3600;
 
     // used by cluster-tree
+    instance.children = [];
+    instance.parent = null;
     instance.hasMaster = true;
-    instance.children = null;
     instance.inMaintenance = false;
     instance.maintenanceEntry = null;
 
@@ -233,20 +234,33 @@ function normalizeInstances(instances, maintenanceList) {
         }
     });
     // create the tree array
-    instances.forEach(function (node) {
+    instances.forEach(function (instance) {
         // add to parent
-        var parent = instancesMap[node.masterId];
+        var parent = instancesMap[instance.masterId];
         if (parent) {
-        	node.parent = parent;
+        	instance.parent = parent;
             // create child array if it doesn't exist
-            (parent.children || (parent.children = [])).push(node);
-            (parent.contents || (parent.contents = [])).push(node);
+            parent.children.push(instance);
+            //(parent.contents || (parent.contents = [])).push(instance);
         } else {
             // parent is null or missing
-            node.hasMaster = false;
-            node.parent = null;
+        	instance.hasMaster = false;
+            instance.parent = null;
         }
     });
+
+    // In case there's a master-master setup, break the circle
+    instances.forEach(function (instance) {
+    	if (instance.isMaster && instance.parent != null && instance.parent.parent != null && instance.parent.parent.id == instance.id) {
+    		var index = instance.parent.children.indexOf(instance);
+    		if (index >= 0)
+    			instance.parent.children.splice(index, 1);
+    		instance.hasMaster = false;
+    		instance.masterId = "";
+    		instance.parent = null;
+    	} 
+    });
+
     return instancesMap;
 }
 

@@ -30,6 +30,9 @@ $(document).ready(function () {
     	if (problemInstancesFound && (autoshowProblems() == "true")) {
     		$("#instance_problems .dropdown-toggle").dropdown('toggle');
     	}
+    	if (!problemInstancesFound) {
+    		$("#instance_problems").hide();
+    	}
         
         $("div.popover").popover();
         $("div.popover").show();

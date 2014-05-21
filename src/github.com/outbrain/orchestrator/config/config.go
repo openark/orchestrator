@@ -16,6 +16,7 @@ type Configuration struct {
 	MySQLOrchestratorUser		string
 	MySQLOrchestratorPassword	string
 	SlaveLagQuery				string		// custom query to check on slave lg (e.g. heartbeat table)
+	SlaveStartPostWaitMilliseconds	int		// Time to wait after START SLAVE before re-readong instance (give slave chance to connect to master)
 	DiscoverByShowSlaveHosts	bool		// Attempt SHOW SLAVE HOSTS before PROCESSLIST
 	InstancePollSeconds			uint		// Number of seconds between instance reads
 	UnseenInstanceForgetHours	uint		// Number of hours after which an unseen instance is forgotten
@@ -31,6 +32,7 @@ func NewConfiguration() *Configuration {
 	return &Configuration {
 		InstancePollSeconds:		60,
 		UnseenInstanceForgetHours:	240,
+		SlaveStartPostWaitMilliseconds: 1000,
 		DiscoverByShowSlaveHosts:	false,
 		DiscoveryPollSeconds:		5,
 		ReasonableReplicationLagSeconds: 10,
