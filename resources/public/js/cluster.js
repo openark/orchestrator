@@ -56,10 +56,11 @@ function generateInstanceDivs(nodesList) {
         	return false;
         });
         $(duplicate).draggable({ 
+        	//scroll: true,
         	addClasses: true, 
         	opacity: 0.67,
         	start: function(event, ui) {
-        		//$(this).data("startingScrollTop",$(this).parent().scrollTop());
+        		//$(this).data("startingScrollTop",$(window).scrollTop());
         		$("#cluster_container .popover.instance").droppable({
         			accept: function(draggable) {
         				var draggedNode = nodesMap[draggedNodeId];
@@ -78,8 +79,12 @@ function generateInstanceDivs(nodesList) {
         		});
         	},
 	    	drag: function(event, ui) {
-	    		//var st = parseInt($(this).data("startingScrollTop"));
-	    		//ui.position.top -= $(this).parent().scrollTop() - st;
+	    		/*
+	    		var st = parseInt($(this).data("startingScrollTop"));
+	    		var offset = $(duplicate).offset();
+	    		offset.top -= $(window).scrollTop();// - st;
+	    		$(duplicate).css(offset);
+	    		*/
 	    	},
 	    	stop: function(event, ui) {
         		$("#cluster_container .accept_drop").removeClass("accept_drop");
