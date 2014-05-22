@@ -44,7 +44,7 @@ function generateInstanceDivs(nodesList) {
     	$(".popover.instance[data-duplicate-node]").remove();
     	var duplicate = $(this).clone().appendTo("#cluster_container");
     	$(duplicate).attr("data-duplicate-node", "true");
-    	$(".popover.instance[data-duplicate-node] h3").addClass("label-primary");
+    	//$(".popover.instance[data-duplicate-node] h3").addClass("label-primary");
     	$(duplicate).css({"margin-left": "0"});
     	$(duplicate).css($(this).offset());
     	$(duplicate).width($(this).width());
@@ -64,7 +64,11 @@ function generateInstanceDivs(nodesList) {
         			accept: function(draggable) {
         				var draggedNode = nodesMap[draggedNodeId];
         				var targetNode = nodesMap[$(this).attr("data-nodeid")];
-        				return moveInstance(draggedNode, targetNode, false);
+        				var acceptDrop =  moveInstance(draggedNode, targetNode, false);
+        				if (acceptDrop) {
+        					$(this).addClass("accept_drop");
+        				}
+        				return acceptDrop;
         			},
         			hoverClass: "draggable-hovers",
 					drop: function( event, ui ) {
@@ -78,7 +82,7 @@ function generateInstanceDivs(nodesList) {
 	    		//ui.position.top -= $(this).parent().scrollTop() - st;
 	    	},
 	    	stop: function(event, ui) {
-        		//$(".popover.instance").droppable("disable");
+        		$("#cluster_container .accept_drop").removeClass("accept_drop");
 	    	}
         });
     	$(duplicate).on("mouseleave", function() {
