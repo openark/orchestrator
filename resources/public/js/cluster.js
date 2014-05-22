@@ -55,12 +55,12 @@ function generateInstanceDivs(nodesList) {
         	openNodeModal(nodesMap[draggedNodeId]);
         	return false;
         });
-        $(duplicate).draggable({ 
-        	//scroll: true,
+        $(duplicate).draggable({
         	addClasses: true, 
         	opacity: 0.67,
+        	cancel: "#cluster_container .popover.instance h3 a",
         	start: function(event, ui) {
-        		//$(this).data("startingScrollTop",$(window).scrollTop());
+        		$("#cluster_container .accept_drop").removeClass("accept_drop");
         		$("#cluster_container .popover.instance").droppable({
         			accept: function(draggable) {
         				var draggedNode = nodesMap[draggedNodeId];
@@ -79,12 +79,6 @@ function generateInstanceDivs(nodesList) {
         		});
         	},
 	    	drag: function(event, ui) {
-	    		/*
-	    		var st = parseInt($(this).data("startingScrollTop"));
-	    		var offset = $(duplicate).offset();
-	    		offset.top -= $(window).scrollTop();// - st;
-	    		$(duplicate).css(offset);
-	    		*/
 	    	},
 	    	stop: function(event, ui) {
         		$("#cluster_container .accept_drop").removeClass("accept_drop");
@@ -92,10 +86,14 @@ function generateInstanceDivs(nodesList) {
         });
     	$(duplicate).on("mouseleave", function() {
     		if (!$(this).hasClass("ui-draggable-dragging")) {
-	        	//$(".popover.instance[data-duplicate-node]").remove();
 	    		$(this).remove();
     		}
     	});
+    	// Don't ask why the following... jqueryUI recognizes the click as start drag, but fails to stop...
+    	$(duplicate).on("click", function() {
+        	$("#cluster_container .accept_drop").removeClass("accept_drop");
+        	return false;
+        });	
     });
 }
 
