@@ -133,3 +133,8 @@
 .bootbox .modal-footer {
     padding: 12px;
 }
+
+#audit table tr td:first-child {
+	white-space: nowrap
+}
+}
