@@ -5,6 +5,7 @@ import (
 	"github.com/outbrain/sqlutils"
 	"github.com/outbrain/orchestrator/db"
 	"github.com/outbrain/log"
+	"github.com/outbrain/orchestrator/config"
 )
 
 
@@ -35,7 +36,7 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 }
 
 
-func ReadRecentAudit() ([]Audit, error) {
+func ReadRecentAudit(page int) ([]Audit, error) {
 	res := []Audit{}
 	query := fmt.Sprintf(`
 		select 
@@ -49,8 +50,9 @@ func ReadRecentAudit() ([]Audit, error) {
 			audit
 		order by
 			audit_timestamp desc
-		limit 100
-		`)
+		limit %d
+		offset %d
+		`, config.Config.AuditPageSize, page * config.Config.AuditPageSize)
 	db,	err	:=	db.OpenOrchestrator()
     if err != nil {goto Cleanup}
     

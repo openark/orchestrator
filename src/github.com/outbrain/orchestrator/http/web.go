@@ -60,10 +60,13 @@ func (this *HttpWeb) Discover(params martini.Params, r render.Render) {
 
 
 func (this *HttpWeb) Audit(params martini.Params, r render.Render) {
+	page, err := strconv.Atoi(params["page"])
+	if err != nil { page = 0 }
 
 	r.HTML(200, "templates/audit", map[string]interface{}{
 		"title": "audit", 
 		"autoshow_problems": false,
+		"page": page,
 		})
 }
 
@@ -85,4 +88,5 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/search", this.Search) 
 	m.Get("/web/discover", this.Discover) 
 	m.Get("/web/audit", this.Audit) 
+	m.Get("/web/audit/:page", this.Audit) 
 }

@@ -1,10 +1,13 @@
 
 $(document).ready(function () {
     showLoader();
+
     $.get("/api/problems", function (instances) {
-			normalizeInstances(instances, []);
+        $.get("/api/maintenance", function (maintenanceList) {
+			normalizeInstances(instances, maintenanceList);
 	        displayProblemInstances(instances);
 	    }, "json");
+    }, "json");
     function displayProblemInstances(instances) {
         hideLoader();
         

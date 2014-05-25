@@ -247,7 +247,9 @@ func (this *HttpAPI) Problems(params martini.Params, r render.Render, req *http.
 
 
 func (this *HttpAPI) Audit(params martini.Params, r render.Render, req *http.Request) {
-	audits, err := inst.ReadRecentAudit()
+	page, err := strconv.Atoi(params["page"])
+	if err != nil || page < 0 { page = 0 }
+	audits, err := inst.ReadRecentAudit(page)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
@@ -274,4 +276,5 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/search", this.Search) 
 	m.Get("/api/problems", this.Problems) 
 	m.Get("/api/audit", this.Audit) 
+	m.Get("/api/audit/:page", this.Audit) 
 }
