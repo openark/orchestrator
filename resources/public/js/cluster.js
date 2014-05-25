@@ -60,6 +60,7 @@ function generateInstanceDivs(nodesList) {
         	opacity: 0.67,
         	cancel: "#cluster_container .popover.instance h3 a",
         	start: function(event, ui) {
+        		resetRefreshTimer();
         		$("#cluster_container .accept_drop").removeClass("accept_drop");
         		$("#cluster_container .popover.instance").droppable({
         			accept: function(draggable) {
@@ -79,8 +80,10 @@ function generateInstanceDivs(nodesList) {
         		});
         	},
 	    	drag: function(event, ui) {
+	    		resetRefreshTimer();
 	    	},
 	    	stop: function(event, ui) {
+	    		resetRefreshTimer();
         		$("#cluster_container .accept_drop").removeClass("accept_drop");
 	    	}
         });
@@ -201,11 +204,9 @@ function instanceIsGrandchild(node, grandparentNode, nodesMap) {
 	return true;
 }
 
-
 $(document)
     .ready(
         function () {
-
             $.get("/api/cluster/"+currentClusterName(), function (instances) {
                 $.get("/api/maintenance",
                     function (maintenanceList) {
@@ -214,4 +215,9 @@ $(document)
                         generateInstanceDivs(instances);
                     }, "json");
             }, "json");
+            
+            startRefreshTimer();
+            $(document).click(function() {
+            	resetRefreshTimer();
+            });
         });

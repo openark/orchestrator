@@ -72,7 +72,7 @@
     color: #ffffff;
 }
 
-/* has to be last so as to override all prior labels*/
+
 .popover.instance h3.label-primary {
   background-color: #428BCA;
   color: #ffffff;

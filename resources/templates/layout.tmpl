@@ -66,12 +66,15 @@
 		            </li>
                     <li><a href="/web/discover">Discover</a></li>
                     <li><a href="/web/audit">Audit</a></li>
-		            <form class="navbar-form navbar-left" role="search" name="searchForm" action="/web/search">
-    			        <div class="form-group">
-                            <input type="text" name="s" id="searchInput" class="form-control input-sm" placeholder="Search">
-			            </div>
-                        <button type="submit" class="btn btn-default btn-sm">Search</button>
-                    </form>
+                    <li>
+			            <form class="navbar-form navbar-left" role="search" name="searchForm" action="/web/search">
+	    			        <div class="form-group">
+	                            <input type="text" name="s" id="searchInput" class="form-control input-sm" placeholder="Search">
+				            </div>
+	                        <button type="submit" class="btn btn-default btn-sm">Search</button>
+	                    </form>
+                    </li>
+                    <li><a href="#" id="refreshCountdown"></a></li>
 				</ul>
 			</div>
 		</div>
@@ -142,22 +145,6 @@
     <script src="/bootstrap/js/bootstrap.min.js"></script>
     <script type="text/javascript" src="/js/bootbox.min.js"></script>        
 	<script>
-		$(document).ready(function() {
-			$.get("/api/clusters", function(clusters) {
-				clusters.forEach(function(cluster) {                      
-			        $("#dropdown-clusters").append('<li><a href="/web/cluster/'+cluster+'">'+cluster+'</a></li>');
-			    });                    
-			}, "json");
-			$("#ajaxLoader").click(function() {
-                return false;
-            });
-		});
-        function showLoader() {
-            $("#ajaxLoader").css('visibility', 'visible');
-        }
-        function hideLoader() {
-            $("#ajaxLoader").css('visibility', 'hidden');
-        }
         function autoshowProblems() {
             return "{{.autoshow_problems}}";
         }

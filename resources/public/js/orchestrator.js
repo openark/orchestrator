@@ -1,3 +1,33 @@
+
+var refreshIntervalSeconds = 60 ; // seconds
+var secondsTillRefresh = refreshIntervalSeconds; 
+var nodeModalVisible = false;
+
+function startRefreshTimer() {
+    setInterval(function() {
+    	if (nodeModalVisible) {
+    		return;
+    	}
+    	secondsTillRefresh = secondsTillRefresh - 1;
+    	if (secondsTillRefresh <= 0) {
+    		location.reload(true);
+    	}
+    	$("#refreshCountdown").html("Refresh in " + secondsTillRefresh + " seconds");
+    }, 1*1000);
+}
+
+function resetRefreshTimer() {
+	secondsTillRefresh = refreshIntervalSeconds;
+}
+		
+function showLoader() {
+    $("#ajaxLoader").css('visibility', 'visible');
+}
+function hideLoader() {
+    $("#ajaxLoader").css('visibility', 'hidden');
+}
+
+
 function booleanString(b) {
 	return (b ? "true" : "false");
 }
@@ -72,6 +102,7 @@ function addModalAlert(alertText) {
 }
 
 function openNodeModal(node) {
+	nodeModalVisible = true;
     $('#node_modal .modal-title').html(node.title);
     $('#modalDataAttributesTable').html("");
 
@@ -163,7 +194,12 @@ function openNodeModal(node) {
     }
     
     $('#node_modal').modal({})
+    $('#node_modal').unbind('hidden.bs.modal');
+    $('#node_modal').on('hidden.bs.modal', function () {
+    	nodeModalVisible = false;
+    })
 }
+
 
 function normalizeInstance(instance) {
     instance.id = getInstanceId(instance.Key.Hostname, instance.Key.Port);
@@ -309,3 +345,18 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     	return false;
     });	
 }
+
+
+$(document).ready(function() {
+	$.get("/api/clusters", function(clusters) {
+		clusters.forEach(function(cluster) {                      
+	        $("#dropdown-clusters").append('<li><a href="/web/cluster/'+cluster+'">'+cluster+'</a></li>');
+	    });                    
+	}, "json");
+	$("#ajaxLoader").click(function() {
+        return false;
+    });
+});
+
+
+
