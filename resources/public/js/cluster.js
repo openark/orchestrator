@@ -220,4 +220,7 @@ $(document)
             $(document).click(function() {
             	resetRefreshTimer();
             });
+            $(document).mousemove(function() {
+            	resetRefreshTimer();
+            });
         });

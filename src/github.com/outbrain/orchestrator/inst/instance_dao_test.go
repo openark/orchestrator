@@ -294,3 +294,46 @@ func (s *TestSuite) TestFailEndMaintenanceTwice(c *C) {
 	c.Assert(err, Not(IsNil))
 }
 
+
+func (s *TestSuite) TestFailMoveBelowUponMaintenance(c *C) {
+	clearTestMaintenance()
+	_, _ = inst.ReadTopologyInstance(&slave1Key)
+	k, err := inst.BeginMaintenance(&slave1Key, "unittest", "TestBeginEndMaintenance");
+	c.Assert(err, IsNil)
+
+	_, err = inst.MoveBelow(&slave1Key, &slave2Key)
+	c.Assert(err, Not(IsNil))
+
+	err = inst.EndMaintenance(k);
+	c.Assert(err, IsNil)
+}
+
+
+func (s *TestSuite) TestFailMoveBelowUponSlaveStopped(c *C) {
+	clearTestMaintenance()
+
+	slave1, _ := inst.ReadTopologyInstance(&slave1Key)
+	c.Assert(slave1.SlaveRunning(), Equals, true)
+	slave1, _ = inst.StopSlaveNicely(&slave1.Key)
+	c.Assert(slave1.SlaveRunning(), Equals, false)
+
+	_, err := inst.MoveBelow(&slave1Key, &slave2Key)
+	c.Assert(err, Not(IsNil))
+
+	_, _ = inst.StartSlave(&slave1.Key)
+}
+
+func (s *TestSuite) TestFailMoveBelowUponOtherSlaveStopped(c *C) {
+	clearTestMaintenance()
+
+	slave1, _ := inst.ReadTopologyInstance(&slave1Key)
+	c.Assert(slave1.SlaveRunning(), Equals, true)
+	slave1, _ = inst.StopSlaveNicely(&slave1.Key)
+	c.Assert(slave1.SlaveRunning(), Equals, false)
+
+	_, err := inst.MoveBelow(&slave2Key, &slave1Key)
+	c.Assert(err, Not(IsNil))
+
+	_, _ = inst.StartSlave(&slave1.Key)
+}
+

@@ -63,8 +63,9 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
        	masterKey, err := NewInstanceKeyFromStrings(m.GetString("Master_Host"), m.GetString("Master_Port")) 
        	if err != nil {log.Errore(err)}
        	instance.MasterKey = *masterKey
+   		instance.SecondsBehindMaster = m.GetNullInt64("Seconds_Behind_Master")
        	if config.Config.SlaveLagQuery == "" {
-       		instance.SecondsBehindMaster = m.GetNullInt64("Seconds_Behind_Master")
+       		instance.SlaveLagSeconds = instance.SecondsBehindMaster
         }
         // Not breaking the flow even on error
        	return nil
@@ -72,7 +73,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
     if err != nil {goto Cleanup}
 
 	if config.Config.SlaveLagQuery != "" {
-		err = db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SecondsBehindMaster)
+		err = db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SlaveLagSeconds)
 	    if err != nil {goto Cleanup}
 	}
         
@@ -172,6 +173,7 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 
 	var slaveHostsJson string
 	var secondsSinceLastChecked uint
+
     err = db.QueryRow(`
        	select 
        		server_id,
@@ -190,6 +192,7 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 			relay_master_log_file,
 			exec_master_log_pos,
 			seconds_behind_master,
+			slave_lag_seconds,
 			slave_hosts,
 			cluster_name,
 			timestampdiff(second, last_checked, now()) as seconds_since_last_checked,
@@ -214,6 +217,7 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 		 	&instance.ExecBinlogCoordinates.LogFile,
 		 	&instance.ExecBinlogCoordinates.LogPos,
 		 	&instance.SecondsBehindMaster,
+		 	&instance.SlaveLagSeconds,
 		 	&slaveHostsJson,
 		 	&instance.ClusterName,
 		 	&secondsSinceLastChecked,
@@ -258,6 +262,7 @@ func ReadInstanceRow(m sqlutils.RowMap) *Instance {
  	instance.ExecBinlogCoordinates.LogFile = m.GetString("relay_master_log_file")
  	instance.ExecBinlogCoordinates.LogPos = m.GetInt64("exec_master_log_pos")
  	instance.SecondsBehindMaster = m.GetNullInt64("seconds_behind_master")
+ 	instance.SlaveLagSeconds = m.GetNullInt64("slave_lag_seconds")
  	slaveHostsJson := m.GetString("slave_hosts")
  	instance.ClusterName = m.GetString("cluster_name")
  	instance.IsUpToDate = (m.GetUint("seconds_since_last_checked") <= config.Config.InstancePollSeconds) 
@@ -464,10 +469,11 @@ func WriteInstance(instance *Instance, lastError error) error {
 				relay_master_log_file,
 				exec_master_log_pos,
 				seconds_behind_master,
+				slave_lag_seconds,
 				num_slave_hosts,
 				slave_hosts,
 				cluster_name
-			) values (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			) values (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			instance.Key.Hostname, 
 		 	instance.Key.Port,
 		 	instance.ServerID,
@@ -486,6 +492,7 @@ func WriteInstance(instance *Instance, lastError error) error {
 		 	instance.ExecBinlogCoordinates.LogFile,
 		 	instance.ExecBinlogCoordinates.LogPos,
 		 	instance.SecondsBehindMaster,
+		 	instance.SlaveLagSeconds,
 		 	len(instance.SlaveHosts),
 		 	instance.GetSlaveHostsAsJson(),
 		 	instance.ClusterName,

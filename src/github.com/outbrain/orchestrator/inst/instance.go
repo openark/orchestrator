@@ -114,6 +114,7 @@ type Instance struct {
 	ReadBinlogCoordinates	BinlogCoordinates
 	ExecBinlogCoordinates	BinlogCoordinates
 	SecondsBehindMaster		sql.NullInt64
+	SlaveLagSeconds			sql.NullInt64
 	SlaveHosts			InstanceKeyMap
 	ClusterName			string
 	

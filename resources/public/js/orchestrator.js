@@ -12,7 +12,7 @@ function startRefreshTimer() {
     	if (secondsTillRefresh <= 0) {
     		location.reload(true);
     	}
-    	$("#refreshCountdown").html("Refresh in " + secondsTillRefresh + " seconds");
+    	$("#refreshCountdown").html('<span class="glyphicon glyphicon-repeat"></span> ' + secondsTillRefresh + 's');
     }, 1*1000);
 }
 
@@ -110,8 +110,10 @@ function openNodeModal(node) {
         addNodeModalDataAttribute("Master", node.masterTitle);
         addNodeModalDataAttribute("Replication running",
             booleanString(node.replicationRunning));
+        addNodeModalDataAttribute("Seconds behind master",
+                node.SecondsBehindMaster.Valid ? node.SecondsBehindMaster.Int64 : "null");
         addNodeModalDataAttribute("Replication lag",
-            node.SecondsBehindMaster.Valid ? node.SecondsBehindMaster.Int64 : "null");
+                node.SlaveLagSeconds.Valid ? node.SlaveLagSeconds.Int64 : "null");
     }
     addNodeModalDataAttribute("Num slaves",
         node.SlaveHosts.length);
@@ -210,7 +212,7 @@ function normalizeInstance(instance) {
             instance.MasterKey.Port);
 
     instance.replicationRunning = instance.Slave_SQL_Running && instance.Slave_IO_Running;
-    instance.replicationLagReasonable = instance.SecondsBehindMaster.Int64 <= 10;
+    instance.replicationLagReasonable = instance.SlaveLagSeconds.Int64 <= 10;
     instance.isSeenRecently = instance.SecondsSinceLastSeen.Valid && instance.SecondsSinceLastSeen.Int64 <= 3600;
 
     // used by cluster-tree
@@ -323,7 +325,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     	popoverElement.find("h3").addClass("label-warning");
     }
     var contentHtml = ''
-        	+ '<div class="pull-right">' + instance.SecondsBehindMaster.Int64 + ' seconds lag</div>'
+        	+ '<div class="pull-right">' + instance.SlaveLagSeconds.Int64 + ' seconds lag</div>'
    		+ '<p>' 
 			+ instance.Version + " " + instance.Binlog_format 
         + '</p>';
