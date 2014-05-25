@@ -108,29 +108,24 @@ function openNodeModal(node) {
 
     if (node.MasterKey.Hostname) {
         addNodeModalDataAttribute("Master", node.masterTitle);
-        addNodeModalDataAttribute("Replication running",
-            booleanString(node.replicationRunning));
-        addNodeModalDataAttribute("Seconds behind master",
-                node.SecondsBehindMaster.Valid ? node.SecondsBehindMaster.Int64 : "null");
-        addNodeModalDataAttribute("Replication lag",
-                node.SlaveLagSeconds.Valid ? node.SlaveLagSeconds.Int64 : "null");
+        addNodeModalDataAttribute("Replication running", booleanString(node.replicationRunning));
+        addNodeModalDataAttribute("Seconds behind master", node.SecondsBehindMaster.Valid ? node.SecondsBehindMaster.Int64 : "null");
+        addNodeModalDataAttribute("Replication lag", node.SlaveLagSeconds.Valid ? node.SlaveLagSeconds.Int64 : "null");
     }
-    addNodeModalDataAttribute("Num slaves",
-        node.SlaveHosts.length);
+    addNodeModalDataAttribute("Num slaves", node.SlaveHosts.length);
     addNodeModalDataAttribute("Server ID", node.ServerID);
     addNodeModalDataAttribute("Version", node.Version);
-    addNodeModalDataAttribute("Binlog format",
-        node.Binlog_format);
-    addNodeModalDataAttribute("Has binary logs",
-        booleanString(node.LogBinEnabled));
-    addNodeModalDataAttribute("Logs slave updates",
-            booleanString(node.LogSlaveUpdatesEnabled));
+    addNodeModalDataAttribute("Binlog format", node.Binlog_format);
+    addNodeModalDataAttribute("Has binary logs", booleanString(node.LogBinEnabled));
+    addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
     addNodeModalDataAttribute("Cluster",
             '<a href="/web/cluster/'+node.ClusterName+'">'+node.ClusterName+'</a>');
     
     $('#node_modal button[data-btn=begin-maintenance]').unbind("click");
     $('#node_modal button[data-btn=end-maintenance]').unbind("click");
     $('#node_modal button[data-btn=forget-instance]').unbind("click");
+    $('#node_modal button[data-btn=start-slave]').unbind("click");
+    $('#node_modal button[data-btn=stop-slave]').unbind("click");
     $('#node_modal button[data-btn=begin-maintenance]').click(function() {
     	if (!$("#beginMaintenanceOwner").val()) {
     		return addModalAlert("You must fill the owner field");
@@ -152,6 +147,28 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=end-maintenance]').click(function(){
     	showLoader();
         $.get("/api/end-maintenance/"+node.Key.Hostname+"/"+node.Key.Port, function (operationResult) {
+			hideLoader();
+			if (operationResult.Code == "ERROR") {
+				addAlert(operationResult.Message)
+			} else {
+				location.reload();
+			}	
+        }, "json");	
+    });
+    $('#node_modal button[data-btn=start-slave]').click(function(){
+    	showLoader();
+        $.get("/api/start-slave/"+node.Key.Hostname+"/"+node.Key.Port, function (operationResult) {
+			hideLoader();
+			if (operationResult.Code == "ERROR") {
+				addAlert(operationResult.Message)
+			} else {
+				location.reload();
+			}	
+        }, "json");	
+    });
+    $('#node_modal button[data-btn=stop-slave]').click(function(){
+    	showLoader();
+        $.get("/api/stop-slave/"+node.Key.Hostname+"/"+node.Key.Port, function (operationResult) {
 			hideLoader();
 			if (operationResult.Code == "ERROR") {
 				addAlert(operationResult.Message)
@@ -193,6 +210,15 @@ function openNodeModal(node) {
     	$('#node_modal [data-panel-type=maintenance]').html("Maintenance");
     	$('#node_modal [data-panel-type=begin-maintenance]').show();
     	$('#node_modal [data-panel-type=end-maintenance]').hide();
+    }
+	$('#node_modal button[data-btn=start-slave]').hide();
+	$('#node_modal button[data-btn=stop-slave]').hide();
+    if (node.MasterKey.Hostname) {
+        if (node.replicationRunning) {
+        	$('#node_modal button[data-btn=stop-slave]').show();
+        } else {
+        	$('#node_modal button[data-btn=start-slave]').show();
+        }
     }
     
     $('#node_modal').modal({})

@@ -195,6 +195,40 @@ func (this *HttpAPI) MoveBelow(params martini.Params, r render.Render) {
 }
 
 
+func (this *HttpAPI) StartSlave(params martini.Params, r render.Render) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+	instance, err := inst.StartSlave(&instanceKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code:OK, Message: "Slave started", Details: instance})
+}
+
+
+func (this *HttpAPI) StopSlave(params martini.Params, r render.Render) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+	instance, err := inst.StopSlave(&instanceKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code:OK, Message: "Slave stopped", Details: instance})
+}
+
+
 func (this *HttpAPI) Cluster(params martini.Params, r render.Render) {
 	instances, err := inst.ReadClusterInstances(params["clusterName"])
 
@@ -269,6 +303,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance) 
 	m.Get("/api/end-maintenance/:host/:port", this.EndMaintenanceByInstanceKey) 
 	m.Get("/api/end-maintenance/:maintenanceKey", this.EndMaintenance)	
+	m.Get("/api/start-slave/:host/:port", this.StartSlave) 
+	m.Get("/api/stop-slave/:host/:port", this.StopSlave) 
 	m.Get("/api/maintenance", this.Maintenance) 
 	m.Get("/api/cluster/:clusterName", this.Cluster) 
 	m.Get("/api/clusters", this.Clusters) 
