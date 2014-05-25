@@ -127,14 +127,14 @@ func (this *HttpAPI) EndMaintenance(params martini.Params, r render.Render) {
 }
 
 
-func (this *HttpAPI) EndMaintenanceByKey(params martini.Params, r render.Render) {
+func (this *HttpAPI) EndMaintenanceByInstanceKey(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
 	}
-	err = inst.EndMaintenanceByKey(&instanceKey)
+	err = inst.EndMaintenanceByInstanceKey(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
@@ -265,7 +265,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/move-up/:host/:port", this.MoveUp) 
 	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow) 
 	m.Get("/api/begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance) 
-	m.Get("/api/end-maintenance/:host/:port", this.EndMaintenanceByKey) 
+	m.Get("/api/end-maintenance/:host/:port", this.EndMaintenanceByInstanceKey) 
 	m.Get("/api/end-maintenance/:maintenanceKey", this.EndMaintenance)	
 	m.Get("/api/maintenance", this.Maintenance) 
 	m.Get("/api/cluster/:clusterName", this.Cluster) 

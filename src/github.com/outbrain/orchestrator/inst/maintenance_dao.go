@@ -87,7 +87,7 @@ func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) (in
 
 
 
-func EndMaintenanceByKey(instanceKey *InstanceKey) error {
+func EndMaintenanceByInstanceKey(instanceKey *InstanceKey) error {
 	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}
 	
@@ -117,6 +117,38 @@ func EndMaintenanceByKey(instanceKey *InstanceKey) error {
 }
 
 
+
+func ReadMaintenanceInstanceKey(maintenanceToken int64) (*InstanceKey, error) {
+	var res *InstanceKey
+	query := fmt.Sprintf(`
+		select 
+			hostname, port 
+		from 
+			database_instance_maintenance 
+		where
+			database_instance_maintenance_id = %d `,
+    		maintenanceToken)
+	db,	err	:=	db.OpenOrchestrator()
+    if err != nil {goto Cleanup}
+    
+    err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+    	instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
+	    if merr != nil { return merr }
+
+    	res = instanceKey
+    	return nil       	
+   	})
+	Cleanup:
+
+	if err	!=	nil	{
+		log.Errore(err)
+	}
+	return res, err
+}
+
+
+
+
 func EndMaintenance(maintenanceToken int64) error {
 	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}
@@ -137,7 +169,8 @@ func EndMaintenance(maintenanceToken int64) error {
 		err = errors.New(fmt.Sprintf("Instance is not in maintenance mode; token = %+v", maintenanceToken))
 	} else {
 		// success
-		AuditOperation("end-maintenance", nil, fmt.Sprintf("maintenanceToken: %d", maintenanceToken))
+		instanceKey, _ := ReadMaintenanceInstanceKey(maintenanceToken)
+		AuditOperation("end-maintenance", instanceKey, fmt.Sprintf("maintenanceToken: %d", maintenanceToken))
 	}
 	return err		 
 }

@@ -57,7 +57,7 @@ func Cli(command string, instance string, sibling string, owner string, reason s
 		}
 		case "end-maintenance": {
 			if instanceKey == nil {log.Fatal("Cannot deduce instance:", instance)}
-			err := inst.EndMaintenanceByKey(instanceKey)
+			err := inst.EndMaintenanceByInstanceKey(instanceKey)
 			if err != nil {log.Errore(err)}
 		}
 		case "continuous": {
