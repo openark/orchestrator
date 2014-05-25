@@ -152,6 +152,7 @@ function moveBelow(node, siblingNode) {
 	    			}	
 	            }, "json");					
 		}
+		$("#cluster_container .accept_drop").removeClass("accept_drop");
 	}); 
 	return false;
 }
@@ -176,6 +177,7 @@ function moveUp(node, grandparentNode) {
 	    			}	
 	            }, "json");					
 		}
+		$("#cluster_container .accept_drop").removeClass("accept_drop");
 	}); 
 	return false;
 }
