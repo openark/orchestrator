@@ -80,9 +80,31 @@ func (this *HttpWeb) Home(params martini.Params, r render.Render) {
 }
 
 
+func (this *HttpWeb) About(params martini.Params, r render.Render) {
+
+	r.HTML(200, "templates/about", map[string]interface{}{
+		"title": "about", 
+		"autoshow_problems": false,
+		})
+}
+
+
+
+func (this *HttpWeb) FAQ(params martini.Params, r render.Render) {
+
+	r.HTML(200, "templates/faq", map[string]interface{}{
+		"title": "FAQ", 
+		"autoshow_problems": false,
+		})
+}
+
+
 func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/", this.Home) 
 	m.Get("/web", this.Home) 
+	m.Get("/web/home", this.Home) 
+	m.Get("/web/about", this.About) 
+	m.Get("/web/faq", this.FAQ) 
 	m.Get("/web/cluster/:clusterName", this.Cluster) 
 	m.Get("/web/search/:searchString", this.Search) 
 	m.Get("/web/search", this.Search) 

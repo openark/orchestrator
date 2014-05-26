@@ -4,6 +4,7 @@ import (
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"database/sql"
+	"github.com/outbrain/log"
 	"github.com/outbrain/sqlutils"
 	"github.com/outbrain/orchestrator/config"
 )
@@ -11,7 +12,7 @@ import (
 
 var generateSQL = []string{
 	`
-        CREATE TABLE database_instance (
+        CREATE TABLE IF NOT EXISTS database_instance (
           hostname varchar(128) CHARACTER SET ascii NOT NULL,
           port smallint(5) unsigned NOT NULL,
           last_checked timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -32,6 +33,7 @@ var generateSQL = []string{
           relay_master_log_file varchar(128) CHARACTER SET ascii NOT NULL,
           exec_master_log_pos bigint(20) unsigned NOT NULL,
           seconds_behind_master bigint(20) unsigned DEFAULT NULL,
+          slave_lag_seconds bigint(20) unsigned DEFAULT NULL,
           num_slave_hosts int(10) unsigned NOT NULL,
           slave_hosts text CHARACTER SET ascii NOT NULL,
           cluster_name tinytext CHARACTER SET ascii NOT NULL,
@@ -39,10 +41,11 @@ var generateSQL = []string{
           KEY cluster_name_idx (cluster_name(128)),
           KEY last_checked_idx (last_checked),
           KEY last_seen_idx (last_seen)
-        ) ENGINE=InnoDB DEFAULT CHARSET=latin1 
+        ) ENGINE=InnoDB DEFAULT CHARSET=ascii
+
 	`,
 	`
-        CREATE TABLE database_instance_maintenance (
+        CREATE TABLE IF NOT EXISTS database_instance_maintenance (
           database_instance_maintenance_id int(10) unsigned NOT NULL AUTO_INCREMENT,
           hostname varchar(128) NOT NULL,
           port smallint(5) unsigned NOT NULL,
@@ -56,7 +59,7 @@ var generateSQL = []string{
         ) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
-        CREATE TABLE audit (
+        CREATE TABLE IF NOT EXISTS audit (
           audit_id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
           audit_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
           audit_type varchar(128) CHARACTER SET ascii NOT NULL,
@@ -73,13 +76,27 @@ var generateSQL = []string{
 
 func OpenTopology(host string, port int) (*sql.DB, error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/", config.Config.MySQLTopologyUser, config.Config.MySQLTopologyPassword, host, port)
-	return sqlutils.GetDB(mysql_uri)
+	db, _, err := sqlutils.GetDB(mysql_uri)
+	return db, err
 }
 
 func OpenOrchestrator() (*sql.DB, error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", config.Config.MySQLOrchestratorUser, config.Config.MySQLOrchestratorPassword, 
 		config.Config.MySQLOrchestratorHost, config.Config.MySQLOrchestratorPort, config.Config.MySQLOrchestratorDatabase)
-	return sqlutils.GetDB(mysql_uri)
+	db, fromCache, err := sqlutils.GetDB(mysql_uri)
+	if err == nil && !fromCache {
+		initOrchestratorDB(db)
+	}
+	return db, err
+}
+
+func initOrchestratorDB(db *sql.DB) error {
+	log.Debug("Initializing orchestrator")
+	for _, query := range generateSQL {
+		_, err := ExecOrchestrator(query)
+		if err != nil { return err }
+	}
+	return nil
 }
 
 func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {

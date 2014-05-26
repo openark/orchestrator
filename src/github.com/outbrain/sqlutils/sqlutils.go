@@ -7,6 +7,8 @@ import (
 	"github.com/outbrain/log"	
 )
 
+// RowMap represents one row in a result set. Its objective is to allow
+// for easy, typed getters by column name.
 type RowMap map[string]sql.NullString
 
 func (this *RowMap) GetString(key string) string {
@@ -48,18 +50,22 @@ func (this *RowMap) GetBool(key string) bool {
 }
 
 
+// knownDBs is a DB cache by uri
 var knownDBs map[string]*sql.DB = make(map[string]*sql.DB)
 
-func GetDB(mysql_uri string) (*sql.DB, error) {
+// Get a DB instance based on uri. 
+// Returns DB; bool indicating whether the DB was returned from cache; err
+func GetDB(mysql_uri string) (*sql.DB, bool, error) {
 	
-	if _, exists := knownDBs[mysql_uri]; !exists {
+	var exists bool
+	if _, exists = knownDBs[mysql_uri]; !exists {
 	    if db, err := sql.Open("mysql", mysql_uri); err == nil {
 	    	knownDBs[mysql_uri] = db
 	    } else {
-	    	return db, err
+	    	return db, exists, err
 	    }	    	    
 	}
-	return knownDBs[mysql_uri], nil
+	return knownDBs[mysql_uri], exists, nil
 }
 
 

@@ -374,12 +374,20 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     });	
 }
 
+var onClustersListeners = [];
+
+function onClusters(func) {
+	onClustersListeners.push(func);
+} 
 
 $(document).ready(function() {
 	$.get("/api/clusters", function(clusters) {
 		clusters.forEach(function(cluster) {                      
 	        $("#dropdown-clusters").append('<li><a href="/web/cluster/'+cluster+'">'+cluster+'</a></li>');
-	    });                    
+	    });                 
+		onClustersListeners.forEach(function(func) {
+			func(clusters);
+		});
 	}, "json");
 	$("#ajaxLoader").click(function() {
         return false;

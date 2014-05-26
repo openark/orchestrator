@@ -1,0 +1,47 @@
+
+<div class="container">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            About
+        </div>
+        <div class="panel-body">
+            <p>
+                <strong>Orchestrator</strong> is a MySQL replication topology management and visualization tool, allowing for: 
+                <ul>
+                    <li>Detection and interrogation of replication clusters</li>
+                    <li>Safe topology refactoring: moving slaves around the topology</li>
+                    <li>Sleek topology visualization</li>
+                    <li>Replication problems visualization</li>
+                    <li>Topology changes via intuitive drag & drop</li>
+                    <li>Maintenance mode declaration and enforcement</li>
+                    <li>Auditing of operations</li>
+                    <li>More...</li>
+                </ul>
+            </p>
+            <p>
+                The topology visualization screens probably make the most impact; they allow for immediate
+                understanding of your topology, along with all pending issues (lags, stopped slaves, etc.) 
+            </p>
+            <p>
+                Refactoring the topology is a matter of a simple drag & drop. <i>Orchestrator</i> will keep you
+                safe by disallowing invalid replication topologies (e.g. replicating from ROW based to STATEMENT based,
+                from 5.5 to 5.1 etc.)
+            </p>
+            <p>
+                <i>Orchestrator</i> is developed at <a href="http://www.outbrain.com">Outbrain</a> to answer for the difficulty 
+                in managing replication topologies. At the time of <i>orchestrator</i> creation GTID is available via MySQL 5.6
+                and MariaDB 10.0. And yet GTID is still not as mature as one would hope for. The majority of users still
+                use plain-old binlog file:position based MySQL replication, and apparently this will hold for some time. 
+            </p>
+            <p>
+                <i>Orchestrator</i> is released as open source under the
+                <a href="http://www.apache.org/licenses/LICENSE-2.0">Apache 2.0 license</a>
+                and is available at: 
+                <a href="https://github.com/outbrain/orchestrator">https://github.com/outbrain/orchestrator</a>
+            </p>
+            <p>
+                Developed by Shlomi Noach.
+            </p>
+        </div>
+    </div>
+</div>
