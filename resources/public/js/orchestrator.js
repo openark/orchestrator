@@ -8,7 +8,7 @@ function startRefreshTimer() {
     	if (nodeModalVisible) {
     		return;
     	}
-    	secondsTillRefresh = secondsTillRefresh - 1;
+    	secondsTillRefresh = Math.max(secondsTillRefresh - 1, 0);
     	if (secondsTillRefresh <= 0) {
     		location.reload(true);
     	}
@@ -391,6 +391,9 @@ $(document).ready(function() {
 	}, "json");
 	$("#ajaxLoader").click(function() {
         return false;
+    });
+	$("#refreshCountdown").click(function() {
+		location.reload(true);
     });
 });
 
