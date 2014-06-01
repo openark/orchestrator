@@ -79,6 +79,25 @@ func (this *HttpAPI) Discover(params martini.Params, r render.Render) {
 	r.JSON(200, &APIResponse{Code:OK, Message: fmt.Sprintf("Instance submitted for discovery: %+v", instanceKey),})
 }
 
+
+func (this *HttpAPI) Refresh(params martini.Params, r render.Render) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+	
+	_, err = inst.RefreshTopologyInstance(&instanceKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+	
+	r.JSON(200, &APIResponse{Code:OK, Message: fmt.Sprintf("Instance refreshedh: %+v", instanceKey),})
+}
+
+
 func (this *HttpAPI) Forget(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
@@ -297,6 +316,7 @@ func (this *HttpAPI) Audit(params martini.Params, r render.Render, req *http.Req
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/instance/:host/:port", this.Instance) 
 	m.Get("/api/discover/:host/:port", this.Discover) 
+	m.Get("/api/refresh/:host/:port", this.Refresh) 
 	m.Get("/api/forget/:host/:port", this.Forget) 
 	m.Get("/api/move-up/:host/:port", this.MoveUp) 
 	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow) 

@@ -565,6 +565,18 @@ func ForgetLongUnseenInstances() error {
 }
 
 
+
+func RefreshTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
+	_, err := ReadTopologyInstance(instanceKey)
+	if err != nil {return nil, err}
+  
+	inst, found, err := ReadInstance(instanceKey)
+	if err != nil || !found {return nil, err}
+	
+	return inst, nil
+}
+  
+
 func StopSlaveNicely(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {return instance, log.Errore(err)}

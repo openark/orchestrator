@@ -123,6 +123,7 @@ function openNodeModal(node) {
     
     $('#node_modal button[data-btn=begin-maintenance]').unbind("click");
     $('#node_modal button[data-btn=end-maintenance]').unbind("click");
+    $('#node_modal button[data-btn=refresh-instance]').unbind("click");
     $('#node_modal button[data-btn=forget-instance]').unbind("click");
     $('#node_modal button[data-btn=start-slave]').unbind("click");
     $('#node_modal button[data-btn=stop-slave]').unbind("click");
@@ -147,6 +148,17 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=end-maintenance]').click(function(){
     	showLoader();
         $.get("/api/end-maintenance/"+node.Key.Hostname+"/"+node.Key.Port, function (operationResult) {
+			hideLoader();
+			if (operationResult.Code == "ERROR") {
+				addAlert(operationResult.Message)
+			} else {
+				location.reload();
+			}	
+        }, "json");	
+    });
+    $('#node_modal button[data-btn=refresh-instance]').click(function(){
+    	showLoader();
+        $.get("/api/refresh/"+node.Key.Hostname+"/"+node.Key.Port, function (operationResult) {
 			hideLoader();
 			if (operationResult.Code == "ERROR") {
 				addAlert(operationResult.Message)
