@@ -1,6 +1,7 @@
 package app 
 
 import (
+	"fmt"
 	"os/user"
 	"github.com/outbrain/orchestrator/inst"	
 	"github.com/outbrain/orchestrator/logic"
@@ -59,6 +60,15 @@ func Cli(command string, instance string, sibling string, owner string, reason s
 			if instanceKey == nil {log.Fatal("Cannot deduce instance:", instance)}
 			err := inst.EndMaintenanceByInstanceKey(instanceKey)
 			if err != nil {log.Errore(err)}
+		}
+		case "topology": {
+			if instanceKey == nil {log.Fatal("Cannot deduce instance:", instance)}
+			output, err := inst.AsciiTopology(instance)
+			if err != nil {
+				log.Errore(err)
+			} else {
+				fmt.Println(output)
+			}
 		}
 		case "continuous": {
 			orchestrator.ContinuousDiscovery()

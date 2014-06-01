@@ -59,6 +59,10 @@ func (this *InstanceKey) IsValid() bool {
 	return len(this.Hostname) > 0 && this.Port > 0
 }
 
+func (this *InstanceKey) DisplayString() string {
+	return fmt.Sprintf("%s:%d", this.Hostname, this.Port)
+}
+
 
 
 //
