@@ -14,7 +14,7 @@ func main() {
 	sibling := flag.String("s", "", "sibling instance, host:port")
 	owner := flag.String("owner", "", "operation owner")
 	reason := flag.String("reason", "", "operation reason")
-	discovery := flag.Bool("discovery", false, "auto discovery mode")
+	discovery := flag.Bool("discovery", true, "auto discovery mode")
 	verbose := flag.Bool("verbose", false, "verbose")
 	debug := flag.Bool("debug", false, "debug mode (very verbose)")
 	flag.Parse();
