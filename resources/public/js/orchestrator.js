@@ -261,6 +261,7 @@ function normalizeInstance(instance) {
     instance.maintenanceEntry = null;
 
     instance.isMaster = (instance.title == instance.ClusterName);
+    instance.isCoMaster = false;
 }
 
 function normalizeInstanceProblem(instance) {
@@ -331,9 +332,12 @@ function normalizeInstances(instances, maintenanceList) {
         }
     });
 
-    // In case there's a master-master setup, break the circle
     instances.forEach(function (instance) {
     	if (instance.isMaster && instance.parent != null && instance.parent.parent != null && instance.parent.parent.id == instance.id) {
+    	    // In case there's a master-master setup, break the circle
+    		// This is for visualization purposes...
+    		instance.isCoMaster = true
+    		instance.parent.isCoMaster = true
     		var index = instance.parent.children.indexOf(instance);
     		if (index >= 0)
     			instance.parent.children.splice(index, 1);
@@ -367,6 +371,12 @@ function renderInstanceElement(popoverElement, instance, renderType) {
    		+ '<p>' 
 			+ instance.Version + " " + instance.Binlog_format 
         + '</p>';
+    if (instance.isCoMaster) {
+    	contentHtml += '<p><strong>Co master</strong></p>';
+    }
+    else if (instance.isMaster) {
+    	contentHtml += '<p><strong>Master</strong></p>';
+    }
     if (renderType == "search") {
     	contentHtml += '<p>' 
         	+ 'Cluster: <a href="/web/cluster/'+instance.ClusterName+'">'+instance.ClusterName+'</a>'
