@@ -28,7 +28,7 @@ func Cli(command string, instance string, sibling string, owner string, reason s
 	}
 		
 	if len(command) == 0 {
-		log.Fatal("expected command (-c) (discover|forget|continuous|move-up|move-below)")
+		log.Fatal("expected command (-c) (discover|forget|continuous|move-up|move-below|begin-maintenance|end-maintenance|topology)")
 	}
 	switch command {
 		case "move-up": {
