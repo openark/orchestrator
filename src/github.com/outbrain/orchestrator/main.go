@@ -10,7 +10,7 @@ import (
 // main is the application's entry point. It will either spawn a CLI or HTTP itnerfaces.
 func main() {
 	configFile := flag.String("config", "", "config file name")
-	command := flag.String("c", "", "command (discover|forget|continuous|move-up|move-below|begin-maintenance|end-maintenance|topology)")
+	command := flag.String("c", "", "command (discover|forget|continuous|move-up|move-below|begin-maintenance|end-maintenance|clusters|topology)")
 	instance := flag.String("i", "", "instance, host:port")
 	sibling := flag.String("s", "", "sibling instance, host:port")
 	owner := flag.String("owner", "", "operation owner")

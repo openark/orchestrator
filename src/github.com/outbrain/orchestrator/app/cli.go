@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 	"os/user"
 	"github.com/outbrain/orchestrator/inst"	
 	"github.com/outbrain/orchestrator/logic"
@@ -13,8 +14,7 @@ import (
 func Cli(command string, instance string, sibling string, owner string, reason string) {
 	
 	instanceKey, err := inst.ParseInstanceKey(instance)
-	// There always has to be an instance; all commands require one.
-	if err != nil {log.Fatal("Cannot deduce instance:", instance)}
+	if err != nil {instanceKey = nil}
 	siblingKey, err := inst.ParseInstanceKey(sibling)
 	if err != nil {siblingKey = nil}
 
@@ -28,7 +28,7 @@ func Cli(command string, instance string, sibling string, owner string, reason s
 	}
 		
 	if len(command) == 0 {
-		log.Fatal("expected command (-c) (discover|forget|continuous|move-up|move-below|begin-maintenance|end-maintenance|topology)")
+		log.Fatal("expected command (-c) (discover|forget|continuous|move-up|move-below|begin-maintenance|end-maintenance|clusters|topology)")
 	}
 	switch command {
 		case "move-up": {
@@ -62,6 +62,14 @@ func Cli(command string, instance string, sibling string, owner string, reason s
 			if instanceKey == nil {log.Fatal("Cannot deduce instance:", instance)}
 			err := inst.EndMaintenanceByInstanceKey(instanceKey)
 			if err != nil {log.Errore(err)}
+		}
+		case "clusters": {
+			clusters, err := inst.ReadClusters()
+			if err != nil {
+				log.Errore(err)
+			} else {
+				fmt.Println(strings.Join(clusters, "\n"))
+			}
 		}
 		case "topology": {
 			if instanceKey == nil {log.Fatal("Cannot deduce instance:", instance)}
