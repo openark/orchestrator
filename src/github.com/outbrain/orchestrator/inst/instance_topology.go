@@ -7,16 +7,6 @@ import (
 	"github.com/outbrain/log"
 )
 
-
-func RefreshInstance(instance *Instance) (*Instance, error) {
-	instance, _, err := ReadInstance(&instance.Key)
-	if err != nil {
-		log.Errore(err)		
-	}
-	return instance, err
-}
-
-
 // GetInstanceMaster synchronously reaches into the replication topology
 // and retrieves master's data
 func GetInstanceMaster(instance *Instance) (*Instance, error) {
@@ -40,7 +30,9 @@ func InstancesAreSiblings(instance0, instance1 *Instance) bool {
 	return instance0.MasterKey.Equals(&instance1.MasterKey)
 }
 
-
+// MoveUp will attempt moving instance indicated by instanceKey up the topology hierarchy.
+// It will perform all safety and sanity checks and will tamper with this instance's replication 
+// as well as its master.
 func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {	return instance, err}
@@ -100,6 +92,9 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 }
 
 
+// MoveUp will attempt moving instance indicated by instanceKey below its supposed sibling indicated by sinblingKey.
+// It will perform all safety and sanity checks and will tamper with this instance's replication 
+// as well as its sibling.
 func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {	return instance, err}
@@ -165,7 +160,10 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
-func appendAsciiTopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance)) []string {
+
+// getAsciiTopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
+// draws the tree 
+func getAsciiTopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance)) []string {
 	prefix := ""
 	if depth > 0 {
 		prefix = strings.Repeat(" ", (depth - 1) * 2)
@@ -178,12 +176,13 @@ func appendAsciiTopologyEntry(depth int, instance *Instance, replicationMap map[
 	entry := fmt.Sprintf("%s%s", prefix, instance.Key.DisplayString()) 
 	result := []string{entry}
 	for _, slave := range replicationMap[instance] {
-		slavesResult := appendAsciiTopologyEntry(depth + 1, slave, replicationMap)
+		slavesResult := getAsciiTopologyEntry(depth + 1, slave, replicationMap)
 		result = append(result, slavesResult...)
 	}
 	return result
 }
 
+// AsciiTopology returns a string representation of the topology of given clusterName.
 func AsciiTopology(clusterName string) (string, error) {
 	instances, err := ReadClusterInstances(clusterName)
 	if err != nil {return "", err} 
@@ -208,7 +207,7 @@ func AsciiTopology(clusterName string) (string, error) {
 			masterInstance = instance
 		} 
 	}
-	resultArray := appendAsciiTopologyEntry(0, masterInstance, replicationMap)
+	resultArray := getAsciiTopologyEntry(0, masterInstance, replicationMap)
 	result := strings.Join(resultArray, "\n")
 	return result, nil
 }

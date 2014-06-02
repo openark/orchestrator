@@ -12,7 +12,7 @@ import (
 	"github.com/outbrain/log"
 )
 
-
+// GetCNAME resolved an IP or hostname into a normalized valid CNAME
 func GetCNAME(hostName string) (string, error) {
 	res, err := net.LookupCNAME(hostName);
 	if err != nil {
@@ -22,11 +22,14 @@ func GetCNAME(hostName string) (string, error) {
 	return res, nil
 }
 
+// InstanceKey is an instance indicator, identifued by hostname and port
 type InstanceKey struct {
 	Hostname 			string
 	Port	 			int
 }
 
+// NewInstanceKeyFromStrings creates a new InstanceKey by resolving hostname and port.
+// hostname is normalized via GetCNAME. port is tested to be valid integer.
 func NewInstanceKeyFromStrings(hostname string, port string) (*InstanceKey, error) {
 	instanceKey := &InstanceKey{}
 	var err error
@@ -38,6 +41,7 @@ func NewInstanceKeyFromStrings(hostname string, port string) (*InstanceKey, erro
 	return instanceKey, nil
 }
 
+// ParseInstanceKey will parse an InstanceKey from a string representation such as 127.0.0.1:3306
 func ParseInstanceKey(hostPort string) (*InstanceKey, error) {
 	tokens := strings.SplitN(hostPort, ":", 2)
 	if len(tokens) != 2 {
@@ -46,37 +50,42 @@ func ParseInstanceKey(hostPort string) (*InstanceKey, error) {
 	return NewInstanceKeyFromStrings(tokens[0], tokens[1])
 }
 
+// Formalize this key by getting CNAME for hostname
 func (this *InstanceKey) Formalize() *InstanceKey {
 	this.Hostname, _ = GetCNAME(this.Hostname) 
 	return this
 }
 
+// Equals tests equality between this key and another key
 func (this *InstanceKey) Equals(other *InstanceKey) bool {
 	return this.Hostname == other.Hostname && this.Port == other.Port
 }
 
+// IsValid uses simple heuristics to see whether this key represents an actual instance
 func (this *InstanceKey) IsValid() bool {
 	return len(this.Hostname) > 0 && this.Port > 0
 }
 
+// DisplayString returns a user-friendly string representation of this key
 func (this *InstanceKey) DisplayString() string {
 	return fmt.Sprintf("%s:%d", this.Hostname, this.Port)
 }
 
 
 
-//
+// BinlogCoordinates described binary log coordinates in the form of log file & log position.
 type BinlogCoordinates struct {
 	LogFile	string
 	LogPos	int64
 }
 
 
+// Equals tests equality of this corrdinate and another one.
 func (this *BinlogCoordinates) Equals(other *BinlogCoordinates) bool {
 	return this.LogFile == other.LogFile && this.LogPos == other.LogPos
 }
 
-
+// SmallerThan returns true if this coordinate is smaller than the other.
 func (this *BinlogCoordinates) SmallerThan(other *BinlogCoordinates) bool {
 	if this.LogFile < other.LogFile {
 		return true
@@ -87,10 +96,11 @@ func (this *BinlogCoordinates) SmallerThan(other *BinlogCoordinates) bool {
 	return false
 }
 
-//
+// InstanceKeyMap is a convenience struct for listing InstanceKey-s
 type InstanceKeyMap map[InstanceKey]bool
 
 
+// GetInstanceKeys returns keys in this map in the form of an array
 func (this *InstanceKeyMap) GetInstanceKeys() []InstanceKey {
 	res := []InstanceKey{}
 	for key, _ := range *this {
@@ -99,11 +109,13 @@ func (this *InstanceKeyMap) GetInstanceKeys() []InstanceKey {
 	return res
 }
 
+// MarshalJSON will marshal this map as JSON
 func (this *InstanceKeyMap) MarshalJSON() ([]byte, error) {
 	return json.Marshal(this.GetInstanceKeys())
 }
 
-
+// Instance represents a database instance, including its current configuration & status.
+// It presents important replication configuration and detailed replication status. 
 type Instance struct {
 	Key					InstanceKey
 	ServerID			uint
@@ -128,20 +140,26 @@ type Instance struct {
 	SecondsSinceLastSeen	sql.NullInt64
 }
 
+// NewInstance creates a new, empty instance
 func NewInstance() *Instance {
     return &Instance{
     	SlaveHosts: make(map[InstanceKey]bool),
     }
 }
 
+// Equals tests that this instance is the same instance as other. The function does not test
+// configuration or status.
 func (this *Instance) Equals(other *Instance) bool {
 	return this.Key == other.Key
 }
 
+// MajorVersion returns this instance's major version number (e.g. for 5.5.36 it returns "5.5")
 func (this *Instance) MajorVersion() []string {
 	return strings.Split(this.Version, ".")[:2]
 }
 
+// MajorVersion tests this instance against another and returns true if this instance is of a smaller "major" varsion.
+// e.g. 5.5.36 is NOT a smaller major version as comapred to 5.5.36, but IS as compared to 5.6.9 
 func (this *Instance) IsSmallerMajorVersion(other *Instance) bool {
 	thisMajorVersion := this.MajorVersion()
 	otherMajorVersion := other.MajorVersion()
@@ -155,30 +173,33 @@ func (this *Instance) IsSmallerMajorVersion(other *Instance) bool {
 	return false
 }
 
+// IsSlave makes simple heuristics to decide whether this insatnce is a slave of another instance
 func (this *Instance) IsSlave() bool {
 	return this.MasterKey.Hostname != "" && this.MasterKey.Port != 0 && this.ReadBinlogCoordinates.LogFile != ""
 }
 
+// SlaveRunning returns true when this instance's status is of a replicating slave.
 func (this *Instance) SlaveRunning() bool {
 	return this.IsSlave() && this.Slave_SQL_Running && this.Slave_IO_Running
 }
 
+// SQLThreadUpToDate returns true when the instance had consumed all relay logs.
 func (this *Instance) SQLThreadUpToDate() bool {
 	return this.ReadBinlogCoordinates.Equals(&this.ExecBinlogCoordinates)
 }
 
-
+// AddSlaveKey adds a slave to the list of this instance's slaves.
 func (this *Instance) AddSlaveKey(slaveKey *InstanceKey) {
 	this.SlaveHosts[*slaveKey] = true
 }
 
-
+// GetSlaveHostsAsJson Marshals slaves list a JSON
 func (this *Instance) GetSlaveHostsAsJson() string {
 	blob, _ := this.SlaveHosts.MarshalJSON()
 	return string(blob)
 }
 
-
+// ReadSlaveHostsFromJson unmarshalls a json to read list of slaves
 func (this *Instance) ReadSlaveHostsFromJson(jsonString string) error {
 	var keys []InstanceKey;
 	err := json.Unmarshal([]byte(jsonString), &keys)
@@ -191,15 +212,18 @@ func (this *Instance) ReadSlaveHostsFromJson(jsonString string) error {
 	return err
 }
 
-
+// IsSlaveOf returns true if this instance claims to replicate from given master
 func (this *Instance) IsSlaveOf(master *Instance) bool {
 	return this.MasterKey.Equals(&master.Key)
 }
 
+// IsSlaveOf returns true if this i supposed master of given slave
 func (this *Instance) IsMasterOf(slave *Instance) bool {
 	return slave.IsSlaveOf(this)
 }
 
+// CanReplicateFrom uses heursitics to decide whether this instacne can practically replicate from other instance.
+// Checks are made to binlog format, version number, binary logs etc.
 func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	if !other.LogBinEnabled {
 		return false, errors.New(fmt.Sprintf("instance does not have binary logs enabled: %+v", other.Key)) 
@@ -224,7 +248,8 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	return true, nil
 }
 
-
+// CanMove returns true if this instance's state allows it to be repositioned. For example,
+// if this instance lags too much, it will not be moveable.
 func (this *Instance) CanMove() (bool, error) {
 	if !this.IsLastCheckValid {
 		return false, errors.New("last check invalid") 

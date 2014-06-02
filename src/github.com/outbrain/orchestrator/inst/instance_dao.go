@@ -12,6 +12,7 @@ import (
 	"github.com/outbrain/log"
 )
 
+// ExecInstance executes a given query on the given MySQL topology instance
 func ExecInstance(instanceKey *InstanceKey, query string, args ...interface{}) (sql.Result, error) {
 	db,	err	:=	db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
@@ -21,7 +22,7 @@ func ExecInstance(instanceKey *InstanceKey, query string, args ...interface{}) (
 	return res, err
 }
 
-
+// ScanInstanceRow executes a read-a-single-row query on a given MySQL topology instance 
 func ScanInstanceRow(instanceKey *InstanceKey, query string, dest ...interface{}) error {
 	db,	err	:=	db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
@@ -31,6 +32,9 @@ func ScanInstanceRow(instanceKey *InstanceKey, query string, dest ...interface{}
 	return err
 }
 
+
+// ReadTopologyInstance connects to a topology MySQL instance and reads its configuration and 
+// replication status. It writes read info into orchestrator's backend.
 func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
     defer func() {
         if err := recover(); err != nil {
@@ -100,6 +104,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
         if err != nil {goto Cleanup}
     } 
     if !foundBySlaveHosts {
+    	// Either not configured to read SHOW SLAVE HOSTS or nothing was there.
        	// Discover by processlist
         err = sqlutils.QueryRowsMap(db, `
         	select 
@@ -136,6 +141,10 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 }
 
 
+// ReadClusterNameByMaster will return the cluster name for a given instance by looking at its master
+// and getting it from there.
+// It is a non-recursive function and so-called-recursion is performed upon periodic reading of 
+// instances.
 func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (string, error) {
 	db,	err	:=	db.OpenOrchestrator()
 	if	err	!=	nil	{
@@ -163,6 +172,7 @@ func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (
 }
 
 
+// ReadInstance reads an instance from the orchestrator backend database
 func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 	db,	err	:=	db.OpenOrchestrator()
 	if	err	!=	nil	{
@@ -235,7 +245,8 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 }
 
 
-func ReadInstanceRow(m sqlutils.RowMap) *Instance {
+// readInstanceRow reads a single instance row from the orchestrator backend database.
+func readInstanceRow(m sqlutils.RowMap) *Instance {
     instance := NewInstance()
     	
     instance.Key.Hostname = m.GetString("hostname")
@@ -275,6 +286,7 @@ func ReadInstanceRow(m sqlutils.RowMap) *Instance {
 }
 
 
+// ReadClusterInstances reads all instances of a given cluster
 func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 	instances := [](*Instance){}
 
@@ -300,7 +312,7 @@ func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 			hostname, port`, clusterName)
 
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-		instance := ReadInstanceRow(m)
+		instance := readInstanceRow(m)
     	instances = append(instances, instance)
     	return nil       	
    	})
@@ -309,7 +321,7 @@ func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 }
 
 
-
+// ReadProblemInstances reads all instances with problems
 func ReadProblemInstances() ([](*Instance), error) {
 	instances := [](*Instance){}
 
@@ -336,7 +348,7 @@ func ReadProblemInstances() ([](*Instance), error) {
 			hostname, port`, config.Config.InstancePollSeconds)
 
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-		instance := ReadInstanceRow(m)
+		instance := readInstanceRow(m)
     	instances = append(instances, instance)
     	return nil       	
    	})
@@ -345,7 +357,7 @@ func ReadProblemInstances() ([](*Instance), error) {
 }
 
 
-
+// SearchInstances reads all instances qualifying for some searchString
 func SearchInstances(searchString string) ([](*Instance), error) {
 	instances := [](*Instance){}
 
@@ -376,7 +388,7 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 			cluster_name,
 			hostname, port`, searchString, searchString, searchString, searchString, searchString, searchString)
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-		instance := ReadInstanceRow(m)
+		instance := readInstanceRow(m)
     	instances = append(instances, instance)
     	return nil       	
    	})
@@ -385,7 +397,7 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 }
 
 
-
+// ReadClusters reads names of all known clusters
 func ReadClusters() ([]string, error) {
 	clusterNames := []string{}
 
@@ -411,6 +423,8 @@ func ReadClusters() ([]string, error) {
 }
 
 
+// ReadOutdatedInstanceKeys reads and returns keys for all instances that are not up to date (i.e.
+// pre-configured time has passed since they were last cheked)
 func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 	res := []InstanceKey{}
 	query := fmt.Sprintf(`
@@ -444,6 +458,7 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 }
 
 
+// WriteInstance stores an instance in the orchestrator backend
 func WriteInstance(instance *Instance, lastError error) error {
 	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}
@@ -509,8 +524,8 @@ func WriteInstance(instance *Instance, lastError error) error {
 }
 
 
-
-
+// UpdateInstanceLastChecked updates the last_check timestamp in the orchestrator backed database 
+// for a given instance
 func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
 	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}
@@ -532,6 +547,8 @@ func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
 }
 
 
+// ForgetInstance removes an instance entry from the orchestrator backed database.
+// It may be auto-rediscovered through topology or requested for discovery by multiple means.
 func ForgetInstance(instanceKey *InstanceKey) error {
 	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}
@@ -549,6 +566,7 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 }
 
 
+// ForgetLongUnseenInstances will remove entries of all instacnes that have long since been last seen.
 func ForgetLongUnseenInstances() error {
 	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}
@@ -565,7 +583,7 @@ func ForgetLongUnseenInstances() error {
 }
 
 
-
+// RefreshTopologyInstance will synchronuously re-read topology instance
 func RefreshTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	_, err := ReadTopologyInstance(instanceKey)
 	if err != nil {return nil, err}
@@ -577,6 +595,8 @@ func RefreshTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 }
   
 
+// StopSlaveNicely stops a slave such that SQL_thread and IO_thread are aligned (i.e.
+// SQL_thread consumes all relay log entries)
 func StopSlaveNicely(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {return instance, log.Errore(err)}
@@ -605,6 +625,7 @@ func StopSlaveNicely(instanceKey *InstanceKey) (*Instance, error) {
 }
 
 
+// StopSlave stops replication on a given instance
 func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {return instance, log.Errore(err)}
@@ -621,6 +642,7 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 }
 
 
+// StopSlave starts replication on a given instance
 func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {return instance, log.Errore(err)}
@@ -641,6 +663,7 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 }
 
 
+// StartSlaveUntilMasterCoordinates issuesa START SLAVE UNTIL... statement on given instance
 func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinates *BinlogCoordinates) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {return instance, log.Errore(err)}
@@ -676,6 +699,7 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 }
 
 
+// ChangeMasterTo changes the given instance's master according to given input.
 func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinlogCoordinates *BinlogCoordinates) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {return instance, log.Errore(err)}
@@ -694,6 +718,7 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 }
 
 
+// MasterPosWait issues a MASTER_POS_WAIT() an given instance according to given coordinates.
 func MasterPosWait(instanceKey *InstanceKey, binlogCoordinates *BinlogCoordinates) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {return instance, log.Errore(err)}

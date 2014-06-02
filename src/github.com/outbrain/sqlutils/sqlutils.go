@@ -53,8 +53,8 @@ func (this *RowMap) GetBool(key string) bool {
 // knownDBs is a DB cache by uri
 var knownDBs map[string]*sql.DB = make(map[string]*sql.DB)
 
-// Get a DB instance based on uri. 
-// Returns DB; bool indicating whether the DB was returned from cache; err
+// GetDB returns a DB instance based on uri. 
+// bool result indicates whether the DB was returned from cache; err
 func GetDB(mysql_uri string) (*sql.DB, bool, error) {
 	
 	var exists bool
@@ -68,7 +68,8 @@ func GetDB(mysql_uri string) (*sql.DB, bool, error) {
 	return knownDBs[mysql_uri], exists, nil
 }
 
-
+// RowToArray is a convenience function, typically not called directly, which maps a
+// single read database row into a NullString
 func RowToArray(rows *sql.Rows, columns []string) []sql.NullString {
     buff := make([]interface{}, len(columns))
     data := make([]sql.NullString, len(columns))
@@ -79,6 +80,8 @@ func RowToArray(rows *sql.Rows, columns []string) []sql.NullString {
 	return data
 }
 
+// ScanRowsToArrays is a convenience function, typically not called directly, which maps rows
+// already read from the databse into arrays of NullString
 func ScanRowsToArrays(rows *sql.Rows, on_row func([]sql.NullString) error) error {
     columns, _ := rows.Columns()
     for rows.Next() {
@@ -92,6 +95,8 @@ func ScanRowsToArrays(rows *sql.Rows, on_row func([]sql.NullString) error) error
     return nil
 }
 
+// ScanRowsToMaps is a convenience function, typically not called directly, which maps rows
+// already read from the databse into RowMap entries.
 func ScanRowsToMaps(rows *sql.Rows, on_row func(RowMap) error) error {
 	columns, _ := rows.Columns()
 	err := ScanRowsToArrays(rows, func(arr []sql.NullString) error {
@@ -109,6 +114,8 @@ func ScanRowsToMaps(rows *sql.Rows, on_row func(RowMap) error) error {
 }
 
 
+// QueryRowsMap is a convenience function allowing querying a result set while poviding a callback
+// function activated per read row.
 func QueryRowsMap(db *sql.DB, query string, on_row func(RowMap) error) error {
 	rows, err := db.Query(query)
 	defer rows.Close()
@@ -120,7 +127,8 @@ func QueryRowsMap(db *sql.DB, query string, on_row func(RowMap) error) error {
 }
 
 
-
+// Exec executes given query using given args on given DB. It will safele prepare, execute and close
+// the statement.
 func Exec(db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
     stmt, err := db.Prepare(query);
 	if err != nil {

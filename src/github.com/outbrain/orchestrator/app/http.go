@@ -12,13 +12,15 @@ import (
 	"github.com/outbrain/log"
 )
 
+
+// Http starts serving HTTP (api/web) requests 
 func Http(discovery bool) {
 	m := martini.Classic()
 	if config.Config.HTTPAuthUser != "" {
 		m.Use(auth.Basic(config.Config.HTTPAuthUser, config.Config.HTTPAuthPassword))
     }
 	
-	// render html templates from templates directory
+	// Render html templates from templates directory
 	m.Use(render.Renderer(render.Options{
 		Directory: "resources",
 		Layout: "templates/layout",	
@@ -35,6 +37,7 @@ func Http(discovery bool) {
 	http.API.RegisterRequests(m)
 	http.Web.RegisterRequests(m)
 
+	// Serve
 	m.Run()
 }
 

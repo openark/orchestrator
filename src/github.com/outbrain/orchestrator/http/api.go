@@ -17,9 +17,13 @@ type HttpAPI struct{}
 var API HttpAPI = HttpAPI{}
 
 
-//
+// APIResponseCode is an OK/ERROR response code
 type APIResponseCode int
 
+const (
+	ERROR APIResponseCode = iota
+	OK
+)
 
 func (this *APIResponseCode) MarshalJSON() ([]byte, error) {
 	return json.Marshal(this.String())
@@ -33,12 +37,8 @@ func (this *APIResponseCode) String() string {
 	return "unknown"
 }
 
-const (
-	ERROR APIResponseCode = iota
-	OK
-)
 
-//
+// APIResponse is a response returned as JSON to various requests.
 type APIResponse struct {
 	Code	APIResponseCode
 	Message	string
@@ -51,6 +51,7 @@ func (this *HttpAPI) getInstanceKey(host string, port string) (inst.InstanceKey,
 	return *instanceKey, err
 }
 
+// Instance reads and returns an instance's details.
 func (this *HttpAPI) Instance(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
@@ -66,7 +67,7 @@ func (this *HttpAPI) Instance(params martini.Params, r render.Render) {
 	r.JSON(200, instance)
 }
 
-
+// Discover starts an asynchronuous discovery for an instance
 func (this *HttpAPI) Discover(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
@@ -79,7 +80,7 @@ func (this *HttpAPI) Discover(params martini.Params, r render.Render) {
 	r.JSON(200, &APIResponse{Code:OK, Message: fmt.Sprintf("Instance submitted for discovery: %+v", instanceKey),})
 }
 
-
+// Refresh synchronuously re-reads a topology instance
 func (this *HttpAPI) Refresh(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
@@ -98,6 +99,7 @@ func (this *HttpAPI) Refresh(params martini.Params, r render.Render) {
 }
 
 
+// Forget removes an instance entry fro backend database
 func (this *HttpAPI) Forget(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
@@ -111,7 +113,7 @@ func (this *HttpAPI) Forget(params martini.Params, r render.Render) {
 }
 
 
-
+// BeginMaintenance begins maintenance mode for given instance
 func (this *HttpAPI) BeginMaintenance(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
@@ -129,7 +131,7 @@ func (this *HttpAPI) BeginMaintenance(params martini.Params, r render.Render) {
 }
 
 
-
+// EndMaintenance terminates maintenance mode
 func (this *HttpAPI) EndMaintenance(params martini.Params, r render.Render) {
 	maintenanceKey, err := strconv.ParseInt(params["maintenanceKey"], 10, 0)
 	if err != nil {
@@ -146,6 +148,7 @@ func (this *HttpAPI) EndMaintenance(params martini.Params, r render.Render) {
 }
 
 
+// EndMaintenanceByInstanceKey terminates maintenance mode for given instance
 func (this *HttpAPI) EndMaintenanceByInstanceKey(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
@@ -163,6 +166,7 @@ func (this *HttpAPI) EndMaintenanceByInstanceKey(params martini.Params, r render
 }
 
 
+// Maintenance provides list of instance under active maintenance
 func (this *HttpAPI) Maintenance(params martini.Params, r render.Render) {
 	instanceKeys, err := inst.ReadActiveMaintenance()
 							  
@@ -175,6 +179,7 @@ func (this *HttpAPI) Maintenance(params martini.Params, r render.Render) {
 }
 
 
+// MoveUp attempts to move an instance up the topology
 func (this *HttpAPI) MoveUp(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
@@ -192,6 +197,7 @@ func (this *HttpAPI) MoveUp(params martini.Params, r render.Render) {
 }
 
 
+// MoveUp attempts to move an instance below its supposed sibling
 func (this *HttpAPI) MoveBelow(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 	if err != nil {
@@ -214,6 +220,7 @@ func (this *HttpAPI) MoveBelow(params martini.Params, r render.Render) {
 }
 
 
+// StartSlave starts replication on given instance
 func (this *HttpAPI) StartSlave(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
@@ -231,6 +238,7 @@ func (this *HttpAPI) StartSlave(params martini.Params, r render.Render) {
 }
 
 
+// StartSlave stops replication on given instance
 func (this *HttpAPI) StopSlave(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
@@ -248,6 +256,7 @@ func (this *HttpAPI) StopSlave(params martini.Params, r render.Render) {
 }
 
 
+// Cluster provides list of instances in given cluster
 func (this *HttpAPI) Cluster(params martini.Params, r render.Render) {
 	instances, err := inst.ReadClusterInstances(params["clusterName"])
 
@@ -260,6 +269,7 @@ func (this *HttpAPI) Cluster(params martini.Params, r render.Render) {
 }
 
 
+// Clusters provides list of known clusters
 func (this *HttpAPI) Clusters(params martini.Params, r render.Render) {
 	clusterNames, err := inst.ReadClusters()
 
@@ -271,6 +281,8 @@ func (this *HttpAPI) Clusters(params martini.Params, r render.Render) {
 	r.JSON(200, clusterNames)
 }
 
+
+// Search provides list of instances matching given search param via various criteria.
 func (this *HttpAPI) Search(params martini.Params, r render.Render, req *http.Request) {
 	searchString := params["searchString"]
 	if searchString == "" {
@@ -287,6 +299,7 @@ func (this *HttpAPI) Search(params martini.Params, r render.Render, req *http.Re
 }
 
 
+// Problems provides list of instances with known problems
 func (this *HttpAPI) Problems(params martini.Params, r render.Render, req *http.Request) {
 	instances, err := inst.ReadProblemInstances()
 
@@ -299,6 +312,7 @@ func (this *HttpAPI) Problems(params martini.Params, r render.Render, req *http.
 }
 
 
+// Audit provides listof audit entries by given page number
 func (this *HttpAPI) Audit(params martini.Params, r render.Render, req *http.Request) {
 	page, err := strconv.Atoi(params["page"])
 	if err != nil || page < 0 { page = 0 }
@@ -313,6 +327,7 @@ func (this *HttpAPI) Audit(params martini.Params, r render.Render, req *http.Req
 }
 
 
+// RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/instance/:host/:port", this.Instance) 
 	m.Get("/api/discover/:host/:port", this.Discover) 

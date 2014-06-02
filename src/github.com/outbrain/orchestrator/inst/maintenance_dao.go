@@ -8,7 +8,7 @@ import (
 	"github.com/outbrain/log"
 )
 
-
+// ReadActiveMaintenance returns the list of currently active maintenance entries
 func ReadActiveMaintenance() ([]Maintenance, error) {
 	res := []Maintenance{}
 	query := fmt.Sprintf(`
@@ -54,7 +54,7 @@ func ReadActiveMaintenance() ([]Maintenance, error) {
 
 }
 
-
+// BeginMaintenance will make new maintenance entry for given instanceKey.
 func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) (int64, error) {
 	db,	err	:=	db.OpenOrchestrator()
 	var maintenanceToken int64 = 0
@@ -86,7 +86,7 @@ func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) (in
 }
 
 
-
+// EndMaintenanceByInstanceKey will terminate an active maintenance using given instanceKey as hint
 func EndMaintenanceByInstanceKey(instanceKey *InstanceKey) error {
 	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}
@@ -117,7 +117,7 @@ func EndMaintenanceByInstanceKey(instanceKey *InstanceKey) error {
 }
 
 
-
+// ReadMaintenanceInstanceKey will return the instanceKey for active maintenance by maintenanceToken
 func ReadMaintenanceInstanceKey(maintenanceToken int64) (*InstanceKey, error) {
 	var res *InstanceKey
 	query := fmt.Sprintf(`
@@ -148,7 +148,7 @@ func ReadMaintenanceInstanceKey(maintenanceToken int64) (*InstanceKey, error) {
 
 
 
-
+// EndMaintenance will terminate an active maintenance via maintenanceToken
 func EndMaintenance(maintenanceToken int64) error {
 	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}

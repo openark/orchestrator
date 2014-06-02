@@ -10,6 +10,7 @@ import (
 )
 
 
+// generateSQL is a list of SQL statements required to build the orchestrator backend
 var generateSQL = []string{
 	`
         CREATE TABLE IF NOT EXISTS database_instance (
@@ -74,12 +75,14 @@ var generateSQL = []string{
 }
 
 
+// OpenTopology returns a DB instance to access a topology instance
 func OpenTopology(host string, port int) (*sql.DB, error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/", config.Config.MySQLTopologyUser, config.Config.MySQLTopologyPassword, host, port)
 	db, _, err := sqlutils.GetDB(mysql_uri)
 	return db, err
 }
 
+// OpenTopology returns the DB instance for the orchestrator backed database
 func OpenOrchestrator() (*sql.DB, error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", config.Config.MySQLOrchestratorUser, config.Config.MySQLOrchestratorPassword, 
 		config.Config.MySQLOrchestratorHost, config.Config.MySQLOrchestratorPort, config.Config.MySQLOrchestratorDatabase)
@@ -90,6 +93,9 @@ func OpenOrchestrator() (*sql.DB, error) {
 	return db, err
 }
 
+
+// initOrchestratorDB attempts to create/upgrade the orchestrator backend database. It is created once in the
+// application's lifetime. 
 func initOrchestratorDB(db *sql.DB) error {
 	log.Debug("Initializing orchestrator")
 	for _, query := range generateSQL {
@@ -99,6 +105,8 @@ func initOrchestratorDB(db *sql.DB) error {
 	return nil
 }
 
+
+// ExecOrchestrator will execute given query on the orchestrator backend database.
 func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
 	db,	err	:=	OpenOrchestrator()
 	if err != nil {

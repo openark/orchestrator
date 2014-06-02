@@ -4,7 +4,7 @@ import (
 
 )
 
-
+// Audit presents a single audit entry (namely in the database)
 type Audit struct {
 	AuditId				int64
 	AuditTimestamp		string

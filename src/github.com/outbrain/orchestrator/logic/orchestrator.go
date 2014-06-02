@@ -11,9 +11,14 @@ import (
 const (
 	maxConcurrency = 5
 )
+
+// discoveryInstanceKeys is a channel of instanceKey-s that were requested for discovery.
+// It can be continuously updated as discovery process progresses.
 var discoveryInstanceKeys chan inst.InstanceKey = make(chan inst.InstanceKey, maxConcurrency)
 
 
+// handleDiscoveryRequests iterates the discoveryInstanceKeys channel and calls upon
+// instance discovery per entry.
 func handleDiscoveryRequests(pendingTokens chan bool, completedTokens chan bool) {
     for instanceKey := range discoveryInstanceKeys {
         AccountedDiscoverInstance(instanceKey, pendingTokens, completedTokens)
@@ -21,6 +26,9 @@ func handleDiscoveryRequests(pendingTokens chan bool, completedTokens chan bool)
 }
 
 
+// AccountedDiscoverInstance will call upon DiscoverInstance and will keep track of 
+// discovery tokens such that management of multiple discoveries can figure out
+// whether all instances in a topology are accounted for.
 func AccountedDiscoverInstance(instanceKey inst.InstanceKey, pendingTokens chan bool, completedTokens chan bool) {
 	if pendingTokens != nil {
 		pendingTokens <- true
@@ -33,6 +41,9 @@ func AccountedDiscoverInstance(instanceKey inst.InstanceKey, pendingTokens chan 
 	}()
 }
 
+
+// DiscoverInstance will attempt discovering an instance (unless it is already up to date) and will
+// list down its master and slaves (if any) for further discovery.
 func DiscoverInstance(instanceKey inst.InstanceKey) {
 	instanceKey.Formalize()
 	if !instanceKey.IsValid() {
@@ -65,6 +76,12 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 }
 
 
+// Start discovery begins a one time asynchronuous discovery process for the given
+// instance and all of its topology connected instances.
+// That is, the instance will be investigated for master and slaves, and the routines will follow on
+// each and every such found master/slave.
+// In essense, assuming all slaves in a replication topology are running, and given a single instance
+// in such topology, this function will detect the entire topology.
 func StartDiscovery(instanceKey inst.InstanceKey) {
 	log.Infof("Starting discovery at %+v", instanceKey)
 	pendingTokens := make(chan bool, maxConcurrency)
@@ -85,7 +102,9 @@ func StartDiscovery(instanceKey inst.InstanceKey) {
 	}
 }
 
-
+// ContinuousDiscovery starts an asynchronuous infinite discovery process where instances are
+// periodically investigated and their status captured, and long since unseen instances are
+// purged and forgotten.
 func ContinuousDiscovery() {
 	log.Infof("Starting continuous discovery")
 	go handleDiscoveryRequests(nil, nil)

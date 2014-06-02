@@ -9,9 +9,11 @@ import (
 )
 
 
+// Cli initiates a command line interface, executing requested command.
 func Cli(command string, instance string, sibling string, owner string, reason string) {
 	
 	instanceKey, err := inst.ParseInstanceKey(instance)
+	// There always has to be an instance; all commands require one.
 	if err != nil {log.Fatal("Cannot deduce instance:", instance)}
 	siblingKey, err := inst.ParseInstanceKey(sibling)
 	if err != nil {siblingKey = nil}

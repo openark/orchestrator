@@ -7,6 +7,9 @@ import (
 	"github.com/outbrain/log"
 )
 
+// Configuration makes for orchestrator configuration input, which can be provided by user via JSON formatted file.
+// Some of the parameteres have reasonable default values, and some (like database credentials) are 
+// strictly expected from user.
 type Configuration struct {
 	MySQLTopologyUser		string
 	MySQLTopologyPassword	string
@@ -45,6 +48,9 @@ func NewConfiguration() *Configuration {
 	}
 }
 
+
+// read reads configuration from given file, or silently skips if the file does not exist.
+// If the file does exist, then it is expected to be in valid JSON format or the function bails out.
 func read(file_name string) (*Configuration, error) {
 	file, err := os.Open(file_name)
 	if err == nil {
@@ -59,6 +65,9 @@ func read(file_name string) (*Configuration, error) {
 	return Config, err
 }
 
+
+// Read reads configuration from zero, either, some or all given files, in order of input.
+// A file can override configuration provided in previous file.
 func Read(file_names ...string) *Configuration {
 	for _, file_name := range file_names {
 		read(file_name)
@@ -66,6 +75,7 @@ func Read(file_names ...string) *Configuration {
 	return Config
 }
 
+// ForceRead reads configuration from given file name or bails out if it fails
 func ForceRead(file_name string) *Configuration {
 	_, err := read(file_name)
 	if err != nil {

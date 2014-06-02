@@ -7,6 +7,7 @@ import (
 	"errors"
 )
 
+// LogLevel indicates the severity of a log entry
 type LogLevel int
 
 func (this LogLevel) String() string {
@@ -34,16 +35,22 @@ const (
 
 const timeFormat = "2006-01-02 15:04:05"
 
+// globalLogLevel indicates the global level filter for all logs (only entries with level equals or higher 
+// than this value will be logged)
 var globalLogLevel LogLevel = DEBUG
 
+// SetLevel sets the global log level. Only entries with level equals or higher than
+// this value will be logged
 func SetLevel(logLevel LogLevel) {
 	globalLogLevel = logLevel
 }
 
+// GetLevel returns current global log level
 func GetLevel() LogLevel {
 	return globalLogLevel
 }
 
+// logFormattedEntry nicely formats and emits a log entry
 func logFormattedEntry(logLevel LogLevel, message string, args ...interface{}) string {
 	if logLevel > globalLogLevel {
 		return ""
@@ -53,6 +60,7 @@ func logFormattedEntry(logLevel LogLevel, message string, args ...interface{}) s
 	return entryString
 }
 
+// logEntry emits a formatted log entry 
 func logEntry(logLevel LogLevel, message string, args ...interface{}) string {
 	entryString := message
 	for _, s := range args {
@@ -61,6 +69,7 @@ func logEntry(logLevel LogLevel, message string, args ...interface{}) string {
 	return logFormattedEntry(logLevel, entryString)
 }
 
+// logErrorEntry emits a log entry based on given error object
 func logErrorEntry(logLevel LogLevel, err error) error {
 	if err == nil {
 		// No error
@@ -127,18 +136,21 @@ func Criticale(err error) error {
 	return logErrorEntry(CRITICAL, err)
 }
 
+// Fatal emits a FATAL level entry and exists the program
 func Fatal(message string, args ...interface{}) error {
 	logEntry(FATAL, message, args...)
 	os.Exit(1)
 	return errors.New(logEntry(CRITICAL, message, args...))
 }
 
+// Fatalf emits a FATAL level entry and exists the program
 func Fatalf(message string, args ...interface{}) error {
 	logEntry(FATAL, message, args...)
 	os.Exit(1)
 	return errors.New(logFormattedEntry(CRITICAL, message, args...))
 }
 
+// Fatale emits a FATAL level entry and exists the program
 func Fatale(err error) error {
 	logErrorEntry(FATAL, err)
 	os.Exit(1)

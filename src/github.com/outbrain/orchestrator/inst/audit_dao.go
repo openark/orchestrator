@@ -9,6 +9,7 @@ import (
 )
 
 
+// AuditOperation creates and writes a new audit entry by given params
 func AuditOperation(auditType string, instanceKey *InstanceKey, message string) error {
 	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}
@@ -35,7 +36,7 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 	return err
 }
 
-
+// ReadRecentAudit returns a list of audit entries order chronologically descending, using page number.
 func ReadRecentAudit(page int) ([]Audit, error) {
 	res := []Audit{}
 	query := fmt.Sprintf(`

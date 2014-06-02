@@ -11,6 +11,7 @@ import (
 	"github.com/outbrain/orchestrator/inst"
 )
 
+// HttpWeb is the web requests server, mapping each request to a web page
 type HttpWeb struct{}
 
 var Web HttpWeb = HttpWeb{}
@@ -99,6 +100,8 @@ func (this *HttpWeb) FAQ(params martini.Params, r render.Render) {
 }
 
 
+
+// RegisterRequests makes for the de-facto list of known Web calls
 func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/", this.Home) 
 	m.Get("/web", this.Home) 

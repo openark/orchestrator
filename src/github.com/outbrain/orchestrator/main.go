@@ -7,6 +7,7 @@ import (
 	"github.com/outbrain/log"
 )
 
+// main is the application's entry point. It will either spawn a CLI or HTTP itnerfaces.
 func main() {
 	configFile := flag.String("config", "", "config file name")
 	command := flag.String("c", "", "command (move-up|make-child-of)")
