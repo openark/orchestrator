@@ -119,9 +119,9 @@ func (this *HttpWeb) FAQ(params martini.Params, r render.Render) {
 
 // RegisterRequests makes for the de-facto list of known Web calls
 func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
-	m.Get("/", this.Home) 
-	m.Get("/web", this.Home) 
-	m.Get("/web/home", this.Home) 
+	m.Get("/", this.About) 
+	m.Get("/web", this.About) 
+	m.Get("/web/home", this.About) 
 	m.Get("/web/about", this.About) 
 	m.Get("/web/faq", this.FAQ) 
 	m.Get("/web/cluster/:clusterName", this.Cluster) 

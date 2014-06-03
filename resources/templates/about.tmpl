@@ -8,7 +8,7 @@
             <p>
                 <strong>Orchestrator</strong> is a MySQL replication topology management and visualization tool, allowing for: 
                 <ul>
-                    <li>Detection and interrogation of replication clusters</li>
+                    <li>Detection and investigation of replication clusters</li>
                     <li>Safe topology refactoring: moving slaves around the topology</li>
                     <li>Sleek topology visualization</li>
                     <li>Replication problems visualization</li>
@@ -19,13 +19,24 @@
                 </ul>
             </p>
             <p>
-                The topology visualization screens probably make the most impact; they allow for immediate
-                understanding of your topology, along with all pending issues (lags, stopped slaves, etc.) 
-            </p>
-            <p>
                 Refactoring the topology is a matter of a simple drag & drop. <i>Orchestrator</i> will keep you
                 safe by disallowing invalid replication topologies (e.g. replicating from ROW based to STATEMENT based,
                 from 5.5 to 5.1 etc.)
+            </p>
+            <p>
+                <i>Orchestrator</i> can serve in different modes:
+                <ul>
+                    <li>
+                        Command line interface
+                    </li>
+                    <li>
+                        Web API
+                    </li>
+                    <li>
+                        Web interface
+                    </li>
+                </ul>
+                 
             </p>
             <p>
                 <i>Orchestrator</i> is developed at <a href="http://www.outbrain.com">Outbrain</a> to answer for the difficulty 
