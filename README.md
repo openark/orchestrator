@@ -14,7 +14,7 @@ _Orchestrator_ is a MySQL replication topology management and visualization tool
 
 Read the [Orchestrator Manual](Orchestrator-Manual) for comprehensive documentation.
 
-![Orcehstrator screenshot](//github.com/outbrain/orchestrator/wiki/images/orchestrator-simple.png)
+![Orcehstrator screenshot](https://github.com/outbrain/orchestrator/wiki/images/orchestrator-simple.png)
 
 Refactoring the topology is a matter of a simple drag & drop. _Orchestrator_ will keep you safe by disallowing invalid replication topologies 
 (e.g. replicating from ROW based to STATEMENT based, from 5.5 to 5.1 etc.)
