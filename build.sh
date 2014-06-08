@@ -20,4 +20,5 @@ cd $release_dir
 # tar packaging
 tar cfz orchestrator.tar.gz ./orchestrator
 # rpm packaging
-fpm -f -s dir -t rpm -n orchestrator -C $release_dir --prefix=/usr/local/orchestrator .
+fpm -f -s dir -t rpm -n orchestrator -C $release_dir --prefix=/usr/local ./orchestrator
+fpm -f -s dir -t deb -n orchestrator -C $release_dir --prefix=/usr/local ./orchestrator
