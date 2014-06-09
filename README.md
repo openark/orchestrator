@@ -12,7 +12,7 @@ _Orchestrator_ is a MySQL replication topology management and visualization tool
 * Auditing of operations
 * More...
 
-Read the [Orchestrator Manual](Orchestrator-Manual) for comprehensive documentation.
+Read the [Orchestrator Manual](wiki/Orchestrator-Manual) for comprehensive documentation.
 
 ![Orcehstrator screenshot](https://github.com/outbrain/orchestrator/wiki/images/orchestrator-simple.png)
 
