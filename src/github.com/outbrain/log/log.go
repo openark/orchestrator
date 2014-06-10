@@ -161,7 +161,7 @@ func Fatal(message string, args ...interface{}) error {
 
 // Fatalf emits a FATAL level entry and exists the program
 func Fatalf(message string, args ...interface{}) error {
-	logEntry(FATAL, message, args...)
+	logFormattedEntry(FATAL, message, args...)
 	os.Exit(1)
 	return errors.New(logFormattedEntry(CRITICAL, message, args...))
 }

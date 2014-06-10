@@ -116,7 +116,9 @@ func initOrchestratorDB(db *sql.DB) error {
 	log.Debug("Initializing orchestrator")
 	for _, query := range generateSQL {
 		_, err := ExecOrchestrator(query)
-		if err != nil { return err }
+		if err != nil { 
+			return log.Fatalf("Cannot initiate orchestrator: %+v", err) 
+		}
 	}
 	return nil
 }
