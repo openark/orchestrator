@@ -354,20 +354,27 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	popoverElement.attr("data-nodeid", instance.id);
 	popoverElement.find("h3").html(
     		instance.canonicalTitle + '<div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog"></span></a></div>');
+	var indicateLastSeenInStatus = false;
     if (instance.inMaintenance) {
     	popoverElement.find("h3").addClass("label-info");
     } else if (!instance.IsLastCheckValid) {
     	popoverElement.find(" h3").addClass("label-fatal");
+    	indicateLastSeenInStatus = true;
     } else if (!instance.IsRecentlyChecked) {
     	popoverElement.find(" h3").addClass("label-stale");
+    	indicateLastSeenInStatus = true;
     } else if (!instance.isMaster && !instance.replicationRunning) {
     	// check slaves only; where not replicating
     	popoverElement.find("h3").addClass("label-danger");
     } else if (!instance.replicationLagReasonable) {
     	popoverElement.find("h3").addClass("label-warning");
     }
+	var statusMessage = instance.SlaveLagSeconds.Int64 + ' seconds lag';
+	if (indicateLastSeenInStatus) {
+		statusMessage = 'seen ' + instance.SecondsSinceLastSeen.Int64 + ' seconds ago';
+	}
     var contentHtml = ''
-        	+ '<div class="pull-right">' + instance.SlaveLagSeconds.Int64 + ' seconds lag</div>'
+        	+ '<div class="pull-right">' + statusMessage + ' </div>'
    		+ '<p>' 
 			+ instance.Version + " " + instance.Binlog_format 
         + '</p>';
