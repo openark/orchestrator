@@ -34,6 +34,7 @@ func main() {
 	discovery := flag.Bool("discovery", true, "auto discovery mode")
 	verbose := flag.Bool("verbose", false, "verbose")
 	debug := flag.Bool("debug", false, "debug mode (very verbose)")
+	stack := flag.Bool("stack", false, "add stack trace upon error")
 	flag.Parse();
 	
 	log.SetLevel(log.ERROR)
@@ -42,6 +43,9 @@ func main() {
 	}
 	if *debug {
 		log.SetLevel(log.DEBUG)
+	}
+	if *stack {
+		log.SetPrintStackTrace(*stack)
 	}
 
 	log.Info("starting")
