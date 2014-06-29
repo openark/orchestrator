@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"errors"
+	"runtime/debug"
 )
 
 // LogLevel indicates the severity of a log entry
@@ -54,6 +55,13 @@ const timeFormat = "2006-01-02 15:04:05"
 // globalLogLevel indicates the global level filter for all logs (only entries with level equals or higher 
 // than this value will be logged)
 var globalLogLevel LogLevel = DEBUG
+var printStackTrace bool = false
+
+
+// SetPrintStackTrace enables/disables dumping the stack upon error logging
+func SetPrintStackTrace(shouldPrintStackTrace bool) {
+	printStackTrace = shouldPrintStackTrace
+}
 
 // SetLevel sets the global log level. Only entries with level equals or higher than
 // this value will be logged
@@ -93,6 +101,9 @@ func logErrorEntry(logLevel LogLevel, err error) error {
 	}
 	entryString := fmt.Sprintf("%+v", err)
 	logEntry(logLevel, entryString)
+	if printStackTrace {
+		debug.PrintStack()
+	}
 	return err	
 }
 
