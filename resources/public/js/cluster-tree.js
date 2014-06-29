@@ -1,4 +1,8 @@
-function visualizeInstances(nodesList, nodesMap) {
+function visualizeInstances(nodesMap) {
+    nodesList = []
+    for (var nodeId in nodesMap) {
+        nodesList.push(nodesMap[nodeId]);
+    } 
     // Calculate tree dimensions
     function getNodeDepth(node) {
         if (node.depth == null) {
@@ -43,8 +47,8 @@ function visualizeInstances(nodesList, nodesMap) {
     // svgWidth = 1560 - margin.right - margin.left;
     // svgHeight = 800 - margin.top - margin.bottom;
 
-    var i = 0,
-        duration = 750;
+    var i = 0;
+    var duration = 750;
 
     var tree = d3.layout.tree().size([svgHeight, svgWidth]);
 
@@ -52,41 +56,47 @@ function visualizeInstances(nodesList, nodesMap) {
         return [d.y, d.x];
     });
 
+	/*
+	    var svg = d3.select("#cluster_container").append("svg").attr("width",
+	            svgWidth + margin.right + margin.left).attr("height",
+	            svgHeight + margin.top + margin.bottom).attr("xmlns", "http://www.w3.org/2000/svg").attr("version", "1.1").append("g")
+	        .attr(
+	            "transform",
+	            "translate(" + margin.left + "," + margin.top + ")");
+	*/
     var svg = d3.select("#cluster_container").append("svg").attr("width",
             svgWidth + margin.right + margin.left).attr("height",
-            svgHeight + margin.top + margin.bottom).attr("xmlns", "http://www.w3.org/2000/svg").attr("version", "1.1").append("g")
-        .attr(
-            "transform",
-            "translate(" + margin.left + "," + margin.top + ")");
+            svgHeight + margin.top + margin.bottom).attr("xmlns", "http://www.w3.org/2000/svg").attr("version", "1.1");
 
-    var root = null;
+
+    var numRoots = 0;
     nodesList.forEach(function (node) {
     	if (!node.hasMaster) {
-    		root = node;
+            numRoots += 1;
+    	} 
+    });
+    var rootIndex = 0;
+    // The following code prepares for the possibility of multiple roots (e.g. master-master or Galera replication)
+    nodesList.forEach(function (node) {
+    	if (!node.hasMaster) {
+    		var root = node;
+		    root.x0 = svgHeight / 2;
+		    root.y0 = 0;
+            var g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+            update(g, root);
+            rootIndex += 1;
     	} 
     });
 
-
-    root.x0 = svgHeight / 2;
-    root.y0 = 0;
-
-    function collapse(d) {
-        if (d.children) {
-            d._children = d.children;
-            d._children.forEach(collapse);
-            d.children = null;
-        }
-    }
-
-    //root.children.forEach(collapse);
-    update(root);
-
-    function update(source) {
+    function update(svg, source) {
         // Compute the new tree layout.
-        var nodes = tree.nodes(root).reverse();
+        var nodes = tree.nodes(source).reverse();
         var links = tree.links(nodes);
 
         // Normalize for fixed-depth.
+        nodes.forEach(function (d) {
+            d.svg = svg;
+        });
         nodes.forEach(function (d) {
             d.y = d.depth * horizontalSpacing;
         });
@@ -175,9 +185,17 @@ function visualizeInstances(nodesList, nodesMap) {
             d.x0 = d.x;
             d.y0 = d.y;
         });
+    } 
+
+    function collapse(d) {
+        if (d.children) {
+            d._children = d.children;
+            d._children.forEach(collapse);
+            d.children = null;
+        }
     }
 
-    // Toggle children on click.
+   // Toggle children on click.
     function click(d) {
         if (d.children) {
             d._children = d.children;
@@ -186,7 +204,7 @@ function visualizeInstances(nodesList, nodesMap) {
             d.children = d._children;
             d._children = null;
         }
-        update(d);
-        generateInstanceDivs(nodesList);
+        update(d.svg, d);
+        generateInstanceDivs(nodesMap);
     }
 }

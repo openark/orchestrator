@@ -262,6 +262,7 @@ function normalizeInstance(instance) {
 
     instance.isMaster = (instance.title == instance.ClusterName);
     instance.isCoMaster = false;
+    instance.isVirtualCoMastersRoot = false;
 }
 
 function normalizeInstanceProblem(instance) {
@@ -288,6 +289,19 @@ function normalizeInstanceProblem(instance) {
 }
 
 function normalizeInstances(instances, maintenanceList) {
+    var virtualCoMastersRoot = {
+    	id: "virtualCoMastersRoot",
+        children : [],
+        parent: null,
+        hasMaster: false,
+        inMaintenance: false,
+        maintenanceEntry: null,
+        isMaster: false,
+        isCoMaster: false,
+        isVirtualCoMastersRoot: true,
+        SlaveLagSeconds: 0,
+        SecondsSinceLastSeen: 0
+    }
     instances.forEach(function(instance) {
     	normalizeInstance(instance);
     });
@@ -300,8 +314,8 @@ function normalizeInstances(instances, maintenanceList) {
     instances.forEach(function (instance) {
     	instance.canonicalTitle = instance.title.substring(0, instance.title.length - suffixLength);
     });
-    var instancesMap = instances.reduce(function (map, node) {
-        map[node.id] = node;
+    var instancesMap = instances.reduce(function (map, instance) {
+        map[instance.id] = instance;
         return map;
     }, {});
     // mark maintenance instances

@@ -1,9 +1,9 @@
 
-function generateInstanceDivs(nodesList) {
-    var nodesMap = nodesList.reduce(function (map, node) {
-        map[node.id] = node;
-        return map;
-    }, {});
+function generateInstanceDivs(nodesMap) {
+    nodesList = []
+    for (var nodeId in nodesMap) {
+        nodesList.push(nodesMap[nodeId]);
+    } 
 
     $("[data-fo-id]").each(function () {
         var id = $(this).attr("data-fo-id");
@@ -213,8 +213,8 @@ $(document)
                 $.get("/api/maintenance",
                     function (maintenanceList) {
                 		var instancesMap = normalizeInstances(instances, maintenanceList);
-                        visualizeInstances(instances, instancesMap);
-                        generateInstanceDivs(instances);
+                        visualizeInstances(instancesMap);
+                        generateInstanceDivs(instancesMap);
                     }, "json");
             }, "json");
             
