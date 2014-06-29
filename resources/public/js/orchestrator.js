@@ -424,6 +424,9 @@ function onClusters(func) {
 } 
 
 $(document).ready(function() {
+	$(".navbar-nav li").removeClass("active");
+	$(".navbar-nav li[data-nav-page='" + activePage() + "']").addClass("active");
+	
 	$.get("/api/clusters", function(clusters) {
 		clusters.forEach(function(cluster) {                      
 	        $("#dropdown-clusters").append('<li><a href="/web/cluster/'+cluster+'">'+cluster+'</a></li>');

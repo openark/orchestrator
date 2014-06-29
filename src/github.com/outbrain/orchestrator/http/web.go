@@ -48,6 +48,7 @@ func (this *HttpWeb) getInstanceKey(host string, port string) (inst.InstanceKey,
 func (this *HttpWeb) Cluster(params martini.Params, r render.Render) {
 	r.HTML(200, "templates/cluster", map[string]interface{}{
 		"title": "cluster", 
+		"activePage": "cluster", 
 		"clusterName": params["clusterName"],
 		"autoshow_problems": true,
 		})
@@ -61,6 +62,7 @@ func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Re
 	}
 	r.HTML(200, "templates/search", map[string]interface{}{
 		"title": "search", 
+		"activePage": "search", 
 		"searchString": searchString, 
 		"autoshow_problems": false,
 		})
@@ -71,6 +73,7 @@ func (this *HttpWeb) Discover(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/discover", map[string]interface{}{
 		"title": "discover", 
+		"activePage": "discover", 
 		"autoshow_problems": false,
 		})
 }
@@ -82,6 +85,7 @@ func (this *HttpWeb) Audit(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/audit", map[string]interface{}{
 		"title": "audit", 
+		"activePage": "audit", 
 		"autoshow_problems": false,
 		"page": page,
 		})
@@ -92,6 +96,7 @@ func (this *HttpWeb) Home(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/home", map[string]interface{}{
 		"title": "home", 
+		"activePage": "home", 
 		"autoshow_problems": false,
 		})
 }
@@ -101,6 +106,7 @@ func (this *HttpWeb) About(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/about", map[string]interface{}{
 		"title": "about", 
+		"activePage": "home", 
 		"autoshow_problems": false,
 		})
 }
@@ -111,6 +117,7 @@ func (this *HttpWeb) FAQ(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/faq", map[string]interface{}{
 		"title": "FAQ", 
+		"activePage": "home", 
 		"autoshow_problems": false,
 		})
 }

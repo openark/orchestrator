@@ -55,7 +55,7 @@
 			<div class="collapse navbar-collapse">
 				<ul class="nav navbar-nav">
                     <li><a href="#" id="ajaxLoader"><img src="/images/ajax-loader.gif"/></a></li>
-					<li class="active dropdown">
+					<li class="dropdown" data-nav-page="home">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">
                             Home
                             <b class="caret"></b> 
@@ -67,16 +67,16 @@
                         </ul>
                     </li>
 					
-		            <li class="dropdown">
+		            <li class="dropdown" data-nav-page="cluster">
                         <a href="#" class="dropdown-toggle" data-toggle="dropdown">
                             Clusters
                             <b class="caret"></b> 
 		                </a>
 		                <ul class="dropdown-menu" id="dropdown-clusters"></ul>
 		            </li>
-                    <li><a href="/web/discover">Discover</a></li>
-                    <li><a href="/web/audit">Audit</a></li>
-                    <li>
+                    <li data-nav-page="discover"><a href="/web/discover">Discover</a></li>
+                    <li data-nav-page="audit"><a href="/web/audit">Audit</a></li>
+                    <li data-nav-page="search">
 			            <form class="navbar-form navbar-left" role="search" name="searchForm" action="/web/search">
 	    			        <div class="form-group">
 	                            <input type="text" name="s" id="searchInput" class="form-control input-sm" placeholder="Search">
@@ -160,6 +160,9 @@
 	<script>
         function autoshowProblems() {
             return "{{.autoshow_problems}}";
+        }
+        function activePage() {
+            return "{{.activePage}}";
         }
 	</script>
     <script src="/js/instance-problems.js"></script>
