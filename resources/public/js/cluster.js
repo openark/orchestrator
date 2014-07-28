@@ -6,14 +6,16 @@ function generateInstanceDivs(nodesMap) {
     } 
 
     $("[data-fo-id]").each(function () {
-        var id = $(this).attr("data-fo-id");
-        $(this).html(
-        	'<div xmlns="http://www.w3.org/1999/xhtml" class="popover right instance"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"></div></div>'
-        );
+        var isVirtual = $(this).attr("data-fo-is-virtual") == "true";
+        if (!isVirtual) {
+	        $(this).html(
+	        	'<div xmlns="http://www.w3.org/1999/xhtml" class="popover right instance"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"></div></div>'
+	        );
+        }
     });
     nodesList.forEach(function (node) {
     	var popoverElement = $("[data-fo-id='" + node.id + "'] .popover");
-    	renderInstanceElement(popoverElement, node, "cluster");
+   		renderInstanceElement(popoverElement, node, "cluster");
     });
     $("[data-fo-id]").each(
         function () {
@@ -101,6 +103,9 @@ function generateInstanceDivs(nodesMap) {
 }
 
 function moveInstance(node, droppableNode, shouldApply) {
+	if (node.isCoMaster) {
+		return false;
+	}
 	if (instancesAreSiblings(node, droppableNode)) {
 		if (node.hasProblem || droppableNode.hasProblem) {
 			return false;
@@ -185,9 +190,9 @@ function moveUp(node, grandparentNode) {
 
 function instancesAreSiblings(node1, node2) {
 	if (node1.id == node2.id) return false;
-	if (node1.parent == null ) return false;
-	if (node2.parent == null ) return false;
-	if (node1.parent.id != node2.parent.id) return false;
+	if (node1.masterNode == null ) return false;
+	if (node2.masterNode == null ) return false;
+	if (node1.masterNode.id != node2.masterNode.id) return false;
 	return true;
 }
 
@@ -196,11 +201,14 @@ function instanceIsGrandchild(node, grandparentNode, nodesMap) {
 	if (!node.hasMaster) {
 		return false;
 	}
-	var parentNode = node.parent;
-	if (!parentNode.hasMaster) {
+	var masterNode = node.masterNode;
+	if (!masterNode.hasMaster) {
 		return false;
 	}
-	if (parentNode.parent.id != grandparentNode.id) {
+	if (masterNode.masterNode.id != grandparentNode.id) {
+		return false;
+	}
+	if (node.id == grandparentNode.id) {
 		return false;
 	}
 	return true;

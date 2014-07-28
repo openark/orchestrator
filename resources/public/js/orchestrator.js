@@ -257,12 +257,13 @@ function normalizeInstance(instance) {
     instance.children = [];
     instance.parent = null;
     instance.hasMaster = true;
+    instance.masterNode = null;
     instance.inMaintenance = false;
     instance.maintenanceEntry = null;
 
     instance.isMaster = (instance.title == instance.ClusterName);
     instance.isCoMaster = false;
-    instance.isVirtualCoMastersRoot = false;
+    instance.isVirtual = false;
 }
 
 function normalizeInstanceProblem(instance) {
@@ -288,20 +289,25 @@ function normalizeInstanceProblem(instance) {
     instance.hasProblem = (instance.problem != null) ;
 }
 
+var virtualInstanceCounter = 0;
+function createVirtualInstance() {
+    var virtualInstance = {
+        	id: "orchestrator-virtual-instance-" + (virtualInstanceCounter++),
+            children : [],
+            parent: null,
+            hasMaster: false,
+            inMaintenance: false,
+            maintenanceEntry: null,
+            isMaster: false,
+            isCoMaster: false,
+            isVirtual: true,
+            SlaveLagSeconds: 0,
+            SecondsSinceLastSeen: 0
+        }
+    return virtualInstance;
+}
+
 function normalizeInstances(instances, maintenanceList) {
-    var virtualCoMastersRoot = {
-    	id: "virtualCoMastersRoot",
-        children : [],
-        parent: null,
-        hasMaster: false,
-        inMaintenance: false,
-        maintenanceEntry: null,
-        isMaster: false,
-        isCoMaster: false,
-        isVirtualCoMastersRoot: true,
-        SlaveLagSeconds: 0,
-        SecondsSinceLastSeen: 0
-    }
     instances.forEach(function(instance) {
     	normalizeInstance(instance);
     });
@@ -336,6 +342,7 @@ function normalizeInstances(instances, maintenanceList) {
         var parent = instancesMap[instance.masterId];
         if (parent) {
         	instance.parent = parent;
+        	instance.masterNode = parent;
             // create child array if it doesn't exist
             parent.children.push(instance);
             //(parent.contents || (parent.contents = [])).push(instance);
@@ -343,21 +350,34 @@ function normalizeInstances(instances, maintenanceList) {
             // parent is null or missing
         	instance.hasMaster = false;
             instance.parent = null;
+            instance.masterNode = null;
         }
     });
 
     instances.forEach(function (instance) {
     	if (instance.isMaster && instance.parent != null && instance.parent.parent != null && instance.parent.parent.id == instance.id) {
-    	    // In case there's a master-master setup, break the circle
+    	    // In case there's a master-master setup, introduce a virtual node that is parent of both.
     		// This is for visualization purposes...
-    		instance.isCoMaster = true
-    		instance.parent.isCoMaster = true
-    		var index = instance.parent.children.indexOf(instance);
-    		if (index >= 0)
-    			instance.parent.children.splice(index, 1);
-    		instance.hasMaster = false;
-    		instance.masterId = "";
-    		instance.parent = null;
+    	    var virtualCoMastersRoot = createVirtualInstance();
+    		coMaster = instance.parent;
+    		
+    		function setAsCoMaster(instance, coMaster) {
+        		instance.isCoMaster = true;
+        		instance.hasMaster = true;
+        		instance.masterId = coMaster.id;
+        		instance.masterNode = coMaster;
+
+        		var index = coMaster.children.indexOf(instance);
+        		if (index >= 0)
+        			coMaster.children.splice(index, 1);
+        			
+        		instance.parent = virtualCoMastersRoot;
+        		virtualCoMastersRoot.children.push(instance);
+    		}
+    		setAsCoMaster(instance, coMaster);
+    		setAsCoMaster(coMaster, instance);
+
+    		instancesMap[virtualCoMastersRoot.id] = virtualCoMastersRoot;
     	} 
     });
 

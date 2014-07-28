@@ -4,25 +4,34 @@ function visualizeInstances(nodesMap) {
         nodesList.push(nodesMap[nodeId]);
     } 
     // Calculate tree dimensions
-    function getNodeDepth(node) {
-        if (node.depth == null) {
+    var maxNodeDepth = 20;
+    // virtualDepth is the depth in tree excluding virtual nodes.
+    // Virtual nodes are introduced as a means to present co-masters on same depth while retaining tree structure. This is
+    // merely for visualization purposes. In such case, a virtual node is introduced which is the parent (though not master) of
+    // said co-masters. But the virtual node is not displayed, and does not affect the visualized depth positioning of the nodes
+    // underneath it.
+    function getNodeDepth(node, recursiveLevel) {
+    	if (recursiveLevel > maxNodeDepth)
+    		return 0;
+        if (node.virtualDepth == null) {
             if (node.parent == null) {
-                node.depth = 0;
+                node.virtualDepth = 0;
             } else {
-                node.depth = getNodeDepth(nodesMap[node.masterId]) + 1;
+            	var parentDepth = getNodeDepth(node.parent, recursiveLevel + 1);
+                node.virtualDepth = (node.parent.isVirtual ? parentDepth : parentDepth + 1);
             }
         }
-        return node.depth;
+        return node.virtualDepth;
     }
     nodesList.forEach(function (node) {
-        getNodeDepth(node);
+        getNodeDepth(node, 0);
     });
     var numNodesPerDepth = {}
     nodesList.forEach(function (node) {
-        if (node.depth in numNodesPerDepth) {
-            numNodesPerDepth[node.depth] = numNodesPerDepth[node.depth] + 1;
+        if (node.virtualDepth in numNodesPerDepth) {
+            numNodesPerDepth[node.virtualDepth] = numNodesPerDepth[node.virtualDepth] + 1;
         } else {
-            numNodesPerDepth[node.depth] = 1;
+            numNodesPerDepth[node.virtualDepth] = 1;
         }
     });
     var maxDepth = 0;
@@ -56,49 +65,38 @@ function visualizeInstances(nodesMap) {
         return [d.y, d.x];
     });
 
+    var svg = d3.select("#cluster_container").append("svg").attr("width",
+            svgWidth + margin.right + margin.left).attr("height",
+            svgHeight + margin.top + margin.bottom).attr("xmlns", "http://www.w3.org/2000/svg").attr("version", "1.1").append("g")
+        .attr(
+            "transform",
+            "translate(" + margin.left + "," + margin.top + ")");
 	/*
-	    var svg = d3.select("#cluster_container").append("svg").attr("width",
-	            svgWidth + margin.right + margin.left).attr("height",
-	            svgHeight + margin.top + margin.bottom).attr("xmlns", "http://www.w3.org/2000/svg").attr("version", "1.1").append("g")
-	        .attr(
-	            "transform",
-	            "translate(" + margin.left + "," + margin.top + ")");
-	*/
     var svg = d3.select("#cluster_container").append("svg").attr("width",
             svgWidth + margin.right + margin.left).attr("height",
             svgHeight + margin.top + margin.bottom).attr("xmlns", "http://www.w3.org/2000/svg").attr("version", "1.1");
+	*/
 
-
-    var numRoots = 0;
+    var root = null;
     nodesList.forEach(function (node) {
     	if (!node.hasMaster) {
-            numRoots += 1;
+    		root = node;
     	} 
     });
-    var rootIndex = 0;
-    // The following code prepares for the possibility of multiple roots (e.g. master-master or Galera replication)
-    nodesList.forEach(function (node) {
-    	if (!node.hasMaster) {
-    		var root = node;
-		    root.x0 = svgHeight / 2;
-		    root.y0 = 0;
-            var g = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-            update(g, root);
-            rootIndex += 1;
-    	} 
-    });
+    root.x0 = svgHeight / 2;
+    root.y0 = 0;
+    update(root);
 
-    function update(svg, source) {
+    function update(source) {
         // Compute the new tree layout.
-        var nodes = tree.nodes(source).reverse();
+        var nodes = tree.nodes(root).reverse();
         var links = tree.links(nodes);
 
         // Normalize for fixed-depth.
         nodes.forEach(function (d) {
-            d.svg = svg;
-        });
-        nodes.forEach(function (d) {
-            d.y = d.depth * horizontalSpacing;
+        	// Position on screen according to virtual-depth, not mathematical tree depth
+        	// (ignores virtual nodes, which are hidden)
+            d.y = d.virtualDepth * horizontalSpacing;
         });
 
         // Update the nodes…
@@ -113,6 +111,9 @@ function visualizeInstances(nodesMap) {
             }).each(function() {this.parentNode.insertBefore(this, this.parentNode.firstChild);});
 
         nodeEnter.append("circle").attr("data-nodeid", function (d) {
+        	if (d.isVirtual) {
+        		return null;
+        	}
             return d.id;
         }).attr("r", 1e-6).style("fill", function (d) {
             return d._children ? "lightsteelblue" : "#fff";
@@ -120,6 +121,8 @@ function visualizeInstances(nodesMap) {
 
         nodeEnter.append("foreignObject").attr("class", "nodeWrapper").attr("data-fo-id", function (d) {
             return d.id
+        }).attr("data-fo-is-virtual", function (d) {
+            return d.isVirtual
         }).attr("width", "100%").attr("dy", ".35em").attr("text-anchor", function (d) {
             return d.children || d._children ? "end" : "start";
         }).attr("x", function (d) {
@@ -132,7 +135,9 @@ function visualizeInstances(nodesMap) {
             return "translate(" + d.y + "," + d.x + ")";
         });
 
-        nodeUpdate.select("circle").attr("r", 4.5).style("fill", function (d) {
+        nodeUpdate.select("circle").attr("r", function (d) {
+            return (d.isVirtual ? 0 : 4.5);
+        }).style("fill", function (d) {
             return d._children ? "lightsteelblue" : "#fff";
         });
 
@@ -187,14 +192,6 @@ function visualizeInstances(nodesMap) {
         });
     } 
 
-    function collapse(d) {
-        if (d.children) {
-            d._children = d.children;
-            d._children.forEach(collapse);
-            d.children = null;
-        }
-    }
-
    // Toggle children on click.
     function click(d) {
         if (d.children) {
@@ -204,7 +201,7 @@ function visualizeInstances(nodesMap) {
             d.children = d._children;
             d._children = null;
         }
-        update(d.svg, d);
+        update(d);
         generateInstanceDivs(nodesMap);
     }
 }
