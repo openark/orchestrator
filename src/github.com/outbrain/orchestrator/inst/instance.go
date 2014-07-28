@@ -28,7 +28,7 @@ import (
 	"github.com/outbrain/log"
 )
 
-// GetCNAME resolved an IP or hostname into a normalized valid CNAME
+// GetCNAME resolves an IP or hostname into a normalized valid CNAME
 func GetCNAME(hostName string) (string, error) {
 	res, err := net.LookupCNAME(hostName);
 	if err != nil {

@@ -17,6 +17,7 @@
 package http
 
 import (
+	"net"
 	"net/http"	
 	"fmt"
 	"strconv"	
@@ -126,6 +127,26 @@ func (this *HttpAPI) Forget(params martini.Params, r render.Render) {
 	inst.ForgetInstance(&instanceKey)
 
 	r.JSON(200, &APIResponse{Code:OK, Message: fmt.Sprintf("Instance forgotten: %+v", instanceKey),})
+}
+
+
+// Resolve tries to resolve hostname and then checks to see if port is open on that host.
+func (this *HttpAPI) Resolve(params martini.Params, r render.Render) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+
+	if conn, err := net.Dial("tcp", instanceKey.DisplayString()); err == nil {
+		conn.Close()
+	} else {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code:OK, Message: "Instance resolved", Details: instanceKey,})
 }
 
 
@@ -349,6 +370,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/discover/:host/:port", this.Discover) 
 	m.Get("/api/refresh/:host/:port", this.Refresh) 
 	m.Get("/api/forget/:host/:port", this.Forget) 
+	m.Get("/api/resolve/:host/:port", this.Resolve) 
 	m.Get("/api/move-up/:host/:port", this.MoveUp) 
 	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow) 
 	m.Get("/api/begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance) 

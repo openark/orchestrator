@@ -17,6 +17,7 @@
 package app 
 
 import (
+	"net"
 	"fmt"
 	"strings"
 	"os/user"
@@ -44,7 +45,7 @@ func Cli(command string, instance string, sibling string, owner string, reason s
 	}
 		
 	if len(command) == 0 {
-		log.Fatal("expected command (-c) (discover|forget|continuous|move-up|move-below|begin-maintenance|end-maintenance|clusters|topology)")
+		log.Fatal("expected command (-c) (discover|forget|continuous|move-up|move-below|begin-maintenance|end-maintenance|clusters|topology|resolve)")
 	}
 	switch command {
 		case "move-up": {
@@ -98,6 +99,15 @@ func Cli(command string, instance string, sibling string, owner string, reason s
 		}
 		case "continuous": {
 			orchestrator.ContinuousDiscovery()
+		}
+		case "resolve": {
+			if instanceKey == nil {log.Fatal("Cannot deduce instance:", instance)}
+			if conn, err := net.Dial("tcp", instanceKey.DisplayString()); err == nil {
+				conn.Close()
+			} else {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString());
 		}
 		default: log.Fatal("Unknown command:", command) 
 	}

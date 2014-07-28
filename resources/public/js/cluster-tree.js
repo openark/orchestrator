@@ -133,24 +133,22 @@ function visualizeInstances(nodesMap) {
         // Transition nodes to their new position.
         var nodeUpdate = node.transition().duration(duration).attr("transform", function (d) {
             return "translate(" + d.y + "," + d.x + ")";
-        });
-
+        });        
         nodeUpdate.select("circle").attr("r", function (d) {
             return (d.isVirtual ? 0 : 4.5);
         }).style("fill", function (d) {
             return d._children ? "lightsteelblue" : "#fff";
         });
 
-        nodeUpdate.select("text").style("fill-opacity", 1);
+        //nodeUpdate.select("text").style("fill-opacity", 1);
 
         // Transition exiting nodes to the parent's new position.
         var nodeExit = node.exit().transition().duration(duration).attr("transform", function (d) {
             return "translate(" + source.y + "," + source.x + ")";
         }).remove();
-
         nodeExit.select("circle").attr("r", 1e-6);
 
-        nodeExit.select("text").style("fill-opacity", 1e-6);
+        //nodeExit.select("text").style("fill-opacity", 1e-6);
         //nodeExit.select("foreignObject").style("fill-opacity", 1e-6);
 
         // Update the links…
