@@ -5,6 +5,7 @@
 # Requires fpm: https://github.com/jordansissel/fpm
 #
 
+release_version="1.0.4"
 release_dir=/tmp/orchestrator-release
 release_files_dir=$release_dir/orchestrator
 rm -rf $release_dir/*
@@ -18,7 +19,10 @@ go build -o $release_files_dir/orchestrator ./src/github.com/outbrain/orchestrat
 
 cd $release_dir
 # tar packaging
-tar cfz orchestrator.tar.gz ./orchestrator
+tar cfz orchestrator-"${release_version}".tar.gz ./orchestrator
 # rpm packaging
-fpm -f -s dir -t rpm -n orchestrator -C $release_dir --prefix=/usr/local ./orchestrator
-fpm -f -s dir -t deb -n orchestrator -C $release_dir --prefix=/usr/local ./orchestrator
+fpm -v "${release_version}" -f -s dir -t rpm -n orchestrator -C $release_dir --prefix=/usr/local ./orchestrator
+fpm -v "${release_version}" -f -s dir -t deb -n orchestrator -C $release_dir --prefix=/usr/local ./orchestrator
+
+echo "---"
+echo "Done. Find releases in $release_dir"
