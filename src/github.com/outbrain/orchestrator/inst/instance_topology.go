@@ -46,6 +46,18 @@ func InstancesAreSiblings(instance0, instance1 *Instance) bool {
 	return instance0.MasterKey.Equals(&instance1.MasterKey)
 }
 
+// InstanceIsMasterOf checks whether an instance is the master of another
+func InstanceIsMasterOf(instance0, instance1 *Instance) bool {
+	if !instance1.IsSlave() {
+		return false
+	}
+	if instance0.Key.Equals(&instance1.Key) {
+		// same instance...
+		return false
+	}
+	return instance0.Key.Equals(&instance1.MasterKey)
+}
+
 // MoveUp will attempt moving instance indicated by instanceKey up the topology hierarchy.
 // It will perform all safety and sanity checks and will tamper with this instance's replication 
 // as well as its master.
@@ -108,7 +120,7 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 }
 
 
-// MoveUp will attempt moving instance indicated by instanceKey below its supposed sibling indicated by sinblingKey.
+// MoveBelow will attempt moving instance indicated by instanceKey below its supposed sibling indicated by sinblingKey.
 // It will perform all safety and sanity checks and will tamper with this instance's replication 
 // as well as its sibling.
 func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
@@ -172,6 +184,99 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	if err != nil {	return instance, log.Errore(err)}
 	// and we're done (pending deferred functions)
 	AuditOperation("move-below", instanceKey, fmt.Sprintf("moved %+v below %+v", *instanceKey, *siblingKey))	
+	 
+	return instance, err
+}
+
+
+
+// MakeCoMaster will attempt to make an instance co-master with its master, by making its master a slave of its own.
+// This only works out if the master is not replicating; the master does not have a known master (it may have an unknown master).
+func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {	return instance, err}
+	master, err := GetInstanceMaster(instance)
+	if err != nil {	return instance, err}
+
+	rinstance, _, _ := ReadInstance(&master.Key)
+	if canMove, merr := rinstance.CanMoveAsCoMaster(); !canMove {
+		return instance, merr
+	}
+	rinstance, _, _ = ReadInstance(instanceKey)
+	if canMove, merr := rinstance.CanMove(); !canMove {
+		return instance, merr
+	}
+	
+	if instanceKey.Equals(&master.MasterKey) {
+		return instance, errors.New(fmt.Sprintf("instance  %+v is already co master of %+v", instanceKey, master.Key))
+	}
+	if _, found, _ := ReadInstance(&master.MasterKey); found {
+		return instance, errors.New(fmt.Sprintf("master %+v already has known master: %+v", master.Key, master.MasterKey))
+	}
+	if canReplicate, err := master.CanReplicateFrom(instance); !canReplicate {
+		return instance, err
+	}
+	log.Infof("Will make %+v co-master of %+v", instanceKey, master.Key)
+	
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("make co-master of %+v", master.Key)); merr != nil {
+		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
+	if maintenanceToken, merr := BeginMaintenance(&master.Key, "orchestrator", fmt.Sprintf("%+v turns into co-master of this", *instanceKey)); merr != nil {
+		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", master.Key))
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
+	
+	// the coMaster used to be merely a slave. Just point master into *some* position
+	// within coMaster...	 
+	master, err = ChangeMasterTo(&master.Key, instanceKey, &instance.SelfBinlogCoordinates)
+	if	err	!=	nil	{goto Cleanup} 
+	
+	Cleanup:
+	master, _ = StartSlave(&master.Key)
+	if err != nil {	return instance, log.Errore(err)}
+	// and we're done (pending deferred functions)
+	AuditOperation("make-co-master", instanceKey, fmt.Sprintf("%+v made co-master of %+v", *instanceKey, master.Key))	
+	 
+	return instance, err
+}
+
+
+
+// DetachSlaveFromMaster will detach an instance from being a slave, and break its replication.
+// This only works if the instance is indeed a slave of a known instance.
+func DetachSlaveFromMaster(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {	return instance, err}
+	master, err := GetInstanceMaster(instance)
+	if err != nil {	return instance, err}
+
+	log.Infof("Will detach %+v from its master %+v", instanceKey, master.Key)
+		
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("detach from master %+v", master.Key)); merr != nil {
+		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}	
+
+	instance, err = StopSlave(instanceKey)
+	if	err	!=	nil	{goto Cleanup} 
+
+	instance, err = DetachSlave(instanceKey)
+	if	err	!=	nil	{goto Cleanup} 
+
+	Cleanup:
+	instance, _ = StartSlave(instanceKey)
+	_, _ = RefreshInstanceSlaveHosts(&master.Key)
+	master, _ = ReadTopologyInstance(&master.Key)
+	if err != nil {	return instance, log.Errore(err)}
+	// and we're done (pending deferred functions)
+	AuditOperation("detach slave", instanceKey, fmt.Sprintf("%+v detached from master %+v", *instanceKey, master.Key))	
 	 
 	return instance, err
 }

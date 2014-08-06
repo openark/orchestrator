@@ -127,6 +127,7 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=forget-instance]').unbind("click");
     $('#node_modal button[data-btn=start-slave]').unbind("click");
     $('#node_modal button[data-btn=stop-slave]').unbind("click");
+    $('#node_modal button[data-btn=detach-slave]').unbind("click");
     $('#node_modal button[data-btn=begin-maintenance]').click(function() {
     	if (!$("#beginMaintenanceOwner").val()) {
     		return addModalAlert("You must fill the owner field");
@@ -188,6 +189,26 @@ function openNodeModal(node) {
 				location.reload();
 			}	
         }, "json");	
+    });
+    $('#node_modal button[data-btn=detach-slave]').click(function(){
+    	var message = "<p>Are you sure you wish to detach <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+			"</strong></code> from its master?" +
+			"<p>FYI, only the <code>MASTER_PORT</code> property will be modified."
+			;
+    	bootbox.confirm(message, function(confirm) {
+				if (confirm) {
+			    	showLoader();
+			        $.get("/api/detach-slave/"+node.Key.Hostname+"/"+node.Key.Port, function (operationResult) {
+							hideLoader();
+							if (operationResult.Code == "ERROR") {
+								addAlert(operationResult.Message)
+							} else {
+								location.reload();
+							}	
+				        }, "json");	
+				}
+			}); 
+		return false;
     });
     $('#node_modal button[data-btn=forget-instance]').click(function(){
     	var message = "<p>Are you sure you wish to forget <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
@@ -278,7 +299,7 @@ function normalizeInstanceProblem(instance) {
     } else if (!instance.IsRecentlyChecked) {
     	instance.problem = "not_recently_checked";
     	instance.problemOrder = 3;
-    } else if (!instance.isMaster && !instance.replicationRunning) {
+    } else if (!instance.replicationRunning && !(instance.isMaster && !instance.isCoMaster)) {
     	// check slaves only; where not replicating
     	instance.problem = "not_replicating";
     	instance.problemOrder = 4;
@@ -397,8 +418,8 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     } else if (!instance.IsRecentlyChecked) {
     	popoverElement.find(" h3").addClass("label-stale");
     	indicateLastSeenInStatus = true;
-    } else if (!instance.isMaster && !instance.replicationRunning) {
-    	// check slaves only; where not replicating
+    } else if (!instance.replicationRunning && !(instance.isMaster && !instance.isCoMaster)) {
+    	// check slaves only; check master only if it's co-master where not replicating
     	popoverElement.find("h3").addClass("label-danger");
     } else if (!instance.replicationLagReasonable) {
     	popoverElement.find("h3").addClass("label-warning");

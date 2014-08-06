@@ -609,6 +609,18 @@ func RefreshTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	
 	return inst, nil
 }
+
+
+// RefreshInstanceSlaveHosts is a workaround for a bug in MySQL where
+// SHOW SLAVE HOSTS continues to present old, long disconnected slaves.
+// It turns out issuing a couple FLUSH commands mitigates the problem.
+func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
+	_, _ = ExecInstance(instanceKey, `flush error logs`)
+	_, _ = ExecInstance(instanceKey, `flush error logs`)
+	
+	instance, err := ReadTopologyInstance(instanceKey)
+	return instance, err
+}
   
 
 // StopSlaveNicely stops a slave such that SQL_thread and IO_thread are aligned (i.e.
@@ -658,7 +670,7 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 }
 
 
-// StopSlave starts replication on a given instance
+// StartSlave starts replication on a given instance
 func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {return instance, log.Errore(err)}
@@ -728,6 +740,26 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 		masterKey.Hostname, masterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
 	if err != nil {return instance, log.Errore(err)}
 	log.Infof("Changed master on %+v to: %+v, %+v", instanceKey, masterKey, masterBinlogCoordinates) 
+	
+	instance, err = ReadTopologyInstance(instanceKey)
+	return instance, err
+}
+
+
+
+// DetachSlave detaches a slave from its master. Instead of performing destructive RESET SLAVE,
+// this function merely resets the MASTER_PORT, which effectively disconnects from master and changes its key altogether.
+func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {return instance, log.Errore(err)}
+	
+	if instance.SlaveRunning() {
+		return instance, errors.New(fmt.Sprintf("Cannot detach slave on: %+v because slave is running", instanceKey))
+	}
+	
+	_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_port=%d", InvalidPort))
+	if err != nil {return instance, log.Errore(err)}
+	log.Infof("Detached slave %+v", instanceKey) 
 	
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err

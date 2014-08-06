@@ -38,6 +38,10 @@ func GetCNAME(hostName string) (string, error) {
 	return res, nil
 }
 
+
+const InvalidPort = 65535 
+
+
 // InstanceKey is an instance indicator, identifued by hostname and port
 type InstanceKey struct {
 	Hostname 			string
@@ -191,7 +195,7 @@ func (this *Instance) IsSmallerMajorVersion(other *Instance) bool {
 
 // IsSlave makes simple heuristics to decide whether this insatnce is a slave of another instance
 func (this *Instance) IsSlave() bool {
-	return this.MasterKey.Hostname != "" && this.MasterKey.Port != 0 && this.ReadBinlogCoordinates.LogFile != ""
+	return this.MasterKey.Hostname != "" && this.MasterKey.Port != 0 && this.MasterKey.Port != InvalidPort && this.ReadBinlogCoordinates.LogFile != ""
 }
 
 // SlaveRunning returns true when this instance's status is of a replicating slave.
@@ -268,22 +272,40 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 // if this instance lags too much, it will not be moveable.
 func (this *Instance) CanMove() (bool, error) {
 	if !this.IsLastCheckValid {
-		return false, errors.New("last check invalid") 
+		return false, errors.New(fmt.Sprintf("%+v: last check invalid", this.Key)) 
 	}
 	if !this.IsRecentlyChecked {
-		return false, errors.New("not recently checked") 
+		return false, errors.New(fmt.Sprintf("%+v: not recently checked", this.Key)) 
 	}
 	if !this.Slave_SQL_Running {
-		return false, errors.New("instance is not replicating") 
+		return false, errors.New(fmt.Sprintf("%+v: instance is not replicating", this.Key)) 
 	}
 	if !this.Slave_IO_Running {
-		return false, errors.New("instance is not replicating") 
+		return false, errors.New(fmt.Sprintf("%+v: instance is not replicating", this.Key)) 
 	}
 	if !this.SecondsBehindMaster.Valid {
-		return false, errors.New("cannot determine slave lag") 
+		return false, errors.New(fmt.Sprintf("%+v: cannot determine slave lag", this.Key)) 
 	}
 	if this.SecondsBehindMaster.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
-		return false, errors.New("lags too much") 
+		return false, errors.New(fmt.Sprintf("%+v: lags too much", this.Key)) 
+	}
+	return true, nil
+}
+
+
+// CanMoveAsCoMaster returns true if this instance's state allows it to be repositioned. 
+func (this *Instance) CanMoveAsCoMaster() (bool, error) {
+	if !this.IsLastCheckValid {
+		return false, errors.New(fmt.Sprintf("%+v: last check invalid", this.Key)) 
+	}
+	if !this.IsRecentlyChecked {
+		return false, errors.New(fmt.Sprintf("%+v: not recently checked", this.Key)) 
+	}
+	if this.Slave_SQL_Running {
+		return false, errors.New(fmt.Sprintf("%+v: instance is replicating", this.Key)) 
+	}
+	if this.Slave_SQL_Running {
+		return false, errors.New(fmt.Sprintf("%+v: instance is replicating", this.Key)) 
 	}
 	return true, nil
 }

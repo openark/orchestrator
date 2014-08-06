@@ -45,7 +45,7 @@ func Cli(command string, instance string, sibling string, owner string, reason s
 	}
 		
 	if len(command) == 0 {
-		log.Fatal("expected command (-c) (discover|forget|continuous|move-up|move-below|begin-maintenance|end-maintenance|clusters|topology|resolve)")
+		log.Fatal("expected command (-c) (discover|forget|continuous|move-up|move-below|make-co-master|begin-maintenance|end-maintenance|clusters|topology|resolve)")
 	}
 	switch command {
 		case "move-up": {
@@ -57,6 +57,16 @@ func Cli(command string, instance string, sibling string, owner string, reason s
 			if instanceKey == nil {log.Fatal("Cannot deduce instance:", instance)}
 			if siblingKey == nil {log.Fatal("Cannot deduce sibling:", sibling)}
 			_, err := inst.MoveBelow(instanceKey, siblingKey)
+			if err != nil {log.Errore(err)}
+		}
+		case "make-co-master": {
+			if instanceKey == nil {log.Fatal("Cannot deduce instance:", instance)}
+			_, err := inst.MakeCoMaster(instanceKey)
+			if err != nil {log.Errore(err)}
+		}
+		case "detach-slave": {
+			if instanceKey == nil {log.Fatal("Cannot deduce instance:", instance)}
+			_, err := inst.DetachSlaveFromMaster(instanceKey)
 			if err != nil {log.Errore(err)}
 		}
 		case "discover": {

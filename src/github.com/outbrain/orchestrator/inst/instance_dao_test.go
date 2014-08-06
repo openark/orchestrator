@@ -144,6 +144,13 @@ func (s *TestSuite) TestNonSiblings(c *C) {
 	c.Assert(inst.InstancesAreSiblings(i0, i1), Not(Equals), true)
 }
 
+func (s *TestSuite) TestInstanceIsMasterOf(c *C) {
+	i0, _ := inst.ReadTopologyInstance(&masterKey)
+	i1, _ := inst.ReadTopologyInstance(&slave1Key)
+	c.Assert(inst.InstanceIsMasterOf(i0, i1), Equals, true)
+}
+
+
 
 func (s *TestSuite) TestStopStartSlave(c *C) {
 
@@ -234,6 +241,61 @@ func (s *TestSuite) TestFailMoveBelow(c *C) {
 	_, err := inst.MoveBelow(&slave1Key, &slave2Key)
 	_, _ = inst.ExecInstance(&slave2Key, `set global binlog_format:='STATEMENT'`)
 	c.Assert(err, Not(IsNil))
+}
+
+
+
+func (s *TestSuite) TestMakeCoMasterAndBack(c *C) {
+	clearTestMaintenance()
+
+	slave1, err := inst.MakeCoMaster(&slave1Key)
+	c.Assert(err, IsNil)
+	
+	// Now master & slave1 expected to be co-masters. Check!
+	master, _ := inst.ReadTopologyInstance(&masterKey)
+	c.Assert(master.MasterKey.Port, Not(Equals), inst.InvalidPort)
+	c.Assert(master.IsSlaveOf(slave1), Equals, true)
+	c.Assert(slave1.IsSlaveOf(master), Equals, true)
+	
+	// detach - resotre to original state
+	master, err = inst.DetachSlaveFromMaster(&masterKey)
+	slave1, _ = inst.ReadTopologyInstance(&slave1Key)
+	c.Assert(err, IsNil)
+	c.Assert(master.MasterKey.Port, Equals, inst.InvalidPort)
+}
+
+
+func (s *TestSuite) TestFailMakeCoMaster(c *C) {	
+	clearTestMaintenance()
+	_, err := inst.MakeCoMaster(&masterKey)
+	c.Assert(err, Not(IsNil))
+}
+
+
+func (s *TestSuite) TestMakeCoMasterAndBackAndFailOthersToBecomeCoMasters(c *C) {
+	clearTestMaintenance()
+
+	slave1, err := inst.MakeCoMaster(&slave1Key)
+	c.Assert(err, IsNil)
+	
+	// Now master & slave1 expected to be co-masters. Check!
+	master, _, _ := inst.ReadInstance(&masterKey)
+	c.Assert(master.MasterKey.Port, Not(Equals), inst.InvalidPort)
+	c.Assert(master.IsSlaveOf(slave1), Equals, true)
+	c.Assert(slave1.IsSlaveOf(master), Equals, true)
+
+	// Verify can't have additional co-masters
+	_, err = inst.MakeCoMaster(&masterKey)
+	c.Assert(err, Not(IsNil))
+	_, err = inst.MakeCoMaster(&slave1Key)
+	c.Assert(err, Not(IsNil))
+	_, err = inst.MakeCoMaster(&slave2Key)
+	c.Assert(err, Not(IsNil))
+	
+	// detach - resotre to original state
+	master, err = inst.DetachSlaveFromMaster(&masterKey)
+	c.Assert(err, IsNil)
+	c.Assert(master.MasterKey.Port, Equals, inst.InvalidPort)
 }
 
 

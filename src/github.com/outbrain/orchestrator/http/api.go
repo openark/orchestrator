@@ -234,7 +234,43 @@ func (this *HttpAPI) MoveUp(params martini.Params, r render.Render) {
 }
 
 
-// MoveUp attempts to move an instance below its supposed sibling
+// MakeCoMaster attempts to make an instance co-master with its own master
+func (this *HttpAPI) MakeCoMaster(params martini.Params, r render.Render) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+	instance, err := inst.MakeCoMaster(&instanceKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code:OK, Message: "Instance made co-master", Details: instance})
+}
+
+
+// MakeCoMaster attempts to make an instance co-master with its own master
+func (this *HttpAPI) DetachSlave(params martini.Params, r render.Render) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+	instance, err := inst.DetachSlaveFromMaster(&instanceKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code:OK, Message: "Slave detached", Details: instance})
+}
+
+
+// MoveBelow attempts to move an instance below its supposed sibling
 func (this *HttpAPI) MoveBelow(params martini.Params, r render.Render) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 	if err != nil {
@@ -372,6 +408,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/forget/:host/:port", this.Forget) 
 	m.Get("/api/resolve/:host/:port", this.Resolve) 
 	m.Get("/api/move-up/:host/:port", this.MoveUp) 
+	m.Get("/api/make-co-master/:host/:port", this.MakeCoMaster) 
+	m.Get("/api/detach-slave/:host/:port", this.DetachSlave) 
 	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow) 
 	m.Get("/api/begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance) 
 	m.Get("/api/end-maintenance/:host/:port", this.EndMaintenanceByInstanceKey) 

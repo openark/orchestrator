@@ -124,6 +124,15 @@ function moveInstance(node, droppableNode, shouldApply) {
 		}
 		return true;
 	}
+	if (instanceIsChild(droppableNode, node) && node.isMaster) {
+		if (node.hasProblem) {
+			return false;
+		}
+		if (shouldApply) {
+			makeCoMaster(node, droppableNode);
+		}
+		return true;
+	}
 	
 	if (shouldApply) {
 		addAlert(
@@ -188,11 +197,50 @@ function moveUp(node, grandparentNode) {
 }
 
 
+function makeCoMaster(node, childNode) {
+	var message = "Are you sure you wish to make <code><strong>" + 
+		node.Key.Hostname + ":" + node.Key.Port +
+		"</strong></code> and <code><strong>" +
+		childNode.Key.Hostname + ":" + childNode.Key.Port +
+		"</strong></code> co-masters?"
+	bootbox.confirm(message, function(confirm) {
+		if (confirm) {
+			showLoader();
+			var apiUrl = "/api/make-co-master/" + childNode.Key.Hostname + "/" + childNode.Key.Port;
+		    $.get(apiUrl, function (operationResult) {
+	    			hideLoader();
+	    			if (operationResult.Code == "ERROR") {
+	    				addAlert(operationResult.Message)
+	    			} else {
+	    				location.reload();
+	    			}	
+	            }, "json");					
+		}
+		$("#cluster_container .accept_drop").removeClass("accept_drop");
+	}); 
+	return false;
+}
+
+
 function instancesAreSiblings(node1, node2) {
 	if (node1.id == node2.id) return false;
 	if (node1.masterNode == null ) return false;
 	if (node2.masterNode == null ) return false;
 	if (node1.masterNode.id != node2.masterNode.id) return false;
+	return true;
+}
+
+
+function instanceIsChild(node, parentNode, nodesMap) {
+	if (!node.hasMaster) {
+		return false;
+	}
+	if (node.masterNode.id != parentNode.id) {
+		return false;
+	}
+	if (node.id == parentNode.id) {
+		return false;
+	}
 	return true;
 }
 
