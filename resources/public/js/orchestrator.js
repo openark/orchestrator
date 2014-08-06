@@ -411,12 +411,13 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     		instance.canonicalTitle + '<div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog"></span></a></div>');
 	var indicateLastSeenInStatus = false;
     if (instance.inMaintenance) {
-    	popoverElement.find("h3").addClass("label-info");
-    } else if (!instance.IsLastCheckValid) {
-    	popoverElement.find(" h3").addClass("label-fatal");
+    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench"></span> ');
+    } 
+    if (!instance.IsLastCheckValid) {
+    	popoverElement.find("h3").addClass("label-fatal");
     	indicateLastSeenInStatus = true;
     } else if (!instance.IsRecentlyChecked) {
-    	popoverElement.find(" h3").addClass("label-stale");
+    	popoverElement.find("h3").addClass("label-stale");
     	indicateLastSeenInStatus = true;
     } else if (!instance.replicationRunning && !(instance.isMaster && !instance.isCoMaster)) {
     	// check slaves only; check master only if it's co-master where not replicating
