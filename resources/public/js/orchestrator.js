@@ -19,6 +19,16 @@ function startRefreshTimer() {
 function resetRefreshTimer() {
 	secondsTillRefresh = refreshIntervalSeconds;
 }
+
+function activateRefreshTimer() {
+    startRefreshTimer();
+    $(document).click(function() {
+    	resetRefreshTimer();
+    });
+    $(document).mousemove(function() {
+    	resetRefreshTimer();
+    });
+}
 		
 function showLoader() {
     $("#ajaxLoader").css('visibility', 'visible');
@@ -288,26 +298,33 @@ function normalizeInstance(instance) {
 }
 
 function normalizeInstanceProblem(instance) {
+    instance.inMaintenanceProblem = function() { return instance.inMaintenance; }
+    instance.lastCheckInvalidProblem = function() { return !instance.IsLastCheckValid; }
+    instance.notRecentlyCheckedProblem = function() { return !instance.IsRecentlyChecked; }
+    instance.notReplicatingProblem = function() { return !instance.replicationRunning && !(instance.isMaster && !instance.isCoMaster); }
+    instance.replicationLagProblem = function() { return !instance.replicationLagReasonable; }
+
     instance.problem = null;
     instance.problemOrder = 0;
-    if (instance.inMaintenance) {
+    if (instance.inMaintenanceProblem()) {
     	instance.problem = "in_maintenance";
     	instance.problemOrder = 1;
-    } else if (!instance.IsLastCheckValid) {
+    } else if (instance.lastCheckInvalidProblem()) {
     	instance.problem = "last_check_invalid";
     	instance.problemOrder = 2;
-    } else if (!instance.IsRecentlyChecked) {
+    } else if (instance.notRecentlyCheckedProblem()) {
     	instance.problem = "not_recently_checked";
     	instance.problemOrder = 3;
-    } else if (!instance.replicationRunning && !(instance.isMaster && !instance.isCoMaster)) {
+    } else if (instance.notReplicatingProblem()) {
     	// check slaves only; where not replicating
     	instance.problem = "not_replicating";
     	instance.problemOrder = 4;
-    } else if (!instance.replicationLagReasonable) {
+    } else if (instance.replicationLagProblem()) {
     	instance.problem = "replication_lag";
     	instance.problemOrder = 5;
     }
     instance.hasProblem = (instance.problem != null) ;
+    
 }
 
 var virtualInstanceCounter = 0;
@@ -410,19 +427,20 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	popoverElement.find("h3").html(
     		instance.canonicalTitle + '<div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog"></span></a></div>');
 	var indicateLastSeenInStatus = false;
-    if (instance.inMaintenance) {
+    if (instance.inMaintenanceProblem()) {
     	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench"></span> ');
     } 
-    if (!instance.IsLastCheckValid) {
+    
+    if (instance.lastCheckInvalidProblem()) {
     	popoverElement.find("h3").addClass("label-fatal");
     	indicateLastSeenInStatus = true;
-    } else if (!instance.IsRecentlyChecked) {
+    } else if (instance.notRecentlyCheckedProblem()) {
     	popoverElement.find("h3").addClass("label-stale");
     	indicateLastSeenInStatus = true;
-    } else if (!instance.replicationRunning && !(instance.isMaster && !instance.isCoMaster)) {
+    } else if (instance.notReplicatingProblem()) {
     	// check slaves only; check master only if it's co-master where not replicating
     	popoverElement.find("h3").addClass("label-danger");
-    } else if (!instance.replicationLagReasonable) {
+    } else if (instance.replicationLagProblem()) {
     	popoverElement.find("h3").addClass("label-warning");
     }
 	var statusMessage = instance.SlaveLagSeconds.Int64 + ' seconds lag';

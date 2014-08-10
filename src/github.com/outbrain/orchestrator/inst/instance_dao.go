@@ -439,6 +439,37 @@ func ReadClusters() ([]string, error) {
 }
 
 
+// ReadClustersInfo reads names of all known clusters and some aggregated info
+func ReadClustersInfo() ([]ClusterInfo, error) {
+	clusters := []ClusterInfo{}
+
+	db,	err	:=	db.OpenOrchestrator()
+	if	err	!=	nil	{
+		return clusters, log.Errore(err)
+	}
+
+	query := fmt.Sprintf(`
+		select 
+			cluster_name,
+			count(*) as count_instances
+		from 
+			database_instance 
+		group by
+			cluster_name`)
+
+    err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+    	clusterInfo := ClusterInfo{
+    		ClusterName : m.GetString("cluster_name"), 
+    		CountInstances : m.GetUint("count_instances"),
+    	}
+    	clusters = append(clusters, clusterInfo)
+    	return nil       	
+   	})
+
+	return clusters, err
+}
+
+
 // ReadOutdatedInstanceKeys reads and returns keys for all instances that are not up to date (i.e.
 // pre-configured time has passed since they were last cheked)
 func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {

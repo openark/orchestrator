@@ -355,6 +355,19 @@ func (this *HttpAPI) Clusters(params martini.Params, r render.Render) {
 }
 
 
+// ClustersInfo provides list of known clusters
+func (this *HttpAPI) ClustersInfo(params martini.Params, r render.Render) {
+	clustersInfo, err := inst.ReadClustersInfo()
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+
+	r.JSON(200, clustersInfo)
+}
+
+
 // Search provides list of instances matching given search param via various criteria.
 func (this *HttpAPI) Search(params martini.Params, r render.Render, req *http.Request) {
 	searchString := params["searchString"]
@@ -419,6 +432,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/maintenance", this.Maintenance) 
 	m.Get("/api/cluster/:clusterName", this.Cluster) 
 	m.Get("/api/clusters", this.Clusters) 
+	m.Get("/api/clusters-info", this.ClustersInfo) 
 	m.Get("/api/search/:searchString", this.Search) 
 	m.Get("/api/search", this.Search) 
 	m.Get("/api/problems", this.Problems) 

@@ -262,23 +262,15 @@ function instanceIsGrandchild(node, grandparentNode, nodesMap) {
 	return true;
 }
 
-$(document)
-    .ready(
-        function () {
-            $.get("/api/cluster/"+currentClusterName(), function (instances) {
-                $.get("/api/maintenance",
-                    function (maintenanceList) {
-                		var instancesMap = normalizeInstances(instances, maintenanceList);
-                        visualizeInstances(instancesMap);
-                        generateInstanceDivs(instancesMap);
-                    }, "json");
+$(document).ready(function () {
+    $.get("/api/cluster/"+currentClusterName(), function (instances) {
+        $.get("/api/maintenance",
+            function (maintenanceList) {
+        		var instancesMap = normalizeInstances(instances, maintenanceList);
+                visualizeInstances(instancesMap);
+                generateInstanceDivs(instancesMap);
             }, "json");
-            
-            startRefreshTimer();
-            $(document).click(function() {
-            	resetRefreshTimer();
-            });
-            $(document).mousemove(function() {
-            	resetRefreshTimer();
-            });
-        });
+    }, "json");
+
+    activateRefreshTimer();
+});

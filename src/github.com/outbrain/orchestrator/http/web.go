@@ -45,6 +45,15 @@ func (this *HttpWeb) getInstanceKey(host string, port string) (inst.InstanceKey,
 }
 
 
+func (this *HttpWeb) Clusters(params martini.Params, r render.Render) {
+	r.HTML(200, "templates/clusters", map[string]interface{}{
+		"title": "clusters", 
+		"activePage": "cluster", 
+		"autoshow_problems": false,
+		})
+}
+
+
 func (this *HttpWeb) Cluster(params martini.Params, r render.Render) {
 	r.HTML(200, "templates/cluster", map[string]interface{}{
 		"title": "cluster", 
@@ -131,6 +140,7 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/home", this.About) 
 	m.Get("/web/about", this.About) 
 	m.Get("/web/faq", this.FAQ) 
+	m.Get("/web/clusters", this.Clusters) 
 	m.Get("/web/cluster/:clusterName", this.Cluster) 
 	m.Get("/web/search/:searchString", this.Search) 
 	m.Get("/web/search", this.Search) 

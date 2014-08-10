@@ -90,6 +90,35 @@
   color: #ffffff;
 }
 
+.popover.instance .badge {
+    color: #ffffff;
+}
+
+.popover.instance .badge.label-info {
+    background-color: #5bc0de;
+}
+
+.popover.instance .badge.label-warning {
+  background-color: #f0ad4e;
+}
+
+.popover.instance .badge.label-danger {
+  background-color: #d9534f;
+}
+
+.popover.instance .badge.label-stale {
+    background-color: #808080;
+}
+
+.popover.instance .badge.label-fatal {
+    background-color: #000000;
+}
+
+
+.popover.instance .badge.label-primary {
+  background-color: #428BCA;
+}
+
 
 .popover.instance.draggable-hovers {
     background-color: #f7f7f7;
@@ -122,7 +151,6 @@
 #instance_problems .popover.instance div.popover-content {
     padding: 4px 8px;
 }
-
 
 #node_modal .modal-content {
     font-size: 12px;
