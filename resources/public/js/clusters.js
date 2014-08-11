@@ -46,7 +46,11 @@ $(document).ready(function () {
         clusters.forEach(function (cluster) {
     		$("#clusters").append('<div xmlns="http://www.w3.org/1999/xhtml" class="popover instance right" data-cluster-name="'+cluster.ClusterName+'"><div class="arrow"></div><h3 class="popover-title"><a href="/web/cluster/'+cluster.ClusterName+'">'+cluster.ClusterName+'</a></h3><div class="popover-content"></div></div>');
     		var popoverElement = $("#clusters [data-cluster-name='" + cluster.ClusterName + "'].popover");
-    		popoverElement.find("h3 a").html(cluster.ClusterName);
+    		var title = cluster.ClusterName;
+    		if (cluster.ClusterAlias != "") {
+    			title = '<strong>' + cluster.ClusterAlias + '</strong>, <span class="small">' + title + '</span>';
+    		}
+    		popoverElement.find("h3 a").html(title);
     	    var contentHtml = ''
     				+ '<div>Instances: <div class="pull-right"></div></div>'
     			;

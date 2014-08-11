@@ -342,6 +342,7 @@ function createVirtualInstance() {
             SlaveLagSeconds: 0,
             SecondsSinceLastSeen: 0
         }
+    normalizeInstanceProblem(virtualInstance);
     return virtualInstance;
 }
 
@@ -487,9 +488,11 @@ $(document).ready(function() {
 	$(".navbar-nav li").removeClass("active");
 	$(".navbar-nav li[data-nav-page='" + activePage() + "']").addClass("active");
 	
-	$.get("/api/clusters", function(clusters) {
-		clusters.forEach(function(cluster) {                      
-	        $("#dropdown-clusters").append('<li><a href="/web/cluster/'+cluster+'">'+cluster+'</a></li>');
+	$.get("/api/clusters-info", function(clusters) {
+		clusters.forEach(function(cluster) {             
+    		var title = '<span class="small">' + cluster.ClusterName + '</span>';
+    		title = ((cluster.ClusterAlias != "") ? '<strong>' + cluster.ClusterAlias + '</strong>, ' + title : title);
+	        $("#dropdown-clusters").append('<li><a href="/web/cluster/'+cluster.ClusterName+'">'+title+'</a></li>');
 	    });                 
 		onClustersListeners.forEach(function(func) {
 			func(clusters);

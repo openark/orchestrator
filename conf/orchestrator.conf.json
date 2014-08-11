@@ -15,5 +15,8 @@
     "AuditPageSize": 20,
     "SlaveStartPostWaitMilliseconds" : 1000,
     "HTTPAuthUser": "",
-    "HTTPAuthPassword": ""
+    "HTTPAuthPassword": "",
+    "ClusterNameToAlias": {
+        "127.0.0.1":  "test suite"
+    }
 }

@@ -18,6 +18,7 @@ package inst
 
 import (
 	"fmt"
+	"regexp"
 	"errors"
 	"time"
 	"strings"
@@ -458,10 +459,16 @@ func ReadClustersInfo() ([]ClusterInfo, error) {
 			cluster_name`)
 
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-    	clusterInfo := ClusterInfo{
+    	clusterInfo := ClusterInfo {
     		ClusterName : m.GetString("cluster_name"), 
     		CountInstances : m.GetUint("count_instances"),
     	}
+    	for pattern, _ := range config.Config.ClusterNameToAlias {
+    		if matched, _ := regexp.MatchString(pattern, clusterInfo.ClusterName) ; matched {
+    			clusterInfo.ClusterAlias = config.Config.ClusterNameToAlias[pattern]
+    		}
+		}
+    	
     	clusters = append(clusters, clusterInfo)
     	return nil       	
    	})
