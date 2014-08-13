@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"time"
 	"github.com/outbrain/orchestrator/inst"
+	"github.com/outbrain/orchestrator/agent"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/log"
 )
@@ -132,10 +133,11 @@ func ContinuousDiscovery() {
 		for _, instanceKey := range instanceKeys {
 			discoveryInstanceKeys <- instanceKey
 		}
-    	// See if we should also forget instances (lower frequency)
+    	// See if we should also forget instances/agents (lower frequency)
 		select {
 			case <- forgetUnseenTick:
 		    	inst.ForgetLongUnseenInstances()
+		    	agent.ForgetLongUnseenAgents()
 			default:
 		}
 	}

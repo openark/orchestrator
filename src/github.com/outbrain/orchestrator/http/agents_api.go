@@ -20,7 +20,7 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	
-	"github.com/outbrain/orchestrator/inst"	
+	"github.com/outbrain/orchestrator/agent"	
 )
 
 
@@ -32,7 +32,7 @@ var AgentsAPI HttpAgentsAPI = HttpAgentsAPI{}
 
 // SubmitAgent registeres an agent on a given host
 func (this *HttpAgentsAPI) SubmitAgent(params martini.Params, r render.Render) {
-	output, err := inst.SubmitAgent(params["host"], params["token"])
+	output, err := agent.SubmitAgent(params["host"], params["token"])
 	if err != nil {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return

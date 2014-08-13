@@ -14,11 +14,12 @@
    limitations under the License.
 */
 
-package inst
+package agent
 
 import (
 	"github.com/outbrain/sqlutils"
 	"github.com/outbrain/orchestrator/db"
+	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/log"
 )
 
@@ -42,4 +43,21 @@ func SubmitAgent(hostname string, token string) (string, error) {
 	if err != nil {return "", log.Errore(err)}
 	
 	return hostname, err
+}
+
+
+
+// ForgetLongUnseenInstances will remove entries of all instacnes that have long since been last seen.
+func ForgetLongUnseenAgents() error {
+	db,	err	:=	db.OpenOrchestrator()
+	if err != nil {return log.Errore(err)}
+	
+	_, err = sqlutils.Exec(db, `
+			delete 
+				from host_agent 
+			where 
+				last_submitted < NOW() - interval ? hour`,
+			config.Config.UnseenAgentForgetHours,
+		 )
+	return err		 
 }

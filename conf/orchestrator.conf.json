@@ -19,5 +19,6 @@
     "ClusterNameToAlias": {
         "127.0.0.1":  "test suite"
     },
-    "ServeAgentsHttp": true
+    "ServeAgentsHttp": true,
+    "UnseenAgentForgetHours": 6
 }
