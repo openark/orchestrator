@@ -29,11 +29,6 @@ import (
 	"github.com/outbrain/orchestrator/logic"
 )
 
-type HttpAPI struct{}
-
-var API HttpAPI = HttpAPI{}
-
-
 // APIResponseCode is an OK/ERROR response code
 type APIResponseCode int
 
@@ -61,6 +56,11 @@ type APIResponse struct {
 	Message	string
 	Details	interface{}
 }
+
+
+type HttpAPI struct{}
+
+var API HttpAPI = HttpAPI{}
 
 
 func (this *HttpAPI) getInstanceKey(host string, port string) (inst.InstanceKey, error) {

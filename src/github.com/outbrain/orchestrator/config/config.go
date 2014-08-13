@@ -46,6 +46,7 @@ type Configuration struct {
 	HTTPAuthUser		string				// Username for HTTP Basic authentication (blank disables authentication)
 	HTTPAuthPassword	string				// Password for HTTP Basic authentication
 	ClusterNameToAlias	map[string]string	// map between regex matching cluster name to a human friendly alias
+	ServeAgentsHttp		bool				// Spawn another HTTP interface dedicated for orcehstrator-agent
 }	
 
 var Config *Configuration = NewConfiguration()
@@ -63,6 +64,7 @@ func NewConfiguration() *Configuration {
 		HTTPAuthUser: 				"",
 		HTTPAuthPassword: 			"",
 		ClusterNameToAlias:			make(map[string]string),
+		ServeAgentsHttp:			false,
 	}
 }
 

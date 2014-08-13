@@ -86,8 +86,22 @@ var generateSQL = []string{
           PRIMARY KEY (audit_id),
           KEY audit_timestamp_idx (audit_timestamp),
           KEY host_port_idx (hostname,port,audit_timestamp)
-        ) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=latin1 
+        ) ENGINE=InnoDB DEFAULT CHARSET=latin1 
 	`,	
+	`
+		CREATE TABLE IF NOT EXISTS host_agent (
+		  hostname varchar(128) NOT NULL,
+		  token varchar(128) NOT NULL,
+		  last_submitted timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  last_checked timestamp NULL DEFAULT NULL,
+		  last_seen timestamp NULL DEFAULT NULL,
+		  PRIMARY KEY (hostname),
+		  KEY token_idx (token(32)),
+		  KEY last_submitted_idx (last_submitted),
+		  KEY last_checked_idx (last_checked),
+		  KEY last_seen_idx (last_seen)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 

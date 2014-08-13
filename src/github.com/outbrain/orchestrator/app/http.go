@@ -22,6 +22,8 @@ import (
 	"github.com/martini-contrib/render"
 	"github.com/martini-contrib/auth"
 	
+	nethttp "net/http" 
+	
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/logic"
 	"github.com/outbrain/orchestrator/http"
@@ -29,8 +31,16 @@ import (
 )
 
 
-// Http starts serving HTTP (api/web) requests 
+// Http starts serving
 func Http(discovery bool) {
+	if config.Config.ServeAgentsHttp {
+		go agentsHttp()
+	}
+	standardHttp(discovery)
+}
+
+// standardHttp starts serving standard HTTP (api/web) requests, to be used by normal clients 
+func standardHttp(discovery bool) {
 	m := martini.Classic()
 	if config.Config.HTTPAuthUser != "" {
 		m.Use(auth.Basic(config.Config.HTTPAuthUser, config.Config.HTTPAuthPassword))
@@ -44,7 +54,7 @@ func Http(discovery bool) {
 	}))
 	m.Use(martini.Static("resources/public"))
 	
-	log.Info("Started HTTP")
+	log.Info("Starting HTTP")
 	
 	if discovery {
 		go orchestrator.ContinuousDiscovery()
@@ -56,4 +66,20 @@ func Http(discovery bool) {
 	// Serve
 	m.Run()
 }
+
+
+
+// agentsHttp startes serving agents API requests
+func agentsHttp() {
+	m := martini.Classic()
+	m.Use(render.Renderer())
+	
+	log.Info("Starting agents HTTP")
+	
+	http.AgentsAPI.RegisterRequests(m)
+	
+	// Serve
+	nethttp.ListenAndServe(":3001", m)
+}
+
 
