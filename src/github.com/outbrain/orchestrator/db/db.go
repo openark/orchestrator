@@ -91,6 +91,7 @@ var generateSQL = []string{
 	`
 		CREATE TABLE IF NOT EXISTS host_agent (
 		  hostname varchar(128) NOT NULL,
+		  port smallint(5) unsigned NOT NULL,
 		  token varchar(128) NOT NULL,
 		  last_submitted timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		  last_checked timestamp NULL DEFAULT NULL,

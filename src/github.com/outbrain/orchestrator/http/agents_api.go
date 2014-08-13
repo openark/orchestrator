@@ -17,6 +17,7 @@
 package http
 
 import (
+	"strconv"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	
@@ -32,7 +33,13 @@ var AgentsAPI HttpAgentsAPI = HttpAgentsAPI{}
 
 // SubmitAgent registeres an agent on a given host
 func (this *HttpAgentsAPI) SubmitAgent(params martini.Params, r render.Render) {
-	output, err := agent.SubmitAgent(params["host"], params["token"])
+	port, err := strconv.Atoi(params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+
+	output, err := agent.SubmitAgent(params["host"], port, params["token"])
 	if err != nil {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
 		return
@@ -42,5 +49,5 @@ func (this *HttpAgentsAPI) SubmitAgent(params martini.Params, r render.Render) {
 
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAgentsAPI) RegisterRequests(m *martini.ClassicMartini) {
-	m.Get("/api/submit-agent/:host/:token", this.SubmitAgent) 
+	m.Get("/api/submit-agent/:host/:port/:token", this.SubmitAgent) 
 }

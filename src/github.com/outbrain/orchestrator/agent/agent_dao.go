@@ -25,19 +25,20 @@ import (
 
 
 // SubmitAgent submits a new agent for listing
-func SubmitAgent(hostname string, token string) (string, error) {
+func SubmitAgent(hostname string, port int, token string) (string, error) {
 	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return "", log.Errore(err)}
 	
 	_, err = sqlutils.Exec(db, `
 			replace 
 				into host_agent (
-					hostname, token, last_submitted
+					hostname, port, token, last_submitted
 				) VALUES (
-					?, ?, NOW()
+					?, ?, ?, NOW()
 				)
 			`,
 			hostname,
+			port,
 		 	token,
 		 )
 	if err != nil {return "", log.Errore(err)}
@@ -70,6 +71,7 @@ func ReadAgents() ([]Agent, error) {
 	query := `
 		select 
 			hostname,
+			port,
 			token,
 			last_submitted
 		from 
@@ -83,6 +85,7 @@ func ReadAgents() ([]Agent, error) {
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
     	agent := Agent{}
     	agent.Hostname = m.GetString("hostname")
+    	agent.Port = m.GetInt("port")
     	agent.Token = m.GetString("token")
     	agent.LastSubmitted = m.GetString("last_submitted") 
 
