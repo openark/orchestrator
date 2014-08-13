@@ -24,6 +24,7 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 
+	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/inst"
 )
 
@@ -47,6 +48,7 @@ func (this *HttpWeb) getInstanceKey(host string, port string) (inst.InstanceKey,
 
 func (this *HttpWeb) Clusters(params martini.Params, r render.Render) {
 	r.HTML(200, "templates/clusters", map[string]interface{}{
+		"agentsHttpActive": config.Config.ServeAgentsHttp,
 		"title": "clusters", 
 		"activePage": "cluster", 
 		"autoshow_problems": false,
@@ -56,6 +58,7 @@ func (this *HttpWeb) Clusters(params martini.Params, r render.Render) {
 
 func (this *HttpWeb) Cluster(params martini.Params, r render.Render) {
 	r.HTML(200, "templates/cluster", map[string]interface{}{
+		"agentsHttpActive": config.Config.ServeAgentsHttp,
 		"title": "cluster", 
 		"activePage": "cluster", 
 		"clusterName": params["clusterName"],
@@ -70,6 +73,7 @@ func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Re
 		searchString = req.URL.Query().Get("s");
 	}
 	r.HTML(200, "templates/search", map[string]interface{}{
+		"agentsHttpActive": config.Config.ServeAgentsHttp,
 		"title": "search", 
 		"activePage": "search", 
 		"searchString": searchString, 
@@ -81,6 +85,7 @@ func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Re
 func (this *HttpWeb) Discover(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/discover", map[string]interface{}{
+		"agentsHttpActive": config.Config.ServeAgentsHttp,
 		"title": "discover", 
 		"activePage": "discover", 
 		"autoshow_problems": false,
@@ -93,6 +98,7 @@ func (this *HttpWeb) Audit(params martini.Params, r render.Render) {
 	if err != nil { page = 0 }
 
 	r.HTML(200, "templates/audit", map[string]interface{}{
+		"agentsHttpActive": config.Config.ServeAgentsHttp,
 		"title": "audit", 
 		"activePage": "audit", 
 		"autoshow_problems": false,
@@ -101,9 +107,20 @@ func (this *HttpWeb) Audit(params martini.Params, r render.Render) {
 }
 
 
+func (this *HttpWeb) Agents(params martini.Params, r render.Render) {
+	r.HTML(200, "templates/agents", map[string]interface{}{
+		"agentsHttpActive": config.Config.ServeAgentsHttp,
+		"title": "agents", 
+		"activePage": "agents", 
+		"autoshow_problems": false,
+		})
+}
+
+
 func (this *HttpWeb) Home(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/home", map[string]interface{}{
+		"agentsHttpActive": config.Config.ServeAgentsHttp,
 		"title": "home", 
 		"activePage": "home", 
 		"autoshow_problems": false,
@@ -114,6 +131,7 @@ func (this *HttpWeb) Home(params martini.Params, r render.Render) {
 func (this *HttpWeb) About(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/about", map[string]interface{}{
+		"agentsHttpActive": config.Config.ServeAgentsHttp,
 		"title": "about", 
 		"activePage": "home", 
 		"autoshow_problems": false,
@@ -125,6 +143,7 @@ func (this *HttpWeb) About(params martini.Params, r render.Render) {
 func (this *HttpWeb) FAQ(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/faq", map[string]interface{}{
+		"agentsHttpActive": config.Config.ServeAgentsHttp,
 		"title": "FAQ", 
 		"activePage": "home", 
 		"autoshow_problems": false,
@@ -147,4 +166,5 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/discover", this.Discover) 
 	m.Get("/web/audit", this.Audit) 
 	m.Get("/web/audit/:page", this.Audit) 
+	m.Get("/web/agents", this.Agents) 
 }

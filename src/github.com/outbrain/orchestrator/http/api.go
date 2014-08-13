@@ -27,6 +27,7 @@ import (
 
 	"github.com/outbrain/orchestrator/inst"
 	"github.com/outbrain/orchestrator/logic"
+	"github.com/outbrain/orchestrator/agent"
 )
 
 // APIResponseCode is an OK/ERROR response code
@@ -413,6 +414,19 @@ func (this *HttpAPI) Audit(params martini.Params, r render.Render, req *http.Req
 }
 
 
+
+// Problems provides list of instances with known problems
+func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request) {
+	instances, err := agent.ReadAgents()
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+
+	r.JSON(200, instances)
+}
+
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/instance/:host/:port", this.Instance) 
@@ -438,4 +452,5 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/problems", this.Problems) 
 	m.Get("/api/audit", this.Audit) 
 	m.Get("/api/audit/:page", this.Audit) 
+	m.Get("/api/agents", this.Agents) 
 }

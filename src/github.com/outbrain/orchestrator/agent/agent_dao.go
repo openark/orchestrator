@@ -61,3 +61,39 @@ func ForgetLongUnseenAgents() error {
 		 )
 	return err		 
 }
+
+
+
+// ReadAgents returns a list of all known agents
+func ReadAgents() ([]Agent, error) {
+	res := []Agent{}
+	query := `
+		select 
+			hostname,
+			token,
+			last_submitted
+		from 
+			host_agent
+		order by
+			hostname
+		`;
+	db,	err	:=	db.OpenOrchestrator()
+    if err != nil {goto Cleanup}
+    
+    err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+    	agent := Agent{}
+    	agent.Hostname = m.GetString("hostname")
+    	agent.Token = m.GetString("token")
+    	agent.LastSubmitted = m.GetString("last_submitted") 
+
+    	res = append(res, agent)
+    	return err       	
+   	})
+	Cleanup:
+
+	if err != nil	{
+		log.Errore(err)
+	}
+	return res, err
+
+}

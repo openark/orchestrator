@@ -504,6 +504,9 @@ $(document).ready(function() {
 	$("#refreshCountdown").click(function() {
 		location.reload(true);
     });
+	if (agentsHttpActive() == "true") {
+		$("#nav_agents").show();
+	}
 });
 
 

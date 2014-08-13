@@ -27,9 +27,12 @@
 			.table {
 			    font-size: 13px;
 			}
-			#ajaxLoader {
+            #ajaxLoader {
                 visibility: hidden;
-			}
+            }
+            #nav_agents {
+                display: none;
+            }
         </style>
 
 	    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
@@ -77,6 +80,7 @@
 		                    <li role="presentation" class="divider"></li>
 		                </ul>
 		            </li>
+                    <li data-nav-page="agents" id="nav_agents"><a href="/web/agents">Agents</a></li>
                     <li data-nav-page="discover"><a href="/web/discover">Discover</a></li>
                     <li data-nav-page="audit"><a href="/web/audit">Audit</a></li>
                     <li data-nav-page="search">
@@ -167,6 +171,9 @@
         }
         function activePage() {
             return "{{.activePage}}";
+        }
+        function agentsHttpActive() {
+        	return "{{.agentsHttpActive}}";
         }
 	</script>
     <script src="/js/instance-problems.js"></script>
