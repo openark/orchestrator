@@ -427,6 +427,20 @@ func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Re
 	r.JSON(200, instances)
 }
 
+
+// Problems provides list of instances with known problems
+func (this *HttpAPI) Agent(params martini.Params, r render.Render, req *http.Request) {
+	agent, err := agent.GetAgent(params["host"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+
+	r.JSON(200, agent)
+}
+
+
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/instance/:host/:port", this.Instance) 
@@ -453,4 +467,5 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/audit", this.Audit) 
 	m.Get("/api/audit/:page", this.Audit) 
 	m.Get("/api/agents", this.Agents) 
+	m.Get("/api/agent/:host", this.Agent) 
 }

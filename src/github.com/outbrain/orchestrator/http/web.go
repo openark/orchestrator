@@ -117,6 +117,17 @@ func (this *HttpWeb) Agents(params martini.Params, r render.Render) {
 }
 
 
+func (this *HttpWeb) Agent(params martini.Params, r render.Render) {
+	r.HTML(200, "templates/agent", map[string]interface{}{
+		"agentsHttpActive": config.Config.ServeAgentsHttp,
+		"title": "agent", 
+		"activePage": "agents", 
+		"autoshow_problems": false,
+		"agentHost": params["host"],
+		})
+}
+
+
 func (this *HttpWeb) Home(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/home", map[string]interface{}{
@@ -167,4 +178,5 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/audit", this.Audit) 
 	m.Get("/web/audit/:page", this.Audit) 
 	m.Get("/web/agents", this.Agents) 
+	m.Get("/web/agent/:host", this.Agent) 
 }

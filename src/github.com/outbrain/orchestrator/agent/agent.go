@@ -26,4 +26,6 @@ type Agent struct {
 	Port				int
 	Token				string
 	LastSubmitted		string
+	AvailableLocalSnapshots	[]string
+	AvailableSnapshots		[]string
 }
