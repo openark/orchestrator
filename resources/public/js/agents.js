@@ -15,8 +15,7 @@ $(document).ready(function () {
     		//var title = agent.Hostname;
     		//popoverElement.find("h3 a").html(title);
     	    var contentHtml = ''
-    	    	
-    	    	+ '<a href="/web/agent/'+ agent.Hostname +'">'
+    	    	+ '<a href="/web/agent/'+ agent.Hostname +'" class="small">'
     	    	+ agent.Hostname
     	    	+ '</a>'
     			;

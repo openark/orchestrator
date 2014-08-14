@@ -101,6 +101,10 @@
     color: #ffffff;
 }
 
+.popover.instance h3 .small {
+    font-size:80%;
+}
+
 .popover.instance .badge.label-info {
     background-color: #5bc0de;
 }
