@@ -1,17 +1,31 @@
 
 <div class="container">
-	<div class="panel panel-default">
-	    <div class="panel-heading">
-	        Agent: <strong><span data-agent="hostname"></span></strong>
+    <div class="row">
+	    <div class="col-xs-4">
+		    <div class="panel panel-default">
+		        <div class="panel-heading">
+		            Agent: <strong><span data-agent="hostname"></span></strong>
+		        </div>
+		        <table class="table">
+		            <tr><td>Hostname</td><td data-agent="hostname"></td></tr>
+		            <tr><td>Port</td><td data-agent="port"></td></tr>
+		            <tr><td>Last submitted</td><td data-agent="last_submitted"></td></tr>
+		        </table>
+		    </div>
 	    </div>
-	    <table class="table">
-            <tr><td>Hostname</td><td data-agent="hostname"></td></tr>
-            <tr><td>Port</td><td data-agent="port"></td></tr>
-            <tr><td>Last submitted</td><td data-agent="last_submitted"></td></tr>
-            <tr><td>Available local snapshots</td><td data-agent="local_snapshots"></td></tr>
-            <tr><td>Available snapshots</td><td data-agent="snapshots"></td></tr>
-        </table>
-	</div>
+	    <div class="col-xs-6">
+		    <div class="panel panel-default">
+		        <div class="panel-heading">
+		            Snapshots
+		        </div>
+		        <table class="table">
+		            <tr><td>Available snapshots</td><td><table class="table table-condensed table-unbordered" data-agent="available_snapshots"></table></td></tr>
+                    <tr><td>Snapshots taken on this host</td><td><table class="table table-condensed table-unbordered" data-agent="lv_snapshots"></table></td></tr>
+                    <!--  <tr><td>Mounted snapshot</td><td data-agent="mount_point"></td></tr>  -->
+		        </table>
+		    </div>
+	    </div>
+    </div>
 </div>
 
 <script>

@@ -48,6 +48,7 @@ type Configuration struct {
 	ClusterNameToAlias	map[string]string	// map between regex matching cluster name to a human friendly alias
 	ServeAgentsHttp		bool				// Spawn another HTTP interface dedicated for orcehstrator-agent
 	UnseenAgentForgetHours	uint			// Number of hours after which an unseen agent is forgotten
+	SnapshotVolumesFilter	string			// text pattern filtering agent logical volumes that are valid snapshots
 }	
 
 var Config *Configuration = NewConfiguration()
@@ -67,6 +68,7 @@ func NewConfiguration() *Configuration {
 		ClusterNameToAlias:			make(map[string]string),
 		ServeAgentsHttp:			false,
 		UnseenAgentForgetHours:		6,		
+		SnapshotVolumesFilter:		"",
 	}
 }
 

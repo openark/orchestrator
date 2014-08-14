@@ -29,6 +29,8 @@ import (
 	"github.com/outbrain/log"
 )
 
+
+
 func readResponse(res *http.Response, err error) ([]byte, error) {
 	if err != nil { return nil, err }
 	
@@ -172,6 +174,22 @@ func GetAgent(hostname string) (Agent, error) {
 	
 			err = json.Unmarshal(body, &agent.AvailableSnapshots)
 			if err != nil {return agent, log.Errore(err)}
+		}
+		{
+			lvSnapshotsUri := fmt.Sprintf("%s/lvs/%s?token=%s", uri, config.Config.SnapshotVolumesFilter, token)		
+			body, err := readResponse(http.Get(lvSnapshotsUri))
+			if err == nil {
+				err = json.Unmarshal(body, &agent.LogicalVolumes)
+			}
+			//if err != nil {return agent, log.Errore(err)}
+		}
+		{
+			mountUri := fmt.Sprintf("%s/mount?token=%s", uri, token)		
+			body, err := readResponse(http.Get(mountUri))
+			if err == nil {
+				err = json.Unmarshal(body, &agent.MountPoint)
+			}
+			//if err != nil {return agent, log.Errore(err)}
 		}
 	}
 	Cleanup:

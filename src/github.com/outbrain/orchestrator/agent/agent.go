@@ -20,6 +20,29 @@ import (
 
 )
 
+
+
+
+// LogicalVolume describes an LVM volume
+type LogicalVolume struct {
+	Name			string
+	GroupName		string
+	Path			string
+	IsSnapshot		bool
+	SnapshotPercent	float64
+}
+
+
+// Mount describes a file system mount point
+type Mount struct {
+	Path			string
+	Device			string
+	LVPath			string
+	FileSystem		string
+	IsMounted		bool
+}
+
+
 // Audit presents a single audit entry (namely in the database)
 type Agent struct {
 	Hostname			string
@@ -28,4 +51,6 @@ type Agent struct {
 	LastSubmitted		string
 	AvailableLocalSnapshots	[]string
 	AvailableSnapshots		[]string
+	LogicalVolumes			[]LogicalVolume
+	MountPoint				Mount
 }

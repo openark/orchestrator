@@ -186,3 +186,6 @@
 	white-space: nowrap
 }
 
+.table-unbordered > tbody > tr > td {
+    border: 0px;
+}
