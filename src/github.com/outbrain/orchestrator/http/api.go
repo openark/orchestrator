@@ -28,6 +28,7 @@ import (
 	"github.com/outbrain/orchestrator/inst"
 	"github.com/outbrain/orchestrator/logic"
 	"github.com/outbrain/orchestrator/agent"
+	"github.com/outbrain/orchestrator/config"
 )
 
 // APIResponseCode is an OK/ERROR response code
@@ -417,6 +418,11 @@ func (this *HttpAPI) Audit(params martini.Params, r render.Render, req *http.Req
 
 // Problems provides list of instances with known problems
 func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request) {
+	if !config.Config.ServeAgentsHttp {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
+		return
+	}
+
 	instances, err := agent.ReadAgents()
 
 	if err != nil {
@@ -430,6 +436,11 @@ func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Re
 
 // Problems provides list of instances with known problems
 func (this *HttpAPI) Agent(params martini.Params, r render.Render, req *http.Request) {
+	if !config.Config.ServeAgentsHttp {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
+		return
+	}
+
 	agent, err := agent.GetAgent(params["host"])
 
 	if err != nil {
@@ -440,6 +451,79 @@ func (this *HttpAPI) Agent(params martini.Params, r render.Render, req *http.Req
 	r.JSON(200, agent)
 }
 
+
+// Problems provides list of instances with known problems
+func (this *HttpAPI) AgentUnmount(params martini.Params, r render.Render, req *http.Request) {
+	if !config.Config.ServeAgentsHttp {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
+		return
+	}
+
+	output, err := agent.Unmount(params["host"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+
+	r.JSON(200, output)
+}
+
+
+// Problems provides list of instances with known problems
+func (this *HttpAPI) AgentMountLV(params martini.Params, r render.Render, req *http.Request) {
+	if !config.Config.ServeAgentsHttp {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
+		return
+	}
+
+	output, err := agent.MountLV(params["host"], req.URL.Query().Get("lv"))
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+
+	r.JSON(200, output)
+}
+
+
+
+
+// AgentMySQLStop stops MySQL service on agent
+func (this *HttpAPI) AgentMySQLStop(params martini.Params, r render.Render, req *http.Request) {
+	if !config.Config.ServeAgentsHttp {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
+		return
+	}
+
+	output, err := agent.MySQLStop(params["host"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+
+	r.JSON(200, output)
+}
+
+
+// AgentMySQLStart starts MySQL service on agent
+func (this *HttpAPI) AgentMySQLStart(params martini.Params, r render.Render, req *http.Request) {
+	if !config.Config.ServeAgentsHttp {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
+		return
+	}
+
+	output, err := agent.MySQLStart(params["host"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+
+	r.JSON(200, output)
+}
 
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
@@ -467,5 +551,9 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/audit", this.Audit) 
 	m.Get("/api/audit/:page", this.Audit) 
 	m.Get("/api/agents", this.Agents) 
-	m.Get("/api/agent/:host", this.Agent) 
+	m.Get("/api/agent/:host", this.Agent)
+	m.Get("/api/agent-umount/:host", this.AgentUnmount)
+	m.Get("/api/agent-mount/:host", this.AgentMountLV)
+	m.Get("/api/agent-mysql-stop/:host", this.AgentMySQLStop)
+	m.Get("/api/agent-mysql-start/:host", this.AgentMySQLStart)
 }

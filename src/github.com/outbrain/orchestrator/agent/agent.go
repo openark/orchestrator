@@ -40,6 +40,7 @@ type Mount struct {
 	LVPath			string
 	FileSystem		string
 	IsMounted		bool
+	DiskUsage		int64
 }
 
 
@@ -53,4 +54,5 @@ type Agent struct {
 	AvailableSnapshots		[]string
 	LogicalVolumes			[]LogicalVolume
 	MountPoint				Mount
+	MySQLRunning		bool
 }

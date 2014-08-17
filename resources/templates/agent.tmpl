@@ -7,9 +7,10 @@
 		            Agent: <strong><span data-agent="hostname"></span></strong>
 		        </div>
 		        <table class="table">
-		            <tr><td>Hostname</td><td data-agent="hostname"></td></tr>
+		            <tr><td>Hostname</td><td data-agent="hostname_search"></td></tr>
 		            <tr><td>Port</td><td data-agent="port"></td></tr>
-		            <tr><td>Last submitted</td><td data-agent="last_submitted"></td></tr>
+                    <tr><td>Last submitted</td><td data-agent="last_submitted"></td></tr>
+                    <tr><td>MySQL running</td><td data-agent="mysql_running"></td></tr>
 		        </table>
 		    </div>
 	    </div>
@@ -19,9 +20,10 @@
 		            Snapshots
 		        </div>
 		        <table class="table">
-		            <tr><td>Available snapshots</td><td><table class="table table-condensed table-unbordered" data-agent="available_snapshots"></table></td></tr>
+                    <tr><td>Available locally</td><td><table class="table table-condensed table-unbordered" data-agent="available_local_snapshots"></table></td></tr>
+                    <tr><td>Available remote</td><td><table class="table table-condensed table-unbordered" data-agent="available_remote_snapshots"></table></td></tr>
                     <tr><td>Snapshots taken on this host</td><td><table class="table table-condensed table-unbordered" data-agent="lv_snapshots"></table></td></tr>
-                    <!--  <tr><td>Mounted snapshot</td><td data-agent="mount_point"></td></tr>  -->
+                    <tr><td>Mounted snapshot</td><td data-agent="mount_point"></td></tr>
 		        </table>
 		    </div>
 	    </div>

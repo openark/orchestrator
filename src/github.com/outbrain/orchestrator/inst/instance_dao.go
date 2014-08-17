@@ -573,6 +573,8 @@ func WriteInstance(instance *Instance, lastError error) error {
         	update database_instance set last_seen = NOW() where hostname=? and port=?
         	`, instance.Key.Hostname, instance.Key.Port,
         )
+	} else {
+		log.Debugf("WriteInstance: will not update database_instance due to error: %+v", lastError)
 	}
 	return nil
 }

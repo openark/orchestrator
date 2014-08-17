@@ -20,6 +20,5 @@
         "127.0.0.1":  "test suite"
     },
     "ServeAgentsHttp": true,
-    "UnseenAgentForgetHours": 6,
-    "SnapshotVolumesFilter": "-my-snapshot-"
+    "UnseenAgentForgetHours": 6
 }

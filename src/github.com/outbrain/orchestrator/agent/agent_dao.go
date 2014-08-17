@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"errors"
 	"encoding/json"
+	"strings"
 			
 	"github.com/outbrain/sqlutils"
 	"github.com/outbrain/orchestrator/db"
@@ -123,8 +124,7 @@ func ReadAgents() ([]Agent, error) {
 }
 
 
-// ReadAgents returns a list of all known agents
-func GetAgent(hostname string) (Agent, error) {
+func readAgentBasicInfo(hostname string) (Agent, string, error) {
 	agent := Agent{}
 	token := ""
 	query := fmt.Sprintf(`
@@ -139,7 +139,7 @@ func GetAgent(hostname string) (Agent, error) {
 			hostname = '%s'
 		`, hostname);
 	db,	err	:=	db.OpenOrchestrator()
-    if err != nil {goto Cleanup}
+    if err != nil {return agent, "", err}
     
     err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
     	agent.Hostname = m.GetString("hostname")
@@ -151,8 +151,17 @@ func GetAgent(hostname string) (Agent, error) {
    	})
 
 	if token == "" {
-		return agent, log.Errorf("Cannot get agent/token: %s", hostname) 
+		return agent, "", log.Errorf("Cannot get agent/token: %s", hostname) 
 	}
+	return agent, token, nil
+}
+
+
+
+// GetAgent gets a single agent status from the agent service
+func GetAgent(hostname string) (Agent, error) {
+	agent, token, err := readAgentBasicInfo(hostname)
+    if err != nil {goto Cleanup}
 
 	// All seems to be in order. Now make some inquiries from orchestrator-agent service:
 	{
@@ -176,7 +185,7 @@ func GetAgent(hostname string) (Agent, error) {
 			if err != nil {return agent, log.Errore(err)}
 		}
 		{
-			lvSnapshotsUri := fmt.Sprintf("%s/lvs/%s?token=%s", uri, config.Config.SnapshotVolumesFilter, token)		
+			lvSnapshotsUri := fmt.Sprintf("%s/lvs-snapshots?token=%s", uri, token)		
 			body, err := readResponse(http.Get(lvSnapshotsUri))
 			if err == nil {
 				err = json.Unmarshal(body, &agent.LogicalVolumes)
@@ -191,11 +200,68 @@ func GetAgent(hostname string) (Agent, error) {
 			}
 			//if err != nil {return agent, log.Errore(err)}
 		}
+		{
+			mySQLRunningUri := fmt.Sprintf("%s/mysql-status?token=%s", uri, token)		
+			body, err := readResponse(http.Get(mySQLRunningUri))
+			if err == nil {
+				err = json.Unmarshal(body, &agent.MySQLRunning)
+			}
+			//if err != nil {return agent, log.Errore(err)}
+		}
 	}
 	Cleanup:
 	if err != nil{
 		return agent, log.Errore(err)
 	}
 	return agent, err
-
 }
+
+
+func executeAgentCommand(hostname string, command string) (Agent, error) {
+	agent, token, err := readAgentBasicInfo(hostname)
+    if err != nil {return agent, err}
+
+	// All seems to be in order. Now make some inquiries from orchestrator-agent service:
+	uri := fmt.Sprintf("http://%s:%d/api", agent.Hostname, agent.Port)
+
+	var fullCommand string
+	if strings.Contains(command, "?") {
+		fullCommand = fmt.Sprintf("%s&token=%s", command, token);
+	} else {
+		fullCommand = fmt.Sprintf("%s?token=%s", command, token);
+	}
+	log.Debugf("orchestrator-agent command: %s", fullCommand)
+	agentCommandUri := fmt.Sprintf("%s/%s", uri, fullCommand)
+	_, err = readResponse(http.Get(agentCommandUri))
+	if err != nil {return agent, log.Errore(err)}
+
+	return agent, err	
+}
+
+
+// Unmount unmounts the designated snapshot mount point
+func Unmount(hostname string) (Agent, error) {
+	return executeAgentCommand(hostname, "umount")
+}
+
+
+// 
+func MountLV(hostname string, lv string) (Agent, error) {
+	return executeAgentCommand(hostname, fmt.Sprintf("mountlv?lv=%s", lv))
+}
+
+
+
+// Unmount unmounts the designated snapshot mount point
+func MySQLStop(hostname string) (Agent, error) {
+	return executeAgentCommand(hostname, "mysql-stop")
+}
+
+
+
+// Unmount unmounts the designated snapshot mount point
+func MySQLStart(hostname string) (Agent, error) {
+	return executeAgentCommand(hostname, "mysql-start")
+}
+
+
