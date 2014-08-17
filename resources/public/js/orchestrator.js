@@ -42,6 +42,12 @@ function booleanString(b) {
 	return (b ? "true" : "false");
 }
 
+function toHumanFormat(bytes) {
+    var s = ['b', 'kB', 'MB', 'GB', 'TB', 'PB'];
+    var e = Math.floor(Math.log(bytes) / Math.log(1024));
+    return (bytes / Math.pow(1024, e)).toFixed(2) + " " + s[e];
+}
+
 function getInstanceId(host, port) {
     return "instance" + host.replace(/[.]/g, "_") + "__" + port
 }

@@ -60,7 +60,7 @@ $(document).ready(function () {
 	    	if (agent.MountPoint.IsMounted) { 
 	    		mountedVolume = agent.MountPoint.LVPath;
 	    		mountMessage = '<code>'+mountedVolume+'</code> mounted on '+
-	    			'<code>'+agent.MountPoint.Path+'</code>, size '+agent.MountPoint.DiskUsage+'b';
+	    			'<code>'+agent.MountPoint.Path+'</code>, size '+toHumanFormat(agent.MountPoint.DiskUsage);
 	    	}
     	}
 		$("[data-agent=mount_point]").append(mountMessage);
