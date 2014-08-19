@@ -54,16 +54,18 @@ $(document).ready(function () {
 //    	});
 //    	$("[data-agent=snapshots]").append(beautifyAvailableSnapshots(agent.AvailableSnapshots).join("<br/>"));
     	
-    	var mountMessage = "No snapshot mounted"
     	var mountedVolume = ""
     	if (agent.MountPoint) {
 	    	if (agent.MountPoint.IsMounted) { 
 	    		mountedVolume = agent.MountPoint.LVPath;
-	    		mountMessage = '<code>'+mountedVolume+'</code> mounted on '+
+	    		var mountMessage = '<td>';
+	    		mountMessage += '<code>'+mountedVolume+'</code> mounted on '+
 	    			'<code>'+agent.MountPoint.Path+'</code>, size '+toHumanFormat(agent.MountPoint.DiskUsage);
+	    		mountMessage += '<br/>MySQL data path: <code>'+agent.MountPoint.MySQLDataPath+'</code>';
+	    		mountMessage += '</td><td><div class="pull-right"><button class="btn btn-xs btn-danger" data-command="unmount">Unmount</button></div></td>';
+	    		$("[data-agent=mount_point]").append(mountMessage);
 	    	}
     	}
-		$("[data-agent=mount_point]").append(mountMessage);
 
     	if (agent.LogicalVolumes) {
 	    	var lvSnapshots = agent.LogicalVolumes.filter(function (logicalVolume) {

@@ -41,6 +41,7 @@ type Mount struct {
 	FileSystem		string
 	IsMounted		bool
 	DiskUsage		int64
+	MySQLDataPath	string
 }
 
 
