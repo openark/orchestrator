@@ -158,6 +158,7 @@ type Instance struct {
 	IsUpToDate			bool
 	IsRecentlyChecked	bool
 	SecondsSinceLastSeen	sql.NullInt64
+	CountMySQLSnapshots		int
 }
 
 // NewInstance creates a new, empty instance

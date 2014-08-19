@@ -96,11 +96,38 @@ var generateSQL = []string{
 		  last_submitted timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		  last_checked timestamp NULL DEFAULT NULL,
 		  last_seen timestamp NULL DEFAULT NULL,
+		  count_mysql_snapshots smallint(5) unsigned NOT NULL,		  
 		  PRIMARY KEY (hostname),
 		  KEY token_idx (token(32)),
 		  KEY last_submitted_idx (last_submitted),
 		  KEY last_checked_idx (last_checked),
 		  KEY last_seen_idx (last_seen)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS agent_seed (
+		  agent_seed_id int(10) unsigned NOT NULL AUTO_INCREMENT,
+		  target_hostname varchar(128) NOT NULL,
+		  source_hostname varchar(128) NOT NULL,
+		  start_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  end_timestamp timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+		  is_successful tinyint(3) unsigned NOT NULL DEFAULT '0',
+		  PRIMARY KEY (agent_seed_id),
+		  KEY target_source_hostname_idx (target_hostname,source_hostname),
+		  KEY source_hostname_idx (source_hostname),
+		  KEY start_timestamp_idx (start_timestamp),
+		  KEY is_successful_idx (is_successful,start_timestamp)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS agent_seed_state (
+		  agent_seed_state_id int(10) unsigned NOT NULL AUTO_INCREMENT,
+		  agent_seed_id int(10) unsigned NOT NULL,
+		  state_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  state_action varchar(127) NOT NULL,
+		  error_message varchar(255) NOT NULL,
+		  PRIMARY KEY (agent_seed_state_id),
+		  KEY agent_seed_idx (agent_seed_id,state_timestamp)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 }

@@ -20,5 +20,6 @@
         "127.0.0.1":  "test suite"
     },
     "ServeAgentsHttp": true,
+    "AgentPollMinutes": 60,
     "UnseenAgentForgetHours": 6
 }

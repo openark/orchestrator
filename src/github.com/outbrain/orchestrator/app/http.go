@@ -76,6 +76,9 @@ func agentsHttp() {
 	
 	log.Info("Starting agents HTTP")
 	
+	go orchestrator.ContinuousAgentsPoll()
+	
+	
 	http.AgentsAPI.RegisterRequests(m)
 	
 	// Serve

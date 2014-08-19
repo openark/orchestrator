@@ -26,6 +26,7 @@ import (
 	"github.com/outbrain/sqlutils"
 	"github.com/outbrain/orchestrator/db"
 	"github.com/outbrain/orchestrator/config"
+	"github.com/outbrain/orchestrator/agent"
 	"github.com/outbrain/log"
 )
 
@@ -333,7 +334,13 @@ func ReadClusterInstances(clusterName string) ([](*Instance), error) {
     	instances = append(instances, instance)
     	return nil       	
    	})
-
+	if	err	!=	nil	{
+		return instances, log.Errore(err)
+	}
+	err = PopulateInstancesAgents(instances)
+	if	err	!=	nil	{
+		return instances, log.Errore(err)
+	}
 	return instances, err
 }
 
@@ -411,6 +418,26 @@ func SearchInstances(searchString string) ([](*Instance), error) {
    	})
 
 	return instances, err
+}
+
+
+
+func PopulateInstancesAgents(instances [](*Instance)) error {
+	if len(instances) == 0 {return nil}
+	hostnames := []string{}
+	for _, instance := range instances {
+		hostnames = append(hostnames, instance.Key.Hostname)
+	}
+	agentsCountMySQLSnapshots, err := agent.ReadCountMySQLSnapshots(hostnames)
+	log.Debugf("************* agentsCountMySQLSnapshots: %+v", agentsCountMySQLSnapshots)
+	if err != nil {return err}
+	for _, instance := range instances {
+		if count, ok := agentsCountMySQLSnapshots[instance.Key.Hostname]; ok {
+			instance.CountMySQLSnapshots = count
+		}
+	}
+	
+	return nil
 }
 
 

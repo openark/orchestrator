@@ -17,6 +17,8 @@
 package sqlutils
 
 import (
+	"fmt"
+	"strings"
 	"strconv"
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
@@ -159,3 +161,11 @@ func Exec(db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
 	return res, err
 }
 
+
+func InClauseStringValues(terms []string) string {
+	quoted := []string{}
+	for _, s := range terms {
+		quoted = append(quoted, fmt.Sprintf("'%s'", strings.Replace(s, ",", "''", -1)))
+	}
+	return strings.Join(quoted, ", ")
+}

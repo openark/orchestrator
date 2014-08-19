@@ -136,10 +136,46 @@ func ContinuousDiscovery() {
 		for _, instanceKey := range instanceKeys {
 			discoveryInstanceKeys <- instanceKey
 		}
-    	// See if we should also forget instances/agents (lower frequency)
+    	// See if we should also forget instances (lower frequency)
 		select {
 			case <- forgetUnseenTick:
 		    	inst.ForgetLongUnseenInstances()
+			default:
+		}
+	}
+}
+
+
+func pollAgent(hostname string) (error) {
+	polledAgent, err := agent.GetAgent(hostname)
+	agent.UpdateAgentLastChecked(hostname)
+
+	if err != nil { return log.Errore(err) }
+	
+	err = agent.UpdateAgentInfo(hostname, polledAgent) 
+	if err != nil { return log.Errore(err) }
+	
+	return nil
+}
+
+
+// ContinuousAgentsPoll starts an asynchronuous infinite process where agents are
+// periodically investigated and their status captured, and long since unseen agents are
+// purged and forgotten.
+func ContinuousAgentsPoll() {
+	log.Infof("Starting continuous agents poll")
+	
+    tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
+    forgetUnseenTick := time.Tick(time.Hour)
+    for _ = range tick {
+		agentsHosts, _ := agent.ReadOutdatedAgentsHosts()
+		log.Debugf("outdated agents hosts: %+v", agentsHosts)
+		for _, hostname := range agentsHosts {
+			go pollAgent(hostname)
+		}
+    	// See if we should also forget agents (lower frequency)
+		select {
+			case <- forgetUnseenTick:
 		    	agent.ForgetLongUnseenAgents()
 			default:
 		}

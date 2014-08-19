@@ -434,6 +434,9 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	popoverElement.find("h3").html(
     		instance.canonicalTitle + '<div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog"></span></a></div>');
 	var indicateLastSeenInStatus = false;
+    if (instance.CountMySQLSnapshots > 0) {
+    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-camera" title="'+instance.CountMySQLSnapshots +' snapshots"></span> ');
+    } 
     if (instance.inMaintenanceProblem()) {
     	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench"></span> ');
     } 

@@ -86,6 +86,33 @@ func ForgetLongUnseenAgents() error {
 }
 
 
+func ReadOutdatedAgentsHosts() ([]string, error) {
+	res := []string{}
+	query := fmt.Sprintf(`
+		select 
+			hostname 
+		from 
+			host_agent 
+		where
+			IFNULL(last_checked < now() - interval %d minute, true)
+			`, 
+    		config.Config.AgentPollMinutes)
+	db,	err	:=	db.OpenOrchestrator()
+    if err != nil {goto Cleanup}
+    
+    err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+    	hostname := m.GetString("hostname")
+    	res = append(res, hostname)
+    	return nil       	
+   	})
+	Cleanup:
+
+	if err	!=	nil	{
+		log.Errore(err)
+	}
+	return res, err
+}
+
 
 // ReadAgents returns a list of all known agents
 func ReadAgents() ([]Agent, error) {
@@ -124,6 +151,36 @@ func ReadAgents() ([]Agent, error) {
 }
 
 
+// ReadAgents returns a list of all known agents
+func ReadCountMySQLSnapshots(hostnames []string) (map[string]int, error) {
+	res := make(map[string]int)
+	query := fmt.Sprintf(`
+		select 
+			hostname,
+			count_mysql_snapshots
+		from 
+			host_agent
+		where
+			hostname in (%s)
+		order by
+			hostname
+		`, sqlutils.InClauseStringValues(hostnames));
+	db,	err	:=	db.OpenOrchestrator()
+    if err != nil {goto Cleanup}
+    
+    err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+    	res[m.GetString("hostname")] = m.GetInt("count_mysql_snapshots")
+    	return nil       	
+   	})
+	Cleanup:
+
+	if err != nil	{
+		log.Errore(err)
+	}
+	return res, err
+}
+
+
 func readAgentBasicInfo(hostname string) (Agent, string, error) {
 	agent := Agent{}
 	token := ""
@@ -156,6 +213,52 @@ func readAgentBasicInfo(hostname string) (Agent, string, error) {
 	return agent, token, nil
 }
 
+
+
+
+// UpdateAgentLastChecked updates the last_check timestamp in the orchestrator backed database 
+// for a given agent
+func UpdateAgentLastChecked(hostname string) error {
+	db,	err	:=	db.OpenOrchestrator()
+	if err != nil {return log.Errore(err)}
+	
+	_, err = sqlutils.Exec(db, `
+        	update 
+        		host_agent 
+        	set
+        		last_checked = NOW()
+			where 
+				hostname = ?`,
+		 	hostname,
+		 	)
+    if err != nil {return log.Errore(err)}
+
+	return nil
+}
+
+
+
+// UpdateAgentLastChecked updates the last_check timestamp in the orchestrator backed database 
+// for a given agent
+func UpdateAgentInfo(hostname string, agent Agent) error {
+	db,	err	:=	db.OpenOrchestrator()
+	if err != nil {return log.Errore(err)}
+	
+	_, err = sqlutils.Exec(db, `
+        	update 
+        		host_agent 
+        	set
+        		last_seen = NOW(),
+        		count_mysql_snapshots = ?
+			where 
+				hostname = ?`,
+		 	len(agent.LogicalVolumes), 
+		 	hostname,
+		 	)
+    if err != nil {return log.Errore(err)}
+
+	return nil
+}
 
 
 // GetAgent gets a single agent status from the agent service
@@ -263,5 +366,4 @@ func MySQLStop(hostname string) (Agent, error) {
 func MySQLStart(hostname string) (Agent, error) {
 	return executeAgentCommand(hostname, "mysql-start")
 }
-
 
