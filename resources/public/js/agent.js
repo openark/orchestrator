@@ -3,8 +3,9 @@ $(document).ready(function () {
     showLoader();
     
     $.get("/api/agent/"+currentAgentHost(), function (agent) {
-    	displayAgent(agent);
-    }, "json");
+    		showLoader();
+	    	displayAgent(agent);
+	    }, "json");
     function displayAgent(agent) {
     	if (!agent.Hostname) {
     		$("[data-agent=hostname]").html('<span class="alert-danger">Not found</span>');
@@ -102,6 +103,7 @@ $(document).ready(function () {
 		
         hideLoader();
     }
+    
     $("body").on("click", "button[data-command=unmount]", function(event) {
     	showLoader();
         $.get("/api/agent-umount/"+currentAgentHost(), function (operationResult) {
@@ -153,4 +155,44 @@ $(document).ready(function () {
 			}	
         }, "json");	
     });
+
+    
+    $.get("/api/agent-active-seeds/"+currentAgentHost(), function (activeSeeds) {
+        showLoader();
+    	activeSeeds.forEach(function (activeSeed) {
+    		appendActiveSeed(activeSeed);
+    	});
+    	if (activeSeeds.length > 0) {
+    	    activateRefreshTimer();
+
+    	    $.get("/api/agent-seed-states/"+activeSeeds[0].SeedId, function (seedStates) {
+    	        showLoader();
+    	        seedStates.forEach(function (seedState) {
+    	        	appendSeedState(seedState);
+    	    	});
+    	    }, "json");    		
+    	}
+    }, "json");
+    
+    function appendActiveSeed(seed) {    	
+    	var row = '<tr>';
+    	row += '<td>' + seed.SeedId + '</td>';
+    	row += '<td>' + (seed.TargetHostname == currentAgentHost() ? seed.TargetHostname : '<a href="/web/agent/'+seed.TargetHostname+'">'+seed.TargetHostname+'</a>') + '</td>';
+    	row += '<td>' + (seed.SourceHostname == currentAgentHost() ? seed.SourceHostname : '<a href="/web/agent/'+seed.SourceHostname+'">'+seed.SourceHostname+'</a>') + '</td>';
+    	row += '<td>' + seed.StartTimestamp + '</td>';
+    	row += '</tr>';
+    	$("[data-agent=active_seeds]").append(row);
+        hideLoader();
+    }
+    
+    function appendSeedState(seedState) {    	
+    	var row = '<tr>';
+    	row += '<td>' + seedState.StateTimestamp + '</td>';
+    	row += '<td>' + seedState.Action + '</td>';
+    	row += '<td>' + seedState.ErrorMessage + '</td>';
+    	row += '</tr>';
+    	$("[data-agent=seed_states]").append(row);
+        hideLoader();
+    }
+
 });	

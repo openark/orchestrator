@@ -165,6 +165,8 @@ func pollAgent(hostname string) (error) {
 func ContinuousAgentsPoll() {
 	log.Infof("Starting continuous agents poll")
 	
+	go discoverSeededAgents()
+	
     tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
     forgetUnseenTick := time.Tick(time.Hour)
     for _ = range tick {
@@ -179,5 +181,13 @@ func ContinuousAgentsPoll() {
 		    	agent.ForgetLongUnseenAgents()
 			default:
 		}
+	}
+}
+
+
+func discoverSeededAgents() {
+	for seededAgent := range agent.SeededAgents {	
+		instanceKey := inst.InstanceKey{Hostname: seededAgent.Hostname, Port: int(seededAgent.MySQLPort),}
+		go StartDiscovery(instanceKey)	
 	}
 }

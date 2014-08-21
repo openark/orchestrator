@@ -31,6 +31,7 @@ import (
 	"github.com/outbrain/log"
 )
 
+var SeededAgents chan *Agent = make(chan *Agent)
 
 
 func readResponse(res *http.Response, err error) ([]byte, error) {
@@ -502,6 +503,7 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 		
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("getting target agent info for %s", targetHostname), "")
 	targetAgent, err := GetAgent(targetHostname)
+	SeededAgents <- &targetAgent
 	if err != nil {return updateSeedStateEntry(seedStateId, err)}
 	
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("getting source agent info for %s", sourceHostname), "")
@@ -588,6 +590,10 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 		return updateSeedStateEntry(seedStateId, err)
 	}
 	
+	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Submitting MySQL instance for reseed: %s", targetHostname), "")
+	SeededAgents <- &targetAgent
+
+	seedStateId, _ = submitSeedStateEntry(seedId, "Done", "")
 	
 	return nil
 }
@@ -595,21 +601,103 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 
 
 // Seed
-func Seed(targetHostname string, sourceHostname string) (int64, *Agent, error) {
+func Seed(targetHostname string, sourceHostname string) (int64, error) {
 	if targetHostname == sourceHostname {
-		return 0, nil, log.Errorf("Cannot seed %s onto itself", targetHostname)
+		return 0, log.Errorf("Cannot seed %s onto itself", targetHostname)
 	}
 	seedId, err := SubmitSeedEntry(targetHostname, sourceHostname)
-	if err != nil {return 0, nil, log.Errore(err)}
+	if err != nil {return 0, log.Errore(err)}
 	
 	go func() {
 		err := executeSeed(seedId, targetHostname, sourceHostname)
 		updateSeedComplete(seedId, err)
 	}()
 
-	targetAgent, err := GetAgent(targetHostname)
-	if err != nil {return 0, nil, log.Errore(err)}
-	
-	return seedId, &targetAgent, nil
+	return seedId, nil
 }
 
+
+
+
+// ReadActiveSeedsForHost reads active seeds where host participates either as source or target
+func ReadActiveSeedsForHost(hostname string) ([]SeedOperation, error) {
+	res := []SeedOperation{}
+	query := fmt.Sprintf(`
+		select 
+			agent_seed_id,
+			target_hostname,
+			source_hostname,
+			start_timestamp,
+			end_timestamp,
+			is_complete,
+			is_successful
+		from 
+			agent_seed
+		where
+			is_complete = 0
+			and (
+				target_hostname = '%s'
+				or source_hostname = '%s'
+			)
+		order by
+			agent_seed_id desc
+		`, hostname, hostname);
+	db,	err	:=	db.OpenOrchestrator()
+    if err != nil {goto Cleanup}
+    
+    err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+    	seedOperation := SeedOperation{}
+    	seedOperation.SeedId = m.GetInt64("agent_seed_id")
+    	seedOperation.TargetHostname = m.GetString("target_hostname")
+    	seedOperation.SourceHostname = m.GetString("source_hostname")
+    	seedOperation.StartTimestamp = m.GetString("start_timestamp")
+    	seedOperation.EndTimestamp = m.GetString("end_timestamp")
+    	seedOperation.IsComplete = m.GetBool("is_complete")
+    	seedOperation.IsSuccessful = m.GetBool("is_successful")
+
+    	res = append(res, seedOperation)
+    	return nil       	
+   	})
+	Cleanup:
+
+	if err != nil {	 log.Errore(err) }
+	return res, err
+}
+
+
+// SeedOperationState reads states for a given seed operation
+func ReadSeedStates(seedId int64) ([]SeedOperationState, error) {
+	res := []SeedOperationState{}
+	query := fmt.Sprintf(`
+		select 
+			agent_seed_state_id,
+			agent_seed_id,
+			state_timestamp,
+			state_action,
+			error_message
+		from 
+			agent_seed_state
+		where
+			agent_seed_id = %d
+		order by
+			agent_seed_state_id desc
+		`, seedId);
+	db,	err	:=	db.OpenOrchestrator()
+    if err != nil {goto Cleanup}
+    
+    err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+    	seedState := SeedOperationState{}
+    	seedState.SeedStateId = m.GetInt64("agent_seed_state_id")
+    	seedState.SeedId = m.GetInt64("agent_seed_id")
+    	seedState.StateTimestamp = m.GetString("state_timestamp")
+    	seedState.Action = m.GetString("state_action")
+    	seedState.ErrorMessage = m.GetString("error_message")
+
+    	res = append(res, seedState)
+    	return nil       	
+   	})
+	Cleanup:
+
+	if err != nil {	 log.Errore(err) }
+	return res, err
+}

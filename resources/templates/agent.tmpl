@@ -1,7 +1,7 @@
 
 <div class="container">
     <div class="row">
-	    <div class="col-xs-4">
+	    <div class="col-xs-6">
 		    <div class="panel panel-default">
 		        <div class="panel-heading">
 		            Agent: <strong><span data-agent="hostname"></span></strong>
@@ -29,6 +29,39 @@
 		        </table>
 		    </div>
 	    </div>
+    </div>
+    <div class="panel panel-default">
+        <div class="panel-body">
+            <h5>Active seeds</h5>
+            <div class="active_seeds">
+                <table class="table table-condensed table-bordered table-striped ">
+                    <thead>
+                        <tr>
+                            <th>Id</th>
+                            <th>Target host</th>
+                            <th>Source host</th>
+                            <th>Seed start time</th>
+                        </tr>
+                    </thead>
+                    <tbody data-agent="active_seeds"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="panel-body">
+            <h5>Seed states</h5>
+            <div class="seed_states">
+                <table class="table table-condensed table-bordered table-striped ">
+                    <thead>
+                        <tr>
+                            <th>State start time</th>
+                            <th>State action</th>
+                            <th>Error message</th>
+                        </tr>
+                    </thead>
+                    <tbody data-agent="seed_states"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 

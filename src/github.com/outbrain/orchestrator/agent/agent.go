@@ -60,3 +60,24 @@ type Agent struct {
 	MySQLDiskUsage		int64
 	MySQLPort			int64
 }
+
+
+type SeedOperation struct {
+	SeedId				int64
+	TargetHostname		string
+	SourceHostname		string
+	StartTimestamp		string
+	EndTimestamp		string
+	IsComplete			bool
+	IsSuccessful		bool	
+}
+
+
+type SeedOperationState struct {
+	SeedStateId			int64
+	SeedId				int64
+	StateTimestamp		string
+	Action				string
+	ErrorMessage		string
+}
+
