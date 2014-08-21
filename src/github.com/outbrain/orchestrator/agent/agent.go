@@ -42,6 +42,7 @@ type Mount struct {
 	IsMounted		bool
 	DiskUsage		int64
 	MySQLDataPath	string
+	MySQLDiskUsage	int64
 }
 
 
@@ -56,4 +57,6 @@ type Agent struct {
 	LogicalVolumes			[]LogicalVolume
 	MountPoint				Mount
 	MySQLRunning		bool
+	MySQLDiskUsage		int64
+	MySQLPort			int64
 }

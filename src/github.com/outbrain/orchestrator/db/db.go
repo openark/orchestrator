@@ -111,11 +111,13 @@ var generateSQL = []string{
 		  source_hostname varchar(128) NOT NULL,
 		  start_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		  end_timestamp timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+		  is_complete tinyint(3) unsigned NOT NULL DEFAULT '0',
 		  is_successful tinyint(3) unsigned NOT NULL DEFAULT '0',
 		  PRIMARY KEY (agent_seed_id),
-		  KEY target_source_hostname_idx (target_hostname,source_hostname),
-		  KEY source_hostname_idx (source_hostname),
+		  KEY target_hostname_idx (target_hostname,is_complete),
+		  KEY source_hostname_idx (source_hostname,is_complete),
 		  KEY start_timestamp_idx (start_timestamp),
+		  KEY is_complete_idx (is_complete,start_timestamp),
 		  KEY is_successful_idx (is_successful,start_timestamp)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,

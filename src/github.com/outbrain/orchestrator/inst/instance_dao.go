@@ -377,6 +377,13 @@ func ReadProblemInstances() ([](*Instance), error) {
     	return nil       	
    	})
 
+	if	err	!=	nil	{
+		return instances, log.Errore(err)
+	}
+	err = PopulateInstancesAgents(instances)
+	if	err	!=	nil	{
+		return instances, log.Errore(err)
+	}
 	return instances, err
 }
 
@@ -417,6 +424,13 @@ func SearchInstances(searchString string) ([](*Instance), error) {
     	return nil       	
    	})
 
+	if	err	!=	nil	{
+		return instances, log.Errore(err)
+	}
+	err = PopulateInstancesAgents(instances)
+	if	err	!=	nil	{
+		return instances, log.Errore(err)
+	}
 	return instances, err
 }
 
@@ -429,7 +443,6 @@ func PopulateInstancesAgents(instances [](*Instance)) error {
 		hostnames = append(hostnames, instance.Key.Hostname)
 	}
 	agentsCountMySQLSnapshots, err := agent.ReadCountMySQLSnapshots(hostnames)
-	log.Debugf("************* agentsCountMySQLSnapshots: %+v", agentsCountMySQLSnapshots)
 	if err != nil {return err}
 	for _, instance := range instances {
 		if count, ok := agentsCountMySQLSnapshots[instance.Key.Hostname]; ok {

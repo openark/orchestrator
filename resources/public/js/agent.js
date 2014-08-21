@@ -22,10 +22,14 @@ $(document).ready(function () {
     			'<button class="btn btn-xs btn-success" data-command="mysql-start">Start</button>') + 
     		'</div>';
     	$("[data-agent=mysql_running]").html(mySQLStatus)
-    	
+    	$("[data-agent=mysql_port]").html(agent.MySQLPort)
+    	$("[data-agent=mysql_disk_usage]").html(toHumanFormat(agent.MySQLDiskUsage))    	
     	
     	function beautifyAvailableSnapshots(hostnames) {
-        	var result = hostnames.map(function(hostname) {
+        	var result = hostnames.filter(function(hostname) {
+        		return hostname.trim() != "";
+        	});
+        	result = result.map(function(hostname) {
         		if (hostname == agent.Hostname) {
         			return '<td><span class="">'+hostname+'</span></td><td></td>';
         		}
@@ -79,7 +83,7 @@ $(document).ready(function () {
         		if (volume == mountedVolume) {
         			volumeText = '<button class="btn btn-xs btn-danger" data-command="unmount">Unmount</button>';
         			volumeTextType = 'text-success';
-        		} else if (mountedVolume == "") {
+        		} else if (!(agent.MountPoint && agent.MountPoint.IsMounted)) {
         			volumeText += '<button class="btn btn-xs btn-success" data-command="mountlv" data-lv="'+volume+'">Mount</button>'
         		} else {
         		}

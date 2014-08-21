@@ -525,6 +525,29 @@ func (this *HttpAPI) AgentMySQLStart(params martini.Params, r render.Render, req
 	r.JSON(200, output)
 }
 
+
+
+// AgentSeed completely seeds a hsot with another host's snapshots
+func (this *HttpAPI) AgentSeed(params martini.Params, r render.Render, req *http.Request) {
+	if !config.Config.ServeAgentsHttp {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
+		return
+	}
+
+	output, agent, err := agent.Seed(params["targetHost"], params["sourceHost"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+	
+	instanceKey := inst.InstanceKey{Hostname: agent.Hostname, Port: int(agent.MySQLPort),}
+	go orchestrator.StartDiscovery(instanceKey)	
+
+	r.JSON(200, output)
+}
+
+
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/instance/:host/:port", this.Instance) 
@@ -556,4 +579,5 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/agent-mount/:host", this.AgentMountLV)
 	m.Get("/api/agent-mysql-stop/:host", this.AgentMySQLStop)
 	m.Get("/api/agent-mysql-start/:host", this.AgentMySQLStart)
+	m.Get("/api/agent-seed/:targetHost/:sourceHost", this.AgentSeed)
 }
