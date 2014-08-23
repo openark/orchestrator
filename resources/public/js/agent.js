@@ -6,6 +6,28 @@ $(document).ready(function () {
     		showLoader();
 	    	displayAgent(agent);
 	    }, "json");
+
+    $.get("/api/agent-active-seeds/"+currentAgentHost(), function (activeSeeds) {
+        showLoader();
+    	activeSeeds.forEach(function (activeSeed) {
+    		appendActiveSeed(activeSeed);
+    	});
+    	if (activeSeeds.length == 0) {
+    		$("div.active_seeds").parent().hide();
+    		$("div.seed_states").parent().hide();
+    	}
+    	if (activeSeeds.length > 0) {
+    	    activateRefreshTimer();
+
+    	    $.get("/api/agent-seed-states/"+activeSeeds[0].SeedId, function (seedStates) {
+    	        showLoader();
+    	        seedStates.forEach(function (seedState) {
+    	        	appendSeedState(seedState);
+    	    	});
+    	    }, "json");    		
+    	}
+    }, "json");
+    
     function displayAgent(agent) {
     	if (!agent.Hostname) {
     		$("[data-agent=hostname]").html('<span class="alert-danger">Not found</span>');
@@ -36,7 +58,7 @@ $(document).ready(function () {
         		}
         		var isLocal = $.inArray(hostname, agent.AvailableLocalSnapshots) >= 0;
         		var btnType = (isLocal ? "btn-success" : "btn-warning"); 
-        		return '<td><a href="/web/agent/'+hostname+'">'+hostname+'</a><div class="pull-right"><button class="btn btn-xs '+btnType+'">Reseed</button></div></td>';
+        		return '<td><a href="/web/agent/'+hostname+'">'+hostname+'</a><div class="pull-right"><button class="btn btn-xs '+btnType+'" data-command="seed" data-seed-source-host="'+hostname+'" data-seed-local="'+isLocal+'" data-mysql-running="'+agent.MySQLRunning+'">Seed</button></div></td>';
         	});
         	result = result.map(function(entry) {
         		return '<tr>'+entry+'</tr>';
@@ -52,12 +74,6 @@ $(document).ready(function () {
     	beautifyAvailableSnapshots(availableRemoteSnapshots).forEach(function (entry) {
         	$("[data-agent=available_remote_snapshots]").append(entry)
     	});
-//    	$("[data-agent=local_snapshots]").append(beautifyAvailableSnapshots(agent.AvailableLocalSnapshots).join("<br/>"));
-    	
-//    	beautifyAvailableSnapshots(agent.AvailableSnapshots).forEach(function (entry) {
-//        	$("[data-agent=available_snapshots]").append(entry)
-//    	});
-//    	$("[data-agent=snapshots]").append(beautifyAvailableSnapshots(agent.AvailableSnapshots).join("<br/>"));
     	
     	var mountedVolume = ""
     	if (agent.MountPoint) {
@@ -98,11 +114,32 @@ $(document).ready(function () {
         	result.forEach(function (entry) {
 	        	$("[data-agent=lv_snapshots]").append(entry)
 	    	});
-			//$("[data-agent=lv_snapshots]").append(lvSnapshots.join("<br/>"));
     	}
 		
         hideLoader();
     }
+    
+    function appendActiveSeed(seed) {    	
+    	var row = '<tr>';
+    	row += '<td>' + seed.SeedId + '</td>';
+    	row += '<td>' + (seed.TargetHostname == currentAgentHost() ? seed.TargetHostname : '<a href="/web/agent/'+seed.TargetHostname+'">'+seed.TargetHostname+'</a>') + '</td>';
+    	row += '<td>' + (seed.SourceHostname == currentAgentHost() ? seed.SourceHostname : '<a href="/web/agent/'+seed.SourceHostname+'">'+seed.SourceHostname+'</a>') + '</td>';
+    	row += '<td>' + seed.StartTimestamp + '</td>';
+    	row += '</tr>';
+    	$("[data-agent=active_seeds]").append(row);
+        hideLoader();
+    }
+    
+    function appendSeedState(seedState) {    	
+    	var row = '<tr>';
+    	row += '<td>' + seedState.StateTimestamp + '</td>';
+    	row += '<td>' + seedState.Action + '</td>';
+    	row += '<td>' + seedState.ErrorMessage + '</td>';
+    	row += '</tr>';
+    	$("[data-agent=seed_states]").append(row);
+        hideLoader();
+    }
+
     
     $("body").on("click", "button[data-command=unmount]", function(event) {
     	showLoader();
@@ -155,44 +192,36 @@ $(document).ready(function () {
 			}	
         }, "json");	
     });
-
-    
-    $.get("/api/agent-active-seeds/"+currentAgentHost(), function (activeSeeds) {
-        showLoader();
-    	activeSeeds.forEach(function (activeSeed) {
-    		appendActiveSeed(activeSeed);
-    	});
-    	if (activeSeeds.length > 0) {
-    	    activateRefreshTimer();
-
-    	    $.get("/api/agent-seed-states/"+activeSeeds[0].SeedId, function (seedStates) {
-    	        showLoader();
-    	        seedStates.forEach(function (seedState) {
-    	        	appendSeedState(seedState);
-    	    	});
-    	    }, "json");    		
+    $("body").on("click", "button[data-command=seed]", function(event) {
+    	if ($(event.target).attr("data-mysql-running") == "true") {
+			addAlert("MySQL is running on this host. Please first stop the MySQL service");
+			return;
     	}
-    }, "json");
-    
-    function appendActiveSeed(seed) {    	
-    	var row = '<tr>';
-    	row += '<td>' + seed.SeedId + '</td>';
-    	row += '<td>' + (seed.TargetHostname == currentAgentHost() ? seed.TargetHostname : '<a href="/web/agent/'+seed.TargetHostname+'">'+seed.TargetHostname+'</a>') + '</td>';
-    	row += '<td>' + (seed.SourceHostname == currentAgentHost() ? seed.SourceHostname : '<a href="/web/agent/'+seed.SourceHostname+'">'+seed.SourceHostname+'</a>') + '</td>';
-    	row += '<td>' + seed.StartTimestamp + '</td>';
-    	row += '</tr>';
-    	$("[data-agent=active_seeds]").append(row);
-        hideLoader();
-    }
-    
-    function appendSeedState(seedState) {    	
-    	var row = '<tr>';
-    	row += '<td>' + seedState.StateTimestamp + '</td>';
-    	row += '<td>' + seedState.Action + '</td>';
-    	row += '<td>' + seedState.ErrorMessage + '</td>';
-    	row += '</tr>';
-    	$("[data-agent=seed_states]").append(row);
-        hideLoader();
-    }
+    	var sourceHost = $(event.target).attr("data-seed-source-host");
+    	var isLocalSeed = ($(event.target).attr("data-seed-local") == "true");
+    	
+    	var message = "Are you sure you wish to destroy data on <code><strong>" + 
+    		currentAgentHost() + "</strong></code> and seed from <code><strong>" + 
+    		sourceHost + "</strong></code>?";
+    	if (isLocalSeed) {
+    		message += '<p/><span class="text-success">This seed is dc-local</span>';
+    	} else {
+    		message += '<p/><span class="text-danger">This seed is non-local and will require cross-DC data transfer!</span>';
+    	}
+    	
+		bootbox.confirm(message, function(confirm) {
+			if (confirm) {
+		    	showLoader();
+		        $.get("/api/agent-seed/"+currentAgentHost()+"/"+sourceHost, function (operationResult) {
+					hideLoader();
+					if (operationResult.Code == "ERROR") {
+						addAlert(operationResult.Message)
+					} else {
+						location.reload();
+					}	
+		        }, "json");
+			}
+		});
+    });
 
 });	
