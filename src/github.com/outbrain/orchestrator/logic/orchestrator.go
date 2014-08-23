@@ -179,6 +179,7 @@ func ContinuousAgentsPoll() {
 		select {
 			case <- forgetUnseenTick:
 		    	agent.ForgetLongUnseenAgents()
+		    	agent.FailStaleSeeds()
 			default:
 		}
 	}

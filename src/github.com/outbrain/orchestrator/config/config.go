@@ -49,6 +49,7 @@ type Configuration struct {
 	ServeAgentsHttp		bool				// Spawn another HTTP interface dedicated for orcehstrator-agent
 	AgentPollMinutes	uint				// Minutes between agent polling
 	UnseenAgentForgetHours	uint			// Number of hours after which an unseen agent is forgotten
+	StaleSeedFailMinutes	uint			// Number of minutes after which a stale (no progress) seed is considered failed.
 }	
 
 var Config *Configuration = NewConfiguration()
@@ -69,6 +70,7 @@ func NewConfiguration() *Configuration {
 		ServeAgentsHttp:			false,
 		AgentPollMinutes:			60,
 		UnseenAgentForgetHours:		6,		
+		StaleSeedFailMinutes:		60,
 	}
 }
 

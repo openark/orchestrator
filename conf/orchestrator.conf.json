@@ -21,5 +21,6 @@
     },
     "ServeAgentsHttp": true,
     "AgentPollMinutes": 60,
-    "UnseenAgentForgetHours": 6
+    "UnseenAgentForgetHours": 6,
+    "StaleSeedFailMinutes": 60
 }

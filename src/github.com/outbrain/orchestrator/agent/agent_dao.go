@@ -495,6 +495,34 @@ func updateSeedStateEntry(seedStateId int64, reason error) error {
 }
 
 
+// FailStaleSeeds marks as failed seeds where no progress have been seen recently
+func FailStaleSeeds() error {
+	db,	err	:=	db.OpenOrchestrator()
+	if err != nil {return log.Errore(err)}
+	
+	_, err = sqlutils.Exec(db, `
+				update 
+						agent_seed 
+					set 
+						is_complete=1, 
+						is_successful=0 
+					where 
+						is_complete=0 
+						and (
+							select 
+									max(state_timestamp) as last_state_timestamp 
+								from 
+									agent_seed_state 
+								where 
+									agent_seed.agent_seed_id = agent_seed_state.agent_seed_id
+						) < now() - interval ? minute`,
+			config.Config.StaleSeedFailMinutes,
+		 )
+	return err		 
+}
+
+
+
 // executeSeed
 func executeSeed(seedId int64, targetHostname string, sourceHostname string) error {
 
