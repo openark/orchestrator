@@ -647,8 +647,8 @@ func Seed(targetHostname string, sourceHostname string) (int64, error) {
 
 
 
-// ReadActiveSeedsForHost reads active seeds where host participates either as source or target
-func ReadActiveSeedsForHost(hostname string) ([]SeedOperation, error) {
+// readSeeds
+func readSeeds(whereCondition string) ([]SeedOperation, error) {
 	res := []SeedOperation{}
 	query := fmt.Sprintf(`
 		select 
@@ -661,15 +661,11 @@ func ReadActiveSeedsForHost(hostname string) ([]SeedOperation, error) {
 			is_successful
 		from 
 			agent_seed
-		where
-			is_complete = 0
-			and (
-				target_hostname = '%s'
-				or source_hostname = '%s'
-			)
+		%s
 		order by
 			agent_seed_id desc
-		`, hostname, hostname);
+		limit 10
+		`, whereCondition);
 	db,	err	:=	db.OpenOrchestrator()
     if err != nil {goto Cleanup}
     
@@ -690,6 +686,50 @@ func ReadActiveSeedsForHost(hostname string) ([]SeedOperation, error) {
 
 	if err != nil {	 log.Errore(err) }
 	return res, err
+}
+
+
+
+
+
+// ReadActiveSeedsForHost reads active seeds where host participates either as source or target
+func ReadActiveSeedsForHost(hostname string) ([]SeedOperation, error) {
+	whereCondition := fmt.Sprintf(`
+		where
+			is_complete = 0
+			and (
+				target_hostname = '%s'
+				or source_hostname = '%s'
+			)
+		`, hostname, hostname);
+	return readSeeds(whereCondition)
+}
+
+
+
+
+// ReadRecentCompletedSeedsForHost reads active seeds where host participates either as source or target
+func ReadRecentCompletedSeedsForHost(hostname string) ([]SeedOperation, error) {
+	whereCondition := fmt.Sprintf(`
+		where
+			is_complete = 1
+			and (
+				target_hostname = '%s'
+				or source_hostname = '%s'
+			)
+		`, hostname, hostname);
+	return readSeeds(whereCondition)
+}
+
+
+
+// AgentSeedDetails
+func AgentSeedDetails(seedId int64) ([]SeedOperation, error) {
+	whereCondition := fmt.Sprintf(`
+		where
+			agent_seed_id = %d
+		`, seedId);
+	return readSeeds(whereCondition)
 }
 
 

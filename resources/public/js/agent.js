@@ -10,7 +10,7 @@ $(document).ready(function () {
     $.get("/api/agent-active-seeds/"+currentAgentHost(), function (activeSeeds) {
         showLoader();
     	activeSeeds.forEach(function (activeSeed) {
-    		appendActiveSeed(activeSeed);
+    		appendSeedDetails(activeSeed, "[data-agent=active_seeds]");
     	});
     	if (activeSeeds.length == 0) {
     		$("div.active_seeds").parent().hide();
@@ -25,6 +25,15 @@ $(document).ready(function () {
     	        	appendSeedState(seedState);
     	    	});
     	    }, "json");    		
+    	}
+    }, "json");
+    $.get("/api/agent-recent-seeds/"+currentAgentHost(), function (recentSeeds) {
+        showLoader();
+        recentSeeds.forEach(function (recentSeed) {
+        	appendSeedDetails(recentSeed, "[data-agent=recent_seeds]");
+    	});
+    	if (recentSeeds.length == 0) {
+    		$("div.recent_seeds").parent().hide();
     	}
     }, "json");
     
@@ -118,28 +127,6 @@ $(document).ready(function () {
 		
         hideLoader();
     }
-    
-    function appendActiveSeed(seed) {    	
-    	var row = '<tr>';
-    	row += '<td>' + seed.SeedId + '</td>';
-    	row += '<td>' + (seed.TargetHostname == currentAgentHost() ? seed.TargetHostname : '<a href="/web/agent/'+seed.TargetHostname+'">'+seed.TargetHostname+'</a>') + '</td>';
-    	row += '<td>' + (seed.SourceHostname == currentAgentHost() ? seed.SourceHostname : '<a href="/web/agent/'+seed.SourceHostname+'">'+seed.SourceHostname+'</a>') + '</td>';
-    	row += '<td>' + seed.StartTimestamp + '</td>';
-    	row += '</tr>';
-    	$("[data-agent=active_seeds]").append(row);
-        hideLoader();
-    }
-    
-    function appendSeedState(seedState) {    	
-    	var row = '<tr>';
-    	row += '<td>' + seedState.StateTimestamp + '</td>';
-    	row += '<td>' + seedState.Action + '</td>';
-    	row += '<td>' + seedState.ErrorMessage + '</td>';
-    	row += '</tr>';
-    	$("[data-agent=seed_states]").append(row);
-        hideLoader();
-    }
-
     
     $("body").on("click", "button[data-command=unmount]", function(event) {
     	showLoader();

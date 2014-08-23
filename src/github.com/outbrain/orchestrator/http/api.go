@@ -565,6 +565,45 @@ func (this *HttpAPI) AgentActiveSeeds(params martini.Params, r render.Render, re
 }
 
 
+
+// AgentActiveSeeds
+func (this *HttpAPI) AgentRecentSeeds(params martini.Params, r render.Render, req *http.Request) {
+	if !config.Config.ServeAgentsHttp {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
+		return
+	}
+
+	output, err := agent.ReadRecentCompletedSeedsForHost(params["host"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+
+	r.JSON(200, output)
+}
+
+// AgentSeedDetails
+func (this *HttpAPI) AgentSeedDetails(params martini.Params, r render.Render, req *http.Request) {
+	if !config.Config.ServeAgentsHttp {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
+		return
+	}
+
+	seedId, err := strconv.ParseInt(params["seedId"], 10, 0)
+	output, err := agent.AgentSeedDetails(seedId)
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+
+	r.JSON(200, output)
+}
+
+
+
+
 // AgentActiveSeeds
 func (this *HttpAPI) AgentSeedStates(params martini.Params, r render.Render, req *http.Request) {
 	if !config.Config.ServeAgentsHttp {
@@ -617,5 +656,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/agent-mysql-start/:host", this.AgentMySQLStart)
 	m.Get("/api/agent-seed/:targetHost/:sourceHost", this.AgentSeed)
 	m.Get("/api/agent-active-seeds/:host", this.AgentActiveSeeds)
+	m.Get("/api/agent-recent-seeds/:host", this.AgentRecentSeeds)
+	m.Get("/api/agent-seed-details/:seedId", this.AgentSeedDetails)
 	m.Get("/api/agent-seed-states/:seedId", this.AgentSeedStates)
 }
