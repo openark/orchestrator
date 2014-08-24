@@ -139,6 +139,16 @@ func (this *HttpWeb) AgentSeedDetails(params martini.Params, r render.Render) {
 }
 
 
+func (this *HttpWeb) Seeds(params martini.Params, r render.Render) {
+	r.HTML(200, "templates/seeds", map[string]interface{}{
+		"agentsHttpActive": config.Config.ServeAgentsHttp,
+		"title": "seeds", 
+		"activePage": "agents", 
+		"autoshow_problems": false,
+		})
+}
+
+
 func (this *HttpWeb) Home(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/home", map[string]interface{}{
@@ -190,5 +200,6 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/audit/:page", this.Audit) 
 	m.Get("/web/agents", this.Agents) 
 	m.Get("/web/agent/:host", this.Agent) 
-	m.Get("/web/agent-seed-details/:seedId", this.AgentSeedDetails)
+	m.Get("/web/seed-details/:seedId", this.AgentSeedDetails)
+	m.Get("/web/seeds", this.Seeds)
 }

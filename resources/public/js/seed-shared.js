@@ -8,7 +8,7 @@ function appendSeedDetails(seed, selector) {
 		statusMessage = '<span class="text-info">Active</span>';
 	}
 	row += '<td>' + statusMessage + '</td>';
-	row += '<td><a href="/web/agent-seed-details/' + seed.SeedId + '">' + seed.SeedId + '</a></td>';
+	row += '<td><a href="/web/seed-details/' + seed.SeedId + '">' + seed.SeedId + '</a></td>';
 	row += '<td><a href="/web/agent/'+seed.TargetHostname+'">'+seed.TargetHostname+'</a></td>';
 	row += '<td><a href="/web/agent/'+seed.SourceHostname+'">'+seed.SourceHostname+'</a></td>';
 	row += '<td>' + seed.StartTimestamp + '</td>';

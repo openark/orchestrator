@@ -647,7 +647,7 @@ func Seed(targetHostname string, sourceHostname string) (int64, error) {
 
 
 // readSeeds
-func readSeeds(whereCondition string) ([]SeedOperation, error) {
+func readSeeds(whereCondition string, limit string) ([]SeedOperation, error) {
 	res := []SeedOperation{}
 	query := fmt.Sprintf(`
 		select 
@@ -663,8 +663,8 @@ func readSeeds(whereCondition string) ([]SeedOperation, error) {
 		%s
 		order by
 			agent_seed_id desc
-		limit 10
-		`, whereCondition);
+		%s
+		`, whereCondition, limit);
 	db,	err	:=	db.OpenOrchestrator()
     if err != nil {goto Cleanup}
     
@@ -701,7 +701,7 @@ func ReadActiveSeedsForHost(hostname string) ([]SeedOperation, error) {
 				or source_hostname = '%s'
 			)
 		`, hostname, hostname);
-	return readSeeds(whereCondition)
+	return readSeeds(whereCondition, "")
 }
 
 
@@ -717,7 +717,7 @@ func ReadRecentCompletedSeedsForHost(hostname string) ([]SeedOperation, error) {
 				or source_hostname = '%s'
 			)
 		`, hostname, hostname);
-	return readSeeds(whereCondition)
+	return readSeeds(whereCondition, "limit 10")
 }
 
 
@@ -728,8 +728,17 @@ func AgentSeedDetails(seedId int64) ([]SeedOperation, error) {
 		where
 			agent_seed_id = %d
 		`, seedId);
-	return readSeeds(whereCondition)
+	return readSeeds(whereCondition, "")
 }
+
+
+
+
+// ReadRecentSeeds
+func ReadRecentSeeds() ([]SeedOperation, error) {
+	return readSeeds("", "limit 100")
+}
+
 
 
 // SeedOperationState reads states for a given seed operation

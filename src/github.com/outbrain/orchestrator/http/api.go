@@ -623,6 +623,27 @@ func (this *HttpAPI) AgentSeedStates(params martini.Params, r render.Render, req
 }
 
 
+
+
+// Seeds retruns all recent seeds
+func (this *HttpAPI) Seeds(params martini.Params, r render.Render, req *http.Request) {
+	if !config.Config.ServeAgentsHttp {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
+		return
+	}
+
+	output, err := agent.ReadRecentSeeds()
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+
+	r.JSON(200, output)
+}
+
+
+
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/instance/:host/:port", this.Instance) 
@@ -659,4 +680,5 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/agent-recent-seeds/:host", this.AgentRecentSeeds)
 	m.Get("/api/agent-seed-details/:seedId", this.AgentSeedDetails)
 	m.Get("/api/agent-seed-states/:seedId", this.AgentSeedStates)
+	m.Get("/api/seeds", this.Seeds)
 }
