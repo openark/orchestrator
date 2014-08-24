@@ -6,6 +6,9 @@ $(document).ready(function () {
 	        showLoader();
 	        seedArray.forEach(function (seed) {
 	    		appendSeedDetails(seed, "[data-agent=seed_details]");
+	    		if (!seed.IsComplete) {
+	    			activateRefreshTimer();
+	    		}
 	    	});
 	    }, "json");
 

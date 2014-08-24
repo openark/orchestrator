@@ -581,9 +581,8 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 	var bytesCopied int64 = 0
 	
 	for !copyComplete {
-		seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("polling target agent info for %s", targetHostname), "")
 		targetAgentPoll, err := GetAgent(targetHostname)
-		if err != nil {return updateSeedStateEntry(seedStateId, err)}
+		if err != nil {return log.Errore(err)}
 
 		if targetAgentPoll.MySQLDiskUsage == bytesCopied {
 			numStaleIterations++
