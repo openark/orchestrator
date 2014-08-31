@@ -266,7 +266,9 @@ func UpdateAgentInfo(hostname string, agent Agent) error {
 // GetAgent gets a single agent status from the agent service
 func GetAgent(hostname string) (Agent, error) {
 	agent, token, err := readAgentBasicInfo(hostname)
-    if err != nil {goto Cleanup}
+	if err != nil {
+		return agent, log.Errore(err)
+	}
 
 	// All seems to be in order. Now make some inquiries from orchestrator-agent service:
 	{
@@ -276,18 +278,18 @@ func GetAgent(hostname string) (Agent, error) {
 		{		
 			availableLocalSnapshotsUri := fmt.Sprintf("%s/available-snapshots-local?token=%s", uri, token)
 			body, err := readResponse(http.Get(availableLocalSnapshotsUri))
-			if err != nil {return agent, log.Errore(err)}
-	
-			err = json.Unmarshal(body, &agent.AvailableLocalSnapshots)
-			if err != nil {return agent, log.Errore(err)}
+			if err == nil {
+				err = json.Unmarshal(body, &agent.AvailableLocalSnapshots)
+			}
+			if err != nil {log.Errore(err)}
 		}
 		{		
 			availableSnapshotsUri := fmt.Sprintf("%s/available-snapshots?token=%s", uri, token)
 			body, err := readResponse(http.Get(availableSnapshotsUri))
-			if err != nil {return agent, log.Errore(err)}
-	
-			err = json.Unmarshal(body, &agent.AvailableSnapshots)
-			if err != nil {return agent, log.Errore(err)}
+			if err == nil {
+				err = json.Unmarshal(body, &agent.AvailableSnapshots)
+			}
+			if err != nil {log.Errore(err)}
 		}
 		{
 			lvSnapshotsUri := fmt.Sprintf("%s/lvs-snapshots?token=%s", uri, token)		
@@ -295,7 +297,7 @@ func GetAgent(hostname string) (Agent, error) {
 			if err == nil {
 				err = json.Unmarshal(body, &agent.LogicalVolumes)
 			}
-			//if err != nil {return agent, log.Errore(err)}
+			if err != nil {log.Errore(err)}
 		}
 		{
 			mountUri := fmt.Sprintf("%s/mount?token=%s", uri, token)		
@@ -303,7 +305,7 @@ func GetAgent(hostname string) (Agent, error) {
 			if err == nil {
 				err = json.Unmarshal(body, &agent.MountPoint)
 			}
-			//if err != nil {return agent, log.Errore(err)}
+			if err != nil {log.Errore(err)}
 		}
 		{
 			mySQLRunningUri := fmt.Sprintf("%s/mysql-status?token=%s", uri, token)		
@@ -311,7 +313,7 @@ func GetAgent(hostname string) (Agent, error) {
 			if err == nil {
 				err = json.Unmarshal(body, &agent.MySQLRunning)
 			}
-			//if err != nil {return agent, log.Errore(err)}
+			// Actually an error is OK here since "status" returns with non-zero exit code when MySQL not running
 		}
 		{
 			mySQLRunningUri := fmt.Sprintf("%s/mysql-port?token=%s", uri, token)		
@@ -319,6 +321,7 @@ func GetAgent(hostname string) (Agent, error) {
 			if err == nil {
 				err = json.Unmarshal(body, &agent.MySQLPort)
 			}
+			if err != nil {log.Errore(err)}
 		}
 		{
 			mySQLDiskUsageUri := fmt.Sprintf("%s/mysql-du?token=%s", uri, token)		
@@ -326,12 +329,8 @@ func GetAgent(hostname string) (Agent, error) {
 			if err == nil {
 				err = json.Unmarshal(body, &agent.MySQLDiskUsage)
 			}
-			//if err != nil {return agent, log.Errore(err)}
+			if err != nil {log.Errore(err)}
 		}
-	}
-	Cleanup:
-	if err != nil{
-		return agent, log.Errore(err)
 	}
 	return agent, err
 }

@@ -4,6 +4,8 @@ $(document).ready(function () {
     
     $.get("/api/agent/"+currentAgentHost(), function (agent) {
     		showLoader();
+    		agent.AvailableLocalSnapshots || (agent.AvailableLocalSnapshots = [])
+    		agent.AvailableSnapshots || (agent.AvailableSnapshots = [])
 	    	displayAgent(agent);
 	    }, "json");
 
@@ -44,7 +46,7 @@ $(document).ready(function () {
     	}
     	$("[data-agent=hostname]").html(agent.Hostname)
     	$("[data-agent=hostname_search]").html(
-    			'<a href="/web/search?s='+agent.Hostname+'">'+agent.Hostname+'</a>'
+    			'<a href="/web/search?s='+agent.Hostname+':'+agent.MySQLPort+'">'+agent.Hostname+'</a>'
     	)
     	$("[data-agent=port]").html(agent.Port)
     	$("[data-agent=last_submitted]").html(agent.LastSubmitted)

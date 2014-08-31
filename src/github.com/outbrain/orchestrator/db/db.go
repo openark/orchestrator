@@ -132,6 +132,20 @@ var generateSQL = []string{
 		  KEY agent_seed_idx (agent_seed_id,state_timestamp)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS host_attributes (
+		  hostname varchar(128) NOT NULL,
+		  attribute_name varchar(128) NOT NULL,
+		  attribute_value varchar(128) NOT NULL,
+		  submit_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  expire_timestamp timestamp NULL DEFAULT NULL,
+		  PRIMARY KEY (hostname,attribute_name),
+		  KEY attribute_name_idx (attribute_name),
+		  KEY attribute_value_idx (attribute_value),
+		  KEY submit_timestamp_idx (submit_timestamp),
+		  KEY expire_timestamp_idx (expire_timestamp)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 
