@@ -22,6 +22,7 @@
   "ServeAgentsHttp": true,
   "AgentPollMinutes": 60,
   "UnseenAgentForgetHours": 6,
-  "StaleSeedFailMinutes": 60
+  "StaleSeedFailMinutes": 60,
+  "SeedAcceptableBytesDiff": 8192
 }
 

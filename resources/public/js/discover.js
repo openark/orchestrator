@@ -9,20 +9,24 @@ $(document).ready(function () {
         if (!$("#discoverPort").val()) {
             return addAlert("You must enter a port");
         }
-        showLoader();
-        var uri = "/api/discover/"+$("#discoverHostName").val()+"/"+$("#discoverPort").val();
-        $.get(uri, function (operationResult) {
-            hideLoader();
-            if (operationResult.Code == "ERROR") {
-                addAlert(operationResult.Message)
-            } else {
-                //location.reload();
-                addInfo(""+$("#discoverHostName").val()+":"+$("#discoverPort").val() 
-                		+ " sent for discovery. This should reflect in the topology listing or in topology instances."
-                		+ ' <a href="/web/search?s='+$("#discoverHostName").val()+":"+$("#discoverPort").val()+'" class="alert-link">Search</a> for this instance');
-            }   
-        }, "json"); 
+        discover($("#discoverHostName").val(), $("#discoverPort").val())
         return false;
     });
 });
 
+function discover(hostname, port) {
+    showLoader();
+    var uri = "/api/discover/"+hostname+"/"+port;
+    $.get(uri, function (operationResult) {
+        hideLoader();
+        if (operationResult.Code == "ERROR") {
+            addAlert(operationResult.Message)
+        } else {
+            //location.reload();
+            addInfo(""+hostname+":"+port
+            		+ " sent for discovery. This should reflect in the topology listing or in topology instances."
+            		+ ' <a href="/web/search?s='+hostname+":"+port+'" class="alert-link">Search</a> for this instance');
+        }   
+    }, "json"); 
+	
+}

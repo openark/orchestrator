@@ -124,7 +124,8 @@ func ReadAgents() ([]Agent, error) {
 			hostname,
 			port,
 			token,
-			last_submitted
+			last_submitted,
+			mysql_port
 		from 
 			host_agent
 		order by
@@ -137,6 +138,7 @@ func ReadAgents() ([]Agent, error) {
     	agent := Agent{}
     	agent.Hostname = m.GetString("hostname")
     	agent.Port = m.GetInt("port")
+    	agent.MySQLPort = m.GetInt64("mysql_port")
     	agent.Token = "" 
     	agent.LastSubmitted = m.GetString("last_submitted") 
 
@@ -191,7 +193,8 @@ func readAgentBasicInfo(hostname string) (Agent, string, error) {
 			hostname,
 			port,
 			token,
-			last_submitted
+			last_submitted,
+			mysql_port
 		from 
 			host_agent
 		where
@@ -204,6 +207,7 @@ func readAgentBasicInfo(hostname string) (Agent, string, error) {
     	agent.Hostname = m.GetString("hostname")
     	agent.Port = m.GetInt("port")
     	agent.LastSubmitted = m.GetString("last_submitted")
+    	agent.MySQLPort = m.GetInt64("mysql_port")
     	token = m.GetString("token")
     	
     	return nil
@@ -251,15 +255,24 @@ func UpdateAgentInfo(hostname string, agent Agent) error {
         		host_agent 
         	set
         		last_seen = NOW(),
+        		mysql_port = ?,
         		count_mysql_snapshots = ?
 			where 
 				hostname = ?`,
+			agent.MySQLPort,
 		 	len(agent.LogicalVolumes), 
 		 	hostname,
 		 	)
     if err != nil {return log.Errore(err)}
 
 	return nil
+}
+
+
+func baseAgentUri(agentHostname string, agentPort int) string {
+	uri := fmt.Sprintf("http://%s:%d/api", agentHostname, agentPort)
+	log.Debugf("orchestrator-agent uri: %s", uri)
+	return uri
 }
 
 
@@ -272,7 +285,7 @@ func GetAgent(hostname string) (Agent, error) {
 
 	// All seems to be in order. Now make some inquiries from orchestrator-agent service:
 	{
-		uri := fmt.Sprintf("http://%s:%d/api", agent.Hostname, agent.Port)
+		uri := baseAgentUri(agent.Hostname, agent.Port)
 		log.Debugf("orchestrator-agent uri: %s", uri)
 
 		{		
@@ -336,12 +349,12 @@ func GetAgent(hostname string) (Agent, error) {
 }
 
 
-func executeAgentCommand(hostname string, command string) (Agent, error) {
+func executeAgentCommand(hostname string, command string, onResponse *func([]byte)) (Agent, error) {
 	agent, token, err := readAgentBasicInfo(hostname)
     if err != nil {return agent, err}
 
 	// All seems to be in order. Now make some inquiries from orchestrator-agent service:
-	uri := fmt.Sprintf("http://%s:%d/api", agent.Hostname, agent.Port)
+	uri := baseAgentUri(agent.Hostname, agent.Port)
 
 	var fullCommand string
 	if strings.Contains(command, "?") {
@@ -351,8 +364,11 @@ func executeAgentCommand(hostname string, command string) (Agent, error) {
 	}
 	log.Debugf("orchestrator-agent command: %s", fullCommand)
 	agentCommandUri := fmt.Sprintf("%s/%s", uri, fullCommand)
-	_, err = readResponse(http.Get(agentCommandUri))
+	body, err := readResponse(http.Get(agentCommandUri))
 	if err != nil {return agent, log.Errore(err)}
+	if onResponse != nil {
+		(*onResponse)(body);
+	}
 
 	return agent, err	
 }
@@ -360,44 +376,89 @@ func executeAgentCommand(hostname string, command string) (Agent, error) {
 
 // Unmount unmounts the designated snapshot mount point
 func Unmount(hostname string) (Agent, error) {
-	return executeAgentCommand(hostname, "umount")
+	return executeAgentCommand(hostname, "umount", nil)
 }
 
 
 // MountLV
 func MountLV(hostname string, lv string) (Agent, error) {
-	return executeAgentCommand(hostname, fmt.Sprintf("mountlv?lv=%s", lv))
+	return executeAgentCommand(hostname, fmt.Sprintf("mountlv?lv=%s", lv), nil)
 }
 
 
 
 // MySQLStop
 func deleteMySQLDatadir(hostname string) (Agent, error) {
-	return executeAgentCommand(hostname, "delete-mysql-datadir")
+	return executeAgentCommand(hostname, "delete-mysql-datadir", nil)
 }
 
 
 // MySQLStop
 func MySQLStop(hostname string) (Agent, error) {
-	return executeAgentCommand(hostname, "mysql-stop")
+	return executeAgentCommand(hostname, "mysql-stop", nil)
 }
 
 
 
 // MySQLStart
 func MySQLStart(hostname string) (Agent, error) {
-	return executeAgentCommand(hostname, "mysql-start")
+	return executeAgentCommand(hostname, "mysql-start", nil)
 }
 
 
 
-func ReceiveMySQLSeedData(hostname string) (Agent, error) {
-	return executeAgentCommand(hostname, "receive-mysql-seed-data")
+func ReceiveMySQLSeedData(hostname string, seedId int64) (Agent, error) {
+	return executeAgentCommand(hostname, fmt.Sprintf("receive-mysql-seed-data/%d", seedId), nil)
 }
 
 
-func SendMySQLSeedData(hostname string, targetHostname string) (Agent, error) {
-	return executeAgentCommand(hostname, fmt.Sprintf("send-mysql-seed-data/%s", targetHostname))
+func SendMySQLSeedData(hostname string, targetHostname string, seedId int64) (Agent, error) {
+	return executeAgentCommand(hostname, fmt.Sprintf("send-mysql-seed-data/%s/%d", targetHostname, seedId), nil)
+}
+
+
+
+func AbortSeedCommand(hostname string, seedId int64) (Agent, error) {
+	return executeAgentCommand(hostname, fmt.Sprintf("abort-seed/%d", seedId), nil)
+}
+
+
+func seedCommandCompleted(hostname string, seedId int64) (Agent, bool, error) {
+	result := false
+	onResponse := func (body []byte) {
+		json.Unmarshal(body, &result)
+	}
+	agent, err := executeAgentCommand(hostname, fmt.Sprintf("seed-command-completed/%d", seedId), &onResponse)
+	return agent, result, err
+}
+
+
+func seedCommandSucceeded(hostname string, seedId int64) (Agent, bool, error) {
+	result := false
+	onResponse := func (body []byte) {
+		json.Unmarshal(body, &result)
+	}
+	agent, err := executeAgentCommand(hostname, fmt.Sprintf("seed-command-succeeded/%d", seedId), &onResponse)
+	return agent, result, err
+}
+
+
+func AbortSeed(seedId int64) error {
+	seedOperations, err := AgentSeedDetails(seedId)
+	if err != nil {return log.Errore(err)}
+	
+	for _, seedOperation := range seedOperations {
+		AbortSeedCommand(seedOperation.TargetHostname, seedId)
+		AbortSeedCommand(seedOperation.SourceHostname, seedId)
+	}
+	updateSeedComplete(seedId, errors.New("Aborted"))
+	return nil
+}
+
+
+
+func PostCopy(hostname string) (Agent, error) {
+	return executeAgentCommand(hostname, "post-copy", nil)
 }
 
 
@@ -567,13 +628,13 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 	
 	// ...
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("%s will now receive data in background", targetHostname), "")
-	ReceiveMySQLSeedData(targetHostname)
+	ReceiveMySQLSeedData(targetHostname, seedId)
 
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Waiting some time for %s to start listening for incoming data", targetHostname), "")
 	time.Sleep(2 * time.Second)	
 	
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("%s will now send data to %s in background", sourceHostname, targetHostname), "")
-	SendMySQLSeedData(sourceHostname, targetHostname)
+	SendMySQLSeedData(sourceHostname, targetHostname, seedId)
 
 	copyComplete := false
 	numStaleIterations := 0
@@ -586,15 +647,47 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 		if targetAgentPoll.MySQLDiskUsage == bytesCopied {
 			numStaleIterations++
 		}
-		if numStaleIterations > 10 {
-			return updateSeedStateEntry(seedStateId, errors.New("10 iterations have passed without progress. Bailing out."))
-		}
 		bytesCopied = targetAgentPoll.MySQLDiskUsage
 		
-		if bytesCopied >= sourceAgent.MountPoint.MySQLDiskUsage {
+		copyFailed := false
+		if _, commandCompleted, _ := seedCommandCompleted(targetHostname, seedId); commandCompleted {
 			copyComplete = true
-		} 
-		copyPct := 100*bytesCopied/sourceAgent.MountPoint.MySQLDiskUsage
+			if _, commandSucceeded, _ := seedCommandSucceeded(targetHostname, seedId); !commandSucceeded {
+				// failed.
+				copyFailed = true
+			}
+		}
+		if numStaleIterations > 10 {
+			copyFailed = true
+		}
+		if copyFailed {
+			AbortSeedCommand(sourceHostname, seedId)
+			AbortSeedCommand(targetHostname, seedId)
+			Unmount(sourceHostname)
+			return updateSeedStateEntry(seedStateId, errors.New("10 iterations have passed without progress. Bailing out."))
+		}
+		/*
+		if bytesCopied >= sourceAgent.MountPoint.MySQLDiskUsage {
+			// Obviously done
+			copyComplete = true
+		} else	if numStaleIterations > 10 {
+			if bytesCopied >= sourceAgent.MountPoint.MySQLDiskUsage - config.Config.SeedAcceptableBytesDiff {
+				// Experiments show a successful copy can end up with 8192 bytes short.
+				// I don't actually understand why; but this is now configurable, and upon
+				// stale iteration we allow such a diff.
+				copyComplete = true
+			} else {
+				AbortSeedCommand(sourceHostname, seedId)
+				AbortSeedCommand(targetHostname, seedId)
+				Unmount(sourceHostname)
+				return updateSeedStateEntry(seedStateId, errors.New("10 iterations have passed without progress. Bailing out."))
+			}
+		}
+		*/
+		var copyPct int64 = 0
+		if sourceAgent.MountPoint.MySQLDiskUsage > 0 {
+			copyPct = 100*bytesCopied/sourceAgent.MountPoint.MySQLDiskUsage
+		}
 		seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Copied %d/%d bytes (%d%%)", bytesCopied, sourceAgent.MountPoint.MySQLDiskUsage, copyPct), "")
 		
 		if !copyComplete {
@@ -603,6 +696,12 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 	}
 	
 	// Cleanup:
+	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Executing post-copy command on %s", targetHostname), "")
+	_, err = PostCopy(targetHostname)
+	if err != nil {
+		return updateSeedStateEntry(seedStateId, err)
+	}
+	
 	
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Unmounting logical volume: %s", seedFromLogicalVolume.Path), "")
 	_, err = Unmount(sourceHostname)

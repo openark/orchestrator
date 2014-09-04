@@ -20,6 +20,7 @@ import (
 	"strconv"
 	"net/http"	
 	"fmt"
+	"strings"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	
@@ -78,9 +79,54 @@ func (this *HttpAgentsAPI) GetHostAttributeByAttributeName(params martini.Params
 }
 
 
+// AgentsHosts provides list of agent host names
+func (this *HttpAgentsAPI) AgentsHosts(params martini.Params, r render.Render, req *http.Request) string {
+	agents, err := agent.ReadAgents()
+	hostnames := []string{}
+	for _, agent := range agents {
+		hostnames = append(hostnames, agent.Hostname)
+	}
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return ""
+	}
+
+	if req.URL.Query().Get("format") == "txt" {
+		return strings.Join(hostnames, "\n")
+	} else {
+		r.JSON(200, hostnames)
+	}
+	return ""
+}
+
+
+// AgentsInstances provides list of assumed MySQL instances (host:port)
+func (this *HttpAgentsAPI) AgentsInstances(params martini.Params, r render.Render, req *http.Request) string {
+	agents, err := agent.ReadAgents()
+	hostnames := []string{}
+	for _, agent := range agents {
+		hostnames = append(hostnames, fmt.Sprintf("%s:%d", agent.Hostname, agent.MySQLPort))
+	}
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return ""
+	}
+
+	if req.URL.Query().Get("format") == "txt" {
+		return strings.Join(hostnames, "\n")
+	} else {
+		r.JSON(200, hostnames)
+	}
+	return ""
+}
+
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAgentsAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/submit-agent/:host/:port/:token", this.SubmitAgent) 
 	m.Get("/api/host-attribute/:host/:attrVame/:attrValue", this.SetHostAttribute)
 	m.Get("/api/host-attribute/attr/:attr/", this.GetHostAttributeByAttributeName)
+	m.Get("/api/agents-hosts", this.AgentsHosts) 
+	m.Get("/api/agents-instances", this.AgentsInstances) 
 }

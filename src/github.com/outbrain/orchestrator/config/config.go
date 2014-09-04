@@ -50,6 +50,7 @@ type Configuration struct {
 	AgentPollMinutes	uint				// Minutes between agent polling
 	UnseenAgentForgetHours	uint			// Number of hours after which an unseen agent is forgotten
 	StaleSeedFailMinutes	uint			// Number of minutes after which a stale (no progress) seed is considered failed.
+	SeedAcceptableBytesDiff	int64			// Difference in bytes between seed source & target data size that is still considered as successful copy
 }	
 
 var Config *Configuration = NewConfiguration()
@@ -71,6 +72,7 @@ func NewConfiguration() *Configuration {
 		AgentPollMinutes:			60,
 		UnseenAgentForgetHours:		6,		
 		StaleSeedFailMinutes:		60,
+		SeedAcceptableBytesDiff:	8192,
 	}
 }
 

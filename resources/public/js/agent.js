@@ -2,6 +2,8 @@
 $(document).ready(function () {
     showLoader();
     
+    var hasActiveSeeds = false;
+    
     $.get("/api/agent/"+currentAgentHost(), function (agent) {
     		showLoader();
     		agent.AvailableLocalSnapshots || (agent.AvailableLocalSnapshots = [])
@@ -19,6 +21,7 @@ $(document).ready(function () {
     		$("div.seed_states").parent().hide();
     	}
     	if (activeSeeds.length > 0) {
+    		hasActiveSeeds = true;
     	    activateRefreshTimer();
 
     	    $.get("/api/agent-seed-states/"+activeSeeds[0].SeedId, function (seedStates) {
@@ -47,7 +50,8 @@ $(document).ready(function () {
     	$("[data-agent=hostname]").html(agent.Hostname)
     	$("[data-agent=hostname_search]").html(
     			'<a href="/web/search?s='+agent.Hostname+':'+agent.MySQLPort+'">'+agent.Hostname+'</a>'
-    	)
+    			+ '<div class="pull-right"><button class="btn btn-xs btn-success" data-command="discover" data-hostname="'+agent.Hostname+'" data-mysql-port="'+agent.MySQLPort+'">Discover</button></div>'
+    	);
     	$("[data-agent=port]").html(agent.Port)
     	$("[data-agent=last_submitted]").html(agent.LastSubmitted)
     	
@@ -131,6 +135,10 @@ $(document).ready(function () {
     }
     
     $("body").on("click", "button[data-command=unmount]", function(event) {
+    	if (hasActiveSeeds) {
+			addAlert("This agent participates in an active seed; please await or abort active seed before unmounting");
+			return;
+    	}
     	showLoader();
         $.get("/api/agent-umount/"+currentAgentHost(), function (operationResult) {
 			hideLoader();
@@ -182,6 +190,10 @@ $(document).ready(function () {
         }, "json");	
     });
     $("body").on("click", "button[data-command=seed]", function(event) {
+    	if (hasActiveSeeds) {
+			addAlert("This agent already participates in an active seed; please await or abort active seed");
+			return;
+    	}
     	if ($(event.target).attr("data-mysql-running") == "true") {
 			addAlert("MySQL is running on this host. Please first stop the MySQL service");
 			return;
@@ -211,6 +223,11 @@ $(document).ready(function () {
 		        }, "json");
 			}
 		});
+    });
+    $("body").on("click", "button[data-command=discover]", function(event) {
+    	var hostname = $(event.target).attr("data-hostname")
+    	var mySQLPort = $(event.target).attr("data-mysql-port")
+    	discover(hostname, mySQLPort)
     });
 
 });	

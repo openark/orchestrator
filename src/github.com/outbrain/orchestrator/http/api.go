@@ -423,14 +423,14 @@ func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Re
 		return
 	}
 
-	instances, err := agent.ReadAgents()
+	agents, err := agent.ReadAgents()
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
 		return
 	}
 
-	r.JSON(200, instances)
+	r.JSON(200, agents)
 }
 
 
@@ -644,6 +644,26 @@ func (this *HttpAPI) Seeds(params martini.Params, r render.Render, req *http.Req
 
 
 
+// AbortSeed
+func (this *HttpAPI) AbortSeed(params martini.Params, r render.Render, req *http.Request) {
+	if !config.Config.ServeAgentsHttp {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
+		return
+	}
+
+	seedId, err := strconv.ParseInt(params["seedId"], 10, 0)
+	err = agent.AbortSeed(seedId)
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+
+	r.JSON(200, err == nil)
+}
+
+
+
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/instance/:host/:port", this.Instance) 
@@ -680,5 +700,6 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/agent-recent-seeds/:host", this.AgentRecentSeeds)
 	m.Get("/api/agent-seed-details/:seedId", this.AgentSeedDetails)
 	m.Get("/api/agent-seed-states/:seedId", this.AgentSeedStates)
+	m.Get("/api/agent-abort-seed/:seedId", this.AbortSeed)
 	m.Get("/api/seeds", this.Seeds)
 }
