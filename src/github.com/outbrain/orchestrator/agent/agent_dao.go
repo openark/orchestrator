@@ -344,6 +344,14 @@ func GetAgent(hostname string) (Agent, error) {
 			}
 			if err != nil {log.Errore(err)}
 		}
+		{
+			mySQLDatadirDiskFreeUri := fmt.Sprintf("%s/mysql-datadir-available-space?token=%s", uri, token)		
+			body, err := readResponse(http.Get(mySQLDatadirDiskFreeUri))
+			if err == nil {
+				err = json.Unmarshal(body, &agent.MySQLDatadirDiskFree)
+			}
+			if err != nil {log.Errore(err)}
+		}		
 	}
 	return agent, err
 }
@@ -625,7 +633,16 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Erasing MySQL data on %s", targetHostname), "")
 	_, err = deleteMySQLDatadir(targetHostname)
 	if err != nil {return updateSeedStateEntry(seedStateId, err)}
+
+	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Aquiring target host datadir free space on %s", targetHostname), "")
+	targetAgent, err = GetAgent(targetHostname)
+	if err != nil {return updateSeedStateEntry(seedStateId, err)}
 	
+	if sourceAgent.MountPoint.MySQLDiskUsage > targetAgent.MySQLDatadirDiskFree {
+		Unmount(sourceHostname)
+		return updateSeedStateEntry(seedStateId, errors.New(fmt.Sprintf("Not enough disk space on target host %s. Required: %d, available: %d. Bailing out.", targetHostname, sourceAgent.MountPoint.MySQLDiskUsage, targetAgent.MySQLDatadirDiskFree)))
+	}
+
 	// ...
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("%s will now receive data in background", targetHostname), "")
 	ReceiveMySQLSeedData(targetHostname, seedId)

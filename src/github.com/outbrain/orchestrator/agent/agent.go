@@ -59,6 +59,7 @@ type Agent struct {
 	MySQLRunning		bool
 	MySQLDiskUsage		int64
 	MySQLPort			int64
+	MySQLDatadirDiskFree	int64
 }
 
 
