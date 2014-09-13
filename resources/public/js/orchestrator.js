@@ -136,6 +136,8 @@ function openNodeModal(node) {
     addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
     addNodeModalDataAttribute("Cluster",
             '<a href="/web/cluster/'+node.ClusterName+'">'+node.ClusterName+'</a>');
+    addNodeModalDataAttribute("Agent",
+            '<a href="/web/agent/'+node.Key.Hostname+'">'+node.Key.Hostname+'</a>');
     
     $('#node_modal button[data-btn=begin-maintenance]').unbind("click");
     $('#node_modal button[data-btn=end-maintenance]').unbind("click");
