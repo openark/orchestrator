@@ -117,6 +117,7 @@ $(document).ready(function () {
         			volumeTextType = 'text-success';
         		} else if (!(agent.MountPoint && agent.MountPoint.IsMounted)) {
         			volumeText += '<button class="btn btn-xs btn-success" data-command="mountlv" data-lv="'+volume+'">Mount</button>'
+        			volumeText += ' <button class="btn btn-xs btn-danger" data-command="removelv" data-lv="'+volume+'">Remove</button>'
         		} else {
         		}
         		volumeText = '<td><code class="'+volumeTextType+'"><strong>'+volume+'</strong></code><div class="pull-right">' + volumeText + '</div></td>';
@@ -160,6 +161,21 @@ $(document).ready(function () {
 				location.reload();
 			}	
         }, "json");	
+    });
+    $("body").on("click", "button[data-command=removelv]", function(event) {
+    	var lv = $(event.target).attr("data-lv")
+    	var message = "Are you sure you wish to remove logical volume <code><strong>" + lv + "</strong></code>?";
+    	bootbox.confirm(message, function(confirm) {
+	    	showLoader();
+	        $.get("/api/agent-removelv/"+currentAgentHost()+"?lv="+encodeURIComponent(lv), function (operationResult) {
+				hideLoader();
+				if (operationResult.Code == "ERROR") {
+					addAlert(operationResult.Message)
+				} else {
+					location.reload();
+				}	
+	        }, "json");	
+		});
     });
     $("body").on("click", "button[data-command=mysql-stop]", function(event) {
     	var message = "Are you sure you wish to shut down MySQL service on <code><strong>" + 

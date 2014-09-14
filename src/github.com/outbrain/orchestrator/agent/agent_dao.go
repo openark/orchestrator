@@ -395,6 +395,13 @@ func MountLV(hostname string, lv string) (Agent, error) {
 
 
 
+// RemoveLV
+func RemoveLV(hostname string, lv string) (Agent, error) {
+	return executeAgentCommand(hostname, fmt.Sprintf("removelv?lv=%s", lv), nil)
+}
+
+
+
 // MySQLStop
 func deleteMySQLDatadir(hostname string) (Agent, error) {
 	return executeAgentCommand(hostname, "delete-mysql-datadir", nil)

@@ -31,11 +31,11 @@ import (
 func AuditOperation(auditType string, instanceKey *InstanceKey, message string) error {
 
 	if config.Config.AuditLogFile != "" {
-		f, err := os.OpenFile(config.Config.AuditLogFile, os.O_APPEND|os.O_WRONLY, 0600)
+		f, err := os.OpenFile(config.Config.AuditLogFile, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0600)
 		if err != nil {return log.Errore(err)}
 		
 		defer f.Close()
-		text := fmt.Sprintf("%s\t%s\t%s\t%d\t%s\n", time.Now().Format(log.TimeFormat), auditType, instanceKey.Hostname, instanceKey.Port, message)
+		text := fmt.Sprintf("%s\t%s\t%s\t%d\t%s\t\n", time.Now().Format(log.TimeFormat), auditType, instanceKey.Hostname, instanceKey.Port, message)
 		if _, err = f.WriteString(text); err != nil {return log.Errore(err)}
 	}
 
