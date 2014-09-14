@@ -21,6 +21,7 @@ import (
 	"net/http"	
 	"fmt"
 	"strconv"	
+	"strings"
 	"encoding/json"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
@@ -65,13 +66,37 @@ type HttpAPI struct{}
 var API HttpAPI = HttpAPI{}
 
 
+
+
+func (this *HttpAPI) getAuthUser(req *http.Request) string {
+	for _, user := range req.Header[config.Config.AuthUserHeader] {
+		return user;
+	}
+	return "";
+}
+
+
+func (this *HttpAPI) isAuthorizedForAction(req *http.Request) bool {
+	if strings.ToLower(config.Config.AuthenticationMethod) != "proxy" {
+		return true;
+	}
+	authUser := this.getAuthUser(req)
+	for _, user := range config.Config.PowerAuthUsers {
+        if user == "*" || user == authUser {
+            return true
+        }
+    }
+    return false
+	
+}
+
 func (this *HttpAPI) getInstanceKey(host string, port string) (inst.InstanceKey, error) {
 	instanceKey, err := inst.NewInstanceKeyFromStrings(host, port)
 	return *instanceKey, err
 }
 
 // Instance reads and returns an instance's details.
-func (this *HttpAPI) Instance(params martini.Params, r render.Render) {
+func (this *HttpAPI) Instance(params martini.Params, r render.Render, req *http.Request) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
@@ -87,7 +112,11 @@ func (this *HttpAPI) Instance(params martini.Params, r render.Render) {
 }
 
 // Discover starts an asynchronuous discovery for an instance
-func (this *HttpAPI) Discover(params martini.Params, r render.Render) {
+func (this *HttpAPI) Discover(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
@@ -100,7 +129,11 @@ func (this *HttpAPI) Discover(params martini.Params, r render.Render) {
 }
 
 // Refresh synchronuously re-reads a topology instance
-func (this *HttpAPI) Refresh(params martini.Params, r render.Render) {
+func (this *HttpAPI) Refresh(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
@@ -119,7 +152,11 @@ func (this *HttpAPI) Refresh(params martini.Params, r render.Render) {
 
 
 // Forget removes an instance entry fro backend database
-func (this *HttpAPI) Forget(params martini.Params, r render.Render) {
+func (this *HttpAPI) Forget(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
@@ -133,7 +170,7 @@ func (this *HttpAPI) Forget(params martini.Params, r render.Render) {
 
 
 // Resolve tries to resolve hostname and then checks to see if port is open on that host.
-func (this *HttpAPI) Resolve(params martini.Params, r render.Render) {
+func (this *HttpAPI) Resolve(params martini.Params, r render.Render, req *http.Request) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
@@ -153,7 +190,11 @@ func (this *HttpAPI) Resolve(params martini.Params, r render.Render) {
 
 
 // BeginMaintenance begins maintenance mode for given instance
-func (this *HttpAPI) BeginMaintenance(params martini.Params, r render.Render) {
+func (this *HttpAPI) BeginMaintenance(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
@@ -171,7 +212,11 @@ func (this *HttpAPI) BeginMaintenance(params martini.Params, r render.Render) {
 
 
 // EndMaintenance terminates maintenance mode
-func (this *HttpAPI) EndMaintenance(params martini.Params, r render.Render) {
+func (this *HttpAPI) EndMaintenance(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	maintenanceKey, err := strconv.ParseInt(params["maintenanceKey"], 10, 0)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
@@ -188,7 +233,11 @@ func (this *HttpAPI) EndMaintenance(params martini.Params, r render.Render) {
 
 
 // EndMaintenanceByInstanceKey terminates maintenance mode for given instance
-func (this *HttpAPI) EndMaintenanceByInstanceKey(params martini.Params, r render.Render) {
+func (this *HttpAPI) EndMaintenanceByInstanceKey(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
@@ -206,7 +255,7 @@ func (this *HttpAPI) EndMaintenanceByInstanceKey(params martini.Params, r render
 
 
 // Maintenance provides list of instance under active maintenance
-func (this *HttpAPI) Maintenance(params martini.Params, r render.Render) {
+func (this *HttpAPI) Maintenance(params martini.Params, r render.Render, req *http.Request) {
 	instanceKeys, err := inst.ReadActiveMaintenance()
 							  
 	if err != nil {
@@ -219,7 +268,11 @@ func (this *HttpAPI) Maintenance(params martini.Params, r render.Render) {
 
 
 // MoveUp attempts to move an instance up the topology
-func (this *HttpAPI) MoveUp(params martini.Params, r render.Render) {
+func (this *HttpAPI) MoveUp(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
@@ -237,7 +290,11 @@ func (this *HttpAPI) MoveUp(params martini.Params, r render.Render) {
 
 
 // MakeCoMaster attempts to make an instance co-master with its own master
-func (this *HttpAPI) MakeCoMaster(params martini.Params, r render.Render) {
+func (this *HttpAPI) MakeCoMaster(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
@@ -255,7 +312,11 @@ func (this *HttpAPI) MakeCoMaster(params martini.Params, r render.Render) {
 
 
 // MakeCoMaster attempts to make an instance co-master with its own master
-func (this *HttpAPI) DetachSlave(params martini.Params, r render.Render) {
+func (this *HttpAPI) DetachSlave(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
@@ -273,7 +334,11 @@ func (this *HttpAPI) DetachSlave(params martini.Params, r render.Render) {
 
 
 // MoveBelow attempts to move an instance below its supposed sibling
-func (this *HttpAPI) MoveBelow(params martini.Params, r render.Render) {
+func (this *HttpAPI) MoveBelow(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 	if err != nil {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
@@ -296,7 +361,11 @@ func (this *HttpAPI) MoveBelow(params martini.Params, r render.Render) {
 
 
 // StartSlave starts replication on given instance
-func (this *HttpAPI) StartSlave(params martini.Params, r render.Render) {
+func (this *HttpAPI) StartSlave(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
@@ -314,7 +383,11 @@ func (this *HttpAPI) StartSlave(params martini.Params, r render.Render) {
 
 
 // StartSlave stops replication on given instance
-func (this *HttpAPI) StopSlave(params martini.Params, r render.Render) {
+func (this *HttpAPI) StopSlave(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 
 	if err != nil {
@@ -332,7 +405,7 @@ func (this *HttpAPI) StopSlave(params martini.Params, r render.Render) {
 
 
 // Cluster provides list of instances in given cluster
-func (this *HttpAPI) Cluster(params martini.Params, r render.Render) {
+func (this *HttpAPI) Cluster(params martini.Params, r render.Render, req *http.Request) {
 	instances, err := inst.ReadClusterInstances(params["clusterName"])
 
 	if err != nil {
@@ -345,7 +418,7 @@ func (this *HttpAPI) Cluster(params martini.Params, r render.Render) {
 
 
 // Clusters provides list of known clusters
-func (this *HttpAPI) Clusters(params martini.Params, r render.Render) {
+func (this *HttpAPI) Clusters(params martini.Params, r render.Render, req *http.Request) {
 	clusterNames, err := inst.ReadClusters()
 
 	if err != nil {
@@ -358,7 +431,7 @@ func (this *HttpAPI) Clusters(params martini.Params, r render.Render) {
 
 
 // ClustersInfo provides list of known clusters
-func (this *HttpAPI) ClustersInfo(params martini.Params, r render.Render) {
+func (this *HttpAPI) ClustersInfo(params martini.Params, r render.Render, req *http.Request) {
 	clustersInfo, err := inst.ReadClustersInfo()
 
 	if err != nil {
@@ -418,6 +491,10 @@ func (this *HttpAPI) Audit(params martini.Params, r render.Render, req *http.Req
 
 // Problems provides list of instances with known problems
 func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	if !config.Config.ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
 		return
@@ -436,6 +513,10 @@ func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Re
 
 // Problems provides list of instances with known problems
 func (this *HttpAPI) Agent(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	if !config.Config.ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
 		return
@@ -454,6 +535,10 @@ func (this *HttpAPI) Agent(params martini.Params, r render.Render, req *http.Req
 
 // Problems provides list of instances with known problems
 func (this *HttpAPI) AgentUnmount(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	if !config.Config.ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
 		return
@@ -472,6 +557,10 @@ func (this *HttpAPI) AgentUnmount(params martini.Params, r render.Render, req *h
 
 // Problems provides list of instances with known problems
 func (this *HttpAPI) AgentMountLV(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	if !config.Config.ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
 		return
@@ -492,6 +581,10 @@ func (this *HttpAPI) AgentMountLV(params martini.Params, r render.Render, req *h
 
 // AgentMySQLStop stops MySQL service on agent
 func (this *HttpAPI) AgentMySQLStop(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	if !config.Config.ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
 		return
@@ -510,6 +603,10 @@ func (this *HttpAPI) AgentMySQLStop(params martini.Params, r render.Render, req 
 
 // AgentMySQLStart starts MySQL service on agent
 func (this *HttpAPI) AgentMySQLStart(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	if !config.Config.ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
 		return
@@ -529,6 +626,10 @@ func (this *HttpAPI) AgentMySQLStart(params martini.Params, r render.Render, req
 
 // AgentSeed completely seeds a hsot with another host's snapshots
 func (this *HttpAPI) AgentSeed(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	if !config.Config.ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
 		return
@@ -549,6 +650,10 @@ func (this *HttpAPI) AgentSeed(params martini.Params, r render.Render, req *http
 
 // AgentActiveSeeds
 func (this *HttpAPI) AgentActiveSeeds(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	if !config.Config.ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
 		return
@@ -568,6 +673,10 @@ func (this *HttpAPI) AgentActiveSeeds(params martini.Params, r render.Render, re
 
 // AgentActiveSeeds
 func (this *HttpAPI) AgentRecentSeeds(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	if !config.Config.ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
 		return
@@ -585,6 +694,10 @@ func (this *HttpAPI) AgentRecentSeeds(params martini.Params, r render.Render, re
 
 // AgentSeedDetails
 func (this *HttpAPI) AgentSeedDetails(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	if !config.Config.ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
 		return
@@ -606,6 +719,10 @@ func (this *HttpAPI) AgentSeedDetails(params martini.Params, r render.Render, re
 
 // AgentActiveSeeds
 func (this *HttpAPI) AgentSeedStates(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	if !config.Config.ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
 		return
@@ -627,6 +744,10 @@ func (this *HttpAPI) AgentSeedStates(params martini.Params, r render.Render, req
 
 // Seeds retruns all recent seeds
 func (this *HttpAPI) Seeds(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	if !config.Config.ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
 		return
@@ -646,6 +767,10 @@ func (this *HttpAPI) Seeds(params martini.Params, r render.Render, req *http.Req
 
 // AbortSeed
 func (this *HttpAPI) AbortSeed(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
 	if !config.Config.ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
 		return
@@ -660,6 +785,13 @@ func (this *HttpAPI) AbortSeed(params martini.Params, r render.Render, req *http
 	}
 
 	r.JSON(200, err == nil)
+}
+
+
+
+// AbortSeed
+func (this *HttpAPI) Headers(params martini.Params, r render.Render, req *http.Request) {
+	r.JSON(200, req.Header)
 }
 
 
@@ -702,4 +834,5 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/agent-seed-states/:seedId", this.AgentSeedStates)
 	m.Get("/api/agent-abort-seed/:seedId", this.AbortSeed)
 	m.Get("/api/seeds", this.Seeds)
+	m.Get("/api/headers", this.Headers)
 }

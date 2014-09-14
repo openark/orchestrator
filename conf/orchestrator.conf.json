@@ -1,4 +1,5 @@
 {
+  "ListenAddress": ":3000",
   "MySQLTopologyUser": "msandbox",
   "MySQLTopologyPassword": "msandbox",
   "MySQLOrchestratorHost": "127.0.0.1",
@@ -12,10 +13,14 @@
   "UnseenInstanceForgetHours": 240,
   "ReasonableReplicationLagSeconds": 10,
   "ReasonableMaintenanceReplicationLagSeconds": 20,
+  "AuditLogFile": "/tmp/orchestrator-audit.log",
   "AuditPageSize": 20,
   "SlaveStartPostWaitMilliseconds": 1000,
+  "AuthenticationMethod": "",
   "HTTPAuthUser": "",
   "HTTPAuthPassword": "",
+  "AuthUserHeader": "",
+  "PowerAuthUsers": ["*"],
   "ClusterNameToAlias": {
     "127.0.0.1": "test suite"
   },

@@ -21,7 +21,8 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 	"github.com/martini-contrib/auth"
-	
+
+	"strings"	
 	nethttp "net/http" 
 	
 	"github.com/outbrain/orchestrator/config"
@@ -42,7 +43,10 @@ func Http(discovery bool) {
 // standardHttp starts serving standard HTTP (api/web) requests, to be used by normal clients 
 func standardHttp(discovery bool) {
 	m := martini.Classic()
-	if config.Config.HTTPAuthUser != "" {
+	if strings.ToLower(config.Config.AuthenticationMethod) == "basic" && config.Config.HTTPAuthUser == "" {
+		log.Warning("AuthenticationMethod is configured as 'basic' but not HTTPAuthUser defined. Running without autherntication.")
+	}
+	if strings.ToLower(config.Config.AuthenticationMethod) == "basic" && config.Config.HTTPAuthUser != "" {
 		m.Use(auth.Basic(config.Config.HTTPAuthUser, config.Config.HTTPAuthPassword))
     }
 	
@@ -64,7 +68,8 @@ func standardHttp(discovery bool) {
 	http.Web.RegisterRequests(m)
 
 	// Serve
-	m.Run()
+	
+	nethttp.ListenAndServe(config.Config.ListenAddress, m)
 }
 
 

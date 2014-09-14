@@ -50,7 +50,7 @@ const (
 	DEBUG
 )
 
-const timeFormat = "2006-01-02 15:04:05"
+const TimeFormat = "2006-01-02 15:04:05"
 
 // globalLogLevel indicates the global level filter for all logs (only entries with level equals or higher 
 // than this value will be logged)
@@ -79,7 +79,7 @@ func logFormattedEntry(logLevel LogLevel, message string, args ...interface{}) s
 	if logLevel > globalLogLevel {
 		return ""
 	} 
-	entryString := fmt.Sprintf("%s %s %s", time.Now().Format(timeFormat), logLevel, fmt.Sprintf(message, args...))
+	entryString := fmt.Sprintf("%s %s %s", time.Now().Format(TimeFormat), logLevel, fmt.Sprintf(message, args...))
 	fmt.Fprintln(os.Stderr, entryString)
 	return entryString
 }

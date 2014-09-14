@@ -27,6 +27,7 @@ import (
 // Some of the parameteres have reasonable default values, and some (like database credentials) are 
 // strictly expected from user.
 type Configuration struct {
+	ListenAddress			string
 	MySQLTopologyUser		string
 	MySQLTopologyPassword	string
 	MySQLOrchestratorHost	string
@@ -42,9 +43,13 @@ type Configuration struct {
 	DiscoveryPollSeconds		int			// Auto/continuous discovery of instances sleep time between polls
 	ReasonableReplicationLagSeconds	int		// Abvoe this value is considered a problem
 	ReasonableMaintenanceReplicationLagSeconds int // Above this value move-up and move-below are blocked
+	AuditLogFile		string				// Name of log file for audit operations. Disabled when empty.
 	AuditPageSize		int
+	AuthenticationMethod	string			// Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "proxy" for forwarded credentials via reverse proxy
 	HTTPAuthUser		string				// Username for HTTP Basic authentication (blank disables authentication)
 	HTTPAuthPassword	string				// Password for HTTP Basic authentication
+	AuthUserHeader		string				// HTTP header indicating auth user, when AuthenticationMethod is "proxy"
+	PowerAuthUsers		[]string			// On AuthenticationMethod == "proxy", list of users that can make changes. All others are read-only.
 	ClusterNameToAlias	map[string]string	// map between regex matching cluster name to a human friendly alias
 	ServeAgentsHttp		bool				// Spawn another HTTP interface dedicated for orcehstrator-agent
 	AgentPollMinutes	uint				// Minutes between agent polling
@@ -57,6 +62,7 @@ var Config *Configuration = NewConfiguration()
 
 func NewConfiguration() *Configuration {
 	return &Configuration {
+		ListenAddress:				":3000",
 		InstancePollSeconds:		60,
 		UnseenInstanceForgetHours:	240,
 		SlaveStartPostWaitMilliseconds: 1000,
@@ -64,9 +70,13 @@ func NewConfiguration() *Configuration {
 		DiscoveryPollSeconds:		5,
 		ReasonableReplicationLagSeconds: 10,
 		ReasonableMaintenanceReplicationLagSeconds: 20,
+		AuditLogFile:				"",
 		AuditPageSize:				20,
+		AuthenticationMethod:		"basic",
 		HTTPAuthUser: 				"",
 		HTTPAuthPassword: 			"",
+		AuthUserHeader:				"X-Forwarded-User",
+		PowerAuthUsers:				[]string{"*",},
 		ClusterNameToAlias:			make(map[string]string),
 		ServeAgentsHttp:			false,
 		AgentPollMinutes:			60,
