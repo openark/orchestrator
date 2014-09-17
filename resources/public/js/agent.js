@@ -177,6 +177,23 @@ $(document).ready(function () {
 	        }, "json");	
 		});
     });
+    $("body").on("click", "button[data-command=create-snapshot]", function(event) {
+    	var message = "Are you sure you wish to create a new snapshot on <code><strong>" + 
+    		currentAgentHost() + "</strong></code>?";
+		bootbox.confirm(message, function(confirm) {
+			if (confirm) {
+		    	showLoader();
+		        $.get("/api/agent-create-snapshot/"+currentAgentHost(), function (operationResult) {
+					hideLoader();
+					if (operationResult.Code == "ERROR") {
+						addAlert(operationResult.Message)
+					} else {
+						location.reload();
+					}	
+		        }, "json");
+			}
+		});
+    });
     $("body").on("click", "button[data-command=mysql-stop]", function(event) {
     	var message = "Are you sure you wish to shut down MySQL service on <code><strong>" + 
     		currentAgentHost() + "</strong></code>?";

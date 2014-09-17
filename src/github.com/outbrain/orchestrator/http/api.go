@@ -578,6 +578,29 @@ func (this *HttpAPI) AgentMountLV(params martini.Params, r render.Render, req *h
 
 
 
+
+// AgentCreateSnapshot instructs an agent to create a new snapshot. Agent's DIY implementation.
+func (this *HttpAPI) AgentCreateSnapshot(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
+	if !config.Config.ServeAgentsHttp {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Agents not served",})
+		return
+	}
+
+	output, err := agent.CreateSnapshot(params["host"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+
+	r.JSON(200, output)
+}
+
+
 // AgentRemoveLV instructs an agent to remove a logical volume
 func (this *HttpAPI) AgentRemoveLV(params martini.Params, r render.Render, req *http.Request) {
 	if !this.isAuthorizedForAction(req) {
@@ -848,6 +871,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/agent/:host", this.Agent)
 	m.Get("/api/agent-umount/:host", this.AgentUnmount)
 	m.Get("/api/agent-mount/:host", this.AgentMountLV)
+	m.Get("/api/agent-create-snapshot/:host", this.AgentCreateSnapshot)
 	m.Get("/api/agent-removelv/:host", this.AgentRemoveLV)
 	m.Get("/api/agent-mysql-stop/:host", this.AgentMySQLStop)
 	m.Get("/api/agent-mysql-start/:host", this.AgentMySQLStart)

@@ -30,6 +30,10 @@ import (
 // AuditOperation creates and writes a new audit entry by given params
 func AuditOperation(auditType string, instanceKey *InstanceKey, message string) error {
 
+	if instanceKey == nil {
+		instanceKey = &InstanceKey{}
+	}
+	
 	if config.Config.AuditLogFile != "" {
 		f, err := os.OpenFile(config.Config.AuditLogFile, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0600)
 		if err != nil {return log.Errore(err)}
@@ -41,10 +45,6 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 
 	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}
-	
-	if instanceKey == nil {
-		instanceKey = &InstanceKey{}
-	}
 	
 	_, err = sqlutils.Exec(db, `
 			insert 

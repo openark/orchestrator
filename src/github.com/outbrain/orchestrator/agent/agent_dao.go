@@ -401,6 +401,12 @@ func RemoveLV(hostname string, lv string) (Agent, error) {
 }
 
 
+// CreateSnapshot
+func CreateSnapshot(hostname string) (Agent, error) {
+	return executeAgentCommand(hostname, "create-snapshot", nil)
+}
+
+
 
 // MySQLStop
 func deleteMySQLDatadir(hostname string) (Agent, error) {
