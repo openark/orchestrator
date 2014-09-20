@@ -140,6 +140,7 @@ type Instance struct {
 	Key					InstanceKey
 	ServerID			uint
 	Version				string
+	ReadOnly			bool
 	Binlog_format		string
 	LogBinEnabled		bool
 	LogSlaveUpdatesEnabled	bool

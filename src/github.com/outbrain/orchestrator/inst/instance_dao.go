@@ -70,8 +70,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
     if err != nil {goto Cleanup}
 
    	instance.Key = *instanceKey
-    err = db.QueryRow("select @@global.server_id, @@global.version, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
-       	&instance.ServerID, &instance.Version, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
+    err = db.QueryRow("select @@global.server_id, @@global.version, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
+       	&instance.ServerID, &instance.Version, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
     if err != nil {goto Cleanup}
     instanceFound = true
     err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
@@ -206,6 +206,7 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
        	select 
        		server_id,
 			version,
+			read_only,
 			binlog_format,
 			log_bin, 
 			log_slave_updates,
@@ -231,6 +232,7 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 		 instanceKey.Hostname, instanceKey.Port).Scan(
 		 	&instance.ServerID,
 		 	&instance.Version,
+		 	&instance.ReadOnly,
 		 	&instance.Binlog_format,
 		 	&instance.LogBinEnabled,
 		 	&instance.LogSlaveUpdatesEnabled,
@@ -277,6 +279,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
     instance.ExecBinlogCoordinates.LogPos = m.GetInt64("Exec_Master_Log_Pos")
     instance.ServerID = m.GetUint("server_id")
  	instance.Version = m.GetString("version")
+ 	instance.ReadOnly = m.GetBool("read_only")
  	instance.Binlog_format = m.GetString("binlog_format")
  	instance.LogBinEnabled = m.GetBool("log_bin")
  	instance.LogSlaveUpdatesEnabled = m.GetBool("log_slave_updates")
@@ -564,6 +567,7 @@ func WriteInstance(instance *Instance, lastError error) error {
         		last_checked,
         		server_id,
 				version,
+				read_only,
 				binlog_format,
 				log_bin,
 				log_slave_updates,
@@ -582,11 +586,12 @@ func WriteInstance(instance *Instance, lastError error) error {
 				num_slave_hosts,
 				slave_hosts,
 				cluster_name
-			) values (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			) values (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			instance.Key.Hostname, 
 		 	instance.Key.Port,
 		 	instance.ServerID,
 		 	instance.Version,
+		 	instance.ReadOnly,
 		 	instance.Binlog_format,
 		 	instance.LogBinEnabled,
 		 	instance.LogSlaveUpdatesEnabled,

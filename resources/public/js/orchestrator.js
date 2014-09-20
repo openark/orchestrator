@@ -131,6 +131,7 @@ function openNodeModal(node) {
     addNodeModalDataAttribute("Num slaves", node.SlaveHosts.length);
     addNodeModalDataAttribute("Server ID", node.ServerID);
     addNodeModalDataAttribute("Version", node.Version);
+    addNodeModalDataAttribute("Read only", booleanString(node.ReadOnly));
     addNodeModalDataAttribute("Binlog format", node.Binlog_format);
     addNodeModalDataAttribute("Has binary logs", booleanString(node.LogBinEnabled));
     addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
@@ -436,11 +437,14 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	popoverElement.find("h3").html(
     		instance.canonicalTitle + '<div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog"></span></a></div>');
 	var indicateLastSeenInStatus = false;
+    if (!instance.ReadOnly) {
+    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-pencil" title="Writeable"></span> ');
+    } 
     if (instance.CountMySQLSnapshots > 0) {
     	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-camera" title="'+instance.CountMySQLSnapshots +' snapshots"></span> ');
     } 
     if (instance.inMaintenanceProblem()) {
-    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench"></span> ');
+    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench" title="Open config dialog"></span> ');
     } 
     
     if (instance.lastCheckInvalidProblem()) {

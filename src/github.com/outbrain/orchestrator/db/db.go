@@ -26,7 +26,7 @@ import (
 )
 
 
-// generateSQL is a list of SQL statements required to build the orchestrator backend
+// generateSQL & generateSQLPatches are lists of SQL statements required to build the orchestrator backend
 var generateSQL = []string{
 	`
         CREATE TABLE IF NOT EXISTS database_instance (
@@ -149,6 +149,14 @@ var generateSQL = []string{
 	`,
 }
 
+var generateSQLPatches = []string{
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN read_only TINYINT UNSIGNED NOT NULL AFTER version
+	`,
+}
+
 
 // OpenTopology returns a DB instance to access a topology instance
 func OpenTopology(host string, port int) (*sql.DB, error) {
@@ -178,6 +186,10 @@ func initOrchestratorDB(db *sql.DB) error {
 		if err != nil { 
 			return log.Fatalf("Cannot initiate orchestrator: %+v", err) 
 		}
+	}
+	for _, query := range generateSQLPatches {
+		// Patches are allowed to fail.
+		_, _ = ExecOrchestrator(query)
 	}
 	return nil
 }
