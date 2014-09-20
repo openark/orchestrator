@@ -63,6 +63,29 @@ $(document).ready(function () {
     	$("[data-agent=mysql_port]").html(agent.MySQLPort)
     	$("[data-agent=mysql_disk_usage]").html(toHumanFormat(agent.MySQLDiskUsage))    	
     	
+    	if (agent.MySQLErrorLogTail != null && agent.MySQLErrorLogTail.length > 0) {
+    		$("[data-agent=mysql_error_log_tail]").html(agent.MySQLErrorLogTail[agent.MySQLErrorLogTail.length -1])
+    	    $("body").on("click", "a[data-agent=mysql_error_log_tail]", function(event) {
+    	    	rows = agent.MySQLErrorLogTail;
+    	    	rows = rows.map(function(row) {
+    	    		return '<strong>' + row + '</strong>';
+            	});
+		    	rows = rows.map(function(row) {
+		    		if (row.indexOf("[ERROR]") >= 0) {
+	    				return '<code class="text-danger">' + row + '</code>';
+		    		} else	if (row.indexOf("[Warning]") >= 0) {
+		    			return '<code class="text-warning">' + row + '</code>';
+		    		} else	if (row.indexOf("[Note]") >= 0) {
+		    			return '<code class="text-info">' + row + '</code>';
+		    		} else	{
+		    			return '<code class="text-primary">' + row + '</code>';
+		    		}
+	        	});
+        		bootbox.alert('<div style="overflow: auto">' + rows.join("<br/>") + '</div>');
+        		return false;
+    	    });
+    	}
+    	
     	function beautifyAvailableSnapshots(hostnames) {
         	var result = hostnames.filter(function(hostname) {
         		return hostname.trim() != "";
@@ -135,6 +158,7 @@ $(document).ready(function () {
         hideLoader();
     }
     
+        
     $("body").on("click", "button[data-command=unmount]", function(event) {
     	if (hasActiveSeeds) {
 			addAlert("This agent participates in an active seed; please await or abort active seed before unmounting");

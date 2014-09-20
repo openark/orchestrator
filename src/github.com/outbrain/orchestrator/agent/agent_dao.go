@@ -352,6 +352,14 @@ func GetAgent(hostname string) (Agent, error) {
 			}
 			if err != nil {log.Errore(err)}
 		}		
+		{		
+			errorLogTailUri := fmt.Sprintf("%s/mysql-error-log-tail?token=%s", uri, token)		
+			body, err := readResponse(http.Get(errorLogTailUri))
+			if err == nil {
+				err = json.Unmarshal(body, &agent.MySQLErrorLogTail)
+			}
+			if err != nil {log.Errore(err)}
+		}
 	}
 	return agent, err
 }
