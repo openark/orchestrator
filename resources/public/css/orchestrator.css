@@ -196,3 +196,27 @@
 .table-unbordered > tbody > tr > td {
     border: 0px;
 }
+
+#long_queries tbody td div {
+    overflow: auto;
+}
+
+#long_queries tbody td div.query {
+    max-width: 1080px;
+    max-height: 240px;
+}
+
+
+#long_queries div.process-query {
+    overflow: auto;
+    max-height: 240px;
+}
+
+
+#long_queries div.row > div {
+    overflow: auto;
+}
+
+#long_queries table tbody tr td:first-child {
+	width: 200px;
+}

@@ -93,6 +93,22 @@ func (this *HttpWeb) Discover(params martini.Params, r render.Render) {
 }
 
 
+func (this *HttpWeb) LongQueries(params martini.Params, r render.Render, req *http.Request) {
+	filter := params["filter"]
+	if filter == "" {
+		filter = req.URL.Query().Get("filter");
+	}
+
+	r.HTML(200, "templates/long_queries", map[string]interface{}{
+		"agentsHttpActive": config.Config.ServeAgentsHttp,
+		"title": "long queries", 
+		"activePage": "queries", 
+		"autoshow_problems": false,
+		"filter": filter,
+		})
+}
+
+
 func (this *HttpWeb) Audit(params martini.Params, r render.Render) {
 	page, err := strconv.Atoi(params["page"])
 	if err != nil { page = 0 }
@@ -196,6 +212,7 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/search/:searchString", this.Search) 
 	m.Get("/web/search", this.Search) 
 	m.Get("/web/discover", this.Discover) 
+	m.Get("/web/long-queries", this.LongQueries) 
 	m.Get("/web/audit", this.Audit) 
 	m.Get("/web/audit/:page", this.Audit) 
 	m.Get("/web/agents", this.Agents) 

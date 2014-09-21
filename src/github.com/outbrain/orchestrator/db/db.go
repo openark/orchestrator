@@ -76,6 +76,23 @@ var generateSQL = []string{
         ) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+        CREATE TABLE IF NOT EXISTS database_instance_long_running_queries (
+          hostname varchar(128) NOT NULL,
+          port smallint(5) unsigned NOT NULL,
+          process_id bigint(20) NOT NULL,
+          process_started_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          process_user varchar(16) CHARACTER SET utf8 NOT NULL,
+          process_host varchar(128) CHARACTER SET utf8 NOT NULL,
+          process_db varchar(128) CHARACTER SET utf8 NOT NULL,
+          process_command varchar(16) CHARACTER SET utf8 NOT NULL,
+          process_time_seconds int(11) NOT NULL,
+          process_state varchar(128) CHARACTER SET utf8 NOT NULL,
+          process_info varchar(1024) CHARACTER SET utf8 NOT NULL,
+          PRIMARY KEY (hostname,port,process_id),
+          KEY process_started_at_idx (process_started_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
         CREATE TABLE IF NOT EXISTS audit (
           audit_id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
           audit_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -404,6 +404,34 @@ func (this *HttpAPI) StopSlave(params martini.Params, r render.Render, req *http
 }
 
 
+
+// KillQuery kills a query running on a server
+func (this *HttpAPI) KillQuery(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	processId, err := strconv.ParseInt(params["process"], 10, 0)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+	instance, err := inst.KillQuery(&instanceKey,processId)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code:OK, Message: "Slave stopped", Details: instance})
+}
+
+
 // Cluster provides list of instances in given cluster
 func (this *HttpAPI) Cluster(params martini.Params, r render.Render, req *http.Request) {
 	instances, err := inst.ReadClusterInstances(params["clusterName"])
@@ -485,6 +513,19 @@ func (this *HttpAPI) Audit(params martini.Params, r render.Render, req *http.Req
 	}
 
 	r.JSON(200, audits)
+}
+
+
+// LongQueries
+func (this *HttpAPI) LongQueries(params martini.Params, r render.Render, req *http.Request) {
+	longQueries, err := inst.ReadLongRunningProcesses(params["filter"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		return
+	}
+
+	r.JSON(200, longQueries)
 }
 
 
@@ -858,6 +899,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/end-maintenance/:maintenanceKey", this.EndMaintenance)	
 	m.Get("/api/start-slave/:host/:port", this.StartSlave) 
 	m.Get("/api/stop-slave/:host/:port", this.StopSlave) 
+	m.Get("/api/kill-query/:host/:port/:process", this.KillQuery) 
 	m.Get("/api/maintenance", this.Maintenance) 
 	m.Get("/api/cluster/:clusterName", this.Cluster) 
 	m.Get("/api/clusters", this.Clusters) 
@@ -865,6 +907,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/search/:searchString", this.Search) 
 	m.Get("/api/search", this.Search) 
 	m.Get("/api/problems", this.Problems) 
+	m.Get("/api/long-queries", this.LongQueries) 
+	m.Get("/api/long-queries/:filter", this.LongQueries) 
 	m.Get("/api/audit", this.Audit) 
 	m.Get("/api/audit/:page", this.Audit) 
 	m.Get("/api/agents", this.Agents) 

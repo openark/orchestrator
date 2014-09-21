@@ -63,7 +63,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	instance := NewInstance()
 	instanceFound := false;
     foundBySlaveHosts := false
-
+	longRunningProcesses := []Process{}
 
 	db,	err	:=	db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 
@@ -109,7 +109,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
         
     // Get slaves, either by SHOW SLAVE HOSTS or via PROCESSLIST
     if config.Config.DiscoverByShowSlaveHosts {
-        err = sqlutils.QueryRowsMap(db, `show slave hosts`, 
+        err := sqlutils.QueryRowsMap(db, `show slave hosts`, 
         		func(m sqlutils.RowMap) error {
         			slaveKey, err := NewInstanceKeyFromStrings(m.GetString("Host"), m.GetString("Port")) 
         			if err == nil {
@@ -124,7 +124,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
     if !foundBySlaveHosts {
     	// Either not configured to read SHOW SLAVE HOSTS or nothing was there.
        	// Discover by processlist
-        err = sqlutils.QueryRowsMap(db, `
+        err := sqlutils.QueryRowsMap(db, `
         	select 
         		substring_index(host, ':', 1) as slave_hostname 
         	from 
@@ -141,7 +141,49 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			
         if err != nil {goto Cleanup}
 	}
-    if err != nil {goto Cleanup}
+	{
+		// Get long running processes		
+        err := sqlutils.QueryRowsMap(db, `
+				  select 
+				    id,
+				    user,
+				    host,
+				    db,
+				    command,
+				    time,
+				    state,
+				    left(processlist.info, 1024) as info,
+				    now() - interval time second as started_at
+				  from 
+				    information_schema.processlist 
+				  where
+				    time > 60
+				    and command != 'Sleep'
+				    and id != connection_id()
+				    and user != 'system user' 
+				    and command != 'Binlog dump'
+				    and user != 'event_scheduler'
+				  order by
+				    time desc
+        		`, 
+        		func(m sqlutils.RowMap) error {
+        			process := Process{}
+        			process.Id = m.GetInt64("id")
+        			process.User = m.GetString("user")
+        			process.Host = m.GetString("host")
+        			process.Db = m.GetString("db")
+        			process.Command = m.GetString("command")
+        			process.Time = m.GetInt64("time")
+        			process.State = m.GetString("state")
+        			process.Info = m.GetString("info")
+        			process.StartedAt = m.GetString("started_at")
+        			
+        			longRunningProcesses = append(longRunningProcesses, process)
+					return nil
+		       	})
+			
+        if err != nil {goto Cleanup}
+	}
 
 	instance.ClusterName, err = ReadClusterNameByMaster(&instance.Key, &instance.MasterKey)
     if err != nil {goto Cleanup}
@@ -149,6 +191,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	Cleanup:
 	if instanceFound {
 		_ = WriteInstance(instance, err)
+		WriteLongRunningProcesses(instanceKey, longRunningProcesses)		
 	} else {
 		_ = UpdateInstanceLastChecked(instanceKey)
 	}
@@ -648,6 +691,7 @@ func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
 }
 
 
+
 // ForgetInstance removes an instance entry from the orchestrator backed database.
 // It may be auto-rediscovered through topology or requested for discovery by multiple means.
 func ForgetInstance(instanceKey *InstanceKey) error {
@@ -864,3 +908,23 @@ func MasterPosWait(instanceKey *InstanceKey, binlogCoordinates *BinlogCoordinate
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
 }
+
+
+
+
+// KillQuery stops replication on a given instance
+func KillQuery(instanceKey *InstanceKey, process int64) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {return instance, log.Errore(err)}
+	
+	_, err = ExecInstance(instanceKey, fmt.Sprintf(`kill query %d`, process))
+	if err != nil {return instance, log.Errore(err)}
+
+	instance, err = ReadTopologyInstance(instanceKey)
+	if err != nil {return instance, log.Errore(err)}
+	
+	log.Infof("Killed query on %+v", *instanceKey) 
+	return instance, err
+}
+
+

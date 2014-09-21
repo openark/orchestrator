@@ -64,9 +64,15 @@ $(document).ready(function () {
     	$("[data-agent=mysql_disk_usage]").html(toHumanFormat(agent.MySQLDiskUsage))    	
     	
     	if (agent.MySQLErrorLogTail != null && agent.MySQLErrorLogTail.length > 0) {
-    		$("[data-agent=mysql_error_log_tail]").html(agent.MySQLErrorLogTail[agent.MySQLErrorLogTail.length -1])
+	    	rows = agent.MySQLErrorLogTail;
+	    	rows = rows.map(function(row) {
+	    		if (row.trim() == "") {
+	    			row = "[empty line]"
+	    		}
+	    		return row;
+        	});
+    		$("[data-agent=mysql_error_log_tail]").html(rows[rows.length -1])
     	    $("body").on("click", "a[data-agent=mysql_error_log_tail]", function(event) {
-    	    	rows = agent.MySQLErrorLogTail;
     	    	rows = rows.map(function(row) {
     	    		return '<strong>' + row + '</strong>';
             	});
@@ -190,15 +196,17 @@ $(document).ready(function () {
     	var lv = $(event.target).attr("data-lv")
     	var message = "Are you sure you wish to remove logical volume <code><strong>" + lv + "</strong></code>?";
     	bootbox.confirm(message, function(confirm) {
-	    	showLoader();
-	        $.get("/api/agent-removelv/"+currentAgentHost()+"?lv="+encodeURIComponent(lv), function (operationResult) {
-				hideLoader();
-				if (operationResult.Code == "ERROR") {
-					addAlert(operationResult.Message)
-				} else {
-					location.reload();
-				}	
-	        }, "json");	
+			if (confirm) {
+		    	showLoader();
+		        $.get("/api/agent-removelv/"+currentAgentHost()+"?lv="+encodeURIComponent(lv), function (operationResult) {
+					hideLoader();
+					if (operationResult.Code == "ERROR") {
+						addAlert(operationResult.Message)
+					} else {
+						location.reload();
+					}	
+		        }, "json");
+			}
 		});
     });
     $("body").on("click", "button[data-command=create-snapshot]", function(event) {
