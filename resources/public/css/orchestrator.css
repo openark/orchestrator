@@ -218,5 +218,15 @@
 }
 
 #long_queries table tbody tr td:first-child {
-	width: 200px;
+    width: 200px;
+}
+
+#long_queries table {
+    margin-bottom: 0px;
+}
+
+#long_queries pre {
+	border-top: 0px;
+    border-radius: 0px;
+    border-color: #dddddd;
 }

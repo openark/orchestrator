@@ -67,7 +67,6 @@ var API HttpAPI = HttpAPI{}
 
 
 
-
 func (this *HttpAPI) getAuthUser(req *http.Request) string {
 	for _, user := range req.Header[config.Config.AuthUserHeader] {
 		return user;
@@ -76,6 +75,8 @@ func (this *HttpAPI) getAuthUser(req *http.Request) string {
 }
 
 
+// isAuthorizedForAction checks req to see whether authenticated user has write-privileges.
+// This depends on configured authentication method, and at this stage only applies in "proxy" method.
 func (this *HttpAPI) isAuthorizedForAction(req *http.Request) bool {
 	if strings.ToLower(config.Config.AuthenticationMethod) != "proxy" {
 		return true;
@@ -86,14 +87,15 @@ func (this *HttpAPI) isAuthorizedForAction(req *http.Request) bool {
             return true
         }
     }
-    return false
-	
+    return false	
 }
+
 
 func (this *HttpAPI) getInstanceKey(host string, port string) (inst.InstanceKey, error) {
 	instanceKey, err := inst.NewInstanceKeyFromStrings(host, port)
 	return *instanceKey, err
 }
+
 
 // Instance reads and returns an instance's details.
 func (this *HttpAPI) Instance(params martini.Params, r render.Render, req *http.Request) {
@@ -127,6 +129,7 @@ func (this *HttpAPI) Discover(params martini.Params, r render.Render, req *http.
 
 	r.JSON(200, &APIResponse{Code:OK, Message: fmt.Sprintf("Instance submitted for discovery: %+v", instanceKey),})
 }
+
 
 // Refresh synchronuously re-reads a topology instance
 func (this *HttpAPI) Refresh(params martini.Params, r render.Render, req *http.Request) {
@@ -311,7 +314,7 @@ func (this *HttpAPI) MakeCoMaster(params martini.Params, r render.Render, req *h
 }
 
 
-// MakeCoMaster attempts to make an instance co-master with its own master
+// DetachSlave makes a slave forget about its master, effectively breaking the replication
 func (this *HttpAPI) DetachSlave(params martini.Params, r render.Render, req *http.Request) {
 	if !this.isAuthorizedForAction(req) {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
@@ -458,7 +461,7 @@ func (this *HttpAPI) Clusters(params martini.Params, r render.Render, req *http.
 }
 
 
-// ClustersInfo provides list of known clusters
+// ClustersInfo provides list of known clusters, along with some added metadata per cluster
 func (this *HttpAPI) ClustersInfo(params martini.Params, r render.Render, req *http.Request) {
 	clustersInfo, err := inst.ReadClustersInfo()
 
@@ -501,7 +504,7 @@ func (this *HttpAPI) Problems(params martini.Params, r render.Render, req *http.
 }
 
 
-// Audit provides listof audit entries by given page number
+// Audit provides list of audit entries by given page number
 func (this *HttpAPI) Audit(params martini.Params, r render.Render, req *http.Request) {
 	page, err := strconv.Atoi(params["page"])
 	if err != nil || page < 0 { page = 0 }
@@ -516,7 +519,8 @@ func (this *HttpAPI) Audit(params martini.Params, r render.Render, req *http.Req
 }
 
 
-// LongQueries
+// LongQueries lists queries running for a long time, on all instances, optionally filtered by
+// arbitrary text
 func (this *HttpAPI) LongQueries(params martini.Params, r render.Render, req *http.Request) {
 	longQueries, err := inst.ReadLongRunningProcesses(params["filter"])
 
@@ -530,7 +534,7 @@ func (this *HttpAPI) LongQueries(params martini.Params, r render.Render, req *ht
 
 
 
-// Problems provides list of instances with known problems
+// Agents provides complete list of registered agents (See https://github.com/outbrain/orchestrator-agent)
 func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request) {
 	if !this.isAuthorizedForAction(req) {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
@@ -552,7 +556,7 @@ func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Re
 }
 
 
-// Problems provides list of instances with known problems
+// Agent returns complete information of a given agent
 func (this *HttpAPI) Agent(params martini.Params, r render.Render, req *http.Request) {
 	if !this.isAuthorizedForAction(req) {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
@@ -574,7 +578,7 @@ func (this *HttpAPI) Agent(params martini.Params, r render.Render, req *http.Req
 }
 
 
-// Problems provides list of instances with known problems
+// AgentUnmount instructs an agent to unmount the designated mount point 
 func (this *HttpAPI) AgentUnmount(params martini.Params, r render.Render, req *http.Request) {
 	if !this.isAuthorizedForAction(req) {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
@@ -596,7 +600,7 @@ func (this *HttpAPI) AgentUnmount(params martini.Params, r render.Render, req *h
 }
 
 
-// Problems provides list of instances with known problems
+// AgentMountLV instructs an agent to mount a given volume on the designated mount point 
 func (this *HttpAPI) AgentMountLV(params martini.Params, r render.Render, req *http.Request) {
 	if !this.isAuthorizedForAction(req) {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
@@ -616,8 +620,6 @@ func (this *HttpAPI) AgentMountLV(params martini.Params, r render.Render, req *h
 
 	r.JSON(200, output)
 }
-
-
 
 
 // AgentCreateSnapshot instructs an agent to create a new snapshot. Agent's DIY implementation.
@@ -711,7 +713,8 @@ func (this *HttpAPI) AgentMySQLStart(params martini.Params, r render.Render, req
 
 
 
-// AgentSeed completely seeds a hsot with another host's snapshots
+// AgentSeed completely seeds a host with another host's snapshots. This is a complex operation
+// governed by orchestrator and executed by the two agents involved.
 func (this *HttpAPI) AgentSeed(params martini.Params, r render.Render, req *http.Request) {
 	if !this.isAuthorizedForAction(req) {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
@@ -733,9 +736,7 @@ func (this *HttpAPI) AgentSeed(params martini.Params, r render.Render, req *http
 }
 
 
-
-
-// AgentActiveSeeds
+// AgentActiveSeeds lists active seeds and their state
 func (this *HttpAPI) AgentActiveSeeds(params martini.Params, r render.Render, req *http.Request) {
 	if !this.isAuthorizedForAction(req) {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
@@ -758,7 +759,7 @@ func (this *HttpAPI) AgentActiveSeeds(params martini.Params, r render.Render, re
 
 
 
-// AgentActiveSeeds
+// AgentRecentSeeds lists recent seeds of a given agent
 func (this *HttpAPI) AgentRecentSeeds(params martini.Params, r render.Render, req *http.Request) {
 	if !this.isAuthorizedForAction(req) {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
@@ -779,7 +780,8 @@ func (this *HttpAPI) AgentRecentSeeds(params martini.Params, r render.Render, re
 	r.JSON(200, output)
 }
 
-// AgentSeedDetails
+
+// AgentSeedDetails provides details of a given seed
 func (this *HttpAPI) AgentSeedDetails(params martini.Params, r render.Render, req *http.Request) {
 	if !this.isAuthorizedForAction(req) {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
@@ -804,7 +806,7 @@ func (this *HttpAPI) AgentSeedDetails(params martini.Params, r render.Render, re
 
 
 
-// AgentActiveSeeds
+// AgentSeedStates returns the breakdown of states (steps) of a given seed
 func (this *HttpAPI) AgentSeedStates(params martini.Params, r render.Render, req *http.Request) {
 	if !this.isAuthorizedForAction(req) {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
@@ -852,7 +854,7 @@ func (this *HttpAPI) Seeds(params martini.Params, r render.Render, req *http.Req
 
 
 
-// AbortSeed
+// AbortSeed instructs agents to abort an active seed
 func (this *HttpAPI) AbortSeed(params martini.Params, r render.Render, req *http.Request) {
 	if !this.isAuthorizedForAction(req) {
 		r.JSON(200, &APIResponse{Code:ERROR, Message: "Unauthorized",})
@@ -875,12 +877,10 @@ func (this *HttpAPI) AbortSeed(params martini.Params, r render.Render, req *http
 }
 
 
-
-// AbortSeed
+// Headers is a self-test call which returns HTTP headers
 func (this *HttpAPI) Headers(params martini.Params, r render.Render, req *http.Request) {
 	r.JSON(200, req.Header)
 }
-
 
 
 // RegisterRequests makes for the de-facto list of known API calls

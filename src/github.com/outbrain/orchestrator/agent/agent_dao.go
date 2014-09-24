@@ -34,6 +34,7 @@ import (
 var SeededAgents chan *Agent = make(chan *Agent)
 
 
+// readResponse returns the body of an HTTP response
 func readResponse(res *http.Response, err error) ([]byte, error) {
 	if err != nil { return nil, err }
 	
@@ -47,6 +48,7 @@ func readResponse(res *http.Response, err error) ([]byte, error) {
 	
 	return body, nil
 }
+
 
 // SubmitAgent submits a new agent for listing
 func SubmitAgent(hostname string, port int, token string) (string, error) {
@@ -71,8 +73,7 @@ func SubmitAgent(hostname string, port int, token string) (string, error) {
 }
 
 
-
-// ForgetLongUnseenInstances will remove entries of all instacnes that have long since been last seen.
+// ForgetLongUnseenAgents will remove entries of all agents that have long since been last seen.
 func ForgetLongUnseenAgents() error {
 	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}
@@ -88,6 +89,7 @@ func ForgetLongUnseenAgents() error {
 }
 
 
+// ReadOutdatedAgentsHosts returns agents that need to be updated
 func ReadOutdatedAgentsHosts() ([]string, error) {
 	res := []string{}
 	query := fmt.Sprintf(`
@@ -155,7 +157,7 @@ func ReadAgents() ([]Agent, error) {
 }
 
 
-// ReadAgents returns a list of all known agents
+// ReadCountMySQLSnapshots is a utility method to return registered number of snapshots for a given list of hosts
 func ReadCountMySQLSnapshots(hostnames []string) (map[string]int, error) {
 	res := make(map[string]int)
 	query := fmt.Sprintf(`
@@ -185,6 +187,7 @@ func ReadCountMySQLSnapshots(hostnames []string) (map[string]int, error) {
 }
 
 
+// readAgentBasicInfo returns the basic data for an agent directly from backend table (no agent access)
 func readAgentBasicInfo(hostname string) (Agent, string, error) {
 	agent := Agent{}
 	token := ""
@@ -244,8 +247,7 @@ func UpdateAgentLastChecked(hostname string) error {
 
 
 
-// UpdateAgentLastChecked updates the last_check timestamp in the orchestrator backed database 
-// for a given agent
+// UpdateAgentInfo  updates some agent state in backend table
 func UpdateAgentInfo(hostname string, agent Agent) error {
 	db,	err	:=	db.OpenOrchestrator()
 	if err != nil {return log.Errore(err)}
@@ -269,6 +271,7 @@ func UpdateAgentInfo(hostname string, agent Agent) error {
 }
 
 
+// baseAgentUri returns the base URI for accessing an agent 
 func baseAgentUri(agentHostname string, agentPort int) string {
 	uri := fmt.Sprintf("http://%s:%d/api", agentHostname, agentPort)
 	log.Debugf("orchestrator-agent uri: %s", uri)
@@ -276,7 +279,7 @@ func baseAgentUri(agentHostname string, agentPort int) string {
 }
 
 
-// GetAgent gets a single agent status from the agent service
+// GetAgent gets a single agent status from the agent service. This involves multiple HTTP requests.
 func GetAgent(hostname string) (Agent, error) {
 	agent, token, err := readAgentBasicInfo(hostname)
 	if err != nil {
@@ -365,6 +368,7 @@ func GetAgent(hostname string) (Agent, error) {
 }
 
 
+// executeAgentCommand requests an agent to execute a command via HTTP api
 func executeAgentCommand(hostname string, command string, onResponse *func([]byte)) (Agent, error) {
 	agent, token, err := readAgentBasicInfo(hostname)
     if err != nil {return agent, err}
@@ -396,62 +400,64 @@ func Unmount(hostname string) (Agent, error) {
 }
 
 
-// MountLV
+// MountLV requests an agent to mount the given volume on the designated mount point
 func MountLV(hostname string, lv string) (Agent, error) {
 	return executeAgentCommand(hostname, fmt.Sprintf("mountlv?lv=%s", lv), nil)
 }
 
 
 
-// RemoveLV
+// RemoveLV requests an agent to remvoe a snapshot
 func RemoveLV(hostname string, lv string) (Agent, error) {
 	return executeAgentCommand(hostname, fmt.Sprintf("removelv?lv=%s", lv), nil)
 }
 
 
-// CreateSnapshot
+// CreateSnapshot requests an agent to create a new snapshot -- a DIY implementation
 func CreateSnapshot(hostname string) (Agent, error) {
 	return executeAgentCommand(hostname, "create-snapshot", nil)
 }
 
 
 
-// MySQLStop
+// deleteMySQLDatadir requests an agent to purge the MySQL data directory (step before seed)
 func deleteMySQLDatadir(hostname string) (Agent, error) {
 	return executeAgentCommand(hostname, "delete-mysql-datadir", nil)
 }
 
 
-// MySQLStop
+// MySQLStop requests an agent to stop MySQL service
 func MySQLStop(hostname string) (Agent, error) {
 	return executeAgentCommand(hostname, "mysql-stop", nil)
 }
 
 
 
-// MySQLStart
+// MySQLStart requests an agent to start the MySQL service
 func MySQLStart(hostname string) (Agent, error) {
 	return executeAgentCommand(hostname, "mysql-start", nil)
 }
 
 
-
+// ReceiveMySQLSeedData requests an agent to start listening for incoming seed data
 func ReceiveMySQLSeedData(hostname string, seedId int64) (Agent, error) {
 	return executeAgentCommand(hostname, fmt.Sprintf("receive-mysql-seed-data/%d", seedId), nil)
 }
 
 
+// ReceiveMySQLSeedData requests an agent to start sending seed data
 func SendMySQLSeedData(hostname string, targetHostname string, seedId int64) (Agent, error) {
 	return executeAgentCommand(hostname, fmt.Sprintf("send-mysql-seed-data/%s/%d", targetHostname, seedId), nil)
 }
 
 
-
+// ReceiveMySQLSeedData requests an agent to abort seed send/receive (depending on the agent's role)
 func AbortSeedCommand(hostname string, seedId int64) (Agent, error) {
 	return executeAgentCommand(hostname, fmt.Sprintf("abort-seed/%d", seedId), nil)
 }
 
 
+// seedCommandCompleted checks an agent to see if it thinks a seed was completed. 
 func seedCommandCompleted(hostname string, seedId int64) (Agent, bool, error) {
 	result := false
 	onResponse := func (body []byte) {
@@ -462,6 +468,7 @@ func seedCommandCompleted(hostname string, seedId int64) (Agent, bool, error) {
 }
 
 
+// seedCommandCompleted checks an agent to see if it thinks a seed was successful. 
 func seedCommandSucceeded(hostname string, seedId int64) (Agent, bool, error) {
 	result := false
 	onResponse := func (body []byte) {
@@ -472,6 +479,7 @@ func seedCommandSucceeded(hostname string, seedId int64) (Agent, bool, error) {
 }
 
 
+// AbortSeed will contact agents associated with a seed and request abort. 
 func AbortSeed(seedId int64) error {
 	seedOperations, err := AgentSeedDetails(seedId)
 	if err != nil {return log.Errore(err)}
@@ -485,7 +493,7 @@ func AbortSeed(seedId int64) error {
 }
 
 
-
+// PostCopy will request an agent to invoke post-copy commands
 func PostCopy(hostname string) (Agent, error) {
 	return executeAgentCommand(hostname, "post-copy", nil)
 }
@@ -612,7 +620,8 @@ func FailStaleSeeds() error {
 
 
 
-// executeSeed
+// executeSeed is *the* function for taking a seed. It is a complex operation of testing, preparing, re-testing
+// agents on both sides, initiating data transfer, following up, awaiting completion, diagnosing errors, claning up.
 func executeSeed(seedId int64, targetHostname string, sourceHostname string) error {
 
 	var err error
@@ -704,24 +713,7 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 			Unmount(sourceHostname)
 			return updateSeedStateEntry(seedStateId, errors.New("10 iterations have passed without progress. Bailing out."))
 		}
-		/*
-		if bytesCopied >= sourceAgent.MountPoint.MySQLDiskUsage {
-			// Obviously done
-			copyComplete = true
-		} else	if numStaleIterations > 10 {
-			if bytesCopied >= sourceAgent.MountPoint.MySQLDiskUsage - config.Config.SeedAcceptableBytesDiff {
-				// Experiments show a successful copy can end up with 8192 bytes short.
-				// I don't actually understand why; but this is now configurable, and upon
-				// stale iteration we allow such a diff.
-				copyComplete = true
-			} else {
-				AbortSeedCommand(sourceHostname, seedId)
-				AbortSeedCommand(targetHostname, seedId)
-				Unmount(sourceHostname)
-				return updateSeedStateEntry(seedStateId, errors.New("10 iterations have passed without progress. Bailing out."))
-			}
-		}
-		*/
+		
 		var copyPct int64 = 0
 		if sourceAgent.MountPoint.MySQLDiskUsage > 0 {
 			copyPct = 100*bytesCopied/sourceAgent.MountPoint.MySQLDiskUsage
@@ -763,7 +755,7 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 
 
 
-// Seed
+// Seed is the entry point for making a seed 
 func Seed(targetHostname string, sourceHostname string) (int64, error) {
 	if targetHostname == sourceHostname {
 		return 0, log.Errorf("Cannot seed %s onto itself", targetHostname)
@@ -781,8 +773,7 @@ func Seed(targetHostname string, sourceHostname string) (int64, error) {
 
 
 
-
-// readSeeds
+// readSeeds reads seed from the backend table
 func readSeeds(whereCondition string, limit string) ([]SeedOperation, error) {
 	res := []SeedOperation{}
 	query := fmt.Sprintf(`
@@ -858,7 +849,7 @@ func ReadRecentCompletedSeedsForHost(hostname string) ([]SeedOperation, error) {
 
 
 
-// AgentSeedDetails
+// AgentSeedDetails reads details from backend table
 func AgentSeedDetails(seedId int64) ([]SeedOperation, error) {
 	whereCondition := fmt.Sprintf(`
 		where
@@ -870,7 +861,7 @@ func AgentSeedDetails(seedId int64) ([]SeedOperation, error) {
 
 
 
-// ReadRecentSeeds
+// ReadRecentSeeds reads seeds from backend table.
 func ReadRecentSeeds() ([]SeedOperation, error) {
 	return readSeeds("", "limit 100")
 }

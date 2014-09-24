@@ -78,6 +78,20 @@ func WriteLongRunningProcesses(instanceKey *InstanceKey, processes []Process) er
 // ReadLongRunningProcesses returns the list of current known long running processes of all instances 
 func ReadLongRunningProcesses(filter string) ([]Process, error) {
 	longRunningProcesses := []Process{}
+	
+	filterClause := ""
+	if filter != "" {
+		filterClause = fmt.Sprintf(`
+			where
+				hostname like '%%%s%%'
+				or process_user like '%%%s%%'
+				or process_host like '%%%s%%'
+				or process_db like '%%%s%%'
+				or process_command like '%%%s%%'
+				or process_state like '%%%s%%'
+				or process_info like '%%%s%%'
+		`, filter, filter, filter, filter, filter, filter, filter)
+	}
 	query := fmt.Sprintf(`
 		select 
 			hostname,
@@ -93,9 +107,10 @@ func ReadLongRunningProcesses(filter string) ([]Process, error) {
 			process_info
 		from 
 			database_instance_long_running_queries
+		%s			
 		order by
 			process_time_seconds desc
-		`)
+		`, filterClause)
 	db,	err	:=	db.OpenOrchestrator()
     if err != nil {goto Cleanup}
     

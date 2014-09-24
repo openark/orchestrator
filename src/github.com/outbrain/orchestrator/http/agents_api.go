@@ -35,7 +35,7 @@ var AgentsAPI HttpAgentsAPI = HttpAgentsAPI{}
 
 
 
-// SubmitAgent registeres an agent on a given host
+// SubmitAgent registeres an agent. It is initiated by an agent to register itself.
 func (this *HttpAgentsAPI) SubmitAgent(params martini.Params, r render.Render) {
 	port, err := strconv.Atoi(params["port"])
 	if err != nil {
@@ -52,7 +52,7 @@ func (this *HttpAgentsAPI) SubmitAgent(params martini.Params, r render.Render) {
 }
 
 
-// SetHostAttribute
+// SetHostAttribute is a utility method that allows per-host key-value store.
 func (this *HttpAgentsAPI) SetHostAttribute(params martini.Params, r render.Render, req *http.Request) {
 	err := attributes.SetHostAttributes(params["host"], params["attrVame"], params["attrValue"])
 
@@ -65,7 +65,7 @@ func (this *HttpAgentsAPI) SetHostAttribute(params martini.Params, r render.Rend
 }
 
 
-// GetHostAttributeByAttributeName
+// GetHostAttributeByAttributeName returns a host attribute
 func (this *HttpAgentsAPI) GetHostAttributeByAttributeName(params martini.Params, r render.Render, req *http.Request) {
 
 	output, err := attributes.GetHostAttributesByAttribute(params["attr"], req.URL.Query().Get("valueMatch"))

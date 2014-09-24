@@ -46,7 +46,7 @@ type Mount struct {
 }
 
 
-// Audit presents a single audit entry (namely in the database)
+// Agent presents the data of an agent
 type Agent struct {
 	Hostname			string
 	Port				int
@@ -64,6 +64,7 @@ type Agent struct {
 }
 
 
+// SeedOperation makes for the high level data & state of a seed operation
 type SeedOperation struct {
 	SeedId				int64
 	TargetHostname		string
@@ -75,6 +76,7 @@ type SeedOperation struct {
 }
 
 
+// SeedOperationState represents a single state (step) in a seed operation
 type SeedOperationState struct {
 	SeedStateId			int64
 	SeedId				int64
