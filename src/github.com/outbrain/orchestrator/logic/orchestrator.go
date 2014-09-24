@@ -18,11 +18,11 @@ package orchestrator
 
 import (
 	"fmt"
-	"time"
-	"github.com/outbrain/orchestrator/inst"
+	"github.com/outbrain/log"
 	"github.com/outbrain/orchestrator/agent"
 	"github.com/outbrain/orchestrator/config"
-	"github.com/outbrain/log"
+	"github.com/outbrain/orchestrator/inst"
+	"time"
 )
 
 const (
@@ -33,31 +33,28 @@ const (
 // It can be continuously updated as discovery process progresses.
 var discoveryInstanceKeys chan inst.InstanceKey = make(chan inst.InstanceKey, maxConcurrency)
 
-
 // handleDiscoveryRequests iterates the discoveryInstanceKeys channel and calls upon
 // instance discovery per entry.
 func handleDiscoveryRequests(pendingTokens chan bool, completedTokens chan bool) {
-    for instanceKey := range discoveryInstanceKeys {
-        AccountedDiscoverInstance(instanceKey, pendingTokens, completedTokens)
-    }
+	for instanceKey := range discoveryInstanceKeys {
+		AccountedDiscoverInstance(instanceKey, pendingTokens, completedTokens)
+	}
 }
 
-
-// AccountedDiscoverInstance will call upon DiscoverInstance and will keep track of 
+// AccountedDiscoverInstance will call upon DiscoverInstance and will keep track of
 // discovery tokens such that management of multiple discoveries can figure out
 // whether all instances in a topology are accounted for.
 func AccountedDiscoverInstance(instanceKey inst.InstanceKey, pendingTokens chan bool, completedTokens chan bool) {
 	if pendingTokens != nil {
 		pendingTokens <- true
 	}
-	go func () {
+	go func() {
 		DiscoverInstance(instanceKey)
 		if completedTokens != nil {
 			completedTokens <- true
 		}
 	}()
 }
-
 
 // DiscoverInstance will attempt discovering an instance (unless it is already up to date) and will
 // list down its master and slaves (if any) for further discovery.
@@ -66,9 +63,9 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	if !instanceKey.IsValid() {
 		return
 	}
-	
+
 	instance, found, err := inst.ReadInstance(&instanceKey)
-	
+
 	if found && instance.IsUpToDate && instance.IsLastCheckValid {
 		// we've already discovered this one. Skip!
 		goto Cleanup
@@ -77,7 +74,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	instance, err = inst.ReadTopologyInstance(&instanceKey)
 	// panic can occur (IO stuff). Therefore it may happen
 	// that instance is nil. Check it.
-	if	err	!= nil || instance == nil {
+	if err != nil || instance == nil {
 		log.Warningf("instance is nil in DiscoverInstance. key=%+v, error=%+v", instanceKey, err)
 		goto Cleanup
 	}
@@ -90,11 +87,9 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	}
 	// Investigate master:
 	discoveryInstanceKeys <- instance.MasterKey
-	
-	
-	Cleanup:
-}
 
+Cleanup:
+}
 
 // Start discovery begins a one time asynchronuous discovery process for the given
 // instance and all of its topology connected instances.
@@ -107,17 +102,17 @@ func StartDiscovery(instanceKey inst.InstanceKey) {
 	pendingTokens := make(chan bool, maxConcurrency)
 	completedTokens := make(chan bool, maxConcurrency)
 
-	AccountedDiscoverInstance(instanceKey, pendingTokens, completedTokens) 
+	AccountedDiscoverInstance(instanceKey, pendingTokens, completedTokens)
 	go handleDiscoveryRequests(pendingTokens, completedTokens)
-	
+
 	// Block until all are complete
 	for {
 		select {
-			case <- pendingTokens:
-				<- completedTokens
-			default:
-				inst.AuditOperation("start-discovery", &instanceKey, "")
-				return
+		case <-pendingTokens:
+			<-completedTokens
+		default:
+			inst.AuditOperation("start-discovery", &instanceKey, "")
+			return
 		}
 	}
 }
@@ -128,67 +123,68 @@ func StartDiscovery(instanceKey inst.InstanceKey) {
 func ContinuousDiscovery() {
 	log.Infof("Starting continuous discovery")
 	go handleDiscoveryRequests(nil, nil)
-    tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
-    forgetUnseenTick := time.Tick(time.Hour)
-    for _ = range tick {
+	tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
+	forgetUnseenTick := time.Tick(time.Hour)
+	for _ = range tick {
 		instanceKeys, _ := inst.ReadOutdatedInstanceKeys()
 		log.Debugf("outdated keys: %+v", instanceKeys)
 		for _, instanceKey := range instanceKeys {
 			discoveryInstanceKeys <- instanceKey
 		}
-    	// See if we should also forget instances (lower frequency)
+		// See if we should also forget instances (lower frequency)
 		select {
-			case <- forgetUnseenTick:
-		    	inst.ForgetLongUnseenInstances()
-			default:
+		case <-forgetUnseenTick:
+			inst.ForgetLongUnseenInstances()
+		default:
 		}
 	}
 }
 
-
-func pollAgent(hostname string) (error) {
+func pollAgent(hostname string) error {
 	polledAgent, err := agent.GetAgent(hostname)
 	agent.UpdateAgentLastChecked(hostname)
 
-	if err != nil { return log.Errore(err) }
-	
-	err = agent.UpdateAgentInfo(hostname, polledAgent) 
-	if err != nil { return log.Errore(err) }
-	
+	if err != nil {
+		return log.Errore(err)
+	}
+
+	err = agent.UpdateAgentInfo(hostname, polledAgent)
+	if err != nil {
+		return log.Errore(err)
+	}
+
 	return nil
 }
-
 
 // ContinuousAgentsPoll starts an asynchronuous infinite process where agents are
 // periodically investigated and their status captured, and long since unseen agents are
 // purged and forgotten.
 func ContinuousAgentsPoll() {
 	log.Infof("Starting continuous agents poll")
-	
+
 	go discoverSeededAgents()
-	
-    tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
-    forgetUnseenTick := time.Tick(time.Hour)
-    for _ = range tick {
+
+	tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
+	forgetUnseenTick := time.Tick(time.Hour)
+	for _ = range tick {
 		agentsHosts, _ := agent.ReadOutdatedAgentsHosts()
 		log.Debugf("outdated agents hosts: %+v", agentsHosts)
 		for _, hostname := range agentsHosts {
 			go pollAgent(hostname)
 		}
-    	// See if we should also forget agents (lower frequency)
+		// See if we should also forget agents (lower frequency)
 		select {
-			case <- forgetUnseenTick:
-		    	agent.ForgetLongUnseenAgents()
-		    	agent.FailStaleSeeds()
-			default:
+		case <-forgetUnseenTick:
+			agent.ForgetLongUnseenAgents()
+			agent.FailStaleSeeds()
+		default:
 		}
 	}
 }
 
-
 func discoverSeededAgents() {
-	for seededAgent := range agent.SeededAgents {	
-		instanceKey := inst.InstanceKey{Hostname: seededAgent.Hostname, Port: int(seededAgent.MySQLPort),}
-		go StartDiscovery(instanceKey)	
+	for seededAgent := range agent.SeededAgents {
+		instanceKey := inst.InstanceKey{Hostname: seededAgent.Hostname, Port: int(seededAgent.MySQLPort)}
+		go StartDiscovery(instanceKey)
 	}
 }

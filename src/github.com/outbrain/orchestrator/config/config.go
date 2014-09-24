@@ -17,75 +17,74 @@
 package config
 
 import (
-    "encoding/json"
-    "os"
-    
+	"encoding/json"
+	"os"
+
 	"github.com/outbrain/log"
 )
 
 // Configuration makes for orchestrator configuration input, which can be provided by user via JSON formatted file.
-// Some of the parameteres have reasonable default values, and some (like database credentials) are 
+// Some of the parameteres have reasonable default values, and some (like database credentials) are
 // strictly expected from user.
 type Configuration struct {
-	ListenAddress			string
-	MySQLTopologyUser		string
-	MySQLTopologyPassword	string
-	MySQLOrchestratorHost	string
-	MySQLOrchestratorPort	uint
-	MySQLOrchestratorDatabase	string
-	MySQLOrchestratorUser		string
-	MySQLOrchestratorPassword	string
-	SlaveLagQuery				string		// custom query to check on slave lg (e.g. heartbeat table)
-	SlaveStartPostWaitMilliseconds	int		// Time to wait after START SLAVE before re-readong instance (give slave chance to connect to master)
-	DiscoverByShowSlaveHosts	bool		// Attempt SHOW SLAVE HOSTS before PROCESSLIST
-	InstancePollSeconds			uint		// Number of seconds between instance reads
-	UnseenInstanceForgetHours	uint		// Number of hours after which an unseen instance is forgotten
-	DiscoveryPollSeconds		int			// Auto/continuous discovery of instances sleep time between polls
-	ReasonableReplicationLagSeconds	int		// Abvoe this value is considered a problem
-	ReasonableMaintenanceReplicationLagSeconds int // Above this value move-up and move-below are blocked
-	AuditLogFile		string				// Name of log file for audit operations. Disabled when empty.
-	AuditPageSize		int
-	AuthenticationMethod	string			// Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "proxy" for forwarded credentials via reverse proxy
-	HTTPAuthUser		string				// Username for HTTP Basic authentication (blank disables authentication)
-	HTTPAuthPassword	string				// Password for HTTP Basic authentication
-	AuthUserHeader		string				// HTTP header indicating auth user, when AuthenticationMethod is "proxy"
-	PowerAuthUsers		[]string			// On AuthenticationMethod == "proxy", list of users that can make changes. All others are read-only.
-	ClusterNameToAlias	map[string]string	// map between regex matching cluster name to a human friendly alias
-	ServeAgentsHttp		bool				// Spawn another HTTP interface dedicated for orcehstrator-agent
-	AgentPollMinutes	uint				// Minutes between agent polling
-	UnseenAgentForgetHours	uint			// Number of hours after which an unseen agent is forgotten
-	StaleSeedFailMinutes	uint			// Number of minutes after which a stale (no progress) seed is considered failed.
-	SeedAcceptableBytesDiff	int64			// Difference in bytes between seed source & target data size that is still considered as successful copy
-}	
+	ListenAddress                              string
+	MySQLTopologyUser                          string
+	MySQLTopologyPassword                      string
+	MySQLOrchestratorHost                      string
+	MySQLOrchestratorPort                      uint
+	MySQLOrchestratorDatabase                  string
+	MySQLOrchestratorUser                      string
+	MySQLOrchestratorPassword                  string
+	SlaveLagQuery                              string // custom query to check on slave lg (e.g. heartbeat table)
+	SlaveStartPostWaitMilliseconds             int    // Time to wait after START SLAVE before re-readong instance (give slave chance to connect to master)
+	DiscoverByShowSlaveHosts                   bool   // Attempt SHOW SLAVE HOSTS before PROCESSLIST
+	InstancePollSeconds                        uint   // Number of seconds between instance reads
+	UnseenInstanceForgetHours                  uint   // Number of hours after which an unseen instance is forgotten
+	DiscoveryPollSeconds                       int    // Auto/continuous discovery of instances sleep time between polls
+	ReasonableReplicationLagSeconds            int    // Abvoe this value is considered a problem
+	ReasonableMaintenanceReplicationLagSeconds int    // Above this value move-up and move-below are blocked
+	AuditLogFile                               string // Name of log file for audit operations. Disabled when empty.
+	AuditPageSize                              int
+	AuthenticationMethod                       string            // Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "proxy" for forwarded credentials via reverse proxy
+	HTTPAuthUser                               string            // Username for HTTP Basic authentication (blank disables authentication)
+	HTTPAuthPassword                           string            // Password for HTTP Basic authentication
+	AuthUserHeader                             string            // HTTP header indicating auth user, when AuthenticationMethod is "proxy"
+	PowerAuthUsers                             []string          // On AuthenticationMethod == "proxy", list of users that can make changes. All others are read-only.
+	ClusterNameToAlias                         map[string]string // map between regex matching cluster name to a human friendly alias
+	ServeAgentsHttp                            bool              // Spawn another HTTP interface dedicated for orcehstrator-agent
+	AgentPollMinutes                           uint              // Minutes between agent polling
+	UnseenAgentForgetHours                     uint              // Number of hours after which an unseen agent is forgotten
+	StaleSeedFailMinutes                       uint              // Number of minutes after which a stale (no progress) seed is considered failed.
+	SeedAcceptableBytesDiff                    int64             // Difference in bytes between seed source & target data size that is still considered as successful copy
+}
 
 var Config *Configuration = NewConfiguration()
 
 func NewConfiguration() *Configuration {
-	return &Configuration {
-		ListenAddress:				":3000",
-		InstancePollSeconds:		60,
-		UnseenInstanceForgetHours:	240,
-		SlaveStartPostWaitMilliseconds: 1000,
-		DiscoverByShowSlaveHosts:	false,
-		DiscoveryPollSeconds:		5,
-		ReasonableReplicationLagSeconds: 10,
+	return &Configuration{
+		ListenAddress:                              ":3000",
+		InstancePollSeconds:                        60,
+		UnseenInstanceForgetHours:                  240,
+		SlaveStartPostWaitMilliseconds:             1000,
+		DiscoverByShowSlaveHosts:                   false,
+		DiscoveryPollSeconds:                       5,
+		ReasonableReplicationLagSeconds:            10,
 		ReasonableMaintenanceReplicationLagSeconds: 20,
-		AuditLogFile:				"",
-		AuditPageSize:				20,
-		AuthenticationMethod:		"basic",
-		HTTPAuthUser: 				"",
-		HTTPAuthPassword: 			"",
-		AuthUserHeader:				"X-Forwarded-User",
-		PowerAuthUsers:				[]string{"*",},
-		ClusterNameToAlias:			make(map[string]string),
-		ServeAgentsHttp:			false,
-		AgentPollMinutes:			60,
-		UnseenAgentForgetHours:		6,		
-		StaleSeedFailMinutes:		60,
-		SeedAcceptableBytesDiff:	8192,
+		AuditLogFile:                               "",
+		AuditPageSize:                              20,
+		AuthenticationMethod:                       "basic",
+		HTTPAuthUser:                               "",
+		HTTPAuthPassword:                           "",
+		AuthUserHeader:                             "X-Forwarded-User",
+		PowerAuthUsers:                             []string{"*"},
+		ClusterNameToAlias:                         make(map[string]string),
+		ServeAgentsHttp:                            false,
+		AgentPollMinutes:                           60,
+		UnseenAgentForgetHours:                     6,
+		StaleSeedFailMinutes:                       60,
+		SeedAcceptableBytesDiff:                    8192,
 	}
 }
-
 
 // read reads configuration from given file, or silently skips if the file does not exist.
 // If the file does exist, then it is expected to be in valid JSON format or the function bails out.
@@ -97,12 +96,11 @@ func read(file_name string) (*Configuration, error) {
 		if err == nil {
 			log.Infof("Read config: %s", file_name)
 		} else {
-	  		log.Fatal("Cannot read config file:", file_name, err)
+			log.Fatal("Cannot read config file:", file_name, err)
 		}
 	}
 	return Config, err
 }
-
 
 // Read reads configuration from zero, either, some or all given files, in order of input.
 // A file can override configuration provided in previous file.

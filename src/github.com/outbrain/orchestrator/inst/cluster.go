@@ -18,7 +18,7 @@ package inst
 
 // ClusterInfo makes for a cluster status/info summary
 type ClusterInfo struct {
-	ClusterName 			string
-	ClusterAlias			string // Human friendly alias
-	CountInstances 			uint
+	ClusterName    string
+	ClusterAlias   string // Human friendly alias
+	CountInstances uint
 }

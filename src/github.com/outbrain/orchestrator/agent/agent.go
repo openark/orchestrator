@@ -16,72 +16,62 @@
 
 package agent
 
-import (
-
-)
-
-
-
+import ()
 
 // LogicalVolume describes an LVM volume
 type LogicalVolume struct {
-	Name			string
-	GroupName		string
-	Path			string
-	IsSnapshot		bool
-	SnapshotPercent	float64
+	Name            string
+	GroupName       string
+	Path            string
+	IsSnapshot      bool
+	SnapshotPercent float64
 }
-
 
 // Mount describes a file system mount point
 type Mount struct {
-	Path			string
-	Device			string
-	LVPath			string
-	FileSystem		string
-	IsMounted		bool
-	DiskUsage		int64
-	MySQLDataPath	string
-	MySQLDiskUsage	int64
+	Path           string
+	Device         string
+	LVPath         string
+	FileSystem     string
+	IsMounted      bool
+	DiskUsage      int64
+	MySQLDataPath  string
+	MySQLDiskUsage int64
 }
-
 
 // Agent presents the data of an agent
 type Agent struct {
-	Hostname			string
-	Port				int
-	Token				string
-	LastSubmitted		string
-	AvailableLocalSnapshots	[]string
-	AvailableSnapshots		[]string
-	LogicalVolumes			[]LogicalVolume
-	MountPoint				Mount
-	MySQLRunning		bool
-	MySQLDiskUsage		int64
-	MySQLPort			int64
-	MySQLDatadirDiskFree	int64
-	MySQLErrorLogTail		[]string
+	Hostname                string
+	Port                    int
+	Token                   string
+	LastSubmitted           string
+	AvailableLocalSnapshots []string
+	AvailableSnapshots      []string
+	LogicalVolumes          []LogicalVolume
+	MountPoint              Mount
+	MySQLRunning            bool
+	MySQLDiskUsage          int64
+	MySQLPort               int64
+	MySQLDatadirDiskFree    int64
+	MySQLErrorLogTail       []string
 }
-
 
 // SeedOperation makes for the high level data & state of a seed operation
 type SeedOperation struct {
-	SeedId				int64
-	TargetHostname		string
-	SourceHostname		string
-	StartTimestamp		string
-	EndTimestamp		string
-	IsComplete			bool
-	IsSuccessful		bool	
+	SeedId         int64
+	TargetHostname string
+	SourceHostname string
+	StartTimestamp string
+	EndTimestamp   string
+	IsComplete     bool
+	IsSuccessful   bool
 }
-
 
 // SeedOperationState represents a single state (step) in a seed operation
 type SeedOperationState struct {
-	SeedStateId			int64
-	SeedId				int64
-	StateTimestamp		string
-	Action				string
-	ErrorMessage		string
+	SeedStateId    int64
+	SeedId         int64
+	StateTimestamp string
+	Action         string
+	ErrorMessage   string
 }
-

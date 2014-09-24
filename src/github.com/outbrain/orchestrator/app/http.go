@@ -14,23 +14,22 @@
    limitations under the License.
 */
 
-// 
+//
 package app
 
 import (
 	"github.com/go-martini/martini"
-	"github.com/martini-contrib/render"
 	"github.com/martini-contrib/auth"
+	"github.com/martini-contrib/render"
 
-	"strings"	
-	nethttp "net/http" 
-	
-	"github.com/outbrain/orchestrator/config"
-	"github.com/outbrain/orchestrator/logic"
-	"github.com/outbrain/orchestrator/http"
+	nethttp "net/http"
+	"strings"
+
 	"github.com/outbrain/log"
+	"github.com/outbrain/orchestrator/config"
+	"github.com/outbrain/orchestrator/http"
+	"github.com/outbrain/orchestrator/logic"
 )
-
 
 // Http starts serving
 func Http(discovery bool) {
@@ -40,7 +39,7 @@ func Http(discovery bool) {
 	standardHttp(discovery)
 }
 
-// standardHttp starts serving standard HTTP (api/web) requests, to be used by normal clients 
+// standardHttp starts serving standard HTTP (api/web) requests, to be used by normal clients
 func standardHttp(discovery bool) {
 	m := martini.Classic()
 	if strings.ToLower(config.Config.AuthenticationMethod) == "basic" && config.Config.HTTPAuthUser == "" {
@@ -48,18 +47,18 @@ func standardHttp(discovery bool) {
 	}
 	if strings.ToLower(config.Config.AuthenticationMethod) == "basic" && config.Config.HTTPAuthUser != "" {
 		m.Use(auth.Basic(config.Config.HTTPAuthUser, config.Config.HTTPAuthPassword))
-    }
-	
+	}
+
 	// Render html templates from templates directory
 	m.Use(render.Renderer(render.Options{
-		Directory: "resources",
-		Layout: "templates/layout",	
+		Directory:       "resources",
+		Layout:          "templates/layout",
 		HTMLContentType: "text/html",
 	}))
 	m.Use(martini.Static("resources/public"))
-	
+
 	log.Info("Starting HTTP")
-	
+
 	if discovery {
 		go orchestrator.ContinuousDiscovery()
 	}
@@ -68,26 +67,21 @@ func standardHttp(discovery bool) {
 	http.Web.RegisterRequests(m)
 
 	// Serve
-	
+
 	nethttp.ListenAndServe(config.Config.ListenAddress, m)
 }
-
-
 
 // agentsHttp startes serving agents API requests
 func agentsHttp() {
 	m := martini.Classic()
 	m.Use(render.Renderer())
-	
+
 	log.Info("Starting agents HTTP")
-	
+
 	go orchestrator.ContinuousAgentsPoll()
-	
-	
+
 	http.AgentsAPI.RegisterRequests(m)
-	
+
 	// Serve
 	nethttp.ListenAndServe(":3001", m)
 }
-
-

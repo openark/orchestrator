@@ -17,20 +17,20 @@
 package inst
 
 import (
-	"strconv"
-	"strings"
-	"net"
-	"fmt"
-	"errors"
 	"database/sql"
 	"encoding/json"
-	"github.com/outbrain/orchestrator/config"
+	"errors"
+	"fmt"
 	"github.com/outbrain/log"
+	"github.com/outbrain/orchestrator/config"
+	"net"
+	"strconv"
+	"strings"
 )
 
 // GetCNAME resolves an IP or hostname into a normalized valid CNAME
 func GetCNAME(hostName string) (string, error) {
-	res, err := net.LookupCNAME(hostName);
+	res, err := net.LookupCNAME(hostName)
 	if err != nil {
 		return hostName, err
 	}
@@ -38,14 +38,12 @@ func GetCNAME(hostName string) (string, error) {
 	return res, nil
 }
 
-
-const InvalidPort = 65535 
-
+const InvalidPort = 65535
 
 // InstanceKey is an instance indicator, identifued by hostname and port
 type InstanceKey struct {
-	Hostname 			string
-	Port	 			int
+	Hostname string
+	Port     int
 }
 
 // NewInstanceKeyFromStrings creates a new InstanceKey by resolving hostname and port.
@@ -53,7 +51,9 @@ type InstanceKey struct {
 func NewInstanceKeyFromStrings(hostname string, port string) (*InstanceKey, error) {
 	instanceKey := &InstanceKey{}
 	var err error
-	if instanceKey.Hostname, err = GetCNAME(hostname); err != nil {return instanceKey, err}
+	if instanceKey.Hostname, err = GetCNAME(hostname); err != nil {
+		return instanceKey, err
+	}
 
 	if instanceKey.Port, err = strconv.Atoi(port); err != nil {
 		return instanceKey, errors.New(fmt.Sprintf("Invalid port: %s", port))
@@ -72,7 +72,7 @@ func ParseInstanceKey(hostPort string) (*InstanceKey, error) {
 
 // Formalize this key by getting CNAME for hostname
 func (this *InstanceKey) Formalize() *InstanceKey {
-	this.Hostname, _ = GetCNAME(this.Hostname) 
+	this.Hostname, _ = GetCNAME(this.Hostname)
 	return this
 }
 
@@ -91,14 +91,11 @@ func (this *InstanceKey) DisplayString() string {
 	return fmt.Sprintf("%s:%d", this.Hostname, this.Port)
 }
 
-
-
 // BinlogCoordinates described binary log coordinates in the form of log file & log position.
 type BinlogCoordinates struct {
-	LogFile	string
-	LogPos	int64
+	LogFile string
+	LogPos  int64
 }
-
 
 // Equals tests equality of this corrdinate and another one.
 func (this *BinlogCoordinates) Equals(other *BinlogCoordinates) bool {
@@ -119,12 +116,11 @@ func (this *BinlogCoordinates) SmallerThan(other *BinlogCoordinates) bool {
 // InstanceKeyMap is a convenience struct for listing InstanceKey-s
 type InstanceKeyMap map[InstanceKey]bool
 
-
 // GetInstanceKeys returns keys in this map in the form of an array
 func (this *InstanceKeyMap) GetInstanceKeys() []InstanceKey {
 	res := []InstanceKey{}
 	for key, _ := range *this {
-    	res = append(res, key)
+		res = append(res, key)
 	}
 	return res
 }
@@ -135,38 +131,38 @@ func (this *InstanceKeyMap) MarshalJSON() ([]byte, error) {
 }
 
 // Instance represents a database instance, including its current configuration & status.
-// It presents important replication configuration and detailed replication status. 
+// It presents important replication configuration and detailed replication status.
 type Instance struct {
-	Key					InstanceKey
-	ServerID			uint
-	Version				string
-	ReadOnly			bool
-	Binlog_format		string
-	LogBinEnabled		bool
-	LogSlaveUpdatesEnabled	bool
-	SelfBinlogCoordinates	BinlogCoordinates
-	MasterKey			InstanceKey
-	Slave_SQL_Running	bool
-	Slave_IO_Running	bool
-	ReadBinlogCoordinates	BinlogCoordinates
-	ExecBinlogCoordinates	BinlogCoordinates
-	SecondsBehindMaster		sql.NullInt64
-	SlaveLagSeconds			sql.NullInt64
-	SlaveHosts			InstanceKeyMap
-	ClusterName			string
-	
-	IsLastCheckValid	bool
-	IsUpToDate			bool
-	IsRecentlyChecked	bool
-	SecondsSinceLastSeen	sql.NullInt64
-	CountMySQLSnapshots		int
+	Key                    InstanceKey
+	ServerID               uint
+	Version                string
+	ReadOnly               bool
+	Binlog_format          string
+	LogBinEnabled          bool
+	LogSlaveUpdatesEnabled bool
+	SelfBinlogCoordinates  BinlogCoordinates
+	MasterKey              InstanceKey
+	Slave_SQL_Running      bool
+	Slave_IO_Running       bool
+	ReadBinlogCoordinates  BinlogCoordinates
+	ExecBinlogCoordinates  BinlogCoordinates
+	SecondsBehindMaster    sql.NullInt64
+	SlaveLagSeconds        sql.NullInt64
+	SlaveHosts             InstanceKeyMap
+	ClusterName            string
+
+	IsLastCheckValid     bool
+	IsUpToDate           bool
+	IsRecentlyChecked    bool
+	SecondsSinceLastSeen sql.NullInt64
+	CountMySQLSnapshots  int
 }
 
 // NewInstance creates a new, empty instance
 func NewInstance() *Instance {
-    return &Instance{
-    	SlaveHosts: make(map[InstanceKey]bool),
-    }
+	return &Instance{
+		SlaveHosts: make(map[InstanceKey]bool),
+	}
 }
 
 // Equals tests that this instance is the same instance as other. The function does not test
@@ -181,16 +177,16 @@ func (this *Instance) MajorVersion() []string {
 }
 
 // MajorVersion tests this instance against another and returns true if this instance is of a smaller "major" varsion.
-// e.g. 5.5.36 is NOT a smaller major version as comapred to 5.5.36, but IS as compared to 5.6.9 
+// e.g. 5.5.36 is NOT a smaller major version as comapred to 5.5.36, but IS as compared to 5.6.9
 func (this *Instance) IsSmallerMajorVersion(other *Instance) bool {
 	thisMajorVersion := this.MajorVersion()
 	otherMajorVersion := other.MajorVersion()
-	for i := 0 ; i < len(thisMajorVersion); i++ {
+	for i := 0; i < len(thisMajorVersion); i++ {
 		this_token, _ := strconv.Atoi(thisMajorVersion[i])
 		other_token, _ := strconv.Atoi(otherMajorVersion[i])
 		if this_token < other_token {
 			return true
-		} 
+		}
 	}
 	return false
 }
@@ -223,13 +219,15 @@ func (this *Instance) GetSlaveHostsAsJson() string {
 
 // ReadSlaveHostsFromJson unmarshalls a json to read list of slaves
 func (this *Instance) ReadSlaveHostsFromJson(jsonString string) error {
-	var keys []InstanceKey;
+	var keys []InstanceKey
 	err := json.Unmarshal([]byte(jsonString), &keys)
-	if err != nil {return log.Errore(err)}
-	
+	if err != nil {
+		return log.Errore(err)
+	}
+
 	this.SlaveHosts = make(map[InstanceKey]bool)
 	for _, key := range keys {
-    	this.AddSlaveKey(&key)
+		this.AddSlaveKey(&key)
 	}
 	return err
 }
@@ -248,24 +246,24 @@ func (this *Instance) IsMasterOf(slave *Instance) bool {
 // Checks are made to binlog format, version number, binary logs etc.
 func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	if !other.LogBinEnabled {
-		return false, errors.New(fmt.Sprintf("instance does not have binary logs enabled: %+v", other.Key)) 
+		return false, errors.New(fmt.Sprintf("instance does not have binary logs enabled: %+v", other.Key))
 	}
 	if !other.LogSlaveUpdatesEnabled {
-		return false, errors.New(fmt.Sprintf("instance does not have log_slave_updates enabled: %+v", other.Key)) 
+		return false, errors.New(fmt.Sprintf("instance does not have log_slave_updates enabled: %+v", other.Key))
 	}
 	if this.IsSmallerMajorVersion(other) {
-		return false, errors.New(fmt.Sprintf("instance %+v has version %s, which is lower than %s on %+v ", this.Key, this.Version, other.Version, other.Key)) 
+		return false, errors.New(fmt.Sprintf("instance %+v has version %s, which is lower than %s on %+v ", this.Key, this.Version, other.Version, other.Key))
 	}
 	if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
 		if this.Binlog_format == "STATEMENT" && (other.Binlog_format == "ROW" || other.Binlog_format == "MIXED") {
 			return false, errors.New(fmt.Sprintf("Cannot replicate from ROW/MIXED binlog format on %+v to STATEMENT on %+v", other.Key, this.Key))
-		} 
+		}
 		if this.Binlog_format == "MIXED" && other.Binlog_format == "ROW" {
-			return false, errors.New(fmt.Sprintf("Cannot replicate from ROW binlog format on %+v to MIXED on %+v", other.Key, this.Key)) 
+			return false, errors.New(fmt.Sprintf("Cannot replicate from ROW binlog format on %+v to MIXED on %+v", other.Key, this.Key))
 		}
 	}
 	if this.ServerID == other.ServerID {
-		return false, errors.New(fmt.Sprintf("Identical server id: %+v, %+v both have %d", other.Key, this.Key, this.ServerID)) 
+		return false, errors.New(fmt.Sprintf("Identical server id: %+v, %+v both have %d", other.Key, this.Key, this.ServerID))
 	}
 	return true, nil
 }
@@ -274,41 +272,39 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 // if this instance lags too much, it will not be moveable.
 func (this *Instance) CanMove() (bool, error) {
 	if !this.IsLastCheckValid {
-		return false, errors.New(fmt.Sprintf("%+v: last check invalid", this.Key)) 
+		return false, errors.New(fmt.Sprintf("%+v: last check invalid", this.Key))
 	}
 	if !this.IsRecentlyChecked {
-		return false, errors.New(fmt.Sprintf("%+v: not recently checked", this.Key)) 
+		return false, errors.New(fmt.Sprintf("%+v: not recently checked", this.Key))
 	}
 	if !this.Slave_SQL_Running {
-		return false, errors.New(fmt.Sprintf("%+v: instance is not replicating", this.Key)) 
+		return false, errors.New(fmt.Sprintf("%+v: instance is not replicating", this.Key))
 	}
 	if !this.Slave_IO_Running {
-		return false, errors.New(fmt.Sprintf("%+v: instance is not replicating", this.Key)) 
+		return false, errors.New(fmt.Sprintf("%+v: instance is not replicating", this.Key))
 	}
 	if !this.SecondsBehindMaster.Valid {
-		return false, errors.New(fmt.Sprintf("%+v: cannot determine slave lag", this.Key)) 
+		return false, errors.New(fmt.Sprintf("%+v: cannot determine slave lag", this.Key))
 	}
 	if this.SecondsBehindMaster.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
-		return false, errors.New(fmt.Sprintf("%+v: lags too much", this.Key)) 
+		return false, errors.New(fmt.Sprintf("%+v: lags too much", this.Key))
 	}
 	return true, nil
 }
 
-
-// CanMoveAsCoMaster returns true if this instance's state allows it to be repositioned. 
+// CanMoveAsCoMaster returns true if this instance's state allows it to be repositioned.
 func (this *Instance) CanMoveAsCoMaster() (bool, error) {
 	if !this.IsLastCheckValid {
-		return false, errors.New(fmt.Sprintf("%+v: last check invalid", this.Key)) 
+		return false, errors.New(fmt.Sprintf("%+v: last check invalid", this.Key))
 	}
 	if !this.IsRecentlyChecked {
-		return false, errors.New(fmt.Sprintf("%+v: not recently checked", this.Key)) 
+		return false, errors.New(fmt.Sprintf("%+v: not recently checked", this.Key))
 	}
 	if this.Slave_SQL_Running {
-		return false, errors.New(fmt.Sprintf("%+v: instance is replicating", this.Key)) 
+		return false, errors.New(fmt.Sprintf("%+v: instance is replicating", this.Key))
 	}
 	if this.Slave_SQL_Running {
-		return false, errors.New(fmt.Sprintf("%+v: instance is replicating", this.Key)) 
+		return false, errors.New(fmt.Sprintf("%+v: instance is replicating", this.Key))
 	}
 	return true, nil
 }
-

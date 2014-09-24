@@ -17,12 +17,12 @@
 package http
 
 import (
-	"strconv"
-	"fmt"	
 	"errors"
-	"net/http"
+	"fmt"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
+	"net/http"
+	"strconv"
 
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/inst"
@@ -32,8 +32,6 @@ import (
 type HttpWeb struct{}
 
 var Web HttpWeb = HttpWeb{}
-
-
 
 func (this *HttpWeb) getInstanceKey(host string, port string) (inst.InstanceKey, error) {
 	instanceKey := inst.InstanceKey{Hostname: host}
@@ -45,178 +43,164 @@ func (this *HttpWeb) getInstanceKey(host string, port string) (inst.InstanceKey,
 	return instanceKey, err
 }
 
-
 func (this *HttpWeb) Clusters(params martini.Params, r render.Render) {
 	r.HTML(200, "templates/clusters", map[string]interface{}{
-		"agentsHttpActive": config.Config.ServeAgentsHttp,
-		"title": "clusters", 
-		"activePage": "cluster", 
+		"agentsHttpActive":  config.Config.ServeAgentsHttp,
+		"title":             "clusters",
+		"activePage":        "cluster",
 		"autoshow_problems": false,
-		})
+	})
 }
-
 
 func (this *HttpWeb) Cluster(params martini.Params, r render.Render) {
 	r.HTML(200, "templates/cluster", map[string]interface{}{
-		"agentsHttpActive": config.Config.ServeAgentsHttp,
-		"title": "cluster", 
-		"activePage": "cluster", 
-		"clusterName": params["clusterName"],
+		"agentsHttpActive":  config.Config.ServeAgentsHttp,
+		"title":             "cluster",
+		"activePage":        "cluster",
+		"clusterName":       params["clusterName"],
 		"autoshow_problems": true,
-		})
+	})
 }
-
 
 func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Request) {
 	searchString := params["searchString"]
 	if searchString == "" {
-		searchString = req.URL.Query().Get("s");
+		searchString = req.URL.Query().Get("s")
 	}
 	r.HTML(200, "templates/search", map[string]interface{}{
-		"agentsHttpActive": config.Config.ServeAgentsHttp,
-		"title": "search", 
-		"activePage": "search", 
-		"searchString": searchString, 
+		"agentsHttpActive":  config.Config.ServeAgentsHttp,
+		"title":             "search",
+		"activePage":        "search",
+		"searchString":      searchString,
 		"autoshow_problems": false,
-		})
+	})
 }
-
 
 func (this *HttpWeb) Discover(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/discover", map[string]interface{}{
-		"agentsHttpActive": config.Config.ServeAgentsHttp,
-		"title": "discover", 
-		"activePage": "discover", 
+		"agentsHttpActive":  config.Config.ServeAgentsHttp,
+		"title":             "discover",
+		"activePage":        "discover",
 		"autoshow_problems": false,
-		})
+	})
 }
-
 
 func (this *HttpWeb) LongQueries(params martini.Params, r render.Render, req *http.Request) {
 	filter := params["filter"]
 	if filter == "" {
-		filter = req.URL.Query().Get("filter");
+		filter = req.URL.Query().Get("filter")
 	}
 
 	r.HTML(200, "templates/long_queries", map[string]interface{}{
-		"agentsHttpActive": config.Config.ServeAgentsHttp,
-		"title": "long queries", 
-		"activePage": "queries", 
+		"agentsHttpActive":  config.Config.ServeAgentsHttp,
+		"title":             "long queries",
+		"activePage":        "queries",
 		"autoshow_problems": false,
-		"filter": filter,
-		})
+		"filter":            filter,
+	})
 }
-
 
 func (this *HttpWeb) Audit(params martini.Params, r render.Render) {
 	page, err := strconv.Atoi(params["page"])
-	if err != nil { page = 0 }
+	if err != nil {
+		page = 0
+	}
 
 	r.HTML(200, "templates/audit", map[string]interface{}{
-		"agentsHttpActive": config.Config.ServeAgentsHttp,
-		"title": "audit", 
-		"activePage": "audit", 
+		"agentsHttpActive":  config.Config.ServeAgentsHttp,
+		"title":             "audit",
+		"activePage":        "audit",
 		"autoshow_problems": false,
-		"page": page,
-		})
+		"page":              page,
+	})
 }
-
 
 func (this *HttpWeb) Agents(params martini.Params, r render.Render) {
 	r.HTML(200, "templates/agents", map[string]interface{}{
-		"agentsHttpActive": config.Config.ServeAgentsHttp,
-		"title": "agents", 
-		"activePage": "agents", 
+		"agentsHttpActive":  config.Config.ServeAgentsHttp,
+		"title":             "agents",
+		"activePage":        "agents",
 		"autoshow_problems": false,
-		})
+	})
 }
-
 
 func (this *HttpWeb) Agent(params martini.Params, r render.Render) {
 	r.HTML(200, "templates/agent", map[string]interface{}{
-		"agentsHttpActive": config.Config.ServeAgentsHttp,
-		"title": "agent", 
-		"activePage": "agents", 
+		"agentsHttpActive":  config.Config.ServeAgentsHttp,
+		"title":             "agent",
+		"activePage":        "agents",
 		"autoshow_problems": false,
-		"agentHost": params["host"],
-		})
+		"agentHost":         params["host"],
+	})
 }
-
 
 func (this *HttpWeb) AgentSeedDetails(params martini.Params, r render.Render) {
 	r.HTML(200, "templates/agent_seed_details", map[string]interface{}{
-		"agentsHttpActive": config.Config.ServeAgentsHttp,
-		"title": "agent seed details", 
-		"activePage": "agents", 
+		"agentsHttpActive":  config.Config.ServeAgentsHttp,
+		"title":             "agent seed details",
+		"activePage":        "agents",
 		"autoshow_problems": false,
-		"seedId": params["seedId"],
-		})
+		"seedId":            params["seedId"],
+	})
 }
-
 
 func (this *HttpWeb) Seeds(params martini.Params, r render.Render) {
 	r.HTML(200, "templates/seeds", map[string]interface{}{
-		"agentsHttpActive": config.Config.ServeAgentsHttp,
-		"title": "seeds", 
-		"activePage": "agents", 
+		"agentsHttpActive":  config.Config.ServeAgentsHttp,
+		"title":             "seeds",
+		"activePage":        "agents",
 		"autoshow_problems": false,
-		})
+	})
 }
-
 
 func (this *HttpWeb) Home(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/home", map[string]interface{}{
-		"agentsHttpActive": config.Config.ServeAgentsHttp,
-		"title": "home", 
-		"activePage": "home", 
+		"agentsHttpActive":  config.Config.ServeAgentsHttp,
+		"title":             "home",
+		"activePage":        "home",
 		"autoshow_problems": false,
-		})
+	})
 }
-
 
 func (this *HttpWeb) About(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/about", map[string]interface{}{
-		"agentsHttpActive": config.Config.ServeAgentsHttp,
-		"title": "about", 
-		"activePage": "home", 
+		"agentsHttpActive":  config.Config.ServeAgentsHttp,
+		"title":             "about",
+		"activePage":        "home",
 		"autoshow_problems": false,
-		})
+	})
 }
-
-
 
 func (this *HttpWeb) FAQ(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/faq", map[string]interface{}{
-		"agentsHttpActive": config.Config.ServeAgentsHttp,
-		"title": "FAQ", 
-		"activePage": "home", 
+		"agentsHttpActive":  config.Config.ServeAgentsHttp,
+		"title":             "FAQ",
+		"activePage":        "home",
 		"autoshow_problems": false,
-		})
+	})
 }
-
-
 
 // RegisterRequests makes for the de-facto list of known Web calls
 func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
-	m.Get("/", this.About) 
-	m.Get("/web", this.About) 
-	m.Get("/web/home", this.About) 
-	m.Get("/web/about", this.About) 
-	m.Get("/web/faq", this.FAQ) 
-	m.Get("/web/clusters", this.Clusters) 
-	m.Get("/web/cluster/:clusterName", this.Cluster) 
-	m.Get("/web/search/:searchString", this.Search) 
-	m.Get("/web/search", this.Search) 
-	m.Get("/web/discover", this.Discover) 
-	m.Get("/web/long-queries", this.LongQueries) 
-	m.Get("/web/audit", this.Audit) 
-	m.Get("/web/audit/:page", this.Audit) 
-	m.Get("/web/agents", this.Agents) 
-	m.Get("/web/agent/:host", this.Agent) 
+	m.Get("/", this.About)
+	m.Get("/web", this.About)
+	m.Get("/web/home", this.About)
+	m.Get("/web/about", this.About)
+	m.Get("/web/faq", this.FAQ)
+	m.Get("/web/clusters", this.Clusters)
+	m.Get("/web/cluster/:clusterName", this.Cluster)
+	m.Get("/web/search/:searchString", this.Search)
+	m.Get("/web/search", this.Search)
+	m.Get("/web/discover", this.Discover)
+	m.Get("/web/long-queries", this.LongQueries)
+	m.Get("/web/audit", this.Audit)
+	m.Get("/web/audit/:page", this.Audit)
+	m.Get("/web/agents", this.Agents)
+	m.Get("/web/agent/:host", this.Agent)
 	m.Get("/web/seed-details/:seedId", this.AgentSeedDetails)
 	m.Get("/web/seeds", this.Seeds)
 }

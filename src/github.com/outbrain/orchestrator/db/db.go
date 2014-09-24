@@ -17,14 +17,13 @@
 package db
 
 import (
+	"database/sql"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
-	"database/sql"
 	"github.com/outbrain/log"
-	"github.com/outbrain/sqlutils"
 	"github.com/outbrain/orchestrator/config"
+	"github.com/outbrain/sqlutils"
 )
-
 
 // generateSQL & generateSQLPatches are lists of SQL statements required to build the orchestrator backend
 var generateSQL = []string{
@@ -104,7 +103,7 @@ var generateSQL = []string{
           KEY audit_timestamp_idx (audit_timestamp),
           KEY host_port_idx (hostname,port,audit_timestamp)
         ) ENGINE=InnoDB DEFAULT CHARSET=latin1 
-	`,	
+	`,
 	`
 		CREATE TABLE IF NOT EXISTS host_agent (
 		  hostname varchar(128) NOT NULL,
@@ -174,7 +173,6 @@ var generateSQLPatches = []string{
 	`,
 }
 
-
 // OpenTopology returns a DB instance to access a topology instance
 func OpenTopology(host string, port int) (*sql.DB, error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/", config.Config.MySQLTopologyUser, config.Config.MySQLTopologyPassword, host, port)
@@ -184,7 +182,7 @@ func OpenTopology(host string, port int) (*sql.DB, error) {
 
 // OpenTopology returns the DB instance for the orchestrator backed database
 func OpenOrchestrator() (*sql.DB, error) {
-	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", config.Config.MySQLOrchestratorUser, config.Config.MySQLOrchestratorPassword, 
+	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", config.Config.MySQLOrchestratorUser, config.Config.MySQLOrchestratorPassword,
 		config.Config.MySQLOrchestratorHost, config.Config.MySQLOrchestratorPort, config.Config.MySQLOrchestratorDatabase)
 	db, fromCache, err := sqlutils.GetDB(mysql_uri)
 	if err == nil && !fromCache {
@@ -193,15 +191,14 @@ func OpenOrchestrator() (*sql.DB, error) {
 	return db, err
 }
 
-
 // initOrchestratorDB attempts to create/upgrade the orchestrator backend database. It is created once in the
-// application's lifetime. 
+// application's lifetime.
 func initOrchestratorDB(db *sql.DB) error {
 	log.Debug("Initializing orchestrator")
 	for _, query := range generateSQL {
 		_, err := ExecOrchestrator(query)
-		if err != nil { 
-			return log.Fatalf("Cannot initiate orchestrator: %+v", err) 
+		if err != nil {
+			return log.Fatalf("Cannot initiate orchestrator: %+v", err)
 		}
 	}
 	for _, query := range generateSQLPatches {
@@ -211,14 +208,12 @@ func initOrchestratorDB(db *sql.DB) error {
 	return nil
 }
 
-
 // ExecOrchestrator will execute given query on the orchestrator backend database.
 func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
-	db,	err	:=	OpenOrchestrator()
+	db, err := OpenOrchestrator()
 	if err != nil {
 		return nil, err
 	}
 	res, err := sqlutils.Exec(db, query, args...)
 	return res, err
 }
-

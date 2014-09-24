@@ -17,10 +17,10 @@
 package inst
 
 import (
-	"fmt"
 	"errors"
-	"strings"
+	"fmt"
 	"github.com/outbrain/log"
+	"strings"
 )
 
 // GetInstanceMaster synchronously reaches into the replication topology
@@ -29,7 +29,6 @@ func GetInstanceMaster(instance *Instance) (*Instance, error) {
 	master, err := ReadTopologyInstance(&instance.MasterKey)
 	return master, err
 }
-
 
 // InstancesAreSiblings checks whether both instances are replicating from same master
 func InstancesAreSiblings(instance0, instance1 *Instance) bool {
@@ -59,11 +58,13 @@ func InstanceIsMasterOf(instance0, instance1 *Instance) bool {
 }
 
 // MoveUp will attempt moving instance indicated by instanceKey up the topology hierarchy.
-// It will perform all safety and sanity checks and will tamper with this instance's replication 
+// It will perform all safety and sanity checks and will tamper with this instance's replication
 // as well as its master.
 func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
-	if err != nil {	return instance, err}
+	if err != nil {
+		return instance, err
+	}
 	if !instance.IsSlave() {
 		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
 	}
@@ -72,17 +73,19 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, merr
 	}
 	master, err := GetInstanceMaster(instance)
-	if err != nil {	return instance, log.Errorf("Cannot GetInstanceMaster() for %+v. error=%+v", instance, err)}
-	
+	if err != nil {
+		return instance, log.Errorf("Cannot GetInstanceMaster() for %+v. error=%+v", instance, err)
+	}
+
 	if !master.IsSlave() {
 		return instance, errors.New(fmt.Sprintf("master is not a slave itself: %+v", master.Key))
 	}
-	
+
 	if canReplicate, err := instance.CanReplicateFrom(master); canReplicate == false {
 		return instance, err
 	}
-	
-	log.Infof("Will move %+v up the topology", *instanceKey) 
+
+	log.Infof("Will move %+v up the topology", *instanceKey)
 
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", "move up"); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
@@ -98,36 +101,49 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	master, err = StopSlave(&master.Key)
-	if	err	!=	nil	{goto Cleanup} 
-	
+	if err != nil {
+		goto Cleanup
+	}
+
 	instance, err = StopSlave(instanceKey)
-	if	err	!=	nil	{goto Cleanup} 
-	
+	if err != nil {
+		goto Cleanup
+	}
+
 	instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &master.SelfBinlogCoordinates)
-	if	err	!=	nil	{goto Cleanup} 
-	
+	if err != nil {
+		goto Cleanup
+	}
+
 	instance, err = ChangeMasterTo(instanceKey, &master.MasterKey, &master.ExecBinlogCoordinates)
-	if	err	!=	nil	{goto Cleanup} 
-	
-	Cleanup:
+	if err != nil {
+		goto Cleanup
+	}
+
+Cleanup:
 	instance, _ = StartSlave(instanceKey)
 	master, _ = StartSlave(&master.Key)
-	if err != nil {	return instance, log.Errore(err)}
+	if err != nil {
+		return instance, log.Errore(err)
+	}
 	// and we're done (pending deferred functions)
 	AuditOperation("move-up", instanceKey, fmt.Sprintf("moved up %+v. Previous master: %+v", *instanceKey, master.Key))
-	 
+
 	return instance, err
 }
 
-
 // MoveBelow will attempt moving instance indicated by instanceKey below its supposed sibling indicated by sinblingKey.
-// It will perform all safety and sanity checks and will tamper with this instance's replication 
+// It will perform all safety and sanity checks and will tamper with this instance's replication
 // as well as its sibling.
 func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
-	if err != nil {	return instance, err}
+	if err != nil {
+		return instance, err
+	}
 	sibling, err := ReadTopologyInstance(siblingKey)
-	if err != nil {	return instance, err}
+	if err != nil {
+		return instance, err
+	}
 
 	rinstance, _, _ := ReadInstance(&instance.Key)
 	if canMove, merr := rinstance.CanMove(); !canMove {
@@ -140,12 +156,12 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	if !InstancesAreSiblings(instance, sibling) {
 		return instance, errors.New(fmt.Sprintf("instances are not siblings: %+v, %+v", *instanceKey, *siblingKey))
 	}
-	
+
 	if canReplicate, err := instance.CanReplicateFrom(sibling); !canReplicate {
 		return instance, err
 	}
 	log.Infof("Will move %+v below its sibling %+v", instanceKey, siblingKey)
-	
+
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("move below %+v", *siblingKey)); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
 		goto Cleanup
@@ -160,43 +176,56 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	}
 
 	instance, err = StopSlave(instanceKey)
-	if	err	!=	nil	{goto Cleanup} 
-	
+	if err != nil {
+		goto Cleanup
+	}
+
 	sibling, err = StopSlave(siblingKey)
-	if	err	!=	nil	{goto Cleanup} 
-	
+	if err != nil {
+		goto Cleanup
+	}
+
 	if instance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
 		instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &sibling.ExecBinlogCoordinates)
-		if	err	!=	nil	{goto Cleanup} 
+		if err != nil {
+			goto Cleanup
+		}
 	} else if sibling.ExecBinlogCoordinates.SmallerThan(&instance.ExecBinlogCoordinates) {
 		sibling, err = StartSlaveUntilMasterCoordinates(siblingKey, &instance.ExecBinlogCoordinates)
-		if	err	!=	nil	{goto Cleanup} 
-	}  
+		if err != nil {
+			goto Cleanup
+		}
+	}
 	// At this point both siblings have executed exact same statements and are identical
-	 
+
 	instance, err = ChangeMasterTo(instanceKey, &sibling.Key, &sibling.SelfBinlogCoordinates)
-	if	err	!=	nil	{goto Cleanup} 
-	
-	
-	Cleanup:
+	if err != nil {
+		goto Cleanup
+	}
+
+Cleanup:
 	instance, _ = StartSlave(instanceKey)
 	sibling, _ = StartSlave(siblingKey)
-	if err != nil {	return instance, log.Errore(err)}
+	if err != nil {
+		return instance, log.Errore(err)
+	}
 	// and we're done (pending deferred functions)
-	AuditOperation("move-below", instanceKey, fmt.Sprintf("moved %+v below %+v", *instanceKey, *siblingKey))	
-	 
+	AuditOperation("move-below", instanceKey, fmt.Sprintf("moved %+v below %+v", *instanceKey, *siblingKey))
+
 	return instance, err
 }
-
-
 
 // MakeCoMaster will attempt to make an instance co-master with its master, by making its master a slave of its own.
 // This only works out if the master is not replicating; the master does not have a known master (it may have an unknown master).
 func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
-	if err != nil {	return instance, err}
+	if err != nil {
+		return instance, err
+	}
 	master, err := GetInstanceMaster(instance)
-	if err != nil {	return instance, err}
+	if err != nil {
+		return instance, err
+	}
 
 	rinstance, _, _ := ReadInstance(&master.Key)
 	if canMove, merr := rinstance.CanMoveAsCoMaster(); !canMove {
@@ -206,7 +235,7 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 	if canMove, merr := rinstance.CanMove(); !canMove {
 		return instance, merr
 	}
-	
+
 	if instanceKey.Equals(&master.MasterKey) {
 		return instance, errors.New(fmt.Sprintf("instance  %+v is already co master of %+v", instanceKey, master.Key))
 	}
@@ -217,7 +246,7 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, err
 	}
 	log.Infof("Will make %+v co-master of %+v", instanceKey, master.Key)
-	
+
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("make co-master of %+v", master.Key)); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
 		goto Cleanup
@@ -230,74 +259,85 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 	} else {
 		defer EndMaintenance(maintenanceToken)
 	}
-	
+
 	// the coMaster used to be merely a slave. Just point master into *some* position
-	// within coMaster...	 
+	// within coMaster...
 	master, err = ChangeMasterTo(&master.Key, instanceKey, &instance.SelfBinlogCoordinates)
-	if	err	!=	nil	{goto Cleanup} 
-	
-	Cleanup:
+	if err != nil {
+		goto Cleanup
+	}
+
+Cleanup:
 	master, _ = StartSlave(&master.Key)
-	if err != nil {	return instance, log.Errore(err)}
+	if err != nil {
+		return instance, log.Errore(err)
+	}
 	// and we're done (pending deferred functions)
-	AuditOperation("make-co-master", instanceKey, fmt.Sprintf("%+v made co-master of %+v", *instanceKey, master.Key))	
-	 
+	AuditOperation("make-co-master", instanceKey, fmt.Sprintf("%+v made co-master of %+v", *instanceKey, master.Key))
+
 	return instance, err
 }
-
-
 
 // DetachSlaveFromMaster will detach an instance from being a slave, and break its replication.
 // This only works if the instance is indeed a slave of a known instance.
 func DetachSlaveFromMaster(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
-	if err != nil {	return instance, err}
+	if err != nil {
+		return instance, err
+	}
 	master, err := GetInstanceMaster(instance)
-	if err != nil {	return instance, err}
+	if err != nil {
+		return instance, err
+	}
 
 	log.Infof("Will detach %+v from its master %+v", instanceKey, master.Key)
-		
+
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("detach from master %+v", master.Key)); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
 		goto Cleanup
 	} else {
 		defer EndMaintenance(maintenanceToken)
-	}	
+	}
 
 	instance, err = StopSlave(instanceKey)
-	if	err	!=	nil	{goto Cleanup} 
+	if err != nil {
+		goto Cleanup
+	}
 
 	instance, err = DetachSlave(instanceKey)
-	if	err	!=	nil	{goto Cleanup} 
+	if err != nil {
+		goto Cleanup
+	}
 
-	Cleanup:
+Cleanup:
 	instance, _ = StartSlave(instanceKey)
 	_, _ = RefreshInstanceSlaveHosts(&master.Key)
 	master, _ = ReadTopologyInstance(&master.Key)
-	if err != nil {	return instance, log.Errore(err)}
+	if err != nil {
+		return instance, log.Errore(err)
+	}
 	// and we're done (pending deferred functions)
-	AuditOperation("detach slave", instanceKey, fmt.Sprintf("%+v detached from master %+v", *instanceKey, master.Key))	
-	 
+	AuditOperation("detach slave", instanceKey, fmt.Sprintf("%+v detached from master %+v", *instanceKey, master.Key))
+
 	return instance, err
 }
 
-
 // getAsciiTopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
-// draws the tree 
+// draws the tree
 func getAsciiTopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance)) []string {
 	prefix := ""
 	if depth > 0 {
-		prefix = strings.Repeat(" ", (depth - 1) * 2)
+		prefix = strings.Repeat(" ", (depth-1)*2)
 		if instance.SlaveRunning() {
 			prefix += "+ "
 		} else {
 			prefix += "- "
 		}
 	}
-	entry := fmt.Sprintf("%s%s", prefix, instance.Key.DisplayString()) 
+	entry := fmt.Sprintf("%s%s", prefix, instance.Key.DisplayString())
 	result := []string{entry}
 	for _, slave := range replicationMap[instance] {
-		slavesResult := getAsciiTopologyEntry(depth + 1, slave, replicationMap)
+		slavesResult := getAsciiTopologyEntry(depth+1, slave, replicationMap)
 		result = append(result, slavesResult...)
 	}
 	return result
@@ -306,14 +346,16 @@ func getAsciiTopologyEntry(depth int, instance *Instance, replicationMap map[*In
 // AsciiTopology returns a string representation of the topology of given clusterName.
 func AsciiTopology(clusterName string) (string, error) {
 	instances, err := ReadClusterInstances(clusterName)
-	if err != nil {return "", err} 
+	if err != nil {
+		return "", err
+	}
 
 	instancesMap := make(map[InstanceKey](*Instance))
 	for _, instance := range instances {
 		log.Debugf("instanceKey: %+v", instance.Key)
 		instancesMap[instance.Key] = instance
 	}
-	
+
 	replicationMap := make(map[*Instance]([]*Instance))
 	var masterInstance *Instance
 	// Investigate slaves:
@@ -326,7 +368,7 @@ func AsciiTopology(clusterName string) (string, error) {
 			replicationMap[master] = append(replicationMap[master], instance)
 		} else {
 			masterInstance = instance
-		} 
+		}
 	}
 	resultArray := getAsciiTopologyEntry(0, masterInstance, replicationMap)
 	result := strings.Join(resultArray, "\n")

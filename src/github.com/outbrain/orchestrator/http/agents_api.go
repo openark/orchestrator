@@ -17,53 +17,48 @@
 package http
 
 import (
-	"strconv"
-	"net/http"	
 	"fmt"
-	"strings"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
-	
-	"github.com/outbrain/orchestrator/agent"	
-	"github.com/outbrain/orchestrator/attributes"	
-)
+	"net/http"
+	"strconv"
+	"strings"
 
+	"github.com/outbrain/orchestrator/agent"
+	"github.com/outbrain/orchestrator/attributes"
+)
 
 type HttpAgentsAPI struct{}
 
 var AgentsAPI HttpAgentsAPI = HttpAgentsAPI{}
 
-
-
 // SubmitAgent registeres an agent. It is initiated by an agent to register itself.
 func (this *HttpAgentsAPI) SubmitAgent(params martini.Params, r render.Render) {
 	port, err := strconv.Atoi(params["port"])
 	if err != nil {
-		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
 
 	output, err := agent.SubmitAgent(params["host"], port, params["token"])
 	if err != nil {
-		r.JSON(200, &APIResponse{Code:ERROR, Message: err.Error(),})
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
 	r.JSON(200, output)
 }
-
 
 // SetHostAttribute is a utility method that allows per-host key-value store.
 func (this *HttpAgentsAPI) SetHostAttribute(params martini.Params, r render.Render, req *http.Request) {
 	err := attributes.SetHostAttributes(params["host"], params["attrVame"], params["attrValue"])
 
 	if err != nil {
-		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
 	r.JSON(200, (err == nil))
 }
-
 
 // GetHostAttributeByAttributeName returns a host attribute
 func (this *HttpAgentsAPI) GetHostAttributeByAttributeName(params martini.Params, r render.Render, req *http.Request) {
@@ -71,13 +66,12 @@ func (this *HttpAgentsAPI) GetHostAttributeByAttributeName(params martini.Params
 	output, err := attributes.GetHostAttributesByAttribute(params["attr"], req.URL.Query().Get("valueMatch"))
 
 	if err != nil {
-		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
 	r.JSON(200, output)
 }
-
 
 // AgentsHosts provides list of agent host names
 func (this *HttpAgentsAPI) AgentsHosts(params martini.Params, r render.Render, req *http.Request) string {
@@ -88,7 +82,7 @@ func (this *HttpAgentsAPI) AgentsHosts(params martini.Params, r render.Render, r
 	}
 
 	if err != nil {
-		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return ""
 	}
 
@@ -100,7 +94,6 @@ func (this *HttpAgentsAPI) AgentsHosts(params martini.Params, r render.Render, r
 	return ""
 }
 
-
 // AgentsInstances provides list of assumed MySQL instances (host:port)
 func (this *HttpAgentsAPI) AgentsInstances(params martini.Params, r render.Render, req *http.Request) string {
 	agents, err := agent.ReadAgents()
@@ -110,7 +103,7 @@ func (this *HttpAgentsAPI) AgentsInstances(params martini.Params, r render.Rende
 	}
 
 	if err != nil {
-		r.JSON(200, &APIResponse{Code:ERROR, Message: fmt.Sprintf("%+v", err),})
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return ""
 	}
 
@@ -124,9 +117,9 @@ func (this *HttpAgentsAPI) AgentsInstances(params martini.Params, r render.Rende
 
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAgentsAPI) RegisterRequests(m *martini.ClassicMartini) {
-	m.Get("/api/submit-agent/:host/:port/:token", this.SubmitAgent) 
+	m.Get("/api/submit-agent/:host/:port/:token", this.SubmitAgent)
 	m.Get("/api/host-attribute/:host/:attrVame/:attrValue", this.SetHostAttribute)
 	m.Get("/api/host-attribute/attr/:attr/", this.GetHostAttributeByAttributeName)
-	m.Get("/api/agents-hosts", this.AgentsHosts) 
-	m.Get("/api/agents-instances", this.AgentsInstances) 
+	m.Get("/api/agents-hosts", this.AgentsHosts)
+	m.Get("/api/agents-instances", this.AgentsInstances)
 }

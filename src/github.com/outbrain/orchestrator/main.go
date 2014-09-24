@@ -14,13 +14,13 @@
    limitations under the License.
 */
 
-package main 
+package main
 
 import (
 	"flag"
+	"github.com/outbrain/log"
 	"github.com/outbrain/orchestrator/app"
 	"github.com/outbrain/orchestrator/config"
-	"github.com/outbrain/log"
 )
 
 // main is the application's entry point. It will either spawn a CLI or HTTP itnerfaces.
@@ -35,8 +35,8 @@ func main() {
 	verbose := flag.Bool("verbose", false, "verbose")
 	debug := flag.Bool("debug", false, "debug mode (very verbose)")
 	stack := flag.Bool("stack", false, "add stack trace upon error")
-	flag.Parse();
-	
+	flag.Parse()
+
 	log.SetLevel(log.ERROR)
 	if *verbose {
 		log.SetLevel(log.INFO)
@@ -57,11 +57,11 @@ func main() {
 	}
 
 	switch {
-		case len(flag.Args()) == 0 || flag.Arg(0) == "cli": 
-			app.Cli(*command, *instance, *sibling, *owner, *reason)
-		case flag.Arg(0) == "http": 
-			app.Http(*discovery)
-		default:
-			log.Error("Usage: orchestrator --options... [cli|http]")
+	case len(flag.Args()) == 0 || flag.Arg(0) == "cli":
+		app.Cli(*command, *instance, *sibling, *owner, *reason)
+	case flag.Arg(0) == "http":
+		app.Http(*discovery)
+	default:
+		log.Error("Usage: orchestrator --options... [cli|http]")
 	}
 }

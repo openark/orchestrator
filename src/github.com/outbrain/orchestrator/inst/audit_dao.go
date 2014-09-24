@@ -18,14 +18,13 @@ package inst
 
 import (
 	"fmt"
-	"os"
-	"time"
-	"github.com/outbrain/sqlutils"
-	"github.com/outbrain/orchestrator/db"
 	"github.com/outbrain/log"
 	"github.com/outbrain/orchestrator/config"
+	"github.com/outbrain/orchestrator/db"
+	"github.com/outbrain/sqlutils"
+	"os"
+	"time"
 )
-
 
 // AuditOperation creates and writes a new audit entry by given params
 func AuditOperation(auditType string, instanceKey *InstanceKey, message string) error {
@@ -33,19 +32,25 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 	if instanceKey == nil {
 		instanceKey = &InstanceKey{}
 	}
-	
+
 	if config.Config.AuditLogFile != "" {
-		f, err := os.OpenFile(config.Config.AuditLogFile, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0600)
-		if err != nil {return log.Errore(err)}
-		
+		f, err := os.OpenFile(config.Config.AuditLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+		if err != nil {
+			return log.Errore(err)
+		}
+
 		defer f.Close()
 		text := fmt.Sprintf("%s\t%s\t%s\t%d\t%s\t\n", time.Now().Format(log.TimeFormat), auditType, instanceKey.Hostname, instanceKey.Port, message)
-		if _, err = f.WriteString(text); err != nil {return log.Errore(err)}
+		if _, err = f.WriteString(text); err != nil {
+			return log.Errore(err)
+		}
 	}
 
-	db,	err	:=	db.OpenOrchestrator()
-	if err != nil {return log.Errore(err)}
-	
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		return log.Errore(err)
+	}
+
 	_, err = sqlutils.Exec(db, `
 			insert 
 				into audit (
@@ -54,13 +59,15 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 					NOW(), ?, ?, ?, ?
 				)
 			`,
-			auditType,
-			instanceKey.Hostname, 
-		 	instanceKey.Port,
-		 	message,
-		 )
-	if err != nil {return log.Errore(err)}
-	
+		auditType,
+		instanceKey.Hostname,
+		instanceKey.Port,
+		message,
+	)
+	if err != nil {
+		return log.Errore(err)
+	}
+
 	return err
 }
 
@@ -81,25 +88,27 @@ func ReadRecentAudit(page int) ([]Audit, error) {
 			audit_timestamp desc
 		limit %d
 		offset %d
-		`, config.Config.AuditPageSize, page * config.Config.AuditPageSize)
-	db,	err	:=	db.OpenOrchestrator()
-    if err != nil {goto Cleanup}
-    
-    err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-    	audit := Audit{}
-    	audit.AuditId = m.GetInt64("audit_id")
-    	audit.AuditTimestamp = m.GetString("audit_timestamp") 
-    	audit.AuditType = m.GetString("audit_type")
-    	audit.AuditInstanceKey.Hostname = m.GetString("hostname")
-    	audit.AuditInstanceKey.Port = m.GetInt("port")
-    	audit.Message = m.GetString("message") 
+		`, config.Config.AuditPageSize, page*config.Config.AuditPageSize)
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		goto Cleanup
+	}
 
-    	res = append(res, audit)
-    	return err       	
-   	})
-	Cleanup:
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		audit := Audit{}
+		audit.AuditId = m.GetInt64("audit_id")
+		audit.AuditTimestamp = m.GetString("audit_timestamp")
+		audit.AuditType = m.GetString("audit_type")
+		audit.AuditInstanceKey.Hostname = m.GetString("hostname")
+		audit.AuditInstanceKey.Port = m.GetInt("port")
+		audit.Message = m.GetString("message")
 
-	if err	!=	nil	{
+		res = append(res, audit)
+		return err
+	})
+Cleanup:
+
+	if err != nil {
 		log.Errore(err)
 	}
 	return res, err

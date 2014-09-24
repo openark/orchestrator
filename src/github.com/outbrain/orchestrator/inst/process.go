@@ -16,21 +16,19 @@
 
 package inst
 
-import (
-
-)
+import ()
 
 // Process presents a MySQL executing thread (as observed by PROCESSLIST)
 type Process struct {
-	InstanceHostname	string
-	InstancePort		int
-	Id				int64
-	User			string
-	Host			string
-	Db				string
-	Command			string
-	Time			int64
-	State			string
-	Info			string
-	StartedAt		string
+	InstanceHostname string
+	InstancePort     int
+	Id               int64
+	User             string
+	Host             string
+	Db               string
+	Command          string
+	Time             int64
+	State            string
+	Info             string
+	StartedAt        string
 }
