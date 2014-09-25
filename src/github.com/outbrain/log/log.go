@@ -17,11 +17,11 @@
 package log
 
 import (
-	"time"
+	"errors"
 	"fmt"
 	"os"
-	"errors"
 	"runtime/debug"
+	"time"
 )
 
 // LogLevel indicates the severity of a log entry
@@ -29,13 +29,20 @@ type LogLevel int
 
 func (this LogLevel) String() string {
 	switch this {
-		case FATAL: return "FATAL"
-		case CRITICAL: return "CRITICAL"
-		case ERROR: return "ERROR"
-		case WARNING: return "WARNING"
-		case NOTICE: return "NOTICE"
-		case INFO: return "INFO"
-		case DEBUG: return "DEBUG"
+	case FATAL:
+		return "FATAL"
+	case CRITICAL:
+		return "CRITICAL"
+	case ERROR:
+		return "ERROR"
+	case WARNING:
+		return "WARNING"
+	case NOTICE:
+		return "NOTICE"
+	case INFO:
+		return "INFO"
+	case DEBUG:
+		return "DEBUG"
 	}
 	return "unknown"
 }
@@ -52,11 +59,10 @@ const (
 
 const TimeFormat = "2006-01-02 15:04:05"
 
-// globalLogLevel indicates the global level filter for all logs (only entries with level equals or higher 
+// globalLogLevel indicates the global level filter for all logs (only entries with level equals or higher
 // than this value will be logged)
 var globalLogLevel LogLevel = DEBUG
 var printStackTrace bool = false
-
 
 // SetPrintStackTrace enables/disables dumping the stack upon error logging
 func SetPrintStackTrace(shouldPrintStackTrace bool) {
@@ -78,13 +84,13 @@ func GetLevel() LogLevel {
 func logFormattedEntry(logLevel LogLevel, message string, args ...interface{}) string {
 	if logLevel > globalLogLevel {
 		return ""
-	} 
+	}
 	entryString := fmt.Sprintf("%s %s %s", time.Now().Format(TimeFormat), logLevel, fmt.Sprintf(message, args...))
 	fmt.Fprintln(os.Stderr, entryString)
 	return entryString
 }
 
-// logEntry emits a formatted log entry 
+// logEntry emits a formatted log entry
 func logEntry(logLevel LogLevel, message string, args ...interface{}) string {
 	entryString := message
 	for _, s := range args {
@@ -97,14 +103,14 @@ func logEntry(logLevel LogLevel, message string, args ...interface{}) string {
 func logErrorEntry(logLevel LogLevel, err error) error {
 	if err == nil {
 		// No error
-		return nil;
+		return nil
 	}
 	entryString := fmt.Sprintf("%+v", err)
 	logEntry(logLevel, entryString)
 	if printStackTrace {
 		debug.PrintStack()
 	}
-	return err	
+	return err
 }
 
 func Debug(message string, args ...interface{}) string {
@@ -183,4 +189,3 @@ func Fatale(err error) error {
 	os.Exit(1)
 	return err
 }
-

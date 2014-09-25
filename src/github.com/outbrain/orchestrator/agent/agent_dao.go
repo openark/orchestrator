@@ -28,10 +28,21 @@ import (
 	"github.com/outbrain/log"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/db"
+	"github.com/outbrain/orchestrator/inst"
 	"github.com/outbrain/sqlutils"
 )
 
 var SeededAgents chan *Agent = make(chan *Agent)
+
+// AuditAgentOperation creates and writes a new audit entry by given agent
+func auditAgentOperation(auditType string, agent *Agent, message string) error {
+
+	instanceKey := &inst.InstanceKey{}
+	if agent != nil {
+		instanceKey = &inst.InstanceKey{Hostname: agent.Hostname, Port: int(agent.MySQLPort)}
+	}
+	return inst.AuditOperation(auditType, instanceKey, message)
+}
 
 // readResponse returns the body of an HTTP response
 func readResponse(res *http.Response, err error) ([]byte, error) {
@@ -163,37 +174,6 @@ Cleanup:
 	}
 	return res, err
 
-}
-
-// ReadCountMySQLSnapshots is a utility method to return registered number of snapshots for a given list of hosts
-func ReadCountMySQLSnapshots(hostnames []string) (map[string]int, error) {
-	res := make(map[string]int)
-	query := fmt.Sprintf(`
-		select 
-			hostname,
-			count_mysql_snapshots
-		from 
-			host_agent
-		where
-			hostname in (%s)
-		order by
-			hostname
-		`, sqlutils.InClauseStringValues(hostnames))
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-		res[m.GetString("hostname")] = m.GetInt("count_mysql_snapshots")
-		return nil
-	})
-Cleanup:
-
-	if err != nil {
-		log.Errore(err)
-	}
-	return res, err
 }
 
 // readAgentBasicInfo returns the basic data for an agent directly from backend table (no agent access)
@@ -420,6 +400,7 @@ func executeAgentCommand(hostname string, command string, onResponse *func([]byt
 	if onResponse != nil {
 		(*onResponse)(body)
 	}
+	auditAgentOperation("agent-command", &agent, command)
 
 	return agent, err
 }

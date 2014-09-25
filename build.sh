@@ -5,7 +5,7 @@
 # Requires fpm: https://github.com/jordansissel/fpm
 #
 
-release_version="1.1.2"
+release_version="1.1.4"
 release_dir=/tmp/orchestrator-release
 release_files_dir=$release_dir/orchestrator
 rm -rf $release_dir/*
@@ -14,6 +14,7 @@ mkdir -p $release_files_dir/usr/local
 mkdir -p $release_files_dir/etc/init.d
 
 cd  $(dirname $0)
+for f in $(find . -name "*.go"); do go fmt $f; done
 
 rsync -av ./resources $release_files_dir/usr/local/orchestrator/
 rsync -av ./conf $release_files_dir/usr/local/orchestrator/

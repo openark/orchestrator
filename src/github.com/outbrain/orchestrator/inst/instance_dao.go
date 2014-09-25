@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/outbrain/log"
-	"github.com/outbrain/orchestrator/agent"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/db"
 	"github.com/outbrain/sqlutils"
@@ -503,6 +502,37 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 	return instances, err
 }
 
+// ReadCountMySQLSnapshots is a utility method to return registered number of snapshots for a given list of hosts
+func ReadCountMySQLSnapshots(hostnames []string) (map[string]int, error) {
+	res := make(map[string]int)
+	query := fmt.Sprintf(`
+		select 
+			hostname,
+			count_mysql_snapshots
+		from 
+			host_agent
+		where
+			hostname in (%s)
+		order by
+			hostname
+		`, sqlutils.InClauseStringValues(hostnames))
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		goto Cleanup
+	}
+
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		res[m.GetString("hostname")] = m.GetInt("count_mysql_snapshots")
+		return nil
+	})
+Cleanup:
+
+	if err != nil {
+		log.Errore(err)
+	}
+	return res, err
+}
+
 func PopulateInstancesAgents(instances [](*Instance)) error {
 	if len(instances) == 0 {
 		return nil
@@ -511,7 +541,7 @@ func PopulateInstancesAgents(instances [](*Instance)) error {
 	for _, instance := range instances {
 		hostnames = append(hostnames, instance.Key.Hostname)
 	}
-	agentsCountMySQLSnapshots, err := agent.ReadCountMySQLSnapshots(hostnames)
+	agentsCountMySQLSnapshots, err := ReadCountMySQLSnapshots(hostnames)
 	if err != nil {
 		return err
 	}
@@ -989,5 +1019,6 @@ func KillQuery(instanceKey *InstanceKey, process int64) (*Instance, error) {
 	}
 
 	log.Infof("Killed query on %+v", *instanceKey)
+	AuditOperation("kill-query", instanceKey, fmt.Sprintf("Killed query %d", process))
 	return instance, err
 }
