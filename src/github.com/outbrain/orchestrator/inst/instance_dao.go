@@ -537,7 +537,7 @@ Cleanup:
 // At current this is the number of snapshots.
 // This isn't too pretty; it's a push-into-instance-data-that-belongs-to-agent thing.
 // Originally the need was to visually present the number of snapshots per host on the web/cluster page, which
-// indeed proves to be useful in our experience.  
+// indeed proves to be useful in our experience.
 func PopulateInstancesAgents(instances [](*Instance)) error {
 	if len(instances) == 0 {
 		return nil
