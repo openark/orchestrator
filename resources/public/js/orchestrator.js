@@ -10,6 +10,7 @@ function startRefreshTimer() {
     	}
     	secondsTillRefresh = Math.max(secondsTillRefresh - 1, 0);
     	if (secondsTillRefresh <= 0) {
+	    	showLoader();
     		location.reload(true);
     	}
     	$("#refreshCountdown").html('<span class="glyphicon glyphicon-repeat"></span> ' + secondsTillRefresh + 's');
@@ -105,7 +106,8 @@ function addInfo(alertText) {
 
 function addNodeModalDataAttribute(name, value) {
     $('#modalDataAttributesTable').append(
-        '<tr><td>' + name + '</td><td><code class="text-primary"><strong>' + value + '</strong></code></td></tr>');
+        '<tr><td>' + name + '</td><td><code class="text-primary"><strong>' + value + '</strong></code><div class="pull-right"></div></td></tr>');
+    return $('#modalDataAttributesTable tr:last td:last');
 }
 
 function addModalAlert(alertText) {
@@ -120,18 +122,31 @@ function addModalAlert(alertText) {
 function openNodeModal(node) {
 	nodeModalVisible = true;
     $('#node_modal .modal-title').html(node.title);
+    
+    $('#node_modal #modalDataAttributesTable button[data-btn]').each(function() {
+    	$(this).appendTo("#node_modal .modal-footer")
+    });
+
     $('#modalDataAttributesTable').html("");
 
     if (node.MasterKey.Hostname) {
-        addNodeModalDataAttribute("Master", node.masterTitle);
-        addNodeModalDataAttribute("Replication running", booleanString(node.replicationRunning));
+        var td = addNodeModalDataAttribute("Master", node.masterTitle);
+        $('#node_modal button[data-btn=detach-slave]').appendTo(td.find("div"))
+        
+        td = addNodeModalDataAttribute("Replication running", booleanString(node.replicationRunning));
+        $('#node_modal button[data-btn=start-slave]').appendTo(td.find("div"))
+        $('#node_modal button[data-btn=stop-slave]').appendTo(td.find("div"))
+        
         addNodeModalDataAttribute("Seconds behind master", node.SecondsBehindMaster.Valid ? node.SecondsBehindMaster.Int64 : "null");
         addNodeModalDataAttribute("Replication lag", node.SlaveLagSeconds.Valid ? node.SlaveLagSeconds.Int64 : "null");
     }
     addNodeModalDataAttribute("Num slaves", node.SlaveHosts.length);
     addNodeModalDataAttribute("Server ID", node.ServerID);
     addNodeModalDataAttribute("Version", node.Version);
-    addNodeModalDataAttribute("Read only", booleanString(node.ReadOnly));
+    var td = addNodeModalDataAttribute("Read only", booleanString(node.ReadOnly));
+    $('#node_modal button[data-btn=turn-read-only]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=turn-writeable]').appendTo(td.find("div"))
+
     addNodeModalDataAttribute("Binlog format", node.Binlog_format);
     addNodeModalDataAttribute("Has binary logs", booleanString(node.LogBinEnabled));
     addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
@@ -146,16 +161,12 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=forget-instance]').unbind("click");
     $('#node_modal button[data-btn=start-slave]').unbind("click");
     $('#node_modal button[data-btn=stop-slave]').unbind("click");
+    $('#node_modal button[data-btn=turn-read-only]').unbind("click");
+    $('#node_modal button[data-btn=turn-writeable]').unbind("click");
     $('#node_modal button[data-btn=detach-slave]').unbind("click");
-    $('#node_modal button[data-btn=begin-maintenance]').click(function() {
-    	if (!$("#beginMaintenanceOwner").val()) {
-    		return addModalAlert("You must fill the owner field");
-    	}
-    	if (!$("#beginMaintenanceReason").val()) {
-    		return addModalAlert("You must fill the reason field");
-    	}
+    
+    function apiCommand(uri) {
     	showLoader();
-    	var uri = "/api/begin-maintenance/"+node.Key.Hostname+"/"+node.Key.Port + "/" + $("#beginMaintenanceOwner").val() + "/" + $("#beginMaintenanceReason").val();
         $.get(uri, function (operationResult) {
 			hideLoader();
 			if (operationResult.Code == "ERROR") {
@@ -164,70 +175,47 @@ function openNodeModal(node) {
 				location.reload();
 			}	
         }, "json");	
+    }
+    $('#node_modal button[data-btn=begin-maintenance]').click(function() {
+    	if (!$("#beginMaintenanceOwner").val()) {
+    		return addModalAlert("You must fill the owner field");
+    	}
+    	if (!$("#beginMaintenanceReason").val()) {
+    		return addModalAlert("You must fill the reason field");
+    	}
+    	var uri = "/api/begin-maintenance/"+node.Key.Hostname+"/"+node.Key.Port + "/" + $("#beginMaintenanceOwner").val() + "/" + $("#beginMaintenanceReason").val();
+    	apiCommand(uri);
     });
     $('#node_modal button[data-btn=end-maintenance]').click(function(){
-    	showLoader();
-        $.get("/api/end-maintenance/"+node.Key.Hostname+"/"+node.Key.Port, function (operationResult) {
-			hideLoader();
-			if (operationResult.Code == "ERROR") {
-				addAlert(operationResult.Message)
-			} else {
-				location.reload();
-			}	
-        }, "json");	
+    	apiCommand("/api/end-maintenance/"+node.Key.Hostname+"/"+node.Key.Port);
     });
     $('#node_modal button[data-btn=refresh-instance]').click(function(){
-    	showLoader();
-        $.get("/api/refresh/"+node.Key.Hostname+"/"+node.Key.Port, function (operationResult) {
-			hideLoader();
-			if (operationResult.Code == "ERROR") {
-				addAlert(operationResult.Message)
-			} else {
-				location.reload();
-			}	
-        }, "json");	
+    	apiCommand("/api/refresh/"+node.Key.Hostname+"/"+node.Key.Port);
     });
     $('#node_modal button[data-btn=start-slave]').click(function(){
-    	showLoader();
-        $.get("/api/start-slave/"+node.Key.Hostname+"/"+node.Key.Port, function (operationResult) {
-			hideLoader();
-			if (operationResult.Code == "ERROR") {
-				addAlert(operationResult.Message)
-			} else {
-				location.reload();
-			}	
-        }, "json");	
+    	apiCommand("/api/start-slave/"+node.Key.Hostname+"/"+node.Key.Port);
     });
     $('#node_modal button[data-btn=stop-slave]').click(function(){
-    	showLoader();
-        $.get("/api/stop-slave/"+node.Key.Hostname+"/"+node.Key.Port, function (operationResult) {
-			hideLoader();
-			if (operationResult.Code == "ERROR") {
-				addAlert(operationResult.Message)
-			} else {
-				location.reload();
-			}	
-        }, "json");	
+    	apiCommand("/api/stop-slave/"+node.Key.Hostname+"/"+node.Key.Port);
     });
     $('#node_modal button[data-btn=detach-slave]').click(function(){
     	var message = "<p>Are you sure you wish to detach <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
 			"</strong></code> from its master?" +
+			"<p>This will stop and break the replication." +
 			"<p>FYI, only the <code>MASTER_PORT</code> property will be modified."
 			;
     	bootbox.confirm(message, function(confirm) {
-				if (confirm) {
-			    	showLoader();
-			        $.get("/api/detach-slave/"+node.Key.Hostname+"/"+node.Key.Port, function (operationResult) {
-							hideLoader();
-							if (operationResult.Code == "ERROR") {
-								addAlert(operationResult.Message)
-							} else {
-								location.reload();
-							}	
-				        }, "json");	
-				}
-			}); 
+			if (confirm) {
+		    	apiCommand("/api/detach-slave/"+node.Key.Hostname+"/"+node.Key.Port);
+			}
+		}); 
 		return false;
+    });
+    $('#node_modal button[data-btn=turn-read-only]').click(function(){
+    	apiCommand("/api/turn-read-only/"+node.Key.Hostname+"/"+node.Key.Port);
+    });
+    $('#node_modal button[data-btn=turn-writeable]').click(function(){
+    	apiCommand("/api/turn-writeable/"+node.Key.Hostname+"/"+node.Key.Port);
     });
     $('#node_modal button[data-btn=forget-instance]').click(function(){
     	var message = "<p>Are you sure you wish to forget <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
@@ -235,19 +223,10 @@ function openNodeModal(node) {
 			"<p>It may be re-discovered if accessible from an existing instance through replication topology."
 			;
     	bootbox.confirm(message, function(confirm) {
-				if (confirm) {
-					showLoader();
-					var apiUrl = "/api/forget/" + node.Key.Hostname + "/" + node.Key.Port;
-				    $.get(apiUrl, function (operationResult) {
-			    			hideLoader();
-			    			if (operationResult.Code == "ERROR") {
-			    				addAlert(operationResult.Message)
-			    			} else {
-			    				location.reload();
-			    			}	
-			            }, "json");					
-				}
-			}); 
+			if (confirm) {
+		    	apiCommand("/api/forget/"+node.Key.Hostname+"/"+node.Key.Port);
+			}
+		}); 
     	return false;
     });
 
@@ -272,7 +251,15 @@ function openNodeModal(node) {
         	$('#node_modal button[data-btn=start-slave]').show();
         }
     }
-    
+
+	$('#node_modal button[data-btn=turn-read-only]').hide();
+	$('#node_modal button[data-btn=turn-writeable]').hide();
+    if (node.ReadOnly) {
+    	$('#node_modal button[data-btn=turn-writeable]').show();
+    } else {
+    	$('#node_modal button[data-btn=turn-read-only]').show();
+    }
+
     $('#node_modal').modal({})
     $('#node_modal').unbind('hidden.bs.modal');
     $('#node_modal').on('hidden.bs.modal', function () {
