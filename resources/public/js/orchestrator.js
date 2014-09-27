@@ -10,7 +10,8 @@ function startRefreshTimer() {
     	}
     	secondsTillRefresh = Math.max(secondsTillRefresh - 1, 0);
     	if (secondsTillRefresh <= 0) {
-	    	showLoader();
+    		$(".navbar-nav li[data-nav-page=refreshCountdown]").addClass("active");
+    		showLoader();
     		location.reload(true);
     	}
     	$("#refreshCountdown").html('<span class="glyphicon glyphicon-repeat"></span> ' + secondsTillRefresh + 's');
@@ -144,8 +145,8 @@ function openNodeModal(node) {
     addNodeModalDataAttribute("Server ID", node.ServerID);
     addNodeModalDataAttribute("Version", node.Version);
     var td = addNodeModalDataAttribute("Read only", booleanString(node.ReadOnly));
-    $('#node_modal button[data-btn=turn-read-only]').appendTo(td.find("div"))
-    $('#node_modal button[data-btn=turn-writeable]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=set-read-only]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=set-writeable]').appendTo(td.find("div"))
 
     addNodeModalDataAttribute("Binlog format", node.Binlog_format);
     addNodeModalDataAttribute("Has binary logs", booleanString(node.LogBinEnabled));
@@ -161,8 +162,8 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=forget-instance]').unbind("click");
     $('#node_modal button[data-btn=start-slave]').unbind("click");
     $('#node_modal button[data-btn=stop-slave]').unbind("click");
-    $('#node_modal button[data-btn=turn-read-only]').unbind("click");
-    $('#node_modal button[data-btn=turn-writeable]').unbind("click");
+    $('#node_modal button[data-btn=set-read-only]').unbind("click");
+    $('#node_modal button[data-btn=set-writeable]').unbind("click");
     $('#node_modal button[data-btn=detach-slave]').unbind("click");
     
     function apiCommand(uri) {
@@ -211,11 +212,11 @@ function openNodeModal(node) {
 		}); 
 		return false;
     });
-    $('#node_modal button[data-btn=turn-read-only]').click(function(){
-    	apiCommand("/api/turn-read-only/"+node.Key.Hostname+"/"+node.Key.Port);
+    $('#node_modal button[data-btn=set-read-only]').click(function(){
+    	apiCommand("/api/set-read-only/"+node.Key.Hostname+"/"+node.Key.Port);
     });
-    $('#node_modal button[data-btn=turn-writeable]').click(function(){
-    	apiCommand("/api/turn-writeable/"+node.Key.Hostname+"/"+node.Key.Port);
+    $('#node_modal button[data-btn=set-writeable]').click(function(){
+    	apiCommand("/api/set-writeable/"+node.Key.Hostname+"/"+node.Key.Port);
     });
     $('#node_modal button[data-btn=forget-instance]').click(function(){
     	var message = "<p>Are you sure you wish to forget <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
@@ -252,12 +253,12 @@ function openNodeModal(node) {
         }
     }
 
-	$('#node_modal button[data-btn=turn-read-only]').hide();
-	$('#node_modal button[data-btn=turn-writeable]').hide();
+	$('#node_modal button[data-btn=set-read-only]').hide();
+	$('#node_modal button[data-btn=set-writeable]').hide();
     if (node.ReadOnly) {
-    	$('#node_modal button[data-btn=turn-writeable]').show();
+    	$('#node_modal button[data-btn=set-writeable]').show();
     } else {
-    	$('#node_modal button[data-btn=turn-read-only]').show();
+    	$('#node_modal button[data-btn=set-read-only]').show();
     }
 
     $('#node_modal').modal({})

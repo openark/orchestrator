@@ -978,7 +978,7 @@ func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, errors.New(fmt.Sprintf("Cannot detach slave on: %+v because slave is running", instanceKey))
 	}
 
-	_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_port=%d", InvalidPort))
+	_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_port=%d, master_log_file='%s', master_log_pos=%d", InvalidPort, instance.ExecBinlogCoordinates.LogFile, instance.ExecBinlogCoordinates.LogPos))
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -1001,6 +1001,23 @@ func MasterPosWait(instanceKey *InstanceKey, binlogCoordinates *BinlogCoordinate
 		return instance, log.Errore(err)
 	}
 	log.Infof("Instance %+v has reached coordinates: %+v", instanceKey, binlogCoordinates)
+
+	instance, err = ReadTopologyInstance(instanceKey)
+	return instance, err
+}
+
+// SetReadOnly sets or clears the instance's global read_only variable
+func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	_, err = ExecInstance(instanceKey, fmt.Sprintf("set global read_only = %t", readOnly))
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	log.Infof("instance %+v read_only: %t", instanceKey, readOnly)
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err

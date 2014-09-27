@@ -388,6 +388,48 @@ func (this *HttpAPI) StopSlave(params martini.Params, r render.Render, req *http
 	r.JSON(200, &APIResponse{Code: OK, Message: "Slave stopped", Details: instance})
 }
 
+// SetReadOnly sets the global read_only variable
+func (this *HttpAPI) SetReadOnly(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, err := inst.SetReadOnly(&instanceKey, true)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: "Server set as read-only", Details: instance})
+}
+
+// SetWriteable clear the global read_only variable
+func (this *HttpAPI) SetWriteable(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, err := inst.SetReadOnly(&instanceKey, false)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: "Server set as writeable", Details: instance})
+}
+
 // KillQuery kills a query running on a server
 func (this *HttpAPI) KillQuery(params martini.Params, r render.Render, req *http.Request) {
 	if !this.isAuthorizedForAction(req) {
@@ -847,6 +889,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/end-maintenance/:maintenanceKey", this.EndMaintenance)
 	m.Get("/api/start-slave/:host/:port", this.StartSlave)
 	m.Get("/api/stop-slave/:host/:port", this.StopSlave)
+	m.Get("/api/set-read-only/:host/:port", this.SetReadOnly)
+	m.Get("/api/set-writeable/:host/:port", this.SetWriteable)
 	m.Get("/api/kill-query/:host/:port/:process", this.KillQuery)
 	m.Get("/api/maintenance", this.Maintenance)
 	m.Get("/api/cluster/:clusterName", this.Cluster)
