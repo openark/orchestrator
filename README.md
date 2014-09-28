@@ -9,7 +9,9 @@ _Orchestrator_ is a MySQL replication topology management and visualization tool
 * Replication problems visualization
 * Topology changes via intuitive drag & drop
 * Maintenance mode declaration and enforcement
+* Reviewing and killing long running queries
 * Auditing of operations
+* When working with [orchestrator-agent](https://github.com/outbrain/orchestrator-agent), seed new/corrupt instances
 * More...
 
 Read the [Orchestrator Manual](https://github.com/outbrain/orchestrator/wiki/Orchestrator-Manual) for comprehensive documentation.
