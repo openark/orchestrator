@@ -266,7 +266,11 @@ func UpdateAgentInfo(hostname string, agent Agent) error {
 
 // baseAgentUri returns the base URI for accessing an agent
 func baseAgentUri(agentHostname string, agentPort int) string {
-	uri := fmt.Sprintf("http://%s:%d/api", agentHostname, agentPort)
+	protocol := "http"
+	if config.Config.AgentsUseSSL {
+		protocol = "https"
+	}
+	uri := fmt.Sprintf("%s://%s:%d/api", protocol, agentHostname, agentPort)
 	log.Debugf("orchestrator-agent uri: %s", uri)
 	return uri
 }

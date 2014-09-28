@@ -83,5 +83,13 @@ func agentsHttp() {
 	http.AgentsAPI.RegisterRequests(m)
 
 	// Serve
-	nethttp.ListenAndServe(":3001", m)
+	if config.Config.AgentsUseSSL {
+		log.Info("Serving via SSL")
+		err := nethttp.ListenAndServeTLS(":3001", config.Config.SSLCertFile, config.Config.SSLPrivateKeyFile, m)
+		if err != nil {
+			log.Fatale(err)
+		}
+	} else {
+		nethttp.ListenAndServe(":3001", m)
+	}
 }

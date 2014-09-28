@@ -52,6 +52,9 @@ type Configuration struct {
 	PowerAuthUsers                             []string          // On AuthenticationMethod == "proxy", list of users that can make changes. All others are read-only.
 	ClusterNameToAlias                         map[string]string // map between regex matching cluster name to a human friendly alias
 	ServeAgentsHttp                            bool              // Spawn another HTTP interface dedicated for orcehstrator-agent
+	AgentsUseSSL                               bool              // When "true" orchestrator will listen on agents port with SSL as well as connect to agents via SSL
+	SSLPrivateKeyFile                          string            // Name of SSL private key file, applies only when AgentsUseSSL = true
+	SSLCertFile                                string            // Name of SSL certification file, applies only when AgentsUseSSL = true
 	AgentPollMinutes                           uint              // Minutes between agent polling
 	UnseenAgentForgetHours                     uint              // Number of hours after which an unseen agent is forgotten
 	StaleSeedFailMinutes                       uint              // Number of minutes after which a stale (no progress) seed is considered failed.
@@ -79,6 +82,9 @@ func NewConfiguration() *Configuration {
 		PowerAuthUsers:                             []string{"*"},
 		ClusterNameToAlias:                         make(map[string]string),
 		ServeAgentsHttp:                            false,
+		AgentsUseSSL:                               false,
+		SSLPrivateKeyFile:                          "",
+		SSLCertFile:                                "",
 		AgentPollMinutes:                           60,
 		UnseenAgentForgetHours:                     6,
 		StaleSeedFailMinutes:                       60,

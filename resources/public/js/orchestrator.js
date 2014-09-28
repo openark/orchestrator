@@ -122,12 +122,8 @@ function addModalAlert(alertText) {
 
 function openNodeModal(node) {
 	nodeModalVisible = true;
+    $('#node_modal #modalDataAttributesTable button[data-btn]').appendTo("#node_modal .modal-footer");
     $('#node_modal .modal-title').html(node.title);
-    
-    $('#node_modal #modalDataAttributesTable button[data-btn]').each(function() {
-    	$(this).appendTo("#node_modal .modal-footer")
-    });
-
     $('#modalDataAttributesTable').html("");
 
     if (node.MasterKey.Hostname) {
@@ -156,15 +152,7 @@ function openNodeModal(node) {
     addNodeModalDataAttribute("Agent",
             '<a href="/web/agent/'+node.Key.Hostname+'">'+node.Key.Hostname+'</a>');
     
-    $('#node_modal button[data-btn=begin-maintenance]').unbind("click");
-    $('#node_modal button[data-btn=end-maintenance]').unbind("click");
-    $('#node_modal button[data-btn=refresh-instance]').unbind("click");
-    $('#node_modal button[data-btn=forget-instance]').unbind("click");
-    $('#node_modal button[data-btn=start-slave]').unbind("click");
-    $('#node_modal button[data-btn=stop-slave]').unbind("click");
-    $('#node_modal button[data-btn=set-read-only]').unbind("click");
-    $('#node_modal button[data-btn=set-writeable]').unbind("click");
-    $('#node_modal button[data-btn=detach-slave]').unbind("click");
+    $('#node_modal button[data-btn]').unbind("click");
     
     function apiCommand(uri) {
     	showLoader();

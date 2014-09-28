@@ -1017,9 +1017,11 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 	if err != nil {
 		return instance, log.Errore(err)
 	}
-	log.Infof("instance %+v read_only: %t", instanceKey, readOnly)
-
 	instance, err = ReadTopologyInstance(instanceKey)
+
+	log.Infof("instance %+v read_only: %t", instanceKey, readOnly)
+	AuditOperation("read-only", instanceKey, fmt.Sprintf("set as %t", readOnly))
+
 	return instance, err
 }
 

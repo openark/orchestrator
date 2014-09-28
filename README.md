@@ -25,6 +25,5 @@ _Orchestrator_ is developed at [Outbrain](http://www.outbrain.com/) to answer fo
 At the time of _orchestrator_ creation GTID is available via MySQL 5.6 and MariaDB 10.0. And yet GTID is still not as mature as one would hope for. 
 The majority of users still use plain-old binlog file:position based MySQL replication, and apparently this will hold for some time.
 
-Authored by Shlomi Noach
- 
+Authored by [Shlomi Noach](https://github.com/shlomi-noach) 
 

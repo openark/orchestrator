@@ -25,6 +25,9 @@
     "127.0.0.1": "test suite"
   },
   "ServeAgentsHttp": true,
+  "AgentsUseSSL": false,
+  "SSLPrivateKeyFile": "",
+  "SSLCertFile": "",
   "AgentPollMinutes": 60,
   "UnseenAgentForgetHours": 6,
   "StaleSeedFailMinutes": 60,
