@@ -303,7 +303,7 @@ func (this *Instance) CanMoveAsCoMaster() (bool, error) {
 	if this.Slave_SQL_Running {
 		return false, errors.New(fmt.Sprintf("%+v: instance is replicating", this.Key))
 	}
-	if this.Slave_SQL_Running {
+	if this.Slave_IO_Running {
 		return false, errors.New(fmt.Sprintf("%+v: instance is replicating", this.Key))
 	}
 	return true, nil

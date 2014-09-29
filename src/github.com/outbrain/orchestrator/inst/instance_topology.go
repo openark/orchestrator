@@ -278,46 +278,43 @@ Cleanup:
 	return instance, err
 }
 
-// DetachSlaveFromMaster will detach an instance from being a slave, and break its replication.
-// This only works if the instance is indeed a slave of a known instance.
-func DetachSlaveFromMaster(instanceKey *InstanceKey) (*Instance, error) {
+// ResetSlaveOperation will reset a slave
+func ResetSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
 	}
-	master, err := GetInstanceMaster(instance)
-	if err != nil {
-		return instance, err
-	}
 
-	log.Infof("Will detach %+v from its master %+v", instanceKey, master.Key)
+	log.Infof("Will reset %+v", instanceKey)
 
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("detach from master %+v", master.Key)); merr != nil {
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", "reset slave"); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
 		goto Cleanup
 	} else {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	instance, err = StopSlave(instanceKey)
-	if err != nil {
-		goto Cleanup
+	if instance.IsSlave() {
+		instance, err = StopSlave(instanceKey)
+		if err != nil {
+			goto Cleanup
+		}
 	}
-
-	instance, err = DetachSlave(instanceKey)
+	
+	instance, err = ResetSlave(instanceKey)
 	if err != nil {
 		goto Cleanup
 	}
 
 Cleanup:
 	instance, _ = StartSlave(instanceKey)
-	_, _ = RefreshInstanceSlaveHosts(&master.Key)
-	master, _ = ReadTopologyInstance(&master.Key)
+
 	if err != nil {
 		return instance, log.Errore(err)
 	}
+
 	// and we're done (pending deferred functions)
-	AuditOperation("detach slave", instanceKey, fmt.Sprintf("%+v detached from master %+v", *instanceKey, master.Key))
+	AuditOperation("reset slave", instanceKey, fmt.Sprintf("%+v replication reset", *instanceKey))
 
 	return instance, err
 }

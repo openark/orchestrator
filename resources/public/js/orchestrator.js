@@ -128,7 +128,7 @@ function openNodeModal(node) {
 
     if (node.MasterKey.Hostname) {
         var td = addNodeModalDataAttribute("Master", node.masterTitle);
-        $('#node_modal button[data-btn=detach-slave]').appendTo(td.find("div"))
+        $('#node_modal button[data-btn=reset-slave]').appendTo(td.find("div"))
         
         td = addNodeModalDataAttribute("Replication running", booleanString(node.replicationRunning));
         $('#node_modal button[data-btn=start-slave]').appendTo(td.find("div"))
@@ -187,15 +187,15 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=stop-slave]').click(function(){
     	apiCommand("/api/stop-slave/"+node.Key.Hostname+"/"+node.Key.Port);
     });
-    $('#node_modal button[data-btn=detach-slave]').click(function(){
-    	var message = "<p>Are you sure you wish to detach <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
-			"</strong></code> from its master?" +
+    $('#node_modal button[data-btn=reset-slave]').click(function(){
+    	var message = "<p>Are you sure you wish to reset <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+			"</strong></code>?" +
 			"<p>This will stop and break the replication." +
-			"<p>FYI, only the <code>MASTER_PORT</code> property will be modified."
+			"<p>FYI, this is a destructive operation that cannot be easily reverted"
 			;
     	bootbox.confirm(message, function(confirm) {
 			if (confirm) {
-		    	apiCommand("/api/detach-slave/"+node.Key.Hostname+"/"+node.Key.Port);
+		    	apiCommand("/api/reset-slave/"+node.Key.Hostname+"/"+node.Key.Port);
 			}
 		}); 
 		return false;
@@ -234,9 +234,10 @@ function openNodeModal(node) {
 	$('#node_modal button[data-btn=start-slave]').hide();
 	$('#node_modal button[data-btn=stop-slave]').hide();
     if (node.MasterKey.Hostname) {
-        if (node.replicationRunning) {
+        if (node.replicationRunning || node.replicationAttemptingToRun) {
         	$('#node_modal button[data-btn=stop-slave]').show();
-        } else {
+        } 
+        if (!node.replicationRunning) {
         	$('#node_modal button[data-btn=start-slave]').show();
         }
     }
@@ -266,6 +267,7 @@ function normalizeInstance(instance) {
             instance.MasterKey.Port);
 
     instance.replicationRunning = instance.Slave_SQL_Running && instance.Slave_IO_Running;
+    instance.replicationAttemptingToRun = instance.Slave_SQL_Running || instance.Slave_IO_Running;
     instance.replicationLagReasonable = instance.SlaveLagSeconds.Int64 <= 10;
     instance.isSeenRecently = instance.SecondsSinceLastSeen.Valid && instance.SecondsSinceLastSeen.Int64 <= 3600;
 

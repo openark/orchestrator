@@ -95,7 +95,7 @@ func (s *TestSuite) TestReadTopologyMaster(c *C) {
 }
 
 func (s *TestSuite) TestReadTopologySlave(c *C) {
-	key := slave1Key
+	key := slave3Key
 	i, _ := inst.ReadTopologyInstance(&key)
 	c.Assert(i.Key.Hostname, Equals, key.Hostname)
 	c.Assert(i.IsSlave(), Equals, true)
@@ -243,15 +243,14 @@ func (s *TestSuite) TestMakeCoMasterAndBack(c *C) {
 
 	// Now master & slave1 expected to be co-masters. Check!
 	master, _ := inst.ReadTopologyInstance(&masterKey)
-	c.Assert(master.MasterKey.Port, Not(Equals), inst.InvalidPort)
 	c.Assert(master.IsSlaveOf(slave1), Equals, true)
 	c.Assert(slave1.IsSlaveOf(master), Equals, true)
 
-	// detach - resotre to original state
-	master, err = inst.DetachSlaveFromMaster(&masterKey)
+	// reset - restore to original state
+	master, err = inst.ResetSlaveOperation(&masterKey)
 	slave1, _ = inst.ReadTopologyInstance(&slave1Key)
 	c.Assert(err, IsNil)
-	c.Assert(master.MasterKey.Port, Equals, inst.InvalidPort)
+	c.Assert(master.MasterKey.Hostname, Equals, "_")
 }
 
 func (s *TestSuite) TestFailMakeCoMaster(c *C) {
@@ -280,10 +279,10 @@ func (s *TestSuite) TestMakeCoMasterAndBackAndFailOthersToBecomeCoMasters(c *C) 
 	_, err = inst.MakeCoMaster(&slave2Key)
 	c.Assert(err, Not(IsNil))
 
-	// detach - resotre to original state
-	master, err = inst.DetachSlaveFromMaster(&masterKey)
+	// reset slave - restore to original state
+	master, err = inst.ResetSlaveOperation(&masterKey)
 	c.Assert(err, IsNil)
-	c.Assert(master.MasterKey.Port, Equals, inst.InvalidPort)
+	c.Assert(master.MasterKey.Hostname, Equals, "_")
 }
 
 func (s *TestSuite) TestDiscover(c *C) {

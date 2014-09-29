@@ -299,8 +299,8 @@ func (this *HttpAPI) MakeCoMaster(params martini.Params, r render.Render, req *h
 	r.JSON(200, &APIResponse{Code: OK, Message: "Instance made co-master", Details: instance})
 }
 
-// DetachSlave makes a slave forget about its master, effectively breaking the replication
-func (this *HttpAPI) DetachSlave(params martini.Params, r render.Render, req *http.Request) {
+// ResetSlave makes a slave forget about its master, effectively breaking the replication
+func (this *HttpAPI) ResetSlave(params martini.Params, r render.Render, req *http.Request) {
 	if !this.isAuthorizedForAction(req) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -311,13 +311,13 @@ func (this *HttpAPI) DetachSlave(params martini.Params, r render.Render, req *ht
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	instance, err := inst.DetachSlaveFromMaster(&instanceKey)
+	instance, err := inst.ResetSlaveOperation(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: "Slave detached", Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: "Slave reset", Details: instance})
 }
 
 // MoveBelow attempts to move an instance below its supposed sibling
@@ -882,7 +882,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/resolve/:host/:port", this.Resolve)
 	m.Get("/api/move-up/:host/:port", this.MoveUp)
 	m.Get("/api/make-co-master/:host/:port", this.MakeCoMaster)
-	m.Get("/api/detach-slave/:host/:port", this.DetachSlave)
+	m.Get("/api/reset-slave/:host/:port", this.ResetSlave)
 	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow)
 	m.Get("/api/begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance)
 	m.Get("/api/end-maintenance/:host/:port", this.EndMaintenanceByInstanceKey)

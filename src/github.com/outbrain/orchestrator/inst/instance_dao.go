@@ -966,23 +966,29 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	return instance, err
 }
 
-// DetachSlave detaches a slave from its master. Instead of performing destructive RESET SLAVE,
-// this function merely resets the MASTER_PORT, which effectively disconnects from master and changes its key altogether.
-func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
+// ResetSlave resets a slave, breaking the replication
+func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
 
 	if instance.SlaveRunning() {
-		return instance, errors.New(fmt.Sprintf("Cannot detach slave on: %+v because slave is running", instanceKey))
+		return instance, errors.New(fmt.Sprintf("Cannot reset slave on: %+v because slave is running", instanceKey))
 	}
 
-	_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_port=%d, master_log_file='%s', master_log_pos=%d", InvalidPort, instance.ExecBinlogCoordinates.LogFile, instance.ExecBinlogCoordinates.LogPos))
+	// MySQL's RESET SLAVE is done correctly; however SHOW SLAVE STATUS still returns old hostnames etc
+	// and only resets till after next restart. This leads to orchestrator still thinking the instance replicates
+	// from old host. We therefore forcibly modify the hostname.
+	_, err = ExecInstance(instanceKey, `change master to master_host='_'`)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
-	log.Infof("Detached slave %+v", instanceKey)
+	_, err = ExecInstance(instanceKey, `reset slave`)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	log.Infof("Reset slave %+v", instanceKey)
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err

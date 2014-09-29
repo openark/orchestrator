@@ -84,12 +84,12 @@ func Cli(command string, instance string, sibling string, owner string, reason s
 				log.Errore(err)
 			}
 		}
-	case "detach-slave":
+	case "reset-slave":
 		{
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			_, err := inst.DetachSlaveFromMaster(instanceKey)
+			_, err := inst.ResetSlaveOperation(instanceKey)
 			if err != nil {
 				log.Errore(err)
 			}
