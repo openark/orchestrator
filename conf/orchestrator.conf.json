@@ -26,6 +26,7 @@
   },
   "ServeAgentsHttp": true,
   "AgentsUseSSL": false,
+  "SSLSkipVerify": false,
   "SSLPrivateKeyFile": "",
   "SSLCertFile": "",
   "AgentPollMinutes": 60,

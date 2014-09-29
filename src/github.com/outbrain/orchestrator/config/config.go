@@ -53,6 +53,7 @@ type Configuration struct {
 	ClusterNameToAlias                         map[string]string // map between regex matching cluster name to a human friendly alias
 	ServeAgentsHttp                            bool              // Spawn another HTTP interface dedicated for orcehstrator-agent
 	AgentsUseSSL                               bool              // When "true" orchestrator will listen on agents port with SSL as well as connect to agents via SSL
+	SSLSkipVerify                              bool              // When using SSL, should we ignore SSL certification error
 	SSLPrivateKeyFile                          string            // Name of SSL private key file, applies only when AgentsUseSSL = true
 	SSLCertFile                                string            // Name of SSL certification file, applies only when AgentsUseSSL = true
 	AgentPollMinutes                           uint              // Minutes between agent polling
@@ -83,6 +84,7 @@ func NewConfiguration() *Configuration {
 		ClusterNameToAlias:                         make(map[string]string),
 		ServeAgentsHttp:                            false,
 		AgentsUseSSL:                               false,
+		SSLSkipVerify:                              false,
 		SSLPrivateKeyFile:                          "",
 		SSLCertFile:                                "",
 		AgentPollMinutes:                           60,

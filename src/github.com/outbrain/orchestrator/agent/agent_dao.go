@@ -17,6 +17,7 @@
 package agent
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,6 +34,15 @@ import (
 )
 
 var SeededAgents chan *Agent = make(chan *Agent)
+
+// httpGet is a convenience method for getting http response from URL, optionaly skipping SSL cert verification
+func httpGet(url string) (resp *http.Response, err error) {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config.SSLSkipVerify},
+	}
+	client := &http.Client{Transport: tr}
+	return client.Get(url)
+}
 
 // AuditAgentOperation creates and writes a new audit entry by given agent
 func auditAgentOperation(auditType string, agent *Agent, message string) error {
@@ -289,7 +299,7 @@ func GetAgent(hostname string) (Agent, error) {
 
 		{
 			availableLocalSnapshotsUri := fmt.Sprintf("%s/available-snapshots-local?token=%s", uri, token)
-			body, err := readResponse(http.Get(availableLocalSnapshotsUri))
+			body, err := readResponse(httpGet(availableLocalSnapshotsUri))
 			if err == nil {
 				err = json.Unmarshal(body, &agent.AvailableLocalSnapshots)
 			}
@@ -299,7 +309,7 @@ func GetAgent(hostname string) (Agent, error) {
 		}
 		{
 			availableSnapshotsUri := fmt.Sprintf("%s/available-snapshots?token=%s", uri, token)
-			body, err := readResponse(http.Get(availableSnapshotsUri))
+			body, err := readResponse(httpGet(availableSnapshotsUri))
 			if err == nil {
 				err = json.Unmarshal(body, &agent.AvailableSnapshots)
 			}
@@ -309,7 +319,7 @@ func GetAgent(hostname string) (Agent, error) {
 		}
 		{
 			lvSnapshotsUri := fmt.Sprintf("%s/lvs-snapshots?token=%s", uri, token)
-			body, err := readResponse(http.Get(lvSnapshotsUri))
+			body, err := readResponse(httpGet(lvSnapshotsUri))
 			if err == nil {
 				err = json.Unmarshal(body, &agent.LogicalVolumes)
 			}
@@ -319,7 +329,7 @@ func GetAgent(hostname string) (Agent, error) {
 		}
 		{
 			mountUri := fmt.Sprintf("%s/mount?token=%s", uri, token)
-			body, err := readResponse(http.Get(mountUri))
+			body, err := readResponse(httpGet(mountUri))
 			if err == nil {
 				err = json.Unmarshal(body, &agent.MountPoint)
 			}
@@ -329,7 +339,7 @@ func GetAgent(hostname string) (Agent, error) {
 		}
 		{
 			mySQLRunningUri := fmt.Sprintf("%s/mysql-status?token=%s", uri, token)
-			body, err := readResponse(http.Get(mySQLRunningUri))
+			body, err := readResponse(httpGet(mySQLRunningUri))
 			if err == nil {
 				err = json.Unmarshal(body, &agent.MySQLRunning)
 			}
@@ -337,7 +347,7 @@ func GetAgent(hostname string) (Agent, error) {
 		}
 		{
 			mySQLRunningUri := fmt.Sprintf("%s/mysql-port?token=%s", uri, token)
-			body, err := readResponse(http.Get(mySQLRunningUri))
+			body, err := readResponse(httpGet(mySQLRunningUri))
 			if err == nil {
 				err = json.Unmarshal(body, &agent.MySQLPort)
 			}
@@ -347,7 +357,7 @@ func GetAgent(hostname string) (Agent, error) {
 		}
 		{
 			mySQLDiskUsageUri := fmt.Sprintf("%s/mysql-du?token=%s", uri, token)
-			body, err := readResponse(http.Get(mySQLDiskUsageUri))
+			body, err := readResponse(httpGet(mySQLDiskUsageUri))
 			if err == nil {
 				err = json.Unmarshal(body, &agent.MySQLDiskUsage)
 			}
@@ -357,7 +367,7 @@ func GetAgent(hostname string) (Agent, error) {
 		}
 		{
 			mySQLDatadirDiskFreeUri := fmt.Sprintf("%s/mysql-datadir-available-space?token=%s", uri, token)
-			body, err := readResponse(http.Get(mySQLDatadirDiskFreeUri))
+			body, err := readResponse(httpGet(mySQLDatadirDiskFreeUri))
 			if err == nil {
 				err = json.Unmarshal(body, &agent.MySQLDatadirDiskFree)
 			}
@@ -367,7 +377,7 @@ func GetAgent(hostname string) (Agent, error) {
 		}
 		{
 			errorLogTailUri := fmt.Sprintf("%s/mysql-error-log-tail?token=%s", uri, token)
-			body, err := readResponse(http.Get(errorLogTailUri))
+			body, err := readResponse(httpGet(errorLogTailUri))
 			if err == nil {
 				err = json.Unmarshal(body, &agent.MySQLErrorLogTail)
 			}
@@ -397,7 +407,8 @@ func executeAgentCommand(hostname string, command string, onResponse *func([]byt
 	}
 	log.Debugf("orchestrator-agent command: %s", fullCommand)
 	agentCommandUri := fmt.Sprintf("%s/%s", uri, fullCommand)
-	body, err := readResponse(http.Get(agentCommandUri))
+
+	body, err := readResponse(httpGet(agentCommandUri))
 	if err != nil {
 		return agent, log.Errore(err)
 	}

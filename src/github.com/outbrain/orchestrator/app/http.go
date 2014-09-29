@@ -20,6 +20,7 @@ package app
 import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/auth"
+	"github.com/martini-contrib/gzip"
 	"github.com/martini-contrib/render"
 
 	nethttp "net/http"
@@ -49,6 +50,7 @@ func standardHttp(discovery bool) {
 		m.Use(auth.Basic(config.Config.HTTPAuthUser, config.Config.HTTPAuthPassword))
 	}
 
+	m.Use(gzip.All())
 	// Render html templates from templates directory
 	m.Use(render.Renderer(render.Options{
 		Directory:       "resources",
@@ -74,6 +76,7 @@ func standardHttp(discovery bool) {
 // agentsHttp startes serving agents API requests
 func agentsHttp() {
 	m := martini.Classic()
+	m.Use(gzip.All())
 	m.Use(render.Renderer())
 
 	log.Info("Starting agents HTTP")
