@@ -144,9 +144,9 @@ func QueryRowsMap(db *sql.DB, query string, on_row func(RowMap) error) error {
 	return err
 }
 
-// Exec executes given query using given args on given DB. It will safele prepare, execute and close
+// ExecQuery executes given query using given args on given DB. It will safele prepare, execute and close
 // the statement.
-func Exec(db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
+func execInternal(silent bool, db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
 	stmt, err := db.Prepare(query)
 	if err != nil {
 		return nil, err
@@ -154,10 +154,21 @@ func Exec(db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
 	defer stmt.Close()
 	var res sql.Result
 	res, err = stmt.Exec(args...)
-	if err != nil {
+	if err != nil && !silent {
 		log.Errore(err)
 	}
 	return res, err
+}
+
+// Exec executes given query using given args on given DB. It will safele prepare, execute and close
+// the statement.
+func Exec(db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
+	return execInternal(false, db, query, args...)
+}
+
+// ExecSilently acts like Exec but does not report any error
+func ExecSilently(db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
+	return execInternal(true, db, query, args...)
 }
 
 func InClauseStringValues(terms []string) string {

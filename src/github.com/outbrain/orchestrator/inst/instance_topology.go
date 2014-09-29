@@ -300,7 +300,7 @@ func ResetSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
 			goto Cleanup
 		}
 	}
-	
+
 	instance, err = ResetSlave(instanceKey)
 	if err != nil {
 		goto Cleanup

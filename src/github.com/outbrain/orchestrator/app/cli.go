@@ -48,7 +48,7 @@ func Cli(command string, instance string, sibling string, owner string, reason s
 	}
 
 	if len(command) == 0 {
-		log.Fatal("expected command (-c) (discover|forget|continuous|move-up|move-below|make-co-master|begin-maintenance|end-maintenance|clusters|topology|resolve)")
+		log.Fatal("expected command (-c) (discover|forget|continuous|move-up|move-below|make-co-master|reset-slave|set-read-only|set-writeable|begin-maintenance|end-maintenance|clusters|topology|resolve)")
 	}
 	switch command {
 	case "move-up":
@@ -90,6 +90,26 @@ func Cli(command string, instance string, sibling string, owner string, reason s
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 			_, err := inst.ResetSlaveOperation(instanceKey)
+			if err != nil {
+				log.Errore(err)
+			}
+		}
+	case "set-read-only":
+		{
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			_, err := inst.SetReadOnly(instanceKey, true)
+			if err != nil {
+				log.Errore(err)
+			}
+		}
+	case "set-writeable":
+		{
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			_, err := inst.SetReadOnly(instanceKey, false)
 			if err != nil {
 				log.Errore(err)
 			}

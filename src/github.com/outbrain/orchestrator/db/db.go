@@ -203,9 +203,19 @@ func initOrchestratorDB(db *sql.DB) error {
 	}
 	for _, query := range generateSQLPatches {
 		// Patches are allowed to fail.
-		_, _ = ExecOrchestrator(query)
+		_, _ = execOrchestratorSilently(query)
 	}
 	return nil
+}
+
+// ExecOrchestrator will execute given query on the orchestrator backend database.
+func execOrchestratorSilently(query string, args ...interface{}) (sql.Result, error) {
+	db, err := OpenOrchestrator()
+	if err != nil {
+		return nil, err
+	}
+	res, err := sqlutils.ExecSilently(db, query, args...)
+	return res, err
 }
 
 // ExecOrchestrator will execute given query on the orchestrator backend database.
