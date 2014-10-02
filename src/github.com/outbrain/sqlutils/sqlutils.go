@@ -18,6 +18,7 @@ package sqlutils
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/outbrain/log"
@@ -135,6 +136,13 @@ func ScanRowsToMaps(rows *sql.Rows, on_row func(RowMap) error) error {
 // QueryRowsMap is a convenience function allowing querying a result set while poviding a callback
 // function activated per read row.
 func QueryRowsMap(db *sql.DB, query string, on_row func(RowMap) error) error {
+	var err error
+	defer func() {
+		if derr := recover(); derr != nil {
+			err = errors.New(fmt.Sprintf("QueryRowsMap unexpected error: %+v", derr))
+		}
+	}()
+
 	rows, err := db.Query(query)
 	defer rows.Close()
 	if err != nil && err != sql.ErrNoRows {
@@ -147,6 +155,13 @@ func QueryRowsMap(db *sql.DB, query string, on_row func(RowMap) error) error {
 // ExecQuery executes given query using given args on given DB. It will safele prepare, execute and close
 // the statement.
 func execInternal(silent bool, db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
+	var err error
+	defer func() {
+		if derr := recover(); derr != nil {
+			err = errors.New(fmt.Sprintf("QueryRowsMap unexpected error: %+v", derr))
+		}
+	}()
+
 	stmt, err := db.Prepare(query)
 	if err != nil {
 		return nil, err
