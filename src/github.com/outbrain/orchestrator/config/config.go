@@ -56,6 +56,7 @@ type Configuration struct {
 	SSLSkipVerify                              bool              // When using SSL, should we ignore SSL certification error
 	SSLPrivateKeyFile                          string            // Name of SSL private key file, applies only when AgentsUseSSL = true
 	SSLCertFile                                string            // Name of SSL certification file, applies only when AgentsUseSSL = true
+	HttpTimeoutSeconds                         int               // Number of idle seconds before HTTP GET request times out (when accessing orchestrator-agent)
 	AgentPollMinutes                           uint              // Minutes between agent polling
 	UnseenAgentForgetHours                     uint              // Number of hours after which an unseen agent is forgotten
 	StaleSeedFailMinutes                       uint              // Number of minutes after which a stale (no progress) seed is considered failed.
@@ -87,6 +88,7 @@ func NewConfiguration() *Configuration {
 		SSLSkipVerify:                              false,
 		SSLPrivateKeyFile:                          "",
 		SSLCertFile:                                "",
+		HttpTimeoutSeconds:                         10,
 		AgentPollMinutes:                           60,
 		UnseenAgentForgetHours:                     6,
 		StaleSeedFailMinutes:                       60,

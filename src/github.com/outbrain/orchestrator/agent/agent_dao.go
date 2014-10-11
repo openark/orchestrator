@@ -36,7 +36,7 @@ import (
 
 var SeededAgents chan *Agent = make(chan *Agent)
 
-var httpTimeout = time.Duration(5 * time.Second)
+var httpTimeout = time.Duration(time.Duration(config.Config.HttpTimeoutSeconds) * time.Second)
 
 func dialTimeout(network, addr string) (net.Conn, error) {
 	return net.DialTimeout(network, addr, httpTimeout)
