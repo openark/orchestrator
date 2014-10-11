@@ -19,7 +19,7 @@ package inst
 import (
 	"errors"
 	"fmt"
-	"github.com/outbrain/log"
+	"github.com/outbrain/golib/log"
 	"strings"
 )
 

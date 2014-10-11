@@ -18,7 +18,7 @@ package main
 
 import (
 	"flag"
-	"github.com/outbrain/log"
+	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/app"
 	"github.com/outbrain/orchestrator/config"
 )

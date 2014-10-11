@@ -19,9 +19,9 @@ package inst
 import (
 	"errors"
 	"fmt"
-	"github.com/outbrain/log"
+	"github.com/outbrain/golib/log"
+	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/db"
-	"github.com/outbrain/sqlutils"
 )
 
 // ReadActiveMaintenance returns the list of currently active maintenance entries

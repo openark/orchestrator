@@ -26,7 +26,7 @@ import (
 	nethttp "net/http"
 	"strings"
 
-	"github.com/outbrain/log"
+	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/http"
 	"github.com/outbrain/orchestrator/logic"
@@ -34,6 +34,7 @@ import (
 
 // Http starts serving
 func Http(discovery bool) {
+	martini.Env = martini.Prod
 	if config.Config.ServeAgentsHttp {
 		go agentsHttp()
 	}

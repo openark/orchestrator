@@ -18,10 +18,10 @@ package inst
 
 import (
 	"fmt"
-	"github.com/outbrain/log"
+	"github.com/outbrain/golib/log"
+	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/db"
-	"github.com/outbrain/sqlutils"
 	"os"
 	"time"
 )

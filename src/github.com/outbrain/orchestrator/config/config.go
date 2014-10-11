@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/outbrain/log"
+	"github.com/outbrain/golib/log"
 )
 
 // Configuration makes for orchestrator configuration input, which can be provided by user via JSON formatted file.

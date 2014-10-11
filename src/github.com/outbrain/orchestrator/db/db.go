@@ -20,9 +20,9 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/outbrain/log"
+	"github.com/outbrain/golib/log"
+	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/config"
-	"github.com/outbrain/sqlutils"
 )
 
 // generateSQL & generateSQLPatches are lists of SQL statements required to build the orchestrator backend

@@ -117,7 +117,15 @@ function moveInstance(node, droppableNode, shouldApply) {
 	}
 	if (instanceIsGrandchild(node, droppableNode)) {
 		if (node.hasProblem) {
-			return false;
+			// Typically, when a node has a problem we do not allow moving it up.
+			// But there's a special situation when allowing is desired: when the parent has personal issues,
+			// (say disk issue or otherwise something heavyweight running which slows down replication)
+			// and you want to move up the slave which is only delayed by its master.
+			// So to help out, if the instance is identically at its master's trail, it is allowed to move up.
+			if (node.ExecBinlogCoordinates.LogFile != node.masterNode.SelfBinlogCoordinates.LogFile ||
+				node.ExecBinlogCoordinates.LogPos != node.masterNode.SelfBinlogCoordinates.LogPos) { 
+				return false;
+			}
 		}
 		if (shouldApply) {
 			moveUp(node, droppableNode);

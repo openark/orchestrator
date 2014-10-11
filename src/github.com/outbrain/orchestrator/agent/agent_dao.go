@@ -22,23 +22,32 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/outbrain/log"
+	"github.com/outbrain/golib/log"
+	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/db"
 	"github.com/outbrain/orchestrator/inst"
-	"github.com/outbrain/sqlutils"
 )
 
 var SeededAgents chan *Agent = make(chan *Agent)
+
+var httpTimeout = time.Duration(5 * time.Second)
+
+func dialTimeout(network, addr string) (net.Conn, error) {
+	return net.DialTimeout(network, addr, httpTimeout)
+}
 
 // httpGet is a convenience method for getting http response from URL, optionaly skipping SSL cert verification
 func httpGet(url string) (resp *http.Response, err error) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config.SSLSkipVerify},
+		Dial:            dialTimeout,
+		ResponseHeaderTimeout: httpTimeout,
 	}
 	client := &http.Client{Transport: tr}
 	return client.Get(url)

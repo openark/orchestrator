@@ -18,7 +18,7 @@ package orchestrator
 
 import (
 	"fmt"
-	"github.com/outbrain/log"
+	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/agent"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/inst"

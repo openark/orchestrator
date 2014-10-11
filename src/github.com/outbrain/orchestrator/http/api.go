@@ -153,12 +153,9 @@ func (this *HttpAPI) Forget(params martini.Params, r render.Render, req *http.Re
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	// We ignore errors: we're looking to do a destructive operation anyhow.
+	instanceKey, _ := this.getInstanceKey(params["host"], params["port"])
 
-	if err != nil {
-		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
-		return
-	}
 	inst.ForgetInstance(&instanceKey)
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance forgotten: %+v", instanceKey)})
