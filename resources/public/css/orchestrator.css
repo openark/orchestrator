@@ -180,6 +180,10 @@
     padding: 5px 9px;
 }
 
+#modalDataAttributesTable td code {
+	white-space: normal;
+	background-color: inherit;
+}
 
 .bootbox .modal-body {
     padding: 12px;

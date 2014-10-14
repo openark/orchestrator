@@ -106,8 +106,15 @@ function addInfo(alertText) {
 // Modal
 
 function addNodeModalDataAttribute(name, value) {
+	var codeClass = "text-primary";
+	if (value == "true" || value == true) {
+		codeClass = "text-success";
+	}
+	if (value == "false" || value == false) {
+		codeClass = "text-danger";
+	}
     $('#modalDataAttributesTable').append(
-        '<tr><td>' + name + '</td><td><code class="text-primary"><strong>' + value + '</strong></code><div class="pull-right"></div></td></tr>');
+        '<tr><td>' + name + '</td><td><code class="'+codeClass+'"><strong>' + value + '</strong></code><div class="pull-right"></div></td></tr>');
     return $('#modalDataAttributesTable tr:last td:last');
 }
 
@@ -134,6 +141,10 @@ function openNodeModal(node) {
         $('#node_modal button[data-btn=start-slave]').appendTo(td.find("div"))
         $('#node_modal button[data-btn=stop-slave]').appendTo(td.find("div"))
         
+        if (!node.replicationRunning) {
+            addNodeModalDataAttribute("Last SQL error", node.LastSQLError);
+            addNodeModalDataAttribute("Last IO error", node.LastIOError);
+        }
         addNodeModalDataAttribute("Seconds behind master", node.SecondsBehindMaster.Valid ? node.SecondsBehindMaster.Int64 : "null");
         addNodeModalDataAttribute("Replication lag", node.SlaveLagSeconds.Valid ? node.SlaveLagSeconds.Int64 : "null");
     }

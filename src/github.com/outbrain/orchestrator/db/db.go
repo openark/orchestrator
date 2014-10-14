@@ -171,6 +171,16 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN read_only TINYINT UNSIGNED NOT NULL AFTER version
 	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN last_sql_error TEXT NOT NULL DEFAULT '' AFTER exec_master_log_pos
+	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN last_io_error TEXT NOT NULL DEFAULT '' AFTER last_sql_error
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance

@@ -146,6 +146,8 @@ type Instance struct {
 	Slave_IO_Running       bool
 	ReadBinlogCoordinates  BinlogCoordinates
 	ExecBinlogCoordinates  BinlogCoordinates
+	LastSQLError           string
+	LastIOError            string
 	SecondsBehindMaster    sql.NullInt64
 	SlaveLagSeconds        sql.NullInt64
 	SlaveHosts             InstanceKeyMap

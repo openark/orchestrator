@@ -83,6 +83,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		instance.ReadBinlogCoordinates.LogPos = m.GetInt64("Read_Master_Log_Pos")
 		instance.ExecBinlogCoordinates.LogFile = m.GetString("Relay_Master_Log_File")
 		instance.ExecBinlogCoordinates.LogPos = m.GetInt64("Exec_Master_Log_Pos")
+		instance.LastSQLError = m.GetString("Last_SQL_Error")
+		instance.LastIOError = m.GetString("Last_IO_Error")
 
 		masterKey, err := NewInstanceKeyFromStrings(m.GetString("Master_Host"), m.GetString("Master_Port"))
 		if err != nil {
@@ -283,6 +285,8 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 			read_master_log_pos,
 			relay_master_log_file,
 			exec_master_log_pos,
+			last_sql_error,
+			last_io_error,
 			seconds_behind_master,
 			slave_lag_seconds,
 			slave_hosts,
@@ -309,6 +313,8 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 		&instance.ReadBinlogCoordinates.LogPos,
 		&instance.ExecBinlogCoordinates.LogFile,
 		&instance.ExecBinlogCoordinates.LogPos,
+		&instance.LastSQLError,
+		&instance.LastIOError,
 		&instance.SecondsBehindMaster,
 		&instance.SlaveLagSeconds,
 		&slaveHostsJson,
@@ -361,6 +367,8 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.ReadBinlogCoordinates.LogPos = m.GetInt64("read_master_log_pos")
 	instance.ExecBinlogCoordinates.LogFile = m.GetString("relay_master_log_file")
 	instance.ExecBinlogCoordinates.LogPos = m.GetInt64("exec_master_log_pos")
+	instance.LastSQLError = m.GetString("last_sql_error")
+	instance.LastIOError = m.GetString("last_io_error")
 	instance.SecondsBehindMaster = m.GetNullInt64("seconds_behind_master")
 	instance.SlaveLagSeconds = m.GetNullInt64("slave_lag_seconds")
 	slaveHostsJson := m.GetString("slave_hosts")
@@ -684,12 +692,14 @@ func WriteInstance(instance *Instance, lastError error) error {
 				read_master_log_pos,
 				relay_master_log_file,
 				exec_master_log_pos,
+				last_sql_error,
+				last_io_error,
 				seconds_behind_master,
 				slave_lag_seconds,
 				num_slave_hosts,
 				slave_hosts,
 				cluster_name
-			) values (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			) values (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		instance.Key.Hostname,
 		instance.Key.Port,
 		instance.ServerID,
@@ -708,6 +718,8 @@ func WriteInstance(instance *Instance, lastError error) error {
 		instance.ReadBinlogCoordinates.LogPos,
 		instance.ExecBinlogCoordinates.LogFile,
 		instance.ExecBinlogCoordinates.LogPos,
+		instance.LastSQLError,
+		instance.LastIOError,
 		instance.SecondsBehindMaster,
 		instance.SlaveLagSeconds,
 		len(instance.SlaveHosts),
