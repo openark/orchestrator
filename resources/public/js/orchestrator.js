@@ -394,6 +394,15 @@ function normalizeInstances(instances, maintenanceList) {
     });
 
     instances.forEach(function (instance) {
+    	if (instance.masterNode != null) {
+		    instance.isSQLThreadCaughtUpWithIOThread = (instance.ExecBinlogCoordinates.LogFile == instance.masterNode.SelfBinlogCoordinates.LogFile &&
+		    		instance.ExecBinlogCoordinates.LogPos == instance.masterNode.SelfBinlogCoordinates.LogPos);
+    	} else {
+    		instance.isSQLThreadCaughtUpWithIOThread = false;
+    	}
+    });
+    
+    instances.forEach(function (instance) {
     	if (instance.isMaster && instance.parent != null && instance.parent.parent != null && instance.parent.parent.id == instance.id) {
     	    // In case there's a master-master setup, introduce a virtual node that is parent of both.
     		// This is for visualization purposes...
@@ -453,6 +462,9 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	var statusMessage = instance.SlaveLagSeconds.Int64 + ' seconds lag';
 	if (indicateLastSeenInStatus) {
 		statusMessage = 'seen ' + instance.SecondsSinceLastSeen.Int64 + ' seconds ago';
+	}
+	if (instance.isSQLThreadCaughtUpWithIOThread) {
+		statusMessage += ' <span class="glyphicon glyphicon-glass" title="SQL thread caught up with IO thread"></span>';
 	}
     var contentHtml = ''
         	+ '<div class="pull-right">' + statusMessage + ' </div>'

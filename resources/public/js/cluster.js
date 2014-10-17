@@ -122,8 +122,7 @@ function moveInstance(node, droppableNode, shouldApply) {
 			// (say disk issue or otherwise something heavyweight running which slows down replication)
 			// and you want to move up the slave which is only delayed by its master.
 			// So to help out, if the instance is identically at its master's trail, it is allowed to move up.
-			if (node.ExecBinlogCoordinates.LogFile != node.masterNode.SelfBinlogCoordinates.LogFile ||
-				node.ExecBinlogCoordinates.LogPos != node.masterNode.SelfBinlogCoordinates.LogPos) { 
+			if (!node.isSQLThreadCaughtUpWithIOThread) { 
 				return false;
 			}
 		}
