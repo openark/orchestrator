@@ -346,7 +346,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 
 	var instanceBinlogs []string
 	var otherInstanceBinlogs []string
-	var nextBinlogCoordinatestoMatch BinlogCoordinates
+	var nextBinlogCoordinatesToMatch BinlogCoordinates
 	var instancePseudoGtidCoordinates BinlogCoordinates
 	var otherInstancePseudoGtidCoordinates BinlogCoordinates
 	var instancePseudoGtidText string
