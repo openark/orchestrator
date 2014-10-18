@@ -1,3 +1,4 @@
+clusterOperationTroubleshootMode = false;
 
 function generateInstanceDivs(nodesMap) {
     nodesList = []
@@ -103,7 +104,31 @@ function generateInstanceDivs(nodesMap) {
 }
 
 function moveInstance(node, droppableNode, shouldApply) {
+	if (clusterOperationTroubleshootMode) {
+		if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem) {
+			return false;
+		}
+		if (!node.isSQLThreadCaughtUpWithIOThread) {
+			return false;
+		}
+		if (instanceIsDescendant(node, droppableNode)) {
+			if (shouldApply) {
+				matchBelow(node, droppableNode);
+			}
+			return true;
+		}
+		if (isReplicationBehindSibling(node, droppableNode)) {
+			if (shouldApply) {
+				matchBelow(node, droppableNode);
+			}
+			return true;
+		}
+		// end troubleshoot mode
+		return false;
+	}
+	// Not toubleshoot mode
 	if (node.isCoMaster) {
+		// Cannot move. RESET SLAVE on one of the co-masters.
 		return false;
 	}
 	if (instancesAreSiblings(node, droppableNode)) {
@@ -229,6 +254,32 @@ function makeCoMaster(node, childNode) {
 }
 
 
+
+function matchBelow(node, otherNode) {
+	var message = "<h4>TROUBLESHOOT MODE</h4>Are you sure you wish to turn <code><strong>" + 
+		node.Key.Hostname + ":" + node.Key.Port +
+		"</strong></code> into a slave of <code><strong>" +
+		otherNode.Key.Hostname + ":" + otherNode.Key.Port +
+		"</strong></code>?";
+	bootbox.confirm(message, function(confirm) {
+		if (confirm) {
+			showLoader();
+			var apiUrl = "/api/match-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
+		    $.get(apiUrl, function (operationResult) {
+	    			hideLoader();
+	    			if (operationResult.Code == "ERROR") {
+	    				addAlert(operationResult.Message)
+	    			} else {
+	    				location.reload();
+	    			}	
+	            }, "json");					
+		}
+		$("#cluster_container .accept_drop").removeClass("accept_drop");
+	}); 
+	return false;
+}
+
+
 function instancesAreSiblings(node1, node2) {
 	if (node1.id == node2.id) return false;
 	if (node1.masterNode == null ) return false;
@@ -238,7 +289,7 @@ function instancesAreSiblings(node1, node2) {
 }
 
 
-function instanceIsChild(node, parentNode, nodesMap) {
+function instanceIsChild(node, parentNode) {
 	if (!node.hasMaster) {
 		return false;
 	}
@@ -252,7 +303,7 @@ function instanceIsChild(node, parentNode, nodesMap) {
 }
 
 
-function instanceIsGrandchild(node, grandparentNode, nodesMap) {
+function instanceIsGrandchild(node, grandparentNode) {
 	if (!node.hasMaster) {
 		return false;
 	}
@@ -269,15 +320,101 @@ function instanceIsGrandchild(node, grandparentNode, nodesMap) {
 	return true;
 }
 
+
+function instanceIsDescendant(node, nodeAtQuestion) {
+	if (nodeAtQuestion == null) {
+		return false;
+	}
+	if (node.id == nodeAtQuestion.id) {
+		return false;
+	}
+	if (!node.hasMaster) {
+		return false;
+	}
+	if (node.masterNode.id == nodeAtQuestion.id) {
+		return true;
+	}
+	return instanceIsDescendant(node.masterNode, nodeAtQuestion)
+}
+
+// Returns true when the two instances are siblings, and 'node' is behind or at same position
+// (in reltation to shared master) as its 'sibling'.
+// i.e. 'sibling' is same as, or more up to date by master than 'node'.
+function isReplicationBehindSibling(node, sibling) { 
+	if (!instancesAreSiblings(node, sibling)) {
+		return false;
+	} 
+	return compareInstancesExecBinlogCoordinates(node, sibling) <= 0;
+}
+
+function compareInstancesExecBinlogCoordinates(i0, i1) {
+	if (i0.ExecBinlogCoordinates.LogFile == i1.ExecBinlogCoordinates.LogFile) {
+		// executing from same master log file
+		return i0.ExecBinlogCoordinates.LogPos - i1.ExecBinlogCoordinates.LogPos;
+	}
+	return (getLogFileNumber(i0.ExecBinlogCoordinates.LogFile) - getLogFileNumber(i1.ExecBinlogCoordinates.LogFile));
+	
+}
+
+function getLogFileNumber(logFileName) {
+	logFileTokens = logFileName.split(".")
+	return parseInt(logFileTokens[logFileTokens.length-1])
+}
+
+
+function analyzeClusterInstances(nodesMap) {
+	instances = []
+    for (var nodeId in nodesMap) {
+    	instances.push(nodesMap[nodeId]);
+    } 
+
+    instances.forEach(function (instance) {
+    	if (instance.isMaster && !instance.isCoMaster) {
+		    if (instance.hasConnectivityProblem) {
+		    	// The master has a connectivity problem! Do a client-size recommendation of best candidat.
+		    	// Candidate would be a direct child of the master, with largest exec binlog coordinates.
+		    	// There could be several children with same cordinates; we pick one.
+		    	var sortedChildren = instance.children.slice(); 
+		    	sortedChildren.sort(compareInstancesExecBinlogCoordinates)
+		    	sortedChildren[sortedChildren.length - 1].isCandidateMaster = true
+		    }
+    	}
+    });
+}
+
+
+function refreshClusterOperationModeButton() {
+	if (clusterOperationTroubleshootMode) {
+		$("#cluster_operation_mode_button").html("Troubleshoot mode");
+		$("#cluster_operation_mode_button").removeClass("btn-success");
+		$("#cluster_operation_mode_button").addClass("btn-warning");
+	} else {
+		$("#cluster_operation_mode_button").html("Safe mode");
+		$("#cluster_operation_mode_button").removeClass("btn-warning");
+		$("#cluster_operation_mode_button").addClass("btn-success");
+	}
+}
+
 $(document).ready(function () {
     $.get("/api/cluster/"+currentClusterName(), function (instances) {
         $.get("/api/maintenance",
             function (maintenanceList) {
         		var instancesMap = normalizeInstances(instances, maintenanceList);
+                analyzeClusterInstances(instancesMap);
                 visualizeInstances(instancesMap);
                 generateInstanceDivs(instancesMap);
             }, "json");
     }, "json");
-
+    
+    if (isTroubleshootModeEnabled()) {
+        $("ul.navbar-nav").append('<li><a class="cluster_operation_mode"><button type="button" class="btn btn-xs" id="cluster_operation_mode_button"></button></a></li>');
+        refreshClusterOperationModeButton();
+        
+	    $("body").on("click", "#cluster_operation_mode_button", function() {
+	    	clusterOperationTroubleshootMode = !clusterOperationTroubleshootMode;
+	    	refreshClusterOperationModeButton(); 
+	    });
+    }
+    
     activateRefreshTimer();
 });

@@ -343,6 +343,32 @@ func (this *HttpAPI) MoveBelow(params martini.Params, r render.Render, req *http
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v moved below %+v", instanceKey, siblingKey), Details: instance})
 }
 
+// MatchBelow attempts to move an instance below another via pseudo GTID matching of binlog entries
+func (this *HttpAPI) MatchBelow(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	belowKey, err := this.getInstanceKey(params["belowHost"], params["belowPort"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	instance, err := inst.MatchBelow(&instanceKey, &belowKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v matched below %+v", instanceKey, belowKey), Details: instance})
+}
+
 // StartSlave starts replication on given instance
 func (this *HttpAPI) StartSlave(params martini.Params, r render.Render, req *http.Request) {
 	if !this.isAuthorizedForAction(req) {
@@ -881,6 +907,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/make-co-master/:host/:port", this.MakeCoMaster)
 	m.Get("/api/reset-slave/:host/:port", this.ResetSlave)
 	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow)
+	m.Get("/api/match-below/:host/:port/:belowHost/:belowPort", this.MatchBelow)
 	m.Get("/api/begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance)
 	m.Get("/api/end-maintenance/:host/:port", this.EndMaintenanceByInstanceKey)
 	m.Get("/api/end-maintenance/:maintenanceKey", this.EndMaintenance)

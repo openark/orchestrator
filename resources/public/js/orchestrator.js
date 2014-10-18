@@ -294,6 +294,7 @@ function normalizeInstance(instance) {
 
     instance.isMaster = (instance.title == instance.ClusterName);
     instance.isCoMaster = false;
+    instance.isCandidateMaster = false
     instance.isVirtual = false;
 }
 
@@ -324,7 +325,7 @@ function normalizeInstanceProblem(instance) {
     	instance.problemOrder = 5;
     }
     instance.hasProblem = (instance.problem != null) ;
-    
+    instance.hasConnectivityProblem = (!instance.IsLastCheckValid || !instance.IsRecentlyChecked);
 }
 
 var virtualInstanceCounter = 0;
@@ -395,8 +396,8 @@ function normalizeInstances(instances, maintenanceList) {
 
     instances.forEach(function (instance) {
     	if (instance.masterNode != null) {
-		    instance.isSQLThreadCaughtUpWithIOThread = (instance.ExecBinlogCoordinates.LogFile == instance.masterNode.SelfBinlogCoordinates.LogFile &&
-		    		instance.ExecBinlogCoordinates.LogPos == instance.masterNode.SelfBinlogCoordinates.LogPos);
+		    instance.isSQLThreadCaughtUpWithIOThread = (instance.ExecBinlogCoordinates.LogFile == instance.ReadBinlogCoordinates.LogFile &&
+		    		instance.ExecBinlogCoordinates.LogPos == instance.ReadBinlogCoordinates.LogPos);
     	} else {
     		instance.isSQLThreadCaughtUpWithIOThread = false;
     	}
@@ -428,7 +429,7 @@ function normalizeInstances(instances, maintenanceList) {
     		instancesMap[virtualCoMastersRoot.id] = virtualCoMastersRoot;
     	} 
     });
-
+    
     return instancesMap;
 }
 
@@ -476,6 +477,9 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     }
     else if (instance.isMaster) {
     	contentHtml += '<p><strong>Master</strong></p>';
+    }
+    if (instance.isCandidateMaster) {
+    	contentHtml += '<p><strong>Candidate for master</strong></p>';
     }
     if (renderType == "search") {
     	contentHtml += '<p>' 

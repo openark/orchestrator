@@ -54,11 +54,12 @@ func (this *HttpWeb) Clusters(params martini.Params, r render.Render) {
 
 func (this *HttpWeb) Cluster(params martini.Params, r render.Render) {
 	r.HTML(200, "templates/cluster", map[string]interface{}{
-		"agentsHttpActive":  config.Config.ServeAgentsHttp,
-		"title":             "cluster",
-		"activePage":        "cluster",
-		"clusterName":       params["clusterName"],
-		"autoshow_problems": true,
+		"agentsHttpActive":        config.Config.ServeAgentsHttp,
+		"title":                   "cluster",
+		"activePage":              "cluster",
+		"clusterName":             params["clusterName"],
+		"autoshow_problems":       true,
+		"troubleshootModeEnabled": config.Config.TroubleshootModeEnabled,
 	})
 }
 

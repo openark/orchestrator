@@ -310,3 +310,14 @@ func (this *Instance) CanMoveAsCoMaster() (bool, error) {
 	}
 	return true, nil
 }
+
+// CanMoveViaMatch returns true if this instance's state allows it to be repositioned via pseudo-GTID matching
+func (this *Instance) CanMoveViaMatch() (bool, error) {
+	if !this.IsLastCheckValid {
+		return false, errors.New(fmt.Sprintf("%+v: last check invalid", this.Key))
+	}
+	if !this.IsRecentlyChecked {
+		return false, errors.New(fmt.Sprintf("%+v: not recently checked", this.Key))
+	}
+	return true, nil
+}

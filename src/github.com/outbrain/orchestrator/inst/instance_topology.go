@@ -319,6 +319,116 @@ Cleanup:
 	return instance, err
 }
 
+// MatchBelow will attempt moving instance indicated by instanceKey below its the one indicated by otherKey.
+// The refactoring is based on matching binlog entries, not on "classic" positions comparisons.
+// The "other instance" could be the sibling of the moving instance any of its ancestors. It may actuall be
+// a cousing of some sort (though unlikely). The only important thing is that the "other instance" is more
+// advanced in replication than given instance.
+func MatchBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, err
+	}
+	otherInstance, err := ReadTopologyInstance(otherKey)
+	if err != nil {
+		return instance, err
+	}
+
+	rinstance, _, _ := ReadInstance(&instance.Key)
+	if canMove, merr := rinstance.CanMoveViaMatch(); !canMove {
+		return instance, merr
+	}
+
+	if canReplicate, err := instance.CanReplicateFrom(otherInstance); !canReplicate {
+		return instance, err
+	}
+	log.Infof("Will match %+v below %+v", *instanceKey, *otherKey)
+
+	var instanceBinlogs []string
+	var otherInstanceBinlogs []string
+	var nextBinlogCoordinatestoMatch BinlogCoordinates
+	var instancePseudoGtidCoordinates BinlogCoordinates
+	var otherInstancePseudoGtidCoordinates BinlogCoordinates
+	var instancePseudoGtidText string
+
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("match below %+v", *otherKey)); merr != nil {
+		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
+	if maintenanceToken, merr := BeginMaintenance(otherKey, "orchestrator", fmt.Sprintf("%+v matches below this", *instanceKey)); merr != nil {
+		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *otherKey))
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
+
+	instance, err = StopSlaveNicely(instanceKey)
+	if err != nil {
+		goto Cleanup
+	}
+
+	{
+		// Look for last GTID in instance:
+		instanceBinlogs, err = GetInstanceBinaryLogNames(instanceKey)
+		if err != nil {
+			goto Cleanup
+		}
+		for i := len(instanceBinlogs) - 1; i >= 0 && instancePseudoGtidCoordinates.LogPos == 0; i-- {
+			instancePseudoGtidCoordinates, instancePseudoGtidText, err = GetLastPseudoGTIDEntryInBinlog(instanceKey, instanceBinlogs[i])
+		}
+		if instancePseudoGtidCoordinates.LogPos == 0 {
+			err = log.Errorf("Cannot find pseudo GTID entry in binlogs of %+v", *instanceKey)
+			goto Cleanup
+		}
+		log.Debugf("Found pseudo gtid entry in %+v: %+v", *instanceKey, instancePseudoGtidCoordinates)
+	}
+	{
+		// Look for GTID entry in other-instance:
+		otherInstanceBinlogs, err = GetInstanceBinaryLogNames(otherKey)
+		if err != nil {
+			goto Cleanup
+		}
+		for i := len(otherInstanceBinlogs) - 1; i >= 0 && otherInstancePseudoGtidCoordinates.LogPos == 0; i-- {
+			otherInstancePseudoGtidCoordinates, err = SearchPseudoGTIDEntryInBinlog(otherKey, otherInstanceBinlogs[i], instancePseudoGtidText)
+		}
+		if otherInstancePseudoGtidCoordinates.LogPos == 0 {
+			err = log.Errorf("Cannot match pseudo GTID entry in binlogs of %+v", *otherKey)
+			goto Cleanup
+		}
+		log.Debugf("Matched entry in %+v: %+v", *otherKey, otherInstancePseudoGtidCoordinates)
+	}
+	// We've found a match: the latest Pseudo GTID position within instance and its identical twin in otherInstance
+	// We now iterate the events in both, up to the completion of events in instance (recall that we looked for
+	// the last entry in instance, hence, assuming pseudo GTID entries are frequent, the amount of entries to read
+	// from instance is not long)
+	// The result of the iteration will be either:
+	// - bad conclusion that instance is actually more advanced than otherInstance (we find more entries in instance
+	//   following the pseudo gtid than we can match in otherInstance), hence we cannot ask instance to replicate
+	//   from otherInstance
+	// - good result: both instances are exactly in same shape (have replicated the exact same number of events since
+	//   the last pseudo gtid). Since they are identical, it is easy to point instance into otherInstance.
+	// - good result: the first position within otherInstance where instance has not replicated yet. It is easy to point
+	//   instance into otherInstance.
+	nextBinlogCoordinatesToMatch, err = GetNextBinlogCoordinatesToMatch(instanceKey, instanceBinlogs, instancePseudoGtidCoordinates,
+		otherKey, otherInstanceBinlogs, otherInstancePseudoGtidCoordinates)
+	if err != nil {
+		goto Cleanup
+	}
+	log.Debugf("%+v will match below %+v at %+v", *instanceKey, *otherKey, nextBinlogCoordinatesToMatch)
+
+Cleanup:
+	instance, _ = StartSlave(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	// and we're done (pending deferred functions)
+	AuditOperation("match-below", instanceKey, fmt.Sprintf("matched %+v below %+v", *instanceKey, *otherKey))
+
+	return instance, err
+}
+
 // getAsciiTopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
 func getAsciiTopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance)) []string {

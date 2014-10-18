@@ -32,6 +32,8 @@
   "AgentPollMinutes": 60,
   "UnseenAgentForgetHours": 6,
   "StaleSeedFailMinutes": 60,
-  "SeedAcceptableBytesDiff": 8192
+  "SeedAcceptableBytesDiff": 8192,
+  "TroubleshootModeEnabled": true,
+  "PseudoGTIDPattern": "@`pseudo_gtid`=_utf8"
 }
 

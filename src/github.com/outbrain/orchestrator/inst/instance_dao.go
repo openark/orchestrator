@@ -844,6 +844,7 @@ func StopSlaveNicely(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	_, err = ExecInstance(instanceKey, `stop slave io_thread`)
+	_, err = ExecInstance(instanceKey, `start slave sql_thread`)
 
 	for up_to_date := false; !up_to_date; {
 		instance, err = ReadTopologyInstance(instanceKey)
@@ -1063,4 +1064,118 @@ func KillQuery(instanceKey *InstanceKey, process int64) (*Instance, error) {
 	log.Infof("Killed query on %+v", *instanceKey)
 	AuditOperation("kill-query", instanceKey, fmt.Sprintf("Killed query %d", process))
 	return instance, err
+}
+
+// GetInstanceBinaryLogNames returns the list of binlog files for a given instance
+func GetInstanceBinaryLogNames(instanceKey *InstanceKey) ([]string, error) {
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return nil, err
+	}
+	binlogs := []string{}
+
+	err = sqlutils.QueryRowsMap(db, "show binary logs", func(m sqlutils.RowMap) error {
+		binlogs = append(binlogs, m.GetString("Log_name"))
+		return nil
+	})
+	if err != nil {
+		return []string{}, err
+	}
+
+	return binlogs, err
+}
+
+// Try and find the last position of a pseudo GTID query entry in the given binary log.
+// Also return the full text of that entry
+func GetLastPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string) (BinlogCoordinates, string, error) {
+	binlogCoordinates := BinlogCoordinates{LogFile: binlog, LogPos: 0}
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return binlogCoordinates, "", err
+	}
+
+	moreRowsExpected := true
+	step := 0
+	stepSize := 10000
+
+	entryText := ""
+	for moreRowsExpected {
+		query := fmt.Sprintf("show binlog events in '%s' LIMIT %d,%d", binlog, (step * stepSize), stepSize)
+
+		moreRowsExpected = false
+		err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+			moreRowsExpected = true
+			binlogEntryInfo := m.GetString("Info")
+			if matched, _ := regexp.MatchString(config.Config.PseudoGTIDPattern, binlogEntryInfo); matched {
+				binlogCoordinates.LogPos = m.GetInt64("Pos")
+				entryText = binlogEntryInfo
+				// Found a match. But we keep searching: we're interested in the LAST entry, and, alas,
+				// we can only search in ASCENDING order...
+			}
+			return nil
+		})
+		if err != nil {
+			return binlogCoordinates, "", err
+		}
+		step++
+	}
+
+	if binlogCoordinates.LogPos == 0 {
+		return binlogCoordinates, "", errors.New(fmt.Sprintf("Cannot find pseudo GTID entry in binlog '%s'", binlog))
+	}
+	return binlogCoordinates, entryText, err
+}
+
+// Given a binlog entry text (query), search it in the give nbinary log of a given instance
+func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entryText string) (BinlogCoordinates, error) {
+	binlogCoordinates := BinlogCoordinates{LogFile: binlog, LogPos: 0}
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return binlogCoordinates, err
+	}
+
+	moreRowsExpected := true
+	step := 0
+	stepSize := 10000
+
+	for moreRowsExpected {
+		query := fmt.Sprintf("show binlog events in '%s' LIMIT %d,%d", binlog, (step * stepSize), stepSize)
+		moreRowsExpected = false
+		err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+			if binlogCoordinates.LogPos != 0 {
+				return nil
+				// moreRowsExpected reamins false, this quits the loop
+			}
+			moreRowsExpected = true
+			if m.GetString("Info") == entryText {
+				// found it!
+				binlogCoordinates.LogPos = m.GetInt64("Pos")
+			}
+			return nil
+		})
+		if err != nil {
+			return binlogCoordinates, err
+		}
+		step++
+	}
+
+	if binlogCoordinates.LogPos == 0 {
+		return binlogCoordinates, errors.New(fmt.Sprintf("Cannot match pseudo GTID entry in binlog '%s'", binlog))
+	}
+	return binlogCoordinates, err
+}
+
+// GetNextBinlogCoordinatesToMatch is given a twin-coordinates couple for a would-be slave (instanceKey) and another 
+// instance (otherKey).
+// This is part of the match-below process, and is the heart of the operation: matching the binlog events starting 
+// the twin-coordinates (where both share the same Pseudo-GTID) until "instance" runs out of entries, hopefully
+// before "other" runs out.
+// If "other" runs out that means "instance" is more advanced in replication than "other", in which case we can't
+// turn it into a slave of "other".
+// Otherwise "instance" will point to the *next* binlog entry in "other"
+func GetNextBinlogCoordinatesToMatch(instanceKey *InstanceKey, instanceBinlogs []string, instanceCoordinates BinlogCoordinates,
+	otherKey *InstanceKey, otherBinlogs []string, otherCoordinates BinlogCoordinates) (BinlogCoordinates, error) {
+
+	binlogCoordinates := BinlogCoordinates{LogFile: "", LogPos: 0}
+	return binlogCoordinates, nil
 }
