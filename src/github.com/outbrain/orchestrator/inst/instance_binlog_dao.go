@@ -68,6 +68,20 @@ func GetLastPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string) (Bi
 	return binlogCoordinates, entryText, err
 }
 
+func GetLastPseudoGTIDEntryInInstance(instance *Instance) (*BinlogCoordinates, string, error) {
+	// Look for last GTID in instance:
+	instanceBinlogs := instance.GetBinaryLogs()
+
+	for i := len(instanceBinlogs) - 1; i >= 0; i-- {
+		resultCoordinates, entryInfo, err := GetLastPseudoGTIDEntryInBinlog(&instance.Key, instanceBinlogs[i])
+		if resultCoordinates.LogPos != 0 && err == nil {
+			log.Debugf("Found pseudo gtid entry in %+v: %+v", instance.Key, resultCoordinates)
+			return &resultCoordinates, entryInfo, err
+		}
+	}
+	return nil, "", log.Errorf("Cannot find pseudo GTID entry in binlogs of %+v", instance.Key)
+}
+
 // Given a binlog entry text (query), search it in the give nbinary log of a given instance
 func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entryText string) (BinlogCoordinates, error) {
 	binlogCoordinates := BinlogCoordinates{LogFile: binlog, LogPos: 0}
@@ -104,6 +118,19 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 		return binlogCoordinates, errors.New(fmt.Sprintf("Cannot match pseudo GTID entry in binlog '%s'", binlog))
 	}
 	return binlogCoordinates, err
+}
+
+func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string) (*BinlogCoordinates, error) {
+	// Look for GTID entry in other-instance:
+	binlogs := instance.GetBinaryLogs()
+	for i := len(binlogs) - 1; i >= 0; i-- {
+		resultCoordinates, err := SearchPseudoGTIDEntryInBinlog(&instance.Key, binlogs[i], entryText)
+		if resultCoordinates.LogPos != 0 && err == nil {
+			log.Debugf("Matched entry in %+v: %+v", instance.Key, resultCoordinates)
+			return &resultCoordinates, nil
+		}
+	}
+	return nil, log.Errorf("Cannot match pseudo GTID entry in binlogs of %+v", instance.Key)
 }
 
 // Read (as much as possible of) a chink of binary log events starting the given startingCoordinates
@@ -170,6 +197,10 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 	otherCursor := NewBinlogEventCursor(otherCoordinates, fetchOtherNextEvents)
 
 	for {
+		// Exhaust binlogs on instance. While iterating them, also iterate the otherInstance binlogs.
+		// We expect entries on both to match, sequentially, until instance's binlogs are exhausted.
+		var instanceEventInfo string
+		var otherEventInfo string
 		{
 			event, err := instanceCursor.NextRealEvent()
 			if err != nil {
@@ -184,7 +215,8 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 				log.Debugf("Reached end of binary logs for instance. Other coordinates: %+v", nextCoordinates)
 				return &nextCoordinates, nil
 			}
-			log.Debugf("%+v %+v %+v", event.Coordinates, event.EventType, event.Info)
+			instanceEventInfo = event.Info
+			log.Debugf("%+v %+v; %+v", event.Coordinates, event.EventType, event.Info)
 		}
 		{
 			event, err := otherCursor.NextRealEvent()
@@ -194,11 +226,16 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 			if event == nil {
 				// end of binary logs for otherInstance: this is unexpected and means instance is more advanced
 				// than otherInstance
-				return nil, errors.New("Unexpected end of binary logs for assumed master. This means the instance which attempted to be a slave was more advanced. Try the other way round")
+				return nil, log.Error("Unexpected end of binary logs for assumed master. This means the instance which attempted to be a slave was more advanced. Try the other way round")
 			}
-			log.Debugf("%+v %+v %+v", event.Coordinates, event.EventType, event.Info)
+			otherEventInfo = event.Info
+			log.Debugf("%+v %+v; %+v", event.Coordinates, event.EventType, event.Info)
+		}
+		// Verify things are sane:
+		if instanceEventInfo != otherEventInfo {
+			return nil, log.Errorf("Mismatching entries, aborting: %+v <-> %+v", instanceEventInfo, otherEventInfo)
 		}
 	}
 
-	return nil, nil
+	return nil, log.Error("GetNextBinlogCoordinatesToMatch: unexpected termination")
 }

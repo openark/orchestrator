@@ -18,7 +18,18 @@ package inst
 
 import (
 	"errors"
+	"regexp"
 )
+
+// Event entries may contains table IDs (can be different for same tables on different servers)
+// and also COMMIT transaction IDs (different values on different servers).
+// So these need to be removed from the event entry if we're to compare and validate matching
+// entries.
+var eventInfoTransformations map[*regexp.Regexp]string = map[*regexp.Regexp]string{
+	regexp.MustCompile(`(.*) [/][*].*?[*][/](.*$)`): "$1 $2",
+	regexp.MustCompile(`(COMMIT) .*$`):              "$1",
+	regexp.MustCompile(`(table_id:) [0-9]+ (.*$)`):  "$1 ### $2",
+}
 
 var skippedEventTypes map[string]bool = map[string]bool{
 	"Format_desc": true,
@@ -36,6 +47,13 @@ type BinlogEvent struct {
 //
 func (this *BinlogEvent) NextBinlogCoordinates() BinlogCoordinates {
 	return BinlogCoordinates{LogFile: this.Coordinates.LogFile, LogPos: this.NextEventPos}
+}
+
+//
+func (this *BinlogEvent) NormalizeInfo() {
+	for reg, replace := range eventInfoTransformations {
+		this.Info = reg.ReplaceAllString(this.Info, replace)
+	}
 }
 
 //
@@ -59,28 +77,37 @@ func NewBinlogEventCursor(startCoordinates BinlogCoordinates, fetchNextEventsFun
 	}
 }
 
-//
+// NextEvent will return the next event entry from binary logs; it will automatically skip to next
+// binary log if need be.
+// Internally, it uses the cachedEvents array, so that it does not go to the MySQL server upon each call.
+// Returns nil upon reaching end of binary logs.
 func (this *BinlogEventCursor) NextEvent() (*BinlogEvent, error) {
 	if len(this.cachedEvents) == 0 {
+		// End of logs
 		return nil, nil
 	}
 	if this.currentEventIndex+1 < len(this.cachedEvents) {
+		// We have enough cache to go by
 		this.currentEventIndex++
 		event := &this.cachedEvents[this.currentEventIndex]
 		this.nextCoordinates = event.NextBinlogCoordinates()
 		return event, nil
 	} else {
+		// Cache exhausted; get next bulk of entries and return the next entry
 		var err error
 		this.cachedEvents, err = this.fetchNextEvents(this.cachedEvents[len(this.cachedEvents)-1].NextBinlogCoordinates())
 		if err != nil {
 			return nil, err
 		}
 		this.currentEventIndex = -1
+		// While this seems recursive do note that recursion level is at most 1, since we either have
+		// entires in the next binlog (no further recursion) or we don't (immediate termination)
 		return this.NextEvent()
 	}
 }
 
-//
+// NextRealEvent returns the next event from binlog that is not meta/control event (these are start-of-binary-log,
+// rotate-binary-log etc.)
 func (this *BinlogEventCursor) NextRealEvent() (*BinlogEvent, error) {
 	event, err := this.NextEvent()
 	if err != nil {
@@ -90,12 +117,19 @@ func (this *BinlogEventCursor) NextRealEvent() (*BinlogEvent, error) {
 		return event, err
 	}
 	if _, found := skippedEventTypes[event.EventType]; found {
+		// Recursion will not be deep here. A few entries (end-of-binlog followed by start-of-bin-log) are possible,
+		// but we really don't expect a huge sequence of those.
 		return this.NextRealEvent()
 	}
+	event.NormalizeInfo()
 	return event, err
 }
 
-//
+// NextCoordinates return the binlog coordinates of the next entry as yet unprocessed by the cursor.
+// Moreover, when the cursor terminates (consumes last entry), these coordinates indicate what will be the futuristic
+// coordinates of the next binlog entry.
+// The value of this function is used by match-below to move a slave behind another, after exhausting the shared binlog
+// entries of both.
 func (this *BinlogEventCursor) NextCoordinates() (BinlogCoordinates, error) {
 	if this.nextCoordinates.LogPos == 0 {
 		return this.nextCoordinates, errors.New("Next coordinates unfound")

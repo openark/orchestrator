@@ -344,12 +344,10 @@ func MatchBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	}
 	log.Infof("Will match %+v below %+v", *instanceKey, *otherKey)
 
-	var instanceBinlogs []string
-	var otherInstanceBinlogs []string
-	var nextBinlogCoordinatesToMatch *BinlogCoordinates
-	var instancePseudoGtidCoordinates BinlogCoordinates
-	var otherInstancePseudoGtidCoordinates BinlogCoordinates
 	var instancePseudoGtidText string
+	var instancePseudoGtidCoordinates *BinlogCoordinates
+	var otherInstancePseudoGtidCoordinates *BinlogCoordinates
+	var nextBinlogCoordinatesToMatch *BinlogCoordinates
 
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("match below %+v", *otherKey)); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
@@ -369,36 +367,15 @@ func MatchBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 		goto Cleanup
 	}
 
-	{
-		// Look for last GTID in instance:
-		instanceBinlogs = instance.GetBinaryLogs()
-		if err != nil {
-			goto Cleanup
-		}
-		for i := len(instanceBinlogs) - 1; i >= 0 && instancePseudoGtidCoordinates.LogPos == 0; i-- {
-			instancePseudoGtidCoordinates, instancePseudoGtidText, err = GetLastPseudoGTIDEntryInBinlog(instanceKey, instanceBinlogs[i])
-		}
-		if instancePseudoGtidCoordinates.LogPos == 0 {
-			err = log.Errorf("Cannot find pseudo GTID entry in binlogs of %+v", *instanceKey)
-			goto Cleanup
-		}
-		log.Debugf("Found pseudo gtid entry in %+v: %+v", *instanceKey, instancePseudoGtidCoordinates)
+	instancePseudoGtidCoordinates, instancePseudoGtidText, err = GetLastPseudoGTIDEntryInInstance(instance)
+	if err != nil {
+		goto Cleanup
 	}
-	{
-		// Look for GTID entry in other-instance:
-		otherInstanceBinlogs = otherInstance.GetBinaryLogs()
-		if err != nil {
-			goto Cleanup
-		}
-		for i := len(otherInstanceBinlogs) - 1; i >= 0 && otherInstancePseudoGtidCoordinates.LogPos == 0; i-- {
-			otherInstancePseudoGtidCoordinates, err = SearchPseudoGTIDEntryInBinlog(otherKey, otherInstanceBinlogs[i], instancePseudoGtidText)
-		}
-		if otherInstancePseudoGtidCoordinates.LogPos == 0 {
-			err = log.Errorf("Cannot match pseudo GTID entry in binlogs of %+v", *otherKey)
-			goto Cleanup
-		}
-		log.Debugf("Matched entry in %+v: %+v", *otherKey, otherInstancePseudoGtidCoordinates)
+	otherInstancePseudoGtidCoordinates, err = SearchPseudoGTIDEntryInInstance(otherInstance, instancePseudoGtidText)
+	if err != nil {
+		goto Cleanup
 	}
+
 	// We've found a match: the latest Pseudo GTID position within instance and its identical twin in otherInstance
 	// We now iterate the events in both, up to the completion of events in instance (recall that we looked for
 	// the last entry in instance, hence, assuming pseudo GTID entries are frequent, the amount of entries to read
@@ -411,15 +388,21 @@ func MatchBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	//   the last pseudo gtid). Since they are identical, it is easy to point instance into otherInstance.
 	// - good result: the first position within otherInstance where instance has not replicated yet. It is easy to point
 	//   instance into otherInstance.
-	nextBinlogCoordinatesToMatch, err = GetNextBinlogCoordinatesToMatch(instance, instancePseudoGtidCoordinates,
-		otherInstance, otherInstancePseudoGtidCoordinates)
+	nextBinlogCoordinatesToMatch, err = GetNextBinlogCoordinatesToMatch(instance, *instancePseudoGtidCoordinates,
+		otherInstance, *otherInstancePseudoGtidCoordinates)
 	if err != nil {
 		goto Cleanup
 	}
 	log.Debugf("%+v will match below %+v at %+v", *instanceKey, *otherKey, nextBinlogCoordinatesToMatch)
 
+	// Drum roll......
+	instance, err = ChangeMasterTo(instanceKey, otherKey, nextBinlogCoordinatesToMatch)
+	if err != nil {
+		goto Cleanup
+	}
+
 Cleanup:
-	//~~~ instance, _ = StartSlave(instanceKey)
+	instance, _ = StartSlave(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}

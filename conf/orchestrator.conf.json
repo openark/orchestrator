@@ -33,6 +33,6 @@
   "UnseenAgentForgetHours": 6,
   "StaleSeedFailMinutes": 60,
   "SeedAcceptableBytesDiff": 8192,
-  "PseudoGTIDPattern": "@`pseudo_gtid`=_utf8"
+  "PseudoGTIDPattern": "CREATE OR REPLACE .*? VIEW `pseudo_gtid_v` AS select"
 }
 
