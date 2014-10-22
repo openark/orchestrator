@@ -346,7 +346,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 
 	var instanceBinlogs []string
 	var otherInstanceBinlogs []string
-	var nextBinlogCoordinatesToMatch BinlogCoordinates
+	var nextBinlogCoordinatesToMatch *BinlogCoordinates
 	var instancePseudoGtidCoordinates BinlogCoordinates
 	var otherInstancePseudoGtidCoordinates BinlogCoordinates
 	var instancePseudoGtidText string
@@ -371,7 +371,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 
 	{
 		// Look for last GTID in instance:
-		instanceBinlogs, err = GetInstanceBinaryLogNames(instanceKey)
+		instanceBinlogs = instance.GetBinaryLogs()
 		if err != nil {
 			goto Cleanup
 		}
@@ -386,7 +386,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	}
 	{
 		// Look for GTID entry in other-instance:
-		otherInstanceBinlogs, err = GetInstanceBinaryLogNames(otherKey)
+		otherInstanceBinlogs = otherInstance.GetBinaryLogs()
 		if err != nil {
 			goto Cleanup
 		}
@@ -411,15 +411,15 @@ func MatchBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	//   the last pseudo gtid). Since they are identical, it is easy to point instance into otherInstance.
 	// - good result: the first position within otherInstance where instance has not replicated yet. It is easy to point
 	//   instance into otherInstance.
-	nextBinlogCoordinatesToMatch, err = GetNextBinlogCoordinatesToMatch(instanceKey, instanceBinlogs, instancePseudoGtidCoordinates,
-		otherKey, otherInstanceBinlogs, otherInstancePseudoGtidCoordinates)
+	nextBinlogCoordinatesToMatch, err = GetNextBinlogCoordinatesToMatch(instance, instancePseudoGtidCoordinates,
+		otherInstance, otherInstancePseudoGtidCoordinates)
 	if err != nil {
 		goto Cleanup
 	}
 	log.Debugf("%+v will match below %+v at %+v", *instanceKey, *otherKey, nextBinlogCoordinatesToMatch)
 
 Cleanup:
-	instance, _ = StartSlave(instanceKey)
+	//~~~ instance, _ = StartSlave(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}

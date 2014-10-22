@@ -84,6 +84,19 @@ func Cli(command string, instance string, sibling string, owner string, reason s
 				log.Errore(err)
 			}
 		}
+	case "match-below":
+		{
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			if siblingKey == nil {
+				log.Fatal("Cannot deduce sibling:", sibling)
+			}
+			_, err := inst.MatchBelow(instanceKey, siblingKey)
+			if err != nil {
+				log.Errore(err)
+			}
+		}
 	case "reset-slave":
 		{
 			if instanceKey == nil {

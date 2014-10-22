@@ -158,6 +158,8 @@ type Instance struct {
 	IsRecentlyChecked    bool
 	SecondsSinceLastSeen sql.NullInt64
 	CountMySQLSnapshots  int
+
+	binaryLogs []string
 }
 
 // NewInstance creates a new, empty instance
@@ -232,6 +234,30 @@ func (this *Instance) ReadSlaveHostsFromJson(jsonString string) error {
 		this.AddSlaveKey(&key)
 	}
 	return err
+}
+
+// GetBinaryLogs returns the list of binary log names
+func (this *Instance) GetBinaryLogs() []string {
+	return this.binaryLogs
+}
+
+// SetBinaryLogs applies the binary logs list
+func (this *Instance) SetBinaryLogs(binlogs []string) {
+	this.binaryLogs = binlogs
+}
+
+// GetNextBinaryLog returns the successive, if any, binary log file to the one given
+func (this *Instance) GetNextBinaryLog(binlog string) (string, error) {
+	returnNext := false
+	for _, current := range this.binaryLogs {
+		if returnNext {
+			return current, nil
+		}
+		if current == binlog {
+			returnNext = true
+		}
+	}
+	return "", errors.New(fmt.Sprintf("Cannot find next binary log for %s", binlog))
 }
 
 // IsSlaveOf returns true if this instance claims to replicate from given master

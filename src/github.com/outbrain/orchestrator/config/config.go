@@ -61,8 +61,7 @@ type Configuration struct {
 	UnseenAgentForgetHours                     uint              // Number of hours after which an unseen agent is forgotten
 	StaleSeedFailMinutes                       uint              // Number of minutes after which a stale (no progress) seed is considered failed.
 	SeedAcceptableBytesDiff                    int64             // Difference in bytes between seed source & target data size that is still considered as successful copy
-	TroubleshootModeEnabled                    bool              // Whether to enable matching of agents based on pseudo GTID
-	PseudoGTIDPattern                          string            // Pattern to look for in binary logs that makes for a unique entry (pseudo GTID)
+	PseudoGTIDPattern                          string            // Pattern to look for in binary logs that makes for a unique entry (pseudo GTID). When empty, Pseudo-GTID based refactoring is disabled.
 }
 
 var Config *Configuration = NewConfiguration()
@@ -95,7 +94,6 @@ func NewConfiguration() *Configuration {
 		UnseenAgentForgetHours:                     6,
 		StaleSeedFailMinutes:                       60,
 		SeedAcceptableBytesDiff:                    8192,
-		TroubleshootModeEnabled:                    false,
 		PseudoGTIDPattern:                          "",
 	}
 }

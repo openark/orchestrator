@@ -59,7 +59,7 @@ func (this *HttpWeb) Cluster(params martini.Params, r render.Render) {
 		"activePage":              "cluster",
 		"clusterName":             params["clusterName"],
 		"autoshow_problems":       true,
-		"troubleshootModeEnabled": config.Config.TroubleshootModeEnabled,
+		"pseudoGTIDModeEnabled": (config.Config.PseudoGTIDPattern != ""),
 	})
 }
 

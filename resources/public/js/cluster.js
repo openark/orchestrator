@@ -1,4 +1,4 @@
-clusterOperationTroubleshootMode = false;
+clusterOperationPseudoGTIDMode = false;
 
 function generateInstanceDivs(nodesMap) {
     nodesList = []
@@ -104,7 +104,7 @@ function generateInstanceDivs(nodesMap) {
 }
 
 function moveInstance(node, droppableNode, shouldApply) {
-	if (clusterOperationTroubleshootMode) {
+	if (clusterOperationPseudoGTIDMode) {
 		if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem) {
 			return false;
 		}
@@ -123,10 +123,10 @@ function moveInstance(node, droppableNode, shouldApply) {
 			}
 			return true;
 		}
-		// end troubleshoot mode
+		// end pseudo-GTID mode
 		return false;
 	}
-	// Not toubleshoot mode
+	// Not pseudo-GTID mode
 	if (node.isCoMaster) {
 		// Cannot move. RESET SLAVE on one of the co-masters.
 		return false;
@@ -256,7 +256,7 @@ function makeCoMaster(node, childNode) {
 
 
 function matchBelow(node, otherNode) {
-	var message = "<h4>TROUBLESHOOT MODE</h4>Are you sure you wish to turn <code><strong>" + 
+	var message = "<h4>PSEUDO-GTID MODE</h4>Are you sure you wish to turn <code><strong>" + 
 		node.Key.Hostname + ":" + node.Key.Port +
 		"</strong></code> into a slave of <code><strong>" +
 		otherNode.Key.Hostname + ":" + otherNode.Key.Port +
@@ -384,8 +384,8 @@ function analyzeClusterInstances(nodesMap) {
 
 
 function refreshClusterOperationModeButton() {
-	if (clusterOperationTroubleshootMode) {
-		$("#cluster_operation_mode_button").html("Troubleshoot mode");
+	if (clusterOperationPseudoGTIDMode) {
+		$("#cluster_operation_mode_button").html("Pseudo-GTID mode");
 		$("#cluster_operation_mode_button").removeClass("btn-success");
 		$("#cluster_operation_mode_button").addClass("btn-warning");
 	} else {
@@ -406,12 +406,12 @@ $(document).ready(function () {
             }, "json");
     }, "json");
     
-    if (isTroubleshootModeEnabled()) {
+    if (isPseudoGTIDModeEnabled()) {
         $("ul.navbar-nav").append('<li><a class="cluster_operation_mode"><button type="button" class="btn btn-xs" id="cluster_operation_mode_button"></button></a></li>');
         refreshClusterOperationModeButton();
         
 	    $("body").on("click", "#cluster_operation_mode_button", function() {
-	    	clusterOperationTroubleshootMode = !clusterOperationTroubleshootMode;
+	    	clusterOperationPseudoGTIDMode = !clusterOperationPseudoGTIDMode;
 	    	refreshClusterOperationModeButton(); 
 	    });
     }
