@@ -73,6 +73,7 @@ func GetLastPseudoGTIDEntryInInstance(instance *Instance) (*BinlogCoordinates, s
 	instanceBinlogs := instance.GetBinaryLogs()
 
 	for i := len(instanceBinlogs) - 1; i >= 0; i-- {
+		log.Debugf("Searching for latest pseudo gtid entry in binlog %+v", instanceBinlogs[i])
 		resultCoordinates, entryInfo, err := GetLastPseudoGTIDEntryInBinlog(&instance.Key, instanceBinlogs[i])
 		if resultCoordinates.LogPos != 0 && err == nil {
 			log.Debugf("Found pseudo gtid entry in %+v: %+v", instance.Key, resultCoordinates)
@@ -124,6 +125,7 @@ func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string) (*Bin
 	// Look for GTID entry in other-instance:
 	binlogs := instance.GetBinaryLogs()
 	for i := len(binlogs) - 1; i >= 0; i-- {
+		log.Debugf("Searching for given pseudo gtid entry in binlog %+v", binlogs[i])
 		resultCoordinates, err := SearchPseudoGTIDEntryInBinlog(&instance.Key, binlogs[i], entryText)
 		if resultCoordinates.LogPos != 0 && err == nil {
 			log.Debugf("Matched entry in %+v: %+v", instance.Key, resultCoordinates)
@@ -208,12 +210,16 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 			}
 			if event == nil {
 				// end of binary logs for instance:
-				nextCoordinates, err := otherCursor.NextCoordinates()
+				targetMatchCoordinates, err := otherCursor.NextCoordinates()
 				if err != nil {
 					return nil, log.Errore(err)
 				}
-				log.Debugf("Reached end of binary logs for instance. Other coordinates: %+v", nextCoordinates)
-				return &nextCoordinates, nil
+				instanceCoordinates, _ := instanceCursor.NextCoordinates()
+				if !instanceCoordinates.Equals(&instance.SelfBinlogCoordinates) {
+					return nil, log.Errorf("Unexpected problem: instance binlog iteration did not end with current master status. Ended with: %+v, self coordinates: %+v", instanceCoordinates, instance.SelfBinlogCoordinates)
+				}
+				log.Debugf("Reached end of binary logs for instance, at %+v. Other coordinates: %+v", instanceCoordinates, targetMatchCoordinates)
+				return &targetMatchCoordinates, nil
 			}
 			instanceEventInfo = event.Info
 			log.Debugf("%+v %+v; %+v", event.Coordinates, event.EventType, event.Info)

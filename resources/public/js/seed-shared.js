@@ -19,9 +19,13 @@ function appendSeedDetails(seed, selector) {
 }
 
 function appendSeedState(seedState) {    	
+	var action = seedState.Action;
+	action = action.replace(/Copied ([0-9]+).([0-9]+) bytes (.*$)/, function(match, match1, match2, match3) { 
+		return "Copied " + toHumanFormat(match1) + " / " + toHumanFormat(match2) + " " + match3;
+	});
 	var row = '<tr>';
 	row += '<td>' + seedState.StateTimestamp + '</td>';
-	row += '<td>' + seedState.Action + '</td>';
+	row += '<td>' + action + '</td>';
 	row += '<td>' + seedState.ErrorMessage + '</td>';
 	row += '</tr>';
 	$("[data-agent=seed_states]").append(row);

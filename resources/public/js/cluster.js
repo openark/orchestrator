@@ -369,8 +369,8 @@ function analyzeClusterInstances(nodesMap) {
     } 
 
     instances.forEach(function (instance) {
-    	if (instance.isMaster && !instance.isCoMaster) {
-		    if (instance.hasConnectivityProblem) {
+	    if (instance.hasConnectivityProblem) {
+	    	if (instance.isMaster && !instance.isCoMaster) {
 		    	// The master has a connectivity problem! Do a client-size recommendation of best candidat.
 		    	// Candidate would be a direct child of the master, with largest exec binlog coordinates.
 		    	// There could be several children with same cordinates; we pick one.
@@ -386,12 +386,10 @@ function analyzeClusterInstances(nodesMap) {
 function refreshClusterOperationModeButton() {
 	if (clusterOperationPseudoGTIDMode) {
 		$("#cluster_operation_mode_button").html("Pseudo-GTID mode");
-		$("#cluster_operation_mode_button").removeClass("btn-success");
-		$("#cluster_operation_mode_button").addClass("btn-warning");
+		$("#cluster_operation_mode_button").removeClass("btn-success").addClass("btn-warning");
 	} else {
 		$("#cluster_operation_mode_button").html("Safe mode");
-		$("#cluster_operation_mode_button").removeClass("btn-warning");
-		$("#cluster_operation_mode_button").addClass("btn-success");
+		$("#cluster_operation_mode_button").removeClass("btn-warning").addClass("btn-success");
 	}
 }
 
