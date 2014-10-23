@@ -786,7 +786,7 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 		return updateSeedStateEntry(seedStateId, err)
 	}
 
-	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Submitting MySQL instance for reseed: %s", targetHostname), "")
+	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Submitting MySQL instance for discovery: %s", targetHostname), "")
 	SeededAgents <- &targetAgent
 
 	seedStateId, _ = submitSeedStateEntry(seedId, "Done", "")
