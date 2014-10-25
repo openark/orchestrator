@@ -435,6 +435,44 @@ func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 	return instances, err
 }
 
+// ReadSlaveInstances reads slaves of a given master
+func ReadSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
+	instances := [](*Instance){}
+
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		return instances, log.Errore(err)
+	}
+
+	query := fmt.Sprintf(`
+		select 
+			*,
+			timestampdiff(second, last_checked, now()) as seconds_since_last_checked,
+			(last_checked <= last_seen) is true as is_last_check_valid,
+			timestampdiff(second, last_seen, now()) as seconds_since_last_seen
+		from 
+			database_instance 
+		where
+			master_host = '%s'
+			and master_port = %d
+		order by
+			hostname, port`, masterKey.Hostname, masterKey.Port)
+
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		instance := readInstanceRow(m)
+		instances = append(instances, instance)
+		return nil
+	})
+	if err != nil {
+		return instances, log.Errore(err)
+	}
+	err = PopulateInstancesAgents(instances)
+	if err != nil {
+		return instances, log.Errore(err)
+	}
+	return instances, err
+}
+
 // ReadProblemInstances reads all instances with problems
 func ReadProblemInstances() ([](*Instance), error) {
 	instances := [](*Instance){}

@@ -234,3 +234,68 @@
     border-radius: 0px;
     border-color: #dddddd;
 }
+
+
+.popover-footer {
+  padding: 8px 14px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: normal;
+  line-height: 18px;
+  background-color: #f7f7f7;
+  border-bottom: 1px solid #ebebeb;
+  border-radius: 0 0 5px 5px;
+}
+#cluster_container .popover.instance {
+    font: 10px sans-serif;
+    display: block;
+    position: inherit;
+    width: 276px;
+    cursor: move;
+}
+
+
+#cluster_container .popover.instance div.popover-content {
+    padding: 4px 8px;
+}
+
+#cluster_container .popover.instance div.popover-content p {
+    margin-bottom: 0px;
+}
+
+#cluster_container .popover.instance div.popover-content p.high {
+    margin-top: 4px;
+    margin-bottom: 8px;
+}
+
+#cluster_container .popover.instance h3 {
+    font-size: 10px;
+    padding: 2px 8px;
+}
+#cluster_container .popover.instance h4 {
+    font-size: 10px;
+    padding: 2px 8px;
+}
+
+
+#cluster_container .popover.instance[data-duplicate-node] {
+    position: absolute;
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.66);
+}
+
+#cluster_container .popover.instance.accept_drop h3 {
+    background-color: #5CB85C;
+    color: #ffffff;
+}
+#cluster_container .popover.instance.accept_drop h3 .glyphicon {
+    color: #ffffff;
+}
+
+
+#main_container.container, #main_container .container {
+    width: inherit;
+}
+
+#cluster_container {
+    overflow: auto;
+}

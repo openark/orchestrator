@@ -47,7 +47,6 @@ function generateInstanceDivs(nodesMap) {
     	$(".popover.instance[data-duplicate-node]").remove();
     	var duplicate = $(this).clone().appendTo("#cluster_container");
     	$(duplicate).attr("data-duplicate-node", "true");
-    	//$(".popover.instance[data-duplicate-node] h3").addClass("label-primary");
     	$(duplicate).css({"margin-left": "0"});
     	$(duplicate).css($(this).offset());
     	$(duplicate).width($(this).width());
@@ -56,6 +55,10 @@ function generateInstanceDivs(nodesMap) {
         $(duplicate).show();
         $(".popover.instance[data-duplicate-node] h3 a").click(function () {
         	openNodeModal(nodesMap[draggedNodeId]);
+        	return false;
+        });
+        $(".popover.instance[data-duplicate-node] button[data-command=make-master]").click(function () {
+        	makeMaster(nodesMap[draggedNodeId]);
         	return false;
         });
         $(duplicate).draggable({
@@ -376,7 +379,13 @@ function analyzeClusterInstances(nodesMap) {
 		    	// There could be several children with same cordinates; we pick one.
 		    	var sortedChildren = instance.children.slice(); 
 		    	sortedChildren.sort(compareInstancesExecBinlogCoordinates)
-		    	sortedChildren[sortedChildren.length - 1].isCandidateMaster = true
+		    	
+		    	instance.children.forEach(function(child) {
+		    		if (compareInstancesExecBinlogCoordinates(child, sortedChildren[sortedChildren.length - 1]) == 0) {
+		    			child.isCandidateMaster = true
+		    		}
+		    	})
+		    	
 		    }
     	}
     });
@@ -391,6 +400,23 @@ function refreshClusterOperationModeButton() {
 		$("#cluster_operation_mode_button").html("Safe mode");
 		$("#cluster_operation_mode_button").removeClass("btn-warning").addClass("btn-success");
 	}
+}
+
+function makeMaster(instance) {
+	var message = "Are you sure you wish to make <code><strong>" + instance.Key.Hostname+":"+instance.Key.Port + "</strong></code> the new master?";
+	bootbox.confirm(message, function(confirm) {
+		if (confirm) {
+	    	showLoader();
+	        $.get("/api/make-master/"+instance.Key.Hostname+"/"+instance.Key.Port, function (operationResult) {
+				hideLoader();
+				if (operationResult.Code == "ERROR") {
+					addAlert(operationResult.Message)
+				} else {
+					location.reload();
+				}	
+	        }, "json");
+		}
+	});
 }
 
 $(document).ready(function () {

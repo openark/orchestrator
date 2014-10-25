@@ -412,6 +412,74 @@ Cleanup:
 	return instance, err
 }
 
+// MakeMaster
+func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, err
+	}
+	masterInstance, err := ReadTopologyInstance(&instance.MasterKey)
+	if err != nil {
+		if masterInstance.IsSlave() {
+			return instance, errors.New(fmt.Sprintf("MakeMaster: instance's master %+v seems to be replicating", masterInstance.Key))
+		}
+		if masterInstance.IsSlave() {
+			return instance, errors.New(fmt.Sprintf("MakeMaster: instance's master %+v seems to be replicating", masterInstance.Key))
+		}
+		if masterInstance.IsLastCheckValid {
+			return instance, errors.New(fmt.Sprintf("MakeMaster: instance's master %+v seems to be accessible", masterInstance.Key))
+		}
+	}
+	if !instance.SQLThreadUpToDate() {
+		return instance, errors.New(fmt.Sprintf("MakeMaster: instance's SQL thread must be up-to-date with I/O thread for %+v", *instanceKey))
+	}
+	siblings, err := ReadSlaveInstances(&masterInstance.Key)
+	if err != nil {
+		return instance, err
+	}
+	for _, sibling := range siblings {
+		if instance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
+			return instance, errors.New(fmt.Sprintf("MakeMaster: instance %+v has more advanced sibling: %+v", *instanceKey, sibling.Key))
+		}
+	}
+
+	// Checklist:
+	// This is the master's child
+	// The master is dead (seen << checked)
+	// SQL thread up to date with I/O thread
+	// This is the (or one of the) most advanced slave
+
+	// Actions:
+	// Stop slave
+	// Check for siblings where SQL thread up to date
+	// Move said siblings below this, start them (actually start is implicit)
+	// Remove read-only property
+	// Suggest to user to RESET SLAVE
+
+	instance, err = StopSlaveNicely(instanceKey)
+	if err != nil {
+		goto Cleanup
+	}
+	for _, sibling := range siblings {
+		if sibling.SQLThreadUpToDate() {
+			_, err := MatchBelow(&sibling.Key, instanceKey)
+			if err != nil {
+				log.Errore(err)
+			}
+		}
+	}
+	SetReadOnly(instanceKey, false)
+
+Cleanup:
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	// and we're done (pending deferred functions)
+	AuditOperation("make-master", instanceKey, fmt.Sprintf("made master of %+v", *instanceKey))
+
+	return instance, err
+}
+
 // getAsciiTopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
 func getAsciiTopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance)) []string {

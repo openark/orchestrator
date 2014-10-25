@@ -478,9 +478,6 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     else if (instance.isMaster) {
     	contentHtml += '<p><strong>Master</strong></p>';
     }
-    if (instance.isCandidateMaster) {
-    	contentHtml += '<p><strong>Candidate for master</strong></p>';
-    }
     if (renderType == "search") {
     	contentHtml += '<p>' 
         	+ 'Cluster: <a href="/web/cluster/'+instance.ClusterName+'">'+instance.ClusterName+'</a>'
@@ -493,6 +490,9 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     }  
     
     popoverElement.find(".popover-content").html(contentHtml);
+    if (instance.isCandidateMaster) {
+    	popoverElement.append('<h4 class="popover-footer"><strong>Master candidate</strong><div class="pull-right"><button class="btn btn-xs btn-default" data-command="make-master"><span class="glyphicon glyphicon-play"></span> Make master</button></div></h4>');
+    }
     
     popoverElement.find("h3 a").click(function () {
     	openNodeModal(instance);
