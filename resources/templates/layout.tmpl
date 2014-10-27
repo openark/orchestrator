@@ -168,8 +168,18 @@
 	                <div class="modal-footer">
                         <button type="button" class="btn alert-success" data-btn="refresh-instance" title="Refresh instance status now"><span class="glyphicon glyphicon-refresh"></span> Refresh</button>
                         <button type="button" class="btn btn-success" data-btn="start-slave"><span class="glyphicon glyphicon-play"></span> Start slave</button>
-                        <button type="button" class="btn btn-danger" data-btn="stop-slave"><span class="glyphicon glyphicon-stop"></span> Stop slave</button>
-                        <button type="button" class="btn btn-warning" data-btn="set-read-only"><span class="glyphicon glyphicon-eye-open"></span> Set read-only</button>
+
+						<div class="btn-group" data-btn-group="stop-slave">
+							<button type="button" class="btn btn-danger" data-btn="stop-slave" data-grouped="true">Stop slave</button>
+							<button type="button" class="btn btn-danger dropdown-toggle" data-toggle="dropdown">
+								<span class="caret"></span> <span class="sr-only">Toggle Dropdown</span>
+							</button>
+							<ul class="dropdown-menu" role="menu">
+								<li><a href="#" data-btn="stop-slave">Normal</a></li>
+								<li><a href="#" data-btn="stop-slave-nice">Nicely</a></li>
+							</ul>
+						</div>
+						<button type="button" class="btn btn-warning" data-btn="set-read-only"><span class="glyphicon glyphicon-eye-open"></span> Set read-only</button>
                         <button type="button" class="btn btn-warning" data-btn="set-writeable"><span class="glyphicon glyphicon-pencil"></span> Set writeable</button>
                         <button type="button" class="btn btn-danger" data-btn="reset-slave" title="Make this slave forget its master and stop replicating">Reset slave</button>
                         <button type="button" class="btn alert-danger" data-btn="forget-instance" title="Make orchestrator forget this instance. Orchestrator may auto-find it again."><span class="glyphicon glyphicon-remove"></span> Forget</button>

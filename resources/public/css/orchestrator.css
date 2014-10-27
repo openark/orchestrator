@@ -40,6 +40,13 @@
 	color: inherit;
 }
 
+.popover.instance h3 .pull-left {
+	width:210px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	overflow: hidden;
+}
+
 .popover.instance h3 .pull-right > .glyphicon {
     color: #606060;
 }

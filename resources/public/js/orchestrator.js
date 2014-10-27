@@ -129,7 +129,8 @@ function addModalAlert(alertText) {
 
 function openNodeModal(node) {
 	nodeModalVisible = true;
-    $('#node_modal #modalDataAttributesTable button[data-btn]').appendTo("#node_modal .modal-footer");
+    $('#node_modal #modalDataAttributesTable button[data-btn][data-grouped!=true]').appendTo("#node_modal .modal-footer");
+    $('#node_modal #modalDataAttributesTable [data-btn-group]').appendTo("#node_modal .modal-footer");
     $('#node_modal .modal-title').html(node.title);
     $('#modalDataAttributesTable').html("");
 
@@ -139,7 +140,7 @@ function openNodeModal(node) {
         
         td = addNodeModalDataAttribute("Replication running", booleanString(node.replicationRunning));
         $('#node_modal button[data-btn=start-slave]').appendTo(td.find("div"))
-        $('#node_modal button[data-btn=stop-slave]').appendTo(td.find("div"))
+        $('#node_modal [data-btn-group=stop-slave]').appendTo(td.find("div"))
         
         if (!node.replicationRunning) {
             addNodeModalDataAttribute("Last SQL error", node.LastSQLError);
@@ -165,7 +166,7 @@ function openNodeModal(node) {
     addNodeModalDataAttribute("Long queries",
             '<a href="/web/long-queries?filter='+node.Key.Hostname+'">on '+node.Key.Hostname+'</a>');
     
-    $('#node_modal button[data-btn]').unbind("click");
+    $('#node_modal [data-btn]').unbind("click");
     
     function apiCommand(uri) {
     	showLoader();
@@ -197,8 +198,11 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=start-slave]').click(function(){
     	apiCommand("/api/start-slave/"+node.Key.Hostname+"/"+node.Key.Port);
     });
-    $('#node_modal button[data-btn=stop-slave]').click(function(){
+    $('#node_modal [data-btn=stop-slave]').click(function(){
     	apiCommand("/api/stop-slave/"+node.Key.Hostname+"/"+node.Key.Port);
+    });
+    $('#node_modal [data-btn=stop-slave-nice]').click(function(){
+    	apiCommand("/api/stop-slave-nice/"+node.Key.Hostname+"/"+node.Key.Port);
     });
     $('#node_modal button[data-btn=reset-slave]').click(function(){
     	var message = "<p>Are you sure you wish to reset <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
@@ -245,10 +249,11 @@ function openNodeModal(node) {
     	$('#node_modal [data-panel-type=end-maintenance]').hide();
     }
 	$('#node_modal button[data-btn=start-slave]').hide();
-	$('#node_modal button[data-btn=stop-slave]').hide();
+	$('#node_modal [data-btn-group=stop-slave]').hide();
+	
     if (node.MasterKey.Hostname) {
         if (node.replicationRunning || node.replicationAttemptingToRun) {
-        	$('#node_modal button[data-btn=stop-slave]').show();
+        	$('#node_modal [data-btn-group=stop-slave]').show();
         } 
         if (!node.replicationRunning) {
         	$('#node_modal button[data-btn=start-slave]').show();
@@ -435,11 +440,14 @@ function normalizeInstances(instances, maintenanceList) {
 
 function renderInstanceElement(popoverElement, instance, renderType) {
 	popoverElement.attr("data-nodeid", instance.id);
-	popoverElement.find("h3").html(
-    		instance.canonicalTitle + '<div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog"></span></a></div>');
+	popoverElement.find("h3").html('&nbsp;<div class="pull-left">'+
+    		instance.canonicalTitle + '</div><div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog"></span></a></div>');
 	var indicateLastSeenInStatus = false;
     if (!instance.ReadOnly) {
     	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-pencil" title="Writeable"></span> ');
+    } 
+    if (instance.isSQLThreadCaughtUpWithIOThread) {
+    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-glass" title="SQL thread caught up with IO thread"></span> ');
     } 
     if (instance.CountMySQLSnapshots > 0) {
     	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-camera" title="'+instance.CountMySQLSnapshots +' snapshots"></span> ');
@@ -463,9 +471,6 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	var statusMessage = instance.SlaveLagSeconds.Int64 + ' seconds lag';
 	if (indicateLastSeenInStatus) {
 		statusMessage = 'seen ' + instance.SecondsSinceLastSeen.Int64 + ' seconds ago';
-	}
-	if (instance.isSQLThreadCaughtUpWithIOThread) {
-		statusMessage += ' <span class="glyphicon glyphicon-glass" title="SQL thread caught up with IO thread"></span>';
 	}
     var contentHtml = ''
         	+ '<div class="pull-right">' + statusMessage + ' </div>'
@@ -491,7 +496,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     
     popoverElement.find(".popover-content").html(contentHtml);
     if (instance.isCandidateMaster) {
-    	popoverElement.append('<h4 class="popover-footer"><strong>Master candidate</strong><div class="pull-right"><button class="btn btn-xs btn-default" data-command="make-master"><span class="glyphicon glyphicon-play"></span> Make master</button></div></h4>');
+    	popoverElement.append('<h4 class="popover-footer"><strong>Master candidate</strong><div class="pull-right" style="display:none"><button class="btn btn-xs btn-default" data-command="make-master"><span class="glyphicon glyphicon-play"></span> Make master</button></div></h4>');
     }
     
     popoverElement.find("h3 a").click(function () {

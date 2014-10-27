@@ -381,8 +381,10 @@ function analyzeClusterInstances(nodesMap) {
 		    	sortedChildren.sort(compareInstancesExecBinlogCoordinates)
 		    	
 		    	instance.children.forEach(function(child) {
-		    		if (compareInstancesExecBinlogCoordinates(child, sortedChildren[sortedChildren.length - 1]) == 0) {
-		    			child.isCandidateMaster = true
+		    		if (!child.hasConnectivityProblem) {
+			    		if (compareInstancesExecBinlogCoordinates(child, sortedChildren[sortedChildren.length - 1]) == 0) {
+			    			child.isCandidateMaster = true
+			    		}
 		    		}
 		    	})
 		    	
@@ -403,7 +405,14 @@ function refreshClusterOperationModeButton() {
 }
 
 function makeMaster(instance) {
-	var message = "Are you sure you wish to make <code><strong>" + instance.Key.Hostname+":"+instance.Key.Port + "</strong></code> the new master?";
+	var message = "Are you sure you wish to make <code><strong>" + instance.Key.Hostname+":"+instance.Key.Port + "</strong></code> the new master?"
+	+ "<p>Siblings of <code><strong>" + instance.Key.Hostname+":"+instance.Key.Port + "</strong></code> will turn to be its children, "
+	+ "via Pseudo-GTID."
+	+ "<p>The instance will be set to be writeable (<code><strong>read_only = 0</strong></code>)."
+	+ "<p>Replication on this instance will be stopped, but not reset. You should run <code><strong>RESET SLAVE</strong></code> yourself "
+	+ "if this instance will indeed become the master."
+	+ "<p>Pointing your application servers to the new master is on you."
+	;
 	bootbox.confirm(message, function(confirm) {
 		if (confirm) {
 	    	showLoader();
