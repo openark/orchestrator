@@ -360,7 +360,7 @@ func (this *HttpAPI) MatchBelow(params martini.Params, r render.Render, req *htt
 		return
 	}
 
-	instance, err := inst.MatchBelow(&instanceKey, &belowKey)
+	instance, err := inst.MatchBelow(&instanceKey, &belowKey, true)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return

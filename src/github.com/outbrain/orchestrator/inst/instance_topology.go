@@ -324,7 +324,7 @@ Cleanup:
 // The "other instance" could be the sibling of the moving instance any of its ancestors. It may actuall be
 // a cousing of some sort (though unlikely). The only important thing is that the "other instance" is more
 // advanced in replication than given instance.
-func MatchBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
+func MatchBelow(instanceKey, otherKey *InstanceKey, requireOtherMaintenance bool) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
@@ -355,13 +355,16 @@ func MatchBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	} else {
 		defer EndMaintenance(maintenanceToken)
 	}
-	if maintenanceToken, merr := BeginMaintenance(otherKey, "orchestrator", fmt.Sprintf("%+v matches below this", *instanceKey)); merr != nil {
-		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *otherKey))
-		goto Cleanup
-	} else {
-		defer EndMaintenance(maintenanceToken)
+	if requireOtherMaintenance {
+		if maintenanceToken, merr := BeginMaintenance(otherKey, "orchestrator", fmt.Sprintf("%+v matches below this", *instanceKey)); merr != nil {
+			err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *otherKey))
+			goto Cleanup
+		} else {
+			defer EndMaintenance(maintenanceToken)
+		}
 	}
 
+	log.Debugf("Stopping slave nicely on %+v", *instanceKey)
 	instance, err = StopSlaveNicely(instanceKey)
 	if err != nil {
 		goto Cleanup
@@ -456,17 +459,35 @@ func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 	// Remove read-only property
 	// Suggest to user to RESET SLAVE
 
+	numOperations := 0
+	completedOperations := make(chan InstanceKey)
+
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("suiblings match below this", *instanceKey)); merr != nil {
+		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
+
 	instance, err = StopSlaveNicely(instanceKey)
 	if err != nil {
 		goto Cleanup
 	}
 	for _, sibling := range siblings {
-		if sibling.SQLThreadUpToDate() {
-			_, err := MatchBelow(&sibling.Key, instanceKey)
-			if err != nil {
-				log.Errore(err)
-			}
+		if sibling.SQLThreadUpToDate() && !sibling.Key.Equals(instanceKey) {
+			numOperations++
+			siblingKey := sibling.Key
+			go func() {
+				_, err := MatchBelow(&siblingKey, instanceKey, false)
+				if err != nil {
+					log.Errore(err)
+				}
+				completedOperations <- sibling.Key
+			}()
 		}
+	}
+	for i := 0; i < numOperations; i++ {
+		<-completedOperations
 	}
 	SetReadOnly(instanceKey, false)
 

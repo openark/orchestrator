@@ -92,7 +92,7 @@ func Cli(command string, instance string, sibling string, owner string, reason s
 			if siblingKey == nil {
 				log.Fatal("Cannot deduce sibling:", sibling)
 			}
-			_, err := inst.MatchBelow(instanceKey, siblingKey)
+			_, err := inst.MatchBelow(instanceKey, siblingKey, true)
 			if err != nil {
 				log.Errore(err)
 			}
