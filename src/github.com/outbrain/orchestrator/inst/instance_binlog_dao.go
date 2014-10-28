@@ -125,7 +125,7 @@ func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string) (*Bin
 	// Look for GTID entry in other-instance:
 	binlogs := instance.GetBinaryLogs()
 	for i := len(binlogs) - 1; i >= 0; i-- {
-		log.Debugf("Searching for given pseudo gtid entry in binlog %+v of ", binlogs[i], instance.Key)
+		log.Debugf("Searching for given pseudo gtid entry in binlog %+v of %+v", binlogs[i], instance.Key)
 		resultCoordinates, err := SearchPseudoGTIDEntryInBinlog(&instance.Key, binlogs[i], entryText)
 		if resultCoordinates.LogPos != 0 && err == nil {
 			log.Debugf("Matched entry in %+v: %+v", instance.Key, resultCoordinates)
