@@ -329,6 +329,9 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireOtherMaintenance bool
 	if err != nil {
 		return instance, err
 	}
+	if instanceKey.Equals(otherKey) {
+		return instance, errors.New(fmt.Sprintf("MatchBelow: attempt to match an instance below itself %+v", *instanceKey))
+	}
 	otherInstance, err := ReadTopologyInstance(otherKey)
 	if err != nil {
 		return instance, err
