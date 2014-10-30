@@ -367,8 +367,8 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireOtherMaintenance bool
 		}
 	}
 
-	log.Debugf("Stopping slave nicely on %+v", *instanceKey)
-	instance, err = StopSlaveNicely(instanceKey)
+	log.Debugf("Stopping slave on %+v", *instanceKey)
+	instance, err = StopSlave(instanceKey)
 	if err != nil {
 		goto Cleanup
 	}

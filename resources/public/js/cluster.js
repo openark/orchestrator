@@ -109,23 +109,33 @@ function generateInstanceDivs(nodesMap) {
 function moveInstance(node, droppableNode, shouldApply) {
 	if (clusterOperationPseudoGTIDMode) {
 		if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem) {
+			// Obviously can't handle.
 			return false;
 		}
-		if (!node.isSQLThreadCaughtUpWithIOThread) {
+		
+		// We accept in the case where SQL thread is up to date (example use case: the node has
+		// a dead master and is sitting idly)
+		// Or when the SQL thread is known to be stopped.
+		// In the future we may choose to allow matching nodes that are fully replicating, with lags etc.
+		if (node.Slave_SQL_Running && !node.isSQLThreadCaughtUpWithIOThread) {
 			return false;
 		}
 		if (instanceIsDescendant(node, droppableNode)) {
+			// clearly node cannot be more up to date than droppableNode
 			if (shouldApply) {
 				matchBelow(node, droppableNode);
 			}
 			return true;
 		}
 		if (isReplicationBehindSibling(node, droppableNode)) {
+			// verified that node isn't more up to date than droppableNode
 			if (shouldApply) {
 				matchBelow(node, droppableNode);
 			}
 			return true;
 		}
+		// TODO: the general case, where there's no clear family connection, meaning we cannot infer
+		// which instance is more up to date
 		// end pseudo-GTID mode
 		return false;
 	}
@@ -399,7 +409,7 @@ function refreshClusterOperationModeButton() {
 		$("#cluster_operation_mode_button").html("Pseudo-GTID mode");
 		$("#cluster_operation_mode_button").removeClass("btn-success").addClass("btn-warning");
 	} else {
-		$("#cluster_operation_mode_button").html("Safe mode");
+		$("#cluster_operation_mode_button").html("Classic mode");
 		$("#cluster_operation_mode_button").removeClass("btn-warning").addClass("btn-success");
 	}
 }
