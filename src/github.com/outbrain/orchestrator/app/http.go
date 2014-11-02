@@ -45,7 +45,7 @@ func Http(discovery bool) {
 func standardHttp(discovery bool) {
 	m := martini.Classic()
 	if strings.ToLower(config.Config.AuthenticationMethod) == "basic" && config.Config.HTTPAuthUser == "" {
-		log.Warning("AuthenticationMethod is configured as 'basic' but not HTTPAuthUser defined. Running without autherntication.")
+		log.Warning("AuthenticationMethod is configured as 'basic' but not HTTPAuthUser defined. Running without authentication.")
 	}
 	if strings.ToLower(config.Config.AuthenticationMethod) == "basic" && config.Config.HTTPAuthUser != "" {
 		m.Use(auth.Basic(config.Config.HTTPAuthUser, config.Config.HTTPAuthPassword))

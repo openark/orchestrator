@@ -395,16 +395,13 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	return instance
 }
 
-// ReadClusterInstances reads all instances of a given cluster
-func ReadClusterInstances(clusterName string) ([](*Instance), error) {
+// readInstancesByCondition is a generic function to read instances from the backend database
+func readInstancesByCondition(condition string) ([](*Instance), error) {
 	instances := [](*Instance){}
 
 	db, err := db.OpenOrchestrator()
 	if err != nil {
 		return instances, log.Errore(err)
-	}
-	if strings.Index(clusterName, "'") >= 0 {
-		return instances, log.Errorf("Invalid cluster name: %s", clusterName)
 	}
 
 	query := fmt.Sprintf(`
@@ -416,9 +413,9 @@ func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 		from 
 			database_instance 
 		where
-			cluster_name = '%s'
+			%s
 		order by
-			hostname, port`, clusterName)
+			hostname, port`, condition)
 
 	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 		instance := readInstanceRow(m)
@@ -433,132 +430,49 @@ func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 		return instances, log.Errore(err)
 	}
 	return instances, err
+}
+
+// ReadClusterInstances reads all instances of a given cluster
+func ReadClusterInstances(clusterName string) ([](*Instance), error) {
+	if strings.Index(clusterName, "'") >= 0 {
+		return [](*Instance){}, log.Errorf("Invalid cluster name: %s", clusterName)
+	}
+	condition := fmt.Sprintf(`cluster_name = '%s'`, clusterName)
+	return readInstancesByCondition(condition)
 }
 
 // ReadSlaveInstances reads slaves of a given master
 func ReadSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
-	instances := [](*Instance){}
-
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return instances, log.Errore(err)
-	}
-
-	query := fmt.Sprintf(`
-		select 
-			*,
-			timestampdiff(second, last_checked, now()) as seconds_since_last_checked,
-			(last_checked <= last_seen) is true as is_last_check_valid,
-			timestampdiff(second, last_seen, now()) as seconds_since_last_seen
-		from 
-			database_instance 
-		where
+	condition := fmt.Sprintf(`
 			master_host = '%s'
 			and master_port = %d
-		order by
-			hostname, port`, masterKey.Hostname, masterKey.Port)
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-		instance := readInstanceRow(m)
-		instances = append(instances, instance)
-		return nil
-	})
-	if err != nil {
-		return instances, log.Errore(err)
-	}
-	err = PopulateInstancesAgents(instances)
-	if err != nil {
-		return instances, log.Errore(err)
-	}
-	return instances, err
+		`, masterKey.Hostname, masterKey.Port)
+	return readInstancesByCondition(condition)
 }
 
 // ReadProblemInstances reads all instances with problems
 func ReadProblemInstances() ([](*Instance), error) {
-	instances := [](*Instance){}
-
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return instances, log.Errore(err)
-	}
-
-	query := fmt.Sprintf(`
-		select 
-			*,
-			timestampdiff(second, last_checked, now()) as seconds_since_last_checked,
-			(last_checked <= last_seen) is true as is_last_check_valid,
-			timestampdiff(second, last_seen, now()) as seconds_since_last_seen
-		from 
-			database_instance 
-		where
+	condition := fmt.Sprintf(`
 			(last_seen < last_checked)
 			or (not ifnull(timestampdiff(second, last_checked, now()) <= %d, false))
 			or (not slave_sql_running)
 			or (not slave_io_running)
 			or (seconds_behind_master > 10)
-		order by
-			hostname, port`, config.Config.InstancePollSeconds)
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-		instance := readInstanceRow(m)
-		instances = append(instances, instance)
-		return nil
-	})
-
-	if err != nil {
-		return instances, log.Errore(err)
-	}
-	err = PopulateInstancesAgents(instances)
-	if err != nil {
-		return instances, log.Errore(err)
-	}
-	return instances, err
+		`, config.Config.InstancePollSeconds)
+	return readInstancesByCondition(condition)
 }
 
 // SearchInstances reads all instances qualifying for some searchString
 func SearchInstances(searchString string) ([](*Instance), error) {
-	instances := [](*Instance){}
-
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return instances, log.Errore(err)
-	}
-	if strings.Index(searchString, "'") >= 0 {
-		return instances, log.Errorf("Invalid searchString: %s", searchString)
-	}
-
-	query := fmt.Sprintf(`
-		select 
-			*,
-			timestampdiff(second, last_checked, now()) as seconds_since_last_checked,
-			(last_checked <= last_seen) is true as is_last_check_valid,
-			timestampdiff(second, last_seen, now()) as seconds_since_last_seen
-		from 
-			database_instance 
-		where
+	condition := fmt.Sprintf(`
 			hostname like '%%%s%%'
 			or cluster_name like '%%%s%%'
 			or server_id = '%s'
 			or version like '%%%s%%'
 			or port = '%s'
 			or concat(hostname, ':', port) like '%%%s%%'
-		order by
-			cluster_name,
-			hostname, port`, searchString, searchString, searchString, searchString, searchString, searchString)
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-		instance := readInstanceRow(m)
-		instances = append(instances, instance)
-		return nil
-	})
-
-	if err != nil {
-		return instances, log.Errore(err)
-	}
-	err = PopulateInstancesAgents(instances)
-	if err != nil {
-		return instances, log.Errore(err)
-	}
-	return instances, err
+		`, searchString, searchString, searchString, searchString, searchString, searchString)
+	return readInstancesByCondition(condition)
 }
 
 // ReadCountMySQLSnapshots is a utility method to return registered number of snapshots for a given list of hosts

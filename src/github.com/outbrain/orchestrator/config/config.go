@@ -35,6 +35,7 @@ type Configuration struct {
 	MySQLOrchestratorDatabase                  string
 	MySQLOrchestratorUser                      string
 	MySQLOrchestratorPassword                  string
+	MySQLConnectTimeoutSeconds                 int    // Number of seconds before connection is aborted (driver-side)
 	SlaveLagQuery                              string // custom query to check on slave lg (e.g. heartbeat table)
 	SlaveStartPostWaitMilliseconds             int    // Time to wait after START SLAVE before re-readong instance (give slave chance to connect to master)
 	DiscoverByShowSlaveHosts                   bool   // Attempt SHOW SLAVE HOSTS before PROCESSLIST
@@ -69,6 +70,7 @@ var Config *Configuration = NewConfiguration()
 func NewConfiguration() *Configuration {
 	return &Configuration{
 		ListenAddress:                              ":3000",
+		MySQLConnectTimeoutSeconds:                 5,
 		InstancePollSeconds:                        60,
 		UnseenInstanceForgetHours:                  240,
 		SlaveStartPostWaitMilliseconds:             1000,
