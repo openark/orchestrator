@@ -1,6 +1,6 @@
 {
   "ListenAddress": ":3000",
-  "MySQLTopologyUser": "msandboxtest",
+  "MySQLTopologyUser": "msandbox",
   "MySQLTopologyPassword": "msandbox",
   "MySQLOrchestratorHost": "127.0.0.1",
   "MySQLOrchestratorPort": 5532,

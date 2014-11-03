@@ -268,114 +268,24 @@ func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (
 	return clusterName, err
 }
 
-// ReadInstance reads an instance from the orchestrator backend database
-func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return nil, false, log.Errore(err)
-	}
-	instance := NewInstance()
-	instance.Key = *instanceKey
-
-	var slaveHostsJson string
-	var secondsSinceLastChecked uint
-
-	err = db.QueryRow(`
-       	select 
-       		server_id,
-			version,
-			read_only,
-			binlog_format,
-			log_bin, 
-			log_slave_updates,
-			binary_log_file,
-			binary_log_pos,
-			master_host,
-			master_port,
-			slave_sql_running,
-			slave_io_running,
-			master_log_file,
-			read_master_log_pos,
-			relay_master_log_file,
-			exec_master_log_pos,
-			last_sql_error,
-			last_io_error,
-			seconds_behind_master,
-			slave_lag_seconds,
-			slave_hosts,
-			cluster_name,
-			timestampdiff(second, last_checked, now()) as seconds_since_last_checked,
-			(last_checked <= last_seen) is true as is_last_check_valid,
-			timestampdiff(second, last_seen, now()) as seconds_since_last_seen
-		 from database_instance 
-		 	where hostname=? and port=?`,
-		instanceKey.Hostname, instanceKey.Port).Scan(
-		&instance.ServerID,
-		&instance.Version,
-		&instance.ReadOnly,
-		&instance.Binlog_format,
-		&instance.LogBinEnabled,
-		&instance.LogSlaveUpdatesEnabled,
-		&instance.SelfBinlogCoordinates.LogFile,
-		&instance.SelfBinlogCoordinates.LogPos,
-		&instance.MasterKey.Hostname,
-		&instance.MasterKey.Port,
-		&instance.Slave_SQL_Running,
-		&instance.Slave_IO_Running,
-		&instance.ReadBinlogCoordinates.LogFile,
-		&instance.ReadBinlogCoordinates.LogPos,
-		&instance.ExecBinlogCoordinates.LogFile,
-		&instance.ExecBinlogCoordinates.LogPos,
-		&instance.LastSQLError,
-		&instance.LastIOError,
-		&instance.SecondsBehindMaster,
-		&instance.SlaveLagSeconds,
-		&slaveHostsJson,
-		&instance.ClusterName,
-		&secondsSinceLastChecked,
-		&instance.IsLastCheckValid,
-		&instance.SecondsSinceLastSeen,
-	)
-	if err == sql.ErrNoRows {
-		log.Infof("No entry for %+v", instanceKey)
-		return instance, false, err
-	}
-
-	if err != nil {
-		log.Error("error on", instanceKey, err)
-		return instance, false, err
-	}
-	instance.IsUpToDate = (secondsSinceLastChecked <= config.Config.InstancePollSeconds)
-	instance.IsRecentlyChecked = (secondsSinceLastChecked <= config.Config.InstancePollSeconds*5)
-	instance.ReadSlaveHostsFromJson(slaveHostsJson)
-
-	return instance, true, err
-}
-
 // readInstanceRow reads a single instance row from the orchestrator backend database.
 func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance := NewInstance()
 
 	instance.Key.Hostname = m.GetString("hostname")
 	instance.Key.Port = m.GetInt("port")
-	instance.Slave_IO_Running = (m.GetString("Slave_IO_Running") == "Yes")
-	instance.Slave_SQL_Running = (m.GetString("Slave_SQL_Running") == "Yes")
-	instance.ReadBinlogCoordinates.LogFile = m.GetString("Master_Log_File")
-	instance.ReadBinlogCoordinates.LogPos = m.GetInt64("Read_Master_Log_Pos")
-	instance.ExecBinlogCoordinates.LogFile = m.GetString("Relay_Master_Log_File")
-	instance.ExecBinlogCoordinates.LogPos = m.GetInt64("Exec_Master_Log_Pos")
 	instance.ServerID = m.GetUint("server_id")
 	instance.Version = m.GetString("version")
 	instance.ReadOnly = m.GetBool("read_only")
 	instance.Binlog_format = m.GetString("binlog_format")
 	instance.LogBinEnabled = m.GetBool("log_bin")
 	instance.LogSlaveUpdatesEnabled = m.GetBool("log_slave_updates")
-	instance.SelfBinlogCoordinates.LogFile = m.GetString("binary_log_file")
-	instance.SelfBinlogCoordinates.LogPos = m.GetInt64("binary_log_pos")
 	instance.MasterKey.Hostname = m.GetString("master_host")
 	instance.MasterKey.Port = m.GetInt("master_port")
 	instance.Slave_SQL_Running = m.GetBool("slave_sql_running")
 	instance.Slave_IO_Running = m.GetBool("slave_io_running")
+	instance.SelfBinlogCoordinates.LogFile = m.GetString("binary_log_file")
+	instance.SelfBinlogCoordinates.LogPos = m.GetInt64("binary_log_pos")
 	instance.ReadBinlogCoordinates.LogFile = m.GetString("master_log_file")
 	instance.ReadBinlogCoordinates.LogPos = m.GetInt64("read_master_log_pos")
 	instance.ExecBinlogCoordinates.LogFile = m.GetString("relay_master_log_file")
@@ -430,6 +340,24 @@ func readInstancesByCondition(condition string) ([](*Instance), error) {
 		return instances, log.Errore(err)
 	}
 	return instances, err
+}
+
+// ReadInstance reads an instance from the orchestrator backend database
+func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
+	condition := fmt.Sprintf(`
+			hostname = '%s'
+			and port = %d
+		`, instanceKey.Hostname, instanceKey.Port)
+	instances, err := readInstancesByCondition(condition)
+	// We know there will be at most one (hostname & port are PK)
+	// And we expect to find one
+	if len(instances) == 0 {
+		return nil, false, err
+	}
+	if err != nil {
+		return instances[0], false, err
+	}
+	return instances[0], true, nil
 }
 
 // ReadClusterInstances reads all instances of a given cluster
