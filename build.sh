@@ -5,7 +5,7 @@
 # Requires fpm: https://github.com/jordansissel/fpm
 #
 
-release_version="1.2.4"
+release_version="1.2.5"
 release_dir=/tmp/orchestrator-release
 release_files_dir=$release_dir/orchestrator
 rm -rf $release_dir/*
