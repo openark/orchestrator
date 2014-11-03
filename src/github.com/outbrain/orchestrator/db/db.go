@@ -181,6 +181,11 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN last_io_error TEXT NOT NULL DEFAULT '' AFTER last_sql_error
 	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN last_attempted_check TIMESTAMP AFTER last_checked
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance

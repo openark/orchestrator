@@ -63,6 +63,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	foundBySlaveHosts := false
 	longRunningProcesses := []Process{}
 
+	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
+
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 
 	if err != nil {
@@ -523,6 +525,10 @@ func ReadClustersInfo() ([]ClusterInfo, error) {
 
 // ReadOutdatedInstanceKeys reads and returns keys for all instances that are not up to date (i.e.
 // pre-configured time has passed since they were last cheked)
+// But we also check for the case where an attempt at instance checking has been made, that hasn't
+// resulted in an actual check! This can happen when TCP/IP connections are hung, in which case the "check"
+// never returns. In such case we multiply interval by a factor, so as not to open too many connections on
+// the instance.
 func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 	res := []InstanceKey{}
 	query := fmt.Sprintf(`
@@ -531,8 +537,13 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 		from 
 			database_instance 
 		where
-			last_checked < now() - interval %d second`,
-		config.Config.InstancePollSeconds)
+			if (
+				last_attempted_check <= last_checked,
+				last_checked < now() - interval %d second,
+				last_checked < now() - interval (%d * 20) second
+			)
+			`,
+		config.Config.InstancePollSeconds, config.Config.InstancePollSeconds)
 	db, err := db.OpenOrchestrator()
 	if err != nil {
 		goto Cleanup
@@ -569,6 +580,7 @@ func WriteInstance(instance *Instance, lastError error) error {
         		hostname,
         		port,
         		last_checked,
+        		last_attempted_check,
         		server_id,
 				version,
 				read_only,
@@ -592,7 +604,7 @@ func WriteInstance(instance *Instance, lastError error) error {
 				num_slave_hosts,
 				slave_hosts,
 				cluster_name
-			) values (?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		instance.Key.Hostname,
 		instance.Key.Port,
 		instance.ServerID,
@@ -647,6 +659,38 @@ func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
         		database_instance 
         	set
         		last_checked = NOW()
+			where 
+				hostname = ?
+				and port = ?`,
+		instanceKey.Hostname,
+		instanceKey.Port,
+	)
+	if err != nil {
+		return log.Errore(err)
+	}
+
+	return nil
+}
+
+// UpdateInstanceLastAttemptedCheck updates the last_attempted_check timestamp in the orchestrator backed database
+// for a given instance.
+// This is used as a failsafe mechanism in case access to the instance gets hung (it happens), in which case
+// the entire ReadTopology gets stuck (and no, connection timeout nor driver timeouts don't help. Don't look at me,
+// the world is a harsh place to live in).
+// And so we make sure to note down *before* we even attempt to access the instance; and this raises a red flag when we
+// wish to access the instance again: if last_attempted_check is *newer* than last_checked, that's bad news and means
+// we have a "hanging" issue.
+func UpdateInstanceLastAttemptedCheck(instanceKey *InstanceKey) error {
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		return log.Errore(err)
+	}
+
+	_, err = sqlutils.Exec(db, `
+        	update 
+        		database_instance 
+        	set
+        		last_attempted_check = NOW()
 			where 
 				hostname = ?
 				and port = ?`,
