@@ -383,22 +383,24 @@ function analyzeClusterInstances(nodesMap) {
 
     instances.forEach(function (instance) {
 	    if (instance.hasConnectivityProblem) {
-	    	if (instance.isMaster && !instance.isCoMaster) {
-		    	// The master has a connectivity problem! Do a client-size recommendation of best candidat.
-		    	// Candidate would be a direct child of the master, with largest exec binlog coordinates.
-		    	// There could be several children with same cordinates; we pick one.
-		    	var sortedChildren = instance.children.slice(); 
-		    	sortedChildren.sort(compareInstancesExecBinlogCoordinates)
-		    	
-		    	instance.children.forEach(function(child) {
-		    		if (!child.hasConnectivityProblem) {
-			    		if (compareInstancesExecBinlogCoordinates(child, sortedChildren[sortedChildren.length - 1]) == 0) {
-			    			child.isCandidateMaster = true
-			    		}
+	    	// The instance has a connectivity problem! Do a client-size recommendation of most advanced slave:
+	    	// a direct child of the master, with largest exec binlog coordinates.
+	    	var sortedChildren = instance.children.slice(); 
+	    	sortedChildren.sort(compareInstancesExecBinlogCoordinates)
+	    	
+	    	instance.children.forEach(function(child) {
+	    		if (!child.hasConnectivityProblem) {
+		    		if (compareInstancesExecBinlogCoordinates(child, sortedChildren[sortedChildren.length - 1]) == 0) {
+		    			child.isMostAdvancedOfSiblings = true;
+		    	    	if (instance.isMaster && !instance.isCoMaster) {
+		    	    		// Moreover, the instance is the (only) master!
+		    	    		// Therefore its most advanced slaves are candidate masters 
+		    	    		child.isCandidateMaster = true;
+		    		    }
 		    		}
-		    	})
+	    		}
+	    	})
 		    	
-		    }
     	}
     });
 }

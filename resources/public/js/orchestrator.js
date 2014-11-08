@@ -299,7 +299,8 @@ function normalizeInstance(instance) {
 
     instance.isMaster = (instance.title == instance.ClusterName);
     instance.isCoMaster = false;
-    instance.isCandidateMaster = false
+    instance.isCandidateMaster = false;
+    instance.isMostAdvancedOfSiblings = false;
     instance.isVirtual = false;
 }
 
@@ -446,8 +447,8 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (!instance.ReadOnly) {
     	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-pencil" title="Writeable"></span> ');
     } 
-    if (instance.isSQLThreadCaughtUpWithIOThread) {
-    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-glass" title="SQL thread caught up with IO thread"></span> ');
+    if (instance.isMostAdvancedOfSiblings) {
+    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-star" title="Most advanced slave"></span> ');
     } 
     if (instance.CountMySQLSnapshots > 0) {
     	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-camera" title="'+instance.CountMySQLSnapshots +' snapshots"></span> ');
