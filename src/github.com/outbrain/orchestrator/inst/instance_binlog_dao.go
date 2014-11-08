@@ -26,7 +26,7 @@ import (
 	"regexp"
 )
 
-const binlogEventsChunkSize int = 10000
+const binlogEventsChunkSize int = 100000
 
 // Try and find the last position of a pseudo GTID query entry in the given binary log.
 // Also return the full text of that entry
