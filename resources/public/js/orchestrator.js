@@ -498,6 +498,8 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     popoverElement.find(".popover-content").html(contentHtml);
     if (instance.isCandidateMaster) {
     	popoverElement.append('<h4 class="popover-footer"><strong>Master candidate</strong><div class="pull-right"><button class="btn btn-xs btn-default" data-command="make-master"><span class="glyphicon glyphicon-play"></span> Make master</button></div></h4>');
+    } else if (instance.isMostAdvancedOfSiblings) {
+    	popoverElement.append('<h4 class="popover-footer"><strong>Candidate</strong><div class="pull-right"><button class="btn btn-xs btn-default" data-command="make-local-master"><span class="glyphicon glyphicon-play"></span> Make local master</button></div></h4>');
     }
     
     popoverElement.find("h3 a").click(function () {

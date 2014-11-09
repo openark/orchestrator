@@ -61,6 +61,10 @@ function generateInstanceDivs(nodesMap) {
         	makeMaster(nodesMap[draggedNodeId]);
         	return false;
         });
+        $(".popover.instance[data-duplicate-node] button[data-command=make-local-master]").click(function () {
+        	makeLocalMaster(nodesMap[draggedNodeId]);
+        	return false;
+        });
         $(duplicate).draggable({
         	addClasses: true, 
         	opacity: 0.67,
@@ -429,6 +433,27 @@ function makeMaster(instance) {
 		if (confirm) {
 	    	showLoader();
 	        $.get("/api/make-master/"+instance.Key.Hostname+"/"+instance.Key.Port, function (operationResult) {
+				hideLoader();
+				if (operationResult.Code == "ERROR") {
+					addAlert(operationResult.Message)
+				} else {
+					location.reload();
+				}	
+	        }, "json");
+		}
+	});
+}
+
+function makeLocalMaster(instance) {
+	var message = "Are you sure you wish to make <code><strong>" + instance.Key.Hostname+":"+instance.Key.Port + "</strong></code> a local master?"
+	+ "<p>Siblings of <code><strong>" + instance.Key.Hostname+":"+instance.Key.Port + "</strong></code> will turn to be its children, "
+	+ "via Pseudo-GTID."
+	+ "<p>The instance will replicate from its grandparent."
+	;
+	bootbox.confirm(message, function(confirm) {
+		if (confirm) {
+	    	showLoader();
+	        $.get("/api/make-local-master/"+instance.Key.Hostname+"/"+instance.Key.Port, function (operationResult) {
 				hideLoader();
 				if (operationResult.Code == "ERROR") {
 					addAlert(operationResult.Message)

@@ -360,7 +360,7 @@ func (this *HttpAPI) MatchBelow(params martini.Params, r render.Render, req *htt
 		return
 	}
 
-	instance, err := inst.MatchBelow(&instanceKey, &belowKey, true)
+	instance, err := inst.MatchBelow(&instanceKey, &belowKey, true, true)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -388,6 +388,28 @@ func (this *HttpAPI) MakeMaster(params martini.Params, r render.Render, req *htt
 	}
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v now made master", instanceKey), Details: instance})
+}
+
+// MakeLocalMaster attempts to make the given instance a local master: take over its master by
+// enslaving its siblings and replicating from its grandparent.
+func (this *HttpAPI) MakeLocalMaster(params martini.Params, r render.Render, req *http.Request) {
+	if !this.isAuthorizedForAction(req) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	instance, err := inst.MakeLocalMaster(&instanceKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v now made local master", instanceKey), Details: instance})
 }
 
 // StartSlave starts replication on given instance
@@ -951,6 +973,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow)
 	m.Get("/api/match-below/:host/:port/:belowHost/:belowPort", this.MatchBelow)
 	m.Get("/api/make-master/:host/:port", this.MakeMaster)
+	m.Get("/api/make-local-master/:host/:port", this.MakeLocalMaster)
 	m.Get("/api/begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance)
 	m.Get("/api/end-maintenance/:host/:port", this.EndMaintenanceByInstanceKey)
 	m.Get("/api/end-maintenance/:maintenanceKey", this.EndMaintenance)

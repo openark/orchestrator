@@ -377,7 +377,7 @@ Cleanup:
 // The "other instance" could be the sibling of the moving instance any of its ancestors. It may actuall be
 // a cousing of some sort (though unlikely). The only important thing is that the "other instance" is more
 // advanced in replication than given instance.
-func MatchBelow(instanceKey, otherKey *InstanceKey, requireOtherMaintenance bool) (*Instance, error) {
+func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance bool, requireOtherMaintenance bool) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
@@ -405,11 +405,13 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireOtherMaintenance bool
 	var otherInstancePseudoGtidCoordinates *BinlogCoordinates
 	var nextBinlogCoordinatesToMatch *BinlogCoordinates
 
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("match below %+v", *otherKey)); merr != nil {
-		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
-		goto Cleanup
-	} else {
-		defer EndMaintenance(maintenanceToken)
+	if requireInstanceMaintenance {
+		if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("match below %+v", *otherKey)); merr != nil {
+			err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
+			goto Cleanup
+		} else {
+			defer EndMaintenance(maintenanceToken)
+		}
 	}
 	if requireOtherMaintenance {
 		if maintenanceToken, merr := BeginMaintenance(otherKey, "orchestrator", fmt.Sprintf("%+v matches below this", *instanceKey)); merr != nil {
@@ -452,7 +454,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireOtherMaintenance bool
 	if err != nil {
 		goto Cleanup
 	}
-	log.Debugf("%+v will match below %+v at %+v", *instanceKey, *otherKey, nextBinlogCoordinatesToMatch)
+	log.Debugf("%+v will match below %+v at %+v", *instanceKey, *otherKey, *nextBinlogCoordinatesToMatch)
 
 	// Drum roll......
 	instance, err = ChangeMasterTo(instanceKey, otherKey, nextBinlogCoordinatesToMatch)
@@ -471,7 +473,34 @@ Cleanup:
 	return instance, err
 }
 
-// MakeMaster
+// enslaveSiblings enslaves given siblings as slaves of given instance using match (pseudo-GTID).
+// It is OK to pass the instance itself in list of siblings (and it is ignored); otherwise there is no validation in this function
+// that the siblings list is indeed composed of siblings.
+func enslaveSiblings(instanceKey *InstanceKey, siblings [](*Instance)) error {
+	numOperations := 0
+	completedOperations := make(chan InstanceKey)
+
+	for _, sibling := range siblings {
+		if sibling.SQLThreadUpToDate() && !sibling.Key.Equals(instanceKey) {
+			numOperations++
+			siblingKey := sibling.Key
+			go func() {
+				_, err := MatchBelow(&siblingKey, instanceKey, true, false)
+				if err != nil {
+					log.Errore(err)
+				}
+				completedOperations <- sibling.Key
+			}()
+		}
+	}
+	for i := 0; i < numOperations; i++ {
+		<-completedOperations
+	}
+	return nil
+}
+
+// MakeMaster will take an instance, make all its siblings its slaves (via pseudo-GTID) and make it master
+// (stop its replicaiton, make writeable).
 func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -479,9 +508,6 @@ func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	masterInstance, err := ReadTopologyInstance(&instance.MasterKey)
 	if err != nil {
-		if masterInstance.IsSlave() {
-			return instance, errors.New(fmt.Sprintf("MakeMaster: instance's master %+v seems to be replicating", masterInstance.Key))
-		}
 		if masterInstance.IsSlave() {
 			return instance, errors.New(fmt.Sprintf("MakeMaster: instance's master %+v seems to be replicating", masterInstance.Key))
 		}
@@ -502,23 +528,57 @@ func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 
-	// Checklist:
-	// This is the master's child
-	// The master is dead (seen << checked)
-	// SQL thread up to date with I/O thread
-	// This is the (or one of the) most advanced slave
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("siblings match below this", *instanceKey)); merr != nil {
+		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
 
-	// Actions:
-	// Stop slave
-	// Check for siblings where SQL thread up to date
-	// Move said siblings below this, start them (actually start is implicit)
-	// Remove read-only property
-	// Suggest to user to RESET SLAVE
+	err = enslaveSiblings(instanceKey, siblings)
+	if err != nil {
+		goto Cleanup
+	}
 
-	numOperations := 0
-	completedOperations := make(chan InstanceKey)
+	SetReadOnly(instanceKey, false)
 
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("suiblings match below this", *instanceKey)); merr != nil {
+Cleanup:
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	// and we're done (pending deferred functions)
+	AuditOperation("make-master", instanceKey, fmt.Sprintf("made master of %+v", *instanceKey))
+
+	return instance, err
+}
+
+// MakeLocalMaster promotes a slave above its master, making it slave of its grandparent, while also enslaving its siblings.
+// This serves as a convenience method to recover replication when a local master fails; the instance promoted is one of its slaves,
+// which is most advanced among its siblings.
+func MakeLocalMaster(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, err
+	}
+	masterInstance, found, err := ReadInstance(&instance.MasterKey)
+	if err != nil || !found {
+		return instance, err
+	}
+	grandparentInstance, err := ReadTopologyInstance(&masterInstance.MasterKey)
+	if err != nil {
+		return instance, err
+	}
+	siblings, err := ReadSlaveInstances(&masterInstance.Key)
+	if err != nil {
+		return instance, err
+	}
+	for _, sibling := range siblings {
+		if instance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
+			return instance, errors.New(fmt.Sprintf("MakeMaster: instance %+v has more advanced sibling: %+v", *instanceKey, sibling.Key))
+		}
+	}
+
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("siblings match below this", *instanceKey)); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
 		goto Cleanup
 	} else {
@@ -529,30 +589,23 @@ func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		goto Cleanup
 	}
-	for _, sibling := range siblings {
-		if sibling.SQLThreadUpToDate() && !sibling.Key.Equals(instanceKey) {
-			numOperations++
-			siblingKey := sibling.Key
-			go func() {
-				_, err := MatchBelow(&siblingKey, instanceKey, false)
-				if err != nil {
-					log.Errore(err)
-				}
-				completedOperations <- sibling.Key
-			}()
-		}
+
+	_, err = MatchBelow(instanceKey, &grandparentInstance.Key, false, false)
+	if err != nil {
+		goto Cleanup
 	}
-	for i := 0; i < numOperations; i++ {
-		<-completedOperations
+
+	err = enslaveSiblings(instanceKey, siblings)
+	if err != nil {
+		goto Cleanup
 	}
-	SetReadOnly(instanceKey, false)
 
 Cleanup:
 	if err != nil {
 		return instance, log.Errore(err)
 	}
 	// and we're done (pending deferred functions)
-	AuditOperation("make-master", instanceKey, fmt.Sprintf("made master of %+v", *instanceKey))
+	AuditOperation("make-local-master", instanceKey, fmt.Sprintf("made master of %+v", *instanceKey))
 
 	return instance, err
 }
