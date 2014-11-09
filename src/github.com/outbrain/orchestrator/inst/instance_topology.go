@@ -23,6 +23,59 @@ import (
 	"strings"
 )
 
+// getAsciiTopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
+// draws the tree
+func getAsciiTopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance)) []string {
+	prefix := ""
+	if depth > 0 {
+		prefix = strings.Repeat(" ", (depth-1)*2)
+		if instance.SlaveRunning() {
+			prefix += "+ "
+		} else {
+			prefix += "- "
+		}
+	}
+	entry := fmt.Sprintf("%s%s", prefix, instance.Key.DisplayString())
+	result := []string{entry}
+	for _, slave := range replicationMap[instance] {
+		slavesResult := getAsciiTopologyEntry(depth+1, slave, replicationMap)
+		result = append(result, slavesResult...)
+	}
+	return result
+}
+
+// AsciiTopology returns a string representation of the topology of given clusterName.
+func AsciiTopology(clusterName string) (string, error) {
+	instances, err := ReadClusterInstances(clusterName)
+	if err != nil {
+		return "", err
+	}
+
+	instancesMap := make(map[InstanceKey](*Instance))
+	for _, instance := range instances {
+		log.Debugf("instanceKey: %+v", instance.Key)
+		instancesMap[instance.Key] = instance
+	}
+
+	replicationMap := make(map[*Instance]([]*Instance))
+	var masterInstance *Instance
+	// Investigate slaves:
+	for _, instance := range instances {
+		master, ok := instancesMap[instance.MasterKey]
+		if ok {
+			if _, ok := replicationMap[master]; !ok {
+				replicationMap[master] = [](*Instance){}
+			}
+			replicationMap[master] = append(replicationMap[master], instance)
+		} else {
+			masterInstance = instance
+		}
+	}
+	resultArray := getAsciiTopologyEntry(0, masterInstance, replicationMap)
+	result := strings.Join(resultArray, "\n")
+	return result, nil
+}
+
 // GetInstanceMaster synchronously reaches into the replication topology
 // and retrieves master's data
 func GetInstanceMaster(instance *Instance) (*Instance, error) {
@@ -502,57 +555,4 @@ Cleanup:
 	AuditOperation("make-master", instanceKey, fmt.Sprintf("made master of %+v", *instanceKey))
 
 	return instance, err
-}
-
-// getAsciiTopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
-// draws the tree
-func getAsciiTopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance)) []string {
-	prefix := ""
-	if depth > 0 {
-		prefix = strings.Repeat(" ", (depth-1)*2)
-		if instance.SlaveRunning() {
-			prefix += "+ "
-		} else {
-			prefix += "- "
-		}
-	}
-	entry := fmt.Sprintf("%s%s", prefix, instance.Key.DisplayString())
-	result := []string{entry}
-	for _, slave := range replicationMap[instance] {
-		slavesResult := getAsciiTopologyEntry(depth+1, slave, replicationMap)
-		result = append(result, slavesResult...)
-	}
-	return result
-}
-
-// AsciiTopology returns a string representation of the topology of given clusterName.
-func AsciiTopology(clusterName string) (string, error) {
-	instances, err := ReadClusterInstances(clusterName)
-	if err != nil {
-		return "", err
-	}
-
-	instancesMap := make(map[InstanceKey](*Instance))
-	for _, instance := range instances {
-		log.Debugf("instanceKey: %+v", instance.Key)
-		instancesMap[instance.Key] = instance
-	}
-
-	replicationMap := make(map[*Instance]([]*Instance))
-	var masterInstance *Instance
-	// Investigate slaves:
-	for _, instance := range instances {
-		master, ok := instancesMap[instance.MasterKey]
-		if ok {
-			if _, ok := replicationMap[master]; !ok {
-				replicationMap[master] = [](*Instance){}
-			}
-			replicationMap[master] = append(replicationMap[master], instance)
-		} else {
-			masterInstance = instance
-		}
-	}
-	resultArray := getAsciiTopologyEntry(0, masterInstance, replicationMap)
-	result := strings.Join(resultArray, "\n")
-	return result, nil
 }
