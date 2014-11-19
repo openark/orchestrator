@@ -17,6 +17,8 @@ DESC="orchestrator: MySQL replication management and visualization"
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
 
+ulimit -n 16384
+
 case "$1" in
   start)
     printf "%-50s" "Starting $NAME..."
