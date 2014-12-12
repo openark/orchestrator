@@ -46,6 +46,7 @@ type Configuration struct {
 	ReasonableMaintenanceReplicationLagSeconds int    // Above this value move-up and move-below are blocked
 	AuditLogFile                               string // Name of log file for audit operations. Disabled when empty.
 	AuditPageSize                              int
+	ReadOnly                                   bool
 	AuthenticationMethod                       string            // Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "proxy" for forwarded credentials via reverse proxy
 	HTTPAuthUser                               string            // Username for HTTP Basic authentication (blank disables authentication)
 	HTTPAuthPassword                           string            // Password for HTTP Basic authentication
@@ -80,6 +81,7 @@ func NewConfiguration() *Configuration {
 		ReasonableMaintenanceReplicationLagSeconds: 20,
 		AuditLogFile:                               "",
 		AuditPageSize:                              20,
+		ReadOnly:                                   false,
 		AuthenticationMethod:                       "basic",
 		HTTPAuthUser:                               "",
 		HTTPAuthPassword:                           "",

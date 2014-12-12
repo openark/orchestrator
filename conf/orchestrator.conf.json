@@ -17,6 +17,7 @@
   "AuditLogFile": "/tmp/orchestrator-audit.log",
   "AuditPageSize": 20,
   "SlaveStartPostWaitMilliseconds": 1000,
+  "ReadOnly": false,
   "AuthenticationMethod": "",
   "HTTPAuthUser": "",
   "HTTPAuthPassword": "",

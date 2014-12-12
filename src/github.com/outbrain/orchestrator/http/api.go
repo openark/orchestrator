@@ -75,6 +75,9 @@ func (this *HttpAPI) getAuthUser(req *http.Request) string {
 // isAuthorizedForAction checks req to see whether authenticated user has write-privileges.
 // This depends on configured authentication method, and at this stage only applies in "proxy" method.
 func (this *HttpAPI) isAuthorizedForAction(req *http.Request) bool {
+	if config.Config.ReadOnly {
+		return false
+	}
 	if strings.ToLower(config.Config.AuthenticationMethod) != "proxy" {
 		return true
 	}
