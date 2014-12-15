@@ -30,6 +30,9 @@ import (
 
 // GetCNAME resolves an IP or hostname into a normalized valid CNAME
 func GetCNAME(hostName string) (string, error) {
+	if !config.Config.LookupCNAME {
+		return hostName, nil
+	}
 	res, err := net.LookupCNAME(hostName)
 	if err != nil {
 		return hostName, err
