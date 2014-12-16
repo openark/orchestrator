@@ -111,14 +111,16 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 
-	err = sqlutils.QueryRowsMap(db, "show master status", func(m sqlutils.RowMap) error {
-		var err error
-		instance.SelfBinlogCoordinates.LogFile = m.GetString("File")
-		instance.SelfBinlogCoordinates.LogPos = m.GetInt64("Position")
-		return err
-	})
-	if err != nil {
-		goto Cleanup
+	if instance.LogBinEnabled {
+		err = sqlutils.QueryRowsMap(db, "show master status", func(m sqlutils.RowMap) error {
+			var err error
+			instance.SelfBinlogCoordinates.LogFile = m.GetString("File")
+			instance.SelfBinlogCoordinates.LogPos = m.GetInt64("Position")
+			return err
+		})
+		if err != nil {
+			goto Cleanup
+		}
 	}
 
 	// Get slaves, either by SHOW SLAVE HOSTS or via PROCESSLIST
@@ -162,15 +164,16 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 	{
-		// Get binary (master) logs
 		binlogs := []string{}
-
-		err = sqlutils.QueryRowsMap(db, "show binary logs", func(m sqlutils.RowMap) error {
-			binlogs = append(binlogs, m.GetString("Log_name"))
-			return nil
-		})
-		if err != nil {
-			goto Cleanup
+		if instance.LogBinEnabled {
+			// Get binary (master) logs
+			err = sqlutils.QueryRowsMap(db, "show binary logs", func(m sqlutils.RowMap) error {
+				binlogs = append(binlogs, m.GetString("Log_name"))
+				return nil
+			})
+			if err != nil {
+				goto Cleanup
+			}
 		}
 		instance.SetBinaryLogs(binlogs)
 	}
