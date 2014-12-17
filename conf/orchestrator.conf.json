@@ -12,6 +12,7 @@
   "DiscoverByShowSlaveHosts": true,
   "InstancePollSeconds": 60,
   "LookupCNAME": true,
+  "ExpiryHostnameResolvesMinutes": 60,
   "UnseenInstanceForgetHours": 240,
   "ReasonableReplicationLagSeconds": 10,
   "ReasonableMaintenanceReplicationLagSeconds": 20,
