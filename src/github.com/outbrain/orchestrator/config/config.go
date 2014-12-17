@@ -42,7 +42,8 @@ type Configuration struct {
 	InstancePollSeconds                        uint   // Number of seconds between instance reads
 	UnseenInstanceForgetHours                  uint   // Number of hours after which an unseen instance is forgotten
 	DiscoveryPollSeconds                       int    // Auto/continuous discovery of instances sleep time between polls
-	LookupCNAME                                bool
+	HostnameResolveMethod                      string // Method by which to "normalize" hostname ("none"/"cname")
+	ExpiryHostnameResolvesMinutes              int    // Number of minutes after which to expire hostname-resolves
 	ReasonableReplicationLagSeconds            int    // Abvoe this value is considered a problem
 	ReasonableMaintenanceReplicationLagSeconds int    // Above this value move-up and move-below are blocked
 	AuditLogFile                               string // Name of log file for audit operations. Disabled when empty.
@@ -78,7 +79,8 @@ func NewConfiguration() *Configuration {
 		SlaveStartPostWaitMilliseconds:             1000,
 		DiscoverByShowSlaveHosts:                   false,
 		DiscoveryPollSeconds:                       5,
-		LookupCNAME:                                true,
+		HostnameResolveMethod:                      "cname",
+		ExpiryHostnameResolvesMinutes:              60,
 		ReasonableReplicationLagSeconds:            10,
 		ReasonableMaintenanceReplicationLagSeconds: 20,
 		AuditLogFile:                               "",
