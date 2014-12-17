@@ -29,6 +29,31 @@ import (
 	"time"
 )
 
+var continuousDBWrites bool = false
+var continuousDBWritesRequests chan func() error = make(chan func() error)
+
+// SetContinuousDBWrites suggests that we will do plenty DB writes, and we choose to serialize them
+// under a specialized thread, instead of letting so many db write requests arrive from different threads
+// (that would lead to too-many-opsn-connections on the database).
+func SetContinuousDBWrites() {
+	continuousDBWrites = true
+	go func() {
+		for f := range continuousDBWritesRequests {
+			f()
+		}
+	}()
+}
+
+// execDBWriteFunc chooses how to execute a write onto the database: whether synchronuously or not
+func execDBWriteFunc(f func() error) error {
+	if continuousDBWrites {
+		continuousDBWritesRequests <- f
+		return nil
+	} else {
+		return f()
+	}
+}
+
 // ExecInstance executes a given query on the given MySQL topology instance
 func ExecInstance(instanceKey *InstanceKey, query string, args ...interface{}) (sql.Result, error) {
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
@@ -62,6 +87,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	instanceFound := false
 	foundBySlaveHosts := false
 	longRunningProcesses := []Process{}
+	resolvedHostname := ""
+	var resolveErr error
 
 	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
 
@@ -72,10 +99,14 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	instance.Key = *instanceKey
-	err = db.QueryRow("select @@global.server_id, @@global.version, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
-		&instance.ServerID, &instance.Version, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
+	err = db.QueryRow("select @@hostname, @@global.server_id, @@global.version, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
+		&resolvedHostname, &instance.ServerID, &instance.Version, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
 	if err != nil {
 		goto Cleanup
+	}
+	if resolvedHostname != instance.Key.Hostname {
+		WriteResolvedHostname(instance.Key.Hostname, resolvedHostname)
+		instance.Key.Hostname = resolvedHostname
 	}
 	instanceFound = true
 	err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
@@ -91,6 +122,10 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		masterKey, err := NewInstanceKeyFromStrings(m.GetString("Master_Host"), m.GetString("Master_Port"))
 		if err != nil {
 			log.Errore(err)
+		}
+		masterKey.Hostname, resolveErr = ResolveHostname(masterKey.Hostname)
+		if resolveErr != nil {
+			log.Errore(resolveErr)
 		}
 		instance.MasterKey = *masterKey
 		instance.SecondsBehindMaster = m.GetNullInt64("Seconds_Behind_Master")
@@ -128,6 +163,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		err := sqlutils.QueryRowsMap(db, `show slave hosts`,
 			func(m sqlutils.RowMap) error {
 				slaveKey, err := NewInstanceKeyFromStrings(m.GetString("Host"), m.GetString("Port"))
+				slaveKey.Hostname, resolveErr = ResolveHostname(slaveKey.Hostname)
 				if err == nil {
 					instance.AddSlaveKey(slaveKey)
 					foundBySlaveHosts = true
@@ -150,9 +186,9 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
         	where 
         		command='Binlog Dump'`,
 			func(m sqlutils.RowMap) error {
-				cname, err := GetCNAME(m.GetString("slave_hostname"))
-				if err != nil {
-					return err
+				cname, resolveErr := ResolveHostname(m.GetString("slave_hostname"))
+				if resolveErr != nil {
+					log.Errore(resolveErr)
 				}
 				slaveKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
 				instance.AddSlaveKey(&slaveKey)
@@ -231,9 +267,9 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 Cleanup:
 	if instanceFound {
 		_ = WriteInstance(instance, err)
-		WriteLongRunningProcesses(instanceKey, longRunningProcesses)
+		WriteLongRunningProcesses(&instance.Key, longRunningProcesses)
 	} else {
-		_ = UpdateInstanceLastChecked(instanceKey)
+		_ = UpdateInstanceLastChecked(&instance.Key)
 	}
 	if err != nil {
 		log.Errore(err)
@@ -264,6 +300,7 @@ func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (
 		masterKey.Hostname, masterKey.Port).Scan(
 		&clusterName,
 	)
+
 	if err != nil {
 		return "", log.Errore(err)
 	}
@@ -573,12 +610,14 @@ Cleanup:
 
 // WriteInstance stores an instance in the orchestrator backend
 func WriteInstance(instance *Instance, lastError error) error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
 
-	_, err = sqlutils.Exec(db, `
+	writeFunc := func() error {
+		db, err := db.OpenOrchestrator()
+		if err != nil {
+			return log.Errore(err)
+		}
+
+		_, err = sqlutils.Exec(db, `
         	replace into database_instance (
         		hostname,
         		port,
@@ -608,56 +647,59 @@ func WriteInstance(instance *Instance, lastError error) error {
 				slave_hosts,
 				cluster_name
 			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		instance.Key.Hostname,
-		instance.Key.Port,
-		instance.ServerID,
-		instance.Version,
-		instance.ReadOnly,
-		instance.Binlog_format,
-		instance.LogBinEnabled,
-		instance.LogSlaveUpdatesEnabled,
-		instance.SelfBinlogCoordinates.LogFile,
-		instance.SelfBinlogCoordinates.LogPos,
-		instance.MasterKey.Hostname,
-		instance.MasterKey.Port,
-		instance.Slave_SQL_Running,
-		instance.Slave_IO_Running,
-		instance.ReadBinlogCoordinates.LogFile,
-		instance.ReadBinlogCoordinates.LogPos,
-		instance.ExecBinlogCoordinates.LogFile,
-		instance.ExecBinlogCoordinates.LogPos,
-		instance.LastSQLError,
-		instance.LastIOError,
-		instance.SecondsBehindMaster,
-		instance.SlaveLagSeconds,
-		len(instance.SlaveHosts),
-		instance.GetSlaveHostsAsJson(),
-		instance.ClusterName,
-	)
-	if err != nil {
-		return log.Errore(err)
-	}
+			instance.Key.Hostname,
+			instance.Key.Port,
+			instance.ServerID,
+			instance.Version,
+			instance.ReadOnly,
+			instance.Binlog_format,
+			instance.LogBinEnabled,
+			instance.LogSlaveUpdatesEnabled,
+			instance.SelfBinlogCoordinates.LogFile,
+			instance.SelfBinlogCoordinates.LogPos,
+			instance.MasterKey.Hostname,
+			instance.MasterKey.Port,
+			instance.Slave_SQL_Running,
+			instance.Slave_IO_Running,
+			instance.ReadBinlogCoordinates.LogFile,
+			instance.ReadBinlogCoordinates.LogPos,
+			instance.ExecBinlogCoordinates.LogFile,
+			instance.ExecBinlogCoordinates.LogPos,
+			instance.LastSQLError,
+			instance.LastIOError,
+			instance.SecondsBehindMaster,
+			instance.SlaveLagSeconds,
+			len(instance.SlaveHosts),
+			instance.GetSlaveHostsAsJson(),
+			instance.ClusterName,
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
 
-	if lastError == nil {
-		sqlutils.Exec(db, `
+		if lastError == nil {
+			sqlutils.Exec(db, `
         	update database_instance set last_seen = NOW() where hostname=? and port=?
         	`, instance.Key.Hostname, instance.Key.Port,
-		)
-	} else {
-		log.Debugf("WriteInstance: will not update database_instance due to error: %+v", lastError)
+			)
+		} else {
+			log.Debugf("WriteInstance: will not update database_instance due to error: %+v", lastError)
+		}
+		return nil
 	}
-	return nil
+	return execDBWriteFunc(writeFunc)
 }
 
 // UpdateInstanceLastChecked updates the last_check timestamp in the orchestrator backed database
 // for a given instance
 func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
+	writeFunc := func() error {
+		db, err := db.OpenOrchestrator()
+		if err != nil {
+			return log.Errore(err)
+		}
 
-	_, err = sqlutils.Exec(db, `
+		_, err = sqlutils.Exec(db, `
         	update 
         		database_instance 
         	set
@@ -665,14 +707,16 @@ func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
 			where 
 				hostname = ?
 				and port = ?`,
-		instanceKey.Hostname,
-		instanceKey.Port,
-	)
-	if err != nil {
-		return log.Errore(err)
-	}
+			instanceKey.Hostname,
+			instanceKey.Port,
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
 
-	return nil
+		return nil
+	}
+	return execDBWriteFunc(writeFunc)
 }
 
 // UpdateInstanceLastAttemptedCheck updates the last_attempted_check timestamp in the orchestrator backed database
@@ -684,12 +728,13 @@ func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
 // wish to access the instance again: if last_attempted_check is *newer* than last_checked, that's bad news and means
 // we have a "hanging" issue.
 func UpdateInstanceLastAttemptedCheck(instanceKey *InstanceKey) error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
+	writeFunc := func() error {
+		db, err := db.OpenOrchestrator()
+		if err != nil {
+			return log.Errore(err)
+		}
 
-	_, err = sqlutils.Exec(db, `
+		_, err = sqlutils.Exec(db, `
         	update 
         		database_instance 
         	set
@@ -697,14 +742,16 @@ func UpdateInstanceLastAttemptedCheck(instanceKey *InstanceKey) error {
 			where 
 				hostname = ?
 				and port = ?`,
-		instanceKey.Hostname,
-		instanceKey.Port,
-	)
-	if err != nil {
-		return log.Errore(err)
-	}
+			instanceKey.Hostname,
+			instanceKey.Port,
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
 
-	return nil
+		return nil
+	}
+	return execDBWriteFunc(writeFunc)
 }
 
 // ForgetInstance removes an instance entry from the orchestrator backed database.
