@@ -122,6 +122,7 @@ func StartDiscovery(instanceKey inst.InstanceKey) {
 // purged and forgotten.
 func ContinuousDiscovery() {
 	log.Infof("Starting continuous discovery")
+	inst.SetContinuousDBWrites()
 	go handleDiscoveryRequests(nil, nil)
 	tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
 	forgetUnseenTick := time.Tick(time.Hour)
@@ -131,6 +132,7 @@ func ContinuousDiscovery() {
 		for _, instanceKey := range instanceKeys {
 			discoveryInstanceKeys <- instanceKey
 		}
+		inst.ForgetExpiredHostnameResolves()
 		// See if we should also forget instances (lower frequency)
 		select {
 		case <-forgetUnseenTick:
