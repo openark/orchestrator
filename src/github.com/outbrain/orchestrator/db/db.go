@@ -127,7 +127,7 @@ var generateSQL = []string{
 		  target_hostname varchar(128) NOT NULL,
 		  source_hostname varchar(128) NOT NULL,
 		  start_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		  end_timestamp timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+		  end_timestamp timestamp NOT NULL,
 		  is_complete tinyint(3) unsigned NOT NULL DEFAULT '0',
 		  is_successful tinyint(3) unsigned NOT NULL DEFAULT '0',
 		  PRIMARY KEY (agent_seed_id),
@@ -161,6 +161,15 @@ var generateSQL = []string{
 		  KEY attribute_value_idx (attribute_value),
 		  KEY submit_timestamp_idx (submit_timestamp),
 		  KEY expire_timestamp_idx (expire_timestamp)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS hostname_resolve (
+		  hostname varchar(128) NOT NULL,
+		  resolved_hostname varchar(128) NOT NULL,
+		  resolved_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  PRIMARY KEY (hostname),
+		  KEY resolved_timestamp_idx (resolved_timestamp)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 }
