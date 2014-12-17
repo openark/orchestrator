@@ -23,23 +23,9 @@ import (
 	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/config"
-	"net"
 	"strconv"
 	"strings"
 )
-
-// GetCNAME resolves an IP or hostname into a normalized valid CNAME
-func GetCNAME(hostName string) (string, error) {
-	if !config.Config.LookupCNAME {
-		return hostName, nil
-	}
-	res, err := net.LookupCNAME(hostName)
-	if err != nil {
-		return hostName, err
-	}
-	res = strings.TrimRight(res, ".")
-	return res, nil
-}
 
 const InvalidPort = 65535
 
@@ -50,17 +36,18 @@ type InstanceKey struct {
 }
 
 // NewInstanceKeyFromStrings creates a new InstanceKey by resolving hostname and port.
-// hostname is normalized via GetCNAME. port is tested to be valid integer.
+// hostname is normalized via ResolveHostname. port is tested to be valid integer.
 func NewInstanceKeyFromStrings(hostname string, port string) (*InstanceKey, error) {
 	instanceKey := &InstanceKey{}
 	var err error
-	if instanceKey.Hostname, err = GetCNAME(hostname); err != nil {
-		return instanceKey, err
-	}
-
 	if instanceKey.Port, err = strconv.Atoi(port); err != nil {
 		return instanceKey, errors.New(fmt.Sprintf("Invalid port: %s", port))
 	}
+
+	if instanceKey.Hostname, err = ResolveHostname(hostname); err != nil {
+		return instanceKey, err
+	}
+
 	return instanceKey, nil
 }
 
@@ -75,7 +62,7 @@ func ParseInstanceKey(hostPort string) (*InstanceKey, error) {
 
 // Formalize this key by getting CNAME for hostname
 func (this *InstanceKey) Formalize() *InstanceKey {
-	this.Hostname, _ = GetCNAME(this.Hostname)
+	this.Hostname, _ = ResolveHostname(this.Hostname)
 	return this
 }
 

@@ -25,26 +25,27 @@ import (
 
 // WriteLongRunningProcesses rewrites current state of long running processes for given instance
 func WriteLongRunningProcesses(instanceKey *InstanceKey, processes []Process) error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
+	writeFunc := func() error {
+		db, err := db.OpenOrchestrator()
+		if err != nil {
+			return log.Errore(err)
+		}
 
-	_, err = sqlutils.Exec(db, `
+		_, err = sqlutils.Exec(db, `
 			delete from 
 					database_instance_long_running_queries
 				where
 					hostname = ?
 					and port = ?
 			`,
-		instanceKey.Hostname,
-		instanceKey.Port)
-	if err != nil {
-		return log.Errore(err)
-	}
+			instanceKey.Hostname,
+			instanceKey.Port)
+		if err != nil {
+			return log.Errore(err)
+		}
 
-	for _, process := range processes {
-		_, merr := sqlutils.Exec(db, `
+		for _, process := range processes {
+			_, merr := sqlutils.Exec(db, `
 	        	insert into database_instance_long_running_queries (
 	        		hostname,
 	        		port,
@@ -58,27 +59,29 @@ func WriteLongRunningProcesses(instanceKey *InstanceKey, processes []Process) er
 					process_state,
 					process_info
 				) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			instanceKey.Hostname,
-			instanceKey.Port,
-			process.Id,
-			process.StartedAt,
-			process.User,
-			process.Host,
-			process.Db,
-			process.Command,
-			process.Time,
-			process.State,
-			process.Info,
-		)
-		if merr != nil {
-			err = merr
+				instanceKey.Hostname,
+				instanceKey.Port,
+				process.Id,
+				process.StartedAt,
+				process.User,
+				process.Host,
+				process.Db,
+				process.Command,
+				process.Time,
+				process.State,
+				process.Info,
+			)
+			if merr != nil {
+				err = merr
+			}
 		}
-	}
-	if err != nil {
-		return log.Errore(err)
-	}
+		if err != nil {
+			return log.Errore(err)
+		}
 
-	return nil
+		return nil
+	}
+	return execDBWriteFunc(writeFunc)
 }
 
 // ReadLongRunningProcesses returns the list of current known long running processes of all instances
