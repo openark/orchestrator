@@ -96,6 +96,5 @@ func ForgetExpiredHostnameResolves() error {
 				resolved_timestamp < NOW() - interval ? minute`,
 		config.Config.ExpiryHostnameResolvesMinutes,
 	)
-	AuditOperation("forget-expired-hostname-resolves", nil, "")
 	return err
 }

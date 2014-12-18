@@ -44,11 +44,37 @@ func Http(discovery bool) {
 // standardHttp starts serving standard HTTP (api/web) requests, to be used by normal clients
 func standardHttp(discovery bool) {
 	m := martini.Classic()
-	if strings.ToLower(config.Config.AuthenticationMethod) == "basic" && config.Config.HTTPAuthUser == "" {
-		log.Warning("AuthenticationMethod is configured as 'basic' but not HTTPAuthUser defined. Running without authentication.")
-	}
-	if strings.ToLower(config.Config.AuthenticationMethod) == "basic" && config.Config.HTTPAuthUser != "" {
-		m.Use(auth.Basic(config.Config.HTTPAuthUser, config.Config.HTTPAuthPassword))
+
+	switch strings.ToLower(config.Config.AuthenticationMethod) {
+	case "basic":
+		{
+			if config.Config.HTTPAuthUser == "" {
+				// Still allowed; may be disallowed in future versions
+				log.Warning("AuthenticationMethod is configured as 'basic' but HTTPAuthUser undefined. Running without authentication.")
+			} else {
+				m.Use(auth.Basic(config.Config.HTTPAuthUser, config.Config.HTTPAuthPassword))
+			}
+		}
+	case "multi":
+		{
+			if config.Config.HTTPAuthUser == "" {
+				// Still allowed; may be disallowed in future versions
+				log.Fatal("AuthenticationMethod is configured as 'multi' but HTTPAuthUser undefined")
+			}
+
+			m.Use(auth.BasicFunc(func(username, password string) bool {
+				if username == "readonly" {
+					// Will be treated as "read-only"
+					return true
+				}
+				return auth.SecureCompare(username, config.Config.HTTPAuthUser) && auth.SecureCompare(password, config.Config.HTTPAuthPassword)
+			}))
+		}
+	default:
+		{
+			// We inject a dummy User object because we have function signatures with User argument in api.go
+			m.Map(auth.User(""))
+		}
 	}
 
 	m.Use(gzip.All())

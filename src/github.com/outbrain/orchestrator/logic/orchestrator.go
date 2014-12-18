@@ -125,18 +125,18 @@ func ContinuousDiscovery() {
 	inst.SetContinuousDBWrites()
 	go handleDiscoveryRequests(nil, nil)
 	tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
-	forgetUnseenTick := time.Tick(time.Hour)
+	forgetUnseenTick := time.Tick(time.Minute)
 	for _ = range tick {
 		instanceKeys, _ := inst.ReadOutdatedInstanceKeys()
 		log.Debugf("outdated keys: %+v", instanceKeys)
 		for _, instanceKey := range instanceKeys {
 			discoveryInstanceKeys <- instanceKey
 		}
-		inst.ForgetExpiredHostnameResolves()
-		// See if we should also forget instances (lower frequency)
+		// See if we should also forget objects (lower frequency)
 		select {
 		case <-forgetUnseenTick:
 			inst.ForgetLongUnseenInstances()
+			inst.ForgetExpiredHostnameResolves()
 		default:
 		}
 	}

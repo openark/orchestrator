@@ -49,7 +49,7 @@ type Configuration struct {
 	AuditLogFile                               string // Name of log file for audit operations. Disabled when empty.
 	AuditPageSize                              int
 	ReadOnly                                   bool
-	AuthenticationMethod                       string            // Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "proxy" for forwarded credentials via reverse proxy
+	AuthenticationMethod                       string            // Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "multi" for advanced BasicAuth, "proxy" for forwarded credentials via reverse proxy
 	HTTPAuthUser                               string            // Username for HTTP Basic authentication (blank disables authentication)
 	HTTPAuthPassword                           string            // Password for HTTP Basic authentication
 	AuthUserHeader                             string            // HTTP header indicating auth user, when AuthenticationMethod is "proxy"
