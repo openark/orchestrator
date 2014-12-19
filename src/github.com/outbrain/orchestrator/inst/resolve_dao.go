@@ -93,7 +93,7 @@ func ForgetExpiredHostnameResolves() error {
 			delete 
 				from hostname_resolve 
 			where 
-				resolved_timestamp < NOW() - interval ? minute`,
+				resolved_timestamp < NOW() - interval (60*?/2) second`,
 		config.Config.ExpiryHostnameResolvesMinutes,
 	)
 	return err

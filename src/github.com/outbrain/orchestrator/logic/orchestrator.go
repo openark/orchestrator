@@ -17,7 +17,6 @@
 package orchestrator
 
 import (
-	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/agent"
 	"github.com/outbrain/orchestrator/config"
@@ -79,7 +78,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 		goto Cleanup
 	}
 
-	fmt.Printf("host: %+v, master: %+v\n", instance.Key, instance.MasterKey)
+	log.Debugf("Discovered host: %+v, master: %+v", instance.Key, instance.MasterKey)
 
 	// Investigate slaves:
 	for _, slaveKey := range instance.SlaveHosts.GetInstanceKeys() {
@@ -122,7 +121,6 @@ func StartDiscovery(instanceKey inst.InstanceKey) {
 // purged and forgotten.
 func ContinuousDiscovery() {
 	log.Infof("Starting continuous discovery")
-	inst.SetContinuousDBWrites()
 	go handleDiscoveryRequests(nil, nil)
 	tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
 	forgetUnseenTick := time.Tick(time.Minute)

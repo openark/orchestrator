@@ -29,29 +29,24 @@ import (
 	"time"
 )
 
-var continuousDBWrites bool = false
-var continuousDBWritesRequests chan func() error = make(chan func() error)
+const backendDBConcurrency = 5
 
-// SetContinuousDBWrites suggests that we will do plenty DB writes, and we choose to serialize them
-// under a specialized thread, instead of letting so many db write requests arrive from different threads
-// (that would lead to too-many-opsn-connections on the database).
-func SetContinuousDBWrites() {
-	continuousDBWrites = true
-	go func() {
-		for f := range continuousDBWritesRequests {
-			f()
-		}
-	}()
+var instanceReadChan = make(chan bool, backendDBConcurrency)
+var instanceWriteChan = make(chan bool, backendDBConcurrency)
+
+func init() {
+	for i := 1; i < backendDBConcurrency; i++ {
+		instanceReadChan <- true
+		instanceWriteChan <- true
+	}
 }
 
 // execDBWriteFunc chooses how to execute a write onto the database: whether synchronuously or not
 func execDBWriteFunc(f func() error) error {
-	if continuousDBWrites {
-		continuousDBWritesRequests <- f
-		return nil
-	} else {
-		return f()
-	}
+	<-instanceWriteChan
+	res := f()
+	instanceWriteChan <- true
+	return res
 }
 
 // ExecInstance executes a given query on the given MySQL topology instance
@@ -105,7 +100,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		goto Cleanup
 	}
 	if resolvedHostname != instance.Key.Hostname {
-		WriteResolvedHostname(instance.Key.Hostname, resolvedHostname)
+		UpdateResolvedHostname(instance.Key.Hostname, resolvedHostname)
 		instance.Key.Hostname = resolvedHostname
 	}
 	instanceFound = true
@@ -349,14 +344,15 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 
 // readInstancesByCondition is a generic function to read instances from the backend database
 func readInstancesByCondition(condition string) ([](*Instance), error) {
-	instances := [](*Instance){}
+	readFunc := func() ([](*Instance), error) {
+		instances := [](*Instance){}
 
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return instances, log.Errore(err)
-	}
+		db, err := db.OpenOrchestrator()
+		if err != nil {
+			return instances, log.Errore(err)
+		}
 
-	query := fmt.Sprintf(`
+		query := fmt.Sprintf(`
 		select 
 			*,
 			timestampdiff(second, last_checked, now()) as seconds_since_last_checked,
@@ -369,18 +365,23 @@ func readInstancesByCondition(condition string) ([](*Instance), error) {
 		order by
 			hostname, port`, condition)
 
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-		instance := readInstanceRow(m)
-		instances = append(instances, instance)
-		return nil
-	})
-	if err != nil {
-		return instances, log.Errore(err)
+		err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+			instance := readInstanceRow(m)
+			instances = append(instances, instance)
+			return nil
+		})
+		if err != nil {
+			return instances, log.Errore(err)
+		}
+		err = PopulateInstancesAgents(instances)
+		if err != nil {
+			return instances, log.Errore(err)
+		}
+		return instances, err
 	}
-	err = PopulateInstancesAgents(instances)
-	if err != nil {
-		return instances, log.Errore(err)
-	}
+	<-instanceReadChan
+	instances, err := readFunc()
+	instanceReadChan <- true
 	return instances, err
 }
 
@@ -448,6 +449,9 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 // ReadCountMySQLSnapshots is a utility method to return registered number of snapshots for a given list of hosts
 func ReadCountMySQLSnapshots(hostnames []string) (map[string]int, error) {
 	res := make(map[string]int)
+	if !config.Config.ServeAgentsHttp {
+		return res, nil
+	}
 	query := fmt.Sprintf(`
 		select 
 			hostname,
