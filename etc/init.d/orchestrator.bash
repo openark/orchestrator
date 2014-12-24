@@ -28,6 +28,9 @@ case "$1" in
     if [ -z $PID ]; then
       printf "%s\n" "Fail"
       exit 1
+    elif [ -z "$(ps axf | awk '{print $1}' | grep ${PID})" ]; then
+      printf "%s\n" "Fail"
+      exit 1
     else
       echo $PID > $PIDFILE
       printf "%s\n" "Ok"
