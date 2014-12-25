@@ -51,9 +51,8 @@ func standardHttp(discovery bool) {
 			if config.Config.HTTPAuthUser == "" {
 				// Still allowed; may be disallowed in future versions
 				log.Warning("AuthenticationMethod is configured as 'basic' but HTTPAuthUser undefined. Running without authentication.")
-			} else {
-				m.Use(auth.Basic(config.Config.HTTPAuthUser, config.Config.HTTPAuthPassword))
 			}
+			m.Use(auth.Basic(config.Config.HTTPAuthUser, config.Config.HTTPAuthPassword))
 		}
 	case "multi":
 		{
