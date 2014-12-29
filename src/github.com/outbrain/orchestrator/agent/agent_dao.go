@@ -46,12 +46,14 @@ var httpClient = &http.Client{}
 
 // httpGet is a convenience method for getting http response from URL, optionaly skipping SSL cert verification
 func httpGet(url string) (resp *http.Response, err error) {
-	httpTransport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config.SSLSkipVerify},
-		Dial:            dialTimeout,
-		ResponseHeaderTimeout: httpTimeout,
+	if config.Config.AgentsUseSSL {
+		httpTransport := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config.SSLSkipVerify},
+			Dial:            dialTimeout,
+			ResponseHeaderTimeout: httpTimeout,
+		}
+		httpClient.Transport = httpTransport
 	}
-	httpClient.Transport = httpTransport
 	return httpClient.Get(url)
 }
 
