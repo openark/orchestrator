@@ -5,8 +5,14 @@
 	<projects>
 	</projects>
 	<buildSpec>
+		<buildCommand>
+			<name>org.eclipse.vjet.eclipse.core.builder</name>
+			<arguments>
+			</arguments>
+		</buildCommand>
 	</buildSpec>
 	<natures>
+		<nature>org.eclipse.vjet.core.nature</nature>
 		<nature>goclipse.goNature</nature>
 	</natures>
 </projectDescription>

@@ -3,6 +3,14 @@ $(document).ready(function () {
     showLoader();
     activateRefreshTimer();
     
+    var errorMapping = {
+   		"inMaintenanceProblem": {"badge": "label-info", "description": "In maintenance"}, 
+   		"lastCheckInvalidProblem": {"badge": "label-fatal", "description": "Last check invalid"}, 
+   		"notRecentlyCheckedProblem": {"badge": "label-stale", "description": "Not recently checked (stale)"}, 
+   		"notReplicatingProblem": {"badge": "label-danger", "description": "Not replicating"}, 
+   		"replicationLagProblem": {"badge": "label-warning", "description": "Replication lag"}
+	};
+    
     $.get("/api/clusters-info", function (clusters) {
         $.get("/api/problems", function (problemInstances) {
 	    		normalizeInstances(problemInstances, []);
@@ -16,8 +24,8 @@ $(document).ready(function () {
         	clustersProblems[cluster.ClusterName] = {};
         });
         
-	    function addInstancesBadge(clusterName, count, badgeClass) {
-	    	$("#clusters [data-cluster-name='" + clusterName + "'].popover").find(".popover-content .pull-right").append('<span class="badge '+badgeClass+'">' + count + '</span> ');
+	    function addInstancesBadge(clusterName, count, badgeClass, title) {
+	    	$("#clusters [data-cluster-name='" + clusterName + "'].popover").find(".popover-content .pull-right").append('<span class="badge '+badgeClass+'" title="' + title + '"">' + count + '</span> ');
 	    }
         
         function incrementClusterProblems(clusterName, problemType) {
@@ -29,17 +37,17 @@ $(document).ready(function () {
         }
         problemInstances.forEach(function(instance) {
 	        if (instance.inMaintenanceProblem()) {
-	        	incrementClusterProblems(instance.ClusterName, "label-info")
+	        	incrementClusterProblems(instance.ClusterName, "inMaintenanceProblem")
 	        }
 	        //
 	        if (instance.lastCheckInvalidProblem()) {
-	        	incrementClusterProblems(instance.ClusterName, "label-fatal")
+	        	incrementClusterProblems(instance.ClusterName, "lastCheckInvalidProblem")
 	        } else if (instance.notRecentlyCheckedProblem()) {
-	        	incrementClusterProblems(instance.ClusterName, "label-stale")
+	        	incrementClusterProblems(instance.ClusterName, "notRecentlyCheckedProblem")
 	        } else if (instance.notReplicatingProblem()) {
-	        	incrementClusterProblems(instance.ClusterName, "label-danger")
+	        	incrementClusterProblems(instance.ClusterName, "notReplicatingProblem")
 	        } else if (instance.replicationLagProblem()) {
-	        	incrementClusterProblems(instance.ClusterName, "label-warning")
+	        	incrementClusterProblems(instance.ClusterName, "replicationLagProblem")
 	        }
 	    });
 
@@ -55,9 +63,9 @@ $(document).ready(function () {
     				+ '<div>Instances: <div class="pull-right"></div></div>'
     			;
     	    popoverElement.find(".popover-content").html(contentHtml);
-    	    addInstancesBadge(cluster.ClusterName, cluster.CountInstances, "alert-default");
+    	    addInstancesBadge(cluster.ClusterName, cluster.CountInstances, "label-primary", "Total instances in cluster");
     	    for (var problemType in clustersProblems[cluster.ClusterName]) {
-    	    	addInstancesBadge(cluster.ClusterName, clustersProblems[cluster.ClusterName][problemType], problemType);
+    	    	addInstancesBadge(cluster.ClusterName, clustersProblems[cluster.ClusterName][problemType], errorMapping[problemType]["badge"], errorMapping[problemType]["description"]);
     	    }
         });     
         
