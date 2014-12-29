@@ -121,6 +121,7 @@ func StartDiscovery(instanceKey inst.InstanceKey) {
 // purged and forgotten.
 func ContinuousDiscovery() {
 	log.Infof("Starting continuous discovery")
+	inst.LoadHostnameResolveCacheFromDatabase()
 	go handleDiscoveryRequests(nil, nil)
 	tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
 	forgetUnseenTick := time.Tick(time.Minute)

@@ -25,6 +25,11 @@ import (
 	"time"
 )
 
+type HostnameResolve struct {
+	hostname         string
+	resolvedHostname string
+}
+
 func init() {
 	if config.Config.ExpiryHostnameResolvesMinutes < 1 {
 		config.Config.ExpiryHostnameResolvesMinutes = 1
@@ -62,23 +67,17 @@ func ResolveHostname(hostname string) (string, error) {
 		return resolvedHostname.(string), nil
 	}
 
-	// Unfound? Go to database cache
-	// Database cache actually has SHORTER expiry, and serves just for the sake of a service restart, to help
-	// warm up the cache
-	if resolvedHostname, _ := ReadResolvedHostname(hostname); resolvedHostname != "" {
-		hostnameResolvesLightweightCache.Set(hostname, resolvedHostname, 0)
-		return resolvedHostname, nil
-	}
-
 	// Unfound: resolve!
 	log.Debugf("Unfound: %s", hostname)
 	resolvedHostname, err := resolveHostname(hostname)
 	if err != nil {
-		UpdateResolvedHostname(hostname, hostname)
+		// Problem. What we'll do is cache the hostname for just one minute, so as to avoid flooding requests
+		// on one hand, yet make it refresh shortly on the other hand. Anyway do not write to database.
+		hostnameResolvesLightweightCache.Set(hostname, resolvedHostname, time.Minute)
 		return hostname, err
 	}
-	// Cache result
-	log.Debugf("Cache %s as %s", hostname, resolvedHostname)
+	// Good result! Cache it, also to DB
+	log.Debugf("Cache hostname resolve %s as %s", hostname, resolvedHostname)
 	UpdateResolvedHostname(hostname, resolvedHostname)
 	return resolvedHostname, nil
 }
@@ -87,4 +86,21 @@ func ResolveHostname(hostname string) (string, error) {
 func UpdateResolvedHostname(hostname string, resolvedHostname string) {
 	hostnameResolvesLightweightCache.Set(hostname, resolvedHostname, 0)
 	WriteResolvedHostname(hostname, resolvedHostname)
+}
+
+func LoadHostnameResolveCacheFromDatabase() error {
+	allHostnamesResolves, err := readAllHostnameResolves()
+	if err != nil {
+		return err
+	}
+	for _, hostnameResolve := range allHostnamesResolves {
+		hostnameResolvesLightweightCache.Set(hostnameResolve.hostname, hostnameResolve.resolvedHostname, 0)
+	}
+	return nil
+}
+
+func ResetHostnameResolveCache() error {
+	err := deleteHostnameResolves()
+	hostnameResolvesLightweightCache.Flush()
+	return err
 }

@@ -82,7 +82,35 @@ Cleanup:
 	return resolvedHostname, err
 }
 
-// ForgetLongUnseenInstances will remove entries of all instacnes that have long since been last seen.
+func readAllHostnameResolves() ([]HostnameResolve, error) {
+	res := []HostnameResolve{}
+	query := fmt.Sprintf(`
+		select 
+			hostname, 
+			resolved_hostname  
+		from 
+			hostname_resolve
+		`)
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		goto Cleanup
+	}
+
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		hostnameResolve := HostnameResolve{hostname: m.GetString("hostname"), resolvedHostname: m.GetString("resolved_hostname")}
+
+		res = append(res, hostnameResolve)
+		return nil
+	})
+Cleanup:
+
+	if err != nil {
+		log.Errore(err)
+	}
+	return res, err
+}
+
+// ForgetLongUnseenInstances will remove entries of all instances that have long since been last seen.
 func ForgetExpiredHostnameResolves() error {
 	db, err := db.OpenOrchestrator()
 	if err != nil {
@@ -93,8 +121,22 @@ func ForgetExpiredHostnameResolves() error {
 			delete 
 				from hostname_resolve 
 			where 
-				resolved_timestamp < NOW() - interval (60*?/2) second`,
+				resolved_timestamp < NOW() - interval (? * 2) minute`,
 		config.Config.ExpiryHostnameResolvesMinutes,
+	)
+	return err
+}
+
+// deleteHostnameResolves compeltely erases the database cache
+func deleteHostnameResolves() error {
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		return log.Errore(err)
+	}
+
+	_, err = sqlutils.Exec(db, `
+			delete 
+				from hostname_resolve`,
 	)
 	return err
 }
