@@ -46,14 +46,13 @@ var httpClient = &http.Client{}
 
 // httpGet is a convenience method for getting http response from URL, optionaly skipping SSL cert verification
 func httpGet(url string) (resp *http.Response, err error) {
-	if config.Config.AgentsUseSSL {
-		httpTransport := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config.SSLSkipVerify},
-			Dial:            dialTimeout,
-			ResponseHeaderTimeout: httpTimeout,
-		}
-		httpClient.Transport = httpTransport
+	httpTransport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config.SSLSkipVerify},
+		Dial:            dialTimeout,
+		ResponseHeaderTimeout: httpTimeout,
 	}
+	httpClient.Transport = httpTransport
+
 	return httpClient.Get(url)
 }
 
@@ -69,11 +68,11 @@ func auditAgentOperation(auditType string, agent *Agent, message string) error {
 
 // readResponse returns the body of an HTTP response
 func readResponse(res *http.Response, err error) ([]byte, error) {
+	defer res.Body.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	defer res.Body.Close()
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
