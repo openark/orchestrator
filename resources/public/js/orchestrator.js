@@ -441,8 +441,9 @@ function normalizeInstances(instances, maintenanceList) {
 
 function renderInstanceElement(popoverElement, instance, renderType) {
 	popoverElement.attr("data-nodeid", instance.id);
+	popoverElement.find("h3").attr('title', instance.title);
 	popoverElement.find("h3").html('&nbsp;<div class="pull-left">'+
-    		instance.canonicalTitle + '</div><div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog"></span></a></div>');
+	instance.canonicalTitle + '</div><div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></a></div>');
 	var indicateLastSeenInStatus = false;
     if (!instance.ReadOnly) {
     	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-pencil" title="Writeable"></span> ');
@@ -454,7 +455,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-camera" title="'+instance.CountMySQLSnapshots +' snapshots"></span> ');
     } 
     if (instance.inMaintenanceProblem()) {
-    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench" title="Open config dialog"></span> ');
+    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench"></span> ');
     } 
     
     if (instance.lastCheckInvalidProblem()) {
