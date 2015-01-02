@@ -36,23 +36,21 @@ import (
 
 var SeededAgents chan *Agent = make(chan *Agent)
 
+var httpTimeout = time.Duration(time.Duration(config.Config.HttpTimeoutSeconds) * time.Second)
+
 func dialTimeout(network, addr string) (net.Conn, error) {
 	return net.DialTimeout(network, addr, httpTimeout)
 }
 
-var httpTimeout = time.Duration(time.Duration(config.Config.HttpTimeoutSeconds) * time.Second)
-
-var httpClient = &http.Client{}
+var httpTransport = &http.Transport{
+	TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config.SSLSkipVerify},
+	Dial:            dialTimeout,
+	ResponseHeaderTimeout: httpTimeout,
+}
+var httpClient = &http.Client{Transport: httpTransport}
 
 // httpGet is a convenience method for getting http response from URL, optionaly skipping SSL cert verification
 func httpGet(url string) (resp *http.Response, err error) {
-	httpTransport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config.SSLSkipVerify},
-		Dial:            dialTimeout,
-		ResponseHeaderTimeout: httpTimeout,
-	}
-	httpClient.Transport = httpTransport
-
 	return httpClient.Get(url)
 }
 
@@ -68,10 +66,10 @@ func auditAgentOperation(auditType string, agent *Agent, message string) error {
 
 // readResponse returns the body of an HTTP response
 func readResponse(res *http.Response, err error) ([]byte, error) {
-	defer res.Body.Close()
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
