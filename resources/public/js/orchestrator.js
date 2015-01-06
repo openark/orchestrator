@@ -288,6 +288,7 @@ function normalizeInstance(instance) {
     instance.replicationAttemptingToRun = instance.Slave_SQL_Running || instance.Slave_IO_Running;
     instance.replicationLagReasonable = instance.SlaveLagSeconds.Int64 <= 10;
     instance.isSeenRecently = instance.SecondsSinceLastSeen.Valid && instance.SecondsSinceLastSeen.Int64 <= 3600;
+    instance.usingGTID = instance.UsingOracleGTID || instance.UsingMariaDBGTID;
 
     // used by cluster-tree
     instance.children = [];
@@ -475,10 +476,18 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 		statusMessage = 'seen ' + instance.SecondsSinceLastSeen.Int64 + ' seconds ago';
 	}
     var contentHtml = ''
-        	+ '<div class="pull-right">' + statusMessage + ' </div>'
-   		+ '<p>' 
-			+ instance.Version + " " + instance.Binlog_format 
-        + '</p>';
+			+ instance.Version + " " + instance.Binlog_format
+			;
+    if (instance.usingGTID) {
+    	contentHtml += " GTID"
+    }
+    
+    contentHtml = ''
+    	+ '<div class="pull-right">' + statusMessage + ' </div>'
+		+ '<p>' 
+		+ contentHtml
+		+ '</p>'
+		;
     if (instance.isCoMaster) {
     	contentHtml += '<p><strong>Co master</strong></p>';
     }

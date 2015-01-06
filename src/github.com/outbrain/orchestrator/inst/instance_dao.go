@@ -113,6 +113,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		instance.ExecBinlogCoordinates.LogPos = m.GetInt64("Exec_Master_Log_Pos")
 		instance.LastSQLError = m.GetString("Last_SQL_Error")
 		instance.LastIOError = m.GetString("Last_IO_Error")
+		instance.UsingOracleGTID = (m.GetIntD("Auto_Position", 0) == 1)
+		instance.UsingMariaDBGTID = (m.GetStringD("Using_Gtid", "No") == "Yes")
 
 		masterKey, err := NewInstanceKeyFromStrings(m.GetString("Master_Host"), m.GetString("Master_Port"))
 		if err != nil {
@@ -321,6 +323,8 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.MasterKey.Port = m.GetInt("master_port")
 	instance.Slave_SQL_Running = m.GetBool("slave_sql_running")
 	instance.Slave_IO_Running = m.GetBool("slave_io_running")
+	instance.UsingOracleGTID = m.GetBool("oracle_gtid")
+	instance.UsingMariaDBGTID = m.GetBool("mariadb_gtid")
 	instance.SelfBinlogCoordinates.LogFile = m.GetString("binary_log_file")
 	instance.SelfBinlogCoordinates.LogPos = m.GetInt64("binary_log_pos")
 	instance.ReadBinlogCoordinates.LogFile = m.GetString("master_log_file")
@@ -639,6 +643,8 @@ func WriteInstance(instance *Instance, lastError error) error {
 				master_port,
 				slave_sql_running,
 				slave_io_running,
+				oracle_gtid,
+				mariadb_gtid,
 				master_log_file,
 				read_master_log_pos,
 				relay_master_log_file,
@@ -650,7 +656,7 @@ func WriteInstance(instance *Instance, lastError error) error {
 				num_slave_hosts,
 				slave_hosts,
 				cluster_name
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			instance.Key.Hostname,
 			instance.Key.Port,
 			instance.ServerID,
@@ -665,6 +671,8 @@ func WriteInstance(instance *Instance, lastError error) error {
 			instance.MasterKey.Port,
 			instance.Slave_SQL_Running,
 			instance.Slave_IO_Running,
+			instance.UsingOracleGTID,
+			instance.UsingMariaDBGTID,
 			instance.ReadBinlogCoordinates.LogFile,
 			instance.ReadBinlogCoordinates.LogPos,
 			instance.ExecBinlogCoordinates.LogFile,

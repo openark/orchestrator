@@ -83,9 +83,15 @@ func ResolveHostname(hostname string) (string, error) {
 }
 
 // UpdateResolvedHostname will store the given resolved hostname in cache
-func UpdateResolvedHostname(hostname string, resolvedHostname string) {
+// Returns false when the key already existed with same resolved value (similar
+// to AFFECTED_ROWS() in mysql)
+func UpdateResolvedHostname(hostname string, resolvedHostname string) bool {
+	if existingResolvedHostname, found := hostnameResolvesLightweightCache.Get(hostname); found && (existingResolvedHostname == resolvedHostname) {
+		return false
+	}
 	hostnameResolvesLightweightCache.Set(hostname, resolvedHostname, 0)
 	WriteResolvedHostname(hostname, resolvedHostname)
+	return true
 }
 
 func LoadHostnameResolveCacheFromDatabase() error {

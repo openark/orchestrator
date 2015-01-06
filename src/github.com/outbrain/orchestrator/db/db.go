@@ -195,6 +195,16 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN last_attempted_check TIMESTAMP AFTER last_checked
 	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN oracle_gtid TINYINT UNSIGNED NOT NULL AFTER slave_io_running
+	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN mariadb_gtid TINYINT UNSIGNED NOT NULL AFTER oracle_gtid
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance

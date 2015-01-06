@@ -134,6 +134,8 @@ type Instance struct {
 	MasterKey              InstanceKey
 	Slave_SQL_Running      bool
 	Slave_IO_Running       bool
+	UsingOracleGTID        bool
+	UsingMariaDBGTID       bool
 	ReadBinlogCoordinates  BinlogCoordinates
 	ExecBinlogCoordinates  BinlogCoordinates
 	LastSQLError           string
@@ -198,6 +200,11 @@ func (this *Instance) SlaveRunning() bool {
 // SQLThreadUpToDate returns true when the instance had consumed all relay logs.
 func (this *Instance) SQLThreadUpToDate() bool {
 	return this.ReadBinlogCoordinates.Equals(&this.ExecBinlogCoordinates)
+}
+
+// UsingGTID returns true when this slave is currently replicating via GTID (either Oracle or MariaDB)
+func (this *Instance) UsingGTID() bool {
+	return this.UsingOracleGTID || this.UsingMariaDBGTID
 }
 
 // AddSlaveKey adds a slave to the list of this instance's slaves.
