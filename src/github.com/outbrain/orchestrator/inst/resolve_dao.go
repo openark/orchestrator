@@ -50,7 +50,7 @@ func WriteResolvedHostname(hostname string, resolvedHostname string) error {
 
 		return nil
 	}
-	return execDBWriteFunc(writeFunc)
+	return ExecDBWriteFunc(writeFunc)
 }
 
 // ReadResolvedHostname returns the resolved hostname given a hostname, or empty if not exists

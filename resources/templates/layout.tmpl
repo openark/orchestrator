@@ -111,6 +111,13 @@
 	                        <button type="submit" class="btn btn-default btn-sm">Search</button>
 	                    </form>
                     </li>
+                    <li class="dropdown" data-nav-page="context" style="visibility: hidden;">
+                        <a href="#" class="dropdown-toggle" data-toggle="dropdown">
+                            <span class="glyphicon glyphicon-cog"></span> 
+                        </a>
+                        <ul class="dropdown-menu" id="dropdown-context">
+                        </ul>
+                    </li>
                     <li data-nav-page="refreshCountdown"><a href="#" id="refreshCountdown" class="small"></a></li>
 				</ul>
 			</div>
@@ -205,6 +212,9 @@
         }
         function agentsHttpActive() {
         	return "{{.agentsHttpActive}}";
+        }
+        function contextMenuVisible() {
+        	return "{{.contextMenuVisible}}";
         }
 	</script>
     <script src="/js/instance-problems.js"></script>

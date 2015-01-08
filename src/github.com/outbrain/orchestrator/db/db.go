@@ -172,6 +172,26 @@ var generateSQL = []string{
 		  KEY resolved_timestamp_idx (resolved_timestamp)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS cluster_alias (
+		  cluster_name varchar(128) CHARACTER SET ascii NOT NULL,
+		  alias varchar(128) NOT NULL,
+		  PRIMARY KEY (cluster_name)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS active_node (
+		  anchor tinyint unsigned NOT NULL,
+		  hostname varchar(128) CHARACTER SET ascii NOT NULL,
+		  token varchar(128) NOT NULL,
+		  last_seen_active timestamp NOT NULL,
+		  PRIMARY KEY (anchor)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		INSERT IGNORE INTO active_node (anchor, hostname, token, last_seen_active)
+			VALUES (1, '', '', NOW())
+	`,
 }
 
 var generateSQLPatches = []string{

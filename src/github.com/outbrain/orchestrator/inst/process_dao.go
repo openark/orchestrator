@@ -81,7 +81,7 @@ func WriteLongRunningProcesses(instanceKey *InstanceKey, processes []Process) er
 
 		return nil
 	}
-	return execDBWriteFunc(writeFunc)
+	return ExecDBWriteFunc(writeFunc)
 }
 
 // ReadLongRunningProcesses returns the list of current known long running processes of all instances

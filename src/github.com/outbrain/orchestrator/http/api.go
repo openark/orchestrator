@@ -581,6 +581,31 @@ func (this *HttpAPI) Cluster(params martini.Params, r render.Render, req *http.R
 	r.JSON(200, instances)
 }
 
+// ClusterInfo provides details of a given cluster
+func (this *HttpAPI) ClusterInfo(params martini.Params, r render.Render, req *http.Request) {
+	clusterInfo, err := inst.ReadClusterInfo(params["clusterName"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, clusterInfo)
+}
+
+// ClusterInfo provides details of a given cluster
+func (this *HttpAPI) SetClusterAlias(params martini.Params, r render.Render, req *http.Request) {
+	clusterName := params["clusterName"]
+	alias := req.URL.Query().Get("alias")
+
+	err := inst.SetClusterAlias(clusterName, alias)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Cluster %s now has alias '%s'", clusterName, alias)})
+}
+
 // Clusters provides list of known clusters
 func (this *HttpAPI) Clusters(params martini.Params, r render.Render, req *http.Request) {
 	clusterNames, err := inst.ReadClusters()
@@ -1023,6 +1048,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/kill-query/:host/:port/:process", this.KillQuery)
 	m.Get("/api/maintenance", this.Maintenance)
 	m.Get("/api/cluster/:clusterName", this.Cluster)
+	m.Get("/api/cluster-info/:clusterName", this.ClusterInfo)
+	m.Get("/api/set-cluster-alias/:clusterName", this.SetClusterAlias)
 	m.Get("/api/clusters", this.Clusters)
 	m.Get("/api/clusters-info", this.ClustersInfo)
 	m.Get("/api/search/:searchString", this.Search)

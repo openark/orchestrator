@@ -42,6 +42,7 @@ type Configuration struct {
 	InstancePollSeconds                        uint   // Number of seconds between instance reads
 	UnseenInstanceForgetHours                  uint   // Number of hours after which an unseen instance is forgotten
 	DiscoveryPollSeconds                       int    // Auto/continuous discovery of instances sleep time between polls
+	ActiveNodeExpireSeconds                    uint
 	HostnameResolveMethod                      string // Method by which to "normalize" hostname ("none"/"cname")
 	ExpiryHostnameResolvesMinutes              int    // Number of minutes after which to expire hostname-resolves
 	ReasonableReplicationLagSeconds            int    // Abvoe this value is considered a problem
@@ -79,6 +80,7 @@ func NewConfiguration() *Configuration {
 		SlaveStartPostWaitMilliseconds:             1000,
 		DiscoverByShowSlaveHosts:                   false,
 		DiscoveryPollSeconds:                       5,
+		ActiveNodeExpireSeconds:                    60,
 		HostnameResolveMethod:                      "cname",
 		ExpiryHostnameResolvesMinutes:              60,
 		ReasonableReplicationLagSeconds:            10,

@@ -475,6 +475,14 @@ $(document).ready(function () {
                 generateInstanceDivs(instancesMap);
             }, "json");
     }, "json");
+    $.get("/api/cluster-info/"+currentClusterName(), function (clusterInfo) {    
+    	var alias = clusterInfo.ClusterAlias
+    	if (!alias) {
+    		alias = "[none]";
+    	}    	
+        $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="'+clusterInfo.ClusterAlias+'">Alias: '+alias+'</a></li>');           
+    	console.log(clusterInfo)
+    }, "json");
     
     if (isPseudoGTIDModeEnabled()) {
         $("ul.navbar-nav").append('<li><a class="cluster_operation_mode"><button type="button" class="btn btn-xs" id="cluster_operation_mode_button"></button></a></li>');
@@ -486,5 +494,27 @@ $(document).ready(function () {
 	    });
     }
     
+    
+    $("body").on("click", "a[data-command=change-cluster-alias]", function(event) {
+    	
+    	bootbox.prompt({
+    		title: "Enter alias for this cluster",
+    		value: $(event.target).attr("data-alias"),
+    		callback: function(result) {
+    			if (result !== null) {
+    		    	showLoader();
+    		        $.get("/api/set-cluster-alias/"+currentClusterName()+"?alias="+encodeURIComponent(result), function (operationResult) {
+    					hideLoader();
+    					if (operationResult.Code == "ERROR") {
+    						addAlert(operationResult.Message)
+    					} else {
+    						location.reload();
+    					}	
+    		        }, "json");	    				
+    			} 
+    		}
+    	}); 
+    });
+
     activateRefreshTimer();
 });

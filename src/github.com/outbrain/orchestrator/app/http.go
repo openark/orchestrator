@@ -29,6 +29,7 @@ import (
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/http"
+	"github.com/outbrain/orchestrator/inst"
 	"github.com/outbrain/orchestrator/logic"
 )
 
@@ -90,13 +91,15 @@ func standardHttp(discovery bool) {
 	if discovery {
 		go orchestrator.ContinuousDiscovery()
 	}
+	inst.ReadClusterAliases()
 
 	http.API.RegisterRequests(m)
 	http.Web.RegisterRequests(m)
 
 	// Serve
-
-	nethttp.ListenAndServe(config.Config.ListenAddress, m)
+	if err := nethttp.ListenAndServe(config.Config.ListenAddress, m); err != nil {
+		log.Fatale(err)
+	}
 }
 
 // agentsHttp startes serving agents API requests

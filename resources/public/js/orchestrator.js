@@ -39,6 +39,9 @@ function hideLoader() {
     $("#ajaxLoader").css('visibility', 'hidden');
 }
 
+function showContextMenu() {
+    $("[data-nav-page=context]").css('visibility', 'visible');
+}
 
 function booleanString(b) {
 	return (b ? "true" : "false");
@@ -546,6 +549,9 @@ $(document).ready(function() {
     });
 	if (agentsHttpActive() == "true") {
 		$("#nav_agents").show();
+	}
+	if (contextMenuVisible() == "true") {
+		showContextMenu();
 	}
 });
 

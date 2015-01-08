@@ -24,7 +24,6 @@ import (
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/db"
-	"regexp"
 	"strings"
 	"time"
 )
@@ -34,18 +33,11 @@ const backendDBConcurrency = 5
 var instanceReadChan = make(chan bool, backendDBConcurrency)
 var instanceWriteChan = make(chan bool, backendDBConcurrency)
 
-func init() {
-	for i := 1; i < backendDBConcurrency; i++ {
-		instanceReadChan <- true
-		instanceWriteChan <- true
-	}
-}
-
-// execDBWriteFunc chooses how to execute a write onto the database: whether synchronuously or not
-func execDBWriteFunc(f func() error) error {
-	<-instanceWriteChan
-	res := f()
+// ExecDBWriteFunc chooses how to execute a write onto the database: whether synchronuously or not
+func ExecDBWriteFunc(f func() error) error {
 	instanceWriteChan <- true
+	res := f()
+	<-instanceWriteChan
 	return res
 }
 
@@ -383,9 +375,9 @@ func readInstancesByCondition(condition string) ([](*Instance), error) {
 		}
 		return instances, err
 	}
-	<-instanceReadChan
-	instances, err := readFunc()
 	instanceReadChan <- true
+	instances, err := readFunc()
+	<-instanceReadChan
 	return instances, err
 }
 
@@ -535,6 +527,36 @@ func ReadClusters() ([]string, error) {
 	return clusterNames, err
 }
 
+// ReadClusterInfo reads some info about a given cluster
+func ReadClusterInfo(clusterName string) (*ClusterInfo, error) {
+	clusterInfo := &ClusterInfo{}
+
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		return clusterInfo, log.Errore(err)
+	}
+
+	query := fmt.Sprintf(`
+		select 
+			cluster_name,
+			count(*) as count_instances
+		from 
+			database_instance 
+		where
+			cluster_name='%s'
+		group by
+			cluster_name`, clusterName)
+
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		clusterInfo.ClusterName = m.GetString("cluster_name")
+		clusterInfo.CountInstances = m.GetUint("count_instances")
+		ApplyClusterAlias(clusterInfo)
+		return nil
+	})
+
+	return clusterInfo, err
+}
+
 // ReadClustersInfo reads names of all known clusters and some aggregated info
 func ReadClustersInfo() ([]ClusterInfo, error) {
 	clusters := []ClusterInfo{}
@@ -558,11 +580,7 @@ func ReadClustersInfo() ([]ClusterInfo, error) {
 			ClusterName:    m.GetString("cluster_name"),
 			CountInstances: m.GetUint("count_instances"),
 		}
-		for pattern, _ := range config.Config.ClusterNameToAlias {
-			if matched, _ := regexp.MatchString(pattern, clusterInfo.ClusterName); matched {
-				clusterInfo.ClusterAlias = config.Config.ClusterNameToAlias[pattern]
-			}
-		}
+		ApplyClusterAlias(&clusterInfo)
 
 		clusters = append(clusters, clusterInfo)
 		return nil
@@ -699,7 +717,7 @@ func WriteInstance(instance *Instance, lastError error) error {
 		}
 		return nil
 	}
-	return execDBWriteFunc(writeFunc)
+	return ExecDBWriteFunc(writeFunc)
 }
 
 // UpdateInstanceLastChecked updates the last_check timestamp in the orchestrator backed database
@@ -728,7 +746,7 @@ func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
 
 		return nil
 	}
-	return execDBWriteFunc(writeFunc)
+	return ExecDBWriteFunc(writeFunc)
 }
 
 // UpdateInstanceLastAttemptedCheck updates the last_attempted_check timestamp in the orchestrator backed database
@@ -763,7 +781,7 @@ func UpdateInstanceLastAttemptedCheck(instanceKey *InstanceKey) error {
 
 		return nil
 	}
-	return execDBWriteFunc(writeFunc)
+	return ExecDBWriteFunc(writeFunc)
 }
 
 // ForgetInstance removes an instance entry from the orchestrator backed database.
