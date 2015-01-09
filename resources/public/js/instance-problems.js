@@ -24,7 +24,14 @@ $(document).ready(function () {
 
         var problemInstancesFound = false;
     	instances.forEach(function (instance) {
-    		if (instance.hasProblem) {
+    		var considerInstance = instance.hasProblem
+    		if (typeof currentClusterName != "undefined") {
+    			// This is a cluster page; we will only consider this instance if it belongs to this cluster
+    			if (instance.ClusterName != currentClusterName()) {
+    				considerInstance = false
+    			}    			
+    		}
+    		if (considerInstance) {
 	    		$("#instance_problems ul").append('<li><div xmlns="http://www.w3.org/1999/xhtml" class="popover instance" data-nodeid="'+instance.id+'"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"></div></div></li>');
 
 	    		var popoverElement = $("#instance_problems [data-nodeid='" + instance.id + "'].popover");

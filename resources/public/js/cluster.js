@@ -481,7 +481,6 @@ $(document).ready(function () {
     		alias = "[none]";
     	}    	
         $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="'+clusterInfo.ClusterAlias+'">Alias: '+alias+'</a></li>');           
-    	console.log(clusterInfo)
     }, "json");
     
     if (isPseudoGTIDModeEnabled()) {
@@ -493,6 +492,7 @@ $(document).ready(function () {
 	    	refreshClusterOperationModeButton(); 
 	    });
     }
+    $("#instance_problems button").html("Cluster " + $("#instance_problems button").html())
     
     
     $("body").on("click", "a[data-command=change-cluster-alias]", function(event) {
