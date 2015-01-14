@@ -7,7 +7,6 @@
 }
 
 
-
 #alerts_container .alert {
     margin-bottom: 4px;
 }
@@ -187,10 +186,15 @@
     padding: 5px 9px;
 }
 
+#modalDataAttributesTable tbody tr td {
+	padding: 3px;
+}
+
 #modalDataAttributesTable td code {
 	white-space: normal;
 	background-color: inherit;
 }
+
 
 .bootbox .modal-body {
     padding: 12px;
@@ -295,6 +299,14 @@
     color: #ffffff;
 }
 #cluster_container .popover.instance.accept_drop h3 .glyphicon {
+    color: #ffffff;
+}
+
+#cluster_container .popover.instance.accept_drop_warning h3 {
+    background-color: #ff6600;
+    color: #ffffff;
+}
+#cluster_container .popover.instance.accept_drop_warning h3 .glyphicon {
     color: #ffffff;
 }
 

@@ -225,6 +225,16 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN mariadb_gtid TINYINT UNSIGNED NOT NULL AFTER oracle_gtid
 	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN relay_log_file varchar(128) CHARACTER SET ascii NOT NULL AFTER exec_master_log_pos
+	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN relay_log_pos bigint unsigned NOT NULL AFTER relay_log_file
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance

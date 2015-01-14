@@ -81,10 +81,18 @@ func (this *InstanceKey) DisplayString() string {
 	return fmt.Sprintf("%s:%d", this.Hostname, this.Port)
 }
 
+type BinlogType int
+
+const (
+	BinaryLog BinlogType = iota
+	RelayLog
+)
+
 // BinlogCoordinates described binary log coordinates in the form of log file & log position.
 type BinlogCoordinates struct {
 	LogFile string
 	LogPos  int64
+	Type    BinlogType
 }
 
 // Equals tests equality of this corrdinate and another one.
@@ -138,6 +146,7 @@ type Instance struct {
 	UsingMariaDBGTID       bool
 	ReadBinlogCoordinates  BinlogCoordinates
 	ExecBinlogCoordinates  BinlogCoordinates
+	RelaylogCoordinates    BinlogCoordinates
 	LastSQLError           string
 	LastIOError            string
 	SecondsBehindMaster    sql.NullInt64

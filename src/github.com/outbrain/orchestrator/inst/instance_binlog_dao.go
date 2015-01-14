@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/outbrain/golib/log"
+	"github.com/outbrain/golib/math"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/db"
@@ -41,8 +42,9 @@ func GetLastPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string) (Bi
 	step := 0
 
 	entryText := ""
+	commandToken := math.TernaryString(binlogCoordinates.Type == BinaryLog, "binlog", "relaylog")
 	for moreRowsExpected {
-		query := fmt.Sprintf("show binlog events in '%s' LIMIT %d,%d", binlog, (step * binlogEventsChunkSize), binlogEventsChunkSize)
+		query := fmt.Sprintf("show %s events in '%s' LIMIT %d,%d", commandToken, binlog, (step * binlogEventsChunkSize), binlogEventsChunkSize)
 
 		moreRowsExpected = false
 		err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
@@ -83,7 +85,7 @@ func GetLastPseudoGTIDEntryInInstance(instance *Instance) (*BinlogCoordinates, s
 	return nil, "", log.Errorf("Cannot find pseudo GTID entry in binlogs of %+v", instance.Key)
 }
 
-// Given a binlog entry text (query), search it in the give nbinary log of a given instance
+// Given a binlog entry text (query), search it in the given binary log of a given instance
 func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entryText string) (BinlogCoordinates, error) {
 	binlogCoordinates := BinlogCoordinates{LogFile: binlog, LogPos: 0}
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
@@ -94,8 +96,9 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 	moreRowsExpected := true
 	step := 0
 
+	commandToken := math.TernaryString(binlogCoordinates.Type == BinaryLog, "binlog", "relaylog")
 	for moreRowsExpected {
-		query := fmt.Sprintf("show binlog events in '%s' LIMIT %d,%d", binlog, (step * binlogEventsChunkSize), binlogEventsChunkSize)
+		query := fmt.Sprintf("show %s events in '%s' LIMIT %d,%d", commandToken, binlog, (step * binlogEventsChunkSize), binlogEventsChunkSize)
 		moreRowsExpected = false
 		err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 			if binlogCoordinates.LogPos != 0 {
@@ -142,7 +145,8 @@ func readBinlogEventsChunk(instanceKey *InstanceKey, startingCoordinates BinlogC
 	if err != nil {
 		return events, err
 	}
-	query := fmt.Sprintf("show binlog events in '%s' FROM %d LIMIT %d", startingCoordinates.LogFile, startingCoordinates.LogPos, binlogEventsChunkSize)
+	commandToken := math.TernaryString(startingCoordinates.Type == BinaryLog, "binlog", "relaylog")
+	query := fmt.Sprintf("show %s events in '%s' FROM %d LIMIT %d", commandToken, startingCoordinates.LogFile, startingCoordinates.LogPos, binlogEventsChunkSize)
 	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 		binlogEvent := BinlogEvent{}
 		binlogEvent.Coordinates.LogFile = m.GetString("Log_name")

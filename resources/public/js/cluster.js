@@ -72,15 +72,19 @@ function generateInstanceDivs(nodesMap) {
         	start: function(event, ui) {
         		resetRefreshTimer();
         		$("#cluster_container .accept_drop").removeClass("accept_drop");
-        		$("#cluster_container .popover.instance").droppable({
+         		$("#cluster_container .accept_drop_warning").removeClass("accept_drop_warning");
+         		$("#cluster_container .popover.instance").droppable({
         			accept: function(draggable) {
         				var draggedNode = nodesMap[draggedNodeId];
         				var targetNode = nodesMap[$(this).attr("data-nodeid")];
         				var acceptDrop =  moveInstance(draggedNode, targetNode, false);
-        				if (acceptDrop) {
+        				if (acceptDrop == "ok") {
         					$(this).addClass("accept_drop");
         				}
-        				return acceptDrop;
+        				if (acceptDrop == "warning") {
+        					$(this).addClass("accept_drop_warning");
+        				}
+        				return acceptDrop != null;
         			},
         			hoverClass: "draggable-hovers",
 					drop: function( event, ui ) {
@@ -95,6 +99,7 @@ function generateInstanceDivs(nodesMap) {
 	    	stop: function(event, ui) {
 	    		resetRefreshTimer();
         		$("#cluster_container .accept_drop").removeClass("accept_drop");
+        		$("#cluster_container .accept_drop_warning").removeClass("accept_drop_warning");
 	    	}
         });
     	$(duplicate).on("mouseleave", function() {
@@ -105,6 +110,7 @@ function generateInstanceDivs(nodesMap) {
     	// Don't ask why the following... jqueryUI recognizes the click as start drag, but fails to stop...
     	$(duplicate).on("click", function() {
         	$("#cluster_container .accept_drop").removeClass("accept_drop");
+        	$("#cluster_container .accept_drop").removeClass("accept_drop_warning");
         	return false;
         });	
     });
@@ -114,7 +120,7 @@ function moveInstance(node, droppableNode, shouldApply) {
 	if (clusterOperationPseudoGTIDMode) {
 		if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem) {
 			// Obviously can't handle.
-			return false;
+			return null;
 		}
 		
 		// We accept in the case where SQL thread is up to date (example use case: the node has
@@ -122,40 +128,49 @@ function moveInstance(node, droppableNode, shouldApply) {
 		// Or when the SQL thread is known to be stopped.
 		// In the future we may choose to allow matching nodes that are fully replicating, with lags etc.
 		if (node.Slave_SQL_Running && !node.isSQLThreadCaughtUpWithIOThread) {
-			return false;
+			return null;
+		}
+		if (node.id == droppableNode.id) {
+			return null;
+		}
+		if (instanceIsDescendant(droppableNode, node)) {
+			// Wrong direction!
+			return null;
 		}
 		if (instanceIsDescendant(node, droppableNode)) {
 			// clearly node cannot be more up to date than droppableNode
 			if (shouldApply) {
 				matchBelow(node, droppableNode);
 			}
-			return true;
+			return "ok";
 		}
 		if (isReplicationBehindSibling(node, droppableNode)) {
 			// verified that node isn't more up to date than droppableNode
 			if (shouldApply) {
 				matchBelow(node, droppableNode);
 			}
-			return true;
+			return "ok";
 		}
 		// TODO: the general case, where there's no clear family connection, meaning we cannot infer
-		// which instance is more up to date
-		// end pseudo-GTID mode
-		return false;
+		// which instance is more up to date. It's under the user's responsibility!
+		if (shouldApply) {
+			matchBelow(node, droppableNode);
+		}
+		return "warning";
 	}
 	// Not pseudo-GTID mode
 	if (node.isCoMaster) {
 		// Cannot move. RESET SLAVE on one of the co-masters.
-		return false;
+		return null;
 	}
 	if (instancesAreSiblings(node, droppableNode)) {
 		if (node.hasProblem || droppableNode.hasProblem) {
-			return false;
+			return null;
 		}
 		if (shouldApply) {
 			moveBelow(node, droppableNode);
 		}
-		return true;
+		return "ok";
 	}
 	if (instanceIsGrandchild(node, droppableNode)) {
 		if (node.hasProblem) {
@@ -165,22 +180,22 @@ function moveInstance(node, droppableNode, shouldApply) {
 			// and you want to move up the slave which is only delayed by its master.
 			// So to help out, if the instance is identically at its master's trail, it is allowed to move up.
 			if (!node.isSQLThreadCaughtUpWithIOThread) { 
-				return false;
+				return null;
 			}
 		}
 		if (shouldApply) {
 			moveUp(node, droppableNode);
 		}
-		return true;
+		return "ok";
 	}
 	if (instanceIsChild(droppableNode, node) && node.isMaster) {
 		if (node.hasProblem) {
-			return false;
+			return null;
 		}
 		if (shouldApply) {
 			makeCoMaster(node, droppableNode);
 		}
-		return true;
+		return "ok";
 	}
 	
 	if (shouldApply) {
@@ -193,7 +208,7 @@ function moveInstance(node, droppableNode, shouldApply) {
 				"You may only move a node down below its sibling or up below its grandparent."
 			);
 	}
-	return false;
+	return null;
 }
 
 function moveBelow(node, siblingNode) {
@@ -216,6 +231,7 @@ function moveBelow(node, siblingNode) {
 	            }, "json");					
 		}
 		$("#cluster_container .accept_drop").removeClass("accept_drop");
+    	$("#cluster_container .accept_drop").removeClass("accept_drop_warning");
 	}); 
 	return false;
 }

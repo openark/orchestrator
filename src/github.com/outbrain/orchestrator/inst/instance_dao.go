@@ -103,6 +103,9 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		instance.ReadBinlogCoordinates.LogPos = m.GetInt64("Read_Master_Log_Pos")
 		instance.ExecBinlogCoordinates.LogFile = m.GetString("Relay_Master_Log_File")
 		instance.ExecBinlogCoordinates.LogPos = m.GetInt64("Exec_Master_Log_Pos")
+		instance.RelaylogCoordinates.LogFile = m.GetString("Relay_Log_File")
+		instance.RelaylogCoordinates.LogPos = m.GetInt64("Relay_Log_Pos")
+		instance.RelaylogCoordinates.Type = RelayLog
 		instance.LastSQLError = m.GetString("Last_SQL_Error")
 		instance.LastIOError = m.GetString("Last_IO_Error")
 		instance.UsingOracleGTID = (m.GetIntD("Auto_Position", 0) == 1)
@@ -323,6 +326,9 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.ReadBinlogCoordinates.LogPos = m.GetInt64("read_master_log_pos")
 	instance.ExecBinlogCoordinates.LogFile = m.GetString("relay_master_log_file")
 	instance.ExecBinlogCoordinates.LogPos = m.GetInt64("exec_master_log_pos")
+	instance.RelaylogCoordinates.LogFile = m.GetString("relay_log_file")
+	instance.RelaylogCoordinates.LogPos = m.GetInt64("relay_log_pos")
+	instance.RelaylogCoordinates.Type = RelayLog
 	instance.LastSQLError = m.GetString("last_sql_error")
 	instance.LastIOError = m.GetString("last_io_error")
 	instance.SecondsBehindMaster = m.GetNullInt64("seconds_behind_master")
@@ -667,6 +673,8 @@ func WriteInstance(instance *Instance, lastError error) error {
 				read_master_log_pos,
 				relay_master_log_file,
 				exec_master_log_pos,
+				relay_log_file,
+				relay_log_pos,
 				last_sql_error,
 				last_io_error,
 				seconds_behind_master,
@@ -674,7 +682,7 @@ func WriteInstance(instance *Instance, lastError error) error {
 				num_slave_hosts,
 				slave_hosts,
 				cluster_name
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			instance.Key.Hostname,
 			instance.Key.Port,
 			instance.ServerID,
@@ -695,6 +703,8 @@ func WriteInstance(instance *Instance, lastError error) error {
 			instance.ReadBinlogCoordinates.LogPos,
 			instance.ExecBinlogCoordinates.LogFile,
 			instance.ExecBinlogCoordinates.LogPos,
+			instance.RelaylogCoordinates.LogFile,
+			instance.RelaylogCoordinates.LogPos,
 			instance.LastSQLError,
 			instance.LastIOError,
 			instance.SecondsBehindMaster,

@@ -375,7 +375,7 @@ Cleanup:
 // MatchBelow will attempt moving instance indicated by instanceKey below its the one indicated by otherKey.
 // The refactoring is based on matching binlog entries, not on "classic" positions comparisons.
 // The "other instance" could be the sibling of the moving instance any of its ancestors. It may actuall be
-// a cousing of some sort (though unlikely). The only important thing is that the "other instance" is more
+// a cousin of some sort (though unlikely). The only important thing is that the "other instance" is more
 // advanced in replication than given instance.
 func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance bool, requireOtherMaintenance bool) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
