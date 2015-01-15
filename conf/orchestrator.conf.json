@@ -11,7 +11,7 @@
   "SlaveLagQuery": "",
   "DiscoverByShowSlaveHosts": true,
   "DiscoveryPollSeconds": 5,
-  "InstancePollSeconds": 60,
+  "InstancePollSeconds": 12,
   "ActiveNodeExpireSeconds": 20,
   "HostnameResolveMethod": "cname",
   "ExpiryHostnameResolvesMinutes": 60,

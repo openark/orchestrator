@@ -137,6 +137,10 @@ function moveInstance(node, droppableNode, shouldApply) {
 			// Wrong direction!
 			return null;
 		}
+		if (isReplicationBehindSibling(droppableNode, node)) {
+			// Sibling known to be less advanced. Wrong direction!
+			return null;
+		}
 		if (instanceIsDescendant(node, droppableNode)) {
 			// clearly node cannot be more up to date than droppableNode
 			if (shouldApply) {

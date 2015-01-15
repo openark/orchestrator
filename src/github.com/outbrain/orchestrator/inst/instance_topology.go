@@ -404,6 +404,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	var instancePseudoGtidCoordinates *BinlogCoordinates
 	var otherInstancePseudoGtidCoordinates *BinlogCoordinates
 	var nextBinlogCoordinatesToMatch *BinlogCoordinates
+	var recordedInstanceRelayLogCoordinates BinlogCoordinates
 
 	if requireInstanceMaintenance {
 		if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("match below %+v", *otherKey)); merr != nil {
@@ -427,8 +428,26 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	if err != nil {
 		goto Cleanup
 	}
+	// We record the relay log coordinates just after the instance stopped since the coordinates can change upon
+	// a FLUSH LOGS/FLUSH RELAY LOGS (or a START SLAVE, though that's an altogether different problem) etc.
+	// We want to be on the safe side; we don't utterly trust that we are the only ones playing with the instance.
+	recordedInstanceRelayLogCoordinates = instance.RelaylogCoordinates
 
-	instancePseudoGtidCoordinates, instancePseudoGtidText, err = GetLastPseudoGTIDEntryInInstance(instance)
+	if instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled {
+		// Well no need to search this instance's binary logs if it doesn't have any...
+		// With regard log-slave-updates, some edge cases are possible, like having this instance's log-slave-updates
+		// enabled/disabled (of course having restarted it)
+		// The approach is not to take chances. If log-slave-updates is disabled, fail and go for relay-logs.
+		// If log-slave-updates was just enabled then possibly no pseudo-gtid is found, and so again we will go
+		// for relay logs.
+		instancePseudoGtidCoordinates, instancePseudoGtidText, err = GetLastPseudoGTIDEntryInInstance(instance)
+	}
+	if err != nil || instancePseudoGtidCoordinates == nil {
+		// Unable to find pseudo GTID in binary logs.
+		// Then MAYBE we are lucky enough (chances are we are, if this slave did not crash) that we can
+		// extract the Pseudo GTID entry from the last (current) relay log file.
+		instancePseudoGtidCoordinates, instancePseudoGtidText, err = GetLastPseudoGTIDEntryInRelayLogs(instance, recordedInstanceRelayLogCoordinates)
+	}
 	if err != nil {
 		goto Cleanup
 	}
@@ -449,8 +468,9 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	//   the last pseudo gtid). Since they are identical, it is easy to point instance into otherInstance.
 	// - good result: the first position within otherInstance where instance has not replicated yet. It is easy to point
 	//   instance into otherInstance.
+
 	nextBinlogCoordinatesToMatch, err = GetNextBinlogCoordinatesToMatch(instance, *instancePseudoGtidCoordinates,
-		otherInstance, *otherInstancePseudoGtidCoordinates)
+		recordedInstanceRelayLogCoordinates, otherInstance, *otherInstancePseudoGtidCoordinates)
 	if err != nil {
 		goto Cleanup
 	}

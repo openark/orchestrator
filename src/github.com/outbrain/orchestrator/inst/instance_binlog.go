@@ -46,7 +46,7 @@ type BinlogEvent struct {
 
 //
 func (this *BinlogEvent) NextBinlogCoordinates() BinlogCoordinates {
-	return BinlogCoordinates{LogFile: this.Coordinates.LogFile, LogPos: this.NextEventPos}
+	return BinlogCoordinates{LogFile: this.Coordinates.LogFile, LogPos: this.NextEventPos, Type: this.Coordinates.Type}
 }
 
 //
