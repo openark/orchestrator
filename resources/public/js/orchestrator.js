@@ -458,6 +458,9 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.CountMySQLSnapshots > 0) {
     	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-camera" title="'+instance.CountMySQLSnapshots +' snapshots"></span> ');
     } 
+    if (instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled && !(instance.isMaster && !instance.isCoMaster)) {
+    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-forward" title="Logs slave updates"></span> ');
+    } 
     if (instance.inMaintenanceProblem()) {
     	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench"></span> ');
     } 
