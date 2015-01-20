@@ -41,7 +41,8 @@ type Configuration struct {
 	DiscoverByShowSlaveHosts                   bool   // Attempt SHOW SLAVE HOSTS before PROCESSLIST
 	InstancePollSeconds                        uint   // Number of seconds between instance reads
 	UnseenInstanceForgetHours                  uint   // Number of hours after which an unseen instance is forgotten
-	DiscoveryPollSeconds                       int    // Auto/continuous discovery of instances sleep time between polls
+	DiscoveryPollSeconds                       uint   // Auto/continuous discovery of instances sleep time between polls
+	InstanceBulkOperationsWaitTimeoutSeconds   uint   // Time to wait on a single instance when doing bulk (many instances) operation
 	ActiveNodeExpireSeconds                    uint
 	HostnameResolveMethod                      string // Method by which to "normalize" hostname ("none"/"cname")
 	ExpiryHostnameResolvesMinutes              int    // Number of minutes after which to expire hostname-resolves
@@ -80,6 +81,7 @@ func NewConfiguration() *Configuration {
 		SlaveStartPostWaitMilliseconds:             1000,
 		DiscoverByShowSlaveHosts:                   false,
 		DiscoveryPollSeconds:                       5,
+		InstanceBulkOperationsWaitTimeoutSeconds:   60,
 		ActiveNodeExpireSeconds:                    60,
 		HostnameResolveMethod:                      "cname",
 		ExpiryHostnameResolvesMinutes:              60,

@@ -485,6 +485,27 @@ function makeLocalMaster(instance) {
 	});
 }
 
+
+function promptForAlias(oldAlias) {
+	bootbox.prompt({
+		title: "Enter alias for this cluster",
+		value: oldAlias,
+		callback: function(result) {
+			if (result !== null) {
+		    	showLoader();
+		        $.get("/api/set-cluster-alias/"+currentClusterName()+"?alias="+encodeURIComponent(result), function (operationResult) {
+					hideLoader();
+					if (operationResult.Code == "ERROR") {
+						addAlert(operationResult.Message)
+					} else {
+						location.reload();
+					}	
+		        }, "json");	    				
+			} 
+		}
+	}); 
+}
+
 $(document).ready(function () {
     $.get("/api/cluster/"+currentClusterName(), function (instances) {
         $.get("/api/maintenance",
@@ -497,9 +518,9 @@ $(document).ready(function () {
     }, "json");
     $.get("/api/cluster-info/"+currentClusterName(), function (clusterInfo) {    
     	var alias = clusterInfo.ClusterAlias
-    	if (!alias) {
-    		alias = "[none]";
-    	}    	
+    	var visualAlias = (alias ? alias : currentClusterName())
+    	document.title = document.title.split(" - ")[0] + " - " + visualAlias;
+    	$("#cluster_container").append('<div class="floating_background">'+visualAlias+'</div>');
         $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="'+clusterInfo.ClusterAlias+'">Alias: '+alias+'</a></li>');           
     }, "json");
     
@@ -515,26 +536,9 @@ $(document).ready(function () {
     $("#instance_problems button").html("Cluster " + $("#instance_problems button").html())
     
     
-    $("body").on("click", "a[data-command=change-cluster-alias]", function(event) {
-    	
-    	bootbox.prompt({
-    		title: "Enter alias for this cluster",
-    		value: $(event.target).attr("data-alias"),
-    		callback: function(result) {
-    			if (result !== null) {
-    		    	showLoader();
-    		        $.get("/api/set-cluster-alias/"+currentClusterName()+"?alias="+encodeURIComponent(result), function (operationResult) {
-    					hideLoader();
-    					if (operationResult.Code == "ERROR") {
-    						addAlert(operationResult.Message)
-    					} else {
-    						location.reload();
-    					}	
-    		        }, "json");	    				
-    			} 
-    		}
-    	}); 
-    });
+    $("body").on("click", "a[data-command=change-cluster-alias]", function(event) {    	
+    	promptForAlias($(event.target).attr("data-alias"));
+    });    
 
     activateRefreshTimer();
 });

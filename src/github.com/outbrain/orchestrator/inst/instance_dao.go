@@ -28,10 +28,17 @@ import (
 	"time"
 )
 
-const backendDBConcurrency = 5
+const SQLThreadPollDuration = 200 * time.Millisecond
+
+const backendDBConcurrency = 20
 
 var instanceReadChan = make(chan bool, backendDBConcurrency)
 var instanceWriteChan = make(chan bool, backendDBConcurrency)
+
+// Max concurrency for bulk topology operations
+const topologyConcurrency = 100
+
+var TopologyConcurrencyChan = make(chan bool, topologyConcurrency)
 
 // ExecDBWriteFunc chooses how to execute a write onto the database: whether synchronuously or not
 func ExecDBWriteFunc(f func() error) error {
@@ -847,6 +854,27 @@ func RefreshTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	return inst, nil
 }
 
+// RefreshTopologyInstances will do a blocking (though concurrent) refresh of all given instances
+func RefreshTopologyInstances(instances [](*Instance)) {
+	// use concurrency but wait for all to complete
+	barrier := make(chan InstanceKey)
+	for _, instance := range instances {
+		instance := instance
+		go func() {
+			// Wait your turn to read a slave
+			TopologyConcurrencyChan <- true
+			log.Debugf("... reading instance: %+v", instance.Key)
+			ReadTopologyInstance(&instance.Key)
+			<-TopologyConcurrencyChan
+			// Signal compelted slave
+			barrier <- instance.Key
+		}()
+	}
+	for _ = range instances {
+		<-barrier
+	}
+}
+
 // RefreshInstanceSlaveHosts is a workaround for a bug in MySQL where
 // SHOW SLAVE HOSTS continues to present old, long disconnected slaves.
 // It turns out issuing a couple FLUSH commands mitigates the problem.
@@ -860,7 +888,8 @@ func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
 
 // StopSlaveNicely stops a slave such that SQL_thread and IO_thread are aligned (i.e.
 // SQL_thread consumes all relay log entries)
-func StopSlaveNicely(instanceKey *InstanceKey) (*Instance, error) {
+// It will actually START the sql_thread even if the slave is completely stopped.
+func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
@@ -873,16 +902,21 @@ func StopSlaveNicely(instanceKey *InstanceKey) (*Instance, error) {
 	_, err = ExecInstance(instanceKey, `stop slave io_thread`)
 	_, err = ExecInstance(instanceKey, `start slave sql_thread`)
 
-	for up_to_date := false; !up_to_date; {
+	startTime := time.Now()
+	for upToDate := false; !upToDate; {
+		if timeout > 0 && time.Since(startTime) >= timeout {
+			// timeout
+			return nil, errors.New(fmt.Sprintf("StopSlaveNicely timeout on %+v", *instanceKey))
+		}
 		instance, err = ReadTopologyInstance(instanceKey)
 		if err != nil {
 			return instance, log.Errore(err)
 		}
 
 		if instance.SQLThreadUpToDate() {
-			up_to_date = true
+			upToDate = true
 		} else {
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(SQLThreadPollDuration)
 		}
 	}
 	_, err = ExecInstance(instanceKey, `stop slave`)
@@ -892,6 +926,26 @@ func StopSlaveNicely(instanceKey *InstanceKey) (*Instance, error) {
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
+}
+
+// StopSlavesNicely will attemt to stop all given slaves nicely, up to timeout
+func StopSlavesNicely(slaves [](*Instance), timeout time.Duration) {
+	// use concurrency but wait for all to complete
+	barrier := make(chan InstanceKey)
+	for _, instance := range slaves {
+		instance := instance
+		go func() {
+			// Wait your turn to read a slave
+			TopologyConcurrencyChan <- true
+			StopSlaveNicely(&instance.Key, timeout)
+			<-TopologyConcurrencyChan
+			// Signal compelted slave
+			barrier <- instance.Key
+		}()
+	}
+	for _ = range slaves {
+		<-barrier
+	}
 }
 
 // StopSlave stops replication on a given instance
@@ -960,7 +1014,7 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 		return instance, log.Errore(err)
 	}
 
-	for up_to_date := false; !up_to_date; {
+	for upToDate := false; !upToDate; {
 		instance, err = ReadTopologyInstance(instanceKey)
 		if err != nil {
 			return instance, log.Errore(err)
@@ -968,9 +1022,9 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 
 		switch {
 		case instance.ExecBinlogCoordinates.SmallerThan(masterCoordinates):
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(SQLThreadPollDuration)
 		case instance.ExecBinlogCoordinates.Equals(masterCoordinates):
-			up_to_date = true
+			upToDate = true
 		case masterCoordinates.SmallerThan(&instance.ExecBinlogCoordinates):
 			return instance, errors.New(fmt.Sprintf("Start SLAVE UNTIL is past coordinates: %+v", instanceKey))
 		}

@@ -27,7 +27,7 @@ import (
 )
 
 // Cli initiates a command line interface, executing requested command.
-func Cli(command string, instance string, sibling string, owner string, reason string) {
+func Cli(command string, strict bool, instance string, sibling string, owner string, reason string) {
 
 	instanceKey, err := inst.ParseInstanceKey(instance)
 	if err != nil {
@@ -92,9 +92,37 @@ func Cli(command string, instance string, sibling string, owner string, reason s
 			if siblingKey == nil {
 				log.Fatal("Cannot deduce sibling:", sibling)
 			}
-			_, err := inst.MatchBelow(instanceKey, siblingKey, true, true)
+			_, _, err := inst.MatchBelow(instanceKey, siblingKey, true, true)
 			if err != nil {
 				log.Errore(err)
+			}
+		}
+	case "get-candidate-slave":
+		{
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+
+			instance, _, err := inst.GetCandidateSlave(instanceKey, strict)
+			if err != nil {
+				log.Errore(err)
+			} else {
+				fmt.Println(instance.Key.DisplayString())
+			}
+		}
+	case "match-up-slaves":
+		{
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+
+			matchedSlaves, err := inst.MatchUpAllSlaves(instanceKey)
+			if err != nil {
+				log.Errore(err)
+			} else {
+				for _, slave := range matchedSlaves {
+					fmt.Println(slave.Key.DisplayString())
+				}
 			}
 		}
 	case "reset-slave":

@@ -315,6 +315,14 @@
     width: inherit;
 }
 
+#main_container .floating_background {
+	float: left;
+	position: fixed;
+	z-index: -1;
+	font-size: 50px;
+	color: #d0d0d0;
+}
+
 #cluster_container {
     overflow: auto;
 }

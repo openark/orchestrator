@@ -24,21 +24,29 @@ import (
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/db"
+	"github.com/pmylund/go-cache"
 	"regexp"
+	"time"
 )
 
 const binlogEventsChunkSize int = 100000
+
+var instancePseudoGTIDEntryCache = cache.New(time.Duration(10)*time.Minute, time.Minute)
+
+func fetInstancePseudoGTIDKey(instance *Instance, entry string) string {
+	return fmt.Sprintf("%s;%s", instance.Key.DisplayString, entry)
+}
 
 // Try and find the last position of a pseudo GTID query entry in the given binary log.
 // Also return the full text of that entry.
 // maxCoordinates is the position beyond which we should not read. This is relevant when reading relay logs; in particular,
 // the last relay log. We must be careful not to scan for Pseudo-GTID entries past the position executed by the SQL thread.
 // maxCoordinates == nil means no limit.
-func GetLastPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, binlogType BinlogType, maxCoordinates *BinlogCoordinates) (BinlogCoordinates, string, error) {
+func getLastPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, binlogType BinlogType, maxCoordinates *BinlogCoordinates) (*BinlogCoordinates, string, error) {
 	binlogCoordinates := BinlogCoordinates{LogFile: binlog, LogPos: 0, Type: binlogType}
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
-		return binlogCoordinates, "", err
+		return nil, "", err
 	}
 
 	moreRowsExpected := true
@@ -67,15 +75,16 @@ func GetLastPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, bin
 			return nil
 		})
 		if err != nil {
-			return binlogCoordinates, "", err
+			return nil, "", err
 		}
 		step++
 	}
 
+	// Not found? return nil. an error is reserved to SQL problems.
 	if binlogCoordinates.LogPos == 0 {
-		return binlogCoordinates, "", errors.New(fmt.Sprintf("Cannot find pseudo GTID entry in binlog '%s'", binlog))
+		return nil, "", nil
 	}
-	return binlogCoordinates, entryText, err
+	return &binlogCoordinates, entryText, err
 }
 
 func GetLastPseudoGTIDEntryInInstance(instance *Instance) (*BinlogCoordinates, string, error) {
@@ -84,10 +93,13 @@ func GetLastPseudoGTIDEntryInInstance(instance *Instance) (*BinlogCoordinates, s
 
 	for i := len(instanceBinlogs) - 1; i >= 0; i-- {
 		log.Debugf("Searching for latest pseudo gtid entry in binlog %+v of %+v", instanceBinlogs[i], instance.Key)
-		resultCoordinates, entryInfo, err := GetLastPseudoGTIDEntryInBinlog(&instance.Key, instanceBinlogs[i], BinaryLog, nil)
-		if resultCoordinates.LogPos != 0 && err == nil {
+		resultCoordinates, entryInfo, err := getLastPseudoGTIDEntryInBinlog(&instance.Key, instanceBinlogs[i], BinaryLog, nil)
+		if err != nil {
+			return nil, "", err
+		}
+		if resultCoordinates != nil {
 			log.Debugf("Found pseudo gtid entry in %+v: %+v", instance.Key, resultCoordinates)
-			return &resultCoordinates, entryInfo, err
+			return resultCoordinates, entryInfo, err
 		}
 	}
 	return nil, "", log.Errorf("Cannot find pseudo GTID entry in binlogs of %+v", instance.Key)
@@ -95,14 +107,21 @@ func GetLastPseudoGTIDEntryInInstance(instance *Instance) (*BinlogCoordinates, s
 
 func GetLastPseudoGTIDEntryInRelayLogs(instance *Instance, recordedInstanceRelayLogCoordinates BinlogCoordinates) (*BinlogCoordinates, string, error) {
 	// Look for last GTID in relay logs:
-
-	log.Debugf("Searching for latest pseudo gtid entry in relaylog %+v of %+v, up to pos %d", recordedInstanceRelayLogCoordinates.LogFile, instance.Key, recordedInstanceRelayLogCoordinates.LogPos)
-	resultCoordinates, entryInfo, err := GetLastPseudoGTIDEntryInBinlog(&instance.Key, recordedInstanceRelayLogCoordinates.LogFile, RelayLog, &recordedInstanceRelayLogCoordinates)
-	if resultCoordinates.LogPos != 0 && err == nil {
-		log.Debugf("Found pseudo gtid entry in %+v: %+v", instance.Key, resultCoordinates)
-		return &resultCoordinates, entryInfo, err
+	// Since MySQL does not provide with a SHOW RELAY LOGS command, we heuristically srtart from current
+	// relay log (indiciated by Relay_log_file) and walk backwards.
+	// Eventually we will hit a relay log name which does not exist.
+	currentRelayLog := recordedInstanceRelayLogCoordinates
+	var err error = nil
+	for err == nil {
+		log.Debugf("Searching for latest pseudo gtid entry in relaylog %+v of %+v, up to pos %+v", currentRelayLog.LogFile, instance.Key, recordedInstanceRelayLogCoordinates)
+		if resultCoordinates, entryInfo, err := getLastPseudoGTIDEntryInBinlog(&instance.Key, currentRelayLog.LogFile, RelayLog, &recordedInstanceRelayLogCoordinates); err != nil {
+			return nil, "", err
+		} else if resultCoordinates != nil {
+			log.Debugf("Found pseudo gtid entry in %+v: %+v", instance.Key, resultCoordinates)
+			return resultCoordinates, entryInfo, err
+		}
+		currentRelayLog, err = currentRelayLog.PreviousFileCoordinates()
 	}
-
 	return nil, "", log.Errorf("Cannot find pseudo GTID entry in relay logs of %+v", instance.Key)
 }
 
@@ -146,6 +165,13 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 }
 
 func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string) (*BinlogCoordinates, error) {
+	cacheKey := fetInstancePseudoGTIDKey(instance, entryText)
+	coords, found := instancePseudoGTIDEntryCache.Get(cacheKey)
+	if found {
+		// This is wonderful. We can skip the tedious GTID search in the binary log
+		log.Debugf("Found instance Pseudo GTID entry coordinates in cache: %+v, %+v, %+v", instance.Key, entryText, coords)
+		return coords.(*BinlogCoordinates), nil
+	}
 	// Look for GTID entry in other-instance:
 	binlogs := instance.GetBinaryLogs()
 	for i := len(binlogs) - 1; i >= 0; i-- {
@@ -153,6 +179,7 @@ func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string) (*Bin
 		resultCoordinates, err := SearchPseudoGTIDEntryInBinlog(&instance.Key, binlogs[i], entryText)
 		if resultCoordinates.LogPos != 0 && err == nil {
 			log.Debugf("Matched entry in %+v: %+v", instance.Key, resultCoordinates)
+			instancePseudoGTIDEntryCache.Set(cacheKey, &resultCoordinates, 0)
 			return &resultCoordinates, nil
 		}
 	}

@@ -17,10 +17,15 @@
 package inst
 
 import (
+	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/inst"
 	. "gopkg.in/check.v1"
 	"testing"
 )
+
+func init() {
+	config.Config.HostnameResolveMethod = "none"
+}
 
 func Test(t *testing.T) { TestingT(t) }
 
@@ -76,6 +81,50 @@ func (s *TestSuite) TestBinlogCoordinates(c *C) {
 	c.Assert(c3.SmallerThan(&c2), Equals, false)
 	c.Assert(c4.SmallerThan(&c2), Equals, false)
 	c.Assert(c4.SmallerThan(&c3), Equals, false)
+}
+
+func (s *TestSuite) TestBinlogPrevious(c *C) {
+	c1 := inst.BinlogCoordinates{LogFile: "mysql-bin.00017", LogPos: 104}
+	cres, err := c1.PreviousFileCoordinates()
+
+	c.Assert(err, IsNil)
+	c.Assert(c1.Type, Equals, cres.Type)
+	c.Assert(cres.LogFile, Equals, "mysql-bin.00016")
+
+	c2 := inst.BinlogCoordinates{LogFile: "mysql-bin.00100", LogPos: 104}
+	cres, err = c2.PreviousFileCoordinates()
+
+	c.Assert(err, IsNil)
+	c.Assert(c1.Type, Equals, cres.Type)
+	c.Assert(cres.LogFile, Equals, "mysql-bin.00099")
+
+	c3 := inst.BinlogCoordinates{LogFile: "mysql.00.prod.com.00100", LogPos: 104}
+	cres, err = c3.PreviousFileCoordinates()
+
+	c.Assert(err, IsNil)
+	c.Assert(c1.Type, Equals, cres.Type)
+	c.Assert(cres.LogFile, Equals, "mysql.00.prod.com.00099")
+
+	c4 := inst.BinlogCoordinates{LogFile: "mysql.00.prod.com.00000", LogPos: 104}
+	_, err = c4.PreviousFileCoordinates()
+
+	c.Assert(err, Not(IsNil))
+}
+
+func (s *TestSuite) TestBinlogCoordinatesAsKey(c *C) {
+	m := make(map[inst.BinlogCoordinates]bool)
+
+	c1 := inst.BinlogCoordinates{LogFile: "mysql-bin.00017", LogPos: 104}
+	c2 := inst.BinlogCoordinates{LogFile: "mysql-bin.00022", LogPos: 104}
+	c3 := inst.BinlogCoordinates{LogFile: "mysql-bin.00017", LogPos: 104}
+	c4 := inst.BinlogCoordinates{LogFile: "mysql-bin.00017", LogPos: 222}
+
+	m[c1] = true
+	m[c2] = true
+	m[c3] = true
+	m[c4] = true
+
+	c.Assert(len(m), Equals, 3)
 }
 
 func (s *TestSuite) TestCanReplicateFrom(c *C) {

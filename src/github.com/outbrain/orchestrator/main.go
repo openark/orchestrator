@@ -27,6 +27,7 @@ import (
 func main() {
 	configFile := flag.String("config", "", "config file name")
 	command := flag.String("c", "", "command (discover|forget|continuous|move-up|move-below|begin-maintenance|end-maintenance|clusters|topology)")
+	strict := flag.Bool("strict", false, "strict mode (more checks, slower)")
 	instance := flag.String("i", "", "instance, host:port")
 	sibling := flag.String("s", "", "sibling instance, host:port")
 	owner := flag.String("owner", "", "operation owner")
@@ -58,7 +59,7 @@ func main() {
 
 	switch {
 	case len(flag.Args()) == 0 || flag.Arg(0) == "cli":
-		app.Cli(*command, *instance, *sibling, *owner, *reason)
+		app.Cli(*command, *strict, *instance, *sibling, *owner, *reason)
 	case flag.Arg(0) == "http":
 		app.Http(*discovery)
 	default:

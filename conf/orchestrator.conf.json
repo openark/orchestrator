@@ -12,6 +12,7 @@
   "DiscoverByShowSlaveHosts": true,
   "DiscoveryPollSeconds": 5,
   "InstancePollSeconds": 12,
+  "InstanceBulkOperationsWaitTimeoutSeconds":60,
   "ActiveNodeExpireSeconds": 20,
   "HostnameResolveMethod": "cname",
   "ExpiryHostnameResolvesMinutes": 60,

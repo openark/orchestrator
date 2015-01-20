@@ -68,7 +68,7 @@ func ResolveHostname(hostname string) (string, error) {
 	}
 
 	// Unfound: resolve!
-	log.Debugf("Unfound: %s", hostname)
+	log.Debugf("Hostname unresolved yet: %s", hostname)
 	resolvedHostname, err := resolveHostname(hostname)
 	if err != nil {
 		// Problem. What we'll do is cache the hostname for just one minute, so as to avoid flooding requests
@@ -90,7 +90,9 @@ func UpdateResolvedHostname(hostname string, resolvedHostname string) bool {
 		return false
 	}
 	hostnameResolvesLightweightCache.Set(hostname, resolvedHostname, 0)
-	WriteResolvedHostname(hostname, resolvedHostname)
+	if strings.ToLower(config.Config.HostnameResolveMethod) != "none" {
+		WriteResolvedHostname(hostname, resolvedHostname)
+	}
 	return true
 }
 

@@ -111,6 +111,32 @@ func (this *BinlogCoordinates) SmallerThan(other *BinlogCoordinates) bool {
 	return false
 }
 
+// Previous guesses the filename of the previous binlog/relaylog
+func (this *BinlogCoordinates) PreviousFileCoordinates() (BinlogCoordinates, error) {
+	result := BinlogCoordinates{LogPos: 0, Type: this.Type}
+
+	tokens := strings.Split(this.LogFile, ".")
+	numPart := tokens[len(tokens)-1]
+	numLen := len(numPart)
+	fileNum, err := strconv.Atoi(numPart)
+	if err != nil {
+		return result, err
+	}
+	if fileNum == 0 {
+		return result, errors.New("Log file number is zero, cannot detect previous file")
+	}
+	newNumStr := fmt.Sprintf("%d", (fileNum - 1))
+	newNumStr = strings.Repeat("0", numLen-len(newNumStr)) + newNumStr
+	tokens[len(tokens)-1] = newNumStr
+	result.LogFile = strings.Join(tokens, ".")
+	return result, nil
+}
+
+// DisplayString returns a user-friendly string representation of these coordinates
+func (this *BinlogCoordinates) DisplayString() string {
+	return fmt.Sprintf("%s:%d", this.LogFile, this.LogPos)
+}
+
 // InstanceKeyMap is a convenience struct for listing InstanceKey-s
 type InstanceKeyMap map[InstanceKey]bool
 

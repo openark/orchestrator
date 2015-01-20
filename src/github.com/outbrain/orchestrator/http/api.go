@@ -386,13 +386,13 @@ func (this *HttpAPI) MatchBelow(params martini.Params, r render.Render, req *htt
 		return
 	}
 
-	instance, err := inst.MatchBelow(&instanceKey, &belowKey, true, true)
+	instance, matchedCoordinates, err := inst.MatchBelow(&instanceKey, &belowKey, true, true)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v matched below %+v", instanceKey, belowKey), Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v matched below %+v at %+v", instanceKey, belowKey, *matchedCoordinates), Details: instance})
 }
 
 // MakeMaster attempts to make the given instance a master, and match its siblings to be its slaves
@@ -492,7 +492,7 @@ func (this *HttpAPI) StopSlaveNicely(params martini.Params, r render.Render, req
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	instance, err := inst.StopSlaveNicely(&instanceKey)
+	instance, err := inst.StopSlaveNicely(&instanceKey, 0)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return

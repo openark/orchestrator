@@ -150,7 +150,7 @@ func (s *TestSuite) TestStopStartSlave(c *C) {
 
 	i, _ := inst.ReadTopologyInstance(&slave1Key)
 	c.Assert(i.SlaveRunning(), Equals, true)
-	i, _ = inst.StopSlaveNicely(&i.Key)
+	i, _ = inst.StopSlaveNicely(&i.Key, 0)
 
 	c.Assert(i.SlaveRunning(), Equals, false)
 	c.Assert(i.SQLThreadUpToDate(), Equals, true)
@@ -371,7 +371,7 @@ func (s *TestSuite) TestFailMoveBelowUponSlaveStopped(c *C) {
 
 	slave1, _ := inst.ReadTopologyInstance(&slave1Key)
 	c.Assert(slave1.SlaveRunning(), Equals, true)
-	slave1, _ = inst.StopSlaveNicely(&slave1.Key)
+	slave1, _ = inst.StopSlaveNicely(&slave1.Key, 0)
 	c.Assert(slave1.SlaveRunning(), Equals, false)
 
 	_, err := inst.MoveBelow(&slave1Key, &slave2Key)
@@ -385,7 +385,7 @@ func (s *TestSuite) TestFailMoveBelowUponOtherSlaveStopped(c *C) {
 
 	slave1, _ := inst.ReadTopologyInstance(&slave1Key)
 	c.Assert(slave1.SlaveRunning(), Equals, true)
-	slave1, _ = inst.StopSlaveNicely(&slave1.Key)
+	slave1, _ = inst.StopSlaveNicely(&slave1.Key, 0)
 	c.Assert(slave1.SlaveRunning(), Equals, false)
 
 	_, err := inst.MoveBelow(&slave2Key, &slave1Key)
