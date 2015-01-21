@@ -120,6 +120,7 @@ function moveInstance(node, droppableNode, shouldApply) {
 	if (clusterOperationPseudoGTIDMode) {
 		if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem) {
 			// Obviously can't handle.
+			console.log(1);
 			return null;
 		}
 		
@@ -128,17 +129,21 @@ function moveInstance(node, droppableNode, shouldApply) {
 		// Or when the SQL thread is known to be stopped.
 		// In the future we may choose to allow matching nodes that are fully replicating, with lags etc.
 		if (node.Slave_SQL_Running && !node.isSQLThreadCaughtUpWithIOThread) {
+			console.log(2);
 			return null;
 		}
 		if (node.id == droppableNode.id) {
+			console.log(3);
 			return null;
 		}
 		if (instanceIsDescendant(droppableNode, node)) {
 			// Wrong direction!
+			console.log(4);
 			return null;
 		}
-		if (isReplicationBehindSibling(droppableNode, node)) {
+		if (isReplicationStrictlyBehindSibling(droppableNode, node)) {
 			// Sibling known to be less advanced. Wrong direction!
+			console.log(5);
 			return null;
 		}
 		if (instanceIsDescendant(node, droppableNode)) {
@@ -382,6 +387,13 @@ function isReplicationBehindSibling(node, sibling) {
 		return false;
 	} 
 	return compareInstancesExecBinlogCoordinates(node, sibling) <= 0;
+}
+
+function isReplicationStrictlyBehindSibling(node, sibling) { 
+	if (!instancesAreSiblings(node, sibling)) {
+		return false;
+	} 
+	return compareInstancesExecBinlogCoordinates(node, sibling) < 0;
 }
 
 function compareInstancesExecBinlogCoordinates(i0, i1) {
