@@ -584,6 +584,31 @@ Cleanup:
 	return instance, err
 }
 
+// EnslaveSiblingsSimple is a convenience method for turning sublings of a slave to be its subordinates.
+// This uses normal connected replication (does not utilize Pseudo-GTID)
+func EnslaveSiblingsSimple(instanceKey *InstanceKey) (*Instance, int, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, 0, err
+	}
+	masterInstance, found, err := ReadInstance(&instance.MasterKey)
+	if err != nil || !found {
+		return instance, 0, err
+	}
+	siblings, err := ReadSlaveInstances(&masterInstance.Key)
+	if err != nil {
+		return instance, 0, err
+	}
+	enslavedSiblings := 0
+	for _, sibling := range siblings {
+		if _, err := MoveBelow(&sibling.Key, &instance.Key); err == nil {
+			enslavedSiblings++
+		}
+	}
+
+	return instance, enslavedSiblings, err
+}
+
 // MakeLocalMaster promotes a slave above its master, making it slave of its grandparent, while also enslaving its siblings.
 // This serves as a convenience method to recover replication when a local master fails; the instance promoted is one of its slaves,
 // which is most advanced among its siblings.
@@ -662,29 +687,29 @@ func sortedSlaves(masterKey *InstanceKey, forceRefresh bool) ([](*Instance), err
 	return slaves, err
 }
 
-// MatchUpAllSlaves will move all slaves og given master up the replication chain,
+// MatchUpSlaves will move all slaves og given master up the replication chain,
 // so that they become siblings of their master.
 // This should be called when the local master dies, and all its slaves are to be resurrected via Pseudo-GTID
-func MatchUpAllSlaves(masterKey *InstanceKey) ([](*Instance), error) {
+func MatchUpSlaves(masterKey *InstanceKey) ([](*Instance), *Instance, error) {
 	res := [](*Instance){}
 
 	masterInstance, found, err := ReadInstance(masterKey)
 	if err != nil || !found {
-		return res, err
+		return res, nil, err
 	}
 	grandparentInstance, err := ReadTopologyInstance(&masterInstance.MasterKey)
 	if err != nil {
 		// Can't access grandparent ==> can't move slaves up to be its children
-		return res, err
+		return res, grandparentInstance, err
 	}
 
 	// slaves involved
 	slaves, err := ReadSlaveInstances(masterKey)
 	if err != nil {
-		return res, err
+		return res, grandparentInstance, err
 	}
 	if len(slaves) == 0 {
-		return res, nil
+		return res, grandparentInstance, nil
 	}
 	log.Debugf("matchUpAllSlaves: stopping nicely %d slaves of %+v", len(slaves), *masterKey)
 	// We want the slaves to have SQL thread up to date with IO thread.
@@ -701,11 +726,10 @@ func MatchUpAllSlaves(masterKey *InstanceKey) ([](*Instance), error) {
 	for _, slave := range slaves {
 		slave := slave
 		slaveBuckets[slave.ExecBinlogCoordinates] = append(slaveBuckets[slave.ExecBinlogCoordinates], slave)
-		knownCoordinatesMap[slave.ExecBinlogCoordinates] = nil
 	}
 	log.Debugf("matchUpAllSlaves: %d slaves merged into %d buckets", len(slaves), len(slaveBuckets))
-	for bucket, _ := range slaveBuckets {
-		log.Debugf("bucket: %+v", bucket)
+	for bucket, bucketSlaves := range slaveBuckets {
+		log.Debugf("bucket: %+v, %d slaves", bucket, len(bucketSlaves))
 	}
 	matchedSlaves := make(map[InstanceKey]bool)
 	barrier := make(chan *BinlogCoordinates)
@@ -714,11 +738,12 @@ func MatchUpAllSlaves(masterKey *InstanceKey) ([](*Instance), error) {
 
 	if maintenanceToken, merr := BeginMaintenance(&grandparentInstance.Key, "orchestrator", fmt.Sprintf("slaves match up below this", grandparentInstance.Key)); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", grandparentInstance.Key))
-		return res, err
+		return res, grandparentInstance, err
 	} else {
 		defer EndMaintenance(maintenanceToken)
 	}
 	for execCoordinates, bucketSlaves := range slaveBuckets {
+		execCoordinates := execCoordinates
 		bucketSlaves := bucketSlaves
 		// Buckets concurrent
 		go func() {
@@ -759,6 +784,10 @@ func MatchUpAllSlaves(masterKey *InstanceKey) ([](*Instance), error) {
 			log.Errorf("matchUpAllSlaves: Cannot match up %+v since cannot lookup matched coordinates for %+v", slave.Key, slave.ExecBinlogCoordinates)
 			continue
 		}
+		if matchedCoordinates == nil {
+			log.Errorf("matchUpAllSlaves: found nil matchedCoordinates in bucket %+v", slave.ExecBinlogCoordinates)
+			continue
+		}
 		log.Debugf("matchUpAllSlaves: Will match up %+v to previously matched master coordinates %+v", slave.Key, matchedCoordinates)
 		if _, err := ChangeMasterTo(&slave.Key, &grandparentInstance.Key, matchedCoordinates); err == nil {
 			StartSlave(&slave.Key)
@@ -775,7 +804,7 @@ func MatchUpAllSlaves(masterKey *InstanceKey) ([](*Instance), error) {
 			res = append(res, slave)
 		}
 	}
-	return res, err
+	return res, grandparentInstance, err
 }
 
 // GetCandidateSlave chooses the best slave to promote given a (possibly dead) master

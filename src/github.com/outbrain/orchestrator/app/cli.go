@@ -74,6 +74,16 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Errore(err)
 			}
 		}
+	case "enslave-sublings-simple":
+		{
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			_, _, err := inst.EnslaveSiblingsSimple(instanceKey)
+			if err != nil {
+				log.Errore(err)
+			}
+		}
 	case "make-co-master":
 		{
 			if instanceKey == nil {
@@ -116,7 +126,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			matchedSlaves, err := inst.MatchUpAllSlaves(instanceKey)
+			matchedSlaves, _, err := inst.MatchUpSlaves(instanceKey)
 			if err != nil {
 				log.Errore(err)
 			} else {

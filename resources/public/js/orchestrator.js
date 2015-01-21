@@ -161,7 +161,9 @@ function openNodeModal(node) {
 
     addNodeModalDataAttribute("Binlog format", node.Binlog_format);
     addNodeModalDataAttribute("Has binary logs", booleanString(node.LogBinEnabled));
-    addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
+    var td = addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
+    $('#node_modal button[data-btn=enslave-siblings-simple]').appendTo(td.find("div"))
+        
     addNodeModalDataAttribute("Cluster",
             '<a href="/web/cluster/'+node.ClusterName+'">'+node.ClusterName+'</a>');
     addNodeModalDataAttribute("Agent",
@@ -270,6 +272,14 @@ function openNodeModal(node) {
     } else {
     	$('#node_modal button[data-btn=set-read-only]').show();
     }
+   	$('#node_modal button[data-btn=enslave-siblings-simple]').hide();
+    if (node.LogBinEnabled && node.LogSlaveUpdatesEnabled) {
+    	$('#node_modal button[data-btn=enslave-siblings-simple]').show();
+    }
+    $('#node_modal button[data-btn=enslave-siblings-simple]').click(function(){
+    	apiCommand("/api/enslave-siblings-simple/"+node.Key.Hostname+"/"+node.Key.Port);
+    });
+
 
     $('#node_modal').modal({})
     $('#node_modal').unbind('hidden.bs.modal');
