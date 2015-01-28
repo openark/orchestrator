@@ -241,6 +241,7 @@ var generateSQLPatches = []string{
 func OpenTopology(host string, port int) (*sql.DB, error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/?timeout=%ds", config.Config.MySQLTopologyUser, config.Config.MySQLTopologyPassword, host, port, config.Config.MySQLConnectTimeoutSeconds)
 	db, _, err := sqlutils.GetDB(mysql_uri)
+	db.SetMaxOpenConns(config.Config.MySQLTopologyMaxPoolConnections)
 	return db, err
 }
 
