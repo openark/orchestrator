@@ -17,6 +17,7 @@
 package config
 
 import (
+	"code.google.com/p/gcfg"
 	"encoding/json"
 	"os"
 
@@ -29,12 +30,15 @@ import (
 type Configuration struct {
 	ListenAddress                              string
 	MySQLTopologyUser                          string
-	MySQLTopologyPassword                      string
+	MySQLTopologyPassword                      string // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
+	MySQLTopologyCredentialsConfigFile         string
+	MySQLTopologyMaxPoolConnections            int // Max concurrent connections on any topology instance
 	MySQLOrchestratorHost                      string
 	MySQLOrchestratorPort                      uint
 	MySQLOrchestratorDatabase                  string
 	MySQLOrchestratorUser                      string
 	MySQLOrchestratorPassword                  string
+	MySQLOrchestratorCredentialsConfigFile     string // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
 	MySQLConnectTimeoutSeconds                 int    // Number of seconds before connection is aborted (driver-side)
 	SlaveLagQuery                              string // custom query to check on slave lg (e.g. heartbeat table)
 	SlaveStartPostWaitMilliseconds             int    // Time to wait after START SLAVE before re-readong instance (give slave chance to connect to master)
@@ -75,6 +79,7 @@ var Config *Configuration = NewConfiguration()
 func NewConfiguration() *Configuration {
 	return &Configuration{
 		ListenAddress:                              ":3000",
+		MySQLTopologyMaxPoolConnections:            3,
 		MySQLConnectTimeoutSeconds:                 5,
 		InstancePollSeconds:                        60,
 		UnseenInstanceForgetHours:                  240,
@@ -122,6 +127,37 @@ func read(file_name string) (*Configuration, error) {
 		} else {
 			log.Fatal("Cannot read config file:", file_name, err)
 		}
+		if Config.MySQLOrchestratorCredentialsConfigFile != "" {
+			mySQLConfig := struct {
+				Client struct {
+					User     string
+					Password string
+				}
+			}{}
+			err := gcfg.ReadFileInto(&mySQLConfig, Config.MySQLOrchestratorCredentialsConfigFile)
+			if err != nil {
+				log.Fatalf("Failed to parse gcfg data from file: %+v", err)
+			} else {
+				Config.MySQLOrchestratorUser = mySQLConfig.Client.User
+				Config.MySQLOrchestratorPassword = mySQLConfig.Client.Password
+			}
+		}
+		if Config.MySQLTopologyCredentialsConfigFile != "" {
+			mySQLConfig := struct {
+				Client struct {
+					User     string
+					Password string
+				}
+			}{}
+			err := gcfg.ReadFileInto(&mySQLConfig, Config.MySQLTopologyCredentialsConfigFile)
+			if err != nil {
+				log.Fatalf("Failed to parse gcfg data from file: %+v", err)
+			} else {
+				Config.MySQLTopologyUser = mySQLConfig.Client.User
+				Config.MySQLTopologyPassword = mySQLConfig.Client.Password
+			}
+		}
+
 	}
 	return Config, err
 }
