@@ -33,10 +33,10 @@ function activateRefreshTimer() {
 }
 		
 function showLoader() {
-    $("#ajaxLoader").css('visibility', 'visible');
+    $(".ajaxLoader").css('visibility', 'visible');
 }
 function hideLoader() {
-    $("#ajaxLoader").css('visibility', 'hidden');
+    $(".ajaxLoader").css('visibility', 'hidden');
 }
 
 function showContextMenu() {
@@ -554,7 +554,7 @@ $(document).ready(function() {
 			func(clusters);
 		});
 	}, "json");
-	$("#ajaxLoader").click(function() {
+	$(".ajaxLoader").click(function() {
         return false;
     });
 	$("#refreshCountdown").click(function() {

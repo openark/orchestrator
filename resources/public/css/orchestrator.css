@@ -32,6 +32,11 @@
     transition: border-color 0.15s ease-in-out 0s, box-shadow 0.15s ease-in-out 0s;
 }
 
+.popover.instance.selected {
+    border-width: 3px;
+    border-color: #808080;
+}
+
 .popover.instance h3 .small {
 	font-size:80%;
 	font-weight: inherit;

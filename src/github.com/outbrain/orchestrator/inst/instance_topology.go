@@ -687,31 +687,22 @@ func sortedSlaves(masterKey *InstanceKey, forceRefresh bool) ([](*Instance), err
 	return slaves, err
 }
 
-// MatchUpSlaves will move all slaves og given master up the replication chain,
-// so that they become siblings of their master.
-// This should be called when the local master dies, and all its slaves are to be resurrected via Pseudo-GTID
-func MatchUpSlaves(masterKey *InstanceKey) ([](*Instance), *Instance, error) {
+// MultiMatchBelow will efficiently match multiple slaves below a given instance.
+// It is assumed that all given slaves are siblings
+func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance), *Instance, error) {
 	res := [](*Instance){}
 
-	masterInstance, found, err := ReadInstance(masterKey)
-	if err != nil || !found {
-		return res, nil, err
-	}
-	grandparentInstance, err := ReadTopologyInstance(&masterInstance.MasterKey)
+	belowInstance, err := ReadTopologyInstance(belowKey)
 	if err != nil {
-		// Can't access grandparent ==> can't move slaves up to be its children
-		return res, grandparentInstance, err
+		// Can't access the server below which we need to match ==> can't move slaves
+		return res, belowInstance, err
 	}
 
 	// slaves involved
-	slaves, err := ReadSlaveInstances(masterKey)
-	if err != nil {
-		return res, grandparentInstance, err
-	}
 	if len(slaves) == 0 {
-		return res, grandparentInstance, nil
+		return res, belowInstance, nil
 	}
-	log.Debugf("matchUpAllSlaves: stopping nicely %d slaves of %+v", len(slaves), *masterKey)
+	log.Debugf("MultiMatchBelow: stopping nicely %d slaves", len(slaves))
 	// We want the slaves to have SQL thread up to date with IO thread.
 	// We will wait for them (up to a timeout) to do so.
 	StopSlavesNicely(slaves, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
@@ -727,21 +718,22 @@ func MatchUpSlaves(masterKey *InstanceKey) ([](*Instance), *Instance, error) {
 		slave := slave
 		slaveBuckets[slave.ExecBinlogCoordinates] = append(slaveBuckets[slave.ExecBinlogCoordinates], slave)
 	}
-	log.Debugf("matchUpAllSlaves: %d slaves merged into %d buckets", len(slaves), len(slaveBuckets))
+	log.Debugf("MultiMatchBelow: %d slaves merged into %d buckets", len(slaves), len(slaveBuckets))
 	for bucket, bucketSlaves := range slaveBuckets {
-		log.Debugf("bucket: %+v, %d slaves", bucket, len(bucketSlaves))
+		log.Debugf("+- bucket: %+v, %d slaves", bucket, len(bucketSlaves))
 	}
 	matchedSlaves := make(map[InstanceKey]bool)
 	barrier := make(chan *BinlogCoordinates)
 	// Now go over the buckets, and try a single slave from each bucket
 	// (though if one results with an error, synchronuously-for-that-bucket continue to the next slave in bucket)
 
-	if maintenanceToken, merr := BeginMaintenance(&grandparentInstance.Key, "orchestrator", fmt.Sprintf("slaves match up below this", grandparentInstance.Key)); merr != nil {
-		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", grandparentInstance.Key))
-		return res, grandparentInstance, err
+	if maintenanceToken, merr := BeginMaintenance(&belowInstance.Key, "orchestrator", fmt.Sprintf("slaves multi match below this: %+v", belowInstance.Key)); merr != nil {
+		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", belowInstance.Key))
+		return res, belowInstance, err
 	} else {
 		defer EndMaintenance(maintenanceToken)
 	}
+
 	for execCoordinates, bucketSlaves := range slaveBuckets {
 		execCoordinates := execCoordinates
 		bucketSlaves := bucketSlaves
@@ -750,16 +742,16 @@ func MatchUpSlaves(masterKey *InstanceKey) ([](*Instance), *Instance, error) {
 			func() {
 				for _, slave := range bucketSlaves {
 					slave := slave
-					log.Debugf("matchUpAllSlaves: attempting slave %+v in bucket %+v", slave.Key, execCoordinates)
+					log.Debugf("MultiMatchBelow: attempting slave %+v in bucket %+v", slave.Key, execCoordinates)
 					TopologyConcurrencyChan <- true
-					_, matchedCoordinates, err := MatchBelow(&slave.Key, &grandparentInstance.Key, true, false)
+					_, matchedCoordinates, err := MatchBelow(&slave.Key, &belowInstance.Key, true, false)
 					<-TopologyConcurrencyChan
-					log.Debugf("matchUpAllSlaves: match result: %+v, %+v", matchedCoordinates, err)
+					log.Debugf("MultiMatchBelow: match result: %+v, %+v", matchedCoordinates, err)
 					if err == nil {
 						// Success! We matched a slave of this bucket
 						knownCoordinatesMap[execCoordinates] = matchedCoordinates
 						matchedSlaves[slave.Key] = true
-						log.Debugf("matchUpAllSlaves: matched slave %+v in bucket %+v", slave.Key, execCoordinates)
+						log.Debugf("MultiMatchBelow: matched slave %+v in bucket %+v", slave.Key, execCoordinates)
 						return
 					}
 					log.Errore(err)
@@ -781,19 +773,19 @@ func MatchUpSlaves(masterKey *InstanceKey) ([](*Instance), *Instance, error) {
 		}
 		matchedCoordinates, found := knownCoordinatesMap[slave.ExecBinlogCoordinates]
 		if !found {
-			log.Errorf("matchUpAllSlaves: Cannot match up %+v since cannot lookup matched coordinates for %+v", slave.Key, slave.ExecBinlogCoordinates)
+			log.Errorf("MultiMatchBelow: Cannot match up %+v since cannot lookup matched coordinates for %+v", slave.Key, slave.ExecBinlogCoordinates)
 			continue
 		}
 		if matchedCoordinates == nil {
-			log.Errorf("matchUpAllSlaves: found nil matchedCoordinates in bucket %+v", slave.ExecBinlogCoordinates)
+			log.Errorf("MultiMatchBelow: found nil matchedCoordinates in bucket %+v", slave.ExecBinlogCoordinates)
 			continue
 		}
-		log.Debugf("matchUpAllSlaves: Will match up %+v to previously matched master coordinates %+v", slave.Key, matchedCoordinates)
-		if _, err := ChangeMasterTo(&slave.Key, &grandparentInstance.Key, matchedCoordinates); err == nil {
+		log.Debugf("MultiMatchBelow: Will match up %+v to previously matched master coordinates %+v", slave.Key, matchedCoordinates)
+		if _, err := ChangeMasterTo(&slave.Key, &belowInstance.Key, matchedCoordinates); err == nil {
 			StartSlave(&slave.Key)
 			matchedSlaves[slave.Key] = true
 		} else {
-			log.Errorf("matchUpAllSlaves: Cannot match up %+v: error is %+v", slave.Key, err)
+			log.Errorf("MultiMatchBelow: Cannot match up %+v: error is %+v", slave.Key, err)
 			continue
 		}
 	}
@@ -804,7 +796,32 @@ func MatchUpSlaves(masterKey *InstanceKey) ([](*Instance), *Instance, error) {
 			res = append(res, slave)
 		}
 	}
-	return res, grandparentInstance, err
+	return res, belowInstance, err
+
+}
+
+// MatchUpSlaves will move all slaves og given master up the replication chain,
+// so that they become siblings of their master.
+// This should be called when the local master dies, and all its slaves are to be resurrected via Pseudo-GTID
+func MatchUpSlaves(masterKey *InstanceKey) ([](*Instance), *Instance, error) {
+	res := [](*Instance){}
+
+	masterInstance, found, err := ReadInstance(masterKey)
+	if err != nil || !found {
+		return res, nil, err
+	}
+	grandparentInstance, err := ReadTopologyInstance(&masterInstance.MasterKey)
+	if err != nil {
+		// Can't access grandparent ==> can't move slaves up to be its children
+		return res, grandparentInstance, err
+	}
+
+	// slaves involved
+	slaves, err := ReadSlaveInstances(masterKey)
+	if err != nil {
+		return res, grandparentInstance, err
+	}
+	return MultiMatchBelow(slaves, &grandparentInstance.Key)
 }
 
 // GetCandidateSlave chooses the best slave to promote given a (possibly dead) master

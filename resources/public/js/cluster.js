@@ -35,6 +35,7 @@ function generateInstanceDivs(nodesMap) {
     $("div.popover").popover();
     $("div.popover").show();
     
+   	
     $("[data-fo-id]").on("mouseenter", ".popover[data-nodeid]", function() {
     	if ($(".popover.instance[data-duplicate-node]").hasClass("ui-draggable-dragging")) {
     		// Do not remove & recreate while dragging. Ignore any mouseenter
@@ -65,6 +66,17 @@ function generateInstanceDivs(nodesMap) {
         	makeLocalMaster(nodesMap[draggedNodeId]);
         	return false;
         });
+        /*
+        $(".popover.instance[data-duplicate-node] h3").click(function () {
+        	var popoverElement = $("[data-fo-id='" + draggedNodeId + "'] .popover");
+        	if (popoverElement.hasClass("selected")) {
+        		popoverElement.removeClass("selected");
+        	} else {
+        		popoverElement.addClass("selected");
+        	}
+       		return false;
+        });
+        */
         $(duplicate).draggable({
         	addClasses: true, 
         	opacity: 0.67,
