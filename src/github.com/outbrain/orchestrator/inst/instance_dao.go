@@ -102,7 +102,6 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		UpdateResolvedHostname(instance.Key.Hostname, resolvedHostname)
 		instance.Key.Hostname = resolvedHostname
 	}
-	instanceFound = true
 	err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
 		instance.Slave_IO_Running = (m.GetString("Slave_IO_Running") == "Yes")
 		instance.Slave_SQL_Running = (m.GetString("Slave_SQL_Running") == "Yes")
@@ -136,13 +135,6 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	})
 	if err != nil {
 		goto Cleanup
-	}
-
-	if config.Config.SlaveLagQuery != "" {
-		err = db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SlaveLagSeconds)
-		if err != nil {
-			goto Cleanup
-		}
 	}
 
 	if instance.LogBinEnabled {
@@ -212,6 +204,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		}
 		instance.SetBinaryLogs(binlogs)
 	}
+	instanceFound = true
+	// Anything after this point does not affect the fact the instance is found.
 	{
 		// Get long running processes
 		err := sqlutils.QueryRowsMap(db, `
@@ -253,6 +247,13 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 				return nil
 			})
 
+		if err != nil {
+			goto Cleanup
+		}
+	}
+
+	if config.Config.SlaveLagQuery != "" {
+		err = db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SlaveLagSeconds)
 		if err != nil {
 			goto Cleanup
 		}
@@ -657,7 +658,7 @@ func WriteInstance(instance *Instance, lastError error) error {
 		}
 
 		_, err = sqlutils.Exec(db, `
-        	replace into database_instance (
+        	insert into database_instance (
         		hostname,
         		port,
         		last_checked,
@@ -689,7 +690,38 @@ func WriteInstance(instance *Instance, lastError error) error {
 				num_slave_hosts,
 				slave_hosts,
 				cluster_name
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			on duplicate key update
+        		last_checked=VALUES(last_checked),
+        		last_attempted_check=VALUES(last_attempted_check),
+        		server_id=VALUES(server_id),
+				version=VALUES(version),
+				read_only=VALUES(read_only),
+				binlog_format=VALUES(binlog_format),
+				log_bin=VALUES(log_bin),
+				log_slave_updates=VALUES(log_slave_updates),
+				binary_log_file=VALUES(binary_log_file),
+				binary_log_pos=VALUES(binary_log_pos),
+				master_host=VALUES(master_host),
+				master_port=VALUES(master_port),
+				slave_sql_running=VALUES(slave_sql_running),
+				slave_io_running=VALUES(slave_io_running),
+				oracle_gtid=VALUES(oracle_gtid),
+				mariadb_gtid=VALUES(mariadb_gtid),
+				master_log_file=VALUES(master_log_file),
+				read_master_log_pos=VALUES(read_master_log_pos),
+				relay_master_log_file=VALUES(relay_master_log_file),
+				exec_master_log_pos=VALUES(exec_master_log_pos),
+				relay_log_file=VALUES(relay_log_file),
+				relay_log_pos=VALUES(relay_log_pos),
+				last_sql_error=VALUES(last_sql_error),
+				last_io_error=VALUES(last_io_error),
+				seconds_behind_master=VALUES(seconds_behind_master),
+				slave_lag_seconds=VALUES(slave_lag_seconds),
+				num_slave_hosts=VALUES(num_slave_hosts),
+				slave_hosts=VALUES(slave_hosts),
+				cluster_name=VALUES(cluster_name)
+			`,
 			instance.Key.Hostname,
 			instance.Key.Port,
 			instance.ServerID,
