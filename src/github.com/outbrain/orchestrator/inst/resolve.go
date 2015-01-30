@@ -52,6 +52,8 @@ func resolveHostname(hostname string) (string, error) {
 	switch strings.ToLower(config.Config.HostnameResolveMethod) {
 	case "none":
 		return hostname, nil
+	case "default":
+		return hostname, nil
 	case "cname":
 		return GetCNAME(hostname)
 	}
@@ -61,7 +63,6 @@ func resolveHostname(hostname string) (string, error) {
 // Attempt to resolve a hostname. This may returned a database cached hostname or otherwise
 // it may resolve the hostname via CNAME
 func ResolveHostname(hostname string) (string, error) {
-
 	// First go to lightweight cache
 	if resolvedHostname, found := hostnameResolvesLightweightCache.Get(hostname); found {
 		return resolvedHostname.(string), nil

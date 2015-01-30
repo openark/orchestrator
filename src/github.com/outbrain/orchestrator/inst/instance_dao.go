@@ -431,6 +431,14 @@ func ReadSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
 	return readInstancesByCondition(condition)
 }
 
+// ReadUnseenInstances reads all instances which were not recently seen
+func ReadUnseenInstances() ([](*Instance), error) {
+	condition := fmt.Sprintf(`
+			last_seen < last_checked
+		`)
+	return readInstancesByCondition(condition)
+}
+
 // ReadProblemInstances reads all instances with problems
 func ReadProblemInstances() ([](*Instance), error) {
 	condition := fmt.Sprintf(`
@@ -454,6 +462,62 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 			or concat(hostname, ':', port) like '%%%s%%'
 		`, searchString, searchString, searchString, searchString, searchString, searchString)
 	return readInstancesByCondition(condition)
+}
+
+// updateClusterNameForUnseenInstances
+func updateInstanceClusterName(instance *Instance) error {
+	writeFunc := func() error {
+		db, err := db.OpenOrchestrator()
+		if err != nil {
+			return log.Errore(err)
+		}
+		_, err = sqlutils.Exec(db, `
+			update 
+				database_instance 
+			set 
+				cluster_name=? 
+			where 
+				hostname=? and port=?
+        	`, instance.ClusterName, instance.Key.Hostname, instance.Key.Port,
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
+		AuditOperation("update-cluster-name", &instance.Key, fmt.Sprintf("set to %s", instance.ClusterName))
+		return nil
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
+// ReviewUnseenInstances reviews instances that have not been seen (suposedly dead) and updates some of their data
+func ReviewUnseenInstances() error {
+	instances, err := ReadUnseenInstances()
+	if err != nil {
+		return log.Errore(err)
+	}
+	operations := 0
+	for _, instance := range instances {
+		instance := instance
+
+		masterHostname, err := ResolveHostname(instance.MasterKey.Hostname)
+		if err != nil {
+			log.Errore(err)
+			continue
+		}
+		instance.MasterKey.Hostname = masterHostname
+		clusterName, err := ReadClusterNameByMaster(&instance.Key, &instance.MasterKey)
+
+		if err != nil {
+			log.Errore(err)
+		} else if clusterName != instance.ClusterName {
+			instance.ClusterName = clusterName
+			updateInstanceClusterName(instance)
+			operations++
+		}
+	}
+
+	AuditOperation("review-unseen-instances", nil, fmt.Sprintf("Operations: %d", operations))
+	return err
 }
 
 // ReadCountMySQLSnapshots is a utility method to return registered number of snapshots for a given list of hosts

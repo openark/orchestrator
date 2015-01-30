@@ -141,6 +141,7 @@ func ContinuousDiscovery() {
 			// See if we should also forget objects (lower frequency)
 			inst.ForgetLongUnseenInstances()
 			inst.ForgetExpiredHostnameResolves()
+			inst.ReviewUnseenInstances()
 		}
 	}
 }

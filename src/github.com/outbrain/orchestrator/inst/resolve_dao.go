@@ -110,7 +110,7 @@ Cleanup:
 	return res, err
 }
 
-// ForgetExpiredHostnameResolves 
+// ForgetExpiredHostnameResolves
 func ForgetExpiredHostnameResolves() error {
 	db, err := db.OpenOrchestrator()
 	if err != nil {

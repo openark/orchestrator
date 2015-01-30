@@ -48,7 +48,7 @@ type Configuration struct {
 	DiscoveryPollSeconds                       uint   // Auto/continuous discovery of instances sleep time between polls
 	InstanceBulkOperationsWaitTimeoutSeconds   uint   // Time to wait on a single instance when doing bulk (many instances) operation
 	ActiveNodeExpireSeconds                    uint
-	HostnameResolveMethod                      string // Method by which to "normalize" hostname ("none"/"cname")
+	HostnameResolveMethod                      string // Method by which to "normalize" hostname ("none"/"default"/"cname")
 	ExpiryHostnameResolvesMinutes              int    // Number of minutes after which to expire hostname-resolves
 	ReasonableReplicationLagSeconds            int    // Abvoe this value is considered a problem
 	ReasonableMaintenanceReplicationLagSeconds int    // Above this value move-up and move-below are blocked
@@ -138,6 +138,7 @@ func read(file_name string) (*Configuration, error) {
 			if err != nil {
 				log.Fatalf("Failed to parse gcfg data from file: %+v", err)
 			} else {
+				log.Debugf("Parsed orchestrator credentials from %s", Config.MySQLOrchestratorCredentialsConfigFile)
 				Config.MySQLOrchestratorUser = mySQLConfig.Client.User
 				Config.MySQLOrchestratorPassword = mySQLConfig.Client.Password
 			}
@@ -153,6 +154,7 @@ func read(file_name string) (*Configuration, error) {
 			if err != nil {
 				log.Fatalf("Failed to parse gcfg data from file: %+v", err)
 			} else {
+				log.Debugf("Parsed topology credentials from %s", Config.MySQLOrchestratorCredentialsConfigFile)
 				Config.MySQLTopologyUser = mySQLConfig.Client.User
 				Config.MySQLTopologyPassword = mySQLConfig.Client.Password
 			}
