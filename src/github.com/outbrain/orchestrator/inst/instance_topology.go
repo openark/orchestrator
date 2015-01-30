@@ -55,9 +55,13 @@ func getAsciiTopologyEntry(depth int, instance *Instance, replicationMap map[*In
 	return result
 }
 
-// AsciiTopology returns a string representation of the topology of given clusterName.
-func AsciiTopology(clusterName string) (string, error) {
-	instances, err := ReadClusterInstances(clusterName)
+// AsciiTopology returns a string representation of the topology of given instance.
+func AsciiTopology(instanceKey *InstanceKey) (string, error) {
+	instance, found, err := ReadInstance(instanceKey)
+	if err != nil || !found {
+		return "", err
+	}
+	instances, err := ReadClusterInstances(instance.ClusterName)
 	if err != nil {
 		return "", err
 	}
@@ -81,6 +85,9 @@ func AsciiTopology(clusterName string) (string, error) {
 		} else {
 			masterInstance = instance
 		}
+	}
+	if masterInstance == nil {
+		return "", nil
 	}
 	resultArray := getAsciiTopologyEntry(0, masterInstance, replicationMap)
 	result := strings.Join(resultArray, "\n")
@@ -504,32 +511,6 @@ Cleanup:
 	return instance, nextBinlogCoordinatesToMatch, err
 }
 
-// enslaveSiblings enslaves given siblings as slaves of given instance using match (pseudo-GTID).
-// It is OK to pass the instance itself in list of siblings (and it is ignored); otherwise there is no validation in this function
-// that the siblings list is indeed composed of siblings.
-func enslaveSiblings(instanceKey *InstanceKey, siblings [](*Instance)) error {
-	numOperations := 0
-	completedOperations := make(chan InstanceKey)
-
-	for _, sibling := range siblings {
-		if sibling.SQLThreadUpToDate() && !sibling.Key.Equals(instanceKey) {
-			numOperations++
-			siblingKey := sibling.Key
-			go func() {
-				_, _, err := MatchBelow(&siblingKey, instanceKey, true, false)
-				if err != nil {
-					log.Errore(err)
-				}
-				completedOperations <- sibling.Key
-			}()
-		}
-	}
-	for i := 0; i < numOperations; i++ {
-		<-completedOperations
-	}
-	return nil
-}
-
 // MakeMaster will take an instance, make all its siblings its slaves (via pseudo-GTID) and make it master
 // (stop its replicaiton, make writeable).
 func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
@@ -567,7 +548,7 @@ func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	err = enslaveSiblings(instanceKey, siblings)
+	_, _, err = MultiMatchBelow(siblings, instanceKey)
 	if err != nil {
 		goto Cleanup
 	}
@@ -636,24 +617,17 @@ func MakeLocalMaster(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("siblings match below this", *instanceKey)); merr != nil {
-		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
-		goto Cleanup
-	} else {
-		defer EndMaintenance(maintenanceToken)
-	}
-
 	instance, err = StopSlaveNicely(instanceKey, 0)
 	if err != nil {
 		goto Cleanup
 	}
 
-	_, _, err = MatchBelow(instanceKey, &grandparentInstance.Key, false, false)
+	_, _, err = MatchBelow(instanceKey, &grandparentInstance.Key, true, true)
 	if err != nil {
 		goto Cleanup
 	}
 
-	err = enslaveSiblings(instanceKey, siblings)
+	_, _, err = MultiMatchBelow(siblings, instanceKey)
 	if err != nil {
 		goto Cleanup
 	}
@@ -691,6 +665,12 @@ func sortedSlaves(masterKey *InstanceKey, forceRefresh bool) ([](*Instance), err
 // It is assumed that all given slaves are siblings
 func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance), *Instance, error) {
 	res := [](*Instance){}
+	for i := 0; i < len(slaves); i++ {
+		slave := slaves[i]
+		if slave.Key.Equals(belowKey) {
+			slaves = append(slaves[:i], slaves[i+1:]...)
+		}
+	}
 
 	belowInstance, err := ReadTopologyInstance(belowKey)
 	if err != nil {
@@ -800,7 +780,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance)
 
 }
 
-// MatchUpSlaves will move all slaves og given master up the replication chain,
+// MatchUpSlaves will move all slaves of given master up the replication chain,
 // so that they become siblings of their master.
 // This should be called when the local master dies, and all its slaves are to be resurrected via Pseudo-GTID
 func MatchUpSlaves(masterKey *InstanceKey) ([](*Instance), *Instance, error) {
