@@ -780,6 +780,24 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance)
 
 }
 
+// MultiMatchSlaves will match (via pseudo-gtid) all slaves of given master below given instance.
+func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey) ([](*Instance), *Instance, error) {
+	res := [](*Instance){}
+
+	belowInstance, err := ReadTopologyInstance(belowKey)
+	if err != nil {
+		// Can't access "below" ==> can't match slaves beneath it
+		return res, nil, err
+	}
+
+	// slaves involved
+	slaves, err := ReadSlaveInstances(masterKey)
+	if err != nil {
+		return res, belowInstance, err
+	}
+	return MultiMatchBelow(slaves, &belowInstance.Key)
+}
+
 // MatchUpSlaves will move all slaves of given master up the replication chain,
 // so that they become siblings of their master.
 // This should be called when the local master dies, and all its slaves are to be resurrected via Pseudo-GTID
@@ -790,18 +808,7 @@ func MatchUpSlaves(masterKey *InstanceKey) ([](*Instance), *Instance, error) {
 	if err != nil || !found {
 		return res, nil, err
 	}
-	grandparentInstance, err := ReadTopologyInstance(&masterInstance.MasterKey)
-	if err != nil {
-		// Can't access grandparent ==> can't move slaves up to be its children
-		return res, grandparentInstance, err
-	}
-
-	// slaves involved
-	slaves, err := ReadSlaveInstances(masterKey)
-	if err != nil {
-		return res, grandparentInstance, err
-	}
-	return MultiMatchBelow(slaves, &grandparentInstance.Key)
+	return MultiMatchSlaves(masterKey, &masterInstance.MasterKey)
 }
 
 // GetCandidateSlave chooses the best slave to promote given a (possibly dead) master
@@ -833,6 +840,8 @@ func PickAndPromoteCandidateSlave(masterKey *InstanceKey) (*Instance, error) {
 			ChangeMasterTo(&slave.Key, &candidateSlave.Key, &candidateSlave.SelfBinlogCoordinates)
 		}
 	}
+
+	//	 TODO
 
 	return nil, nil
 }

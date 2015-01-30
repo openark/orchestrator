@@ -416,6 +416,32 @@ func (this *HttpAPI) MatchBelow(params martini.Params, r render.Render, req *htt
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v matched below %+v at %+v", instanceKey, belowKey, *matchedCoordinates), Details: instance})
 }
 
+// MultiMatchSlaves attempts to match all slaves of a given instance below another, efficiently
+func (this *HttpAPI) MultiMatchSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !this.isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	belowKey, err := this.getInstanceKey(params["belowHost"], params["belowPort"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	slaves, newMaster, err := inst.MultiMatchSlaves(&instanceKey, &belowKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Matched up %d slaves of %+v below %+v", len(slaves), instanceKey, newMaster.Key), Details: newMaster.Key})
+}
+
 // MatchBelow attempts to move an instance below another via pseudo GTID matching of binlog entries
 func (this *HttpAPI) MatchUpSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !this.isAuthorizedForAction(req, user) {
@@ -1078,6 +1104,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow)
 	m.Get("/api/enslave-siblings-simple/:host/:port", this.EnslaveSiblingsSimple)
 	m.Get("/api/match-below/:host/:port/:belowHost/:belowPort", this.MatchBelow)
+	m.Get("/api/multi-match-slaves/:host/:port/:belowHost/:belowPort", this.MultiMatchSlaves)
 	m.Get("/api/match-up-slaves/:host/:port", this.MatchUpSlaves)
 	m.Get("/api/make-master/:host/:port", this.MakeMaster)
 	m.Get("/api/make-local-master/:host/:port", this.MakeLocalMaster)

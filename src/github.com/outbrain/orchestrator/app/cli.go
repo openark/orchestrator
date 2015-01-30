@@ -120,6 +120,25 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				fmt.Println(instance.Key.DisplayString())
 			}
 		}
+	case "multi-match-slaves":
+		{
+			// Move all slaves of "instance" beneath "sibling"
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			if siblingKey == nil {
+				log.Fatal("Cannot deduce sibling:", sibling)
+			}
+
+			matchedSlaves, _, err := inst.MultiMatchSlaves(instanceKey, siblingKey)
+			if err != nil {
+				log.Errore(err)
+			} else {
+				for _, slave := range matchedSlaves {
+					fmt.Println(slave.Key.DisplayString())
+				}
+			}
+		}
 	case "match-up-slaves":
 		{
 			if instanceKey == nil {
