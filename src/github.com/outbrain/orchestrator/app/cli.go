@@ -222,7 +222,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			output, err := inst.AsciiTopology(instance)
+			output, err := inst.AsciiTopology(instanceKey)
 			if err != nil {
 				log.Errore(err)
 			} else {

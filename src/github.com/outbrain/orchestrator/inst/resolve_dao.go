@@ -110,7 +110,7 @@ Cleanup:
 	return res, err
 }
 
-// ForgetLongUnseenInstances will remove entries of all instances that have long since been last seen.
+// ForgetExpiredHostnameResolves 
 func ForgetExpiredHostnameResolves() error {
 	db, err := db.OpenOrchestrator()
 	if err != nil {

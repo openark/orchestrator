@@ -33,7 +33,7 @@ const binlogEventsChunkSize int = 100000
 
 var instancePseudoGTIDEntryCache = cache.New(time.Duration(10)*time.Minute, time.Minute)
 
-func fetInstancePseudoGTIDKey(instance *Instance, entry string) string {
+func getInstancePseudoGTIDKey(instance *Instance, entry string) string {
 	return fmt.Sprintf("%s;%s", instance.Key.DisplayString, entry)
 }
 
@@ -165,7 +165,7 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 }
 
 func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string) (*BinlogCoordinates, error) {
-	cacheKey := fetInstancePseudoGTIDKey(instance, entryText)
+	cacheKey := getInstancePseudoGTIDKey(instance, entryText)
 	coords, found := instancePseudoGTIDEntryCache.Get(cacheKey)
 	if found {
 		// This is wonderful. We can skip the tedious GTID search in the binary log
