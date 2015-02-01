@@ -464,6 +464,15 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 	return readInstancesByCondition(condition)
 }
 
+
+// FindInstances reads all instances whose name matches given pattern
+func FindInstances(regexpPattern string) ([](*Instance), error) {
+	condition := fmt.Sprintf(`
+			hostname rlike '%s'
+		`, regexpPattern)
+	return readInstancesByCondition(condition)
+}
+
 // updateClusterNameForUnseenInstances
 func updateInstanceClusterName(instance *Instance) error {
 	writeFunc := func() error {

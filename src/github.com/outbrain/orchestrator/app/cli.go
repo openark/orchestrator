@@ -19,6 +19,7 @@ package app
 import (
 	"fmt"
 	"github.com/outbrain/golib/log"
+	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/inst"
 	"github.com/outbrain/orchestrator/logic"
 	"net"
@@ -27,11 +28,18 @@ import (
 )
 
 // Cli initiates a command line interface, executing requested command.
-func Cli(command string, strict bool, instance string, sibling string, owner string, reason string) {
+func Cli(command string, strict bool, instance string, sibling string, owner string, reason string, pattern string) {
 
+	if !strings.Contains(instance, ":") {
+		instance = fmt.Sprintf("%s:%d", instance, config.Config.DefaultInstancePort)
+	}
 	instanceKey, err := inst.ParseInstanceKey(instance)
 	if err != nil {
+		log.Errore(err)
 		instanceKey = nil
+	}
+	if !strings.Contains(sibling, ":") {
+		sibling = fmt.Sprintf("%s:%d", sibling, config.Config.DefaultInstancePort)
 	}
 	siblingKey, err := inst.ParseInstanceKey(sibling)
 	if err != nil {
@@ -234,6 +242,17 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Errore(err)
 			} else {
 				fmt.Println(strings.Join(clusters, "\n"))
+			}
+		}
+	case "find":
+		{
+			instances, err := inst.FindInstances(pattern)
+			if err != nil {
+				log.Errore(err)
+			} else {
+				for _, instance := range instances {
+					fmt.Println(instance.Key.DisplayString())
+				}
 			}
 		}
 	case "topology":

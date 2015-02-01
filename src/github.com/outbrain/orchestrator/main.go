@@ -32,6 +32,7 @@ func main() {
 	sibling := flag.String("s", "", "sibling instance, host:port")
 	owner := flag.String("owner", "", "operation owner")
 	reason := flag.String("reason", "", "operation reason")
+	pattern := flag.String("pattern", "", "regular expression pattern")
 	discovery := flag.Bool("discovery", true, "auto discovery mode")
 	verbose := flag.Bool("verbose", false, "verbose")
 	debug := flag.Bool("debug", false, "debug mode (very verbose)")
@@ -59,7 +60,7 @@ func main() {
 
 	switch {
 	case len(flag.Args()) == 0 || flag.Arg(0) == "cli":
-		app.Cli(*command, *strict, *instance, *sibling, *owner, *reason)
+		app.Cli(*command, *strict, *instance, *sibling, *owner, *reason, *pattern)
 	case flag.Arg(0) == "http":
 		app.Http(*discovery)
 	default:

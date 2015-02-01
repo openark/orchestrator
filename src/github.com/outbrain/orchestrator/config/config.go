@@ -40,6 +40,7 @@ type Configuration struct {
 	MySQLOrchestratorPassword                  string
 	MySQLOrchestratorCredentialsConfigFile     string // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
 	MySQLConnectTimeoutSeconds                 int    // Number of seconds before connection is aborted (driver-side)
+	DefaultInstancePort                        uint   // In case port was not specified on command line
 	SlaveLagQuery                              string // custom query to check on slave lg (e.g. heartbeat table)
 	SlaveStartPostWaitMilliseconds             int    // Time to wait after START SLAVE before re-readong instance (give slave chance to connect to master)
 	DiscoverByShowSlaveHosts                   bool   // Attempt SHOW SLAVE HOSTS before PROCESSLIST
@@ -79,8 +80,10 @@ var Config *Configuration = NewConfiguration()
 func NewConfiguration() *Configuration {
 	return &Configuration{
 		ListenAddress:                              ":3000",
+		MySQLOrchestratorPort:                      3306,
 		MySQLTopologyMaxPoolConnections:            3,
 		MySQLConnectTimeoutSeconds:                 5,
+		DefaultInstancePort:                        3306,
 		InstancePollSeconds:                        60,
 		UnseenInstanceForgetHours:                  240,
 		SlaveStartPostWaitMilliseconds:             1000,

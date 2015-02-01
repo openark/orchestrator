@@ -17,7 +17,7 @@
   "InstancePollSeconds": 12,
   "InstanceBulkOperationsWaitTimeoutSeconds":60,
   "ActiveNodeExpireSeconds": 20,
-  "HostnameResolveMethod": "cname",
+  "HostnameResolveMethod": "default",
   "ExpiryHostnameResolvesMinutes": 60,
   "UnseenInstanceForgetHours": 240,
   "ReasonableReplicationLagSeconds": 10,
