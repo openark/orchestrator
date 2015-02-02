@@ -1096,6 +1096,26 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
+// StartSlaves will do concurrent start-slave
+func StartSlaves(slaves [](*Instance)) {
+	// use concurrency but wait for all to complete
+	barrier := make(chan InstanceKey)
+	for _, instance := range slaves {
+		instance := instance
+		go func() {
+			// Wait your turn to read a slave
+			TopologyConcurrencyChan <- true
+			StartSlave(&instance.Key)
+			<-TopologyConcurrencyChan
+			// Signal compelted slave
+			barrier <- instance.Key
+		}()
+	}
+	for _ = range slaves {
+		<-barrier
+	}
+}
+
 // StartSlaveUntilMasterCoordinates issuesa START SLAVE UNTIL... statement on given instance
 func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinates *BinlogCoordinates) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)

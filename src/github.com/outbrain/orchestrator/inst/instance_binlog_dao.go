@@ -29,7 +29,7 @@ import (
 	"time"
 )
 
-const binlogEventsChunkSize int = 100000
+const binlogEventsChunkSize int = 1000000
 
 var instancePseudoGTIDEntryCache = cache.New(time.Duration(10)*time.Minute, time.Minute)
 

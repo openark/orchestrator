@@ -670,10 +670,12 @@ func sortedSlaves(masterKey *InstanceKey, forceRefresh bool) ([](*Instance), err
 		return slaves, nil
 	}
 	if forceRefresh {
-		//RefreshTopologyInstances(slaves)
 		StopSlavesNicely(slaves, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
 	}
 	sort.Sort(sort.Reverse(InstancesByExecBinlogCoordinates(slaves)))
+	if forceRefresh {
+		StartSlaves(slaves)
+	}
 
 	return slaves, err
 }
