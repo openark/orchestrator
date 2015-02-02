@@ -31,6 +31,12 @@ type InstancesByExecBinlogCoordinates [](*Instance)
 func (this InstancesByExecBinlogCoordinates) Len() int      { return len(this) }
 func (this InstancesByExecBinlogCoordinates) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
 func (this InstancesByExecBinlogCoordinates) Less(i, j int) bool {
+	if this[i].ExecBinlogCoordinates.Equals(&this[j].ExecBinlogCoordinates) {
+		// Secondary sorting: "smaller" if not logging slave updates
+		if this[j].LogSlaveUpdatesEnabled && !this[i].LogSlaveUpdatesEnabled {
+			return true
+		}
+	}
 	return this[i].ExecBinlogCoordinates.SmallerThan(&this[j].ExecBinlogCoordinates)
 }
 
@@ -390,6 +396,31 @@ Cleanup:
 	return instance, err
 }
 
+// FindLastPseudoGTIDEntry will search an instance's binary logs or relay logs for the last pseudo-GTID entry,
+// and return found coordinates as well as entry text
+func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordinates BinlogCoordinates) (*BinlogCoordinates, string, error) {
+	var instancePseudoGtidText string
+	var instancePseudoGtidCoordinates *BinlogCoordinates
+	var err error = nil
+
+	if instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled {
+		// Well no need to search this instance's binary logs if it doesn't have any...
+		// With regard log-slave-updates, some edge cases are possible, like having this instance's log-slave-updates
+		// enabled/disabled (of course having restarted it)
+		// The approach is not to take chances. If log-slave-updates is disabled, fail and go for relay-logs.
+		// If log-slave-updates was just enabled then possibly no pseudo-gtid is found, and so again we will go
+		// for relay logs.
+		instancePseudoGtidCoordinates, instancePseudoGtidText, err = GetLastPseudoGTIDEntryInInstance(instance)
+	}
+	if err != nil || instancePseudoGtidCoordinates == nil {
+		// Unable to find pseudo GTID in binary logs.
+		// Then MAYBE we are lucky enough (chances are we are, if this slave did not crash) that we can
+		// extract the Pseudo GTID entry from the last (current) relay log file.
+		instancePseudoGtidCoordinates, instancePseudoGtidText, err = GetLastPseudoGTIDEntryInRelayLogs(instance, recordedInstanceRelayLogCoordinates)
+	}
+	return instancePseudoGtidCoordinates, instancePseudoGtidText, err
+}
+
 // MatchBelow will attempt moving instance indicated by instanceKey below its the one indicated by otherKey.
 // The refactoring is based on matching binlog entries, not on "classic" positions comparisons.
 // The "other instance" could be the sibling of the moving instance any of its ancestors. It may actuall be
@@ -450,22 +481,8 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	// a FLUSH LOGS/FLUSH RELAY LOGS (or a START SLAVE, though that's an altogether different problem) etc.
 	// We want to be on the safe side; we don't utterly trust that we are the only ones playing with the instance.
 	recordedInstanceRelayLogCoordinates = instance.RelaylogCoordinates
+	instancePseudoGtidCoordinates, instancePseudoGtidText, err = FindLastPseudoGTIDEntry(instance, recordedInstanceRelayLogCoordinates)
 
-	if instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled {
-		// Well no need to search this instance's binary logs if it doesn't have any...
-		// With regard log-slave-updates, some edge cases are possible, like having this instance's log-slave-updates
-		// enabled/disabled (of course having restarted it)
-		// The approach is not to take chances. If log-slave-updates is disabled, fail and go for relay-logs.
-		// If log-slave-updates was just enabled then possibly no pseudo-gtid is found, and so again we will go
-		// for relay logs.
-		instancePseudoGtidCoordinates, instancePseudoGtidText, err = GetLastPseudoGTIDEntryInInstance(instance)
-	}
-	if err != nil || instancePseudoGtidCoordinates == nil {
-		// Unable to find pseudo GTID in binary logs.
-		// Then MAYBE we are lucky enough (chances are we are, if this slave did not crash) that we can
-		// extract the Pseudo GTID entry from the last (current) relay log file.
-		instancePseudoGtidCoordinates, instancePseudoGtidText, err = GetLastPseudoGTIDEntryInRelayLogs(instance, recordedInstanceRelayLogCoordinates)
-	}
 	if err != nil {
 		goto Cleanup
 	}
@@ -812,20 +829,29 @@ func MatchUpSlaves(masterKey *InstanceKey) ([](*Instance), *Instance, error) {
 }
 
 // GetCandidateSlave chooses the best slave to promote given a (possibly dead) master
-func GetCandidateSlave(masterKey *InstanceKey, forceRefresh bool) (*Instance, [](*Instance), error) {
+func GetCandidateSlave(masterKey *InstanceKey, forceRefresh bool) (*Instance, [](*Instance), int, error) {
+	skippedSlaves := 0
 	slaves, err := sortedSlaves(masterKey, forceRefresh)
 	if err != nil {
-		return nil, slaves, err
+		return nil, slaves, skippedSlaves, err
 	}
 	if len(slaves) == 0 {
-		return nil, slaves, errors.New(fmt.Sprintf("No slaves found for %+v", *masterKey))
+		return nil, slaves, skippedSlaves, errors.New(fmt.Sprintf("No slaves found for %+v", *masterKey))
 	}
-	return slaves[0], slaves, err
+	for _, slave := range slaves {
+		slave := slave
+		if slave.LogSlaveUpdatesEnabled {
+			return slave, slaves, skippedSlaves, nil
+		}
+		// Should not promote.
+		skippedSlaves++
+	}
+	return nil, slaves, skippedSlaves, errors.New(fmt.Sprintf("No slaves found with log_slave_updates for %+v", *masterKey))
 }
 
 // PickAndPromoteCandidateSlave will choose a candidate slave
 func PickAndPromoteCandidateSlave(masterKey *InstanceKey) (*Instance, error) {
-	candidateSlave, slaves, err := GetCandidateSlave(masterKey, true)
+	candidateSlave, slaves, _, err := GetCandidateSlave(masterKey, true)
 	if err != nil {
 		return nil, err
 	}

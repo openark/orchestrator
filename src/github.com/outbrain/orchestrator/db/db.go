@@ -250,6 +250,7 @@ func OpenTopology(host string, port int) (*sql.DB, error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/?timeout=%ds", config.Config.MySQLTopologyUser, config.Config.MySQLTopologyPassword, host, port, config.Config.MySQLConnectTimeoutSeconds)
 	db, _, err := sqlutils.GetDB(mysql_uri)
 	db.SetMaxOpenConns(config.Config.MySQLTopologyMaxPoolConnections)
+	db.SetMaxIdleConns(config.Config.MySQLTopologyMaxPoolConnections)
 	return db, err
 }
 
@@ -260,6 +261,7 @@ func OpenOrchestrator() (*sql.DB, error) {
 	db, fromCache, err := sqlutils.GetDB(mysql_uri)
 	if err == nil && !fromCache {
 		initOrchestratorDB(db)
+		db.SetMaxIdleConns(10)
 	}
 	return db, err
 }

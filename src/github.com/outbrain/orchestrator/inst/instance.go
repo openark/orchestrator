@@ -100,7 +100,7 @@ func (this *BinlogCoordinates) Equals(other *BinlogCoordinates) bool {
 	return this.LogFile == other.LogFile && this.LogPos == other.LogPos
 }
 
-// SmallerThan returns true if this coordinate is smaller than the other.
+// SmallerThan returns true if this coordinate is strictly smaller than the other.
 func (this *BinlogCoordinates) SmallerThan(other *BinlogCoordinates) bool {
 	if this.LogFile < other.LogFile {
 		return true
@@ -388,7 +388,7 @@ func (this *Instance) StatusString() string {
 	if !this.IsRecentlyChecked {
 		return "not recently checked"
 	}
-	if !this.Slave_SQL_Running || !this.Slave_IO_Running {
+	if this.IsSlave() && !(this.Slave_SQL_Running && this.Slave_IO_Running) {
 		return "not replicating"
 	}
 	if !this.SecondsBehindMaster.Valid {

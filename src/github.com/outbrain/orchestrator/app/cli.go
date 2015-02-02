@@ -125,7 +125,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			instance, _, err := inst.GetCandidateSlave(instanceKey, strict)
+			instance, _, _, err := inst.GetCandidateSlave(instanceKey, strict)
 			if err != nil {
 				log.Errore(err)
 			} else {
@@ -165,6 +165,27 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 					fmt.Println(slave.Key.DisplayString())
 				}
 			}
+		}
+	case "last-pseudo-gtid":
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance, err := inst.ReadTopologyInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			coordinates, text, err := inst.FindLastPseudoGTIDEntry(instance, instance.RelaylogCoordinates)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(fmt.Sprintf("%+v:%s", *coordinates, text))
 		}
 	case "reset-slave":
 		{
@@ -262,14 +283,16 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 	case "topology":
 		{
 			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 			output, err := inst.AsciiTopology(instanceKey)
 			if err != nil {
-				log.Errore(err)
-			} else {
-				fmt.Println(output)
+				log.Fatale(err)
 			}
+			fmt.Println(output)
 		}
 	case "instance-status":
 		{
@@ -284,10 +307,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Errore(err)
 			}
 			if instance == nil {
-				log.Errorf("Instance not found: %+v", *instanceKey)
-			} else {
-				fmt.Println(instance.HumanReadableDescription())
+				log.Fatalf("Instance not found: %+v", *instanceKey)
 			}
+			fmt.Println(instance.HumanReadableDescription())
 		}
 	case "continuous":
 		{

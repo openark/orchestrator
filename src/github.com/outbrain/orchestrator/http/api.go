@@ -390,6 +390,41 @@ func (this *HttpAPI) EnslaveSiblingsSimple(params martini.Params, r render.Rende
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Enslaved %d siblings of %+v", count, instanceKey), Details: instance})
 }
 
+// LastPseudoGTID attempts to find the last pseugo-gtid entry in an instance
+func (this *HttpAPI) LastPseudoGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !this.isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	instance, err := inst.ReadTopologyInstance(&instanceKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	if instance == nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Instance not found: %+v", instanceKey)})
+		return
+	}
+	coordinates, text, err := inst.FindLastPseudoGTIDEntry(instance, instance.RelaylogCoordinates)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("%+v", *coordinates), Details: text})
+}
+
 // MatchBelow attempts to move an instance below another via pseudo GTID matching of binlog entries
 func (this *HttpAPI) MatchBelow(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !this.isAuthorizedForAction(req, user) {
@@ -1115,6 +1150,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/reset-slave/:host/:port", this.ResetSlave)
 	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow)
 	m.Get("/api/enslave-siblings-simple/:host/:port", this.EnslaveSiblingsSimple)
+	m.Get("/api/last-pseudo-gtid/:host/:port", this.LastPseudoGTID)
 	m.Get("/api/match-below/:host/:port/:belowHost/:belowPort", this.MatchBelow)
 	m.Get("/api/multi-match-slaves/:host/:port/:belowHost/:belowPort", this.MultiMatchSlaves)
 	m.Get("/api/match-up-slaves/:host/:port", this.MatchUpSlaves)
