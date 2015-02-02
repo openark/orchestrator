@@ -192,6 +192,14 @@ var generateSQL = []string{
 		INSERT IGNORE INTO active_node (anchor, hostname, token, last_seen_active)
 			VALUES (1, '', '', NOW())
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS node_health (
+		  hostname varchar(128) CHARACTER SET ascii NOT NULL,
+		  token varchar(128) NOT NULL,
+		  last_seen_active timestamp NOT NULL,
+		  PRIMARY KEY (hostname)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{

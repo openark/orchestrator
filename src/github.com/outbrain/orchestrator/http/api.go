@@ -1091,6 +1091,18 @@ func (this *HttpAPI) Headers(params martini.Params, r render.Render, req *http.R
 	r.JSON(200, req.Header)
 }
 
+// Health performs a self test
+func (this *HttpAPI) Health(params martini.Params, r render.Render, req *http.Request) {
+	_, err := orchestrator.HealthTest()
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Application node is unhealthy %+v", err)})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Application node is healthy")})
+
+}
+
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/instance/:host/:port", this.Instance)
@@ -1148,4 +1160,5 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/agent-abort-seed/:seedId", this.AbortSeed)
 	m.Get("/api/seeds", this.Seeds)
 	m.Get("/api/headers", this.Headers)
+	m.Get("/api/health", this.Health)
 }

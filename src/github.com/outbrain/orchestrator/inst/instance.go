@@ -55,7 +55,7 @@ func NewInstanceKeyFromStrings(hostname string, port string) (*InstanceKey, erro
 func ParseInstanceKey(hostPort string) (*InstanceKey, error) {
 	tokens := strings.SplitN(hostPort, ":", 2)
 	if len(tokens) != 2 {
-		return nil, errors.New(fmt.Sprintf("Cannpt parse InstanceKey from %s. Expected format is host:port", hostPort))
+		return nil, errors.New(fmt.Sprintf("Cannot parse InstanceKey from %s. Expected format is host:port", hostPort))
 	}
 	return NewInstanceKeyFromStrings(tokens[0], tokens[1])
 }

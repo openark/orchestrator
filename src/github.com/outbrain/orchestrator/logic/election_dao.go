@@ -1,5 +1,5 @@
 /*
-   Copyright 2014 Outbrain Inc.
+   Copyright 2015 Shlomi Noach, courtesy Booking.com
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -22,18 +22,7 @@ import (
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/db"
-	"os"
 )
-
-var hostname string
-
-func init() {
-	var err error
-	hostname, err = os.Hostname()
-	if err != nil {
-		log.Fatalf("Cannot resolve self hostname; required. Aborting. %+v", err)
-	}
-}
 
 // WriteResolvedHostname stores a hostname and the resolved hostname to backend database
 func AttemptElection() (bool, error) {
@@ -56,7 +45,7 @@ func AttemptElection() (bool, error) {
 					or (hostname = ? and token = ?)
 				)					
 			`,
-		hostname, ProcessToken.Hash, config.Config.ActiveNodeExpireSeconds, hostname, ProcessToken.Hash,
+		ThisHostname, ProcessToken.Hash, config.Config.ActiveNodeExpireSeconds, ThisHostname, ProcessToken.Hash,
 	)
 	if err != nil {
 		return false, log.Errore(err)
@@ -78,7 +67,7 @@ func IsElected() (bool, error) {
 			and hostname = '%s'
 			and token = '%s'
 		`,
-		hostname, ProcessToken.Hash)
+		ThisHostname, ProcessToken.Hash)
 	db, err := db.OpenOrchestrator()
 	if err != nil {
 		goto Cleanup
