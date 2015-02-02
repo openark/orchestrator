@@ -23,6 +23,7 @@ import (
 	"github.com/outbrain/orchestrator/inst"
 	"github.com/outbrain/orchestrator/logic"
 	"net"
+	"os"
 	"os/user"
 	"strings"
 )
@@ -30,20 +31,23 @@ import (
 // Cli initiates a command line interface, executing requested command.
 func Cli(command string, strict bool, instance string, sibling string, owner string, reason string, pattern string) {
 
-	if !strings.Contains(instance, ":") {
+	if instance != "" && !strings.Contains(instance, ":") {
 		instance = fmt.Sprintf("%s:%d", instance, config.Config.DefaultInstancePort)
 	}
 	instanceKey, err := inst.ParseInstanceKey(instance)
 	if err != nil {
-		log.Errore(err)
 		instanceKey = nil
 	}
-	if !strings.Contains(sibling, ":") {
+	if sibling != "" && !strings.Contains(sibling, ":") {
 		sibling = fmt.Sprintf("%s:%d", sibling, config.Config.DefaultInstancePort)
 	}
 	siblingKey, err := inst.ParseInstanceKey(sibling)
 	if err != nil {
 		siblingKey = nil
+	}
+	var thisInstanceKey *inst.InstanceKey = nil
+	if hostname, err := os.Hostname(); err == nil {
+		thisInstanceKey = &inst.InstanceKey{Hostname: hostname, Port: int(config.Config.DefaultInstancePort)}
 	}
 
 	if len(owner) == 0 {
@@ -265,6 +269,24 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Errore(err)
 			} else {
 				fmt.Println(output)
+			}
+		}
+	case "instance-status":
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatalf("Unable to get status: unresolved instance")
+			}
+			instance, _, err := inst.ReadInstance(instanceKey)
+			if err != nil {
+				log.Errore(err)
+			}
+			if instance == nil {
+				log.Errorf("Instance not found: %+v", *instanceKey)
+			} else {
+				fmt.Println(instance.HumanReadableDescription())
 			}
 		}
 	case "continuous":

@@ -5,13 +5,16 @@
 # Requires fpm: https://github.com/jordansissel/fpm
 #
 
-release_version="1.3.8"
+release_version="1.3.9"
 release_dir=/tmp/orchestrator-release
 release_files_dir=$release_dir/orchestrator
+release_files_cli_dir=$release_dir/orchestrator-cli
 rm -rf $release_dir/*
-mkdir -p $release_files_dir/
+mkdir -p $release_files_dir
 mkdir -p $release_files_dir/usr/local
 mkdir -p $release_files_dir/etc/init.d
+mkdir -p $release_files_cli_dir
+mkdir -p $release_files_cli_dir/usr/bin
 
 cd  $(dirname $0)
 for f in $(find . -name "*.go"); do go fmt $f; done
@@ -33,9 +36,15 @@ fi
 cd $release_dir
 # tar packaging
 tar cfz orchestrator-"${release_version}".tar.gz ./orchestrator
-# rpm packaging
+# rpm packaging -- full package
 fpm -v "${release_version}" -f -s dir -t rpm -n orchestrator -C $release_dir/orchestrator --prefix=/ .
 fpm -v "${release_version}" -f -s dir -t deb -n orchestrator -C $release_dir/orchestrator --prefix=/ .
+
+cp $release_files_dir/usr/local/orchestrator/orchestrator $release_files_cli_dir/usr/bin
+cd $release_dir
+# rpm packaging -- executable only
+fpm -v "${release_version}" -f -s dir -t rpm -n orchestrator-cli -C $release_dir/orchestrator-cli --prefix=/ .
+fpm -v "${release_version}" -f -s dir -t deb -n orchestrator-cli -C $release_dir/orchestrator-cli --prefix=/ .
 
 echo "---"
 echo "Done. Find releases in $release_dir"

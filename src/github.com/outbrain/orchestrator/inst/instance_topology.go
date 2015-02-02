@@ -46,7 +46,7 @@ func getAsciiTopologyEntry(depth int, instance *Instance, replicationMap map[*In
 			prefix += "- "
 		}
 	}
-	entry := fmt.Sprintf("%s%s", prefix, instance.Key.DisplayString())
+	entry := fmt.Sprintf("%s%s %s", prefix, instance.Key.DisplayString(), instance.HumanReadableDescription())
 	result := []string{entry}
 	for _, slave := range replicationMap[instance] {
 		slavesResult := getAsciiTopologyEntry(depth+1, slave, replicationMap)

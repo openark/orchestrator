@@ -379,3 +379,37 @@ func (this *Instance) CanMoveViaMatch() (bool, error) {
 	}
 	return true, nil
 }
+
+// StatusString returns a human readable description of this instance's status
+func (this *Instance) StatusString() string {
+	if !this.IsLastCheckValid {
+		return "last check invalid"
+	}
+	if !this.IsRecentlyChecked {
+		return "not recently checked"
+	}
+	if !this.Slave_SQL_Running || !this.Slave_IO_Running {
+		return "not replicating"
+	}
+	if !this.SecondsBehindMaster.Valid {
+		return "cannot determine slave lag"
+	}
+	if this.SecondsBehindMaster.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
+		return "lags too much"
+	}
+	return "OK"
+}
+
+// HumanReadableDescription returns a simple readable string describing the status, version,
+// etc. properties of this instance
+func (this *Instance) HumanReadableDescription() string {
+	tokens := []string{}
+	tokens = append(tokens, this.StatusString())
+	tokens = append(tokens, this.Version)
+	tokens = append(tokens, this.Binlog_format)
+	if this.LogSlaveUpdatesEnabled {
+		tokens = append(tokens, ">>")
+	}
+	description := fmt.Sprintf("[%s]", strings.Join(tokens, ","))
+	return description
+}
