@@ -391,10 +391,10 @@ func (this *Instance) StatusString() string {
 	if this.IsSlave() && !(this.Slave_SQL_Running && this.Slave_IO_Running) {
 		return "not replicating"
 	}
-	if !this.SecondsBehindMaster.Valid {
+	if this.IsSlave() && !this.SecondsBehindMaster.Valid {
 		return "cannot determine slave lag"
 	}
-	if this.SecondsBehindMaster.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
+	if this.IsSlave() && this.SecondsBehindMaster.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
 		return "lags too much"
 	}
 	return "OK"
