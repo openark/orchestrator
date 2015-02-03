@@ -142,6 +142,7 @@ func ContinuousDiscovery() {
 			inst.ForgetLongUnseenInstances()
 			inst.ForgetExpiredHostnameResolves()
 			inst.ReviewUnseenInstances()
+			inst.InjectUnseenMasters()
 		}
 	}
 }

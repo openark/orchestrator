@@ -38,13 +38,21 @@ var instanceWriteChan = make(chan bool, backendDBConcurrency)
 // Max concurrency for bulk topology operations
 const topologyConcurrency = 100
 
-var TopologyConcurrencyChan = make(chan bool, topologyConcurrency)
+var topologyConcurrencyChan = make(chan bool, topologyConcurrency)
+
+// ExecuteOnTopology will execute given function while maintaining concurrency limit
+// on topology servers. It is safe in the sense that we will not leak tokens.
+func ExecuteOnTopology(f func()) {
+	topologyConcurrencyChan <- true
+	defer func() { <-topologyConcurrencyChan }()
+	f()
+}
 
 // ExecDBWriteFunc chooses how to execute a write onto the database: whether synchronuously or not
 func ExecDBWriteFunc(f func() error) error {
 	instanceWriteChan <- true
+	defer func() { <-instanceWriteChan }()
 	res := f()
-	<-instanceWriteChan
 	return res
 }
 
@@ -266,7 +274,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 
 Cleanup:
 	if instanceFound {
-		_ = WriteInstance(instance, err)
+		_ = writeInstance(instance, instanceFound, err)
 		WriteLongRunningProcesses(&instance.Key, longRunningProcesses)
 	} else {
 		_ = UpdateInstanceLastChecked(&instance.Key)
@@ -528,6 +536,71 @@ func ReviewUnseenInstances() error {
 	return err
 }
 
+// readUnseenMasterKeys will read list of masters that have never been seen, and yet whose slaves
+// seem to be replicating.
+func readUnseenMasterKeys() ([]InstanceKey, error) {
+	res := []InstanceKey{}
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		return res, log.Errore(err)
+	}
+	err = sqlutils.QueryRowsMap(db, `
+			SELECT DISTINCT
+			    slave_instance.master_host, slave_instance.master_port
+			FROM
+			    database_instance slave_instance
+			        LEFT JOIN
+			    hostname_resolve ON (slave_instance.master_host = hostname_resolve.hostname)
+			        LEFT JOIN
+			    database_instance master_instance ON (
+			    	COALESCE(hostname_resolve.resolved_hostname, slave_instance.master_host) = master_instance.hostname)
+			WHERE
+			    master_instance.port IS NULL
+			    and slave_instance.master_host != ''
+			    and slave_instance.master_host != '_'
+			    and slave_instance.master_port > 0
+			    and slave_instance.slave_io_running = 1
+			`, func(m sqlutils.RowMap) error {
+		instanceKey, _ := NewInstanceKeyFromStrings(m.GetString("master_host"), m.GetString("master_port"))
+		// we ignore the error. It can be expected that we are unable to resolve the hostname.
+		// Maybe that's how we got here in the first place!
+		res = append(res, *instanceKey)
+
+		return nil
+	})
+	if err != nil {
+		return res, log.Errore(err)
+	}
+
+	return res, nil
+
+}
+
+// InjectUnseenMasters will review masters of instances that are known to be replication, yet which are not listed
+// in database_instance. Since their slaves are listed as replicating, we can assume that such masters actually do
+// exist: we shall therefore inject them with minimal details into the database_instance table.
+func InjectUnseenMasters() error {
+
+	unseenMasterKeys, err := readUnseenMasterKeys()
+	if err != nil {
+		return err
+	}
+
+	operations := 0
+	for _, masterKey := range unseenMasterKeys {
+		masterKey := masterKey
+		clusterName := fmt.Sprintf("%s:%d", masterKey.Hostname, masterKey.Port)
+		// minimal details:
+		instance := Instance{Key: masterKey, ClusterName: clusterName}
+		if err := writeInstance(&instance, false, nil); err == nil {
+			operations++
+		}
+	}
+
+	AuditOperation("inject-unseen-masters", nil, fmt.Sprintf("Operations: %d", operations))
+	return err
+}
+
 // ReadCountMySQLSnapshots is a utility method to return registered number of snapshots for a given list of hosts
 func ReadCountMySQLSnapshots(hostnames []string) (map[string]int, error) {
 	res := make(map[string]int)
@@ -720,8 +793,8 @@ Cleanup:
 
 }
 
-// WriteInstance stores an instance in the orchestrator backend
-func WriteInstance(instance *Instance, lastError error) error {
+// writeInstance stores an instance in the orchestrator backend
+func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError error) error {
 
 	writeFunc := func() error {
 		db, err := db.OpenOrchestrator()
@@ -729,8 +802,50 @@ func WriteInstance(instance *Instance, lastError error) error {
 			return log.Errore(err)
 		}
 
-		_, err = sqlutils.Exec(db, `
-        	insert into database_instance (
+		insertIgnore := ""
+		onDuplicateKeyUpdate := ""
+		if instanceWasActuallyFound {
+			// Data is real
+			onDuplicateKeyUpdate = `
+				on duplicate key update
+	        		last_checked=VALUES(last_checked),
+	        		last_attempted_check=VALUES(last_attempted_check),
+	        		server_id=VALUES(server_id),
+					version=VALUES(version),
+					read_only=VALUES(read_only),
+					binlog_format=VALUES(binlog_format),
+					log_bin=VALUES(log_bin),
+					log_slave_updates=VALUES(log_slave_updates),
+					binary_log_file=VALUES(binary_log_file),
+					binary_log_pos=VALUES(binary_log_pos),
+					master_host=VALUES(master_host),
+					master_port=VALUES(master_port),
+					slave_sql_running=VALUES(slave_sql_running),
+					slave_io_running=VALUES(slave_io_running),
+					oracle_gtid=VALUES(oracle_gtid),
+					mariadb_gtid=VALUES(mariadb_gtid),
+					master_log_file=VALUES(master_log_file),
+					read_master_log_pos=VALUES(read_master_log_pos),
+					relay_master_log_file=VALUES(relay_master_log_file),
+					exec_master_log_pos=VALUES(exec_master_log_pos),
+					relay_log_file=VALUES(relay_log_file),
+					relay_log_pos=VALUES(relay_log_pos),
+					last_sql_error=VALUES(last_sql_error),
+					last_io_error=VALUES(last_io_error),
+					seconds_behind_master=VALUES(seconds_behind_master),
+					slave_lag_seconds=VALUES(slave_lag_seconds),
+					num_slave_hosts=VALUES(num_slave_hosts),
+					slave_hosts=VALUES(slave_hosts),
+					cluster_name=VALUES(cluster_name)
+			`
+		} else {
+			// Scenario: some slave reported a master of his; but the master cannot be contacted.
+			// We might still want to have that master written down
+			// Use with caution
+			insertIgnore = `ignore`
+		}
+		insertQuery := fmt.Sprintf(`
+        	insert %s into database_instance (
         		hostname,
         		port,
         		last_checked,
@@ -763,37 +878,10 @@ func WriteInstance(instance *Instance, lastError error) error {
 				slave_hosts,
 				cluster_name
 			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-			on duplicate key update
-        		last_checked=VALUES(last_checked),
-        		last_attempted_check=VALUES(last_attempted_check),
-        		server_id=VALUES(server_id),
-				version=VALUES(version),
-				read_only=VALUES(read_only),
-				binlog_format=VALUES(binlog_format),
-				log_bin=VALUES(log_bin),
-				log_slave_updates=VALUES(log_slave_updates),
-				binary_log_file=VALUES(binary_log_file),
-				binary_log_pos=VALUES(binary_log_pos),
-				master_host=VALUES(master_host),
-				master_port=VALUES(master_port),
-				slave_sql_running=VALUES(slave_sql_running),
-				slave_io_running=VALUES(slave_io_running),
-				oracle_gtid=VALUES(oracle_gtid),
-				mariadb_gtid=VALUES(mariadb_gtid),
-				master_log_file=VALUES(master_log_file),
-				read_master_log_pos=VALUES(read_master_log_pos),
-				relay_master_log_file=VALUES(relay_master_log_file),
-				exec_master_log_pos=VALUES(exec_master_log_pos),
-				relay_log_file=VALUES(relay_log_file),
-				relay_log_pos=VALUES(relay_log_pos),
-				last_sql_error=VALUES(last_sql_error),
-				last_io_error=VALUES(last_io_error),
-				seconds_behind_master=VALUES(seconds_behind_master),
-				slave_lag_seconds=VALUES(slave_lag_seconds),
-				num_slave_hosts=VALUES(num_slave_hosts),
-				slave_hosts=VALUES(slave_hosts),
-				cluster_name=VALUES(cluster_name)
-			`,
+			%s
+			`, insertIgnore, onDuplicateKeyUpdate)
+
+		_, err = sqlutils.Exec(db, insertQuery,
 			instance.Key.Hostname,
 			instance.Key.Port,
 			instance.ServerID,
@@ -828,13 +916,13 @@ func WriteInstance(instance *Instance, lastError error) error {
 			return log.Errore(err)
 		}
 
-		if lastError == nil {
+		if instanceWasActuallyFound && lastError == nil {
 			sqlutils.Exec(db, `
         	update database_instance set last_seen = NOW() where hostname=? and port=?
         	`, instance.Key.Hostname, instance.Key.Port,
 			)
 		} else {
-			log.Debugf("WriteInstance: will not update database_instance due to error: %+v", lastError)
+			log.Debugf("writeInstance: will not update database_instance due to error: %+v", lastError)
 		}
 		return nil
 	}
@@ -966,10 +1054,10 @@ func RefreshTopologyInstances(instances [](*Instance)) {
 		instance := instance
 		go func() {
 			// Wait your turn to read a slave
-			TopologyConcurrencyChan <- true
-			log.Debugf("... reading instance: %+v", instance.Key)
-			ReadTopologyInstance(&instance.Key)
-			<-TopologyConcurrencyChan
+			ExecuteOnTopology(func() {
+				log.Debugf("... reading instance: %+v", instance.Key)
+				ReadTopologyInstance(&instance.Key)
+			})
 			// Signal compelted slave
 			barrier <- instance.Key
 		}()
@@ -1040,9 +1128,7 @@ func StopSlavesNicely(slaves [](*Instance), timeout time.Duration) {
 		instance := instance
 		go func() {
 			// Wait your turn to read a slave
-			TopologyConcurrencyChan <- true
-			StopSlaveNicely(&instance.Key, timeout)
-			<-TopologyConcurrencyChan
+			ExecuteOnTopology(func() { StopSlaveNicely(&instance.Key, timeout) })
 			// Signal compelted slave
 			barrier <- instance.Key
 		}()
@@ -1104,9 +1190,7 @@ func StartSlaves(slaves [](*Instance)) {
 		instance := instance
 		go func() {
 			// Wait your turn to read a slave
-			TopologyConcurrencyChan <- true
-			StartSlave(&instance.Key)
-			<-TopologyConcurrencyChan
+			ExecuteOnTopology(func() { StartSlave(&instance.Key) })
 			// Signal compelted slave
 			barrier <- instance.Key
 		}()

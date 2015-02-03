@@ -51,6 +51,7 @@ type Configuration struct {
 	ActiveNodeExpireSeconds                    uint
 	HostnameResolveMethod                      string // Method by which to "normalize" hostname ("none"/"default"/"cname")
 	ExpiryHostnameResolvesMinutes              int    // Number of minutes after which to expire hostname-resolves
+	RejectHostnameResolvePattern               string // Regexp pattern for resolved hostname that will not be accepted (not cached, not written to db). This is done to avoid storing wrong resovles due to network glitches.
 	ReasonableReplicationLagSeconds            int    // Abvoe this value is considered a problem
 	ReasonableMaintenanceReplicationLagSeconds int    // Above this value move-up and move-below are blocked
 	AuditLogFile                               string // Name of log file for audit operations. Disabled when empty.
@@ -93,6 +94,7 @@ func NewConfiguration() *Configuration {
 		ActiveNodeExpireSeconds:                    60,
 		HostnameResolveMethod:                      "cname",
 		ExpiryHostnameResolvesMinutes:              60,
+		RejectHostnameResolvePattern:               "",
 		ReasonableReplicationLagSeconds:            10,
 		ReasonableMaintenanceReplicationLagSeconds: 20,
 		AuditLogFile:                               "",

@@ -17,10 +17,13 @@
 package inst
 
 import (
+	"errors"
+	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/pmylund/go-cache"
 	"net"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -71,6 +74,13 @@ func ResolveHostname(hostname string) (string, error) {
 	// Unfound: resolve!
 	log.Debugf("Hostname unresolved yet: %s", hostname)
 	resolvedHostname, err := resolveHostname(hostname)
+	if config.Config.RejectHostnameResolvePattern != "" {
+		// Reject, don't even cache
+		if matched, _ := regexp.MatchString(config.Config.RejectHostnameResolvePattern, resolvedHostname); matched {
+			return hostname, errors.New(fmt.Sprintf("Resolved hostname is rejected: %s", resolvedHostname))
+		}
+	}
+
 	if err != nil {
 		// Problem. What we'll do is cache the hostname for just one minute, so as to avoid flooding requests
 		// on one hand, yet make it refresh shortly on the other hand. Anyway do not write to database.

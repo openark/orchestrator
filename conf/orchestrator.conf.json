@@ -19,6 +19,7 @@
   "ActiveNodeExpireSeconds": 20,
   "HostnameResolveMethod": "default",
   "ExpiryHostnameResolvesMinutes": 60,
+  "RejectHostnameResolvePattern": "",
   "UnseenInstanceForgetHours": 240,
   "ReasonableReplicationLagSeconds": 10,
   "ReasonableMaintenanceReplicationLagSeconds": 20,

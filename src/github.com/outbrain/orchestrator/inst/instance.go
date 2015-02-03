@@ -224,7 +224,7 @@ func (this *Instance) IsSmallerMajorVersion(other *Instance) bool {
 
 // IsSlave makes simple heuristics to decide whether this insatnce is a slave of another instance
 func (this *Instance) IsSlave() bool {
-	return this.MasterKey.Hostname != "" && this.MasterKey.Port != 0 && this.MasterKey.Port != InvalidPort && this.ReadBinlogCoordinates.LogFile != ""
+	return this.MasterKey.Hostname != "" && this.MasterKey.Hostname != "_" && this.MasterKey.Port != 0 && this.MasterKey.Port != InvalidPort && this.ReadBinlogCoordinates.LogFile != ""
 }
 
 // SlaveRunning returns true when this instance's status is of a replicating slave.

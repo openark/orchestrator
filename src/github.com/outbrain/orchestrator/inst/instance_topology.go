@@ -741,11 +741,13 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance)
 			func() {
 				for _, slave := range bucketSlaves {
 					slave := slave
+					var matchedCoordinates *BinlogCoordinates
 					log.Debugf("MultiMatchBelow: attempting slave %+v in bucket %+v", slave.Key, execCoordinates)
-					TopologyConcurrencyChan <- true
-					_, matchedCoordinates, err := MatchBelow(&slave.Key, &belowInstance.Key, true, false)
-					<-TopologyConcurrencyChan
+					ExecuteOnTopology(func() {
+						_, matchedCoordinates, err = MatchBelow(&slave.Key, &belowInstance.Key, true, false)
+					})
 					log.Debugf("MultiMatchBelow: match result: %+v, %+v", matchedCoordinates, err)
+
 					if err == nil {
 						// Success! We matched a slave of this bucket
 						knownCoordinatesMap[execCoordinates] = matchedCoordinates
