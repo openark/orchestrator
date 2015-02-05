@@ -58,6 +58,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		}
 		owner = usr.Username
 	}
+	inst.SetMaintenanceOwner(owner)
 
 	if len(command) == 0 {
 		log.Fatal("expected command (-c) (discover|forget|continuous|move-up|move-below|make-co-master|match-below|reset-slave|set-read-only|set-writeable|begin-maintenance|end-maintenance|clusters|topology|resolve)")
@@ -239,13 +240,10 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			if owner == "" {
-				log.Fatal("--owner option required")
-			}
 			if reason == "" {
 				log.Fatal("--reason option required")
 			}
-			maintenanceKey, err := inst.BeginMaintenance(instanceKey, owner, reason)
+			maintenanceKey, err := inst.BeginMaintenance(instanceKey, inst.GetMaintenanceOwner(), reason)
 			if err == nil {
 				log.Infof("Maintenance key: %+v", maintenanceKey)
 			}

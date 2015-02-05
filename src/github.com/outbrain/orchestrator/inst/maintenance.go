@@ -16,7 +16,9 @@
 
 package inst
 
-import ()
+import (
+	"github.com/outbrain/orchestrator/config"
+)
 
 // Maintenance indicates a maintenance entry (also in the database)
 type Maintenance struct {
@@ -27,4 +29,17 @@ type Maintenance struct {
 	IsActive       bool
 	Owner          string
 	Reason         string
+}
+
+var maintenanceOwner string = ""
+
+func GetMaintenanceOwner() string {
+	if maintenanceOwner != "" {
+		return maintenanceOwner
+	}
+	return config.Config.MaintenanceOwner
+}
+
+func SetMaintenanceOwner(owner string) {
+	maintenanceOwner = owner
 }

@@ -164,13 +164,13 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 
 	log.Infof("Will move %+v up the topology", *instanceKey)
 
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", "move up"); merr != nil {
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "move up"); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
 		goto Cleanup
 	} else {
 		defer EndMaintenance(maintenanceToken)
 	}
-	if maintenanceToken, merr := BeginMaintenance(&master.Key, "orchestrator", fmt.Sprintf("child %+v moves up", *instanceKey)); merr != nil {
+	if maintenanceToken, merr := BeginMaintenance(&master.Key, GetMaintenanceOwner(), fmt.Sprintf("child %+v moves up", *instanceKey)); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", master.Key))
 		goto Cleanup
 	} else {
@@ -239,13 +239,13 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	}
 	log.Infof("Will move %+v below its sibling %+v", instanceKey, siblingKey)
 
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("move below %+v", *siblingKey)); merr != nil {
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("move below %+v", *siblingKey)); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
 		goto Cleanup
 	} else {
 		defer EndMaintenance(maintenanceToken)
 	}
-	if maintenanceToken, merr := BeginMaintenance(siblingKey, "orchestrator", fmt.Sprintf("%+v moves below this", *instanceKey)); merr != nil {
+	if maintenanceToken, merr := BeginMaintenance(siblingKey, GetMaintenanceOwner(), fmt.Sprintf("%+v moves below this", *instanceKey)); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *siblingKey))
 		goto Cleanup
 	} else {
@@ -324,13 +324,13 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	log.Infof("Will make %+v co-master of %+v", instanceKey, master.Key)
 
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("make co-master of %+v", master.Key)); merr != nil {
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("make co-master of %+v", master.Key)); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
 		goto Cleanup
 	} else {
 		defer EndMaintenance(maintenanceToken)
 	}
-	if maintenanceToken, merr := BeginMaintenance(&master.Key, "orchestrator", fmt.Sprintf("%+v turns into co-master of this", *instanceKey)); merr != nil {
+	if maintenanceToken, merr := BeginMaintenance(&master.Key, GetMaintenanceOwner(), fmt.Sprintf("%+v turns into co-master of this", *instanceKey)); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", master.Key))
 		goto Cleanup
 	} else {
@@ -364,7 +364,7 @@ func ResetSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
 
 	log.Infof("Will reset %+v", instanceKey)
 
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", "reset slave"); merr != nil {
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "reset slave"); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
 		goto Cleanup
 	} else {
@@ -456,7 +456,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	var recordedInstanceRelayLogCoordinates BinlogCoordinates
 
 	if requireInstanceMaintenance {
-		if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("match below %+v", *otherKey)); merr != nil {
+		if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("match below %+v", *otherKey)); merr != nil {
 			err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
 			goto Cleanup
 		} else {
@@ -464,7 +464,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 		}
 	}
 	if requireOtherMaintenance {
-		if maintenanceToken, merr := BeginMaintenance(otherKey, "orchestrator", fmt.Sprintf("%+v matches below this", *instanceKey)); merr != nil {
+		if maintenanceToken, merr := BeginMaintenance(otherKey, GetMaintenanceOwner(), fmt.Sprintf("%+v matches below this", *instanceKey)); merr != nil {
 			err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *otherKey))
 			goto Cleanup
 		} else {
@@ -558,7 +558,7 @@ func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, "orchestrator", fmt.Sprintf("siblings match below this", *instanceKey)); merr != nil {
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("siblings match below this", *instanceKey)); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
 		goto Cleanup
 	} else {
@@ -726,7 +726,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance)
 	// Now go over the buckets, and try a single slave from each bucket
 	// (though if one results with an error, synchronuously-for-that-bucket continue to the next slave in bucket)
 
-	if maintenanceToken, merr := BeginMaintenance(&belowInstance.Key, "orchestrator", fmt.Sprintf("slaves multi match below this: %+v", belowInstance.Key)); merr != nil {
+	if maintenanceToken, merr := BeginMaintenance(&belowInstance.Key, GetMaintenanceOwner(), fmt.Sprintf("slaves multi match below this: %+v", belowInstance.Key)); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", belowInstance.Key))
 		return res, belowInstance, err
 	} else {

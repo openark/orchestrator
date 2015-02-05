@@ -553,9 +553,10 @@ func readUnseenMasterKeys() ([]InstanceKey, error) {
 			    hostname_resolve ON (slave_instance.master_host = hostname_resolve.hostname)
 			        LEFT JOIN
 			    database_instance master_instance ON (
-			    	COALESCE(hostname_resolve.resolved_hostname, slave_instance.master_host) = master_instance.hostname)
+			    	COALESCE(hostname_resolve.resolved_hostname, slave_instance.master_host) = master_instance.hostname
+			    	and slave_instance.master_port = master_instance.port)
 			WHERE
-			    master_instance.port IS NULL
+			    master_instance.last_checked IS NULL
 			    and slave_instance.master_host != ''
 			    and slave_instance.master_host != '_'
 			    and slave_instance.master_port > 0
@@ -591,7 +592,7 @@ func InjectUnseenMasters() error {
 		masterKey := masterKey
 		clusterName := fmt.Sprintf("%s:%d", masterKey.Hostname, masterKey.Port)
 		// minimal details:
-		instance := Instance{Key: masterKey, ClusterName: clusterName}
+		instance := Instance{Key: masterKey, Version: "Unknown", ClusterName: clusterName}
 		if err := writeInstance(&instance, false, nil); err == nil {
 			operations++
 		}
