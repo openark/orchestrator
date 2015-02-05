@@ -70,7 +70,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			_, err := inst.MoveUp(instanceKey)
 			if err != nil {
-				log.Errore(err)
+				log.Fatale(err)
 			}
 		}
 	case "move-below":
@@ -83,7 +83,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			_, err := inst.MoveBelow(instanceKey, siblingKey)
 			if err != nil {
-				log.Errore(err)
+				log.Fatale(err)
 			}
 		}
 	case "enslave-sublings-simple":
@@ -93,7 +93,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			_, _, err := inst.EnslaveSiblingsSimple(instanceKey)
 			if err != nil {
-				log.Errore(err)
+				log.Fatale(err)
 			}
 		}
 	case "make-co-master":
@@ -103,7 +103,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			_, err := inst.MakeCoMaster(instanceKey)
 			if err != nil {
-				log.Errore(err)
+				log.Fatale(err)
 			}
 		}
 	case "match-below":
@@ -116,7 +116,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			_, _, err := inst.MatchBelow(instanceKey, siblingKey, true, true)
 			if err != nil {
-				log.Errore(err)
+				log.Fatale(err)
 			}
 		}
 	case "get-candidate-slave":
@@ -127,7 +127,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 
 			instance, _, _, err := inst.GetCandidateSlave(instanceKey, strict)
 			if err != nil {
-				log.Errore(err)
+				log.Fatale(err)
 			} else {
 				fmt.Println(instance.Key.DisplayString())
 			}
@@ -144,7 +144,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 
 			matchedSlaves, _, err := inst.MultiMatchSlaves(instanceKey, siblingKey)
 			if err != nil {
-				log.Errore(err)
+				log.Fatale(err)
 			} else {
 				for _, slave := range matchedSlaves {
 					fmt.Println(slave.Key.DisplayString())
@@ -159,7 +159,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 
 			matchedSlaves, _, err := inst.MatchUpSlaves(instanceKey)
 			if err != nil {
-				log.Errore(err)
+				log.Fatale(err)
 			} else {
 				for _, slave := range matchedSlaves {
 					fmt.Println(slave.Key.DisplayString())
@@ -194,7 +194,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			_, err := inst.ResetSlaveOperation(instanceKey)
 			if err != nil {
-				log.Errore(err)
+				log.Fatale(err)
 			}
 		}
 	case "set-read-only":
@@ -204,7 +204,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			_, err := inst.SetReadOnly(instanceKey, true)
 			if err != nil {
-				log.Errore(err)
+				log.Fatale(err)
 			}
 		}
 	case "set-writeable":
@@ -214,7 +214,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			_, err := inst.SetReadOnly(instanceKey, false)
 			if err != nil {
-				log.Errore(err)
+				log.Fatale(err)
 			}
 		}
 	case "discover":
@@ -229,7 +229,10 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			inst.ForgetInstance(instanceKey)
+			err := inst.ForgetInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
 		}
 	case "begin-maintenance":
 		{
@@ -247,7 +250,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Infof("Maintenance key: %+v", maintenanceKey)
 			}
 			if err != nil {
-				log.Errore(err)
+				log.Fatale(err)
 			}
 		}
 	case "end-maintenance":
@@ -257,14 +260,14 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			err := inst.EndMaintenanceByInstanceKey(instanceKey)
 			if err != nil {
-				log.Errore(err)
+				log.Fatale(err)
 			}
 		}
 	case "clusters":
 		{
 			clusters, err := inst.ReadClusters()
 			if err != nil {
-				log.Errore(err)
+				log.Fatale(err)
 			} else {
 				fmt.Println(strings.Join(clusters, "\n"))
 			}
@@ -273,7 +276,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		{
 			instances, err := inst.FindInstances(pattern)
 			if err != nil {
-				log.Errore(err)
+				log.Fatale(err)
 			} else {
 				for _, instance := range instances {
 					fmt.Println(instance.Key.DisplayString())
@@ -304,7 +307,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			instance, _, err := inst.ReadInstance(instanceKey)
 			if err != nil {
-				log.Errore(err)
+				log.Fatale(err)
 			}
 			if instance == nil {
 				log.Fatalf("Instance not found: %+v", *instanceKey)
