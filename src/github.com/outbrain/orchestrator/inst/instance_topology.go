@@ -396,6 +396,88 @@ Cleanup:
 	return instance, err
 }
 
+// DetachSlaveOperation will detach a slave from its master by forcibly corrupting its replication coordinates
+func DetachSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, err
+	}
+
+	log.Infof("Will detach %+v", instanceKey)
+
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "detach slave"); merr != nil {
+		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
+
+	if instance.IsSlave() {
+		instance, err = StopSlave(instanceKey)
+		if err != nil {
+			goto Cleanup
+		}
+	}
+
+	instance, err = DetachSlave(instanceKey)
+	if err != nil {
+		goto Cleanup
+	}
+
+Cleanup:
+	instance, _ = StartSlave(instanceKey)
+
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	// and we're done (pending deferred functions)
+	AuditOperation("detach slave", instanceKey, fmt.Sprintf("%+v replication detached", *instanceKey))
+
+	return instance, err
+}
+
+// ReattachSlaveOperation will detach a slave from its master by forcibly corrupting its replication coordinates
+func ReattachSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, err
+	}
+
+	log.Infof("Will reattach %+v", instanceKey)
+
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "detach slave"); merr != nil {
+		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
+
+	if instance.IsSlave() {
+		instance, err = StopSlave(instanceKey)
+		if err != nil {
+			goto Cleanup
+		}
+	}
+
+	instance, err = ReattachSlave(instanceKey)
+	if err != nil {
+		goto Cleanup
+	}
+
+Cleanup:
+	instance, _ = StartSlave(instanceKey)
+
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	// and we're done (pending deferred functions)
+	AuditOperation("reattach slave", instanceKey, fmt.Sprintf("%+v replication reattached", *instanceKey))
+
+	return instance, err
+}
+
 // FindLastPseudoGTIDEntry will search an instance's binary logs or relay logs for the last pseudo-GTID entry,
 // and return found coordinates as well as entry text
 func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordinates BinlogCoordinates) (*BinlogCoordinates, string, error) {
@@ -684,7 +766,7 @@ func sortedSlaves(masterKey *InstanceKey, forceRefresh bool) ([](*Instance), err
 // It is assumed that all given slaves are siblings
 func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance), *Instance, error) {
 	res := [](*Instance){}
-	for i := 0; i < len(slaves); i++ {
+	for i := len(slaves) - 1; i >= 0; i-- {
 		slave := slaves[i]
 		if slave.Key.Equals(belowKey) {
 			slaves = append(slaves[:i], slaves[i+1:]...)

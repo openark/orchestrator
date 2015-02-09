@@ -343,6 +343,50 @@ func (this *HttpAPI) ResetSlave(params martini.Params, r render.Render, req *htt
 	r.JSON(200, &APIResponse{Code: OK, Message: "Slave reset", Details: instance})
 }
 
+// DetachSlave corrupts a slave's binlog corrdinates (though encodes it in such way
+// that is reversible), effectively breaking replication
+func (this *HttpAPI) DetachSlave(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !this.isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, err := inst.DetachSlaveOperation(&instanceKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: "Slave detached", Details: instance})
+}
+
+// ReattachSlave reverts a DetachSlave commands by reassigning the correct
+// binlog coordinates to an instance
+func (this *HttpAPI) ReattachSlave(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !this.isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, err := inst.ReattachSlaveOperation(&instanceKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: "Slave reattached", Details: instance})
+}
+
 // MoveBelow attempts to move an instance below its supposed sibling
 func (this *HttpAPI) MoveBelow(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !this.isAuthorizedForAction(req, user) {
@@ -1148,6 +1192,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/move-up/:host/:port", this.MoveUp)
 	m.Get("/api/make-co-master/:host/:port", this.MakeCoMaster)
 	m.Get("/api/reset-slave/:host/:port", this.ResetSlave)
+	m.Get("/api/detach-slave/:host/:port", this.DetachSlave)
+	m.Get("/api/reattach-slave/:host/:port", this.ReattachSlave)
 	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow)
 	m.Get("/api/enslave-siblings-simple/:host/:port", this.EnslaveSiblingsSimple)
 	m.Get("/api/last-pseudo-gtid/:host/:port", this.LastPseudoGTID)

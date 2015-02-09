@@ -203,6 +203,28 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
+	case "detach-slave":
+		{
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			_, err := inst.DetachSlaveOperation(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
+	case "reattach-slave":
+		{
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			_, err := inst.ReattachSlaveOperation(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
 	case "set-read-only":
 		{
 			if instanceKey == nil {

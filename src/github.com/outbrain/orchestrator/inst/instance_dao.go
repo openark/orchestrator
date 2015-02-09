@@ -24,6 +24,7 @@ import (
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/db"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -35,10 +36,16 @@ const backendDBConcurrency = 20
 var instanceReadChan = make(chan bool, backendDBConcurrency)
 var instanceWriteChan = make(chan bool, backendDBConcurrency)
 
+var detachPattern *regexp.Regexp
+
 // Max concurrency for bulk topology operations
 const topologyConcurrency = 100
 
 var topologyConcurrencyChan = make(chan bool, topologyConcurrency)
+
+func init() {
+	detachPattern, _ = regexp.Compile(`//([^/:]+):([\d]+)`)
+}
 
 // ExecuteOnTopology will execute given function while maintaining concurrency limit
 // on topology servers. It is safe in the sense that we will not leak tokens.
@@ -1309,6 +1316,63 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 	log.Infof("Reset slave %+v", instanceKey)
+
+	instance, err = ReadTopologyInstance(instanceKey)
+	return instance, err
+}
+
+// DetachSlave detaches a slave from replication; forcibly corrupting the binlog coordinates (though in such way
+// that is reversible)
+func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	if instance.SlaveRunning() {
+		return instance, errors.New(fmt.Sprintf("Cannot detach slave on: %+v because slave is running", instanceKey))
+	}
+
+	detachedCoordinatesSubmatch := detachPattern.FindStringSubmatch(instance.ExecBinlogCoordinates.LogFile)
+	if len(detachedCoordinatesSubmatch) != 0 {
+		return instance, errors.New(fmt.Sprintf("Cannot (need not) detach slave on: %+v because slave is already detached", instanceKey))
+	}
+
+	detachedCoordinates := BinlogCoordinates{LogFile: fmt.Sprintf("//%s:%d", instance.ExecBinlogCoordinates.LogFile, instance.ExecBinlogCoordinates.LogPos), LogPos: instance.ExecBinlogCoordinates.LogPos}
+	// Encode the current coordinates within the log file name, in such way that replication is broken, but info can still be resurrected
+	_, err = ExecInstance(instanceKey, fmt.Sprintf(`change master to master_log_file='%s', master_log_pos=%d`, detachedCoordinates.LogFile, detachedCoordinates.LogPos))
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	log.Infof("Detach slave %+v", instanceKey)
+
+	instance, err = ReadTopologyInstance(instanceKey)
+	return instance, err
+}
+
+// ReattachSlave restores a detahced slave back into replication
+func ReattachSlave(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	if instance.SlaveRunning() {
+		return instance, errors.New(fmt.Sprintf("Cannot (need not) reattach slave on: %+v because slave is running", instanceKey))
+	}
+
+	detachedCoordinatesSubmatch := detachPattern.FindStringSubmatch(instance.ExecBinlogCoordinates.LogFile)
+	if len(detachedCoordinatesSubmatch) == 0 {
+		return instance, errors.New(fmt.Sprintf("Cannot reattach slave on: %+v because slave is not detached", instanceKey))
+	}
+
+	_, err = ExecInstance(instanceKey, fmt.Sprintf(`change master to master_log_file='%s', master_log_pos=%s`, detachedCoordinatesSubmatch[1], detachedCoordinatesSubmatch[2]))
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	log.Infof("Reattach slave %+v", instanceKey)
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
