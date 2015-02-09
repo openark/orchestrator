@@ -17,8 +17,18 @@ $(document).ready(function () {
 	    		displayClusters(clusters, problemInstances);
         }, "json");
     }, "json");
+    function sortByCountInstances(cluster1, cluster2) {
+    	var diff = cluster2.CountInstances - cluster1.CountInstances;
+    	if (diff != 0) {
+    		return diff;
+    	}
+    	return cluster1.ClusterName.localeCompare(cluster2.ClusterName);
+    }
+    
     function displayClusters(clusters, problemInstances) {
         hideLoader();
+        
+        clusters.sort(sortByCountInstances);
         var clustersProblems = {};
         clusters.forEach(function (cluster) {
         	clustersProblems[cluster.ClusterName] = {};

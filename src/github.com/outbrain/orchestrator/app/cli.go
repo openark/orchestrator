@@ -86,6 +86,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if err != nil {
 				log.Fatale(err)
 			}
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), siblingKey.DisplayString()))
 		}
 	case "enslave-sublings-simple":
 		{
@@ -96,6 +97,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if err != nil {
 				log.Fatale(err)
 			}
+			fmt.Println(instanceKey.DisplayString())
 		}
 	case "make-co-master":
 		{
@@ -106,6 +108,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if err != nil {
 				log.Fatale(err)
 			}
+			fmt.Println(instanceKey.DisplayString())
 		}
 	case "match-below":
 		{
@@ -119,6 +122,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if err != nil {
 				log.Fatale(err)
 			}
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), siblingKey.DisplayString()))
 		}
 	case "get-candidate-slave":
 		{
@@ -197,6 +201,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if err != nil {
 				log.Fatale(err)
 			}
+			fmt.Println(instanceKey.DisplayString())
 		}
 	case "set-read-only":
 		{
@@ -207,6 +212,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if err != nil {
 				log.Fatale(err)
 			}
+			fmt.Println(instanceKey.DisplayString())
 		}
 	case "set-writeable":
 		{
@@ -217,6 +223,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if err != nil {
 				log.Fatale(err)
 			}
+			fmt.Println(instanceKey.DisplayString())
 		}
 	case "discover":
 		{
@@ -224,6 +231,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 			orchestrator.StartDiscovery(*instanceKey)
+			fmt.Println(instanceKey.DisplayString())
 		}
 	case "forget":
 		{
@@ -234,6 +242,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if err != nil {
 				log.Fatale(err)
 			}
+			fmt.Println(instanceKey.DisplayString())
 		}
 	case "begin-maintenance":
 		{
@@ -250,6 +259,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if err != nil {
 				log.Fatale(err)
 			}
+			fmt.Println(instanceKey.DisplayString())
 		}
 	case "end-maintenance":
 		{
@@ -260,6 +270,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if err != nil {
 				log.Fatale(err)
 			}
+			fmt.Println(instanceKey.DisplayString())
 		}
 	case "clusters":
 		{

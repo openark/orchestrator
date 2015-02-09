@@ -267,7 +267,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 
-	instance.ClusterName, err = ReadClusterNameByMaster(&instance.Key, &instance.MasterKey)
+	instance.ClusterName, instance.ReplicationDepth, err = ReadClusterNameByMaster(&instance.Key, &instance.MasterKey)
 	if err != nil {
 		goto Cleanup
 	}
@@ -289,33 +289,35 @@ Cleanup:
 // and getting it from there.
 // It is a non-recursive function and so-called-recursion is performed upon periodic reading of
 // instances.
-func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (string, error) {
+func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (string, uint, error) {
 	db, err := db.OpenOrchestrator()
 	if err != nil {
-		return "", log.Errore(err)
+		return "", 0, log.Errore(err)
 	}
 
 	var clusterName string
+	var replicationDepth uint
 	err = db.QueryRow(`
        	select 
        		if (
        			cluster_name != '',
        			cluster_name,
 	       		ifnull(concat(max(hostname), ':', max(port)), '')
-	       	) as cluster_name
+	       	) as cluster_name,
+	       	ifnull(max(replication_depth)+1, 0) as replication_depth
        	from database_instance 
 		 	where hostname=? and port=?`,
 		masterKey.Hostname, masterKey.Port).Scan(
-		&clusterName,
+		&clusterName, &replicationDepth,
 	)
 
 	if err != nil {
-		return "", log.Errore(err)
+		return "", 0, log.Errore(err)
 	}
 	if clusterName == "" {
-		return fmt.Sprintf("%s:%d", instanceKey.Hostname, instanceKey.Port), nil
+		clusterName = fmt.Sprintf("%s:%d", instanceKey.Hostname, instanceKey.Port)
 	}
-	return clusterName, err
+	return clusterName, replicationDepth, err
 }
 
 // readInstanceRow reads a single instance row from the orchestrator backend database.
@@ -336,6 +338,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.Slave_IO_Running = m.GetBool("slave_io_running")
 	instance.UsingOracleGTID = m.GetBool("oracle_gtid")
 	instance.UsingMariaDBGTID = m.GetBool("mariadb_gtid")
+	instance.UsingPseudoGTID = m.GetBool("pseudo_gtid")
 	instance.SelfBinlogCoordinates.LogFile = m.GetString("binary_log_file")
 	instance.SelfBinlogCoordinates.LogPos = m.GetInt64("binary_log_pos")
 	instance.ReadBinlogCoordinates.LogFile = m.GetString("master_log_file")
@@ -351,6 +354,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.SlaveLagSeconds = m.GetNullInt64("slave_lag_seconds")
 	slaveHostsJson := m.GetString("slave_hosts")
 	instance.ClusterName = m.GetString("cluster_name")
+	instance.ReplicationDepth = m.GetUint("replication_depth")
 	instance.IsUpToDate = (m.GetUint("seconds_since_last_checked") <= config.Config.InstancePollSeconds)
 	instance.IsRecentlyChecked = (m.GetUint("seconds_since_last_checked") <= config.Config.InstancePollSeconds*5)
 	instance.IsLastCheckValid = m.GetBool("is_last_check_valid")
@@ -521,12 +525,13 @@ func ReviewUnseenInstances() error {
 			continue
 		}
 		instance.MasterKey.Hostname = masterHostname
-		clusterName, err := ReadClusterNameByMaster(&instance.Key, &instance.MasterKey)
+		clusterName, replicationDepth, err := ReadClusterNameByMaster(&instance.Key, &instance.MasterKey)
 
 		if err != nil {
 			log.Errore(err)
 		} else if clusterName != instance.ClusterName {
 			instance.ClusterName = clusterName
+			instance.ReplicationDepth = replicationDepth
 			updateInstanceClusterName(instance)
 			operations++
 		}
@@ -837,8 +842,9 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 					slave_lag_seconds=VALUES(slave_lag_seconds),
 					num_slave_hosts=VALUES(num_slave_hosts),
 					slave_hosts=VALUES(slave_hosts),
-					cluster_name=VALUES(cluster_name)
-			`
+					cluster_name=VALUES(cluster_name),
+					replication_depth=VALUES(replication_depth)			
+				`
 		} else {
 			// Scenario: some slave reported a master of his; but the master cannot be contacted.
 			// We might still want to have that master written down
@@ -865,6 +871,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				slave_io_running,
 				oracle_gtid,
 				mariadb_gtid,
+				pseudo_gtid,
 				master_log_file,
 				read_master_log_pos,
 				relay_master_log_file,
@@ -877,8 +884,9 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				slave_lag_seconds,
 				num_slave_hosts,
 				slave_hosts,
-				cluster_name
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				cluster_name,
+				replication_depth
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
@@ -899,6 +907,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			instance.Slave_IO_Running,
 			instance.UsingOracleGTID,
 			instance.UsingMariaDBGTID,
+			instance.UsingPseudoGTID,
 			instance.ReadBinlogCoordinates.LogFile,
 			instance.ReadBinlogCoordinates.LogPos,
 			instance.ExecBinlogCoordinates.LogFile,
@@ -912,6 +921,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			len(instance.SlaveHosts),
 			instance.GetSlaveHostsAsJson(),
 			instance.ClusterName,
+			instance.ReplicationDepth,
 		)
 		if err != nil {
 			return log.Errore(err)
@@ -1021,14 +1031,21 @@ func ForgetLongUnseenInstances() error {
 		return log.Errore(err)
 	}
 
-	_, err = sqlutils.Exec(db, `
+	sqlResult, err := sqlutils.Exec(db, `
 			delete 
 				from database_instance 
 			where 
 				last_seen < NOW() - interval ? hour`,
 		config.Config.UnseenInstanceForgetHours,
 	)
-	AuditOperation("forget-unseen", nil, "")
+	if err != nil {
+		return log.Errore(err)
+	}
+	rows, err := sqlResult.RowsAffected()
+	if err != nil {
+		return log.Errore(err)
+	}
+	AuditOperation("forget-unseen", nil, fmt.Sprintf("Forgotten instances: %d", rows))
 	return err
 }
 

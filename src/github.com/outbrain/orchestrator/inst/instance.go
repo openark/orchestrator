@@ -170,6 +170,7 @@ type Instance struct {
 	Slave_IO_Running       bool
 	UsingOracleGTID        bool
 	UsingMariaDBGTID       bool
+	UsingPseudoGTID        bool
 	ReadBinlogCoordinates  BinlogCoordinates
 	ExecBinlogCoordinates  BinlogCoordinates
 	RelaylogCoordinates    BinlogCoordinates
@@ -179,6 +180,7 @@ type Instance struct {
 	SlaveLagSeconds        sql.NullInt64
 	SlaveHosts             InstanceKeyMap
 	ClusterName            string
+	ReplicationDepth       uint
 
 	IsLastCheckValid     bool
 	IsUpToDate           bool
