@@ -480,7 +480,7 @@ Cleanup:
 
 // FindLastPseudoGTIDEntry will search an instance's binary logs or relay logs for the last pseudo-GTID entry,
 // and return found coordinates as well as entry text
-func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordinates BinlogCoordinates) (*BinlogCoordinates, string, error) {
+func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordinates BinlogCoordinates, exhaustiveSearch bool) (*BinlogCoordinates, string, error) {
 	var instancePseudoGtidText string
 	var instancePseudoGtidCoordinates *BinlogCoordinates
 	var err error = nil
@@ -492,13 +492,13 @@ func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordin
 		// The approach is not to take chances. If log-slave-updates is disabled, fail and go for relay-logs.
 		// If log-slave-updates was just enabled then possibly no pseudo-gtid is found, and so again we will go
 		// for relay logs.
-		instancePseudoGtidCoordinates, instancePseudoGtidText, err = GetLastPseudoGTIDEntryInInstance(instance)
+		instancePseudoGtidCoordinates, instancePseudoGtidText, err = getLastPseudoGTIDEntryInInstance(instance, exhaustiveSearch)
 	}
 	if err != nil || instancePseudoGtidCoordinates == nil {
 		// Unable to find pseudo GTID in binary logs.
 		// Then MAYBE we are lucky enough (chances are we are, if this slave did not crash) that we can
 		// extract the Pseudo GTID entry from the last (current) relay log file.
-		instancePseudoGtidCoordinates, instancePseudoGtidText, err = GetLastPseudoGTIDEntryInRelayLogs(instance, recordedInstanceRelayLogCoordinates)
+		instancePseudoGtidCoordinates, instancePseudoGtidText, err = getLastPseudoGTIDEntryInRelayLogs(instance, recordedInstanceRelayLogCoordinates, exhaustiveSearch)
 	}
 	return instancePseudoGtidCoordinates, instancePseudoGtidText, err
 }
@@ -563,7 +563,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	// a FLUSH LOGS/FLUSH RELAY LOGS (or a START SLAVE, though that's an altogether different problem) etc.
 	// We want to be on the safe side; we don't utterly trust that we are the only ones playing with the instance.
 	recordedInstanceRelayLogCoordinates = instance.RelaylogCoordinates
-	instancePseudoGtidCoordinates, instancePseudoGtidText, err = FindLastPseudoGTIDEntry(instance, recordedInstanceRelayLogCoordinates)
+	instancePseudoGtidCoordinates, instancePseudoGtidText, err = FindLastPseudoGTIDEntry(instance, recordedInstanceRelayLogCoordinates, true)
 
 	if err != nil {
 		goto Cleanup
@@ -608,6 +608,19 @@ Cleanup:
 	AuditOperation("match-below", instanceKey, fmt.Sprintf("matched %+v below %+v", *instanceKey, *otherKey))
 
 	return instance, nextBinlogCoordinatesToMatch, err
+}
+
+// RematchSlave will re-match a slave to its master, using pseudo-gtid
+func RematchSlave(instanceKey *InstanceKey, requireInstanceMaintenance bool, requireOtherMaintenance bool) (*Instance, *BinlogCoordinates, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, nil, err
+	}
+	masterInstance, found, err := ReadInstance(&instance.MasterKey)
+	if err != nil || !found {
+		return instance, nil, err
+	}
+	return MatchBelow(instanceKey, &masterInstance.Key, requireInstanceMaintenance, requireOtherMaintenance)
 }
 
 // MakeMaster will take an instance, make all its siblings its slaves (via pseudo-GTID) and make it master
@@ -743,7 +756,7 @@ Cleanup:
 
 // sortedSlaves returns the list of slaves of a given master, sorted by exec coordinates
 // (most up-to-date slave first)
-func sortedSlaves(masterKey *InstanceKey, forceRefresh bool) ([](*Instance), error) {
+func sortedSlaves(masterKey *InstanceKey, forceRefresh bool, resumeReplication bool) ([](*Instance), error) {
 	slaves, err := ReadSlaveInstances(masterKey)
 	if err != nil {
 		return slaves, err
@@ -755,23 +768,29 @@ func sortedSlaves(masterKey *InstanceKey, forceRefresh bool) ([](*Instance), err
 		StopSlavesNicely(slaves, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
 	}
 	sort.Sort(sort.Reverse(InstancesByExecBinlogCoordinates(slaves)))
-	if forceRefresh {
+	if forceRefresh && resumeReplication {
 		StartSlaves(slaves)
 	}
 
 	return slaves, err
 }
 
+// removeInstance will remove an instance from a list of instances
+func removeInstance(instances [](*Instance), instanceKey *InstanceKey) [](*Instance) {
+	for i := len(instances) - 1; i >= 0; i-- {
+		if instances[i].Key.Equals(instanceKey) {
+			instances = append(instances[:i], instances[i+1:]...)
+		}
+	}
+	return instances
+}
+
 // MultiMatchBelow will efficiently match multiple slaves below a given instance.
 // It is assumed that all given slaves are siblings
 func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance), *Instance, error) {
 	res := [](*Instance){}
-	for i := len(slaves) - 1; i >= 0; i-- {
-		slave := slaves[i]
-		if slave.Key.Equals(belowKey) {
-			slaves = append(slaves[:i], slaves[i+1:]...)
-		}
-	}
+
+	slaves = removeInstance(slaves, belowKey)
 
 	belowInstance, err := ReadTopologyInstance(belowKey)
 	if err != nil {
@@ -915,45 +934,88 @@ func MatchUpSlaves(masterKey *InstanceKey) ([](*Instance), *Instance, error) {
 }
 
 // GetCandidateSlave chooses the best slave to promote given a (possibly dead) master
-func GetCandidateSlave(masterKey *InstanceKey, forceRefresh bool) (*Instance, [](*Instance), int, error) {
-	skippedSlaves := 0
-	slaves, err := sortedSlaves(masterKey, forceRefresh)
+func GetCandidateSlave(masterKey *InstanceKey, forceRefresh bool, resumeReplication bool) (*Instance, [](*Instance), [](*Instance), [](*Instance), error) {
+	var candidateSlave *Instance = nil
+	aheadSlaves := [](*Instance){}
+	equalSlaves := [](*Instance){}
+	laterSlaves := [](*Instance){}
+	slaves, err := sortedSlaves(masterKey, forceRefresh, resumeReplication)
 	if err != nil {
-		return nil, slaves, skippedSlaves, err
+		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err
 	}
 	if len(slaves) == 0 {
-		return nil, slaves, skippedSlaves, errors.New(fmt.Sprintf("No slaves found for %+v", *masterKey))
+		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, errors.New(fmt.Sprintf("No slaves found for %+v", *masterKey))
 	}
 	for _, slave := range slaves {
 		slave := slave
 		if slave.LogSlaveUpdatesEnabled {
-			return slave, slaves, skippedSlaves, nil
+			// this is the one
+			candidateSlave = slave
+			break
 		}
-		// Should not promote.
-		skippedSlaves++
 	}
-	return nil, slaves, skippedSlaves, errors.New(fmt.Sprintf("No slaves found with log_slave_updates for %+v", *masterKey))
-}
-
-// PickAndPromoteCandidateSlave will choose a candidate slave
-func PickAndPromoteCandidateSlave(masterKey *InstanceKey) (*Instance, error) {
-	candidateSlave, slaves, _, err := GetCandidateSlave(masterKey, true)
-	if err != nil {
-		return nil, err
+	if candidateSlave == nil {
+		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, errors.New(fmt.Sprintf("No slaves found with log_slave_updates for %+v", *masterKey))
 	}
+	slaves = removeInstance(slaves, &candidateSlave.Key)
 	for _, slave := range slaves {
 		slave := slave
-		if slave.Key.Equals(&candidateSlave.Key) {
-			continue
-		}
-		if slave.ExecBinlogCoordinates.Equals(&candidateSlave.ExecBinlogCoordinates) {
-			// This slave has the exact same executing coordinates as the candidate slave. This slave
-			// is *extremely* easy to attach below the candidate slave!
-			ChangeMasterTo(&slave.Key, &candidateSlave.Key, &candidateSlave.SelfBinlogCoordinates)
+		if slave.ExecBinlogCoordinates.SmallerThan(&candidateSlave.ExecBinlogCoordinates) {
+			laterSlaves = append(laterSlaves, slave)
+		} else if slave.ExecBinlogCoordinates.Equals(&candidateSlave.ExecBinlogCoordinates) {
+			equalSlaves = append(equalSlaves, slave)
+		} else {
+			aheadSlaves = append(aheadSlaves, slave)
 		}
 	}
+	log.Debugf("sortedSlaves: candidate: %+v, ahead: %d, equal: %d, late: %d", candidateSlave.Key, len(aheadSlaves), len(equalSlaves), len(laterSlaves))
+	return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, nil
+}
 
-	//	 TODO
+// RegroupSlaves will choose a candidate slave of a given instance, and enslave its siblings using
+// either simple CHANGE MASTER TO, where possible, or pseudo-gtid
+func RegroupSlaves(masterKey *InstanceKey) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
+	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err := GetCandidateSlave(masterKey, true, false)
+	if err != nil {
+		return aheadSlaves, equalSlaves, laterSlaves, nil, err
+	}
 
-	return nil, nil
+	barrier := make(chan *InstanceKey)
+	for _, slave := range equalSlaves {
+		slave := slave
+		// This slave has the exact same executing coordinates as the candidate slave. This slave
+		// is *extremely* easy to attach below the candidate slave!
+		go func() {
+			ExecuteOnTopology(func() {
+				ChangeMasterTo(&slave.Key, &candidateSlave.Key, &candidateSlave.SelfBinlogCoordinates)
+			})
+			barrier <- &candidateSlave.Key
+		}()
+	}
+	for _, _ = range equalSlaves {
+		<-barrier
+	}
+
+	// As for the laterSlaves, we'll have to apply pseudo GTID
+	laterSlaves, instance, err := MultiMatchBelow(laterSlaves, &candidateSlave.Key)
+
+	barrier = make(chan *InstanceKey)
+	operatedSlaves := append(equalSlaves, candidateSlave)
+	operatedSlaves = append(operatedSlaves, laterSlaves...)
+	for _, slave := range operatedSlaves {
+		slave := slave
+		// This slave has the exact same executing coordinates as the candidate slave. This slave
+		// is *extremely* easy to attach below the candidate slave!
+		go func() {
+			ExecuteOnTopology(func() {
+				StartSlave(&slave.Key)
+			})
+			barrier <- &candidateSlave.Key
+		}()
+	}
+	for _, _ = range operatedSlaves {
+		<-barrier
+	}
+
+	return aheadSlaves, equalSlaves, laterSlaves, instance, err
 }

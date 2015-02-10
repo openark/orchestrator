@@ -87,7 +87,7 @@ func getLastPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, bin
 	return &binlogCoordinates, entryText, err
 }
 
-func GetLastPseudoGTIDEntryInInstance(instance *Instance) (*BinlogCoordinates, string, error) {
+func getLastPseudoGTIDEntryInInstance(instance *Instance, exhaustiveSearch bool) (*BinlogCoordinates, string, error) {
 	// Look for last GTID in instance:
 	instanceBinlogs := instance.GetBinaryLogs()
 
@@ -101,11 +101,14 @@ func GetLastPseudoGTIDEntryInInstance(instance *Instance) (*BinlogCoordinates, s
 			log.Debugf("Found pseudo gtid entry in %+v: %+v", instance.Key, resultCoordinates)
 			return resultCoordinates, entryInfo, err
 		}
+		if !exhaustiveSearch {
+			break
+		}
 	}
 	return nil, "", log.Errorf("Cannot find pseudo GTID entry in binlogs of %+v", instance.Key)
 }
 
-func GetLastPseudoGTIDEntryInRelayLogs(instance *Instance, recordedInstanceRelayLogCoordinates BinlogCoordinates) (*BinlogCoordinates, string, error) {
+func getLastPseudoGTIDEntryInRelayLogs(instance *Instance, recordedInstanceRelayLogCoordinates BinlogCoordinates, exhaustiveSearch bool) (*BinlogCoordinates, string, error) {
 	// Look for last GTID in relay logs:
 	// Since MySQL does not provide with a SHOW RELAY LOGS command, we heuristically srtart from current
 	// relay log (indiciated by Relay_log_file) and walk backwards.
@@ -119,6 +122,9 @@ func GetLastPseudoGTIDEntryInRelayLogs(instance *Instance, recordedInstanceRelay
 		} else if resultCoordinates != nil {
 			log.Debugf("Found pseudo gtid entry in %+v: %+v", instance.Key, resultCoordinates)
 			return resultCoordinates, entryInfo, err
+		}
+		if !exhaustiveSearch {
+			break
 		}
 		currentRelayLog, err = currentRelayLog.PreviousFileCoordinates()
 	}

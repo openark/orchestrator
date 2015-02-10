@@ -124,13 +124,24 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), siblingKey.DisplayString()))
 		}
+	case "rematch":
+		{
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			instance, _, err := inst.RematchSlave(instanceKey, true, true)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instance.Key.DisplayString())
+		}
 	case "get-candidate-slave":
 		{
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			instance, _, _, err := inst.GetCandidateSlave(instanceKey, strict)
+			instance, _, _, _, err := inst.GetCandidateSlave(instanceKey, strict, true)
 			if err != nil {
 				log.Fatale(err)
 			} else {
@@ -171,6 +182,20 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				}
 			}
 		}
+	case "regroup-slaves":
+		{
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+
+			lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlaves(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			} else {
+				fmt.Println(fmt.Sprintf("promoted slave: %s, lost: %d, trivial: %d, pseudo-gtid: %d",
+					promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalSlaves), len(aheadSlaves)))
+			}
+		}
 	case "last-pseudo-gtid":
 		{
 			if instanceKey == nil {
@@ -186,7 +211,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if instance == nil {
 				log.Fatalf("Instance not found: %+v", *instanceKey)
 			}
-			coordinates, text, err := inst.FindLastPseudoGTIDEntry(instance, instance.RelaylogCoordinates)
+			coordinates, text, err := inst.FindLastPseudoGTIDEntry(instance, instance.RelaylogCoordinates, strict)
 			if err != nil {
 				log.Fatale(err)
 			}
