@@ -24,7 +24,7 @@ import (
 	"github.com/outbrain/orchestrator/db"
 )
 
-// WriteResolvedHostname stores a hostname and the resolved hostname to backend database
+// AttemptElection tries to grab leadership (become active node)
 func AttemptElection() (bool, error) {
 
 	db, err := db.OpenOrchestrator()
@@ -54,7 +54,32 @@ func AttemptElection() (bool, error) {
 	return (rows > 0), err
 }
 
-// ReadResolvedHostname returns the resolved hostname given a hostname, or empty if not exists
+// GrabElection forcibly grabs leadership. Use with care!!
+func GrabElection() (bool, error) {
+
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		return false, log.Errore(err)
+	}
+
+	sqlResult, err := sqlutils.Exec(db, `
+			update active_node set 
+				hostname = ?,
+				token = ?,
+				last_seen_active = now()
+			where
+				anchor = 1
+			`,
+		ThisHostname, ProcessToken.Hash,
+	)
+	if err != nil {
+		return false, log.Errore(err)
+	}
+	rows, err := sqlResult.RowsAffected()
+	return (rows > 0), err
+}
+
+// IsElected checks whether this node is the elected active node
 func IsElected() (bool, error) {
 	isElected := false
 	query := fmt.Sprintf(`
@@ -83,4 +108,30 @@ Cleanup:
 		log.Errore(err)
 	}
 	return isElected, err
+}
+
+// ElectedNode returns the hostname of the elected node
+func ElectedNode() (string, error) {
+	hostname := ""
+	query := fmt.Sprintf(`
+		select 
+			ifnull(max(hostname), '') as hostname
+		from 
+			active_node
+		`)
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		goto Cleanup
+	}
+
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		hostname = m.GetString("hostname")
+		return nil
+	})
+Cleanup:
+
+	if err != nil {
+		log.Errore(err)
+	}
+	return hostname, err
 }

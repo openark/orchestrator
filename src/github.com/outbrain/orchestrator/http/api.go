@@ -1208,13 +1208,29 @@ func (this *HttpAPI) Headers(params martini.Params, r render.Render, req *http.R
 
 // Health performs a self test
 func (this *HttpAPI) Health(params martini.Params, r render.Render, req *http.Request) {
-	_, err := orchestrator.HealthTest()
+	health, err := orchestrator.HealthTest()
 	if err != nil {
-		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Application node is unhealthy %+v", err)})
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Application node is unhealthy %+v", err), Details: health})
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Application node is healthy")})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Application node is healthy"), Details: health})
+
+}
+
+// GrabElection forcibly grabs leadership. Use with care!!
+func (this *HttpAPI) GrabElection(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !this.isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	success, err := orchestrator.GrabElection()
+	if err != nil || !success {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Unable to grab election %+v", err)})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Node elected as leader")})
 
 }
 
@@ -1263,6 +1279,10 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/audit/:page", this.Audit)
 	m.Get("/api/hostname-resolve-cache", this.HostnameResolveCache)
 	m.Get("/api/reset-hostname-resolve-cache", this.ResetHostnameResolveCache)
+	// General
+	m.Get("/api/headers", this.Headers)
+	m.Get("/api/health", this.Health)
+	m.Get("/api/grab-election", this.GrabElection)
 	// Agents
 	m.Get("/api/agents", this.Agents)
 	m.Get("/api/agent/:host", this.Agent)
@@ -1279,6 +1299,4 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/agent-seed-states/:seedId", this.AgentSeedStates)
 	m.Get("/api/agent-abort-seed/:seedId", this.AbortSeed)
 	m.Get("/api/seeds", this.Seeds)
-	m.Get("/api/headers", this.Headers)
-	m.Get("/api/health", this.Health)
 }

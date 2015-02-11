@@ -22,12 +22,20 @@ import (
 	"github.com/outbrain/orchestrator/db"
 )
 
+type HealthStatus struct {
+	Healthy    bool
+	ActiveNode string
+	Error      error
+}
+
 // HealthTest attempts to write to the backend database and get a result
-func HealthTest() (bool, error) {
+func HealthTest() (*HealthStatus, error) {
+	health := HealthStatus{Healthy: false}
 
 	db, err := db.OpenOrchestrator()
 	if err != nil {
-		return false, log.Errore(err)
+		health.Error = err
+		return &health, log.Errore(err)
 	}
 
 	sqlResult, err := sqlutils.Exec(db, `
@@ -42,11 +50,20 @@ func HealthTest() (bool, error) {
 		ThisHostname, ProcessToken.Hash,
 	)
 	if err != nil {
-		return false, log.Errore(err)
+		health.Error = err
+		return &health, log.Errore(err)
 	}
 	rows, err := sqlResult.RowsAffected()
 	if err != nil {
-		return false, log.Errore(err)
+		health.Error = err
+		return &health, log.Errore(err)
 	}
-	return (rows > 0), nil
+	health.Healthy = (rows > 0)
+	health.ActiveNode, err = ElectedNode()
+	if err != nil {
+		health.Error = err
+		return &health, log.Errore(err)
+	}
+
+	return &health, nil
 }
