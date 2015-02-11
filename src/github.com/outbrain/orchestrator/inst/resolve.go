@@ -123,3 +123,7 @@ func ResetHostnameResolveCache() error {
 	hostnameResolvesLightweightCache.Flush()
 	return err
 }
+
+func HostnameResolveCache() (map[string]*cache.Item, error) {
+	return hostnameResolvesLightweightCache.Items(), nil
+}

@@ -858,7 +858,19 @@ func (this *HttpAPI) LongQueries(params martini.Params, r render.Render, req *ht
 	r.JSON(200, longQueries)
 }
 
-// Audit provides list of audit entries by given page number
+// HostnameResolveCache shows content of in-memory hostname cache
+func (this *HttpAPI) HostnameResolveCache(params martini.Params, r render.Render, req *http.Request) {
+	content, err := inst.HostnameResolveCache()
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: "Cache retrieved", Details: content})
+}
+
+// ResetHostnameResolveCache clears in-memory hostname resovle cache
 func (this *HttpAPI) ResetHostnameResolveCache(params martini.Params, r render.Render, req *http.Request) {
 	err := inst.ResetHostnameResolveCache()
 
@@ -1249,6 +1261,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/long-queries/:filter", this.LongQueries)
 	m.Get("/api/audit", this.Audit)
 	m.Get("/api/audit/:page", this.Audit)
+	m.Get("/api/hostname-resolve-cache", this.HostnameResolveCache)
 	m.Get("/api/reset-hostname-resolve-cache", this.ResetHostnameResolveCache)
 	// Agents
 	m.Get("/api/agents", this.Agents)

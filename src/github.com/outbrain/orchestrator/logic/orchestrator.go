@@ -125,10 +125,11 @@ func ContinuousDiscovery() {
 	go handleDiscoveryRequests(nil, nil)
 	tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
 	forgetUnseenTick := time.Tick(time.Minute)
+	elected := false
 	for {
 		select {
 		case <-tick:
-			if elected, _ := AttemptElection(); elected {
+			if elected, _ = AttemptElection(); elected {
 				instanceKeys, _ := inst.ReadOutdatedInstanceKeys()
 				log.Debugf("outdated keys: %+v", instanceKeys)
 				for _, instanceKey := range instanceKeys {
@@ -143,6 +144,11 @@ func ContinuousDiscovery() {
 			inst.ForgetExpiredHostnameResolves()
 			inst.ReviewUnseenInstances()
 			inst.InjectUnseenMasters()
+			HealthTest()
+			if !elected {
+				// Take this opportunity to refresh yourself
+				inst.LoadHostnameResolveCacheFromDatabase()
+			}
 		}
 	}
 }
