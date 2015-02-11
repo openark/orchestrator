@@ -44,6 +44,6 @@
   "UnseenAgentForgetHours": 6,
   "StaleSeedFailMinutes": 60,
   "SeedAcceptableBytesDiff": 8192,
-  "PseudoGTIDPattern": "drop view if exists .*?[.]`_pseudo_gtid_hint__"
+  "PseudoGTIDPattern": "drop view if exists .*?`_pseudo_gtid_hint__"
 }
 

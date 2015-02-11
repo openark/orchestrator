@@ -67,6 +67,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 	case "move-up":
 		{
 			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 			_, err := inst.MoveUp(instanceKey)
@@ -76,6 +79,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		}
 	case "move-below":
 		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
@@ -102,6 +108,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 	case "make-co-master":
 		{
 			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 			_, err := inst.MakeCoMaster(instanceKey)
@@ -112,6 +121,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		}
 	case "match-below":
 		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
@@ -126,6 +138,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		}
 	case "rematch":
 		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
@@ -220,6 +235,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 	case "reset-slave":
 		{
 			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 			_, err := inst.ResetSlaveOperation(instanceKey)
@@ -230,6 +248,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		}
 	case "detach-slave":
 		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
@@ -242,6 +263,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 	case "reattach-slave":
 		{
 			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 			_, err := inst.ReattachSlaveOperation(instanceKey)
@@ -252,6 +276,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		}
 	case "set-read-only":
 		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
@@ -264,6 +291,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 	case "set-writeable":
 		{
 			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 			_, err := inst.SetReadOnly(instanceKey, false)
@@ -275,6 +305,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 	case "discover":
 		{
 			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 			orchestrator.StartDiscovery(*instanceKey)
@@ -282,6 +315,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		}
 	case "forget":
 		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
@@ -293,6 +329,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		}
 	case "begin-maintenance":
 		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
@@ -310,6 +349,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		}
 	case "end-maintenance":
 		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
