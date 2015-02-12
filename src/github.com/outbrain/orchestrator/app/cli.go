@@ -204,11 +204,10 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 
 			lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlaves(instanceKey)
+			fmt.Println(fmt.Sprintf("%s lost: %d, trivial: %d, pseudo-gtid: %d",
+				promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalSlaves), len(aheadSlaves)))
 			if err != nil {
 				log.Fatale(err)
-			} else {
-				fmt.Println(fmt.Sprintf("promoted slave: %s, lost: %d, trivial: %d, pseudo-gtid: %d",
-					promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalSlaves), len(aheadSlaves)))
 			}
 		}
 	case "last-pseudo-gtid":

@@ -40,6 +40,7 @@ func init() {
 }
 
 var hostnameResolvesLightweightCache = cache.New(time.Duration(config.Config.ExpiryHostnameResolvesMinutes)*time.Minute, time.Minute)
+var hostnameResolvesLightweightCacheLoadedOnceFromDB bool = false
 
 // GetCNAME resolves an IP or hostname into a normalized valid CNAME
 func GetCNAME(hostname string) (string, error) {
@@ -69,6 +70,20 @@ func ResolveHostname(hostname string) (string, error) {
 	// First go to lightweight cache
 	if resolvedHostname, found := hostnameResolvesLightweightCache.Get(hostname); found {
 		return resolvedHostname.(string), nil
+	}
+
+	if !hostnameResolvesLightweightCacheLoadedOnceFromDB {
+		// A continuous-discovery will first make sure to load all resolves from DB.
+		// However cli does not do so.
+		// Anyway, it seems like the cache was not loaded from DB. Before doing real resolves,
+		// let's try and get the resolved hostname from database.
+		log.Debugf("giving database a chance!! %+v", hostname)
+		if resolvedHostname, err := ReadResolvedHostname(hostname); err == nil && resolvedHostname != "" {
+			log.Debugf("+ that was a good idea: %+v", resolvedHostname)
+			return resolvedHostname, nil
+		} else {
+			log.Debugf("- got: %+v, %+v", resolvedHostname, err)
+		}
 	}
 
 	// Unfound: resolve!
@@ -115,6 +130,7 @@ func LoadHostnameResolveCacheFromDatabase() error {
 	for _, hostnameResolve := range allHostnamesResolves {
 		hostnameResolvesLightweightCache.Set(hostnameResolve.hostname, hostnameResolve.resolvedHostname, 0)
 	}
+	hostnameResolvesLightweightCacheLoadedOnceFromDB = true
 	return nil
 }
 
