@@ -258,6 +258,11 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN replication_depth TINYINT UNSIGNED NOT NULL AFTER cluster_name
 	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN has_replication_filters TINYINT UNSIGNED NOT NULL AFTER slave_io_running
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance

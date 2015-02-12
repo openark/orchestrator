@@ -29,7 +29,7 @@ var eventInfoTransformations map[*regexp.Regexp]string = map[*regexp.Regexp]stri
 	regexp.MustCompile(`(.*) [/][*].*?[*][/](.*$)`): "$1 $2",
 	regexp.MustCompile(`(COMMIT) .*$`):              "$1",
 	regexp.MustCompile(`(table_id:) [0-9]+ (.*$)`):  "$1 ### $2",
-	regexp.MustCompile(`(table_id:) [0-9]+$`):  "$1 ###",
+	regexp.MustCompile(`(table_id:) [0-9]+$`):       "$1 ###",
 }
 
 var skippedEventTypes map[string]bool = map[string]bool{

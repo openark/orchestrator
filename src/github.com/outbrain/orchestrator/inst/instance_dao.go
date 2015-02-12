@@ -131,6 +131,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		instance.LastIOError = m.GetString("Last_IO_Error")
 		instance.UsingOracleGTID = (m.GetIntD("Auto_Position", 0) == 1)
 		instance.UsingMariaDBGTID = (m.GetStringD("Using_Gtid", "No") == "Yes")
+		instance.HasReplicationFilters = ((m.GetStringD("Replicate_Do_DB", "") != "") || (m.GetStringD("Replicate_Ignore_DB", "") != "") || (m.GetStringD("Replicate_Do_Table", "") != "") || (m.GetStringD("Replicate_Ignore_Table", "") != "") || (m.GetStringD("Replicate_Wild_Do_Table", "") != "") || (m.GetStringD("Replicate_Wild_Ignore_Table", "") != ""))
 
 		masterKey, err := NewInstanceKeyFromStrings(m.GetString("Master_Host"), m.GetString("Master_Port"))
 		if err != nil {
@@ -343,6 +344,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.MasterKey.Port = m.GetInt("master_port")
 	instance.Slave_SQL_Running = m.GetBool("slave_sql_running")
 	instance.Slave_IO_Running = m.GetBool("slave_io_running")
+	instance.HasReplicationFilters = m.GetBool("has_replication_filters")
 	instance.UsingOracleGTID = m.GetBool("oracle_gtid")
 	instance.UsingMariaDBGTID = m.GetBool("mariadb_gtid")
 	instance.UsingPseudoGTID = m.GetBool("pseudo_gtid")
@@ -835,6 +837,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 					master_port=VALUES(master_port),
 					slave_sql_running=VALUES(slave_sql_running),
 					slave_io_running=VALUES(slave_io_running),
+					has_replication_filters=VALUES(has_replication_filters),
 					oracle_gtid=VALUES(oracle_gtid),
 					mariadb_gtid=VALUES(mariadb_gtid),
 					master_log_file=VALUES(master_log_file),
@@ -876,6 +879,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				master_port,
 				slave_sql_running,
 				slave_io_running,
+				has_replication_filters,
 				oracle_gtid,
 				mariadb_gtid,
 				pseudo_gtid,
@@ -893,7 +897,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				slave_hosts,
 				cluster_name,
 				replication_depth
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
@@ -912,6 +916,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			instance.MasterKey.Port,
 			instance.Slave_SQL_Running,
 			instance.Slave_IO_Running,
+			instance.HasReplicationFilters,
 			instance.UsingOracleGTID,
 			instance.UsingMariaDBGTID,
 			instance.UsingPseudoGTID,
@@ -1435,4 +1440,52 @@ func KillQuery(instanceKey *InstanceKey, process int64) (*Instance, error) {
 	log.Infof("Killed query on %+v", *instanceKey)
 	AuditOperation("kill-query", instanceKey, fmt.Sprintf("Killed query %d", process))
 	return instance, err
+}
+
+func WhatsWrongResults() error {
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		return log.Errore(err)
+	}
+	query := `
+		SELECT 
+		    master_instance.hostname,
+		    master_instance.port,
+		    MIN(master_instance.last_checked <= master_instance.last_seen)
+		        IS TRUE AS is_last_check_valid,
+		    MIN(master_instance.master_host IN ('' , '_')
+		        OR master_instance.master_port = 0) AS is_master,
+		    MIN(CONCAT(master_instance.hostname,
+		            ':',
+		            master_instance.port) = master_instance.cluster_name) AS is_cluster_master,
+		    COUNT(slave_instance.server_id) AS count_slaves,
+		    IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen),
+		            0) AS count_valid_slaves,
+		    IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
+		                AND slave_instance.slave_io_running != 0
+		                AND slave_instance.slave_sql_running != 0),
+		            0) AS count_valid_replicating_slaves
+		FROM
+		    database_instance master_instance
+		        LEFT JOIN
+		    hostname_resolve ON (master_instance.hostname = hostname_resolve.hostname)
+		        LEFT JOIN
+		    database_instance slave_instance ON (COALESCE(hostname_resolve.resolved_hostname,
+		            master_instance.hostname) = slave_instance.master_host
+		        AND master_instance.port = slave_instance.master_port)
+		GROUP BY 
+			master_instance.hostname, 
+			master_instance.port
+		ORDER BY 
+			is_master DESC , 
+			is_cluster_master DESC, 
+			count_slaves DESC
+	`
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }

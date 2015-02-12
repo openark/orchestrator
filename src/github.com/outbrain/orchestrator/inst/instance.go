@@ -168,6 +168,7 @@ type Instance struct {
 	MasterKey              InstanceKey
 	Slave_SQL_Running      bool
 	Slave_IO_Running       bool
+	HasReplicationFilters  bool
 	UsingOracleGTID        bool
 	UsingMariaDBGTID       bool
 	UsingPseudoGTID        bool
@@ -177,10 +178,11 @@ type Instance struct {
 	LastSQLError           string
 	LastIOError            string
 	SecondsBehindMaster    sql.NullInt64
-	SlaveLagSeconds        sql.NullInt64
-	SlaveHosts             InstanceKeyMap
-	ClusterName            string
-	ReplicationDepth       uint
+
+	SlaveLagSeconds  sql.NullInt64
+	SlaveHosts       InstanceKeyMap
+	ClusterName      string
+	ReplicationDepth uint
 
 	IsLastCheckValid     bool
 	IsUpToDate           bool
