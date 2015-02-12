@@ -77,9 +77,8 @@ func ResolveHostname(hostname string) (string, error) {
 		// However cli does not do so.
 		// Anyway, it seems like the cache was not loaded from DB. Before doing real resolves,
 		// let's try and get the resolved hostname from database.
-		log.Debugf("giving database a chance!! %+v", hostname)
 		if resolvedHostname, err := ReadResolvedHostname(hostname); err == nil && resolvedHostname != "" {
-			log.Debugf("+ that was a good idea: %+v", resolvedHostname)
+			hostnameResolvesLightweightCache.Set(hostname, resolvedHostname, 0)
 			return resolvedHostname, nil
 		} else {
 			log.Debugf("- got: %+v, %+v", resolvedHostname, err)
