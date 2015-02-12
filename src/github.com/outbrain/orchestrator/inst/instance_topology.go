@@ -151,7 +151,7 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	master, err := GetInstanceMaster(instance)
 	if err != nil {
-		return instance, log.Errorf("Cannot GetInstanceMaster() for %+v. error=%+v", instance, err)
+		return instance, log.Errorf("Cannot GetInstanceMaster() for %+v. error=%+v", instance.Key, err)
 	}
 
 	if !master.IsSlave() {
@@ -918,6 +918,27 @@ func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey) ([](*Instan
 		return res, belowInstance, err
 	}
 	return MultiMatchBelow(slaves, &belowInstance.Key)
+}
+
+// MatchUp will move a slave up the replication chain, so that it becomes sibling of its master, via Pseudo-GTID
+func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool, requireOtherMaintenance bool) (*Instance, *BinlogCoordinates, error) {
+	instance, found, err := ReadInstance(instanceKey)
+	if err != nil || !found {
+		return nil, nil, err
+	}
+	if !instance.IsSlave() {
+		return instance, nil, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
+	}
+	master, found, err := ReadInstance(&instance.MasterKey)
+	if err != nil || !found {
+		return instance, nil, log.Errorf("Cannot get master for %+v. error=%+v", instance.Key, err)
+	}
+
+	if !master.IsSlave() {
+		return instance, nil, errors.New(fmt.Sprintf("master is not a slave itself: %+v", master.Key))
+	}
+
+	return MatchBelow(instanceKey, &master.MasterKey, requireInstanceMaintenance, requireOtherMaintenance)
 }
 
 // MatchUpSlaves will move all slaves of given master up the replication chain,

@@ -136,6 +136,20 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), siblingKey.DisplayString()))
 		}
+	case "match-up":
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			instance, _, err := inst.MatchUp(instanceKey, true, true)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instance.Key.DisplayString())
+		}
 	case "rematch":
 		{
 			if instanceKey == nil {
@@ -393,6 +407,23 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatale(err)
 			}
 			fmt.Println(output)
+		}
+	case "get-master":
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatalf("Unable to get master: unresolved instance")
+			}
+			instance, _, err := inst.ReadInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			fmt.Println(instance.MasterKey.DisplayString())
 		}
 	case "instance-status":
 		{
