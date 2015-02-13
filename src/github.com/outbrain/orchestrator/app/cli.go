@@ -72,10 +72,11 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			_, err := inst.MoveUp(instanceKey)
+			instance, err := inst.MoveUp(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), instance.MasterKey.DisplayString()))
 		}
 	case "move-below":
 		{
@@ -148,7 +149,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instance.Key.DisplayString())
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), instance.MasterKey.DisplayString()))
 		}
 	case "rematch":
 		{
@@ -162,7 +163,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instance.Key.DisplayString())
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), instance.MasterKey.DisplayString()))
 		}
 	case "get-candidate-slave":
 		{

@@ -265,7 +265,7 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 		var otherEventInfo string
 		{
 			// Extract next binlog/relaylog entry from instance:
-			event, err := instanceCursor.NextRealEvent()
+			event, err := instanceCursor.nextRealEvent()
 			if err != nil {
 				return nil, log.Errore(err)
 			}
@@ -277,11 +277,11 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 			case BinaryLog:
 				if event == nil {
 					// end of binary logs for instance:
-					targetMatchCoordinates, err := otherCursor.NextCoordinates()
+					targetMatchCoordinates, err := otherCursor.getNextCoordinates()
 					if err != nil {
 						return nil, log.Errore(err)
 					}
-					nextCoordinates, _ := instanceCursor.NextCoordinates()
+					nextCoordinates, _ := instanceCursor.getNextCoordinates()
 					if !nextCoordinates.Equals(&instance.SelfBinlogCoordinates) {
 						return nil, log.Errorf("Unexpected problem: instance binlog iteration did not end with current master status. Ended with: %+v, self coordinates: %+v", nextCoordinates, instance.SelfBinlogCoordinates)
 					}
@@ -312,7 +312,8 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 				}
 				if endOfScan {
 					// end of binary logs for instance:
-					targetMatchCoordinates, err := otherCursor.NextCoordinates()
+					targetMatchCoordinates, err := otherCursor.getNextCoordinates()
+					log.Debugf("Cannot otherCursor.getNextCoordinates(). otherCoordinates=%+v, cached events in cursor: %d; index=%d", otherCoordinates, len(otherCursor.cachedEvents), otherCursor.currentEventIndex)
 					if err != nil {
 						return nil, log.Errore(err)
 					}
@@ -327,7 +328,7 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 		}
 		{
 			// Extract next binlog/relaylog entry from otherInstance (intended master):
-			event, err := otherCursor.NextRealEvent()
+			event, err := otherCursor.nextRealEvent()
 			if err != nil {
 				return nil, log.Errore(err)
 			}

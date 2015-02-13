@@ -71,10 +71,15 @@ type BinlogEventCursor struct {
 // It is expected to return error upon error...
 func NewBinlogEventCursor(startCoordinates BinlogCoordinates, fetchNextEventsFunc func(BinlogCoordinates) ([]BinlogEvent, error)) BinlogEventCursor {
 	events, _ := fetchNextEventsFunc(startCoordinates)
+	var initialNextCoordinates BinlogCoordinates
+	if len(events) > 0 {
+		initialNextCoordinates = events[0].NextBinlogCoordinates()
+	}
 	return BinlogEventCursor{
 		cachedEvents:      events,
 		currentEventIndex: -1,
 		fetchNextEvents:   fetchNextEventsFunc,
+		nextCoordinates:   initialNextCoordinates,
 	}
 }
 
@@ -109,7 +114,7 @@ func (this *BinlogEventCursor) NextEvent() (*BinlogEvent, error) {
 
 // NextRealEvent returns the next event from binlog that is not meta/control event (these are start-of-binary-log,
 // rotate-binary-log etc.)
-func (this *BinlogEventCursor) NextRealEvent() (*BinlogEvent, error) {
+func (this *BinlogEventCursor) nextRealEvent() (*BinlogEvent, error) {
 	event, err := this.NextEvent()
 	if err != nil {
 		return event, err
@@ -120,7 +125,7 @@ func (this *BinlogEventCursor) NextRealEvent() (*BinlogEvent, error) {
 	if _, found := skippedEventTypes[event.EventType]; found {
 		// Recursion will not be deep here. A few entries (end-of-binlog followed by start-of-bin-log) are possible,
 		// but we really don't expect a huge sequence of those.
-		return this.NextRealEvent()
+		return this.nextRealEvent()
 	}
 	event.NormalizeInfo()
 	return event, err
@@ -131,7 +136,7 @@ func (this *BinlogEventCursor) NextRealEvent() (*BinlogEvent, error) {
 // coordinates of the next binlog entry.
 // The value of this function is used by match-below to move a slave behind another, after exhausting the shared binlog
 // entries of both.
-func (this *BinlogEventCursor) NextCoordinates() (BinlogCoordinates, error) {
+func (this *BinlogEventCursor) getNextCoordinates() (BinlogCoordinates, error) {
 	if this.nextCoordinates.LogPos == 0 {
 		return this.nextCoordinates, errors.New("Next coordinates unfound")
 	}
