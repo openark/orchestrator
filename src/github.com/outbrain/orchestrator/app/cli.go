@@ -409,7 +409,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(output)
 		}
-	case "get-master":
+	case "which-master":
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -425,6 +425,39 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatalf("Instance not found: %+v", *instanceKey)
 			}
 			fmt.Println(instance.MasterKey.DisplayString())
+		}
+	case "which-cluster":
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatalf("Unable to get cluster: unresolved instance")
+			}
+			instance, _, err := inst.ReadInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			fmt.Println(instance.ClusterName)
+		}
+	case "which-slaves":
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatalf("Unable to get slaves: unresolved instance")
+			}
+			slaves, err := inst.ReadSlaveInstances(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, slave := range slaves {
+				fmt.Println(slave.Key.DisplayString())
+			}
 		}
 	case "instance-status":
 		{
