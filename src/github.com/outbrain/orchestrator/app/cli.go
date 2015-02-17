@@ -171,7 +171,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			instance, _, _, _, err := inst.GetCandidateSlave(instanceKey, strict, true)
+			instance, _, _, _, err := inst.GetCandidateSlave(instanceKey, false)
 			if err != nil {
 				log.Fatale(err)
 			} else {

@@ -111,7 +111,12 @@ func (this *BinlogCoordinates) SmallerThan(other *BinlogCoordinates) bool {
 	return false
 }
 
-// Previous guesses the filename of the previous binlog/relaylog
+// SmallerThan returns true if this coordinate is strictly smaller than the other.
+func (this *BinlogCoordinates) FileSmallerThan(other *BinlogCoordinates) bool {
+	return this.LogFile < other.LogFile
+}
+
+// PreviousFileCoordinates guesses the filename of the previous binlog/relaylog
 func (this *BinlogCoordinates) PreviousFileCoordinates() (BinlogCoordinates, error) {
 	result := BinlogCoordinates{LogPos: 0, Type: this.Type}
 
@@ -126,6 +131,24 @@ func (this *BinlogCoordinates) PreviousFileCoordinates() (BinlogCoordinates, err
 		return result, errors.New("Log file number is zero, cannot detect previous file")
 	}
 	newNumStr := fmt.Sprintf("%d", (fileNum - 1))
+	newNumStr = strings.Repeat("0", numLen-len(newNumStr)) + newNumStr
+	tokens[len(tokens)-1] = newNumStr
+	result.LogFile = strings.Join(tokens, ".")
+	return result, nil
+}
+
+// PreviousFileCoordinates guesses the filename of the previous binlog/relaylog
+func (this *BinlogCoordinates) NextFileCoordinates() (BinlogCoordinates, error) {
+	result := BinlogCoordinates{LogPos: 0, Type: this.Type}
+
+	tokens := strings.Split(this.LogFile, ".")
+	numPart := tokens[len(tokens)-1]
+	numLen := len(numPart)
+	fileNum, err := strconv.Atoi(numPart)
+	if err != nil {
+		return result, err
+	}
+	newNumStr := fmt.Sprintf("%d", (fileNum + 1))
 	newNumStr = strings.Repeat("0", numLen-len(newNumStr)) + newNumStr
 	tokens[len(tokens)-1] = newNumStr
 	result.LogFile = strings.Join(tokens, ".")
@@ -189,8 +212,6 @@ type Instance struct {
 	IsRecentlyChecked    bool
 	SecondsSinceLastSeen sql.NullInt64
 	CountMySQLSnapshots  int
-
-	binaryLogs []string
 }
 
 // NewInstance creates a new, empty instance
@@ -272,28 +293,12 @@ func (this *Instance) ReadSlaveHostsFromJson(jsonString string) error {
 	return err
 }
 
-// GetBinaryLogs returns the list of binary log names
-func (this *Instance) GetBinaryLogs() []string {
-	return this.binaryLogs
-}
-
-// SetBinaryLogs applies the binary logs list
-func (this *Instance) SetBinaryLogs(binlogs []string) {
-	this.binaryLogs = binlogs
-}
-
 // GetNextBinaryLog returns the successive, if any, binary log file to the one given
-func (this *Instance) GetNextBinaryLog(binlog string) (string, error) {
-	returnNext := false
-	for _, current := range this.binaryLogs {
-		if returnNext {
-			return current, nil
-		}
-		if current == binlog {
-			returnNext = true
-		}
+func (this *Instance) GetNextBinaryLog(binlogCoordinates BinlogCoordinates) (BinlogCoordinates, error) {
+	if binlogCoordinates.LogFile == this.SelfBinlogCoordinates.LogFile {
+		return binlogCoordinates, errors.New(fmt.Sprintf("Cannot find next binary log for %+v", binlogCoordinates))
 	}
-	return "", errors.New(fmt.Sprintf("Cannot find next binary log for %s", binlog))
+	return binlogCoordinates.NextFileCoordinates()
 }
 
 // IsSlaveOf returns true if this instance claims to replicate from given master

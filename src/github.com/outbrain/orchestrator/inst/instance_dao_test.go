@@ -64,7 +64,7 @@ func (s *TestSuite) SetUpSuite(c *C) {
 	config.Config.MySQLTopologyUser = "msandbox"
 	config.Config.MySQLTopologyPassword = "msandbox"
 	config.Config.MySQLOrchestratorHost = "127.0.0.1"
-	config.Config.MySQLOrchestratorPort = 5532
+	config.Config.MySQLOrchestratorPort = 5622
 	config.Config.MySQLOrchestratorDatabase = "orchestrator"
 	config.Config.MySQLOrchestratorUser = "msandbox"
 	config.Config.MySQLOrchestratorPassword = "msandbox"

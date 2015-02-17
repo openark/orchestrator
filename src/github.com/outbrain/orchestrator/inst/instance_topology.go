@@ -660,7 +660,7 @@ func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	_, _, err = MultiMatchBelow(siblings, instanceKey)
+	_, _, err = MultiMatchBelow(siblings, instanceKey, false)
 	if err != nil {
 		goto Cleanup
 	}
@@ -739,7 +739,7 @@ func MakeLocalMaster(instanceKey *InstanceKey) (*Instance, error) {
 		goto Cleanup
 	}
 
-	_, _, err = MultiMatchBelow(siblings, instanceKey)
+	_, _, err = MultiMatchBelow(siblings, instanceKey, false)
 	if err != nil {
 		goto Cleanup
 	}
@@ -756,7 +756,7 @@ Cleanup:
 
 // sortedSlaves returns the list of slaves of a given master, sorted by exec coordinates
 // (most up-to-date slave first)
-func sortedSlaves(masterKey *InstanceKey, forceRefresh bool, resumeReplication bool) ([](*Instance), error) {
+func sortedSlaves(masterKey *InstanceKey, shouldStopSlaves bool) ([](*Instance), error) {
 	slaves, err := ReadSlaveInstances(masterKey)
 	if err != nil {
 		return slaves, err
@@ -764,12 +764,14 @@ func sortedSlaves(masterKey *InstanceKey, forceRefresh bool, resumeReplication b
 	if len(slaves) == 0 {
 		return slaves, nil
 	}
-	if forceRefresh {
-		StopSlavesNicely(slaves, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
+	if shouldStopSlaves {
+		log.Debugf("sortedSlaves: stopping %d slaves nicely", len(slaves))
+		slaves = StopSlavesNicely(slaves, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
 	}
+
 	sort.Sort(sort.Reverse(InstancesByExecBinlogCoordinates(slaves)))
-	if forceRefresh && resumeReplication {
-		StartSlaves(slaves)
+	for _, slave := range slaves {
+		log.Debugf("- sorted slave: %+v %+v", slave.Key, slave.ExecBinlogCoordinates)
 	}
 
 	return slaves, err
@@ -787,7 +789,7 @@ func removeInstance(instances [](*Instance), instanceKey *InstanceKey) [](*Insta
 
 // MultiMatchBelow will efficiently match multiple slaves below a given instance.
 // It is assumed that all given slaves are siblings
-func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance), *Instance, error) {
+func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyStopped bool) ([](*Instance), *Instance, error) {
 	res := [](*Instance){}
 
 	slaves = removeInstance(slaves, belowKey)
@@ -802,10 +804,12 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance)
 	if len(slaves) == 0 {
 		return res, belowInstance, nil
 	}
-	log.Debugf("MultiMatchBelow: stopping nicely %d slaves", len(slaves))
-	// We want the slaves to have SQL thread up to date with IO thread.
-	// We will wait for them (up to a timeout) to do so.
-	StopSlavesNicely(slaves, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
+	if !slavesAlreadyStopped {
+		log.Debugf("MultiMatchBelow: stopping %d slaves nicely", len(slaves))
+		// We want the slaves to have SQL thread up to date with IO thread.
+		// We will wait for them (up to a timeout) to do so.
+		slaves = StopSlavesNicely(slaves, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
+	}
 	sort.Sort(sort.Reverse(InstancesByExecBinlogCoordinates(slaves)))
 
 	// Optimizations:
@@ -917,7 +921,7 @@ func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey) ([](*Instan
 	if err != nil {
 		return res, belowInstance, err
 	}
-	return MultiMatchBelow(slaves, &belowInstance.Key)
+	return MultiMatchBelow(slaves, &belowInstance.Key, false)
 }
 
 // MatchUp will move a slave up the replication chain, so that it becomes sibling of its master, via Pseudo-GTID
@@ -955,12 +959,13 @@ func MatchUpSlaves(masterKey *InstanceKey) ([](*Instance), *Instance, error) {
 }
 
 // GetCandidateSlave chooses the best slave to promote given a (possibly dead) master
-func GetCandidateSlave(masterKey *InstanceKey, forceRefresh bool, resumeReplication bool) (*Instance, [](*Instance), [](*Instance), [](*Instance), error) {
+func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instance, [](*Instance), [](*Instance), [](*Instance), error) {
 	var candidateSlave *Instance = nil
 	aheadSlaves := [](*Instance){}
 	equalSlaves := [](*Instance){}
 	laterSlaves := [](*Instance){}
-	slaves, err := sortedSlaves(masterKey, forceRefresh, resumeReplication)
+
+	slaves, err := sortedSlaves(masterKey, forRematchPurposes)
 	if err != nil {
 		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err
 	}
@@ -996,11 +1001,12 @@ func GetCandidateSlave(masterKey *InstanceKey, forceRefresh bool, resumeReplicat
 // RegroupSlaves will choose a candidate slave of a given instance, and enslave its siblings using
 // either simple CHANGE MASTER TO, where possible, or pseudo-gtid
 func RegroupSlaves(masterKey *InstanceKey) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
-	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err := GetCandidateSlave(masterKey, true, false)
+	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err := GetCandidateSlave(masterKey, true)
 	if err != nil {
 		return aheadSlaves, equalSlaves, laterSlaves, nil, err
 	}
 
+	log.Debugf("RegroupSlaves: working on %d equals slaves", len(equalSlaves))
 	barrier := make(chan *InstanceKey)
 	for _, slave := range equalSlaves {
 		slave := slave
@@ -1017,12 +1023,14 @@ func RegroupSlaves(masterKey *InstanceKey) ([](*Instance), [](*Instance), [](*In
 		<-barrier
 	}
 
+	log.Debugf("RegroupSlaves: multi matching %d later slaves", len(laterSlaves))
 	// As for the laterSlaves, we'll have to apply pseudo GTID
-	laterSlaves, instance, err := MultiMatchBelow(laterSlaves, &candidateSlave.Key)
+	laterSlaves, instance, err := MultiMatchBelow(laterSlaves, &candidateSlave.Key, true)
 
 	barrier = make(chan *InstanceKey)
 	operatedSlaves := append(equalSlaves, candidateSlave)
 	operatedSlaves = append(operatedSlaves, laterSlaves...)
+	log.Debugf("RegroupSlaves: starting %d slaves", len(operatedSlaves))
 	for _, slave := range operatedSlaves {
 		slave := slave
 		// This slave has the exact same executing coordinates as the candidate slave. This slave
@@ -1038,6 +1046,7 @@ func RegroupSlaves(masterKey *InstanceKey) ([](*Instance), [](*Instance), [](*In
 		<-barrier
 	}
 
+	log.Debugf("RegroupSlaves: done")
 	return aheadSlaves, equalSlaves, laterSlaves, instance, err
 }
 

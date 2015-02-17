@@ -206,20 +206,6 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			goto Cleanup
 		}
 	}
-	{
-		binlogs := []string{}
-		if instance.LogBinEnabled {
-			// Get binary (master) logs
-			err = sqlutils.QueryRowsMap(db, "show binary logs", func(m sqlutils.RowMap) error {
-				binlogs = append(binlogs, m.GetString("Log_name"))
-				return nil
-			})
-			if err != nil {
-				goto Cleanup
-			}
-		}
-		instance.SetBinaryLogs(binlogs)
-	}
 	instanceFound = true
 	// Anything after this point does not affect the fact the instance is found.
 	{
@@ -1128,7 +1114,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	for upToDate := false; !upToDate; {
 		if timeout > 0 && time.Since(startTime) >= timeout {
 			// timeout
-			return nil, errors.New(fmt.Sprintf("StopSlaveNicely timeout on %+v", *instanceKey))
+			return nil, log.Errorf("StopSlaveNicely timeout on %+v", *instanceKey)
 		}
 		instance, err = ReadTopologyInstance(instanceKey)
 		if err != nil {
@@ -1147,25 +1133,33 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	}
 
 	instance, err = ReadTopologyInstance(instanceKey)
+	log.Infof("Stopped slave nicely on %+v, Self:%+v, Exec:%+v", *instanceKey, instance.SelfBinlogCoordinates, instance.ExecBinlogCoordinates)
 	return instance, err
 }
 
 // StopSlavesNicely will attemt to stop all given slaves nicely, up to timeout
-func StopSlavesNicely(slaves [](*Instance), timeout time.Duration) {
+func StopSlavesNicely(slaves [](*Instance), timeout time.Duration) [](*Instance) {
+	refreshedSlaves := [](*Instance){}
+
+	log.Debugf("Stopping %d slaves nicely", len(slaves))
 	// use concurrency but wait for all to complete
-	barrier := make(chan InstanceKey)
-	for _, instance := range slaves {
-		instance := instance
+	barrier := make(chan *Instance)
+	for _, slave := range slaves {
+		slave := slave
 		go func() {
 			// Wait your turn to read a slave
-			ExecuteOnTopology(func() { StopSlaveNicely(&instance.Key, timeout) })
-			// Signal compelted slave
-			barrier <- instance.Key
+			ExecuteOnTopology(func() {
+				StopSlaveNicely(&slave.Key, timeout)
+				slave, _ := StopSlave(&slave.Key)
+				// Signal completed slave
+				barrier <- slave
+			})
 		}()
 	}
 	for _ = range slaves {
-		<-barrier
+		refreshedSlaves = append(refreshedSlaves, <-barrier)
 	}
+	return refreshedSlaves
 }
 
 // StopSlave stops replication on a given instance
@@ -1215,6 +1209,7 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 // StartSlaves will do concurrent start-slave
 func StartSlaves(slaves [](*Instance)) {
 	// use concurrency but wait for all to complete
+	log.Debugf("Starting %d slaves", len(slaves))
 	barrier := make(chan InstanceKey)
 	for _, instance := range slaves {
 		instance := instance
