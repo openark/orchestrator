@@ -23,9 +23,10 @@ import (
 )
 
 type HealthStatus struct {
-	Healthy    bool
-	ActiveNode string
-	Error      error
+	Healthy      bool
+	IsActiveNode bool
+	ActiveNode   string
+	Error        error
 }
 
 // HealthTest attempts to write to the backend database and get a result
@@ -60,6 +61,7 @@ func HealthTest() (*HealthStatus, error) {
 	}
 	health.Healthy = (rows > 0)
 	health.ActiveNode, err = ElectedNode()
+	health.IsActiveNode, err = IsElected()
 	if err != nil {
 		health.Error = err
 		return &health, log.Errore(err)
