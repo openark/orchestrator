@@ -17,6 +17,7 @@
 package orchestrator
 
 import (
+	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/db"
@@ -24,6 +25,8 @@ import (
 
 type HealthStatus struct {
 	Healthy      bool
+	Hostname     string
+	Token        string
 	IsActiveNode bool
 	ActiveNode   string
 	Error        error
@@ -31,7 +34,7 @@ type HealthStatus struct {
 
 // HealthTest attempts to write to the backend database and get a result
 func HealthTest() (*HealthStatus, error) {
-	health := HealthStatus{Healthy: false}
+	health := HealthStatus{Healthy: false, Hostname: ThisHostname, Token: ProcessToken.Hash}
 
 	db, err := db.OpenOrchestrator()
 	if err != nil {
@@ -60,12 +63,13 @@ func HealthTest() (*HealthStatus, error) {
 		return &health, log.Errore(err)
 	}
 	health.Healthy = (rows > 0)
-	health.ActiveNode, err = ElectedNode()
-	health.IsActiveNode, err = IsElected()
+	activeHostname, activeToken, isActive, err := ElectedNode()
 	if err != nil {
 		health.Error = err
 		return &health, log.Errore(err)
 	}
+	health.ActiveNode = fmt.Sprintf("%s;%s", activeHostname, activeToken)
+	health.IsActiveNode = isActive
 
 	return &health, nil
 }

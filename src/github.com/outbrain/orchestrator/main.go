@@ -18,10 +18,55 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/app"
 	"github.com/outbrain/orchestrator/config"
 )
+
+const prompt string = `
+orchestrator [-c command] [-i instance] [... cli ] | http
+
+-i (instance): 
+	instance on which to operate, in "hostname" or "hostname:port" format.
+	Default port is 3306 (or DefaultInstancePort in config)
+	For some commands this argument can be ommitted altogether, and the
+	value is implicitly the local hostname.
+-s (sibling/subinstance/)
+	associated instance. Meaning depends on specific command.
+	
+-c (command):			
+	move-up
+	move-below
+	enslave-sublings-simple
+	make-co-master
+	match-below
+	match-up
+	rematch
+	get-candidate-slave
+	multi-match-slaves
+	match-up-slaves
+	regroup-slaves
+	last-pseudo-gtid
+	reset-slave
+	detach-slave
+	reattach-slave
+	set-read-only
+	set-writeable
+	discover
+	forget
+	begin-maintenance
+	end-maintenance
+	clusters
+	find
+	topology
+	which-master
+	which-cluster
+	which-slaves
+	instance-status
+	continuous
+	resolve
+		`
 
 // main is the application's entry point. It will either spawn a CLI or HTTP itnerfaces.
 func main() {
@@ -56,6 +101,12 @@ func main() {
 		config.ForceRead(*configFile)
 	} else {
 		config.Read("/etc/orchestrator.conf.json", "conf/orchestrator.conf.json", "orchestrator.conf.json")
+	}
+
+	if len(flag.Args()) == 0 && *command == "" {
+		// No command, no argument: just prompt
+		fmt.Println(prompt)
+		return
 	}
 
 	switch {

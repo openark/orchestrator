@@ -201,10 +201,11 @@ var generateSQL = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
-		CREATE OR REPLACE VIEW whats_wrong AS
+		CREATE OR REPLACE VIEW _whats_wrong AS
 		SELECT 
 		    master_instance.hostname,
 		    master_instance.port,
+		    MIN(master_instance.cluster_name) AS cluster_name,
 		    MIN(master_instance.last_checked <= master_instance.last_seen)
 		        IS TRUE AS is_last_check_valid,
 		    MIN(master_instance.master_host IN ('' , '_')
@@ -234,6 +235,122 @@ var generateSQL = []string{
 			is_master DESC , 
 			is_cluster_master DESC, 
 			count_slaves DESC
+	`,
+	`
+		CREATE OR REPLACE VIEW whats_wrong AS
+			(
+				SELECT 
+					hostname,
+					port,
+					cluster_name,
+					'dead_master' as analysis,
+					'This master cannot be reached by orchestrator and none of its slaves is replicating' as description,
+					is_last_check_valid,
+					count_slaves,
+					count_valid_slaves,
+					count_valid_replicating_slaves
+				FROM _whats_wrong
+				WHERE
+					is_master
+					AND is_last_check_valid = 0
+					AND count_valid_slaves = count_slaves
+					AND count_valid_replicating_slaves = 0
+			)
+			UNION ALL
+			(
+				SELECT 
+					hostname,
+					port,
+					cluster_name,
+					'dead_master_and_slaves' as analysis,
+					'This master cannot be reached by orchestrator; all of its slaves are unreachable' as description,
+					is_last_check_valid,
+					count_slaves,
+					count_valid_slaves,
+					count_valid_replicating_slaves
+				FROM _whats_wrong
+				WHERE
+					is_master
+					AND count_slaves > 0
+					AND is_last_check_valid = 0
+					AND count_valid_slaves = 0
+					AND count_valid_replicating_slaves = 0
+			)
+			UNION ALL
+			(
+				SELECT 
+					hostname,
+					port,
+					cluster_name,
+					'dead_master_and_some_slaves' as analysis,
+					'This master cannot be reached by orchestrator; some of its slaves are unreachable and none of its reachable slaves is replicating' as description,
+					is_last_check_valid,
+					count_slaves,
+					count_valid_slaves,
+					count_valid_replicating_slaves
+				FROM _whats_wrong
+				WHERE
+					is_master
+					AND is_last_check_valid = 0
+					AND count_valid_slaves < count_slaves
+					AND count_valid_slaves > 0
+					AND count_valid_replicating_slaves = 0
+			)
+			UNION ALL
+			(
+				SELECT 
+					hostname,
+					port,
+					cluster_name,
+					'unreachable_master' as analysis,
+					'This master cannot be reached by orchestrator but it has replicating slaves; possibly a network/host issue' as description,
+					is_last_check_valid,
+					count_slaves,
+					count_valid_slaves,
+					count_valid_replicating_slaves
+				FROM _whats_wrong
+				WHERE
+					is_master
+					AND is_last_check_valid = 0
+					AND count_valid_slaves > 0
+					AND count_valid_replicating_slaves > 0
+			)
+			UNION ALL
+			(
+				SELECT 
+					hostname,
+					port,
+					cluster_name,
+					'all_slaves_not_replicating' as analysis,
+					'The master is reachable but none of its slaves is replicating' as description,
+					is_last_check_valid,
+					count_slaves,
+					count_valid_slaves,
+					count_valid_replicating_slaves
+				FROM _whats_wrong
+				WHERE
+					is_master
+					AND is_last_check_valid = 1
+					AND count_slaves > 0
+					AND count_valid_replicating_slaves = 0
+			)
+			UNION ALL
+			(
+				SELECT 
+					hostname,
+					port,
+					cluster_name,
+					'master_without_slaves' as analysis,
+					'The master does not have any slaves' as description,
+					is_last_check_valid,
+					count_slaves,
+					count_valid_slaves,
+					count_valid_replicating_slaves
+				FROM _whats_wrong
+				WHERE
+					is_master
+					AND count_slaves = 0
+			)
 	`,
 }
 

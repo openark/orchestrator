@@ -111,14 +111,21 @@ Cleanup:
 }
 
 // ElectedNode returns the hostname of the elected node
-func ElectedNode() (string, error) {
+func ElectedNode() (string, string, bool, error) {
 	hostname := ""
+	token := ""
+	isElected := false
 	query := fmt.Sprintf(`
 		select 
-			ifnull(max(hostname), '') as hostname
+			ifnull(max(hostname), '') as hostname,
+			ifnull(max(token), '') as token,
+			(ifnull(max(hostname), '') = '%s') and (ifnull(max(token), '') = '%s') as is_elected
 		from 
 			active_node
-		`)
+		where
+			anchor = 1
+		`,
+		ThisHostname, ProcessToken.Hash)
 	db, err := db.OpenOrchestrator()
 	if err != nil {
 		goto Cleanup
@@ -126,6 +133,8 @@ func ElectedNode() (string, error) {
 
 	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 		hostname = m.GetString("hostname")
+		token = m.GetString("token")
+		isElected = m.GetBool("is_elected")
 		return nil
 	})
 Cleanup:
@@ -133,5 +142,5 @@ Cleanup:
 	if err != nil {
 		log.Errore(err)
 	}
-	return hostname, err
+	return hostname, token, isElected, err
 }
