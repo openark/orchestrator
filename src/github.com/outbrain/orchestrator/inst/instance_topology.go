@@ -1049,7 +1049,3 @@ func RegroupSlaves(masterKey *InstanceKey) ([](*Instance), [](*Instance), [](*In
 	log.Debugf("RegroupSlaves: done")
 	return aheadSlaves, equalSlaves, laterSlaves, instance, err
 }
-
-func WhatsWrong() error {
-	return nil
-}

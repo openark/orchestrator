@@ -476,6 +476,16 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instance.HumanReadableDescription())
 		}
+	case "replication-analysis":
+		{
+			analysis, err := inst.GetReplicationAnalysis()
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, entry := range analysis {
+				fmt.Println(fmt.Sprintf("%s (cluster %s): %s", entry.AnalizedInstanceKey.DisplayString(), entry.ClusterName, entry.Analysis))
+			}
+		}
 	case "continuous":
 		{
 			orchestrator.ContinuousDiscovery()

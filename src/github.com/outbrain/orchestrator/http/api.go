@@ -1255,6 +1255,18 @@ func (this *HttpAPI) GrabElection(params martini.Params, r render.Render, req *h
 
 }
 
+// ReplicationAnalysis retuens list of issues
+func (this *HttpAPI) ReplicationAnalysis(params martini.Params, r render.Render, req *http.Request) {
+	analysis, err := inst.GetReplicationAnalysis()
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get analysis: %+v", err)})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Analysis"), Details: analysis})
+
+}
+
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/instance/:host/:port", this.Instance)
@@ -1305,6 +1317,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/headers", this.Headers)
 	m.Get("/api/health", this.Health)
 	m.Get("/api/grab-election", this.GrabElection)
+	m.Get("/api/replication-analysis", this.ReplicationAnalysis)
 	// Agents
 	m.Get("/api/agents", this.Agents)
 	m.Get("/api/agent/:host", this.Agent)
