@@ -18,13 +18,31 @@ package inst
 
 import ()
 
+type AnalysisCode string
+
+const (
+	NoProblem                                 AnalysisCode = "NoProblem"
+	DeadMasterWithoutSlaves                                = "DeadMasterWithoutSlaves"
+	DeadMaster                                             = "DeadMaster"
+	DeadMasterAndSlaves                                    = "DeadMasterAndSlaves"
+	DeadMasterAndSomeSlaves                                = "DeadMasterAndSomeSlaves"
+	UnreachableMaster                                      = "UnreachableMaster"
+	AllMasterSlavesNotReplicating                          = "AllMasterSlavesNotReplicating"
+	MasterWithoutSlaves                                    = "MasterWithoutSlaves"
+	DeadIntermediateMaster                                 = "DeadIntermediateMaster"
+	UnreachableIntermediateMaster                          = "UnreachableIntermediateMaster"
+	AllIntermediateMasterSlavesNotReplicating              = "AllIntermediateMasterSlavesNotReplicating"
+)
+
 // ReplicationAnalysis notes analysis on replication chain status, per instance
 type ReplicationAnalysis struct {
-	AnalizedInstanceKey         InstanceKey
+	AnalyzedInstanceKey         InstanceKey
 	ClusterName                 string
+	IsMaster                    bool
 	LastCheckValid              bool
 	CountSlaves                 uint
 	CountValidSlaves            uint
 	CountValidReplicatingSlaves uint
-	Analysis                    string
+	Analysis                    AnalysisCode
+	Description                 string
 }

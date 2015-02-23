@@ -23,7 +23,7 @@ import (
 )
 
 // GetReplicationAnalysis will check for replication problems (dead master; unreachable master; etc)
-func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
+func GetReplicationAnalysis__old() ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
 	query := `
@@ -126,15 +126,116 @@ func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
 	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 		replicationAnalysis := ReplicationAnalysis{}
 
-		replicationAnalysis.AnalizedInstanceKey = InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
+		replicationAnalysis.AnalyzedInstanceKey = InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
 		replicationAnalysis.ClusterName = m.GetString("cluster_name")
 		replicationAnalysis.LastCheckValid = m.GetBool("is_last_check_valid")
 		replicationAnalysis.CountSlaves = m.GetUint("count_slaves")
 		replicationAnalysis.CountValidSlaves = m.GetUint("count_valid_slaves")
 		replicationAnalysis.CountValidReplicatingSlaves = m.GetUint("count_valid_replicating_slaves")
-		replicationAnalysis.Analysis = m.GetString("analysis")
+		//replicationAnalysis.Analysis = m.GetString("analysis")
 
 		result = append(result, replicationAnalysis)
+		return nil
+	})
+Cleanup:
+
+	if err != nil {
+		log.Errore(err)
+	}
+	return result, err
+
+}
+
+// GetReplicationAnalysis will check for replication problems (dead master; unreachable master; etc)
+func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
+	result := []ReplicationAnalysis{}
+
+	query := `
+		    SELECT 
+		        master_instance.hostname,
+		        master_instance.port,
+		        MIN(master_instance.cluster_name) AS cluster_name,
+		        MIN(master_instance.last_checked <= master_instance.last_seen)
+		            IS TRUE AS is_last_check_valid,
+		        MIN(master_instance.master_host IN ('' , '_')
+		            OR master_instance.master_port = 0) AS is_master,
+		        MIN(CONCAT(master_instance.hostname,
+		                ':',
+		                master_instance.port) = master_instance.cluster_name) AS is_cluster_master,
+		        COUNT(slave_instance.server_id) AS count_slaves,
+		        IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen),
+		                0) AS count_valid_slaves,
+		        IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
+		                    AND slave_instance.slave_io_running != 0
+		                    AND slave_instance.slave_sql_running != 0),
+		                0) AS count_valid_replicating_slaves
+		    FROM
+		        database_instance master_instance
+		            LEFT JOIN
+		        hostname_resolve ON (master_instance.hostname = hostname_resolve.hostname)
+		            LEFT JOIN
+		        database_instance slave_instance ON (COALESCE(hostname_resolve.resolved_hostname,
+		                master_instance.hostname) = slave_instance.master_host
+		            AND master_instance.port = slave_instance.master_port)
+		    GROUP BY 
+			    master_instance.hostname, 
+			    master_instance.port
+		    ORDER BY 
+			    is_master DESC , 
+			    is_cluster_master DESC, 
+			    count_slaves DESC
+	`
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		goto Cleanup
+	}
+
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		a := ReplicationAnalysis{Analysis: NoProblem}
+
+		a.IsMaster = m.GetBool("is_master")
+		a.AnalyzedInstanceKey = InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
+		a.ClusterName = m.GetString("cluster_name")
+		a.LastCheckValid = m.GetBool("is_last_check_valid")
+		a.CountSlaves = m.GetUint("count_slaves")
+		a.CountValidSlaves = m.GetUint("count_valid_slaves")
+		a.CountValidReplicatingSlaves = m.GetUint("count_valid_replicating_slaves")
+
+		if a.IsMaster && !a.LastCheckValid && a.CountSlaves == 0 {
+			a.Analysis = DeadMasterWithoutSlaves
+			a.Description = "Master cannot be reached by orchestrator and has no slave"
+		} else if a.IsMaster && !a.LastCheckValid && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
+			a.Analysis = DeadMaster
+			a.Description = "Master cannot be reached by orchestrator and none of its slaves is replicating"
+		} else if a.IsMaster && !a.LastCheckValid && a.CountSlaves > 0 && a.CountValidSlaves == 0 && a.CountValidReplicatingSlaves == 0 {
+			a.Analysis = DeadMasterAndSlaves
+			a.Description = "Master cannot be reached by orchestrator and none of its slaves is replicating"
+		} else if a.IsMaster && !a.LastCheckValid && a.CountValidSlaves < a.CountSlaves && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
+			a.Analysis = DeadMasterAndSomeSlaves
+			a.Description = "Master cannot be reached by orchestrator; some of its slaves are unreachable and none of its reachable slaves is replicating"
+		} else if a.IsMaster && !a.LastCheckValid && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves > 0 {
+			a.Analysis = UnreachableMaster
+			a.Description = "Master cannot be reached by orchestrator but it has replicating slaves; possibly a network/host issue"
+		} else if a.IsMaster && a.LastCheckValid && a.CountSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
+			a.Analysis = AllMasterSlavesNotReplicating
+			a.Description = "Master is reachable but none of its slaves is replicating"
+		} else if a.IsMaster && a.CountSlaves == 0 {
+			a.Analysis = MasterWithoutSlaves
+			a.Description = "Master has no slaves"
+		} else if !a.IsMaster && !a.LastCheckValid && a.CountSlaves > 0 && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
+			a.Analysis = DeadIntermediateMaster
+			a.Description = "Intermediate master cannot be reached by orchestrator and none of its slaves is replicating"
+		} else if !a.IsMaster && !a.LastCheckValid && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves > 0 {
+			a.Analysis = UnreachableIntermediateMaster
+			a.Description = "Intermediate master cannot be reached by orchestrator but it has replicating slaves; possibly a network/host issue"
+		} else if !a.IsMaster && a.LastCheckValid && a.CountSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
+			a.Analysis = AllIntermediateMasterSlavesNotReplicating
+			a.Description = "Intermediate master is reachable but none of its slaves is replicating"
+		}
+
+		if a.Analysis != NoProblem {
+			result = append(result, a)
+		}
 		return nil
 	})
 Cleanup:

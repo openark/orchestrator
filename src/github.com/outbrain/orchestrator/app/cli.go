@@ -38,6 +38,11 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 	if err != nil {
 		instanceKey = nil
 	}
+	rawInstanceKey, err := inst.NewRawInstanceKey(instance)
+	if err != nil {
+		rawInstanceKey = nil
+	}
+
 	if sibling != "" && !strings.Contains(sibling, ":") {
 		sibling = fmt.Sprintf("%s:%d", sibling, config.Config.DefaultInstancePort)
 	}
@@ -329,17 +334,17 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		}
 	case "forget":
 		{
-			if instanceKey == nil {
-				instanceKey = thisInstanceKey
+			if rawInstanceKey == nil {
+				rawInstanceKey = thisInstanceKey
 			}
-			if instanceKey == nil {
+			if rawInstanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			err := inst.ForgetInstance(instanceKey)
+			err := inst.ForgetInstance(rawInstanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(rawInstanceKey.DisplayString())
 		}
 	case "begin-maintenance":
 		{
@@ -483,7 +488,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatale(err)
 			}
 			for _, entry := range analysis {
-				fmt.Println(fmt.Sprintf("%s (cluster %s): %s", entry.AnalizedInstanceKey.DisplayString(), entry.ClusterName, entry.Analysis))
+				fmt.Println(fmt.Sprintf("%s (cluster %s): %s", entry.AnalyzedInstanceKey.DisplayString(), entry.ClusterName, entry.Analysis))
 			}
 		}
 	case "continuous":

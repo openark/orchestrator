@@ -140,15 +140,18 @@ func ContinuousDiscovery() {
 			}
 		case <-forgetUnseenTick:
 			// See if we should also forget objects (lower frequency)
-			inst.ForgetLongUnseenInstances()
-			inst.ForgetExpiredHostnameResolves()
-			inst.ReviewUnseenInstances()
-			inst.InjectUnseenMasters()
-			HealthTest()
+			if elected {
+				inst.ForgetLongUnseenInstances()
+				inst.ForgetUnseenInstancesDifferentlyResolved()
+				inst.ForgetExpiredHostnameResolves()
+				inst.ReviewUnseenInstances()
+				inst.InjectUnseenMasters()
+			}
 			if !elected {
 				// Take this opportunity to refresh yourself
 				inst.LoadHostnameResolveCacheFromDatabase()
 			}
+			HealthTest()
 		}
 	}
 }

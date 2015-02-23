@@ -180,11 +180,11 @@ func (this *HttpAPI) Forget(params martini.Params, r render.Render, req *http.Re
 		return
 	}
 	// We ignore errors: we're looking to do a destructive operation anyhow.
-	instanceKey, _ := this.getInstanceKey(params["host"], params["port"])
+	rawInstanceKey, _ := inst.NewRawInstanceKey(fmt.Sprintf("%s:%s", params["host"], params["port"]))
 
-	inst.ForgetInstance(&instanceKey)
+	inst.ForgetInstance(rawInstanceKey)
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance forgotten: %+v", instanceKey)})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance forgotten: %+v", *rawInstanceKey)})
 }
 
 // Resolve tries to resolve hostname and then checks to see if port is open on that host.

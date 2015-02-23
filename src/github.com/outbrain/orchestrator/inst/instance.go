@@ -35,6 +35,21 @@ type InstanceKey struct {
 	Port     int
 }
 
+// ParseInstanceKey will parse an InstanceKey from a string representation such as 127.0.0.1:3306
+func NewRawInstanceKey(hostPort string) (*InstanceKey, error) {
+	tokens := strings.SplitN(hostPort, ":", 2)
+	if len(tokens) != 2 {
+		return nil, errors.New(fmt.Sprintf("Cannot parse InstanceKey from %s. Expected format is host:port", hostPort))
+	}
+	instanceKey := &InstanceKey{Hostname: tokens[0]}
+	var err error
+	if instanceKey.Port, err = strconv.Atoi(tokens[1]); err != nil {
+		return instanceKey, errors.New(fmt.Sprintf("Invalid port: %s", tokens[1]))
+	}
+
+	return instanceKey, nil
+}
+
 // NewInstanceKeyFromStrings creates a new InstanceKey by resolving hostname and port.
 // hostname is normalized via ResolveHostname. port is tested to be valid integer.
 func NewInstanceKeyFromStrings(hostname string, port string) (*InstanceKey, error) {

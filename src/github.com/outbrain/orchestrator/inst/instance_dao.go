@@ -597,7 +597,6 @@ func readUnseenMasterKeys() ([]InstanceKey, error) {
 	}
 
 	return res, nil
-
 }
 
 // InjectUnseenMasters will review masters of instances that are known to be replication, yet which are not listed
@@ -622,6 +621,37 @@ func InjectUnseenMasters() error {
 	}
 
 	AuditOperation("inject-unseen-masters", nil, fmt.Sprintf("Operations: %d", operations))
+	return err
+}
+
+// ForgetUnseenInstancesDifferentlyResolved will purge instances which are invalid, and whose hostname
+// appears on the hostname_resolved table; this means some time in the past their hostname was unresovled, and now
+// resovled to a different value; the old hostname is never accessed anymore and the old entry should be removed.
+func ForgetUnseenInstancesDifferentlyResolved() error {
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		return log.Errore(err)
+	}
+
+	sqlResult, err := sqlutils.Exec(db, `
+		DELETE FROM 
+			database_instance
+		USING
+		    hostname_resolve
+		    JOIN database_instance ON (hostname_resolve.hostname = database_instance.hostname)
+		WHERE
+		    hostname_resolve.hostname != hostname_resolve.resolved_hostname
+		    AND (last_checked <= last_seen) IS NOT TRUE
+		`,
+	)
+	if err != nil {
+		return log.Errore(err)
+	}
+	rows, err := sqlResult.RowsAffected()
+	if err != nil {
+		return log.Errore(err)
+	}
+	AuditOperation("forget-unseen-differently-resolved", nil, fmt.Sprintf("Forgotten instances: %d", rows))
 	return err
 }
 
