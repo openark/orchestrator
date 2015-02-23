@@ -97,6 +97,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	foundBySlaveHosts := false
 	longRunningProcesses := []Process{}
 	resolvedHostname := ""
+	isMaxScale := false
 	var resolveErr error
 
 	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
@@ -108,10 +109,32 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	instance.Key = *instanceKey
-	err = db.QueryRow("select @@hostname, @@global.server_id, @@global.version, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
-		&resolvedHostname, &instance.ServerID, &instance.Version, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
-	if err != nil {
-		goto Cleanup
+
+	{
+		// Is this MaxScale? (a proxy, not a real server)
+		err = sqlutils.QueryRowsMap(db, "show variables like 'maxscale%'", func(m sqlutils.RowMap) error {
+			variable_name := m.GetString("Variable_name")
+			if variable_name == "MAXSCALE_VERSION" {
+				instance.Version = m.GetString("value") + "-maxscale"
+				instance.ServerID = 0
+				instance.Binlog_format = "TRANSPARENT"
+				instance.ReadOnly = true
+				instance.LogBinEnabled = true
+				instance.LogSlaveUpdatesEnabled = true
+				resolvedHostname = instance.Key.Hostname
+				UpdateResolvedHostname(resolvedHostname, resolvedHostname)
+				isMaxScale = true
+			}
+			return nil
+		})
+	}
+
+	if !isMaxScale {
+		err = db.QueryRow("select @@hostname, @@global.server_id, @@global.version, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
+			&resolvedHostname, &instance.ServerID, &instance.Version, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
+		if err != nil {
+			goto Cleanup
+		}
 	}
 	if resolvedHostname != instance.Key.Hostname {
 		UpdateResolvedHostname(instance.Key.Hostname, resolvedHostname)
@@ -166,7 +189,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	// Get slaves, either by SHOW SLAVE HOSTS or via PROCESSLIST
-	if config.Config.DiscoverByShowSlaveHosts {
+	if config.Config.DiscoverByShowSlaveHosts && !isMaxScale {
 		err := sqlutils.QueryRowsMap(db, `show slave hosts`,
 			func(m sqlutils.RowMap) error {
 				slaveKey, err := NewInstanceKeyFromStrings(m.GetString("Host"), m.GetString("Port"))
@@ -182,7 +205,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			goto Cleanup
 		}
 	}
-	if !foundBySlaveHosts {
+	if !foundBySlaveHosts && !isMaxScale {
 		// Either not configured to read SHOW SLAVE HOSTS or nothing was there.
 		// Discover by processlist
 		err := sqlutils.QueryRowsMap(db, `
@@ -208,7 +231,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	instanceFound = true
 	// Anything after this point does not affect the fact the instance is found.
-	{
+	if !isMaxScale {
 		// Get long running processes
 		err := sqlutils.QueryRowsMap(db, `
 				  select 
@@ -1069,13 +1092,13 @@ func RefreshTopologyInstances(instances [](*Instance)) {
 	for _, instance := range instances {
 		instance := instance
 		go func() {
+			// Signal completed slave
+			defer func() { barrier <- instance.Key }()
 			// Wait your turn to read a slave
 			ExecuteOnTopology(func() {
 				log.Debugf("... reading instance: %+v", instance.Key)
 				ReadTopologyInstance(&instance.Key)
 			})
-			// Signal compelted slave
-			barrier <- instance.Key
 		}()
 	}
 	for _ = range instances {
@@ -1147,12 +1170,14 @@ func StopSlavesNicely(slaves [](*Instance), timeout time.Duration) [](*Instance)
 	for _, slave := range slaves {
 		slave := slave
 		go func() {
+			updatedSlave := &slave
+			// Signal completed slave
+			defer func() { barrier <- *updatedSlave }()
 			// Wait your turn to read a slave
 			ExecuteOnTopology(func() {
 				StopSlaveNicely(&slave.Key, timeout)
-				slave, _ := StopSlave(&slave.Key)
-				// Signal completed slave
-				barrier <- slave
+				slave, _ = StopSlave(&slave.Key)
+				updatedSlave = &slave
 			})
 		}()
 	}
@@ -1214,10 +1239,10 @@ func StartSlaves(slaves [](*Instance)) {
 	for _, instance := range slaves {
 		instance := instance
 		go func() {
+			// Signal compelted slave
+			defer func() { barrier <- instance.Key }()
 			// Wait your turn to read a slave
 			ExecuteOnTopology(func() { StartSlave(&instance.Key) })
-			// Signal compelted slave
-			barrier <- instance.Key
 		}()
 	}
 	for _ = range slaves {

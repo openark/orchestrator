@@ -67,6 +67,10 @@ func resolveHostname(hostname string) (string, error) {
 // Attempt to resolve a hostname. This may returned a database cached hostname or otherwise
 // it may resolve the hostname via CNAME
 func ResolveHostname(hostname string) (string, error) {
+	hostname = strings.TrimSpace(hostname)
+	if hostname == "" {
+		return hostname, errors.New("Will not resolve empty hostname")
+	}
 	// First go to lightweight cache
 	if resolvedHostname, found := hostnameResolvesLightweightCache.Get(hostname); found {
 		return resolvedHostname.(string), nil

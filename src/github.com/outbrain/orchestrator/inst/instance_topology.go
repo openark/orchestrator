@@ -843,6 +843,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 		bucketSlaves := bucketSlaves
 		// Buckets concurrent
 		go func() {
+			defer func() { barrier <- &execCoordinates }()
 			func() {
 				for _, slave := range bucketSlaves {
 					slave := slave
@@ -864,7 +865,6 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 					// Failure: some unknown problem with bucket slave. Let's try the next one (continue loop)
 				}
 			}()
-			barrier <- &execCoordinates
 		}()
 	}
 	for _ = range slaveBuckets {
@@ -1013,10 +1013,10 @@ func RegroupSlaves(masterKey *InstanceKey) ([](*Instance), [](*Instance), [](*In
 		// This slave has the exact same executing coordinates as the candidate slave. This slave
 		// is *extremely* easy to attach below the candidate slave!
 		go func() {
+			defer func() { barrier <- &candidateSlave.Key }()
 			ExecuteOnTopology(func() {
 				ChangeMasterTo(&slave.Key, &candidateSlave.Key, &candidateSlave.SelfBinlogCoordinates)
 			})
-			barrier <- &candidateSlave.Key
 		}()
 	}
 	for _, _ = range equalSlaves {
@@ -1036,10 +1036,10 @@ func RegroupSlaves(masterKey *InstanceKey) ([](*Instance), [](*Instance), [](*In
 		// This slave has the exact same executing coordinates as the candidate slave. This slave
 		// is *extremely* easy to attach below the candidate slave!
 		go func() {
+			defer func() { barrier <- &candidateSlave.Key }()
 			ExecuteOnTopology(func() {
 				StartSlave(&slave.Key)
 			})
-			barrier <- &candidateSlave.Key
 		}()
 	}
 	for _, _ = range operatedSlaves {
