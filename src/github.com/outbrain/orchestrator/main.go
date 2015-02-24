@@ -32,41 +32,52 @@ orchestrator [-c command] [-i instance] [... cli ] | http
 	Default port is 3306 (or DefaultInstancePort in config)
 	For some commands this argument can be ommitted altogether, and the
 	value is implicitly the local hostname.
--s (sibling/subinstance/)
+-s (sibling/subinstance/destination)
 	associated instance. Meaning depends on specific command.
 	
 -c (command):			
 	move-up
 	move-below
-	enslave-sublings-simple
+	enslave-siblings-simple
 	make-co-master
+	
+	get-candidate-slave
+	
+	last-pseudo-gtid
 	match-below
 	match-up
 	rematch
-	get-candidate-slave
 	multi-match-slaves
 	match-up-slaves
 	regroup-slaves
-	last-pseudo-gtid
+	
 	reset-slave
 	detach-slave
 	reattach-slave
+	
 	set-read-only
 	set-writeable
+	
+	find
+	clusters
+	topology
+	which-cluster
+	which-cluster-instances
+	which-master
+	which-slaves
+	
 	discover
 	forget
+	
 	begin-maintenance
 	end-maintenance
-	clusters
-	find
-	topology
-	which-master
-	which-cluster
-	which-slaves
 	instance-status
+	
+	replication-analysis
+	
 	continuous
 	resolve
-		`
+	`
 
 // main is the application's entry point. It will either spawn a CLI or HTTP itnerfaces.
 func main() {

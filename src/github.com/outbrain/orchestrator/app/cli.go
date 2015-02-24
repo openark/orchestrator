@@ -100,7 +100,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), siblingKey.DisplayString()))
 		}
-	case "enslave-sublings-simple":
+	case "enslave-siblings-simple":
 		{
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
@@ -447,6 +447,29 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatalf("Instance not found: %+v", *instanceKey)
 			}
 			fmt.Println(instance.ClusterName)
+		}
+	case "which-cluster-instances":
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatalf("Unable to get cluster instances: unresolved instance")
+			}
+			instance, _, err := inst.ReadInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			instances, err := inst.ReadClusterInstances(instance.ClusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, clusterInstance := range instances {
+				fmt.Println(clusterInstance.Key.DisplayString())
+			}
 		}
 	case "which-slaves":
 		{
