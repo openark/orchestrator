@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/config"
+	"github.com/outbrain/orchestrator/os"
 	"sort"
 	"strings"
 	"time"
@@ -1000,10 +1001,13 @@ func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instan
 
 // RegroupSlaves will choose a candidate slave of a given instance, and enslave its siblings using
 // either simple CHANGE MASTER TO, where possible, or pseudo-gtid
-func RegroupSlaves(masterKey *InstanceKey) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
+func RegroupSlaves(masterKey *InstanceKey, onCandidateSlaveChosen func(*Instance)) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
 	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err := GetCandidateSlave(masterKey, true)
 	if err != nil {
 		return aheadSlaves, equalSlaves, laterSlaves, nil, err
+	}
+	if onCandidateSlaveChosen != nil {
+		onCandidateSlaveChosen(candidateSlave)
 	}
 
 	log.Debugf("RegroupSlaves: working on %d equals slaves", len(equalSlaves))
@@ -1048,4 +1052,32 @@ func RegroupSlaves(masterKey *InstanceKey) ([](*Instance), [](*Instance), [](*In
 
 	log.Debugf("RegroupSlaves: done")
 	return aheadSlaves, equalSlaves, laterSlaves, instance, err
+}
+
+func Failover(oldMaster *InstanceKey, newMaster *InstanceKey) error {
+
+	var preProcessesFailures []error = []error{}
+	barrier := make(chan error)
+	for _, command := range config.Config.PreFailoverProcesses {
+		command := command
+		command = strings.Replace(command, "{oldMaster}", oldMaster.Hostname, -1)
+		command = strings.Replace(command, "{oldMasterPort}", fmt.Sprintf("%d", oldMaster.Port), -1)
+		command = strings.Replace(command, "{newMaster}", newMaster.Hostname, -1)
+		command = strings.Replace(command, "{newMasterPort}", fmt.Sprintf("%d", newMaster.Port), -1)
+		var cmdErr error = nil
+		go func() {
+			defer func() { barrier <- cmdErr }()
+			cmdErr = os.CommandRun(command)
+		}()
+	}
+	for _, _ = range config.Config.PreFailoverProcesses {
+		if cmdErr := <-barrier; cmdErr != nil {
+			preProcessesFailures = append(preProcessesFailures, cmdErr)
+		}
+	}
+	if len(preProcessesFailures) > 0 {
+		return preProcessesFailures[0]
+	}
+
+	return nil
 }

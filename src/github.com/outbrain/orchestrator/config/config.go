@@ -49,13 +49,15 @@ type Configuration struct {
 	DiscoveryPollSeconds                       uint   // Auto/continuous discovery of instances sleep time between polls
 	InstanceBulkOperationsWaitTimeoutSeconds   uint   // Time to wait on a single instance when doing bulk (many instances) operation
 	ActiveNodeExpireSeconds                    uint
-	HostnameResolveMethod                      string // Method by which to "normalize" hostname ("none"/"default"/"cname")
-	ExpiryHostnameResolvesMinutes              int    // Number of minutes after which to expire hostname-resolves
-	RejectHostnameResolvePattern               string // Regexp pattern for resolved hostname that will not be accepted (not cached, not written to db). This is done to avoid storing wrong resovles due to network glitches.
-	ReasonableReplicationLagSeconds            int    // Above this value is considered a problem
-	MaintenanceOwner                           string // (Default) name of maintenance owner to use if none provided
-	ReasonableMaintenanceReplicationLagSeconds int    // Above this value move-up and move-below are blocked
-	AuditLogFile                               string // Name of log file for audit operations. Disabled when empty.
+	HostnameResolveMethod                      string   // Method by which to "normalize" hostname ("none"/"default"/"cname")
+	ExpiryHostnameResolvesMinutes              int      // Number of minutes after which to expire hostname-resolves
+	RejectHostnameResolvePattern               string   // Regexp pattern for resolved hostname that will not be accepted (not cached, not written to db). This is done to avoid storing wrong resovles due to network glitches.
+	ReasonableReplicationLagSeconds            int      // Above this value is considered a problem
+	MaintenanceOwner                           string   // (Default) name of maintenance owner to use if none provided
+	ReasonableMaintenanceReplicationLagSeconds int      // Above this value move-up and move-below are blocked
+	PreFailoverProcesses                       []string // Processes to execute before doing a master failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {oldMaster}, {oldMasterPort}, {newMaster}, {newMasterPort}
+	PostFailoverProcesses                      []string // Processes to execute after doing a master failover (order of execution undefined). Will be provided with old-master-hostname, new-master-hostname arguments. May and should use some of these placeholders: {oldMaster}, {oldMasterPort}, {newMaster}, {newMasterPort}
+	AuditLogFile                               string   // Name of log file for audit operations. Disabled when empty.
 	AuditPageSize                              int
 	ReadOnly                                   bool
 	AuthenticationMethod                       string            // Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "multi" for advanced BasicAuth, "proxy" for forwarded credentials via reverse proxy
@@ -99,6 +101,8 @@ func NewConfiguration() *Configuration {
 		ReasonableReplicationLagSeconds:            10,
 		MaintenanceOwner:                           "orchestrator",
 		ReasonableMaintenanceReplicationLagSeconds: 20,
+		PreFailoverProcesses:                       []string{},
+		PostFailoverProcesses:                      []string{},
 		AuditLogFile:                               "",
 		AuditPageSize:                              20,
 		ReadOnly:                                   false,

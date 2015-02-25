@@ -84,8 +84,6 @@ func ResolveHostname(hostname string) (string, error) {
 		if resolvedHostname, err := ReadResolvedHostname(hostname); err == nil && resolvedHostname != "" {
 			hostnameResolvesLightweightCache.Set(hostname, resolvedHostname, 0)
 			return resolvedHostname, nil
-		} else {
-			log.Debugf("- got: %+v, %+v", resolvedHostname, err)
 		}
 	}
 

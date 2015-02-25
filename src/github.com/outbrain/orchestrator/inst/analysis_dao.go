@@ -219,9 +219,6 @@ func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
 		} else if a.IsMaster && a.LastCheckValid && a.CountSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = AllMasterSlavesNotReplicating
 			a.Description = "Master is reachable but none of its slaves is replicating"
-		} else if a.IsMaster && a.CountSlaves == 0 {
-			a.Analysis = MasterWithoutSlaves
-			a.Description = "Master has no slaves"
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountSlaves > 0 && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadIntermediateMaster
 			a.Description = "Intermediate master cannot be reached by orchestrator and none of its slaves is replicating"
@@ -232,6 +229,10 @@ func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
 			a.Analysis = AllIntermediateMasterSlavesNotReplicating
 			a.Description = "Intermediate master is reachable but none of its slaves is replicating"
 		}
+		//		 else if a.IsMaster && a.CountSlaves == 0 {
+		//			a.Analysis = MasterWithoutSlaves
+		//			a.Description = "Master has no slaves"
+		//		}
 
 		if a.Analysis != NoProblem {
 			result = append(result, a)
