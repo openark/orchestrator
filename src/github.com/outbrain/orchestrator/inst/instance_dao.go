@@ -486,9 +486,9 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 	condition := fmt.Sprintf(`
 			hostname like '%%%s%%'
 			or cluster_name like '%%%s%%'
-			or server_id = '%s'
+			or concat(server_id, '') = '%s'
 			or version like '%%%s%%'
-			or port = '%s'
+			or concat(port, '') = '%s'
 			or concat(hostname, ':', port) like '%%%s%%'
 		`, searchString, searchString, searchString, searchString, searchString, searchString)
 	return readInstancesByCondition(condition)
