@@ -220,6 +220,7 @@ type Instance struct {
 	SlaveLagSeconds  sql.NullInt64
 	SlaveHosts       InstanceKeyMap
 	ClusterName      string
+	DataCenter       string
 	ReplicationDepth uint
 
 	IsLastCheckValid     bool

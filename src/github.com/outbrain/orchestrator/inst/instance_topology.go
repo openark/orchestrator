@@ -1078,10 +1078,19 @@ func RegroupSlaves(masterKey *InstanceKey, onCandidateSlaveChosen func(*Instance
 }
 
 func isValidAsCandidateSiblingOfIntermediateMaster(sibling *Instance) bool {
-	//	if !insta
-	//
-	//	if !sibling.Key.Equals(intermediateMasterKey) && sibling.SlaveRunning() && sibling.IsLastCheckValid && sibling.LogSlaveUpdatesEnabled && intermediateMasterInstance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
-	return false
+	if !sibling.LogBinEnabled {
+		return false
+	}
+	if !sibling.LogSlaveUpdatesEnabled {
+		return false
+	}
+	if !sibling.SlaveRunning() {
+		return false
+	}
+	if !sibling.IsLastCheckValid {
+		return false
+	}
+	return true
 }
 
 // GetCandidateSlave chooses the best slave to promote given a (possibly dead) master
@@ -1103,13 +1112,15 @@ func GetCandidateSiblingOfIntermediateMaster(intermediateMasterKey *InstanceKey)
 
 	for _, sibling := range siblings {
 		sibling := sibling
-		if !sibling.Key.Equals(intermediateMasterKey) && sibling.SlaveRunning() && sibling.IsLastCheckValid && sibling.LogSlaveUpdatesEnabled && intermediateMasterInstance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
-			// this is *assumed* to be a good choice.
-			// We don't know for sure:
-			// - the dead intermediate master's position may have been more advanced then last recorded
-			// - and the candidate's position may have been stalled in the past seconds
-			// But it's an attempt...
-			return sibling, nil
+		if isValidAsCandidateSiblingOfIntermediateMaster(sibling) {
+			if !sibling.Key.Equals(intermediateMasterKey) && intermediateMasterInstance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
+				// this is *assumed* to be a good choice.
+				// We don't know for sure:
+				// - the dead intermediate master's position may have been more advanced then last recorded
+				// - and the candidate's position may have been stalled in the past seconds
+				// But it's an attempt...
+				return sibling, nil
+			}
 		}
 	}
 	return nil, log.Errorf("Cannot find candidate sibling of %+v", *intermediateMasterKey)

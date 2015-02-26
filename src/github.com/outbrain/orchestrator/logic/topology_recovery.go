@@ -18,6 +18,7 @@ package orchestrator
 
 import (
 	"fmt"
+	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/inst"
 	"github.com/outbrain/orchestrator/os"
@@ -53,15 +54,24 @@ func RecoverDeadMaster(oldMaster *inst.InstanceKey, newMaster *inst.InstanceKey)
 }
 
 func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
+	log.Debugf("RecoverDeadIntermediateMaster: will recover %+v", *failedInstanceKey)
 	candidateSibling, err := inst.GetCandidateSiblingOfIntermediateMaster(failedInstanceKey)
 	if err == nil {
+		log.Debugf("- RecoverDeadIntermediateMaster: will attempt a candidate intermediate master: %+v", candidateSibling.Key)
 		// We have a candidate
 		if _, belowInstance, err := inst.MultiMatchSlaves(failedInstanceKey, &candidateSibling.Key); err == nil {
+			log.Debugf("- RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) went well", candidateSibling.Key)
+			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("candidate sibling: %+v", candidateSibling.Key))
 			return belowInstance, nil
+		} else {
+			log.Debugf("- RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) did not complete: %+v", candidateSibling.Key, err)
 		}
 	}
 	// Either no candidate or only partial match of slaves. Match-up as plan B
+	log.Debugf("- RecoverDeadIntermediateMaster: will next attempt a match up from %+v", *failedInstanceKey)
 	_, successorInstance, err := inst.MatchUpSlaves(failedInstanceKey)
+	log.Debugf("- RecoverDeadIntermediateMaster: matched up to %+v", successorInstance.Key)
+	inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("master: %+v", successorInstance.Key))
 
 	return successorInstance, err
 }

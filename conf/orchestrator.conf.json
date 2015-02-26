@@ -42,6 +42,7 @@
   "ClusterNameToAlias": {
     "127.0.0.1": "test suite"
   },
+  "DataCenterPattern": "[.]([^.]+)[.][^.]+[.]booking[.]com",
   "ServeAgentsHttp": false,
   "AgentsUseSSL": false,
   "SSLSkipVerify": false,

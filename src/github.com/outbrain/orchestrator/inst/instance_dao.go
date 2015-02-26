@@ -140,6 +140,15 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		UpdateResolvedHostname(instance.Key.Hostname, resolvedHostname)
 		instance.Key.Hostname = resolvedHostname
 	}
+	if config.Config.DataCenterPattern != "" {
+		if pattern, err := regexp.Compile(config.Config.DataCenterPattern); err == nil {
+			dcMatch := pattern.FindStringSubmatch(instance.Key.Hostname)
+			if len(dcMatch) != 0 {
+				instance.DataCenter = dcMatch[1]
+			}
+		}
+	}
+
 	err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
 		instance.Slave_IO_Running = (m.GetString("Slave_IO_Running") == "Yes")
 		instance.Slave_SQL_Running = (m.GetString("Slave_SQL_Running") == "Yes")
@@ -372,6 +381,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.SlaveLagSeconds = m.GetNullInt64("slave_lag_seconds")
 	slaveHostsJson := m.GetString("slave_hosts")
 	instance.ClusterName = m.GetString("cluster_name")
+	instance.DataCenter = m.GetString("data_center")
 	instance.ReplicationDepth = m.GetUint("replication_depth")
 	instance.IsUpToDate = (m.GetUint("seconds_since_last_checked") <= config.Config.InstancePollSeconds)
 	instance.IsRecentlyChecked = (m.GetUint("seconds_since_last_checked") <= config.Config.InstancePollSeconds*5)
@@ -892,6 +902,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 					num_slave_hosts=VALUES(num_slave_hosts),
 					slave_hosts=VALUES(slave_hosts),
 					cluster_name=VALUES(cluster_name),
+					data_center=VALUES(data_center),
 					replication_depth=VALUES(replication_depth)			
 				`
 		} else {
@@ -935,8 +946,9 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				num_slave_hosts,
 				slave_hosts,
 				cluster_name,
+				data_center,
 				replication_depth
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
@@ -972,6 +984,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			len(instance.SlaveHosts),
 			instance.GetSlaveHostsAsJson(),
 			instance.ClusterName,
+			instance.DataCenter,
 			instance.ReplicationDepth,
 		)
 		if err != nil {
