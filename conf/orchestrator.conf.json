@@ -1,4 +1,5 @@
 {
+  "Debug": true,
   "ListenAddress": ":3000",
   "MySQLTopologyUser": "msandbox",
   "MySQLTopologyPassword": "msandbox",
@@ -24,10 +25,10 @@
   "ReasonableReplicationLagSeconds": 10,
   "ReasonableMaintenanceReplicationLagSeconds": 20,
   "PreFailoverProcesses": [
-  	"echo 'failing over:' h:{oldMaster} p:{oldMasterPort} th:{newMaster} tp:{newMasterPort} > /tmp/a.txt"
+  	"echo 'failing over:' h:{failedHost} p:{failedPort} th:{successorHost} tp:{successorPort} > /tmp/a.txt"
   ],
   "PostFailoverProcesses": [
-  	"echo 'failed over:' {oldMaster} {oldMasterPort} {newMaster} {newMasterPort}"
+  	"echo 'failed over:' h:{failedHost} p:{failedPort} th:{successorHost} tp:{successorPort}"
   ],
   "AuditLogFile": "/tmp/orchestrator-audit.log",
   "AuditPageSize": 20,

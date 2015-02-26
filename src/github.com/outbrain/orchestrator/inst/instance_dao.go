@@ -1337,8 +1337,13 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 		return instance, errors.New(fmt.Sprintf("Cannot change master on: %+v because slave is running", instanceKey))
 	}
 
-	_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d",
-		masterKey.Hostname, masterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
+	if instance.UsingMariaDBGTID {
+		_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d",
+			masterKey.Hostname, masterKey.Port))
+	} else {
+		_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d",
+			masterKey.Hostname, masterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
+	}
 	if err != nil {
 		return instance, log.Errore(err)
 	}

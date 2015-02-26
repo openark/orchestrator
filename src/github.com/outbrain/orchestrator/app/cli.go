@@ -239,7 +239,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatal("Cannot deduce destination:", sibling)
 			}
 
-			err := inst.Failover(instanceKey, siblingKey)
+			err := orchestrator.RecoverDeadMaster(instanceKey, siblingKey)
 			if err != nil {
 				log.Fatale(err)
 			}

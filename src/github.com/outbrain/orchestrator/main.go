@@ -113,6 +113,9 @@ func main() {
 	} else {
 		config.Read("/etc/orchestrator.conf.json", "conf/orchestrator.conf.json", "orchestrator.conf.json")
 	}
+	if config.Config.Debug {
+		log.SetLevel(log.DEBUG)
+	}
 
 	if len(flag.Args()) == 0 && *command == "" {
 		// No command, no argument: just prompt

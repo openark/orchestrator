@@ -28,6 +28,7 @@ import (
 // Some of the parameteres have reasonable default values, and some (like database credentials) are
 // strictly expected from user.
 type Configuration struct {
+	Debug                                      bool // set debug mode (similar to --debug option)
 	ListenAddress                              string
 	MySQLTopologyUser                          string
 	MySQLTopologyPassword                      string // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
@@ -55,8 +56,8 @@ type Configuration struct {
 	ReasonableReplicationLagSeconds            int      // Above this value is considered a problem
 	MaintenanceOwner                           string   // (Default) name of maintenance owner to use if none provided
 	ReasonableMaintenanceReplicationLagSeconds int      // Above this value move-up and move-below are blocked
-	PreFailoverProcesses                       []string // Processes to execute before doing a master failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {oldMaster}, {oldMasterPort}, {newMaster}, {newMasterPort}
-	PostFailoverProcesses                      []string // Processes to execute after doing a master failover (order of execution undefined). Will be provided with old-master-hostname, new-master-hostname arguments. May and should use some of these placeholders: {oldMaster}, {oldMasterPort}, {newMaster}, {newMasterPort}
+	PreFailoverProcesses                       []string // Processes to execute before doing a master failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failedHost}, {failedPort}, {successorHost}, {successorPort}
+	PostFailoverProcesses                      []string // Processes to execute after doing a master failover (order of execution undefined). Will be provided with old-master-hostname, new-master-hostname arguments. May and should use some of these placeholders: {failedHost}, {failedPort}, {successorHost}, {successorPort}
 	AuditLogFile                               string   // Name of log file for audit operations. Disabled when empty.
 	AuditPageSize                              int
 	ReadOnly                                   bool
@@ -83,6 +84,7 @@ var Config *Configuration = NewConfiguration()
 
 func NewConfiguration() *Configuration {
 	return &Configuration{
+		Debug:                                      false,
 		ListenAddress:                              ":3000",
 		MySQLOrchestratorPort:                      3306,
 		MySQLTopologyMaxPoolConnections:            3,

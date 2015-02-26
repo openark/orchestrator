@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/config"
-	"github.com/outbrain/orchestrator/os"
 	"sort"
 	"strings"
 	"time"
@@ -39,6 +38,18 @@ func (this InstancesByExecBinlogCoordinates) Less(i, j int) bool {
 		}
 	}
 	return this[i].ExecBinlogCoordinates.SmallerThan(&this[j].ExecBinlogCoordinates)
+}
+
+type InstancesByCountSlaves [](*Instance)
+
+func (this InstancesByCountSlaves) Len() int      { return len(this) }
+func (this InstancesByCountSlaves) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
+func (this InstancesByCountSlaves) Less(i, j int) bool {
+	if len(this[i].SlaveHosts) == len(this[j].SlaveHosts) {
+		// Secondary sorting: prefer more advanced slaves
+		return !this[i].ExecBinlogCoordinates.SmallerThan(&this[j].ExecBinlogCoordinates)
+	}
+	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
 }
 
 // getAsciiTopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
@@ -178,9 +189,11 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	master, err = StopSlave(&master.Key)
-	if err != nil {
-		goto Cleanup
+	if !instance.UsingMariaDBGTID {
+		master, err = StopSlave(&master.Key)
+		if err != nil {
+			goto Cleanup
+		}
 	}
 
 	instance, err = StopSlave(instanceKey)
@@ -188,9 +201,11 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 		goto Cleanup
 	}
 
-	instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &master.SelfBinlogCoordinates)
-	if err != nil {
-		goto Cleanup
+	if !instance.UsingMariaDBGTID {
+		instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &master.SelfBinlogCoordinates)
+		if err != nil {
+			goto Cleanup
+		}
 	}
 
 	instance, err = ChangeMasterTo(instanceKey, &master.MasterKey, &master.ExecBinlogCoordinates)
@@ -200,7 +215,9 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 
 Cleanup:
 	instance, _ = StartSlave(instanceKey)
-	master, _ = StartSlave(&master.Key)
+	if !instance.UsingMariaDBGTID {
+		master, _ = StartSlave(&master.Key)
+	}
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -922,7 +939,13 @@ func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey) ([](*Instan
 	if err != nil {
 		return res, belowInstance, err
 	}
-	return MultiMatchBelow(slaves, &belowInstance.Key, false)
+	matchedSlaves, belowInstance, err := MultiMatchBelow(slaves, &belowInstance.Key, false)
+
+	if len(matchedSlaves) != len(slaves) {
+		err = errors.New(fmt.Sprintf("MultiMatchSlaves: only matched %d out of %d slaves of %+v", len(matchedSlaves), len(slaves), *masterKey))
+	}
+
+	return matchedSlaves, belowInstance, err
 }
 
 // MatchUp will move a slave up the replication chain, so that it becomes sibling of its master, via Pseudo-GTID
@@ -1054,30 +1077,40 @@ func RegroupSlaves(masterKey *InstanceKey, onCandidateSlaveChosen func(*Instance
 	return aheadSlaves, equalSlaves, laterSlaves, instance, err
 }
 
-func Failover(oldMaster *InstanceKey, newMaster *InstanceKey) error {
+func isValidAsCandidateSiblingOfIntermediateMaster(sibling *Instance) bool {
+	//	if !insta
+	//
+	//	if !sibling.Key.Equals(intermediateMasterKey) && sibling.SlaveRunning() && sibling.IsLastCheckValid && sibling.LogSlaveUpdatesEnabled && intermediateMasterInstance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
+	return false
+}
 
-	var preProcessesFailures []error = []error{}
-	barrier := make(chan error)
-	for _, command := range config.Config.PreFailoverProcesses {
-		command := command
-		command = strings.Replace(command, "{oldMaster}", oldMaster.Hostname, -1)
-		command = strings.Replace(command, "{oldMasterPort}", fmt.Sprintf("%d", oldMaster.Port), -1)
-		command = strings.Replace(command, "{newMaster}", newMaster.Hostname, -1)
-		command = strings.Replace(command, "{newMasterPort}", fmt.Sprintf("%d", newMaster.Port), -1)
-		var cmdErr error = nil
-		go func() {
-			defer func() { barrier <- cmdErr }()
-			cmdErr = os.CommandRun(command)
-		}()
+// GetCandidateSlave chooses the best slave to promote given a (possibly dead) master
+func GetCandidateSiblingOfIntermediateMaster(intermediateMasterKey *InstanceKey) (*Instance, error) {
+	intermediateMasterInstance, _, err := ReadInstance(intermediateMasterKey)
+	if err != nil {
+		return nil, err
 	}
-	for _, _ = range config.Config.PreFailoverProcesses {
-		if cmdErr := <-barrier; cmdErr != nil {
-			preProcessesFailures = append(preProcessesFailures, cmdErr)
+
+	siblings, err := ReadSlaveInstances(&intermediateMasterInstance.MasterKey)
+	if err != nil {
+		return nil, err
+	}
+	if len(siblings) <= 1 {
+		return nil, log.Errorf("No siblings found for %+v", *intermediateMasterKey)
+	}
+
+	sort.Sort(sort.Reverse(InstancesByCountSlaves(siblings)))
+
+	for _, sibling := range siblings {
+		sibling := sibling
+		if !sibling.Key.Equals(intermediateMasterKey) && sibling.SlaveRunning() && sibling.IsLastCheckValid && sibling.LogSlaveUpdatesEnabled && intermediateMasterInstance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
+			// this is *assumed* to be a good choice.
+			// We don't know for sure:
+			// - the dead intermediate master's position may have been more advanced then last recorded
+			// - and the candidate's position may have been stalled in the past seconds
+			// But it's an attempt...
+			return sibling, nil
 		}
 	}
-	if len(preProcessesFailures) > 0 {
-		return preProcessesFailures[0]
-	}
-
-	return nil
+	return nil, log.Errorf("Cannot find candidate sibling of %+v", *intermediateMasterKey)
 }

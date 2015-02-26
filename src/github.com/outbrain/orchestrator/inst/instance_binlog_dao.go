@@ -192,8 +192,11 @@ func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string) (*Bin
 			instancePseudoGTIDEntryCache.Set(cacheKey, &resultCoordinates, 0)
 			return &resultCoordinates, nil
 		}
-
-		currentBinlog, err = currentBinlog.PreviousFileCoordinates()
+		// Got here? Unfound
+		if err == nil {
+			// Keep looking
+			currentBinlog, err = currentBinlog.PreviousFileCoordinates()
+		}
 	}
 
 	return nil, log.Errorf("Cannot match pseudo GTID entry in binlogs of %+v", instance.Key)
