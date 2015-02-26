@@ -166,6 +166,8 @@ function visualizeInstances(nodesMap) {
                 source: o,
                 target: o
             });
+        }).style("stroke-dasharray", function(o) {
+            return o.source.DataCenter == o.target.DataCenter ? ("0, 0") : ("3, 2") ;
         });
 
         // Transition links to their new position.
