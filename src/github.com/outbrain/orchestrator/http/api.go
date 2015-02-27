@@ -630,6 +630,27 @@ func (this *HttpAPI) MakeLocalMaster(params martini.Params, r render.Render, req
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v now made local master", instanceKey), Details: instance})
 }
 
+// SkipQuery skips a single query on a failed replication instance
+func (this *HttpAPI) SkipQuery(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !this.isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, err := inst.SkipQuery(&instanceKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: "Query skipped", Details: instance})
+}
+
 // StartSlave starts replication on given instance
 func (this *HttpAPI) StartSlave(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !this.isAuthorizedForAction(req, user) {
@@ -1264,6 +1285,30 @@ func (this *HttpAPI) ReplicationAnalysis(params martini.Params, r render.Render,
 	}
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Analysis"), Details: analysis})
+}
+
+// Recover attempts recovery on a given instance
+func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !this.isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	actionTaken, err := orchestrator.CheckAndRecover(&instanceKey, true)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	if actionTaken {
+		r.JSON(200, &APIResponse{Code: OK, Message: "Action taken", Details: instanceKey})
+	} else {
+		r.JSON(200, &APIResponse{Code: OK, Message: "No action taken", Details: instanceKey})
+	}
 
 }
 
@@ -1292,6 +1337,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance)
 	m.Get("/api/end-maintenance/:host/:port", this.EndMaintenanceByInstanceKey)
 	m.Get("/api/end-maintenance/:maintenanceKey", this.EndMaintenance)
+	m.Get("/api/skip-query/:host/:port", this.SkipQuery)
 	m.Get("/api/start-slave/:host/:port", this.StartSlave)
 	m.Get("/api/stop-slave/:host/:port", this.StopSlave)
 	m.Get("/api/stop-slave-nice/:host/:port", this.StopSlaveNicely)
@@ -1317,7 +1363,9 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/headers", this.Headers)
 	m.Get("/api/health", this.Health)
 	m.Get("/api/grab-election", this.GrabElection)
+	// Recovery
 	m.Get("/api/replication-analysis", this.ReplicationAnalysis)
+	m.Get("/api/recover/:host/:port", this.Recover)
 	// Agents
 	m.Get("/api/agents", this.Agents)
 	m.Get("/api/agent/:host", this.Agent)

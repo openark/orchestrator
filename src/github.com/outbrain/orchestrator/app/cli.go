@@ -69,6 +69,20 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		log.Fatal("expected command (-c) (discover|forget|continuous|move-up|move-below|make-co-master|match-below|reset-slave|set-read-only|set-writeable|begin-maintenance|end-maintenance|clusters|topology|resolve)")
 	}
 	switch command {
+	case "skip-query":
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			_, err := inst.SkipQuery(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
 	case "move-up":
 		{
 			if instanceKey == nil {
@@ -230,18 +244,18 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatale(err)
 			}
 		}
-	case "failover":
+	case "recover":
 		{
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			if siblingKey == nil {
-				log.Fatal("Cannot deduce destination:", sibling)
-			}
 
-			err := orchestrator.RecoverDeadMaster(instanceKey, siblingKey)
+			actionTaken, err := orchestrator.CheckAndRecover(instanceKey, true)
 			if err != nil {
 				log.Fatale(err)
+			}
+			if actionTaken {
+				fmt.Println("true")
 			}
 		}
 	case "last-pseudo-gtid":

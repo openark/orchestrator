@@ -40,18 +40,6 @@ func (this InstancesByExecBinlogCoordinates) Less(i, j int) bool {
 	return this[i].ExecBinlogCoordinates.SmallerThan(&this[j].ExecBinlogCoordinates)
 }
 
-type InstancesByCountSlaves [](*Instance)
-
-func (this InstancesByCountSlaves) Len() int      { return len(this) }
-func (this InstancesByCountSlaves) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
-func (this InstancesByCountSlaves) Less(i, j int) bool {
-	if len(this[i].SlaveHosts) == len(this[j].SlaveHosts) {
-		// Secondary sorting: prefer more advanced slaves
-		return !this[i].ExecBinlogCoordinates.SmallerThan(&this[j].ExecBinlogCoordinates)
-	}
-	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
-}
-
 // getAsciiTopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
 func getAsciiTopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance)) []string {
@@ -1075,53 +1063,4 @@ func RegroupSlaves(masterKey *InstanceKey, onCandidateSlaveChosen func(*Instance
 
 	log.Debugf("RegroupSlaves: done")
 	return aheadSlaves, equalSlaves, laterSlaves, instance, err
-}
-
-func isValidAsCandidateSiblingOfIntermediateMaster(sibling *Instance) bool {
-	if !sibling.LogBinEnabled {
-		return false
-	}
-	if !sibling.LogSlaveUpdatesEnabled {
-		return false
-	}
-	if !sibling.SlaveRunning() {
-		return false
-	}
-	if !sibling.IsLastCheckValid {
-		return false
-	}
-	return true
-}
-
-// GetCandidateSlave chooses the best slave to promote given a (possibly dead) master
-func GetCandidateSiblingOfIntermediateMaster(intermediateMasterKey *InstanceKey) (*Instance, error) {
-	intermediateMasterInstance, _, err := ReadInstance(intermediateMasterKey)
-	if err != nil {
-		return nil, err
-	}
-
-	siblings, err := ReadSlaveInstances(&intermediateMasterInstance.MasterKey)
-	if err != nil {
-		return nil, err
-	}
-	if len(siblings) <= 1 {
-		return nil, log.Errorf("No siblings found for %+v", *intermediateMasterKey)
-	}
-
-	sort.Sort(sort.Reverse(InstancesByCountSlaves(siblings)))
-
-	for _, sibling := range siblings {
-		sibling := sibling
-		if isValidAsCandidateSiblingOfIntermediateMaster(sibling) {
-			if !sibling.Key.Equals(intermediateMasterKey) && intermediateMasterInstance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
-				// this is *assumed* to be a good choice.
-				// We don't know for sure:
-				// - the dead intermediate master's position may have been more advanced then last recorded
-				// - and the candidate's position may have been stalled in the past seconds
-				// But it's an attempt...
-				return sibling, nil
-			}
-		}
-	}
-	return nil, log.Errorf("Cannot find candidate sibling of %+v", *intermediateMasterKey)
 }

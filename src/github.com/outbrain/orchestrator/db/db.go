@@ -277,6 +277,11 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN data_center varchar(32) CHARACTER SET ascii NOT NULL AFTER cluster_name
 	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN physical_environment varchar(32) CHARACTER SET ascii NOT NULL AFTER data_center
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance

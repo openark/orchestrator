@@ -142,9 +142,17 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	if config.Config.DataCenterPattern != "" {
 		if pattern, err := regexp.Compile(config.Config.DataCenterPattern); err == nil {
-			dcMatch := pattern.FindStringSubmatch(instance.Key.Hostname)
-			if len(dcMatch) != 0 {
-				instance.DataCenter = dcMatch[1]
+			match := pattern.FindStringSubmatch(instance.Key.Hostname)
+			if len(match) != 0 {
+				instance.DataCenter = match[1]
+			}
+		}
+	}
+	if config.Config.PhysicalEnvironmentPattern != "" {
+		if pattern, err := regexp.Compile(config.Config.PhysicalEnvironmentPattern); err == nil {
+			match := pattern.FindStringSubmatch(instance.Key.Hostname)
+			if len(match) != 0 {
+				instance.PhysicalEnvironment = match[1]
 			}
 		}
 	}
@@ -396,6 +404,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	slaveHostsJson := m.GetString("slave_hosts")
 	instance.ClusterName = m.GetString("cluster_name")
 	instance.DataCenter = m.GetString("data_center")
+	instance.PhysicalEnvironment = m.GetString("physical_environment")
 	instance.ReplicationDepth = m.GetUint("replication_depth")
 	instance.IsUpToDate = (m.GetUint("seconds_since_last_checked") <= config.Config.InstancePollSeconds)
 	instance.IsRecentlyChecked = (m.GetUint("seconds_since_last_checked") <= config.Config.InstancePollSeconds*5)
@@ -918,6 +927,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 					slave_hosts=VALUES(slave_hosts),
 					cluster_name=VALUES(cluster_name),
 					data_center=VALUES(data_center),
+					physical_environment=values(physical_environment),
 					replication_depth=VALUES(replication_depth)			
 				`
 		} else {
@@ -962,8 +972,9 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				slave_hosts,
 				cluster_name,
 				data_center,
+				physical_environment,
 				replication_depth
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
@@ -1000,6 +1011,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			instance.GetSlaveHostsAsJson(),
 			instance.ClusterName,
 			instance.DataCenter,
+			instance.PhysicalEnvironment,
 			instance.ReplicationDepth,
 		)
 		if err != nil {
@@ -1407,6 +1419,31 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
+}
+
+// SkipQuery skip a single query in a failed replication instance
+func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	if !instance.IsSlave() {
+		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
+	}
+	if instance.Slave_SQL_Running {
+		return instance, errors.New(fmt.Sprintf("Slave_SQL_is running on %+v", instanceKey))
+	}
+	if instance.LastSQLError == "" {
+		return instance, errors.New(fmt.Sprintf("No SQL error on %+v", instanceKey))
+	}
+
+	log.Debugf("Skipping one query on %+v", instanceKey)
+	_, err = ExecInstance(instanceKey, `set global sql_slave_skip_counter := 1`)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	return StartSlave(instanceKey)
 }
 
 // DetachSlave detaches a slave from replication; forcibly corrupting the binlog coordinates (though in such way

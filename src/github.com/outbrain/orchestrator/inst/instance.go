@@ -217,11 +217,12 @@ type Instance struct {
 	LastIOError            string
 	SecondsBehindMaster    sql.NullInt64
 
-	SlaveLagSeconds  sql.NullInt64
-	SlaveHosts       InstanceKeyMap
-	ClusterName      string
-	DataCenter       string
-	ReplicationDepth uint
+	SlaveLagSeconds     sql.NullInt64
+	SlaveHosts          InstanceKeyMap
+	ClusterName         string
+	DataCenter          string
+	PhysicalEnvironment string
+	ReplicationDepth    uint
 
 	IsLastCheckValid     bool
 	IsUpToDate           bool

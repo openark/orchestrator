@@ -68,6 +68,7 @@ type Configuration struct {
 	PowerAuthUsers                             []string          // On AuthenticationMethod == "proxy", list of users that can make changes. All others are read-only.
 	ClusterNameToAlias                         map[string]string // map between regex matching cluster name to a human friendly alias
 	DataCenterPattern                          string            // Regexp pattern with one group, extracting the datacenter name from the hostname
+	PhysicalEnvironmentPattern                 string            // Regexp pattern with one group, extracting physical environment info from hostname (e.g. combination of datacenter & prod/dev env)
 	ServeAgentsHttp                            bool              // Spawn another HTTP interface dedicated for orcehstrator-agent
 	AgentsUseSSL                               bool              // When "true" orchestrator will listen on agents port with SSL as well as connect to agents via SSL
 	SSLSkipVerify                              bool              // When using SSL, should we ignore SSL certification error
@@ -80,6 +81,7 @@ type Configuration struct {
 	SeedAcceptableBytesDiff                    int64             // Difference in bytes between seed source & target data size that is still considered as successful copy
 	PseudoGTIDPattern                          string            // Pattern to look for in binary logs that makes for a unique entry (pseudo GTID). When empty, Pseudo-GTID based refactoring is disabled.
 	DetectPseudoGTIDQuery                      string            // Optional query which is used to authoritatively decide whether pseudo gtid is enabled on instance
+	RecoverIntermediateMasterClusterFilters    []string          // Only do IM recovery on clusters matching these regexp patterns (of course the ".*" pattern matches everything)
 }
 
 var Config *Configuration = NewConfiguration()
@@ -117,6 +119,7 @@ func NewConfiguration() *Configuration {
 		PowerAuthUsers:                             []string{"*"},
 		ClusterNameToAlias:                         make(map[string]string),
 		DataCenterPattern:                          "",
+		PhysicalEnvironmentPattern:                 "",
 		ServeAgentsHttp:                            false,
 		AgentsUseSSL:                               false,
 		SSLSkipVerify:                              false,
@@ -129,6 +132,7 @@ func NewConfiguration() *Configuration {
 		SeedAcceptableBytesDiff:                    8192,
 		PseudoGTIDPattern:                          "",
 		DetectPseudoGTIDQuery:                      "",
+		RecoverIntermediateMasterClusterFilters:    []string{},
 	}
 }
 

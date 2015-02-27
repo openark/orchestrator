@@ -125,6 +125,7 @@ func ContinuousDiscovery() {
 	go handleDiscoveryRequests(nil, nil)
 	tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
 	forgetUnseenTick := time.Tick(time.Minute)
+	recoverTick := time.Tick(10 * time.Second)
 	elected := false
 	for {
 		select {
@@ -152,6 +153,8 @@ func ContinuousDiscovery() {
 				inst.LoadHostnameResolveCacheFromDatabase()
 			}
 			HealthTest()
+		case <-recoverTick:
+			CheckAndRecover(nil, false)
 		}
 	}
 }

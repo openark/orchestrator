@@ -146,7 +146,8 @@ function openNodeModal(node) {
         $('#node_modal [data-btn-group=stop-slave]').appendTo(td.find("div"))
         
         if (!node.replicationRunning) {
-            addNodeModalDataAttribute("Last SQL error", node.LastSQLError);
+            td = addNodeModalDataAttribute("Last SQL error", node.LastSQLError);
+            $('#node_modal button[data-btn=skip-query]').appendTo(td.find("div"))
             addNodeModalDataAttribute("Last IO error", node.LastIOError);
         }
         addNodeModalDataAttribute("Seconds behind master", node.SecondsBehindMaster.Valid ? node.SecondsBehindMaster.Int64 : "null");
@@ -199,6 +200,9 @@ function openNodeModal(node) {
     });
     $('#node_modal button[data-btn=refresh-instance]').click(function(){
     	apiCommand("/api/refresh/"+node.Key.Hostname+"/"+node.Key.Port);
+    });
+    $('#node_modal button[data-btn=skip-query]').click(function(){
+    	apiCommand("/api/skip-query/"+node.Key.Hostname+"/"+node.Key.Port);
     });
     $('#node_modal button[data-btn=start-slave]').click(function(){
     	apiCommand("/api/start-slave/"+node.Key.Hostname+"/"+node.Key.Port);
@@ -253,6 +257,7 @@ function openNodeModal(node) {
     	$('#node_modal [data-panel-type=begin-maintenance]').show();
     	$('#node_modal [data-panel-type=end-maintenance]').hide();
     }
+	$('#node_modal button[data-btn=skip-query]').hide();
 	$('#node_modal button[data-btn=start-slave]').hide();
 	$('#node_modal [data-btn-group=stop-slave]').hide();
 	
@@ -262,6 +267,9 @@ function openNodeModal(node) {
         } 
         if (!node.replicationRunning) {
         	$('#node_modal button[data-btn=start-slave]').show();
+        }
+        if (!node.Slave_SQL_Running && node.LastSQLError) {
+        	$('#node_modal button[data-btn=skip-query]').show();
         }
     }
 
@@ -280,6 +288,13 @@ function openNodeModal(node) {
     	apiCommand("/api/enslave-siblings-simple/"+node.Key.Hostname+"/"+node.Key.Port);
     });
 
+    $('#node_modal button[data-btn=recover]').hide();
+    if (!node.IsLastCheckValid) {
+        $('#node_modal button[data-btn=recover]').show();
+    }
+    $('#node_modal button[data-btn=recover]').click(function(){
+    	apiCommand("/api/recover/"+node.Key.Hostname+"/"+node.Key.Port);
+    });
 
     $('#node_modal').modal({})
     $('#node_modal').unbind('hidden.bs.modal');

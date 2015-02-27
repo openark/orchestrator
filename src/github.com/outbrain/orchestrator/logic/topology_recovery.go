@@ -22,11 +22,24 @@ import (
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/inst"
 	"github.com/outbrain/orchestrator/os"
+	"regexp"
+	"sort"
 	"strings"
 )
 
-func RecoverDeadMaster(oldMaster *inst.InstanceKey, newMaster *inst.InstanceKey) error {
+type InstancesByCountSlaves [](*inst.Instance)
 
+func (this InstancesByCountSlaves) Len() int      { return len(this) }
+func (this InstancesByCountSlaves) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
+func (this InstancesByCountSlaves) Less(i, j int) bool {
+	if len(this[i].SlaveHosts) == len(this[j].SlaveHosts) {
+		// Secondary sorting: prefer more advanced slaves
+		return !this[i].ExecBinlogCoordinates.SmallerThan(&this[j].ExecBinlogCoordinates)
+	}
+	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
+}
+
+func RecoverDeadMaster(oldMaster *inst.InstanceKey, newMaster *inst.InstanceKey) error {
 	var preProcessesFailures []error = []error{}
 	barrier := make(chan error)
 	for _, command := range config.Config.PreFailoverProcesses {
@@ -53,9 +66,60 @@ func RecoverDeadMaster(oldMaster *inst.InstanceKey, newMaster *inst.InstanceKey)
 	return nil
 }
 
+func isValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instance) bool {
+	if !sibling.LogBinEnabled {
+		return false
+	}
+	if !sibling.LogSlaveUpdatesEnabled {
+		return false
+	}
+	if !sibling.SlaveRunning() {
+		return false
+	}
+	if !sibling.IsLastCheckValid {
+		return false
+	}
+	return true
+}
+
+// GetCandidateSlave chooses the best slave to promote given a (possibly dead) master
+func GetCandidateSiblingOfIntermediateMaster(intermediateMasterKey *inst.InstanceKey) (*inst.Instance, error) {
+	intermediateMasterInstance, _, err := inst.ReadInstance(intermediateMasterKey)
+	if err != nil {
+		return nil, err
+	}
+
+	siblings, err := inst.ReadSlaveInstances(&intermediateMasterInstance.MasterKey)
+	if err != nil {
+		return nil, err
+	}
+	if len(siblings) <= 1 {
+		return nil, log.Errorf("No siblings found for %+v", *intermediateMasterKey)
+	}
+
+	sort.Sort(sort.Reverse(InstancesByCountSlaves(siblings)))
+
+	for _, sibling := range siblings {
+		sibling := sibling
+		if isValidAsCandidateSiblingOfIntermediateMaster(sibling) {
+			if sibling.DataCenter == intermediateMasterInstance.DataCenter && sibling.PhysicalEnvironment == intermediateMasterInstance.PhysicalEnvironment {
+				if !sibling.Key.Equals(intermediateMasterKey) && intermediateMasterInstance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
+					// this is *assumed* to be a good choice.
+					// We don't know for sure:
+					// - the dead intermediate master's position may have been more advanced then last recorded
+					// - and the candidate's position may have been stalled in the past seconds
+					// But it's an attempt...
+					return sibling, nil
+				}
+			}
+		}
+	}
+	return nil, log.Errorf("Cannot find candidate sibling of %+v", *intermediateMasterKey)
+}
+
 func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
 	log.Debugf("RecoverDeadIntermediateMaster: will recover %+v", *failedInstanceKey)
-	candidateSibling, err := inst.GetCandidateSiblingOfIntermediateMaster(failedInstanceKey)
+	candidateSibling, err := GetCandidateSiblingOfIntermediateMaster(failedInstanceKey)
 	if err == nil {
 		log.Debugf("- RecoverDeadIntermediateMaster: will attempt a candidate intermediate master: %+v", candidateSibling.Key)
 		// We have a candidate
@@ -67,11 +131,46 @@ func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (*inst.I
 			log.Debugf("- RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) did not complete: %+v", candidateSibling.Key, err)
 		}
 	}
-	// Either no candidate or only partial match of slaves. Match-up as plan B
+	// Either no candidate or only partial match of slaves. Regroup as plan B
+	inst.RegroupSlaves(failedInstanceKey, nil)
+	// Either no candidate or only partial match of slaves, and/or regroup: continue to match-up, plan C
 	log.Debugf("- RecoverDeadIntermediateMaster: will next attempt a match up from %+v", *failedInstanceKey)
 	_, successorInstance, err := inst.MatchUpSlaves(failedInstanceKey)
 	log.Debugf("- RecoverDeadIntermediateMaster: matched up to %+v", successorInstance.Key)
 	inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("master: %+v", successorInstance.Key))
 
 	return successorInstance, err
+}
+
+// checkAndRecoverDeadIntermediateMaster checks a given analysis, decides whether to take action, and possibly takes action
+// Returns true when action was taken.
+func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, error) {
+	for _, filter := range config.Config.RecoverIntermediateMasterClusterFilters {
+		if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched || skipFilters {
+			log.Debugf("Will handle DeadIntermediateMaster event on %+v", analysisEntry.ClusterName)
+			_, err := RecoverDeadIntermediateMaster(&analysisEntry.AnalyzedInstanceKey)
+			return true, err
+		}
+	}
+	return false, nil
+}
+
+func CheckAndRecover(specificInstance *inst.InstanceKey, skipFilters bool) (bool, error) {
+	actionTaken := false
+	replicationAnalysis, err := inst.GetReplicationAnalysis()
+	if err != nil {
+		return false, log.Errore(err)
+	}
+	for _, analysisEntry := range replicationAnalysis {
+		if specificInstance != nil {
+			// We are looking for a specific instance; if this is not the one, skip!
+			if !specificInstance.Equals(&analysisEntry.AnalyzedInstanceKey) {
+				continue
+			}
+		}
+		if analysisEntry.Analysis == inst.DeadIntermediateMaster {
+			actionTaken, err = checkAndRecoverDeadIntermediateMaster(analysisEntry, skipFilters)
+		}
+	}
+	return actionTaken, err
 }
