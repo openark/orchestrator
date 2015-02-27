@@ -81,6 +81,7 @@ type Configuration struct {
 	SeedAcceptableBytesDiff                    int64             // Difference in bytes between seed source & target data size that is still considered as successful copy
 	PseudoGTIDPattern                          string            // Pattern to look for in binary logs that makes for a unique entry (pseudo GTID). When empty, Pseudo-GTID based refactoring is disabled.
 	DetectPseudoGTIDQuery                      string            // Optional query which is used to authoritatively decide whether pseudo gtid is enabled on instance
+	RecoverMasterClusterFilters                []string          // Only do master recovery on clusters matching these regexp patterns (of course the ".*" pattern matches everything)
 	RecoverIntermediateMasterClusterFilters    []string          // Only do IM recovery on clusters matching these regexp patterns (of course the ".*" pattern matches everything)
 }
 
@@ -133,6 +134,7 @@ func NewConfiguration() *Configuration {
 		SeedAcceptableBytesDiff:                    8192,
 		PseudoGTIDPattern:                          "",
 		DetectPseudoGTIDQuery:                      "",
+		RecoverMasterClusterFilters:                []string{},
 		RecoverIntermediateMasterClusterFilters:    []string{},
 	}
 }

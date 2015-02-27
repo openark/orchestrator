@@ -24,7 +24,6 @@ import (
 	"github.com/outbrain/orchestrator/os"
 	"regexp"
 	"sort"
-	"strings"
 )
 
 type InstancesByCountSlaves [](*inst.Instance)
@@ -39,15 +38,18 @@ func (this InstancesByCountSlaves) Less(i, j int) bool {
 	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
 }
 
-func RecoverDeadMaster(oldMaster *inst.InstanceKey, newMaster *inst.InstanceKey) error {
+func RecoverDeadMaster(failedInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
+
 	var preProcessesFailures []error = []error{}
 	barrier := make(chan error)
 	for _, command := range config.Config.PreFailoverProcesses {
 		command := command
-		command = strings.Replace(command, "{failedHost}", oldMaster.Hostname, -1)
-		command = strings.Replace(command, "{failedPort}", fmt.Sprintf("%d", oldMaster.Port), -1)
-		command = strings.Replace(command, "{successorHost}", newMaster.Hostname, -1)
-		command = strings.Replace(command, "{successorPort}", fmt.Sprintf("%d", newMaster.Port), -1)
+		/*
+			command = strings.Replace(command, "{failedHost}", oldMaster.Hostname, -1)
+			command = strings.Replace(command, "{failedPort}", fmt.Sprintf("%d", oldMaster.Port), -1)
+			command = strings.Replace(command, "{successorHost}", newMaster.Hostname, -1)
+			command = strings.Replace(command, "{successorPort}", fmt.Sprintf("%d", newMaster.Port), -1)
+		*/
 		var cmdErr error = nil
 		go func() {
 			defer func() { barrier <- cmdErr }()
@@ -60,10 +62,28 @@ func RecoverDeadMaster(oldMaster *inst.InstanceKey, newMaster *inst.InstanceKey)
 		}
 	}
 	if len(preProcessesFailures) > 0 {
-		return preProcessesFailures[0]
+		return nil, preProcessesFailures[0]
 	}
 
-	return nil
+	log.Debugf("RecoverDeadMaster: will recover %+v", *failedInstanceKey)
+	_, _, _, candidateSlave, err := inst.RegroupSlaves(failedInstanceKey, nil)
+	log.Debugf("- RecoverDeadIntermediateMaster: candidate slave is %+v", candidateSlave.Key)
+	inst.AuditOperation("recover-dead-master", failedInstanceKey, fmt.Sprintf("master: %+v", candidateSlave.Key))
+
+	return candidateSlave, err
+}
+
+// checkAndRecoverDeadMaster checks a given analysis, decides whether to take action, and possibly takes action
+// Returns true when action was taken.
+func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, error) {
+	for _, filter := range config.Config.RecoverMasterClusterFilters {
+		if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched || skipFilters {
+			log.Debugf("Will handle DeadMaster event on %+v", analysisEntry.ClusterName)
+			_, err := RecoverDeadMaster(&analysisEntry.AnalyzedInstanceKey)
+			return true, err
+		}
+	}
+	return false, nil
 }
 
 func isValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instance) bool {
@@ -167,6 +187,9 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, skipFilters bool) (bool
 			if !specificInstance.Equals(&analysisEntry.AnalyzedInstanceKey) {
 				continue
 			}
+		}
+		if analysisEntry.Analysis == inst.DeadMaster {
+			actionTaken, err = checkAndRecoverDeadMaster(analysisEntry, skipFilters)
 		}
 		if analysisEntry.Analysis == inst.DeadIntermediateMaster {
 			actionTaken, err = checkAndRecoverDeadIntermediateMaster(analysisEntry, skipFilters)
