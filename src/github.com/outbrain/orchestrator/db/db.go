@@ -275,7 +275,7 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE 
 			database_instance
-			ADD COLUMN data_center varchar(128) CHARACTER SET ascii NOT NULL AFTER cluster_name
+			ADD COLUMN data_center varchar(32) CHARACTER SET ascii NOT NULL AFTER cluster_name
 	`,
 }
 

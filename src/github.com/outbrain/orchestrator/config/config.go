@@ -79,6 +79,7 @@ type Configuration struct {
 	StaleSeedFailMinutes                       uint              // Number of minutes after which a stale (no progress) seed is considered failed.
 	SeedAcceptableBytesDiff                    int64             // Difference in bytes between seed source & target data size that is still considered as successful copy
 	PseudoGTIDPattern                          string            // Pattern to look for in binary logs that makes for a unique entry (pseudo GTID). When empty, Pseudo-GTID based refactoring is disabled.
+	DetectPseudoGTIDQuery                      string            // Optional query which is used to authoritatively decide whether pseudo gtid is enabled on instance
 }
 
 var Config *Configuration = NewConfiguration()
@@ -127,6 +128,7 @@ func NewConfiguration() *Configuration {
 		StaleSeedFailMinutes:                       60,
 		SeedAcceptableBytesDiff:                    8192,
 		PseudoGTIDPattern:                          "",
+		DetectPseudoGTIDQuery:                      "",
 	}
 }
 

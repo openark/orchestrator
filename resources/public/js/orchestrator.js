@@ -459,6 +459,12 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	popoverElement.find("h3").html('&nbsp;<div class="pull-left">'+
 	instance.canonicalTitle + '</div><div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></a></div>');
 	var indicateLastSeenInStatus = false;
+    if (instance.usingGTID) {
+    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using GTID"></span> ');
+    } 
+    if (instance.UsingPseudoGTID) {
+    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using Pseudo GTID"></span> ');
+    } 
     if (!instance.ReadOnly) {
     	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-pencil" title="Writeable"></span> ');
     } 
@@ -497,9 +503,6 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     var contentHtml = ''
 			+ instance.Version + " " + instance.Binlog_format
 			;
-    if (instance.usingGTID) {
-    	contentHtml += " GTID"
-    }
     
     contentHtml = ''
     	+ '<div class="pull-right">' + statusMessage + ' </div>'

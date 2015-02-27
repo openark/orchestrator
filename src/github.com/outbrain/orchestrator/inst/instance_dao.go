@@ -185,6 +185,20 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		goto Cleanup
 	}
 
+	instance.UsingPseudoGTID = false
+	if config.Config.DetectPseudoGTIDQuery != "" && !isMaxScale {
+		resultData, err := sqlutils.QueryResultData(db, config.Config.DetectPseudoGTIDQuery)
+		if err == nil {
+			if len(resultData) > 0 {
+				if len(resultData[0]) > 0 {
+					if resultData[0][0].Valid && resultData[0][0].String == "1" {
+						instance.UsingPseudoGTID = true
+					}
+				}
+			}
+		}
+	}
+
 	if instance.LogBinEnabled {
 		err = sqlutils.QueryRowsMap(db, "show master status", func(m sqlutils.RowMap) error {
 			var err error
@@ -889,6 +903,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 					has_replication_filters=VALUES(has_replication_filters),
 					oracle_gtid=VALUES(oracle_gtid),
 					mariadb_gtid=VALUES(mariadb_gtid),
+					pseudo_gtid=values(pseudo_gtid),
 					master_log_file=VALUES(master_log_file),
 					read_master_log_pos=VALUES(read_master_log_pos),
 					relay_master_log_file=VALUES(relay_master_log_file),
