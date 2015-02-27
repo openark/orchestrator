@@ -1276,6 +1276,18 @@ func (this *HttpAPI) GrabElection(params martini.Params, r render.Render, req *h
 
 }
 
+// ReloadConfiguration reloads confiug settings (not all of which will apply after change)
+func (this *HttpAPI) ReloadConfiguration(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !this.isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	config.Reload()
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Config reloaded")})
+
+}
+
 // ReplicationAnalysis retuens list of issues
 func (this *HttpAPI) ReplicationAnalysis(params martini.Params, r render.Render, req *http.Request) {
 	analysis, err := inst.GetReplicationAnalysis()
@@ -1363,6 +1375,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/headers", this.Headers)
 	m.Get("/api/health", this.Health)
 	m.Get("/api/grab-election", this.GrabElection)
+	m.Get("/api/reload-configuration", this.ReloadConfiguration)
 	// Recovery
 	m.Get("/api/replication-analysis", this.ReplicationAnalysis)
 	m.Get("/api/recover/:host/:port", this.Recover)

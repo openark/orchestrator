@@ -85,6 +85,7 @@ type Configuration struct {
 }
 
 var Config *Configuration = NewConfiguration()
+var readFileNames []string
 
 func NewConfiguration() *Configuration {
 	return &Configuration{
@@ -191,6 +192,7 @@ func Read(file_names ...string) *Configuration {
 	for _, file_name := range file_names {
 		read(file_name)
 	}
+	readFileNames = file_names
 	return Config
 }
 
@@ -199,6 +201,14 @@ func ForceRead(file_name string) *Configuration {
 	_, err := read(file_name)
 	if err != nil {
 		log.Fatal("Cannot read config file:", file_name, err)
+	}
+	readFileNames = []string{file_name}
+	return Config
+}
+
+func Reload() *Configuration {
+	for _, file_name := range readFileNames {
+		read(file_name)
 	}
 	return Config
 }
