@@ -1,5 +1,8 @@
 clusterOperationPseudoGTIDMode = false;
 
+dcColors = ["#ff8c00", "#4682b4", "#9acd32", "#dc143c", "#9932cc", "#ffd700", "#191970", "#7fffd4", "#808080", "#dda0dd"];
+
+
 function generateInstanceDivs(nodesMap) {
     nodesList = []
     for (var nodeId in nodesMap) {
@@ -56,6 +59,10 @@ function generateInstanceDivs(nodesMap) {
         $(duplicate).show();
         $(".popover.instance[data-duplicate-node] h3 a").click(function () {
         	openNodeModal(nodesMap[draggedNodeId]);
+        	return false;
+        });
+        $(".popover.instance[data-duplicate-node] button[data-command=recover]").click(function () {
+        	recover(nodesMap[draggedNodeId]);
         	return false;
         });
         $(".popover.instance[data-duplicate-node] button[data-command=make-master]").click(function () {
@@ -462,6 +469,18 @@ function refreshClusterOperationModeButton() {
 		$("#cluster_operation_mode_button").html("Classic mode");
 		$("#cluster_operation_mode_button").removeClass("btn-warning").addClass("btn-success");
 	}
+}
+
+function recover(instance) {
+	showLoader();
+    $.get("/api/recover/"+instance.Key.Hostname+"/"+instance.Key.Port, function (operationResult) {
+		hideLoader();
+		if (operationResult.Code == "ERROR") {
+			addAlert(operationResult.Message)
+		} else {
+			location.reload();
+		}	
+    }, "json");
 }
 
 function makeMaster(instance) {

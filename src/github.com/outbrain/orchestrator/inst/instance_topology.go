@@ -542,6 +542,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	var otherInstancePseudoGtidCoordinates *BinlogCoordinates
 	var nextBinlogCoordinatesToMatch *BinlogCoordinates
 	var recordedInstanceRelayLogCoordinates BinlogCoordinates
+	var countMatchedEvents int = 0
 
 	if requireInstanceMaintenance {
 		if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("match below %+v", *otherKey)); merr != nil {
@@ -591,13 +592,16 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	//   the last pseudo gtid). Since they are identical, it is easy to point instance into otherInstance.
 	// - good result: the first position within otherInstance where instance has not replicated yet. It is easy to point
 	//   instance into otherInstance.
-
-	nextBinlogCoordinatesToMatch, err = GetNextBinlogCoordinatesToMatch(instance, *instancePseudoGtidCoordinates,
+	nextBinlogCoordinatesToMatch, countMatchedEvents, err = GetNextBinlogCoordinatesToMatch(instance, *instancePseudoGtidCoordinates,
 		recordedInstanceRelayLogCoordinates, otherInstance, *otherInstancePseudoGtidCoordinates)
 	if err != nil {
 		goto Cleanup
 	}
-	log.Debugf("%+v will match below %+v at %+v", *instanceKey, *otherKey, *nextBinlogCoordinatesToMatch)
+	if countMatchedEvents == 0 {
+		err = errors.New(fmt.Sprintf("Unexpected: 0 events processed while iterating logs. Something went wrong; aborting. nextBinlogCoordinatesToMatch: %+v", nextBinlogCoordinatesToMatch))
+		goto Cleanup
+	}
+	log.Debugf("%+v will match below %+v at %+v; validated events: %d", *instanceKey, *otherKey, *nextBinlogCoordinatesToMatch, countMatchedEvents)
 
 	// Drum roll......
 	instance, err = ChangeMasterTo(instanceKey, otherKey, nextBinlogCoordinatesToMatch)

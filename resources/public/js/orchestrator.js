@@ -153,7 +153,9 @@ function openNodeModal(node) {
         addNodeModalDataAttribute("Seconds behind master", node.SecondsBehindMaster.Valid ? node.SecondsBehindMaster.Int64 : "null");
         addNodeModalDataAttribute("Replication lag", node.SlaveLagSeconds.Valid ? node.SlaveLagSeconds.Int64 : "null");
     }
-    addNodeModalDataAttribute("Num slaves", node.SlaveHosts.length);
+    var td = addNodeModalDataAttribute("Num slaves", node.SlaveHosts.length);
+    $('#node_modal button[data-btn=match-up-slaves]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=regroup-slaves]').appendTo(td.find("div"))
     addNodeModalDataAttribute("Server ID", node.ServerID);
     addNodeModalDataAttribute("Version", node.Version);
     var td = addNodeModalDataAttribute("Read only", booleanString(node.ReadOnly));
@@ -280,6 +282,22 @@ function openNodeModal(node) {
     } else {
     	$('#node_modal button[data-btn=set-read-only]').show();
     }
+
+    $('#node_modal button[data-btn=match-up-slaves]').hide();
+    $('#node_modal button[data-btn=regroup-slaves]').hide();
+    if (node.UsingPseudoGTID) {
+        $('#node_modal button[data-btn=match-up-slaves]').show();
+        if (node.SlaveHosts.length > 1) {
+            $('#node_modal button[data-btn=regroup-slaves]').show();
+        }
+    }
+    $('#node_modal button[data-btn=match-up-slaves]').click(function(){
+    	apiCommand("/api/match-up-slaves/"+node.Key.Hostname+"/"+node.Key.Port);
+    });
+    $('#node_modal button[data-btn=regroup-slaves]').click(function(){
+    	apiCommand("/api/regroup-slaves/"+node.Key.Hostname+"/"+node.Key.Port);
+    });
+
    	$('#node_modal button[data-btn=enslave-siblings-simple]').hide();
     if (node.LogBinEnabled && node.LogSlaveUpdatesEnabled) {
     	$('#node_modal button[data-btn=enslave-siblings-simple]').show();
@@ -289,7 +307,7 @@ function openNodeModal(node) {
     });
 
     $('#node_modal button[data-btn=recover]').hide();
-    if (!node.IsLastCheckValid) {
+    if (node.lastCheckInvalidProblem() && node.children && node.children.length > 0) {
         $('#node_modal button[data-btn=recover]').show();
     }
     $('#node_modal button[data-btn=recover]').click(function(){
@@ -540,14 +558,17 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     	contentHtml += '<p>' 
         	+ 'Problem: <strong>'+instance.problem.replace(/_/g, ' ') + '</strong>'
         + '</p>';
-    }  
-    
+    }      
     popoverElement.find(".popover-content").html(contentHtml);
-    if (instance.isCandidateMaster) {
-    	popoverElement.append('<h4 class="popover-footer"><strong>Master candidate</strong><div class="pull-right"><button class="btn btn-xs btn-default" data-command="make-master"><span class="glyphicon glyphicon-play"></span> Make master</button></div></h4>');
-    } else if (instance.isMostAdvancedOfSiblings) {
-    	popoverElement.append('<h4 class="popover-footer"><strong>Candidate</strong><div class="pull-right"><button class="btn btn-xs btn-default" data-command="make-local-master"><span class="glyphicon glyphicon-play"></span> Make local master</button></div></h4>');
+
+    if (instance.lastCheckInvalidProblem() && instance.children && instance.children.length > 0) {
+    	popoverElement.append('<h4 class="popover-footer"><div><button class="btn btn-xs btn-default" data-command="recover"><span class="glyphicon glyphicon-heart text-danger"></span> Recover</button></div></h4>');
     }
+    //if (instance.isCandidateMaster) {
+    //	popoverElement.append('<h4 class="popover-footer"><strong>Master candidate</strong><div class="pull-right"><button class="btn btn-xs btn-default" data-command="make-master"><span class="glyphicon glyphicon-play"></span> Make master</button></div></h4>');
+    //} else if (instance.isMostAdvancedOfSiblings) {
+    //	popoverElement.append('<h4 class="popover-footer"><strong>Candidate</strong><div class="pull-right"><button class="btn btn-xs btn-default" data-command="make-local-master"><span class="glyphicon glyphicon-play"></span> Make local master</button></div></h4>');
+    //}
     
     popoverElement.find("h3 a").click(function () {
     	openNodeModal(instance);

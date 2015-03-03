@@ -122,6 +122,7 @@ func (this *BinlogEventCursor) nextRealEvent() (*BinlogEvent, error) {
 	if event == nil {
 		return event, err
 	}
+
 	if _, found := skippedEventTypes[event.EventType]; found {
 		// Recursion will not be deep here. A few entries (end-of-binlog followed by start-of-bin-log) are possible,
 		// but we really don't expect a huge sequence of those.

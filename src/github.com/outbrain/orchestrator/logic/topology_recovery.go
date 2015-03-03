@@ -40,6 +40,7 @@ func (this InstancesByCountSlaves) Less(i, j int) bool {
 
 func RecoverDeadMaster(failedInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
 
+	inst.AuditOperation("recover-dead-master", failedInstanceKey, "problem found; will recover")
 	var preProcessesFailures []error = []error{}
 	barrier := make(chan error)
 	for _, command := range config.Config.PreFailoverProcesses {
@@ -76,8 +77,13 @@ func RecoverDeadMaster(failedInstanceKey *inst.InstanceKey) (*inst.Instance, err
 // checkAndRecoverDeadMaster checks a given analysis, decides whether to take action, and possibly takes action
 // Returns true when action was taken.
 func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, error) {
-	for _, filter := range config.Config.RecoverMasterClusterFilters {
-		if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched || skipFilters {
+	filters := config.Config.RecoverMasterClusterFilters
+	if skipFilters {
+		// The following filter catches-all
+		filters = append(filters, ".")
+	}
+	for _, filter := range filters {
+		if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched {
 			log.Debugf("Will handle DeadMaster event on %+v", analysisEntry.ClusterName)
 			_, err := RecoverDeadMaster(&analysisEntry.AnalyzedInstanceKey)
 			return true, err
@@ -138,12 +144,19 @@ func GetCandidateSiblingOfIntermediateMaster(intermediateMasterKey *inst.Instanc
 }
 
 func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
+	if ok, err := AttemptRecoveryRegistration(failedInstanceKey); !ok {
+		log.Debugf("Will not RecoverDeadIntermediateMaster on %+v", *failedInstanceKey)
+		return nil, err
+	}
+
+	inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, "problem found; will recover")
 	log.Debugf("RecoverDeadIntermediateMaster: will recover %+v", *failedInstanceKey)
 	candidateSibling, err := GetCandidateSiblingOfIntermediateMaster(failedInstanceKey)
 	if err == nil {
 		log.Debugf("- RecoverDeadIntermediateMaster: will attempt a candidate intermediate master: %+v", candidateSibling.Key)
 		// We have a candidate
 		if _, belowInstance, err := inst.MultiMatchSlaves(failedInstanceKey, &candidateSibling.Key); err == nil {
+			ResolveRecovery(failedInstanceKey, &candidateSibling.Key)
 			log.Debugf("- RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) went well", candidateSibling.Key)
 			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("candidate sibling: %+v", candidateSibling.Key))
 			return belowInstance, nil
@@ -153,9 +166,10 @@ func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (*inst.I
 	}
 	// Either no candidate or only partial match of slaves. Regroup as plan B
 	inst.RegroupSlaves(failedInstanceKey, nil)
-	// Either no candidate or only partial match of slaves, and/or regroup: continue to match-up, plan C
+	// And anyway, match up all that's left continue to match-up, plan C
 	log.Debugf("- RecoverDeadIntermediateMaster: will next attempt a match up from %+v", *failedInstanceKey)
 	_, successorInstance, err := inst.MatchUpSlaves(failedInstanceKey)
+	ResolveRecovery(failedInstanceKey, &successorInstance.Key)
 	log.Debugf("- RecoverDeadIntermediateMaster: matched up to %+v", successorInstance.Key)
 	inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("master: %+v", successorInstance.Key))
 
@@ -165,8 +179,13 @@ func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (*inst.I
 // checkAndRecoverDeadIntermediateMaster checks a given analysis, decides whether to take action, and possibly takes action
 // Returns true when action was taken.
 func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, error) {
-	for _, filter := range config.Config.RecoverIntermediateMasterClusterFilters {
-		if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched || skipFilters {
+	filters := config.Config.RecoverIntermediateMasterClusterFilters
+	if skipFilters {
+		// The following filter catches-all
+		filters = append(filters, ".")
+	}
+	for _, filter := range filters {
+		if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched {
 			log.Debugf("Will handle DeadIntermediateMaster event on %+v", analysisEntry.ClusterName)
 			_, err := RecoverDeadIntermediateMaster(&analysisEntry.AnalyzedInstanceKey)
 			return true, err
@@ -189,10 +208,20 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, skipFilters bool) (bool
 			}
 		}
 		if analysisEntry.Analysis == inst.DeadMaster {
-			actionTaken, err = checkAndRecoverDeadMaster(analysisEntry, skipFilters)
+			if specificInstance != nil && skipFilters {
+				// force mode. Keep it synchronuous
+				actionTaken, err = checkAndRecoverDeadMaster(analysisEntry, skipFilters)
+			} else {
+				go checkAndRecoverDeadMaster(analysisEntry, skipFilters)
+			}
 		}
 		if analysisEntry.Analysis == inst.DeadIntermediateMaster {
-			actionTaken, err = checkAndRecoverDeadIntermediateMaster(analysisEntry, skipFilters)
+			if specificInstance != nil && skipFilters {
+				// force mode. Keep it synchronuous
+				actionTaken, err = checkAndRecoverDeadIntermediateMaster(analysisEntry, skipFilters)
+			} else {
+				go checkAndRecoverDeadIntermediateMaster(analysisEntry, skipFilters)
+			}
 		}
 	}
 	return actionTaken, err

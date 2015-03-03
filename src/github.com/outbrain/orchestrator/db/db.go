@@ -209,6 +209,25 @@ var generateSQL = []string{
 	`
 		DROP VIEW IF EXISTS whats_wrong_summary
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS topology_recovery (
+          recovery_id bigint unsigned not null auto_increment,
+		  hostname varchar(128) NOT NULL,
+		  port smallint unsigned NOT NULL,
+          in_active_period tinyint unsigned NOT NULL DEFAULT 0,
+          start_active_period timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          end_active_period_unixtime int unsigned,
+          end_recovery timestamp NULL,
+		  processing_node_hostname varchar(128) CHARACTER SET ascii NOT NULL,
+		  processcing_node_token varchar(128) NOT NULL,
+		  successor_hostname varchar(128) DEFAULT NULL,
+		  successor_port smallint unsigned DEFAULT NULL,
+		  PRIMARY KEY (recovery_id),
+          UNIQUE KEY hostname_port_active_period_uidx(hostname, port, in_active_period, end_active_period_unixtime),
+		  KEY in_active_start_period_idx (in_active_period, start_active_period),
+		  KEY start_active_period_idx (start_active_period)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{

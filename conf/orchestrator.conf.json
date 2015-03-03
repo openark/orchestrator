@@ -55,6 +55,7 @@
   "SeedAcceptableBytesDiff": 8192,
   "PseudoGTIDPattern": "CREATE OR REPLACE .* VIEW `pseudo_gtid_view`.*pseudo-gtid://",
   "DetectPseudoGTIDQuery": "select count(*) as pseudo_gtid_exists from meta.pseudo_gtid_view where time_created > now() - interval 2 day",
+  "RecoveryPeriodBlockMinutes": 1,
   "RecoverMasterClusterFilters": [
   	"kvmuser"
   ],

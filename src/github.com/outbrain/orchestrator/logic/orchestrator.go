@@ -154,6 +154,7 @@ func ContinuousDiscovery() {
 			}
 			HealthTest()
 		case <-recoverTick:
+			ClearActiveRecoveries()
 			CheckAndRecover(nil, false)
 		}
 	}
