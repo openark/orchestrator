@@ -56,6 +56,7 @@ type Configuration struct {
 	ReasonableReplicationLagSeconds            int      // Above this value is considered a problem
 	MaintenanceOwner                           string   // (Default) name of maintenance owner to use if none provided
 	ReasonableMaintenanceReplicationLagSeconds int      // Above this value move-up and move-below are blocked
+	MaintenanceExpireMinutes                   uint     // Minutes after which a maintenance flag is considered stale and is cleared
 	PreFailoverProcesses                       []string // Processes to execute before doing a master failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failedHost}, {failedPort}, {successorHost}, {successorPort}
 	PostFailoverProcesses                      []string // Processes to execute after doing a master failover (order of execution undefined). Will be provided with old-master-hostname, new-master-hostname arguments. May and should use some of these placeholders: {failedHost}, {failedPort}, {successorHost}, {successorPort}
 	AuditLogFile                               string   // Name of log file for audit operations. Disabled when empty.
@@ -69,6 +70,7 @@ type Configuration struct {
 	ClusterNameToAlias                         map[string]string // map between regex matching cluster name to a human friendly alias
 	DataCenterPattern                          string            // Regexp pattern with one group, extracting the datacenter name from the hostname
 	PhysicalEnvironmentPattern                 string            // Regexp pattern with one group, extracting physical environment info from hostname (e.g. combination of datacenter & prod/dev env)
+	DenyAutoPromotionHostnamePattern           string            // Orchestrator will not auto-promote (via
 	ServeAgentsHttp                            bool              // Spawn another HTTP interface dedicated for orcehstrator-agent
 	AgentsUseSSL                               bool              // When "true" orchestrator will listen on agents port with SSL as well as connect to agents via SSL
 	SSLSkipVerify                              bool              // When using SSL, should we ignore SSL certification error
@@ -110,6 +112,7 @@ func NewConfiguration() *Configuration {
 		ReasonableReplicationLagSeconds:            10,
 		MaintenanceOwner:                           "orchestrator",
 		ReasonableMaintenanceReplicationLagSeconds: 20,
+		MaintenanceExpireMinutes:                   10,
 		PreFailoverProcesses:                       []string{},
 		PostFailoverProcesses:                      []string{},
 		AuditLogFile:                               "",
@@ -123,6 +126,7 @@ func NewConfiguration() *Configuration {
 		ClusterNameToAlias:                         make(map[string]string),
 		DataCenterPattern:                          "",
 		PhysicalEnvironmentPattern:                 "",
+		DenyAutoPromotionHostnamePattern:           "",
 		ServeAgentsHttp:                            false,
 		AgentsUseSSL:                               false,
 		SSLSkipVerify:                              false,

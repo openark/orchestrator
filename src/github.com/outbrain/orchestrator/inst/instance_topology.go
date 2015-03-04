@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/config"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -974,6 +975,21 @@ func MatchUpSlaves(masterKey *InstanceKey) ([](*Instance), *Instance, error) {
 	return MultiMatchSlaves(masterKey, &masterInstance.MasterKey)
 }
 
+func isGenerallyValidAsCandidateSlave(slave *Instance) bool {
+	if !slave.LogBinEnabled {
+		return false
+	}
+	if !slave.LogSlaveUpdatesEnabled {
+		return false
+	}
+	if config.Config.DenyAutoPromotionHostnamePattern != "" {
+		if matched, _ := regexp.MatchString(config.Config.DenyAutoPromotionHostnamePattern, slave.Key.Hostname); matched {
+			return false
+		}
+	}
+	return true
+}
+
 // GetCandidateSlave chooses the best slave to promote given a (possibly dead) master
 func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instance, [](*Instance), [](*Instance), [](*Instance), error) {
 	var candidateSlave *Instance = nil
@@ -990,7 +1006,7 @@ func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instan
 	}
 	for _, slave := range slaves {
 		slave := slave
-		if slave.LogSlaveUpdatesEnabled {
+		if isGenerallyValidAsCandidateSlave(slave) {
 			// this is the one
 			candidateSlave = slave
 			break

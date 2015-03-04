@@ -147,6 +147,7 @@ func ContinuousDiscovery() {
 				inst.ForgetExpiredHostnameResolves()
 				inst.ReviewUnseenInstances()
 				inst.InjectUnseenMasters()
+				inst.ExpireMaintenance()
 			}
 			if !elected {
 				// Take this opportunity to refresh yourself

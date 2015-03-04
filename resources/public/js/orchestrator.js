@@ -117,7 +117,7 @@ function addNodeModalDataAttribute(name, value) {
 		codeClass = "text-danger";
 	}
     $('#modalDataAttributesTable').append(
-        '<tr><td>' + name + '</td><td><code class="'+codeClass+'"><strong>' + value + '</strong></code><div class="pull-right"></div></td></tr>');
+        '<tr><td>' + name + '</td><td><code class="'+codeClass+'"><strong>' + value + '</strong></code><div class="pull-right attributes-buttons"></div></td></tr>');
     return $('#modalDataAttributesTable tr:last td:last');
 }
 

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
+	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/db"
 )
 
@@ -201,6 +202,34 @@ func EndMaintenance(maintenanceToken int64) error {
 		// success
 		instanceKey, _ := ReadMaintenanceInstanceKey(maintenanceToken)
 		AuditOperation("end-maintenance", instanceKey, fmt.Sprintf("maintenanceToken: %d", maintenanceToken))
+	}
+	return err
+}
+
+// ExpireMaintenance will remove the maintenance flag on old maintenances
+func ExpireMaintenance() error {
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		return log.Errore(err)
+	}
+
+	res, err := sqlutils.Exec(db, `
+			update
+				database_instance_maintenance
+			set  
+				maintenance_active = NULL,
+				end_timestamp = NOW()
+			where
+				maintenance_active = 1
+				and begin_timestamp < NOW() - INTERVAL ? MINUTE 
+			`,
+		config.Config.MaintenanceExpireMinutes,
+	)
+	if err != nil {
+		return log.Errore(err)
+	}
+	if affected, _ := res.RowsAffected(); affected > 0 {
+		AuditOperation("expire-maintenance", nil, fmt.Sprintf("Expired flags: %d", affected))
 	}
 	return err
 }

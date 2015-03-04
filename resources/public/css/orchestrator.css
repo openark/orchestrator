@@ -200,6 +200,10 @@
 	background-color: inherit;
 }
 
+#modalDataAttributesTable div.attributes-buttons > button {
+    margin-left: 4px;
+}
+
 
 .bootbox .modal-body {
     padding: 12px;

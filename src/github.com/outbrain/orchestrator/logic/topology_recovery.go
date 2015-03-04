@@ -83,7 +83,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipFilte
 		filters = append(filters, ".")
 	}
 	for _, filter := range filters {
-		if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched {
+		if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched && filter != "" {
 			log.Debugf("Will handle DeadMaster event on %+v", analysisEntry.ClusterName)
 			_, err := RecoverDeadMaster(&analysisEntry.AnalyzedInstanceKey)
 			return true, err
@@ -92,7 +92,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipFilte
 	return false, nil
 }
 
-func isValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instance) bool {
+func isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instance) bool {
 	if !sibling.LogBinEnabled {
 		return false
 	}
@@ -103,6 +103,28 @@ func isValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instance) bool 
 		return false
 	}
 	if !sibling.IsLastCheckValid {
+		return false
+	}
+	return true
+}
+
+func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *inst.Instance, sibling *inst.Instance) bool {
+	if !isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling) {
+		return false
+	}
+	if sibling.DataCenter != intermediateMasterInstance.DataCenter {
+		return false
+	}
+	if sibling.PhysicalEnvironment != intermediateMasterInstance.PhysicalEnvironment {
+		return false
+	}
+	if sibling.HasReplicationFilters != intermediateMasterInstance.HasReplicationFilters {
+		return false
+	}
+	if sibling.Key.Equals(&intermediateMasterInstance.Key) {
+		return false
+	}
+	if sibling.ExecBinlogCoordinates.SmallerThan(&intermediateMasterInstance.ExecBinlogCoordinates) {
 		return false
 	}
 	return true
@@ -127,19 +149,13 @@ func GetCandidateSiblingOfIntermediateMaster(intermediateMasterKey *inst.Instanc
 
 	for _, sibling := range siblings {
 		sibling := sibling
-		if isValidAsCandidateSiblingOfIntermediateMaster(sibling) {
-			if sibling.DataCenter == intermediateMasterInstance.DataCenter &&
-				sibling.PhysicalEnvironment == intermediateMasterInstance.PhysicalEnvironment &&
-				sibling.HasReplicationFilters == intermediateMasterInstance.HasReplicationFilters {
-				if !sibling.Key.Equals(intermediateMasterKey) && intermediateMasterInstance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
-					// this is *assumed* to be a good choice.
-					// We don't know for sure:
-					// - the dead intermediate master's position may have been more advanced then last recorded
-					// - and the candidate's position may have been stalled in the past seconds
-					// But it's an attempt...
-					return sibling, nil
-				}
-			}
+		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) {
+			// this is *assumed* to be a good choice.
+			// We don't know for sure:
+			// - the dead intermediate master's position may have been more advanced then last recorded
+			// - and the candidate's position may have been stalled in the past seconds
+			// But it's an attempt...
+			return sibling, nil
 		}
 	}
 	return nil, log.Errorf("Cannot find candidate sibling of %+v", *intermediateMasterKey)
@@ -187,7 +203,7 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 		filters = append(filters, ".")
 	}
 	for _, filter := range filters {
-		if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched {
+		if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched && filter != "" {
 			log.Debugf("Will handle DeadIntermediateMaster event on %+v", analysisEntry.ClusterName)
 			_, err := RecoverDeadIntermediateMaster(&analysisEntry.AnalyzedInstanceKey)
 			return true, err
