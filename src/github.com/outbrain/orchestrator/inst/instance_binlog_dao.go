@@ -17,7 +17,6 @@
 package inst
 
 import (
-	"errors"
 	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/math"
@@ -137,11 +136,11 @@ func getLastPseudoGTIDEntryInRelayLogs(instance *Instance, recordedInstanceRelay
 }
 
 // Given a binlog entry text (query), search it in the given binary log of a given instance
-func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entryText string) (BinlogCoordinates, error) {
+func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entryText string) (BinlogCoordinates, bool, error) {
 	binlogCoordinates := BinlogCoordinates{LogFile: binlog, LogPos: 0, Type: BinaryLog}
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
-		return binlogCoordinates, err
+		return binlogCoordinates, false, err
 	}
 
 	moreRowsExpected := true
@@ -164,15 +163,12 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 			return nil
 		})
 		if err != nil {
-			return binlogCoordinates, err
+			return binlogCoordinates, (binlogCoordinates.LogPos != 0), err
 		}
 		step++
 	}
 
-	if binlogCoordinates.LogPos == 0 {
-		return binlogCoordinates, errors.New(fmt.Sprintf("Cannot match pseudo GTID entry in binlog '%s'", binlog))
-	}
-	return binlogCoordinates, err
+	return binlogCoordinates, (binlogCoordinates.LogPos != 0), err
 }
 
 func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string) (*BinlogCoordinates, error) {
@@ -187,22 +183,29 @@ func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string) (*Bin
 	// Look for GTID entry in other-instance:
 	currentBinlog := instance.SelfBinlogCoordinates
 	var err error = nil
-	for err == nil {
+	for {
+		// loop iteration per binary log
 		log.Debugf("Searching for given pseudo gtid entry in binlog %+v of %+v", currentBinlog.LogFile, instance.Key)
-		resultCoordinates, err := SearchPseudoGTIDEntryInBinlog(&instance.Key, currentBinlog.LogFile, entryText)
-		if resultCoordinates.LogPos != 0 && err == nil {
+		var resultCoordinates BinlogCoordinates
+		var found bool = false
+		resultCoordinates, found, err = SearchPseudoGTIDEntryInBinlog(&instance.Key, currentBinlog.LogFile, entryText)
+		if err != nil {
+			break
+		}
+		if found {
 			log.Debugf("Matched entry in %+v: %+v", instance.Key, resultCoordinates)
 			instancePseudoGTIDEntryCache.Set(cacheKey, &resultCoordinates, 0)
 			return &resultCoordinates, nil
 		}
-		// Got here? Unfound
-		if err == nil {
-			// Keep looking
-			currentBinlog, err = currentBinlog.PreviousFileCoordinates()
+		// Got here? Unfound. Keep looking
+		currentBinlog, err = currentBinlog.PreviousFileCoordinates()
+		if err != nil {
+			break
 		}
+		log.Debugf("- Will move next to binlog %+v", currentBinlog.LogFile)
 	}
 
-	return nil, log.Errorf("Cannot match pseudo GTID entry in binlogs of %+v", instance.Key)
+	return nil, log.Errorf("Cannot match pseudo GTID entry in binlogs of %+v; err: %+v", instance.Key, err)
 }
 
 // Read (as much as possible of) a chink of binary log events starting the given startingCoordinates

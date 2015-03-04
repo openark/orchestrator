@@ -348,6 +348,9 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 			return false, errors.New(fmt.Sprintf("Cannot replicate from ROW binlog format on %+v to MIXED on %+v", other.Key, this.Key))
 		}
 	}
+	if other.HasReplicationFilters && !this.HasReplicationFilters {
+		return false, errors.New(fmt.Sprintf("%+v has replication filters", other.Key))
+	}
 	if this.ServerID == other.ServerID {
 		return false, errors.New(fmt.Sprintf("Identical server id: %+v, %+v both have %d", other.Key, this.Key, this.ServerID))
 	}

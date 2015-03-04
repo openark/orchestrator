@@ -128,7 +128,9 @@ func GetCandidateSiblingOfIntermediateMaster(intermediateMasterKey *inst.Instanc
 	for _, sibling := range siblings {
 		sibling := sibling
 		if isValidAsCandidateSiblingOfIntermediateMaster(sibling) {
-			if sibling.DataCenter == intermediateMasterInstance.DataCenter && sibling.PhysicalEnvironment == intermediateMasterInstance.PhysicalEnvironment {
+			if sibling.DataCenter == intermediateMasterInstance.DataCenter &&
+				sibling.PhysicalEnvironment == intermediateMasterInstance.PhysicalEnvironment &&
+				sibling.HasReplicationFilters == intermediateMasterInstance.HasReplicationFilters {
 				if !sibling.Key.Equals(intermediateMasterKey) && intermediateMasterInstance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
 					// this is *assumed* to be a good choice.
 					// We don't know for sure:
