@@ -61,9 +61,20 @@ function generateInstanceDivs(nodesMap) {
         	openNodeModal(nodesMap[draggedNodeId]);
         	return false;
         });
-        $(".popover.instance[data-duplicate-node] button[data-command=recover]").click(function () {
-        	recover(nodesMap[draggedNodeId]);
-        	return false;
+        $(".popover.instance[data-duplicate-node] a[data-command=recover-auto]").click(function () {
+        	return apiCommand("/api/recover/"+nodesMap[draggedNodeId].Key.Hostname+"/"+nodesMap[draggedNodeId].Key.Port);
+
+        });
+        $(".popover.instance[data-duplicate-node] a[data-command=match-up-slaves]").click(function () {
+        	return apiCommand("/api/match-up-slaves/"+nodesMap[draggedNodeId].Key.Hostname+"/"+nodesMap[draggedNodeId].Key.Port);
+        });
+        $(".popover.instance[data-duplicate-node] a[data-command=regroup-slaves]").click(function () {
+        	return apiCommand("/api/regroup-slaves/"+nodesMap[draggedNodeId].Key.Hostname+"/"+nodesMap[draggedNodeId].Key.Port);
+        });
+        $(".popover.instance[data-duplicate-node] a[data-command=multi-match-slaves]").click(function (event) {
+            var belowHost = $(event.target).attr("data-below-host");
+            var belowPort = $(event.target).attr("data-below-port");
+        	return apiCommand("/api/multi-match-slaves/"+nodesMap[draggedNodeId].Key.Hostname+"/"+nodesMap[draggedNodeId].Key.Port+"/"+belowHost+"/"+belowPort);
         });
         $(".popover.instance[data-duplicate-node] button[data-command=make-master]").click(function () {
         	makeMaster(nodesMap[draggedNodeId]);
@@ -85,7 +96,7 @@ function generateInstanceDivs(nodesMap) {
         });
         */
         if (nodesMap[draggedNodeId].lastCheckInvalidProblem()) {
-            $(".popover.instance[data-duplicate-node]").click(function () {
+            $(".popover.instance[data-duplicate-node] h3").click(function () {
                	openNodeModal(nodesMap[draggedNodeId]);
             	return false;
             });
@@ -465,6 +476,11 @@ function analyzeClusterInstances(nodesMap) {
 		    	
     	}
     });
+    instances.forEach(function (instance) {
+    	if (instance.children && instance.children.length > 0) {
+            instance.children[0].isFirstChildInDisplay = true
+        }
+    });
 }
 
 
@@ -476,18 +492,6 @@ function refreshClusterOperationModeButton() {
 		$("#cluster_operation_mode_button").html("Classic mode");
 		$("#cluster_operation_mode_button").removeClass("btn-warning").addClass("btn-success");
 	}
-}
-
-function recover(instance) {
-	showLoader();
-    $.get("/api/recover/"+instance.Key.Hostname+"/"+instance.Key.Port, function (operationResult) {
-		hideLoader();
-		if (operationResult.Code == "ERROR") {
-			addAlert(operationResult.Message)
-		} else {
-			location.reload();
-		}	
-    }, "json");
 }
 
 function makeMaster(instance) {

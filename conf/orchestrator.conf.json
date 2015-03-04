@@ -57,10 +57,10 @@
   "DetectPseudoGTIDQuery": "select count(*) as pseudo_gtid_exists from meta.pseudo_gtid_view where time_created > now() - interval 2 day",
   "RecoveryPeriodBlockMinutes": 1,
   "RecoverMasterClusterFilters": [
-  	"zzzkvmuser"
+  	"kvmuser"
   ],
   "RecoverIntermediateMasterClusterFilters": [
-  	"zzzkvmuser"
+  	"kvmuser"
   ]
 }
 

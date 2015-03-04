@@ -204,6 +204,11 @@
     margin-left: 4px;
 }
 
+div[data-btn-group=recover] code {
+    color: inherit;
+	background-color: inherit;
+}
+
 
 .bootbox .modal-body {
     padding: 12px;

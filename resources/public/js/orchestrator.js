@@ -105,6 +105,19 @@ function addInfo(alertText) {
 	return addAlert(alertText, "info");
 }
 
+function apiCommand(uri) {
+	showLoader();
+    $.get(uri, function (operationResult) {
+		hideLoader();
+		if (operationResult.Code == "ERROR") {
+			addAlert(operationResult.Message)
+		} else {
+			location.reload();
+		}	
+    }, "json");	
+    return false;
+}
+
 
 // Modal
 
@@ -176,17 +189,6 @@ function openNodeModal(node) {
     
     $('#node_modal [data-btn]').unbind("click");
     
-    function apiCommand(uri) {
-    	showLoader();
-        $.get(uri, function (operationResult) {
-			hideLoader();
-			if (operationResult.Code == "ERROR") {
-				addAlert(operationResult.Message)
-			} else {
-				location.reload();
-			}	
-        }, "json");	
-    }
     $('#node_modal button[data-btn=begin-maintenance]').click(function() {
     	if (!$("#beginMaintenanceOwner").val()) {
     		return addModalAlert("You must fill the owner field");
@@ -324,7 +326,7 @@ function openNodeModal(node) {
 
 function normalizeInstance(instance) {
     instance.id = getInstanceId(instance.Key.Hostname, instance.Key.Port);
-    instance.title= instance.Key.Hostname+':'+instance.Key.Port;
+    instance.title = instance.Key.Hostname+':'+instance.Key.Port;
     instance.canonicalTitle = instance.title;
     instance.masterTitle = instance.MasterKey.Hostname + ":" + instance.MasterKey.Port;
     instance.masterId = getInstanceId(instance.MasterKey.Hostname,
@@ -343,6 +345,7 @@ function normalizeInstance(instance) {
     instance.masterNode = null;
     instance.inMaintenance = false;
     instance.maintenanceEntry = null;
+    instance.isFirstChildInDisplay = false
 
     instance.isMaster = (instance.title == instance.ClusterName);
     instance.isCoMaster = false;
@@ -492,6 +495,11 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	popoverElement.find("h3").html('&nbsp;<div class="pull-left">'+
 	instance.canonicalTitle + '</div><div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></a></div>');
 	var indicateLastSeenInStatus = false;
+
+    if (instance.isFirstChildInDisplay) {
+    	popoverElement.addClass("first-child-in-display");
+        popoverElement.attr("data-first-child-in-display", "true");
+    } 
     if (instance.usingGTID) {
     	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using GTID"></span> ');
     } 
@@ -562,7 +570,21 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     popoverElement.find(".popover-content").html(contentHtml);
 
     if (instance.lastCheckInvalidProblem() && instance.children && instance.children.length > 0) {
-    	popoverElement.append('<h4 class="popover-footer"><div><button class="btn btn-xs btn-default" data-command="recover"><span class="glyphicon glyphicon-heart text-danger"></span> Recover</button></div></h4>');
+    	popoverElement.append('<h4 class="popover-footer"><div class="btn-group" data-btn-group="recover"><button type="button" class="btn btn-xs btn-default dropdown-toggle" data-toggle="dropdown"><span class="glyphicon glyphicon-heart text-danger"></span> Recover <span class="caret"></span> <span class="sr-only">Toggle Dropdown</span></button><ul class="dropdown-menu" role="menu"></ul></div></h4>');
+        popoverElement.find("div[data-btn-group=recover] ul").append('<li><a href="#" data-btn="auto" data-command="recover-auto">Auto</a></li>');
+        if (!instance.isMaster) {
+            popoverElement.find("div[data-btn-group=recover] ul").append('<li><a href="#" data-btn="match-up-slaves" data-command="match-up-slaves">Match up slaves to <code>'+instance.masterTitle+'</code></a></li>');
+        }
+        popoverElement.find("div[data-btn-group=recover] ul").append('<li><a href="#" data-btn="regroup-slaves" data-command="regroup-slaves">Regroup slaves (auto pick best slave)</a></li>');
+        if (instance.masterNode) {
+		    instance.masterNode.children.forEach(function(sibling) {
+                if (sibling.id == instance.id) {
+                    return
+                }
+                popoverElement.find("div[data-btn-group=recover] ul").append('<li><a href="#" data-btn="multi-match-slaves" data-command="multi-match-slaves" data-below-host="'+sibling.Key.Hostname+'" data-below-port="'+sibling.Key.Port+'">Match all slaves below <code>'+sibling.title+'</code></a></li>');
+	        });                 
+    
+        }
     }
     //if (instance.isCandidateMaster) {
     //	popoverElement.append('<h4 class="popover-footer"><strong>Master candidate</strong><div class="pull-right"><button class="btn btn-xs btn-default" data-command="make-master"><span class="glyphicon glyphicon-play"></span> Make master</button></div></h4>');
