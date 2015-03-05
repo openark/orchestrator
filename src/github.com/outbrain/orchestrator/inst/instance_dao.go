@@ -308,7 +308,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 
-	if config.Config.SlaveLagQuery != "" {
+	if config.Config.SlaveLagQuery != "" && !isMaxScale {
 		err = db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SlaveLagSeconds)
 		if err != nil {
 			log.Errore(err)
