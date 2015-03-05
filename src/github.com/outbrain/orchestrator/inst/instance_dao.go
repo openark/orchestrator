@@ -304,20 +304,20 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			})
 
 		if err != nil {
-			goto Cleanup
+			log.Errore(err)
 		}
 	}
 
 	if config.Config.SlaveLagQuery != "" {
 		err = db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SlaveLagSeconds)
 		if err != nil {
-			goto Cleanup
+			log.Errore(err)
 		}
 	}
 
 	instance.ClusterName, instance.ReplicationDepth, err = ReadClusterNameByMaster(&instance.Key, &instance.MasterKey)
 	if err != nil {
-		goto Cleanup
+		log.Errore(err)
 	}
 
 Cleanup:
