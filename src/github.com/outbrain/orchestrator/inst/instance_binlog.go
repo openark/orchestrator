@@ -18,6 +18,7 @@ package inst
 
 import (
 	"errors"
+	"github.com/outbrain/golib/log"
 	"regexp"
 )
 
@@ -57,6 +58,8 @@ func (this *BinlogEvent) NormalizeInfo() {
 	}
 }
 
+const maxEmptyEventsEvents int = 10
+
 //
 type BinlogEventCursor struct {
 	cachedEvents      []BinlogEvent
@@ -83,14 +86,31 @@ func NewBinlogEventCursor(startCoordinates BinlogCoordinates, fetchNextEventsFun
 	}
 }
 
-// NextEvent will return the next event entry from binary logs; it will automatically skip to next
+// nextEvent will return the next event entry from binary logs; it will automatically skip to next
 // binary log if need be.
 // Internally, it uses the cachedEvents array, so that it does not go to the MySQL server upon each call.
 // Returns nil upon reaching end of binary logs.
-func (this *BinlogEventCursor) NextEvent() (*BinlogEvent, error) {
-	if len(this.cachedEvents) == 0 {
+func (this *BinlogEventCursor) nextEvent(numEmptyEventsEvents int) (*BinlogEvent, error) {
+	if numEmptyEventsEvents > maxEmptyEventsEvents {
+		log.Debugf("End of logs. currentEventIndex: %d, nextCoordinates: %+v", this.currentEventIndex, this.nextCoordinates)
 		// End of logs
 		return nil, nil
+	}
+	if len(this.cachedEvents) == 0 {
+		// Cache exhausted; get next bulk of entries and return the next entry
+		nextFileCoordinates, err := this.nextCoordinates.NextFileCoordinates()
+		if err != nil {
+			return nil, err
+		}
+		log.Debugf("zero cached events, next file: %+v", nextFileCoordinates)
+		this.cachedEvents, err = this.fetchNextEvents(nextFileCoordinates)
+		if err != nil {
+			return nil, err
+		}
+		this.currentEventIndex = -1
+		// While this seems recursive do note that recursion level is at most 1, since we either have
+		// entires in the next binlog (no further recursion) or we don't (immediate termination)
+		return this.nextEvent(numEmptyEventsEvents + 1)
 	}
 	if this.currentEventIndex+1 < len(this.cachedEvents) {
 		// We have enough cache to go by
@@ -108,14 +128,14 @@ func (this *BinlogEventCursor) NextEvent() (*BinlogEvent, error) {
 		this.currentEventIndex = -1
 		// While this seems recursive do note that recursion level is at most 1, since we either have
 		// entires in the next binlog (no further recursion) or we don't (immediate termination)
-		return this.NextEvent()
+		return this.nextEvent(numEmptyEventsEvents + 1)
 	}
 }
 
 // NextRealEvent returns the next event from binlog that is not meta/control event (these are start-of-binary-log,
 // rotate-binary-log etc.)
 func (this *BinlogEventCursor) nextRealEvent() (*BinlogEvent, error) {
-	event, err := this.NextEvent()
+	event, err := this.nextEvent(0)
 	if err != nil {
 		return event, err
 	}

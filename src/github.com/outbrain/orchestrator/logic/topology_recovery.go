@@ -233,7 +233,7 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, skipFilters bool) (bool
 				go checkAndRecoverDeadMaster(analysisEntry, skipFilters)
 			}
 		}
-		if analysisEntry.Analysis == inst.DeadIntermediateMaster {
+		if analysisEntry.Analysis == inst.DeadIntermediateMaster || analysisEntry.Analysis == inst.DeadIntermediateMasterAndSomeSlaves {
 			if specificInstance != nil && skipFilters {
 				// force mode. Keep it synchronuous
 				actionTaken, err = checkAndRecoverDeadIntermediateMaster(analysisEntry, skipFilters)

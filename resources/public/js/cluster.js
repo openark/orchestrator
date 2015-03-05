@@ -95,7 +95,7 @@ function generateInstanceDivs(nodesMap) {
        		return false;
         });
         */
-        if (nodesMap[draggedNodeId].lastCheckInvalidProblem()) {
+        if (nodesMap[draggedNodeId].lastCheckInvalidProblem() || nodesMap[draggedNodeId].notRecentlyCheckedProblem()) {
             $(".popover.instance[data-duplicate-node] h3").click(function () {
                	openNodeModal(nodesMap[draggedNodeId]);
             	return false;

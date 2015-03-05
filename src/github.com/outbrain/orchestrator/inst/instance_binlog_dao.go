@@ -236,17 +236,18 @@ func readBinlogEventsChunk(instanceKey *InstanceKey, startingCoordinates BinlogC
 // if reached end of binary logs
 func getNextBinlogEventsChunk(instance *Instance, startingCoordinates BinlogCoordinates, numEmptyBinlogs int) ([]BinlogEvent, error) {
 	if numEmptyBinlogs > maxEmptyBinlogFiles {
+		log.Debugf("Reached maxEmptyBinlogFiles (%d) at %+v", maxEmptyBinlogFiles, startingCoordinates)
 		// Give up and return empty results
 		return []BinlogEvent{}, nil
 	}
-	coordinatesPassed := false
+	coordinatesExceededCurrent := false
 	switch startingCoordinates.Type {
 	case BinaryLog:
-		coordinatesPassed = instance.SelfBinlogCoordinates.FileSmallerThan(&startingCoordinates)
+		coordinatesExceededCurrent = instance.SelfBinlogCoordinates.FileSmallerThan(&startingCoordinates)
 	case RelayLog:
-		coordinatesPassed = instance.RelaylogCoordinates.FileSmallerThan(&startingCoordinates)
+		coordinatesExceededCurrent = instance.RelaylogCoordinates.FileSmallerThan(&startingCoordinates)
 	}
-	if coordinatesPassed {
+	if coordinatesExceededCurrent {
 		// We're past the last file. This is a non-error: there are no more events.
 		log.Debugf("Coordinates overflow: %+v; terminating search", startingCoordinates)
 		return []BinlogEvent{}, nil
@@ -256,11 +257,13 @@ func getNextBinlogEventsChunk(instance *Instance, startingCoordinates BinlogCoor
 		return events, err
 	}
 	if len(events) > 0 {
+		log.Debugf("Returning %d events at %+v", len(events), startingCoordinates)
 		return events, nil
 	}
 
 	// events are empty
 	if nextCoordinates, err := instance.GetNextBinaryLog(startingCoordinates); err == nil {
+		log.Debugf("Recursing into %+v", nextCoordinates)
 		return getNextBinlogEventsChunk(instance, nextCoordinates, numEmptyBinlogs+1)
 	}
 	// on error
@@ -322,8 +325,8 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 						return nil, 0, log.Errore(err)
 					}
 					nextCoordinates, _ := instanceCursor.getNextCoordinates()
-					if !nextCoordinates.Equals(&instance.SelfBinlogCoordinates) {
-						return nil, 0, log.Errorf("Unexpected problem: instance binlog iteration did not end with current master status. Ended with: %+v, self coordinates: %+v", nextCoordinates, instance.SelfBinlogCoordinates)
+					if nextCoordinates.SmallerThan(&instance.SelfBinlogCoordinates) {
+						return nil, 0, log.Errorf("Unexpected problem: instance binlog iteration ended before self coordinates. Ended with: %+v, self coordinates: %+v", nextCoordinates, instance.SelfBinlogCoordinates)
 					}
 					log.Debugf("Reached end of binary logs for instance, at %+v. Other coordinates: %+v", nextCoordinates, targetMatchCoordinates)
 					return &targetMatchCoordinates, countMatchedEvents, nil

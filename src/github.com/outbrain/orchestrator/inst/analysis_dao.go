@@ -222,6 +222,9 @@ func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountSlaves > 0 && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadIntermediateMaster
 			a.Description = "Intermediate master cannot be reached by orchestrator and none of its slaves is replicating"
+		} else if !a.IsMaster && !a.LastCheckValid && a.CountValidSlaves < a.CountSlaves && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
+			a.Analysis = DeadIntermediateMasterAndSomeSlaves
+			a.Description = "Intermediate master cannot be reached by orchestrator; some of its slaves are unreachable and none of its reachable slaves is replicating"
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves > 0 {
 			a.Analysis = UnreachableIntermediateMaster
 			a.Description = "Intermediate master cannot be reached by orchestrator but it has replicating slaves; possibly a network/host issue"

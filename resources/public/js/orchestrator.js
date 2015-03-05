@@ -581,7 +581,21 @@ function renderInstanceElement(popoverElement, instance, renderType) {
                 if (sibling.id == instance.id) {
                     return
                 }
-                popoverElement.find("div[data-btn-group=recover] ul").append('<li><a href="#" data-btn="multi-match-slaves" data-command="multi-match-slaves" data-below-host="'+sibling.Key.Hostname+'" data-below-port="'+sibling.Key.Port+'">Match all slaves below <code>'+sibling.title+'</code></a></li>');
+                if (!sibling.LogBinEnabled) {
+                    return
+                }
+                if (!sibling.LogSlaveUpdatesEnabled) {
+                    return
+                }
+                if (sibling.lastCheckInvalidProblem()) {
+                    return
+                }
+                if (sibling.notRecentlyCheckedProblem()) {
+                    return
+                }
+                popoverElement.find("div[data-btn-group=recover] ul").append(
+                    '<li><a href="#" data-btn="multi-match-slaves" data-command="multi-match-slaves" data-below-host="'+sibling.Key.Hostname
+                    +'" data-below-port="'+sibling.Key.Port+'">Match all slaves below <code>'+sibling.title+'</code></a></li>');
 	        });                 
     
         }
