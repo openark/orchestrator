@@ -340,3 +340,7 @@ div[data-btn-group=recover] code {
 #cluster_container {
     overflow: auto;
 }
+
+#keep_calm_container {
+    background-color: #000000;
+}

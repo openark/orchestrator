@@ -176,6 +176,16 @@ func (this *HttpWeb) About(params martini.Params, r render.Render) {
 	})
 }
 
+func (this *HttpWeb) KeepCalm(params martini.Params, r render.Render) {
+
+	r.HTML(200, "templates/keep-calm", map[string]interface{}{
+		"agentsHttpActive":  config.Config.ServeAgentsHttp,
+		"title":             "Keep Calm",
+		"activePage":        "home",
+		"autoshow_problems": false,
+	})
+}
+
 func (this *HttpWeb) FAQ(params martini.Params, r render.Render) {
 
 	r.HTML(200, "templates/faq", map[string]interface{}{
@@ -192,6 +202,7 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web", this.About)
 	m.Get("/web/home", this.About)
 	m.Get("/web/about", this.About)
+	m.Get("/web/keep-calm", this.KeepCalm)
 	m.Get("/web/faq", this.FAQ)
 	m.Get("/web/clusters", this.Clusters)
 	m.Get("/web/cluster/:clusterName", this.Cluster)
