@@ -19,7 +19,9 @@ package inst
 import (
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
+	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/db"
+	"regexp"
 )
 
 // GetReplicationAnalysis will check for replication problems (dead master; unreachable master; etc)
@@ -238,7 +240,15 @@ func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
 		//		}
 
 		if a.Analysis != NoProblem {
-			result = append(result, a)
+			skipThisHost := false
+			for _, filter := range config.Config.RecoveryIgnoreHostnameFilters {
+				if matched, _ := regexp.MatchString(filter, a.AnalyzedInstanceKey.Hostname); matched {
+					skipThisHost = true
+				}
+			}
+			if !skipThisHost {
+				result = append(result, a)
+			}
 		}
 		return nil
 	})

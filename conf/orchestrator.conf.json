@@ -53,9 +53,11 @@
   "UnseenAgentForgetHours": 6,
   "StaleSeedFailMinutes": 60,
   "SeedAcceptableBytesDiff": 8192,
-  "PseudoGTIDPattern": "CREATE OR REPLACE .* VIEW `pseudo_gtid_view`.*pseudo-gtid://",
-  "DetectPseudoGTIDQuery": "select count(*) as pseudo_gtid_exists from meta.pseudo_gtid_view where time_created > now() - interval 2 day",
+  "PseudoGTIDPattern": "drop view if exists .*?`_pseudo_gtid_hint__",
+  "DetectPseudoGTIDQuery": "select count(*) as pseudo_gtid_exists from meta.pseudo_gtid_status where anchor = 1 and time_generated > now() - interval 2 day",
   "RecoveryPeriodBlockMinutes": 1,
+  "RecoveryIgnoreHostnameFilters": [
+  ],
   "RecoverMasterClusterFilters": [
   	"kvmuser"
   ],
