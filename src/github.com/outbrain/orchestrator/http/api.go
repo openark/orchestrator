@@ -301,6 +301,27 @@ func (this *HttpAPI) MoveUp(params martini.Params, r render.Render, req *http.Re
 	r.JSON(200, &APIResponse{Code: OK, Message: "Instance moved up", Details: instance})
 }
 
+// MoveUpSlaves attempts to move up all slaves of an instance
+func (this *HttpAPI) MoveUpSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !this.isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	slaves, newMaster, err := inst.MoveUpSlaves(&instanceKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Moved up %d slaves of %+v below %+v", len(slaves), instanceKey, newMaster.Key), Details: newMaster.Key})
+}
+
 // MakeCoMaster attempts to make an instance co-master with its own master
 func (this *HttpAPI) MakeCoMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !this.isAuthorizedForAction(req, user) {
@@ -542,7 +563,7 @@ func (this *HttpAPI) MultiMatchSlaves(params martini.Params, r render.Render, re
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Matched up %d slaves of %+v below %+v", len(slaves), instanceKey, newMaster.Key), Details: newMaster.Key})
 }
 
-// MatchBelow attempts to move an instance below another via pseudo GTID matching of binlog entries
+// MatchUpSlaves attempts to match up all slaves of an instance
 func (this *HttpAPI) MatchUpSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !this.isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -1332,6 +1353,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/forget/:host/:port", this.Forget)
 	m.Get("/api/resolve/:host/:port", this.Resolve)
 	m.Get("/api/move-up/:host/:port", this.MoveUp)
+	m.Get("/api/move-up-slaves/:host/:port", this.MoveUpSlaves)
 	m.Get("/api/make-co-master/:host/:port", this.MakeCoMaster)
 	m.Get("/api/reset-slave/:host/:port", this.ResetSlave)
 	m.Get("/api/detach-slave/:host/:port", this.DetachSlave)

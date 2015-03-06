@@ -97,6 +97,21 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), instance.MasterKey.DisplayString()))
 		}
+	case "move-up-slaves":
+		{
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+
+			movedSlaves, _, err := inst.MoveUpSlaves(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			} else {
+				for _, slave := range movedSlaves {
+					fmt.Println(slave.Key.DisplayString())
+				}
+			}
+		}
 	case "move-below":
 		{
 			if instanceKey == nil {

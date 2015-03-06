@@ -216,6 +216,99 @@ Cleanup:
 	return instance, err
 }
 
+// MoveUpSlaves will attempt moving up all slaves of a given instance, at the same time.
+// Clock-time, this is fater than moving one at a time. However this means all slaves of the given instance, and the instance itself,
+// will all stop replicating together.
+func MoveUpSlaves(instanceKey *InstanceKey) ([](*Instance), *Instance, error) {
+	res := [](*Instance){}
+	var barrier chan *Instance
+
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return res, nil, err
+	}
+	if !instance.IsSlave() {
+		return res, instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
+	}
+	_, err = GetInstanceMaster(instance)
+	if err != nil {
+		return res, instance, log.Errorf("Cannot GetInstanceMaster() for %+v. error=%+v", instance.Key, err)
+	}
+
+	slaves, err := ReadSlaveInstances(instanceKey)
+	if err != nil {
+		return res, instance, err
+	}
+	if len(slaves) == 0 {
+		return res, instance, nil
+	}
+	log.Infof("Will move slaves of %+v up the topology", *instanceKey)
+
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "move up slaves"); merr != nil {
+		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
+	for _, slave := range slaves {
+		if maintenanceToken, merr := BeginMaintenance(&slave.Key, GetMaintenanceOwner(), fmt.Sprintf("%+v moves up", slave.Key)); merr != nil {
+			err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", slave.Key))
+			goto Cleanup
+		} else {
+			defer EndMaintenance(maintenanceToken)
+		}
+	}
+
+	instance, err = StopSlave(instanceKey)
+	if err != nil {
+		goto Cleanup
+	}
+
+	barrier = make(chan *Instance)
+	for _, slave := range slaves {
+		slave := slave
+		go func() {
+			defer func() {
+				slave, _ := StartSlave(&slave.Key)
+				barrier <- slave
+			}()
+
+			ExecuteOnTopology(func() {
+				if canReplicate, err := slave.CanReplicateFrom(instance); canReplicate == false || err != nil {
+					return
+				}
+				slave, err = StopSlave(&slave.Key)
+				if err != nil {
+					return
+				}
+				slave, err = StartSlaveUntilMasterCoordinates(&slave.Key, &instance.SelfBinlogCoordinates)
+				if err != nil {
+					return
+				}
+
+				slave, err = ChangeMasterTo(&slave.Key, &instance.MasterKey, &instance.ExecBinlogCoordinates)
+				if err != nil {
+					return
+				}
+			})
+		}()
+	}
+	for _ = range slaves {
+		slave := <-barrier
+		res = append(res, slave)
+	}
+
+Cleanup:
+	instance, _ = StartSlave(instanceKey)
+	if err != nil {
+		return res, instance, log.Errore(err)
+	}
+	// and we're done (pending deferred functions)
+	AuditOperation("move-up-slaves", instanceKey, fmt.Sprintf("moved up %d slaves of %+v. New master: %+v", len(res), *instanceKey, instance.MasterKey))
+
+	return res, instance, err
+}
+
 // MoveBelow will attempt moving instance indicated by instanceKey below its supposed sibling indicated by sinblingKey.
 // It will perform all safety and sanity checks and will tamper with this instance's replication
 // as well as its sibling.

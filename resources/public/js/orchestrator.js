@@ -167,6 +167,7 @@ function openNodeModal(node) {
         addNodeModalDataAttribute("Replication lag", node.SlaveLagSeconds.Valid ? node.SlaveLagSeconds.Int64 : "null");
     }
     var td = addNodeModalDataAttribute("Num slaves", node.SlaveHosts.length);
+    $('#node_modal button[data-btn=move-up-slaves]').appendTo(td.find("div"))
     $('#node_modal button[data-btn=match-up-slaves]').appendTo(td.find("div"))
     $('#node_modal button[data-btn=regroup-slaves]').appendTo(td.find("div"))
     addNodeModalDataAttribute("Server ID", node.ServerID);
@@ -285,6 +286,15 @@ function openNodeModal(node) {
     	$('#node_modal button[data-btn=set-read-only]').show();
     }
 
+    $('#node_modal button[data-btn=move-up-slaves]').hide();
+    if (!node.lastCheckInvalidProblem()) {
+        if (node.SlaveHosts.length > 1) {
+            $('#node_modal button[data-btn=move-up-slaves]').show();
+        }
+    }
+    $('#node_modal button[data-btn=move-up-slaves]').click(function(){
+    	apiCommand("/api/move-up-slaves/"+node.Key.Hostname+"/"+node.Key.Port);
+    });
     $('#node_modal button[data-btn=match-up-slaves]').hide();
     $('#node_modal button[data-btn=regroup-slaves]').hide();
     if (node.UsingPseudoGTID) {
