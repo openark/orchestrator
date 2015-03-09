@@ -123,6 +123,8 @@ function generateInstanceDivs(nodesMap) {
             				return acceptDrop != null;
             			},
             			hoverClass: "draggable-hovers",
+					    over: function( event, ui ) {
+					    },
 					    drop: function( event, ui ) {
 				            $(".popover.instance[data-duplicate-node]").remove();
 				            moveInstance(nodesMap[draggedNodeId], nodesMap[$(this).attr("data-nodeid")], true);
@@ -157,30 +159,18 @@ function moveInstance(node, droppableNode, shouldApply) {
 	if (clusterOperationPseudoGTIDMode) {
 		if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem) {
 			// Obviously can't handle.
-			console.log(1);
 			return null;
 		}
 		
-		// We accept in the case where SQL thread is up to date (example use case: the node has
-		// a dead master and is sitting idly)
-		// Or when the SQL thread is known to be stopped.
-		// In the future we may choose to allow matching nodes that are fully replicating, with lags etc.
-		if (node.Slave_SQL_Running && !node.isSQLThreadCaughtUpWithIOThread) {
-			console.log(2);
-			return null;
-		}
 		if (node.id == droppableNode.id) {
-			console.log(3);
 			return null;
 		}
 		if (instanceIsDescendant(droppableNode, node)) {
 			// Wrong direction!
-			console.log(4);
 			return null;
 		}
 		if (isReplicationStrictlyBehindSibling(droppableNode, node)) {
 			// Sibling known to be less advanced. Wrong direction!
-			console.log(5);
 			return null;
 		}
 		if (instanceIsDescendant(node, droppableNode)) {
