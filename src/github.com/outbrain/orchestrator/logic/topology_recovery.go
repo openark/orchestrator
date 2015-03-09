@@ -173,12 +173,13 @@ func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (*inst.I
 	if err == nil {
 		log.Debugf("- RecoverDeadIntermediateMaster: will attempt a candidate intermediate master: %+v", candidateSibling.Key)
 		// We have a candidate
-		if _, belowInstance, err := inst.MultiMatchSlaves(failedInstanceKey, &candidateSibling.Key); err == nil {
+		if matchedSlaves, belowInstance, err := inst.MultiMatchSlaves(failedInstanceKey, &candidateSibling.Key); err == nil {
 			ResolveRecovery(failedInstanceKey, &candidateSibling.Key)
 			log.Debugf("- RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) went well", candidateSibling.Key)
-			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("candidate sibling: %+v", candidateSibling.Key))
+			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Done. Matched %d slaves under candidate sibling: %+v", len(matchedSlaves), candidateSibling.Key))
 			return belowInstance, nil
 		} else {
+			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Matched %d slaves under candidate sibling: %+v", len(matchedSlaves), candidateSibling.Key))
 			log.Debugf("- RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) did not complete: %+v", candidateSibling.Key, err)
 		}
 	}
@@ -189,7 +190,7 @@ func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (*inst.I
 	_, successorInstance, err := inst.MatchUpSlaves(failedInstanceKey)
 	ResolveRecovery(failedInstanceKey, &successorInstance.Key)
 	log.Debugf("- RecoverDeadIntermediateMaster: matched up to %+v", successorInstance.Key)
-	inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("master: %+v", successorInstance.Key))
+	inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Done. Matched slaves under: %+v", successorInstance.Key))
 
 	return successorInstance, err
 }

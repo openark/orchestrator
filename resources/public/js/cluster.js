@@ -566,6 +566,7 @@ $(document).ready(function () {
     	document.title = document.title.split(" - ")[0] + " - " + visualAlias;
     	$("#cluster_container").append('<div class="floating_background">'+visualAlias+'</div>');
         $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="'+clusterInfo.ClusterAlias+'">Alias: '+alias+'</a></li>');           
+        $("#dropdown-context").append('<li><a data-command="anonymize">Anonymize</a></li>');           
     }, "json");
     
     if (isPseudoGTIDModeEnabled()) {
@@ -582,6 +583,16 @@ $(document).ready(function () {
     
     $("body").on("click", "a[data-command=change-cluster-alias]", function(event) {    	
     	promptForAlias($(event.target).attr("data-alias"));
+    });    
+    $("body").on("click", "a[data-command=anonymize]", function(event) {    	
+        var _ = function() {
+            var counter = 0;  
+            var port = 3306;
+            jQuery("h3.popover-title .pull-left").each(function() {
+               jQuery(this).html("instance-"+(counter++)+":"+port)
+           });
+        }();
+    	$("#cluster_container div.floating_background").html("");
     });    
 
     activateRefreshTimer();
