@@ -198,9 +198,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		}
 		instance.MasterKey = *masterKey
 		instance.SecondsBehindMaster = m.GetNullInt64("Seconds_Behind_Master")
-		if config.Config.SlaveLagQuery == "" {
-			instance.SlaveLagSeconds = instance.SecondsBehindMaster
-		}
+		// And until told otherwise:
+		instance.SlaveLagSeconds = instance.SecondsBehindMaster
 		// Not breaking the flow even on error
 		return nil
 	})
@@ -326,6 +325,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	if config.Config.SlaveLagQuery != "" && !isMaxScale {
 		err = db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SlaveLagSeconds)
 		if err != nil {
+			instance.SlaveLagSeconds = instance.SecondsBehindMaster
 			log.Errore(err)
 		}
 	}
