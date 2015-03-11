@@ -73,6 +73,16 @@ func ExecInstance(instanceKey *InstanceKey, query string, args ...interface{}) (
 	return res, err
 }
 
+// ExecInstanceNoPrepare executes a given query on the given MySQL topology instance, without using prepared statements
+func ExecInstanceNoPrepare(instanceKey *InstanceKey, query string, args ...interface{}) (sql.Result, error) {
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return nil, err
+	}
+	res, err := sqlutils.ExecNoPrepare(db, query, args...)
+	return res, err
+}
+
 // ScanInstanceRow executes a read-a-single-row query on a given MySQL topology instance
 func ScanInstanceRow(instanceKey *InstanceKey, query string, dest ...interface{}) error {
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
@@ -1209,8 +1219,8 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
 	}
 
-	_, err = ExecInstance(instanceKey, `stop slave io_thread`)
-	_, err = ExecInstance(instanceKey, `start slave sql_thread`)
+	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave io_thread`)
+	_, err = ExecInstanceNoPrepare(instanceKey, `start slave sql_thread`)
 
 	startTime := time.Now()
 	for upToDate := false; !upToDate; {
@@ -1229,7 +1239,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 			time.Sleep(SQLThreadPollDuration)
 		}
 	}
-	_, err = ExecInstance(instanceKey, `stop slave`)
+	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave`)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -1276,7 +1286,7 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 	if !instance.IsSlave() {
 		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
 	}
-	_, err = ExecInstance(instanceKey, `stop slave`)
+	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave`)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -1297,7 +1307,7 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
 	}
 
-	_, err = ExecInstance(instanceKey, `start slave`)
+	_, err = ExecInstanceNoPrepare(instanceKey, `start slave`)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -1345,7 +1355,10 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 
 	log.Infof("Will start slave on %+v until coordinates: %+v", instanceKey, masterCoordinates)
 
-	_, err = ExecInstance(instanceKey, fmt.Sprintf("start slave until master_log_file='%s', master_log_pos=%d",
+	// MariaDB has a bug: a CHANGE MASTER TO statement does not work properly with prepared statement... :P
+	// See https://mariadb.atlassian.net/browse/MDEV-7640
+	// This is the reason for ExecInstanceNoPrepare
+	_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("start slave until master_log_file='%s', master_log_pos=%d",
 		masterCoordinates.LogFile, masterCoordinates.LogPos))
 	if err != nil {
 		return instance, log.Errore(err)
@@ -1387,10 +1400,13 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	}
 
 	if instance.UsingMariaDBGTID {
-		_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d",
+		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d",
 			masterKey.Hostname, masterKey.Port))
 	} else {
-		_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d",
+		// MariaDB has a bug: a CHANGE MASTER TO statement does not work properly with prepared statement... :P
+		// See https://mariadb.atlassian.net/browse/MDEV-7640
+		// This is the reason for ExecInstanceNoPrepare
+		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d",
 			masterKey.Hostname, masterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
 	}
 	if err != nil {
