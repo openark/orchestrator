@@ -302,7 +302,6 @@ div[data-btn-group=recover] code {
     padding: 2px 8px;
 }
 
-
 #cluster_container .popover.instance[data-duplicate-node] {
     position: absolute;
     box-shadow: 0 5px 10px rgba(0, 0, 0, 0.66);

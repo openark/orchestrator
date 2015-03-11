@@ -196,6 +196,7 @@ func (this *InstanceKeyMap) MarshalJSON() ([]byte, error) {
 // It presents important replication configuration and detailed replication status.
 type Instance struct {
 	Key                    InstanceKey
+	Uptime                 uint
 	ServerID               uint
 	Version                string
 	ReadOnly               bool

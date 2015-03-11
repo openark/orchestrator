@@ -306,6 +306,11 @@ var generateSQLPatches = []string{
 			database_instance_maintenance
 			ADD KEY active_timestamp_idx (maintenance_active, begin_timestamp)
 	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN uptime INT UNSIGNED NOT NULL AFTER last_seen
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance

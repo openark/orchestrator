@@ -1,6 +1,7 @@
 clusterOperationPseudoGTIDMode = false;
 
-dcColors = ["#ff8c00", "#4682b4", "#9acd32", "#dc143c", "#9932cc", "#ffd700", "#191970", "#7fffd4", "#808080", "#dda0dd"];
+var dcColors = ["#ff8c00", "#4682b4", "#9acd32", "#dc143c", "#9932cc", "#ffd700", "#191970", "#7fffd4", "#808080", "#dda0dd"];
+var dcColorsMap = {};
 
 
 function generateInstanceDivs(nodesMap) {
@@ -473,6 +474,28 @@ function analyzeClusterInstances(nodesMap) {
     });
 }
 
+function postVisualizeInstances(nodesMap) {
+    // DC colors
+    var knownDCs = [];
+    instances.forEach(function (instance) {
+        knownDCs.push(instance.DataCenter)
+    });
+    function uniq(a) {
+        return a.sort().filter(function(item, pos) {
+            return !pos || item != a[pos - 1];
+        })
+    }
+    knownDCs = uniq(knownDCs);
+    for (i = 0 ; i < knownDCs.length ; ++i) {
+        dcColorsMap[knownDCs[i]] = dcColors[i % dcColors.length];
+    }
+    instances.forEach(function (instance) {
+    	var draggedNodeId = $(this).attr("data-nodeid"); 
+    	$(".popover.instance[data-nodeid="+instance.id+"]").attr("data-dc-color", dcColorsMap[instance.DataCenter]);
+        console.log($(".popover.instance[data-nodeid="+instance.id+"]").attr("data-dc-color"));
+    });
+}
+
 
 function refreshClusterOperationModeButton() {
 	if (clusterOperationPseudoGTIDMode) {
@@ -558,6 +581,7 @@ $(document).ready(function () {
                 analyzeClusterInstances(instancesMap);
                 visualizeInstances(instancesMap);
                 generateInstanceDivs(instancesMap);
+                postVisualizeInstances(instancesMap);
             }, "json");
     }, "json");
     $.get("/api/cluster-info/"+currentClusterName(), function (clusterInfo) {    
@@ -567,6 +591,7 @@ $(document).ready(function () {
     	$("#cluster_container").append('<div class="floating_background">'+visualAlias+'</div>');
         $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="'+clusterInfo.ClusterAlias+'">Alias: '+alias+'</a></li>');           
         $("#dropdown-context").append('<li><a data-command="anonymize">Anonymize</a></li>');           
+        $("#dropdown-context").append('<li><a data-command="colorize-dc">Colorize DC</a></li>');           
     }, "json");
     
     if (isPseudoGTIDModeEnabled()) {
@@ -588,11 +613,19 @@ $(document).ready(function () {
         var _ = function() {
             var counter = 0;  
             var port = 3306;
-            jQuery("h3.popover-title .pull-left").each(function() {
+            $("h3.popover-title .pull-left").each(function() {
                jQuery(this).html("instance-"+(counter++)+":"+port)
-           });
+            });
         }();
     	$("#cluster_container div.floating_background").html("");
+    });    
+    $("body").on("click", "a[data-command=colorize-dc]", function(event) {
+        console.log("here");
+        $(".popover.instance[data-dc-color]").each(function () {
+            console.log($(this).attr("data-dc-color"))
+            $(this).css("border-color", $(this).attr("data-dc-color"));
+            $(this).css("border-width", 2);
+        });
     });    
 
     activateRefreshTimer();

@@ -117,6 +117,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			if variable_name == "MAXSCALE_VERSION" {
 				instance.Version = m.GetString("value") + "-maxscale"
 				instance.ServerID = 0
+				instance.Uptime = 0
 				instance.Binlog_format = "TRANSPARENT"
 				instance.ReadOnly = true
 				instance.LogBinEnabled = true
@@ -132,6 +133,10 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	if !isMaxScale {
 		err = db.QueryRow("select @@hostname, @@global.server_id, @@global.version, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
 			&resolvedHostname, &instance.ServerID, &instance.Version, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
+		if err != nil {
+			goto Cleanup
+		}
+		err = db.QueryRow("select variable_value from information_schema.global_status where variable_name='Uptime'").Scan(&instance.Uptime)
 		if err != nil {
 			goto Cleanup
 		}
@@ -374,6 +379,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 
 	instance.Key.Hostname = m.GetString("hostname")
 	instance.Key.Port = m.GetInt("port")
+	instance.Uptime = m.GetUint("uptime")
 	instance.ServerID = m.GetUint("server_id")
 	instance.Version = m.GetString("version")
 	instance.ReadOnly = m.GetBool("read_only")
@@ -897,6 +903,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				on duplicate key update
 	        		last_checked=VALUES(last_checked),
 	        		last_attempted_check=VALUES(last_attempted_check),
+	        		uptime=VALUES(uptime),
 	        		server_id=VALUES(server_id),
 					version=VALUES(version),
 					read_only=VALUES(read_only),
@@ -942,6 +949,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
         		port,
         		last_checked,
         		last_attempted_check,
+        		uptime,
         		server_id,
 				version,
 				read_only,
@@ -974,13 +982,14 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				data_center,
 				physical_environment,
 				replication_depth
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
 		_, err = sqlutils.Exec(db, insertQuery,
 			instance.Key.Hostname,
 			instance.Key.Port,
+			instance.Uptime,
 			instance.ServerID,
 			instance.Version,
 			instance.ReadOnly,
