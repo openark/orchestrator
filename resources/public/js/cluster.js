@@ -96,7 +96,7 @@ function generateInstanceDivs(nodesMap) {
        		return false;
         });
         */
-        if (nodesMap[draggedNodeId].lastCheckInvalidProblem() || nodesMap[draggedNodeId].notRecentlyCheckedProblem()) {
+        if (!isAuthorizedForAction() || nodesMap[draggedNodeId].lastCheckInvalidProblem() || nodesMap[draggedNodeId].notRecentlyCheckedProblem()) {
             $(".popover.instance[data-duplicate-node] h3").click(function () {
                	openNodeModal(nodesMap[draggedNodeId]);
             	return false;
@@ -157,6 +157,10 @@ function generateInstanceDivs(nodesMap) {
 }
 
 function moveInstance(node, droppableNode, shouldApply) {
+    if (!isAuthorizedForAction()) {
+    	// Obviously this is also checked on server side, no need to try stupid hacks
+		return null;
+    }
 	if (clusterOperationPseudoGTIDMode) {
 		if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem) {
 			// Obviously can't handle.

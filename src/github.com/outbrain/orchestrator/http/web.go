@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-martini/martini"
+	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/render"
 	"net/http"
 	"strconv"
@@ -52,7 +53,7 @@ func (this *HttpWeb) Clusters(params martini.Params, r render.Render) {
 	})
 }
 
-func (this *HttpWeb) Cluster(params martini.Params, r render.Render) {
+func (this *HttpWeb) Cluster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/cluster", map[string]interface{}{
 		"agentsHttpActive":      config.Config.ServeAgentsHttp,
 		"title":                 "cluster",
@@ -61,6 +62,7 @@ func (this *HttpWeb) Cluster(params martini.Params, r render.Render) {
 		"autoshow_problems":     true,
 		"contextMenuVisible":    true,
 		"pseudoGTIDModeEnabled": (config.Config.PseudoGTIDPattern != ""),
+		"authorizedForAction":   isAuthorizedForAction(req, user),
 	})
 }
 
