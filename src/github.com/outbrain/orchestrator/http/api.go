@@ -1241,6 +1241,11 @@ func (this *HttpAPI) Health(params martini.Params, r render.Render, req *http.Re
 
 }
 
+// LBCheck returns a constant respnse, and this can be used by load balancers that expect a given string.
+func (this *HttpAPI) LBCheck(params martini.Params, r render.Render, req *http.Request) {
+	r.JSON(200, "OK")
+}
+
 // GrabElection forcibly grabs leadership. Use with care!!
 func (this *HttpAPI) GrabElection(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -1356,6 +1361,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	// General
 	m.Get("/api/headers", this.Headers)
 	m.Get("/api/health", this.Health)
+	m.Get("/api/lb-check", this.LBCheck)
 	m.Get("/api/grab-election", this.GrabElection)
 	m.Get("/api/reload-configuration", this.ReloadConfiguration)
 	// Recovery
