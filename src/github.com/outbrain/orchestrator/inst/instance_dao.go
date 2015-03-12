@@ -532,6 +532,7 @@ func ReadProblemInstances() ([](*Instance), error) {
 
 // SearchInstances reads all instances qualifying for some searchString
 func SearchInstances(searchString string) ([](*Instance), error) {
+	searchString = strings.TrimSpace(searchString)
 	condition := fmt.Sprintf(`
 			hostname like '%%%s%%'
 			or cluster_name like '%%%s%%'

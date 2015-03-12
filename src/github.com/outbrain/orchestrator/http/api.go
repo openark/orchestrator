@@ -827,8 +827,12 @@ func (this *HttpAPI) ClusterInfo(params martini.Params, r render.Render, req *ht
 	r.JSON(200, clusterInfo)
 }
 
-// ClusterInfo provides details of a given cluster
-func (this *HttpAPI) SetClusterAlias(params martini.Params, r render.Render, req *http.Request) {
+// SetClusterAlias will change an alias for a given clustername
+func (this *HttpAPI) SetClusterAlias(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !this.isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
 	clusterName := params["clusterName"]
 	alias := req.URL.Query().Get("alias")
 
@@ -934,7 +938,11 @@ func (this *HttpAPI) HostnameResolveCache(params martini.Params, r render.Render
 }
 
 // ResetHostnameResolveCache clears in-memory hostname resovle cache
-func (this *HttpAPI) ResetHostnameResolveCache(params martini.Params, r render.Render, req *http.Request) {
+func (this *HttpAPI) ResetHostnameResolveCache(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !this.isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
 	err := inst.ResetHostnameResolveCache()
 
 	if err != nil {
