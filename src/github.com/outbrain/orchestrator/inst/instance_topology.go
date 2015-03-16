@@ -392,6 +392,54 @@ Cleanup:
 	return instance, err
 }
 
+// Repoint connects a slave to a master using its exact same executing coordinates.
+// The given masterKey can be null, in which case the existing master is used.
+// Two use cases:
+// - masterKey is nil: use case is corrupted relay logs on slave
+// - masterKey is not nil: using MaxScale and Binlog servers (coordinates remain the same)
+func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, err
+	}
+	if !instance.IsSlave() {
+		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", *instanceKey))
+	}
+
+	if masterKey == nil {
+		masterKey = &instance.MasterKey
+	}
+	log.Infof("Will repoint %+v to master %+v", *instanceKey, *masterKey)
+
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "repoint"); merr != nil {
+		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", *instanceKey))
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
+
+	instance, err = StopSlave(instanceKey)
+	if err != nil {
+		goto Cleanup
+	}
+
+	instance, err = ChangeMasterTo(instanceKey, masterKey, &instance.ExecBinlogCoordinates)
+	if err != nil {
+		goto Cleanup
+	}
+
+Cleanup:
+	instance, _ = StartSlave(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	// and we're done (pending deferred functions)
+	AuditOperation("repoint", instanceKey, fmt.Sprintf("slave %+v repointed to master: %+v", *instanceKey, *masterKey))
+
+	return instance, err
+
+}
+
 // MakeCoMaster will attempt to make an instance co-master with its master, by making its master a slave of its own.
 // This only works out if the master is not replicating; the master does not have a known master (it may have an unknown master).
 func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {

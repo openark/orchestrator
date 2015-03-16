@@ -6,6 +6,11 @@
     font-size: inherit;
 }
 
+#dropdown-clusters.dropdown-menu {
+    height: auto;
+    max-height: 600px;
+    overflow-x: hidden;
+}
 
 #alerts_container .alert {
     margin-bottom: 4px;

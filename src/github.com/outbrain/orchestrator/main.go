@@ -37,7 +37,9 @@ orchestrator [-c command] [-i instance] [... cli ] | http
 	
 -c (command):			
 	move-up
+	move-up-slaves
 	move-below
+	repoint
 	enslave-siblings-simple
 	make-co-master
 	
@@ -61,6 +63,7 @@ orchestrator [-c command] [-i instance] [... cli ] | http
 	find
 	clusters
 	topology
+	which-instance
 	which-cluster
 	which-cluster-instances
 	which-master
@@ -74,6 +77,7 @@ orchestrator [-c command] [-i instance] [... cli ] | http
 	instance-status
 	
 	replication-analysis
+	recover
 	
 	continuous
 	resolve
