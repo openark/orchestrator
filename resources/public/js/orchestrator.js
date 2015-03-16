@@ -422,10 +422,16 @@ function normalizeInstances(instances, maintenanceList) {
     var hostNames = instances.map(function (instance) {
         return instance.title
     });
-    var suffixLength = commonSuffixLength(hostNames);
-    instances.forEach(function (instance) {
-    	instance.canonicalTitle = instance.title.substring(0, instance.title.length - suffixLength);
-    });
+    if (typeof removeTextFromHostnameDisplay != "undefined" && removeTextFromHostnameDisplay()) {
+        instances.forEach(function (instance) {
+        	instance.canonicalTitle = instance.title.replace(removeTextFromHostnameDisplay(), '');
+        });
+    } else {
+        var suffixLength = commonSuffixLength(hostNames);
+        instances.forEach(function (instance) {
+        	instance.canonicalTitle = instance.title.substring(0, instance.title.length - suffixLength);
+        });
+    }
     var instancesMap = instances.reduce(function (map, instance) {
         map[instance.id] = instance;
         return map;

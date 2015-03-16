@@ -44,6 +44,7 @@
   },
   "DataCenterPattern": "[.]([^.]+)[.][^.]+[.]booking[.]com",
   "PhysicalEnvironmentPattern": "[.]([^.]+[.][^.]+)[.]booking[.]com",
+  "RemoveTextFromHostnameDisplay": ".booking.com:3306",
   "ServeAgentsHttp": false,
   "AgentsUseSSL": false,
   "SSLSkipVerify": false,

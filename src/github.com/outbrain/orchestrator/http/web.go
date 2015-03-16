@@ -46,23 +46,25 @@ func (this *HttpWeb) getInstanceKey(host string, port string) (inst.InstanceKey,
 
 func (this *HttpWeb) Clusters(params martini.Params, r render.Render) {
 	r.HTML(200, "templates/clusters", map[string]interface{}{
-		"agentsHttpActive":  config.Config.ServeAgentsHttp,
-		"title":             "clusters",
-		"activePage":        "cluster",
-		"autoshow_problems": false,
+		"agentsHttpActive":              config.Config.ServeAgentsHttp,
+		"title":                         "clusters",
+		"activePage":                    "cluster",
+		"autoshow_problems":             false,
+		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
 	})
 }
 
 func (this *HttpWeb) Cluster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/cluster", map[string]interface{}{
-		"agentsHttpActive":      config.Config.ServeAgentsHttp,
-		"title":                 "cluster",
-		"activePage":            "cluster",
-		"clusterName":           params["clusterName"],
-		"autoshow_problems":     true,
-		"contextMenuVisible":    true,
-		"pseudoGTIDModeEnabled": (config.Config.PseudoGTIDPattern != ""),
-		"authorizedForAction":   isAuthorizedForAction(req, user),
+		"agentsHttpActive":              config.Config.ServeAgentsHttp,
+		"title":                         "cluster",
+		"activePage":                    "cluster",
+		"clusterName":                   params["clusterName"],
+		"autoshow_problems":             true,
+		"contextMenuVisible":            true,
+		"pseudoGTIDModeEnabled":         (config.Config.PseudoGTIDPattern != ""),
+		"authorizedForAction":           isAuthorizedForAction(req, user),
+		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
 	})
 }
 

@@ -62,6 +62,7 @@ type Configuration struct {
 	PostFailoverProcesses                      []string // Processes to execute after doing a master failover (order of execution undefined). Will be provided with old-master-hostname, new-master-hostname arguments. May and should use some of these placeholders: {failedHost}, {failedPort}, {successorHost}, {successorPort}
 	AuditLogFile                               string   // Name of log file for audit operations. Disabled when empty.
 	AuditPageSize                              int
+	RemoveTextFromHostnameDisplay              string // Text to strip off the hostname on cluster/clusters pages
 	ReadOnly                                   bool
 	AuthenticationMethod                       string            // Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "multi" for advanced BasicAuth, "proxy" for forwarded credentials via reverse proxy
 	HTTPAuthUser                               string            // Username for HTTP Basic authentication (blank disables authentication)
@@ -120,6 +121,7 @@ func NewConfiguration() *Configuration {
 		PostFailoverProcesses:                      []string{},
 		AuditLogFile:                               "",
 		AuditPageSize:                              20,
+		RemoveTextFromHostnameDisplay:              "",
 		ReadOnly:                                   false,
 		AuthenticationMethod:                       "basic",
 		HTTPAuthUser:                               "",
