@@ -334,6 +334,20 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		log.Errore(err)
 	}
+	if instance.ReplicationDepth == 0 && config.Config.DetectClusterAliasQuery != "" && !isMaxScale {
+		clusterAlias := ""
+		err = db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
+		if err != nil {
+			clusterAlias = ""
+			log.Errore(err)
+		}
+		if clusterAlias != "" {
+			err = SetClusterAlias(instance.ClusterName, clusterAlias)
+			if err != nil {
+				log.Errore(err)
+			}
+		}
+	}
 
 Cleanup:
 	if instanceFound {

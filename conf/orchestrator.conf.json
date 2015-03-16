@@ -42,6 +42,7 @@
   "ClusterNameToAlias": {
     "127.0.0.1": "test suite"
   },
+  "DetectClusterAliasQuery": "select substring_index(@@hostname, '.', 1)",
   "DataCenterPattern": "[.]([^.]+)[.][^.]+[.]booking[.]com",
   "PhysicalEnvironmentPattern": "[.]([^.]+[.][^.]+)[.]booking[.]com",
   "RemoveTextFromHostnameDisplay": ".booking.com:3306",
