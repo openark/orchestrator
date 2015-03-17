@@ -37,6 +37,7 @@ func ReadClusterAliases() error {
 		goto Cleanup
 	}
 
+	clusterAliasMap = make(map[string]string)
 	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 		clusterAliasMap[m.GetString("cluster_name")] = m.GetString("alias")
 		return err
