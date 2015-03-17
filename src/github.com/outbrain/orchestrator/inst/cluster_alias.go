@@ -17,6 +17,8 @@
 package inst
 
 import (
+	"errors"
+	"fmt"
 	"github.com/outbrain/orchestrator/config"
 	"regexp"
 )
@@ -44,4 +46,25 @@ func SetClusterAlias(clusterName string, alias string) error {
 	}
 	clusterAliasMap[clusterName] = alias
 	return nil
+}
+
+// GetClusterByAlias returns the cluster name associated with given alias.
+// The function returns with error when:
+// - No cluster is associated with the alias
+// - More than one cluster is associated with the alias
+func GetClusterByAlias(alias string) (string, error) {
+	clusterName := ""
+	for mappedName, mappedAlias := range clusterAliasMap {
+		if mappedAlias == alias {
+			if clusterName == "" {
+				clusterName = mappedName
+			} else {
+				return "", errors.New(fmt.Sprintf("GetClusterByAlias: multiple clusters for alias %s", alias))
+			}
+		}
+	}
+	if clusterName == "" {
+		return "", errors.New(fmt.Sprintf("GetClusterByAlias: no cluster found for alias %s", alias))
+	}
+	return clusterName, nil
 }

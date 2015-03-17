@@ -62,16 +62,16 @@ $(document).ready(function () {
 	    });
 
         clusters.forEach(function (cluster) {
-    		$("#clusters").append('<div xmlns="http://www.w3.org/1999/xhtml" class="popover instance right" data-cluster-name="'+cluster.ClusterName+'"><div class="arrow"></div><h3 class="popover-title"><a href="/web/cluster/'+cluster.ClusterName+'">'+cluster.ClusterName+'</a></h3><div class="popover-content"></div></div>');
+    		$("#clusters").append('<div xmlns="http://www.w3.org/1999/xhtml" class="popover instance right" data-cluster-name="'+cluster.ClusterName+'"><div class="arrow"></div><h3 class="popover-title"><a href="/web/cluster/'+cluster.ClusterName+'"><span>'+cluster.ClusterName+'</span></a></h3><div class="popover-content"></div></div>');
     		var popoverElement = $("#clusters [data-cluster-name='" + cluster.ClusterName + "'].popover");
     		var title = cluster.ClusterName;
             if (typeof removeTextFromHostnameDisplay != "undefined" && removeTextFromHostnameDisplay()) {
               	title = title.replace(removeTextFromHostnameDisplay(), '');
             } 
     		if (cluster.ClusterAlias != "") {
-    			title = '<strong>' + cluster.ClusterAlias + '</strong>, <span class="small">' + title + '</span>';
+                popoverElement.find("h3 a span").addClass("small");
+                popoverElement.find("h3").prepend('<a href="/web/cluster/alias/'+encodeURIComponent(cluster.ClusterAlias)+'"><strong>'+cluster.ClusterAlias+'</strong></a><br/>');
     		}
-    		popoverElement.find("h3 a").html(title);
     	    var contentHtml = ''
     				+ '<div>Instances: <div class="pull-right"></div></div>'
     			;

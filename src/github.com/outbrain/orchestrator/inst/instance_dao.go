@@ -323,7 +323,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if config.Config.SlaveLagQuery != "" && !isMaxScale {
-		err = db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SlaveLagSeconds)
+		err := db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SlaveLagSeconds)
 		if err != nil {
 			instance.SlaveLagSeconds = instance.SecondsBehindMaster
 			log.Errore(err)
@@ -336,13 +336,13 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	if instance.ReplicationDepth == 0 && config.Config.DetectClusterAliasQuery != "" && !isMaxScale {
 		clusterAlias := ""
-		err = db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
+		err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
 		if err != nil {
 			clusterAlias = ""
 			log.Errore(err)
 		}
 		if clusterAlias != "" {
-			err = SetClusterAlias(instance.ClusterName, clusterAlias)
+			err := SetClusterAlias(instance.ClusterName, clusterAlias)
 			if err != nil {
 				log.Errore(err)
 			}

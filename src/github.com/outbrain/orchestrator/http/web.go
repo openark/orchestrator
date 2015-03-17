@@ -68,6 +68,17 @@ func (this *HttpWeb) Cluster(params martini.Params, r render.Render, req *http.R
 	})
 }
 
+func (this *HttpWeb) ClusterByAlias(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	clusterName, err := inst.GetClusterByAlias(params["clusterAlias"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	params["clusterName"] = clusterName
+	this.Cluster(params, r, req, user)
+}
+
 func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Request) {
 	searchString := params["searchString"]
 	if searchString == "" {
@@ -210,6 +221,7 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/faq", this.FAQ)
 	m.Get("/web/clusters", this.Clusters)
 	m.Get("/web/cluster/:clusterName", this.Cluster)
+	m.Get("/web/cluster/alias/:clusterAlias", this.ClusterByAlias)
 	m.Get("/web/search/:searchString", this.Search)
 	m.Get("/web/search", this.Search)
 	m.Get("/web/discover", this.Discover)
