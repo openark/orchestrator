@@ -386,8 +386,8 @@ func (this *HttpAPI) MoveBelow(params martini.Params, r render.Render, req *http
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v moved below %+v", instanceKey, siblingKey), Details: instance})
 }
 
-// EnslaveSiblingsSimple
-func (this *HttpAPI) EnslaveSiblingsSimple(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+// EnslaveSiblings
+func (this *HttpAPI) EnslaveSiblings(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -398,7 +398,7 @@ func (this *HttpAPI) EnslaveSiblingsSimple(params martini.Params, r render.Rende
 		return
 	}
 
-	instance, count, err := inst.EnslaveSiblingsSimple(&instanceKey)
+	instance, count, err := inst.EnslaveSiblings(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -1340,7 +1340,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/detach-slave/:host/:port", this.DetachSlave)
 	m.Get("/api/reattach-slave/:host/:port", this.ReattachSlave)
 	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow)
-	m.Get("/api/enslave-siblings-simple/:host/:port", this.EnslaveSiblingsSimple)
+	m.Get("/api/enslave-siblings/:host/:port", this.EnslaveSiblings)
 	m.Get("/api/last-pseudo-gtid/:host/:port", this.LastPseudoGTID)
 	m.Get("/api/match-below/:host/:port/:belowHost/:belowPort", this.MatchBelow)
 	m.Get("/api/match-up/:host/:port", this.MatchUp)

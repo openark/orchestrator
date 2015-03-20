@@ -273,21 +273,26 @@ func MoveUpSlaves(instanceKey *InstanceKey) ([](*Instance), *Instance, error) {
 				barrier <- slave
 			}()
 
+			var slaveErr error = nil
 			ExecuteOnTopology(func() {
 				if canReplicate, err := slave.CanReplicateFrom(instance); canReplicate == false || err != nil {
+					slaveErr = err
 					return
 				}
 				slave, err = StopSlave(&slave.Key)
 				if err != nil {
+					slaveErr = err
 					return
 				}
 				slave, err = StartSlaveUntilMasterCoordinates(&slave.Key, &instance.SelfBinlogCoordinates)
 				if err != nil {
+					slaveErr = err
 					return
 				}
 
 				slave, err = ChangeMasterTo(&slave.Key, &instance.MasterKey, &instance.ExecBinlogCoordinates)
 				if err != nil {
+					slaveErr = err
 					return
 				}
 			})
@@ -409,6 +414,14 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey) (*Instance, error
 	if masterKey == nil {
 		masterKey = &instance.MasterKey
 	}
+	master, err := ReadTopologyInstance(masterKey)
+	if err != nil {
+		return instance, err
+	}
+	if canReplicate, err := instance.CanReplicateFrom(master); !canReplicate {
+		return instance, err
+	}
+
 	log.Infof("Will repoint %+v to master %+v", *instanceKey, *masterKey)
 
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "repoint"); merr != nil {
@@ -829,9 +842,9 @@ Cleanup:
 	return instance, err
 }
 
-// EnslaveSiblingsSimple is a convenience method for turning sublings of a slave to be its subordinates.
+// EnslaveSiblings is a convenience method for turning sublings of a slave to be its subordinates.
 // This uses normal connected replication (does not utilize Pseudo-GTID)
-func EnslaveSiblingsSimple(instanceKey *InstanceKey) (*Instance, int, error) {
+func EnslaveSiblings(instanceKey *InstanceKey) (*Instance, int, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, 0, err

@@ -24,7 +24,7 @@ import (
 )
 
 // clusterAlias maps a cluster name to an alias
-var clusterAliasMap map[string]string = make(map[string]string)
+var clusterAliasMap = make(map[string]string)
 
 func ApplyClusterAlias(clusterInfo *ClusterInfo) {
 	for pattern, _ := range config.Config.ClusterNameToAlias {

@@ -179,8 +179,9 @@ function openNodeModal(node) {
     addNodeModalDataAttribute("Binlog format", node.Binlog_format);
     addNodeModalDataAttribute("Has binary logs", booleanString(node.LogBinEnabled));
     var td = addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
-    $('#node_modal button[data-btn=enslave-siblings-simple]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=enslave-siblings]').appendTo(td.find("div"))
         
+    addNodeModalDataAttribute("Uptime", node.Uptime);
     addNodeModalDataAttribute("Cluster",
             '<a href="/web/cluster/'+node.ClusterName+'">'+node.ClusterName+'</a>');
     addNodeModalDataAttribute("Agent",
@@ -310,12 +311,12 @@ function openNodeModal(node) {
     	apiCommand("/api/regroup-slaves/"+node.Key.Hostname+"/"+node.Key.Port);
     });
 
-   	$('#node_modal button[data-btn=enslave-siblings-simple]').hide();
+   	$('#node_modal button[data-btn=enslave-siblings]').hide();
     if (node.LogBinEnabled && node.LogSlaveUpdatesEnabled) {
-    	$('#node_modal button[data-btn=enslave-siblings-simple]').show();
+    	$('#node_modal button[data-btn=enslave-siblings]').show();
     }
-    $('#node_modal button[data-btn=enslave-siblings-simple]').click(function(){
-    	apiCommand("/api/enslave-siblings-simple/"+node.Key.Hostname+"/"+node.Key.Port);
+    $('#node_modal button[data-btn=enslave-siblings]').click(function(){
+    	apiCommand("/api/enslave-siblings/"+node.Key.Hostname+"/"+node.Key.Port);
     });
 
     $('#node_modal button[data-btn=recover]').hide();
@@ -585,7 +586,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     }      
     popoverElement.find(".popover-content").html(contentHtml);
 
-    if (instance.lastCheckInvalidProblem() && instance.children && instance.children.length > 0) {
+    if (renderType == "cluster" && instance.lastCheckInvalidProblem() && instance.children && instance.children.length > 0) {
     	popoverElement.append('<h4 class="popover-footer"><div class="btn-group" data-btn-group="recover"><button type="button" class="btn btn-xs btn-default dropdown-toggle" data-toggle="dropdown"><span class="glyphicon glyphicon-heart text-danger"></span> Recover <span class="caret"></span> <span class="sr-only">Toggle Dropdown</span></button><ul class="dropdown-menu" role="menu"></ul></div></h4>');
         popoverElement.find("div[data-btn-group=recover] ul").append('<li><a href="#" data-btn="auto" data-command="recover-auto">Auto</a></li>');
         if (!instance.isMaster) {

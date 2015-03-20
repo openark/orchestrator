@@ -337,6 +337,9 @@ func (this *Instance) IsMasterOf(slave *Instance) bool {
 // CanReplicateFrom uses heursitics to decide whether this instacne can practically replicate from other instance.
 // Checks are made to binlog format, version number, binary logs etc.
 func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
+	if this.Key.Equals(&other.Key) {
+		return false, errors.New(fmt.Sprintf("instance cannot replicate from itself: %+v", this.Key))
+	}
 	if !other.LogBinEnabled {
 		return false, errors.New(fmt.Sprintf("instance does not have binary logs enabled: %+v", other.Key))
 	}

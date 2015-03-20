@@ -25,45 +25,183 @@ import (
 )
 
 const prompt string = `
-orchestrator [-c command] [-i instance] [... cli ] | http
+orchestrator [-c command] [-i instance] [--verbose|--debug] [... cli ] | http
 
 -i (instance): 
 	instance on which to operate, in "hostname" or "hostname:port" format.
 	Default port is 3306 (or DefaultInstancePort in config)
 	For some commands this argument can be ommitted altogether, and the
 	value is implicitly the local hostname.
--s (sibling/subinstance/destination)
+-s (Sibling/Subinstance/deStination)
 	associated instance. Meaning depends on specific command.
 	
 -c (command):			
-	move-up
-	move-up-slaves
-	move-below
-	repoint
-	enslave-siblings-simple
-	make-co-master
+
+	Topology refactoring using classic MySQL replication commands
+		(ie STOP SLAVE; START SLAVE UNTIL; CHANGE MASTER TO; ...)
+		These commands require connected topology: slaves that are up and running; a lagging, stopped or 
+		failed slave will disable use of most these commands. At least one, and typically two or more slaves 
+		will be stopped for a short time during these operations. 
+		
+		move-up
+			Move a slave one level up the topology; makes it replicate from its grandparent and become sibling of
+			its parent. It is OK if the instance's master is not replicating. Examples:
+			
+			orchestrator -c move-up -i slave.to.move.up.com:3306
+
+			orchestrator -c move-up
+				-i not given, implicitly assumed local hostname
+			
+		move-up-slaves
+			Moves slaves of the given instance one level up the topology, making them siblings of given instance.
+			This is a (faster) shortcut to executing move-up on all slaves of given instance.
+			Example:
+			
+			orchestrator -c move-up-slaves -i slave.whose.subslaves.will.move.up.com[:3306]
+
+		move-below
+			Moves a slave beneath its sibling. Both slaves must be actively replicating from same master.
+			The sibling will become instance's master. No action taken when sibling cannot act as master 
+			(e.g. has no binary logs, is of incompatible version, incompatible binlog format etc.)
+			Example:
+			
+			orchestrator -c move-below -i slave.to.move.com -s sibling.slave.under.which.to.move.com
+
+			orchestrator -c move-below -s sibling.slave.under.which.to.move.com
+				-i not given, implicitly assumed local hostname
+			
+		enslave-siblings
+			Turn all siblings of a slave into its sub-slaves. No action taken for siblings that cannot become
+			slaves of given instance (e.g. incompatible versions, binlog format etc.). This is a (faster) shortcut
+			to executing move-below for all siblings of the given instance. Example:
+			
+			orchestrator -c enslave-siblings -i slave.whose.siblings.will.move.below.com
+			
+		repoint
+			Make the given instance replicate from another instance without changing the binglog coordinates. There
+			are little sanity checks to this and this is a risky operation. Use cases are: a rename of the master's 
+			host, a corruption in relay-logs, move from beneath MaxScale & Binlog-server. Examples:
+			
+			orchestrator -c repoint -i slave.to.operate.on.com -s new.master.com
+			
+			orchestrator -c repoint -i slave.to.operate.on.com
+				The above will repoint the slave back to its existing master without change 
+			
+			orchestrator -c repoint
+				-i not given, implicitly assumed local hostname
+			
+		make-co-master
+			Create a master-master replication. Given instance is a slave which replicates directly from a master.
+			The master is then turned to be a slave of the instance. The master is expected to not be a slave.
+			The read_only property of the slve is unaffected by this operation. Examples:
 	
+			orchestrator -c make-co-master -i slave.to.turn.into.co.master.com
+			
+			orchestrator -c make-co-master
+				-i not given, implicitly assumed local hostname
+			
+
+	Topology refactoring using Pseudo-GTID
+		These operations require that the topology's master is periodically injected with pseudo-GTID,
+		and that the PseudoGTIDPattern configuration is setup accordingly. Also consider setting 
+		DetectPseudoGTIDQuery.
+		
+
+		match-below
+		match-up
+		rematch
+		multi-match-slaves
+		match-up-slaves
+		regroup-slaves
+
 	get-candidate-slave
-	
 	last-pseudo-gtid
-	match-below
-	match-up
-	rematch
-	multi-match-slaves
-	match-up-slaves
-	regroup-slaves
+
+	General replication commands
+		These commands issue various statements that relate to replication.
+		stop-slave
+			Issues a STOP SLAVE; command. Example:
+
+			orchestrator -c stop-slave -i slave.to.be.stopped.com
+			
+		start-slave
+			Issues a START SLAVE; command. Example:
+
+			orchestrator -c start-slave -i slave.to.be.started.com
+			
+		skip-query
+			On a failed replicating slave, skips a single query and attempts to resume replication.
+			Only applies when the replication seems to be broken on SQL thread (e.g. on duplicate
+			key error). Example:
+
+			orchestrator -c skip-query -i slave.with.broken.sql.thread.com
+			
+		reset-slave
+			Issues a RESET SLAVE command. Destructive to replication. Example:
+
+			orchestrator -c reset-slave -i slave.to.reset.com
+			
+		detach-slave
+			Stops replication and modified binlog position into an impossible, yet reversible, value.
+			This effectively means the replication becomes broken. See reattach-slave. Example:
+			
+			orchestrator -c detach-slave -i slave.whose.replication.will.break.com
+			
+			Issuing this on an already detached slave will do nothing.
+			
+		reattach-slave
+			Undo a detahc-slave operation. Reverses the binlog change into the original values, and 
+			resumes replication. Example:
+			
+			orchestrator -c reattach-slave -i detahced.slave.whose.replication.will.amend.com
+
+			Issuing this on an attached (i.e. normal) slave will do nothing.
 	
-	reset-slave
-	detach-slave
-	reattach-slave
+		set-read-only
+			Turn an instance read-only, via SET GLOBAL read_only := 1. Examples:
+			
+			orchestrator -c set-read-only -i instance.to.turn.read.only.com
+			
+			orchestrator -c set-read-only
+				-i not given, implicitly assumed local hostname
+			
+		set-writeable
+			Turn an instance writeable, via SET GLOBAL read_only := 0. Example:
+			
+			orchestrator -c set-writeable -i instance.to.turn.writeable.com
+			
+			orchestrator -c set-writeable
+				-i not given, implicitly assumed local hostname
+			
 	
-	set-read-only
-	set-writeable
-	
-	find
-	clusters
-	topology
-	which-instance
+	Informational commands
+		These commands provide information about topologies, replication connections, or otherwise orchstrator's
+		"inventory".
+		
+		find
+			Find instances whose hostname matches given regex pattern. Example:
+			
+			orchestrator -c find -pattern "backup.*us-east"
+			
+		clusters
+			List all clusters known to orchestrator. A cluster (aka topology, aka chain) is identified by its
+			master (or one of its master if more than one exists). Example:
+			
+			orchesrtator -c clusters
+				-i not given, implicitly assumed local hostname
+			
+		topology
+			Show an ascii-graph of a replication topology, given a member of that topology. Example:
+			
+			orchestrator -c topology -i instance.belonging.to.a.topology
+			
+			orchestrator -c topology
+			
+			Instance must be already known to orchestrator. Topology is generated by orchestrator's mapping
+			and not from synchronuous investigation of the instances. The generated topology may include
+			instances that are dead, or whose replication is broken.
+			
+		which-instance
 	which-cluster
 	which-cluster-instances
 	which-master

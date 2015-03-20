@@ -311,6 +311,11 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN uptime INT UNSIGNED NOT NULL AFTER last_seen
 	`,
+	`
+		ALTER TABLE
+			cluster_alias
+			ADD UNIQUE KEY alias_uidx (alias)
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance

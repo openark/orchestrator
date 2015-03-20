@@ -144,12 +144,12 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), instance.MasterKey.DisplayString()))
 		}
-	case "enslave-siblings-simple":
+	case "enslave-siblings":
 		{
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			_, _, err := inst.EnslaveSiblingsSimple(instanceKey)
+			_, _, err := inst.EnslaveSiblings(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -309,6 +309,35 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(fmt.Sprintf("%+v:%s", *coordinates, text))
 		}
+
+	case "stop-slave":
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			_, err := inst.StopSlave(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
+	case "start-slave":
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			_, err := inst.StartSlave(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
 	case "reset-slave":
 		{
 			if instanceKey == nil {
@@ -449,6 +478,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		}
 	case "find":
 		{
+			if pattern == "" {
+				log.Fatal("No pattern given")
+			}
 			instances, err := inst.FindInstances(pattern)
 			if err != nil {
 				log.Fatale(err)
