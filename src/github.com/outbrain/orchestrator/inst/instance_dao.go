@@ -1447,11 +1447,12 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 	// MySQL's RESET SLAVE is done correctly; however SHOW SLAVE STATUS still returns old hostnames etc
 	// and only resets till after next restart. This leads to orchestrator still thinking the instance replicates
 	// from old host. We therefore forcibly modify the hostname.
+	// RESET SLAVE ALL command solves this, but only as of 5.6.3
 	_, err = ExecInstance(instanceKey, `change master to master_host='_'`)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
-	_, err = ExecInstance(instanceKey, `reset slave`)
+	_, err = ExecInstance(instanceKey, `reset slave /*!50603 all */`)
 	if err != nil {
 		return instance, log.Errore(err)
 	}

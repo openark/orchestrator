@@ -267,7 +267,7 @@ function moveBelow(node, siblingNode) {
 	    			if (operationResult.Code == "ERROR") {
 	    				addAlert(operationResult.Message)
 	    			} else {
-	    				location.reload();
+	    				reloadWithOperationResult(operationResult);
 	    			}	
 	            }, "json");					
 		}
@@ -293,7 +293,7 @@ function moveUp(node, grandparentNode) {
 	    			if (operationResult.Code == "ERROR") {
 	    				addAlert(operationResult.Message)
 	    			} else {
-	    				location.reload();
+	    				reloadWithOperationResult(operationResult);
 	    			}	
 	            }, "json");					
 		}
@@ -318,7 +318,7 @@ function makeCoMaster(node, childNode) {
 	    			if (operationResult.Code == "ERROR") {
 	    				addAlert(operationResult.Message)
 	    			} else {
-	    				location.reload();
+	    				reloadWithOperationResult(operationResult);
 	    			}	
 	            }, "json");					
 		}
@@ -344,7 +344,7 @@ function matchBelow(node, otherNode) {
 	    			if (operationResult.Code == "ERROR") {
 	    				addAlert(operationResult.Message)
 	    			} else {
-	    				location.reload();
+	    				reloadWithOperationResult(operationResult);
 	    			}	
 	            }, "json");					
 		}
@@ -496,7 +496,6 @@ function postVisualizeInstances(nodesMap) {
     instances.forEach(function (instance) {
     	var draggedNodeId = $(this).attr("data-nodeid"); 
     	$(".popover.instance[data-nodeid="+instance.id+"]").attr("data-dc-color", dcColorsMap[instance.DataCenter]);
-        console.log($(".popover.instance[data-nodeid="+instance.id+"]").attr("data-dc-color"));
     });
 }
 
@@ -528,7 +527,7 @@ function makeMaster(instance) {
 				if (operationResult.Code == "ERROR") {
 					addAlert(operationResult.Message)
 				} else {
-					location.reload();
+    				reloadWithOperationResult(operationResult);
 				}	
 	        }, "json");
 		}
@@ -549,7 +548,7 @@ function makeLocalMaster(instance) {
 				if (operationResult.Code == "ERROR") {
 					addAlert(operationResult.Message)
 				} else {
-					location.reload();
+                    reloadWithOperationResult(operationResult);
 				}	
 	        }, "json");
 		}

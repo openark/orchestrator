@@ -122,7 +122,7 @@ func (this *HttpAPI) Refresh(params martini.Params, r render.Render, req *http.R
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance refreshedh: %+v", instanceKey)})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance refreshed: %+v", instanceKey)})
 }
 
 // Forget removes an instance entry fro backend database
@@ -250,7 +250,7 @@ func (this *HttpAPI) MoveUp(params martini.Params, r render.Render, req *http.Re
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: "Instance moved up", Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v moved up", instanceKey), Details: instance})
 }
 
 // MoveUpSlaves attempts to move up all slaves of an instance
@@ -292,7 +292,7 @@ func (this *HttpAPI) MakeCoMaster(params martini.Params, r render.Render, req *h
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: "Instance made co-master", Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance made co-master: %+v", instance.Key), Details: instance})
 }
 
 // ResetSlave makes a slave forget about its master, effectively breaking the replication
@@ -313,7 +313,7 @@ func (this *HttpAPI) ResetSlave(params martini.Params, r render.Render, req *htt
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: "Slave reset", Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave reset on %+v", instance.Key), Details: instance})
 }
 
 // DetachSlave corrupts a slave's binlog corrdinates (though encodes it in such way
@@ -335,7 +335,7 @@ func (this *HttpAPI) DetachSlave(params martini.Params, r render.Render, req *ht
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: "Slave detached", Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave detached: %+v", instance.Key), Details: instance})
 }
 
 // ReattachSlave reverts a DetachSlave commands by reassigning the correct
@@ -357,7 +357,7 @@ func (this *HttpAPI) ReattachSlave(params martini.Params, r render.Render, req *
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: "Slave reattached", Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave reattached", instance.Key), Details: instance})
 }
 
 // MoveBelow attempts to move an instance below its supposed sibling
@@ -621,7 +621,7 @@ func (this *HttpAPI) SkipQuery(params martini.Params, r render.Render, req *http
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: "Query skipped", Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Query skipped on %+v", instance.Key), Details: instance})
 }
 
 // StartSlave starts replication on given instance
@@ -642,7 +642,7 @@ func (this *HttpAPI) StartSlave(params martini.Params, r render.Render, req *htt
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: "Slave started", Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave started: %+v", instance.Key), Details: instance})
 }
 
 // StopSlave stops replication on given instance
@@ -663,7 +663,7 @@ func (this *HttpAPI) StopSlave(params martini.Params, r render.Render, req *http
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: "Slave stopped", Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave stopped: %+v", instance.Key), Details: instance})
 }
 
 // StopSlaveNicely stops replication on given instance, such that sql thead is aligned with IO thread
@@ -684,7 +684,7 @@ func (this *HttpAPI) StopSlaveNicely(params martini.Params, r render.Render, req
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: "Slave stopped nicely", Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave stopped nicely: %+v", instance.Key), Details: instance})
 }
 
 // SetReadOnly sets the global read_only variable
@@ -752,7 +752,7 @@ func (this *HttpAPI) KillQuery(params martini.Params, r render.Render, req *http
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: "Slave stopped", Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Query killed on : %+v", instance.Key), Details: instance})
 }
 
 // Cluster provides list of instances in given cluster

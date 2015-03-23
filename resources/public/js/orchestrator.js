@@ -91,7 +91,9 @@ function commonSuffixLength(strings) {
 
 
 function addAlert(alertText, alertClass) {
-	if(typeof(alertClass)==='undefined') alertClass = "danger";
+	if(typeof(alertClass)==='undefined') {
+        alertClass = "danger";
+    }
 	$("#alerts_container").append(
 		'<div class="alert alert-'+alertClass+' alert-dismissable">'
 				+ '<button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>'
@@ -112,10 +114,20 @@ function apiCommand(uri) {
 		if (operationResult.Code == "ERROR") {
 			addAlert(operationResult.Message)
 		} else {
-			location.reload();
+			reloadWithOperationResult(operationResult);
 		}	
     }, "json");	
     return false;
+}
+
+
+function reloadWithMessage(msg) {
+    window.location.href = window.location.href.split("#")[0].split("?")[0] + "?orchestrator-msg="+ encodeURIComponent(msg);
+}
+
+function reloadWithOperationResult(operationResult) {
+    var msg = operationResult.Message;
+    reloadWithMessage(msg);
 }
 
 
@@ -635,6 +647,15 @@ function onClusters(func) {
 	onClustersListeners.push(func);
 } 
 
+
+function getParameterByName(name) {
+    name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+    var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+        results = regex.exec(location.search);
+    return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+}
+
+
 $(document).ready(function() {
 	$(".navbar-nav li").removeClass("active");
 	$(".navbar-nav li[data-nav-page='" + activePage() + "']").addClass("active");
@@ -661,6 +682,11 @@ $(document).ready(function() {
 	if (contextMenuVisible() == "true") {
 		showContextMenu();
 	}
+    var orchestratorMsg = getParameterByName("orchestrator-msg")
+    if (orchestratorMsg) {
+        addInfo(orchestratorMsg)
+        history.pushState(null, document.title, location.href.split("?orchestrator-msg=")[0])
+    }
 });
 
 
