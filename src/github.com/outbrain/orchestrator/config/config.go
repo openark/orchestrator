@@ -58,8 +58,8 @@ type Configuration struct {
 	MaintenanceOwner                           string   // (Default) name of maintenance owner to use if none provided
 	ReasonableMaintenanceReplicationLagSeconds int      // Above this value move-up and move-below are blocked
 	MaintenanceExpireMinutes                   uint     // Minutes after which a maintenance flag is considered stale and is cleared
-	PreFailoverProcesses                       []string // Processes to execute before doing a master failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failedHost}, {failedPort}, {successorHost}, {successorPort}
-	PostFailoverProcesses                      []string // Processes to execute after doing a master failover (order of execution undefined). Will be provided with old-master-hostname, new-master-hostname arguments. May and should use some of these placeholders: {failedHost}, {failedPort}, {successorHost}, {successorPort}
+	PreFailoverProcesses                       []string // Processes to execute before doing a failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failedPort}, {successorHost}, {successorPort}
+	PostFailoverProcesses                      []string // Processes to execute after doing a failover (order of execution undefined). Will be provided with old-master-hostname, new-master-hostname arguments. May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failedPort}, {successorHost}, {successorPort}
 	AuditLogFile                               string   // Name of log file for audit operations. Disabled when empty.
 	AuditPageSize                              int
 	RemoveTextFromHostnameDisplay              string // Text to strip off the hostname on cluster/clusters pages

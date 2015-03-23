@@ -24,6 +24,7 @@ import (
 	"github.com/outbrain/orchestrator/os"
 	"regexp"
 	"sort"
+	"strings"
 )
 
 type InstancesByCountSlaves [](*inst.Instance)
@@ -41,30 +42,6 @@ func (this InstancesByCountSlaves) Less(i, j int) bool {
 func RecoverDeadMaster(failedInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
 
 	inst.AuditOperation("recover-dead-master", failedInstanceKey, "problem found; will recover")
-	var preProcessesFailures []error = []error{}
-	barrier := make(chan error)
-	for _, command := range config.Config.PreFailoverProcesses {
-		command := command
-		/*
-			command = strings.Replace(command, "{failedHost}", oldMaster.Hostname, -1)
-			command = strings.Replace(command, "{failedPort}", fmt.Sprintf("%d", oldMaster.Port), -1)
-			command = strings.Replace(command, "{successorHost}", newMaster.Hostname, -1)
-			command = strings.Replace(command, "{successorPort}", fmt.Sprintf("%d", newMaster.Port), -1)
-		*/
-		var cmdErr error = nil
-		go func() {
-			defer func() { barrier <- cmdErr }()
-			cmdErr = os.CommandRun(command)
-		}()
-	}
-	for _, _ = range config.Config.PreFailoverProcesses {
-		if cmdErr := <-barrier; cmdErr != nil {
-			preProcessesFailures = append(preProcessesFailures, cmdErr)
-		}
-	}
-	if len(preProcessesFailures) > 0 {
-		return nil, preProcessesFailures[0]
-	}
 
 	log.Debugf("RecoverDeadMaster: will recover %+v", *failedInstanceKey)
 	_, _, _, candidateSlave, err := inst.RegroupSlaves(failedInstanceKey, nil)
@@ -213,6 +190,53 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 	return false, nil
 }
 
+// executeCheckAndRecoverFunction will choose the correct check & recovery function based on analysis.
+// It executes the function synchronuously
+func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, error) {
+	var checkAndRecoverFunction func(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, error) = nil
+	if analysisEntry.Analysis == inst.DeadMaster {
+		checkAndRecoverFunction = checkAndRecoverDeadMaster
+	} else if analysisEntry.Analysis == inst.DeadIntermediateMaster || analysisEntry.Analysis == inst.DeadIntermediateMasterAndSomeSlaves {
+		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
+	}
+	if checkAndRecoverFunction == nil {
+		// Unhandled problem type
+		return false, nil
+	}
+	// we have a recovery function; its execution still depends on filters if not disabled.
+
+	// Execute general pre-processes
+	{
+		var preProcessesFailures []error = []error{}
+		barrier := make(chan error)
+		for _, command := range config.Config.PreFailoverProcesses {
+			command := command
+
+			command = strings.Replace(command, "{failureType}", string(analysisEntry.Analysis), -1)
+			command = strings.Replace(command, "{failureDescription}", analysisEntry.Description, -1)
+			command = strings.Replace(command, "{failedHost}", analysisEntry.AnalyzedInstanceKey.Hostname, -1)
+			command = strings.Replace(command, "{failedPort}", fmt.Sprintf("%d", analysisEntry.AnalyzedInstanceKey.Port), -1)
+			command = strings.Replace(command, "{failureCluster}", analysisEntry.ClusterName, -1)
+
+			var cmdErr error = nil
+			go func() {
+				defer func() { barrier <- cmdErr }()
+				cmdErr = os.CommandRun(command)
+			}()
+		}
+		for _, _ = range config.Config.PreFailoverProcesses {
+			if cmdErr := <-barrier; cmdErr != nil {
+				preProcessesFailures = append(preProcessesFailures, cmdErr)
+			}
+		}
+		if len(preProcessesFailures) > 0 {
+			return false, preProcessesFailures[0]
+		}
+	}
+
+	return checkAndRecoverFunction(analysisEntry, skipFilters)
+}
+
 func CheckAndRecover(specificInstance *inst.InstanceKey, skipFilters bool) (bool, error) {
 	actionTaken := false
 	replicationAnalysis, err := inst.GetReplicationAnalysis()
@@ -226,21 +250,12 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, skipFilters bool) (bool
 				continue
 			}
 		}
-		if analysisEntry.Analysis == inst.DeadMaster {
-			if specificInstance != nil && skipFilters {
-				// force mode. Keep it synchronuous
-				actionTaken, err = checkAndRecoverDeadMaster(analysisEntry, skipFilters)
-			} else {
-				go checkAndRecoverDeadMaster(analysisEntry, skipFilters)
-			}
-		}
-		if analysisEntry.Analysis == inst.DeadIntermediateMaster || analysisEntry.Analysis == inst.DeadIntermediateMasterAndSomeSlaves {
-			if specificInstance != nil && skipFilters {
-				// force mode. Keep it synchronuous
-				actionTaken, err = checkAndRecoverDeadIntermediateMaster(analysisEntry, skipFilters)
-			} else {
-				go checkAndRecoverDeadIntermediateMaster(analysisEntry, skipFilters)
-			}
+
+		if specificInstance != nil && skipFilters {
+			// force mode. Keep it synchronuous
+			actionTaken, err = executeCheckAndRecoverFunction(analysisEntry, skipFilters)
+		} else {
+			go executeCheckAndRecoverFunction(analysisEntry, skipFilters)
 		}
 	}
 	return actionTaken, err

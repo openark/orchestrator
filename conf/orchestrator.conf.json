@@ -25,7 +25,7 @@
   "ReasonableReplicationLagSeconds": 10,
   "ReasonableMaintenanceReplicationLagSeconds": 20,
   "PreFailoverProcesses": [
-  	"echo 'failing over:' h:{failedHost} p:{failedPort} th:{successorHost} tp:{successorPort} > /tmp/a.txt"
+  	"echo 'Cluster is: {failureCluster}. Reason: {failureDescription}' | mail -s 'orchestrator thinks there should be a fail over on {failedHost} due to {failureType}' admin@localhost"
   ],
   "PostFailoverProcesses": [
   	"echo 'failed over:' h:{failedHost} p:{failedPort} th:{successorHost} tp:{successorPort}"
