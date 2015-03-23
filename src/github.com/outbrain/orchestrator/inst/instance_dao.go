@@ -372,8 +372,10 @@ func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (
 		return "", 0, log.Errore(err)
 	}
 
+	clusterNameByInstanceKey := fmt.Sprintf("%s:%d", instanceKey.Hostname, instanceKey.Port)
 	var clusterName string
 	var replicationDepth uint
+	var masterMasterKey InstanceKey
 	err = db.QueryRow(`
        	select 
        		if (
@@ -381,18 +383,22 @@ func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (
        			cluster_name,
 	       		ifnull(concat(max(hostname), ':', max(port)), '')
 	       	) as cluster_name,
-	       	ifnull(max(replication_depth)+1, 0) as replication_depth
+	       	ifnull(max(replication_depth)+1, 0) as replication_depth,
+	       	ifnull(max(master_host), '') as master_master_host,
+	       	ifnull(max(master_port), 0) as master_master_port
        	from database_instance 
 		 	where hostname=? and port=?`,
-		masterKey.Hostname, masterKey.Port).Scan(
-		&clusterName, &replicationDepth,
-	)
+		masterKey.Hostname, masterKey.Port).Scan(&clusterName, &replicationDepth, &masterMasterKey.Hostname, &masterMasterKey.Port)
 
 	if err != nil {
 		return "", 0, log.Errore(err)
 	}
 	if clusterName == "" {
-		clusterName = fmt.Sprintf("%s:%d", instanceKey.Hostname, instanceKey.Port)
+		clusterName = clusterNameByInstanceKey
+	}
+	if masterMasterKey.Equals(instanceKey) && clusterName == clusterNameByInstanceKey {
+		// circular replication. Avoid infinite ++ on replicationDepth
+		replicationDepth = 0
 	}
 	return clusterName, replicationDepth, err
 }

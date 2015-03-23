@@ -918,7 +918,7 @@ func (this *HttpAPI) ReloadClusterAlias(params martini.Params, r render.Render, 
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: "Cluster cache reloaded"})
+	r.JSON(200, &APIResponse{Code: OK, Message: "Cluster alias cache reloaded"})
 }
 
 // Agents provides complete list of registered agents (See https://github.com/outbrain/orchestrator-agent)
