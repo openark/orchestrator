@@ -152,8 +152,8 @@ func ContinuousDiscovery() {
 			if !elected {
 				// Take this opportunity to refresh yourself
 				inst.LoadHostnameResolveCacheFromDatabase()
-				inst.ReadClusterAliases()
 			}
+			inst.ReadClusterAliases()
 			HealthTest()
 		case <-recoverTick:
 			ClearActiveRecoveries()

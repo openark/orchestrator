@@ -86,6 +86,8 @@ func standardHttp(discovery bool) {
 	}))
 	m.Use(martini.Static("resources/public"))
 
+	inst.SetMaintenanceOwner(orchestrator.ThisHostname)
+
 	log.Info("Starting HTTP")
 
 	if discovery {
