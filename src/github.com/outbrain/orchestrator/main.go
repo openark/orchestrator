@@ -27,6 +27,13 @@ import (
 const prompt string = `
 orchestrator [-c command] [-i instance] [--verbose|--debug] [... cli ] | http
 
+Cheatsheet:
+	Run orchestrator in HTTP mode:
+	
+	orchestrator --debug http
+	
+	For CLI executuon see details below.
+	
 -i (instance): 
 	instance on which to operate, in "hostname" or "hostname:port" format.
 	Default port is 3306 (or DefaultInstancePort in config)
@@ -35,7 +42,9 @@ orchestrator [-c command] [-i instance] [--verbose|--debug] [... cli ] | http
 -s (Sibling/Subinstance/deStination)
 	associated instance. Meaning depends on specific command.
 	
--c (command):			
+-c (command):
+	Listed below are all available commands; all of which apply for CLI execution (ignored by HTTP mode).
+	Different flags are required for different commands; see specific documentation per commmand.
 
 	Topology refactoring using classic MySQL replication commands
 		(ie STOP SLAVE; START SLAVE UNTIL; CHANGE MASTER TO; ...)
@@ -348,12 +357,28 @@ orchestrator [-c command] [-i instance] [--verbose|--debug] [... cli ] | http
 			UnseenAgentForgetHours. If you happen to know a machine is decommisioned, for example, it 
 			can be nice to remove it from the repository before it auto-expires. Example:  
 
-			orchestrator -c forget -i instance.to.forget
+			orchestrator -c forget -i instance.to.forget.com
 			
 			Orchestrator will *not* resolve CNAMEs and VIPs for given instance.
 	
 		begin-maintenance
+			Request a maintenance lock on an instance. Topology changes require placing locks on the minimal set of
+			affected instances, so as to avoid an incident of two uncoordinated operations on a smae instance (leading
+			to possible chaos). Locks are placed in the backend database, and so multiple orchestrator instances are safe.
+			Operations automatically acquire locks and release them. This command manually acquires a lock, and will
+			block other operations on the instance until lock is released. 
+			Note that orchestrator automatically assumed locks to be expired after MaintenanceExpireMinutes (in config).
+			Example:
+			
+			orchestrator -c begin-maintenance -i instance.to.lock.com
+			
 		end-maintenance
+			Remove maintenance lock; such lock may have been gained by an explicit begin-maintenance command implicitly
+			by a topology change. You should generally only remove locks you have placed manually; orchestrator will 
+			automatically expire locks after MaintenanceExpireMinutes (in config).
+			Example:
+			
+			orchestrator -c end-maintenance -i locked.instance.com
 	
 	Crash recovery commands
 	
