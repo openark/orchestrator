@@ -156,8 +156,10 @@ func ContinuousDiscovery() {
 			inst.ReadClusterAliases()
 			HealthTest()
 		case <-recoverTick:
-			ClearActiveRecoveries()
-			CheckAndRecover(nil, false)
+			if elected {
+				ClearActiveRecoveries()
+				CheckAndRecover(nil, false)
+			}
 		}
 	}
 }
