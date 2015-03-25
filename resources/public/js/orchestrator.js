@@ -529,13 +529,12 @@ function normalizeInstances(instances, maintenanceList) {
     });
     
     if (isCompactDisplay()) {
-    	compactInstances(instances);
+    	instancesMap = compactInstances(instances, instancesMap);
     }
-    
     return instancesMap;
 }
 
-function compactInstances(instances) {
+function compactInstances(instances, instancesMap) {
     instances.forEach(function (instance) {
     	if (instance.children) {
     		// Aggregating children who are childless
@@ -581,12 +580,14 @@ function compactInstances(instances) {
 				childlessChildren.forEach(function (child) {
         			if (!child.isAggregate) {
         				instance.children.splice( $.inArray(child, instance.children), 1 );
+        				delete instancesMap[child.id];
         			}
         		});
     		}
 
     	}
     });	
+    return instancesMap;
 }
 
 function renderInstanceElement(popoverElement, instance, renderType) {
