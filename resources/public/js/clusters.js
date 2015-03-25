@@ -62,16 +62,17 @@ $(document).ready(function () {
 	    });
 
         clusters.forEach(function (cluster) {
-    		$("#clusters").append('<div xmlns="http://www.w3.org/1999/xhtml" class="popover instance right" data-cluster-name="'+cluster.ClusterName+'"><div class="arrow"></div><h3 class="popover-title"><a href="/web/cluster/'+cluster.ClusterName+'"><span>'+cluster.ClusterName+'</span></a></h3><div class="popover-content"></div></div>');
+    		$("#clusters").append('<div xmlns="http://www.w3.org/1999/xhtml" class="popover instance right" data-cluster-name="'+cluster.ClusterName+'"><div class="arrow"></div><h3 class="popover-title"><div class="pull-left"><a href="/web/cluster/'+cluster.ClusterName+'"><span>'+cluster.ClusterName+'</span></a></div><div class="pull-right"></div>&nbsp;<br/>&nbsp;</h3><div class="popover-content"></div></div>');
     		var popoverElement = $("#clusters [data-cluster-name='" + cluster.ClusterName + "'].popover");
 
             if (typeof removeTextFromHostnameDisplay != "undefined" && removeTextFromHostnameDisplay()) {
               	var title = cluster.ClusterName.replace(removeTextFromHostnameDisplay(), '');
-                popoverElement.find("h3 a span").html(title);
+                popoverElement.find("h3 .pull-left a span").html(title);
             } 
     		if (cluster.ClusterAlias != "") {
-                popoverElement.find("h3 a span").addClass("small");
-                popoverElement.find("h3").prepend('<a href="/web/cluster/alias/'+encodeURIComponent(cluster.ClusterAlias)+'"><strong>'+cluster.ClusterAlias+'</strong></a><br/>');
+                popoverElement.find("h3 .pull-left a span").addClass("small");
+                popoverElement.find("h3 .pull-left").prepend('<a href="/web/cluster/alias/'+encodeURIComponent(cluster.ClusterAlias)+'"><strong>'+cluster.ClusterAlias+'</strong></a><br/>');
+                popoverElement.find("h3 .pull-right").append('<a href="/web/cluster/alias/'+encodeURIComponent(cluster.ClusterAlias)+'?compact=true"><span class="glyphicon glyphicon-compressed" title="Compact view"></span></a>');
     		}
     	    var contentHtml = ''
     				+ '<div>Instances: <div class="pull-right"></div></div>'

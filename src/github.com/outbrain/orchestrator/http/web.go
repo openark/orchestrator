@@ -65,6 +65,7 @@ func (this *HttpWeb) Cluster(params martini.Params, r render.Render, req *http.R
 		"pseudoGTIDModeEnabled":         (config.Config.PseudoGTIDPattern != ""),
 		"authorizedForAction":           isAuthorizedForAction(req, user),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
+		"compactDisplay":                req.URL.Query().Get("compact"),
 	})
 }
 

@@ -96,7 +96,7 @@ function generateInstanceDivs(nodesMap) {
        		return false;
         });
         */
-        if (!isAuthorizedForAction() || nodesMap[draggedNodeId].lastCheckInvalidProblem() || nodesMap[draggedNodeId].notRecentlyCheckedProblem()) {
+        if (!isAuthorizedForAction() || nodesMap[draggedNodeId].lastCheckInvalidProblem() || nodesMap[draggedNodeId].notRecentlyCheckedProblem() || nodesMap[draggedNodeId].isAggregate) {
             $(".popover.instance[data-duplicate-node] h3").click(function () {
                	openNodeModal(nodesMap[draggedNodeId]);
             	return false;
@@ -162,7 +162,7 @@ function moveInstance(node, droppableNode, shouldApply) {
 		return null;
     }
 	if (clusterOperationPseudoGTIDMode) {
-		if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem) {
+		if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem || droppableNode.isAggregate) {
 			// Obviously can't handle.
 			return null;
 		}
@@ -205,7 +205,7 @@ function moveInstance(node, droppableNode, shouldApply) {
 		return null;
 	}
 	if (instancesAreSiblings(node, droppableNode)) {
-		if (node.hasProblem || droppableNode.hasProblem) {
+		if (node.hasProblem || droppableNode.hasProblem || droppableNode.isAggregate) {
 			return null;
 		}
 		if (shouldApply) {
@@ -592,9 +592,15 @@ $(document).ready(function () {
     	var visualAlias = (alias ? alias : currentClusterName())
     	document.title = document.title.split(" - ")[0] + " - " + visualAlias;
     	$("#cluster_container").append('<div class="floating_background">'+visualAlias+'</div>');
+        if (isCompactDisplay()) {
+            $("#dropdown-context").append('<li><a data-command="expand-display" href="'+location.href.split("?")[0]+'?compact=false">Expand display</a></li>');    
+        } else {
+            $("#dropdown-context").append('<li><a data-command="compact-display" href="'+location.href.split("?")[0]+'?compact=true">Compact display</a></li>');    
+        }
+        $("#dropdown-context").append('<li><a data-command="colorize-dc">Colorize DC</a></li>');    
         $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="'+clusterInfo.ClusterAlias+'">Alias: '+alias+'</a></li>');           
         $("#dropdown-context").append('<li><a data-command="anonymize">Anonymize</a></li>');           
-        $("#dropdown-context").append('<li><a data-command="colorize-dc">Colorize DC</a></li>');           
+
     }, "json");
     
     if (isPseudoGTIDModeEnabled()) {
@@ -623,7 +629,6 @@ $(document).ready(function () {
     	$("#cluster_container div.floating_background").html("");
     });    
     $("body").on("click", "a[data-command=colorize-dc]", function(event) {
-        console.log("here");
         $(".popover.instance[data-dc-color]").each(function () {
             console.log($(this).attr("data-dc-color"))
             $(this).css("border-color", $(this).attr("data-dc-color"));

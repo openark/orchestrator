@@ -53,8 +53,6 @@ function visualizeInstances(nodesMap) {
     svgWidth = Math.min(svgWidth, (maxDepth + 1) * horizontalSpacing);
     var svgHeight = $("#cluster_container").height() - margin.top - margin.bottom;
     svgHeight = Math.max(svgHeight, maxNodesAtDepth * verticalSpacing);
-    // svgWidth = 1560 - margin.right - margin.left;
-    // svgHeight = 800 - margin.top - margin.bottom;
 
     var i = 0;
     var duration = 750;
@@ -71,11 +69,6 @@ function visualizeInstances(nodesMap) {
         .attr(
             "transform",
             "translate(" + margin.left + "," + margin.top + ")");
-	/*
-    var svg = d3.select("#cluster_container").append("svg").attr("width",
-            svgWidth + margin.right + margin.left).attr("height",
-            svgHeight + margin.top + margin.bottom).attr("xmlns", "http://www.w3.org/2000/svg").attr("version", "1.1");
-	*/
 
     var root = null;
     nodesList.forEach(function (node) {
@@ -140,16 +133,11 @@ function visualizeInstances(nodesMap) {
             return d._children ? "lightsteelblue" : "#fff";
         });
 
-        //nodeUpdate.select("text").style("fill-opacity", 1);
-
         // Transition exiting nodes to the parent's new position.
         var nodeExit = node.exit().transition().duration(duration).attr("transform", function (d) {
             return "translate(" + source.y + "," + source.x + ")";
         }).remove();
         nodeExit.select("circle").attr("r", 1e-6);
-
-        //nodeExit.select("text").style("fill-opacity", 1e-6);
-        //nodeExit.select("foreignObject").style("fill-opacity", 1e-6);
 
         // Update the links…
         var link = svg.selectAll("path.link").data(links, function (d) {

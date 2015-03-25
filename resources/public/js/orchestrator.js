@@ -3,6 +3,14 @@ var refreshIntervalSeconds = 60 ; // seconds
 var secondsTillRefresh = refreshIntervalSeconds; 
 var nodeModalVisible = false;
 
+var errorMapping = {
+   		"inMaintenanceProblem": {"badge": "label-info", "description": "In maintenance"}, 
+   		"lastCheckInvalidProblem": {"badge": "label-fatal", "description": "Last check invalid"}, 
+   		"notRecentlyCheckedProblem": {"badge": "label-stale", "description": "Not recently checked (stale)"}, 
+   		"notReplicatingProblem": {"badge": "label-danger", "description": "Not replicating"}, 
+   		"replicationLagProblem": {"badge": "label-warning", "description": "Replication lag"}
+	};
+
 function startRefreshTimer() {
     setInterval(function() {
     	if (nodeModalVisible) {
@@ -156,6 +164,9 @@ function addModalAlert(alertText) {
 }
 
 function openNodeModal(node) {
+	if (node.isAggregate) {
+		return false;
+	}
 	nodeModalVisible = true;
     $('#node_modal #modalDataAttributesTable button[data-btn][data-grouped!=true]').appendTo("#node_modal .modal-footer");
     $('#node_modal #modalDataAttributesTable [data-btn-group]').appendTo("#node_modal .modal-footer");
@@ -375,6 +386,7 @@ function normalizeInstance(instance) {
     instance.isCandidateMaster = false;
     instance.isMostAdvancedOfSiblings = false;
     instance.isVirtual = false;
+    instance.isAggregate = false;
 }
 
 function normalizeInstanceProblem(instance) {
@@ -470,7 +482,7 @@ function normalizeInstances(instances, maintenanceList) {
         	instance.masterNode = parent;
             // create child array if it doesn't exist
             parent.children.push(instance);
-            //(parent.contents || (parent.contents = [])).push(instance);
+            // (parent.contents || (parent.contents = [])).push(instance);
         } else {
             // parent is null or missing
         	instance.hasMaster = false;
@@ -490,7 +502,8 @@ function normalizeInstances(instances, maintenanceList) {
     
     instances.forEach(function (instance) {
     	if (instance.isMaster && instance.parent != null && instance.parent.parent != null && instance.parent.parent.id == instance.id) {
-    	    // In case there's a master-master setup, introduce a virtual node that is parent of both.
+    	    // In case there's a master-master setup, introduce a virtual node
+			// that is parent of both.
     		// This is for visualization purposes...
     	    var virtualCoMastersRoot = createVirtualInstance();
     		coMaster = instance.parent;
@@ -515,77 +528,147 @@ function normalizeInstances(instances, maintenanceList) {
     	} 
     });
     
+    if (isCompactDisplay()) {
+    	compactInstances(instances);
+    }
+    
     return instancesMap;
+}
+
+function compactInstances(instances) {
+    instances.forEach(function (instance) {
+    	if (instance.children) {
+    		// Aggregating children who are childless
+        	childlessChildren = instance.children.filter(function(child) {
+        		if (child.children && child.children.length > 0) {
+        			return false
+        		}
+    			return true;
+    		});
+        	if (childlessChildren.length > 1) {
+        		// OK, more than one childless child. Aggregate!
+        		var aggregatedChild = childlessChildren[0]
+        		aggregatedChild.isAggregate = true;
+        		aggregatedChild.title = "[aggregation]";
+        		aggregatedChild.canonicalTitle = aggregatedChild.title;
+        		var aggregatedProblems = {}
+        		aggregatedChild.aggregatedInstances = childlessChildren; // includes itself
+
+                function incrementProblems(problemType) {
+                	if (aggregatedProblems[problemType] > 0) {
+                		aggregatedProblems[problemType] = aggregatedProblems[problemType] + 1;
+                	} else {
+                		aggregatedProblems[problemType] = 1;
+                	}
+                }
+        		aggregatedChild.aggregatedProblems = aggregatedProblems;
+        		
+				childlessChildren.forEach(function (instance) {
+			        if (instance.inMaintenanceProblem()) {
+			        	incrementProblems(instance.ClusterName, "inMaintenanceProblem")
+			        }
+			        if (instance.lastCheckInvalidProblem()) {
+			        	incrementProblems("lastCheckInvalidProblem")
+			        } else if (instance.notRecentlyCheckedProblem()) {
+			        	incrementProblems("notRecentlyCheckedProblem")
+			        } else if (instance.notReplicatingProblem()) {
+			        	incrementProblems("notReplicatingProblem")
+			        } else if (instance.replicationLagProblem()) {
+			        	incrementProblems("replicationLagProblem")
+			        }
+        		});
+
+				childlessChildren.forEach(function (child) {
+        			if (!child.isAggregate) {
+        				instance.children.splice( $.inArray(child, instance.children), 1 );
+        			}
+        		});
+    		}
+
+    	}
+    });	
 }
 
 function renderInstanceElement(popoverElement, instance, renderType) {
 	popoverElement.attr("data-nodeid", instance.id);
 	popoverElement.find("h3").attr('title', instance.title);
 	popoverElement.find("h3").html('&nbsp;<div class="pull-left">'+
-	instance.canonicalTitle + '</div><div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></a></div>');
+			instance.canonicalTitle + '</div><div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></a></div>');
 	var indicateLastSeenInStatus = false;
 
-    if (instance.isFirstChildInDisplay) {
-    	popoverElement.addClass("first-child-in-display");
-        popoverElement.attr("data-first-child-in-display", "true");
-    } 
-    if (instance.usingGTID) {
-    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using GTID"></span> ');
-    } 
-    if (instance.UsingPseudoGTID) {
-    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using Pseudo GTID"></span> ');
-    } 
-    if (!instance.ReadOnly) {
-    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-pencil" title="Writeable"></span> ');
-    } 
-    if (instance.isMostAdvancedOfSiblings) {
-    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-star" title="Most advanced slave"></span> ');
-    } 
-    if (instance.CountMySQLSnapshots > 0) {
-    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-camera" title="'+instance.CountMySQLSnapshots +' snapshots"></span> ');
-    } 
-    if (instance.HasReplicationFilters) {
-    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-filter" title="Using replication filters"></span> ');
-    } 
-    if (instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled && !(instance.isMaster && !instance.isCoMaster)) {
-    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-forward" title="Logs slave updates"></span> ');
-    } 
-    if (instance.inMaintenanceProblem()) {
-    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench"></span> ');
-    } 
-    
-    if (instance.lastCheckInvalidProblem()) {
-    	popoverElement.find("h3").addClass("label-fatal");
-    	indicateLastSeenInStatus = true;
-    } else if (instance.notRecentlyCheckedProblem()) {
-    	popoverElement.find("h3").addClass("label-stale");
-    	indicateLastSeenInStatus = true;
-    } else if (instance.notReplicatingProblem()) {
-    	// check slaves only; check master only if it's co-master where not replicating
-    	popoverElement.find("h3").addClass("label-danger");
-    } else if (instance.replicationLagProblem()) {
-    	popoverElement.find("h3").addClass("label-warning");
-    }
-	var statusMessage = instance.SlaveLagSeconds.Int64 + ' seconds lag';
-	if (indicateLastSeenInStatus) {
-		statusMessage = 'seen ' + instance.SecondsSinceLastSeen.Int64 + ' seconds ago';
+	if (instance.isAggregate) {
+	    function addInstancesBadge(count, badgeClass, title) {
+	    	popoverElement.find(".popover-content").append('<span class="badge '+badgeClass+'" title="' + title + '"">' + count + '</span> ');
+	    }
+	    addInstancesBadge(instance.aggregatedInstances.length, "label-primary", "Aggregated instances");
+	    for (var problemType in instance.aggregatedProblems) {
+	    	addInstancesBadge(instance.aggregatedProblems[problemType], errorMapping[problemType]["badge"], errorMapping[problemType]["description"]);
+	    }
 	}
-    var contentHtml = ''
-			+ instance.Version + " " + instance.Binlog_format
+	if (!instance.isAggregate) {
+	    if (instance.isFirstChildInDisplay) {
+	    	popoverElement.addClass("first-child-in-display");
+	        popoverElement.attr("data-first-child-in-display", "true");
+	    } 
+	    if (instance.usingGTID) {
+	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using GTID"></span> ');
+	    } 
+	    if (instance.UsingPseudoGTID) {
+	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using Pseudo GTID"></span> ');
+	    } 
+	    if (!instance.ReadOnly) {
+	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-pencil" title="Writeable"></span> ');
+	    } 
+	    if (instance.isMostAdvancedOfSiblings) {
+	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-star" title="Most advanced slave"></span> ');
+	    } 
+	    if (instance.CountMySQLSnapshots > 0) {
+	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-camera" title="'+instance.CountMySQLSnapshots +' snapshots"></span> ');
+	    } 
+	    if (instance.HasReplicationFilters) {
+	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-filter" title="Using replication filters"></span> ');
+	    } 
+	    if (instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled && !(instance.isMaster && !instance.isCoMaster)) {
+	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-forward" title="Logs slave updates"></span> ');
+	    } 
+	    if (instance.inMaintenanceProblem()) {
+	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench"></span> ');
+	    } 
+	
+	    if (instance.lastCheckInvalidProblem()) {
+	    	popoverElement.find("h3").addClass("label-fatal");
+	    	indicateLastSeenInStatus = true;
+	    } else if (instance.notRecentlyCheckedProblem()) {
+	    	popoverElement.find("h3").addClass("label-stale");
+	    	indicateLastSeenInStatus = true;
+	    } else if (instance.notReplicatingProblem()) {
+	    	// check slaves only; check master only if it's co-master where not
+			// replicating
+	    	popoverElement.find("h3").addClass("label-danger");
+	    } else if (instance.replicationLagProblem()) {
+	    	popoverElement.find("h3").addClass("label-warning");
+	    }
+		var statusMessage = instance.SlaveLagSeconds.Int64 + ' seconds lag';
+		if (indicateLastSeenInStatus) {
+			statusMessage = 'seen ' + instance.SecondsSinceLastSeen.Int64 + ' seconds ago';
+		}
+	    var contentHtml = ''
+				+ instance.Version + " " + instance.Binlog_format
+				;
+	    
+	    contentHtml = ''
+	    	+ '<div class="pull-right">' + statusMessage + ' </div>'
+			+ '<p>' 
+			+ contentHtml
+			+ '</p>'
 			;
-    
-    contentHtml = ''
-    	+ '<div class="pull-right">' + statusMessage + ' </div>'
-		+ '<p>' 
-		+ contentHtml
-		+ '</p>'
-		;
-    if (instance.isCoMaster) {
-    	contentHtml += '<p><strong>Co master</strong></p>';
-    }
-    else if (instance.isMaster) {
-    	contentHtml += '<p><strong>Master</strong></p>';
-    }
+	    if (instance.isCoMaster) {
+	    	contentHtml += '<p><strong>Co master</strong></p>';
+	    }
+	    else if (instance.isMaster) {
+	    	contentHtml += '<p><strong>Master</strong></p>';
+	    }
+	}
     if (renderType == "search") {
     	contentHtml += '<p>' 
         	+ 'Cluster: <a href="/web/cluster/'+instance.ClusterName+'">'+instance.ClusterName+'</a>'
@@ -629,11 +712,18 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     
         }
     }
-    //if (instance.isCandidateMaster) {
-    //	popoverElement.append('<h4 class="popover-footer"><strong>Master candidate</strong><div class="pull-right"><button class="btn btn-xs btn-default" data-command="make-master"><span class="glyphicon glyphicon-play"></span> Make master</button></div></h4>');
-    //} else if (instance.isMostAdvancedOfSiblings) {
-    //	popoverElement.append('<h4 class="popover-footer"><strong>Candidate</strong><div class="pull-right"><button class="btn btn-xs btn-default" data-command="make-local-master"><span class="glyphicon glyphicon-play"></span> Make local master</button></div></h4>');
-    //}
+    // if (instance.isCandidateMaster) {
+    // popoverElement.append('<h4 class="popover-footer"><strong>Master
+	// candidate</strong><div class="pull-right"><button class="btn btn-xs
+	// btn-default" data-command="make-master"><span class="glyphicon
+	// glyphicon-play"></span> Make master</button></div></h4>');
+    // } else if (instance.isMostAdvancedOfSiblings) {
+    // popoverElement.append('<h4
+	// class="popover-footer"><strong>Candidate</strong><div
+	// class="pull-right"><button class="btn btn-xs btn-default"
+	// data-command="make-local-master"><span class="glyphicon
+	// glyphicon-play"></span> Make local master</button></div></h4>');
+    // }
     
     popoverElement.find("h3 a").click(function () {
     	openNodeModal(instance);
