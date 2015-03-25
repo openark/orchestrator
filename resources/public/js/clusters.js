@@ -72,7 +72,7 @@ $(document).ready(function () {
     		if (cluster.ClusterAlias != "") {
                 popoverElement.find("h3 .pull-left a span").addClass("small");
                 popoverElement.find("h3 .pull-left").prepend('<a href="/web/cluster/alias/'+encodeURIComponent(cluster.ClusterAlias)+'"><strong>'+cluster.ClusterAlias+'</strong></a><br/>');
-                popoverElement.find("h3 .pull-right").append('<a href="/web/cluster/alias/'+encodeURIComponent(cluster.ClusterAlias)+'?compact=true"><span class="glyphicon glyphicon-compressed" title="Compact view"></span></a>');
+                popoverElement.find("h3 .pull-right").append('<a href="/web/cluster/alias/'+encodeURIComponent(cluster.ClusterAlias)+'?compact=true"><span class="glyphicon glyphicon-compressed" title="Compact display"></span></a>');
     		}
     	    var contentHtml = ''
     				+ '<div>Instances: <div class="pull-right"></div></div>'

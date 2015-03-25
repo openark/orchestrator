@@ -598,8 +598,11 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	var indicateLastSeenInStatus = false;
 
 	if (instance.isAggregate) {
+		popoverElement.find("h3 div.pull-right span").remove();			
+	    popoverElement.find(".popover-content").append('<div>Instances: <div class="pull-right"></div></div>');
+	    
 	    function addInstancesBadge(count, badgeClass, title) {
-	    	popoverElement.find(".popover-content").append('<span class="badge '+badgeClass+'" title="' + title + '"">' + count + '</span> ');
+	    	popoverElement.find(".popover-content .pull-right").append('<span class="badge '+badgeClass+'" title="' + title + '"">' + count + '</span> ');
 	    }
 	    addInstancesBadge(instance.aggregatedInstances.length, "label-primary", "Aggregated instances");
 	    for (var problemType in instance.aggregatedProblems) {
@@ -669,18 +672,18 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	    else if (instance.isMaster) {
 	    	contentHtml += '<p><strong>Master</strong></p>';
 	    }
+	    if (renderType == "search") {
+	    	contentHtml += '<p>' 
+	        	+ 'Cluster: <a href="/web/cluster/'+instance.ClusterName+'">'+instance.ClusterName+'</a>'
+	        + '</p>';
+	    }  
+	    if (renderType == "problems") {
+	    	contentHtml += '<p>' 
+	        	+ 'Problem: <strong>'+instance.problem.replace(/_/g, ' ') + '</strong>'
+	        + '</p>';
+	    }      
+	    popoverElement.find(".popover-content").html(contentHtml);
 	}
-    if (renderType == "search") {
-    	contentHtml += '<p>' 
-        	+ 'Cluster: <a href="/web/cluster/'+instance.ClusterName+'">'+instance.ClusterName+'</a>'
-        + '</p>';
-    }  
-    if (renderType == "problems") {
-    	contentHtml += '<p>' 
-        	+ 'Problem: <strong>'+instance.problem.replace(/_/g, ' ') + '</strong>'
-        + '</p>';
-    }      
-    popoverElement.find(".popover-content").html(contentHtml);
 
     if (renderType == "cluster" && instance.lastCheckInvalidProblem() && instance.children && instance.children.length > 0) {
     	popoverElement.append('<h4 class="popover-footer"><div class="btn-group" data-btn-group="recover"><button type="button" class="btn btn-xs btn-default dropdown-toggle" data-toggle="dropdown"><span class="glyphicon glyphicon-heart text-danger"></span> Recover <span class="caret"></span> <span class="sr-only">Toggle Dropdown</span></button><ul class="dropdown-menu" role="menu"></ul></div></h4>');
