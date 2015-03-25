@@ -122,6 +122,7 @@
 
 .popover.instance .badge {
     color: #ffffff;
+    font-size: 10px;
 }
 
 .popover.instance h3 .small {

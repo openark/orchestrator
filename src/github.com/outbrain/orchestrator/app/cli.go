@@ -103,10 +103,13 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			movedSlaves, _, err := inst.MoveUpSlaves(instanceKey)
+			movedSlaves, _, err, errs := inst.MoveUpSlaves(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			} else {
+				for _, e := range errs {
+					log.Errore(e)
+				}
 				for _, slave := range movedSlaves {
 					fmt.Println(slave.Key.DisplayString())
 				}
@@ -237,10 +240,13 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatal("Cannot deduce sibling:", sibling)
 			}
 
-			matchedSlaves, _, err := inst.MultiMatchSlaves(instanceKey, siblingKey)
+			matchedSlaves, _, err, errs := inst.MultiMatchSlaves(instanceKey, siblingKey)
 			if err != nil {
 				log.Fatale(err)
 			} else {
+				for _, e := range errs {
+					log.Errore(e)
+				}
 				for _, slave := range matchedSlaves {
 					fmt.Println(slave.Key.DisplayString())
 				}
@@ -252,10 +258,13 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			matchedSlaves, _, err := inst.MatchUpSlaves(instanceKey)
+			matchedSlaves, _, err, errs := inst.MatchUpSlaves(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			} else {
+				for _, e := range errs {
+					log.Errore(e)
+				}
 				for _, slave := range matchedSlaves {
 					fmt.Println(slave.Key.DisplayString())
 				}

@@ -265,13 +265,13 @@ func (this *HttpAPI) MoveUpSlaves(params martini.Params, r render.Render, req *h
 		return
 	}
 
-	slaves, newMaster, err := inst.MoveUpSlaves(&instanceKey)
+	slaves, newMaster, err, errs := inst.MoveUpSlaves(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Moved up %d slaves of %+v below %+v", len(slaves), instanceKey, newMaster.Key), Details: newMaster.Key})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Moved up %d slaves of %+v below %+v; %d errors: %+v", len(slaves), instanceKey, newMaster.Key, len(errs), errs), Details: newMaster.Key})
 }
 
 // MakeCoMaster attempts to make an instance co-master with its own master
@@ -506,13 +506,13 @@ func (this *HttpAPI) MultiMatchSlaves(params martini.Params, r render.Render, re
 		return
 	}
 
-	slaves, newMaster, err := inst.MultiMatchSlaves(&instanceKey, &belowKey)
+	slaves, newMaster, err, errs := inst.MultiMatchSlaves(&instanceKey, &belowKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Matched up %d slaves of %+v below %+v", len(slaves), instanceKey, newMaster.Key), Details: newMaster.Key})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Matched %d slaves of %+v below %+v; %d errors: %+v", len(slaves), instanceKey, newMaster.Key, len(errs), errs), Details: newMaster.Key})
 }
 
 // MatchUpSlaves attempts to match up all slaves of an instance
@@ -527,13 +527,13 @@ func (this *HttpAPI) MatchUpSlaves(params martini.Params, r render.Render, req *
 		return
 	}
 
-	slaves, newMaster, err := inst.MatchUpSlaves(&instanceKey)
+	slaves, newMaster, err, errs := inst.MatchUpSlaves(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Matched up %d slaves of %+v below %+v", len(slaves), instanceKey, newMaster.Key), Details: newMaster.Key})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Matched up %d slaves of %+v below %+v; %d errors: %+v", len(slaves), instanceKey, newMaster.Key, len(errs), errs), Details: newMaster.Key})
 }
 
 // RegroupSlaves attempts to pick a slave of a given instance and make it enslave its siblings, efficiently,

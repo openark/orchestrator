@@ -219,28 +219,30 @@ Cleanup:
 // MoveUpSlaves will attempt moving up all slaves of a given instance, at the same time.
 // Clock-time, this is fater than moving one at a time. However this means all slaves of the given instance, and the instance itself,
 // will all stop replicating together.
-func MoveUpSlaves(instanceKey *InstanceKey) ([](*Instance), *Instance, error) {
+func MoveUpSlaves(instanceKey *InstanceKey) ([](*Instance), *Instance, error, []error) {
 	res := [](*Instance){}
+	errs := []error{}
+	slaveMutex := make(chan bool, 1)
 	var barrier chan *Instance
 
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
-		return res, nil, err
+		return res, nil, err, errs
 	}
 	if !instance.IsSlave() {
-		return res, instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
+		return res, instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey)), errs
 	}
 	_, err = GetInstanceMaster(instance)
 	if err != nil {
-		return res, instance, log.Errorf("Cannot GetInstanceMaster() for %+v. error=%+v", instance.Key, err)
+		return res, instance, log.Errorf("Cannot GetInstanceMaster() for %+v. error=%+v", instance.Key, err), errs
 	}
 
 	slaves, err := ReadSlaveInstances(instanceKey)
 	if err != nil {
-		return res, instance, err
+		return res, instance, err, errs
 	}
 	if len(slaves) == 0 {
-		return res, instance, nil
+		return res, instance, nil, errs
 	}
 	log.Infof("Will move slaves of %+v up the topology", *instanceKey)
 
@@ -296,22 +298,34 @@ func MoveUpSlaves(instanceKey *InstanceKey) ([](*Instance), *Instance, error) {
 					return
 				}
 			})
+
+			func() {
+				slaveMutex <- true
+				defer func() { <-slaveMutex }()
+				if slaveErr == nil {
+					res = append(res, slave)
+				} else {
+					errs = append(errs, slaveErr)
+				}
+			}()
 		}()
 	}
 	for _ = range slaves {
-		slave := <-barrier
-		res = append(res, slave)
+		<-barrier
 	}
 
 Cleanup:
 	instance, _ = StartSlave(instanceKey)
 	if err != nil {
-		return res, instance, log.Errore(err)
+		return res, instance, log.Errore(err), errs
 	}
-	// and we're done (pending deferred functions)
-	AuditOperation("move-up-slaves", instanceKey, fmt.Sprintf("moved up %d slaves of %+v. New master: %+v", len(res), *instanceKey, instance.MasterKey))
+	if len(errs) == len(slaves) {
+		// All returned with error
+		return res, instance, log.Error("Error on all operations"), errs
+	}
+	AuditOperation("move-up-slaves", instanceKey, fmt.Sprintf("moved up %d/%d slaves of %+v. New master: %+v", len(res), len(slaves), *instanceKey, instance.MasterKey))
 
-	return res, instance, err
+	return res, instance, err, errs
 }
 
 // MoveBelow will attempt moving instance indicated by instanceKey below its supposed sibling indicated by sinblingKey.
@@ -825,7 +839,7 @@ func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	_, _, err = MultiMatchBelow(siblings, instanceKey, false)
+	_, _, err, _ = MultiMatchBelow(siblings, instanceKey, false)
 	if err != nil {
 		goto Cleanup
 	}
@@ -904,7 +918,7 @@ func MakeLocalMaster(instanceKey *InstanceKey) (*Instance, error) {
 		goto Cleanup
 	}
 
-	_, _, err = MultiMatchBelow(siblings, instanceKey, false)
+	_, _, err, _ = MultiMatchBelow(siblings, instanceKey, false)
 	if err != nil {
 		goto Cleanup
 	}
@@ -954,20 +968,22 @@ func removeInstance(instances [](*Instance), instanceKey *InstanceKey) [](*Insta
 
 // MultiMatchBelow will efficiently match multiple slaves below a given instance.
 // It is assumed that all given slaves are siblings
-func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyStopped bool) ([](*Instance), *Instance, error) {
+func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyStopped bool) ([](*Instance), *Instance, error, []error) {
 	res := [](*Instance){}
+	errs := []error{}
+	slaveMutex := make(chan bool, 1)
 
 	slaves = removeInstance(slaves, belowKey)
 
 	belowInstance, err := ReadTopologyInstance(belowKey)
 	if err != nil {
 		// Can't access the server below which we need to match ==> can't move slaves
-		return res, belowInstance, err
+		return res, belowInstance, err, errs
 	}
 
 	// slaves involved
 	if len(slaves) == 0 {
-		return res, belowInstance, nil
+		return res, belowInstance, nil, errs
 	}
 	if !slavesAlreadyStopped {
 		log.Debugf("MultiMatchBelow: stopping %d slaves nicely", len(slaves))
@@ -998,7 +1014,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 
 	if maintenanceToken, merr := BeginMaintenance(&belowInstance.Key, GetMaintenanceOwner(), fmt.Sprintf("slaves multi match below this: %+v", belowInstance.Key)); merr != nil {
 		err = errors.New(fmt.Sprintf("Cannot begin maintenance on %+v", belowInstance.Key))
-		return res, belowInstance, err
+		return res, belowInstance, err, errs
 	} else {
 		defer EndMaintenance(maintenanceToken)
 	}
@@ -1012,21 +1028,28 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 			func() {
 				for _, slave := range bucketSlaves {
 					slave := slave
+					var slaveErr error = nil
 					var matchedCoordinates *BinlogCoordinates
 					log.Debugf("MultiMatchBelow: attempting slave %+v in bucket %+v", slave.Key, execCoordinates)
 					ExecuteOnTopology(func() {
-						_, matchedCoordinates, err = MatchBelow(&slave.Key, &belowInstance.Key, true, false)
+						_, matchedCoordinates, slaveErr = MatchBelow(&slave.Key, &belowInstance.Key, true, false)
 					})
-					log.Debugf("MultiMatchBelow: match result: %+v, %+v", matchedCoordinates, err)
+					log.Debugf("MultiMatchBelow: match result: %+v, %+v", matchedCoordinates, slaveErr)
 
-					if err == nil {
+					if slaveErr == nil {
 						// Success! We matched a slave of this bucket
 						knownCoordinatesMap[execCoordinates] = matchedCoordinates
 						matchedSlaves[slave.Key] = true
 						log.Debugf("MultiMatchBelow: matched slave %+v in bucket %+v", slave.Key, execCoordinates)
 						return
 					}
-					log.Errore(err)
+
+					func() {
+						slaveMutex <- true
+						defer func() { <-slaveMutex }()
+						errs = append(errs, slaveErr)
+					}()
+					log.Errore(slaveErr)
 					// Failure: some unknown problem with bucket slave. Let's try the next one (continue loop)
 				}
 			}()
@@ -1056,6 +1079,11 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 			StartSlave(&slave.Key)
 			matchedSlaves[slave.Key] = true
 		} else {
+			func() {
+				slaveMutex <- true
+				defer func() { <-slaveMutex }()
+				errs = append(errs, err)
+			}()
 			log.Errorf("MultiMatchBelow: Cannot match up %+v: error is %+v", slave.Key, err)
 			continue
 		}
@@ -1067,32 +1095,33 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 			res = append(res, slave)
 		}
 	}
-	return res, belowInstance, err
+	return res, belowInstance, err, errs
 
 }
 
 // MultiMatchSlaves will match (via pseudo-gtid) all slaves of given master below given instance.
-func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey) ([](*Instance), *Instance, error) {
+func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey) ([](*Instance), *Instance, error, []error) {
 	res := [](*Instance){}
+	errs := []error{}
 
 	belowInstance, err := ReadTopologyInstance(belowKey)
 	if err != nil {
 		// Can't access "below" ==> can't match slaves beneath it
-		return res, nil, err
+		return res, nil, err, errs
 	}
 
 	// slaves involved
 	slaves, err := ReadSlaveInstances(masterKey)
 	if err != nil {
-		return res, belowInstance, err
+		return res, belowInstance, err, errs
 	}
-	matchedSlaves, belowInstance, err := MultiMatchBelow(slaves, &belowInstance.Key, false)
+	matchedSlaves, belowInstance, err, errs := MultiMatchBelow(slaves, &belowInstance.Key, false)
 
 	if len(matchedSlaves) != len(slaves) {
 		err = errors.New(fmt.Sprintf("MultiMatchSlaves: only matched %d out of %d slaves of %+v", len(matchedSlaves), len(slaves), *masterKey))
 	}
 
-	return matchedSlaves, belowInstance, err
+	return matchedSlaves, belowInstance, err, errs
 }
 
 // MatchUp will move a slave up the replication chain, so that it becomes sibling of its master, via Pseudo-GTID
@@ -1119,12 +1148,13 @@ func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool, requireO
 // MatchUpSlaves will move all slaves of given master up the replication chain,
 // so that they become siblings of their master.
 // This should be called when the local master dies, and all its slaves are to be resurrected via Pseudo-GTID
-func MatchUpSlaves(masterKey *InstanceKey) ([](*Instance), *Instance, error) {
+func MatchUpSlaves(masterKey *InstanceKey) ([](*Instance), *Instance, error, []error) {
 	res := [](*Instance){}
+	errs := []error{}
 
 	masterInstance, found, err := ReadInstance(masterKey)
 	if err != nil || !found {
-		return res, nil, err
+		return res, nil, err, errs
 	}
 	return MultiMatchSlaves(masterKey, &masterInstance.MasterKey)
 }
@@ -1214,7 +1244,7 @@ func RegroupSlaves(masterKey *InstanceKey, onCandidateSlaveChosen func(*Instance
 
 	log.Debugf("RegroupSlaves: multi matching %d later slaves", len(laterSlaves))
 	// As for the laterSlaves, we'll have to apply pseudo GTID
-	laterSlaves, instance, err := MultiMatchBelow(laterSlaves, &candidateSlave.Key, true)
+	laterSlaves, instance, err, _ := MultiMatchBelow(laterSlaves, &candidateSlave.Key, true)
 
 	barrier = make(chan *InstanceKey)
 	operatedSlaves := append(equalSlaves, candidateSlave)

@@ -150,24 +150,24 @@ func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (*inst.I
 	if err == nil {
 		log.Debugf("- RecoverDeadIntermediateMaster: will attempt a candidate intermediate master: %+v", candidateSibling.Key)
 		// We have a candidate
-		if matchedSlaves, belowInstance, err := inst.MultiMatchSlaves(failedInstanceKey, &candidateSibling.Key); err == nil {
+		if matchedSlaves, belowInstance, err, errs := inst.MultiMatchSlaves(failedInstanceKey, &candidateSibling.Key); err == nil {
 			ResolveRecovery(failedInstanceKey, &candidateSibling.Key)
-			log.Debugf("- RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) went well", candidateSibling.Key)
-			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Done. Matched %d slaves under candidate sibling: %+v", len(matchedSlaves), candidateSibling.Key))
+			log.Debugf("- RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) went with %d errors", candidateSibling.Key, len(errs))
+			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Done. Matched %d slaves under candidate sibling: %+v; %d errors: %+v", len(matchedSlaves), candidateSibling.Key, len(errs), errs))
 			return belowInstance, nil
 		} else {
-			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Matched %d slaves under candidate sibling: %+v", len(matchedSlaves), candidateSibling.Key))
 			log.Debugf("- RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) did not complete: %+v", candidateSibling.Key, err)
+			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Matched %d slaves under candidate sibling: %+v; %d errors: %+v", len(matchedSlaves), candidateSibling.Key, len(errs), errs))
 		}
 	}
 	// Either no candidate or only partial match of slaves. Regroup as plan B
 	inst.RegroupSlaves(failedInstanceKey, nil)
 	// And anyway, match up all that's left continue to match-up, plan C
 	log.Debugf("- RecoverDeadIntermediateMaster: will next attempt a match up from %+v", *failedInstanceKey)
-	_, successorInstance, err := inst.MatchUpSlaves(failedInstanceKey)
+	_, successorInstance, err, errs := inst.MatchUpSlaves(failedInstanceKey)
 	ResolveRecovery(failedInstanceKey, &successorInstance.Key)
 	log.Debugf("- RecoverDeadIntermediateMaster: matched up to %+v", successorInstance.Key)
-	inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Done. Matched slaves under: %+v", successorInstance.Key))
+	inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Done. Matched slaves under: %+v %d errors: %+v", successorInstance.Key, len(errs), errs))
 
 	return successorInstance, err
 }

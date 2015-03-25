@@ -312,7 +312,7 @@ function openNodeModal(node) {
 
     $('#node_modal button[data-btn=move-up-slaves]').hide();
     if (!node.lastCheckInvalidProblem()) {
-        if (node.SlaveHosts.length > 1) {
+        if (node.SlaveHosts.length > 0) {
             $('#node_modal button[data-btn=move-up-slaves]').show();
         }
     }
@@ -371,6 +371,7 @@ function normalizeInstance(instance) {
     instance.replicationLagReasonable = instance.SlaveLagSeconds.Int64 <= 10;
     instance.isSeenRecently = instance.SecondsSinceLastSeen.Valid && instance.SecondsSinceLastSeen.Int64 <= 3600;
     instance.usingGTID = instance.UsingOracleGTID || instance.UsingMariaDBGTID;
+    instance.isMaxScale = (instance.Version.indexOf("maxscale") >= 0); 
 
     // used by cluster-tree
     instance.children = [];
