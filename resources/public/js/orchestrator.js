@@ -527,68 +527,9 @@ function normalizeInstances(instances, maintenanceList) {
     		instancesMap[virtualCoMastersRoot.id] = virtualCoMastersRoot;
     	} 
     });
-    
-    if (isCompactDisplay()) {
-    	instancesMap = compactInstances(instances, instancesMap);
-    }
     return instancesMap;
 }
 
-function compactInstances(instances, instancesMap) {
-    instances.forEach(function (instance) {
-    	if (instance.children) {
-    		// Aggregating children who are childless
-        	childlessChildren = instance.children.filter(function(child) {
-        		if (child.children && child.children.length > 0) {
-        			return false
-        		}
-    			return true;
-    		});
-        	if (childlessChildren.length > 1) {
-        		// OK, more than one childless child. Aggregate!
-        		var aggregatedChild = childlessChildren[0]
-        		aggregatedChild.isAggregate = true;
-        		aggregatedChild.title = "[aggregation]";
-        		aggregatedChild.canonicalTitle = aggregatedChild.title;
-        		var aggregatedProblems = {}
-        		aggregatedChild.aggregatedInstances = childlessChildren; // includes itself
-
-                function incrementProblems(problemType) {
-                	if (aggregatedProblems[problemType] > 0) {
-                		aggregatedProblems[problemType] = aggregatedProblems[problemType] + 1;
-                	} else {
-                		aggregatedProblems[problemType] = 1;
-                	}
-                }
-        		aggregatedChild.aggregatedProblems = aggregatedProblems;
-        		
-				childlessChildren.forEach(function (instance) {
-			        if (instance.inMaintenanceProblem()) {
-			        	incrementProblems(instance.ClusterName, "inMaintenanceProblem")
-			        }
-			        if (instance.lastCheckInvalidProblem()) {
-			        	incrementProblems("lastCheckInvalidProblem")
-			        } else if (instance.notRecentlyCheckedProblem()) {
-			        	incrementProblems("notRecentlyCheckedProblem")
-			        } else if (instance.notReplicatingProblem()) {
-			        	incrementProblems("notReplicatingProblem")
-			        } else if (instance.replicationLagProblem()) {
-			        	incrementProblems("replicationLagProblem")
-			        }
-        		});
-
-				childlessChildren.forEach(function (child) {
-        			if (!child.isAggregate) {
-        				instance.children.splice( $.inArray(child, instance.children), 1 );
-        				delete instancesMap[child.id];
-        			}
-        		});
-    		}
-
-    	}
-    });	
-    return instancesMap;
-}
 
 function renderInstanceElement(popoverElement, instance, renderType) {
 	popoverElement.attr("data-nodeid", instance.id);
@@ -598,7 +539,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	var indicateLastSeenInStatus = false;
 
 	if (instance.isAggregate) {
-		popoverElement.find("h3 div.pull-right span").remove();			
+		popoverElement.find("h3 div.pull-right span").remove();
 	    popoverElement.find(".popover-content").append('<div>Instances: <div class="pull-right"></div></div>');
 	    
 	    function addInstancesBadge(count, badgeClass, title) {

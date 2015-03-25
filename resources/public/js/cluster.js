@@ -442,6 +442,61 @@ function getLogFileNumber(logFileName) {
 	return parseInt(logFileTokens[logFileTokens.length-1])
 }
 
+function compactInstances(instances, instancesMap) {
+    instances.forEach(function (instance) {
+    	if (instance.children) {
+    		// Aggregating children who are childless
+        	childlessChildren = instance.children.filter(function(child) {
+        		if (child.children && child.children.length > 0) {
+        			return false
+        		}
+    			return true;
+    		});
+        	if (childlessChildren.length > 1) {
+        		// OK, more than one childless child. Aggregate!
+        		var aggregatedChild = childlessChildren[0]
+        		aggregatedChild.isAggregate = true;
+        		aggregatedChild.title = "[aggregation]";
+        		aggregatedChild.canonicalTitle = aggregatedChild.title;
+        		var aggregatedProblems = {}
+        		aggregatedChild.aggregatedInstances = childlessChildren; // includes itself
+
+                function incrementProblems(problemType) {
+                	if (aggregatedProblems[problemType] > 0) {
+                		aggregatedProblems[problemType] = aggregatedProblems[problemType] + 1;
+                	} else {
+                		aggregatedProblems[problemType] = 1;
+                	}
+                }
+        		aggregatedChild.aggregatedProblems = aggregatedProblems;
+        		
+				childlessChildren.forEach(function (instance) {
+			        if (instance.inMaintenanceProblem()) {
+			        	incrementProblems(instance.ClusterName, "inMaintenanceProblem")
+			        }
+			        if (instance.lastCheckInvalidProblem()) {
+			        	incrementProblems("lastCheckInvalidProblem")
+			        } else if (instance.notRecentlyCheckedProblem()) {
+			        	incrementProblems("notRecentlyCheckedProblem")
+			        } else if (instance.notReplicatingProblem()) {
+			        	incrementProblems("notReplicatingProblem")
+			        } else if (instance.replicationLagProblem()) {
+			        	incrementProblems("replicationLagProblem")
+			        }
+        		});
+
+				childlessChildren.forEach(function (child) {
+        			if (!child.isAggregate) {
+        				instance.children.splice( $.inArray(child, instance.children), 1 );
+        				delete instancesMap[child.id];
+        			}
+        		});
+    		}
+
+    	}
+    });	
+    return instancesMap;
+}
 
 function analyzeClusterInstances(nodesMap) {
 	instances = []
@@ -581,6 +636,9 @@ $(document).ready(function () {
         $.get("/api/maintenance",
             function (maintenanceList) {
         		var instancesMap = normalizeInstances(instances, maintenanceList);
+        	    if (isCompactDisplay()) {
+        	    	instancesMap = compactInstances(instances, instancesMap);
+        	    }
                 analyzeClusterInstances(instancesMap);
                 visualizeInstances(instancesMap);
                 generateInstanceDivs(instancesMap);
