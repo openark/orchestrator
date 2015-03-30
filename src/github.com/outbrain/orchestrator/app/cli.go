@@ -103,7 +103,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			movedSlaves, _, err, errs := inst.MoveUpSlaves(instanceKey)
+			movedSlaves, _, err, errs := inst.MoveUpSlaves(instanceKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {
@@ -240,7 +240,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatal("Cannot deduce sibling:", sibling)
 			}
 
-			matchedSlaves, _, err, errs := inst.MultiMatchSlaves(instanceKey, siblingKey)
+			matchedSlaves, _, err, errs := inst.MultiMatchSlaves(instanceKey, siblingKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {
@@ -258,7 +258,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			matchedSlaves, _, err, errs := inst.MatchUpSlaves(instanceKey)
+			matchedSlaves, _, err, errs := inst.MatchUpSlaves(instanceKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {

@@ -64,9 +64,12 @@ Cheatsheet:
 		move-up-slaves
 			Moves slaves of the given instance one level up the topology, making them siblings of given instance.
 			This is a (faster) shortcut to executing move-up on all slaves of given instance.
-			Example:
+			Examples:
 			
 			orchestrator -c move-up-slaves -i slave.whose.subslaves.will.move.up.com[:3306]
+			
+			orchestrator -c move-up-slaves -i slave.whose.subslaves.will.move.up.com[:3306] --pattern=regexp.filter
+				only apply to those instances that match given regex
 
 		move-below
 			Moves a slave beneath its sibling. Both slaves must be actively replicating from same master.
@@ -147,6 +150,9 @@ Cheatsheet:
 			
 			orchestrator -c match-up-slaves -i slave.whose.subslaves.will.match.up.com
 
+			orchestrator -c match-up-slaves -i slave.whose.subslaves.will.match.up.com[:3306] --pattern=regexp.filter
+				only apply to those instances that match given regex
+
 		match-below
 			Matches a slave beneath another (destination) instance. The choice of destination is almost arbitrary;
 			it must not be a child/descendant of the instance. But otherwise they don't have to be direct siblings,
@@ -169,6 +175,9 @@ Cheatsheet:
 			The instance itself may be crashed or inaccessible. It is not contacted throughout the operation. Examples:
 			
 			orchestrator -c multi-match-slaves -i instance.whose.slaves.will.transport -s instance.that.becomes.their.master
+			
+			orchestrator -c multi-match-slaves -i instance.whose.slaves.will.transport -s instance.that.becomes.their.master --pattern=regexp.filter
+				only apply to those instances that match given regex
 			
 		rematch
 			Reconnect a slave onto its master, via PSeudo-GTID. The use case for this operation is a non-crash-safe

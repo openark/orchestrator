@@ -265,7 +265,7 @@ func (this *HttpAPI) MoveUpSlaves(params martini.Params, r render.Render, req *h
 		return
 	}
 
-	slaves, newMaster, err, errs := inst.MoveUpSlaves(&instanceKey)
+	slaves, newMaster, err, errs := inst.MoveUpSlaves(&instanceKey, "")
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -506,7 +506,7 @@ func (this *HttpAPI) MultiMatchSlaves(params martini.Params, r render.Render, re
 		return
 	}
 
-	slaves, newMaster, err, errs := inst.MultiMatchSlaves(&instanceKey, &belowKey)
+	slaves, newMaster, err, errs := inst.MultiMatchSlaves(&instanceKey, &belowKey, "")
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -527,7 +527,7 @@ func (this *HttpAPI) MatchUpSlaves(params martini.Params, r render.Render, req *
 		return
 	}
 
-	slaves, newMaster, err, errs := inst.MatchUpSlaves(&instanceKey)
+	slaves, newMaster, err, errs := inst.MatchUpSlaves(&instanceKey, "")
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return

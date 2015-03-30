@@ -101,6 +101,20 @@ func AsciiTopology(instanceKey *InstanceKey) (string, error) {
 	return result, nil
 }
 
+// filterInstancesByPattern will filter given array of instances according to regular expression pattern
+func filterInstancesByPattern(instances [](*Instance), pattern string) [](*Instance) {
+	if pattern == "" {
+		return instances
+	}
+	filtered := [](*Instance){}
+	for _, instance := range instances {
+		if matched, _ := regexp.MatchString(pattern, instance.Key.DisplayString()); matched {
+			filtered = append(filtered, instance)
+		}
+	}
+	return filtered
+}
+
 // GetInstanceMaster synchronously reaches into the replication topology
 // and retrieves master's data
 func GetInstanceMaster(instance *Instance) (*Instance, error) {
@@ -219,7 +233,7 @@ Cleanup:
 // MoveUpSlaves will attempt moving up all slaves of a given instance, at the same time.
 // Clock-time, this is fater than moving one at a time. However this means all slaves of the given instance, and the instance itself,
 // will all stop replicating together.
-func MoveUpSlaves(instanceKey *InstanceKey) ([](*Instance), *Instance, error, []error) {
+func MoveUpSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), *Instance, error, []error) {
 	res := [](*Instance){}
 	errs := []error{}
 	slaveMutex := make(chan bool, 1)
@@ -241,6 +255,7 @@ func MoveUpSlaves(instanceKey *InstanceKey) ([](*Instance), *Instance, error, []
 	if err != nil {
 		return res, instance, err, errs
 	}
+	slaves = filterInstancesByPattern(slaves, pattern)
 	if len(slaves) == 0 {
 		return res, instance, nil, errs
 	}
@@ -1100,7 +1115,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 }
 
 // MultiMatchSlaves will match (via pseudo-gtid) all slaves of given master below given instance.
-func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey) ([](*Instance), *Instance, error, []error) {
+func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey, pattern string) ([](*Instance), *Instance, error, []error) {
 	res := [](*Instance){}
 	errs := []error{}
 
@@ -1115,6 +1130,7 @@ func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey) ([](*Instan
 	if err != nil {
 		return res, belowInstance, err, errs
 	}
+	slaves = filterInstancesByPattern(slaves, pattern)
 	matchedSlaves, belowInstance, err, errs := MultiMatchBelow(slaves, &belowInstance.Key, false)
 
 	if len(matchedSlaves) != len(slaves) {
@@ -1148,7 +1164,7 @@ func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool, requireO
 // MatchUpSlaves will move all slaves of given master up the replication chain,
 // so that they become siblings of their master.
 // This should be called when the local master dies, and all its slaves are to be resurrected via Pseudo-GTID
-func MatchUpSlaves(masterKey *InstanceKey) ([](*Instance), *Instance, error, []error) {
+func MatchUpSlaves(masterKey *InstanceKey, pattern string) ([](*Instance), *Instance, error, []error) {
 	res := [](*Instance){}
 	errs := []error{}
 
@@ -1156,7 +1172,7 @@ func MatchUpSlaves(masterKey *InstanceKey) ([](*Instance), *Instance, error, []e
 	if err != nil || !found {
 		return res, nil, err, errs
 	}
-	return MultiMatchSlaves(masterKey, &masterInstance.MasterKey)
+	return MultiMatchSlaves(masterKey, &masterInstance.MasterKey, pattern)
 }
 
 func isGenerallyValidAsCandidateSlave(slave *Instance) bool {
