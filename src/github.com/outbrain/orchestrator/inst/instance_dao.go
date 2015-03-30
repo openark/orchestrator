@@ -330,7 +330,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 
-	instance.ClusterName, instance.ReplicationDepth, err = ReadClusterNameByMaster(&instance.Key, &instance.MasterKey)
+	instance.ClusterName, instance.ReplicationDepth, instance.IsCoMaster, err = ReadClusterNameByMaster(&instance.Key, &instance.MasterKey)
 	if err != nil {
 		log.Errore(err)
 	}
@@ -366,15 +366,13 @@ Cleanup:
 // and getting it from there.
 // It is a non-recursive function and so-called-recursion is performed upon periodic reading of
 // instances.
-func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (string, uint, error) {
+func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (clusterName string, replicationDepth uint, isCoMaster bool, err error) {
 	db, err := db.OpenOrchestrator()
 	if err != nil {
-		return "", 0, log.Errore(err)
+		return "", 0, false, log.Errore(err)
 	}
 
 	clusterNameByInstanceKey := fmt.Sprintf("%s:%d", instanceKey.Hostname, instanceKey.Port)
-	var clusterName string
-	var replicationDepth uint
 	var masterMasterKey InstanceKey
 	err = db.QueryRow(`
        	select 
@@ -391,16 +389,20 @@ func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (
 		masterKey.Hostname, masterKey.Port).Scan(&clusterName, &replicationDepth, &masterMasterKey.Hostname, &masterMasterKey.Port)
 
 	if err != nil {
-		return "", 0, log.Errore(err)
+		return "", 0, false, log.Errore(err)
 	}
 	if clusterName == "" {
 		clusterName = clusterNameByInstanceKey
 	}
-	if masterMasterKey.Equals(instanceKey) && clusterName == clusterNameByInstanceKey {
-		// circular replication. Avoid infinite ++ on replicationDepth
-		replicationDepth = 0
+	isCoMaster = false
+	if masterMasterKey.Equals(instanceKey) {
+		isCoMaster = true
+		if clusterName == clusterNameByInstanceKey {
+			// circular replication. Avoid infinite ++ on replicationDepth
+			replicationDepth = 0
+		} // While the other stays "1"
 	}
-	return clusterName, replicationDepth, err
+	return clusterName, replicationDepth, isCoMaster, err
 }
 
 // readInstanceRow reads a single instance row from the orchestrator backend database.
@@ -442,6 +444,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.DataCenter = m.GetString("data_center")
 	instance.PhysicalEnvironment = m.GetString("physical_environment")
 	instance.ReplicationDepth = m.GetUint("replication_depth")
+	instance.IsCoMaster = m.GetBool("is_co_master")
 	instance.IsUpToDate = (m.GetUint("seconds_since_last_checked") <= config.Config.InstancePollSeconds)
 	instance.IsRecentlyChecked = (m.GetUint("seconds_since_last_checked") <= config.Config.InstancePollSeconds*5)
 	instance.IsLastCheckValid = m.GetBool("is_last_check_valid")
@@ -613,13 +616,14 @@ func ReviewUnseenInstances() error {
 			continue
 		}
 		instance.MasterKey.Hostname = masterHostname
-		clusterName, replicationDepth, err := ReadClusterNameByMaster(&instance.Key, &instance.MasterKey)
+		clusterName, replicationDepth, isCoMaster, err := ReadClusterNameByMaster(&instance.Key, &instance.MasterKey)
 
 		if err != nil {
 			log.Errore(err)
 		} else if clusterName != instance.ClusterName {
 			instance.ClusterName = clusterName
 			instance.ReplicationDepth = replicationDepth
+			instance.IsCoMaster = isCoMaster
 			updateInstanceClusterName(instance)
 			operations++
 		}
@@ -966,7 +970,8 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 					cluster_name=VALUES(cluster_name),
 					data_center=VALUES(data_center),
 					physical_environment=values(physical_environment),
-					replication_depth=VALUES(replication_depth)			
+					replication_depth=VALUES(replication_depth),
+					is_co_master=VALUES(is_co_master)
 				`
 		} else {
 			// Scenario: some slave reported a master of his; but the master cannot be contacted.
@@ -1012,8 +1017,9 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				cluster_name,
 				data_center,
 				physical_environment,
-				replication_depth
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				replication_depth,
+				is_co_master
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
@@ -1053,6 +1059,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			instance.DataCenter,
 			instance.PhysicalEnvironment,
 			instance.ReplicationDepth,
+			instance.IsCoMaster,
 		)
 		if err != nil {
 			return log.Errore(err)

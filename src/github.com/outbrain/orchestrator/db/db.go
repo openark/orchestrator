@@ -324,6 +324,16 @@ var generateSQLPatches = []string{
 			cluster_alias
 			ADD UNIQUE KEY alias_uidx (alias)
 	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN is_co_master TINYINT UNSIGNED NOT NULL AFTER replication_depth
+	`,
+	`
+		ALTER TABLE 
+			database_instance_maintenance
+			ADD KEY active_end_timestamp_idx (maintenance_active, end_timestamp)
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance

@@ -23,9 +23,10 @@
   "RejectHostnameResolvePattern": "",
   "UnseenInstanceForgetHours": 240,
   "ReasonableReplicationLagSeconds": 10,
+  "VerifyReplicationFilters": false,
   "ReasonableMaintenanceReplicationLagSeconds": 20,
   "PreFailoverProcesses": [
-  	"echo 'Cluster is: {failureCluster}. Reason: {failureDescription}' | mail -s 'orchestrator thinks there should be a fail over on {failedHost} due to {failureType}' admin@localhost"
+  	"echo 'Cluster is: {failureCluster}. Reason: {failureDescription}' >> /tmp/recovery.log"
   ],
   "PostFailoverProcesses": [
   	"echo 'failed over:' h:{failedHost} p:{failedPort} th:{successorHost} tp:{successorPort}"

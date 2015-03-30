@@ -224,6 +224,7 @@ type Instance struct {
 	DataCenter          string
 	PhysicalEnvironment string
 	ReplicationDepth    uint
+	IsCoMaster          bool
 
 	IsLastCheckValid     bool
 	IsUpToDate           bool

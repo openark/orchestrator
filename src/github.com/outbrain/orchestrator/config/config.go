@@ -59,6 +59,7 @@ type Configuration struct {
 	MaintenanceOwner                           string   // (Default) name of maintenance owner to use if none provided
 	ReasonableMaintenanceReplicationLagSeconds int      // Above this value move-up and move-below are blocked
 	MaintenanceExpireMinutes                   uint     // Minutes after which a maintenance flag is considered stale and is cleared
+	MaintenancePurgeDays                       uint     // Days after which maintenance entries are purged from the database
 	PreFailoverProcesses                       []string // Processes to execute before doing a failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failedPort}, {successorHost}, {successorPort}
 	PostFailoverProcesses                      []string // Processes to execute after doing a failover (order of execution undefined). Will be provided with old-master-hostname, new-master-hostname arguments. May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failedPort}, {successorHost}, {successorPort}
 	AuditLogFile                               string   // Name of log file for audit operations. Disabled when empty.
@@ -120,6 +121,7 @@ func NewConfiguration() *Configuration {
 		MaintenanceOwner:                           "orchestrator",
 		ReasonableMaintenanceReplicationLagSeconds: 20,
 		MaintenanceExpireMinutes:                   10,
+		MaintenancePurgeDays:                       365,
 		PreFailoverProcesses:                       []string{},
 		PostFailoverProcesses:                      []string{},
 		AuditLogFile:                               "",

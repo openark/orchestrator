@@ -206,14 +206,50 @@ func EndMaintenance(maintenanceToken int64) error {
 	return err
 }
 
-// ExpireMaintenance will remove the maintenance flag on old maintenances
+// ExpireMaintenance will remove the maintenance flag on old maintenances and on pre-limited maintenances
 func ExpireMaintenance() error {
 	db, err := db.OpenOrchestrator()
 	if err != nil {
 		return log.Errore(err)
 	}
 
-	res, err := sqlutils.Exec(db, `
+	{
+		res, err := sqlutils.Exec(db, `
+			delete from
+				database_instance_maintenance
+			where
+				maintenance_active is null
+				and end_timestamp < NOW() - INTERVAL ? DAY 
+			`,
+			config.Config.MaintenancePurgeDays,
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
+		if rowsAffected, _ := res.RowsAffected(); rowsAffected > 0 {
+			AuditOperation("expire-maintenance", nil, fmt.Sprintf("Purged historical entries: %d", rowsAffected))
+		}
+	}
+	{
+		res, err := sqlutils.Exec(db, `
+			update
+				database_instance_maintenance
+			set  
+				maintenance_active = NULL				
+			where
+				maintenance_active = 1
+				and end_timestamp < NOW() 
+			`,
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
+		if rowsAffected, _ := res.RowsAffected(); rowsAffected > 0 {
+			AuditOperation("expire-maintenance", nil, fmt.Sprintf("Expired pre-limited: %d", rowsAffected))
+		}
+	}
+	{
+		res, err := sqlutils.Exec(db, `
 			update
 				database_instance_maintenance
 			set  
@@ -223,13 +259,15 @@ func ExpireMaintenance() error {
 				maintenance_active = 1
 				and begin_timestamp < NOW() - INTERVAL ? MINUTE 
 			`,
-		config.Config.MaintenanceExpireMinutes,
-	)
-	if err != nil {
-		return log.Errore(err)
+			config.Config.MaintenanceExpireMinutes,
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
+		if rowsAffected, _ := res.RowsAffected(); rowsAffected > 0 {
+			AuditOperation("expire-maintenance", nil, fmt.Sprintf("Expired flags: %d", rowsAffected))
+		}
 	}
-	if affected, _ := res.RowsAffected(); affected > 0 {
-		AuditOperation("expire-maintenance", nil, fmt.Sprintf("Expired flags: %d", affected))
-	}
+
 	return err
 }
