@@ -19,6 +19,7 @@ package app
 import (
 	"fmt"
 	"github.com/outbrain/golib/log"
+	"github.com/outbrain/golib/util"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/inst"
 	"github.com/outbrain/orchestrator/logic"
@@ -29,7 +30,7 @@ import (
 )
 
 // Cli initiates a command line interface, executing requested command.
-func Cli(command string, strict bool, instance string, sibling string, owner string, reason string, pattern string) {
+func Cli(command string, strict bool, instance string, sibling string, owner string, reason string, duration string, pattern string) {
 
 	if instance != "" && !strings.Contains(instance, ":") {
 		instance = fmt.Sprintf("%s:%d", instance, config.Config.DefaultInstancePort)
@@ -473,7 +474,14 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if reason == "" {
 				log.Fatal("--reason option required")
 			}
-			maintenanceKey, err := inst.BeginMaintenance(instanceKey, inst.GetMaintenanceOwner(), reason)
+			var durationSeconds int = 0
+			if duration != "" {
+				durationSeconds, err = util.SimpleTimeToSeconds(duration)
+				if err != nil {
+					log.Fatale(err)
+				}
+			}
+			maintenanceKey, err := inst.BeginBoundedMaintenance(instanceKey, inst.GetMaintenanceOwner(), reason, durationSeconds)
 			if err == nil {
 				log.Infof("Maintenance key: %+v", maintenanceKey)
 			}

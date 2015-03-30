@@ -73,24 +73,31 @@ Cleanup:
 
 }
 
-// BeginMaintenance will make new maintenance entry for given instanceKey.
-func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) (int64, error) {
+// BeginBoundedMaintenance will make new maintenance entry for given instanceKey.
+func BeginBoundedMaintenance(instanceKey *InstanceKey, owner string, reason string, durationSeconds int) (int64, error) {
 	db, err := db.OpenOrchestrator()
 	var maintenanceToken int64 = 0
 	if err != nil {
 		return maintenanceToken, log.Errore(err)
 	}
 
+	var endTimestampHint *int = nil
+	if durationSeconds > 0 {
+		// A hack here. If endTimestampHint is nil, then the statement "NOW() + INTERVAL ? SECOND" is NULL,
+		// which is what we want.
+		endTimestampHint = &durationSeconds
+	}
 	res, err := sqlutils.Exec(db, `
 			insert ignore
 				into database_instance_maintenance (
 					hostname, port, maintenance_active, begin_timestamp, end_timestamp, owner, reason
 				) VALUES (
-					?, ?, 1, NOW(), NULL, ?, ?
+					?, ?, 1, NOW(), NOW() + INTERVAL ? SECOND, ?, ?
 				)
 			`,
 		instanceKey.Hostname,
 		instanceKey.Port,
+		endTimestampHint,
 		owner,
 		reason,
 	)
@@ -106,6 +113,11 @@ func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) (in
 		AuditOperation("begin-maintenance", instanceKey, fmt.Sprintf("maintenanceToken: %d, owner: %s, reason: %s", maintenanceToken, owner, reason))
 	}
 	return maintenanceToken, err
+}
+
+// BeginMaintenance will make new maintenance entry for given instanceKey. Maintenance time is unbounded
+func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) (int64, error) {
+	return BeginBoundedMaintenance(instanceKey, owner, reason, 0)
 }
 
 // EndMaintenanceByInstanceKey will terminate an active maintenance using given instanceKey as hint
@@ -206,7 +218,7 @@ func EndMaintenance(maintenanceToken int64) error {
 	return err
 }
 
-// ExpireMaintenance will remove the maintenance flag on old maintenances and on pre-limited maintenances
+// ExpireMaintenance will remove the maintenance flag on old maintenances and on bounded maintenances
 func ExpireMaintenance() error {
 	db, err := db.OpenOrchestrator()
 	if err != nil {
@@ -245,7 +257,7 @@ func ExpireMaintenance() error {
 			return log.Errore(err)
 		}
 		if rowsAffected, _ := res.RowsAffected(); rowsAffected > 0 {
-			AuditOperation("expire-maintenance", nil, fmt.Sprintf("Expired pre-limited: %d", rowsAffected))
+			AuditOperation("expire-maintenance", nil, fmt.Sprintf("Expired bounded: %d", rowsAffected))
 		}
 	}
 	{
