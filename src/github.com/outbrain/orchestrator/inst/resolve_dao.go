@@ -110,9 +110,9 @@ Cleanup:
 	return res, err
 }
 
-// ReadUnresolvedHostname reverse-reads hostname resolve. It returns a hostname which matches given pattern and resovles to resolvedHostname,
+// readUnresolvedHostname reverse-reads hostname resolve. It returns a hostname which matches given pattern and resovles to resolvedHostname,
 // or, in the event no such hostname is found, the given resolvedHostname, unchanged.
-func ReadUnresolvedHostname(hostname string) (string, error) {
+func readUnresolvedHostname(hostname string) (string, error) {
 	unresolvedHostname := hostname
 
 	query := fmt.Sprintf(`

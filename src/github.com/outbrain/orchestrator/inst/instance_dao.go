@@ -1419,8 +1419,10 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	if instance.SlaveRunning() {
 		return instance, errors.New(fmt.Sprintf("Cannot change master on: %+v because slave is running", instanceKey))
 	}
-	unresolvedMasterKey := *masterKey
-	unresolvedMasterKey.Hostname, _ = ReadUnresolvedHostname(masterKey.Hostname)
+	unresolvedMasterKey, err := UnresolveHostname(masterKey)
+	if err != nil {
+		return instance, err
+	}
 
 	if instance.UsingMariaDBGTID {
 		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d",
