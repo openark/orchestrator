@@ -3,7 +3,10 @@ $(document).ready(function () {
     showLoader();
     $.get("/api/long-queries/"+currentFilter(), function (processes) {
             displayProcesses(processes);
-            activateRefreshTimer();
+            if (isAuthorizedForAction()) {
+            	// Read-only users don't get auto-refresh. Sorry!
+            	activateRefreshTimer();
+            }
     	}, "json");
     function displayProcesses(processes) {
         hideLoader();

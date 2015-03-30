@@ -86,6 +86,10 @@ func isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instanc
 }
 
 func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *inst.Instance, sibling *inst.Instance) bool {
+	if sibling.Key.Equals(&intermediateMasterInstance.Key) {
+		// same instance
+		return false
+	}
 	if !isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling) {
 		return false
 	}
@@ -98,7 +102,8 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 	if sibling.HasReplicationFilters != intermediateMasterInstance.HasReplicationFilters {
 		return false
 	}
-	if sibling.Key.Equals(&intermediateMasterInstance.Key) {
+	if sibling.IsMaxScale() || intermediateMasterInstance.IsMaxScale() {
+		// With MaxScale the failover is different; we don't need this "move to uncle" logic.
 		return false
 	}
 	if sibling.ExecBinlogCoordinates.SmallerThan(&intermediateMasterInstance.ExecBinlogCoordinates) {

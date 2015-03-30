@@ -228,6 +228,14 @@ var generateSQL = []string{
 		  KEY start_active_period_idx (start_active_period)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS hostname_unresolve (
+		  hostname varchar(128) NOT NULL,
+		  unresolved_hostname varchar(128) NOT NULL,
+		  PRIMARY KEY (hostname),
+		  KEY unresolved_hostname_idx (unresolved_hostname)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{

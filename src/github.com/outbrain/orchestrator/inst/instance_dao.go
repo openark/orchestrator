@@ -1419,21 +1419,23 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	if instance.SlaveRunning() {
 		return instance, errors.New(fmt.Sprintf("Cannot change master on: %+v because slave is running", instanceKey))
 	}
+	unresolvedMasterKey := *masterKey
+	unresolvedMasterKey.Hostname, _ = ReadUnresolvedHostname(masterKey.Hostname)
 
 	if instance.UsingMariaDBGTID {
 		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d",
-			masterKey.Hostname, masterKey.Port))
+			unresolvedMasterKey.Hostname, unresolvedMasterKey.Port))
 	} else {
 		// MariaDB has a bug: a CHANGE MASTER TO statement does not work properly with prepared statement... :P
 		// See https://mariadb.atlassian.net/browse/MDEV-7640
 		// This is the reason for ExecInstanceNoPrepare
 		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d",
-			masterKey.Hostname, masterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
+			unresolvedMasterKey.Hostname, unresolvedMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
 	}
 	if err != nil {
 		return instance, log.Errore(err)
 	}
-	log.Infof("Changed master on %+v to: %+v, %+v", instanceKey, masterKey, masterBinlogCoordinates)
+	log.Infof("Changed master on %+v to: %+v, %+v", *instanceKey, unresolvedMasterKey, masterBinlogCoordinates)
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err

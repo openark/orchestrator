@@ -631,6 +631,21 @@ function promptForAlias(oldAlias) {
 	}); 
 }
 
+function anonymize() {
+    var _ = function() {
+        var counter = 0;  
+        var port = 3306;
+        $("h3.popover-title .pull-left").each(function() {
+            jQuery(this).html("instance-"+(counter++)+":"+port)
+         });
+        $(".popover-content p").each(function() {
+        	tokens = jQuery(this).html().split(" ", 2)
+            jQuery(this).html(tokens[0].match(/[^.]+[.][^.]+/) + " " + tokens[1])
+         });
+    }();
+	$("#cluster_container div.floating_background").html("");	
+}
+
 $(document).ready(function () {
     $.get("/api/cluster/"+currentClusterName(), function (instances) {
         $.get("/api/maintenance",
@@ -643,6 +658,9 @@ $(document).ready(function () {
                 visualizeInstances(instancesMap);
                 generateInstanceDivs(instancesMap);
                 postVisualizeInstances(instancesMap);
+                if ($.cookie("anonymize") == "true") {
+                	anonymize();
+                }
             }, "json");
     }, "json");
     $.get("/api/cluster-info/"+currentClusterName(), function (clusterInfo) {    
@@ -656,8 +674,11 @@ $(document).ready(function () {
             $("#dropdown-context").append('<li><a data-command="compact-display" href="'+location.href.split("?")[0]+'?compact=true">Compact display</a></li>');    
         }
         $("#dropdown-context").append('<li><a data-command="colorize-dc">Colorize DC</a></li>');    
-        $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="'+clusterInfo.ClusterAlias+'">Alias: '+alias+'</a></li>');           
-        $("#dropdown-context").append('<li><a data-command="anonymize">Anonymize</a></li>');           
+        $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="'+clusterInfo.ClusterAlias+'">Alias: '+alias+'</a></li>');
+        $("#dropdown-context").append('<li><a data-command="anonymize">Anonymize</a></li>');    
+        if ($.cookie("anonymize") == "true") {
+        	$("#dropdown-context a[data-command=anonymize]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
+        } 
 
     }, "json");
     
@@ -676,23 +697,25 @@ $(document).ready(function () {
     $("body").on("click", "a[data-command=change-cluster-alias]", function(event) {    	
     	promptForAlias($(event.target).attr("data-alias"));
     });    
-    $("body").on("click", "a[data-command=anonymize]", function(event) {    	
-        var _ = function() {
-            var counter = 0;  
-            var port = 3306;
-            $("h3.popover-title .pull-left").each(function() {
-               jQuery(this).html("instance-"+(counter++)+":"+port)
-            });
-        }();
-    	$("#cluster_container div.floating_background").html("");
+    $("body").on("click", "a[data-command=anonymize]", function(event) {
+    	if ($.cookie("anonymize") == "true") {
+    		$.cookie("anonymize", "false", { path: '/', expires: 1 });
+    		location.reload();
+    		return
+        }
+    	anonymize();
+    	$("#dropdown-context a[data-command=anonymize]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
+    	$.cookie("anonymize", "true", { path: '/', expires: 1 });
     });    
     $("body").on("click", "a[data-command=colorize-dc]", function(event) {
         $(".popover.instance[data-dc-color]").each(function () {
-            console.log($(this).attr("data-dc-color"))
             $(this).css("border-color", $(this).attr("data-dc-color"));
             $(this).css("border-width", 2);
         });
     });    
 
-    activateRefreshTimer();
+    if (isAuthorizedForAction()) {
+    	// Read-only users don't get auto-refresh. Sorry!
+    	activateRefreshTimer();
+    }
 });

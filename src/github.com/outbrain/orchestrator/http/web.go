@@ -44,12 +44,13 @@ func (this *HttpWeb) getInstanceKey(host string, port string) (inst.InstanceKey,
 	return instanceKey, err
 }
 
-func (this *HttpWeb) Clusters(params martini.Params, r render.Render) {
+func (this *HttpWeb) Clusters(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/clusters", map[string]interface{}{
 		"agentsHttpActive":              config.Config.ServeAgentsHttp,
 		"title":                         "clusters",
 		"activePage":                    "cluster",
 		"autoshow_problems":             false,
+		"authorizedForAction":           isAuthorizedForAction(req, user),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
 	})
 }
@@ -104,18 +105,19 @@ func (this *HttpWeb) Discover(params martini.Params, r render.Render) {
 	})
 }
 
-func (this *HttpWeb) LongQueries(params martini.Params, r render.Render, req *http.Request) {
+func (this *HttpWeb) LongQueries(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	filter := params["filter"]
 	if filter == "" {
 		filter = req.URL.Query().Get("filter")
 	}
 
 	r.HTML(200, "templates/long_queries", map[string]interface{}{
-		"agentsHttpActive":  config.Config.ServeAgentsHttp,
-		"title":             "long queries",
-		"activePage":        "queries",
-		"autoshow_problems": false,
-		"filter":            filter,
+		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"title":               "long queries",
+		"activePage":          "queries",
+		"autoshow_problems":   false,
+		"authorizedForAction": isAuthorizedForAction(req, user),
+		"filter":              filter,
 	})
 }
 

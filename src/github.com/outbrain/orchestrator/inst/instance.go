@@ -265,9 +265,14 @@ func (this *Instance) IsSmallerMajorVersion(other *Instance) bool {
 	return false
 }
 
-// IsSlave makes simple heuristics to decide whether this insatnce is a slave of another instance
+// IsMariaDB checkes whether this is any version of MariaDB
 func (this *Instance) IsMariaDB() bool {
 	return strings.Contains(this.Version, "MariaDB")
+}
+
+// IsMariaDB checkes whether this is any version of MaScale
+func (this *Instance) IsMaxScale() bool {
+	return strings.Contains(this.Version, "maxscale")
 }
 
 // IsSlave makes simple heuristics to decide whether this insatnce is a slave of another instance
@@ -357,8 +362,10 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 			return false, errors.New(fmt.Sprintf("Cannot replicate from ROW binlog format on %+v to MIXED on %+v", other.Key, this.Key))
 		}
 	}
-	if other.HasReplicationFilters && !this.HasReplicationFilters {
-		return false, errors.New(fmt.Sprintf("%+v has replication filters", other.Key))
+	if config.Config.VerifyReplicationFilters {
+		if other.HasReplicationFilters && !this.HasReplicationFilters {
+			return false, errors.New(fmt.Sprintf("%+v has replication filters", other.Key))
+		}
 	}
 	if this.ServerID == other.ServerID {
 		return false, errors.New(fmt.Sprintf("Identical server id: %+v, %+v both have %d", other.Key, this.Key, this.ServerID))

@@ -1,7 +1,6 @@
 
 $(document).ready(function () {
     showLoader();
-    activateRefreshTimer();
     
     var errorMapping = {
    		"inMaintenanceProblem": {"badge": "label-info", "description": "In maintenance"}, 
@@ -13,8 +12,8 @@ $(document).ready(function () {
     
     $.get("/api/clusters-info", function (clusters) {
         $.get("/api/problems", function (problemInstances) {
-	    		normalizeInstances(problemInstances, []);
-	    		displayClusters(clusters, problemInstances);
+        	normalizeInstances(problemInstances, []);
+	    	displayClusters(clusters, problemInstances);
         }, "json");
     }, "json");
     function sortByCountInstances(cluster1, cluster2) {
@@ -90,5 +89,10 @@ $(document).ready(function () {
         if (clusters.length == 0) {
         	addAlert("No clusters found");
         }
+    }
+
+    if (isAuthorizedForAction()) {
+    	// Read-only users don't get auto-refresh. Sorry!
+    	activateRefreshTimer();
     }
 });	

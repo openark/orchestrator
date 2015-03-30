@@ -110,6 +110,36 @@ Cleanup:
 	return res, err
 }
 
+// ReadUnresolvedHostname reverse-reads hostname resolve. It returns a hostname which matches given pattern and resovles to resolvedHostname,
+// or, in the event no such hostname is found, the given resolvedHostname, unchanged.
+func ReadUnresolvedHostname(hostname string) (string, error) {
+	unresolvedHostname := hostname
+
+	query := fmt.Sprintf(`
+	   		select
+	   			unresolved_hostname
+	   		from
+	   			hostname_unresolve
+	   		where
+	   			hostname = '%s'
+	   		`, hostname)
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		goto Cleanup
+	}
+
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		unresolvedHostname = m.GetString("unresolved_hostname")
+		return nil
+	})
+Cleanup:
+
+	if err != nil {
+		log.Errore(err)
+	}
+	return unresolvedHostname, err
+}
+
 // ForgetExpiredHostnameResolves
 func ForgetExpiredHostnameResolves() error {
 	db, err := db.OpenOrchestrator()
