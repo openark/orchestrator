@@ -147,6 +147,26 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), instance.MasterKey.DisplayString()))
 		}
+	case "repoint-slaves":
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			repointedSlaves, err, errs := inst.RepointSlaves(instanceKey, pattern)
+			if err != nil {
+				log.Fatale(err)
+			} else {
+				for _, e := range errs {
+					log.Errore(e)
+				}
+				for _, slave := range repointedSlaves {
+					fmt.Println(fmt.Sprintf("%s<%s", slave.Key.DisplayString(), instanceKey.DisplayString()))
+				}
+			}
+		}
 	case "enslave-siblings":
 		{
 			if instanceKey == nil {

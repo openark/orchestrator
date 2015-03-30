@@ -482,6 +482,44 @@ Cleanup:
 
 }
 
+// RepointSlaves sequentially repoints all slaves of a given instance onto its existing master.
+func RepointSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), error, []error) {
+	res := [](*Instance){}
+	errs := []error{}
+
+	slaves, err := ReadSlaveInstances(instanceKey)
+	if err != nil {
+		return res, err, errs
+	}
+	slaves = filterInstancesByPattern(slaves, pattern)
+	if len(slaves) == 0 {
+		return res, nil, errs
+	}
+
+	log.Infof("Will repoint slaves of %+v", *instanceKey)
+	for _, slave := range slaves {
+		slave := slave
+
+		slave, slaveErr := Repoint(&slave.Key, nil)
+		if slaveErr == nil {
+			res = append(res, slave)
+		} else {
+			errs = append(errs, slaveErr)
+		}
+	}
+
+	if err != nil {
+		return res, log.Errore(err), errs
+	}
+	if len(errs) == len(slaves) {
+		// All returned with error
+		return res, log.Error("Error on all operations"), errs
+	}
+	AuditOperation("repoint-slaves", instanceKey, fmt.Sprintf("repointed %d/%d slaves of %+v", len(res), len(slaves), *instanceKey))
+
+	return res, err, errs
+}
+
 // MakeCoMaster will attempt to make an instance co-master with its master, by making its master a slave of its own.
 // This only works out if the master is not replicating; the master does not have a known master (it may have an unknown master).
 func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
