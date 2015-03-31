@@ -29,6 +29,9 @@ const (
 	UnreachableMaster                                      = "UnreachableMaster"
 	AllMasterSlavesNotReplicating                          = "AllMasterSlavesNotReplicating"
 	MasterWithoutSlaves                                    = "MasterWithoutSlaves"
+	DeadCoMaster                                           = "DeadCoMaster"
+	UnreachableCoMaster                                    = "UnreachableCoMaster"
+	AllCoMasterSlavesNotReplicating                        = "AllCoMasterSlavesNotReplicating"
 	DeadIntermediateMaster                                 = "DeadIntermediateMaster"
 	DeadIntermediateMasterAndSomeSlaves                    = "DeadIntermediateMasterAndSomeSlaves"
 	UnreachableIntermediateMaster                          = "UnreachableIntermediateMaster"
@@ -40,6 +43,7 @@ type ReplicationAnalysis struct {
 	AnalyzedInstanceKey         InstanceKey
 	ClusterName                 string
 	IsMaster                    bool
+	IsCoMaster                  bool
 	LastCheckValid              bool
 	CountSlaves                 uint
 	CountValidSlaves            uint

@@ -199,11 +199,18 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 // It executes the function synchronuously
 func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, error) {
 	var checkAndRecoverFunction func(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, error) = nil
-	if analysisEntry.Analysis == inst.DeadMaster {
+
+	switch analysisEntry.Analysis {
+	case inst.DeadMaster:
 		checkAndRecoverFunction = checkAndRecoverDeadMaster
-	} else if analysisEntry.Analysis == inst.DeadIntermediateMaster || analysisEntry.Analysis == inst.DeadIntermediateMasterAndSomeSlaves {
+	case inst.DeadIntermediateMaster:
+		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
+	case inst.DeadIntermediateMasterAndSomeSlaves:
+		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
+	case inst.DeadCoMaster:
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
 	}
+
 	if checkAndRecoverFunction == nil {
 		// Unhandled problem type
 		return false, nil

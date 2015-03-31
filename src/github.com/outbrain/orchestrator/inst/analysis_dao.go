@@ -161,6 +161,7 @@ func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
 		            IS TRUE AS is_last_check_valid,
 		        MIN(master_instance.master_host IN ('' , '_')
 		            OR master_instance.master_port = 0) AS is_master,
+		        MIN(master_instance.is_co_master) AS is_co_master,
 		        MIN(CONCAT(master_instance.hostname,
 		                ':',
 		                master_instance.port) = master_instance.cluster_name) AS is_cluster_master,
@@ -202,6 +203,7 @@ func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
 		a := ReplicationAnalysis{Analysis: NoProblem}
 
 		a.IsMaster = m.GetBool("is_master")
+		a.IsCoMaster = m.GetBool("is_co_master")
 		a.AnalyzedInstanceKey = InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
 		a.ClusterName = m.GetString("cluster_name")
 		a.LastCheckValid = m.GetBool("is_last_check_valid")
@@ -227,7 +229,16 @@ func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
 		} else if a.IsMaster && a.LastCheckValid && a.CountSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = AllMasterSlavesNotReplicating
 			a.Description = "Master is reachable but none of its slaves is replicating"
-		} else if !a.IsMaster && !a.LastCheckValid && a.CountSlaves > 0 && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
+		} else /* co-master */ if a.IsCoMaster && !a.LastCheckValid && a.CountSlaves > 0 && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
+			a.Analysis = DeadCoMaster
+			a.Description = "Co-master cannot be reached by orchestrator and none of its slaves is replicating"
+		} else if a.IsCoMaster && !a.LastCheckValid && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves > 0 {
+			a.Analysis = UnreachableCoMaster
+			a.Description = "Co-master cannot be reached by orchestrator but it has replicating slaves; possibly a network/host issue"
+		} else if a.IsCoMaster && a.LastCheckValid && a.CountSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
+			a.Analysis = AllCoMasterSlavesNotReplicating
+			a.Description = "Co-master is reachable but none of its slaves is replicating"
+		} else /* intermediate-master */ if !a.IsMaster && !a.LastCheckValid && a.CountSlaves > 0 && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadIntermediateMaster
 			a.Description = "Intermediate master cannot be reached by orchestrator and none of its slaves is replicating"
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountValidSlaves < a.CountSlaves && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
