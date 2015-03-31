@@ -74,18 +74,15 @@ Cleanup:
 }
 
 // BeginBoundedMaintenance will make new maintenance entry for given instanceKey.
-func BeginBoundedMaintenance(instanceKey *InstanceKey, owner string, reason string, durationSeconds int) (int64, error) {
+func BeginBoundedMaintenance(instanceKey *InstanceKey, owner string, reason string, durationSeconds uint) (int64, error) {
 	db, err := db.OpenOrchestrator()
 	var maintenanceToken int64 = 0
 	if err != nil {
 		return maintenanceToken, log.Errore(err)
 	}
 
-	var endTimestampHint *int = nil
-	if durationSeconds > 0 {
-		// A hack here. If endTimestampHint is nil, then the statement "NOW() + INTERVAL ? SECOND" is NULL,
-		// which is what we want.
-		endTimestampHint = &durationSeconds
+	if durationSeconds == 0 {
+		durationSeconds = config.Config.MaintenanceExpireMinutes * 60
 	}
 	res, err := sqlutils.Exec(db, `
 			insert ignore
@@ -97,7 +94,7 @@ func BeginBoundedMaintenance(instanceKey *InstanceKey, owner string, reason stri
 			`,
 		instanceKey.Hostname,
 		instanceKey.Port,
-		endTimestampHint,
+		durationSeconds,
 		owner,
 		reason,
 	)
@@ -258,26 +255,6 @@ func ExpireMaintenance() error {
 		}
 		if rowsAffected, _ := res.RowsAffected(); rowsAffected > 0 {
 			AuditOperation("expire-maintenance", nil, fmt.Sprintf("Expired bounded: %d", rowsAffected))
-		}
-	}
-	{
-		res, err := sqlutils.Exec(db, `
-			update
-				database_instance_maintenance
-			set  
-				maintenance_active = NULL,
-				end_timestamp = NOW()
-			where
-				maintenance_active = 1
-				and begin_timestamp < NOW() - INTERVAL ? MINUTE 
-			`,
-			config.Config.MaintenanceExpireMinutes,
-		)
-		if err != nil {
-			return log.Errore(err)
-		}
-		if rowsAffected, _ := res.RowsAffected(); rowsAffected > 0 {
-			AuditOperation("expire-maintenance", nil, fmt.Sprintf("Expired flags: %d", rowsAffected))
 		}
 	}
 

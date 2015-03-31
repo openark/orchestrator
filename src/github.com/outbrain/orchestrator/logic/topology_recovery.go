@@ -242,6 +242,7 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, skip
 	return checkAndRecoverFunction(analysisEntry, skipFilters)
 }
 
+// CheckAndRecover is the main entry point for the recovery mechanism
 func CheckAndRecover(specificInstance *inst.InstanceKey, skipFilters bool) (bool, error) {
 	actionTaken := false
 	replicationAnalysis, err := inst.GetReplicationAnalysis()

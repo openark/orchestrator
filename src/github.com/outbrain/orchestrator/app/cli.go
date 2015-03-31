@@ -480,8 +480,11 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				if err != nil {
 					log.Fatale(err)
 				}
+				if durationSeconds < 0 {
+					log.Fatalf("Duration value must be non-negative. Given value: %d", durationSeconds)
+				}
 			}
-			maintenanceKey, err := inst.BeginBoundedMaintenance(instanceKey, inst.GetMaintenanceOwner(), reason, durationSeconds)
+			maintenanceKey, err := inst.BeginBoundedMaintenance(instanceKey, inst.GetMaintenanceOwner(), reason, uint(durationSeconds))
 			if err == nil {
 				log.Infof("Maintenance key: %+v", maintenanceKey)
 			}

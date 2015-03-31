@@ -178,7 +178,13 @@ func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
 		            LEFT JOIN
 		        database_instance slave_instance ON (COALESCE(hostname_resolve.resolved_hostname,
 		                master_instance.hostname) = slave_instance.master_host
-		            AND master_instance.port = slave_instance.master_port)
+		            	AND master_instance.port = slave_instance.master_port)
+		            LEFT JOIN
+		        database_instance_maintenance ON (master_instance.hostname = database_instance_maintenance.hostname
+		        		AND master_instance.port = database_instance_maintenance.port
+		        		AND database_instance_maintenance.maintenance_active = 1)
+		    WHERE
+		    	database_instance_maintenance.database_instance_maintenance_id IS NULL
 		    GROUP BY 
 			    master_instance.hostname, 
 			    master_instance.port
