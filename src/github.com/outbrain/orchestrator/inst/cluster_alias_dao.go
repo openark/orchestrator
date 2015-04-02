@@ -17,6 +17,7 @@
 package inst
 
 import (
+	"errors"
 	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
@@ -49,6 +50,38 @@ Cleanup:
 	}
 	clusterAliasMap = updatedMap
 	return err
+
+}
+
+// ReadClusterAliases reads the entrie cluster name aliases mapping
+func ReadClusterByAlias(alias string) (string, error) {
+	clusterName := ""
+	query := fmt.Sprintf(`
+		select 
+			cluster_name
+		from 
+			cluster_alias
+		where
+			alias = '%s'
+		`, alias)
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		goto Cleanup
+	}
+
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		clusterName = m.GetString("cluster_name")
+		return err
+	})
+Cleanup:
+
+	if err != nil {
+		return "", err
+	}
+	if clusterName == "" {
+		err = errors.New(fmt.Sprintf("No cluster found for alias %s", alias))
+	}
+	return clusterName, err
 
 }
 

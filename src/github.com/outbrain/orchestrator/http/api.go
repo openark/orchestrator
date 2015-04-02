@@ -767,6 +767,18 @@ func (this *HttpAPI) Cluster(params martini.Params, r render.Render, req *http.R
 	r.JSON(200, instances)
 }
 
+// Cluster provides list of instances in given cluster
+func (this *HttpAPI) ClusterByAlias(params martini.Params, r render.Render, req *http.Request) {
+	clusterName, err := inst.GetClusterByAlias(params["clusterAlias"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	params["clusterName"] = clusterName
+	this.Cluster(params, r, req)
+}
+
 // ClusterInfo provides details of a given cluster
 func (this *HttpAPI) ClusterInfo(params martini.Params, r render.Render, req *http.Request) {
 	clusterInfo, err := inst.ReadClusterInfo(params["clusterName"])
@@ -1361,6 +1373,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/kill-query/:host/:port/:process", this.KillQuery)
 	m.Get("/api/maintenance", this.Maintenance)
 	m.Get("/api/cluster/:clusterName", this.Cluster)
+	m.Get("/api/cluster/alias/:clusterAlias", this.ClusterByAlias)
 	m.Get("/api/cluster-info/:clusterName", this.ClusterInfo)
 	m.Get("/api/set-cluster-alias/:clusterName", this.SetClusterAlias)
 	m.Get("/api/clusters", this.Clusters)
