@@ -51,16 +51,22 @@ func getLastPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, bin
 	}
 
 	moreRowsExpected := true
+	var nextPos int64 = 0
 	step := 0
 
 	entryText := ""
-	commandToken := math.TernaryString(binlogCoordinates.Type == BinaryLog, "binlog", "relaylog")
 	for moreRowsExpected {
-		query := fmt.Sprintf("show %s events in '%s' LIMIT %d,%d", commandToken, binlog, (step * config.Config.BinlogEventsChunkSize), config.Config.BinlogEventsChunkSize)
+		query := ""
+		if binlogCoordinates.Type == BinaryLog {
+			query = fmt.Sprintf("show binlog events in '%s' FROM %d LIMIT %d", binlog, nextPos, config.Config.BinlogEventsChunkSize)
+		} else {
+			query = fmt.Sprintf("show relaylog events in '%s' LIMIT %d,%d", binlog, (step * config.Config.BinlogEventsChunkSize), config.Config.BinlogEventsChunkSize)
+		}
 
 		moreRowsExpected = false
 		err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 			moreRowsExpected = true
+			nextPos = m.GetInt64("End_log_pos")
 			binlogEntryInfo := m.GetString("Info")
 			if matched, _ := regexp.MatchString(config.Config.PseudoGTIDPattern, binlogEntryInfo); matched {
 				if maxCoordinates != nil && maxCoordinates.SmallerThan(&BinlogCoordinates{LogFile: binlog, LogPos: m.GetInt64("Pos")}) {
@@ -144,10 +150,17 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 
 	moreRowsExpected := true
 	step := 0
+	var nextPos int64 = 0
 
-	commandToken := math.TernaryString(binlogCoordinates.Type == BinaryLog, "binlog", "relaylog")
+	//	commandToken := math.TernaryString(binlogCoordinates.Type == BinaryLog, "binlog", "relaylog")
 	for moreRowsExpected {
-		query := fmt.Sprintf("show %s events in '%s' LIMIT %d,%d", commandToken, binlog, (step * config.Config.BinlogEventsChunkSize), config.Config.BinlogEventsChunkSize)
+		query := ""
+		if binlogCoordinates.Type == BinaryLog {
+			query = fmt.Sprintf("show binlog events in '%s' FROM %d LIMIT %d", binlog, nextPos, config.Config.BinlogEventsChunkSize)
+		} else {
+			query = fmt.Sprintf("show relaylog events in '%s' LIMIT %d,%d", binlog, (step * config.Config.BinlogEventsChunkSize), config.Config.BinlogEventsChunkSize)
+		}
+
 		moreRowsExpected = false
 		err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 			if binlogCoordinates.LogPos != 0 {
@@ -155,6 +168,7 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 				// moreRowsExpected reamins false, this quits the loop
 			}
 			moreRowsExpected = true
+			nextPos = m.GetInt64("End_log_pos")
 			if m.GetString("Info") == entryText {
 				// found it!
 				binlogCoordinates.LogPos = m.GetInt64("Pos")

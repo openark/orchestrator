@@ -58,6 +58,7 @@
   "SeedAcceptableBytesDiff": 8192,
   "PseudoGTIDPattern": "drop view if exists .*?`_pseudo_gtid_hint__",
   "DetectPseudoGTIDQuery": "select count(*) as pseudo_gtid_exists from meta.pseudo_gtid_status where anchor = 1 and time_generated > now() - interval 2 day",
+  "BinlogEventsChunkSize": 10000,
   "RecoveryPeriodBlockMinutes": 1,
   "RecoveryIgnoreHostnameFilters": [
   ],
