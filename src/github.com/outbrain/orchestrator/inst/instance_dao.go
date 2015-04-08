@@ -549,6 +549,7 @@ func ReadProblemInstances() ([](*Instance), error) {
 			or (not slave_sql_running)
 			or (not slave_io_running)
 			or (seconds_behind_master > 10)
+			or (slave_lag_seconds > 10)
 		`, config.Config.InstancePollSeconds)
 	return readInstancesByCondition(condition)
 }
@@ -1232,6 +1233,20 @@ func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
 
 	instance, err := ReadTopologyInstance(instanceKey)
 	return instance, err
+}
+
+// FlushBinaryLogs attempts a 'FLUSH BINARY LOGS' statement on the given instance.
+func FlushBinaryLogs(instanceKey *InstanceKey) error {
+
+	_, err := ExecInstance(instanceKey, `flush binary logs`)
+	if err != nil {
+		return log.Errore(err)
+	}
+
+	log.Infof("flush-binary-logs on %+v", *instanceKey)
+	AuditOperation("flush-binary-logs", instanceKey, "success")
+
+	return nil
 }
 
 // StopSlaveNicely stops a slave such that SQL_thread and IO_thread are aligned (i.e.

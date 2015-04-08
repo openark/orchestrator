@@ -29,7 +29,6 @@ import (
 	"time"
 )
 
-const binlogEventsChunkSize int = 1000000
 const maxEmptyBinlogFiles int = 10
 const maxEventInfoDisplayLength int = 200
 
@@ -57,7 +56,7 @@ func getLastPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, bin
 	entryText := ""
 	commandToken := math.TernaryString(binlogCoordinates.Type == BinaryLog, "binlog", "relaylog")
 	for moreRowsExpected {
-		query := fmt.Sprintf("show %s events in '%s' LIMIT %d,%d", commandToken, binlog, (step * binlogEventsChunkSize), binlogEventsChunkSize)
+		query := fmt.Sprintf("show %s events in '%s' LIMIT %d,%d", commandToken, binlog, (step * config.Config.BinlogEventsChunkSize), config.Config.BinlogEventsChunkSize)
 
 		moreRowsExpected = false
 		err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
@@ -148,7 +147,7 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 
 	commandToken := math.TernaryString(binlogCoordinates.Type == BinaryLog, "binlog", "relaylog")
 	for moreRowsExpected {
-		query := fmt.Sprintf("show %s events in '%s' LIMIT %d,%d", commandToken, binlog, (step * binlogEventsChunkSize), binlogEventsChunkSize)
+		query := fmt.Sprintf("show %s events in '%s' LIMIT %d,%d", commandToken, binlog, (step * config.Config.BinlogEventsChunkSize), config.Config.BinlogEventsChunkSize)
 		moreRowsExpected = false
 		err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 			if binlogCoordinates.LogPos != 0 {
@@ -171,6 +170,7 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 	return binlogCoordinates, (binlogCoordinates.LogPos != 0), err
 }
 
+// SearchPseudoGTIDEntryInInstance will search for a specific text entry within the binary logs of a given instance.
 func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string) (*BinlogCoordinates, error) {
 	cacheKey := getInstancePseudoGTIDKey(instance, entryText)
 	coords, found := instancePseudoGTIDEntryCache.Get(cacheKey)
@@ -208,7 +208,7 @@ func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string) (*Bin
 	return nil, log.Errorf("Cannot match pseudo GTID entry in binlogs of %+v; err: %+v", instance.Key, err)
 }
 
-// Read (as much as possible of) a chink of binary log events starting the given startingCoordinates
+// Read (as much as possible of) a chunk of binary log events starting the given startingCoordinates
 func readBinlogEventsChunk(instanceKey *InstanceKey, startingCoordinates BinlogCoordinates) ([]BinlogEvent, error) {
 	events := []BinlogEvent{}
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
@@ -216,7 +216,7 @@ func readBinlogEventsChunk(instanceKey *InstanceKey, startingCoordinates BinlogC
 		return events, err
 	}
 	commandToken := math.TernaryString(startingCoordinates.Type == BinaryLog, "binlog", "relaylog")
-	query := fmt.Sprintf("show %s events in '%s' FROM %d LIMIT %d", commandToken, startingCoordinates.LogFile, startingCoordinates.LogPos, binlogEventsChunkSize)
+	query := fmt.Sprintf("show %s events in '%s' FROM %d LIMIT %d", commandToken, startingCoordinates.LogFile, startingCoordinates.LogPos, config.Config.BinlogEventsChunkSize)
 	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 		binlogEvent := BinlogEvent{}
 		binlogEvent.Coordinates.LogFile = m.GetString("Log_name")
