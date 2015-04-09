@@ -89,6 +89,7 @@ type Configuration struct {
 	PseudoGTIDPattern                          string            // Pattern to look for in binary logs that makes for a unique entry (pseudo GTID). When empty, Pseudo-GTID based refactoring is disabled.
 	DetectPseudoGTIDQuery                      string            // Optional query which is used to authoritatively decide whether pseudo gtid is enabled on instance
 	BinlogEventsChunkSize                      int               // Chunk size (X) for SHOW BINLOG|RELAYLOG EVENTS LIMIT ?,X statements. Smaller means less locking and mroe work to be done
+	BufferBinlogEvents                         bool              // Should we used buffered read on SHOW BINLOG|RELAYLOG EVENTS -- releases the database lock sooner (recommended)
 	RecoveryPeriodBlockMinutes                 int               // The time for which an instance's recovery is kept "active", so as to avoid concurrent recoveries on smae instance as well as flapping
 	RecoveryIgnoreHostnameFilters              []string          // Recovery analysis will completely ignore hosts matching given patterns
 	RecoverMasterClusterFilters                []string          // Only do master recovery on clusters matching these regexp patterns (of course the ".*" pattern matches everything)
@@ -152,6 +153,7 @@ func NewConfiguration() *Configuration {
 		PseudoGTIDPattern:                          "",
 		DetectPseudoGTIDQuery:                      "",
 		BinlogEventsChunkSize:                      10000,
+		BufferBinlogEvents:                         true,
 		RecoveryPeriodBlockMinutes:                 60,
 		RecoveryIgnoreHostnameFilters:              []string{},
 		RecoverMasterClusterFilters:                []string{},

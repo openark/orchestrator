@@ -64,7 +64,11 @@ func getLastPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, bin
 		}
 
 		moreRowsExpected = false
-		err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		queryRowsFunc := sqlutils.QueryRowsMap
+		if config.Config.BufferBinlogEvents {
+			queryRowsFunc = sqlutils.QueryRowsMapBuffered
+		}
+		err = queryRowsFunc(db, query, func(m sqlutils.RowMap) error {
 			moreRowsExpected = true
 			nextPos = m.GetInt64("End_log_pos")
 			binlogEntryInfo := m.GetString("Info")
@@ -162,7 +166,11 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 		}
 
 		moreRowsExpected = false
-		err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		queryRowsFunc := sqlutils.QueryRowsMap
+		if config.Config.BufferBinlogEvents {
+			queryRowsFunc = sqlutils.QueryRowsMapBuffered
+		}
+		err = queryRowsFunc(db, query, func(m sqlutils.RowMap) error {
 			if binlogCoordinates.LogPos != 0 {
 				return nil
 				// moreRowsExpected reamins false, this quits the loop
