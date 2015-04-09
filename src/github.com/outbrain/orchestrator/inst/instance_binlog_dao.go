@@ -35,7 +35,7 @@ const maxEventInfoDisplayLength int = 200
 var instancePseudoGTIDEntryCache = cache.New(time.Duration(10)*time.Minute, time.Minute)
 
 func getInstancePseudoGTIDKey(instance *Instance, entry string) string {
-	return fmt.Sprintf("%s;%s", instance.Key.DisplayString, entry)
+	return fmt.Sprintf("%s;%s", instance.Key.DisplayString(), entry)
 }
 
 // Try and find the last position of a pseudo GTID query entry in the given binary log.
