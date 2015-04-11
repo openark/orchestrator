@@ -17,7 +17,6 @@
 package inst
 
 import (
-	"errors"
 	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
@@ -79,7 +78,7 @@ Cleanup:
 		return "", err
 	}
 	if clusterName == "" {
-		err = errors.New(fmt.Sprintf("No cluster found for alias %s", alias))
+		err = fmt.Errorf("No cluster found for alias %s", alias)
 	}
 	return clusterName, err
 
