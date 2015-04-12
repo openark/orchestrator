@@ -39,12 +39,12 @@ type InstanceKey struct {
 func NewRawInstanceKey(hostPort string) (*InstanceKey, error) {
 	tokens := strings.SplitN(hostPort, ":", 2)
 	if len(tokens) != 2 {
-		return nil, errors.New(fmt.Sprintf("Cannot parse InstanceKey from %s. Expected format is host:port", hostPort))
+		return nil, fmt.Errorf("Cannot parse InstanceKey from %s. Expected format is host:port", hostPort)
 	}
 	instanceKey := &InstanceKey{Hostname: tokens[0]}
 	var err error
 	if instanceKey.Port, err = strconv.Atoi(tokens[1]); err != nil {
-		return instanceKey, errors.New(fmt.Sprintf("Invalid port: %s", tokens[1]))
+		return instanceKey, fmt.Errorf("Invalid port: %s", tokens[1])
 	}
 
 	return instanceKey, nil
@@ -56,7 +56,7 @@ func NewInstanceKeyFromStrings(hostname string, port string) (*InstanceKey, erro
 	instanceKey := &InstanceKey{}
 	var err error
 	if instanceKey.Port, err = strconv.Atoi(port); err != nil {
-		return instanceKey, errors.New(fmt.Sprintf("Invalid port: %s", port))
+		return instanceKey, fmt.Errorf("Invalid port: %s", port)
 	}
 
 	if instanceKey.Hostname, err = ResolveHostname(hostname); err != nil {
@@ -70,7 +70,7 @@ func NewInstanceKeyFromStrings(hostname string, port string) (*InstanceKey, erro
 func ParseInstanceKey(hostPort string) (*InstanceKey, error) {
 	tokens := strings.SplitN(hostPort, ":", 2)
 	if len(tokens) != 2 {
-		return nil, errors.New(fmt.Sprintf("Cannot parse InstanceKey from %s. Expected format is host:port", hostPort))
+		return nil, fmt.Errorf("Cannot parse InstanceKey from %s. Expected format is host:port", hostPort)
 	}
 	return NewInstanceKeyFromStrings(tokens[0], tokens[1])
 }
@@ -325,7 +325,7 @@ func (this *Instance) ReadSlaveHostsFromJson(jsonString string) error {
 // GetNextBinaryLog returns the successive, if any, binary log file to the one given
 func (this *Instance) GetNextBinaryLog(binlogCoordinates BinlogCoordinates) (BinlogCoordinates, error) {
 	if binlogCoordinates.LogFile == this.SelfBinlogCoordinates.LogFile {
-		return binlogCoordinates, errors.New(fmt.Sprintf("Cannot find next binary log for %+v", binlogCoordinates))
+		return binlogCoordinates, fmt.Errorf("Cannot find next binary log for %+v", binlogCoordinates)
 	}
 	return binlogCoordinates.NextFileCoordinates()
 }
@@ -344,32 +344,32 @@ func (this *Instance) IsMasterOf(slave *Instance) bool {
 // Checks are made to binlog format, version number, binary logs etc.
 func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	if this.Key.Equals(&other.Key) {
-		return false, errors.New(fmt.Sprintf("instance cannot replicate from itself: %+v", this.Key))
+		return false, fmt.Errorf("instance cannot replicate from itself: %+v", this.Key)
 	}
 	if !other.LogBinEnabled {
-		return false, errors.New(fmt.Sprintf("instance does not have binary logs enabled: %+v", other.Key))
+		return false, fmt.Errorf("instance does not have binary logs enabled: %+v", other.Key)
 	}
 	if !other.LogSlaveUpdatesEnabled {
-		return false, errors.New(fmt.Sprintf("instance does not have log_slave_updates enabled: %+v", other.Key))
+		return false, fmt.Errorf("instance does not have log_slave_updates enabled: %+v", other.Key)
 	}
 	if this.IsSmallerMajorVersion(other) {
-		return false, errors.New(fmt.Sprintf("instance %+v has version %s, which is lower than %s on %+v ", this.Key, this.Version, other.Version, other.Key))
+		return false, fmt.Errorf("instance %+v has version %s, which is lower than %s on %+v ", this.Key, this.Version, other.Version, other.Key)
 	}
 	if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
 		if this.Binlog_format == "STATEMENT" && (other.Binlog_format == "ROW" || other.Binlog_format == "MIXED") {
-			return false, errors.New(fmt.Sprintf("Cannot replicate from ROW/MIXED binlog format on %+v to STATEMENT on %+v", other.Key, this.Key))
+			return false, fmt.Errorf("Cannot replicate from ROW/MIXED binlog format on %+v to STATEMENT on %+v", other.Key, this.Key)
 		}
 		if this.Binlog_format == "MIXED" && other.Binlog_format == "ROW" {
-			return false, errors.New(fmt.Sprintf("Cannot replicate from ROW binlog format on %+v to MIXED on %+v", other.Key, this.Key))
+			return false, fmt.Errorf("Cannot replicate from ROW binlog format on %+v to MIXED on %+v", other.Key, this.Key)
 		}
 	}
 	if config.Config.VerifyReplicationFilters {
 		if other.HasReplicationFilters && !this.HasReplicationFilters {
-			return false, errors.New(fmt.Sprintf("%+v has replication filters", other.Key))
+			return false, fmt.Errorf("%+v has replication filters", other.Key)
 		}
 	}
 	if this.ServerID == other.ServerID {
-		return false, errors.New(fmt.Sprintf("Identical server id: %+v, %+v both have %d", other.Key, this.Key, this.ServerID))
+		return false, fmt.Errorf("Identical server id: %+v, %+v both have %d", other.Key, this.Key, this.ServerID)
 	}
 	return true, nil
 }
@@ -378,22 +378,22 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 // if this instance lags too much, it will not be moveable.
 func (this *Instance) CanMove() (bool, error) {
 	if !this.IsLastCheckValid {
-		return false, errors.New(fmt.Sprintf("%+v: last check invalid", this.Key))
+		return false, fmt.Errorf("%+v: last check invalid", this.Key)
 	}
 	if !this.IsRecentlyChecked {
-		return false, errors.New(fmt.Sprintf("%+v: not recently checked", this.Key))
+		return false, fmt.Errorf("%+v: not recently checked", this.Key)
 	}
 	if !this.Slave_SQL_Running {
-		return false, errors.New(fmt.Sprintf("%+v: instance is not replicating", this.Key))
+		return false, fmt.Errorf("%+v: instance is not replicating", this.Key)
 	}
 	if !this.Slave_IO_Running {
-		return false, errors.New(fmt.Sprintf("%+v: instance is not replicating", this.Key))
+		return false, fmt.Errorf("%+v: instance is not replicating", this.Key)
 	}
 	if !this.SecondsBehindMaster.Valid {
-		return false, errors.New(fmt.Sprintf("%+v: cannot determine slave lag", this.Key))
+		return false, fmt.Errorf("%+v: cannot determine slave lag", this.Key)
 	}
 	if this.SecondsBehindMaster.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
-		return false, errors.New(fmt.Sprintf("%+v: lags too much", this.Key))
+		return false, fmt.Errorf("%+v: lags too much", this.Key)
 	}
 	return true, nil
 }
@@ -401,16 +401,16 @@ func (this *Instance) CanMove() (bool, error) {
 // CanMoveAsCoMaster returns true if this instance's state allows it to be repositioned.
 func (this *Instance) CanMoveAsCoMaster() (bool, error) {
 	if !this.IsLastCheckValid {
-		return false, errors.New(fmt.Sprintf("%+v: last check invalid", this.Key))
+		return false, fmt.Errorf("%+v: last check invalid", this.Key)
 	}
 	if !this.IsRecentlyChecked {
-		return false, errors.New(fmt.Sprintf("%+v: not recently checked", this.Key))
+		return false, fmt.Errorf("%+v: not recently checked", this.Key)
 	}
 	if this.Slave_SQL_Running {
-		return false, errors.New(fmt.Sprintf("%+v: instance is replicating", this.Key))
+		return false, fmt.Errorf("%+v: instance is replicating", this.Key)
 	}
 	if this.Slave_IO_Running {
-		return false, errors.New(fmt.Sprintf("%+v: instance is replicating", this.Key))
+		return false, fmt.Errorf("%+v: instance is replicating", this.Key)
 	}
 	return true, nil
 }
@@ -418,10 +418,10 @@ func (this *Instance) CanMoveAsCoMaster() (bool, error) {
 // CanMoveViaMatch returns true if this instance's state allows it to be repositioned via pseudo-GTID matching
 func (this *Instance) CanMoveViaMatch() (bool, error) {
 	if !this.IsLastCheckValid {
-		return false, errors.New(fmt.Sprintf("%+v: last check invalid", this.Key))
+		return false, fmt.Errorf("%+v: last check invalid", this.Key)
 	}
 	if !this.IsRecentlyChecked {
-		return false, errors.New(fmt.Sprintf("%+v: not recently checked", this.Key))
+		return false, fmt.Errorf("%+v: not recently checked", this.Key)
 	}
 	return true, nil
 }

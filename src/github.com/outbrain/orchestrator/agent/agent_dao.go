@@ -709,7 +709,7 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 
 	if sourceAgent.MountPoint.MySQLDiskUsage > targetAgent.MySQLDatadirDiskFree {
 		Unmount(sourceHostname)
-		return updateSeedStateEntry(seedStateId, errors.New(fmt.Sprintf("Not enough disk space on target host %s. Required: %d, available: %d. Bailing out.", targetHostname, sourceAgent.MountPoint.MySQLDiskUsage, targetAgent.MySQLDatadirDiskFree)))
+		return updateSeedStateEntry(seedStateId, fmt.Errorf("Not enough disk space on target host %s. Required: %d, available: %d. Bailing out.", targetHostname, sourceAgent.MountPoint.MySQLDiskUsage, targetAgent.MySQLDatadirDiskFree))
 	}
 
 	// ...

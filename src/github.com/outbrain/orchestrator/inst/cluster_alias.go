@@ -17,7 +17,6 @@
 package inst
 
 import (
-	"errors"
 	"fmt"
 	"github.com/outbrain/orchestrator/config"
 	"regexp"
@@ -59,12 +58,12 @@ func GetClusterByAlias(alias string) (string, error) {
 			if clusterName == "" {
 				clusterName = mappedName
 			} else {
-				return "", errors.New(fmt.Sprintf("GetClusterByAlias: multiple clusters for alias %s", alias))
+				return "", fmt.Errorf("GetClusterByAlias: multiple clusters for alias %s", alias)
 			}
 		}
 	}
 	if clusterName == "" {
-		return "", errors.New(fmt.Sprintf("GetClusterByAlias: no cluster found for alias %s", alias))
+		return "", fmt.Errorf("GetClusterByAlias: no cluster found for alias %s", alias)
 	}
 	return clusterName, nil
 }

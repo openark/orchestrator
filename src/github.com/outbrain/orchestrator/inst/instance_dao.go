@@ -18,7 +18,6 @@ package inst
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
@@ -1259,7 +1258,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	}
 
 	if !instance.IsSlave() {
-		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
+		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
 	}
 
 	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave io_thread`)
@@ -1327,7 +1326,7 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if !instance.IsSlave() {
-		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
+		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
 	}
 	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave`)
 	if err != nil {
@@ -1347,7 +1346,7 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if !instance.IsSlave() {
-		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
+		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
 	}
 
 	_, err = ExecInstanceNoPrepare(instanceKey, `start slave`)
@@ -1390,10 +1389,10 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 	}
 
 	if !instance.IsSlave() {
-		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
+		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
 	}
 	if instance.SlaveRunning() {
-		return instance, errors.New(fmt.Sprintf("slave already running: %+v", instanceKey))
+		return instance, fmt.Errorf("slave already running: %+v", instanceKey)
 	}
 
 	log.Infof("Will start slave on %+v until coordinates: %+v", instanceKey, masterCoordinates)
@@ -1419,7 +1418,7 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 		case instance.ExecBinlogCoordinates.Equals(masterCoordinates):
 			upToDate = true
 		case masterCoordinates.SmallerThan(&instance.ExecBinlogCoordinates):
-			return instance, errors.New(fmt.Sprintf("Start SLAVE UNTIL is past coordinates: %+v", instanceKey))
+			return instance, fmt.Errorf("Start SLAVE UNTIL is past coordinates: %+v", instanceKey)
 		}
 	}
 
@@ -1439,7 +1438,7 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	}
 
 	if instance.SlaveRunning() {
-		return instance, errors.New(fmt.Sprintf("Cannot change master on: %+v because slave is running", instanceKey))
+		return instance, fmt.Errorf("Cannot change master on: %+v because slave is running", instanceKey)
 	}
 	unresolvedMasterKey, err := UnresolveHostname(masterKey)
 	if err != nil {
@@ -1473,7 +1472,7 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if instance.SlaveRunning() {
-		return instance, errors.New(fmt.Sprintf("Cannot reset slave on: %+v because slave is running", instanceKey))
+		return instance, fmt.Errorf("Cannot reset slave on: %+v because slave is running", instanceKey)
 	}
 
 	// MySQL's RESET SLAVE is done correctly; however SHOW SLAVE STATUS still returns old hostnames etc
@@ -1502,13 +1501,13 @@ func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if !instance.IsSlave() {
-		return instance, errors.New(fmt.Sprintf("instance is not a slave: %+v", instanceKey))
+		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
 	}
 	if instance.Slave_SQL_Running {
-		return instance, errors.New(fmt.Sprintf("Slave_SQL_is running on %+v", instanceKey))
+		return instance, fmt.Errorf("Slave_SQL_is running on %+v", instanceKey)
 	}
 	if instance.LastSQLError == "" {
-		return instance, errors.New(fmt.Sprintf("No SQL error on %+v", instanceKey))
+		return instance, fmt.Errorf("No SQL error on %+v", instanceKey)
 	}
 
 	log.Debugf("Skipping one query on %+v", instanceKey)
@@ -1528,12 +1527,12 @@ func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if instance.SlaveRunning() {
-		return instance, errors.New(fmt.Sprintf("Cannot detach slave on: %+v because slave is running", instanceKey))
+		return instance, fmt.Errorf("Cannot detach slave on: %+v because slave is running", instanceKey)
 	}
 
 	detachedCoordinatesSubmatch := detachPattern.FindStringSubmatch(instance.ExecBinlogCoordinates.LogFile)
 	if len(detachedCoordinatesSubmatch) != 0 {
-		return instance, errors.New(fmt.Sprintf("Cannot (need not) detach slave on: %+v because slave is already detached", instanceKey))
+		return instance, fmt.Errorf("Cannot (need not) detach slave on: %+v because slave is already detached", instanceKey)
 	}
 
 	detachedCoordinates := BinlogCoordinates{LogFile: fmt.Sprintf("//%s:%d", instance.ExecBinlogCoordinates.LogFile, instance.ExecBinlogCoordinates.LogPos), LogPos: instance.ExecBinlogCoordinates.LogPos}
@@ -1557,12 +1556,12 @@ func ReattachSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if instance.SlaveRunning() {
-		return instance, errors.New(fmt.Sprintf("Cannot (need not) reattach slave on: %+v because slave is running", instanceKey))
+		return instance, fmt.Errorf("Cannot (need not) reattach slave on: %+v because slave is running", instanceKey)
 	}
 
 	detachedCoordinatesSubmatch := detachPattern.FindStringSubmatch(instance.ExecBinlogCoordinates.LogFile)
 	if len(detachedCoordinatesSubmatch) == 0 {
-		return instance, errors.New(fmt.Sprintf("Cannot reattach slave on: %+v because slave is not detached", instanceKey))
+		return instance, fmt.Errorf("Cannot reattach slave on: %+v because slave is not detached", instanceKey)
 	}
 
 	_, err = ExecInstance(instanceKey, fmt.Sprintf(`change master to master_log_file='%s', master_log_pos=%s`, detachedCoordinatesSubmatch[1], detachedCoordinatesSubmatch[2]))

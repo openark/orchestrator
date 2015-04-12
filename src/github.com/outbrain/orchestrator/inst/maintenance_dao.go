@@ -17,7 +17,6 @@
 package inst
 
 import (
-	"errors"
 	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
@@ -103,7 +102,7 @@ func BeginBoundedMaintenance(instanceKey *InstanceKey, owner string, reason stri
 	}
 
 	if affected, _ := res.RowsAffected(); affected == 0 {
-		err = errors.New(fmt.Sprintf("Cannot begin maintenance for instance: %+v", instanceKey))
+		err = fmt.Errorf("Cannot begin maintenance for instance: %+v", instanceKey)
 	} else {
 		// success
 		maintenanceToken, _ = res.LastInsertId()
@@ -143,7 +142,7 @@ func EndMaintenanceByInstanceKey(instanceKey *InstanceKey) error {
 	}
 
 	if affected, _ := res.RowsAffected(); affected == 0 {
-		err = errors.New(fmt.Sprintf("Instance is not in maintenance mode: %+v", instanceKey))
+		err = fmt.Errorf("Instance is not in maintenance mode: %+v", instanceKey)
 	} else {
 		// success
 		AuditOperation("end-maintenance", instanceKey, "")
@@ -206,7 +205,7 @@ func EndMaintenance(maintenanceToken int64) error {
 		return log.Errore(err)
 	}
 	if affected, _ := res.RowsAffected(); affected == 0 {
-		err = errors.New(fmt.Sprintf("Instance is not in maintenance mode; token = %+v", maintenanceToken))
+		err = fmt.Errorf("Instance is not in maintenance mode; token = %+v", maintenanceToken)
 	} else {
 		// success
 		instanceKey, _ := ReadMaintenanceInstanceKey(maintenanceToken)

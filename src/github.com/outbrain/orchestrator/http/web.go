@@ -17,7 +17,6 @@
 package http
 
 import (
-	"errors"
 	"fmt"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/auth"
@@ -39,7 +38,7 @@ func (this *HttpWeb) getInstanceKey(host string, port string) (inst.InstanceKey,
 	var err error
 
 	if instanceKey.Port, err = strconv.Atoi(port); err != nil {
-		return instanceKey, errors.New(fmt.Sprintf("Invalid port: %s", port))
+		return instanceKey, fmt.Errorf("Invalid port: %s", port)
 	}
 	return instanceKey, err
 }
