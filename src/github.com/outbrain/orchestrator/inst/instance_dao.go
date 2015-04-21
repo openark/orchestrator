@@ -183,6 +183,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		instance.RelaylogCoordinates.Type = RelayLog
 		instance.LastSQLError = m.GetString("Last_SQL_Error")
 		instance.LastIOError = m.GetString("Last_IO_Error")
+		instance.SQLDelay = m.GetUintD("SQL_Delay", 0)
 		instance.UsingOracleGTID = (m.GetIntD("Auto_Position", 0) == 1)
 		instance.UsingMariaDBGTID = (m.GetStringD("Using_Gtid", "No") != "No")
 		instance.HasReplicationFilters = ((m.GetStringD("Replicate_Do_DB", "") != "") || (m.GetStringD("Replicate_Ignore_DB", "") != "") || (m.GetStringD("Replicate_Do_Table", "") != "") || (m.GetStringD("Replicate_Ignore_Table", "") != "") || (m.GetStringD("Replicate_Wild_Do_Table", "") != "") || (m.GetStringD("Replicate_Wild_Ignore_Table", "") != ""))
@@ -438,6 +439,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.LastIOError = m.GetString("last_io_error")
 	instance.SecondsBehindMaster = m.GetNullInt64("seconds_behind_master")
 	instance.SlaveLagSeconds = m.GetNullInt64("slave_lag_seconds")
+	instance.SQLDelay = m.GetUint("sql_delay")
 	slaveHostsJson := m.GetString("slave_hosts")
 	instance.ClusterName = m.GetString("cluster_name")
 	instance.DataCenter = m.GetString("data_center")
@@ -547,8 +549,8 @@ func ReadProblemInstances() ([](*Instance), error) {
 			or (not ifnull(timestampdiff(second, last_checked, now()) <= %d, false))
 			or (not slave_sql_running)
 			or (not slave_io_running)
-			or (seconds_behind_master > 10)
-			or (slave_lag_seconds > 10)
+			or (abs(seconds_behind_master-sql_delay) > 10)
+			or (abs(slave_lag_seconds-sql_delay) > 10)
 		`, config.Config.InstancePollSeconds)
 	return readInstancesByCondition(condition)
 }
@@ -965,6 +967,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 					last_io_error=VALUES(last_io_error),
 					seconds_behind_master=VALUES(seconds_behind_master),
 					slave_lag_seconds=VALUES(slave_lag_seconds),
+					sql_delay=VALUES(sql_delay),
 					num_slave_hosts=VALUES(num_slave_hosts),
 					slave_hosts=VALUES(slave_hosts),
 					cluster_name=VALUES(cluster_name),
@@ -1012,6 +1015,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				last_io_error,
 				seconds_behind_master,
 				slave_lag_seconds,
+				sql_delay,
 				num_slave_hosts,
 				slave_hosts,
 				cluster_name,
@@ -1019,7 +1023,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				physical_environment,
 				replication_depth,
 				is_co_master
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
@@ -1053,6 +1057,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			instance.LastIOError,
 			instance.SecondsBehindMaster,
 			instance.SlaveLagSeconds,
+			instance.SQLDelay,
 			len(instance.SlaveHosts),
 			instance.GetSlaveHostsAsJson(),
 			instance.ClusterName,

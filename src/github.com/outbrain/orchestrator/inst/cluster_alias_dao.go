@@ -47,7 +47,9 @@ Cleanup:
 	if err != nil {
 		log.Errore(err)
 	}
+	clusterAliasMapMutex.Lock()
 	clusterAliasMap = updatedMap
+	clusterAliasMapMutex.Unlock()
 	return err
 
 }

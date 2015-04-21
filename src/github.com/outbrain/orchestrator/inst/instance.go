@@ -217,6 +217,7 @@ type Instance struct {
 	LastSQLError           string
 	LastIOError            string
 	SecondsBehindMaster    sql.NullInt64
+	SQLDelay               uint
 
 	SlaveLagSeconds     sql.NullInt64
 	SlaveHosts          InstanceKeyMap

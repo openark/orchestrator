@@ -191,33 +191,39 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	if !instance.UsingMariaDBGTID {
-		master, err = StopSlave(&master.Key)
+	if master.IsMaxScale() {
+		instance, err = Repoint(instanceKey, &master.MasterKey)
+		if err != nil {
+			goto Cleanup
+		}
+	} else {
+		if !instance.UsingMariaDBGTID {
+			master, err = StopSlave(&master.Key)
+			if err != nil {
+				goto Cleanup
+			}
+		}
+
+		instance, err = StopSlave(instanceKey)
+		if err != nil {
+			goto Cleanup
+		}
+
+		if !instance.UsingMariaDBGTID {
+			instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &master.SelfBinlogCoordinates)
+			if err != nil {
+				goto Cleanup
+			}
+		}
+
+		instance, err = ChangeMasterTo(instanceKey, &master.MasterKey, &master.ExecBinlogCoordinates)
 		if err != nil {
 			goto Cleanup
 		}
 	}
-
-	instance, err = StopSlave(instanceKey)
-	if err != nil {
-		goto Cleanup
-	}
-
-	if !instance.UsingMariaDBGTID {
-		instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &master.SelfBinlogCoordinates)
-		if err != nil {
-			goto Cleanup
-		}
-	}
-
-	instance, err = ChangeMasterTo(instanceKey, &master.MasterKey, &master.ExecBinlogCoordinates)
-	if err != nil {
-		goto Cleanup
-	}
-
 Cleanup:
 	instance, _ = StartSlave(instanceKey)
-	if !instance.UsingMariaDBGTID {
+	if !instance.UsingMariaDBGTID && !master.IsMaxScale() {
 		master, _ = StartSlave(&master.Key)
 	}
 	if err != nil {
@@ -385,37 +391,46 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	instance, err = StopSlave(instanceKey)
-	if err != nil {
-		goto Cleanup
-	}
-
-	sibling, err = StopSlave(siblingKey)
-	if err != nil {
-		goto Cleanup
-	}
-
-	if instance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
-		instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &sibling.ExecBinlogCoordinates)
+	if sibling.IsMaxScale() {
+		// MaxScale(binlog server) has same coordinates as master
+		instance, err = Repoint(instanceKey, &sibling.Key)
 		if err != nil {
 			goto Cleanup
 		}
-	} else if sibling.ExecBinlogCoordinates.SmallerThan(&instance.ExecBinlogCoordinates) {
-		sibling, err = StartSlaveUntilMasterCoordinates(siblingKey, &instance.ExecBinlogCoordinates)
+	} else {
+		instance, err = StopSlave(instanceKey)
+		if err != nil {
+			goto Cleanup
+		}
+
+		sibling, err = StopSlave(siblingKey)
+		if err != nil {
+			goto Cleanup
+		}
+
+		if instance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
+			instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &sibling.ExecBinlogCoordinates)
+			if err != nil {
+				goto Cleanup
+			}
+		} else if sibling.ExecBinlogCoordinates.SmallerThan(&instance.ExecBinlogCoordinates) {
+			sibling, err = StartSlaveUntilMasterCoordinates(siblingKey, &instance.ExecBinlogCoordinates)
+			if err != nil {
+				goto Cleanup
+			}
+		}
+		// At this point both siblings have executed exact same statements and are identical
+
+		instance, err = ChangeMasterTo(instanceKey, &sibling.Key, &sibling.SelfBinlogCoordinates)
 		if err != nil {
 			goto Cleanup
 		}
 	}
-	// At this point both siblings have executed exact same statements and are identical
-
-	instance, err = ChangeMasterTo(instanceKey, &sibling.Key, &sibling.SelfBinlogCoordinates)
-	if err != nil {
-		goto Cleanup
-	}
-
 Cleanup:
 	instance, _ = StartSlave(instanceKey)
-	sibling, _ = StartSlave(siblingKey)
+	if !sibling.IsMaxScale() {
+		sibling, _ = StartSlave(siblingKey)
+	}
 	if err != nil {
 		return instance, log.Errore(err)
 	}

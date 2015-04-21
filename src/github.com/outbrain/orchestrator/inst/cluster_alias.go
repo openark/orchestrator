@@ -20,10 +20,12 @@ import (
 	"fmt"
 	"github.com/outbrain/orchestrator/config"
 	"regexp"
+	"sync"
 )
 
 // clusterAlias maps a cluster name to an alias
 var clusterAliasMap = make(map[string]string)
+var clusterAliasMapMutex = &sync.Mutex{}
 
 func ApplyClusterAlias(clusterInfo *ClusterInfo) {
 	for pattern, _ := range config.Config.ClusterNameToAlias {
@@ -31,10 +33,11 @@ func ApplyClusterAlias(clusterInfo *ClusterInfo) {
 			clusterInfo.ClusterAlias = config.Config.ClusterNameToAlias[pattern]
 		}
 	}
+	clusterAliasMapMutex.Lock()
 	if alias, ok := clusterAliasMap[clusterInfo.ClusterName]; ok {
 		clusterInfo.ClusterAlias = alias
 	}
-
+	clusterAliasMapMutex.Unlock()
 }
 
 // SetClusterAlias will write (and override) a single cluster name mapping
@@ -43,7 +46,9 @@ func SetClusterAlias(clusterName string, alias string) error {
 	if err != nil {
 		return err
 	}
+	clusterAliasMapMutex.Lock()
 	clusterAliasMap[clusterName] = alias
+	clusterAliasMapMutex.Unlock()
 	return nil
 }
 
@@ -53,6 +58,7 @@ func SetClusterAlias(clusterName string, alias string) error {
 // - More than one cluster is associated with the alias
 func GetClusterByAlias(alias string) (string, error) {
 	clusterName := ""
+	clusterAliasMapMutex.Lock()
 	for mappedName, mappedAlias := range clusterAliasMap {
 		if mappedAlias == alias {
 			if clusterName == "" {
@@ -62,6 +68,7 @@ func GetClusterByAlias(alias string) (string, error) {
 			}
 		}
 	}
+	clusterAliasMapMutex.Unlock()
 	if clusterName == "" {
 		return "", fmt.Errorf("GetClusterByAlias: no cluster found for alias %s", alias)
 	}

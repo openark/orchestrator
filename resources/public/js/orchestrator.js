@@ -99,6 +99,9 @@ function commonSuffixLength(strings) {
 
 
 function addAlert(alertText, alertClass) {
+    if ($.cookie("anonymize") == "true") {
+        return false;
+    }
 	if(typeof(alertClass)==='undefined') {
         alertClass = "danger";
     }
@@ -146,7 +149,7 @@ function addNodeModalDataAttribute(name, value) {
 	if (value == "true" || value == true) {
 		codeClass = "text-success";
 	}
-	if (value == "false" || value == false) {
+	if (value == "false" || value === false) {
 		codeClass = "text-danger";
 	}
     $('#modalDataAttributesTable').append(
@@ -188,6 +191,7 @@ function openNodeModal(node) {
         }
         addNodeModalDataAttribute("Seconds behind master", node.SecondsBehindMaster.Valid ? node.SecondsBehindMaster.Int64 : "null");
         addNodeModalDataAttribute("Replication lag", node.SlaveLagSeconds.Valid ? node.SlaveLagSeconds.Int64 : "null");
+        addNodeModalDataAttribute("SQL delay", node.SQLDelay);
     }
     var td = addNodeModalDataAttribute("Num slaves", node.SlaveHosts.length);
     $('#node_modal button[data-btn=move-up-slaves]').appendTo(td.find("div"))
@@ -368,7 +372,7 @@ function normalizeInstance(instance) {
 
     instance.replicationRunning = instance.Slave_SQL_Running && instance.Slave_IO_Running;
     instance.replicationAttemptingToRun = instance.Slave_SQL_Running || instance.Slave_IO_Running;
-    instance.replicationLagReasonable = instance.SlaveLagSeconds.Int64 <= 10;
+    instance.replicationLagReasonable = Math.abs(instance.SlaveLagSeconds.Int64 - instance.SQLDelay) <= 10;
     instance.isSeenRecently = instance.SecondsSinceLastSeen.Valid && instance.SecondsSinceLastSeen.Int64 <= 3600;
     instance.usingGTID = instance.UsingOracleGTID || instance.UsingMariaDBGTID;
     instance.isMaxScale = (instance.Version.indexOf("maxscale") >= 0); 

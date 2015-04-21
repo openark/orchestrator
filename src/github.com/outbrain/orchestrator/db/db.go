@@ -334,6 +334,11 @@ var generateSQLPatches = []string{
 			database_instance_maintenance
 			ADD KEY active_end_timestamp_idx (maintenance_active, end_timestamp)
 	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN sql_delay INT UNSIGNED NOT NULL AFTER slave_lag_seconds
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance
@@ -364,24 +369,26 @@ func OpenOrchestrator() (*sql.DB, error) {
 func initOrchestratorDB(db *sql.DB) error {
 	log.Debug("Initializing orchestrator")
 	for _, query := range generateSQL {
-		_, err := ExecOrchestrator(query)
+		_, err := execInternal(db, query)
 		if err != nil {
 			return log.Fatalf("Cannot initiate orchestrator: %+v", err)
 		}
 	}
 	for _, query := range generateSQLPatches {
 		// Patches are allowed to fail.
-		_, _ = execOrchestratorSilently(query)
+		_, _ = execInternalSilently(db, query)
 	}
 	return nil
 }
 
 // ExecOrchestrator will execute given query on the orchestrator backend database.
-func execOrchestratorSilently(query string, args ...interface{}) (sql.Result, error) {
-	db, err := OpenOrchestrator()
-	if err != nil {
-		return nil, err
-	}
+func execInternalSilently(db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
+	res, err := sqlutils.ExecSilently(db, query, args...)
+	return res, err
+}
+
+// ExecOrchestrator will execute given query on the orchestrator backend database.
+func execInternal(db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
 	res, err := sqlutils.ExecSilently(db, query, args...)
 	return res, err
 }
