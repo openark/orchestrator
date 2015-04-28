@@ -236,6 +236,15 @@ var generateSQL = []string{
 		  KEY unresolved_hostname_idx (unresolved_hostname)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS database_instance_pool (
+          hostname varchar(128) CHARACTER SET ascii NOT NULL,
+          port smallint(5) unsigned NOT NULL,
+		  pool varchar(128) NOT NULL,
+		  PRIMARY KEY (hostname, port, pool),
+		  KEY pool_idx (pool)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{

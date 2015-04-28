@@ -59,6 +59,8 @@ func SetClusterAlias(clusterName string, alias string) error {
 func GetClusterByAlias(alias string) (string, error) {
 	clusterName := ""
 	clusterAliasMapMutex.Lock()
+	defer clusterAliasMapMutex.Unlock()
+
 	for mappedName, mappedAlias := range clusterAliasMap {
 		if mappedAlias == alias {
 			if clusterName == "" {
@@ -68,7 +70,6 @@ func GetClusterByAlias(alias string) (string, error) {
 			}
 		}
 	}
-	clusterAliasMapMutex.Unlock()
 	if clusterName == "" {
 		return "", fmt.Errorf("GetClusterByAlias: no cluster found for alias %s", alias)
 	}

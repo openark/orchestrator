@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const SQLThreadPollDuration = 200 * time.Millisecond
+const sqlThreadPollDuration = 200 * time.Millisecond
 
 const backendDBConcurrency = 20
 
@@ -122,8 +122,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	{
 		// Is this MaxScale? (a proxy, not a real server)
 		err = sqlutils.QueryRowsMap(db, "show variables like 'maxscale%'", func(m sqlutils.RowMap) error {
-			variable_name := m.GetString("Variable_name")
-			if variable_name == "MAXSCALE_VERSION" {
+			variableName := m.GetString("Variable_name")
+			if variableName == "MAXSCALE_VERSION" {
 				instance.Version = m.GetString("value") + "-maxscale"
 				instance.ServerID = 0
 				instance.Uptime = 0
@@ -440,7 +440,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.SecondsBehindMaster = m.GetNullInt64("seconds_behind_master")
 	instance.SlaveLagSeconds = m.GetNullInt64("slave_lag_seconds")
 	instance.SQLDelay = m.GetUint("sql_delay")
-	slaveHostsJson := m.GetString("slave_hosts")
+	slaveHostsJSON := m.GetString("slave_hosts")
 	instance.ClusterName = m.GetString("cluster_name")
 	instance.DataCenter = m.GetString("data_center")
 	instance.PhysicalEnvironment = m.GetString("physical_environment")
@@ -451,7 +451,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.IsLastCheckValid = m.GetBool("is_last_check_valid")
 	instance.SecondsSinceLastSeen = m.GetNullInt64("seconds_since_last_seen")
 
-	instance.ReadSlaveHostsFromJson(slaveHostsJson)
+	instance.ReadSlaveHostsFromJson(slaveHostsJSON)
 	return instance
 }
 
@@ -765,7 +765,7 @@ Cleanup:
 	return res, err
 }
 
-// For the given list of instances, fill in extra data acquired from agents
+// PopulateInstancesAgents will fill in extra data acquired from agents for given instances
 // At current this is the number of snapshots.
 // This isn't too pretty; it's a push-into-instance-data-that-belongs-to-agent thing.
 // Originally the need was to visually present the number of snapshots per host on the web/cluster page, which
@@ -1283,7 +1283,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 		if instance.SQLThreadUpToDate() {
 			upToDate = true
 		} else {
-			time.Sleep(SQLThreadPollDuration)
+			time.Sleep(sqlThreadPollDuration)
 		}
 	}
 	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave`)
@@ -1419,7 +1419,7 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 
 		switch {
 		case instance.ExecBinlogCoordinates.SmallerThan(masterCoordinates):
-			time.Sleep(SQLThreadPollDuration)
+			time.Sleep(sqlThreadPollDuration)
 		case instance.ExecBinlogCoordinates.Equals(masterCoordinates):
 			upToDate = true
 		case masterCoordinates.SmallerThan(&instance.ExecBinlogCoordinates):

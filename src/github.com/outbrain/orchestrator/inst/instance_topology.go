@@ -26,6 +26,7 @@ import (
 	"time"
 )
 
+// InstancesByExecBinlogCoordinates is a sortabel type for BinlogCoordinates
 type InstancesByExecBinlogCoordinates [](*Instance)
 
 func (this InstancesByExecBinlogCoordinates) Len() int      { return len(this) }
@@ -40,9 +41,9 @@ func (this InstancesByExecBinlogCoordinates) Less(i, j int) bool {
 	return this[i].ExecBinlogCoordinates.SmallerThan(&this[j].ExecBinlogCoordinates)
 }
 
-// getAsciiTopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
+// getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
-func getAsciiTopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance)) []string {
+func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance)) []string {
 	prefix := ""
 	if depth > 0 {
 		prefix = strings.Repeat(" ", (depth-1)*2)
@@ -55,14 +56,14 @@ func getAsciiTopologyEntry(depth int, instance *Instance, replicationMap map[*In
 	entry := fmt.Sprintf("%s%s %s", prefix, instance.Key.DisplayString(), instance.HumanReadableDescription())
 	result := []string{entry}
 	for _, slave := range replicationMap[instance] {
-		slavesResult := getAsciiTopologyEntry(depth+1, slave, replicationMap)
+		slavesResult := getASCIITopologyEntry(depth+1, slave, replicationMap)
 		result = append(result, slavesResult...)
 	}
 	return result
 }
 
-// AsciiTopology returns a string representation of the topology of given instance.
-func AsciiTopology(instanceKey *InstanceKey) (string, error) {
+// ASCIITopology returns a string representation of the topology of given instance.
+func ASCIITopology(instanceKey *InstanceKey) (string, error) {
 	instance, found, err := ReadInstance(instanceKey)
 	if err != nil || !found {
 		return "", err
@@ -95,7 +96,7 @@ func AsciiTopology(instanceKey *InstanceKey) (string, error) {
 	if masterInstance == nil {
 		return "", nil
 	}
-	resultArray := getAsciiTopologyEntry(0, masterInstance, replicationMap)
+	resultArray := getASCIITopologyEntry(0, masterInstance, replicationMap)
 	result := strings.Join(resultArray, "\n")
 	return result, nil
 }
@@ -295,7 +296,7 @@ func MoveUpSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), *Ins
 				barrier <- slave
 			}()
 
-			var slaveErr error = nil
+			var slaveErr error
 			ExecuteOnTopology(func() {
 				if canReplicate, err := slave.CanReplicateFrom(instance); canReplicate == false || err != nil {
 					slaveErr = err
@@ -725,7 +726,7 @@ Cleanup:
 func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordinates BinlogCoordinates, exhaustiveSearch bool) (*BinlogCoordinates, string, error) {
 	var instancePseudoGtidText string
 	var instancePseudoGtidCoordinates *BinlogCoordinates
-	var err error = nil
+	var err error
 
 	if instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled {
 		// Well no need to search this instance's binary logs if it doesn't have any...
@@ -778,7 +779,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	var otherInstancePseudoGtidCoordinates *BinlogCoordinates
 	var nextBinlogCoordinatesToMatch *BinlogCoordinates
 	var recordedInstanceRelayLogCoordinates BinlogCoordinates
-	var countMatchedEvents int = 0
+	var countMatchedEvents int
 
 	if requireInstanceMaintenance {
 		if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("match below %+v", *otherKey)); merr != nil {
@@ -1085,7 +1086,6 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 	} else {
 		defer EndMaintenance(maintenanceToken)
 	}
-
 	for execCoordinates, bucketSlaves := range slaveBuckets {
 		execCoordinates := execCoordinates
 		bucketSlaves := bucketSlaves
@@ -1095,7 +1095,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 			func() {
 				for _, slave := range bucketSlaves {
 					slave := slave
-					var slaveErr error = nil
+					var slaveErr error
 					var matchedCoordinates *BinlogCoordinates
 					log.Debugf("MultiMatchBelow: attempting slave %+v in bucket %+v", slave.Key, execCoordinates)
 					ExecuteOnTopology(func() {
@@ -1244,7 +1244,7 @@ func isGenerallyValidAsCandidateSlave(slave *Instance) bool {
 
 // GetCandidateSlave chooses the best slave to promote given a (possibly dead) master
 func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instance, [](*Instance), [](*Instance), [](*Instance), error) {
-	var candidateSlave *Instance = nil
+	var candidateSlave *Instance
 	aheadSlaves := [](*Instance){}
 	equalSlaves := [](*Instance){}
 	laterSlaves := [](*Instance){}
@@ -1306,7 +1306,7 @@ func RegroupSlaves(masterKey *InstanceKey, onCandidateSlaveChosen func(*Instance
 			})
 		}()
 	}
-	for _, _ = range equalSlaves {
+	for _ = range equalSlaves {
 		<-barrier
 	}
 
@@ -1329,7 +1329,7 @@ func RegroupSlaves(masterKey *InstanceKey, onCandidateSlaveChosen func(*Instance
 			})
 		}()
 	}
-	for _, _ = range operatedSlaves {
+	for _ = range operatedSlaves {
 		<-barrier
 	}
 

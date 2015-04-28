@@ -267,7 +267,6 @@ func (s *TestSuite) TestMakeCoMasterAndBackAndFailOthersToBecomeCoMasters(c *C) 
 
 	// Now master & slave1 expected to be co-masters. Check!
 	master, _, _ := inst.ReadInstance(&masterKey)
-	c.Assert(master.MasterKey.Port, Not(Equals), inst.InvalidPort)
 	c.Assert(master.IsSlaveOf(slave1), Equals, true)
 	c.Assert(slave1.IsSlaveOf(master), Equals, true)
 

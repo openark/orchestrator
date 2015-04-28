@@ -27,8 +27,6 @@ import (
 	"strings"
 )
 
-const InvalidPort = 65535
-
 // InstanceKey is an instance indicator, identifued by hostname and port
 type InstanceKey struct {
 	Hostname string
@@ -73,6 +71,15 @@ func ParseInstanceKey(hostPort string) (*InstanceKey, error) {
 		return nil, fmt.Errorf("Cannot parse InstanceKey from %s. Expected format is host:port", hostPort)
 	}
 	return NewInstanceKeyFromStrings(tokens[0], tokens[1])
+}
+
+// ParseInstanceKeyLoose will parse an InstanceKey from a string representation such as 127.0.0.1:3306.
+// The port part is optional
+func ParseInstanceKeyLoose(hostPort string) (*InstanceKey, error) {
+	if !strings.Contains(hostPort, ":") {
+		return &InstanceKey{Hostname: hostPort, Port: config.Config.DefaultInstancePort}, nil
+	}
+	return ParseInstanceKey(hostPort)
 }
 
 // Formalize this key by getting CNAME for hostname
@@ -181,7 +188,7 @@ type InstanceKeyMap map[InstanceKey]bool
 // GetInstanceKeys returns keys in this map in the form of an array
 func (this *InstanceKeyMap) GetInstanceKeys() []InstanceKey {
 	res := []InstanceKey{}
-	for key, _ := range *this {
+	for key := range *this {
 		res = append(res, key)
 	}
 	return res
@@ -279,7 +286,7 @@ func (this *Instance) IsMaxScale() bool {
 
 // IsSlave makes simple heuristics to decide whether this insatnce is a slave of another instance
 func (this *Instance) IsSlave() bool {
-	return this.MasterKey.Hostname != "" && this.MasterKey.Hostname != "_" && this.MasterKey.Port != 0 && this.MasterKey.Port != InvalidPort && this.ReadBinlogCoordinates.LogFile != ""
+	return this.MasterKey.Hostname != "" && this.MasterKey.Hostname != "_" && this.MasterKey.Port != 0 && this.ReadBinlogCoordinates.LogFile != ""
 }
 
 // SlaveRunning returns true when this instance's status is of a replicating slave.

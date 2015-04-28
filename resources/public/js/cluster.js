@@ -1,6 +1,6 @@
 clusterOperationPseudoGTIDMode = false;
 
-var dcColors = ["#ff8c00", "#4682b4", "#9acd32", "#dc143c", "#9932cc", "#ffd700", "#191970", "#7fffd4", "#808080", "#dda0dd"];
+var renderColors = ["#ff8c00", "#4682b4", "#9acd32", "#dc143c", "#9932cc", "#ffd700", "#191970", "#7fffd4", "#808080", "#dda0dd"];
 var dcColorsMap = {};
 
 
@@ -546,7 +546,7 @@ function postVisualizeInstances(nodesMap) {
     }
     knownDCs = uniq(knownDCs);
     for (i = 0 ; i < knownDCs.length ; ++i) {
-        dcColorsMap[knownDCs[i]] = dcColors[i % dcColors.length];
+        dcColorsMap[knownDCs[i]] = renderColors[i % renderColors.length];
     }
     instances.forEach(function (instance) {
     	var draggedNodeId = $(this).attr("data-nodeid"); 

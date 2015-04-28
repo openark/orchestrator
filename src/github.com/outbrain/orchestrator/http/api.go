@@ -917,6 +917,41 @@ func (this *HttpAPI) ResetHostnameResolveCache(params martini.Params, r render.R
 	r.JSON(200, &APIResponse{Code: OK, Message: "Hostname cache cleared"})
 }
 
+// SubmitPoolInstances (re-)applies the list of hostnames for a given pool
+func (this *HttpAPI) SubmitPoolInstances(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	pool := params["pool"]
+	instances := req.URL.Query().Get("instances")
+
+	err := inst.ApplyPoolInstances(pool, instances)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Applied %s pool instances", pool)})
+}
+
+// SubmitPoolHostnames (re-)applies the list of hostnames for a given pool
+func (this *HttpAPI) ReadClusterPoolInstances(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	clusterName := params["clusterName"]
+
+	poolInstancesMap, err := inst.ReadClusterPoolInstances(clusterName)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Read pool instances for cluster %s", clusterName), Details: poolInstancesMap})
+}
+
 // ReloadClusterAlias clears in-memory hostname resovle cache
 func (this *HttpAPI) ReloadClusterAlias(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -1394,6 +1429,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/reload-cluster-alias", this.ReloadClusterAlias)
 	m.Get("/api/hostname-resolve-cache", this.HostnameResolveCache)
 	m.Get("/api/reset-hostname-resolve-cache", this.ResetHostnameResolveCache)
+	m.Get("/api/submit-pool-instances/:pool", this.SubmitPoolInstances)
+	m.Get("/api/cluster-pool-instances/:clusterName", this.ReadClusterPoolInstances)
 	// Recovery
 	m.Get("/api/replication-analysis", this.ReplicationAnalysis)
 	m.Get("/api/recover/:host/:port", this.Recover)

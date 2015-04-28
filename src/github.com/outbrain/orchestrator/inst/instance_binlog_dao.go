@@ -420,6 +420,5 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 		}
 		countMatchedEvents++
 	}
-
-	return nil, 0, log.Error("GetNextBinlogCoordinatesToMatch: unexpected termination")
+	// Won't get here
 }
