@@ -93,3 +93,38 @@ Cleanup:
 	return &poolInstancesMap, nil
 
 }
+
+func ReadAllClusterPoolInstances() ([](*ClusterPoolInstance), error) {
+	var result [](*ClusterPoolInstance) = [](*ClusterPoolInstance){}
+	query := fmt.Sprintf(`
+		select 
+			cluster_name,
+			database_instance_pool.*
+		from 
+			database_instance
+			join database_instance_pool using (hostname, port)
+		`)
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		goto Cleanup
+	}
+
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		clusterPoolInstance := ClusterPoolInstance{
+			ClusterName: m.GetString("cluster_name"),
+			Pool:        m.GetString("pool"),
+			Hostname:    m.GetString("hostname"),
+			Port:        m.GetInt("port"),
+		}
+		result = append(result, &clusterPoolInstance)
+		return nil
+	})
+Cleanup:
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+
+}

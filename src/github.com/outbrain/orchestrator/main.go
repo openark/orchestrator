@@ -440,6 +440,7 @@ func main() {
 	duration := flag.String("duration", "", "maintenance duration (format: 59s, 59m, 23h, 6d, 4w)")
 	pattern := flag.String("pattern", "", "regular expression pattern")
 	clusterAlias := flag.String("alias", "", "cluster alias")
+	pool := flag.String("pool", "", "Pool logical name")
 	discovery := flag.Bool("discovery", true, "auto discovery mode")
 	verbose := flag.Bool("verbose", false, "verbose")
 	debug := flag.Bool("debug", false, "debug mode (very verbose)")
@@ -476,7 +477,7 @@ func main() {
 
 	switch {
 	case len(flag.Args()) == 0 || flag.Arg(0) == "cli":
-		app.Cli(*command, *strict, *instance, *sibling, *owner, *reason, *duration, *pattern, *clusterAlias)
+		app.Cli(*command, *strict, *instance, *sibling, *owner, *reason, *duration, *pattern, *clusterAlias, *pool)
 	case flag.Arg(0) == "http":
 		app.Http(*discovery)
 	default:

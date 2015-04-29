@@ -673,6 +673,7 @@ $(document).ready(function () {
         } else {
             $("#dropdown-context").append('<li><a data-command="compact-display" href="'+location.href.split("?")[0]+'?compact=true">Compact display</a></li>');    
         }
+        $("#dropdown-context").append('<li><a href="/web/cluster-pools/'+currentClusterName()+'">Pools</a></li>');    
         $("#dropdown-context").append('<li><a data-command="colorize-dc">Colorize DC</a></li>');    
         $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="'+clusterInfo.ClusterAlias+'">Alias: '+alias+'</a></li>');
         $("#dropdown-context").append('<li><a data-command="anonymize">Anonymize</a></li>');    

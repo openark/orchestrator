@@ -24,6 +24,14 @@ import (
 // PoolInstancesMap lists instance keys per pool name
 type PoolInstancesMap map[string]([]*InstanceKey)
 
+// ClusterPoolInstance is an instance mapping a cluster, pool & instance
+type ClusterPoolInstance struct {
+	ClusterName string
+	Pool        string
+	Hostname    string
+	Port        int
+}
+
 func ApplyPoolInstances(pool string, instancesList string) error {
 	var instanceKeys [](*InstanceKey)
 	if instancesList != "" {

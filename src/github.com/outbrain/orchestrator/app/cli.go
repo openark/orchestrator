@@ -30,7 +30,7 @@ import (
 )
 
 // Cli initiates a command line interface, executing requested command.
-func Cli(command string, strict bool, instance string, sibling string, owner string, reason string, duration string, pattern string, clusterAlias string) {
+func Cli(command string, strict bool, instance string, sibling string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string) {
 
 	if instance != "" && !strings.Contains(instance, ":") {
 		instance = fmt.Sprintf("%s:%d", instance, config.Config.DefaultInstancePort)
@@ -506,6 +506,26 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatale(err)
 			}
 			fmt.Println(instanceKey.DisplayString())
+		}
+	case "submit-pool-instances":
+		{
+			if pool == "" {
+				log.Fatal("Please submit --pool")
+			}
+			err := inst.ApplyPoolInstances(pool, instance)
+			if err != nil {
+				log.Fatale(err)
+			}
+		}
+	case "cluster-pool-instances":
+		{
+			clusterPoolInstances, err := inst.ReadAllClusterPoolInstances()
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, clusterPoolInstance := range clusterPoolInstances {
+				fmt.Println(fmt.Sprintf("%s\t%s\t%s:%d", clusterPoolInstance.ClusterName, clusterPoolInstance.Pool, clusterPoolInstance.Hostname, clusterPoolInstance.Port))
+			}
 		}
 	case "clusters":
 		{

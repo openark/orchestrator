@@ -80,6 +80,22 @@ func (this *HttpWeb) ClusterByAlias(params martini.Params, r render.Render, req 
 	this.Cluster(params, r, req, user)
 }
 
+func (this *HttpWeb) ClusterPools(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	r.HTML(200, "templates/cluster_pools", map[string]interface{}{
+		"agentsHttpActive":              config.Config.ServeAgentsHttp,
+		"title":                         "cluster pools",
+		"activePage":                    "cluster_pools",
+		"clusterName":                   params["clusterName"],
+		"autoshow_problems":             true,
+		"contextMenuVisible":            true,
+		"pseudoGTIDModeEnabled":         (config.Config.PseudoGTIDPattern != ""),
+		"authorizedForAction":           isAuthorizedForAction(req, user),
+		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
+		"compactDisplay":                req.URL.Query().Get("compact"),
+	})
+}
+
+
 func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Request) {
 	searchString := params["searchString"]
 	if searchString == "" {
@@ -224,6 +240,7 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/clusters", this.Clusters)
 	m.Get("/web/cluster/:clusterName", this.Cluster)
 	m.Get("/web/cluster/alias/:clusterAlias", this.ClusterByAlias)
+	m.Get("/web/cluster-pools/:clusterName", this.ClusterPools)
 	m.Get("/web/search/:searchString", this.Search)
 	m.Get("/web/search", this.Search)
 	m.Get("/web/discover", this.Discover)
