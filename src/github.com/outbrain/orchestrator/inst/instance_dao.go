@@ -549,9 +549,9 @@ func ReadProblemInstances() ([](*Instance), error) {
 			or (not ifnull(timestampdiff(second, last_checked, now()) <= %d, false))
 			or (not slave_sql_running)
 			or (not slave_io_running)
-			or (abs(seconds_behind_master-sql_delay) > 10)
-			or (abs(slave_lag_seconds-sql_delay) > 10)
-		`, config.Config.InstancePollSeconds)
+			or (abs(seconds_behind_master-sql_delay) > %d)
+			or (abs(slave_lag_seconds-sql_delay) > %d)
+		`, config.Config.InstancePollSeconds, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
 	return readInstancesByCondition(condition)
 }
 

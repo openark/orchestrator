@@ -39,18 +39,18 @@ type Configuration struct {
 	MySQLOrchestratorDatabase                  string
 	MySQLOrchestratorUser                      string
 	MySQLOrchestratorPassword                  string
-	MySQLOrchestratorCredentialsConfigFile     string // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
-	MySQLConnectTimeoutSeconds                 int    // Number of seconds before connection is aborted (driver-side)
-	DefaultInstancePort                        int    // In case port was not specified on command line
-	SkipOrchestratorDatabaseUpdate             bool   // When false, orchestrator will attempt to create & update all tables in backend database; when true, this is skipped. It makes sense to skip on command-line invocations and to enable for http or occasional invocations, or just after upgrades
-	SlaveLagQuery                              string // custom query to check on slave lg (e.g. heartbeat table)
-	SlaveStartPostWaitMilliseconds             int    // Time to wait after START SLAVE before re-readong instance (give slave chance to connect to master)
-	DiscoverByShowSlaveHosts                   bool   // Attempt SHOW SLAVE HOSTS before PROCESSLIST
-	InstancePollSeconds                        uint   // Number of seconds between instance reads
-	UnseenInstanceForgetHours                  uint   // Number of hours after which an unseen instance is forgotten
-	DiscoveryPollSeconds                       uint   // Auto/continuous discovery of instances sleep time between polls
-	InstanceBulkOperationsWaitTimeoutSeconds   uint   // Time to wait on a single instance when doing bulk (many instances) operation
-	ActiveNodeExpireSeconds                    uint
+	MySQLOrchestratorCredentialsConfigFile     string   // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
+	MySQLConnectTimeoutSeconds                 int      // Number of seconds before connection is aborted (driver-side)
+	DefaultInstancePort                        int      // In case port was not specified on command line
+	SkipOrchestratorDatabaseUpdate             bool     // When false, orchestrator will attempt to create & update all tables in backend database; when true, this is skipped. It makes sense to skip on command-line invocations and to enable for http or occasional invocations, or just after upgrades
+	SlaveLagQuery                              string   // custom query to check on slave lg (e.g. heartbeat table)
+	SlaveStartPostWaitMilliseconds             int      // Time to wait after START SLAVE before re-readong instance (give slave chance to connect to master)
+	DiscoverByShowSlaveHosts                   bool     // Attempt SHOW SLAVE HOSTS before PROCESSLIST
+	InstancePollSeconds                        uint     // Number of seconds between instance reads
+	UnseenInstanceForgetHours                  uint     // Number of hours after which an unseen instance is forgotten
+	DiscoveryPollSeconds                       uint     // Auto/continuous discovery of instances sleep time between polls
+	InstanceBulkOperationsWaitTimeoutSeconds   uint     // Time to wait on a single instance when doing bulk (many instances) operation
+	ActiveNodeExpireSeconds                    uint     // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
 	HostnameResolveMethod                      string   // Method by which to "normalize" hostname ("none"/"default"/"cname")
 	ExpiryHostnameResolvesMinutes              int      // Number of minutes after which to expire hostname-resolves
 	RejectHostnameResolvePattern               string   // Regexp pattern for resolved hostname that will not be accepted (not cached, not written to db). This is done to avoid storing wrong resolves due to network glitches.
@@ -75,7 +75,7 @@ type Configuration struct {
 	DetectClusterAliasQuery                    string            // Optional query (executed on topology instance) that returns the alias of a cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all slaves). If provided, must return one row, one column
 	DataCenterPattern                          string            // Regexp pattern with one group, extracting the datacenter name from the hostname
 	PhysicalEnvironmentPattern                 string            // Regexp pattern with one group, extracting physical environment info from hostname (e.g. combination of datacenter & prod/dev env)
-	DenyAutoPromotionHostnamePattern           string            // Orchestrator will not auto-promote (via
+	DenyAutoPromotionHostnamePattern           string            // Orchestrator will not auto-promote hosts with name matching patterb (via -c recovery; for example, avoid promoting dev-dedicated machines)
 	ServeAgentsHttp                            bool              // Spawn another HTTP interface dedicated for orcehstrator-agent
 	AgentsUseSSL                               bool              // When "true" orchestrator will listen on agents port with SSL as well as connect to agents via SSL
 	SSLSkipVerify                              bool              // When using SSL, should we ignore SSL certification error

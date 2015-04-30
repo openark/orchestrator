@@ -382,6 +382,11 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	return true, nil
 }
 
+// HasReasonableMaintenanceReplicationLag returns true when the slave lag is reasonable, and maintenance operations should have a green light to go.
+func (this *Instance) HasReasonableMaintenanceReplicationLag() bool {
+	return this.SecondsBehindMaster.Int64 <= int64(config.Config.ReasonableMaintenanceReplicationLagSeconds)
+}
+
 // CanMove returns true if this instance's state allows it to be repositioned. For example,
 // if this instance lags too much, it will not be moveable.
 func (this *Instance) CanMove() (bool, error) {
@@ -400,7 +405,7 @@ func (this *Instance) CanMove() (bool, error) {
 	if !this.SecondsBehindMaster.Valid {
 		return false, fmt.Errorf("%+v: cannot determine slave lag", this.Key)
 	}
-	if this.SecondsBehindMaster.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
+	if !this.HasReasonableMaintenanceReplicationLag() {
 		return false, fmt.Errorf("%+v: lags too much", this.Key)
 	}
 	return true, nil

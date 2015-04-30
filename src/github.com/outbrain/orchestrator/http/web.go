@@ -95,7 +95,6 @@ func (this *HttpWeb) ClusterPools(params martini.Params, r render.Render, req *h
 	})
 }
 
-
 func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Request) {
 	searchString := params["searchString"]
 	if searchString == "" {

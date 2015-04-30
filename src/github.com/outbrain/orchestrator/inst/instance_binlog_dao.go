@@ -153,17 +153,11 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 	}
 
 	moreRowsExpected := true
-	step := 0
 	var nextPos int64 = 0
 
 	//	commandToken := math.TernaryString(binlogCoordinates.Type == BinaryLog, "binlog", "relaylog")
 	for moreRowsExpected {
-		query := ""
-		if binlogCoordinates.Type == BinaryLog {
-			query = fmt.Sprintf("show binlog events in '%s' FROM %d LIMIT %d", binlog, nextPos, config.Config.BinlogEventsChunkSize)
-		} else {
-			query = fmt.Sprintf("show relaylog events in '%s' LIMIT %d,%d", binlog, (step * config.Config.BinlogEventsChunkSize), config.Config.BinlogEventsChunkSize)
-		}
+		query := fmt.Sprintf("show binlog events in '%s' FROM %d LIMIT %d", binlog, nextPos, config.Config.BinlogEventsChunkSize)
 
 		moreRowsExpected = false
 		queryRowsFunc := sqlutils.QueryRowsMap
@@ -186,7 +180,6 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 		if err != nil {
 			return binlogCoordinates, (binlogCoordinates.LogPos != 0), err
 		}
-		step++
 	}
 
 	return binlogCoordinates, (binlogCoordinates.LogPos != 0), err
@@ -202,12 +195,28 @@ func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string) (*Bin
 		return coords.(*BinlogCoordinates), nil
 	}
 
-	// Look for GTID entry in other-instance:
+	// Look for GTID entry in given instance:
 	currentBinlog := instance.SelfBinlogCoordinates
 	var err error = nil
 	for {
-		// loop iteration per binary log
 		log.Debugf("Searching for given pseudo gtid entry in binlog %+v of %+v", currentBinlog.LogFile, instance.Key)
+		// loop iteration per binary log. This might turn to be a heavyweight operation. We wish to throttle the operation such that
+		// the instance does not suffer. If it is a slave, we will only act as long as it's not lagging too much.
+		if instance.SlaveRunning() {
+			for {
+				log.Debugf("%+v is a replicating slave. Verifying lag", instance.Key)
+				instance, err = ReadTopologyInstance(&instance.Key)
+				if err != nil {
+					break
+				}
+				if instance.HasReasonableMaintenanceReplicationLag() {
+					// is good to go!
+					break
+				}
+				log.Debugf("lag is too high on %+v. Throttling the search for pseudo gtid entry", instance.Key)
+				time.Sleep(time.Duration(config.Config.ReasonableMaintenanceReplicationLagSeconds) * time.Second)
+			}
+		}
 		var resultCoordinates BinlogCoordinates
 		var found bool = false
 		resultCoordinates, found, err = SearchPseudoGTIDEntryInBinlog(&instance.Key, currentBinlog.LogFile, entryText)

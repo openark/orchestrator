@@ -99,10 +99,12 @@ func ReadAllClusterPoolInstances() ([](*ClusterPoolInstance), error) {
 	query := fmt.Sprintf(`
 		select 
 			cluster_name,
+			ifnull(alias, cluster_name) as alias,
 			database_instance_pool.*
 		from 
 			database_instance
 			join database_instance_pool using (hostname, port)
+			left join cluster_alias using (cluster_name)
 		`)
 	db, err := db.OpenOrchestrator()
 	if err != nil {
@@ -111,10 +113,11 @@ func ReadAllClusterPoolInstances() ([](*ClusterPoolInstance), error) {
 
 	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 		clusterPoolInstance := ClusterPoolInstance{
-			ClusterName: m.GetString("cluster_name"),
-			Pool:        m.GetString("pool"),
-			Hostname:    m.GetString("hostname"),
-			Port:        m.GetInt("port"),
+			ClusterName:  m.GetString("cluster_name"),
+			ClusterAlias: m.GetString("alias"),
+			Pool:         m.GetString("pool"),
+			Hostname:     m.GetString("hostname"),
+			Port:         m.GetInt("port"),
 		}
 		result = append(result, &clusterPoolInstance)
 		return nil

@@ -524,7 +524,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatale(err)
 			}
 			for _, clusterPoolInstance := range clusterPoolInstances {
-				fmt.Println(fmt.Sprintf("%s\t%s\t%s:%d", clusterPoolInstance.ClusterName, clusterPoolInstance.Pool, clusterPoolInstance.Hostname, clusterPoolInstance.Port))
+				fmt.Println(fmt.Sprintf("%s\t%s\t%s\t%s:%d", clusterPoolInstance.ClusterName, clusterPoolInstance.ClusterAlias, clusterPoolInstance.Pool, clusterPoolInstance.Hostname, clusterPoolInstance.Port))
 			}
 		}
 	case "clusters":
