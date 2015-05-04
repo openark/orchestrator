@@ -163,7 +163,10 @@ func UnresolveHostname(instanceKey *InstanceKey) (InstanceKey, error) {
 	}
 	if instance.Key.Hostname != instanceKey.Hostname {
 		// Resolve(Unresolve(hostname)) != hostname ==> Bad; reject
-		return *instanceKey, log.Errorf("Error unresolving; hostname=%s, unresolved=%s, re-resolved=%s; mismatch", instanceKey.Hostname, unresolvedKey.Hostname, instance.Key.Hostname)
+		if *config.RuntimeCLIFlags.SkipUnresolveCheck {
+			return *instanceKey, nil
+		}
+		return *instanceKey, log.Errorf("Error unresolving; hostname=%s, unresolved=%s, re-resolved=%s; mismatch. Skip/ignore with --skip-unresolve-check", instanceKey.Hostname, unresolvedKey.Hostname, instance.Key.Hostname)
 	}
 	return *unresolvedKey, nil
 }

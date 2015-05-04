@@ -43,7 +43,7 @@ const topologyConcurrency = 100
 var topologyConcurrencyChan = make(chan bool, topologyConcurrency)
 
 func init() {
-	detachPattern, _ = regexp.Compile(`//([^/:]+):([\d]+)`)
+	detachPattern, _ = regexp.Compile(`//([^/:]+):([\d]+)`) // e.g. `//binlog.01234:567890`
 }
 
 // ExecuteOnTopology will execute given function while maintaining concurrency limit
@@ -549,8 +549,8 @@ func ReadProblemInstances() ([](*Instance), error) {
 			or (not ifnull(timestampdiff(second, last_checked, now()) <= %d, false))
 			or (not slave_sql_running)
 			or (not slave_io_running)
-			or (abs(seconds_behind_master-sql_delay) > %d)
-			or (abs(slave_lag_seconds-sql_delay) > %d)
+			or (abs(cast(seconds_behind_master as signed) - cast(sql_delay as signed)) > %d)
+			or (abs(cast(slave_lag_seconds as signed) - cast(sql_delay as signed)) > %d)
 		`, config.Config.InstancePollSeconds, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
 	return readInstancesByCondition(condition)
 }

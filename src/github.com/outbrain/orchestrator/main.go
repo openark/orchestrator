@@ -382,7 +382,7 @@ Cheatsheet:
 			Note that orchestrator automatically assumes locks to be expired after MaintenanceExpireMinutes (in config).
 			Examples:
 			
-			orchestrator -c begin-maintenance -i instance.to.lock.com --duration=3h
+			orchestrator -c begin-maintenance -i instance.to.lock.com --duration=3h --reason="load testing; do not disturb"
 				accepted duration format: 10s, 30m, 24h, 3d, 4w
 			
 			orchestrator -c begin-maintenance -i instance.to.lock.com
@@ -445,6 +445,7 @@ func main() {
 	verbose := flag.Bool("verbose", false, "verbose")
 	debug := flag.Bool("debug", false, "debug mode (very verbose)")
 	stack := flag.Bool("stack", false, "add stack trace upon error")
+	config.RuntimeCLIFlags.SkipUnresolveCheck = flag.Bool("skip-unresolve-check", false, "Skip/ignore checking an unresolve mapping (via hostname_unresolve table) resolves back to same hostname")
 	flag.Parse()
 
 	log.SetLevel(log.ERROR)
