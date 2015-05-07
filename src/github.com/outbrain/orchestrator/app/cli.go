@@ -29,6 +29,13 @@ import (
 	"strings"
 )
 
+var knownCommands []string
+
+func cliCommand(command string) string {
+	knownCommands = append(knownCommands, command)
+	return command
+}
+
 // Cli initiates a command line interface, executing requested command.
 func Cli(command string, strict bool, instance string, sibling string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string) {
 
@@ -70,7 +77,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		log.Fatal("expected command (-c) (skip-query|move-up|move-up-slaves|move-below|repoint|repoint-slaves|enslave-siblings|make-co-master|match-below|match-up|rematch|get-candidate-slave|multi-match-slaves|match-up-slaves|regroup-slaves|recover|last-pseudo-gtid|stop-slave|start-slave|reset-slave|detach-slave|reattach-slave|set-read-only|set-writeable|discover|forget|begin-maintenance|end-maintenance|clusters|find|topology|which-instance|which-master|which-cluster|which-cluster-instances|which-slaves|instance-status|replication-analysis|continuous|resolve)")
 	}
 	switch command {
-	case "skip-query":
+	case cliCommand("skip-query"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -84,7 +91,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
-	case "move-up":
+	case cliCommand("move-up"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -98,7 +105,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), instance.MasterKey.DisplayString()))
 		}
-	case "move-up-slaves":
+	case cliCommand("move-up-slaves"):
 		{
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
@@ -116,7 +123,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				}
 			}
 		}
-	case "move-below":
+	case cliCommand("move-below"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -133,7 +140,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), siblingKey.DisplayString()))
 		}
-	case "repoint":
+	case cliCommand("repoint"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -148,7 +155,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), instance.MasterKey.DisplayString()))
 		}
-	case "repoint-slaves":
+	case cliCommand("repoint-slaves"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -168,7 +175,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				}
 			}
 		}
-	case "enslave-siblings":
+	case cliCommand("enslave-siblings"):
 		{
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
@@ -179,7 +186,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
-	case "make-co-master":
+	case cliCommand("make-co-master"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -193,7 +200,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
-	case "match-below":
+	case cliCommand("match-below"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -210,7 +217,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), siblingKey.DisplayString()))
 		}
-	case "match-up":
+	case cliCommand("match-up"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -224,7 +231,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), instance.MasterKey.DisplayString()))
 		}
-	case "rematch":
+	case cliCommand("rematch"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -238,7 +245,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), instance.MasterKey.DisplayString()))
 		}
-	case "get-candidate-slave":
+	case cliCommand("get-candidate-slave"):
 		{
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
@@ -251,7 +258,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				fmt.Println(instance.Key.DisplayString())
 			}
 		}
-	case "multi-match-slaves":
+	case cliCommand("multi-match-slaves"):
 		{
 			// Move all slaves of "instance" beneath "sibling"
 			if instanceKey == nil {
@@ -273,7 +280,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				}
 			}
 		}
-	case "match-up-slaves":
+	case cliCommand("match-up-slaves"):
 		{
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
@@ -291,7 +298,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				}
 			}
 		}
-	case "regroup-slaves":
+	case cliCommand("regroup-slaves"):
 		{
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
@@ -304,7 +311,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatale(err)
 			}
 		}
-	case "recover":
+	case cliCommand("recover"):
 		{
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
@@ -318,7 +325,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				fmt.Println("true")
 			}
 		}
-	case "last-pseudo-gtid":
+	case cliCommand("last-pseudo-gtid"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -340,7 +347,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			fmt.Println(fmt.Sprintf("%+v:%s", *coordinates, text))
 		}
 
-	case "stop-slave":
+	case cliCommand("stop-slave"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -354,7 +361,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
-	case "start-slave":
+	case cliCommand("start-slave"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -368,7 +375,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
-	case "reset-slave":
+	case cliCommand("reset-slave"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -382,7 +389,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
-	case "detach-slave":
+	case cliCommand("detach-slave"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -396,7 +403,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
-	case "reattach-slave":
+	case cliCommand("reattach-slave"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -410,7 +417,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
-	case "set-read-only":
+	case cliCommand("set-read-only"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -424,7 +431,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
-	case "set-writeable":
+	case cliCommand("set-writeable"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -438,7 +445,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
-	case "discover":
+	case cliCommand("discover"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -449,7 +456,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			orchestrator.StartDiscovery(*instanceKey)
 			fmt.Println(instanceKey.DisplayString())
 		}
-	case "forget":
+	case cliCommand("forget"):
 		{
 			if rawInstanceKey == nil {
 				rawInstanceKey = thisInstanceKey
@@ -463,7 +470,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(rawInstanceKey.DisplayString())
 		}
-	case "begin-maintenance":
+	case cliCommand("begin-maintenance"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -493,7 +500,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
-	case "end-maintenance":
+	case cliCommand("end-maintenance"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -507,7 +514,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
-	case "submit-pool-instances":
+	case cliCommand("submit-pool-instances"):
 		{
 			if pool == "" {
 				log.Fatal("Please submit --pool")
@@ -517,7 +524,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatale(err)
 			}
 		}
-	case "cluster-pool-instances":
+	case cliCommand("cluster-pool-instances"):
 		{
 			clusterPoolInstances, err := inst.ReadAllClusterPoolInstances()
 			if err != nil {
@@ -527,7 +534,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				fmt.Println(fmt.Sprintf("%s\t%s\t%s\t%s:%d", clusterPoolInstance.ClusterName, clusterPoolInstance.ClusterAlias, clusterPoolInstance.Pool, clusterPoolInstance.Hostname, clusterPoolInstance.Port))
 			}
 		}
-	case "clusters":
+	case cliCommand("clusters"):
 		{
 			clusters, err := inst.ReadClusters()
 			if err != nil {
@@ -536,7 +543,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				fmt.Println(strings.Join(clusters, "\n"))
 			}
 		}
-	case "find":
+	case cliCommand("find"):
 		{
 			if pattern == "" {
 				log.Fatal("No pattern given")
@@ -550,7 +557,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				}
 			}
 		}
-	case "topology":
+	case cliCommand("topology"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -564,7 +571,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(output)
 		}
-	case "which-instance":
+	case cliCommand("which-instance"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -581,7 +588,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instance.Key.DisplayString())
 		}
-	case "which-master":
+	case cliCommand("which-master"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -598,7 +605,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instance.MasterKey.DisplayString())
 		}
-	case "which-cluster":
+	case cliCommand("which-cluster"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -615,7 +622,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instance.ClusterName)
 		}
-	case "which-cluster-instances":
+	case cliCommand("which-cluster-instances"):
 		{
 			clusterName := ""
 			if clusterAlias != "" {
@@ -649,7 +656,41 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				fmt.Println(clusterInstance.Key.DisplayString())
 			}
 		}
-	case "which-slaves":
+	case cliCommand("which-cluster-osc-slaves"):
+		{
+			clusterName := ""
+			if clusterAlias != "" {
+				clusterName, err = inst.ReadClusterByAlias(clusterAlias)
+				if err != nil {
+					log.Fatale(err)
+				}
+			} else {
+				// deduce cluster by instance
+				if instanceKey == nil {
+					instanceKey = thisInstanceKey
+				}
+				if instanceKey == nil {
+					log.Fatalf("Unable to get cluster instances: unresolved instance")
+				}
+				instance, _, err := inst.ReadInstance(instanceKey)
+				if err != nil {
+					log.Fatale(err)
+				}
+				if instance == nil {
+					log.Fatalf("Instance not found: %+v", *instanceKey)
+				}
+				clusterName = instance.ClusterName
+			}
+
+			instances, err := inst.GetClusterOSCSlaves(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, clusterInstance := range instances {
+				fmt.Println(clusterInstance.Key.DisplayString())
+			}
+		}
+	case cliCommand("which-slaves"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -665,7 +706,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				fmt.Println(slave.Key.DisplayString())
 			}
 		}
-	case "instance-status":
+	case cliCommand("instance-status"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -682,7 +723,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instance.HumanReadableDescription())
 		}
-	case "replication-analysis":
+	case cliCommand("replication-analysis"):
 		{
 			analysis, err := inst.GetReplicationAnalysis()
 			if err != nil {
@@ -692,11 +733,11 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				fmt.Println(fmt.Sprintf("%s (cluster %s): %s", entry.AnalyzedInstanceKey.DisplayString(), entry.ClusterName, entry.Analysis))
 			}
 		}
-	case "continuous":
+	case cliCommand("continuous"):
 		{
 			orchestrator.ContinuousDiscovery()
 		}
-	case "resolve":
+	case cliCommand("resolve"):
 		{
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
@@ -709,6 +750,6 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			fmt.Println(instanceKey.DisplayString())
 		}
 	default:
-		log.Fatal("Unknown command:", command)
+		log.Fatalf(`Unknown command: "%s". Available commands: %v`, command, knownCommands)
 	}
 }

@@ -94,6 +94,7 @@ type Configuration struct {
 	RecoveryIgnoreHostnameFilters              []string          // Recovery analysis will completely ignore hosts matching given patterns
 	RecoverMasterClusterFilters                []string          // Only do master recovery on clusters matching these regexp patterns (of course the ".*" pattern matches everything)
 	RecoverIntermediateMasterClusterFilters    []string          // Only do IM recovery on clusters matching these regexp patterns (of course the ".*" pattern matches everything)
+	OSCIgnoreHostnameFilters                   []string          // OSC slaves recommendation will ignore slave hostnames matching given patterns
 }
 
 var Config *Configuration = NewConfiguration()
@@ -158,6 +159,7 @@ func NewConfiguration() *Configuration {
 		RecoveryIgnoreHostnameFilters:              []string{},
 		RecoverMasterClusterFilters:                []string{},
 		RecoverIntermediateMasterClusterFilters:    []string{},
+		OSCIgnoreHostnameFilters:                   []string{},
 	}
 }
 

@@ -20,10 +20,12 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/outbrain/golib/log"
+	"github.com/outbrain/golib/math"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/db"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -41,6 +43,15 @@ var detachPattern *regexp.Regexp
 const topologyConcurrency = 100
 
 var topologyConcurrencyChan = make(chan bool, topologyConcurrency)
+
+// InstancesByCountSlaveHosts is a sortable type for Instance
+type InstancesByCountSlaveHosts [](*Instance)
+
+func (this InstancesByCountSlaveHosts) Len() int      { return len(this) }
+func (this InstancesByCountSlaveHosts) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
+func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
+	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
+}
 
 func init() {
 	detachPattern, _ = regexp.Compile(`//([^/:]+):([\d]+)`) // e.g. `//binlog.01234:567890`
@@ -575,6 +586,118 @@ func FindInstances(regexpPattern string) ([](*Instance), error) {
 			hostname rlike '%s'
 		`, regexpPattern)
 	return readInstancesByCondition(condition)
+}
+
+// filterOSCInstances will filter the given list such that only slaves fit for OSC control remain.
+func filterOSCInstances(instances [](*Instance)) [](*Instance) {
+	result := [](*Instance){}
+	for _, instance := range instances {
+		skipThisHost := false
+		for _, filter := range config.Config.OSCIgnoreHostnameFilters {
+			if matched, _ := regexp.MatchString(filter, instance.Key.Hostname); matched {
+				skipThisHost = true
+			}
+		}
+		if instance.IsMaxScale() {
+			skipThisHost = true
+		}
+
+		if !instance.IsLastCheckValid {
+			skipThisHost = true
+		}
+		if !skipThisHost {
+			result = append(result, instance)
+		}
+	}
+	return result
+}
+
+// GetClusterOSCSlaves returns a heuristic list of slaves which are fit as controll slaves for an OSC operation.
+// These would be intermediate masters
+func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
+	intermediateMasters := [](*Instance){}
+	result := [](*Instance){}
+	var err error
+	if strings.Index(clusterName, "'") >= 0 {
+		return [](*Instance){}, log.Errorf("Invalid cluster name: %s", clusterName)
+	}
+	{
+		// Pick up to two busiest IMs
+		condition := fmt.Sprintf(`
+			replication_depth = 1
+			and num_slave_hosts > 0
+			and cluster_name = '%s'
+		`, clusterName)
+		intermediateMasters, err = readInstancesByCondition(condition)
+		if err != nil {
+			return result, err
+		}
+		sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(intermediateMasters)))
+		intermediateMasters = filterOSCInstances(intermediateMasters)
+		intermediateMasters = intermediateMasters[0:math.MinInt(2, len(intermediateMasters))]
+		result = append(result, intermediateMasters...)
+	}
+	{
+		// Get 2 slaves of found IMs, if possible
+		if len(intermediateMasters) == 1 {
+			// Pick 2 slaves for this IM
+			slaves, err := ReadSlaveInstances(&(intermediateMasters[0].Key))
+			if err != nil {
+				return result, err
+			}
+			sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(slaves)))
+			slaves = filterOSCInstances(slaves)
+			slaves = slaves[0:math.MinInt(2, len(slaves))]
+			result = append(result, slaves...)
+
+		}
+		if len(intermediateMasters) == 2 {
+			// Pick one slave from each IM (should be possible)
+			for _, im := range intermediateMasters {
+				slaves, err := ReadSlaveInstances(&im.Key)
+				if err != nil {
+					return result, err
+				}
+				sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(slaves)))
+				slaves = filterOSCInstances(slaves)
+				if len(slaves) > 0 {
+					result = append(result, slaves[0])
+				}
+			}
+		}
+	}
+	{
+		// Get 2 3rd tier slaves, if possible
+		condition := fmt.Sprintf(`
+			replication_depth = 3
+			and cluster_name = '%s'
+		`, clusterName)
+		slaves, err := readInstancesByCondition(condition)
+		if err != nil {
+			return result, err
+		}
+		sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(slaves)))
+		slaves = filterOSCInstances(slaves)
+		slaves = slaves[0:math.MinInt(2, len(slaves))]
+		result = append(result, slaves...)
+	}
+	{
+		// Get 2 1st tier leaf slaves, if possible
+		condition := fmt.Sprintf(`
+			replication_depth = 1
+			and num_slave_hosts = 0
+			and cluster_name = '%s'
+		`, clusterName)
+		slaves, err := readInstancesByCondition(condition)
+		if err != nil {
+			return result, err
+		}
+		slaves = filterOSCInstances(slaves)
+		slaves = slaves[0:math.MinInt(2, len(slaves))]
+		result = append(result, slaves...)
+	}
+
+	return result, nil
 }
 
 // updateClusterNameForUnseenInstances
