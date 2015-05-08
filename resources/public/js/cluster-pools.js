@@ -1,5 +1,7 @@
 
 $(document).ready(function () {
+	var isExpanded = false;
+	
     showLoader();
     
     var errorMapping = {
@@ -78,13 +80,21 @@ $(document).ready(function () {
     		var popoverElement = $("#pools [data-pool-name='" + pool.name + "'].popover");
 
     	    var contentHtml = ''
-    				+ '<div>Instances: <div class="pull-right"></div></div>'
+    				+ '<div>Instances: <div class="pull-right"></div><div class="pool-instances-listing"></div></div>'
     			;
     	    popoverElement.find(".popover-content").html(contentHtml);
     	    addInstancesBadge(pool.name, pool.instances.length, "label-primary", "Total instances in pool");
     	    for (var problemType in poolsProblems[pool.name]) {
     	    	addInstancesBadge(pool.name, poolsProblems[pool.name][problemType], errorMapping[problemType]["badge"], errorMapping[problemType]["description"]);
     	    }
+    	    pool.instances.forEach(function(instance) {
+    	    	var instanceDisplay = instance.Hostname+":"+instance.Port;
+    	    	if (typeof removeTextFromHostnameDisplay != "undefined" && removeTextFromHostnameDisplay()) {
+    	    		instanceDisplay = instanceDisplay.replace(removeTextFromHostnameDisplay(), '');
+    	        }
+    	    	popoverElement.find("div.pool-instances-listing").append("<div>"+instanceDisplay+"</div>");
+    	    });
+    	    popoverElement.find("div.pool-instances-listing").toggleClass('hidden');
         });     
         
         $("div.popover").popover();
@@ -99,5 +109,15 @@ $(document).ready(function () {
     	// Read-only users don't get auto-refresh. Sorry!
     	activateRefreshTimer();
     }
-    $("#dropdown-context").append('<li><a href="/web/cluster/'+currentClusterName()+'">Instances</a></li>');    
+    $("#dropdown-context").append('<li><a data-command="expand-instances">Expand</a></li>');    
+    $("#dropdown-context").append('<li><a href="/web/cluster/'+currentClusterName()+'">Topology</a></li>');    
+    $("body").on("click", "a[data-command=expand-instances]", function(event) {
+	    $("div.pool-instances-listing").toggleClass('hidden');
+	    isExpanded = !isExpanded;
+        if (isExpanded) {
+        	$("#dropdown-context a[data-command=expand-instances]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
+        } else {
+        	$("#dropdown-context a[data-command=expand-instances] span").remove();
+        }
+    });    
 });	

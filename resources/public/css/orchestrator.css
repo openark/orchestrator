@@ -187,6 +187,16 @@
     padding: 4px 8px;
 }
 
+#pools .popover div.pool-instances-listing {
+    font: 12px sans-serif;
+}
+
+#pools .popover div.pool-instances-listing div {
+    margin-top: 8px;
+}
+
+
+
 #node_modal .modal-content {
     font-size: 12px;
 }

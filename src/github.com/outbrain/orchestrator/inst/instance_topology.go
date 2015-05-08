@@ -302,21 +302,31 @@ func MoveUpSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), *Ins
 					slaveErr = err
 					return
 				}
-				slave, err = StopSlave(&slave.Key)
-				if err != nil {
-					slaveErr = err
-					return
-				}
-				slave, err = StartSlaveUntilMasterCoordinates(&slave.Key, &instance.SelfBinlogCoordinates)
-				if err != nil {
-					slaveErr = err
-					return
-				}
+				if instance.IsMaxScale() {
+					// Special case. Just repoint
+					slave, err = Repoint(&slave.Key, instanceKey)
+					if err != nil {
+						slaveErr = err
+						return
+					}
+				} else {
+					// Normal case. Do the math.
+					slave, err = StopSlave(&slave.Key)
+					if err != nil {
+						slaveErr = err
+						return
+					}
+					slave, err = StartSlaveUntilMasterCoordinates(&slave.Key, &instance.SelfBinlogCoordinates)
+					if err != nil {
+						slaveErr = err
+						return
+					}
 
-				slave, err = ChangeMasterTo(&slave.Key, &instance.MasterKey, &instance.ExecBinlogCoordinates)
-				if err != nil {
-					slaveErr = err
-					return
+					slave, err = ChangeMasterTo(&slave.Key, &instance.MasterKey, &instance.ExecBinlogCoordinates)
+					if err != nil {
+						slaveErr = err
+						return
+					}
 				}
 			})
 
@@ -763,7 +773,6 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	if err != nil {
 		return instance, nil, err
 	}
-
 	rinstance, _, _ := ReadInstance(&instance.Key)
 	if canMove, merr := rinstance.CanMoveViaMatch(); !canMove {
 		return instance, nil, merr
@@ -772,14 +781,20 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	if canReplicate, err := instance.CanReplicateFrom(otherInstance); !canReplicate {
 		return instance, nil, err
 	}
-	log.Infof("Will match %+v below %+v", *instanceKey, *otherKey)
-
 	var instancePseudoGtidText string
 	var instancePseudoGtidCoordinates *BinlogCoordinates
 	var otherInstancePseudoGtidCoordinates *BinlogCoordinates
 	var nextBinlogCoordinatesToMatch *BinlogCoordinates
 	var recordedInstanceRelayLogCoordinates BinlogCoordinates
 	var countMatchedEvents int
+
+	if otherInstance.IsMaxScale() {
+		// MaxScale(binlog server) does not do all the SHOW BINLOG EVENTS stuff
+		err = fmt.Errorf("Cannot use PseudoGTID with MaxScale server %+v", otherInstance.Key)
+		goto Cleanup
+	}
+
+	log.Infof("Will match %+v below %+v", *instanceKey, *otherKey)
 
 	if requireInstanceMaintenance {
 		if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("match below %+v", *otherKey)); merr != nil {
@@ -1046,6 +1061,11 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 	belowInstance, err := ReadTopologyInstance(belowKey)
 	if err != nil {
 		// Can't access the server below which we need to match ==> can't move slaves
+		return res, belowInstance, err, errs
+	}
+	if belowInstance.IsMaxScale() {
+		// MaxScale(binlog server) does not do all the SHOW BINLOG EVENTS stuff
+		err = fmt.Errorf("Cannot use PseudoGTID with MaxScale server %+v", belowInstance.Key)
 		return res, belowInstance, err, errs
 	}
 

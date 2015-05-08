@@ -73,9 +73,6 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 	}
 	inst.SetMaintenanceOwner(owner)
 
-	if len(command) == 0 {
-		log.Fatal("expected command (-c) (skip-query|move-up|move-up-slaves|move-below|repoint|repoint-slaves|enslave-siblings|make-co-master|match-below|match-up|rematch|get-candidate-slave|multi-match-slaves|match-up-slaves|regroup-slaves|recover|last-pseudo-gtid|stop-slave|start-slave|reset-slave|detach-slave|reattach-slave|set-read-only|set-writeable|discover|forget|begin-maintenance|end-maintenance|clusters|find|topology|which-instance|which-master|which-cluster|which-cluster-instances|which-slaves|instance-status|replication-analysis|continuous|resolve)")
-	}
 	switch command {
 	case cliCommand("skip-query"):
 		{
@@ -750,6 +747,6 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			fmt.Println(instanceKey.DisplayString())
 		}
 	default:
-		log.Fatalf(`Unknown command: "%s". Available commands: %v`, command, knownCommands)
+		log.Fatalf(`Unknown command: "%s". Available commands (-c): %v`, command, knownCommands)
 	}
 }
