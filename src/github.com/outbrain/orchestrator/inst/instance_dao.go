@@ -1566,11 +1566,15 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	}
 
 	if instance.SlaveRunning() {
-		return instance, fmt.Errorf("Cannot change master on: %+v because slave is running", instanceKey)
+		return instance, fmt.Errorf("Cannot change master on: %+v because slave is running", *instanceKey)
 	}
 	unresolvedMasterKey, err := UnresolveHostname(masterKey)
 	if err != nil {
 		return instance, err
+	}
+
+	if *config.RuntimeCLIFlags.Noop {
+		return instance, fmt.Errorf("noop: aborting CHANGE MASTER TO operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
 
 	if instance.UsingMariaDBGTID {
@@ -1601,6 +1605,10 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 
 	if instance.SlaveRunning() {
 		return instance, fmt.Errorf("Cannot reset slave on: %+v because slave is running", instanceKey)
+	}
+
+	if *config.RuntimeCLIFlags.Noop {
+		return instance, fmt.Errorf("noop: aborting reset-slave operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
 
 	// MySQL's RESET SLAVE is done correctly; however SHOW SLAVE STATUS still returns old hostnames etc
@@ -1638,6 +1646,10 @@ func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, fmt.Errorf("No SQL error on %+v", instanceKey)
 	}
 
+	if *config.RuntimeCLIFlags.Noop {
+		return instance, fmt.Errorf("noop: aborting skip-query operation on %+v; signalling error but nothing went wrong.", *instanceKey)
+	}
+
 	log.Debugf("Skipping one query on %+v", instanceKey)
 	_, err = ExecInstance(instanceKey, `set global sql_slave_skip_counter := 1`)
 	if err != nil {
@@ -1661,6 +1673,10 @@ func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
 	detachedCoordinatesSubmatch := detachPattern.FindStringSubmatch(instance.ExecBinlogCoordinates.LogFile)
 	if len(detachedCoordinatesSubmatch) != 0 {
 		return instance, fmt.Errorf("Cannot (need not) detach slave on: %+v because slave is already detached", instanceKey)
+	}
+
+	if *config.RuntimeCLIFlags.Noop {
+		return instance, fmt.Errorf("noop: aborting detach-slave operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
 
 	detachedCoordinates := BinlogCoordinates{LogFile: fmt.Sprintf("//%s:%d", instance.ExecBinlogCoordinates.LogFile, instance.ExecBinlogCoordinates.LogPos), LogPos: instance.ExecBinlogCoordinates.LogPos}
@@ -1690,6 +1706,10 @@ func ReattachSlave(instanceKey *InstanceKey) (*Instance, error) {
 	detachedCoordinatesSubmatch := detachPattern.FindStringSubmatch(instance.ExecBinlogCoordinates.LogFile)
 	if len(detachedCoordinatesSubmatch) == 0 {
 		return instance, fmt.Errorf("Cannot reattach slave on: %+v because slave is not detached", instanceKey)
+	}
+
+	if *config.RuntimeCLIFlags.Noop {
+		return instance, fmt.Errorf("noop: aborting reattach-slave operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
 
 	_, err = ExecInstance(instanceKey, fmt.Sprintf(`change master to master_log_file='%s', master_log_pos=%s`, detachedCoordinatesSubmatch[1], detachedCoordinatesSubmatch[2]))
@@ -1728,6 +1748,10 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 
+	if *config.RuntimeCLIFlags.Noop {
+		return instance, fmt.Errorf("noop: aborting set-read-only operation on %+v; signalling error but nothing went wrong.", *instanceKey)
+	}
+
 	_, err = ExecInstance(instanceKey, fmt.Sprintf("set global read_only = %t", readOnly))
 	if err != nil {
 		return instance, log.Errore(err)
@@ -1745,6 +1769,10 @@ func KillQuery(instanceKey *InstanceKey, process int64) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
+	}
+
+	if *config.RuntimeCLIFlags.Noop {
+		return instance, fmt.Errorf("noop: aborting kill-query operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
 
 	_, err = ExecInstance(instanceKey, fmt.Sprintf(`kill query %d`, process))
