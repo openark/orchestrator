@@ -337,7 +337,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if instance == nil {
 				log.Fatalf("Instance not found: %+v", *instanceKey)
 			}
-			coordinates, text, err := inst.FindLastPseudoGTIDEntry(instance, instance.RelaylogCoordinates, strict)
+			coordinates, text, err := inst.FindLastPseudoGTIDEntry(instance, instance.RelaylogCoordinates, strict, nil)
 			if err != nil {
 				log.Fatale(err)
 			}
