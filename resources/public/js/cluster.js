@@ -229,6 +229,15 @@ function moveInstance(node, droppableNode, shouldApply) {
 		}
 		return "ok";
 	}
+	if (instanceIsChild(node, droppableNode) && !droppableNode.isMaster) {
+		if (node.hasProblem) {
+			return null;
+		}
+		if (shouldApply) {
+			enslaveMaster(node, droppableNode);
+		}
+		return "ok";
+	}
 	if (instanceIsChild(droppableNode, node) && node.isMaster) {
 		if (node.hasProblem) {
 			return null;
@@ -302,6 +311,31 @@ function moveUp(node, grandparentNode) {
 	return false;
 }
 
+
+
+function enslaveMaster(node, masterNode) {
+	var message = "Enslave master: are you sure you wish to make <code><strong>" + 
+		node.Key.Hostname + ":" + node.Key.Port +
+		"</strong></code> master of <code><strong>" +
+		masterNode.Key.Hostname + ":" + masterNode.Key.Port +
+		"</strong></code>?"
+	bootbox.confirm(message, function(confirm) {
+		if (confirm) {
+			showLoader();
+			var apiUrl = "/api/enslave-master/" + node.Key.Hostname + "/" + node.Key.Port;
+		    $.get(apiUrl, function (operationResult) {
+	    			hideLoader();
+	    			if (operationResult.Code == "ERROR") {
+	    				addAlert(operationResult.Message)
+	    			} else {
+	    				reloadWithOperationResult(operationResult);
+	    			}	
+	            }, "json");					
+		}
+		$("#cluster_container .accept_drop").removeClass("accept_drop");
+	}); 
+	return false;
+}
 
 function makeCoMaster(node, childNode) {
 	var message = "Are you sure you wish to make <code><strong>" + 

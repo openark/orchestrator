@@ -966,6 +966,66 @@ func EnslaveSiblings(instanceKey *InstanceKey) (*Instance, int, error) {
 	return instance, enslavedSiblings, err
 }
 
+// EnslaveMaster will move an instance up the chain and cause its master to become its slave.
+// It's almost a role change, just that other slaves of either 'instance' or its master are currently unaffected
+// (they continue replicate without change)
+// Note that the master must itself be a slave; however the grandparent does not necessarily have to be reachable
+// and can in fact be dead.
+func EnslaveMaster(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, err
+	}
+	masterInstance, found, err := ReadInstance(&instance.MasterKey)
+	if err != nil || !found {
+		return instance, err
+	}
+
+	if canReplicate, err := masterInstance.CanReplicateFrom(instance); canReplicate == false {
+		return instance, err
+	}
+	// We begin
+	masterInstance, err = StopSlave(&masterInstance.Key)
+	if err != nil {
+		goto Cleanup
+	}
+	instance, err = StopSlave(&instance.Key)
+	if err != nil {
+		goto Cleanup
+	}
+
+	instance, err = StartSlaveUntilMasterCoordinates(&instance.Key, &masterInstance.SelfBinlogCoordinates)
+	if err != nil {
+		goto Cleanup
+	}
+
+	// instance and masterInstance are equal
+	instance, err = ChangeMasterTo(&instance.Key, &masterInstance.MasterKey, &masterInstance.ExecBinlogCoordinates)
+	if err != nil {
+		goto Cleanup
+	}
+	// instance is now sibling of master
+	masterInstance, err = ChangeMasterTo(&masterInstance.Key, &instance.Key, &instance.SelfBinlogCoordinates)
+	if err != nil {
+		goto Cleanup
+	}
+	// swap is done!
+
+	// Take care of instance's previous siblings (slaves of masterInstance)
+
+	// Don't have to do this right now.
+
+Cleanup:
+	instance, _ = StartSlave(&instance.Key)
+	masterInstance, _ = StartSlave(&masterInstance.Key)
+	if err != nil {
+		return instance, err
+	}
+	AuditOperation("enslave-master", instanceKey, fmt.Sprintf("enslaved master: %+v", masterInstance.Key))
+
+	return instance, err
+}
+
 // MakeLocalMaster promotes a slave above its master, making it slave of its grandparent, while also enslaving its siblings.
 // This serves as a convenience method to recover replication when a local master fails; the instance promoted is one of its slaves,
 // which is most advanced among its siblings.

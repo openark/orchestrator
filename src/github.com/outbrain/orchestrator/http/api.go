@@ -407,6 +407,27 @@ func (this *HttpAPI) EnslaveSiblings(params martini.Params, r render.Render, req
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Enslaved %d siblings of %+v", count, instanceKey), Details: instance})
 }
 
+// EnslaveMaster
+func (this *HttpAPI) EnslaveMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	instance, err := inst.EnslaveMaster(&instanceKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("%+v enslaved its master", instanceKey), Details: instance})
+}
+
 // LastPseudoGTID attempts to find the last pseugo-gtid entry in an instance
 func (this *HttpAPI) LastPseudoGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -1388,6 +1409,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/reattach-slave/:host/:port", this.ReattachSlave)
 	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow)
 	m.Get("/api/enslave-siblings/:host/:port", this.EnslaveSiblings)
+	m.Get("/api/enslave-master/:host/:port", this.EnslaveMaster)
 	m.Get("/api/last-pseudo-gtid/:host/:port", this.LastPseudoGTID)
 	m.Get("/api/match-below/:host/:port/:belowHost/:belowPort", this.MatchBelow)
 	m.Get("/api/match-up/:host/:port", this.MatchUp)

@@ -183,6 +183,17 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
+	case cliCommand("enslave-master"):
+		{
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			_, err := inst.EnslaveMaster(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
 	case cliCommand("make-co-master"):
 		{
 			if instanceKey == nil {
