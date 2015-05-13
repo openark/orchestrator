@@ -89,6 +89,13 @@ Cheatsheet:
 			
 			orchestrator -c enslave-siblings -i slave.whose.siblings.will.move.below.com
 			
+		enslave-master
+			Turn an instance into a master of its own master; essentially switch the two. Slaves of each of the two
+			involved instances are unaffected, and continue to replicate as they were.
+			The instance's master must itself be a slave. It does not necessarily have to be actively replicating.
+			
+			orchestrator -c enslave-master -i slave.that.will.switch.places.with.its.master.com
+			
 		repoint
 			Make the given instance replicate from another instance without changing the binglog coordinates. There
 			are little sanity checks to this and this is a risky operation. Use cases are: a rename of the master's 
@@ -100,6 +107,15 @@ Cheatsheet:
 				The above will repoint the slave back to its existing master without change 
 			
 			orchestrator -c repoint
+				-i not given, implicitly assumed local hostname
+			
+		repoint-slaves
+			Repoint all slaves of given instance to replicate back from the instance. This is a convenience method
+			which implies a one-by-one "repoint" command on each slave.
+			
+			orchestrator -c repoint-slaves -i instance.whose.slaves.will.be.repointed.com
+			
+			orchestrator -c repoint-slaves
 				-i not given, implicitly assumed local hostname
 			
 		make-co-master
@@ -263,7 +279,23 @@ Cheatsheet:
 			orchestrator -c set-writeable
 				-i not given, implicitly assumed local hostname
 			
-	
+	Pool commands
+		Orchestrator provides with getter/setter commands for handling pools. It does not on its own investigate pools,
+		but merely accepts and provides association of an instance (host:port) and a pool (any_name).
+		
+		submit-pool-instances
+			Submit a pool name with a list of instances in that pool. This removes any previous instances associated with 
+			that pool. Expecting comma delimited list of instances
+
+			orchestrator -c submit-pool-instances --pool name_of_pool -i pooled.instance1.com,pooled.instance2.com:3306,pooled.instance3.com
+		
+		cluster-pool-instances
+			List all pools and their associated instances. Output is in tab delimited format, and lists:
+			cluster_name, cluster_alias, pool_name, pooled instance
+			Example:
+			
+			orchestrator -c cluster-pool-instances
+
 	Information commands
 		These commands provide information about topologies, replication connections, or otherwise orchstrator's
 		"inventory".
@@ -319,6 +351,20 @@ Cheatsheet:
 				-i not given, implicitly assumed local hostname
 
 			orchestrator -c which-cluster-instances -alias some_alias
+				assuming some_alias is a known cluster alias (see ClusterNameToAlias or DetectClusterAliasQuery configuration)
+
+		which-cluster-osc-slaves
+			Output a list of slaves in same cluster as given instance, that would server as good candidates as control slaves
+			for a pt-online-schema-change operation.
+			Those slaves would be used for replication delay so as to throtthe osc operation. Selected slaves will include,
+			where possible: intermediate masters, their slaves, 3rd level slaves, direct non-intermediate-master slaves.
+
+			orchestrator -c which-cluster-osc-slaves -i instance.to.check.com
+			
+			orchestrator -c which-cluster-osc-slaves
+				-i not given, implicitly assumed local hostname
+
+			orchestrator -c which-cluster-osc-slaves -alias some_alias
 				assuming some_alias is a known cluster alias (see ClusterNameToAlias or DetectClusterAliasQuery configuration)
 
 		which-master

@@ -22,11 +22,16 @@ import (
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/inst"
 	"github.com/outbrain/orchestrator/os"
+	"github.com/pmylund/go-cache"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
+var emergencyReadTopologyInstanceMap = cache.New(time.Duration(config.Config.DiscoveryPollSeconds)*time.Second, time.Duration(config.Config.DiscoveryPollSeconds)*time.Second)
+
+// InstancesByCountSlaves sorts instances by umber of slaves, descending
 type InstancesByCountSlaves [](*inst.Instance)
 
 func (this InstancesByCountSlaves) Len() int      { return len(this) }
@@ -40,11 +45,18 @@ func (this InstancesByCountSlaves) Less(i, j int) bool {
 }
 
 func RecoverDeadMaster(failedInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
+	if ok, err := AttemptRecoveryRegistration(failedInstanceKey); !ok {
+		log.Debugf("Will not RecoverDeadMaster on %+v", *failedInstanceKey)
+		return nil, err
+	}
 
 	inst.AuditOperation("recover-dead-master", failedInstanceKey, "problem found; will recover")
 
 	log.Debugf("RecoverDeadMaster: will recover %+v", *failedInstanceKey)
 	_, _, _, candidateSlave, err := inst.RegroupSlaves(failedInstanceKey, nil)
+
+	ResolveRecovery(failedInstanceKey, &candidateSlave.Key)
+
 	log.Debugf("- RecoverDeadIntermediateMaster: candidate slave is %+v", candidateSlave.Key)
 	inst.AuditOperation("recover-dead-master", failedInstanceKey, fmt.Sprintf("master: %+v", candidateSlave.Key))
 
@@ -195,6 +207,30 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 	return false, nil
 }
 
+// Force a re-read of a topology instance; this is done because we need to substantiate a suspicion that we may have a failover
+// scenario. we want to speed up rading the complete picture.
+func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
+	if err := emergencyReadTopologyInstanceMap.Add(instanceKey.DisplayString(), true, 0); err == nil {
+		emergencyReadTopologyInstanceMap.Set(instanceKey.DisplayString(), true, 0)
+		go inst.ExecuteOnTopology(func() {
+			inst.ReadTopologyInstance(instanceKey)
+			inst.AuditOperation("emergently-read-topology-instance", instanceKey, string(analysisCode))
+		})
+	}
+}
+
+// Force reading of slaves of given instance. This is because we suspect the instance is dead, and want to speed up
+// detection of replication failure from its slaves.
+func emergentlyReadTopologyInstanceSlaves(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
+	slaves, err := inst.ReadSlaveInstances(instanceKey)
+	if err != nil {
+		return
+	}
+	for _, slave := range slaves {
+		go emergentlyReadTopologyInstance(&slave.Key, analysisCode)
+	}
+}
+
 // executeCheckAndRecoverFunction will choose the correct check & recovery function based on analysis.
 // It executes the function synchronuously
 func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, error) {
@@ -209,6 +245,12 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, skip
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
 	case inst.DeadCoMaster:
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
+	case inst.UnreachableMaster:
+		go emergentlyReadTopologyInstanceSlaves(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
+	case inst.AllMasterSlavesNotReplicating:
+		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
+	case inst.FirstTierSlaveFailingToConnectToMaster:
+		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
 	}
 
 	if checkAndRecoverFunction == nil {

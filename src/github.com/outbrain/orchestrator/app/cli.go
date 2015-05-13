@@ -758,6 +758,6 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			fmt.Println(instanceKey.DisplayString())
 		}
 	default:
-		log.Fatalf(`Unknown command: "%s". Available commands (-c): %v`, command, knownCommands)
+		log.Fatalf("Unknown command: \"%s\". Available commands (-c):\n\t%v", command, strings.Join(knownCommands, "\n\t"))
 	}
 }

@@ -1316,11 +1316,12 @@ func isGenerallyValidAsCandidateSlave(slave *Instance) bool {
 	if !slave.LogSlaveUpdatesEnabled {
 		return false
 	}
-	if config.Config.DenyAutoPromotionHostnamePattern != "" {
-		if matched, _ := regexp.MatchString(config.Config.DenyAutoPromotionHostnamePattern, slave.Key.Hostname); matched {
+	for _, filter := range config.Config.PromotionIgnoreHostnameFilters {
+		if matched, _ := regexp.MatchString(filter, slave.Key.Hostname); matched {
 			return false
 		}
 	}
+
 	return true
 }
 

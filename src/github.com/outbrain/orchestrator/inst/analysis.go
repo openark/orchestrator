@@ -36,11 +36,13 @@ const (
 	DeadIntermediateMasterAndSomeSlaves                    = "DeadIntermediateMasterAndSomeSlaves"
 	UnreachableIntermediateMaster                          = "UnreachableIntermediateMaster"
 	AllIntermediateMasterSlavesNotReplicating              = "AllIntermediateMasterSlavesNotReplicating"
+	FirstTierSlaveFailingToConnectToMaster                 = "FirstTierSlaveFailingToConnectToMaster"
 )
 
 // ReplicationAnalysis notes analysis on replication chain status, per instance
 type ReplicationAnalysis struct {
 	AnalyzedInstanceKey         InstanceKey
+	AnalyzedInstanceMasterKey   InstanceKey
 	ClusterName                 string
 	IsMaster                    bool
 	IsCoMaster                  bool
@@ -48,6 +50,8 @@ type ReplicationAnalysis struct {
 	CountSlaves                 uint
 	CountValidSlaves            uint
 	CountValidReplicatingSlaves uint
+	ReplicationDepth            uint
+	IsFailingToConnectToMaster  bool
 	Analysis                    AnalysisCode
 	Description                 string
 }

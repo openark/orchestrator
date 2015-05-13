@@ -262,7 +262,7 @@ function moveInstance(node, droppableNode, shouldApply) {
 }
 
 function moveBelow(node, siblingNode) {
-	var message = "Are you sure you wish to turn <code><strong>" + 
+	var message = "<h4>move-below</h4>Are you sure you wish to turn <code><strong>" + 
 		node.Key.Hostname + ":" + node.Key.Port +
 		"</strong></code> into a slave of <code><strong>" +
 		siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
@@ -288,7 +288,7 @@ function moveBelow(node, siblingNode) {
 
 
 function moveUp(node, grandparentNode) {
-	var message = "Are you sure you wish to turn <code><strong>" + 
+	var message = "<h4>move-up</h4>Are you sure you wish to turn <code><strong>" + 
 		node.Key.Hostname + ":" + node.Key.Port +
 		"</strong></code> into a slave of <code><strong>" +
 		grandparentNode.Key.Hostname + ":" + grandparentNode.Key.Port +
@@ -314,7 +314,7 @@ function moveUp(node, grandparentNode) {
 
 
 function enslaveMaster(node, masterNode) {
-	var message = "Enslave master: are you sure you wish to make <code><strong>" + 
+	var message = "<h4>enslave-master</h4>Are you sure you wish to make <code><strong>" + 
 		node.Key.Hostname + ":" + node.Key.Port +
 		"</strong></code> master of <code><strong>" +
 		masterNode.Key.Hostname + ":" + masterNode.Key.Port +
@@ -338,7 +338,7 @@ function enslaveMaster(node, masterNode) {
 }
 
 function makeCoMaster(node, childNode) {
-	var message = "Are you sure you wish to make <code><strong>" + 
+	var message = "<h4>make-co-master</h4>Are you sure you wish to make <code><strong>" + 
 		node.Key.Hostname + ":" + node.Key.Port +
 		"</strong></code> and <code><strong>" +
 		childNode.Key.Hostname + ":" + childNode.Key.Port +
@@ -364,7 +364,7 @@ function makeCoMaster(node, childNode) {
 
 
 function matchBelow(node, otherNode) {
-	var message = "<h4>PSEUDO-GTID MODE</h4>Are you sure you wish to turn <code><strong>" + 
+	var message = "<h4>PSEUDO-GTID MODE, match-below</h4>Are you sure you wish to turn <code><strong>" + 
 		node.Key.Hostname + ":" + node.Key.Port +
 		"</strong></code> into a slave of <code><strong>" +
 		otherNode.Key.Hostname + ":" + otherNode.Key.Port +

@@ -75,7 +75,7 @@ type Configuration struct {
 	DetectClusterAliasQuery                    string            // Optional query (executed on topology instance) that returns the alias of a cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all slaves). If provided, must return one row, one column
 	DataCenterPattern                          string            // Regexp pattern with one group, extracting the datacenter name from the hostname
 	PhysicalEnvironmentPattern                 string            // Regexp pattern with one group, extracting physical environment info from hostname (e.g. combination of datacenter & prod/dev env)
-	DenyAutoPromotionHostnamePattern           string            // Orchestrator will not auto-promote hosts with name matching patterb (via -c recovery; for example, avoid promoting dev-dedicated machines)
+	PromotionIgnoreHostnameFilters             []string          // Orchestrator will not promote slaves with hostname matching pattern (via -c recovery; for example, avoid promoting dev-dedicated machines)
 	ServeAgentsHttp                            bool              // Spawn another HTTP interface dedicated for orcehstrator-agent
 	AgentsUseSSL                               bool              // When "true" orchestrator will listen on agents port with SSL as well as connect to agents via SSL
 	SSLSkipVerify                              bool              // When using SSL, should we ignore SSL certification error
@@ -140,7 +140,7 @@ func NewConfiguration() *Configuration {
 		DetectClusterAliasQuery:                    "",
 		DataCenterPattern:                          "",
 		PhysicalEnvironmentPattern:                 "",
-		DenyAutoPromotionHostnamePattern:           "",
+		PromotionIgnoreHostnameFilters:             []string{},
 		ServeAgentsHttp:                            false,
 		AgentsUseSSL:                               false,
 		SSLSkipVerify:                              false,
