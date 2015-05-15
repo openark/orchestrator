@@ -27,10 +27,11 @@ import (
 // So these need to be removed from the event entry if we're to compare and validate matching
 // entries.
 var eventInfoTransformations map[*regexp.Regexp]string = map[*regexp.Regexp]string{
-	regexp.MustCompile(`(.*) [/][*].*?[*][/](.*$)`): "$1 $2",
-	regexp.MustCompile(`(COMMIT) .*$`):              "$1",
-	regexp.MustCompile(`(table_id:) [0-9]+ (.*$)`):  "$1 ### $2",
-	regexp.MustCompile(`(table_id:) [0-9]+$`):       "$1 ###",
+	regexp.MustCompile(`(.*) [/][*].*?[*][/](.*$)`):  "$1 $2",
+	regexp.MustCompile(`(COMMIT) .*$`):               "$1",
+	regexp.MustCompile(`(table_id:) [0-9]+ (.*$)`):   "$1 ### $2",
+	regexp.MustCompile(`(table_id:) [0-9]+$`):        "$1 ###",
+	regexp.MustCompile(` X'([0-9a-fA-F]+)' COLLATE`): " 0x$1 COLLATE",
 }
 
 var skippedEventTypes map[string]bool = map[string]bool{

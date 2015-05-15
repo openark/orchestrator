@@ -65,7 +65,7 @@ func RecoverDeadMaster(failedInstanceKey *inst.InstanceKey) (*inst.Instance, err
 
 // checkAndRecoverDeadMaster checks a given analysis, decides whether to take action, and possibly takes action
 // Returns true when action was taken.
-func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, error) {
+func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, *inst.Instance, error) {
 	filters := config.Config.RecoverMasterClusterFilters
 	if skipFilters {
 		// The following filter catches-all
@@ -74,11 +74,33 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipFilte
 	for _, filter := range filters {
 		if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched && filter != "" {
 			log.Debugf("Will handle DeadMaster event on %+v", analysisEntry.ClusterName)
-			_, err := RecoverDeadMaster(&analysisEntry.AnalyzedInstanceKey)
-			return true, err
+			promotedSlave, err := RecoverDeadMaster(&analysisEntry.AnalyzedInstanceKey)
+
+			if promotedSlave != nil {
+				// Execute post master-failover processes
+				for _, command := range config.Config.PostMasterFailoverProcesses {
+					command := command
+
+					command = strings.Replace(command, "{failureType}", string(analysisEntry.Analysis), -1)
+					command = strings.Replace(command, "{failureDescription}", analysisEntry.Description, -1)
+					command = strings.Replace(command, "{failedHost}", analysisEntry.AnalyzedInstanceKey.Hostname, -1)
+					command = strings.Replace(command, "{failedPort}", fmt.Sprintf("%d", analysisEntry.AnalyzedInstanceKey.Port), -1)
+					command = strings.Replace(command, "{successorHost}", promotedSlave.Key.Hostname, -1)
+					command = strings.Replace(command, "{successorPort}", fmt.Sprintf("%d", promotedSlave.Key.Port), -1)
+					command = strings.Replace(command, "{failureCluster}", analysisEntry.ClusterName, -1)
+
+					if cmdErr := os.CommandRun(command); cmdErr == nil {
+						log.Infof("Executed post-master-failover command %s", command)
+					} else {
+						log.Errorf("Failed to execute post-master-failover command %s", command)
+					}
+				}
+			}
+
+			return true, promotedSlave, err
 		}
 	}
-	return false, nil
+	return false, nil, nil
 }
 
 func isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instance) bool {
@@ -191,7 +213,7 @@ func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (*inst.I
 
 // checkAndRecoverDeadIntermediateMaster checks a given analysis, decides whether to take action, and possibly takes action
 // Returns true when action was taken.
-func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, error) {
+func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, *inst.Instance, error) {
 	filters := config.Config.RecoverIntermediateMasterClusterFilters
 	if skipFilters {
 		// The following filter catches-all
@@ -200,11 +222,11 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 	for _, filter := range filters {
 		if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched && filter != "" {
 			log.Debugf("Will handle DeadIntermediateMaster event on %+v", analysisEntry.ClusterName)
-			_, err := RecoverDeadIntermediateMaster(&analysisEntry.AnalyzedInstanceKey)
-			return true, err
+			promotedSlave, err := RecoverDeadIntermediateMaster(&analysisEntry.AnalyzedInstanceKey)
+			return true, promotedSlave, err
 		}
 	}
-	return false, nil
+	return false, nil, nil
 }
 
 // Force a re-read of a topology instance; this is done because we need to substantiate a suspicion that we may have a failover
@@ -233,8 +255,8 @@ func emergentlyReadTopologyInstanceSlaves(instanceKey *inst.InstanceKey, analysi
 
 // executeCheckAndRecoverFunction will choose the correct check & recovery function based on analysis.
 // It executes the function synchronuously
-func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, error) {
-	var checkAndRecoverFunction func(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, error) = nil
+func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, *inst.Instance, error) {
+	var checkAndRecoverFunction func(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, *inst.Instance, error) = nil
 
 	switch analysisEntry.Analysis {
 	case inst.DeadMaster:
@@ -255,13 +277,13 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, skip
 
 	if checkAndRecoverFunction == nil {
 		// Unhandled problem type
-		return false, nil
+		return false, nil, nil
 	}
 	// we have a recovery function; its execution still depends on filters if not disabled.
 
 	// Execute general pre-processes
 	{
-		var preProcessesFailures []error = []error{}
+		var processesFailures []error = []error{}
 		barrier := make(chan error)
 		for _, command := range config.Config.PreFailoverProcesses {
 			command := command
@@ -280,11 +302,11 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, skip
 		}
 		for _, _ = range config.Config.PreFailoverProcesses {
 			if cmdErr := <-barrier; cmdErr != nil {
-				preProcessesFailures = append(preProcessesFailures, cmdErr)
+				processesFailures = append(processesFailures, cmdErr)
 			}
 		}
-		if len(preProcessesFailures) > 0 {
-			return false, preProcessesFailures[0]
+		if len(processesFailures) > 0 {
+			return false, nil, processesFailures[0]
 		}
 	}
 
@@ -292,11 +314,10 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, skip
 }
 
 // CheckAndRecover is the main entry point for the recovery mechanism
-func CheckAndRecover(specificInstance *inst.InstanceKey, skipFilters bool) (bool, error) {
-	actionTaken := false
+func CheckAndRecover(specificInstance *inst.InstanceKey, skipFilters bool) (actionTaken bool, instance *inst.Instance, err error) {
 	replicationAnalysis, err := inst.GetReplicationAnalysis()
 	if err != nil {
-		return false, log.Errore(err)
+		return false, nil, log.Errore(err)
 	}
 	for _, analysisEntry := range replicationAnalysis {
 		if specificInstance != nil {
@@ -308,10 +329,10 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, skipFilters bool) (bool
 
 		if specificInstance != nil && skipFilters {
 			// force mode. Keep it synchronuous
-			actionTaken, err = executeCheckAndRecoverFunction(analysisEntry, skipFilters)
+			actionTaken, instance, err = executeCheckAndRecoverFunction(analysisEntry, skipFilters)
 		} else {
 			go executeCheckAndRecoverFunction(analysisEntry, skipFilters)
 		}
 	}
-	return actionTaken, err
+	return actionTaken, instance, err
 }

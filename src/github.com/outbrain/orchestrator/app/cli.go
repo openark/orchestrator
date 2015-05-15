@@ -325,12 +325,12 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			actionTaken, err := orchestrator.CheckAndRecover(instanceKey, true)
+			actionTaken, promotedInstance, err := orchestrator.CheckAndRecover(instanceKey, true)
 			if err != nil {
 				log.Fatale(err)
 			}
 			if actionTaken {
-				fmt.Println("true")
+				fmt.Println(promotedInstance.Key.DisplayString())
 			}
 		}
 	case cliCommand("last-pseudo-gtid"):

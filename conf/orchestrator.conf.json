@@ -31,6 +31,9 @@
   "PostFailoverProcesses": [
   	"echo 'failed over:' h:{failedHost} p:{failedPort} th:{successorHost} tp:{successorPort}"
   ],
+  "PostMasterFailoverProcesses": [
+  	"echo '*************** MASTER failed over:' h:{failedHost} p:{failedPort} th:{successorHost} tp:{successorPort}"
+  ],
   "AuditLogFile": "/tmp/orchestrator-audit.log",
   "AuditPageSize": 20,
   "SlaveStartPostWaitMilliseconds": 1000,

@@ -1392,21 +1392,24 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave io_thread`)
 	_, err = ExecInstanceNoPrepare(instanceKey, `start slave sql_thread`)
 
-	startTime := time.Now()
-	for upToDate := false; !upToDate; {
-		if timeout > 0 && time.Since(startTime) >= timeout {
-			// timeout
-			return nil, log.Errorf("StopSlaveNicely timeout on %+v", *instanceKey)
-		}
-		instance, err = ReadTopologyInstance(instanceKey)
-		if err != nil {
-			return instance, log.Errore(err)
-		}
+	if instance.SQLDelay == 0 {
+		// Otherwise we don't bother.
+		startTime := time.Now()
+		for upToDate := false; !upToDate; {
+			if timeout > 0 && time.Since(startTime) >= timeout {
+				// timeout
+				return nil, log.Errorf("StopSlaveNicely timeout on %+v", *instanceKey)
+			}
+			instance, err = ReadTopologyInstance(instanceKey)
+			if err != nil {
+				return instance, log.Errore(err)
+			}
 
-		if instance.SQLThreadUpToDate() {
-			upToDate = true
-		} else {
-			time.Sleep(sqlThreadPollDuration)
+			if instance.SQLThreadUpToDate() {
+				upToDate = true
+			} else {
+				time.Sleep(sqlThreadPollDuration)
+			}
 		}
 	}
 	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave`)

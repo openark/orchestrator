@@ -270,6 +270,9 @@ func (this *Instance) IsSmallerMajorVersion(other *Instance) bool {
 		if this_token < other_token {
 			return true
 		}
+		if this_token > other_token {
+			return false
+		}
 	}
 	return false
 }
