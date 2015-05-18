@@ -44,10 +44,10 @@ func (this InstancesByCountSlaves) Less(i, j int) bool {
 	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
 }
 
-func RecoverDeadMaster(failedInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
+func RecoverDeadMaster(failedInstanceKey *inst.InstanceKey) (bool, *inst.Instance, error) {
 	if ok, err := AttemptRecoveryRegistration(failedInstanceKey); !ok {
 		log.Debugf("Will not RecoverDeadMaster on %+v", *failedInstanceKey)
-		return nil, err
+		return false, nil, err
 	}
 
 	inst.AuditOperation("recover-dead-master", failedInstanceKey, "problem found; will recover")
@@ -60,7 +60,7 @@ func RecoverDeadMaster(failedInstanceKey *inst.InstanceKey) (*inst.Instance, err
 	log.Debugf("- RecoverDeadIntermediateMaster: candidate slave is %+v", candidateSlave.Key)
 	inst.AuditOperation("recover-dead-master", failedInstanceKey, fmt.Sprintf("master: %+v", candidateSlave.Key))
 
-	return candidateSlave, err
+	return true, candidateSlave, err
 }
 
 // checkAndRecoverDeadMaster checks a given analysis, decides whether to take action, and possibly takes action
@@ -74,9 +74,9 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipFilte
 	for _, filter := range filters {
 		if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched && filter != "" {
 			log.Debugf("Will handle DeadMaster event on %+v", analysisEntry.ClusterName)
-			promotedSlave, err := RecoverDeadMaster(&analysisEntry.AnalyzedInstanceKey)
+			actionTaken, promotedSlave, err := RecoverDeadMaster(&analysisEntry.AnalyzedInstanceKey)
 
-			if promotedSlave != nil {
+			if actionTaken && promotedSlave != nil {
 				// Execute post master-failover processes
 				for _, command := range config.Config.PostMasterFailoverProcesses {
 					command := command
@@ -97,7 +97,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipFilte
 				}
 			}
 
-			return true, promotedSlave, err
+			return actionTaken, promotedSlave, err
 		}
 	}
 	return false, nil, nil
@@ -177,10 +177,10 @@ func GetCandidateSiblingOfIntermediateMaster(intermediateMasterKey *inst.Instanc
 	return nil, log.Errorf("Cannot find candidate sibling of %+v", *intermediateMasterKey)
 }
 
-func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
+func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (bool, *inst.Instance, error) {
 	if ok, err := AttemptRecoveryRegistration(failedInstanceKey); !ok {
 		log.Debugf("Will not RecoverDeadIntermediateMaster on %+v", *failedInstanceKey)
-		return nil, err
+		return false, nil, err
 	}
 
 	inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, "problem found; will recover")
@@ -193,7 +193,7 @@ func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (*inst.I
 			ResolveRecovery(failedInstanceKey, &candidateSibling.Key)
 			log.Debugf("- RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) went with %d errors", candidateSibling.Key, len(errs))
 			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Done. Matched %d slaves under candidate sibling: %+v; %d errors: %+v", len(matchedSlaves), candidateSibling.Key, len(errs), errs))
-			return belowInstance, nil
+			return true, belowInstance, nil
 		} else {
 			log.Debugf("- RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) did not complete: %+v", candidateSibling.Key, err)
 			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Matched %d slaves under candidate sibling: %+v; %d errors: %+v", len(matchedSlaves), candidateSibling.Key, len(errs), errs))
@@ -208,7 +208,7 @@ func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (*inst.I
 	log.Debugf("- RecoverDeadIntermediateMaster: matched up to %+v", successorInstance.Key)
 	inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Done. Matched slaves under: %+v %d errors: %+v", successorInstance.Key, len(errs), errs))
 
-	return successorInstance, err
+	return true, successorInstance, err
 }
 
 // checkAndRecoverDeadIntermediateMaster checks a given analysis, decides whether to take action, and possibly takes action
@@ -222,8 +222,8 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 	for _, filter := range filters {
 		if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched && filter != "" {
 			log.Debugf("Will handle DeadIntermediateMaster event on %+v", analysisEntry.ClusterName)
-			promotedSlave, err := RecoverDeadIntermediateMaster(&analysisEntry.AnalyzedInstanceKey)
-			return true, promotedSlave, err
+			actionTaken, promotedSlave, err := RecoverDeadIntermediateMaster(&analysisEntry.AnalyzedInstanceKey)
+			return actionTaken, promotedSlave, err
 		}
 	}
 	return false, nil, nil

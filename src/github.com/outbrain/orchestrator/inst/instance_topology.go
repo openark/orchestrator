@@ -43,7 +43,7 @@ func (this InstancesByExecBinlogCoordinates) Less(i, j int) bool {
 
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
-func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance)) []string {
+func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance), extendedOutput bool) []string {
 	prefix := ""
 	if depth > 0 {
 		prefix = strings.Repeat(" ", (depth-1)*2)
@@ -53,22 +53,30 @@ func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*In
 			prefix += "- "
 		}
 	}
-	entry := fmt.Sprintf("%s%s %s", prefix, instance.Key.DisplayString(), instance.HumanReadableDescription())
+	entry := fmt.Sprintf("%s%s", prefix, instance.Key.DisplayString())
+	if extendedOutput {
+		entry = fmt.Sprintf("%s %s", entry, instance.HumanReadableDescription())
+	}
 	result := []string{entry}
 	for _, slave := range replicationMap[instance] {
-		slavesResult := getASCIITopologyEntry(depth+1, slave, replicationMap)
+		slavesResult := getASCIITopologyEntry(depth+1, slave, replicationMap, extendedOutput)
 		result = append(result, slavesResult...)
 	}
 	return result
 }
 
 // ASCIITopology returns a string representation of the topology of given instance.
-func ASCIITopology(instanceKey *InstanceKey) (string, error) {
+func ASCIITopology(instanceKey *InstanceKey, historyTimestampPattern string) (string, error) {
 	instance, found, err := ReadInstance(instanceKey)
 	if err != nil || !found {
 		return "", err
 	}
-	instances, err := ReadClusterInstances(instance.ClusterName)
+	var instances [](*Instance)
+	if historyTimestampPattern == "" {
+		instances, err = ReadClusterInstances(instance.ClusterName)
+	} else {
+		instances, err = ReadHistoryClusterInstances(instance.ClusterName, historyTimestampPattern)
+	}
 	if err != nil {
 		return "", err
 	}
@@ -96,7 +104,7 @@ func ASCIITopology(instanceKey *InstanceKey) (string, error) {
 	if masterInstance == nil {
 		return "", nil
 	}
-	resultArray := getASCIITopologyEntry(0, masterInstance, replicationMap)
+	resultArray := getASCIITopologyEntry(0, masterInstance, replicationMap, historyTimestampPattern == "")
 	result := strings.Join(resultArray, "\n")
 	return result, nil
 }

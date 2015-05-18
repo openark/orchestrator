@@ -1618,11 +1618,11 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 	// and only resets till after next restart. This leads to orchestrator still thinking the instance replicates
 	// from old host. We therefore forcibly modify the hostname.
 	// RESET SLAVE ALL command solves this, but only as of 5.6.3
-	_, err = ExecInstance(instanceKey, `change master to master_host='_'`)
+	_, err = ExecInstanceNoPrepare(instanceKey, `change master to master_host='_'`)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
-	_, err = ExecInstance(instanceKey, `reset slave /*!50603 all */`)
+	_, err = ExecInstanceNoPrepare(instanceKey, `reset slave /*!50603 all */`)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -1684,7 +1684,7 @@ func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
 
 	detachedCoordinates := BinlogCoordinates{LogFile: fmt.Sprintf("//%s:%d", instance.ExecBinlogCoordinates.LogFile, instance.ExecBinlogCoordinates.LogPos), LogPos: instance.ExecBinlogCoordinates.LogPos}
 	// Encode the current coordinates within the log file name, in such way that replication is broken, but info can still be resurrected
-	_, err = ExecInstance(instanceKey, fmt.Sprintf(`change master to master_log_file='%s', master_log_pos=%d`, detachedCoordinates.LogFile, detachedCoordinates.LogPos))
+	_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf(`change master to master_log_file='%s', master_log_pos=%d`, detachedCoordinates.LogFile, detachedCoordinates.LogPos))
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -1715,7 +1715,7 @@ func ReattachSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, fmt.Errorf("noop: aborting reattach-slave operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
 
-	_, err = ExecInstance(instanceKey, fmt.Sprintf(`change master to master_log_file='%s', master_log_pos=%s`, detachedCoordinatesSubmatch[1], detachedCoordinatesSubmatch[2]))
+	_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf(`change master to master_log_file='%s', master_log_pos=%s`, detachedCoordinatesSubmatch[1], detachedCoordinatesSubmatch[2]))
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -1791,4 +1791,70 @@ func KillQuery(instanceKey *InstanceKey, process int64) (*Instance, error) {
 	log.Infof("Killed query on %+v", *instanceKey)
 	AuditOperation("kill-query", instanceKey, fmt.Sprintf("Killed query %d", process))
 	return instance, err
+}
+
+// SnapshotTopologies records topology graph for all existing topologies
+func SnapshotTopologies() error {
+	writeFunc := func() error {
+		db, err := db.OpenOrchestrator()
+		if err != nil {
+			return log.Errore(err)
+		}
+
+		_, err = sqlutils.Exec(db, `
+        	insert into 
+        		database_instance_topology_history (snapshot_unix_timestamp,
+        			hostname, port, master_host, master_port, cluster_name)
+        	select
+        		UNIX_TIMESTAMP(NOW()),
+        		hostname, port, master_host, master_port, cluster_name
+			from
+				database_instance
+				`,
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
+
+		return nil
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
+// ReadHistoryClusterInstances reads (thin) instances from history
+func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern string) ([](*Instance), error) {
+	instances := [](*Instance){}
+
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		return instances, log.Errore(err)
+	}
+
+	query := fmt.Sprintf(`
+		select 
+			*
+		from 
+			database_instance_topology_history 
+		where
+			snapshot_unix_timestamp rlike '%s'
+			and cluster_name ='%s' 
+		order by
+			hostname, port`, historyTimestampPattern, clusterName)
+
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		instance := NewInstance()
+
+		instance.Key.Hostname = m.GetString("hostname")
+		instance.Key.Port = m.GetInt("port")
+		instance.MasterKey.Hostname = m.GetString("master_host")
+		instance.MasterKey.Port = m.GetInt("master_port")
+		instance.ClusterName = m.GetString("cluster_name")
+
+		instances = append(instances, instance)
+		return nil
+	})
+	if err != nil {
+		return instances, log.Errore(err)
+	}
+	return instances, err
 }

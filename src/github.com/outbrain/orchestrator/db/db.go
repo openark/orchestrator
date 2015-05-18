@@ -245,6 +245,19 @@ var generateSQL = []string{
 		  KEY pool_idx (pool)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+        CREATE TABLE IF NOT EXISTS database_instance_topology_history (
+          snapshot_unix_timestamp INT UNSIGNED NOT NULL,
+          hostname varchar(128) CHARACTER SET ascii NOT NULL,
+          port smallint(5) unsigned NOT NULL,
+          master_host varchar(128) CHARACTER SET ascii NOT NULL,
+          master_port smallint(5) unsigned NOT NULL,
+          cluster_name tinytext CHARACTER SET ascii NOT NULL,
+          PRIMARY KEY (snapshot_unix_timestamp, hostname, port),
+          KEY cluster_name_idx (snapshot_unix_timestamp, cluster_name(128))
+        ) ENGINE=InnoDB DEFAULT CHARSET=ascii
+
+	`,
 }
 
 var generateSQLPatches = []string{
