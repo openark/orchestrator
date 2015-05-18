@@ -1381,7 +1381,7 @@ func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.R
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	actionTaken, _, err := orchestrator.CheckAndRecover(&instanceKey, true)
+	actionTaken, _, err := orchestrator.CheckAndRecover(&instanceKey, nil, true)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return

@@ -65,42 +65,67 @@ func RecoverDeadMaster(failedInstanceKey *inst.InstanceKey) (bool, *inst.Instanc
 
 // checkAndRecoverDeadMaster checks a given analysis, decides whether to take action, and possibly takes action
 // Returns true when action was taken.
-func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, *inst.Instance, error) {
+func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, suggestedSuccessorInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
 	filters := config.Config.RecoverMasterClusterFilters
 	if skipFilters {
 		// The following filter catches-all
 		filters = append(filters, ".")
 	}
+	masterFilterMatched := false
 	for _, filter := range filters {
 		if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched && filter != "" {
-			log.Debugf("Will handle DeadMaster event on %+v", analysisEntry.ClusterName)
-			actionTaken, promotedSlave, err := RecoverDeadMaster(&analysisEntry.AnalyzedInstanceKey)
-
-			if actionTaken && promotedSlave != nil {
-				// Execute post master-failover processes
-				for _, command := range config.Config.PostMasterFailoverProcesses {
-					command := command
-
-					command = strings.Replace(command, "{failureType}", string(analysisEntry.Analysis), -1)
-					command = strings.Replace(command, "{failureDescription}", analysisEntry.Description, -1)
-					command = strings.Replace(command, "{failedHost}", analysisEntry.AnalyzedInstanceKey.Hostname, -1)
-					command = strings.Replace(command, "{failedPort}", fmt.Sprintf("%d", analysisEntry.AnalyzedInstanceKey.Port), -1)
-					command = strings.Replace(command, "{successorHost}", promotedSlave.Key.Hostname, -1)
-					command = strings.Replace(command, "{successorPort}", fmt.Sprintf("%d", promotedSlave.Key.Port), -1)
-					command = strings.Replace(command, "{failureCluster}", analysisEntry.ClusterName, -1)
-
-					if cmdErr := os.CommandRun(command); cmdErr == nil {
-						log.Infof("Executed post-master-failover command %s", command)
-					} else {
-						log.Errorf("Failed to execute post-master-failover command %s", command)
-					}
-				}
-			}
-
-			return actionTaken, promotedSlave, err
+			masterFilterMatched = true
 		}
 	}
-	return false, nil, nil
+	if !masterFilterMatched {
+		return false, nil, nil
+	}
+	// Let's do dead master recovery!
+	log.Debugf("Will handle DeadMaster event on %+v", analysisEntry.ClusterName)
+	actionTaken, promotedSlave, err := RecoverDeadMaster(&analysisEntry.AnalyzedInstanceKey)
+
+	if actionTaken && promotedSlave != nil {
+		// Try and promote suggested successor, if applicable and possible
+		if suggestedSuccessorInstanceKey != nil && !promotedSlave.Key.Equals(suggestedSuccessorInstanceKey) {
+			promotedSuggestedSuccessor := false
+			// Let's try and make suggestedSuccessorInstanceKey the new master
+			log.Debugf("Promoted instance %+v is not the suggested successor %+v. Will see what can be done", promotedSlave.Key, *suggestedSuccessorInstanceKey)
+			if suggestedSuccessorInstance, _, err := inst.ReadInstance(suggestedSuccessorInstanceKey); err == nil {
+				if suggestedSuccessorInstance.MasterKey.Equals(&promotedSlave.Key) {
+					log.Debugf("Suggested successor %+v is slave of promoted instance %+v. Will try and enslave its master", *suggestedSuccessorInstanceKey, promotedSlave.Key)
+					suggestedSuccessorInstance, err = inst.EnslaveMaster(&suggestedSuccessorInstance.Key)
+					if err != nil {
+						log.Errore(err)
+					}
+				}
+			} else {
+				log.Errore(err)
+			}
+			if !promotedSuggestedSuccessor {
+				log.Debugf("Could not manage to promoted suggested successor %+v", *suggestedSuccessorInstanceKey)
+			}
+		}
+		// Execute post master-failover processes
+		for _, command := range config.Config.PostMasterFailoverProcesses {
+			command := command
+
+			command = strings.Replace(command, "{failureType}", string(analysisEntry.Analysis), -1)
+			command = strings.Replace(command, "{failureDescription}", analysisEntry.Description, -1)
+			command = strings.Replace(command, "{failedHost}", analysisEntry.AnalyzedInstanceKey.Hostname, -1)
+			command = strings.Replace(command, "{failedPort}", fmt.Sprintf("%d", analysisEntry.AnalyzedInstanceKey.Port), -1)
+			command = strings.Replace(command, "{successorHost}", promotedSlave.Key.Hostname, -1)
+			command = strings.Replace(command, "{successorPort}", fmt.Sprintf("%d", promotedSlave.Key.Port), -1)
+			command = strings.Replace(command, "{failureCluster}", analysisEntry.ClusterName, -1)
+
+			if cmdErr := os.CommandRun(command); cmdErr == nil {
+				log.Infof("Executed post-master-failover command %s", command)
+			} else {
+				log.Errorf("Failed to execute post-master-failover command %s", command)
+			}
+		}
+	}
+
+	return actionTaken, promotedSlave, err
 }
 
 func isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instance) bool {
@@ -213,7 +238,7 @@ func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (bool, *
 
 // checkAndRecoverDeadIntermediateMaster checks a given analysis, decides whether to take action, and possibly takes action
 // Returns true when action was taken.
-func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, *inst.Instance, error) {
+func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, suggestedSuccessorInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
 	filters := config.Config.RecoverIntermediateMasterClusterFilters
 	if skipFilters {
 		// The following filter catches-all
@@ -255,8 +280,8 @@ func emergentlyReadTopologyInstanceSlaves(instanceKey *inst.InstanceKey, analysi
 
 // executeCheckAndRecoverFunction will choose the correct check & recovery function based on analysis.
 // It executes the function synchronuously
-func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, *inst.Instance, error) {
-	var checkAndRecoverFunction func(analysisEntry inst.ReplicationAnalysis, skipFilters bool) (bool, *inst.Instance, error) = nil
+func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, suggestedSuccessorInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
+	var checkAndRecoverFunction func(analysisEntry inst.ReplicationAnalysis, suggestedSuccessorInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) = nil
 
 	switch analysisEntry.Analysis {
 	case inst.DeadMaster:
@@ -312,11 +337,11 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, skip
 		}
 	}
 
-	return checkAndRecoverFunction(analysisEntry, skipFilters)
+	return checkAndRecoverFunction(analysisEntry, suggestedSuccessorInstanceKey, skipFilters)
 }
 
 // CheckAndRecover is the main entry point for the recovery mechanism
-func CheckAndRecover(specificInstance *inst.InstanceKey, skipFilters bool) (actionTaken bool, instance *inst.Instance, err error) {
+func CheckAndRecover(specificInstance *inst.InstanceKey, suggestedSuccessorInstanceKey *inst.InstanceKey, skipFilters bool) (actionTaken bool, instance *inst.Instance, err error) {
 	replicationAnalysis, err := inst.GetReplicationAnalysis()
 	if err != nil {
 		return false, nil, log.Errore(err)
@@ -331,9 +356,9 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, skipFilters bool) (acti
 
 		if specificInstance != nil && skipFilters {
 			// force mode. Keep it synchronuous
-			actionTaken, instance, err = executeCheckAndRecoverFunction(analysisEntry, skipFilters)
+			actionTaken, instance, err = executeCheckAndRecoverFunction(analysisEntry, suggestedSuccessorInstanceKey, skipFilters)
 		} else {
-			go executeCheckAndRecoverFunction(analysisEntry, skipFilters)
+			go executeCheckAndRecoverFunction(analysisEntry, suggestedSuccessorInstanceKey, skipFilters)
 		}
 	}
 	return actionTaken, instance, err
