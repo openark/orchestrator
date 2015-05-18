@@ -70,10 +70,10 @@
   "RecoveryIgnoreHostnameFilters": [
   ],
   "RecoverMasterClusterFilters": [
-  	"kvmuser__"
+  	"kvmuser"
   ],
   "RecoverIntermediateMasterClusterFilters": [
-  	"kvmuser__"
+  	"kvmuser"
   ]
 }
 

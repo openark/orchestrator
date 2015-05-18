@@ -261,6 +261,8 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, skip
 	switch analysisEntry.Analysis {
 	case inst.DeadMaster:
 		checkAndRecoverFunction = checkAndRecoverDeadMaster
+	case inst.DeadMasterAndSomeSlaves:
+		checkAndRecoverFunction = checkAndRecoverDeadMaster
 	case inst.DeadIntermediateMaster:
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
 	case inst.DeadIntermediateMasterAndSomeSlaves:
