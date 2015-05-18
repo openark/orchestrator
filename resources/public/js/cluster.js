@@ -72,6 +72,11 @@ function generateInstanceDivs(nodesMap) {
         $(".popover.instance[data-duplicate-node] a[data-command=regroup-slaves]").click(function () {
         	return apiCommand("/api/regroup-slaves/"+nodesMap[draggedNodeId].Key.Hostname+"/"+nodesMap[draggedNodeId].Key.Port);
         });
+        $(".popover.instance[data-duplicate-node] a[data-command=recover-suggested-successor]").click(function (event) {
+            var suggestedSuccessorHost = $(event.target).attr("data-suggested-successor-host");
+            var suggestedSuccessorPort = $(event.target).attr("data-suggested-successor-port");
+        	return apiCommand("/api/recover/"+nodesMap[draggedNodeId].Key.Hostname+"/"+nodesMap[draggedNodeId].Key.Port+"/"+suggestedSuccessorHost+"/"+suggestedSuccessorPort);
+        });
         $(".popover.instance[data-duplicate-node] a[data-command=multi-match-slaves]").click(function (event) {
             var belowHost = $(event.target).attr("data-below-host");
             var belowPort = $(event.target).attr("data-below-port");
