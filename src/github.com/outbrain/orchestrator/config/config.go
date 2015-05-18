@@ -48,6 +48,7 @@ type Configuration struct {
 	DiscoverByShowSlaveHosts                   bool     // Attempt SHOW SLAVE HOSTS before PROCESSLIST
 	InstancePollSeconds                        uint     // Number of seconds between instance reads
 	UnseenInstanceForgetHours                  uint     // Number of hours after which an unseen instance is forgotten
+	SnapshotTopologiesIntervalHours            uint     // Interval in hour between snapshot-topologies invocation. Default: 0 (disabled)
 	DiscoveryPollSeconds                       uint     // Auto/continuous discovery of instances sleep time between polls
 	InstanceBulkOperationsWaitTimeoutSeconds   uint     // Time to wait on a single instance when doing bulk (many instances) operation
 	ActiveNodeExpireSeconds                    uint     // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
@@ -112,6 +113,7 @@ func NewConfiguration() *Configuration {
 		SkipOrchestratorDatabaseUpdate:             false,
 		InstancePollSeconds:                        60,
 		UnseenInstanceForgetHours:                  240,
+		SnapshotTopologiesIntervalHours:            0,
 		SlaveStartPostWaitMilliseconds:             1000,
 		DiscoverByShowSlaveHosts:                   false,
 		DiscoveryPollSeconds:                       5,

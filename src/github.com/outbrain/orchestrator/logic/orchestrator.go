@@ -126,6 +126,12 @@ func ContinuousDiscovery() {
 	tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
 	forgetUnseenTick := time.Tick(time.Minute)
 	recoverTick := time.Tick(10 * time.Second)
+
+	var snapshotTopologiesTick <-chan time.Time
+	if config.Config.SnapshotTopologiesIntervalHours > 0 {
+		snapshotTopologiesTick = time.Tick(time.Duration(config.Config.SnapshotTopologiesIntervalHours) * time.Hour)
+	}
+
 	elected := false
 	for {
 		select {
@@ -160,6 +166,8 @@ func ContinuousDiscovery() {
 				ClearActiveRecoveries()
 				CheckAndRecover(nil, false)
 			}
+		case <-snapshotTopologiesTick:
+			inst.SnapshotTopologies()
 		}
 	}
 }

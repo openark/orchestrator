@@ -22,6 +22,7 @@
   "ExpiryHostnameResolvesMinutes": 60,
   "RejectHostnameResolvePattern": "",
   "UnseenInstanceForgetHours": 240,
+  "SnapshotTopologiesIntervalHours": 24,
   "ReasonableReplicationLagSeconds": 10,
   "VerifyReplicationFilters": false,
   "ReasonableMaintenanceReplicationLagSeconds": 20,
