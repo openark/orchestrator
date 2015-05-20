@@ -522,6 +522,20 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
+	case cliCommand("register-candidate"):
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			err := inst.RegisterCandidateInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
 	case cliCommand("submit-pool-instances"):
 		{
 			if pool == "" {

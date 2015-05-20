@@ -57,15 +57,65 @@ func RecoverDeadMaster(failedInstanceKey *inst.InstanceKey) (bool, *inst.Instanc
 
 	ResolveRecovery(failedInstanceKey, &candidateSlave.Key)
 
-	log.Debugf("- RecoverDeadIntermediateMaster: candidate slave is %+v", candidateSlave.Key)
+	log.Debugf("- RecoverDeadMaster: candidate slave is %+v", candidateSlave.Key)
 	inst.AuditOperation("recover-dead-master", failedInstanceKey, fmt.Sprintf("master: %+v", candidateSlave.Key))
 
 	return true, candidateSlave, err
 }
 
+func replacePromotedSlaveWithCandidate(promotedSlave *inst.Instance, candidateInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
+	if candidateInstanceKey == nil {
+		// See if we can auto-figure out a candidate
+		candidateSlaves, _ := inst.ReadClusterCandidateInstances(promotedSlave.ClusterName)
+		for _, candidateSlave := range candidateSlaves {
+			if promotedSlave.Key.Equals(&candidateSlave.Key) {
+				// Seems like we promoted a candidate! We're happy!
+				return promotedSlave, nil
+			}
+		}
+		// We didn't pick a candidate; let's offer one
+		for _, candidateSlave := range candidateSlaves {
+			if promotedSlave.DataCenter == candidateSlave.DataCenter && promotedSlave.PhysicalEnvironment == candidateSlave.PhysicalEnvironment {
+				// This would make a good candidate
+				candidateInstanceKey = &candidateSlave.Key
+				log.Debugf("No candidate was offered for %+v but orchestrator picks %+v as candidate replacement", promotedSlave.Key, candidateSlave.Key)
+			}
+		}
+	}
+
+	// So do we have a candidate?
+	if candidateInstanceKey == nil {
+		return promotedSlave, nil
+	}
+	if promotedSlave.Key.Equals(candidateInstanceKey) {
+		// It IS the candidate
+		return promotedSlave, nil
+	}
+
+	// Try and promote suggested candidate, if applicable and possible
+	log.Debugf("Promoted instance %+v is not the suggested candidate %+v. Will see what can be done", promotedSlave.Key, *candidateInstanceKey)
+
+	candidateInstance, _, err := inst.ReadInstance(candidateInstanceKey)
+	if err != nil {
+		return promotedSlave, log.Errore(err)
+	}
+
+	if candidateInstance.MasterKey.Equals(&promotedSlave.Key) {
+		log.Debugf("Suggested candidate %+v is slave of promoted instance %+v. Will try and enslave its master", *candidateInstanceKey, promotedSlave.Key)
+		candidateInstance, err = inst.EnslaveMaster(&candidateInstance.Key)
+		if err != nil {
+			return promotedSlave, log.Errore(err)
+		}
+		return candidateInstance, nil
+	}
+
+	log.Debugf("Could not manage to promoted suggested candidate %+v", *candidateInstanceKey)
+	return promotedSlave, nil
+}
+
 // checkAndRecoverDeadMaster checks a given analysis, decides whether to take action, and possibly takes action
 // Returns true when action was taken.
-func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, suggestedSuccessorInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
+func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
 	filters := config.Config.RecoverMasterClusterFilters
 	if skipFilters {
 		// The following filter catches-all
@@ -85,26 +135,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, suggested
 	actionTaken, promotedSlave, err := RecoverDeadMaster(&analysisEntry.AnalyzedInstanceKey)
 
 	if actionTaken && promotedSlave != nil {
-		// Try and promote suggested successor, if applicable and possible
-		if suggestedSuccessorInstanceKey != nil && !promotedSlave.Key.Equals(suggestedSuccessorInstanceKey) {
-			promotedSuggestedSuccessor := false
-			// Let's try and make suggestedSuccessorInstanceKey the new master
-			log.Debugf("Promoted instance %+v is not the suggested successor %+v. Will see what can be done", promotedSlave.Key, *suggestedSuccessorInstanceKey)
-			if suggestedSuccessorInstance, _, err := inst.ReadInstance(suggestedSuccessorInstanceKey); err == nil {
-				if suggestedSuccessorInstance.MasterKey.Equals(&promotedSlave.Key) {
-					log.Debugf("Suggested successor %+v is slave of promoted instance %+v. Will try and enslave its master", *suggestedSuccessorInstanceKey, promotedSlave.Key)
-					suggestedSuccessorInstance, err = inst.EnslaveMaster(&suggestedSuccessorInstance.Key)
-					if err != nil {
-						log.Errore(err)
-					}
-				}
-			} else {
-				log.Errore(err)
-			}
-			if !promotedSuggestedSuccessor {
-				log.Debugf("Could not manage to promoted suggested successor %+v", *suggestedSuccessorInstanceKey)
-			}
-		}
+		promotedSlave, _ = replacePromotedSlaveWithCandidate(promotedSlave, candidateInstanceKey)
 		// Execute post master-failover processes
 		for _, command := range config.Config.PostMasterFailoverProcesses {
 			command := command
@@ -238,7 +269,7 @@ func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (bool, *
 
 // checkAndRecoverDeadIntermediateMaster checks a given analysis, decides whether to take action, and possibly takes action
 // Returns true when action was taken.
-func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, suggestedSuccessorInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
+func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
 	filters := config.Config.RecoverIntermediateMasterClusterFilters
 	if skipFilters {
 		// The following filter catches-all
@@ -280,8 +311,8 @@ func emergentlyReadTopologyInstanceSlaves(instanceKey *inst.InstanceKey, analysi
 
 // executeCheckAndRecoverFunction will choose the correct check & recovery function based on analysis.
 // It executes the function synchronuously
-func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, suggestedSuccessorInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
-	var checkAndRecoverFunction func(analysisEntry inst.ReplicationAnalysis, suggestedSuccessorInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) = nil
+func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
+	var checkAndRecoverFunction func(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) = nil
 
 	switch analysisEntry.Analysis {
 	case inst.DeadMaster:
@@ -337,11 +368,11 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, sugg
 		}
 	}
 
-	return checkAndRecoverFunction(analysisEntry, suggestedSuccessorInstanceKey, skipFilters)
+	return checkAndRecoverFunction(analysisEntry, candidateInstanceKey, skipFilters)
 }
 
 // CheckAndRecover is the main entry point for the recovery mechanism
-func CheckAndRecover(specificInstance *inst.InstanceKey, suggestedSuccessorInstanceKey *inst.InstanceKey, skipFilters bool) (actionTaken bool, instance *inst.Instance, err error) {
+func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *inst.InstanceKey, skipFilters bool) (actionTaken bool, instance *inst.Instance, err error) {
 	replicationAnalysis, err := inst.GetReplicationAnalysis()
 	if err != nil {
 		return false, nil, log.Errore(err)
@@ -356,9 +387,9 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, suggestedSuccessorInsta
 
 		if specificInstance != nil && skipFilters {
 			// force mode. Keep it synchronuous
-			actionTaken, instance, err = executeCheckAndRecoverFunction(analysisEntry, suggestedSuccessorInstanceKey, skipFilters)
+			actionTaken, instance, err = executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, skipFilters)
 		} else {
-			go executeCheckAndRecoverFunction(analysisEntry, suggestedSuccessorInstanceKey, skipFilters)
+			go executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, skipFilters)
 		}
 	}
 	return actionTaken, instance, err

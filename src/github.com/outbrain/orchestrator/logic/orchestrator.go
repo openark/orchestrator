@@ -154,6 +154,7 @@ func ContinuousDiscovery() {
 				inst.ReviewUnseenInstances()
 				inst.InjectUnseenMasters()
 				inst.ExpireMaintenance()
+				inst.ExpireCandidateInstances()
 			}
 			if !elected {
 				// Take this opportunity to refresh yourself

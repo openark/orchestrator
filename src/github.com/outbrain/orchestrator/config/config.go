@@ -61,6 +61,7 @@ type Configuration struct {
 	ReasonableMaintenanceReplicationLagSeconds int      // Above this value move-up and move-below are blocked
 	MaintenanceExpireMinutes                   uint     // Minutes after which a maintenance flag is considered stale and is cleared
 	MaintenancePurgeDays                       uint     // Days after which maintenance entries are purged from the database
+	CandidateInstanceExpireMinutes             uint     // Minutes after which a suggestion to use an instance as a candidate slave (to be preferably promoted on master failover) is expired.
 	PreFailoverProcesses                       []string // Processes to execute before doing a failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failedPort}, {successorHost}, {successorPort}
 	PostFailoverProcesses                      []string // Processes to execute after doing a failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failedPort}, {successorHost}, {successorPort}
 	PostMasterFailoverProcesses                []string // Processes to execute after doing a master failover (order of execution undefined). Will be provided2 with old-master-hostname, new-master-hostname arguments. Uses same placeholders as PostFailoverProcesses
@@ -128,6 +129,7 @@ func NewConfiguration() *Configuration {
 		ReasonableMaintenanceReplicationLagSeconds: 20,
 		MaintenanceExpireMinutes:                   10,
 		MaintenancePurgeDays:                       365,
+		CandidateInstanceExpireMinutes:             60,
 		PreFailoverProcesses:                       []string{},
 		PostFailoverProcesses:                      []string{},
 		PostMasterFailoverProcesses:                []string{},

@@ -1380,12 +1380,12 @@ func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.R
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	var suggestedSuccessorKey *inst.InstanceKey
-	if key, err := this.getInstanceKey(params["suggestedSuccessorHost"], params["suggestedSuccessorPort"]); err == nil {
-		suggestedSuccessorKey = &key
+	var candidateKey *inst.InstanceKey
+	if key, err := this.getInstanceKey(params["candidateHost"], params["candidatePort"]); err == nil {
+		candidateKey = &key
 	}
 
-	actionTaken, _, err := orchestrator.CheckAndRecover(&instanceKey, suggestedSuccessorKey, true)
+	actionTaken, _, err := orchestrator.CheckAndRecover(&instanceKey, candidateKey, true)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -1460,7 +1460,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	// Recovery
 	m.Get("/api/replication-analysis", this.ReplicationAnalysis)
 	m.Get("/api/recover/:host/:port", this.Recover)
-	m.Get("/api/recover/:host/:port/:suggestedSuccessorHost/:suggestedSuccessorPort", this.Recover)
+	m.Get("/api/recover/:host/:port/:candidateHost/:candidatePort", this.Recover)
 	// Agents
 	m.Get("/api/agents", this.Agents)
 	m.Get("/api/agent/:host", this.Agent)

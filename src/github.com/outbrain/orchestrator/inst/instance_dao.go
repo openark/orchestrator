@@ -1858,3 +1858,63 @@ func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern str
 	}
 	return instances, err
 }
+
+// RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.
+func RegisterCandidateInstance(instanceKey *InstanceKey) error {
+	writeFunc := func() error {
+		db, err := db.OpenOrchestrator()
+		if err != nil {
+			return log.Errore(err)
+		}
+
+		_, err = sqlutils.Exec(db, `
+        	insert into candidate_database_instance (
+        		hostname,
+        		port,
+        		last_suggested)
+        	values (?, ?, NOW())
+        	on duplicate key update
+        		hostname=values(hostname),
+        		port=values(port),
+        		last_suggested=now()
+				`, instanceKey.Hostname, instanceKey.Port,
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
+
+		return nil
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
+// RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.
+func ExpireCandidateInstances() error {
+	writeFunc := func() error {
+		db, err := db.OpenOrchestrator()
+		if err != nil {
+			return log.Errore(err)
+		}
+
+		_, err = sqlutils.Exec(db, `
+        	delete from candidate_database_instance 
+				where last_suggested < NOW() - INTERVAL ? MINUTE
+				`, config.Config.CandidateInstanceExpireMinutes,
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
+
+		return nil
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
+// ReadClusterCandidateInstances reads cluster instances which are also marked as candidates
+func ReadClusterCandidateInstances(clusterName string) ([](*Instance), error) {
+	condition := fmt.Sprintf(`
+			cluster_name = '%s'
+			and (hostname, port) in (select hostname, port from candidate_database_instance)
+			`, clusterName)
+	return readInstancesByCondition(condition)
+}

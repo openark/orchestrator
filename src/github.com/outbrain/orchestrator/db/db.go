@@ -71,7 +71,7 @@ var generateSQL = []string{
           owner varchar(128) CHARACTER SET utf8 NOT NULL,
           reason text CHARACTER SET utf8 NOT NULL,
           PRIMARY KEY (database_instance_maintenance_id),
-          UNIQUE KEY maintenance_uidx (maintenance_active,hostname,port)
+          UNIQUE KEY maintenance_uidx (maintenance_active, hostname, port)
         ) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
@@ -101,7 +101,7 @@ var generateSQL = []string{
           message text CHARACTER SET utf8 NOT NULL,
           PRIMARY KEY (audit_id),
           KEY audit_timestamp_idx (audit_timestamp),
-          KEY host_port_idx (hostname,port,audit_timestamp)
+          KEY host_port_idx (hostname, port, audit_timestamp)
         ) ENGINE=InnoDB DEFAULT CHARSET=latin1 
 	`,
 	`
@@ -135,7 +135,7 @@ var generateSQL = []string{
 		  KEY source_hostname_idx (source_hostname,is_complete),
 		  KEY start_timestamp_idx (start_timestamp),
 		  KEY is_complete_idx (is_complete,start_timestamp),
-		  KEY is_successful_idx (is_successful,start_timestamp)
+		  KEY is_successful_idx (is_successful, start_timestamp)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
@@ -146,7 +146,7 @@ var generateSQL = []string{
 		  state_action varchar(127) NOT NULL,
 		  error_message varchar(255) NOT NULL,
 		  PRIMARY KEY (agent_seed_state_id),
-		  KEY agent_seed_idx (agent_seed_id,state_timestamp)
+		  KEY agent_seed_idx (agent_seed_id, state_timestamp)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
@@ -255,6 +255,16 @@ var generateSQL = []string{
           cluster_name tinytext CHARACTER SET ascii NOT NULL,
           PRIMARY KEY (snapshot_unix_timestamp, hostname, port),
           KEY cluster_name_idx (snapshot_unix_timestamp, cluster_name(128))
+        ) ENGINE=InnoDB DEFAULT CHARSET=ascii
+
+	`,
+	`
+        CREATE TABLE IF NOT EXISTS candidate_database_instance (
+          hostname varchar(128) CHARACTER SET ascii NOT NULL,
+          port smallint(5) unsigned NOT NULL,
+          last_suggested TIMESTAMP NOT NULL,
+          PRIMARY KEY (hostname, port),
+          KEY last_suggested_idx (last_suggested)
         ) ENGINE=InnoDB DEFAULT CHARSET=ascii
 
 	`,
