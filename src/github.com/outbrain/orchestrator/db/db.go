@@ -279,12 +279,12 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE 
 			database_instance
-			ADD COLUMN last_sql_error TEXT NOT NULL DEFAULT '' AFTER exec_master_log_pos
+			ADD COLUMN last_sql_error TEXT NOT NULL AFTER exec_master_log_pos
 	`,
 	`
 		ALTER TABLE 
 			database_instance
-			ADD COLUMN last_io_error TEXT NOT NULL DEFAULT '' AFTER last_sql_error
+			ADD COLUMN last_io_error TEXT NOT NULL AFTER last_sql_error
 	`,
 	`
 		ALTER TABLE 
