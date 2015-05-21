@@ -388,18 +388,19 @@ func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (
 	err = db.QueryRow(`
        	select 
        		if (
-       			cluster_name != '',
-       			cluster_name,
+       			max(cluster_name) != '',
+       			max(cluster_name),
 	       		ifnull(concat(max(hostname), ':', max(port)), '')
 	       	) as cluster_name,
 	       	ifnull(max(replication_depth)+1, 0) as replication_depth,
 	       	ifnull(max(master_host), '') as master_master_host,
 	       	ifnull(max(master_port), 0) as master_master_port
        	from database_instance 
-		 	where hostname=? and port=?`,
+		 	where hostname=? and port=?
+		 	group by hostname, port`,
 		masterKey.Hostname, masterKey.Port).Scan(&clusterName, &replicationDepth, &masterMasterKey.Hostname, &masterMasterKey.Port)
 
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return "", 0, false, log.Errore(err)
 	}
 	if clusterName == "" {
@@ -413,7 +414,7 @@ func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (
 			replicationDepth = 0
 		} // While the other stays "1"
 	}
-	return clusterName, replicationDepth, isCoMaster, err
+	return clusterName, replicationDepth, isCoMaster, nil
 }
 
 // readInstanceRow reads a single instance row from the orchestrator backend database.
