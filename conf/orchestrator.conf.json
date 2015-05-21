@@ -6,7 +6,7 @@
   "MySQLTopologyCredentialsConfigFile": "",
   "MySQLOrchestratorHost": "127.0.0.1",
   "MySQLOrchestratorPort": 5622,
-  "MySQLOrchestratorDatabase": "orchestrator",
+  "MySQLOrchestratorDatabase": "orchestrator1",
   "MySQLOrchestratorUser": "msandbox",
   "MySQLOrchestratorPassword": "msandbox",
   "MySQLOrchestratorCredentialsConfigFile": "",
