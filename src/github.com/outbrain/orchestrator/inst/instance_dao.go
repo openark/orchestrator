@@ -151,11 +151,23 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if !isMaxScale {
-		err = db.QueryRow("select @@hostname, @@global.server_id, @@global.version, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
-			&resolvedHostname, &instance.ServerID, &instance.Version, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
+		var mysqlHostname, mysqlReportHost string
+		err = db.QueryRow("select @@hostname, @@report_host, @@global.server_id, @@global.version, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
+			&mysqlHostname, &mysqlReportHost, &instance.ServerID, &instance.Version, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
 		if err != nil {
 			goto Cleanup
 		}
+		switch strings.ToLower(config.Config.MySQLHostnameResolveMethod) {
+		case "none":
+			resolvedHostname = instance.Key.Hostname
+		case "default", "hostname", "@@hostname":
+			resolvedHostname = mysqlHostname
+		case "report_host", "@@report_host":
+			resolvedHostname = mysqlReportHost
+		default:
+			resolvedHostname = instance.Key.Hostname
+		}
+
 		err = db.QueryRow("select variable_value from information_schema.global_status where variable_name='Uptime'").Scan(&instance.Uptime)
 		if err != nil {
 			goto Cleanup
