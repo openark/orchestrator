@@ -151,8 +151,9 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if !isMaxScale {
-		var mysqlHostname, mysqlReportHost string
-		err = db.QueryRow("select @@hostname, @@report_host, @@global.server_id, @@global.version, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
+		var mysqlHostname string
+		var mysqlReportHost sql.NullString
+		err = db.QueryRow("select @@global.hostname, @@global.report_host, @@global.server_id, @@global.version, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
 			&mysqlHostname, &mysqlReportHost, &instance.ServerID, &instance.Version, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
 		if err != nil {
 			goto Cleanup
@@ -163,7 +164,11 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		case "default", "hostname", "@@hostname":
 			resolvedHostname = mysqlHostname
 		case "report_host", "@@report_host":
-			resolvedHostname = mysqlReportHost
+			if !mysqlReportHost.Valid {
+				err = fmt.Errorf("MySQLHostnameResolveMethod configured to use @@report_host but %+v has NULL @@report_host", instanceKey)
+				goto Cleanup
+			}
+			resolvedHostname = mysqlReportHost.String
 		default:
 			resolvedHostname = instance.Key.Hostname
 		}
