@@ -1276,7 +1276,7 @@ func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey, pattern str
 	matchedSlaves, belowInstance, err, errs := MultiMatchBelow(slaves, &belowInstance.Key, false)
 
 	if len(matchedSlaves) != len(slaves) {
-		err = fmt.Errorf("MultiMatchSlaves: only matched %d out of %d slaves of %+v", len(matchedSlaves), len(slaves), *masterKey)
+		err = fmt.Errorf("MultiMatchSlaves: only matched %d out of %d slaves of %+v; error is: %+v", len(matchedSlaves), len(slaves), *masterKey, err)
 	}
 
 	return matchedSlaves, belowInstance, err, errs

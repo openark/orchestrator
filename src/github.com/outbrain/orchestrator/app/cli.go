@@ -502,6 +502,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			maintenanceKey, err := inst.BeginBoundedMaintenance(instanceKey, inst.GetMaintenanceOwner(), reason, uint(durationSeconds))
 			if err == nil {
 				log.Infof("Maintenance key: %+v", maintenanceKey)
+				log.Infof("Maintenance duration: %d seconds", durationSeconds)
 			}
 			if err != nil {
 				log.Fatale(err)
@@ -544,7 +545,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				}
 			}
 			err := inst.BeginDowntime(instanceKey, inst.GetMaintenanceOwner(), reason, uint(durationSeconds))
-			if err != nil {
+			if err == nil {
+				log.Infof("Downtime duration: %d seconds", durationSeconds)
+			} else {
 				log.Fatale(err)
 			}
 			fmt.Println(instanceKey.DisplayString())

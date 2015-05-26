@@ -75,7 +75,9 @@ func replacePromotedSlaveWithCandidate(promotedSlave *inst.Instance, candidateIn
 		}
 		// We didn't pick a candidate; let's offer one
 		for _, candidateSlave := range candidateSlaves {
-			if promotedSlave.DataCenter == candidateSlave.DataCenter && promotedSlave.PhysicalEnvironment == candidateSlave.PhysicalEnvironment {
+			if promotedSlave.DataCenter == candidateSlave.DataCenter &&
+				promotedSlave.PhysicalEnvironment == candidateSlave.PhysicalEnvironment &&
+				candidateSlave.MasterKey.Equals(&promotedSlave.Key) {
 				// This would make a good candidate
 				candidateInstanceKey = &candidateSlave.Key
 				log.Debugf("No candidate was offered for %+v but orchestrator picks %+v as candidate replacement", promotedSlave.Key, candidateSlave.Key)
