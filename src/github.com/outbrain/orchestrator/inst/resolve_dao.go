@@ -157,6 +157,48 @@ func ForgetExpiredHostnameResolves() error {
 	return err
 }
 
+// DeleteInvalidHostnameResolves removes invalid resolves. At this time these are:
+// - infinite loop resolves (A->B and B->A), remove earlier mapping
+func DeleteInvalidHostnameResolves() error {
+	var invalidHostnames []string
+	query := `
+		select 
+		    early.hostname
+		  from 
+		    hostname_resolve as latest 
+		    join hostname_resolve early on (latest.resolved_hostname = early.hostname and latest.hostname = early.resolved_hostname) 
+		  where 
+		    latest.hostname != latest.resolved_hostname 
+		    and latest.resolved_timestamp > early.resolved_timestamp
+	   	`
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		return err
+	}
+
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		invalidHostnames = append(invalidHostnames, m.GetString("hostname"))
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+
+	for _, invalidHostname := range invalidHostnames {
+		_, err = sqlutils.Exec(db, `
+			delete 
+				from hostname_resolve 
+			where 
+				hostname = ?`,
+			invalidHostname,
+		)
+		if err != nil {
+			log.Errore(err)
+		}
+	}
+	return err
+}
+
 // deleteHostnameResolves compeltely erases the database cache
 func deleteHostnameResolves() error {
 	db, err := db.OpenOrchestrator()

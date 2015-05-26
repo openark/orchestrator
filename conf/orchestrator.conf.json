@@ -19,7 +19,7 @@
   "InstanceBulkOperationsWaitTimeoutSeconds":60,
   "ActiveNodeExpireSeconds": 20,
   "HostnameResolveMethod": "default",
-  "MySQLHostnameResolveMethod": "@@report_host",
+  "MySQLHostnameResolveMethod": "default",
   "ExpiryHostnameResolvesMinutes": 60,
   "RejectHostnameResolvePattern": "",
   "UnseenInstanceForgetHours": 240,

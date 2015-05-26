@@ -522,6 +522,47 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
+	case cliCommand("begin-downtime"):
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			if reason == "" {
+				log.Fatal("--reason option required")
+			}
+			var durationSeconds int = 0
+			if duration != "" {
+				durationSeconds, err = util.SimpleTimeToSeconds(duration)
+				if err != nil {
+					log.Fatale(err)
+				}
+				if durationSeconds < 0 {
+					log.Fatalf("Duration value must be non-negative. Given value: %d", durationSeconds)
+				}
+			}
+			err := inst.BeginDowntime(instanceKey, inst.GetMaintenanceOwner(), reason, uint(durationSeconds))
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
+	case cliCommand("end-downtime"):
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			err := inst.EndDowntime(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
 	case cliCommand("register-candidate"):
 		{
 			if instanceKey == nil {

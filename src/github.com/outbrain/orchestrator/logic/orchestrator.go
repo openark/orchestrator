@@ -151,9 +151,11 @@ func ContinuousDiscovery() {
 				inst.ForgetLongUnseenInstances()
 				inst.ForgetUnseenInstancesDifferentlyResolved()
 				inst.ForgetExpiredHostnameResolves()
+				inst.DeleteInvalidHostnameResolves()
 				inst.ReviewUnseenInstances()
 				inst.InjectUnseenMasters()
 				inst.ExpireMaintenance()
+				inst.ExpireDowntime()
 				inst.ExpireCandidateInstances()
 			}
 			if !elected {

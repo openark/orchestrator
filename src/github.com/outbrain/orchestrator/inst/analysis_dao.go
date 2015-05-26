@@ -68,8 +68,16 @@ func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
 		        database_instance_maintenance ON (master_instance.hostname = database_instance_maintenance.hostname
 		        		AND master_instance.port = database_instance_maintenance.port
 		        		AND database_instance_maintenance.maintenance_active = 1)
+		            LEFT JOIN
+		        database_instance_downtime ON (master_instance.hostname = database_instance_downtime.hostname
+		        		AND master_instance.port = database_instance_downtime.port
+		        		AND database_instance_downtime.downtime_active = 1)
 		    WHERE
 		    	database_instance_maintenance.database_instance_maintenance_id IS NULL
+		    	AND (
+		    		database_instance_downtime.downtime_active IS NULL
+		    		OR database_instance_downtime.end_timestamp < NOW()
+		    		)
 		    GROUP BY 
 			    master_instance.hostname, 
 			    master_instance.port

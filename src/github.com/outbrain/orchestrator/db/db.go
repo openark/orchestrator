@@ -268,6 +268,18 @@ var generateSQL = []string{
         ) ENGINE=InnoDB DEFAULT CHARSET=ascii
 
 	`,
+	`
+        CREATE TABLE IF NOT EXISTS database_instance_downtime (
+          hostname varchar(128) NOT NULL,
+          port smallint(5) unsigned NOT NULL,
+          downtime_active tinyint(4) DEFAULT NULL,
+          begin_timestamp timestamp DEFAULT CURRENT_TIMESTAMP,
+          end_timestamp timestamp,
+          owner varchar(128) CHARACTER SET utf8 NOT NULL,
+          reason text CHARACTER SET utf8 NOT NULL,
+          PRIMARY KEY (hostname, port)
+        ) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{
