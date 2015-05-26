@@ -297,7 +297,7 @@ Cheatsheet:
 			orchestrator -c cluster-pool-instances
 
 	Information commands
-		These commands provide information about topologies, replication connections, or otherwise orchstrator's
+		These commands provide/store information about topologies, replication connections, or otherwise orchstrator's
 		"inventory".
 		
 		find
@@ -391,6 +391,15 @@ Cheatsheet:
 			
 			orchestrator -c replication-status
 				-i not given, implicitly assumed local hostname
+				
+		snapshot-topologies
+			Take a snapshot of existing topologies. This will record minimal replication topology data: the identity 
+			of an instance, its master and its cluster.
+			Taking a snapshot later allows for reviewing changes in topologies. One might wish to invoke this command
+			on a daily basis, and later be able to solve questions like 'where was this instacne replicating from before
+			we moved it?', 'which instances were replication from this instance a week ago?' etc. Example:
+			
+			orchestrator -c snapshot-topologies
 
 	Orchestrator instance management
 		These command dig into the way orchestrator manages instances and operations on instances			
@@ -431,7 +440,7 @@ Cheatsheet:
 			orchestrator -c begin-maintenance -i instance.to.lock.com --duration=3h --reason="load testing; do not disturb"
 				accepted duration format: 10s, 30m, 24h, 3d, 4w
 			
-			orchestrator -c begin-maintenance -i instance.to.lock.com
+			orchestrator -c begin-maintenance -i instance.to.lock.com --reason="load testing; do not disturb"
 				--duration not given; default to config's MaintenanceExpireMinutes
 			
 		end-maintenance
@@ -442,6 +451,30 @@ Cheatsheet:
 			
 			orchestrator -c end-maintenance -i locked.instance.com
 	
+		begin-downtime
+			Mark an instance as downtimed. A downtimed instance is assumed to be taken care of, and recovery-analysis does
+			not apply for such an instance. As result, no recommendation for recovery, and no automated-recovery are issued
+			on a downtimed instance.
+			Downtime is different than maintanence in that it places no lock (mainenance uses an exclusive lock on the instance).
+			It is OK to downtime an instance that is already downtimed -- the new begin-downtime command will override whatever
+			previous downtime attributes there were on downtimes instance.  
+			Note that orchestrator automatically assumes downtime to be expired after MaintenanceExpireMinutes (in config).
+			Examples:
+			
+			orchestrator -c begin-downtime -i instance.to.downtime.com --duration=3h --reason="dba handling; do not do recovery"
+				accepted duration format: 10s, 30m, 24h, 3d, 4w
+			
+			orchestrator -c begin-downtime -i instance.to.lock.com --reason="dba handling; do not do recovery" 
+				--duration not given; default to config's MaintenanceExpireMinutes
+			
+		end-downtime
+			Indicate an instance is no longer downtimed. Typically you should not need to use this since
+			a downtime is always bounded by a duration and auto-expires. But you may use this to forcibly
+			indicate the active downtime should be expired now.
+			Example:
+			
+			orchestrator -c end-downtime -i downtimed.instance.com
+	
 	Crash recovery commands
 	
 		replication-analysis
@@ -450,7 +483,28 @@ Cheatsheet:
 			for automated parsing. Use web API instead, at this time. Example:
 			
 			orchestrator -c replication-analysis
+
+		register-candidate
+			Indicate that a specific instance is a preferred candidate for master promotion. Upon a dead master
+			recovery, orchestrator will do its best to promote instances that are marked as candidates. However
+			orchestrator cannot guarantee this will always work. Issues like version compatabilities, binlog format
+			etc. are limiting factors.
+			You will want to mark an instance as a candidate when: it is replicating directly from the master, has
+			binary logs and log_slave_updates is enabled, uses same binlog_format as its siblings, compatible version
+			as its siblings. If you're using DataCenterPattern & PhysicalEnvironmentPattern (see configuration), 
+			you would further wish to make sure	you have a candidate in each data center. 
+			Orchestrator first promotes the best-possible slave, and only then replaces it with your candidate, 
+			and only if both in same datcenter and physical enviroment.
+			An instance needs to continuously be marked as candidate, so as to make sure orchestrator is not wasting 
+			time with stale instances. Orchestrator periodically clears candidate-registration for instances that have
+			not been registeres for over CandidateInstanceExpireMinutes (see config).
+			Example:
 			
+			orchestrator -c register-candidate -i candidate.instance.com
+			
+			orchestrator -c register-candidate
+				-i not given, implicitly assumed local hostname
+						
 		recover
 			Do auto-recovery given a dead instance. Orchestrator chooses the best course of action.
 			The given instance must be acknowledged as dead and have slaves, or else there's nothing to do.
