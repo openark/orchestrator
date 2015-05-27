@@ -522,6 +522,11 @@ Cheatsheet:
 			
 			orchestrator -c continuous  
 			
+		reset-hostname-resolve-cache
+			Clear the hostname resolve cache; it will be refilled by following host discoveries
+			
+			orchestrator -c reset-hostname-resolve-cache
+			
 		resolve
 			Utility command to resolve a CNAME and return resolved hostname name. Example:
 			

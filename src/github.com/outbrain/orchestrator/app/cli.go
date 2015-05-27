@@ -810,6 +810,14 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		{
 			orchestrator.ContinuousDiscovery()
 		}
+	case cliCommand("reset-hostname-resolve-cache"):
+		{
+			err := inst.ResetHostnameResolveCache()
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println("hostname resolve cache cleared")
+		}
 	case cliCommand("resolve"):
 		{
 			if instanceKey == nil {

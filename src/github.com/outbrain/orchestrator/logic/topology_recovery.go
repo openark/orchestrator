@@ -63,24 +63,43 @@ func RecoverDeadMaster(failedInstanceKey *inst.InstanceKey) (bool, *inst.Instanc
 	return true, candidateSlave, err
 }
 
-func replacePromotedSlaveWithCandidate(promotedSlave *inst.Instance, candidateInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
+func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promotedSlave *inst.Instance, candidateInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
+	var candidateSlaves [](*inst.Instance)
 	if candidateInstanceKey == nil {
 		// See if we can auto-figure out a candidate
-		candidateSlaves, _ := inst.ReadClusterCandidateInstances(promotedSlave.ClusterName)
+		candidateSlaves, _ = inst.ReadClusterCandidateInstances(promotedSlave.ClusterName)
 		for _, candidateSlave := range candidateSlaves {
 			if promotedSlave.Key.Equals(&candidateSlave.Key) {
 				// Seems like we promoted a candidate! We're happy!
 				return promotedSlave, nil
 			}
 		}
-		// We didn't pick a candidate; let's offer one
+	}
+	// We didn't pick a candidate; let's offer one
+	if candidateInstanceKey == nil {
+		// Try a candidate slave that is in same DC & env as the dead instance
+		if deadInstance, _, err := inst.ReadInstance(deadInstanceKey); err == nil && deadInstance != nil {
+			for _, candidateSlave := range candidateSlaves {
+				if deadInstance.DataCenter == deadInstance.DataCenter &&
+					deadInstance.PhysicalEnvironment == deadInstance.PhysicalEnvironment &&
+					candidateSlave.MasterKey.Equals(&promotedSlave.Key) {
+					// This would make a good candidate
+					candidateInstanceKey = &candidateSlave.Key
+					log.Debugf("No candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as failed instance", promotedSlave.Key, candidateSlave.Key)
+				}
+			}
+		}
+	}
+	// Still nothing?
+	if candidateInstanceKey == nil {
+		// Try a candidate slave that is in same DC & env as the promoted slave
 		for _, candidateSlave := range candidateSlaves {
 			if promotedSlave.DataCenter == candidateSlave.DataCenter &&
 				promotedSlave.PhysicalEnvironment == candidateSlave.PhysicalEnvironment &&
 				candidateSlave.MasterKey.Equals(&promotedSlave.Key) {
 				// This would make a good candidate
 				candidateInstanceKey = &candidateSlave.Key
-				log.Debugf("No candidate was offered for %+v but orchestrator picks %+v as candidate replacement", promotedSlave.Key, candidateSlave.Key)
+				log.Debugf("No candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as promoted instance", promotedSlave.Key, candidateSlave.Key)
 			}
 		}
 	}
@@ -137,7 +156,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 	actionTaken, promotedSlave, err := RecoverDeadMaster(&analysisEntry.AnalyzedInstanceKey)
 
 	if actionTaken && promotedSlave != nil {
-		promotedSlave, _ = replacePromotedSlaveWithCandidate(promotedSlave, candidateInstanceKey)
+		promotedSlave, _ = replacePromotedSlaveWithCandidate(&analysisEntry.AnalyzedInstanceKey, promotedSlave, candidateInstanceKey)
 		// Execute post master-failover processes
 		for _, command := range config.Config.PostMasterFailoverProcesses {
 			command := command
@@ -149,6 +168,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			command = strings.Replace(command, "{successorHost}", promotedSlave.Key.Hostname, -1)
 			command = strings.Replace(command, "{successorPort}", fmt.Sprintf("%d", promotedSlave.Key.Port), -1)
 			command = strings.Replace(command, "{failureCluster}", analysisEntry.ClusterName, -1)
+			command = strings.Replace(command, "{countSlaves}", fmt.Sprintf("%d", analysisEntry.CountSlaves), -1)
 
 			if cmdErr := os.CommandRun(command); cmdErr == nil {
 				log.Infof("Executed post-master-failover command %s", command)
@@ -353,6 +373,7 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 			command = strings.Replace(command, "{failedHost}", analysisEntry.AnalyzedInstanceKey.Hostname, -1)
 			command = strings.Replace(command, "{failedPort}", fmt.Sprintf("%d", analysisEntry.AnalyzedInstanceKey.Port), -1)
 			command = strings.Replace(command, "{failureCluster}", analysisEntry.ClusterName, -1)
+			command = strings.Replace(command, "{countSlaves}", fmt.Sprintf("%d", analysisEntry.CountSlaves), -1)
 
 			var cmdErr error = nil
 			go func() {
