@@ -114,7 +114,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 
 	instance := NewInstance()
 	instanceFound := false
-	foundBySlaveHosts := false
+	foundByShowSlaveHosts := false
 	longRunningProcesses := []Process{}
 	resolvedHostname := ""
 	isMaxScale := false
@@ -151,9 +151,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if !isMaxScale {
-		var mysqlHostname string
-		var mysqlReportHost sql.NullString
-		err = db.QueryRow("select @@global.hostname, @@global.report_host, @@global.server_id, @@global.version, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
+		var mysqlHostname, mysqlReportHost string
+		err = db.QueryRow("select @@global.hostname, ifnull(@@global.report_host, ''), @@global.server_id, @@global.version, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
 			&mysqlHostname, &mysqlReportHost, &instance.ServerID, &instance.Version, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
 		if err != nil {
 			goto Cleanup
@@ -164,11 +163,11 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		case "default", "hostname", "@@hostname":
 			resolvedHostname = mysqlHostname
 		case "report_host", "@@report_host":
-			if !mysqlReportHost.Valid {
-				err = fmt.Errorf("MySQLHostnameResolveMethod configured to use @@report_host but %+v has NULL @@report_host", instanceKey)
+			if mysqlReportHost == "" {
+				err = fmt.Errorf("MySQLHostnameResolveMethod configured to use @@report_host but %+v has NULL/empty @@report_host", instanceKey)
 				goto Cleanup
 			}
-			resolvedHostname = mysqlReportHost.String
+			resolvedHostname = mysqlReportHost
 		default:
 			resolvedHostname = instance.Key.Hostname
 		}
@@ -261,27 +260,34 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 
+	instanceFound = true
+
+	// -------------------------------------------------------------------------
+	// Anything after this point does not affect the fact the instance is found.
+	// No `goto Cleanup` after this point.
+	// -------------------------------------------------------------------------
+
 	// Get slaves, either by SHOW SLAVE HOSTS or via PROCESSLIST
 	if config.Config.DiscoverByShowSlaveHosts && !isMaxScale {
-		err := sqlutils.QueryRowsMap(db, `show slave hosts`,
+		err = sqlutils.QueryRowsMap(db, `show slave hosts`,
 			func(m sqlutils.RowMap) error {
 				slaveKey, err := NewInstanceKeyFromStrings(m.GetString("Host"), m.GetString("Port"))
 				slaveKey.Hostname, resolveErr = ResolveHostname(slaveKey.Hostname)
 				if err == nil {
 					instance.AddSlaveKey(slaveKey)
-					foundBySlaveHosts = true
+					foundByShowSlaveHosts = true
 				}
 				return err
 			})
 
 		if err != nil {
-			goto Cleanup
+			log.Errore(err)
 		}
 	}
-	if !foundBySlaveHosts && !isMaxScale {
+	if !foundByShowSlaveHosts && !isMaxScale {
 		// Either not configured to read SHOW SLAVE HOSTS or nothing was there.
 		// Discover by processlist
-		err := sqlutils.QueryRowsMap(db, `
+		err = sqlutils.QueryRowsMap(db, `
         	select 
         		substring_index(host, ':', 1) as slave_hostname 
         	from 
@@ -299,12 +305,11 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			})
 
 		if err != nil {
-			goto Cleanup
+			log.Errore(err)
 		}
 	}
-	instanceFound = true
-	// Anything after this point does not affect the fact the instance is found.
-	if !isMaxScale {
+
+	if config.Config.ReadLongRunningQueries && !isMaxScale {
 		// Get long running processes
 		err := sqlutils.QueryRowsMap(db, `
 				  select 
@@ -363,6 +368,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		log.Errore(err)
 	}
 	if instance.ReplicationDepth == 0 && config.Config.DetectClusterAliasQuery != "" && !isMaxScale {
+		// Only need to do on masters
 		clusterAlias := ""
 		err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
 		if err != nil {

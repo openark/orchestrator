@@ -47,6 +47,7 @@ type Configuration struct {
 	SlaveStartPostWaitMilliseconds             int      // Time to wait after START SLAVE before re-readong instance (give slave chance to connect to master)
 	DiscoverByShowSlaveHosts                   bool     // Attempt SHOW SLAVE HOSTS before PROCESSLIST
 	InstancePollSeconds                        uint     // Number of seconds between instance reads
+	ReadLongRunningQueries                     bool     // Whether orchestrator should read and record current long running executing queries.
 	UnseenInstanceForgetHours                  uint     // Number of hours after which an unseen instance is forgotten
 	SnapshotTopologiesIntervalHours            uint     // Interval in hour between snapshot-topologies invocation. Default: 0 (disabled)
 	DiscoveryPollSeconds                       uint     // Auto/continuous discovery of instances sleep time between polls
@@ -114,6 +115,7 @@ func NewConfiguration() *Configuration {
 		DefaultInstancePort:                        3306,
 		SkipOrchestratorDatabaseUpdate:             false,
 		InstancePollSeconds:                        60,
+		ReadLongRunningQueries:                     true,
 		UnseenInstanceForgetHours:                  240,
 		SnapshotTopologiesIntervalHours:            0,
 		SlaveStartPostWaitMilliseconds:             1000,
