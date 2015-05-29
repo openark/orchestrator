@@ -19,7 +19,12 @@ $(document).ready(function () {
         	"DeadMaster": true,	
         	"DeadMasterAndSlaves": true,	
         	"DeadMasterAndSomeSlaves": true,	
-        	"DeadIntermediateMaster": true
+        	"DeadMasterWithoutSlaves": true,
+        	"UnreachableMaster": true,
+        	"AllMasterSlavesNotReplicating": true,
+        	"DeadIntermediateMaster": true,
+        	"DeadIntermediateMasterAndSomeSlaves": true,
+        	"UnreachableIntermediateMaster": true
     };
     
     function displayClustersAnalysis(clusters, replicationAnalysis) {
@@ -78,7 +83,7 @@ $(document).ready(function () {
         
         if (Object.keys(clustersWithProblems).length == 0) {
         	// No problems
-        	addInfo("No incidents which require a failvoer to report. Orchestrator reports dead-master and dead-intermediate master issues.");
+        	addInfo("No incidents which require a failover to report. Orchestrator reports dead-master and dead-intermediate-master issues.");
         }
 
         $("div.popover").popover();

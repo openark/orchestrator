@@ -51,6 +51,7 @@ type ReplicationAnalysis struct {
 	CountValidSlaves            uint
 	CountValidReplicatingSlaves uint
 	ReplicationDepth            uint
+	SlaveHosts                  InstanceKeyMap
 	IsFailingToConnectToMaster  bool
 	Analysis                    AnalysisCode
 	Description                 string

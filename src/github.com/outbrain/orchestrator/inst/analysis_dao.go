@@ -51,6 +51,7 @@ func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
 		                    AND slave_instance.slave_sql_running != 0),
 		                0) AS count_valid_replicating_slaves,
 		        MIN(master_instance.replication_depth) AS replication_depth,
+		        MIN(master_instance.slave_hosts) AS slave_hosts,
 		        MIN(
 		            master_instance.slave_sql_running = 1
 		            AND master_instance.slave_io_running = 0
@@ -105,6 +106,10 @@ func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
 		a.CountValidReplicatingSlaves = m.GetUint("count_valid_replicating_slaves")
 		a.ReplicationDepth = m.GetUint("replication_depth")
 		a.IsFailingToConnectToMaster = m.GetBool("is_failing_to_connect_to_master")
+
+		instance := &Instance{}
+		instance.ReadSlaveHostsFromJson(m.GetString("slave_hosts"))
+		a.SlaveHosts = instance.SlaveHosts
 
 		if a.IsMaster && !a.LastCheckValid && a.CountSlaves == 0 {
 			a.Analysis = DeadMasterWithoutSlaves
