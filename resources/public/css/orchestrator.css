@@ -356,3 +356,28 @@ div[data-btn-group=recover] code {
     overflow: auto;
 }
 
+.container.clusters .popover.instance {
+    display: inline-block;
+    position: inherit;
+    width: 276px;
+}
+
+.container.clusters .popover.instance {
+   margin: 8px;
+}
+
+.container.clusters .popover.instance p {
+   margin: 8px 0px;
+}
+
+
+.container.clusters .popover.instance code {
+	white-space: normal;
+	color: inherit;
+	background-color: inherit;
+}
+
+
+.container.clusters .popover.instance .popover-content span {
+    font: 12px sans-serif;
+}

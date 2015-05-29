@@ -29,11 +29,52 @@ import (
 	"strings"
 )
 
+var thisInstanceKey *inst.InstanceKey
 var knownCommands []string
 
 func cliCommand(command string) string {
 	knownCommands = append(knownCommands, command)
 	return command
+}
+
+func getInstanceKey(instanceKey *inst.InstanceKey) *inst.InstanceKey {
+	if instanceKey == nil {
+		instanceKey = thisInstanceKey
+	}
+	if instanceKey == nil {
+		log.Fatal("Cannot deduce instance key")
+	}
+	return instanceKey
+}
+
+func getClusterName(clusterAlias string, instanceKey *inst.InstanceKey) (clusterName string) {
+	var err error
+	if clusterAlias != "" {
+		clusterName, err = inst.ReadClusterByAlias(clusterAlias)
+		if err != nil {
+			log.Fatale(err)
+		}
+	} else {
+		// deduce cluster by instance
+		if instanceKey == nil {
+			instanceKey = thisInstanceKey
+		}
+		if instanceKey == nil {
+			log.Fatalf("Unable to get cluster instances: unresolved instance")
+		}
+		instance, _, err := inst.ReadInstance(instanceKey)
+		if err != nil {
+			log.Fatale(err)
+		}
+		if instance == nil {
+			log.Fatalf("Instance not found: %+v", *instanceKey)
+		}
+		clusterName = instance.ClusterName
+	}
+	if clusterName == "" {
+		log.Fatalf("Unable to determine cluster name")
+	}
+	return clusterName
 }
 
 // Cli initiates a command line interface, executing requested command.
@@ -58,7 +99,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 	if err != nil {
 		siblingKey = nil
 	}
-	var thisInstanceKey *inst.InstanceKey = nil
+
 	if hostname, err := os.Hostname(); err == nil {
 		thisInstanceKey = &inst.InstanceKey{Hostname: hostname, Port: int(config.Config.DefaultInstancePort)}
 	}
@@ -690,30 +731,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		}
 	case cliCommand("which-cluster-instances"):
 		{
-			clusterName := ""
-			if clusterAlias != "" {
-				clusterName, err = inst.ReadClusterByAlias(clusterAlias)
-				if err != nil {
-					log.Fatale(err)
-				}
-			} else {
-				// deduce cluster by instance
-				if instanceKey == nil {
-					instanceKey = thisInstanceKey
-				}
-				if instanceKey == nil {
-					log.Fatalf("Unable to get cluster instances: unresolved instance")
-				}
-				instance, _, err := inst.ReadInstance(instanceKey)
-				if err != nil {
-					log.Fatale(err)
-				}
-				if instance == nil {
-					log.Fatalf("Instance not found: %+v", *instanceKey)
-				}
-				clusterName = instance.ClusterName
-			}
-
+			clusterName := getClusterName(clusterAlias, instanceKey)
 			instances, err := inst.ReadClusterInstances(clusterName)
 			if err != nil {
 				log.Fatale(err)
@@ -724,30 +742,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		}
 	case cliCommand("which-cluster-osc-slaves"):
 		{
-			clusterName := ""
-			if clusterAlias != "" {
-				clusterName, err = inst.ReadClusterByAlias(clusterAlias)
-				if err != nil {
-					log.Fatale(err)
-				}
-			} else {
-				// deduce cluster by instance
-				if instanceKey == nil {
-					instanceKey = thisInstanceKey
-				}
-				if instanceKey == nil {
-					log.Fatalf("Unable to get cluster instances: unresolved instance")
-				}
-				instance, _, err := inst.ReadInstance(instanceKey)
-				if err != nil {
-					log.Fatale(err)
-				}
-				if instance == nil {
-					log.Fatalf("Instance not found: %+v", *instanceKey)
-				}
-				clusterName = instance.ClusterName
-			}
-
+			clusterName := getClusterName(clusterAlias, instanceKey)
 			instances, err := inst.GetClusterOSCSlaves(clusterName)
 			if err != nil {
 				log.Fatale(err)
@@ -795,6 +790,21 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatalf("Instance not found: %+v", *instanceKey)
 			}
 			fmt.Println(instance.HumanReadableDescription())
+		}
+	case cliCommand("get-cluster-heuristic-lag"):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			instances, err := inst.GetClusterOSCSlaves(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			var maxLag int64
+			for _, clusterInstance := range instances {
+				if clusterInstance.SlaveLagSeconds.Valid && clusterInstance.SlaveLagSeconds.Int64 > maxLag {
+					maxLag = clusterInstance.SlaveLagSeconds.Int64
+				}
+			}
+			fmt.Println(maxLag)
 		}
 	case cliCommand("replication-analysis"):
 		{

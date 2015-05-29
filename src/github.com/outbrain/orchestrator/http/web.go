@@ -54,6 +54,17 @@ func (this *HttpWeb) Clusters(params martini.Params, r render.Render, req *http.
 	})
 }
 
+func (this *HttpWeb) ClustersAnalysis(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	r.HTML(200, "templates/clusters_analysis", map[string]interface{}{
+		"agentsHttpActive":              config.Config.ServeAgentsHttp,
+		"title":                         "clusters",
+		"activePage":                    "cluster",
+		"autoshow_problems":             false,
+		"authorizedForAction":           isAuthorizedForAction(req, user),
+		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
+	})
+}
+
 func (this *HttpWeb) Cluster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/cluster", map[string]interface{}{
 		"agentsHttpActive":              config.Config.ServeAgentsHttp,
@@ -237,6 +248,7 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/keep-calm", this.KeepCalm)
 	m.Get("/web/faq", this.FAQ)
 	m.Get("/web/clusters", this.Clusters)
+	m.Get("/web/clusters-analysis", this.ClustersAnalysis)
 	m.Get("/web/cluster/:clusterName", this.Cluster)
 	m.Get("/web/cluster/alias/:clusterAlias", this.ClusterByAlias)
 	m.Get("/web/cluster-pools/:clusterName", this.ClusterPools)
