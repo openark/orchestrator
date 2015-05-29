@@ -45,6 +45,9 @@ $(document).ready(function () {
         var clustersWithProblems = {};
 
         replicationAnalysis.Details.forEach(function (analysisEntry) {
+        	if (!(analysisEntry.Analysis in interestingAnalysis)) {
+	    		return;
+	    	}
         	clustersWithProblems[analysisEntry.ClusterName] = true;
         });
 
@@ -73,6 +76,11 @@ $(document).ready(function () {
         	console.log(analysisEntry);
         });
         
+        if (Object.keys(clustersWithProblems).length == 0) {
+        	// No problems
+        	addInfo("No incidents which require a failvoer to report. Orchestrator reports dead-master and dead-intermediate master issues.");
+        }
+
         $("div.popover").popover();
         $("div.popover").show();
 	

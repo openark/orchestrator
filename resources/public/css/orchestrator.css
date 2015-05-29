@@ -381,3 +381,9 @@ div[data-btn-group=recover] code {
 .container.clusters .popover.instance .popover-content span {
     font: 12px sans-serif;
 }
+
+.container.clusters .popover.instance .popover-content span.badge {
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: bold;
+}

@@ -34,7 +34,7 @@ $(document).ready(function () {
         });
         
 	    function addInstancesBadge(clusterName, count, badgeClass, title) {
-	    	$("#clusters [data-cluster-name='" + clusterName + "'].popover").find(".popover-content .pull-right").append('<span class="badge '+badgeClass+'" title="' + title + '"">' + count + '</span> ');
+	    	$("#clusters [data-cluster-name='" + clusterName + "'].popover").find(".popover-content .pull-right").append('<span class="badge '+badgeClass+'" title="' + title + '">' + count + '</span> ');
 	    }
         
         function incrementClusterProblems(clusterName, problemType) {
