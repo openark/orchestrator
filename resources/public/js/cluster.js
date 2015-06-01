@@ -670,6 +670,18 @@ function promptForAlias(oldAlias) {
 	}); 
 }
 
+function showOSCSlaves() {
+    $.get("/api/cluster-osc-slaves/"+currentClusterName(), function (instances) {
+		var instancesMap = normalizeInstances(instances, Array());
+		var instancesTitles = Array();
+	    instances.forEach(function (instance) {
+	    	instancesTitles.push(instance.title);
+	    });
+	    var instancesTitlesConcatenates = instancesTitles.join(" ");
+	    bootbox.alert("Heuristic list of OSC controller slaves: <pre>"+instancesTitlesConcatenates+"</pre>");
+    }, "json");
+}
+
 function anonymize() {
     var _ = function() {
         var counter = 0;  
@@ -707,14 +719,16 @@ $(document).ready(function () {
     	var visualAlias = (alias ? alias : currentClusterName())
     	document.title = document.title.split(" - ")[0] + " - " + visualAlias;
     	$("#cluster_container").append('<div class="floating_background">'+visualAlias+'</div>');
+        $("#dropdown-context").append('<li><a data-command="cluster-heuristic-lag">Heuristic lag: '+clusterInfo.HeuristicLag+'s</a></li>');
+        $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="'+clusterInfo.ClusterAlias+'">Alias: '+alias+'</a></li>');
+        $("#dropdown-context").append('<li><a data-command="cluster-osc-slaves">OSC slaves</a></li>');
+        $("#dropdown-context").append('<li><a href="/web/cluster-pools/'+currentClusterName()+'">Pools</a></li>');    
         if (isCompactDisplay()) {
             $("#dropdown-context").append('<li><a data-command="expand-display" href="'+location.href.split("?")[0]+'?compact=false">Expand display</a></li>');    
         } else {
             $("#dropdown-context").append('<li><a data-command="compact-display" href="'+location.href.split("?")[0]+'?compact=true">Compact display</a></li>');    
         }
-        $("#dropdown-context").append('<li><a href="/web/cluster-pools/'+currentClusterName()+'">Pools</a></li>');    
         $("#dropdown-context").append('<li><a data-command="colorize-dc">Colorize DC</a></li>');    
-        $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="'+clusterInfo.ClusterAlias+'">Alias: '+alias+'</a></li>');
         $("#dropdown-context").append('<li><a data-command="anonymize">Anonymize</a></li>');    
         if ($.cookie("anonymize") == "true") {
         	$("#dropdown-context a[data-command=anonymize]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
@@ -736,6 +750,9 @@ $(document).ready(function () {
     
     $("body").on("click", "a[data-command=change-cluster-alias]", function(event) {    	
     	promptForAlias($(event.target).attr("data-alias"));
+    });    
+    $("body").on("click", "a[data-command=cluster-osc-slaves]", function(event) {    	
+    	showOSCSlaves();
     });    
     $("body").on("click", "a[data-command=anonymize]", function(event) {
     	if ($.cookie("anonymize") == "true") {

@@ -794,17 +794,11 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 	case cliCommand("get-cluster-heuristic-lag"):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
-			instances, err := inst.GetClusterOSCSlaves(clusterName)
+			lag, err := inst.GetClusterHeuristicLag(clusterName)
 			if err != nil {
 				log.Fatale(err)
 			}
-			var maxLag int64
-			for _, clusterInstance := range instances {
-				if clusterInstance.SlaveLagSeconds.Valid && clusterInstance.SlaveLagSeconds.Int64 > maxLag {
-					maxLag = clusterInstance.SlaveLagSeconds.Int64
-				}
-			}
-			fmt.Println(maxLag)
+			fmt.Println(lag)
 		}
 	case cliCommand("replication-analysis"):
 		{

@@ -812,6 +812,19 @@ func (this *HttpAPI) ClusterInfo(params martini.Params, r render.Render, req *ht
 	r.JSON(200, clusterInfo)
 }
 
+
+// ClusterOSCSlaves returns heuristic list of OSC slaves
+func (this *HttpAPI) ClusterOSCSlaves(params martini.Params, r render.Render, req *http.Request) {
+	instances, err := inst.GetClusterOSCSlaves(params["clusterName"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, instances)
+}
+
 // SetClusterAlias will change an alias for a given clustername
 func (this *HttpAPI) SetClusterAlias(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -1436,6 +1449,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/cluster/:clusterName", this.Cluster)
 	m.Get("/api/cluster/alias/:clusterAlias", this.ClusterByAlias)
 	m.Get("/api/cluster-info/:clusterName", this.ClusterInfo)
+	m.Get("/api/cluster-osc-slaves/:clusterName", this.ClusterOSCSlaves)
 	m.Get("/api/set-cluster-alias/:clusterName", this.SetClusterAlias)
 	m.Get("/api/clusters", this.Clusters)
 	m.Get("/api/clusters-info", this.ClustersInfo)

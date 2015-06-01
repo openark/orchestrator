@@ -727,6 +727,22 @@ func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
 	return result, nil
 }
 
+// GetClusterHeuristicLag returns a heuristic lag for a cluster, based on its OSC slaves
+func GetClusterHeuristicLag(clusterName string) (int64, error) {
+	instances, err := GetClusterOSCSlaves(clusterName)
+	if err != nil {
+		return 0, err
+	}
+	var maxLag int64
+	for _, clusterInstance := range instances {
+		if clusterInstance.SlaveLagSeconds.Valid && clusterInstance.SlaveLagSeconds.Int64 > maxLag {
+			maxLag = clusterInstance.SlaveLagSeconds.Int64
+		}
+	}
+	return maxLag, nil
+
+}
+
 // updateClusterNameForUnseenInstances
 func updateInstanceClusterName(instance *Instance) error {
 	writeFunc := func() error {
@@ -992,6 +1008,10 @@ func ReadClusterInfo(clusterName string) (*ClusterInfo, error) {
 		ApplyClusterAlias(clusterInfo)
 		return nil
 	})
+	if err != nil {
+		return clusterInfo, err
+	}
+	clusterInfo.HeuristicLag, err = GetClusterHeuristicLag(clusterName)
 
 	return clusterInfo, err
 }

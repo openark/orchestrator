@@ -21,4 +21,5 @@ type ClusterInfo struct {
 	ClusterName    string
 	ClusterAlias   string // Human friendly alias
 	CountInstances uint
+	HeuristicLag   int64
 }
