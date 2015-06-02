@@ -1407,8 +1407,20 @@ func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.R
 	} else {
 		r.JSON(200, &APIResponse{Code: OK, Message: "No action taken", Details: instanceKey})
 	}
-
 }
+
+
+// AutomatedRecoveryFilters retuens list of clusters which are configured with automated recovery
+func (this *HttpAPI) AutomatedRecoveryFilters(params martini.Params, r render.Render, req *http.Request) {
+	automatedRecoveryMap := make(map[string]interface{})
+	automatedRecoveryMap["RecoverMasterClusterFilters"] = config.Config.RecoverMasterClusterFilters
+	automatedRecoveryMap["RecoverIntermediateMasterClusterFilters"] = config.Config.RecoverIntermediateMasterClusterFilters
+	automatedRecoveryMap["RecoveryIgnoreHostnameFilters"] = config.Config.RecoveryIgnoreHostnameFilters
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Automated recovery configuration details"), Details: automatedRecoveryMap})
+}
+
+
 
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
@@ -1474,6 +1486,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/replication-analysis", this.ReplicationAnalysis)
 	m.Get("/api/recover/:host/:port", this.Recover)
 	m.Get("/api/recover/:host/:port/:candidateHost/:candidatePort", this.Recover)
+	m.Get("/api/automated-recovery-filters", this.AutomatedRecoveryFilters)
 	// Agents
 	m.Get("/api/agents", this.Agents)
 	m.Get("/api/agent/:host", this.Agent)

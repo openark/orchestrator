@@ -44,7 +44,7 @@ $(document).ready(function () {
         	clustersMap[cluster.ClusterName] = cluster;
         });
 	    
-        var clustersWithProblems = {};
+        // Apply/associate analysis to clusters
         replicationAnalysis.Details.forEach(function (analysisEntry) {
         	if (!(analysisEntry.Analysis in interestingAnalysis)) {
 	    		return;
@@ -53,7 +53,10 @@ $(document).ready(function () {
         	if (!analysisEntry.IsDowntimed) {
         		clustersMap[analysisEntry.ClusterName].allAnalysisDowntimed = false;
         	}
-        	clustersWithProblems[analysisEntry.ClusterName] = true;
+        });
+        // Only keep clusters with some analysis (the rest are fine, no need to include them)
+        clusters = clusters.filter(function(cluster) {
+        	return (cluster.analysisEntries.length > 0);
         });
 
 	    function displayInstancesBadge(popoverElement, text, count, badgeClass, title) {
@@ -97,22 +100,16 @@ $(document).ready(function () {
 
         clusters.sort(sortByCountInstances);
         clusters.forEach(function (cluster) {
-        	if (cluster.ClusterName in clustersWithProblems) {
-            	displayCluster(cluster)
-        	}
+        	displayCluster(cluster);
         });
                 
-        if (Object.keys(clustersWithProblems).length == 0) {
+        if (clusters.length == 0) {
         	// No problems
         	addInfo("No incidents which require a failover to report. Orchestrator reports dead-master and dead-intermediate-master issues.");
         }
 
         $("div.popover").popover();
         $("div.popover").show();
-	
-        if (clusters.length == 0) {
-        	addAlert("No clusters found");
-        }
     }
 
     if (isAuthorizedForAction()) {
