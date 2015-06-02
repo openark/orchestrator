@@ -25,7 +25,7 @@ import (
 )
 
 // GetReplicationAnalysis will check for replication problems (dead master; unreachable master; etc)
-func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
+func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
 	query := `
@@ -56,7 +56,11 @@ func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
 		            master_instance.slave_sql_running = 1
 		            AND master_instance.slave_io_running = 0
 		            AND master_instance.last_io_error RLIKE 'error (connecting|reconnecting) to master'
-		          ) AS is_failing_to_connect_to_master
+		          ) AS is_failing_to_connect_to_master,
+		        MIN(
+		    		database_instance_downtime.downtime_active IS NULL
+		    		OR database_instance_downtime.end_timestamp < NOW()
+		    	) IS FALSE AS is_downtimed
 		    FROM
 		        database_instance master_instance
 		            LEFT JOIN
@@ -75,10 +79,6 @@ func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
 		        		AND database_instance_downtime.downtime_active = 1)
 		    WHERE
 		    	database_instance_maintenance.database_instance_maintenance_id IS NULL
-		    	AND (
-		    		database_instance_downtime.downtime_active IS NULL
-		    		OR database_instance_downtime.end_timestamp < NOW()
-		    		)
 		    GROUP BY 
 			    master_instance.hostname, 
 			    master_instance.port
@@ -106,6 +106,7 @@ func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
 		a.CountValidReplicatingSlaves = m.GetUint("count_valid_replicating_slaves")
 		a.ReplicationDepth = m.GetUint("replication_depth")
 		a.IsFailingToConnectToMaster = m.GetBool("is_failing_to_connect_to_master")
+		a.IsDowntimed = m.GetBool("is_downtimed")
 
 		instance := &Instance{}
 		instance.ReadSlaveHostsFromJson(m.GetString("slave_hosts"))
@@ -165,6 +166,9 @@ func GetReplicationAnalysis() ([]ReplicationAnalysis, error) {
 				if matched, _ := regexp.MatchString(filter, a.AnalyzedInstanceKey.Hostname); matched {
 					skipThisHost = true
 				}
+			}
+			if a.IsDowntimed && !includeDowntimed {
+				skipThisHost = true
 			}
 			if !skipThisHost {
 				result = append(result, a)

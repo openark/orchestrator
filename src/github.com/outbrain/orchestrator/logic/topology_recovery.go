@@ -412,7 +412,7 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 
 // CheckAndRecover is the main entry point for the recovery mechanism
 func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *inst.InstanceKey, skipFilters bool) (actionTaken bool, instance *inst.Instance, err error) {
-	replicationAnalysis, err := inst.GetReplicationAnalysis()
+	replicationAnalysis, err := inst.GetReplicationAnalysis(true)
 	if err != nil {
 		return false, nil, log.Errore(err)
 	}
@@ -422,6 +422,10 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 			if !specificInstance.Equals(&analysisEntry.AnalyzedInstanceKey) {
 				continue
 			}
+		}
+		if analysisEntry.IsDowntimed && specificInstance == nil {
+			// Only recover a downtimed server if explicitly requested
+			continue
 		}
 
 		if specificInstance != nil && skipFilters {

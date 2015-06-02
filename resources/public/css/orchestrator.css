@@ -381,6 +381,9 @@ div[data-btn-group=recover] code {
 .container.clusters .popover.instance .popover-content span {
     font: 12px sans-serif;
 }
+.container.clusters .popover.instance .popover-content div.downtimed {
+    background-color: #e7e7e7;
+}
 
 .container.clusters .popover.instance .popover-content span.badge {
     color: #ffffff;

@@ -802,7 +802,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		}
 	case cliCommand("replication-analysis"):
 		{
-			analysis, err := inst.GetReplicationAnalysis()
+			analysis, err := inst.GetReplicationAnalysis(false)
 			if err != nil {
 				log.Fatale(err)
 			}

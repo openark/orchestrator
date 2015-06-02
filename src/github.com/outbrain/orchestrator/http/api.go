@@ -812,7 +812,6 @@ func (this *HttpAPI) ClusterInfo(params martini.Params, r render.Render, req *ht
 	r.JSON(200, clusterInfo)
 }
 
-
 // ClusterOSCSlaves returns heuristic list of OSC slaves
 func (this *HttpAPI) ClusterOSCSlaves(params martini.Params, r render.Render, req *http.Request) {
 	instances, err := inst.GetClusterOSCSlaves(params["clusterName"])
@@ -1373,7 +1372,7 @@ func (this *HttpAPI) ReloadConfiguration(params martini.Params, r render.Render,
 
 // ReplicationAnalysis retuens list of issues
 func (this *HttpAPI) ReplicationAnalysis(params martini.Params, r render.Render, req *http.Request) {
-	analysis, err := inst.GetReplicationAnalysis()
+	analysis, err := inst.GetReplicationAnalysis(true)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get analysis: %+v", err)})
 		return

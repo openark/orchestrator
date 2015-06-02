@@ -55,4 +55,5 @@ type ReplicationAnalysis struct {
 	IsFailingToConnectToMaster  bool
 	Analysis                    AnalysisCode
 	Description                 string
+	IsDowntimed                 bool
 }
