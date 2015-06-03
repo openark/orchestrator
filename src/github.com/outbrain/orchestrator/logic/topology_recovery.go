@@ -44,6 +44,29 @@ func (this InstancesByCountSlaves) Less(i, j int) bool {
 	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
 }
 
+// replaceCommandPlaceholders replaxces agreed-upon placeholders with analysis data
+func replaceCommandPlaceholders(command string, analysisEntry inst.ReplicationAnalysis, successorKey *inst.Instance) string {
+	command = strings.Replace(command, "{failureType}", string(analysisEntry.Analysis), -1)
+	command = strings.Replace(command, "{failureDescription}", analysisEntry.Description, -1)
+	command = strings.Replace(command, "{failedHost}", analysisEntry.AnalyzedInstanceKey.Hostname, -1)
+	command = strings.Replace(command, "{failedPort}", fmt.Sprintf("%d", analysisEntry.AnalyzedInstanceKey.Port), -1)
+	command = strings.Replace(command, "{failureCluster}", analysisEntry.ClusterName, -1)
+	command = strings.Replace(command, "{countSlaves}", fmt.Sprintf("%d", analysisEntry.CountSlaves), -1)
+
+	if successorKey != nil {
+		command = strings.Replace(command, "{successorHost}", successorKey.Key.Hostname, -1)
+		command = strings.Replace(command, "{successorPort}", fmt.Sprintf("%d", successorKey.Key.Port), -1)
+	}
+
+	slaveHostsStrings := []string{}
+	for slaveKey := range analysisEntry.SlaveHosts {
+		slaveHostsStrings = append(slaveHostsStrings, slaveKey.DisplayString())
+	}
+	command = strings.Replace(command, "{slaveHosts}", strings.Join(slaveHostsStrings, ","), -1)
+
+	return command
+}
+
 func RecoverDeadMaster(failedInstanceKey *inst.InstanceKey) (bool, *inst.Instance, error) {
 	if ok, err := AttemptRecoveryRegistration(failedInstanceKey); !ok {
 		log.Debugf("Will not RecoverDeadMaster on %+v", *failedInstanceKey)
@@ -159,21 +182,12 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		promotedSlave, _ = replacePromotedSlaveWithCandidate(&analysisEntry.AnalyzedInstanceKey, promotedSlave, candidateInstanceKey)
 		// Execute post master-failover processes
 		for _, command := range config.Config.PostMasterFailoverProcesses {
-			command := command
-
-			command = strings.Replace(command, "{failureType}", string(analysisEntry.Analysis), -1)
-			command = strings.Replace(command, "{failureDescription}", analysisEntry.Description, -1)
-			command = strings.Replace(command, "{failedHost}", analysisEntry.AnalyzedInstanceKey.Hostname, -1)
-			command = strings.Replace(command, "{failedPort}", fmt.Sprintf("%d", analysisEntry.AnalyzedInstanceKey.Port), -1)
-			command = strings.Replace(command, "{successorHost}", promotedSlave.Key.Hostname, -1)
-			command = strings.Replace(command, "{successorPort}", fmt.Sprintf("%d", promotedSlave.Key.Port), -1)
-			command = strings.Replace(command, "{failureCluster}", analysisEntry.ClusterName, -1)
-			command = strings.Replace(command, "{countSlaves}", fmt.Sprintf("%d", analysisEntry.CountSlaves), -1)
+			command := replaceCommandPlaceholders(command, analysisEntry, promotedSlave)
 
 			if cmdErr := os.CommandRun(command); cmdErr == nil {
-				log.Infof("Executed post-master-failover command %s", command)
+				log.Infof("Executed post-master-failover command: %s", command)
 			} else {
-				log.Errorf("Failed to execute post-master-failover command %s", command)
+				log.Errorf("Failed to execute post-master-failover command: %s", command)
 			}
 		}
 	}
@@ -382,14 +396,7 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 		var processesFailures []error = []error{}
 		barrier := make(chan error)
 		for _, command := range config.Config.PreFailoverProcesses {
-			command := command
-
-			command = strings.Replace(command, "{failureType}", string(analysisEntry.Analysis), -1)
-			command = strings.Replace(command, "{failureDescription}", analysisEntry.Description, -1)
-			command = strings.Replace(command, "{failedHost}", analysisEntry.AnalyzedInstanceKey.Hostname, -1)
-			command = strings.Replace(command, "{failedPort}", fmt.Sprintf("%d", analysisEntry.AnalyzedInstanceKey.Port), -1)
-			command = strings.Replace(command, "{failureCluster}", analysisEntry.ClusterName, -1)
-			command = strings.Replace(command, "{countSlaves}", fmt.Sprintf("%d", analysisEntry.CountSlaves), -1)
+			command := replaceCommandPlaceholders(command, analysisEntry, nil)
 
 			var cmdErr error = nil
 			go func() {
