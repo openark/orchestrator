@@ -35,6 +35,7 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		        MIN(master_instance.master_host) AS master_host,
 		        MIN(master_instance.master_port) AS master_port,
 		        MIN(master_instance.cluster_name) AS cluster_name,
+		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
 		        MIN(master_instance.last_checked <= master_instance.last_seen)
 		            IS TRUE AS is_last_check_valid,
 		        MIN(master_instance.master_host IN ('' , '_')
@@ -77,6 +78,8 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		        database_instance_downtime ON (master_instance.hostname = database_instance_downtime.hostname
 		        		AND master_instance.port = database_instance_downtime.port
 		        		AND database_instance_downtime.downtime_active = 1)
+		        	LEFT JOIN 
+		        cluster_alias ON (cluster_alias.cluster_name = master_instance.cluster_name)
 		    WHERE
 		    	database_instance_maintenance.database_instance_maintenance_id IS NULL
 		    GROUP BY 
@@ -100,6 +103,7 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		a.AnalyzedInstanceKey = InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
 		a.AnalyzedInstanceMasterKey = InstanceKey{Hostname: m.GetString("master_host"), Port: m.GetInt("master_port")}
 		a.ClusterName = m.GetString("cluster_name")
+		a.ClusterAlias = m.GetString("cluster_alias")
 		a.LastCheckValid = m.GetBool("is_last_check_valid")
 		a.CountSlaves = m.GetUint("count_slaves")
 		a.CountValidSlaves = m.GetUint("count_valid_slaves")

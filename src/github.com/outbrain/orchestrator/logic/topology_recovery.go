@@ -51,6 +51,7 @@ func replaceCommandPlaceholders(command string, analysisEntry inst.ReplicationAn
 	command = strings.Replace(command, "{failedHost}", analysisEntry.AnalyzedInstanceKey.Hostname, -1)
 	command = strings.Replace(command, "{failedPort}", fmt.Sprintf("%d", analysisEntry.AnalyzedInstanceKey.Port), -1)
 	command = strings.Replace(command, "{failureCluster}", analysisEntry.ClusterName, -1)
+	command = strings.Replace(command, "{failureClusterAlias}", analysisEntry.ClusterAlias, -1)
 	command = strings.Replace(command, "{countSlaves}", fmt.Sprintf("%d", analysisEntry.CountSlaves), -1)
 
 	if successorKey != nil {
@@ -65,6 +66,31 @@ func replaceCommandPlaceholders(command string, analysisEntry inst.ReplicationAn
 	command = strings.Replace(command, "{slaveHosts}", strings.Join(slaveHostsStrings, ","), -1)
 
 	return command
+}
+
+// filtersMatchAnalysisEntry will see whether the given filters apply for the given analysis entry (and hence the cluster it relates to)
+func filtersMatchAnalysisEntry(analysisEntry inst.ReplicationAnalysis, filters []string, skipFilters bool) bool {
+	if skipFilters {
+		return true
+	}
+	for _, filter := range filters {
+		if strings.HasPrefix(filter, "alias=") {
+			// Match by exact cluster alias name
+			alias := strings.SplitN(filter, "=", 2)[1]
+			if alias == analysisEntry.ClusterAlias {
+				return true
+			}
+		} else if strings.HasPrefix(filter, "alias~=") {
+			// Match by cluster alias regex
+			aliasPattern := strings.SplitN(filter, "~=", 2)[1]
+			if matched, _ := regexp.MatchString(aliasPattern, analysisEntry.ClusterAlias); matched {
+				return true
+			}
+		} else if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched && filter != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func RecoverDeadMaster(failedInstanceKey *inst.InstanceKey) (bool, *inst.Instance, error) {
@@ -160,18 +186,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 // checkAndRecoverDeadMaster checks a given analysis, decides whether to take action, and possibly takes action
 // Returns true when action was taken.
 func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
-	filters := config.Config.RecoverMasterClusterFilters
-	if skipFilters {
-		// The following filter catches-all
-		filters = append(filters, ".")
-	}
-	masterFilterMatched := false
-	for _, filter := range filters {
-		if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched && filter != "" {
-			masterFilterMatched = true
-		}
-	}
-	if !masterFilterMatched {
+	if !filtersMatchAnalysisEntry(analysisEntry, config.Config.RecoverMasterClusterFilters, skipFilters) {
 		return false, nil, nil
 	}
 	// Let's do dead master recovery!
@@ -322,19 +337,12 @@ func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (actionT
 // checkAndRecoverDeadIntermediateMaster checks a given analysis, decides whether to take action, and possibly takes action
 // Returns true when action was taken.
 func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
-	filters := config.Config.RecoverIntermediateMasterClusterFilters
-	if skipFilters {
-		// The following filter catches-all
-		filters = append(filters, ".")
+	if !filtersMatchAnalysisEntry(analysisEntry, config.Config.RecoverIntermediateMasterClusterFilters, skipFilters) {
+		return false, nil, nil
 	}
-	for _, filter := range filters {
-		if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched && filter != "" {
-			log.Debugf("Will handle DeadIntermediateMaster event on %+v", analysisEntry.ClusterName)
-			actionTaken, promotedSlave, err := RecoverDeadIntermediateMaster(&analysisEntry.AnalyzedInstanceKey)
-			return actionTaken, promotedSlave, err
-		}
-	}
-	return false, nil, nil
+
+	actionTaken, promotedSlave, err := RecoverDeadIntermediateMaster(&analysisEntry.AnalyzedInstanceKey)
+	return actionTaken, promotedSlave, err
 }
 
 // Force a re-read of a topology instance; this is done because we need to substantiate a suspicion that we may have a failover

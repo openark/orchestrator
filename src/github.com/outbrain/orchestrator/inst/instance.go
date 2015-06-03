@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/outbrain/golib/log"
+	"github.com/outbrain/golib/math"
 	"github.com/outbrain/orchestrator/config"
 	"strconv"
 	"strings"
@@ -389,6 +390,10 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 
 // HasReasonableMaintenanceReplicationLag returns true when the slave lag is reasonable, and maintenance operations should have a green light to go.
 func (this *Instance) HasReasonableMaintenanceReplicationLag() bool {
+	// Slaves with SQLDelay are a special case
+	if this.SQLDelay > 0 {
+		return math.AbsInt64(this.SecondsBehindMaster.Int64-int64(this.SQLDelay)) <= int64(config.Config.ReasonableMaintenanceReplicationLagSeconds)
+	}
 	return this.SecondsBehindMaster.Int64 <= int64(config.Config.ReasonableMaintenanceReplicationLagSeconds)
 }
 
