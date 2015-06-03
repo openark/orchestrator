@@ -67,6 +67,7 @@ type Configuration struct {
 	PreFailoverProcesses                       []string // Processes to execute before doing a failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}
 	PostFailoverProcesses                      []string // Processes to execute after doing a failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}
 	PostMasterFailoverProcesses                []string // Processes to execute after doing a master failover (order of execution undefined). Will be provided2 with old-master-hostname, new-master-hostname arguments. Uses same placeholders as PostFailoverProcesses
+	PostIntermediateMasterFailoverProcesses    []string // Processes to execute after doing a master failover (order of execution undefined). Will be provided2 with old-master-hostname, new-master-hostname arguments. Uses same placeholders as PostFailoverProcesses
 	AuditLogFile                               string   // Name of log file for audit operations. Disabled when empty.
 	AuditPageSize                              int
 	RemoveTextFromHostnameDisplay              string // Text to strip off the hostname on cluster/clusters pages
@@ -137,6 +138,7 @@ func NewConfiguration() *Configuration {
 		PreFailoverProcesses:                       []string{},
 		PostFailoverProcesses:                      []string{},
 		PostMasterFailoverProcesses:                []string{},
+		PostIntermediateMasterFailoverProcesses:    []string{},
 		AuditLogFile:                               "",
 		AuditPageSize:                              20,
 		RemoveTextFromHostnameDisplay:              "",

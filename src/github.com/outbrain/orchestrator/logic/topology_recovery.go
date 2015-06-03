@@ -45,7 +45,7 @@ func (this InstancesByCountSlaves) Less(i, j int) bool {
 }
 
 // replaceCommandPlaceholders replaxces agreed-upon placeholders with analysis data
-func replaceCommandPlaceholders(command string, analysisEntry inst.ReplicationAnalysis, successorKey *inst.Instance) string {
+func replaceCommandPlaceholders(command string, analysisEntry inst.ReplicationAnalysis, successorInstance *inst.Instance) string {
 	command = strings.Replace(command, "{failureType}", string(analysisEntry.Analysis), -1)
 	command = strings.Replace(command, "{failureDescription}", analysisEntry.Description, -1)
 	command = strings.Replace(command, "{failedHost}", analysisEntry.AnalyzedInstanceKey.Hostname, -1)
@@ -54,9 +54,9 @@ func replaceCommandPlaceholders(command string, analysisEntry inst.ReplicationAn
 	command = strings.Replace(command, "{failureClusterAlias}", analysisEntry.ClusterAlias, -1)
 	command = strings.Replace(command, "{countSlaves}", fmt.Sprintf("%d", analysisEntry.CountSlaves), -1)
 
-	if successorKey != nil {
-		command = strings.Replace(command, "{successorHost}", successorKey.Key.Hostname, -1)
-		command = strings.Replace(command, "{successorPort}", fmt.Sprintf("%d", successorKey.Key.Port), -1)
+	if successorInstance != nil {
+		command = strings.Replace(command, "{successorHost}", successorInstance.Key.Hostname, -1)
+		command = strings.Replace(command, "{successorPort}", fmt.Sprintf("%d", successorInstance.Key.Port), -1)
 	}
 
 	slaveHostsStrings := []string{}
@@ -342,6 +342,18 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 	}
 
 	actionTaken, promotedSlave, err := RecoverDeadIntermediateMaster(&analysisEntry.AnalyzedInstanceKey)
+	if actionTaken {
+		// Execute post intermediate-master-failover processes
+		for _, command := range config.Config.PostIntermediateMasterFailoverProcesses {
+			command := replaceCommandPlaceholders(command, analysisEntry, promotedSlave)
+
+			if cmdErr := os.CommandRun(command); cmdErr == nil {
+				log.Infof("Executed post-intermediate-master-failover command: %s", command)
+			} else {
+				log.Errorf("Failed to execute post-intermediate-master-failover command: %s", command)
+			}
+		}
+	}
 	return actionTaken, promotedSlave, err
 }
 
