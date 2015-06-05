@@ -430,7 +430,12 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 		return false, nil, err
 	}
 
-	return checkAndRecoverFunction(analysisEntry, candidateInstanceKey, skipFilters)
+	actionTaken, promotedSlave, err := checkAndRecoverFunction(analysisEntry, candidateInstanceKey, skipFilters)
+	if actionTaken {
+		// Execute post intermediate-master-failover processes
+		executeProcesses(config.Config.PostFailoverProcesses, "PostFailoverProcesses", analysisEntry, promotedSlave, false)
+	}
+	return actionTaken, promotedSlave, err
 }
 
 // CheckAndRecover is the main entry point for the recovery mechanism

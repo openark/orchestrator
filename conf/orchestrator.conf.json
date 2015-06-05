@@ -28,21 +28,6 @@
   "ReasonableReplicationLagSeconds": 10,
   "VerifyReplicationFilters": false,
   "ReasonableMaintenanceReplicationLagSeconds": 20,
-  "OnFailureDetectionProcesses": [
-  	"echo 'Detected {failureType} on {failureCluster}. Affected slaves: {countSlaves}' >> /tmp/recovery.log"
-  ], 
-  "PreFailoverProcesses": [
-  	"echo 'Will recover from {failureType} on {failureCluster}' >> /tmp/recovery.log"
-  ],
-  "PostFailoverProcesses": [
-  	"echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
-  ],
-  "PostMasterFailoverProcesses": [
-  	"echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Promoted: {successorHost}:{successorPort}' >> /tmp/recovery.log"
-  ],
-  "PostIntermediateMasterFailoverProcesses": [
-  	"echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
-  ],
   "AuditLogFile": "/tmp/orchestrator-audit.log",
   "AuditPageSize": 20,
   "SlaveStartPostWaitMilliseconds": 1000,
@@ -83,6 +68,21 @@
   ],
   "RecoverIntermediateMasterClusterFilters": [
   	"kvmuser__"
+  ],
+  "OnFailureDetectionProcesses": [
+  	"echo 'Detected {failureType} on {failureCluster}. Affected slaves: {countSlaves}' >> /tmp/recovery.log"
+  ], 
+  "PreFailoverProcesses": [
+  	"echo 'Will recover from {failureType} on {failureCluster}' >> /tmp/recovery.log"
+  ],
+  "PostFailoverProcesses": [
+  	"echo '(for all types) Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
+  ],
+  "PostMasterFailoverProcesses": [
+  	"echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Promoted: {successorHost}:{successorPort}' >> /tmp/recovery.log"
+  ],
+  "PostIntermediateMasterFailoverProcesses": [
+  	"echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
   ]
 }
 
