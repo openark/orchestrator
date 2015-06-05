@@ -384,6 +384,21 @@ Cheatsheet:
 			orchestrator -c which-slaves
 				-i not given, implicitly assumed local hostname
 				
+		get-cluster-heuristic-lag
+			For a given cluster (indicated by an instance or alias), output a heuristic "representative" lag of that cluster.
+			The output is obtained by examining the slaves that are member of "which-cluster-osc-slaves"-command, and
+			getting the maximum slave lag of those slaves. Recall that those slaves are a subset of the entire cluster, 
+			and that they are ebing polled periodically. Hence the output of this command is not necessarily up-to-date
+			and does not represent all slaves in cluster. Examples:
+
+			orchestrator -c get-cluster-heuristic-lag -i instance.that.is.part.of.cluster.com
+
+			orchestrator -c get-cluster-heuristic-lag
+				-i not given, implicitly assumed local host, cluster implied
+
+			orchestrator -c get-cluster-heuristic-lag -alias some_alias
+				assuming some_alias is a known cluster alias (see ClusterNameToAlias or DetectClusterAliasQuery configuration)
+
 		instance-status
 			Output short status on a given instance (name, replication status, noteable configuration). Example2:
 			
