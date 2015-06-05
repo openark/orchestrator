@@ -93,13 +93,39 @@ func filtersMatchAnalysisEntry(analysisEntry inst.ReplicationAnalysis, filters [
 	return false
 }
 
-func RecoverDeadMaster(failedInstanceKey *inst.InstanceKey) (bool, *inst.Instance, error) {
+// executeProcesses executes a list of processes
+func executeProcesses(processes []string, description string, analysisEntry inst.ReplicationAnalysis, successorInstance *inst.Instance, failOnError bool) error {
+	var err error
+	for _, command := range processes {
+		command := replaceCommandPlaceholders(command, analysisEntry, successorInstance)
+
+		if cmdErr := os.CommandRun(command); cmdErr == nil {
+			log.Infof("Executed %s command: %s", description, command)
+		} else {
+			if err == nil {
+				// Note first error
+				err = cmdErr
+			}
+			log.Errorf("Failed to execute %s command: %s", description, command)
+			if failOnError {
+				return err
+			}
+		}
+	}
+	return err
+}
+
+func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis) (bool, *inst.Instance, error) {
+	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	if ok, err := AttemptRecoveryRegistration(failedInstanceKey); !ok {
 		log.Debugf("Will not RecoverDeadMaster on %+v", *failedInstanceKey)
 		return false, nil, err
 	}
 
 	inst.AuditOperation("recover-dead-master", failedInstanceKey, "problem found; will recover")
+	if err := executeProcesses(config.Config.PreFailoverProcesses, "PreFailoverProcesses", analysisEntry, nil, true); err != nil {
+		return false, nil, err
+	}
 
 	log.Debugf("RecoverDeadMaster: will recover %+v", *failedInstanceKey)
 	_, _, _, candidateSlave, err := inst.RegroupSlaves(failedInstanceKey, nil)
@@ -191,20 +217,12 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 	}
 	// Let's do dead master recovery!
 	log.Debugf("Will handle DeadMaster event on %+v", analysisEntry.ClusterName)
-	actionTaken, promotedSlave, err := RecoverDeadMaster(&analysisEntry.AnalyzedInstanceKey)
+	actionTaken, promotedSlave, err := RecoverDeadMaster(analysisEntry)
 
 	if actionTaken && promotedSlave != nil {
 		promotedSlave, _ = replacePromotedSlaveWithCandidate(&analysisEntry.AnalyzedInstanceKey, promotedSlave, candidateInstanceKey)
 		// Execute post master-failover processes
-		for _, command := range config.Config.PostMasterFailoverProcesses {
-			command := replaceCommandPlaceholders(command, analysisEntry, promotedSlave)
-
-			if cmdErr := os.CommandRun(command); cmdErr == nil {
-				log.Infof("Executed post-master-failover command: %s", command)
-			} else {
-				log.Errorf("Failed to execute post-master-failover command: %s", command)
-			}
-		}
+		executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", analysisEntry, promotedSlave, false)
 	}
 
 	return actionTaken, promotedSlave, err
@@ -284,7 +302,8 @@ func GetCandidateSiblingOfIntermediateMaster(intermediateMasterKey *inst.Instanc
 	return nil, log.Errorf("Cannot find candidate sibling of %+v", *intermediateMasterKey)
 }
 
-func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (actionTaken bool, successorInstance *inst.Instance, err error) {
+func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis) (actionTaken bool, successorInstance *inst.Instance, err error) {
+	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	if ok, err := AttemptRecoveryRegistration(failedInstanceKey); !ok {
 		log.Debugf("Will not RecoverDeadIntermediateMaster on %+v", *failedInstanceKey)
 		return false, nil, err
@@ -292,6 +311,9 @@ func RecoverDeadIntermediateMaster(failedInstanceKey *inst.InstanceKey) (actionT
 
 	inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, "problem found; will recover")
 	log.Debugf("RecoverDeadIntermediateMaster: will recover %+v", *failedInstanceKey)
+	if err := executeProcesses(config.Config.PreFailoverProcesses, "PreFailoverProcesses", analysisEntry, nil, true); err != nil {
+		return false, nil, err
+	}
 
 	if candidateSibling, err := GetCandidateSiblingOfIntermediateMaster(failedInstanceKey); err == nil {
 		log.Debugf("- RecoverDeadIntermediateMaster: will attempt a candidate intermediate master: %+v", candidateSibling.Key)
@@ -341,18 +363,10 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 		return false, nil, nil
 	}
 
-	actionTaken, promotedSlave, err := RecoverDeadIntermediateMaster(&analysisEntry.AnalyzedInstanceKey)
+	actionTaken, promotedSlave, err := RecoverDeadIntermediateMaster(analysisEntry)
 	if actionTaken {
 		// Execute post intermediate-master-failover processes
-		for _, command := range config.Config.PostIntermediateMasterFailoverProcesses {
-			command := replaceCommandPlaceholders(command, analysisEntry, promotedSlave)
-
-			if cmdErr := os.CommandRun(command); cmdErr == nil {
-				log.Infof("Executed post-intermediate-master-failover command: %s", command)
-			} else {
-				log.Errorf("Failed to execute post-intermediate-master-failover command: %s", command)
-			}
-		}
+		executeProcesses(config.Config.PostIntermediateMasterFailoverProcesses, "PostIntermediateMasterFailoverProcesses", analysisEntry, promotedSlave, false)
 	}
 	return actionTaken, promotedSlave, err
 }
@@ -411,27 +425,9 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	}
 	// we have a recovery function; its execution still depends on filters if not disabled.
 
-	// Execute general pre-processes
-	{
-		var processesFailures []error = []error{}
-		barrier := make(chan error)
-		for _, command := range config.Config.PreFailoverProcesses {
-			command := replaceCommandPlaceholders(command, analysisEntry, nil)
-
-			var cmdErr error = nil
-			go func() {
-				defer func() { barrier <- cmdErr }()
-				cmdErr = os.CommandRun(command)
-			}()
-		}
-		for _, _ = range config.Config.PreFailoverProcesses {
-			if cmdErr := <-barrier; cmdErr != nil {
-				processesFailures = append(processesFailures, cmdErr)
-			}
-		}
-		if len(processesFailures) > 0 {
-			return false, nil, processesFailures[0]
-		}
+	// Execute on-detection processes
+	if err := executeProcesses(config.Config.OnFailureDetectionProcesses, "OnFailureDetectionProcesses", analysisEntry, nil, true); err != nil {
+		return false, nil, err
 	}
 
 	return checkAndRecoverFunction(analysisEntry, candidateInstanceKey, skipFilters)

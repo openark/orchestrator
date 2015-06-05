@@ -64,10 +64,11 @@ type Configuration struct {
 	MaintenanceExpireMinutes                   uint     // Minutes after which a maintenance flag is considered stale and is cleared
 	MaintenancePurgeDays                       uint     // Days after which maintenance entries are purged from the database
 	CandidateInstanceExpireMinutes             uint     // Minutes after which a suggestion to use an instance as a candidate slave (to be preferably promoted on master failover) is expired.
-	PreFailoverProcesses                       []string // Processes to execute before doing a failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}
-	PostFailoverProcesses                      []string // Processes to execute after doing a failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}
-	PostMasterFailoverProcesses                []string // Processes to execute after doing a master failover (order of execution undefined). Will be provided2 with old-master-hostname, new-master-hostname arguments. Uses same placeholders as PostFailoverProcesses
-	PostIntermediateMasterFailoverProcesses    []string // Processes to execute after doing a master failover (order of execution undefined). Will be provided2 with old-master-hostname, new-master-hostname arguments. Uses same placeholders as PostFailoverProcesses
+	OnFailureDetectionProcesses                []string // Processes to execute when detecting a failover scenario (before making a decision whether to failover or not). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}, {slaveHosts}
+	PreFailoverProcesses                       []string // Processes to execute before doing a failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}, {slaveHosts}
+	PostFailoverProcesses                      []string // Processes to execute after doing a failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}, {slaveHosts}
+	PostMasterFailoverProcesses                []string // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
+	PostIntermediateMasterFailoverProcesses    []string // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
 	AuditLogFile                               string   // Name of log file for audit operations. Disabled when empty.
 	AuditPageSize                              int
 	RemoveTextFromHostnameDisplay              string // Text to strip off the hostname on cluster/clusters pages
@@ -135,6 +136,7 @@ func NewConfiguration() *Configuration {
 		MaintenanceExpireMinutes:                   10,
 		MaintenancePurgeDays:                       365,
 		CandidateInstanceExpireMinutes:             60,
+		OnFailureDetectionProcesses:                []string{},
 		PreFailoverProcesses:                       []string{},
 		PostFailoverProcesses:                      []string{},
 		PostMasterFailoverProcesses:                []string{},
