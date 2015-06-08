@@ -17,6 +17,7 @@
 package orchestrator
 
 import (
+	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/config"
@@ -25,7 +26,7 @@ import (
 )
 
 // AttemptRecoveryRegistration tries to add a recovery entry; if this fails that means recovery is already in place.
-func AttemptRecoveryRegistration(failedKey *inst.InstanceKey) (bool, error) {
+func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis) (bool, error) {
 
 	db, err := db.OpenOrchestrator()
 	if err != nil {
@@ -41,7 +42,12 @@ func AttemptRecoveryRegistration(failedKey *inst.InstanceKey) (bool, error) {
 					start_active_period, 
 					end_active_period_unixtime, 
 					processing_node_hostname, 
-					processcing_node_token
+					processcing_node_token,
+					analysis,
+					cluster_name,
+					cluster_alias,
+					count_affected_slaves,
+					slave_hosts
 				) values (
 					?,
 					?,
@@ -49,9 +55,15 @@ func AttemptRecoveryRegistration(failedKey *inst.InstanceKey) (bool, error) {
 					NOW(),
 					0,
 					?,
+					?,
+					?,
+					?,
+					?,
+					?,
 					?
 				)
-			`, failedKey.Hostname, failedKey.Port, ThisHostname, ProcessToken.Hash,
+			`, analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port, ThisHostname, ProcessToken.Hash,
+		string(analysisEntry.Analysis), analysisEntry.ClusterName, analysisEntry.ClusterAlias, analysisEntry.CountSlaves, analysisEntry.GetSlaveHostsAsString(),
 	)
 	if err != nil {
 		return false, log.Errore(err)
@@ -116,4 +128,92 @@ func ResolveRecovery(failedKey *inst.InstanceKey, successorKey *inst.InstanceKey
 		return log.Errore(err)
 	}
 	return nil
+}
+
+// readRecoveries reads recovery entry/audit entires from topology_recovery
+func readRecoveries(whereCondition string, limit string) ([]TopologyRecovery, error) {
+	res := []TopologyRecovery{}
+	query := fmt.Sprintf(`
+		select 
+            recovery_id,
+            hostname,
+            port,
+            (end_active_period_unixtime IS NULL) as is_active,
+            start_active_period,
+            IFNULL(end_active_period_unixtime, 0) as end_active_period_unixtime,
+            IFNULL(end_recovery, '') AS end_recovery,
+            processing_node_hostname,
+            processcing_node_token,
+            ifnull(successor_hostname, '') as successor_hostname,
+            ifnull(successor_port, 0) as successor_port,
+            analysis,
+            cluster_name,
+            cluster_alias,
+            count_affected_slaves,
+            slave_hosts		
+		from 
+			topology_recovery
+		%s
+		order by
+			recovery_id desc
+		%s
+		`, whereCondition, limit)
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		goto Cleanup
+	}
+
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		topologyRecovery := TopologyRecovery{}
+		topologyRecovery.TopologyRecoveryId = m.GetInt64("recovery_id")
+
+		topologyRecovery.IsActive = m.GetBool("is_active")
+		topologyRecovery.RecoveryStartTimestamp = m.GetString("start_active_period")
+		topologyRecovery.RecoveryEndTimestamp = m.GetString("end_recovery")
+		topologyRecovery.ProcessingNodeHostname = m.GetString("processing_node_hostname")
+		topologyRecovery.ProcessingNodeToken = m.GetString("processcing_node_token")
+
+		topologyRecovery.AnalysisEntry.AnalyzedInstanceKey.Hostname = m.GetString("hostname")
+		topologyRecovery.AnalysisEntry.AnalyzedInstanceKey.Port = m.GetInt("port")
+		topologyRecovery.AnalysisEntry.Analysis = inst.AnalysisCode(m.GetString("analysis"))
+		topologyRecovery.AnalysisEntry.ClusterName = m.GetString("cluster_name")
+		topologyRecovery.AnalysisEntry.ClusterAlias = m.GetString("cluster_alias")
+		topologyRecovery.AnalysisEntry.CountSlaves = m.GetUint("count_affected_slaves")
+		topologyRecovery.AnalysisEntry.ReadSlaveHostsFromString(m.GetString("slave_hosts"))
+
+		topologyRecovery.SuccessorKey.Hostname = m.GetString("successor_hostname")
+		topologyRecovery.SuccessorKey.Port = m.GetInt("successor_port")
+
+		res = append(res, topologyRecovery)
+		return nil
+	})
+Cleanup:
+
+	if err != nil {
+		log.Errore(err)
+	}
+	return res, err
+}
+
+// ReadActiveRecoveries reads active recovery entry/audit entires from topology_recovery
+func ReadActiveRecoveries() ([]TopologyRecovery, error) {
+	return readRecoveries(`where in_active_period=1 and end_active_period_unixtime IS NULL`, ``)
+}
+
+// ReadCompletedRecoveries reads completed recovery entry/audit entires from topology_recovery
+func ReadCompletedRecoveries(page int) ([]TopologyRecovery, error) {
+	limit := fmt.Sprintf(`
+		limit %d
+		offset %d`,
+		config.Config.AuditPageSize, page*config.Config.AuditPageSize)
+	return readRecoveries(`where end_active_period_unixtime IS NOT NULL`, limit)
+}
+
+// ReadCRecoveries reads latest recovery entreis from topology_recovery
+func ReadRecentRecoveries(page int) ([]TopologyRecovery, error) {
+	limit := fmt.Sprintf(`
+		limit %d
+		offset %d`,
+		config.Config.AuditPageSize, page*config.Config.AuditPageSize)
+	return readRecoveries(``, limit)
 }

@@ -170,9 +170,9 @@ func NewConfiguration() *Configuration {
 		RecoverIntermediateMasterClusterFilters:    []string{},
 		OnFailureDetectionProcesses:                []string{},
 		PreFailoverProcesses:                       []string{},
-		PostFailoverProcesses:                      []string{},
 		PostMasterFailoverProcesses:                []string{},
 		PostIntermediateMasterFailoverProcesses:    []string{},
+		PostFailoverProcesses:                      []string{},
 		OSCIgnoreHostnameFilters:                   []string{},
 	}
 }

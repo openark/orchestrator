@@ -587,6 +587,9 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	    if (instance.inMaintenanceProblem()) {
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench"></span> ');
 	    } 
+	    if (instance.IsDowntimed) {
+	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-volume-off"></span> ');
+	    } 
 	
 	    if (instance.lastCheckInvalidProblem()) {
 	    	popoverElement.find("h3").addClass("label-fatal");

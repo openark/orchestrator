@@ -383,6 +383,15 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN sql_delay INT UNSIGNED NOT NULL AFTER slave_lag_seconds
 	`,
+	`
+		ALTER TABLE 
+			topology_recovery
+			ADD COLUMN analysis              varchar(128) CHARACTER SET ascii NOT NULL,
+			ADD COLUMN cluster_name          varchar(128) CHARACTER SET ascii NOT NULL,
+			ADD COLUMN cluster_alias         varchar(128) CHARACTER SET ascii NOT NULL,
+			ADD COLUMN count_affected_slaves int unsigned NOT NULL,
+			ADD COLUMN slave_hosts text CHARACTER SET ascii NOT NULL
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance

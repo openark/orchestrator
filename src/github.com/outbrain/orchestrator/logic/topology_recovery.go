@@ -29,6 +29,18 @@ import (
 	"time"
 )
 
+// TopologyRecovery represents an entry in the topology_recovery table
+type TopologyRecovery struct {
+	TopologyRecoveryId     int64
+	AnalysisEntry          inst.ReplicationAnalysis
+	SuccessorKey           inst.InstanceKey
+	IsActive               bool
+	RecoveryStartTimestamp string
+	RecoveryEndTimestamp   string
+	ProcessingNodeHostname string
+	ProcessingNodeToken    string
+}
+
 var emergencyReadTopologyInstanceMap = cache.New(time.Duration(config.Config.DiscoveryPollSeconds)*time.Second, time.Duration(config.Config.DiscoveryPollSeconds)*time.Second)
 
 // InstancesByCountSlaves sorts instances by umber of slaves, descending
@@ -59,11 +71,7 @@ func replaceCommandPlaceholders(command string, analysisEntry inst.ReplicationAn
 		command = strings.Replace(command, "{successorPort}", fmt.Sprintf("%d", successorInstance.Key.Port), -1)
 	}
 
-	slaveHostsStrings := []string{}
-	for slaveKey := range analysisEntry.SlaveHosts {
-		slaveHostsStrings = append(slaveHostsStrings, slaveKey.DisplayString())
-	}
-	command = strings.Replace(command, "{slaveHosts}", strings.Join(slaveHostsStrings, ","), -1)
+	command = strings.Replace(command, "{slaveHosts}", analysisEntry.GetSlaveHostsAsString(), -1)
 
 	return command
 }
@@ -117,7 +125,7 @@ func executeProcesses(processes []string, description string, analysisEntry inst
 
 func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis) (bool, *inst.Instance, error) {
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
-	if ok, err := AttemptRecoveryRegistration(failedInstanceKey); !ok {
+	if ok, err := AttemptRecoveryRegistration(&analysisEntry); !ok {
 		log.Debugf("Will not RecoverDeadMaster on %+v", *failedInstanceKey)
 		return false, nil, err
 	}
@@ -304,7 +312,7 @@ func GetCandidateSiblingOfIntermediateMaster(intermediateMasterKey *inst.Instanc
 
 func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis) (actionTaken bool, successorInstance *inst.Instance, err error) {
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
-	if ok, err := AttemptRecoveryRegistration(failedInstanceKey); !ok {
+	if ok, err := AttemptRecoveryRegistration(&analysisEntry); !ok {
 		log.Debugf("Will not RecoverDeadIntermediateMaster on %+v", *failedInstanceKey)
 		return false, nil, err
 	}

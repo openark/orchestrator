@@ -16,7 +16,9 @@
 
 package inst
 
-import ()
+import (
+	"strings"
+)
 
 type AnalysisCode string
 
@@ -57,4 +59,28 @@ type ReplicationAnalysis struct {
 	Analysis                    AnalysisCode
 	Description                 string
 	IsDowntimed                 bool
+}
+
+// GetSlaveHostsAsString serializes all slave keys as a single comma delimited string
+func (this *ReplicationAnalysis) GetSlaveHostsAsString() string {
+	slaveHostsStrings := []string{}
+	for slaveKey := range this.SlaveHosts {
+		slaveHostsStrings = append(slaveHostsStrings, slaveKey.DisplayString())
+	}
+	return strings.Join(slaveHostsStrings, ",")
+}
+
+// ReadSlaveHostsFromString parses and reads slave keys from comma delimited string
+func (this *ReplicationAnalysis) ReadSlaveHostsFromString(slaveHostsString string) error {
+	this.SlaveHosts = make(map[InstanceKey]bool)
+
+	slaveHostsStrings := strings.Split(slaveHostsString, ",")
+	for _, slaveKeyString := range slaveHostsStrings {
+		slaveKey, err := ParseInstanceKey(slaveKeyString)
+		if err != nil {
+			return err
+		}
+		this.SlaveHosts[*slaveKey] = true
+	}
+	return nil
 }

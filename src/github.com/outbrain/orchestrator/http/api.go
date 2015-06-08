@@ -232,6 +232,49 @@ func (this *HttpAPI) Maintenance(params martini.Params, r render.Render, req *ht
 	r.JSON(200, instanceKeys)
 }
 
+// BeginDowntime sets a downtime flag with default duration
+func (this *HttpAPI) BeginDowntime(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	err = inst.BeginDowntime(&instanceKey, params["owner"], params["reason"], 0)
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error(), Details: instanceKey})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Downtime begun: %+v", instanceKey)})
+}
+
+// EndDowntime terminates downtime (removes downtime flag) for an instance
+func (this *HttpAPI) EndDowntime(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	err = inst.EndDowntime(&instanceKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Downtime ended: %+v", instanceKey)})
+}
+
 // MoveUp attempts to move an instance up the topology
 func (this *HttpAPI) MoveUp(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -1419,6 +1462,22 @@ func (this *HttpAPI) AutomatedRecoveryFilters(params martini.Params, r render.Re
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Automated recovery configuration details"), Details: automatedRecoveryMap})
 }
 
+// AuditRecovery provides list of topology-recovery entries
+func (this *HttpAPI) AuditRecovery(params martini.Params, r render.Render, req *http.Request) {
+	page, err := strconv.Atoi(params["page"])
+	if err != nil || page < 0 {
+		page = 0
+	}
+	audits, err := orchestrator.ReadRecentRecoveries(page)
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, audits)
+}
+
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/instance/:host/:port", this.Instance)
@@ -1446,6 +1505,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance)
 	m.Get("/api/end-maintenance/:host/:port", this.EndMaintenanceByInstanceKey)
 	m.Get("/api/end-maintenance/:maintenanceKey", this.EndMaintenance)
+	m.Get("/api/begin-downtime/:host/:port/:owner/:reason", this.BeginDowntime)
+	m.Get("/api/end-downtime/:host/:port", this.EndDowntime)
 	m.Get("/api/skip-query/:host/:port", this.SkipQuery)
 	m.Get("/api/start-slave/:host/:port", this.StartSlave)
 	m.Get("/api/stop-slave/:host/:port", this.StopSlave)
@@ -1484,6 +1545,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/recover/:host/:port", this.Recover)
 	m.Get("/api/recover/:host/:port/:candidateHost/:candidatePort", this.Recover)
 	m.Get("/api/automated-recovery-filters", this.AutomatedRecoveryFilters)
+	m.Get("/api/audit-recovery", this.AuditRecovery)
+	m.Get("/api/audit-recovery/:page", this.AuditRecovery)
 	// Agents
 	m.Get("/api/agents", this.Agents)
 	m.Get("/api/agent/:host", this.Agent)

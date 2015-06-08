@@ -161,6 +161,21 @@ func (this *HttpWeb) Audit(params martini.Params, r render.Render) {
 	})
 }
 
+func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render) {
+	page, err := strconv.Atoi(params["page"])
+	if err != nil {
+		page = 0
+	}
+
+	r.HTML(200, "templates/audit_recovery", map[string]interface{}{
+		"agentsHttpActive":  config.Config.ServeAgentsHttp,
+		"title":             "audit-recovery",
+		"activePage":        "audit-recovery",
+		"autoshow_problems": false,
+		"page":              page,
+	})
+}
+
 func (this *HttpWeb) Agents(params martini.Params, r render.Render) {
 	r.HTML(200, "templates/agents", map[string]interface{}{
 		"agentsHttpActive":  config.Config.ServeAgentsHttp,
@@ -258,6 +273,8 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/long-queries", this.LongQueries)
 	m.Get("/web/audit", this.Audit)
 	m.Get("/web/audit/:page", this.Audit)
+	m.Get("/web/audit-recovery", this.AuditRecovery)
+	m.Get("/web/audit-recovery/:page", this.AuditRecovery)
 	m.Get("/web/agents", this.Agents)
 	m.Get("/web/agent/:host", this.Agent)
 	m.Get("/web/seed-details/:seedId", this.AgentSeedDetails)
