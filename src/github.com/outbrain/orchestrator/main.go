@@ -20,8 +20,10 @@ import (
 	"flag"
 	"fmt"
 	"github.com/outbrain/golib/log"
+	"github.com/outbrain/golib/math"
 	"github.com/outbrain/orchestrator/app"
 	"github.com/outbrain/orchestrator/config"
+	"runtime"
 )
 
 const prompt string = `
@@ -581,6 +583,8 @@ func main() {
 	}
 
 	log.Info("starting")
+
+	runtime.GOMAXPROCS(math.MinInt(4, runtime.NumCPU()))
 
 	if len(*configFile) > 0 {
 		config.ForceRead(*configFile)

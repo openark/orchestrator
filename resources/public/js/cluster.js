@@ -697,6 +697,13 @@ function anonymize() {
 	$("#cluster_container div.floating_background").html("");	
 }
 
+function colorize_dc() {
+    $(".popover.instance[data-dc-color]").each(function () {
+        $(this).css("border-color", $(this).attr("data-dc-color"));
+        $(this).css("border-width", 2);
+    });	
+}
+
 $(document).ready(function () {
     $.get("/api/cluster/"+currentClusterName(), function (instances) {
         $.get("/api/maintenance",
@@ -711,6 +718,9 @@ $(document).ready(function () {
                 postVisualizeInstances(instancesMap);
                 if ($.cookie("anonymize") == "true") {
                 	anonymize();
+                }
+                if ($.cookie("colorize-dc") == "true") {
+                	colorize_dc();
                 }
             }, "json");
     }, "json");
@@ -732,6 +742,9 @@ $(document).ready(function () {
         $("#dropdown-context").append('<li><a data-command="anonymize">Anonymize</a></li>');    
         if ($.cookie("anonymize") == "true") {
         	$("#dropdown-context a[data-command=anonymize]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
+        } 
+        if ($.cookie("colorize-dc") == "true") {
+        	$("#dropdown-context a[data-command=colorize-dc]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
         } 
 
     }, "json");
@@ -765,10 +778,14 @@ $(document).ready(function () {
     	$.cookie("anonymize", "true", { path: '/', expires: 1 });
     });    
     $("body").on("click", "a[data-command=colorize-dc]", function(event) {
-        $(".popover.instance[data-dc-color]").each(function () {
-            $(this).css("border-color", $(this).attr("data-dc-color"));
-            $(this).css("border-width", 2);
-        });
+    	if ($.cookie("colorize-dc") == "true") {
+    		$.cookie("colorize-dc", "false", { path: '/', expires: 1 });
+    		location.reload();
+    		return
+        }
+    	colorize_dc();
+    	$("#dropdown-context a[data-command=colorize-dc]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
+    	$.cookie("colorize-dc", "true", { path: '/', expires: 1 });
     });    
 
     if (isAuthorizedForAction()) {

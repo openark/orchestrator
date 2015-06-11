@@ -66,8 +66,8 @@ $(document).ready(function () {
 	    	if (!(analysisEntry.Analysis in interestingAnalysis)) {
 	    		return;
 	    	}
-	    	var displayText = '<hr/><span><strong>'+analysisEntry.Analysis
-	    		+ (analysisEntry.IsDowntimed ? " [<i>downtimed</i>]": "")
+	    	var displayText = '<hr/><span><strong>'+analysisEntry.Analysis 
+	    		+ (analysisEntry.IsDowntimed ? '<br/>[<i>downtime till '+analysisEntry.DowntimeEndTimestamp+'</i>]': '')
 	    		+ "</strong></span>" 
 	    		+ "<br/>" + "<span>" + analysisEntry.AnalyzedInstanceKey.Hostname+":"+analysisEntry.AnalyzedInstanceKey.Port+ "</span>" 
 	    		;

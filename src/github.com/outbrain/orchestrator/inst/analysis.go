@@ -59,6 +59,8 @@ type ReplicationAnalysis struct {
 	Analysis                    AnalysisCode
 	Description                 string
 	IsDowntimed                 bool
+	DowntimeEndTimestamp        string
+	DowntimeRemainingSeconds    int
 }
 
 // GetSlaveHostsAsString serializes all slave keys as a single comma delimited string

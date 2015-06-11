@@ -61,7 +61,13 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		        MIN(
 		    		database_instance_downtime.downtime_active IS NULL
 		    		OR database_instance_downtime.end_timestamp < NOW()
-		    	) IS FALSE AS is_downtimed
+		    	) IS FALSE AS is_downtimed,
+		    	MIN(
+		    		IFNULL(database_instance_downtime.end_timestamp, '')
+		    	) AS downtime_end_timestamp,
+		    	MIN(
+		    		IFNULL(TIMESTAMPDIFF(SECOND, NOW(), database_instance_downtime.end_timestamp), 0)
+		    	) AS downtime_remaining_seconds
 		    FROM
 		        database_instance master_instance
 		            LEFT JOIN
@@ -111,6 +117,8 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		a.ReplicationDepth = m.GetUint("replication_depth")
 		a.IsFailingToConnectToMaster = m.GetBool("is_failing_to_connect_to_master")
 		a.IsDowntimed = m.GetBool("is_downtimed")
+		a.DowntimeEndTimestamp = m.GetString("downtime_end_timestamp")
+		a.DowntimeRemainingSeconds = m.GetInt("downtime_remaining_seconds")
 
 		instance := &Instance{}
 		instance.ReadSlaveHostsFromJson(m.GetString("slave_hosts"))
