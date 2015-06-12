@@ -50,6 +50,7 @@ func (this *HttpWeb) Clusters(params martini.Params, r render.Render, req *http.
 		"activePage":                    "cluster",
 		"autoshow_problems":             false,
 		"authorizedForAction":           isAuthorizedForAction(req, user),
+		"userId":                        getUserId(req, user),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
 	})
 }
@@ -61,6 +62,7 @@ func (this *HttpWeb) ClustersAnalysis(params martini.Params, r render.Render, re
 		"activePage":                    "cluster",
 		"autoshow_problems":             false,
 		"authorizedForAction":           isAuthorizedForAction(req, user),
+		"userId":                        getUserId(req, user),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
 	})
 }
@@ -75,6 +77,7 @@ func (this *HttpWeb) Cluster(params martini.Params, r render.Render, req *http.R
 		"contextMenuVisible":            true,
 		"pseudoGTIDModeEnabled":         (config.Config.PseudoGTIDPattern != ""),
 		"authorizedForAction":           isAuthorizedForAction(req, user),
+		"userId":                        getUserId(req, user),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
 		"compactDisplay":                req.URL.Query().Get("compact"),
 	})
@@ -101,32 +104,37 @@ func (this *HttpWeb) ClusterPools(params martini.Params, r render.Render, req *h
 		"contextMenuVisible":            true,
 		"pseudoGTIDModeEnabled":         (config.Config.PseudoGTIDPattern != ""),
 		"authorizedForAction":           isAuthorizedForAction(req, user),
+		"userId":                        getUserId(req, user),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
 		"compactDisplay":                req.URL.Query().Get("compact"),
 	})
 }
 
-func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Request) {
+func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	searchString := params["searchString"]
 	if searchString == "" {
 		searchString = req.URL.Query().Get("s")
 	}
 	r.HTML(200, "templates/search", map[string]interface{}{
-		"agentsHttpActive":  config.Config.ServeAgentsHttp,
-		"title":             "search",
-		"activePage":        "search",
-		"searchString":      searchString,
-		"autoshow_problems": false,
+		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"title":               "search",
+		"activePage":          "search",
+		"searchString":        searchString,
+		"authorizedForAction": isAuthorizedForAction(req, user),
+		"userId":              getUserId(req, user),
+		"autoshow_problems":   false,
 	})
 }
 
-func (this *HttpWeb) Discover(params martini.Params, r render.Render) {
+func (this *HttpWeb) Discover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 
 	r.HTML(200, "templates/discover", map[string]interface{}{
-		"agentsHttpActive":  config.Config.ServeAgentsHttp,
-		"title":             "discover",
-		"activePage":        "discover",
-		"autoshow_problems": false,
+		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"title":               "discover",
+		"activePage":          "discover",
+		"authorizedForAction": isAuthorizedForAction(req, user),
+		"userId":              getUserId(req, user),
+		"autoshow_problems":   false,
 	})
 }
 
@@ -140,117 +148,138 @@ func (this *HttpWeb) LongQueries(params martini.Params, r render.Render, req *ht
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "long queries",
 		"activePage":          "queries",
-		"autoshow_problems":   false,
 		"authorizedForAction": isAuthorizedForAction(req, user),
+		"userId":              getUserId(req, user),
+		"autoshow_problems":   false,
 		"filter":              filter,
 	})
 }
 
-func (this *HttpWeb) Audit(params martini.Params, r render.Render) {
+func (this *HttpWeb) Audit(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	page, err := strconv.Atoi(params["page"])
 	if err != nil {
 		page = 0
 	}
 
 	r.HTML(200, "templates/audit", map[string]interface{}{
-		"agentsHttpActive":  config.Config.ServeAgentsHttp,
-		"title":             "audit",
-		"activePage":        "audit",
-		"autoshow_problems": false,
-		"page":              page,
+		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"title":               "audit",
+		"activePage":          "audit",
+		"authorizedForAction": isAuthorizedForAction(req, user),
+		"userId":              getUserId(req, user),
+		"autoshow_problems":   false,
+		"page":                page,
 	})
 }
 
-func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render) {
+func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	page, err := strconv.Atoi(params["page"])
 	if err != nil {
 		page = 0
 	}
 
 	r.HTML(200, "templates/audit_recovery", map[string]interface{}{
-		"agentsHttpActive":  config.Config.ServeAgentsHttp,
-		"title":             "audit-recovery",
-		"activePage":        "audit-recovery",
-		"autoshow_problems": false,
-		"page":              page,
+		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"title":               "audit-recovery",
+		"activePage":          "audit-recovery",
+		"authorizedForAction": isAuthorizedForAction(req, user),
+		"userId":              getUserId(req, user),
+		"autoshow_problems":   false,
+		"page":                page,
 	})
 }
 
-func (this *HttpWeb) Agents(params martini.Params, r render.Render) {
+func (this *HttpWeb) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/agents", map[string]interface{}{
-		"agentsHttpActive":  config.Config.ServeAgentsHttp,
-		"title":             "agents",
-		"activePage":        "agents",
-		"autoshow_problems": false,
+		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"title":               "agents",
+		"activePage":          "agents",
+		"authorizedForAction": isAuthorizedForAction(req, user),
+		"userId":              getUserId(req, user),
+		"autoshow_problems":   false,
 	})
 }
 
-func (this *HttpWeb) Agent(params martini.Params, r render.Render) {
+func (this *HttpWeb) Agent(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/agent", map[string]interface{}{
-		"agentsHttpActive":  config.Config.ServeAgentsHttp,
-		"title":             "agent",
-		"activePage":        "agents",
-		"autoshow_problems": false,
-		"agentHost":         params["host"],
+		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"title":               "agent",
+		"activePage":          "agents",
+		"authorizedForAction": isAuthorizedForAction(req, user),
+		"userId":              getUserId(req, user),
+		"autoshow_problems":   false,
+		"agentHost":           params["host"],
 	})
 }
 
-func (this *HttpWeb) AgentSeedDetails(params martini.Params, r render.Render) {
+func (this *HttpWeb) AgentSeedDetails(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/agent_seed_details", map[string]interface{}{
-		"agentsHttpActive":  config.Config.ServeAgentsHttp,
-		"title":             "agent seed details",
-		"activePage":        "agents",
-		"autoshow_problems": false,
-		"seedId":            params["seedId"],
+		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"title":               "agent seed details",
+		"activePage":          "agents",
+		"authorizedForAction": isAuthorizedForAction(req, user),
+		"userId":              getUserId(req, user),
+		"autoshow_problems":   false,
+		"seedId":              params["seedId"],
 	})
 }
 
-func (this *HttpWeb) Seeds(params martini.Params, r render.Render) {
+func (this *HttpWeb) Seeds(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/seeds", map[string]interface{}{
-		"agentsHttpActive":  config.Config.ServeAgentsHttp,
-		"title":             "seeds",
-		"activePage":        "agents",
-		"autoshow_problems": false,
+		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"title":               "seeds",
+		"activePage":          "agents",
+		"authorizedForAction": isAuthorizedForAction(req, user),
+		"userId":              getUserId(req, user),
+		"autoshow_problems":   false,
 	})
 }
 
-func (this *HttpWeb) Home(params martini.Params, r render.Render) {
+func (this *HttpWeb) Home(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 
 	r.HTML(200, "templates/home", map[string]interface{}{
-		"agentsHttpActive":  config.Config.ServeAgentsHttp,
-		"title":             "home",
-		"activePage":        "home",
-		"autoshow_problems": false,
+		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"title":               "home",
+		"activePage":          "home",
+		"authorizedForAction": isAuthorizedForAction(req, user),
+		"userId":              getUserId(req, user),
+		"autoshow_problems":   false,
 	})
 }
 
-func (this *HttpWeb) About(params martini.Params, r render.Render) {
+func (this *HttpWeb) About(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 
 	r.HTML(200, "templates/about", map[string]interface{}{
-		"agentsHttpActive":  config.Config.ServeAgentsHttp,
-		"title":             "about",
-		"activePage":        "home",
-		"autoshow_problems": false,
+		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"title":               "about",
+		"activePage":          "home",
+		"authorizedForAction": isAuthorizedForAction(req, user),
+		"userId":              getUserId(req, user),
+		"autoshow_problems":   false,
 	})
 }
 
-func (this *HttpWeb) KeepCalm(params martini.Params, r render.Render) {
+func (this *HttpWeb) KeepCalm(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 
 	r.HTML(200, "templates/keep-calm", map[string]interface{}{
-		"agentsHttpActive":  config.Config.ServeAgentsHttp,
-		"title":             "Keep Calm",
-		"activePage":        "home",
-		"autoshow_problems": false,
+		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"title":               "Keep Calm",
+		"activePage":          "home",
+		"authorizedForAction": isAuthorizedForAction(req, user),
+		"userId":              getUserId(req, user),
+		"autoshow_problems":   false,
 	})
 }
 
-func (this *HttpWeb) FAQ(params martini.Params, r render.Render) {
+func (this *HttpWeb) FAQ(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 
 	r.HTML(200, "templates/faq", map[string]interface{}{
-		"agentsHttpActive":  config.Config.ServeAgentsHttp,
-		"title":             "FAQ",
-		"activePage":        "home",
-		"autoshow_problems": false,
+		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"title":               "FAQ",
+		"activePage":          "home",
+		"authorizedForAction": isAuthorizedForAction(req, user),
+		"userId":              getUserId(req, user),
+		"autoshow_problems":   false,
 	})
 }
 

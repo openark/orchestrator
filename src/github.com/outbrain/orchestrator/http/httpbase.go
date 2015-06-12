@@ -69,3 +69,29 @@ func isAuthorizedForAction(req *http.Request, user auth.User) bool {
 		}
 	}
 }
+
+// getUserId returns the authenticated user id, if available, depending on authertication method.
+func getUserId(req *http.Request, user auth.User) string {
+	if config.Config.ReadOnly {
+		return ""
+	}
+
+	switch strings.ToLower(config.Config.AuthenticationMethod) {
+	case "basic":
+		{
+			return string(user)
+		}
+	case "multi":
+		{
+			return string(user)
+		}
+	case "proxy":
+		{
+			return getProxyAuthUser(req)
+		}
+	default:
+		{
+			return ""
+		}
+	}
+}

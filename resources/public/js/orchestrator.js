@@ -751,6 +751,13 @@ $(document).ready(function() {
 	if (contextMenuVisible() == "true") {
 		showContextMenu();
 	}
+	if (!isAuthorizedForAction()) {
+	    $("[data-nav-page=read-only]").css('display', 'inline-block');
+	}
+	if (getUserId() != "") {
+		$("[data-nav-page=user-id]").css('display', 'inline-block');
+		$("[data-nav-page=user-id] a").html(" "+getUserId());
+	}
     var orchestratorMsg = getParameterByName("orchestrator-msg")
     if (orchestratorMsg) {
         addInfo(orchestratorMsg)
