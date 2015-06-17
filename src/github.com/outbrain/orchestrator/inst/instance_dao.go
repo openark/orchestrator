@@ -176,6 +176,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		if err != nil {
 			goto Cleanup
 		}
+		// @@gtid_mode only available in Orcale MySQL >= 5.6
+		_ = db.QueryRow("select @@global.gtid_mode = 'ON'").Scan(&instance.SupportsOracleGTID)
 	}
 	if resolvedHostname != instance.Key.Hostname {
 		UpdateResolvedHostname(instance.Key.Hostname, resolvedHostname)
@@ -1628,12 +1630,15 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	}
 
 	if instance.UsingMariaDBGTID {
-		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d",
-			unresolvedMasterKey.Hostname, unresolvedMasterKey.Port))
-	} else {
 		// MariaDB has a bug: a CHANGE MASTER TO statement does not work properly with prepared statement... :P
 		// See https://mariadb.atlassian.net/browse/MDEV-7640
 		// This is the reason for ExecInstanceNoPrepare
+		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d",
+			unresolvedMasterKey.Hostname, unresolvedMasterKey.Port))
+	} else if instance.UsingOracleGTID {
+		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_auto_position=1",
+			unresolvedMasterKey.Hostname, unresolvedMasterKey.Port))
+	} else {
 		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d",
 			unresolvedMasterKey.Hostname, unresolvedMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
 	}

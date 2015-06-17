@@ -216,6 +216,7 @@ type Instance struct {
 	Slave_SQL_Running      bool
 	Slave_IO_Running       bool
 	HasReplicationFilters  bool
+	SupportsOracleGTID     bool
 	UsingOracleGTID        bool
 	UsingMariaDBGTID       bool
 	UsingPseudoGTID        bool
@@ -292,7 +293,7 @@ func (this *Instance) IsMaxScale() bool {
 
 // IsSlave makes simple heuristics to decide whether this insatnce is a slave of another instance
 func (this *Instance) IsSlave() bool {
-	return this.MasterKey.Hostname != "" && this.MasterKey.Hostname != "_" && this.MasterKey.Port != 0 && this.ReadBinlogCoordinates.LogFile != ""
+	return this.MasterKey.Hostname != "" && this.MasterKey.Hostname != "_" && this.MasterKey.Port != 0 && (this.ReadBinlogCoordinates.LogFile != "" || this.UsingGTID())
 }
 
 // SlaveRunning returns true when this instance's status is of a replicating slave.

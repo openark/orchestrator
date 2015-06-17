@@ -78,7 +78,7 @@ func getClusterName(clusterAlias string, instanceKey *inst.InstanceKey) (cluster
 }
 
 // Cli initiates a command line interface, executing requested command.
-func Cli(command string, strict bool, instance string, sibling string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string) {
+func Cli(command string, strict bool, instance string, sibling string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string, hostnameFlag string) {
 
 	if instance != "" && !strings.Contains(instance, ":") {
 		instance = fmt.Sprintf("%s:%d", instance, config.Config.DefaultInstancePort)
@@ -616,6 +616,34 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 			err := inst.RegisterCandidateInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
+	case cliCommand("register-hostname-unresolve"):
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			err := inst.RegisterHostnameUnresolve(instanceKey, hostnameFlag)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
+	case cliCommand("deregister-hostname-unresolve"):
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			err := inst.DeregisterHostnameUnresolve(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}

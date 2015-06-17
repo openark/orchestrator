@@ -166,7 +166,16 @@ function moveInstance(node, droppableNode, shouldApply) {
     	// Obviously this is also checked on server side, no need to try stupid hacks
 		return null;
     }
+    var isUsingGTID = (node.usingGTID && droppableNode.usingGTID);
+    var gtidBelowFunc = null
 	if (clusterOperationPseudoGTIDMode) {
+		// definitely peudo-gtid match
+		gtidBelowFunc = matchBelow
+	} else if (isUsingGTID) {
+		//gtidBelowFunc = moveBelow
+	}
+	if (gtidBelowFunc != null) {
+		// Moving via GTID or Pseudo GTID
 		if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem || droppableNode.isAggregate) {
 			// Obviously can't handle.
 			return null;
@@ -186,25 +195,25 @@ function moveInstance(node, droppableNode, shouldApply) {
 		if (instanceIsDescendant(node, droppableNode)) {
 			// clearly node cannot be more up to date than droppableNode
 			if (shouldApply) {
-				matchBelow(node, droppableNode);
+				gtidBelowFunc(node, droppableNode);
 			}
 			return "ok";
 		}
 		if (isReplicationBehindSibling(node, droppableNode)) {
 			// verified that node isn't more up to date than droppableNode
 			if (shouldApply) {
-				matchBelow(node, droppableNode);
+				gtidBelowFunc(node, droppableNode);
 			}
 			return "ok";
 		}
 		// TODO: the general case, where there's no clear family connection, meaning we cannot infer
 		// which instance is more up to date. It's under the user's responsibility!
 		if (shouldApply) {
-			matchBelow(node, droppableNode);
+			gtidBelowFunc(node, droppableNode);
 		}
 		return "warning";
 	}
-	// Not pseudo-GTID mode
+	// Not pseudo-GTID mode, non GTID mode
 	if (node.isCoMaster) {
 		// Cannot move. RESET SLAVE on one of the co-masters.
 		return null;

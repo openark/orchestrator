@@ -392,6 +392,11 @@ var generateSQLPatches = []string{
 			ADD COLUMN count_affected_slaves int unsigned NOT NULL,
 			ADD COLUMN slave_hosts text CHARACTER SET ascii NOT NULL
 	`,
+	`
+		ALTER TABLE hostname_unresolve
+			ADD COLUMN last_registered TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			ADD KEY last_registered_idx (last_registered)
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance

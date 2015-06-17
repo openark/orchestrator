@@ -380,10 +380,18 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 		return instance, err
 	}
 
+	isOracleGTID := (instance.UsingOracleGTID && sibling.UsingOracleGTID)
+	isMariaDBGTID := (instance.UsingMariaDBGTID && sibling.UsingMariaDBGTID)
+
+	if isOracleGTID || isMariaDBGTID {
+		//~~~return MoveBelowViaGTID(instance, sibling)
+	}
+
 	rinstance, _, _ := ReadInstance(&instance.Key)
 	if canMove, merr := rinstance.CanMove(); !canMove {
 		return instance, merr
 	}
+
 	rinstance, _, _ = ReadInstance(&sibling.Key)
 	if canMove, merr := rinstance.CanMove(); !canMove {
 		return instance, merr
@@ -395,7 +403,7 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 	if canReplicate, err := instance.CanReplicateFrom(sibling); !canReplicate {
 		return instance, err
 	}
-	log.Infof("Will move %+v below its sibling %+v", instanceKey, siblingKey)
+	log.Infof("Will move %+v below %+v", instanceKey, siblingKey)
 
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("move below %+v", *siblingKey)); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
@@ -426,7 +434,6 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 		if err != nil {
 			goto Cleanup
 		}
-
 		if instance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
 			instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &sibling.ExecBinlogCoordinates)
 			if err != nil {
@@ -455,6 +462,62 @@ Cleanup:
 	}
 	// and we're done (pending deferred functions)
 	AuditOperation("move-below", instanceKey, fmt.Sprintf("moved %+v below %+v", *instanceKey, *siblingKey))
+
+	return instance, err
+}
+
+// MoveBelowViaGTID will attempt moving instance indicated by instanceKey below another instance using either Oracle GTID or MaroaDB GTID.
+func MoveBelowViaGTID(instance, otherInstance *Instance) (*Instance, error) {
+	isOracleGTID := (instance.UsingOracleGTID && otherInstance.UsingOracleGTID)
+	isMariaDBGTID := (instance.UsingMariaDBGTID && otherInstance.UsingMariaDBGTID)
+
+	instanceKey := &instance.Key
+	otherInstanceKey := &otherInstance.Key
+	if !isOracleGTID && !isMariaDBGTID {
+		return instance, fmt.Errorf("Cannot move via GTID as not both instances use GTID: %+v, %+v", *instanceKey, *otherInstanceKey)
+	}
+
+	var err error
+
+	rinstance, _, _ := ReadInstance(&instance.Key)
+	if canMove, merr := rinstance.CanMoveViaMatch(); !canMove {
+		return instance, merr
+	}
+
+	if canReplicate, err := instance.CanReplicateFrom(otherInstance); !canReplicate {
+		return instance, err
+	}
+	log.Infof("Will move %+v below %+v", instanceKey, otherInstanceKey)
+
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("move below %+v", *otherInstanceKey)); merr != nil {
+		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
+	if maintenanceToken, merr := BeginMaintenance(otherInstanceKey, GetMaintenanceOwner(), fmt.Sprintf("%+v moves below this", *instanceKey)); merr != nil {
+		err = fmt.Errorf("Cannot begin maintenance on %+v", *otherInstanceKey)
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
+
+	instance, err = StopSlave(instanceKey)
+	if err != nil {
+		goto Cleanup
+	}
+
+	instance, err = ChangeMasterTo(instanceKey, &otherInstance.Key, &otherInstance.SelfBinlogCoordinates)
+	if err != nil {
+		goto Cleanup
+	}
+Cleanup:
+	instance, _ = StartSlave(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	// and we're done (pending deferred functions)
+	AuditOperation("move-below-gtid", instanceKey, fmt.Sprintf("moved %+v below %+v", *instanceKey, *otherInstanceKey))
 
 	return instance, err
 }
@@ -783,6 +846,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	if err != nil {
 		return instance, nil, err
 	}
+
 	rinstance, _, _ := ReadInstance(&instance.Key)
 	if canMove, merr := rinstance.CanMoveViaMatch(); !canMove {
 		return instance, nil, merr
