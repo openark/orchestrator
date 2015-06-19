@@ -488,6 +488,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.IsLastCheckValid = m.GetBool("is_last_check_valid")
 	instance.SecondsSinceLastSeen = m.GetNullInt64("seconds_since_last_seen")
 	instance.IsCandidate = m.GetBool("is_candidate")
+	instance.UnresolvedHostname = m.GetString("unresolved_hostname")
 
 	instance.ReadSlaveHostsFromJson(slaveHostsJSON)
 	return instance
@@ -509,10 +510,12 @@ func readInstancesByCondition(condition string) ([](*Instance), error) {
 			timestampdiff(second, last_checked, now()) as seconds_since_last_checked,
 			(last_checked <= last_seen) is true as is_last_check_valid,
 			timestampdiff(second, last_seen, now()) as seconds_since_last_seen,
-			candidate_database_instance.last_suggested is not null as is_candidate 
+			candidate_database_instance.last_suggested is not null as is_candidate,
+			ifnull(unresolved_hostname, "") as unresolved_hostname 
 		from 
 			database_instance 
 			left join candidate_database_instance using (hostname, port)
+			left join hostname_unresolve using (hostname)
 		where
 			%s
 		order by

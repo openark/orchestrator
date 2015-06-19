@@ -176,6 +176,9 @@ function openNodeModal(node) {
     $('#node_modal .modal-title').html(node.title);
     $('#modalDataAttributesTable').html("");
 
+    if (node.UnresolvedHostname) {
+    	addNodeModalDataAttribute("Unresolved hostname", node.UnresolvedHostname);
+    }
     if (node.MasterKey.Hostname) {
         var td = addNodeModalDataAttribute("Master", node.masterTitle);
         $('#node_modal button[data-btn=reset-slave]').appendTo(td.find("div"))

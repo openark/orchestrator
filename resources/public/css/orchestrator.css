@@ -197,6 +197,10 @@
 
 
 
+#node_modal .modal-title {
+    font: 12px sans-serif;
+}
+
 #node_modal .modal-content {
     font-size: 12px;
 }
