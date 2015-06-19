@@ -745,7 +745,7 @@ func GetClusterHeuristicLag(clusterName string) (int64, error) {
 
 }
 
-// updateClusterNameForUnseenInstances
+// updateInstanceClusterName
 func updateInstanceClusterName(instance *Instance) error {
 	writeFunc := func() error {
 		db, err := db.OpenOrchestrator()
