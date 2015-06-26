@@ -164,6 +164,17 @@
     color: inherit;
 }
 
+
+#instance_problems button.btn-stale {
+    background-color: #808080;
+    color: #ffffff;
+}
+
+#instance_problems button.btn-fatal {
+    background-color: #000000;
+    color: #ffffff;
+}
+
 #instance_problems .popover.instance {
     font: 10px sans-serif;
     display: block;
@@ -280,7 +291,6 @@ div[data-btn-group=recover] code {
     border-color: #dddddd;
 }
 
-
 .popover-footer {
   padding: 8px 14px;
   margin: 0;
@@ -291,6 +301,38 @@ div[data-btn-group=recover] code {
   border-bottom: 1px solid #ebebeb;
   border-radius: 0 0 5px 5px;
 }
+
+#cluster_sidebar {
+	float:left;
+	position: absolute;
+	display: none;
+}
+
+#cluster_sidebar li {
+	font-size: 1.2em;
+}
+
+#cluster_sidebar li div {
+	cursor: pointer;
+}
+
+#cluster_sidebar li span.glyphicon {
+	font-size: 2em;
+}
+
+#cluster_sidebar .nav li > a {
+	padding: 0;
+	
+}
+
+#cluster_sidebar .nav li a:hover {
+	background-color: inherit;
+}
+
+#cluster_sidebar li .popover {
+	width: 640px;
+}
+
 #cluster_container .popover.instance {
     font: 10px sans-serif;
     display: block;
@@ -354,6 +396,7 @@ div[data-btn-group=recover] code {
 	z-index: -1;
 	font-size: 50px;
 	color: #d0d0d0;
+	padding-left: 32px;
 }
 
 #cluster_container {

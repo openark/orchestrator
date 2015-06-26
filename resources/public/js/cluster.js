@@ -188,10 +188,6 @@ function moveInstance(node, droppableNode, shouldApply) {
 			// Wrong direction!
 			return null;
 		}
-		if (isReplicationStrictlyBehindSibling(droppableNode, node)) {
-			// Sibling known to be less advanced. Wrong direction!
-			return null;
-		}
 		if (instanceIsDescendant(node, droppableNode)) {
 			// clearly node cannot be more up to date than droppableNode
 			if (shouldApply) {
@@ -245,7 +241,12 @@ function moveInstance(node, droppableNode, shouldApply) {
 	}
 	if (instanceIsChild(node, droppableNode) && !droppableNode.isMaster) {
 		if (node.hasProblem) {
-			return null;
+			// Typically, when a node has a problem we do not allow moving it up.
+			// But there's a special situation when allowing is desired: when
+			// this slave is completely caught up;
+			if (!node.isSQLThreadCaughtUpWithIOThread) { 
+				return null;
+			}
 		}
 		if (shouldApply) {
 			enslaveMaster(node, droppableNode);
@@ -713,6 +714,15 @@ function colorize_dc() {
     });	
 }
 
+function populateSidebar(clusterInfo) {
+//	$("#cluster_sidebar [data-bullet=info]").append('<span class="glyphicon glyphicon-info-sign"></span>');
+	$("#cluster_sidebar [data-bullet=problem]").append('<span class="glyphicon glyphicon-exclamation-sign"></span>');
+	$("#cluster_sidebar [data-bullet=lag]").append('<span class="glyphicon glyphicon-time"></span>');
+	$("#cluster_sidebar [data-bullet=compact]").append('<span class="glyphicon glyphicon-resize-small"></span>');
+	$("#cluster_sidebar [data-bullet=pools]").append('<span class="glyphicon glyphicon-list"></span>');
+	//$("#cluster_sidebar [data-bullet=compact]").append('<span class="glyphicon glyphicon-resize-small"></span>');
+}
+
 $(document).ready(function () {
     $.get("/api/cluster/"+currentClusterName(), function (instances) {
         $.get("/api/maintenance",
@@ -755,6 +765,7 @@ $(document).ready(function () {
         if ($.cookie("colorize-dc") == "true") {
         	$("#dropdown-context a[data-command=colorize-dc]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
         } 
+        populateSidebar(clusterInfo);
 
     }, "json");
     
@@ -767,8 +778,7 @@ $(document).ready(function () {
 	    	refreshClusterOperationModeButton(); 
 	    });
     }
-    $("#instance_problems button").html("Cluster " + $("#instance_problems button").html())
-    
+    $("#instance_problems_button").attr("title", "Cluster Problems");
     
     $("body").on("click", "a[data-command=change-cluster-alias]", function(event) {    	
     	promptForAlias($(event.target).attr("data-alias"));
@@ -797,6 +807,9 @@ $(document).ready(function () {
     	$.cookie("colorize-dc", "true", { path: '/', expires: 1 });
     });    
 
+    $("[data-toggle=popover]").popover();
+    $("[data-toggle=popover]").show();
+    
     if (isAuthorizedForAction()) {
     	// Read-only users don't get auto-refresh. Sorry!
     	activateRefreshTimer();

@@ -108,8 +108,8 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		a.IsCoMaster = m.GetBool("is_co_master")
 		a.AnalyzedInstanceKey = InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
 		a.AnalyzedInstanceMasterKey = InstanceKey{Hostname: m.GetString("master_host"), Port: m.GetInt("master_port")}
-		a.ClusterName = m.GetString("cluster_name")
-		a.ClusterAlias = m.GetString("cluster_alias")
+		a.ClusterDetails.ClusterName = m.GetString("cluster_name")
+		a.ClusterDetails.ClusterAlias = m.GetString("cluster_alias")
 		a.LastCheckValid = m.GetBool("is_last_check_valid")
 		a.CountSlaves = m.GetUint("count_slaves")
 		a.CountValidSlaves = m.GetUint("count_valid_slaves")
@@ -119,6 +119,7 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		a.IsDowntimed = m.GetBool("is_downtimed")
 		a.DowntimeEndTimestamp = m.GetString("downtime_end_timestamp")
 		a.DowntimeRemainingSeconds = m.GetInt("downtime_remaining_seconds")
+		a.ClusterDetails.ReadRecoveryInfo()
 
 		instance := &Instance{}
 		instance.ReadSlaveHostsFromJson(m.GetString("slave_hosts"))

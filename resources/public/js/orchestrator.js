@@ -395,6 +395,8 @@ function normalizeInstance(instance) {
     instance.isMostAdvancedOfSiblings = false;
     instance.isVirtual = false;
     instance.isAggregate = false;
+    
+    instance.renderHint = "";
 }
 
 function normalizeInstanceProblem(instance) {
@@ -595,17 +597,20 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	    } 
 	
 	    if (instance.lastCheckInvalidProblem()) {
-	    	popoverElement.find("h3").addClass("label-fatal");
+	    	instance.renderHint = "fatal";
 	    	indicateLastSeenInStatus = true;
 	    } else if (instance.notRecentlyCheckedProblem()) {
-	    	popoverElement.find("h3").addClass("label-stale");
+	    	instance.renderHint = "stale";
 	    	indicateLastSeenInStatus = true;
 	    } else if (instance.notReplicatingProblem()) {
 	    	// check slaves only; check master only if it's co-master where not
 			// replicating
-	    	popoverElement.find("h3").addClass("label-danger");
+	    	instance.renderHint = "danger";
 	    } else if (instance.replicationLagProblem()) {
-	    	popoverElement.find("h3").addClass("label-warning");
+	    	instance.renderHint = "warning";
+	    }
+	    if (instance.renderHint != "") {
+	    	popoverElement.find("h3").addClass("label-" + instance.renderHint);
 	    }
 		var statusMessage = instance.SlaveLagSeconds.Int64 + ' seconds lag';
 		if (indicateLastSeenInStatus) {
@@ -641,12 +646,16 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	}
 
     if (renderType == "cluster" && instance.lastCheckInvalidProblem() && instance.children && instance.children.length > 0) {
+    	// Recovery options!
     	popoverElement.append('<h4 class="popover-footer"><div class="btn-group" data-btn-group="recover"><button type="button" class="btn btn-xs btn-default dropdown-toggle" data-toggle="dropdown"><span class="glyphicon glyphicon-heart text-danger"></span> Recover <span class="caret"></span> <span class="sr-only">Toggle Dropdown</span></button><ul class="dropdown-menu" role="menu"></ul></div></h4>');
-        popoverElement.find("div[data-btn-group=recover] ul").append('<li><a href="#" data-btn="auto" data-command="recover-auto">Auto</a></li>');
+    	var recoveryListing = popoverElement.find("div[data-btn-group=recover] ul");
+        recoveryListing.append('<li><a href="#" data-btn="auto" data-command="recover-auto">Auto (implies running external hooks/processes)</a></li>');
+        recoveryListing.append('<li role="separator" class="divider"></li>');
+        
         if (!instance.isMaster) {
-            popoverElement.find("div[data-btn-group=recover] ul").append('<li><a href="#" data-btn="match-up-slaves" data-command="match-up-slaves">Match up slaves to <code>'+instance.masterTitle+'</code></a></li>');
+            recoveryListing.append('<li><a href="#" data-btn="match-up-slaves" data-command="match-up-slaves">Match up slaves to <code>'+instance.masterTitle+'</code></a></li>');
         }
-        popoverElement.find("div[data-btn-group=recover] ul").append('<li><a href="#" data-btn="regroup-slaves" data-command="regroup-slaves">Regroup slaves (auto pick best slave)</a></li>');
+        recoveryListing.append('<li><a href="#" data-btn="regroup-slaves" data-command="regroup-slaves">Regroup slaves (auto pick best slave, only heals topology, no external processes)</a></li>');
         if (instance.isMaster) {
         	// Suggest successor
 		    instance.children.forEach(function(slave) {
@@ -665,7 +674,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
                 if (slave.notRecentlyCheckedProblem()) {
                     return
                 }
-                popoverElement.find("div[data-btn-group=recover] ul").append(
+                recoveryListing.append(
                     '<li><a href="#" data-btn="recover-suggested-successor" data-command="recover-suggested-successor" data-suggested-successor-host="'+slave.Key.Hostname
                     +'" data-suggested-successor-port="'+slave.Key.Port+'">Regroup slaves, try to promote <code>'+slave.title+'</code></a></li>');
 	        });                 
@@ -688,7 +697,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
                 if (sibling.notRecentlyCheckedProblem()) {
                     return
                 }
-                popoverElement.find("div[data-btn-group=recover] ul").append(
+                recoveryListing.append(
                     '<li><a href="#" data-btn="multi-match-slaves" data-command="multi-match-slaves" data-below-host="'+sibling.Key.Hostname
                     +'" data-below-port="'+sibling.Key.Port+'">Match all slaves below <code>'+sibling.title+'</code></a></li>');
 	        });                 

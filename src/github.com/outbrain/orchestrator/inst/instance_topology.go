@@ -1083,10 +1083,6 @@ func EnslaveMaster(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	// swap is done!
 
-	// Take care of instance's previous siblings (slaves of masterInstance)
-
-	// Don't have to do this right now.
-
 Cleanup:
 	instance, _ = StartSlave(&instance.Key)
 	masterInstance, _ = StartSlave(&masterInstance.Key)

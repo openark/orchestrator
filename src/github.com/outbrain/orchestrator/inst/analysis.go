@@ -45,8 +45,7 @@ const (
 type ReplicationAnalysis struct {
 	AnalyzedInstanceKey         InstanceKey
 	AnalyzedInstanceMasterKey   InstanceKey
-	ClusterName                 string
-	ClusterAlias                string
+	ClusterDetails              ClusterInfo
 	IsMaster                    bool
 	IsCoMaster                  bool
 	LastCheckValid              bool

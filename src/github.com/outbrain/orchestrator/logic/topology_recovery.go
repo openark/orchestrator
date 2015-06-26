@@ -23,7 +23,6 @@ import (
 	"github.com/outbrain/orchestrator/inst"
 	"github.com/outbrain/orchestrator/os"
 	"github.com/pmylund/go-cache"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -62,8 +61,8 @@ func replaceCommandPlaceholders(command string, analysisEntry inst.ReplicationAn
 	command = strings.Replace(command, "{failureDescription}", analysisEntry.Description, -1)
 	command = strings.Replace(command, "{failedHost}", analysisEntry.AnalyzedInstanceKey.Hostname, -1)
 	command = strings.Replace(command, "{failedPort}", fmt.Sprintf("%d", analysisEntry.AnalyzedInstanceKey.Port), -1)
-	command = strings.Replace(command, "{failureCluster}", analysisEntry.ClusterName, -1)
-	command = strings.Replace(command, "{failureClusterAlias}", analysisEntry.ClusterAlias, -1)
+	command = strings.Replace(command, "{failureCluster}", analysisEntry.ClusterDetails.ClusterName, -1)
+	command = strings.Replace(command, "{failureClusterAlias}", analysisEntry.ClusterDetails.ClusterAlias, -1)
 	command = strings.Replace(command, "{countSlaves}", fmt.Sprintf("%d", analysisEntry.CountSlaves), -1)
 
 	if successorInstance != nil {
@@ -74,31 +73,6 @@ func replaceCommandPlaceholders(command string, analysisEntry inst.ReplicationAn
 	command = strings.Replace(command, "{slaveHosts}", analysisEntry.GetSlaveHostsAsString(), -1)
 
 	return command
-}
-
-// filtersMatchAnalysisEntry will see whether the given filters apply for the given analysis entry (and hence the cluster it relates to)
-func filtersMatchAnalysisEntry(analysisEntry inst.ReplicationAnalysis, filters []string, skipFilters bool) bool {
-	if skipFilters {
-		return true
-	}
-	for _, filter := range filters {
-		if strings.HasPrefix(filter, "alias=") {
-			// Match by exact cluster alias name
-			alias := strings.SplitN(filter, "=", 2)[1]
-			if alias == analysisEntry.ClusterAlias {
-				return true
-			}
-		} else if strings.HasPrefix(filter, "alias~=") {
-			// Match by cluster alias regex
-			aliasPattern := strings.SplitN(filter, "~=", 2)[1]
-			if matched, _ := regexp.MatchString(aliasPattern, analysisEntry.ClusterAlias); matched {
-				return true
-			}
-		} else if matched, _ := regexp.MatchString(filter, analysisEntry.ClusterName); matched && filter != "" {
-			return true
-		}
-	}
-	return false
 }
 
 // executeProcesses executes a list of processes
@@ -220,11 +194,11 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 // checkAndRecoverDeadMaster checks a given analysis, decides whether to take action, and possibly takes action
 // Returns true when action was taken.
 func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
-	if !filtersMatchAnalysisEntry(analysisEntry, config.Config.RecoverMasterClusterFilters, skipFilters) {
+	if !(skipFilters || analysisEntry.ClusterDetails.HasAutomatedMasterRecovery) {
 		return false, nil, nil
 	}
 	// Let's do dead master recovery!
-	log.Debugf("Will handle DeadMaster event on %+v", analysisEntry.ClusterName)
+	log.Debugf("Will handle DeadMaster event on %+v", analysisEntry.ClusterDetails.ClusterName)
 	actionTaken, promotedSlave, err := RecoverDeadMaster(analysisEntry)
 
 	if actionTaken && promotedSlave != nil {
@@ -367,7 +341,7 @@ func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis) (acti
 // checkAndRecoverDeadIntermediateMaster checks a given analysis, decides whether to take action, and possibly takes action
 // Returns true when action was taken.
 func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
-	if !filtersMatchAnalysisEntry(analysisEntry, config.Config.RecoverIntermediateMasterClusterFilters, skipFilters) {
+	if !(skipFilters || analysisEntry.ClusterDetails.HasAutomatedIntermediateMasterRecovery) {
 		return false, nil, nil
 	}
 

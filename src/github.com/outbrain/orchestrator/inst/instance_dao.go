@@ -1011,6 +1011,7 @@ func ReadClusterInfo(clusterName string) (*ClusterInfo, error) {
 		clusterInfo.ClusterName = m.GetString("cluster_name")
 		clusterInfo.CountInstances = m.GetUint("count_instances")
 		ApplyClusterAlias(clusterInfo)
+		clusterInfo.ReadRecoveryInfo()
 		return nil
 	})
 	if err != nil {
@@ -1045,6 +1046,7 @@ func ReadClustersInfo() ([]ClusterInfo, error) {
 			CountInstances: m.GetUint("count_instances"),
 		}
 		ApplyClusterAlias(&clusterInfo)
+		clusterInfo.ReadRecoveryInfo()
 
 		clusters = append(clusters, clusterInfo)
 		return nil

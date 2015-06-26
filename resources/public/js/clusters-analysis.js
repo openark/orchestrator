@@ -49,9 +49,9 @@ $(document).ready(function () {
         	if (!(analysisEntry.Analysis in interestingAnalysis)) {
 	    		return;
 	    	}
-        	clustersMap[analysisEntry.ClusterName].analysisEntries.push(analysisEntry);
+        	clustersMap[analysisEntry.ClusterDetails.ClusterName].analysisEntries.push(analysisEntry);
         	if (!analysisEntry.IsDowntimed) {
-        		clustersMap[analysisEntry.ClusterName].allAnalysisDowntimed = false;
+        		clustersMap[analysisEntry.ClusterDetails.ClusterName].allAnalysisDowntimed = false;
         	}
         });
         // Only keep clusters with some analysis (the rest are fine, no need to include them)

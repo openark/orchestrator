@@ -40,6 +40,10 @@ $(document).ready(function () {
 	    	    	openNodeModal(instance);
 	    	    	return false;
 	    	    });	
+	    	    if (!problemInstancesFound) {
+	    	    	// First problem instance
+	    	    	$("#instance_problems_button").addClass("btn-" + instance.renderHint)
+	    	    }
 	    		problemInstancesFound = true;
     		}
     	});        	

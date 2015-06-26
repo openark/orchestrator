@@ -63,7 +63,7 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis) (bool,
 					?
 				)
 			`, analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port, ThisHostname, ProcessToken.Hash,
-		string(analysisEntry.Analysis), analysisEntry.ClusterName, analysisEntry.ClusterAlias, analysisEntry.CountSlaves, analysisEntry.GetSlaveHostsAsString(),
+		string(analysisEntry.Analysis), analysisEntry.ClusterDetails.ClusterName, analysisEntry.ClusterDetails.ClusterAlias, analysisEntry.CountSlaves, analysisEntry.GetSlaveHostsAsString(),
 	)
 	if err != nil {
 		return false, log.Errore(err)
@@ -176,13 +176,15 @@ func readRecoveries(whereCondition string, limit string) ([]TopologyRecovery, er
 		topologyRecovery.AnalysisEntry.AnalyzedInstanceKey.Hostname = m.GetString("hostname")
 		topologyRecovery.AnalysisEntry.AnalyzedInstanceKey.Port = m.GetInt("port")
 		topologyRecovery.AnalysisEntry.Analysis = inst.AnalysisCode(m.GetString("analysis"))
-		topologyRecovery.AnalysisEntry.ClusterName = m.GetString("cluster_name")
-		topologyRecovery.AnalysisEntry.ClusterAlias = m.GetString("cluster_alias")
+		topologyRecovery.AnalysisEntry.ClusterDetails.ClusterName = m.GetString("cluster_name")
+		topologyRecovery.AnalysisEntry.ClusterDetails.ClusterAlias = m.GetString("cluster_alias")
 		topologyRecovery.AnalysisEntry.CountSlaves = m.GetUint("count_affected_slaves")
 		topologyRecovery.AnalysisEntry.ReadSlaveHostsFromString(m.GetString("slave_hosts"))
 
 		topologyRecovery.SuccessorKey.Hostname = m.GetString("successor_hostname")
 		topologyRecovery.SuccessorKey.Port = m.GetInt("successor_port")
+		
+		topologyRecovery.AnalysisEntry.ClusterDetails.ReadRecoveryInfo()
 
 		res = append(res, topologyRecovery)
 		return nil
