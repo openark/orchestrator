@@ -183,7 +183,7 @@ func readRecoveries(whereCondition string, limit string) ([]TopologyRecovery, er
 
 		topologyRecovery.SuccessorKey.Hostname = m.GetString("successor_hostname")
 		topologyRecovery.SuccessorKey.Port = m.GetInt("successor_port")
-		
+
 		topologyRecovery.AnalysisEntry.ClusterDetails.ReadRecoveryInfo()
 
 		res = append(res, topologyRecovery)
