@@ -747,12 +747,12 @@ function populateSidebar(clusterInfo) {
 		if (clusterInfo.HasAutomatedMasterRecovery === true) {
 			content += '<span class="glyphicon glyphicon-heart text-info" title="Automated master recovery for this cluster ENABLED"></span>';
 		} else {
-			content += '<span class="glyphicon glyphicon-heart text-danger" title="Automated master recovery for this cluster DISABLED"></span>';
+			content += '<span class="glyphicon glyphicon-heart text-muted" title="Automated master recovery for this cluster DISABLED"></span>';
 		}
 		if (clusterInfo.HasAutomatedIntermediateMasterRecovery === true) {
 			content += '<span class="glyphicon glyphicon-heart-empty text-info" title="Automated intermediate master recovery for this cluster ENABLED"></span>';
 		} else {
-			content += '<span class="glyphicon glyphicon-heart-empty text-danger" title="Automated intermediate master recovery for this cluster DISABLED"></span>';
+			content += '<span class="glyphicon glyphicon-heart-empty text-muted" title="Automated intermediate master recovery for this cluster DISABLED"></span>';
 		}
 		addSidebarInfoPopoverContent(content, true);
 	}
@@ -805,21 +805,26 @@ $(document).ready(function () {
     
     $.get("/api/replication-analysis", function (replicationAnalysis) {
         // Apply/associate analysis to clusters
+    	var clusterHasReplicationAnalysisIssue = false;
         replicationAnalysis.Details.forEach(function (analysisEntry) {
 	    	if (!(analysisEntry.Analysis in interestingAnalysis)) {
 	    		return;
 	    	}
         	if (analysisEntry.ClusterDetails.ClusterName == currentClusterName()) {
-        		$("#cluster_sidebar [data-bullet=info] div span").addClass("text-danger");
-
+        		clusterHasReplicationAnalysisIssue = true;
     	    	var content = '<span><strong>'+analysisEntry.Analysis 
 		    		+ (analysisEntry.IsDowntimed ? '<br/>[<i>downtime till '+analysisEntry.DowntimeEndTimestamp+'</i>]': '')
 		    		+ "</strong></span>" 
 		    		+ "<br/>" + "<span>" + analysisEntry.AnalyzedInstanceKey.Hostname+":"+analysisEntry.AnalyzedInstanceKey.Port+ "</span>" 
-		    		;
-    	    	addSidebarInfoPopoverContent(content);
+	    		;
+    	    	addSidebarInfoPopoverContent(content);        	
         	}
         });
+        if (clusterHasReplicationAnalysisIssue) {
+    		$("#cluster_sidebar [data-bullet=info] div span").addClass("text-danger");
+        } else {
+        	$("#cluster_sidebar [data-bullet=info] div span").addClass("text-info");
+        }
     }, "json");
     $.get("/api/cluster-osc-slaves/"+currentClusterName(), function (instances) {
 		var instancesMap = normalizeInstances(instances, Array());

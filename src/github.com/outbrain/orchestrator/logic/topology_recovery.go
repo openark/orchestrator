@@ -296,14 +296,31 @@ func GetCandidateSiblingOfIntermediateMaster(intermediateMasterKey *inst.Instanc
 
 	sort.Sort(sort.Reverse(InstancesByCountSlaves(siblings)))
 
+	// In the next series of steps we attempt to return a good replacement.
+	// None of the below attempts is sure to pick a winning server. Perhaps picked server is not enough up-todate -- but
+	// this has small likelihood in the general case, and, well, it's an attempt. It's a Plan A, but we have Plan B & C if this fails.
+
+	// At first, we try to return an "is_candidate" server in same dc & env
+	for _, sibling := range siblings {
+		sibling := sibling
+		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) &&
+			sibling.IsCandidate &&
+			sibling.DataCenter == intermediateMasterInstance.DataCenter &&
+			sibling.PhysicalEnvironment == intermediateMasterInstance.PhysicalEnvironment {
+			return sibling, nil
+		}
+	}
+	// Nothing in same DC & env, let's just go for is_candidate
+	for _, sibling := range siblings {
+		sibling := sibling
+		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) && sibling.IsCandidate {
+			return sibling, nil
+		}
+	}
+	// Havent foiund an "is_candidate". Just whatever is valid.
 	for _, sibling := range siblings {
 		sibling := sibling
 		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) {
-			// this is *assumed* to be a good choice.
-			// We don't know for sure:
-			// - the dead intermediate master's position may have been more advanced then last recorded
-			// - and the candidate's position may have been stalled in the past seconds
-			// But it's an attempt...
 			return sibling, nil
 		}
 	}
@@ -323,6 +340,7 @@ func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis) (acti
 		return false, nil, err
 	}
 
+	// Plan A: find a replacement intermediate master
 	if candidateSibling, err := GetCandidateSiblingOfIntermediateMaster(failedInstanceKey); err == nil {
 		log.Debugf("- RecoverDeadIntermediateMaster: will attempt a candidate intermediate master: %+v", candidateSibling.Key)
 		// We have a candidate

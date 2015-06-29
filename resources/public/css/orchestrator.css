@@ -311,7 +311,7 @@ div[data-btn-group=recover] code {
 	font-size: 1.2em;
 }
 
-#cluster_sidebar li div {
+#cluster_sidebar li > div > span {
 	cursor: pointer;
 }
 
