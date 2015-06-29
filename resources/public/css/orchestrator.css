@@ -305,7 +305,6 @@ div[data-btn-group=recover] code {
 #cluster_sidebar {
 	float:left;
 	position: absolute;
-	display: none;
 }
 
 #cluster_sidebar li {
@@ -331,6 +330,17 @@ div[data-btn-group=recover] code {
 
 #cluster_sidebar li .popover {
 	width: 640px;
+	font: 12px sans-serif;	
+}
+
+#cluster_sidebar li .popover hr {
+	margin-top: 8px;
+	margin-bottom: 8px;	
+}
+
+#cluster_sidebar li .popover pre {
+	margin-top: 8px;
+	margin-bottom: 8px;	
 }
 
 #cluster_container .popover.instance {

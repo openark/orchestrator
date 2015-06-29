@@ -180,6 +180,10 @@ function moveInstance(node, droppableNode, shouldApply) {
 			// Obviously can't handle.
 			return null;
 		}
+		if (!droppableNode.LogSlaveUpdatesEnabled) {
+			// Obviously can't handle.
+			return null;
+		}
 		
 		if (node.id == droppableNode.id) {
 			return null;
@@ -215,7 +219,7 @@ function moveInstance(node, droppableNode, shouldApply) {
 		return null;
 	}
 	if (instancesAreSiblings(node, droppableNode)) {
-		if (node.hasProblem || droppableNode.hasProblem || droppableNode.isAggregate) {
+		if (node.hasProblem || droppableNode.hasProblem || droppableNode.isAggregate || !droppableNode.LogSlaveUpdatesEnabled) {
 			return null;
 		}
 		if (shouldApply) {
@@ -714,13 +718,45 @@ function colorize_dc() {
     });	
 }
 
+function addSidebarInfoPopoverContent(content, prepend) {
+	if (prepend === true) {
+		var wrappedContent = '<div>'+content+'</div>';
+		$("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content",
+			wrappedContent + $("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content"));
+		
+	} else {
+		var wrappedContent = '<div><hr/>'+content+'</div>';
+		$("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content",
+			$("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content") + wrappedContent);
+	}
+}
+
 function populateSidebar(clusterInfo) {
-//	$("#cluster_sidebar [data-bullet=info]").append('<span class="glyphicon glyphicon-info-sign"></span>');
-	$("#cluster_sidebar [data-bullet=problem]").append('<span class="glyphicon glyphicon-exclamation-sign"></span>');
-	$("#cluster_sidebar [data-bullet=lag]").append('<span class="glyphicon glyphicon-time"></span>');
-	$("#cluster_sidebar [data-bullet=compact]").append('<span class="glyphicon glyphicon-resize-small"></span>');
-	$("#cluster_sidebar [data-bullet=pools]").append('<span class="glyphicon glyphicon-list"></span>');
-	//$("#cluster_sidebar [data-bullet=compact]").append('<span class="glyphicon glyphicon-resize-small"></span>');
+	var content = '';
+
+	{
+		var content = 'Alias: '+clusterInfo.ClusterAlias+'';
+		addSidebarInfoPopoverContent(content, false);
+	}
+	{
+		var content = 'Heuristic lag: '+clusterInfo.HeuristicLag+'s';
+		addSidebarInfoPopoverContent(content, false);
+	}
+	{
+		var content = '';
+		if (clusterInfo.HasAutomatedMasterRecovery === true) {
+			content += '<span class="glyphicon glyphicon-heart text-info" title="Automated master recovery for this cluster ENABLED"></span>';
+		} else {
+			content += '<span class="glyphicon glyphicon-heart text-danger" title="Automated master recovery for this cluster ENABLED"></span>';
+		}
+		if (clusterInfo.HasAutomatedIntermediateMasterRecovery === true) {
+			content += '<span class="glyphicon glyphicon-heart-empty text-info" title="Automated intermediate master recovery for this cluster ENABLED"></span>';
+		} else {
+			content += '<span class="glyphicon glyphicon-heart-empty text-danger" title="Automated intermediate master recovery for this cluster DISABLED"></span>';
+		}
+		addSidebarInfoPopoverContent(content, true);
+	}
+
 }
 
 $(document).ready(function () {
@@ -748,9 +784,7 @@ $(document).ready(function () {
     	var visualAlias = (alias ? alias : currentClusterName())
     	document.title = document.title.split(" - ")[0] + " - " + visualAlias;
     	$("#cluster_container").append('<div class="floating_background">'+visualAlias+'</div>');
-        $("#dropdown-context").append('<li><a data-command="cluster-heuristic-lag">Heuristic lag: '+clusterInfo.HeuristicLag+'s</a></li>');
         $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="'+clusterInfo.ClusterAlias+'">Alias: '+alias+'</a></li>');
-        $("#dropdown-context").append('<li><a data-command="cluster-osc-slaves">OSC slaves</a></li>');
         $("#dropdown-context").append('<li><a href="/web/cluster-pools/'+currentClusterName()+'">Pools</a></li>');    
         if (isCompactDisplay()) {
             $("#dropdown-context").append('<li><a data-command="expand-display" href="'+location.href.split("?")[0]+'?compact=false">Expand display</a></li>');    
@@ -767,6 +801,36 @@ $(document).ready(function () {
         } 
         populateSidebar(clusterInfo);
 
+    }, "json");
+    
+    $.get("/api/replication-analysis", function (replicationAnalysis) {
+        // Apply/associate analysis to clusters
+        replicationAnalysis.Details.forEach(function (analysisEntry) {
+	    	if (!(analysisEntry.Analysis in interestingAnalysis)) {
+	    		return;
+	    	}
+        	if (analysisEntry.ClusterDetails.ClusterName == currentClusterName()) {
+        		$("#cluster_sidebar [data-bullet=info] div span").addClass("text-danger");
+
+    	    	var content = '<span><strong>'+analysisEntry.Analysis 
+		    		+ (analysisEntry.IsDowntimed ? '<br/>[<i>downtime till '+analysisEntry.DowntimeEndTimestamp+'</i>]': '')
+		    		+ "</strong></span>" 
+		    		+ "<br/>" + "<span>" + analysisEntry.AnalyzedInstanceKey.Hostname+":"+analysisEntry.AnalyzedInstanceKey.Port+ "</span>" 
+		    		;
+    	    	addSidebarInfoPopoverContent(content);
+        	}
+        });
+    }, "json");
+    $.get("/api/cluster-osc-slaves/"+currentClusterName(), function (instances) {
+		var instancesMap = normalizeInstances(instances, Array());
+		var instancesTitles = Array();
+	    instances.forEach(function (instance) {
+	    	instancesTitles.push(instance.title);
+	    });
+	    var instancesTitlesConcatenates = instancesTitles.join(" ");
+    	var content = "Heuristic list of OSC controller slaves: <pre>"+instancesTitlesConcatenates+"</pre>"; 
+		;
+    	addSidebarInfoPopoverContent(content);
     }, "json");
     
     if (isPseudoGTIDModeEnabled()) {

@@ -22,18 +22,6 @@ $(document).ready(function () {
     	return cluster1.ClusterName.localeCompare(cluster2.ClusterName);
     }
     
-    var interestingAnalysis = {
-        	"DeadMaster": true,	
-        	"DeadMasterAndSlaves": true,	
-        	"DeadMasterAndSomeSlaves": true,	
-        	"DeadMasterWithoutSlaves": true,
-        	"UnreachableMaster": true,
-        	"AllMasterSlavesNotReplicating": true,
-        	"DeadIntermediateMaster": true,
-        	"DeadIntermediateMasterAndSomeSlaves": true,
-        	"UnreachableIntermediateMaster": true
-    };
-    
     function displayClustersAnalysis(clusters, replicationAnalysis) {
         hideLoader();
         

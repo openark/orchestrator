@@ -1384,6 +1384,10 @@ func isGenerallyValidAsCandidateSlave(slave *Instance) bool {
 	if !slave.LogSlaveUpdatesEnabled {
 		return false
 	}
+	if slave.IsMaxScale() {
+		// Can't regroup under MaxScale because it does not support pseudo-gtid related queries such as SHOW BINLOG EVENTS
+		return false
+	}
 	for _, filter := range config.Config.PromotionIgnoreHostnameFilters {
 		if matched, _ := regexp.MatchString(filter, slave.Key.Hostname); matched {
 			return false
