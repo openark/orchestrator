@@ -121,41 +121,64 @@ func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis) (bool, *inst.Inst
 	return true, candidateSlave, err
 }
 
+// replacePromotedSlaveWithCandidate is called after an intermediate master has died and been replaced by some promotedSlave.
+// But, is there an even better slave to promote?
+// if candidateInstanceKey is given, then it is forced to be promoted over the promotedSlave
+// Otherwise, search for the best to promote!
 func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promotedSlave *inst.Instance, candidateInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
-	var candidateSlaves [](*inst.Instance)
+	candidateSlaves, _ := inst.ReadClusterCandidateInstances(promotedSlave.ClusterName)
+	// So we've already promoted a slave.
+	// However, can we improve on our choice? Are there any slaves marked with "is_candidate"?
+	// Maybe we actually promoted such a slave. Does that mean we should keep it?
+	// The current logic is:
+	// - 1. we prefer to promote a "is_candidate" which is in the same DC & env as the dead intermediate master (or do nothing if the promtoed slave is such one)
+	// - 2. we prefer to promote a "is_candidate" which is in the same DC & env as the promoted slave (or do nothing if the promtoed slave is such one)
+	// - 3. keep to current choice
 	if candidateInstanceKey == nil {
-		// See if we can auto-figure out a candidate
-		candidateSlaves, _ = inst.ReadClusterCandidateInstances(promotedSlave.ClusterName)
-		for _, candidateSlave := range candidateSlaves {
-			if promotedSlave.Key.Equals(&candidateSlave.Key) {
-				// Seems like we promoted a candidate! We're happy!
-				return promotedSlave, nil
+		if deadInstance, _, err := inst.ReadInstance(deadInstanceKey); err == nil && deadInstance != nil {
+			for _, candidateSlave := range candidateSlaves {
+				if promotedSlave.Key.Equals(&candidateSlave.Key) &&
+					promotedSlave.DataCenter == deadInstance.DataCenter &&
+					promotedSlave.PhysicalEnvironment == deadInstance.PhysicalEnvironment {
+					// Seems like we promoted a candidate in the same DC & ENV as dead IM! Ideal! We're happy!
+					return promotedSlave, nil
+				}
 			}
 		}
 	}
-	// We didn't pick a candidate; let's offer one
+	// We didn't pick the ideal candidate; let's see if we can replace with a candidate from same DC and ENV
 	if candidateInstanceKey == nil {
 		// Try a candidate slave that is in same DC & env as the dead instance
 		if deadInstance, _, err := inst.ReadInstance(deadInstanceKey); err == nil && deadInstance != nil {
 			for _, candidateSlave := range candidateSlaves {
-				if deadInstance.DataCenter == deadInstance.DataCenter &&
-					deadInstance.PhysicalEnvironment == deadInstance.PhysicalEnvironment &&
+				if candidateSlave.DataCenter == deadInstance.DataCenter &&
+					candidateSlave.PhysicalEnvironment == deadInstance.PhysicalEnvironment &&
 					candidateSlave.MasterKey.Equals(&promotedSlave.Key) {
-					// This would make a good candidate
+					// This would make a great candidate
 					candidateInstanceKey = &candidateSlave.Key
 					log.Debugf("No candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as failed instance", promotedSlave.Key, candidateSlave.Key)
 				}
 			}
 		}
 	}
+	if candidateInstanceKey == nil {
+		// We cannot find a candidate in same DC and ENV as dead master
+		for _, candidateSlave := range candidateSlaves {
+			if promotedSlave.Key.Equals(&candidateSlave.Key) {
+				// Seems like we promoted a candidate slave (though not in same DC and ENV as dead master). Good enough.
+				// No further action required.
+				return promotedSlave, nil
+			}
+		}
+	}
 	// Still nothing?
 	if candidateInstanceKey == nil {
-		// Try a candidate slave that is in same DC & env as the promoted slave
+		// Try a candidate slave that is in same DC & env as the promoted slave (our promoted slave is not an "is_candidate")
 		for _, candidateSlave := range candidateSlaves {
 			if promotedSlave.DataCenter == candidateSlave.DataCenter &&
 				promotedSlave.PhysicalEnvironment == candidateSlave.PhysicalEnvironment &&
 				candidateSlave.MasterKey.Equals(&promotedSlave.Key) {
-				// This would make a good candidate
+				// OK, better than nothing
 				candidateInstanceKey = &candidateSlave.Key
 				log.Debugf("No candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as promoted instance", promotedSlave.Key, candidateSlave.Key)
 			}
@@ -164,10 +187,11 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 
 	// So do we have a candidate?
 	if candidateInstanceKey == nil {
+		// Found nothing. Stick with promoted slave
 		return promotedSlave, nil
 	}
 	if promotedSlave.Key.Equals(candidateInstanceKey) {
-		// It IS the candidate
+		// Sanity. It IS the candidate
 		return promotedSlave, nil
 	}
 
@@ -254,7 +278,8 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 	return true
 }
 
-// GetCandidateSlave chooses the best slave to promote given a (possibly dead) master
+// GetCandidateSiblingOfIntermediateMaster chooses the best sibling of a dead intermediate master
+// to whom the IM's slaves can be moved.
 func GetCandidateSiblingOfIntermediateMaster(intermediateMasterKey *inst.InstanceKey) (*inst.Instance, error) {
 	intermediateMasterInstance, _, err := inst.ReadInstance(intermediateMasterKey)
 	if err != nil {

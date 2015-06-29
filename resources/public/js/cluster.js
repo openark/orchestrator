@@ -747,7 +747,7 @@ function populateSidebar(clusterInfo) {
 		if (clusterInfo.HasAutomatedMasterRecovery === true) {
 			content += '<span class="glyphicon glyphicon-heart text-info" title="Automated master recovery for this cluster ENABLED"></span>';
 		} else {
-			content += '<span class="glyphicon glyphicon-heart text-danger" title="Automated master recovery for this cluster ENABLED"></span>';
+			content += '<span class="glyphicon glyphicon-heart text-danger" title="Automated master recovery for this cluster DISABLED"></span>';
 		}
 		if (clusterInfo.HasAutomatedIntermediateMasterRecovery === true) {
 			content += '<span class="glyphicon glyphicon-heart-empty text-info" title="Automated intermediate master recovery for this cluster ENABLED"></span>';

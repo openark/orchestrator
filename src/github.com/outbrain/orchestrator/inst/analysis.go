@@ -39,6 +39,7 @@ const (
 	UnreachableIntermediateMaster                          = "UnreachableIntermediateMaster"
 	AllIntermediateMasterSlavesNotReplicating              = "AllIntermediateMasterSlavesNotReplicating"
 	FirstTierSlaveFailingToConnectToMaster                 = "FirstTierSlaveFailingToConnectToMaster"
+	MaxscaleFailingToConnectToMaster                       = "MaxscaleFailingToConnectToMaster"
 )
 
 // ReplicationAnalysis notes analysis on replication chain status, per instance
@@ -60,6 +61,7 @@ type ReplicationAnalysis struct {
 	IsDowntimed                 bool
 	DowntimeEndTimestamp        string
 	DowntimeRemainingSeconds    int
+	IsMaxscale                  bool
 }
 
 // GetSlaveHostsAsString serializes all slave keys as a single comma delimited string

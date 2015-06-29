@@ -67,7 +67,10 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		    	) AS downtime_end_timestamp,
 		    	MIN(
 		    		IFNULL(TIMESTAMPDIFF(SECOND, NOW(), database_instance_downtime.end_timestamp), 0)
-		    	) AS downtime_remaining_seconds
+		    	) AS downtime_remaining_seconds,
+		    	MIN(
+		    		master_instance.version like '%maxscale%'
+		    	) AS is_maxscale
 		    FROM
 		        database_instance master_instance
 		            LEFT JOIN
@@ -119,6 +122,7 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		a.IsDowntimed = m.GetBool("is_downtimed")
 		a.DowntimeEndTimestamp = m.GetString("downtime_end_timestamp")
 		a.DowntimeRemainingSeconds = m.GetInt("downtime_remaining_seconds")
+		a.IsMaxscale = m.GetBool("is_maxscale")
 		a.ClusterDetails.ReadRecoveryInfo()
 
 		instance := &Instance{}
@@ -164,6 +168,9 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		} else if !a.IsMaster && a.LastCheckValid && a.CountSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = AllIntermediateMasterSlavesNotReplicating
 			a.Description = "Intermediate master is reachable but none of its slaves is replicating"
+		} else if a.IsMaxscale && a.IsFailingToConnectToMaster {
+			a.Analysis = MaxscaleFailingToConnectToMaster
+			a.Description = "Maxscale is unable to connect to its master"
 		} else if a.ReplicationDepth == 1 && a.IsFailingToConnectToMaster {
 			a.Analysis = FirstTierSlaveFailingToConnectToMaster
 			a.Description = "1st tier slave (directly replicating from topology master) is unable to connect to the master"
