@@ -38,8 +38,7 @@ function generateInstanceDivs(nodesMap) {
         });
     $("div.popover").popover();
     $("div.popover").show();
-    
-   	
+
     $("[data-fo-id]").on("mouseenter", ".popover[data-nodeid]", function() {
     	if ($(".popover.instance[data-duplicate-node]").hasClass("ui-draggable-dragging")) {
     		// Do not remove & recreate while dragging. Ignore any mouseenter

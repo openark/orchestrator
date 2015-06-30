@@ -27,11 +27,12 @@ import (
 // So these need to be removed from the event entry if we're to compare and validate matching
 // entries.
 var eventInfoTransformations map[*regexp.Regexp]string = map[*regexp.Regexp]string{
-	regexp.MustCompile(`(.*) [/][*].*?[*][/](.*$)`):  "$1 $2",
-	regexp.MustCompile(`(COMMIT) .*$`):               "$1",
-	regexp.MustCompile(`(table_id:) [0-9]+ (.*$)`):   "$1 ### $2",
-	regexp.MustCompile(`(table_id:) [0-9]+$`):        "$1 ###",
-	regexp.MustCompile(` X'([0-9a-fA-F]+)' COLLATE`): " 0x$1 COLLATE",
+	regexp.MustCompile(`(.*) [/][*].*?[*][/](.*$)`):  "$1 $2",         // strip comments
+	regexp.MustCompile(`(COMMIT) .*$`):               "$1",            // commit number varies cross servers
+	regexp.MustCompile(`(table_id:) [0-9]+ (.*$)`):   "$1 ### $2",     // table ids change cross servers
+	regexp.MustCompile(`(table_id:) [0-9]+$`):        "$1 ###",        // table ids change cross servers
+	regexp.MustCompile(` X'([0-9a-fA-F]+)' COLLATE`): " 0x$1 COLLATE", // different ways to represent collate
+	regexp.MustCompile(`(BEGIN GTID [^ ]+) cid=.*`):  "$1",            // MariaDB GTID someimtes gets addition of "cid=...". Stripping
 }
 
 var skippedEventTypes map[string]bool = map[string]bool{
