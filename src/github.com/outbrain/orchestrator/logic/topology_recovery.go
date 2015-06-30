@@ -101,7 +101,7 @@ func executeProcesses(processes []string, description string, analysisEntry inst
 func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis) (bool, *inst.Instance, error) {
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	if ok, err := AttemptRecoveryRegistration(&analysisEntry); !ok {
-		log.Debugf("Will not RecoverDeadMaster on %+v", *failedInstanceKey)
+		log.Debugf("topology_recovery: will not RecoverDeadMaster on %+v", *failedInstanceKey)
 		return false, nil, err
 	}
 
@@ -110,12 +110,12 @@ func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis) (bool, *inst.Inst
 		return false, nil, err
 	}
 
-	log.Debugf("RecoverDeadMaster: will recover %+v", *failedInstanceKey)
+	log.Debugf("topology_recovery: RecoverDeadMaster: will recover %+v", *failedInstanceKey)
 	_, _, _, candidateSlave, err := inst.RegroupSlaves(failedInstanceKey, nil)
 
 	ResolveRecovery(failedInstanceKey, &candidateSlave.Key)
 
-	log.Debugf("- RecoverDeadMaster: candidate slave is %+v", candidateSlave.Key)
+	log.Debugf("topology_recovery: - RecoverDeadMaster: candidate slave is %+v", candidateSlave.Key)
 	inst.AuditOperation("recover-dead-master", failedInstanceKey, fmt.Sprintf("master: %+v", candidateSlave.Key))
 
 	return true, candidateSlave, err
@@ -134,6 +134,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 	// - 1. we prefer to promote a "is_candidate" which is in the same DC & env as the dead intermediate master (or do nothing if the promtoed slave is such one)
 	// - 2. we prefer to promote a "is_candidate" which is in the same DC & env as the promoted slave (or do nothing if the promtoed slave is such one)
 	// - 3. keep to current choice
+	log.Infof("topology_recovery: checking if should replace promoted slave with a better candidate")
 	if candidateInstanceKey == nil {
 		if deadInstance, _, err := inst.ReadInstance(deadInstanceKey); err == nil && deadInstance != nil {
 			for _, candidateSlave := range candidateSlaves {
@@ -141,6 +142,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 					promotedSlave.DataCenter == deadInstance.DataCenter &&
 					promotedSlave.PhysicalEnvironment == deadInstance.PhysicalEnvironment {
 					// Seems like we promoted a candidate in the same DC & ENV as dead IM! Ideal! We're happy!
+					log.Infof("topology_recovery: promoted slave %+v is the ideal candidate", promotedSlave.Key)
 					return promotedSlave, nil
 				}
 			}
@@ -156,7 +158,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 					candidateSlave.MasterKey.Equals(&promotedSlave.Key) {
 					// This would make a great candidate
 					candidateInstanceKey = &candidateSlave.Key
-					log.Debugf("No candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as failed instance", promotedSlave.Key, candidateSlave.Key)
+					log.Debugf("topology_recovery: no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as failed instance", promotedSlave.Key, candidateSlave.Key)
 				}
 			}
 		}
@@ -167,6 +169,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 			if promotedSlave.Key.Equals(&candidateSlave.Key) {
 				// Seems like we promoted a candidate slave (though not in same DC and ENV as dead master). Good enough.
 				// No further action required.
+				log.Infof("topology_recovery: promoted slave %+v is a good candidate", promotedSlave.Key)
 				return promotedSlave, nil
 			}
 		}
@@ -180,7 +183,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 				candidateSlave.MasterKey.Equals(&promotedSlave.Key) {
 				// OK, better than nothing
 				candidateInstanceKey = &candidateSlave.Key
-				log.Debugf("No candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as promoted instance", promotedSlave.Key, candidateSlave.Key)
+				log.Debugf("topology_recovery: no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as promoted instance", promotedSlave.Key, candidateSlave.Key)
 			}
 		}
 	}
@@ -196,7 +199,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 	}
 
 	// Try and promote suggested candidate, if applicable and possible
-	log.Debugf("Promoted instance %+v is not the suggested candidate %+v. Will see what can be done", promotedSlave.Key, *candidateInstanceKey)
+	log.Debugf("topology_recovery: promoted instance %+v is not the suggested candidate %+v. Will see what can be done", promotedSlave.Key, *candidateInstanceKey)
 
 	candidateInstance, _, err := inst.ReadInstance(candidateInstanceKey)
 	if err != nil {
@@ -204,7 +207,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 	}
 
 	if candidateInstance.MasterKey.Equals(&promotedSlave.Key) {
-		log.Debugf("Suggested candidate %+v is slave of promoted instance %+v. Will try and enslave its master", *candidateInstanceKey, promotedSlave.Key)
+		log.Debugf("topology_recovery: suggested candidate %+v is slave of promoted instance %+v. Will try and enslave its master", *candidateInstanceKey, promotedSlave.Key)
 		candidateInstance, err = inst.EnslaveMaster(&candidateInstance.Key)
 		if err != nil {
 			return promotedSlave, log.Errore(err)
@@ -212,7 +215,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 		return candidateInstance, nil
 	}
 
-	log.Debugf("Could not manage to promoted suggested candidate %+v", *candidateInstanceKey)
+	log.Debugf("topology_recovery: could not manage to promoted suggested candidate %+v", *candidateInstanceKey)
 	return promotedSlave, nil
 }
 
@@ -223,7 +226,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		return false, nil, nil
 	}
 	// Let's do dead master recovery!
-	log.Debugf("Will handle DeadMaster event on %+v", analysisEntry.ClusterDetails.ClusterName)
+	log.Debugf("topology_recovery: will handle DeadMaster event on %+v", analysisEntry.ClusterDetails.ClusterName)
 	actionTaken, promotedSlave, err := RecoverDeadMaster(analysisEntry)
 
 	if actionTaken && promotedSlave != nil {
@@ -259,12 +262,6 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 	if !isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling) {
 		return false
 	}
-	if sibling.DataCenter != intermediateMasterInstance.DataCenter {
-		return false
-	}
-	if sibling.PhysicalEnvironment != intermediateMasterInstance.PhysicalEnvironment {
-		return false
-	}
 	if sibling.HasReplicationFilters != intermediateMasterInstance.HasReplicationFilters {
 		return false
 	}
@@ -291,7 +288,7 @@ func GetCandidateSiblingOfIntermediateMaster(intermediateMasterKey *inst.Instanc
 		return nil, err
 	}
 	if len(siblings) <= 1 {
-		return nil, log.Errorf("No siblings found for %+v", *intermediateMasterKey)
+		return nil, log.Errorf("topology_recovery: no siblings found for %+v", *intermediateMasterKey)
 	}
 
 	sort.Sort(sort.Reverse(InstancesByCountSlaves(siblings)))
@@ -301,48 +298,62 @@ func GetCandidateSiblingOfIntermediateMaster(intermediateMasterKey *inst.Instanc
 	// this has small likelihood in the general case, and, well, it's an attempt. It's a Plan A, but we have Plan B & C if this fails.
 
 	// At first, we try to return an "is_candidate" server in same dc & env
+	log.Infof("topology_recovery: searching for the best candidate sibling of dead intermediate master")
 	for _, sibling := range siblings {
 		sibling := sibling
 		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) &&
 			sibling.IsCandidate &&
 			sibling.DataCenter == intermediateMasterInstance.DataCenter &&
 			sibling.PhysicalEnvironment == intermediateMasterInstance.PhysicalEnvironment {
+			log.Infof("topology_recovery: found %+v as the ideal candidate", sibling.Key)
 			return sibling, nil
 		}
 	}
-	// Nothing in same DC & env, let's just go for is_candidate
+	// Go for something else in the same DC & ENV
+	for _, sibling := range siblings {
+		sibling := sibling
+		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) &&
+			sibling.DataCenter == intermediateMasterInstance.DataCenter &&
+			sibling.PhysicalEnvironment == intermediateMasterInstance.PhysicalEnvironment {
+			log.Infof("topology_recovery: found %+v as a replacement in same dc & environment", sibling.Key)
+			return sibling, nil
+		}
+	}
+	// Nothing in same DC & env, let's just go for some is_candidate
 	for _, sibling := range siblings {
 		sibling := sibling
 		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) && sibling.IsCandidate {
+			log.Infof("topology_recovery: found %+v as a good candidate", sibling.Key)
 			return sibling, nil
 		}
 	}
-	// Havent foiund an "is_candidate". Just whatever is valid.
+	// Havent found an "is_candidate". Just whatever is valid.
 	for _, sibling := range siblings {
 		sibling := sibling
 		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) {
+			log.Infof("topology_recovery: found %+v as a replacement", sibling.Key)
 			return sibling, nil
 		}
 	}
-	return nil, log.Errorf("Cannot find candidate sibling of %+v", *intermediateMasterKey)
+	return nil, log.Errorf("topology_recovery: cannot find candidate sibling of %+v", *intermediateMasterKey)
 }
 
 func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis) (actionTaken bool, successorInstance *inst.Instance, err error) {
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	if ok, err := AttemptRecoveryRegistration(&analysisEntry); !ok {
-		log.Debugf("Will not RecoverDeadIntermediateMaster on %+v", *failedInstanceKey)
+		log.Debugf("topology_recovery: will not RecoverDeadIntermediateMaster on %+v", *failedInstanceKey)
 		return false, nil, err
 	}
 
 	inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, "problem found; will recover")
-	log.Debugf("RecoverDeadIntermediateMaster: will recover %+v", *failedInstanceKey)
+	log.Debugf("topology_recovery: RecoverDeadIntermediateMaster: will recover %+v", *failedInstanceKey)
 	if err := executeProcesses(config.Config.PreFailoverProcesses, "PreFailoverProcesses", analysisEntry, nil, true); err != nil {
 		return false, nil, err
 	}
 
 	// Plan A: find a replacement intermediate master
 	if candidateSibling, err := GetCandidateSiblingOfIntermediateMaster(failedInstanceKey); err == nil {
-		log.Debugf("- RecoverDeadIntermediateMaster: will attempt a candidate intermediate master: %+v", candidateSibling.Key)
+		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will attempt a candidate intermediate master: %+v", candidateSibling.Key)
 		// We have a candidate
 		if matchedSlaves, candidateSibling, err, errs := inst.MultiMatchSlaves(failedInstanceKey, &candidateSibling.Key, ""); err == nil {
 			ResolveRecovery(failedInstanceKey, &candidateSibling.Key)
@@ -350,10 +361,10 @@ func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis) (acti
 			successorInstance = candidateSibling
 			actionTaken = true
 
-			log.Debugf("- RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) went with %d errors", candidateSibling.Key, len(errs))
+			log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) went with %d errors", candidateSibling.Key, len(errs))
 			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Done. Matched %d slaves under candidate sibling: %+v; %d errors: %+v", len(matchedSlaves), candidateSibling.Key, len(errs), errs))
 		} else {
-			log.Debugf("- RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) did not complete: %+v", candidateSibling.Key, err)
+			log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) did not complete: %+v", candidateSibling.Key, err)
 			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Matched %d slaves under candidate sibling: %+v; %d errors: %+v", len(matchedSlaves), candidateSibling.Key, len(errs), errs))
 		}
 	}
@@ -364,19 +375,19 @@ func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis) (acti
 		// one slave, but the operation is still valid if regroup partially/completely failed. We just promote anything
 		// not regrouped.
 		// So, match up all that's left, plan C
-		log.Debugf("- RecoverDeadIntermediateMaster: will next attempt a match up from %+v", *failedInstanceKey)
+		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will next attempt a match up from %+v", *failedInstanceKey)
 
 		var errs []error
 		var matchedSlaves [](*inst.Instance)
 		matchedSlaves, successorInstance, err, errs = inst.MatchUpSlaves(failedInstanceKey, "")
 		if len(matchedSlaves) == 0 {
-			log.Errorf("RecoverDeadIntermediateMaster failed to match up any slave from %+v", *failedInstanceKey)
+			log.Errorf("topology_recovery: RecoverDeadIntermediateMaster failed to match up any slave from %+v", *failedInstanceKey)
 			return false, successorInstance, err
 		}
 		ResolveRecovery(failedInstanceKey, &successorInstance.Key)
 		actionTaken = true
 
-		log.Debugf("- RecoverDeadIntermediateMaster: matched up to %+v", successorInstance.Key)
+		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: matched up to %+v", successorInstance.Key)
 		inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Done. Matched slaves under: %+v %d errors: %+v", successorInstance.Key, len(errs), errs))
 	}
 	return actionTaken, successorInstance, err

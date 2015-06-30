@@ -22,19 +22,38 @@ import (
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/gzip"
 	"github.com/martini-contrib/render"
-
-	nethttp "net/http"
-	"strings"
-
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/config"
 	"github.com/outbrain/orchestrator/http"
 	"github.com/outbrain/orchestrator/inst"
 	"github.com/outbrain/orchestrator/logic"
+	nethttp "net/http"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
 )
+
+// acceptSignals registers for OS signals
+func acceptSignals() {
+	c := make(chan os.Signal, 1)
+
+	signal.Notify(c, syscall.SIGHUP)
+	go func() {
+		for sig := range c {
+			switch sig {
+			case syscall.SIGHUP:
+				log.Debugf("Received SIGHUP. Reloading configuration")
+				config.Reload()
+			}
+		}
+	}()
+}
 
 // Http starts serving
 func Http(discovery bool) {
+	acceptSignals()
+
 	martini.Env = martini.Prod
 	if config.Config.ServeAgentsHttp {
 		go agentsHttp()

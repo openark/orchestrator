@@ -56,21 +56,30 @@ case "$1" in
     PID=$(cat $PIDFILE)
     cd $DAEMON_PATH
     if [ -f $PIDFILE ]; then
-      kill -HUP $PID
+      kill -TERM $PID
       printf "%s\n" "Ok"
       rm -f $PIDFILE
     else
       printf "%s\n" "pidfile not found"
       exit 1
     fi
-  ;;
-  
+  ;;  
   restart)
     $0 stop
     $0 start
-  ;;
+  ;;  
+  reload)
+    PID=$(cat $PIDFILE)
+    cd $DAEMON_PATH
+    if [ -f $PIDFILE ]; then
+      kill -HUP $PID
+      printf "%s\n" "Ok"
+    else
+      printf "%s\n" "pidfile not found"
+      exit 1
+    fi
   
   *)
-    echo "Usage: $0 {status|start|stop|restart}"
+    echo "Usage: $0 {status|start|stop|restart|reload}"
     exit 1
 esac
