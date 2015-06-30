@@ -78,7 +78,7 @@ case "$1" in
       printf "%s\n" "pidfile not found"
       exit 1
     fi
-  
+	;;
   *)
     echo "Usage: $0 {status|start|stop|restart|reload}"
     exit 1
