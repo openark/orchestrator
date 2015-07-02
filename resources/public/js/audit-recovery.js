@@ -11,8 +11,8 @@ $(document).ready(function () {
     		jQuery('<td/>', { text: audit.AnalysisEntry.Analysis }).appendTo(row);
     		jQuery('<td/>', { text: audit.AnalysisEntry.AnalyzedInstanceKey.Hostname+":"+audit.AnalysisEntry.AnalyzedInstanceKey.Port }).appendTo(row);
     		jQuery('<td/>', { text: audit.AnalysisEntry.CountSlaves }).appendTo(row);
-    		jQuery('<td/>', { text: audit.AnalysisEntry.ClusterName }).appendTo(row);
-    		jQuery('<td/>', { text: audit.AnalysisEntry.ClusterAlias }).appendTo(row);
+    		jQuery('<td/>', { text: audit.AnalysisEntry.ClusterDetails.ClusterName }).appendTo(row);
+    		jQuery('<td/>', { text: audit.AnalysisEntry.ClusterDetails.ClusterAlias }).appendTo(row);
     		jQuery('<td/>', { text: audit.RecoveryStartTimestamp }).appendTo(row);
     		jQuery('<td/>', { text: audit.RecoveryEndTimestamp }).appendTo(row);
     		jQuery('<td/>', { text: audit.SuccessorKey.Hostname+":"+audit.SuccessorKey.Port }).appendTo(row);

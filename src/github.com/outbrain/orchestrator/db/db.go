@@ -397,6 +397,10 @@ var generateSQLPatches = []string{
 			ADD COLUMN last_registered TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			ADD KEY last_registered_idx (last_registered)
 	`,
+	`
+		ALTER TABLE topology_recovery
+			ADD KEY cluster_name_in_active_idx (cluster_name, in_active_period)
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance

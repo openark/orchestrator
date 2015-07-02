@@ -1478,6 +1478,30 @@ func (this *HttpAPI) AuditRecovery(params martini.Params, r render.Render, req *
 	r.JSON(200, audits)
 }
 
+// ActiveClusterRecovery returns recoveries in-progress for a given cluster
+func (this *HttpAPI) ActiveClusterRecovery(params martini.Params, r render.Render, req *http.Request) {
+	recoveries, err := orchestrator.ReadActiveClusterRecovery(params["clusterName"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, recoveries)
+}
+
+// RecentlyActiveClusterRecovery returns recoveries in-progress for a given cluster
+func (this *HttpAPI) RecentlyActiveClusterRecovery(params martini.Params, r render.Render, req *http.Request) {
+	recoveries, err := orchestrator.ReadRecentlyActiveClusterRecovery(params["clusterName"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, recoveries)
+}
+
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/instance/:host/:port", this.Instance)
@@ -1547,6 +1571,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/automated-recovery-filters", this.AutomatedRecoveryFilters)
 	m.Get("/api/audit-recovery", this.AuditRecovery)
 	m.Get("/api/audit-recovery/:page", this.AuditRecovery)
+	m.Get("/api/active-cluster-recovery/:clusterName", this.ActiveClusterRecovery)
+	m.Get("/api/recently-active-cluster-recovery/:clusterName", this.RecentlyActiveClusterRecovery)
 	// Agents
 	m.Get("/api/agents", this.Agents)
 	m.Get("/api/agent/:host", this.Agent)

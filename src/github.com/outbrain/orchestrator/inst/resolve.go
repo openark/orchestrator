@@ -145,28 +145,28 @@ func HostnameResolveCache() (map[string]*cache.Item, error) {
 	return hostnameResolvesLightweightCache.Items(), nil
 }
 
-func UnresolveHostname(instanceKey *InstanceKey) (InstanceKey, error) {
+func UnresolveHostname(instanceKey *InstanceKey) (InstanceKey, bool, error) {
 	unresolvedHostname, err := readUnresolvedHostname(instanceKey.Hostname)
 	if err != nil {
-		return *instanceKey, log.Errore(err)
+		return *instanceKey, false, log.Errore(err)
 	}
 	if unresolvedHostname == instanceKey.Hostname {
 		// unchanged. Nothing to do
-		return *instanceKey, nil
+		return *instanceKey, false, nil
 	}
 	// We unresovled to a different hostname. We will now re-resolve to double-check!
 	unresolvedKey := &InstanceKey{Hostname: unresolvedHostname, Port: instanceKey.Port}
 
 	instance, err := ReadTopologyInstance(unresolvedKey)
 	if err != nil {
-		return *instanceKey, log.Errore(err)
+		return *instanceKey, false, log.Errore(err)
 	}
 	if instance.Key.Hostname != instanceKey.Hostname {
 		// Resolve(Unresolve(hostname)) != hostname ==> Bad; reject
 		if *config.RuntimeCLIFlags.SkipUnresolveCheck {
-			return *instanceKey, nil
+			return *instanceKey, false, nil
 		}
-		return *instanceKey, log.Errorf("Error unresolving; hostname=%s, unresolved=%s, re-resolved=%s; mismatch. Skip/ignore with --skip-unresolve-check", instanceKey.Hostname, unresolvedKey.Hostname, instance.Key.Hostname)
+		return *instanceKey, false, log.Errorf("Error unresolving; hostname=%s, unresolved=%s, re-resolved=%s; mismatch. Skip/ignore with --skip-unresolve-check", instanceKey.Hostname, unresolvedKey.Hostname, instance.Key.Hostname)
 	}
-	return *unresolvedKey, nil
+	return *unresolvedKey, true, nil
 }

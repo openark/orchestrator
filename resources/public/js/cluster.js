@@ -802,6 +802,18 @@ $(document).ready(function () {
 
     }, "json");
     
+    $.get("/api/active-cluster-recovery/"+currentClusterName(), function (recoveries) {
+        // Result is an array: either empty (no active recovery) or with multiple entries
+    	recoveries.forEach(function (recoveryEntry) {
+    		addInfo("<strong>" + recoveryEntry.AnalysisEntry.Analysis + " active recovery in progress.</strong> Topology is subject to change in the next moments.");
+        });
+    }, "json");
+    $.get("/api/recently-active-cluster-recovery/"+currentClusterName(), function (recoveries) {
+        // Result is an array: either empty (no active recovery) or with multiple entries
+    	recoveries.forEach(function (recoveryEntry) {
+    		addInfo("This cluster just recently recovered from <strong>" + recoveryEntry.AnalysisEntry.Analysis + "</strong>. It may still take some time to rebuild topology graph.");
+        });
+    }, "json");
     $.get("/api/replication-analysis", function (replicationAnalysis) {
         // Apply/associate analysis to clusters
     	var clusterHasReplicationAnalysisIssue = false;

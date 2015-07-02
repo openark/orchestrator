@@ -225,7 +225,8 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 			}
 		}
 
-		instance, err = ChangeMasterTo(instanceKey, &master.MasterKey, &master.ExecBinlogCoordinates)
+		// We can skip hsotname unresolve; we just copy+paste whatever our master thinks of its master.
+		instance, err = ChangeMasterTo(instanceKey, &master.MasterKey, &master.ExecBinlogCoordinates, true)
 		if err != nil {
 			goto Cleanup
 		}
@@ -330,7 +331,7 @@ func MoveUpSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), *Ins
 						return
 					}
 
-					slave, err = ChangeMasterTo(&slave.Key, &instance.MasterKey, &instance.ExecBinlogCoordinates)
+					slave, err = ChangeMasterTo(&slave.Key, &instance.MasterKey, &instance.ExecBinlogCoordinates, false)
 					if err != nil {
 						slaveErr = err
 						return
@@ -447,7 +448,7 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 		}
 		// At this point both siblings have executed exact same statements and are identical
 
-		instance, err = ChangeMasterTo(instanceKey, &sibling.Key, &sibling.SelfBinlogCoordinates)
+		instance, err = ChangeMasterTo(instanceKey, &sibling.Key, &sibling.SelfBinlogCoordinates, false)
 		if err != nil {
 			goto Cleanup
 		}
@@ -507,7 +508,7 @@ func MoveBelowViaGTID(instance, otherInstance *Instance) (*Instance, error) {
 		goto Cleanup
 	}
 
-	instance, err = ChangeMasterTo(instanceKey, &otherInstance.Key, &otherInstance.SelfBinlogCoordinates)
+	instance, err = ChangeMasterTo(instanceKey, &otherInstance.Key, &otherInstance.SelfBinlogCoordinates, false)
 	if err != nil {
 		goto Cleanup
 	}
@@ -561,7 +562,7 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey) (*Instance, error
 		goto Cleanup
 	}
 
-	instance, err = ChangeMasterTo(instanceKey, masterKey, &instance.ExecBinlogCoordinates)
+	instance, err = ChangeMasterTo(instanceKey, masterKey, &instance.ExecBinlogCoordinates, false)
 	if err != nil {
 		goto Cleanup
 	}
@@ -663,7 +664,7 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 
 	// the coMaster used to be merely a slave. Just point master into *some* position
 	// within coMaster...
-	master, err = ChangeMasterTo(&master.Key, instanceKey, &instance.SelfBinlogCoordinates)
+	master, err = ChangeMasterTo(&master.Key, instanceKey, &instance.SelfBinlogCoordinates, false)
 	if err != nil {
 		goto Cleanup
 	}
@@ -930,7 +931,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	log.Debugf("%+v will match below %+v at %+v; validated events: %d", *instanceKey, *otherKey, *nextBinlogCoordinatesToMatch, countMatchedEvents)
 
 	// Drum roll......
-	instance, err = ChangeMasterTo(instanceKey, otherKey, nextBinlogCoordinatesToMatch)
+	instance, err = ChangeMasterTo(instanceKey, otherKey, nextBinlogCoordinatesToMatch, false)
 	if err != nil {
 		goto Cleanup
 	}
@@ -1052,6 +1053,7 @@ func EnslaveMaster(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil || !found {
 		return instance, err
 	}
+	log.Debugf("EnslaveMaster: will attempt making %+v enslave its master %+v, now resolved as %+v", *instanceKey, instance.MasterKey, masterInstance.Key)
 
 	if canReplicate, err := masterInstance.CanReplicateFrom(instance); canReplicate == false {
 		return instance, err
@@ -1072,12 +1074,15 @@ func EnslaveMaster(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	// instance and masterInstance are equal
-	instance, err = ChangeMasterTo(&instance.Key, &masterInstance.MasterKey, &masterInstance.ExecBinlogCoordinates)
+	// We skip name unresolve. It is OK if the master's master is dead, unreachable, does nto resolve properly.
+	// We just copy+paste info from the master.
+	// In particular, this is commonly calledin DeadMaster recovery
+	instance, err = ChangeMasterTo(&instance.Key, &masterInstance.MasterKey, &masterInstance.ExecBinlogCoordinates, true)
 	if err != nil {
 		goto Cleanup
 	}
 	// instance is now sibling of master
-	masterInstance, err = ChangeMasterTo(&masterInstance.Key, &instance.Key, &instance.SelfBinlogCoordinates)
+	masterInstance, err = ChangeMasterTo(&masterInstance.Key, &instance.Key, &instance.SelfBinlogCoordinates, false)
 	if err != nil {
 		goto Cleanup
 	}
@@ -1292,7 +1297,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 			continue
 		}
 		log.Debugf("MultiMatchBelow: Will match up %+v to previously matched master coordinates %+v", slave.Key, matchedCoordinates)
-		if _, err := ChangeMasterTo(&slave.Key, &belowInstance.Key, matchedCoordinates); err == nil {
+		if _, err := ChangeMasterTo(&slave.Key, &belowInstance.Key, matchedCoordinates, false); err == nil {
 			StartSlave(&slave.Key)
 			matchedSlaves[slave.Key] = true
 		} else {
@@ -1457,7 +1462,7 @@ func RegroupSlaves(masterKey *InstanceKey, onCandidateSlaveChosen func(*Instance
 		go func() {
 			defer func() { barrier <- &candidateSlave.Key }()
 			ExecuteOnTopology(func() {
-				ChangeMasterTo(&slave.Key, &candidateSlave.Key, &candidateSlave.SelfBinlogCoordinates)
+				ChangeMasterTo(&slave.Key, &candidateSlave.Key, &candidateSlave.SelfBinlogCoordinates, false)
 			})
 		}()
 	}

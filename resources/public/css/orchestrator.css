@@ -329,6 +329,7 @@ div[data-btn-group=recover] code {
 }
 
 #cluster_sidebar li .popover {
+	max-width: 640px;
 	width: 640px;
 	font: 12px sans-serif;	
 }

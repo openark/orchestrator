@@ -198,6 +198,18 @@ Cleanup:
 }
 
 // ReadActiveRecoveries reads active recovery entry/audit entires from topology_recovery
+func ReadActiveClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
+	whereClause := fmt.Sprintf(`where in_active_period=1 and end_active_period_unixtime IS NULL and cluster_name='%s'`, clusterName)
+	return readRecoveries(whereClause, ``)
+}
+
+// ReadActiveRecoveries reads active recovery entry/audit entires from topology_recovery
+func ReadRecentlyActiveClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
+	whereClause := fmt.Sprintf(`where in_active_period=0 and end_recovery > now() - interval 5 minute and cluster_name='%s'`, clusterName)
+	return readRecoveries(whereClause, ``)
+}
+
+// ReadActiveRecoveries reads active recovery entry/audit entires from topology_recovery
 func ReadActiveRecoveries() ([]TopologyRecovery, error) {
 	return readRecoveries(`where in_active_period=1 and end_active_period_unixtime IS NULL`, ``)
 }

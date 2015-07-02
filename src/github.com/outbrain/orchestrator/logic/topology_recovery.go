@@ -212,6 +212,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 		if err != nil {
 			return promotedSlave, log.Errore(err)
 		}
+		log.Debugf("topology_recovery: success promoting %+v over %+v", *candidateInstanceKey, promotedSlave.Key)
 		return candidateInstance, nil
 	}
 

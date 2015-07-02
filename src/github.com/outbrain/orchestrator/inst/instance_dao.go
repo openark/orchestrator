@@ -1616,18 +1616,26 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 }
 
 // ChangeMasterTo changes the given instance's master according to given input.
-func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinlogCoordinates *BinlogCoordinates) (*Instance, error) {
+func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinlogCoordinates *BinlogCoordinates, skipUnresolve bool) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
 
 	if instance.SlaveRunning() {
-		return instance, fmt.Errorf("Cannot change master on: %+v because slave is running", *instanceKey)
+		return instance, fmt.Errorf("ChangeMasterTo: Cannot change master on: %+v because slave is running", *instanceKey)
 	}
-	unresolvedMasterKey, err := UnresolveHostname(masterKey)
-	if err != nil {
-		return instance, err
+	log.Debugf("ChangeMasterTo: will attempt changing master on %+v to %+v, %+v", *instanceKey, *masterKey, *masterBinlogCoordinates)
+	unresolvedMasterKey := masterKey
+	if !skipUnresolve {
+		unresolvedMasterKey, nameUnresolved, err := UnresolveHostname(masterKey)
+		if err != nil {
+			log.Debugf("ChangeMasterTo: aborting operation on %+v due to resolving error on %+v: %+v", *instanceKey, *masterKey, err)
+			return instance, err
+		}
+		if nameUnresolved {
+			log.Debugf("ChangeMasterTo: Unresolved %+v into %+v", masterKey, unresolvedMasterKey)
+		}
 	}
 
 	if *config.RuntimeCLIFlags.Noop {
@@ -1650,7 +1658,7 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	if err != nil {
 		return instance, log.Errore(err)
 	}
-	log.Infof("Changed master on %+v to: %+v, %+v", *instanceKey, unresolvedMasterKey, masterBinlogCoordinates)
+	log.Infof("ChangeMasterTo: Changed master on %+v to: %+v, %+v", *instanceKey, unresolvedMasterKey, masterBinlogCoordinates)
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
