@@ -283,6 +283,18 @@ func (this *HttpWeb) FAQ(params martini.Params, r render.Render, req *http.Reque
 	})
 }
 
+func (this *HttpWeb) Status(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+
+	r.HTML(200, "templates/status", map[string]interface{}{
+		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"title":               "status",
+		"activePage":          "home",
+		"authorizedForAction": isAuthorizedForAction(req, user),
+		"userId":              getUserId(req, user),
+		"autoshow_problems":   false,
+	})
+}
+
 // RegisterRequests makes for the de-facto list of known Web calls
 func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/", this.Clusters)
@@ -291,6 +303,7 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/about", this.About)
 	m.Get("/web/keep-calm", this.KeepCalm)
 	m.Get("/web/faq", this.FAQ)
+	m.Get("/web/status", this.Status)
 	m.Get("/web/clusters", this.Clusters)
 	m.Get("/web/clusters-analysis", this.ClustersAnalysis)
 	m.Get("/web/cluster/:clusterName", this.Cluster)

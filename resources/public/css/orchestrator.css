@@ -448,3 +448,13 @@ div[data-btn-group=recover] code {
     font-size: 10px;
     font-weight: bold;
 }
+
+
+#orchestratorStatusTable {
+    font: 12px sans-serif;
+}
+
+#orchestratorStatusTable code {
+	font-size: 100%;
+	background-color: inherit;
+}
