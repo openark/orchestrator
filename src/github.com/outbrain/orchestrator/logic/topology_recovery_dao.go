@@ -203,9 +203,15 @@ func ReadActiveClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
 	return readRecoveries(whereClause, ``)
 }
 
-// ReadActiveRecoveries reads active recovery entry/audit entires from topology_recovery
+// ReadRecentlyActiveInstanceRecovery reads recently completed entries for a given cluster
 func ReadRecentlyActiveClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
 	whereClause := fmt.Sprintf(`where in_active_period=0 and end_recovery > now() - interval 5 minute and cluster_name='%s'`, clusterName)
+	return readRecoveries(whereClause, ``)
+}
+
+// ReadRecentlyActiveInstanceRecovery reads recently completed entries for a given instance
+func ReadRecentlyActiveInstanceRecovery(instanceKey *inst.InstanceKey) ([]TopologyRecovery, error) {
+	whereClause := fmt.Sprintf(`where in_active_period=0 and end_recovery > now() - interval 5 minute and hostname='%s' and port=%d`, instanceKey.Hostname, instanceKey.Port)
 	return readRecoveries(whereClause, ``)
 }
 
