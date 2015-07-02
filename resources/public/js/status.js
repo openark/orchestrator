@@ -20,8 +20,17 @@ $(document).ready(function () {
 	var statusObject = $("#orchestratorStatus .panel-body");
     $.get("/api/health/", function (health) {
     	statusObject.prepend('<h4>'+health.Message+'</h4>')
-    	addStatusTableData("Active node", health.Details.ActiveNode.split(";")[0]);
-    	addStatusTableData("This node", health.Details.Hostname);
+    	var activeNode = health.Details.ActiveNode.split(";")[0];
+    	health.Details.AvailableNodes.forEach(function(hostname) {
+    		var message = hostname;
+    		if (hostname == health.Details.Hostname) {
+    			message += ' <span class="text-primary">[This node]</span>';
+    		}
+    		if (hostname == activeNode) {
+    			message += ' <span class="text-success">[Active]</span>';
+    		}
+    		addStatusTableData("Available node", message);
+    	})
     	
     	var userId = getUserId();
     	if (userId == "") {
@@ -33,6 +42,7 @@ $(document).ready(function () {
     	if (isAuthorizedForAction()) {
     		addStatusActionButton("Reload configuration", "reload-configuration");
     		addStatusActionButton("Reset hostname resolve cache", "reset-hostname-resolve-cache");
+    		addStatusActionButton("Reelect", "reelect");
     	}
     
     }, "json");   

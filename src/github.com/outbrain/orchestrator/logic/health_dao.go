@@ -24,12 +24,13 @@ import (
 )
 
 type HealthStatus struct {
-	Healthy      bool
-	Hostname     string
-	Token        string
-	IsActiveNode bool
-	ActiveNode   string
-	Error        error
+	Healthy        bool
+	Hostname       string
+	Token          string
+	IsActiveNode   bool
+	ActiveNode     string
+	Error          error
+	AvailableNodes []string
 }
 
 // HealthTest attempts to write to the backend database and get a result
@@ -71,5 +72,36 @@ func HealthTest() (*HealthStatus, error) {
 	health.ActiveNode = fmt.Sprintf("%s;%s", activeHostname, activeToken)
 	health.IsActiveNode = isActive
 
+	health.AvailableNodes, err = readAvailableNodes()
+
 	return &health, nil
+}
+
+func readAvailableNodes() ([]string, error) {
+	res := []string{}
+	query := fmt.Sprintf(`
+		select 
+			hostname
+		from 
+			node_health
+		where
+			last_seen_active > now() - interval 5 minute
+		order by
+			hostname
+		`)
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		goto Cleanup
+	}
+
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		res = append(res, m.GetString("hostname"))
+		return nil
+	})
+Cleanup:
+
+	if err != nil {
+		log.Errore(err)
+	}
+	return res, err
 }

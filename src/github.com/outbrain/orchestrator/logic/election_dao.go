@@ -24,6 +24,30 @@ import (
 	"github.com/outbrain/orchestrator/db"
 )
 
+func CreateElectionAnchor(force bool) error {
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		return log.Errore(err)
+	}
+
+	statement := `insert ignore`
+	if force {
+		statement = `replace`
+	}
+
+	_, err = sqlutils.Exec(db, statement+`
+			 into active_node
+				(anchor, last_seen_active, hostname)
+			values
+				(1, now() - interval (? + 1) second, '')
+		`, config.Config.ActiveNodeExpireSeconds)
+	if err != nil {
+		return log.Errore(err)
+	}
+	return nil
+
+}
+
 // AttemptElection tries to grab leadership (become active node)
 func AttemptElection() (bool, error) {
 
@@ -77,6 +101,11 @@ func GrabElection() (bool, error) {
 	}
 	rows, err := sqlResult.RowsAffected()
 	return (rows > 0), err
+}
+
+// Reelect clears the way for re-elections. Active node is immediately demoted.
+func Reelect() error {
+	return CreateElectionAnchor(true)
 }
 
 // IsElected checks whether this node is the elected active node

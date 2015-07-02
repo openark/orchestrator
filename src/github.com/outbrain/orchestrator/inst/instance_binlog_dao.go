@@ -44,6 +44,9 @@ func getInstancePseudoGTIDKey(instance *Instance, entry string) string {
 // the last relay log. We must be careful not to scan for Pseudo-GTID entries past the position executed by the SQL thread.
 // maxCoordinates == nil means no limit.
 func getLastPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, binlogType BinlogType, maxCoordinates *BinlogCoordinates) (*BinlogCoordinates, string, error) {
+	if binlog == "" {
+		return nil, "", log.Errorf("getLastPseudoGTIDEntryInBinlog: empty binlog file name for %+v. maxCoordinates = %+v", *instanceKey, maxCoordinates)
+	}
 	binlogCoordinates := BinlogCoordinates{LogFile: binlog, LogPos: 0, Type: binlogType}
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
@@ -147,6 +150,10 @@ func getLastPseudoGTIDEntryInRelayLogs(instance *Instance, recordedInstanceRelay
 // Given a binlog entry text (query), search it in the given binary log of a given instance
 func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entryText string) (BinlogCoordinates, bool, error) {
 	binlogCoordinates := BinlogCoordinates{LogFile: binlog, LogPos: 0, Type: BinaryLog}
+	if binlog == "" {
+		return binlogCoordinates, false, log.Errorf("SearchPseudoGTIDEntryInBinlog: empty binlog file name for %+v", *instanceKey)
+	}
+
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
 		return binlogCoordinates, false, err
@@ -247,6 +254,9 @@ func readBinlogEventsChunk(instanceKey *InstanceKey, startingCoordinates BinlogC
 		return events, err
 	}
 	commandToken := math.TernaryString(startingCoordinates.Type == BinaryLog, "binlog", "relaylog")
+	if startingCoordinates.LogFile == "" {
+		return events, log.Errorf("readBinlogEventsChunk: empty binlog file name for %+v.", *instanceKey)
+	}
 	query := fmt.Sprintf("show %s events in '%s' FROM %d LIMIT %d", commandToken, startingCoordinates.LogFile, startingCoordinates.LogPos, config.Config.BinlogEventsChunkSize)
 	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 		binlogEvent := BinlogEvent{}

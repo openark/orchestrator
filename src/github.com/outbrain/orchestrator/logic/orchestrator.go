@@ -133,6 +133,7 @@ func ContinuousDiscovery() {
 	}
 
 	elected := false
+	_ = CreateElectionAnchor(false)
 	for {
 		select {
 		case <-tick:
