@@ -26,8 +26,8 @@ cp etc/init.d/orchestrator.bash $release_files_dir/etc/init.d/orchestrator
 chmod +x $release_files_dir/etc/init.d/orchestrator
 
 
-GOPATH=/usr/share/golang:$(pwd):$GOPATH
-go build -o $release_files_dir/usr/local/orchestrator/orchestrator main.go
+GOPATH=/usr/share/golang:$(pwd)
+go build -o $release_files_dir/usr/local/orchestrator/orchestrator ./src/github.com/outbrain/orchestrator/main.go
 
 if [[ $? -ne 0 ]] ; then
 	exit 1
