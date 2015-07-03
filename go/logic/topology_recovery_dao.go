@@ -212,7 +212,6 @@ func ReadActiveClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
 func ReadRecentlyActiveClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
 	whereClause := fmt.Sprintf(`
 		where 
-			in_active_period=0 
 			and end_recovery > now() - interval 5 minute 
 			and cluster_name='%s'`,
 		clusterName)
@@ -223,7 +222,6 @@ func ReadRecentlyActiveClusterRecovery(clusterName string) ([]TopologyRecovery, 
 func ReadRecentlyActiveInstanceRecovery(instanceKey *inst.InstanceKey) ([]TopologyRecovery, error) {
 	whereClause := fmt.Sprintf(`
 		where 
-			in_active_period=0 
 			and end_recovery > now() - interval 5 minute 
 			and 
 				successor_hostname='%s' and successor_port=%d`,

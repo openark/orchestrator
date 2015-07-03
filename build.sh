@@ -5,7 +5,7 @@
 # Requires fpm: https://github.com/jordansissel/fpm
 #
 
-release_version="1.4.185"
+release_version="1.4.187"
 release_dir=/tmp/orchestrator-release
 release_files_dir=$release_dir/orchestrator
 release_files_cli_dir=$release_dir/orchestrator-cli
@@ -25,9 +25,7 @@ for f in $release_files_dir/usr/local/orchestrator/conf/*; do mv $f $f.sample; d
 cp etc/init.d/orchestrator.bash $release_files_dir/etc/init.d/orchestrator
 chmod +x $release_files_dir/etc/init.d/orchestrator
 
-
-GOPATH=/usr/share/golang:$(pwd)
-go build -o $release_files_dir/usr/local/orchestrator/orchestrator ./src/github.com/outbrain/orchestrator/main.go
+go build -o $release_files_dir/usr/local/orchestrator/orchestrator go/cmd/orchestrator/main.go
 
 if [[ $? -ne 0 ]] ; then
 	exit 1

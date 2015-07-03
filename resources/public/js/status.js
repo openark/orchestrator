@@ -23,11 +23,11 @@ $(document).ready(function () {
     	var activeNode = health.Details.ActiveNode.split(";")[0];
     	health.Details.AvailableNodes.forEach(function(hostname) {
     		var message = hostname;
+    		if (health.Details.IsActiveNode) {
+    			message += ' <span class="text-success">[Active]</span>';
+    		}
     		if (hostname == health.Details.Hostname) {
     			message += ' <span class="text-primary">[This node]</span>';
-    		}
-    		if (hostname == activeNode) {
-    			message += ' <span class="text-success">[Active]</span>';
     		}
     		addStatusTableData("Available node", message);
     	})

@@ -401,6 +401,10 @@ var generateSQLPatches = []string{
 		ALTER TABLE topology_recovery
 			ADD KEY cluster_name_in_active_idx (cluster_name, in_active_period)
 	`,
+	`
+		ALTER TABLE topology_recovery
+			ADD KEY end_recovery_idx (end_recovery)
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance
