@@ -81,7 +81,7 @@ func readAvailableNodes() ([]string, error) {
 	res := []string{}
 	query := fmt.Sprintf(`
 		select 
-			hostname
+			concat(hostname, ';', token) as node
 		from 
 			node_health
 		where
@@ -95,7 +95,7 @@ func readAvailableNodes() ([]string, error) {
 	}
 
 	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-		res = append(res, m.GetString("hostname"))
+		res = append(res, m.GetString("node"))
 		return nil
 	})
 Cleanup:

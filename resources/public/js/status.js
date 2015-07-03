@@ -20,10 +20,10 @@ $(document).ready(function () {
 	var statusObject = $("#orchestratorStatus .panel-body");
     $.get("/api/health/", function (health) {
     	statusObject.prepend('<h4>'+health.Message+'</h4>')
-    	var activeNode = health.Details.ActiveNode.split(";")[0];
-    	health.Details.AvailableNodes.forEach(function(hostname) {
+    	health.Details.AvailableNodes.forEach(function(node) {
+    		var hostname = node.split(";")[0];
     		var message = hostname;
-    		if (health.Details.IsActiveNode) {
+    		if (node == health.Details.ActiveNode) {
     			message += ' <span class="text-success">[Active]</span>';
     		}
     		if (hostname == health.Details.Hostname) {
