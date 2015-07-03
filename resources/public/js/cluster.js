@@ -776,6 +776,17 @@ $(document).ready(function () {
                 if ($.cookie("colorize-dc") == "true") {
                 	colorize_dc();
                 }
+                
+                instances.forEach(function (instance) {
+                	if (instance.isMaster) {
+                	    $.get("/api/recently-active-instance-recovery/"+ instance.Key.Hostname + "/" + instance.Key.Port, function (recoveries) {
+                	        // Result is an array: either empty (no active recovery) or with multiple entries
+                	    	recoveries.forEach(function (recoveryEntry) {
+                	    		addInfo("<strong>" + instance.title + "</strong> has just recently been promoted as result of <strong>" + recoveryEntry.AnalysisEntry.Analysis + "</strong>. It may still take some time to rebuild topology graph.");
+                	        });
+                	    }, "json");                		
+                    }
+                });                
             }, "json");
     }, "json");
     $.get("/api/cluster-info/"+currentClusterName(), function (clusterInfo) {    
