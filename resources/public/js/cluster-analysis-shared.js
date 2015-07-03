@@ -7,5 +7,6 @@ var interestingAnalysis = {
     	"AllMasterSlavesNotReplicating": true,
     	"DeadIntermediateMaster": true,
     	"DeadIntermediateMasterAndSomeSlaves": true,
-    	"UnreachableIntermediateMaster": true
+    	"UnreachableIntermediateMaster": true,
+    	"MaxscaleFailingToConnectToMaster": true
 };
