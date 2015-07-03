@@ -105,12 +105,12 @@ func standardHttp(discovery bool) {
 	}))
 	m.Use(martini.Static("resources/public"))
 
-	inst.SetMaintenanceOwner(orchestrator.ThisHostname)
+	inst.SetMaintenanceOwner(logic.ThisHostname)
 
 	log.Info("Starting HTTP")
 
 	if discovery {
-		go orchestrator.ContinuousDiscovery()
+		go logic.ContinuousDiscovery()
 	}
 	inst.ReadClusterAliases()
 
@@ -131,7 +131,7 @@ func agentsHttp() {
 
 	log.Info("Starting agents HTTP")
 
-	go orchestrator.ContinuousAgentsPoll()
+	go logic.ContinuousAgentsPoll()
 
 	http.AgentsAPI.RegisterRequests(m)
 

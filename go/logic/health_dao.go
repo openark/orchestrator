@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package orchestrator
+package logic
 
 import (
 	"fmt"

@@ -98,7 +98,7 @@ func (this *HttpAPI) Discover(params martini.Params, r render.Render, req *http.
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	go orchestrator.StartDiscovery(instanceKey)
+	go logic.StartDiscovery(instanceKey)
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance submitted for discovery: %+v", instanceKey)})
 }
@@ -1370,7 +1370,7 @@ func (this *HttpAPI) Headers(params martini.Params, r render.Render, req *http.R
 
 // Health performs a self test
 func (this *HttpAPI) Health(params martini.Params, r render.Render, req *http.Request) {
-	health, err := orchestrator.HealthTest()
+	health, err := logic.HealthTest()
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Application node is unhealthy %+v", err), Details: health})
 		return
@@ -1391,7 +1391,7 @@ func (this *HttpAPI) GrabElection(params martini.Params, r render.Render, req *h
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	success, err := orchestrator.GrabElection()
+	success, err := logic.GrabElection()
 	if err != nil || !success {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Unable to grab election: %+v", err)})
 		return
@@ -1407,7 +1407,7 @@ func (this *HttpAPI) Reelect(params martini.Params, r render.Render, req *http.R
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	err := orchestrator.Reelect()
+	err := logic.Reelect()
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Unable to re-elect: %+v", err)})
 		return
@@ -1456,7 +1456,7 @@ func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.R
 		candidateKey = &key
 	}
 
-	actionTaken, _, err := orchestrator.CheckAndRecover(&instanceKey, candidateKey, true)
+	actionTaken, _, err := logic.CheckAndRecover(&instanceKey, candidateKey, true)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -1484,7 +1484,7 @@ func (this *HttpAPI) AuditRecovery(params martini.Params, r render.Render, req *
 	if err != nil || page < 0 {
 		page = 0
 	}
-	audits, err := orchestrator.ReadRecentRecoveries(page)
+	audits, err := logic.ReadRecentRecoveries(page)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -1496,7 +1496,7 @@ func (this *HttpAPI) AuditRecovery(params martini.Params, r render.Render, req *
 
 // ActiveClusterRecovery returns recoveries in-progress for a given cluster
 func (this *HttpAPI) ActiveClusterRecovery(params martini.Params, r render.Render, req *http.Request) {
-	recoveries, err := orchestrator.ReadActiveClusterRecovery(params["clusterName"])
+	recoveries, err := logic.ReadActiveClusterRecovery(params["clusterName"])
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -1508,7 +1508,7 @@ func (this *HttpAPI) ActiveClusterRecovery(params martini.Params, r render.Rende
 
 // RecentlyActiveClusterRecovery returns recoveries in-progress for a given cluster
 func (this *HttpAPI) RecentlyActiveClusterRecovery(params martini.Params, r render.Render, req *http.Request) {
-	recoveries, err := orchestrator.ReadRecentlyActiveClusterRecovery(params["clusterName"])
+	recoveries, err := logic.ReadRecentlyActiveClusterRecovery(params["clusterName"])
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -1526,7 +1526,7 @@ func (this *HttpAPI) RecentlyActiveInstanceRecovery(params martini.Params, r ren
 		return
 	}
 
-	recoveries, err := orchestrator.ReadRecentlyActiveInstanceRecovery(&instanceKey)
+	recoveries, err := logic.ReadRecentlyActiveInstanceRecovery(&instanceKey)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})

@@ -366,7 +366,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			actionTaken, promotedInstance, err := orchestrator.CheckAndRecover(instanceKey, siblingKey, true)
+			actionTaken, promotedInstance, err := logic.CheckAndRecover(instanceKey, siblingKey, true)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -502,7 +502,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			orchestrator.StartDiscovery(*instanceKey)
+			logic.StartDiscovery(*instanceKey)
 			fmt.Println(instanceKey.DisplayString())
 		}
 	case cliCommand("forget"):
@@ -840,7 +840,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		}
 	case cliCommand("continuous"):
 		{
-			orchestrator.ContinuousDiscovery()
+			logic.ContinuousDiscovery()
 		}
 	case cliCommand("reset-hostname-resolve-cache"):
 		{
