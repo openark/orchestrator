@@ -30,7 +30,7 @@ import (
 
 // TopologyRecovery represents an entry in the topology_recovery table
 type TopologyRecovery struct {
-	TopologyRecoveryId     int64
+	Id                     int64
 	AnalysisEntry          inst.ReplicationAnalysis
 	SuccessorKey           inst.InstanceKey
 	IsActive               bool

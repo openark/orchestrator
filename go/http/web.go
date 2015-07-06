@@ -181,7 +181,25 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 	r.HTML(200, "templates/audit_recovery", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "audit-recovery",
-		"activePage":          "audit-recovery",
+		"activePage":          "audit",
+		"authorizedForAction": isAuthorizedForAction(req, user),
+		"userId":              getUserId(req, user),
+		"autoshow_problems":   false,
+		"page":                page,
+	})
+}
+
+
+func (this *HttpWeb) AuditFailureDetection(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	page, err := strconv.Atoi(params["page"])
+	if err != nil {
+		page = 0
+	}
+
+	r.HTML(200, "templates/audit_failure_detection", map[string]interface{}{
+		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"title":               "audit-failure-detection",
+		"activePage":          "audit",
 		"authorizedForAction": isAuthorizedForAction(req, user),
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
@@ -317,6 +335,8 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/audit/:page", this.Audit)
 	m.Get("/web/audit-recovery", this.AuditRecovery)
 	m.Get("/web/audit-recovery/:page", this.AuditRecovery)
+	m.Get("/web/audit-failure-detection", this.AuditFailureDetection)
+	m.Get("/web/audit-failure-detection/:page", this.AuditFailureDetection)
 	m.Get("/web/agents", this.Agents)
 	m.Get("/web/agent/:host", this.Agent)
 	m.Get("/web/seed-details/:seedId", this.AgentSeedDetails)

@@ -210,7 +210,7 @@ func readRecoveries(whereCondition string, limit string) ([]TopologyRecovery, er
 
 	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
 		topologyRecovery := TopologyRecovery{}
-		topologyRecovery.TopologyRecoveryId = m.GetInt64("recovery_id")
+		topologyRecovery.Id = m.GetInt64("recovery_id")
 
 		topologyRecovery.IsActive = m.GetBool("is_active")
 		topologyRecovery.RecoveryStartTimestamp = m.GetString("start_active_period")
@@ -299,4 +299,73 @@ func ReadRecentRecoveries(page int) ([]TopologyRecovery, error) {
 		offset %d`,
 		config.Config.AuditPageSize, page*config.Config.AuditPageSize)
 	return readRecoveries(``, limit)
+}
+
+// readRecoveries reads recovery entry/audit entires from topology_recovery
+func readFailureDetections(whereCondition string, limit string) ([]TopologyRecovery, error) {
+	res := []TopologyRecovery{}
+	query := fmt.Sprintf(`
+		select 
+            detection_id,
+            hostname,
+            port,
+            in_active_period as is_active,
+            start_active_period,
+            end_active_period_unixtime,
+            processing_node_hostname,
+            processcing_node_token,
+            analysis,
+            cluster_name,
+            cluster_alias,
+            count_affected_slaves,
+            slave_hosts		
+		from 
+			topology_failure_detection
+		%s
+		order by
+			detection_id desc
+		%s
+		`, whereCondition, limit)
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		goto Cleanup
+	}
+
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		failureDetection := TopologyRecovery{}
+		failureDetection.Id = m.GetInt64("detection_id")
+
+		failureDetection.IsActive = m.GetBool("is_active")
+		failureDetection.RecoveryStartTimestamp = m.GetString("start_active_period")
+		failureDetection.ProcessingNodeHostname = m.GetString("processing_node_hostname")
+		failureDetection.ProcessingNodeToken = m.GetString("processcing_node_token")
+
+		failureDetection.AnalysisEntry.AnalyzedInstanceKey.Hostname = m.GetString("hostname")
+		failureDetection.AnalysisEntry.AnalyzedInstanceKey.Port = m.GetInt("port")
+		failureDetection.AnalysisEntry.Analysis = inst.AnalysisCode(m.GetString("analysis"))
+		failureDetection.AnalysisEntry.ClusterDetails.ClusterName = m.GetString("cluster_name")
+		failureDetection.AnalysisEntry.ClusterDetails.ClusterAlias = m.GetString("cluster_alias")
+		failureDetection.AnalysisEntry.CountSlaves = m.GetUint("count_affected_slaves")
+		failureDetection.AnalysisEntry.ReadSlaveHostsFromString(m.GetString("slave_hosts"))
+
+		failureDetection.AnalysisEntry.ClusterDetails.ReadRecoveryInfo()
+
+		res = append(res, failureDetection)
+		return nil
+	})
+Cleanup:
+
+	if err != nil {
+		log.Errore(err)
+	}
+	return res, err
+}
+
+// ReadCRecoveries reads latest recovery entreis from topology_recovery
+func ReadRecentFailureDetections(page int) ([]TopologyRecovery, error) {
+	limit := fmt.Sprintf(`
+		limit %d
+		offset %d`,
+		config.Config.AuditPageSize, page*config.Config.AuditPageSize)
+	return readFailureDetections(``, limit)
 }
