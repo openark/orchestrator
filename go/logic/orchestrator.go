@@ -168,6 +168,7 @@ func ContinuousDiscovery() {
 			HealthTest()
 		case <-recoverTick:
 			if elected {
+				ClearActiveFailureDetections()
 				ClearActiveRecoveries()
 				CheckAndRecover(nil, nil, false)
 			}

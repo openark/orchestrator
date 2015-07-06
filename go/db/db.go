@@ -280,6 +280,26 @@ var generateSQL = []string{
           PRIMARY KEY (hostname, port)
         ) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+        CREATE TABLE IF NOT EXISTS topology_failure_detection (
+          detection_id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+          hostname varchar(128) NOT NULL,
+          port smallint unsigned NOT NULL,
+          in_active_period tinyint unsigned NOT NULL DEFAULT '0',
+          start_active_period timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          end_active_period_unixtime int unsigned NOT NULL,
+          processing_node_hostname varchar(128) NOT NULL,
+          processcing_node_token varchar(128) NOT NULL,
+          analysis varchar(128) NOT NULL,
+          cluster_name varchar(128) NOT NULL,
+          cluster_alias varchar(128) NOT NULL,
+          count_affected_slaves int unsigned NOT NULL,
+          slave_hosts text NOT NULL,
+          PRIMARY KEY (detection_id),
+          UNIQUE KEY hostname_port_active_period_uidx (hostname, port, in_active_period, end_active_period_unixtime),
+          KEY in_active_start_period_idx (in_active_period, start_active_period)
+        ) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{

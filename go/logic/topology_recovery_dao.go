@@ -25,6 +25,69 @@ import (
 	"github.com/outbrain/orchestrator/go/inst"
 )
 
+// AttemptFailureDetectionRegistration tries to add a failure-detection entry; if this fails that means the problem has already been detected
+func AttemptFailureDetectionRegistration(analysisEntry *inst.ReplicationAnalysis) (bool, error) {
+
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		return false, log.Errore(err)
+	}
+
+	sqlResult, err := sqlutils.Exec(db, `
+			insert ignore 
+				into topology_failure_detection (
+					hostname, 
+					port, 
+					in_active_period, 
+					start_active_period, 
+					end_active_period_unixtime, 
+					processing_node_hostname, 
+					processcing_node_token,
+					analysis,
+					cluster_name,
+					cluster_alias,
+					count_affected_slaves,
+					slave_hosts
+				) values (
+					?,
+					?,
+					1,
+					NOW(),
+					0,
+					?,
+					?,
+					?,
+					?,
+					?,
+					?,
+					?
+				)
+			`, analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port, ThisHostname, ProcessToken.Hash,
+		string(analysisEntry.Analysis), analysisEntry.ClusterDetails.ClusterName, analysisEntry.ClusterDetails.ClusterAlias, analysisEntry.CountSlaves, analysisEntry.GetSlaveHostsAsString(),
+	)
+	if err != nil {
+		return false, log.Errore(err)
+	}
+	rows, err := sqlResult.RowsAffected()
+	return (err == nil && rows > 0), err
+}
+
+// ClearActiveFailureDetections clears the "in_active_period" flag for old-enough detections, thereby allowing for
+// further detections on cleared instances.
+func ClearActiveFailureDetections() error {
+	_, err := db.ExecOrchestrator(`
+			update topology_failure_detection set 
+				in_active_period = 0,
+				end_active_period_unixtime = UNIX_TIMESTAMP()
+			where
+				in_active_period = 1
+				AND start_active_period < NOW() - INTERVAL ? MINUTE
+			`,
+		config.Config.FailureDetectionPeriodBlockMinutes,
+	)
+	return log.Errore(err)
+}
+
 // AttemptRecoveryRegistration tries to add a recovery entry; if this fails that means recovery is already in place.
 func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis) (bool, error) {
 
@@ -75,13 +138,7 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis) (bool,
 // ClearActiveRecoveries clears the "in_active_period" flag for old-enough recoveries, thereby allowing for
 // further recoveries on cleared instances.
 func ClearActiveRecoveries() error {
-
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	_, err = sqlutils.Exec(db, `
+	_, err := db.ExecOrchestrator(`
 			update topology_recovery set 
 				in_active_period = 0,
 				end_active_period_unixtime = UNIX_TIMESTAMP()
@@ -89,28 +146,19 @@ func ClearActiveRecoveries() error {
 				in_active_period = 1
 				AND start_active_period < NOW() - INTERVAL ? MINUTE
 			`,
-		config.Config.RecoveryPeriodBlockMinutes,
+		config.Config.FailureDetectionPeriodBlockMinutes,
 	)
-	if err != nil {
-		return log.Errore(err)
-	}
-	return nil
+	return log.Errore(err)
 }
 
 // ResolveRecovery is called on completion of a recovery process and updates the recovery status.
 // It does not clear the "active period" as this still takes place in order to avoid flapping.
 func ResolveRecovery(failedKey *inst.InstanceKey, successorKey *inst.InstanceKey) error {
 
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
 	if successorKey == nil {
 		successorKey = &inst.InstanceKey{}
 	}
-
-	_, err = sqlutils.Exec(db, `
+	_, err := db.ExecOrchestrator(`
 			update topology_recovery set 
 				successor_hostname = ?,
 				successor_port = ?,
@@ -124,10 +172,7 @@ func ResolveRecovery(failedKey *inst.InstanceKey, successorKey *inst.InstanceKey
 			`, successorKey.Hostname, successorKey.Port,
 		failedKey.Hostname, failedKey.Port, ThisHostname, ProcessToken.Hash,
 	)
-	if err != nil {
-		return log.Errore(err)
-	}
-	return nil
+	return log.Errore(err)
 }
 
 // readRecoveries reads recovery entry/audit entires from topology_recovery

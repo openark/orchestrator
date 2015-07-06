@@ -537,7 +537,6 @@ func readInstancesByCondition(condition string, sort string) ([](*Instance), err
 		if err != nil {
 			return instances, log.Errore(err)
 		}
-		log.Debugf(query)
 		return instances, err
 	}
 	instanceReadChan <- true

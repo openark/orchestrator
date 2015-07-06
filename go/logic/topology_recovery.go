@@ -65,6 +65,7 @@ func replaceCommandPlaceholders(command string, analysisEntry inst.ReplicationAn
 	command = strings.Replace(command, "{failureClusterAlias}", analysisEntry.ClusterDetails.ClusterAlias, -1)
 	command = strings.Replace(command, "{countSlaves}", fmt.Sprintf("%d", analysisEntry.CountSlaves), -1)
 	command = strings.Replace(command, "{isDowntimed}", fmt.Sprint(analysisEntry.IsDowntimed), -1)
+	command = strings.Replace(command, "{orchestratorHost}", ThisHostname, -1)
 
 	if successorInstance != nil {
 		command = strings.Replace(command, "{successorHost}", successorInstance.Key.Hostname, -1)
@@ -463,9 +464,12 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	}
 	// we have a recovery function; its execution still depends on filters if not disabled.
 
-	// Execute on-detection processes
-	if err := executeProcesses(config.Config.OnFailureDetectionProcesses, "OnFailureDetectionProcesses", analysisEntry, nil, true); err != nil {
-		return false, nil, err
+	if ok, _ := AttemptFailureDetectionRegistration(&analysisEntry); ok {
+		log.Debugf("topology_recovery: detected %+v failure on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
+		// Execute on-detection processes
+		if err := executeProcesses(config.Config.OnFailureDetectionProcesses, "OnFailureDetectionProcesses", analysisEntry, nil, true); err != nil {
+			return false, nil, err
+		}
 	}
 
 	actionTaken, promotedSlave, err := checkAndRecoverFunction(analysisEntry, candidateInstanceKey, skipFilters)
