@@ -410,6 +410,11 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 	return actionTaken, promotedSlave, err
 }
 
+// checkAndRecoverGenericProblem is a general=purpose recovery function
+func checkAndRecoverGenericProblem(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
+	return false, nil, nil
+}
+
 // Force a re-read of a topology instance; this is done because we need to substantiate a suspicion that we may have a failover
 // scenario. we want to speed up rading the complete picture.
 func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
@@ -450,6 +455,10 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
 	case inst.DeadCoMaster:
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
+	case DeadMasterAndSlaves:
+		checkAndRecoverFunction = checkAndRecoverGenericProblem
+	case AllMasterSlavesNotReplicating:
+		checkAndRecoverFunction = checkAndRecoverGenericProblem
 	case inst.UnreachableMaster:
 		go emergentlyReadTopologyInstanceSlaves(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 	case inst.AllMasterSlavesNotReplicating:

@@ -300,6 +300,26 @@ var generateSQL = []string{
           KEY in_active_start_period_idx (in_active_period, start_active_period)
         ) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS hostname_resolve_history (
+		  resolved_hostname varchar(128) NOT NULL,
+		  hostname varchar(128) NOT NULL,
+		  resolved_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  PRIMARY KEY (resolved_hostname),
+		  KEY (hostname),
+		  KEY resolved_timestamp_idx (resolved_timestamp)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS hostname_unresolve_history (
+		  unresolved_hostname varchar(128) NOT NULL,
+		  hostname varchar(128) NOT NULL,
+		  last_registered TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  PRIMARY KEY (unresolved_hostname),
+		  KEY (hostname),
+		  KEY last_registered_idx (last_registered)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{

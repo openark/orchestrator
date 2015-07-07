@@ -27,12 +27,7 @@ import (
 // WriteResolvedHostname stores a hostname and the resolved hostname to backend database
 func WriteResolvedHostname(hostname string, resolvedHostname string) error {
 	writeFunc := func() error {
-		db, err := db.OpenOrchestrator()
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		_, err = sqlutils.Exec(db, `
+		_, err := db.ExecOrchestrator(`
 			insert into  
 					hostname_resolve (hostname, resolved_hostname, resolved_timestamp)
 				values
@@ -46,6 +41,14 @@ func WriteResolvedHostname(hostname string, resolvedHostname string) error {
 		if err != nil {
 			return log.Errore(err)
 		}
+		_, err = db.ExecOrchestrator(`
+			replace into  
+					hostname_resolve_history (hostname, resolved_hostname, resolved_timestamp)
+				values
+					(?, ?, NOW())
+			`,
+			hostname,
+			resolvedHostname)
 		log.Debugf("WriteResolvedHostname: resolved %s to %s", hostname, resolvedHostname)
 
 		return nil
@@ -143,12 +146,7 @@ Cleanup:
 // RegisterHostnameUnresolve upserts an entry in hostname_unresolve
 func RegisterHostnameUnresolve(instanceKey *InstanceKey, unresolvedHostname string) error {
 	writeFunc := func() error {
-		db, err := db.OpenOrchestrator()
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		_, err = sqlutils.Exec(db, `
+		_, err := db.ExecOrchestrator(`
         	insert into hostname_unresolve (
         		hostname,
         		unresolved_hostname,
@@ -162,7 +160,14 @@ func RegisterHostnameUnresolve(instanceKey *InstanceKey, unresolvedHostname stri
 		if err != nil {
 			return log.Errore(err)
 		}
-
+		_, err = db.ExecOrchestrator(`
+	        	replace into hostname_unresolve_history (
+        		hostname,
+        		unresolved_hostname,
+        		last_registered)
+        	values (?, ?, NOW())
+				`, instanceKey.Hostname, unresolvedHostname,
+		)
 		return nil
 	}
 	return ExecDBWriteFunc(writeFunc)
@@ -171,21 +176,12 @@ func RegisterHostnameUnresolve(instanceKey *InstanceKey, unresolvedHostname stri
 // DeregisterHostnameUnresolve removes an unresovle entry
 func DeregisterHostnameUnresolve(instanceKey *InstanceKey) error {
 	writeFunc := func() error {
-		db, err := db.OpenOrchestrator()
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		_, err = sqlutils.Exec(db, `
+		_, err := db.ExecOrchestrator(`
         	delete from hostname_unresolve 
 				where hostname=?
 				`, instanceKey.Hostname,
 		)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
+		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }
@@ -193,33 +189,19 @@ func DeregisterHostnameUnresolve(instanceKey *InstanceKey) error {
 // ExpireHostnameUnresolve expires hostname_unresolve entries that haven't been updated recently.
 func ExpireHostnameUnresolve() error {
 	writeFunc := func() error {
-		db, err := db.OpenOrchestrator()
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		_, err = sqlutils.Exec(db, `
+		_, err := db.ExecOrchestrator(`
         	delete from hostname_unresolve 
 				where last_registered < NOW() - INTERVAL ? MINUTE
 				`, config.Config.ExpiryHostnameResolvesMinutes,
 		)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
+		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }
 
 // ForgetExpiredHostnameResolves
 func ForgetExpiredHostnameResolves() error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	_, err = sqlutils.Exec(db, `
+	_, err := db.ExecOrchestrator(`
 			delete 
 				from hostname_resolve 
 			where 
@@ -264,21 +246,14 @@ func DeleteInvalidHostnameResolves() error {
 				hostname = ?`,
 			invalidHostname,
 		)
-		if err != nil {
-			log.Errore(err)
-		}
+		log.Errore(err)
 	}
 	return err
 }
 
 // deleteHostnameResolves compeltely erases the database cache
 func deleteHostnameResolves() error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	_, err = sqlutils.Exec(db, `
+	_, err := db.ExecOrchestrator(`
 			delete 
 				from hostname_resolve`,
 	)

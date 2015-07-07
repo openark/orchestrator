@@ -189,7 +189,6 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 	})
 }
 
-
 func (this *HttpWeb) AuditFailureDetection(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	page, err := strconv.Atoi(params["page"])
 	if err != nil {
