@@ -62,7 +62,7 @@ function toHumanFormat(bytes) {
 }
 
 function getInstanceId(host, port) {
-    return "instance" + host.replace(/[.]/g, "_") + "__" + port
+    return "instance__" + host.replace(/[.]/g, "_") + "__" + port
 }
 
 function commonSuffixLength(strings) {
@@ -644,65 +644,6 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	    }      
 	    popoverElement.find(".popover-content").html(contentHtml);
 	}
-
-    if (renderType == "cluster" && instance.lastCheckInvalidProblem() && instance.children && instance.children.length > 0) {
-    	// Recovery options!
-    	popoverElement.append('<h4 class="popover-footer"><div class="btn-group" data-btn-group="recover"><button type="button" class="btn btn-xs btn-default dropdown-toggle" data-toggle="dropdown"><span class="glyphicon glyphicon-heart text-danger"></span> Recover <span class="caret"></span> <span class="sr-only">Toggle Dropdown</span></button><ul class="dropdown-menu" role="menu"></ul></div></h4>');
-    	var recoveryListing = popoverElement.find("div[data-btn-group=recover] ul");
-        recoveryListing.append('<li><a href="#" data-btn="auto" data-command="recover-auto">Auto (implies running external hooks/processes)</a></li>');
-        recoveryListing.append('<li role="separator" class="divider"></li>');
-        
-        if (!instance.isMaster) {
-            recoveryListing.append('<li><a href="#" data-btn="match-up-slaves" data-command="match-up-slaves">Match up slaves to <code>'+instance.masterTitle+'</code></a></li>');
-        }
-        recoveryListing.append('<li><a href="#" data-btn="regroup-slaves" data-command="regroup-slaves">Regroup slaves (auto pick best slave, only heals topology, no external processes)</a></li>');
-        if (instance.isMaster) {
-        	// Suggest successor
-		    instance.children.forEach(function(slave) {
-                if (!slave.LogBinEnabled) {
-                    return
-                }
-                if (slave.SQLDelay > 0) {
-                    return
-                }
-                if (!slave.LogSlaveUpdatesEnabled) {
-                    return
-                }
-                if (slave.lastCheckInvalidProblem()) {
-                    return
-                }
-                if (slave.notRecentlyCheckedProblem()) {
-                    return
-                }
-                recoveryListing.append(
-                    '<li><a href="#" data-btn="recover-suggested-successor" data-command="recover-suggested-successor" data-suggested-successor-host="'+slave.Key.Hostname
-                    +'" data-suggested-successor-port="'+slave.Key.Port+'">Regroup slaves, try to promote <code>'+slave.title+'</code></a></li>');
-	        });                 
-        }
-        if (instance.masterNode) {
-        	// Intermediate master; suggest successor
-		    instance.masterNode.children.forEach(function(sibling) {
-                if (sibling.id == instance.id) {
-                    return
-                }
-                if (!sibling.LogBinEnabled) {
-                    return
-                }
-                if (!sibling.LogSlaveUpdatesEnabled) {
-                    return
-                }
-                if (sibling.lastCheckInvalidProblem()) {
-                    return
-                }
-                if (sibling.notRecentlyCheckedProblem()) {
-                    return
-                }
-                recoveryListing.append(
-                    '<li><a href="#" data-btn="multi-match-slaves" data-command="multi-match-slaves" data-below-host="'+sibling.Key.Hostname
-                    +'" data-below-port="'+sibling.Key.Port+'">Match all slaves below <code>'+sibling.title+'</code></a></li>');
-	        });                 
-        }
-    }
     // if (instance.isCandidateMaster) {
     // popoverElement.append('<h4 class="popover-footer"><strong>Master
 	// candidate</strong><div class="pull-right"><button class="btn btn-xs

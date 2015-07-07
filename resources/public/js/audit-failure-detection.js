@@ -1,7 +1,7 @@
 
 $(document).ready(function () {
     showLoader();
-    $.get("/api/audit-failure-detection/"+currentPage(), function (auditEntries) {
+    $.get("/api/audit-recovery/"+currentPage(), function (auditEntries) {
             displayAudit(auditEntries);
     	}, "json");
     function displayAudit(auditEntries) {
@@ -14,6 +14,8 @@ $(document).ready(function () {
     		jQuery('<td/>', { text: audit.AnalysisEntry.ClusterDetails.ClusterName }).appendTo(row);
     		jQuery('<td/>', { text: audit.AnalysisEntry.ClusterDetails.ClusterAlias }).appendTo(row);
     		jQuery('<td/>', { text: audit.RecoveryStartTimestamp }).appendTo(row);
+    		jQuery('<td/>', { text: audit.RecoveryEndTimestamp }).appendTo(row);
+    		jQuery('<td/>', { text: audit.SuccessorKey.Hostname+":"+audit.SuccessorKey.Port }).appendTo(row);
     		row.appendTo('#audit tbody');
     	});
         if (currentPage() <= 0) {
@@ -23,10 +25,10 @@ $(document).ready(function () {
         	$("#audit .pager .next").addClass("disabled");        	
         }
         $("#audit .pager .previous").not(".disabled").find("a").click(function() {
-            window.location.href = "/web/audit-failure-detection/"+(currentPage() - 1);
+            window.location.href = "/web/audit-recovery/"+(currentPage() - 1);
         });
         $("#audit .pager .next").not(".disabled").find("a").click(function() {
-            window.location.href = "/web/audit-failure-detection/"+(currentPage() + 1);
+            window.location.href = "/web/audit-recovery/"+(currentPage() + 1);
         });
         $("#audit .pager .disabled a").click(function() {
             return false;

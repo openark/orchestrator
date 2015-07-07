@@ -235,7 +235,7 @@
     margin-left: 4px;
 }
 
-div[data-btn-group=recover] code {
+.popover-footer div.dropdown code {
     color: inherit;
 	background-color: inherit;
 }
