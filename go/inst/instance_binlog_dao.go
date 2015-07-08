@@ -148,7 +148,7 @@ func getLastPseudoGTIDEntryInRelayLogs(instance *Instance, recordedInstanceRelay
 }
 
 // Given a binlog entry text (query), search it in the given binary log of a given instance
-func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entryText string) (BinlogCoordinates, bool, error) {
+func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entryText string, entriesMonotonic bool) (BinlogCoordinates, bool, error) {
 	binlogCoordinates := BinlogCoordinates{LogFile: binlog, LogPos: 0, Type: BinaryLog}
 	if binlog == "" {
 		return binlogCoordinates, false, log.Errorf("SearchPseudoGTIDEntryInBinlog: empty binlog file name for %+v", *instanceKey)
@@ -160,12 +160,15 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 	}
 
 	moreRowsExpected := true
+	skipRestOfBinlog := false
 	var nextPos int64 = 0
 
 	//	commandToken := math.TernaryString(binlogCoordinates.Type == BinaryLog, "binlog", "relaylog")
 	for moreRowsExpected {
 		query := fmt.Sprintf("show binlog events in '%s' FROM %d LIMIT %d", binlog, nextPos, config.Config.BinlogEventsChunkSize)
 
+		// We don't know in advance when we will hit the end of the binlog. We will implicitly understand it when our
+		// `show binlog events` query does not return any row.
 		moreRowsExpected = false
 		queryRowsFunc := sqlutils.QueryRowsMap
 		if config.Config.BufferBinlogEvents {
@@ -173,18 +176,38 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 		}
 		err = queryRowsFunc(db, query, func(m sqlutils.RowMap) error {
 			if binlogCoordinates.LogPos != 0 {
+				// Entry found!
+				skipRestOfBinlog = true
 				return nil
-				// moreRowsExpected reamins false, this quits the loop
+			}
+			if skipRestOfBinlog {
+				return nil
 			}
 			moreRowsExpected = true
 			nextPos = m.GetInt64("End_log_pos")
-			if m.GetString("Info") == entryText {
+			binlogEntryInfo := m.GetString("Info")
+			//
+			if binlogEntryInfo == entryText {
 				// found it!
 				binlogCoordinates.LogPos = m.GetInt64("Pos")
+			} else if entriesMonotonic {
+				// More heavyweight computation here. Need to verify whether the binlog entry we have is a pseudo-gtid entry
+				if matched, _ := regexp.MatchString(config.Config.PseudoGTIDPattern, binlogEntryInfo); matched {
+					if binlogEntryInfo > entryText {
+						// Entries ascending, and current entry is larger than the one we are searching for.
+						// There is no need to scan further on. We can skip the entire binlog
+						log.Debugf(`Pseudo GTID entries are monotonic and we hit "%+v" > "%+v"; skipping binlog %+v`, m.GetString("Info"), entryText, binlogCoordinates.LogFile)
+						skipRestOfBinlog = true
+						return nil
+					}
+				}
 			}
 			return nil
 		})
 		if err != nil {
+			return binlogCoordinates, (binlogCoordinates.LogPos != 0), err
+		}
+		if skipRestOfBinlog {
 			return binlogCoordinates, (binlogCoordinates.LogPos != 0), err
 		}
 	}
@@ -193,7 +216,7 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 }
 
 // SearchPseudoGTIDEntryInInstance will search for a specific text entry within the binary logs of a given instance.
-func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string) (*BinlogCoordinates, error) {
+func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string, entriesMonotonic bool) (*BinlogCoordinates, error) {
 	cacheKey := getInstancePseudoGTIDKey(instance, entryText)
 	coords, found := instancePseudoGTIDEntryCache.Get(cacheKey)
 	if found {
@@ -203,6 +226,7 @@ func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string) (*Bin
 	}
 
 	// Look for GTID entry in given instance:
+	log.Debugf("Searching for given pseudo gtid entry in %+v. entriesMonotonic=%+v", instance.Key, entriesMonotonic)
 	currentBinlog := instance.SelfBinlogCoordinates
 	var err error = nil
 	for {
@@ -226,7 +250,7 @@ func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string) (*Bin
 		}
 		var resultCoordinates BinlogCoordinates
 		var found bool = false
-		resultCoordinates, found, err = SearchPseudoGTIDEntryInBinlog(&instance.Key, currentBinlog.LogFile, entryText)
+		resultCoordinates, found, err = SearchPseudoGTIDEntryInBinlog(&instance.Key, currentBinlog.LogFile, entryText, entriesMonotonic)
 		if err != nil {
 			break
 		}

@@ -5,6 +5,7 @@ var interestingAnalysis = {
     	"DeadMasterWithoutSlaves": true,
     	"UnreachableMaster": true,
     	"AllMasterSlavesNotReplicating": true,
+    	"AllMasterSlavesNotReplicatingOrDead": true,
     	"DeadIntermediateMaster": true,
     	"DeadIntermediateMasterAndSomeSlaves": true,
     	"AllIntermediateMasterSlavesNotReplicating": true,

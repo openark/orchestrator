@@ -172,10 +172,5 @@ func UnresolveHostname(instanceKey *InstanceKey) (InstanceKey, bool, error) {
 }
 
 func RegisterHostnameUnresolve(instanceKey *InstanceKey, unresolvedHostname string) (err error) {
-	if err = WriteHostnameUnresolve(instanceKey, unresolvedHostname); err == nil {
-		// We take this chance to do the revers: if we're to unresolve a into b,
-		// then b should resolve back to a.
-		UpdateResolvedHostname(unresolvedHostname, instanceKey.Hostname)
-	}
-	return err
+	return WriteHostnameUnresolve(instanceKey, unresolvedHostname)
 }

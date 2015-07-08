@@ -132,48 +132,75 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		if a.IsMaster && !a.LastCheckValid && a.CountSlaves == 0 {
 			a.Analysis = DeadMasterWithoutSlaves
 			a.Description = "Master cannot be reached by orchestrator and has no slave"
+			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadMaster
 			a.Description = "Master cannot be reached by orchestrator and none of its slaves is replicating"
+			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountSlaves > 0 && a.CountValidSlaves == 0 && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadMasterAndSlaves
 			a.Description = "Master cannot be reached by orchestrator and none of its slaves is replicating"
+			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountValidSlaves < a.CountSlaves && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadMasterAndSomeSlaves
 			a.Description = "Master cannot be reached by orchestrator; some of its slaves are unreachable and none of its reachable slaves is replicating"
+			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves > 0 {
 			a.Analysis = UnreachableMaster
 			a.Description = "Master cannot be reached by orchestrator but it has replicating slaves; possibly a network/host issue"
-		} else if a.IsMaster && a.LastCheckValid && a.CountSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
+			//
+		} else if a.IsMaster && a.LastCheckValid && a.CountSlaves == 1 && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
+			a.Analysis = MasterSingleSlaveNotReplicating
+			a.Description = "Master is reachable but its single slave is not replicating"
+			//
+		} else if a.IsMaster && a.LastCheckValid && a.CountSlaves == 1 && a.CountValidSlaves == 0 {
+			a.Analysis = MasterSingleSlaveDead
+			a.Description = "Master is reachable but its single slave is dead"
+			//
+		} else if a.IsMaster && a.LastCheckValid && a.CountSlaves > 1 && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = AllMasterSlavesNotReplicating
 			a.Description = "Master is reachable but none of its slaves is replicating"
+			//
+		} else if a.IsMaster && a.LastCheckValid && a.CountSlaves > 1 && a.CountValidSlaves < a.CountSlaves && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
+			a.Analysis = AllMasterSlavesNotReplicatingOrDead
+			a.Description = "Master is reachable but none of its slaves is replicating"
+			//
 		} else /* co-master */ if a.IsCoMaster && !a.LastCheckValid && a.CountSlaves > 0 && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadCoMaster
 			a.Description = "Co-master cannot be reached by orchestrator and none of its slaves is replicating"
+			//
 		} else if a.IsCoMaster && !a.LastCheckValid && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves > 0 {
 			a.Analysis = UnreachableCoMaster
 			a.Description = "Co-master cannot be reached by orchestrator but it has replicating slaves; possibly a network/host issue"
+			//
 		} else if a.IsCoMaster && a.LastCheckValid && a.CountSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = AllCoMasterSlavesNotReplicating
 			a.Description = "Co-master is reachable but none of its slaves is replicating"
+			//
 		} else /* intermediate-master */ if !a.IsMaster && !a.LastCheckValid && a.CountSlaves > 0 && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadIntermediateMaster
 			a.Description = "Intermediate master cannot be reached by orchestrator and none of its slaves is replicating"
+			//
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountValidSlaves < a.CountSlaves && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadIntermediateMasterAndSomeSlaves
 			a.Description = "Intermediate master cannot be reached by orchestrator; some of its slaves are unreachable and none of its reachable slaves is replicating"
+			//
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves > 0 {
 			a.Analysis = UnreachableIntermediateMaster
 			a.Description = "Intermediate master cannot be reached by orchestrator but it has replicating slaves; possibly a network/host issue"
+			//
 		} else if !a.IsMaster && a.LastCheckValid && a.CountSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = AllIntermediateMasterSlavesNotReplicating
 			a.Description = "Intermediate master is reachable but none of its slaves is replicating"
+			//
 		} else if a.IsMaxscale && a.IsFailingToConnectToMaster {
 			a.Analysis = MaxscaleFailingToConnectToMaster
 			a.Description = "Maxscale is unable to connect to its master"
+			//
 		} else if a.ReplicationDepth == 1 && a.IsFailingToConnectToMaster {
 			a.Analysis = FirstTierSlaveFailingToConnectToMaster
 			a.Description = "1st tier slave (directly replicating from topology master) is unable to connect to the master"
+			//
 		}
 		//		 else if a.IsMaster && a.CountSlaves == 0 {
 		//			a.Analysis = MasterWithoutSlaves

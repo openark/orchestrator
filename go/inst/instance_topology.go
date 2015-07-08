@@ -862,6 +862,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	var nextBinlogCoordinatesToMatch *BinlogCoordinates
 	var recordedInstanceRelayLogCoordinates BinlogCoordinates
 	var countMatchedEvents int
+	var entriesMonotonic bool
 
 	if otherInstance.IsMaxScale() {
 		// MaxScale(binlog server) does not do all the SHOW BINLOG EVENTS stuff
@@ -902,7 +903,8 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	if err != nil {
 		goto Cleanup
 	}
-	otherInstancePseudoGtidCoordinates, err = SearchPseudoGTIDEntryInInstance(otherInstance, instancePseudoGtidText)
+	entriesMonotonic = (config.Config.PseudoGTIDMonotonicHint != "") && strings.Contains(instancePseudoGtidText, config.Config.PseudoGTIDMonotonicHint)
+	otherInstancePseudoGtidCoordinates, err = SearchPseudoGTIDEntryInInstance(otherInstance, instancePseudoGtidText, entriesMonotonic)
 	if err != nil {
 		goto Cleanup
 	}

@@ -42,10 +42,13 @@ func WriteResolvedHostname(hostname string, resolvedHostname string) error {
 			return log.Errore(err)
 		}
 		_, err = db.ExecOrchestrator(`
-			replace into  
+			insert into  
 					hostname_resolve_history (hostname, resolved_hostname, resolved_timestamp)
 				values
 					(?, ?, NOW())
+				on duplicate key update 
+					hostname=if(values(hostname) != resolved_hostname, values(hostname), hostname), 
+					resolved_timestamp=values(resolved_timestamp)
 			`,
 			hostname,
 			resolvedHostname)
