@@ -143,8 +143,8 @@ Cleanup:
 	return unresolvedHostname, err
 }
 
-// RegisterHostnameUnresolve upserts an entry in hostname_unresolve
-func RegisterHostnameUnresolve(instanceKey *InstanceKey, unresolvedHostname string) error {
+// WriteHostnameUnresolve upserts an entry in hostname_unresolve
+func WriteHostnameUnresolve(instanceKey *InstanceKey, unresolvedHostname string) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
         	insert into hostname_unresolve (

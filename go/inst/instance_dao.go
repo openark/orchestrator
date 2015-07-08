@@ -514,7 +514,7 @@ func readInstancesByCondition(condition string, sort string) ([](*Instance), err
 			(last_checked <= last_seen) is true as is_last_check_valid,
 			timestampdiff(second, last_seen, now()) as seconds_since_last_seen,
 			candidate_database_instance.last_suggested is not null as is_candidate,
-			ifnull(unresolved_hostname, "") as unresolved_hostname 
+			ifnull(unresolved_hostname, '') as unresolved_hostname 
 		from 
 			database_instance 
 			left join candidate_database_instance using (hostname, port)
@@ -850,7 +850,7 @@ func readUnseenMasterKeys() ([]InstanceKey, error) {
 	return res, nil
 }
 
-// InjectUnseenMasters will review masters of instances that are known to be replication, yet which are not listed
+// InjectUnseenMasters will review masters of instances that are known to be replicating, yet which are not listed
 // in database_instance. Since their slaves are listed as replicating, we can assume that such masters actually do
 // exist: we shall therefore inject them with minimal details into the database_instance table.
 func InjectUnseenMasters() error {
