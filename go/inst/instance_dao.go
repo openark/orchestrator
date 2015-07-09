@@ -909,7 +909,8 @@ func ForgetUnseenInstancesDifferentlyResolved() error {
 // readUnknownMasterHostnameResolves will figure out the resolved hostnames of master-hosts which cannot be found.
 // It uses the hostname_resolve_history table to heuristically guess the correct hostname (based on "this was the
 // last time we saw this hostname and it resolves into THAT")
-func readUnknownMasterHostnameResolves() (res map[string]string, err error) {
+func readUnknownMasterHostnameResolves() (map[string]string, error) {
+	res := make(map[string]string)
 	db, err := db.OpenOrchestrator()
 	if err != nil {
 		return res, log.Errore(err)

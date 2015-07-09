@@ -148,31 +148,35 @@ func ContinuousDiscovery() {
 			}
 		case <-forgetUnseenTick:
 			// See if we should also forget objects (lower frequency)
-			if elected {
-				inst.ForgetLongUnseenInstances()
-				inst.ForgetUnseenInstancesDifferentlyResolved()
-				inst.ForgetExpiredHostnameResolves()
-				inst.DeleteInvalidHostnameResolves()
-				inst.ReviewUnseenInstances()
-				inst.InjectUnseenMasters()
-				inst.ResolveUnknownMasterHostnameResolves()
-				inst.ExpireMaintenance()
-				inst.ExpireDowntime()
-				inst.ExpireCandidateInstances()
-				inst.ExpireHostnameUnresolve()
-			}
-			if !elected {
-				// Take this opportunity to refresh yourself
-				inst.LoadHostnameResolveCacheFromDatabase()
-			}
-			inst.ReadClusterAliases()
-			HealthTest()
+			go func() {
+				if elected {
+					inst.ForgetLongUnseenInstances()
+					inst.ForgetUnseenInstancesDifferentlyResolved()
+					inst.ForgetExpiredHostnameResolves()
+					inst.DeleteInvalidHostnameResolves()
+					inst.ReviewUnseenInstances()
+					inst.InjectUnseenMasters()
+					inst.ResolveUnknownMasterHostnameResolves()
+					inst.ExpireMaintenance()
+					inst.ExpireDowntime()
+					inst.ExpireCandidateInstances()
+					inst.ExpireHostnameUnresolve()
+				}
+				if !elected {
+					// Take this opportunity to refresh yourself
+					inst.LoadHostnameResolveCacheFromDatabase()
+				}
+				inst.ReadClusterAliases()
+				HealthTest()
+			}()
 		case <-recoverTick:
-			if elected {
-				ClearActiveFailureDetections()
-				ClearActiveRecoveries()
-				CheckAndRecover(nil, nil, false)
-			}
+			go func() {
+				if elected {
+					ClearActiveFailureDetections()
+					ClearActiveRecoveries()
+					CheckAndRecover(nil, nil, false)
+				}
+			}()
 		case <-snapshotTopologiesTick:
 			inst.SnapshotTopologies()
 		}
