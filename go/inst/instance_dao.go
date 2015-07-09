@@ -906,6 +906,57 @@ func ForgetUnseenInstancesDifferentlyResolved() error {
 	return err
 }
 
+// readUnknownMasterHostnameResolves will figure out the resolved hostnames of master-hosts which cannot be found.
+// It uses the hostname_resolve_history table to heuristically guess the correct hostname (based on "this was the
+// last time we saw this hostname and it resolves into THAT")
+func readUnknownMasterHostnameResolves() (res map[string]string, err error) {
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		return res, log.Errore(err)
+	}
+	err = sqlutils.QueryRowsMap(db, `
+			SELECT DISTINCT
+			    slave_instance.master_host, hostname_resolve_history.resolved_hostname
+			FROM
+			    database_instance slave_instance
+			LEFT JOIN hostname_resolve ON (slave_instance.master_host = hostname_resolve.hostname)
+			LEFT JOIN database_instance master_instance ON (
+			    COALESCE(hostname_resolve.resolved_hostname, slave_instance.master_host) = master_instance.hostname
+			    and slave_instance.master_port = master_instance.port
+			) LEFT JOIN hostname_resolve_history ON (slave_instance.master_host = hostname_resolve_history.hostname)
+			WHERE
+			    master_instance.last_checked IS NULL
+			    and slave_instance.master_host != ''
+			    and slave_instance.master_host != '_'
+			    and slave_instance.master_port > 0
+			`, func(m sqlutils.RowMap) error {
+		res[m.GetString("master_host")] = m.GetString("resolved_hostname")
+		return nil
+	})
+	if err != nil {
+		return res, log.Errore(err)
+	}
+
+	return res, nil
+}
+
+// ResolveUnknownMasterHostnameResolves fixes missing hostname resolves based on hostname_resolve_history
+// The use case is slaves replicating from some unknown-hostname which cannot be otherwise found. This could
+// happen due to an expire unresolve together with clearing up of hostname cache.
+func ResolveUnknownMasterHostnameResolves() error {
+
+	hostnameResolves, err := readUnknownMasterHostnameResolves()
+	if err != nil {
+		return err
+	}
+	for hostname, resolvedHostname := range hostnameResolves {
+		UpdateResolvedHostname(hostname, resolvedHostname)
+	}
+
+	AuditOperation("resolve-unknown-masters", nil, fmt.Sprintf("Num resolved hostnames: %d", len(hostnameResolves)))
+	return err
+}
+
 // ReadCountMySQLSnapshots is a utility method to return registered number of snapshots for a given list of hosts
 func ReadCountMySQLSnapshots(hostnames []string) (map[string]int, error) {
 	res := make(map[string]int)

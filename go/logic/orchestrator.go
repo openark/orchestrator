@@ -155,6 +155,7 @@ func ContinuousDiscovery() {
 				inst.DeleteInvalidHostnameResolves()
 				inst.ReviewUnseenInstances()
 				inst.InjectUnseenMasters()
+				inst.ResolveUnknownMasterHostnameResolves()
 				inst.ExpireMaintenance()
 				inst.ExpireDowntime()
 				inst.ExpireCandidateInstances()
