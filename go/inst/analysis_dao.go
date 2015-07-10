@@ -183,6 +183,10 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 			a.Analysis = AllCoMasterSlavesNotReplicating
 			a.Description = "Co-master is reachable but none of its slaves is replicating"
 			//
+		} else /* intermediate-master */ if !a.IsMaster && !a.LastCheckValid && a.CountSlaves == 1 && a.CountValidSlaves == a.CountSlaves && a.CountSlavesFailingToConnectToMaster == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
+			a.Analysis = DeadIntermediateMasterWithSingleSlaveFailingToConnect
+			a.Description = "Intermediate master cannot be reached by orchestrator and its (single) slave is failing to connect"
+			//
 		} else /* intermediate-master */ if !a.IsMaster && !a.LastCheckValid && a.CountSlaves == 1 && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadIntermediateMasterWithSingleSlave
 			a.Description = "Intermediate master cannot be reached by orchestrator and its (single) slave is not replicating"
