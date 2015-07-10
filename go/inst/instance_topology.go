@@ -184,6 +184,10 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	if canReplicate, err := instance.CanReplicateFrom(master); canReplicate == false {
 		return instance, err
 	}
+	if master.IsMaxScale() {
+		// Bail out!
+		return Repoint(instanceKey, &master.MasterKey)
+	}
 
 	log.Infof("Will move %+v up the topology", *instanceKey)
 
@@ -200,40 +204,34 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	if master.IsMaxScale() {
-		instance, err = Repoint(instanceKey, &master.MasterKey)
-		if err != nil {
-			goto Cleanup
-		}
-	} else {
-		if !instance.UsingMariaDBGTID {
-			master, err = StopSlave(&master.Key)
-			if err != nil {
-				goto Cleanup
-			}
-		}
-
-		instance, err = StopSlave(instanceKey)
-		if err != nil {
-			goto Cleanup
-		}
-
-		if !instance.UsingMariaDBGTID {
-			instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &master.SelfBinlogCoordinates)
-			if err != nil {
-				goto Cleanup
-			}
-		}
-
-		// We can skip hsotname unresolve; we just copy+paste whatever our master thinks of its master.
-		instance, err = ChangeMasterTo(instanceKey, &master.MasterKey, &master.ExecBinlogCoordinates, true)
+	if !instance.UsingMariaDBGTID {
+		master, err = StopSlave(&master.Key)
 		if err != nil {
 			goto Cleanup
 		}
 	}
+
+	instance, err = StopSlave(instanceKey)
+	if err != nil {
+		goto Cleanup
+	}
+
+	if !instance.UsingMariaDBGTID {
+		instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &master.SelfBinlogCoordinates)
+		if err != nil {
+			goto Cleanup
+		}
+	}
+
+	// We can skip hsotname unresolve; we just copy+paste whatever our master thinks of its master.
+	instance, err = ChangeMasterTo(instanceKey, &master.MasterKey, &master.ExecBinlogCoordinates, true)
+	if err != nil {
+		goto Cleanup
+	}
+
 Cleanup:
 	instance, _ = StartSlave(instanceKey)
-	if !instance.UsingMariaDBGTID && !master.IsMaxScale() {
+	if !instance.UsingMariaDBGTID {
 		master, _ = StartSlave(&master.Key)
 	}
 	if err != nil {
@@ -264,6 +262,12 @@ func MoveUpSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), *Ins
 	_, err = GetInstanceMaster(instance)
 	if err != nil {
 		return res, instance, log.Errorf("Cannot GetInstanceMaster() for %+v. error=%+v", instance.Key, err), errs
+	}
+
+	if instance.IsMaxScale() {
+		slaves, err, errors := RepointSlavesTo(instanceKey, pattern, &instance.MasterKey)
+		// Bail out!
+		return slaves, instance, err, errors
 	}
 
 	slaves, err := ReadSlaveInstances(instanceKey)
@@ -381,6 +385,12 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 		return instance, err
 	}
 
+	if sibling.IsMaxScale() {
+		// MaxScale(binlog server) has same coordinates as master
+		// Bail out!
+		return Repoint(instanceKey, &sibling.Key)
+	}
+
 	isOracleGTID := (instance.UsingOracleGTID && sibling.UsingOracleGTID)
 	isMariaDBGTID := (instance.UsingMariaDBGTID && sibling.UsingMariaDBGTID)
 
@@ -419,45 +429,37 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	if sibling.IsMaxScale() {
-		// MaxScale(binlog server) has same coordinates as master
-		instance, err = Repoint(instanceKey, &sibling.Key)
-		if err != nil {
-			goto Cleanup
-		}
-	} else {
-		instance, err = StopSlave(instanceKey)
-		if err != nil {
-			goto Cleanup
-		}
+	instance, err = StopSlave(instanceKey)
+	if err != nil {
+		goto Cleanup
+	}
 
-		sibling, err = StopSlave(siblingKey)
+	sibling, err = StopSlave(siblingKey)
+	if err != nil {
+		goto Cleanup
+	}
+	if instance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
+		instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &sibling.ExecBinlogCoordinates)
 		if err != nil {
 			goto Cleanup
 		}
-		if instance.ExecBinlogCoordinates.SmallerThan(&sibling.ExecBinlogCoordinates) {
-			instance, err = StartSlaveUntilMasterCoordinates(instanceKey, &sibling.ExecBinlogCoordinates)
-			if err != nil {
-				goto Cleanup
-			}
-		} else if sibling.ExecBinlogCoordinates.SmallerThan(&instance.ExecBinlogCoordinates) {
-			sibling, err = StartSlaveUntilMasterCoordinates(siblingKey, &instance.ExecBinlogCoordinates)
-			if err != nil {
-				goto Cleanup
-			}
-		}
-		// At this point both siblings have executed exact same statements and are identical
-
-		instance, err = ChangeMasterTo(instanceKey, &sibling.Key, &sibling.SelfBinlogCoordinates, false)
+	} else if sibling.ExecBinlogCoordinates.SmallerThan(&instance.ExecBinlogCoordinates) {
+		sibling, err = StartSlaveUntilMasterCoordinates(siblingKey, &instance.ExecBinlogCoordinates)
 		if err != nil {
 			goto Cleanup
 		}
 	}
+	// At this point both siblings have executed exact same statements and are identical
+
+	instance, err = ChangeMasterTo(instanceKey, &sibling.Key, &sibling.SelfBinlogCoordinates, false)
+	if err != nil {
+		goto Cleanup
+	}
+
 Cleanup:
 	instance, _ = StartSlave(instanceKey)
-	if !sibling.IsMaxScale() {
-		sibling, _ = StartSlave(siblingKey)
-	}
+	sibling, _ = StartSlave(siblingKey)
+
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -579,8 +581,9 @@ Cleanup:
 
 }
 
-// RepointSlaves sequentially repoints all slaves of a given instance onto its existing master.
-func RepointSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), error, []error) {
+// RepointSlaves sequentially repoints slaves of a given instance (possibly filtered) onto another master.
+// MaxScale is the major use case
+func RepointSlavesTo(instanceKey *InstanceKey, pattern string, masterKey *InstanceKey) ([](*Instance), error, []error) {
 	res := [](*Instance){}
 	errs := []error{}
 
@@ -590,14 +593,19 @@ func RepointSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), err
 	}
 	slaves = filterInstancesByPattern(slaves, pattern)
 	if len(slaves) == 0 {
+		// Nothing to do
 		return res, nil, errs
 	}
+	if masterKey == nil {
+		// Default to existing master. All slaves are of the same master, hence just pick one.
+		masterKey = &slaves[0].MasterKey
+	}
 
-	log.Infof("Will repoint slaves of %+v", *instanceKey)
+	log.Infof("Will repoint slaves of %+v to %+v", *instanceKey, *masterKey)
 	for _, slave := range slaves {
 		slave := slave
 
-		slave, slaveErr := Repoint(&slave.Key, nil)
+		slave, slaveErr := Repoint(&slave.Key, masterKey)
 		if slaveErr == nil {
 			res = append(res, slave)
 		} else {
@@ -612,9 +620,14 @@ func RepointSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), err
 		// All returned with error
 		return res, log.Error("Error on all operations"), errs
 	}
-	AuditOperation("repoint-slaves", instanceKey, fmt.Sprintf("repointed %d/%d slaves of %+v", len(res), len(slaves), *instanceKey))
+	AuditOperation("repoint-slaves", instanceKey, fmt.Sprintf("repointed %d/%d slaves of %+v to %+v", len(res), len(slaves), *instanceKey, *masterKey))
 
 	return res, err, errs
+}
+
+// RepointSlaves sequentially repoints all slaves of a given instance onto its existing master.
+func RepointSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), error, []error) {
+	return RepointSlavesTo(instanceKey, pattern, nil)
 }
 
 // MakeCoMaster will attempt to make an instance co-master with its master, by making its master a slave of its own.

@@ -38,6 +38,7 @@ const (
 	UnreachableCoMaster                                    = "UnreachableCoMaster"
 	AllCoMasterSlavesNotReplicating                        = "AllCoMasterSlavesNotReplicating"
 	DeadIntermediateMaster                                 = "DeadIntermediateMaster"
+	DeadIntermediateMasterWithSingleSlave                  = "DeadIntermediateMasterWithSingleSlave"
 	DeadIntermediateMasterAndSomeSlaves                    = "DeadIntermediateMasterAndSomeSlaves"
 	UnreachableIntermediateMaster                          = "UnreachableIntermediateMaster"
 	AllIntermediateMasterSlavesNotReplicating              = "AllIntermediateMasterSlavesNotReplicating"
@@ -47,24 +48,25 @@ const (
 
 // ReplicationAnalysis notes analysis on replication chain status, per instance
 type ReplicationAnalysis struct {
-	AnalyzedInstanceKey         InstanceKey
-	AnalyzedInstanceMasterKey   InstanceKey
-	ClusterDetails              ClusterInfo
-	IsMaster                    bool
-	IsCoMaster                  bool
-	LastCheckValid              bool
-	CountSlaves                 uint
-	CountValidSlaves            uint
-	CountValidReplicatingSlaves uint
-	ReplicationDepth            uint
-	SlaveHosts                  InstanceKeyMap
-	IsFailingToConnectToMaster  bool
-	Analysis                    AnalysisCode
-	Description                 string
-	IsDowntimed                 bool
-	DowntimeEndTimestamp        string
-	DowntimeRemainingSeconds    int
-	IsMaxscale                  bool
+	AnalyzedInstanceKey                 InstanceKey
+	AnalyzedInstanceMasterKey           InstanceKey
+	ClusterDetails                      ClusterInfo
+	IsMaster                            bool
+	IsCoMaster                          bool
+	LastCheckValid                      bool
+	CountSlaves                         uint
+	CountValidSlaves                    uint
+	CountValidReplicatingSlaves         uint
+	CountSlavesFailingToConnectToMaster uint
+	ReplicationDepth                    uint
+	SlaveHosts                          InstanceKeyMap
+	IsFailingToConnectToMaster          bool
+	Analysis                            AnalysisCode
+	Description                         string
+	IsDowntimed                         bool
+	DowntimeEndTimestamp                string
+	DowntimeRemainingSeconds            int
+	IsMaxscale                          bool
 }
 
 // GetSlaveHostsAsString serializes all slave keys as a single comma delimited string

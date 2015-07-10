@@ -1690,7 +1690,7 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 			return instance, err
 		}
 		if nameUnresolved {
-			log.Debugf("ChangeMasterTo: Unresolved %+v into %+v", masterKey, unresolvedMasterKey)
+			log.Debugf("ChangeMasterTo: Unresolved %+v into %+v", *masterKey, unresolvedMasterKey)
 		}
 		changeToMasterKey = &unresolvedMasterKey
 	}

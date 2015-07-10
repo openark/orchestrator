@@ -138,6 +138,7 @@ func LoadHostnameResolveCacheFromDatabase() error {
 func ResetHostnameResolveCache() error {
 	err := deleteHostnameResolves()
 	hostnameResolvesLightweightCache.Flush()
+	hostnameResolvesLightweightCacheLoadedOnceFromDB = false
 	return err
 }
 

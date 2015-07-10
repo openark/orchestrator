@@ -41,7 +41,9 @@ func WriteResolvedHostname(hostname string, resolvedHostname string) error {
 		if err != nil {
 			return log.Errore(err)
 		}
-		_, err = db.ExecOrchestrator(`
+		if hostname != resolvedHostname {
+			// history is only interesting when there's actually something to resolve...
+			_, err = db.ExecOrchestrator(`
 			insert into  
 					hostname_resolve_history (hostname, resolved_hostname, resolved_timestamp)
 				values
@@ -50,8 +52,9 @@ func WriteResolvedHostname(hostname string, resolvedHostname string) error {
 					hostname=if(values(hostname) != resolved_hostname, values(hostname), hostname), 
 					resolved_timestamp=values(resolved_timestamp)
 			`,
-			hostname,
-			resolvedHostname)
+				hostname,
+				resolvedHostname)
+		}
 		log.Debugf("WriteResolvedHostname: resolved %s to %s", hostname, resolvedHostname)
 
 		return nil

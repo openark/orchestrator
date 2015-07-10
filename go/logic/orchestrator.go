@@ -178,7 +178,9 @@ func ContinuousDiscovery() {
 				}
 			}()
 		case <-snapshotTopologiesTick:
-			inst.SnapshotTopologies()
+			go func() {
+				inst.SnapshotTopologies()
+			}()
 		}
 	}
 }

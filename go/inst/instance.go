@@ -139,8 +139,8 @@ func (this *BinlogCoordinates) FileSmallerThan(other *BinlogCoordinates) bool {
 	return this.LogFile < other.LogFile
 }
 
-// PreviousFileCoordinates guesses the filename of the previous binlog/relaylog
-func (this *BinlogCoordinates) PreviousFileCoordinates() (BinlogCoordinates, error) {
+// PreviousFileCoordinatesBy guesses the filename of the previous binlog/relaylog, by given offset (number of files back)
+func (this *BinlogCoordinates) PreviousFileCoordinatesBy(offset int) (BinlogCoordinates, error) {
 	result := BinlogCoordinates{LogPos: 0, Type: this.Type}
 
 	tokens := strings.Split(this.LogFile, ".")
@@ -153,11 +153,16 @@ func (this *BinlogCoordinates) PreviousFileCoordinates() (BinlogCoordinates, err
 	if fileNum == 0 {
 		return result, errors.New("Log file number is zero, cannot detect previous file")
 	}
-	newNumStr := fmt.Sprintf("%d", (fileNum - 1))
+	newNumStr := fmt.Sprintf("%d", (fileNum - offset))
 	newNumStr = strings.Repeat("0", numLen-len(newNumStr)) + newNumStr
 	tokens[len(tokens)-1] = newNumStr
 	result.LogFile = strings.Join(tokens, ".")
 	return result, nil
+}
+
+// PreviousFileCoordinates guesses the filename of the previous binlog/relaylog
+func (this *BinlogCoordinates) PreviousFileCoordinates() (BinlogCoordinates, error) {
+	return this.PreviousFileCoordinatesBy(1)
 }
 
 // PreviousFileCoordinates guesses the filename of the previous binlog/relaylog
