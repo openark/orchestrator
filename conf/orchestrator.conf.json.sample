@@ -24,7 +24,7 @@
   "RejectHostnameResolvePattern": "",
   "UnseenInstanceForgetHours": 240,
   "CandidateInstanceExpireMinutes": 60,
-  "SnapshotTopologiesIntervalHours": 0,
+  "SnapshotTopologiesIntervalHours": 24,
   "ReasonableReplicationLagSeconds": 10,
   "VerifyReplicationFilters": false,
   "ReasonableMaintenanceReplicationLagSeconds": 20,
