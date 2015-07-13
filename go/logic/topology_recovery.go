@@ -267,8 +267,9 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 	if sibling.HasReplicationFilters != intermediateMasterInstance.HasReplicationFilters {
 		return false
 	}
-	if sibling.IsMaxScale() || intermediateMasterInstance.IsMaxScale() {
-		// With MaxScale the failover is different; we don't need this "move to uncle" logic.
+	if sibling.IsMaxScale() != intermediateMasterInstance.IsMaxScale() {
+		// When both are maxscale, failover is trivial.
+		// When failved IM is maxscale, its sibling is still valid, but we catually prefer to just repoint the slave up -- simplest!
 		return false
 	}
 	if sibling.ExecBinlogCoordinates.SmallerThan(&intermediateMasterInstance.ExecBinlogCoordinates) {

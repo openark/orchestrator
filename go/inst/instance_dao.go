@@ -118,6 +118,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	longRunningProcesses := []Process{}
 	resolvedHostname := ""
 	isMaxScale := false
+	slaveStatusFound := false
 	var resolveErr error
 
 	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
@@ -148,6 +149,10 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			}
 			return nil
 		})
+		if err != nil {
+			// The query should not error (even if it's not maxscale)
+			goto Cleanup
+		}
 	}
 
 	if !isMaxScale {
@@ -230,9 +235,14 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		// And until told otherwise:
 		instance.SlaveLagSeconds = instance.SecondsBehindMaster
 		// Not breaking the flow even on error
+		slaveStatusFound = true
 		return nil
 	})
 	if err != nil {
+		goto Cleanup
+	}
+	if isMaxScale && !slaveStatusFound {
+		err = fmt.Errorf("No 'SHOW SLAVE STATUS' output found for a MaxScale instance: %+v", instanceKey)
 		goto Cleanup
 	}
 
