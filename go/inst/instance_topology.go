@@ -583,7 +583,7 @@ Cleanup:
 
 // RepointSlaves sequentially repoints slaves of a given instance (possibly filtered) onto another master.
 // MaxScale is the major use case
-func RepointSlavesTo(instanceKey *InstanceKey, pattern string, masterKey *InstanceKey) ([](*Instance), error, []error) {
+func RepointSlavesTo(instanceKey *InstanceKey, pattern string, belowKey *InstanceKey) ([](*Instance), error, []error) {
 	res := [](*Instance){}
 	errs := []error{}
 
@@ -591,21 +591,22 @@ func RepointSlavesTo(instanceKey *InstanceKey, pattern string, masterKey *Instan
 	if err != nil {
 		return res, err, errs
 	}
+	slaves = removeInstance(slaves, belowKey)
 	slaves = filterInstancesByPattern(slaves, pattern)
 	if len(slaves) == 0 {
 		// Nothing to do
 		return res, nil, errs
 	}
-	if masterKey == nil {
+	if belowKey == nil {
 		// Default to existing master. All slaves are of the same master, hence just pick one.
-		masterKey = &slaves[0].MasterKey
+		belowKey = &slaves[0].MasterKey
 	}
 
-	log.Infof("Will repoint slaves of %+v to %+v", *instanceKey, *masterKey)
+	log.Infof("Will repoint slaves of %+v to %+v", *instanceKey, *belowKey)
 	for _, slave := range slaves {
 		slave := slave
 
-		slave, slaveErr := Repoint(&slave.Key, masterKey)
+		slave, slaveErr := Repoint(&slave.Key, belowKey)
 		if slaveErr == nil {
 			res = append(res, slave)
 		} else {
@@ -620,7 +621,7 @@ func RepointSlavesTo(instanceKey *InstanceKey, pattern string, masterKey *Instan
 		// All returned with error
 		return res, log.Error("Error on all operations"), errs
 	}
-	AuditOperation("repoint-slaves", instanceKey, fmt.Sprintf("repointed %d/%d slaves of %+v to %+v", len(res), len(slaves), *instanceKey, *masterKey))
+	AuditOperation("repoint-slaves", instanceKey, fmt.Sprintf("repointed %d/%d slaves of %+v to %+v", len(res), len(slaves), *instanceKey, *belowKey))
 
 	return res, err, errs
 }
@@ -1347,6 +1348,34 @@ func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey, pattern str
 		return res, nil, err, errs
 	}
 
+	masterInstance, found, err := ReadInstance(masterKey)
+	if err != nil || !found {
+		return res, nil, err, errs
+	}
+
+	// See if we have a binlog server case (special handling):
+	binlogCase := false
+	if masterInstance.IsMaxScale() && masterInstance.MasterKey.Equals(belowKey) {
+		// repoint-up
+		log.Debugf("MultiMatchSlaves: pointing slaves up from binlog server")
+		binlogCase = true
+	} else if belowInstance.IsMaxScale() && belowInstance.MasterKey.Equals(masterKey) {
+		// repoint-down
+		log.Debugf("MultiMatchSlaves: pointing slaves down to binlog server")
+		binlogCase = true
+	} else if masterInstance.IsMaxScale() && belowInstance.IsMaxScale() && masterInstance.MasterKey.Equals(&belowInstance.MasterKey) {
+		// Both BLS, siblings
+		log.Debugf("MultiMatchSlaves: pointing slaves to binlong sibling")
+		binlogCase = true
+	}
+	if binlogCase {
+		slaves, err, errors := RepointSlavesTo(masterKey, pattern, belowKey)
+		// Bail out!
+		return slaves, masterInstance, err, errors
+	}
+
+	// Not binlog server
+
 	// slaves involved
 	slaves, err := ReadSlaveInstances(masterKey)
 	if err != nil {
@@ -1394,6 +1423,7 @@ func MatchUpSlaves(masterKey *InstanceKey, pattern string) ([](*Instance), *Inst
 	if err != nil || !found {
 		return res, nil, err, errs
 	}
+
 	return MultiMatchSlaves(masterKey, &masterInstance.MasterKey, pattern)
 }
 
