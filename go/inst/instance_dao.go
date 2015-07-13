@@ -270,7 +270,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	// -------------------------------------------------------------------------
 
 	// Get slaves, either by SHOW SLAVE HOSTS or via PROCESSLIST
-	if config.Config.DiscoverByShowSlaveHosts && !isMaxScale {
+	if config.Config.DiscoverByShowSlaveHosts {
 		err = sqlutils.QueryRowsMap(db, `show slave hosts`,
 			func(m sqlutils.RowMap) error {
 				slaveKey, err := NewInstanceKeyFromStrings(m.GetString("Host"), m.GetString("Port"))

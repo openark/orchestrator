@@ -352,6 +352,10 @@
     cursor: move;
 }
 
+#clusters_analysis .popover {
+	width: 430px;
+	max-width: 430px;
+}
 
 #cluster_container .popover.instance div.popover-content {
     padding: 4px 8px;
