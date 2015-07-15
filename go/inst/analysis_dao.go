@@ -36,7 +36,7 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		        MIN(master_instance.master_port) AS master_port,
 		        MIN(master_instance.cluster_name) AS cluster_name,
 		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
-		        MIN(master_instance.last_attempted_check <= master_instance.last_seen)
+		        MIN(master_instance.last_checked <= master_instance.last_seen)
 		            IS TRUE AS is_last_check_valid,
 		        MIN(master_instance.master_host IN ('' , '_')
 		            OR master_instance.master_port = 0) AS is_master,
@@ -45,13 +45,13 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		                ':',
 		                master_instance.port) = master_instance.cluster_name) AS is_cluster_master,
 		        COUNT(slave_instance.server_id) AS count_slaves,
-		        IFNULL(SUM(slave_instance.last_attempted_check <= slave_instance.last_seen),
+		        IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen),
 		                0) AS count_valid_slaves,
-		        IFNULL(SUM(slave_instance.last_attempted_check <= slave_instance.last_seen
+		        IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
 		                    AND slave_instance.slave_io_running != 0
 		                    AND slave_instance.slave_sql_running != 0),
 		                0) AS count_valid_replicating_slaves,
-		        IFNULL(SUM(slave_instance.last_attempted_check <= slave_instance.last_seen
+		        IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
 		                    AND slave_instance.slave_io_running = 0
 		                    AND slave_instance.last_io_error RLIKE 'error (connecting|reconnecting) to master'
 		                    AND slave_instance.slave_sql_running = 1),

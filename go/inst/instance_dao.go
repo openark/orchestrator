@@ -524,7 +524,7 @@ func readInstancesByCondition(condition string, sort string) ([](*Instance), err
 		select 
 			*,
 			timestampdiff(second, last_checked, now()) as seconds_since_last_checked,
-			(last_attempted_check <= last_seen) is true as is_last_check_valid,
+			(last_checked <= last_seen) is true as is_last_check_valid,
 			timestampdiff(second, last_seen, now()) as seconds_since_last_seen,
 			candidate_database_instance.last_suggested is not null as is_candidate,
 			ifnull(unresolved_hostname, '') as unresolved_hostname 
@@ -597,7 +597,7 @@ func ReadSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
 // ReadUnseenInstances reads all instances which were not recently seen
 func ReadUnseenInstances() ([](*Instance), error) {
 	condition := fmt.Sprintf(`
-			last_seen < last_attempted_check
+			last_seen < last_checked
 		`)
 	return readInstancesByCondition(condition, "")
 }
@@ -605,8 +605,8 @@ func ReadUnseenInstances() ([](*Instance), error) {
 // ReadProblemInstances reads all instances with problems
 func ReadProblemInstances() ([](*Instance), error) {
 	condition := fmt.Sprintf(`
-			(last_seen < last_attempted_check)
-			or (not ifnull(timestampdiff(second, last_attempted_check, now()) <= %d, false))
+			(last_seen < last_checked)
+			or (not ifnull(timestampdiff(second, last_checked, now()) <= %d, false))
 			or (not slave_sql_running)
 			or (not slave_io_running)
 			or (abs(cast(seconds_behind_master as signed) - cast(sql_delay as signed)) > %d)
@@ -843,7 +843,7 @@ func readUnseenMasterKeys() ([]InstanceKey, error) {
 			    	COALESCE(hostname_resolve.resolved_hostname, slave_instance.master_host) = master_instance.hostname
 			    	and slave_instance.master_port = master_instance.port)
 			WHERE
-			    master_instance.last_attempted_check IS NULL
+			    master_instance.last_checked IS NULL
 			    and slave_instance.master_host != ''
 			    and slave_instance.master_host != '_'
 			    and slave_instance.master_port > 0
@@ -905,7 +905,7 @@ func ForgetUnseenInstancesDifferentlyResolved() error {
 		    JOIN database_instance ON (hostname_resolve.hostname = database_instance.hostname)
 		WHERE
 		    hostname_resolve.hostname != hostname_resolve.resolved_hostname
-		    AND (last_attempted_check <= last_seen) IS NOT TRUE
+		    AND (last_checked <= last_seen) IS NOT TRUE
 		`,
 	)
 	if err != nil {
@@ -939,7 +939,7 @@ func readUnknownMasterHostnameResolves() (map[string]string, error) {
 			    and slave_instance.master_port = master_instance.port
 			) LEFT JOIN hostname_resolve_history ON (slave_instance.master_host = hostname_resolve_history.hostname)
 			WHERE
-			    master_instance.last_attempted_check IS NULL
+			    master_instance.last_checked IS NULL
 			    and slave_instance.master_host != ''
 			    and slave_instance.master_host != '_'
 			    and slave_instance.master_port > 0
