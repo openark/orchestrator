@@ -902,8 +902,12 @@ $(document).ready(function () {
         } else {
             $("#dropdown-context").append('<li><a data-command="compact-display" href="'+location.href.split("?")[0]+'?compact=true">Compact display</a></li>');    
         }
+        $("#dropdown-context").append('<li><a data-command="pool-indicator">Pool indicator</a></li>');    
         $("#dropdown-context").append('<li><a data-command="colorize-dc">Colorize DC</a></li>');    
         $("#dropdown-context").append('<li><a data-command="anonymize">Anonymize</a></li>');    
+        if ($.cookie("pool-indicator") == "true") {
+        	$("#dropdown-context a[data-command=pool-indicator]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
+        } 
         if ($.cookie("anonymize") == "true") {
         	$("#dropdown-context a[data-command=anonymize]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
         } 
@@ -954,6 +958,16 @@ $(document).ready(function () {
     });    
     $("body").on("click", "a[data-command=cluster-osc-slaves]", function(event) {    	
     	showOSCSlaves();
+    });    
+    $("body").on("click", "a[data-command=pool-indicator]", function(event) {
+    	if ($.cookie("pool-indicator") == "true") {
+    		$.cookie("pool-indicator", "false", { path: '/', expires: 1 });
+    		location.reload();
+    		return
+        }
+    	$("#dropdown-context a[data-command=pool-indicator]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
+    	$.cookie("pool-indicator", "true", { path: '/', expires: 1 });
+		location.reload();
     });    
     $("body").on("click", "a[data-command=anonymize]", function(event) {
     	if ($.cookie("anonymize") == "true") {

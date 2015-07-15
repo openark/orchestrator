@@ -42,6 +42,7 @@ const (
 	DeadIntermediateMasterWithSingleSlaveFailingToConnect              = "DeadIntermediateMasterWithSingleSlaveFailingToConnect"
 	DeadIntermediateMasterAndSomeSlaves                                = "DeadIntermediateMasterAndSomeSlaves"
 	UnreachableIntermediateMaster                                      = "UnreachableIntermediateMaster"
+	AllIntermediateMasterSlavesFailingToConnect                        = "AllIntermediateMasterSlavesFailingToConnect"
 	AllIntermediateMasterSlavesNotReplicating                          = "AllIntermediateMasterSlavesNotReplicating"
 	FirstTierSlaveFailingToConnectToMaster                             = "FirstTierSlaveFailingToConnectToMaster"
 	MaxscaleFailingToConnectToMaster                                   = "MaxscaleFailingToConnectToMaster"

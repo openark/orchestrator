@@ -248,6 +248,7 @@ type Instance struct {
 	CountMySQLSnapshots  int
 
 	IsCandidate        bool
+	IsInPool           bool
 	UnresolvedHostname string
 }
 

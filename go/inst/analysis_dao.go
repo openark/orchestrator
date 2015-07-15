@@ -203,6 +203,10 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 			a.Analysis = UnreachableIntermediateMaster
 			a.Description = "Intermediate master cannot be reached by orchestrator but it has replicating slaves; possibly a network/host issue"
 			//
+		} else if !a.IsMaster && a.LastCheckValid && a.CountSlaves > 0 && a.CountValidReplicatingSlaves == 0 && a.CountSlavesFailingToConnectToMaster == a.CountSlaves {
+			a.Analysis = AllIntermediateMasterSlavesFailingToConnect
+			a.Description = "Intermediate master is reachable but all of its slaves are failing to connect"
+			//
 		} else if !a.IsMaster && a.LastCheckValid && a.CountSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = AllIntermediateMasterSlavesNotReplicating
 			a.Description = "Intermediate master is reachable but none of its slaves is replicating"
