@@ -1237,7 +1237,6 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 	// we only need to figure out one slave of each group/bucket of exec-coordinates; then apply the CHANGE MASTER TO
 	// on all its fellow members using same coordinates.
 	slaveBuckets := make(map[BinlogCoordinates][](*Instance))
-	knownCoordinatesMap := make(map[BinlogCoordinates](*BinlogCoordinates))
 	for _, slave := range slaves {
 		slave := slave
 		slaveBuckets[slave.ExecBinlogCoordinates] = append(slaveBuckets[slave.ExecBinlogCoordinates], slave)
@@ -1260,8 +1259,10 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 	for execCoordinates, bucketSlaves := range slaveBuckets {
 		execCoordinates := execCoordinates
 		bucketSlaves := bucketSlaves
+		var bucketMatchedCoordinates *BinlogCoordinates
 		// Buckets concurrent
 		go func() {
+			// find coordinates for a single bucket based on a slave in said bucket
 			defer func() { barrier <- &execCoordinates }()
 			func() {
 				for _, slave := range bucketSlaves {
@@ -1276,13 +1277,20 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 
 					if slaveErr == nil {
 						// Success! We matched a slave of this bucket
-						knownCoordinatesMap[execCoordinates] = matchedCoordinates
-						matchedSlaves[slave.Key] = true
+						func() {
+							// Instantaneous mutex.
+							slaveMutex <- true
+							defer func() { <-slaveMutex }()
+							bucketMatchedCoordinates = matchedCoordinates
+							matchedSlaves[slave.Key] = true
+						}()
 						log.Debugf("MultiMatchBelow: matched slave %+v in bucket %+v", slave.Key, execCoordinates)
 						return
 					}
 
+					// Got here? Error!
 					func() {
+						// Instantaneous mutex.
 						slaveMutex <- true
 						defer func() { <-slaveMutex }()
 						errs = append(errs, slaveErr)
@@ -1291,40 +1299,46 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 					// Failure: some unknown problem with bucket slave. Let's try the next one (continue loop)
 				}
 			}()
+			if bucketMatchedCoordinates == nil {
+				log.Errorf("MultiMatchBelow: Cannot match up %d slaves since their bucket %+v is failed", len(bucketSlaves), execCoordinates)
+				return
+			}
+			log.Debugf("MultiMatchBelow: bucket %+v coordinates are: %+v. Proceeding to match all bucket slaves", execCoordinates, *bucketMatchedCoordinates)
+			// At this point our bucket is complete.
+			// We don't wait for the other buckets -- we immediately work out all the other slaves in this bucket.
+			// (perhaps another bucket is busy matching a 24h delayed-replica; we definitely don't want to hold on that)
+			func() {
+				for _, slave := range bucketSlaves {
+					var err error
+					slave := slave
+					if _, found := matchedSlaves[slave.Key]; found {
+						// Already matched this slave
+						continue
+					}
+					log.Debugf("MultiMatchBelow: Will match up %+v to previously matched master coordinates %+v", slave.Key, *bucketMatchedCoordinates)
+					slaveMatchSuccess := false
+					ExecuteOnTopology(func() {
+						if _, err = ChangeMasterTo(&slave.Key, &belowInstance.Key, bucketMatchedCoordinates, false); err == nil {
+							StartSlave(&slave.Key)
+							slaveMatchSuccess = true
+						}
+					})
+					func() {
+						slaveMutex <- true
+						defer func() { <-slaveMutex }()
+						if slaveMatchSuccess {
+							matchedSlaves[slave.Key] = true
+						} else {
+							errs = append(errs, err)
+							log.Errorf("MultiMatchBelow: Cannot match up %+v: error is %+v", slave.Key, err)
+						}
+					}()
+				}
+			}()
 		}()
 	}
 	for _ = range slaveBuckets {
 		<-barrier
-	}
-	// Now that we've handled the representative slaves-per-bucket, let's go over all other slaves
-	for _, slave := range slaves {
-		slave := slave
-		if _, found := matchedSlaves[slave.Key]; found {
-			// Already matched this slave
-			continue
-		}
-		matchedCoordinates, found := knownCoordinatesMap[slave.ExecBinlogCoordinates]
-		if !found {
-			log.Errorf("MultiMatchBelow: Cannot match up %+v since cannot lookup matched coordinates for %+v", slave.Key, slave.ExecBinlogCoordinates)
-			continue
-		}
-		if matchedCoordinates == nil {
-			log.Errorf("MultiMatchBelow: found nil matchedCoordinates in bucket %+v", slave.ExecBinlogCoordinates)
-			continue
-		}
-		log.Debugf("MultiMatchBelow: Will match up %+v to previously matched master coordinates %+v", slave.Key, matchedCoordinates)
-		if _, err := ChangeMasterTo(&slave.Key, &belowInstance.Key, matchedCoordinates, false); err == nil {
-			StartSlave(&slave.Key)
-			matchedSlaves[slave.Key] = true
-		} else {
-			func() {
-				slaveMutex <- true
-				defer func() { <-slaveMutex }()
-				errs = append(errs, err)
-			}()
-			log.Errorf("MultiMatchBelow: Cannot match up %+v: error is %+v", slave.Key, err)
-			continue
-		}
 	}
 
 	for _, slave := range slaves {

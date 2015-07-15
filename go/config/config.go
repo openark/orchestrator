@@ -125,7 +125,7 @@ func NewConfiguration() *Configuration {
 		SlaveStartPostWaitMilliseconds:             1000,
 		DiscoverByShowSlaveHosts:                   false,
 		DiscoveryPollSeconds:                       5,
-		InstanceBulkOperationsWaitTimeoutSeconds:   60,
+		InstanceBulkOperationsWaitTimeoutSeconds:   10,
 		ActiveNodeExpireSeconds:                    60,
 		HostnameResolveMethod:                      "cname",
 		MySQLHostnameResolveMethod:                 "@@hostname",

@@ -373,7 +373,7 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	if !other.LogSlaveUpdatesEnabled {
 		return false, fmt.Errorf("instance does not have log_slave_updates enabled: %+v", other.Key)
 	}
-	if this.IsSmallerMajorVersion(other) {
+	if this.IsSmallerMajorVersion(other) && !this.IsMaxScale() {
 		return false, fmt.Errorf("instance %+v has version %s, which is lower than %s on %+v ", this.Key, this.Version, other.Version, other.Key)
 	}
 	if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
@@ -389,7 +389,7 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 			return false, fmt.Errorf("%+v has replication filters", other.Key)
 		}
 	}
-	if this.ServerID == other.ServerID {
+	if this.ServerID == other.ServerID && !this.IsMaxScale() {
 		return false, fmt.Errorf("Identical server id: %+v, %+v both have %d", other.Key, this.Key, this.ServerID)
 	}
 	return true, nil
