@@ -3,11 +3,17 @@ clusterOperationPseudoGTIDMode = false;
 var renderColors = ["#ff8c00", "#4682b4", "#9acd32", "#dc143c", "#9932cc", "#ffd700", "#191970", "#7fffd4", "#808080", "#dda0dd"];
 var dcColorsMap = {};
 
+
+function getInstanceDiv(instanceId) {
+    var popoverDiv = $("[data-fo-id='" + instanceId + "'] div.popover");
+	return popoverDiv
+}
+
 function repositionIntanceDivs() {
     $("[data-fo-id]").each(
             function () {
                 var id = $(this).attr("data-fo-id");
-                var popoverDiv = $("[data-fo-id='" + id + "'] div.popover");
+                var popoverDiv = getInstanceDiv(id);
 
                 popoverDiv.attr("x", $(this).attr("x"));
                 $(this).attr("y",
@@ -37,7 +43,7 @@ function generateInstanceDivs(nodesMap) {
         }
     });
     nodesList.forEach(function (node) {
-    	var popoverElement = $("[data-fo-id='" + node.id + "'] .popover");
+    	var popoverElement = getInstanceDiv(node.id);
    		renderInstanceElement(popoverElement, node, "cluster");
     });
 
@@ -773,7 +779,7 @@ function onAnalysisEntry(analysisEntry, instance) {
 	;
 	addSidebarInfoPopoverContent(content);        
 	
-	var popoverElement = $("[data-fo-id='" + instance.id + "'] .popover");
+	var popoverElement = getInstanceDiv(instance.id);
 
 	popoverElement.append('<h4 class="popover-footer"><div class="dropdown"><button type="button" class="btn btn-xs btn-default dropdown-toggle" id="recover_dropdown_'+instance.id+'" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="glyphicon glyphicon-heart text-danger"></span> Recover <span class="caret"></span></button><ul class="dropdown-menu" aria-labelledby="recover_dropdown_'+instance.id+'"></ul></div></h4>');
 	var recoveryListing = popoverElement.find(".dropdown ul");
@@ -857,6 +863,23 @@ function reviewReplicationAnalysis(replicationAnalysis, instancesMap) {
 }
 
 
+function indicateClusterPoolInstances(clusterPoolInstances, instancesMap) {
+	for (var pool in clusterPoolInstances.Details) {
+		if (clusterPoolInstances.Details.hasOwnProperty(pool)) {
+			clusterPoolInstances.Details[pool].forEach(function(instanceKey) {
+				var instanceId = getInstanceId(instanceKey.Hostname, instanceKey.Port)
+				var instance  = instancesMap[instanceId];
+				if (!instance.IsInPool) {
+					instance.IsInPool = true;
+					getInstanceDiv(instance.id).find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-tint" title="pools:"></span> ');
+				}
+				var indicatorElement = getInstanceDiv(instance.id).find("h3 div.pull-right span.glyphicon-tint");
+				indicatorElement.attr("title", indicatorElement.attr("title") + " " + pool);
+			});
+		}
+	}
+}
+
 $(document).ready(function () {
     $.get("/api/cluster/"+currentClusterName(), function (instances) {
         $.get("/api/replication-analysis", function (replicationAnalysis) {
@@ -886,7 +909,12 @@ $(document).ready(function () {
                 	        });
                 	    }, "json");                		
                     }
-                });                
+                });            
+                if ($.cookie("pool-indicator") == "true") {
+                    $.get("/api/cluster-pool-instances/" + currentClusterName(), function (clusterPoolInstances) {
+               	    	indicateClusterPoolInstances(clusterPoolInstances, instancesMap);
+                    }, "json");                	
+                }
         	}, "json");
     	}, "json");
     }, "json");

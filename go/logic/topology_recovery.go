@@ -456,6 +456,9 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
 	case inst.DeadIntermediateMasterWithSingleSlaveFailingToConnect:
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
+	case inst.AllIntermediateMasterSlavesFailingToConnectOrDead:
+		// testing this: checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
+		checkAndRecoverFunction = checkAndRecoverGenericProblem
 	case inst.DeadCoMaster:
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
 	case inst.DeadMasterAndSlaves:

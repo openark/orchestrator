@@ -595,9 +595,6 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	    if (instance.IsDowntimed) {
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-volume-off"></span> ');
 	    } 
-	    if (instance.IsInPool && ($.cookie("pool-indicator") == "true")) {
-	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-tint" title="Pool member"></span> ');
-	    } 
 	
 	    if (instance.lastCheckInvalidProblem()) {
 	    	instance.renderHint = "fatal";

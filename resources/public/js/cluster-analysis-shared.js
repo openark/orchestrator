@@ -10,7 +10,7 @@ var interestingAnalysis = {
 	"DeadIntermediateMasterWithSingleSlaveFailingToConnect" : true,
 	"DeadIntermediateMasterWithSingleSlave" : true,
 	"DeadIntermediateMasterAndSomeSlaves" : true,
-	"AllIntermediateMasterSlavesFailingToConnect" : true,
+	"AllIntermediateMasterSlavesFailingToConnectOrDead" : true,
 	"AllIntermediateMasterSlavesNotReplicating" : true,
 	"UnreachableIntermediateMaster" : true,
 	"MaxscaleFailingToConnectToMaster" : true

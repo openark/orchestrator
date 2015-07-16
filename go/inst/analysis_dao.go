@@ -17,6 +17,7 @@
 package inst
 
 import (
+	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
@@ -28,7 +29,7 @@ import (
 func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
-	query := `
+	query := fmt.Sprintf(`
 		    SELECT 
 		        master_instance.hostname,
 		        master_instance.port,
@@ -36,8 +37,10 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		        MIN(master_instance.master_port) AS master_port,
 		        MIN(master_instance.cluster_name) AS cluster_name,
 		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
-		        MIN(master_instance.last_checked <= master_instance.last_seen)
-		            IS TRUE AS is_last_check_valid,
+		        MIN(
+		        		master_instance.last_checked <= master_instance.last_seen
+		        		AND master_instance.last_attempted_check <= master_instance.last_seen + INTERVAL (2 * %d) SECOND
+		        	) IS TRUE AS is_last_check_valid,
 		        MIN(master_instance.master_host IN ('' , '_')
 		            OR master_instance.master_port = 0) AS is_master,
 		        MIN(master_instance.is_co_master) AS is_co_master,
@@ -74,7 +77,7 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		    		IFNULL(TIMESTAMPDIFF(SECOND, NOW(), database_instance_downtime.end_timestamp), 0)
 		    	) AS downtime_remaining_seconds,
 		    	MIN(
-		    		master_instance.version like '%maxscale%'
+		    		master_instance.version like '%%maxscale%%'
 		    	) AS is_maxscale
 		    FROM
 		        database_instance master_instance
@@ -103,7 +106,8 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 			    is_master DESC , 
 			    is_cluster_master DESC, 
 			    count_slaves DESC
-	`
+	`, config.Config.InstancePollSeconds)
+
 	db, err := db.OpenOrchestrator()
 	if err != nil {
 		goto Cleanup
@@ -203,8 +207,11 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 			a.Analysis = UnreachableIntermediateMaster
 			a.Description = "Intermediate master cannot be reached by orchestrator but it has replicating slaves; possibly a network/host issue"
 			//
-		} else if !a.IsMaster && a.LastCheckValid && a.CountSlaves > 0 && a.CountValidReplicatingSlaves == 0 && a.CountSlavesFailingToConnectToMaster == a.CountSlaves {
-			a.Analysis = AllIntermediateMasterSlavesFailingToConnect
+		} else if !a.IsMaster && a.LastCheckValid && a.CountSlaves > 0 && a.CountValidReplicatingSlaves == 0 &&
+			a.CountSlavesFailingToConnectToMaster > 0 && a.CountSlavesFailingToConnectToMaster == a.CountValidSlaves {
+			// All slaves are either failing to connect to master (and at least one of these have to exist)
+			// or completely dead.
+			a.Analysis = AllIntermediateMasterSlavesFailingToConnectOrDead
 			a.Description = "Intermediate master is reachable but all of its slaves are failing to connect"
 			//
 		} else if !a.IsMaster && a.LastCheckValid && a.CountSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
