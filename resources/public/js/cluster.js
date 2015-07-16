@@ -1,4 +1,4 @@
-clusterOperationPseudoGTIDMode = false;
+clusterOperationPseudoGTIDMode = ($.cookie("operation-pgtid-mode") == "true");
 
 var renderColors = ["#ff8c00", "#4682b4", "#9acd32", "#dc143c", "#9932cc", "#ffd700", "#191970", "#7fffd4", "#808080", "#dda0dd"];
 var dcColorsMap = {};
@@ -934,13 +934,13 @@ $(document).ready(function () {
         $("#dropdown-context").append('<li><a data-command="colorize-dc">Colorize DC</a></li>');    
         $("#dropdown-context").append('<li><a data-command="anonymize">Anonymize</a></li>');    
         if ($.cookie("pool-indicator") == "true") {
-        	$("#dropdown-context a[data-command=pool-indicator]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
+        	$("#dropdown-context a[data-command=pool-indicator]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
         } 
         if ($.cookie("anonymize") == "true") {
-        	$("#dropdown-context a[data-command=anonymize]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
+        	$("#dropdown-context a[data-command=anonymize]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
         } 
         if ($.cookie("colorize-dc") == "true") {
-        	$("#dropdown-context a[data-command=colorize-dc]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
+        	$("#dropdown-context a[data-command=colorize-dc]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
         } 
         populateSidebar(clusterInfo);
 
@@ -976,6 +976,7 @@ $(document).ready(function () {
         
 	    $("body").on("click", "#cluster_operation_mode_button", function() {
 	    	clusterOperationPseudoGTIDMode = !clusterOperationPseudoGTIDMode;
+	    	$.cookie("operation-pgtid-mode", ""+clusterOperationPseudoGTIDMode, { path: '/', expires: 1 });
 	    	refreshClusterOperationModeButton(); 
 	    });
     }
@@ -993,7 +994,6 @@ $(document).ready(function () {
     		location.reload();
     		return
         }
-    	$("#dropdown-context a[data-command=pool-indicator]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
     	$.cookie("pool-indicator", "true", { path: '/', expires: 1 });
 		location.reload();
     });    
@@ -1004,7 +1004,7 @@ $(document).ready(function () {
     		return
         }
     	anonymize();
-    	$("#dropdown-context a[data-command=anonymize]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
+    	$("#dropdown-context a[data-command=anonymize]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
     	$.cookie("anonymize", "true", { path: '/', expires: 1 });
     });    
     $("body").on("click", "a[data-command=colorize-dc]", function(event) {
@@ -1014,7 +1014,7 @@ $(document).ready(function () {
     		return
         }
     	colorize_dc();
-    	$("#dropdown-context a[data-command=colorize-dc]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
+    	$("#dropdown-context a[data-command=colorize-dc]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
     	$.cookie("colorize-dc", "true", { path: '/', expires: 1 });
     });    
 

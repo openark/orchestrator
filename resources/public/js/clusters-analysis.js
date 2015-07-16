@@ -93,7 +93,14 @@ $(document).ready(function () {
                 
         if (clusters.length == 0) {
         	// No problems
-        	addInfo("No incidents which require a failover to report. Orchestrator reports dead-master and dead-intermediate-master issues.");
+        	var info = "No incidents which require a failover to report. Orchestrator reports the following incidents:<ul>";
+        	for ( var analysis in interestingAnalysis) {
+				if (interestingAnalysis[analysis]) {
+					info += "<li>" + analysis + "</li>";
+				}
+			}
+        	info += "</ul>";
+        	addInfo(info);
         }
 
         $("div.popover").popover();
