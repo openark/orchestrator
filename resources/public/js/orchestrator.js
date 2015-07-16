@@ -716,6 +716,7 @@ $(document).ready(function() {
         addInfo(orchestratorMsg)
         history.pushState(null, document.title, location.href.split("?orchestrator-msg=")[0])
     }
+    $("#searchInput").focus();
 });
 
 

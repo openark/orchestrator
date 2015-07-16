@@ -12,6 +12,7 @@ $(document).ready(function () {
         discover($("#discoverHostName").val(), $("#discoverPort").val())
         return false;
     });
+    $("#discoverHostName").focus();
 });
 
 function discover(hostname, port) {
