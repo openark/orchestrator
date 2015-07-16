@@ -502,8 +502,11 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			logic.StartDiscovery(*instanceKey)
-			fmt.Println(instanceKey.DisplayString())
+			instance, err := inst.ReadTopologyInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instance.Key.DisplayString())
 		}
 	case cliCommand("forget"):
 		{

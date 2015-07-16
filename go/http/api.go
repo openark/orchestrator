@@ -86,7 +86,7 @@ func (this *HttpAPI) Instance(params martini.Params, r render.Render, req *http.
 	r.JSON(200, instance)
 }
 
-// Discover starts an asynchronuous discovery for an instance
+// Discover issues a synchronous read on an instance
 func (this *HttpAPI) Discover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -98,9 +98,13 @@ func (this *HttpAPI) Discover(params martini.Params, r render.Render, req *http.
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	go logic.StartDiscovery(instanceKey)
+	instance, err := inst.ReadTopologyInstance(&instanceKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance submitted for discovery: %+v", instanceKey)})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance discovered: %+v", instance.Key)})
 }
 
 // Refresh synchronuously re-reads a topology instance
