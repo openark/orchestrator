@@ -400,7 +400,7 @@ func (this *HttpAPI) ReattachSlave(params martini.Params, r render.Render, req *
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave reattached", instance.Key), Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave reattached: %+v", instance.Key), Details: instance})
 }
 
 // MoveBelow attempts to move an instance below its supposed sibling

@@ -207,10 +207,12 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 			a.Analysis = UnreachableIntermediateMaster
 			a.Description = "Intermediate master cannot be reached by orchestrator but it has replicating slaves; possibly a network/host issue"
 			//
-		} else if !a.IsMaster && a.LastCheckValid && a.CountSlaves > 0 && a.CountValidReplicatingSlaves == 0 &&
+		} else if !a.IsMaster && a.LastCheckValid && a.CountSlaves > 1 && a.CountValidReplicatingSlaves == 0 &&
 			a.CountSlavesFailingToConnectToMaster > 0 && a.CountSlavesFailingToConnectToMaster == a.CountValidSlaves {
 			// All slaves are either failing to connect to master (and at least one of these have to exist)
 			// or completely dead.
+			// Must have at least two slaves to reach such conclusion -- do note that the intermediate master is still
+			// reachable to orchestrator, so we base our conclusion on slaves only at this point.
 			a.Analysis = AllIntermediateMasterSlavesFailingToConnectOrDead
 			a.Description = "Intermediate master is reachable but all of its slaves are failing to connect"
 			//
