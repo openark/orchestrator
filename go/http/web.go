@@ -17,12 +17,15 @@
 package http
 
 import (
+	"expvar"
 	"fmt"
+	"net/http"
+	"net/http/pprof"
+	"strconv"
+
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/render"
-	"net/http"
-	"strconv"
 
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/inst"
@@ -340,4 +343,36 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/agent/:host", this.Agent)
 	m.Get("/web/seed-details/:seedId", this.AgentSeedDetails)
 	m.Get("/web/seeds", this.Seeds)
+
+	this.RegisterDebug(m)
+}
+
+// RegisterDebug adds handlers for /debug/vars (expvar) and /debug/pprof (net/http/pprof) support
+func (this *HttpWeb) RegisterDebug(m *martini.ClassicMartini) {
+
+	m.Get("/debug/vars", func(w http.ResponseWriter, r *http.Request) {
+		// from expvar.go, since the expvarHandler isn't exported :(
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		fmt.Fprintf(w, "{\n")
+		first := true
+		expvar.Do(func(kv expvar.KeyValue) {
+			if !first {
+				fmt.Fprintf(w, ",\n")
+			}
+			first = false
+			fmt.Fprintf(w, "%q: %s", kv.Key, kv.Value)
+		})
+		fmt.Fprintf(w, "\n}\n")
+	})
+
+	// list all the /debug/ endpoints we want
+	m.Get("/debug/pprof", pprof.Index)
+	m.Get("/debug/pprof/cmdline", pprof.Cmdline)
+	m.Get("/debug/pprof/profile", pprof.Profile)
+	m.Get("/debug/pprof/symbol", pprof.Symbol)
+	m.Post("/debug/pprof/symbol", pprof.Symbol)
+	m.Get("/debug/pprof/block", pprof.Handler("block").ServeHTTP)
+	m.Get("/debug/pprof/heap", pprof.Handler("heap").ServeHTTP)
+	m.Get("/debug/pprof/goroutine", pprof.Handler("goroutine").ServeHTTP)
+	m.Get("/debug/pprof/threadcreate", pprof.Handler("threadcreate").ServeHTTP)
 }
