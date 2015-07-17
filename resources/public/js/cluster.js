@@ -781,7 +781,9 @@ function onAnalysisEntry(analysisEntry, instance) {
 	
 	var popoverElement = getInstanceDiv(instance.id);
 
-	popoverElement.append('<h4 class="popover-footer"><div class="dropdown"><button type="button" class="btn btn-xs btn-default dropdown-toggle" id="recover_dropdown_'+instance.id+'" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="glyphicon glyphicon-heart text-danger"></span> Recover <span class="caret"></span></button><ul class="dropdown-menu" aria-labelledby="recover_dropdown_'+instance.id+'"></ul></div></h4>');
+	popoverElement.append('<h4 class="popover-footer"><div class="dropdown"></div></h4>');
+	popoverElement.find(".popover-footer .dropdown").append('<button type="button" class="btn btn-xs btn-default dropdown-toggle" id="recover_dropdown_'+instance.id+'" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="glyphicon glyphicon-heart text-danger"></span> Recover <span class="caret"></span></button><ul class="dropdown-menu" aria-labelledby="recover_dropdown_'+instance.id+'"></ul>');
+	popoverElement.find(".popover-footer .dropdown").append('<ul class="dropdown-menu" aria-labelledby="recover_dropdown_'+instance.id+'"></ul>');
 	var recoveryListing = popoverElement.find(".dropdown ul");
     recoveryListing.append('<li><a href="#" data-btn="auto" data-command="recover-auto">Auto (implies running external hooks/processes)</a></li>');
     recoveryListing.append('<li role="separator" class="divider"></li>');

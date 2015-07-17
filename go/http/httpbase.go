@@ -55,8 +55,8 @@ func isAuthorizedForAction(req *http.Request, user auth.User) bool {
 	case "proxy":
 		{
 			authUser := getProxyAuthUser(req)
-			for _, user := range config.Config.PowerAuthUsers {
-				if user == "*" || user == authUser {
+			for _, configPowerAuthUser := range config.Config.PowerAuthUsers {
+				if configPowerAuthUser == "*" || configPowerAuthUser == authUser {
 					return true
 				}
 			}

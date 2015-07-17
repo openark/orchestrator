@@ -461,7 +461,7 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	case inst.DeadCoMaster:
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
 	case inst.DeadMasterAndSlaves:
-		checkAndRecoverFunction = checkAndRecoverGenericProblem
+		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
 	case inst.UnreachableMaster:
 		go emergentlyReadTopologyInstanceSlaves(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 	case inst.AllMasterSlavesNotReplicating:
