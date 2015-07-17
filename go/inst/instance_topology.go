@@ -1192,6 +1192,9 @@ func sortedSlaves(masterKey *InstanceKey, shouldStopSlaves bool) ([](*Instance),
 
 // removeInstance will remove an instance from a list of instances
 func removeInstance(instances [](*Instance), instanceKey *InstanceKey) [](*Instance) {
+	if instanceKey == nil {
+		return instances
+	}
 	for i := len(instances) - 1; i >= 0; i-- {
 		if instances[i].Key.Equals(instanceKey) {
 			instances = append(instances[:i], instances[i+1:]...)
