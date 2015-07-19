@@ -5,7 +5,7 @@
 # Requires fpm: https://github.com/jordansissel/fpm
 #
 
-release_version="1.4.243"
+release_version="1.4.244"
 release_dir=/tmp/orchestrator-release
 release_files_dir=$release_dir/orchestrator
 release_files_cli_dir=$release_dir/orchestrator-cli
@@ -23,10 +23,6 @@ fi
 
 if [[ ! -x "$( which rpmbuild )" ]]; then
   echo "rpmbuild not in PATH, rpm will not be built"
-fi
-
-if [[ ! -x "$( which gtar )" ]]; then
-  echo "gtar not in PATH, deb will not be built"
 fi
 
 cd  $(dirname $0)
