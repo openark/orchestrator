@@ -33,6 +33,9 @@ type TestSuite struct{}
 
 var _ = Suite(&TestSuite{})
 
+var key1 inst.InstanceKey = inst.InstanceKey{Hostname: "host1", Port: 3306}
+var key2 inst.InstanceKey = inst.InstanceKey{Hostname: "host2", Port: 3306}
+
 func (s *TestSuite) TestInstanceKeyEquals(c *C) {
 	i1 := inst.Instance{
 		Key: inst.InstanceKey{
@@ -128,8 +131,8 @@ func (s *TestSuite) TestBinlogCoordinatesAsKey(c *C) {
 }
 
 func (s *TestSuite) TestCanReplicateFrom(c *C) {
-	i55 := inst.Instance{Version: "5.5"}
-	i56 := inst.Instance{Version: "5.6"}
+	i55 := inst.Instance{Key: key1, Version: "5.5"}
+	i56 := inst.Instance{Key: key2, Version: "5.6"}
 
 	var canReplicate bool
 	canReplicate, _ = i56.CanReplicateFrom(&i55)
@@ -145,14 +148,16 @@ func (s *TestSuite) TestCanReplicateFrom(c *C) {
 	i55.ServerID = 55
 	i56.ServerID = 56
 
-	canReplicate, _ = i56.CanReplicateFrom(&i55)
+	canReplicate, err := i56.CanReplicateFrom(&i55)
+	c.Assert(err, IsNil)
 	c.Assert(canReplicate, Equals, true)
 	canReplicate, _ = i55.CanReplicateFrom(&i56)
 	c.Assert(canReplicate, Equals, false)
 
-	iStatement := inst.Instance{Binlog_format: "STATEMENT", ServerID: 1, Version: "5.5", LogBinEnabled: true, LogSlaveUpdatesEnabled: true}
-	iRow := inst.Instance{Binlog_format: "ROW", ServerID: 2, Version: "5.5", LogBinEnabled: true, LogSlaveUpdatesEnabled: true}
-	canReplicate, _ = iRow.CanReplicateFrom(&iStatement)
+	iStatement := inst.Instance{Key: key1, Binlog_format: "STATEMENT", ServerID: 1, Version: "5.5", LogBinEnabled: true, LogSlaveUpdatesEnabled: true}
+	iRow := inst.Instance{Key: key2, Binlog_format: "ROW", ServerID: 2, Version: "5.5", LogBinEnabled: true, LogSlaveUpdatesEnabled: true}
+	canReplicate, err = iRow.CanReplicateFrom(&iStatement)
+	c.Assert(err, IsNil)
 	c.Assert(canReplicate, Equals, true)
 	canReplicate, _ = iStatement.CanReplicateFrom(&iRow)
 	c.Assert(canReplicate, Equals, false)

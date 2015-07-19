@@ -293,7 +293,7 @@ func (s *TestSuite) TestDiscover(c *C) {
 	_, found, _ := inst.ReadInstance(&masterKey)
 	c.Assert(found, Equals, false)
 	_, _ = inst.ReadTopologyInstance(&slave1Key)
-	orchestrator.StartDiscovery(slave1Key)
+	logic.StartDiscovery(slave1Key)
 	_, found, err = inst.ReadInstance(&slave1Key)
 	c.Assert(found, Equals, true)
 	c.Assert(err, IsNil)
@@ -310,7 +310,7 @@ func (s *TestSuite) TestForgetMaster(c *C) {
 
 func (s *TestSuite) TestCluster(c *C) {
 	inst.ReadInstance(&masterKey)
-	orchestrator.StartDiscovery(slave1Key)
+	logic.StartDiscovery(slave1Key)
 	instances, _ := inst.ReadClusterInstances(fmt.Sprintf("%s:%d", masterKey.Hostname, masterKey.Port))
 	c.Assert(len(instances) >= 1, Equals, true)
 }
