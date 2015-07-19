@@ -16,6 +16,19 @@ mkdir -p $release_files_dir/etc/init.d
 mkdir -p $release_files_cli_dir
 mkdir -p $release_files_cli_dir/usr/bin
 
+if [[ ! -x "$( which fpm )" ]]; then
+  echo "Please install fpm and ensure it is in PATH"
+  exit 1
+fi
+
+if [[ ! -x "$( which rpmbuild )" ]]; then
+  echo "rpmbuild not in PATH, rpm will not be built"
+fi
+
+if [[ ! -x "$( which gtar )" ]]; then
+  echo "gtar not in PATH, deb will not be built"
+fi
+
 cd  $(dirname $0)
 for f in $(find . -name "*.go"); do go fmt $f; done
 
