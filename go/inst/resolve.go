@@ -81,9 +81,11 @@ func ResolveHostname(hostname string) (string, error) {
 		// However cli does not do so.
 		// Anyway, it seems like the cache was not loaded from DB. Before doing real resolves,
 		// let's try and get the resolved hostname from database.
-		if resolvedHostname, err := ReadResolvedHostname(hostname); err == nil && resolvedHostname != "" {
-			hostnameResolvesLightweightCache.Set(hostname, resolvedHostname, 0)
-			return resolvedHostname, nil
+		if strings.ToLower(config.Config.HostnameResolveMethod) != "none" {
+			if resolvedHostname, err := ReadResolvedHostname(hostname); err == nil && resolvedHostname != "" {
+				hostnameResolvesLightweightCache.Set(hostname, resolvedHostname, 0)
+				return resolvedHostname, nil
+			}
 		}
 	}
 
