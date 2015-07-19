@@ -17,6 +17,7 @@
 package inst
 
 import (
+	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/inst"
 	. "gopkg.in/check.v1"
@@ -25,6 +26,7 @@ import (
 
 func init() {
 	config.Config.HostnameResolveMethod = "none"
+	log.SetLevel(log.ERROR)
 }
 
 func Test(t *testing.T) { TestingT(t) }
