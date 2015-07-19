@@ -34,7 +34,6 @@ for f in $(find . -name "*.go"); do go fmt $f; done
 
 rsync -av ./resources $release_files_dir/usr/local/orchestrator/
 rsync -av ./conf $release_files_dir/usr/local/orchestrator/
-for f in $release_files_dir/usr/local/orchestrator/conf/*; do mv $f $f.sample; done
 cp etc/init.d/orchestrator.bash $release_files_dir/etc/init.d/orchestrator
 chmod +x $release_files_dir/etc/init.d/orchestrator
 
