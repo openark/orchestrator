@@ -125,6 +125,10 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	// this is our source of truth in terms of instance being inaccessible
 	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
 
+	if !instanceKey.IsValid() {
+		return instance, fmt.Errorf("ReadTopologyInstance will not act on invalid instance key: %+v", *instanceKey)
+	}
+
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 
 	if err != nil {

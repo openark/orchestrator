@@ -1203,6 +1203,16 @@ func removeInstance(instances [](*Instance), instanceKey *InstanceKey) [](*Insta
 	return instances
 }
 
+// removeMaxScaleInstances will remove all MaxScale/binlog servers from give nlsit
+func removeMaxScaleInstances(instances [](*Instance)) [](*Instance) {
+	for i := len(instances) - 1; i >= 0; i-- {
+		if instances[i].IsMaxScale() {
+			instances = append(instances[:i], instances[i+1:]...)
+		}
+	}
+	return instances
+}
+
 // MultiMatchBelow will efficiently match multiple slaves below a given instance.
 // It is assumed that all given slaves are siblings
 func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyStopped bool) ([](*Instance), *Instance, error, []error) {
@@ -1211,6 +1221,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 	slaveMutex := make(chan bool, 1)
 
 	slaves = removeInstance(slaves, belowKey)
+	slaves = removeMaxScaleInstances(slaves)
 
 	belowInstance, err := ReadTopologyInstance(belowKey)
 	if err != nil {

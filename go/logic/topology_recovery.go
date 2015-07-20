@@ -393,6 +393,9 @@ func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis) (acti
 		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: matched up to %+v", successorInstance.Key)
 		inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Done. Matched slaves under: %+v %d errors: %+v", successorInstance.Key, len(errs), errs))
 	}
+	if !actionTaken {
+		ResolveRecovery(failedInstanceKey, nil)
+	}
 	return actionTaken, successorInstance, err
 }
 
