@@ -292,9 +292,17 @@ func (this *Instance) IsMariaDB() bool {
 	return strings.Contains(this.Version, "MariaDB")
 }
 
-// IsMariaDB checkes whether this is any version of MaScale
+// IsMaxScale checkes whether this is any version of MaxScale
 func (this *Instance) IsMaxScale() bool {
 	return strings.Contains(this.Version, "maxscale")
+}
+
+// IsMaxScale checkes whether this is any type of a binlog server (currently only maxscale)
+func (this *Instance) IsBinlogServer() bool {
+	if this.IsMaxScale() {
+		return true
+	}
+	return false
 }
 
 // IsSlave makes simple heuristics to decide whether this insatnce is a slave of another instance
@@ -373,7 +381,7 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	if !other.LogSlaveUpdatesEnabled {
 		return false, fmt.Errorf("instance does not have log_slave_updates enabled: %+v", other.Key)
 	}
-	if this.IsSmallerMajorVersion(other) && !this.IsMaxScale() {
+	if this.IsSmallerMajorVersion(other) && !this.IsBinlogServer() {
 		return false, fmt.Errorf("instance %+v has version %s, which is lower than %s on %+v ", this.Key, this.Version, other.Version, other.Key)
 	}
 	if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
@@ -389,7 +397,7 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 			return false, fmt.Errorf("%+v has replication filters", other.Key)
 		}
 	}
-	if this.ServerID == other.ServerID && !this.IsMaxScale() {
+	if this.ServerID == other.ServerID && !this.IsBinlogServer() {
 		return false, fmt.Errorf("Identical server id: %+v, %+v both have %d", other.Key, this.Key, this.ServerID)
 	}
 	return true, nil

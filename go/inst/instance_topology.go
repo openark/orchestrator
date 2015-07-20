@@ -184,7 +184,7 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	if canReplicate, err := instance.CanReplicateFrom(master); canReplicate == false {
 		return instance, err
 	}
-	if master.IsMaxScale() {
+	if master.IsBinlogServer() {
 		// Bail out!
 		return Repoint(instanceKey, &master.MasterKey)
 	}
@@ -264,7 +264,7 @@ func MoveUpSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), *Ins
 		return res, instance, log.Errorf("Cannot GetInstanceMaster() for %+v. error=%+v", instance.Key, err), errs
 	}
 
-	if instance.IsMaxScale() {
+	if instance.IsBinlogServer() {
 		slaves, err, errors := RepointSlavesTo(instanceKey, pattern, &instance.MasterKey)
 		// Bail out!
 		return slaves, instance, err, errors
@@ -315,7 +315,7 @@ func MoveUpSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), *Ins
 					slaveErr = err
 					return
 				}
-				if instance.IsMaxScale() {
+				if instance.IsBinlogServer() {
 					// Special case. Just repoint
 					slave, err = Repoint(&slave.Key, instanceKey)
 					if err != nil {
@@ -385,8 +385,8 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 		return instance, err
 	}
 
-	if sibling.IsMaxScale() {
-		// MaxScale(binlog server) has same coordinates as master
+	if sibling.IsBinlogServer() {
+		// Binlog server has same coordinates as master
 		// Bail out!
 		return Repoint(instanceKey, &sibling.Key)
 	}
@@ -529,7 +529,7 @@ Cleanup:
 // The given masterKey can be null, in which case the existing master is used.
 // Two use cases:
 // - masterKey is nil: use case is corrupted relay logs on slave
-// - masterKey is not nil: using MaxScale and Binlog servers (coordinates remain the same)
+// - masterKey is not nil: using Binlog servers (coordinates remain the same)
 func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -582,7 +582,7 @@ Cleanup:
 }
 
 // RepointSlaves sequentially repoints slaves of a given instance (possibly filtered) onto another master.
-// MaxScale is the major use case
+// Binlog Server is the major use case
 func RepointSlavesTo(instanceKey *InstanceKey, pattern string, belowKey *InstanceKey) ([](*Instance), error, []error) {
 	res := [](*Instance){}
 	errs := []error{}
@@ -878,9 +878,9 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	var countMatchedEvents int
 	var entriesMonotonic bool
 
-	if otherInstance.IsMaxScale() {
-		// MaxScale(binlog server) does not do all the SHOW BINLOG EVENTS stuff
-		err = fmt.Errorf("Cannot use PseudoGTID with MaxScale server %+v", otherInstance.Key)
+	if otherInstance.IsBinlogServer() {
+		// A Binlog Server does not do all the SHOW BINLOG EVENTS stuff
+		err = fmt.Errorf("Cannot use PseudoGTID with Binlog Server %+v", otherInstance.Key)
 		goto Cleanup
 	}
 
@@ -1203,10 +1203,10 @@ func removeInstance(instances [](*Instance), instanceKey *InstanceKey) [](*Insta
 	return instances
 }
 
-// removeMaxScaleInstances will remove all MaxScale/binlog servers from give nlsit
-func removeMaxScaleInstances(instances [](*Instance)) [](*Instance) {
+// removeBinlogServerInstances will remove all binlog servers from given lsit
+func removeBinlogServerInstances(instances [](*Instance)) [](*Instance) {
 	for i := len(instances) - 1; i >= 0; i-- {
-		if instances[i].IsMaxScale() {
+		if instances[i].IsBinlogServer() {
 			instances = append(instances[:i], instances[i+1:]...)
 		}
 	}
@@ -1221,16 +1221,16 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 	slaveMutex := make(chan bool, 1)
 
 	slaves = removeInstance(slaves, belowKey)
-	slaves = removeMaxScaleInstances(slaves)
+	slaves = removeBinlogServerInstances(slaves)
 
 	belowInstance, err := ReadTopologyInstance(belowKey)
 	if err != nil {
 		// Can't access the server below which we need to match ==> can't move slaves
 		return res, belowInstance, err, errs
 	}
-	if belowInstance.IsMaxScale() {
-		// MaxScale(binlog server) does not do all the SHOW BINLOG EVENTS stuff
-		err = fmt.Errorf("Cannot use PseudoGTID with MaxScale server %+v", belowInstance.Key)
+	if belowInstance.IsBinlogServer() {
+		// A Binlog Server does not do all the SHOW BINLOG EVENTS stuff
+		err = fmt.Errorf("Cannot use PseudoGTID with Binlog Server %+v", belowInstance.Key)
 		return res, belowInstance, err, errs
 	}
 
@@ -1383,15 +1383,15 @@ func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey, pattern str
 
 	// See if we have a binlog server case (special handling):
 	binlogCase := false
-	if masterInstance.IsMaxScale() && masterInstance.MasterKey.Equals(belowKey) {
+	if masterInstance.IsBinlogServer() && masterInstance.MasterKey.Equals(belowKey) {
 		// repoint-up
 		log.Debugf("MultiMatchSlaves: pointing slaves up from binlog server")
 		binlogCase = true
-	} else if belowInstance.IsMaxScale() && belowInstance.MasterKey.Equals(masterKey) {
+	} else if belowInstance.IsBinlogServer() && belowInstance.MasterKey.Equals(masterKey) {
 		// repoint-down
 		log.Debugf("MultiMatchSlaves: pointing slaves down to binlog server")
 		binlogCase = true
-	} else if masterInstance.IsMaxScale() && belowInstance.IsMaxScale() && masterInstance.MasterKey.Equals(&belowInstance.MasterKey) {
+	} else if masterInstance.IsBinlogServer() && belowInstance.IsBinlogServer() && masterInstance.MasterKey.Equals(&belowInstance.MasterKey) {
 		// Both BLS, siblings
 		log.Debugf("MultiMatchSlaves: pointing slaves to binlong sibling")
 		binlogCase = true
@@ -1405,7 +1405,7 @@ func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey, pattern str
 	// Not binlog server
 
 	// slaves involved
-	slaves, err := ReadSlaveInstances(masterKey)
+	slaves, err := ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey)
 	if err != nil {
 		return res, belowInstance, err, errs
 	}
@@ -1462,8 +1462,8 @@ func isGenerallyValidAsCandidateSlave(slave *Instance) bool {
 	if !slave.LogSlaveUpdatesEnabled {
 		return false
 	}
-	if slave.IsMaxScale() {
-		// Can't regroup under MaxScale because it does not support pseudo-gtid related queries such as SHOW BINLOG EVENTS
+	if slave.IsBinlogServer() {
+		// Can't regroup under a binlog server because it does not support pseudo-gtid related queries such as SHOW BINLOG EVENTS
 		return false
 	}
 	for _, filter := range config.Config.PromotionIgnoreHostnameFilters {

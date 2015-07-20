@@ -598,6 +598,26 @@ func ReadSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
 	return readInstancesByCondition(condition, "")
 }
 
+// ReadSlaveInstancesIncludingBinlogServerSubSlaves returns a list of direct slves including any slaves
+// of a binlog server replica
+func ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey *InstanceKey) ([](*Instance), error) {
+	slaves, err := ReadSlaveInstances(masterKey)
+	if err != nil {
+		return slaves, err
+	}
+	for _, slave := range slaves {
+		slave := slave
+		if slave.IsBinlogServer() {
+			binlogServerSlaves, err := ReadSlaveInstancesIncludingBinlogServerSubSlaves(&slave.Key)
+			if err != nil {
+				return slaves, err
+			}
+			slaves = append(slaves, binlogServerSlaves...)
+		}
+	}
+	return slaves, err
+}
+
 // ReadUnseenInstances reads all instances which were not recently seen
 func ReadUnseenInstances() ([](*Instance), error) {
 	condition := fmt.Sprintf(`
@@ -651,7 +671,7 @@ func filterOSCInstances(instances [](*Instance)) [](*Instance) {
 				skipThisHost = true
 			}
 		}
-		if instance.IsMaxScale() {
+		if instance.IsBinlogServer() {
 			skipThisHost = true
 		}
 

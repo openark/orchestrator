@@ -383,17 +383,18 @@ func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis) (acti
 		var errs []error
 		var matchedSlaves [](*inst.Instance)
 		matchedSlaves, successorInstance, err, errs = inst.MatchUpSlaves(failedInstanceKey, "")
-		if len(matchedSlaves) == 0 {
-			log.Errorf("topology_recovery: RecoverDeadIntermediateMaster failed to match up any slave from %+v", *failedInstanceKey)
-			return false, successorInstance, err
-		}
-		ResolveRecovery(failedInstanceKey, &successorInstance.Key)
-		actionTaken = true
 
-		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: matched up to %+v", successorInstance.Key)
-		inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Done. Matched slaves under: %+v %d errors: %+v", successorInstance.Key, len(errs), errs))
+		if len(matchedSlaves) > 0 {
+			actionTaken = true
+			log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: matched up to %+v", successorInstance.Key)
+			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Done. Matched slaves under: %+v %d errors: %+v", successorInstance.Key, len(errs), errs))
+		} else {
+			err = log.Errorf("topology_recovery: RecoverDeadIntermediateMaster failed to match up any slave from %+v", *failedInstanceKey)
+		}
 	}
-	if !actionTaken {
+	if successorInstance != nil {
+		ResolveRecovery(failedInstanceKey, &successorInstance.Key)
+	} else {
 		ResolveRecovery(failedInstanceKey, nil)
 	}
 	return actionTaken, successorInstance, err
