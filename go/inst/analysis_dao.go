@@ -77,8 +77,8 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		    		IFNULL(TIMESTAMPDIFF(SECOND, NOW(), database_instance_downtime.end_timestamp), 0)
 		    	) AS downtime_remaining_seconds,
 		    	MIN(
-		    		master_instance.version like '%%maxscale%%'
-		    	) AS is_maxscale
+		    		master_instance.binlog_server
+		    	) AS is_binlog_server
 		    FROM
 		        database_instance master_instance
 		            LEFT JOIN
@@ -132,7 +132,7 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		a.IsDowntimed = m.GetBool("is_downtimed")
 		a.DowntimeEndTimestamp = m.GetString("downtime_end_timestamp")
 		a.DowntimeRemainingSeconds = m.GetInt("downtime_remaining_seconds")
-		a.IsMaxscale = m.GetBool("is_maxscale")
+		a.IsBinlogServer = m.GetBool("is_binlog_server")
 		a.ClusterDetails.ReadRecoveryInfo()
 
 		instance := &Instance{}
@@ -220,9 +220,9 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 			a.Analysis = AllIntermediateMasterSlavesNotReplicating
 			a.Description = "Intermediate master is reachable but none of its slaves is replicating"
 			//
-		} else if a.IsMaxscale && a.IsFailingToConnectToMaster {
-			a.Analysis = MaxscaleFailingToConnectToMaster
-			a.Description = "Maxscale is unable to connect to its master"
+		} else if a.IsBinlogServer && a.IsFailingToConnectToMaster {
+			a.Analysis = BinlogServerFailingToConnectToMaster
+			a.Description = "Binlog rerver is unable to connect to its master"
 			//
 		} else if a.ReplicationDepth == 1 && a.IsFailingToConnectToMaster {
 			a.Analysis = FirstTierSlaveFailingToConnectToMaster

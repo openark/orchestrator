@@ -445,6 +445,11 @@ var generateSQLPatches = []string{
 		ALTER TABLE topology_recovery
 			ADD KEY end_recovery_idx (end_recovery)
 	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN binlog_server TINYINT UNSIGNED NOT NULL AFTER version
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance

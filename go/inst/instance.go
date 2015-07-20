@@ -292,14 +292,14 @@ func (this *Instance) IsMariaDB() bool {
 	return strings.Contains(this.Version, "MariaDB")
 }
 
-// IsMaxScale checkes whether this is any version of MaxScale
-func (this *Instance) IsMaxScale() bool {
+// isMaxScale checkes whether this is any version of MaxScale
+func (this *Instance) isMaxScale() bool {
 	return strings.Contains(this.Version, "maxscale")
 }
 
 // IsMaxScale checkes whether this is any type of a binlog server (currently only maxscale)
 func (this *Instance) IsBinlogServer() bool {
-	if this.IsMaxScale() {
+	if this.isMaxScale() {
 		return true
 	}
 	return false

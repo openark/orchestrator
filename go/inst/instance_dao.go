@@ -1213,6 +1213,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 	        		uptime=VALUES(uptime),
 	        		server_id=VALUES(server_id),
 					version=VALUES(version),
+					binlog_server=VALUES(binlog_server),
 					read_only=VALUES(read_only),
 					binlog_format=VALUES(binlog_format),
 					log_bin=VALUES(log_bin),
@@ -1261,6 +1262,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
         		uptime,
         		server_id,
 				version,
+				binlog_server,
 				read_only,
 				binlog_format,
 				log_bin,
@@ -1293,7 +1295,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				physical_environment,
 				replication_depth,
 				is_co_master
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
@@ -1303,6 +1305,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			instance.Uptime,
 			instance.ServerID,
 			instance.Version,
+			instance.IsBinlogServer(),
 			instance.ReadOnly,
 			instance.Binlog_format,
 			instance.LogBinEnabled,
