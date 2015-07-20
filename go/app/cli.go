@@ -366,7 +366,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			actionTaken, promotedInstance, err := logic.CheckAndRecover(instanceKey, siblingKey, true)
+			actionTaken, promotedInstance, err := logic.CheckAndRecover(instanceKey, siblingKey, true, false)
 			if err != nil {
 				log.Fatale(err)
 			}

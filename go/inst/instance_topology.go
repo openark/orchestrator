@@ -1553,8 +1553,6 @@ func RegroupSlaves(masterKey *InstanceKey, onCandidateSlaveChosen func(*Instance
 	log.Debugf("RegroupSlaves: starting %d slaves", len(operatedSlaves))
 	for _, slave := range operatedSlaves {
 		slave := slave
-		// This slave has the exact same executing coordinates as the candidate slave. This slave
-		// is *extremely* easy to attach below the candidate slave!
 		go func() {
 			defer func() { barrier <- &candidateSlave.Key }()
 			ExecuteOnTopology(func() {

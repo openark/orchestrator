@@ -1460,7 +1460,8 @@ func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.R
 		candidateKey = &key
 	}
 
-	actionTaken, _, err := logic.CheckAndRecover(&instanceKey, candidateKey, true)
+	skipProcesses := (req.URL.Query().Get("skipProcesses") == "true")
+	actionTaken, _, err := logic.CheckAndRecover(&instanceKey, candidateKey, true, skipProcesses)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return

@@ -174,7 +174,7 @@ func ContinuousDiscovery() {
 				if elected {
 					ClearActiveFailureDetections()
 					ClearActiveRecoveries()
-					CheckAndRecover(nil, nil, false)
+					CheckAndRecover(nil, nil, false, false)
 				}
 			}()
 		case <-snapshotTopologiesTick:

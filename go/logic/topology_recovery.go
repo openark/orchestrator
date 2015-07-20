@@ -99,7 +99,7 @@ func executeProcesses(processes []string, description string, analysisEntry inst
 	return err
 }
 
-func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis) (bool, *inst.Instance, error) {
+func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (bool, *inst.Instance, error) {
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	if ok, err := AttemptRecoveryRegistration(&analysisEntry); !ok {
 		log.Debugf("topology_recovery: found an active or recent recovery on %+v. Will not issue another RecoverDeadMaster.", *failedInstanceKey)
@@ -107,8 +107,10 @@ func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis) (bool, *inst.Inst
 	}
 
 	inst.AuditOperation("recover-dead-master", failedInstanceKey, "problem found; will recover")
-	if err := executeProcesses(config.Config.PreFailoverProcesses, "PreFailoverProcesses", analysisEntry, nil, true); err != nil {
-		return false, nil, err
+	if !skipProcesses {
+		if err := executeProcesses(config.Config.PreFailoverProcesses, "PreFailoverProcesses", analysisEntry, nil, true); err != nil {
+			return false, nil, err
+		}
 	}
 
 	log.Debugf("topology_recovery: RecoverDeadMaster: will recover %+v", *failedInstanceKey)
@@ -223,18 +225,20 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 
 // checkAndRecoverDeadMaster checks a given analysis, decides whether to take action, and possibly takes action
 // Returns true when action was taken.
-func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
+func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool, skipProcesses bool) (bool, *inst.Instance, error) {
 	if !(skipFilters || analysisEntry.ClusterDetails.HasAutomatedMasterRecovery) {
 		return false, nil, nil
 	}
 	// Let's do dead master recovery!
 	log.Debugf("topology_recovery: will handle DeadMaster event on %+v", analysisEntry.ClusterDetails.ClusterName)
-	actionTaken, promotedSlave, err := RecoverDeadMaster(analysisEntry)
+	actionTaken, promotedSlave, err := RecoverDeadMaster(analysisEntry, skipProcesses)
 
 	if actionTaken && promotedSlave != nil {
 		promotedSlave, _ = replacePromotedSlaveWithCandidate(&analysisEntry.AnalyzedInstanceKey, promotedSlave, candidateInstanceKey)
-		// Execute post master-failover processes
-		executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", analysisEntry, promotedSlave, false)
+		if !skipProcesses {
+			// Execute post master-failover processes
+			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", analysisEntry, promotedSlave, false)
+		}
 	}
 
 	return actionTaken, promotedSlave, err
@@ -341,7 +345,7 @@ func GetCandidateSiblingOfIntermediateMaster(intermediateMasterKey *inst.Instanc
 	return nil, log.Errorf("topology_recovery: cannot find candidate sibling of %+v", *intermediateMasterKey)
 }
 
-func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis) (actionTaken bool, successorInstance *inst.Instance, err error) {
+func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (actionTaken bool, successorInstance *inst.Instance, err error) {
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	if ok, err := AttemptRecoveryRegistration(&analysisEntry); !ok {
 		log.Debugf("topology_recovery: found an active or recent recovery on %+v. Will not issue another RecoverDeadIntermediateMaster.", *failedInstanceKey)
@@ -350,8 +354,10 @@ func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis) (acti
 
 	inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, "problem found; will recover")
 	log.Debugf("topology_recovery: RecoverDeadIntermediateMaster: will recover %+v", *failedInstanceKey)
-	if err := executeProcesses(config.Config.PreFailoverProcesses, "PreFailoverProcesses", analysisEntry, nil, true); err != nil {
-		return false, nil, err
+	if !skipProcesses {
+		if err := executeProcesses(config.Config.PreFailoverProcesses, "PreFailoverProcesses", analysisEntry, nil, true); err != nil {
+			return false, nil, err
+		}
 	}
 
 	// Plan A: find a replacement intermediate master
@@ -402,21 +408,23 @@ func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis) (acti
 
 // checkAndRecoverDeadIntermediateMaster checks a given analysis, decides whether to take action, and possibly takes action
 // Returns true when action was taken.
-func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
+func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool, skipProcesses bool) (bool, *inst.Instance, error) {
 	if !(skipFilters || analysisEntry.ClusterDetails.HasAutomatedIntermediateMasterRecovery) {
 		return false, nil, nil
 	}
 
-	actionTaken, promotedSlave, err := RecoverDeadIntermediateMaster(analysisEntry)
+	actionTaken, promotedSlave, err := RecoverDeadIntermediateMaster(analysisEntry, skipProcesses)
 	if actionTaken {
-		// Execute post intermediate-master-failover processes
-		executeProcesses(config.Config.PostIntermediateMasterFailoverProcesses, "PostIntermediateMasterFailoverProcesses", analysisEntry, promotedSlave, false)
+		if !skipProcesses {
+			// Execute post intermediate-master-failover processes
+			executeProcesses(config.Config.PostIntermediateMasterFailoverProcesses, "PostIntermediateMasterFailoverProcesses", analysisEntry, promotedSlave, false)
+		}
 	}
 	return actionTaken, promotedSlave, err
 }
 
 // checkAndRecoverGenericProblem is a general=purpose recovery function
-func checkAndRecoverGenericProblem(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
+func checkAndRecoverGenericProblem(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool, skipProcesses bool) (bool, *inst.Instance, error) {
 	return false, nil, nil
 }
 
@@ -446,8 +454,8 @@ func emergentlyReadTopologyInstanceSlaves(instanceKey *inst.InstanceKey, analysi
 
 // executeCheckAndRecoverFunction will choose the correct check & recovery function based on analysis.
 // It executes the function synchronuously
-func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) {
-	var checkAndRecoverFunction func(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool) (bool, *inst.Instance, error) = nil
+func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool, skipProcesses bool) (bool, *inst.Instance, error) {
+	var checkAndRecoverFunction func(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool, skipProcesses bool) (bool, *inst.Instance, error) = nil
 
 	switch analysisEntry.Analysis {
 	case inst.DeadMaster:
@@ -484,21 +492,25 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	if ok, _ := AttemptFailureDetectionRegistration(&analysisEntry); ok {
 		log.Debugf("topology_recovery: detected %+v failure on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
 		// Execute on-detection processes
-		if err := executeProcesses(config.Config.OnFailureDetectionProcesses, "OnFailureDetectionProcesses", analysisEntry, nil, true); err != nil {
-			return false, nil, err
+		if !skipProcesses {
+			if err := executeProcesses(config.Config.OnFailureDetectionProcesses, "OnFailureDetectionProcesses", analysisEntry, nil, true); err != nil {
+				return false, nil, err
+			}
 		}
 	}
 
-	actionTaken, promotedSlave, err := checkAndRecoverFunction(analysisEntry, candidateInstanceKey, skipFilters)
+	actionTaken, promotedSlave, err := checkAndRecoverFunction(analysisEntry, candidateInstanceKey, skipFilters, skipProcesses)
 	if actionTaken {
-		// Execute post intermediate-master-failover processes
-		executeProcesses(config.Config.PostFailoverProcesses, "PostFailoverProcesses", analysisEntry, promotedSlave, false)
+		if !skipProcesses {
+			// Execute post intermediate-master-failover processes
+			executeProcesses(config.Config.PostFailoverProcesses, "PostFailoverProcesses", analysisEntry, promotedSlave, false)
+		}
 	}
 	return actionTaken, promotedSlave, err
 }
 
 // CheckAndRecover is the main entry point for the recovery mechanism
-func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *inst.InstanceKey, skipFilters bool) (actionTaken bool, instance *inst.Instance, err error) {
+func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *inst.InstanceKey, skipFilters bool, skipProcesses bool) (actionTaken bool, instance *inst.Instance, err error) {
 	replicationAnalysis, err := inst.GetReplicationAnalysis(true)
 	if err != nil {
 		return false, nil, log.Errore(err)
@@ -517,9 +529,9 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 
 		if specificInstance != nil && skipFilters {
 			// force mode. Keep it synchronuous
-			actionTaken, instance, err = executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, skipFilters)
+			actionTaken, instance, err = executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, skipFilters, skipProcesses)
 		} else {
-			go executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, skipFilters)
+			go executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, skipFilters, skipProcesses)
 		}
 	}
 	return actionTaken, instance, err
