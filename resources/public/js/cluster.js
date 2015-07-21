@@ -719,7 +719,7 @@ function anonymize() {
         var counter = 0;  
         var port = 3306;
         $("h3.popover-title .pull-left").each(function() {
-            jQuery(this).html("instance-"+(counter++)+":"+port)
+            jQuery(this).html("instance-"+(md5(jQuery(this).html()).substring(0,4))+":"+port)
          });
         $(".popover-content p").each(function() {
         	tokens = jQuery(this).html().split(" ", 2)
