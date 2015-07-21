@@ -114,8 +114,17 @@ func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses boo
 	}
 
 	log.Debugf("topology_recovery: RecoverDeadMaster: will recover %+v", *failedInstanceKey)
-	_, _, _, candidateSlave, err := inst.RegroupSlaves(failedInstanceKey, nil)
+	_, _, _, candidateSlave, err := inst.RegroupSlaves(failedInstanceKey, true, nil)
 
+	//	binlogServerSlaves, err := inst.ReadBinlogServerSlaveInstances(failedInstanceKey)
+	//	if err != nil {
+	//		log.Errore(err)
+	//		// And continue; just try to salvage anything you can
+	//	}
+	//	var candidateSlave *inst.Instance
+	//	if len(binlogServerSlaves) == 0 {
+	//	} else {
+	//	}
 	ResolveRecovery(failedInstanceKey, &candidateSlave.Key)
 
 	log.Debugf("topology_recovery: - RecoverDeadMaster: candidate slave is %+v", candidateSlave.Key)
@@ -235,6 +244,8 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 
 	if actionTaken && promotedSlave != nil {
 		promotedSlave, _ = replacePromotedSlaveWithCandidate(&analysisEntry.AnalyzedInstanceKey, promotedSlave, candidateInstanceKey)
+	}
+	if actionTaken && promotedSlave != nil {
 		if !skipProcesses {
 			// Execute post master-failover processes
 			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", analysisEntry, promotedSlave, false)
@@ -379,7 +390,7 @@ func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, skipP
 	}
 	if !actionTaken {
 		// Either no candidate or only partial match of slaves. Regroup as plan B
-		inst.RegroupSlaves(failedInstanceKey, nil)
+		inst.RegroupSlaves(failedInstanceKey, true, nil)
 		// We don't care much if regroup made it or not. We prefer that it made it, in whcih case we only need to match up
 		// one slave, but the operation is still valid if regroup partially/completely failed. We just promote anything
 		// not regrouped.

@@ -353,9 +353,9 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlaves(instanceKey, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) })
+			lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlaves(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) })
 			if promotedSlave == nil {
-				log.Fatalf("Could not regroup slaves of %+v", *instanceKey)
+				log.Fatalf("Could not regroup slaves of %+v; error: %+v", *instanceKey, err)
 			}
 			fmt.Println(fmt.Sprintf("%s lost: %d, trivial: %d, pseudo-gtid: %d",
 				promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalSlaves), len(aheadSlaves)))

@@ -581,7 +581,7 @@ Cleanup:
 
 }
 
-// RepointSlaves sequentially repoints slaves of a given instance (possibly filtered) onto another master.
+// RepointSlaves repoints slaves of a given instance (possibly filtered) onto another master.
 // Binlog Server is the major use case
 func RepointSlavesTo(instanceKey *InstanceKey, pattern string, belowKey *InstanceKey) ([](*Instance), error, []error) {
 	res := [](*Instance){}
@@ -603,15 +603,32 @@ func RepointSlavesTo(instanceKey *InstanceKey, pattern string, belowKey *Instanc
 	}
 
 	log.Infof("Will repoint slaves of %+v to %+v", *instanceKey, *belowKey)
+	barrier := make(chan *InstanceKey)
+	slaveMutex := make(chan bool, 1)
 	for _, slave := range slaves {
 		slave := slave
 
-		slave, slaveErr := Repoint(&slave.Key, belowKey)
-		if slaveErr == nil {
-			res = append(res, slave)
-		} else {
-			errs = append(errs, slaveErr)
-		}
+		// Parallelize repoints
+		go func() {
+			defer func() { barrier <- &slave.Key }()
+			ExecuteOnTopology(func() {
+				slave, slaveErr := Repoint(&slave.Key, belowKey)
+
+				func() {
+					// Instantaneous mutex.
+					slaveMutex <- true
+					defer func() { <-slaveMutex }()
+					if slaveErr == nil {
+						res = append(res, slave)
+					} else {
+						errs = append(errs, slaveErr)
+					}
+				}()
+			})
+		}()
+	}
+	for _ = range slaves {
+		<-barrier
 	}
 
 	if err != nil {
@@ -1260,7 +1277,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 		log.Debugf("+- bucket: %+v, %d slaves", bucket, len(bucketSlaves))
 	}
 	matchedSlaves := make(map[InstanceKey]bool)
-	barrier := make(chan *BinlogCoordinates)
+	bucketsBarrier := make(chan *BinlogCoordinates)
 	// Now go over the buckets, and try a single slave from each bucket
 	// (though if one results with an error, synchronuously-for-that-bucket continue to the next slave in bucket)
 
@@ -1277,7 +1294,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 		// Buckets concurrent
 		go func() {
 			// find coordinates for a single bucket based on a slave in said bucket
-			defer func() { barrier <- &execCoordinates }()
+			defer func() { bucketsBarrier <- &execCoordinates }()
 			func() {
 				for _, slave := range bucketSlaves {
 					slave := slave
@@ -1322,37 +1339,49 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 			// We don't wait for the other buckets -- we immediately work out all the other slaves in this bucket.
 			// (perhaps another bucket is busy matching a 24h delayed-replica; we definitely don't want to hold on that)
 			func() {
+				barrier := make(chan *InstanceKey)
+				// We point all this bucket's slaves into the same coordinates, concurrently
+				// We are already doing concurrent buckets; but for each bucket we also want to do concurrent slaves,
+				// otherwise one large bucket would make for a sequential work...
 				for _, slave := range bucketSlaves {
-					var err error
 					slave := slave
-					if _, found := matchedSlaves[slave.Key]; found {
-						// Already matched this slave
-						continue
-					}
-					log.Debugf("MultiMatchBelow: Will match up %+v to previously matched master coordinates %+v", slave.Key, *bucketMatchedCoordinates)
-					slaveMatchSuccess := false
-					ExecuteOnTopology(func() {
-						if _, err = ChangeMasterTo(&slave.Key, &belowInstance.Key, bucketMatchedCoordinates, false); err == nil {
-							StartSlave(&slave.Key)
-							slaveMatchSuccess = true
+					go func() {
+						defer func() { barrier <- &slave.Key }()
+
+						var err error
+						if _, found := matchedSlaves[slave.Key]; found {
+							// Already matched this slave
+							return
 						}
-					})
-					func() {
-						slaveMutex <- true
-						defer func() { <-slaveMutex }()
-						if slaveMatchSuccess {
-							matchedSlaves[slave.Key] = true
-						} else {
-							errs = append(errs, err)
-							log.Errorf("MultiMatchBelow: Cannot match up %+v: error is %+v", slave.Key, err)
-						}
+						log.Debugf("MultiMatchBelow: Will match up %+v to previously matched master coordinates %+v", slave.Key, *bucketMatchedCoordinates)
+						slaveMatchSuccess := false
+						ExecuteOnTopology(func() {
+							if _, err = ChangeMasterTo(&slave.Key, &belowInstance.Key, bucketMatchedCoordinates, false); err == nil {
+								StartSlave(&slave.Key)
+								slaveMatchSuccess = true
+							}
+						})
+						func() {
+							// Quickly update lists; mutext is instantenous
+							slaveMutex <- true
+							defer func() { <-slaveMutex }()
+							if slaveMatchSuccess {
+								matchedSlaves[slave.Key] = true
+							} else {
+								errs = append(errs, err)
+								log.Errorf("MultiMatchBelow: Cannot match up %+v: error is %+v", slave.Key, err)
+							}
+						}()
 					}()
+				}
+				for _ = range bucketSlaves {
+					<-barrier
 				}
 			}()
 		}()
 	}
 	for _ = range slaveBuckets {
-		<-barrier
+		<-bucketsBarrier
 	}
 
 	for _, slave := range slaves {
@@ -1362,7 +1391,6 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 		}
 	}
 	return res, belowInstance, err, errs
-
 }
 
 // MultiMatchSlaves will match (via pseudo-gtid) all slaves of given master below given instance.
@@ -1498,7 +1526,7 @@ func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instan
 		}
 	}
 	if candidateSlave == nil {
-		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, fmt.Errorf("No slaves found with log_slave_updates for %+v", *masterKey)
+		return slaves[0], slaves[1:], equalSlaves, laterSlaves, fmt.Errorf("No slaves found with log_slave_updates for %+v", *masterKey)
 	}
 	slaves = removeInstance(slaves, &candidateSlave.Key)
 	for _, slave := range slaves {
@@ -1517,10 +1545,13 @@ func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instan
 
 // RegroupSlaves will choose a candidate slave of a given instance, and enslave its siblings using
 // either simple CHANGE MASTER TO, where possible, or pseudo-gtid
-func RegroupSlaves(masterKey *InstanceKey, onCandidateSlaveChosen func(*Instance)) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
+func RegroupSlaves(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance)) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
 	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err := GetCandidateSlave(masterKey, true)
 	if err != nil {
-		return aheadSlaves, equalSlaves, laterSlaves, nil, err
+		if !returnSlaveEvenOnFailureToRegroup {
+			candidateSlave = nil
+		}
+		return aheadSlaves, equalSlaves, laterSlaves, candidateSlave, err
 	}
 	if onCandidateSlaveChosen != nil {
 		onCandidateSlaveChosen(candidateSlave)
@@ -1547,10 +1578,10 @@ func RegroupSlaves(masterKey *InstanceKey, onCandidateSlaveChosen func(*Instance
 	// As for the laterSlaves, we'll have to apply pseudo GTID
 	laterSlaves, instance, err, _ := MultiMatchBelow(laterSlaves, &candidateSlave.Key, true)
 
-	barrier = make(chan *InstanceKey)
 	operatedSlaves := append(equalSlaves, candidateSlave)
 	operatedSlaves = append(operatedSlaves, laterSlaves...)
 	log.Debugf("RegroupSlaves: starting %d slaves", len(operatedSlaves))
+	barrier = make(chan *InstanceKey)
 	for _, slave := range operatedSlaves {
 		slave := slave
 		go func() {

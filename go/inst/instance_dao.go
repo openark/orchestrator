@@ -618,6 +618,16 @@ func ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey *InstanceKey) ([
 	return slaves, err
 }
 
+// ReadBinlogServerSlaveInstances reads direct slaves of a given master that are binlog servers
+func ReadBinlogServerSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
+	condition := fmt.Sprintf(`
+			master_host = '%s'
+			and master_port = %d
+			and binlog_server = 1
+		`, masterKey.Hostname, masterKey.Port)
+	return readInstancesByCondition(condition, "")
+}
+
 // ReadUnseenInstances reads all instances which were not recently seen
 func ReadUnseenInstances() ([](*Instance), error) {
 	condition := fmt.Sprintf(`
