@@ -295,18 +295,14 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 
 // GetCandidateSiblingOfIntermediateMaster chooses the best sibling of a dead intermediate master
 // to whom the IM's slaves can be moved.
-func GetCandidateSiblingOfIntermediateMaster(intermediateMasterKey *inst.InstanceKey) (*inst.Instance, error) {
-	intermediateMasterInstance, _, err := inst.ReadInstance(intermediateMasterKey)
-	if err != nil {
-		return nil, err
-	}
+func GetCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *inst.Instance) (*inst.Instance, error) {
 
 	siblings, err := inst.ReadSlaveInstances(&intermediateMasterInstance.MasterKey)
 	if err != nil {
 		return nil, err
 	}
 	if len(siblings) <= 1 {
-		return nil, log.Errorf("topology_recovery: no siblings found for %+v", *intermediateMasterKey)
+		return nil, log.Errorf("topology_recovery: no siblings found for %+v", intermediateMasterInstance.Key)
 	}
 
 	sort.Sort(sort.Reverse(InstancesByCountSlaves(siblings)))
@@ -353,7 +349,7 @@ func GetCandidateSiblingOfIntermediateMaster(intermediateMasterKey *inst.Instanc
 			return sibling, nil
 		}
 	}
-	return nil, log.Errorf("topology_recovery: cannot find candidate sibling of %+v", *intermediateMasterKey)
+	return nil, log.Errorf("topology_recovery: cannot find candidate sibling of %+v", intermediateMasterInstance.Key)
 }
 
 func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (actionTaken bool, successorInstance *inst.Instance, err error) {
@@ -371,11 +367,20 @@ func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, skipP
 		}
 	}
 
-	// Plan A: find a replacement intermediate master
-	if candidateSibling, err := GetCandidateSiblingOfIntermediateMaster(failedInstanceKey); err == nil {
-		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will attempt a candidate intermediate master: %+v", candidateSibling.Key)
+	intermediateMasterInstance, _, err := inst.ReadInstance(failedInstanceKey)
+	if err != nil {
+		return false, nil, err
+	}
+	// Plan A: find a replacement intermediate master in same Data Center
+	candidateSiblingOfIntermediateMaster, err := GetCandidateSiblingOfIntermediateMaster(intermediateMasterInstance)
+
+	multiMatchSlavesToCandidateSibling := func() {
+		if candidateSiblingOfIntermediateMaster == nil {
+			return
+		}
+		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will attempt a candidate intermediate master: %+v", candidateSiblingOfIntermediateMaster.Key)
 		// We have a candidate
-		if matchedSlaves, candidateSibling, err, errs := inst.MultiMatchSlaves(failedInstanceKey, &candidateSibling.Key, ""); err == nil {
+		if matchedSlaves, candidateSibling, err, errs := inst.MultiMatchSlaves(failedInstanceKey, &candidateSiblingOfIntermediateMaster.Key, ""); err == nil {
 			ResolveRecovery(failedInstanceKey, &candidateSibling.Key)
 
 			successorInstance = candidateSibling
@@ -388,13 +393,24 @@ func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, skipP
 			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Matched %d slaves under candidate sibling: %+v; %d errors: %+v", len(matchedSlaves), candidateSibling.Key, len(errs), errs))
 		}
 	}
+	if candidateSiblingOfIntermediateMaster != nil && candidateSiblingOfIntermediateMaster.DataCenter == intermediateMasterInstance.DataCenter {
+		multiMatchSlavesToCandidateSibling()
+	}
 	if !actionTaken {
-		// Either no candidate or only partial match of slaves. Regroup as plan B
+		// Plan B: regroup (we wish to reduce cross-DC replication streams)
 		inst.RegroupSlaves(failedInstanceKey, true, nil)
+		// Plan C: try replacement intermediate master in other DC...
+		if candidateSiblingOfIntermediateMaster != nil && candidateSiblingOfIntermediateMaster.DataCenter != intermediateMasterInstance.DataCenter {
+			multiMatchSlavesToCandidateSibling()
+		}
+	}
+	if !actionTaken {
+		// Do we still have leftovers? Soem slaves couldn't move? Couldn't regroup? Only left with regrou's resulting leader?
+		// nothing moved?
 		// We don't care much if regroup made it or not. We prefer that it made it, in whcih case we only need to match up
 		// one slave, but the operation is still valid if regroup partially/completely failed. We just promote anything
 		// not regrouped.
-		// So, match up all that's left, plan C
+		// So, match up all that's left, plan D
 		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will next attempt a match up from %+v", *failedInstanceKey)
 
 		var errs []error
