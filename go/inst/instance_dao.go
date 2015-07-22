@@ -637,15 +637,18 @@ func ReadUnseenInstances() ([](*Instance), error) {
 }
 
 // ReadProblemInstances reads all instances with problems
-func ReadProblemInstances() ([](*Instance), error) {
+func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 	condition := fmt.Sprintf(`
-			(last_seen < last_checked)
-			or (not ifnull(timestampdiff(second, last_checked, now()) <= %d, false))
-			or (not slave_sql_running)
-			or (not slave_io_running)
-			or (abs(cast(seconds_behind_master as signed) - cast(sql_delay as signed)) > %d)
-			or (abs(cast(slave_lag_seconds as signed) - cast(sql_delay as signed)) > %d)
-		`, config.Config.InstancePollSeconds, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
+			cluster_name LIKE IF('%s' = '', '%%', '%s')
+			and (
+				(last_seen < last_checked)
+				or (not ifnull(timestampdiff(second, last_checked, now()) <= %d, false))
+				or (not slave_sql_running)
+				or (not slave_io_running)
+				or (abs(cast(seconds_behind_master as signed) - cast(sql_delay as signed)) > %d)
+				or (abs(cast(slave_lag_seconds as signed) - cast(sql_delay as signed)) > %d)
+			)
+		`, clusterName, clusterName, config.Config.InstancePollSeconds, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
 	return readInstancesByCondition(condition, "")
 }
 

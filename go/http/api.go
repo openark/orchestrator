@@ -930,7 +930,8 @@ func (this *HttpAPI) Search(params martini.Params, r render.Render, req *http.Re
 
 // Problems provides list of instances with known problems
 func (this *HttpAPI) Problems(params martini.Params, r render.Render, req *http.Request) {
-	instances, err := inst.ReadProblemInstances()
+	clusterName := params["clusterName"]
+	instances, err := inst.ReadProblemInstances(clusterName)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -1604,6 +1605,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/search/:searchString", this.Search)
 	m.Get("/api/search", this.Search)
 	m.Get("/api/problems", this.Problems)
+	m.Get("/api/problems/:clusterName", this.Problems)
 	m.Get("/api/long-queries", this.LongQueries)
 	m.Get("/api/long-queries/:filter", this.LongQueries)
 	m.Get("/api/audit", this.Audit)

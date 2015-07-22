@@ -189,13 +189,16 @@
     padding: 2px 8px;
 }
 
-
 #instance_problems .popover.instance div.popover-content p {
     margin: 4px 0px;
 }
 
 #instance_problems .popover.instance div.popover-content {
     padding: 4px 8px;
+}
+
+#pools .popover {
+	vertical-align: top;
 }
 
 #pools .popover div.pool-instances-listing {
@@ -205,8 +208,6 @@
 #pools .popover div.pool-instances-listing div {
     margin-top: 8px;
 }
-
-
 
 #node_modal .modal-title {
     font: 12px sans-serif;

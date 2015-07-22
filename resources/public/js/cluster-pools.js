@@ -1,6 +1,6 @@
 
 $(document).ready(function () {
-	var isExpanded = false;
+	var isExpanded = true;
 	
     showLoader();
     
@@ -14,8 +14,8 @@ $(document).ready(function () {
     
     $.get("/api/cluster-pool-instances/" + currentClusterName(), function (clusterPoolInstances) {
         $.get("/api/problems", function (problemInstances) {
-        	normalizeInstances(problemInstances, []);
-	    	displayClusterPoolInstances(clusterPoolInstances, problemInstances);
+        	var problemInstancesMap = normalizeInstances(problemInstances, []);
+	    	displayClusterPoolInstances(clusterPoolInstances, problemInstances, problemInstancesMap);
         }, "json");
     }, "json");
     function sortByCountInstances(pool1, pool2) {
@@ -26,7 +26,7 @@ $(document).ready(function () {
     	return pool1.name.localeCompare(pool2.name);
     }
     
-    function displayClusterPoolInstances(clusterPoolInstances, problemInstances) {
+    function displayClusterPoolInstances(clusterPoolInstances, problemInstances, problemInstancesMap) {
         hideLoader();
         
         var poolsProblems = {};
@@ -40,7 +40,7 @@ $(document).ready(function () {
         pools.sort(sortByCountInstances);
         
 	    function addInstancesBadge(poolName, count, badgeClass, title) {
-	    	$("#pools [data-pool-name='" + poolName + "'].popover").find(".popover-content .pull-right").append('<span class="badge '+badgeClass+'" title="' + title + '"">' + count + '</span> ');
+	    	$("#pools [data-pool-name='" + poolName + "'].popover").find(".popover-content .pull-right").append('<span class="badge '+badgeClass+'" title="' + title + '">' + count + '</span> ');
 	    }
         
         function incrementPoolProblems(poolName, problemType) {
@@ -51,6 +51,9 @@ $(document).ready(function () {
         	}
         }
         function incrementPoolsProblems(instance, problemType) {
+        	if (typeof instance.problemHint === 'undefined') {
+        		instance.problemHint = problemType
+        	}
             pools.forEach(function (pool) {
             	pool.instances.forEach(function (poolInstance) {
             		if ((poolInstance.Hostname == instance.Key.Hostname) && (poolInstance.Port = instance.Key.Port)) {
@@ -88,13 +91,20 @@ $(document).ready(function () {
     	    	addInstancesBadge(pool.name, poolsProblems[pool.name][problemType], errorMapping[problemType]["badge"], errorMapping[problemType]["description"]);
     	    }
     	    pool.instances.forEach(function(instance) {
+    	    	var instanceId = getInstanceId(instance.Hostname, instance.Port);
+    	    	var problemInstance = problemInstancesMap[instanceId];
     	    	var instanceDisplay = instance.Hostname+":"+instance.Port;
     	    	if (typeof removeTextFromHostnameDisplay != "undefined" && removeTextFromHostnameDisplay()) {
     	    		instanceDisplay = instanceDisplay.replace(removeTextFromHostnameDisplay(), '');
     	        }
-    	    	popoverElement.find("div.pool-instances-listing").append("<div>"+instanceDisplay+"</div>");
+    	    	var instanceContent = "<div>";
+    	    	if (problemInstance && problemInstance.problemHint) {
+    	    		instanceContent += '<span class="badge '+errorMapping[problemInstance.problemHint]["badge"]+'" title="'+errorMapping[problemInstance.problemHint]["description"]+'">&nbsp;</span> '
+    	    	}
+    	    	instanceContent += instanceDisplay;
+    	    	instanceContent += "</div>";
+    	    	popoverElement.find("div.pool-instances-listing").append(instanceContent);
     	    });
-    	    popoverElement.find("div.pool-instances-listing").toggleClass('hidden');
         });     
         
         $("div.popover").popover();
@@ -112,12 +122,19 @@ $(document).ready(function () {
     $("#dropdown-context").append('<li><a data-command="expand-instances">Expand</a></li>');    
     $("#dropdown-context").append('<li><a href="/web/cluster/'+currentClusterName()+'">Topology</a></li>');    
     $("body").on("click", "a[data-command=expand-instances]", function(event) {
-	    $("div.pool-instances-listing").toggleClass('hidden');
 	    isExpanded = !isExpanded;
+	    updateExpandedStatus();
+    });  
+    
+    function updateExpandedStatus() {
         if (isExpanded) {
+    	    $("div.pool-instances-listing").removeClass('hidden');
         	$("#dropdown-context a[data-command=expand-instances]").prepend('<span class="glyphicon glyphicon-ok"></span> ');
         } else {
+    	    $("div.pool-instances-listing").addClass('hidden');
         	$("#dropdown-context a[data-command=expand-instances] span").remove();
         }
-    });    
+    }
+    
+    updateExpandedStatus();
 });	
