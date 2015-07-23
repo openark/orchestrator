@@ -117,6 +117,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	foundByShowSlaveHosts := false
 	longRunningProcesses := []Process{}
 	resolvedHostname := ""
+	maxScaleMasterHostname := ""
 	isMaxScale := false
 	slaveStatusFound := false
 	var resolveErr error
@@ -161,6 +162,14 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 
+	if isMaxScale && strings.Contains(instance.Version, "1.1.0") {
+		// Buggy buggy maxscale 1.1.0. Reported Master_Host can be corrupted.
+		// Therefore we (currently) take @@hostname (which is masquarading as master host anyhow)
+		err = db.QueryRow("select @@hostname").Scan(&maxScaleMasterHostname)
+		if err != nil {
+			goto Cleanup
+		}
+	}
 	if !isMaxScale {
 		var mysqlHostname, mysqlReportHost string
 		err = db.QueryRow("select @@global.hostname, ifnull(@@global.report_host, ''), @@global.server_id, @@global.version, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
@@ -213,6 +222,10 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 
 	err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
 		instance.Slave_IO_Running = (m.GetString("Slave_IO_Running") == "Yes")
+		if isMaxScale && strings.Contains(instance.Version, "1.1.0") {
+			// Covering buggy MaxScale 1.1.0
+			instance.Slave_IO_Running = instance.Slave_IO_Running && (m.GetString("Slave_IO_State") == "Binlog Dump")
+		}
 		instance.Slave_SQL_Running = (m.GetString("Slave_SQL_Running") == "Yes")
 		instance.ReadBinlogCoordinates.LogFile = m.GetString("Master_Log_File")
 		instance.ReadBinlogCoordinates.LogPos = m.GetInt64("Read_Master_Log_Pos")
@@ -228,7 +241,13 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		instance.UsingMariaDBGTID = (m.GetStringD("Using_Gtid", "No") != "No")
 		instance.HasReplicationFilters = ((m.GetStringD("Replicate_Do_DB", "") != "") || (m.GetStringD("Replicate_Ignore_DB", "") != "") || (m.GetStringD("Replicate_Do_Table", "") != "") || (m.GetStringD("Replicate_Ignore_Table", "") != "") || (m.GetStringD("Replicate_Wild_Do_Table", "") != "") || (m.GetStringD("Replicate_Wild_Ignore_Table", "") != ""))
 
-		masterKey, err := NewInstanceKeyFromStrings(m.GetString("Master_Host"), m.GetString("Master_Port"))
+		masterHostname := m.GetString("Master_Host")
+		if isMaxScale && strings.Contains(instance.Version, "1.1.0") {
+			// Buggy buggy maxscale 1.1.0. Reported Master_Host can be corrupted.
+			// Therefore we (currently) take @@hostname (which is masquarading as master host anyhow)
+			masterHostname = maxScaleMasterHostname
+		}
+		masterKey, err := NewInstanceKeyFromStrings(masterHostname, m.GetString("Master_Port"))
 		if err != nil {
 			log.Errore(err)
 		}

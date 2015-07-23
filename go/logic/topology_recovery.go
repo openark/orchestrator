@@ -114,17 +114,8 @@ func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses boo
 	}
 
 	log.Debugf("topology_recovery: RecoverDeadMaster: will recover %+v", *failedInstanceKey)
-	_, _, _, candidateSlave, err := inst.RegroupSlaves(failedInstanceKey, true, nil)
+	_, _, _, candidateSlave, err := inst.RegroupSlavesIncludingSubSlavesOfBinlogServers(failedInstanceKey, true, nil)
 
-	//	binlogServerSlaves, err := inst.ReadBinlogServerSlaveInstances(failedInstanceKey)
-	//	if err != nil {
-	//		log.Errore(err)
-	//		// And continue; just try to salvage anything you can
-	//	}
-	//	var candidateSlave *inst.Instance
-	//	if len(binlogServerSlaves) == 0 {
-	//	} else {
-	//	}
 	ResolveRecovery(failedInstanceKey, &candidateSlave.Key)
 
 	log.Debugf("topology_recovery: - RecoverDeadMaster: candidate slave is %+v", candidateSlave.Key)

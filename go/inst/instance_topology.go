@@ -542,9 +542,15 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey) (*Instance, error
 	if masterKey == nil {
 		masterKey = &instance.MasterKey
 	}
+	// With repoint we *prefer* the master to be alive, but we don't structly require it.
+	// The use case for the master being alive is with hostname-resolve or hostname-unresolve: asking the slave
+	// to reconnect to its same master while changing the MASTER_HOST in CHANGE MASTER TO due to DNS changes etc.
 	master, err := ReadTopologyInstance(masterKey)
 	if err != nil {
-		return instance, err
+		master, _, err = ReadInstance(masterKey)
+		if err != nil {
+			return instance, err
+		}
 	}
 	if canReplicate, err := instance.CanReplicateFrom(master); !canReplicate {
 		return instance, err
@@ -581,28 +587,21 @@ Cleanup:
 
 }
 
-// RepointSlaves repoints slaves of a given instance (possibly filtered) onto another master.
+// RepointTo repoints list of slaves onto another master.
 // Binlog Server is the major use case
-func RepointSlavesTo(instanceKey *InstanceKey, pattern string, belowKey *InstanceKey) ([](*Instance), error, []error) {
+func RepointTo(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance), error, []error) {
 	res := [](*Instance){}
 	errs := []error{}
 
-	slaves, err := ReadSlaveInstances(instanceKey)
-	if err != nil {
-		return res, err, errs
-	}
-	slaves = removeInstance(slaves, belowKey)
-	slaves = filterInstancesByPattern(slaves, pattern)
 	if len(slaves) == 0 {
 		// Nothing to do
 		return res, nil, errs
 	}
 	if belowKey == nil {
-		// Default to existing master. All slaves are of the same master, hence just pick one.
-		belowKey = &slaves[0].MasterKey
+		return res, log.Errorf("RepointTo received nil belowKey"), errs
 	}
 
-	log.Infof("Will repoint slaves of %+v to %+v", *instanceKey, *belowKey)
+	log.Infof("Will repoint %+v slaves below %+v", len(slaves), *belowKey)
 	barrier := make(chan *InstanceKey)
 	slaveMutex := make(chan bool, 1)
 	for _, slave := range slaves {
@@ -631,16 +630,37 @@ func RepointSlavesTo(instanceKey *InstanceKey, pattern string, belowKey *Instanc
 		<-barrier
 	}
 
-	if err != nil {
-		return res, log.Errore(err), errs
-	}
 	if len(errs) == len(slaves) {
 		// All returned with error
 		return res, log.Error("Error on all operations"), errs
 	}
-	AuditOperation("repoint-slaves", instanceKey, fmt.Sprintf("repointed %d/%d slaves of %+v to %+v", len(res), len(slaves), *instanceKey, *belowKey))
+	AuditOperation("repoint-to", belowKey, fmt.Sprintf("repointed %d/%d slaves to %+v", len(res), len(slaves), *belowKey))
 
-	return res, err, errs
+	return res, nil, errs
+}
+
+// RepointSlaves repoints slaves of a given instance (possibly filtered) onto another master.
+// Binlog Server is the major use case
+func RepointSlavesTo(instanceKey *InstanceKey, pattern string, belowKey *InstanceKey) ([](*Instance), error, []error) {
+	res := [](*Instance){}
+	errs := []error{}
+
+	slaves, err := ReadSlaveInstances(instanceKey)
+	if err != nil {
+		return res, err, errs
+	}
+	slaves = removeInstance(slaves, belowKey)
+	slaves = filterInstancesByPattern(slaves, pattern)
+	if len(slaves) == 0 {
+		// Nothing to do
+		return res, nil, errs
+	}
+	if belowKey == nil {
+		// Default to existing master. All slaves are of the same master, hence just pick one.
+		belowKey = &slaves[0].MasterKey
+	}
+	log.Infof("Will repoint slaves of %+v to %+v", *instanceKey, *belowKey)
+	return RepointTo(slaves, belowKey)
 }
 
 // RepointSlaves sequentially repoints all slaves of a given instance onto its existing master.
@@ -1597,4 +1617,47 @@ func RegroupSlaves(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup boo
 
 	log.Debugf("RegroupSlaves: done")
 	return aheadSlaves, equalSlaves, laterSlaves, instance, err
+}
+
+// RegroupSlaves will choose a candidate slave of a given instance, and enslave its siblings using
+// either simple CHANGE MASTER TO, where possible, or pseudo-gtid
+func RegroupSlavesIncludingSubSlavesOfBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance)) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
+
+	if binlogServerSlaves, err := ReadBinlogServerSlaveInstances(masterKey); err == nil && len(binlogServerSlaves) > 0 {
+		mostAdvancedBinlogServer := binlogServerSlaves[0]
+		for _, binlogServer := range binlogServerSlaves {
+			if mostAdvancedBinlogServer.ExecBinlogCoordinates.SmallerThan(&binlogServer.ExecBinlogCoordinates) {
+				mostAdvancedBinlogServer = binlogServer
+			}
+		}
+		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: mostAdvancedBinlogServer is %+v", mostAdvancedBinlogServer.Key)
+		if allSlaves, err := ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey); err == nil {
+			var slavesBehindMostAdvancedBinlogServer [](*Instance)
+			for _, slave := range allSlaves {
+				slave := slave
+				if slave.ExecBinlogCoordinates.SmallerThan(&mostAdvancedBinlogServer.ExecBinlogCoordinates) {
+					slavesBehindMostAdvancedBinlogServer = append(slavesBehindMostAdvancedBinlogServer, slave)
+				}
+			}
+			// Everything that stopped replicating on an earlier point than the mostAdvancedBinlogServer will be
+			// directed at mostAdvancedBinlogServer to continue replicating as much as possible
+			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: will repoint %+v slaves that are behind replication as compared to %+v below it", len(slavesBehindMostAdvancedBinlogServer), mostAdvancedBinlogServer.Key)
+			RepointTo(slavesBehindMostAdvancedBinlogServer, &mostAdvancedBinlogServer.Key)
+			// We issued a START SLAVE on all the above; this included a minimal sleep (config.Config.SlaveStartPostWaitMilliseconds)
+			// Let's give it another one
+			if config.Config.SlaveStartPostWaitMilliseconds > 0 {
+				time.Sleep(time.Duration(config.Config.SlaveStartPostWaitMilliseconds) * time.Millisecond)
+			}
+			// So hopefully they caught up with the mostAdvancedBinlogServer
+
+			// We don't wait forever for that to happen though.
+			// The ideal case is that everything is as caught up as mostAdvancedBinlogServer or even beyond.
+			// Remember all slaves involved were either direct slaves of masterKey or slaves of binlog server slves
+			// of masterKey. It is thus safe to move everything (ie normal slaves) around. We will now repoint everything
+			// to masterKey, thus all the slaves are now aligned as siblings. We can now continue with a normal regroup.
+			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: will align up all slaves and subslaves of binlog servers of %+v ", *masterKey)
+			RepointTo(allSlaves, masterKey)
+		}
+	}
+	return RegroupSlaves(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen)
 }
