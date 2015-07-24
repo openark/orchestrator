@@ -472,3 +472,21 @@
 	font-size: 100%;
 	background-color: inherit;
 }
+
+#searchResults .popover.instance {
+    display: block;
+    position: inherit;
+    max-width: inherit;
+}
+
+#searchResults .popover.instance h3.popover-title {
+    cursor: pointer;
+}
+
+#searchResults .popover.instance {
+   margin: 8px;
+}
+
+#searchResults .popover.instance p {
+   margin: 8px 0px;
+}
