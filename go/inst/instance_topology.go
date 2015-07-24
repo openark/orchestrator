@@ -1508,6 +1508,10 @@ func MatchUpSlaves(masterKey *InstanceKey, pattern string) ([](*Instance), *Inst
 }
 
 func isGenerallyValidAsCandidateSlave(slave *Instance) bool {
+	if !slave.IsLastCheckValid {
+		// something wrong with this slave irhgt now. We shouldn't hope to be able to promote it
+		return false
+	}
 	if !slave.LogBinEnabled {
 		return false
 	}
@@ -1623,39 +1627,68 @@ func RegroupSlaves(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup boo
 	return aheadSlaves, equalSlaves, laterSlaves, instance, err
 }
 
+func getMostUpToDateActiveBinlogServer(masterKey *InstanceKey) (mostAdvancedBinlogServer *Instance, err error) {
+	var binlogServerSlaves [](*Instance)
+	if binlogServerSlaves, err = ReadBinlogServerSlaveInstances(masterKey); err == nil && len(binlogServerSlaves) > 0 {
+		// Pick the most advanced binlog sever that is good to go
+		for _, binlogServer := range binlogServerSlaves {
+			if binlogServer.IsLastCheckValid {
+				if mostAdvancedBinlogServer == nil {
+					mostAdvancedBinlogServer = binlogServer
+				}
+				if mostAdvancedBinlogServer.ExecBinlogCoordinates.SmallerThan(&binlogServer.ExecBinlogCoordinates) {
+					mostAdvancedBinlogServer = binlogServer
+				}
+			}
+		}
+	}
+	return mostAdvancedBinlogServer, err
+}
+
 // RegroupSlaves will choose a candidate slave of a given instance, and enslave its siblings using
 // either simple CHANGE MASTER TO, where possible, or pseudo-gtid
 func RegroupSlavesIncludingSubSlavesOfBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance)) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
 
-	if binlogServerSlaves, err := ReadBinlogServerSlaveInstances(masterKey); err == nil && len(binlogServerSlaves) > 0 {
-		mostAdvancedBinlogServer := binlogServerSlaves[0]
-		for _, binlogServer := range binlogServerSlaves {
-			if mostAdvancedBinlogServer.ExecBinlogCoordinates.SmallerThan(&binlogServer.ExecBinlogCoordinates) {
-				mostAdvancedBinlogServer = binlogServer
-			}
-		}
+	if mostAdvancedBinlogServer, _ := getMostUpToDateActiveBinlogServer(masterKey); mostAdvancedBinlogServer != nil {
 		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: mostAdvancedBinlogServer is %+v", mostAdvancedBinlogServer.Key)
 		if allSlaves, err := ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey); err == nil {
-			var slavesBehindMostAdvancedBinlogServer [](*Instance)
+			slavesBehindMostAdvancedBinlogServer := [](*Instance){}
+			foundPotentialPromotedSlaveAheadOfBinlogServer := false
 			for _, slave := range allSlaves {
 				slave := slave
 				if slave.ExecBinlogCoordinates.SmallerThan(&mostAdvancedBinlogServer.ExecBinlogCoordinates) {
 					slavesBehindMostAdvancedBinlogServer = append(slavesBehindMostAdvancedBinlogServer, slave)
+				} else if isGenerallyValidAsCandidateSlave(slave) && !foundPotentialPromotedSlaveAheadOfBinlogServer {
+					// We have a slave with log-slave-updates that is *ahead* of most-up-to-date binlog server.
+					// This means all alves behind binlog servers are able to match below said slave via pseudo-gtid.
+					// This keeps us on safe grounds. We don't need to make further precautionary checks or waits
+					// on binlog server slaves.
+					foundPotentialPromotedSlaveAheadOfBinlogServer = true
+					log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: Found %+v to be ahead of most up to date binlog server %+v", slave.Key, mostAdvancedBinlogServer.Key)
 				}
 			}
 			// Everything that stopped replicating on an earlier point than the mostAdvancedBinlogServer will be
 			// directed at mostAdvancedBinlogServer to continue replicating as much as possible
 			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: will repoint %+v slaves that are behind replication as compared to %+v below it", len(slavesBehindMostAdvancedBinlogServer), mostAdvancedBinlogServer.Key)
 			RepointTo(slavesBehindMostAdvancedBinlogServer, &mostAdvancedBinlogServer.Key)
-			// We issued a START SLAVE on all the above; this included a minimal sleep (config.Config.SlaveStartPostWaitMilliseconds)
-			// Let's give it another one
-			if config.Config.SlaveStartPostWaitMilliseconds > 0 {
-				time.Sleep(time.Duration(config.Config.SlaveStartPostWaitMilliseconds) * time.Millisecond)
-			}
-			// So hopefully they caught up with the mostAdvancedBinlogServer
 
-			// We don't wait forever for that to happen though.
-			// The ideal case is that everything is as caught up as mostAdvancedBinlogServer or even beyond.
+			if foundPotentialPromotedSlaveAheadOfBinlogServer {
+				// We on safe grounds. But let's spend a very short time to allow slaves to align up to the binlog server
+				if config.Config.SlaveStartPostWaitMilliseconds > 0 {
+					time.Sleep(time.Duration(config.Config.SlaveStartPostWaitMilliseconds) * time.Millisecond)
+					// on one hand, we just wasted time. On the other hand, we hope all slaves are now aligned, so are in same exec binlog positions, which means
+					// less computation for pseudo-gtid
+				}
+			} else {
+				// Make sure a good candidate slave is aligned with the binlog server. We spend time on this now.
+				// This slave would be able to enslave all its siblings (ie all slaves that were behind binlog server)
+				log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: Haven't found a slave to promote that is ahead of most up to date binlog server %+v. Will find a suitable slave behind the binlog server.", mostAdvancedBinlogServer.Key)
+				if candidateSlaveOfBinlogServer, _, _, _, err := GetCandidateSlave(&mostAdvancedBinlogServer.Key, false); err == nil && candidateSlaveOfBinlogServer != nil {
+					log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: will start %+v until most-up-to-date binlog server %+v coordinates", candidateSlaveOfBinlogServer.Key, mostAdvancedBinlogServer.Key)
+					StartSlaveUntilMasterCoordinates(&candidateSlaveOfBinlogServer.Key, &mostAdvancedBinlogServer.ExecBinlogCoordinates)
+				}
+			}
+
 			// Remember all slaves involved were either direct slaves of masterKey or slaves of binlog server slves
 			// of masterKey. It is thus safe to move everything (ie normal slaves) around. We will now repoint everything
 			// to masterKey, thus all the slaves are now aligned as siblings. We can now continue with a normal regroup.

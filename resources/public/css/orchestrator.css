@@ -49,11 +49,20 @@
 	color: inherit;
 }
 
+.popover.instance h3 {
+	overflow: auto;
+}
+
 .popover.instance h3 .pull-left {
-	width:190px;
+	max-width: 190px;
+	width: auto;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	overflow: hidden;
+}
+
+.popover.instance h3 .pull-right {
+	width:auto;
 }
 
 .popover.instance h3 .pull-right > .glyphicon {

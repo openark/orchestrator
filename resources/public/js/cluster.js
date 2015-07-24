@@ -717,7 +717,7 @@ function showOSCSlaves() {
 
 function anonymizeInstanceId(instanceId) {
 	var tokens = instanceId.split("__");
-    return "instance-"+md5(tokens[1]).substring(0,4)+":"+tokens[2];
+    return "instance-"+md5(tokens[1]).substring(0, 4)+":"+tokens[2];
 }
 
 function anonymizeIfNeedBe(message) {
