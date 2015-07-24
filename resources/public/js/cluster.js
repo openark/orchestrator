@@ -303,7 +303,7 @@ function moveBelow(node, siblingNode) {
 		"</strong></code> into a slave of <code><strong>" +
 		siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
 		"</strong></code>?";
-	bootbox.confirm(message, function(confirm) {
+	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
 		if (confirm) {
 			showLoader();
 			var apiUrl = "/api/move-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port;
@@ -329,7 +329,7 @@ function moveUp(node, grandparentNode) {
 		"</strong></code> into a slave of <code><strong>" +
 		grandparentNode.Key.Hostname + ":" + grandparentNode.Key.Port +
 		"</strong></code>?"
-	bootbox.confirm(message, function(confirm) {
+	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
 		if (confirm) {
 			showLoader();
 			var apiUrl = "/api/move-up/" + node.Key.Hostname + "/" + node.Key.Port;
@@ -355,7 +355,7 @@ function enslaveMaster(node, masterNode) {
 		"</strong></code> master of <code><strong>" +
 		masterNode.Key.Hostname + ":" + masterNode.Key.Port +
 		"</strong></code>?"
-	bootbox.confirm(message, function(confirm) {
+	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
 		if (confirm) {
 			showLoader();
 			var apiUrl = "/api/enslave-master/" + node.Key.Hostname + "/" + node.Key.Port;
@@ -379,7 +379,7 @@ function makeCoMaster(node, childNode) {
 		"</strong></code> and <code><strong>" +
 		childNode.Key.Hostname + ":" + childNode.Key.Port +
 		"</strong></code> co-masters?"
-	bootbox.confirm(message, function(confirm) {
+	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
 		if (confirm) {
 			showLoader();
 			var apiUrl = "/api/make-co-master/" + childNode.Key.Hostname + "/" + childNode.Key.Port;
@@ -405,7 +405,7 @@ function matchBelow(node, otherNode) {
 		"</strong></code> into a slave of <code><strong>" +
 		otherNode.Key.Hostname + ":" + otherNode.Key.Port +
 		"</strong></code>?";
-	bootbox.confirm(message, function(confirm) {
+	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
 		if (confirm) {
 			showLoader();
 			var apiUrl = "/api/match-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
@@ -645,7 +645,7 @@ function makeMaster(instance) {
 	+ "if this instance will indeed become the master."
 	+ "<p>Pointing your application servers to the new master is on you."
 	;
-	bootbox.confirm(message, function(confirm) {
+	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
 		if (confirm) {
 	    	showLoader();
 	        $.get("/api/make-master/"+instance.Key.Hostname+"/"+instance.Key.Port, function (operationResult) {
@@ -666,7 +666,7 @@ function makeLocalMaster(instance) {
 	+ "via Pseudo-GTID."
 	+ "<p>The instance will replicate from its grandparent."
 	;
-	bootbox.confirm(message, function(confirm) {
+	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
 		if (confirm) {
 	    	showLoader();
 	        $.get("/api/make-local-master/"+instance.Key.Hostname+"/"+instance.Key.Port, function (operationResult) {
@@ -714,13 +714,27 @@ function showOSCSlaves() {
     }, "json");
 }
 
+
+function anonymizeInstanceId(instanceId) {
+	var tokens = instanceId.split("__");
+    return "instance-"+md5(tokens[1]).substring(0,4)+":"+tokens[2];
+}
+
+function anonymizeIfNeedBe(message) {
+	if ($.cookie("anonymize") == "true") {
+    	message = message.replace(/<strong>.*?<\/strong>/g, "############");
+    }
+    return message;
+}
+
 function anonymize() {
     var _ = function() {
         var counter = 0;  
-        var port = 3306;
-        $("h3.popover-title .pull-left").each(function() {
-            jQuery(this).html("instance-"+(md5(jQuery(this).html()).substring(0,4))+":"+port)
-         });
+        $("[data-fo-id]").each(function() {
+        	var instanceId = $(this).attr("data-fo-id");
+        	$(this).find("h3.popover-title .pull-left").html(anonymizeInstanceId(instanceId));
+        	$(this).find("h3.popover-title").attr("title", anonymizeInstanceId(instanceId));
+        });
         $(".popover-content p").each(function() {
         	tokens = jQuery(this).html().split(" ", 2)
             jQuery(this).html(tokens[0].match(/[^.]+[.][^.]+/) + " " + tokens[1])

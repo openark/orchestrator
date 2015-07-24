@@ -223,7 +223,7 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 
-	// We can skip hsotname unresolve; we just copy+paste whatever our master thinks of its master.
+	// We can skip hostname unresolve; we just copy+paste whatever our master thinks of its master.
 	instance, err = ChangeMasterTo(instanceKey, &master.MasterKey, &master.ExecBinlogCoordinates, true)
 	if err != nil {
 		goto Cleanup
@@ -546,7 +546,8 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey) (*Instance, error
 	// The use case for the master being alive is with hostname-resolve or hostname-unresolve: asking the slave
 	// to reconnect to its same master while changing the MASTER_HOST in CHANGE MASTER TO due to DNS changes etc.
 	master, err := ReadTopologyInstance(masterKey)
-	if err != nil {
+	masterIsAccessible := (err == nil)
+	if !masterIsAccessible {
 		master, _, err = ReadInstance(masterKey)
 		if err != nil {
 			return instance, err
@@ -570,7 +571,10 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey) (*Instance, error
 		goto Cleanup
 	}
 
-	instance, err = ChangeMasterTo(instanceKey, masterKey, &instance.ExecBinlogCoordinates, false)
+	// See above, we are relaxed about the master being accessible/inaccessible.
+	// If accessible, we wish to do hostname-unresolve. If inaccessible, we can skip the test and not fail the
+	// ChangeMasterTo operation. This is why we pass "!masterIsAccessible" below.
+	instance, err = ChangeMasterTo(instanceKey, masterKey, &instance.ExecBinlogCoordinates, !masterIsAccessible)
 	if err != nil {
 		goto Cleanup
 	}
@@ -1127,7 +1131,7 @@ func EnslaveMaster(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	// instance and masterInstance are equal
-	// We skip name unresolve. It is OK if the master's master is dead, unreachable, does nto resolve properly.
+	// We skip name unresolve. It is OK if the master's master is dead, unreachable, does not resolve properly.
 	// We just copy+paste info from the master.
 	// In particular, this is commonly calledin DeadMaster recovery
 	instance, err = ChangeMasterTo(&instance.Key, &masterInstance.MasterKey, &masterInstance.ExecBinlogCoordinates, true)

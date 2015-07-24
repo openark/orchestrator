@@ -45,7 +45,7 @@ $(document).ready(function () {
 	    		problemInstancesFound = true;
     		}
     	});        	
-    	if (problemInstancesFound && (autoshowProblems() == "true")) {
+       	if (problemInstancesFound && (autoshowProblems() == "true") && ($.cookie("anonymize") != "true")) {
     		$("#instance_problems .dropdown-toggle").dropdown('toggle');
     	}
     	if (!problemInstancesFound) {
