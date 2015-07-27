@@ -363,13 +363,13 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatale(err)
 			}
 		}
-	case cliCommand("recover"):
+	case cliCommand("recover"), cliCommand("recover-lite"):
 		{
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			actionTaken, promotedInstance, err := logic.CheckAndRecover(instanceKey, siblingKey, true, false)
+			actionTaken, promotedInstance, err := logic.CheckAndRecover(instanceKey, siblingKey, true, (command == "recover-lite"))
 			if err != nil {
 				log.Fatale(err)
 			}

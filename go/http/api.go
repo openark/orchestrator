@@ -1445,6 +1445,12 @@ func (this *HttpAPI) ReplicationAnalysis(params martini.Params, r render.Render,
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Analysis"), Details: analysis})
 }
 
+// RecoverLite attempts recovery on a given instance, without executing external processes
+func (this *HttpAPI) RecoverLite(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	params["skipProcesses"] = "true"
+	this.Recover(params, r, req, user)
+}
+
 // Recover attempts recovery on a given instance
 func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -1461,7 +1467,7 @@ func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.R
 		candidateKey = &key
 	}
 
-	skipProcesses := (req.URL.Query().Get("skipProcesses") == "true")
+	skipProcesses := (req.URL.Query().Get("skipProcesses") == "true") || (params["skipProcesses"] == "true")
 	actionTaken, _, err := logic.CheckAndRecover(&instanceKey, candidateKey, true, skipProcesses)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
@@ -1626,6 +1632,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/replication-analysis", this.ReplicationAnalysis)
 	m.Get("/api/recover/:host/:port", this.Recover)
 	m.Get("/api/recover/:host/:port/:candidateHost/:candidatePort", this.Recover)
+	m.Get("/api/recover-lite/:host/:port", this.RecoverLite)
+	m.Get("/api/recover-lite/:host/:port/:candidateHost/:candidatePort", this.RecoverLite)
 	m.Get("/api/automated-recovery-filters", this.AutomatedRecoveryFilters)
 	m.Get("/api/audit-failure-detection", this.AuditFailureDetection)
 	m.Get("/api/audit-failure-detection/:page", this.AuditFailureDetection)

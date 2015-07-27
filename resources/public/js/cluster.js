@@ -74,8 +74,8 @@ function generateInstanceDivs(nodesMap) {
         	apiCommand("/api/recover/"+nodesMap[draggedNodeId].Key.Hostname+"/"+nodesMap[draggedNodeId].Key.Port);
         	return true;
         });
-        $(".popover.instance[data-duplicate-node] a[data-command=recover-auto-skip-processes]").click(function () {
-        	apiCommand("/api/recover/"+nodesMap[draggedNodeId].Key.Hostname+"/"+nodesMap[draggedNodeId].Key.Port+"?skipProcesses=true");
+        $(".popover.instance[data-duplicate-node] a[data-command=recover-auto-lite]").click(function () {
+        	apiCommand("/api/recover-lite/"+nodesMap[draggedNodeId].Key.Hostname+"/"+nodesMap[draggedNodeId].Key.Port);
         	//console.log("auto & skip!")
         	return true;
         });
@@ -805,7 +805,7 @@ function onAnalysisEntry(analysisEntry, instance) {
 	popoverElement.find(".popover-footer .dropdown").append('<ul class="dropdown-menu" aria-labelledby="recover_dropdown_'+instance.id+'"></ul>');
 	var recoveryListing = popoverElement.find(".dropdown ul");
     recoveryListing.append('<li><a href="#" data-btn="auto" data-command="recover-auto">Auto (implies running external hooks/processes)</a></li>');
-    recoveryListing.append('<li><a href="#" data-btn="auto-skip-processes" data-command="recover-auto-skip-processes">Auto (do not execute hooks/processes)</a></li>');
+    recoveryListing.append('<li><a href="#" data-btn="auto-lite" data-command="recover-auto-lite">Auto (do not execute hooks/processes)</a></li>');
     recoveryListing.append('<li role="separator" class="divider"></li>');
     
     if (!instance.isMaster) {

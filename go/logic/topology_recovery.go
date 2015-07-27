@@ -461,7 +461,7 @@ func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode 
 // Force reading of slaves of given instance. This is because we suspect the instance is dead, and want to speed up
 // detection of replication failure from its slaves.
 func emergentlyReadTopologyInstanceSlaves(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
-	slaves, err := inst.ReadSlaveInstances(instanceKey)
+	slaves, err := inst.ReadSlaveInstancesIncludingBinlogServerSubSlaves(instanceKey)
 	if err != nil {
 		return
 	}
@@ -506,6 +506,7 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 		return false, nil, nil
 	}
 	// we have a recovery function; its execution still depends on filters if not disabled.
+	log.Debugf("executeCheckAndRecoverFunction: proceeeding with %+v; skipProcesses: %+v", analysisEntry.AnalyzedInstanceKey, skipProcesses)
 
 	if ok, _ := AttemptFailureDetectionRegistration(&analysisEntry); ok {
 		log.Debugf("topology_recovery: detected %+v failure on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
