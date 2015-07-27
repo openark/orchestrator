@@ -394,6 +394,7 @@ function normalizeInstance(instance) {
     instance.isCandidateMaster = false;
     instance.isMostAdvancedOfSiblings = false;
     instance.isVirtual = false;
+    instance.isAnchor = false;
     instance.isAggregate = false;
     
     instance.renderHint = "";

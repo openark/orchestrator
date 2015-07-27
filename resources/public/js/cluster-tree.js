@@ -2,7 +2,29 @@ function visualizeInstances(nodesMap) {
     nodesList = []
     for (var nodeId in nodesMap) {
         nodesList.push(nodesMap[nodeId]);
-    } 
+    }
+    var anchorVisualizationExperimentalMode = false;
+    if (anchorVisualizationExperimentalMode) {
+	    nodesList.forEach(function (node) {
+	    	if (node.children.length == 0) {
+	    		return;
+	    	}
+	    	var realChildren = node.children;
+	    	var pseudoChild = jQuery.extend({}, node)
+	    	pseudoChild.children = realChildren;
+	    	pseudoChild.children.forEach(function (child) {
+	    		child.parent = pseudoChild;
+	    	});
+	    	pseudoChild.hasMaster = true;
+	    	pseudoChild.parent = node;
+	    	pseudoChild.isAnchor = true;
+	    	pseudoChild.id += "__virtualnode";
+	
+	    	nodesMap[pseudoChild.id] = pseudoChild;
+	        nodesList.push(pseudoChild);
+	    	node.children = [pseudoChild];
+	    });
+    }
     // Calculate tree dimensions
     var maxNodeDepth = 20;
     // virtualDepth is the depth in tree excluding virtual nodes.
@@ -18,7 +40,7 @@ function visualizeInstances(nodesMap) {
                 node.virtualDepth = 0;
             } else {
             	var parentDepth = getNodeDepth(node.parent, recursiveLevel + 1);
-                node.virtualDepth = (node.parent.isVirtual ? parentDepth : parentDepth + 1);
+                node.virtualDepth = (node.parent.isVirtual || node.parent.isAnchor ? parentDepth : parentDepth + 1);
             }
         }
         return node.virtualDepth;
@@ -89,7 +111,11 @@ function visualizeInstances(nodesMap) {
         nodes.forEach(function (d) {
         	// Position on screen according to virtual-depth, not mathematical tree depth
         	// (ignores virtual nodes, which are hidden)
-            d.y = d.virtualDepth * horizontalSpacing;
+        	if (d.isAnchor) {
+        		d.y = (d.virtualDepth * horizontalSpacing) - horizontalSpacing/2;
+        	} else {
+        		d.y = d.virtualDepth * horizontalSpacing;
+        	}
         });
 
         // Update the nodes…
@@ -107,6 +133,9 @@ function visualizeInstances(nodesMap) {
         	if (d.isVirtual) {
         		return null;
         	}
+        	if (d.isAnchor) {
+        		return null;
+        	}
             return d.id;
         }).attr("r", 1e-6).style("fill", function (d) {
             return d._children ? "lightsteelblue" : "#fff";
@@ -116,6 +145,8 @@ function visualizeInstances(nodesMap) {
             return d.id
         }).attr("data-fo-is-virtual", function (d) {
             return d.isVirtual
+        }).attr("data-fo-is-anchor", function (d) {
+            return d.isAnchor
         }).attr("width", "100%").attr("dy", ".35em").attr("text-anchor", function (d) {
             return d.children || d._children ? "end" : "start";
         }).attr("x", function (d) {
@@ -128,7 +159,13 @@ function visualizeInstances(nodesMap) {
             return "translate(" + d.y + "," + d.x + ")";
         });        
         nodeUpdate.select("circle").attr("r", function (d) {
-            return (d.isVirtual ? 0 : 4.5);
+        	if (d.isVirtual) {
+        		return 0;
+        	}
+        	if (d.isAnchor) {
+        		return 0;
+        	}
+        	return 4.5;
         }).style("fill", function (d) {
             return d._children ? "lightsteelblue" : "#fff";
         });
@@ -191,5 +228,6 @@ function visualizeInstances(nodesMap) {
         }
         update(d);
         generateInstanceDivs(nodesMap);
+        repositionIntanceDivs();
     }
 }

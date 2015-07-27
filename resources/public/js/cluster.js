@@ -10,20 +10,16 @@ function getInstanceDiv(instanceId) {
 }
 
 function repositionIntanceDivs() {
-    $("[data-fo-id]").each(
-            function () {
-                var id = $(this).attr("data-fo-id");
-                var popoverDiv = getInstanceDiv(id);
+    $("[data-fo-id]").each(function () {
+        var id = $(this).attr("data-fo-id");
+        var popoverDiv = getInstanceDiv(id);
 
-                popoverDiv.attr("x", $(this).attr("x"));
-                $(this).attr("y",
-                    0 - popoverDiv.height() / 2 - 2);
-                popoverDiv.attr("y", $(this).attr("y"));
-                $(this).attr("width",
-                    popoverDiv.width() + 30);
-                $(this).attr("height",
-                    popoverDiv.height() +16);
-            });	
+        popoverDiv.attr("x", $(this).attr("x"));
+        $(this).attr("y", 0 - popoverDiv.height() / 2 - 2);
+        popoverDiv.attr("y", $(this).attr("y"));
+        $(this).attr("width", popoverDiv.width() + 30);
+        $(this).attr("height", popoverDiv.height() +16);
+    });	
     $("div.popover").popover();
     $("div.popover").show();
 }
@@ -35,8 +31,9 @@ function generateInstanceDivs(nodesMap) {
     } 
 
     $("[data-fo-id]").each(function () {
-        var isVirtual = $(this).attr("data-fo-is-virtual") == "true";
-        if (!isVirtual) {
+    	var isVirtual = $(this).attr("data-fo-is-virtual") == "true";
+    	var isAnchor = $(this).attr("data-fo-is-anchor") == "true";
+        if (!isVirtual && !isAnchor) {
 	        $(this).html(
 	        	'<div xmlns="http://www.w3.org/1999/xhtml" class="popover right instance"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"></div></div>'
 	        );
