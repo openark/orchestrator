@@ -17,9 +17,10 @@
 package config
 
 import (
-	"code.google.com/p/gcfg"
 	"encoding/json"
 	"os"
+
+	"code.google.com/p/gcfg"
 
 	"github.com/outbrain/golib/log"
 )
@@ -30,6 +31,7 @@ import (
 type Configuration struct {
 	Debug                                      bool // set debug mode (similar to --debug option)
 	ListenAddress                              string
+	AgentsServerPort                           string // port orchestrator agents talk back to
 	MySQLTopologyUser                          string
 	MySQLTopologyPassword                      string // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
 	MySQLTopologyCredentialsConfigFile         string
@@ -114,6 +116,7 @@ func NewConfiguration() *Configuration {
 	return &Configuration{
 		Debug:                                      false,
 		ListenAddress:                              ":3000",
+		AgentsServerPort:                           ":3001",
 		MySQLOrchestratorPort:                      3306,
 		MySQLTopologyMaxPoolConnections:            3,
 		MySQLConnectTimeoutSeconds:                 5,
