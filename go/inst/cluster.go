@@ -26,6 +26,7 @@ import (
 type ClusterInfo struct {
 	ClusterName                            string
 	ClusterAlias                           string // Human friendly alias
+	ClusterDomain                          string // CNAME/VIP/A-record/whatever of the master of this cluster
 	CountInstances                         uint
 	HeuristicLag                           int64
 	HasAutomatedMasterRecovery             bool

@@ -320,6 +320,14 @@ var generateSQL = []string{
 		  KEY last_registered_idx (last_registered)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS cluster_domain_name (
+		  cluster_name varchar(128) CHARACTER SET ascii NOT NULL,
+		  domain_name varchar(128) NOT NULL,
+		  PRIMARY KEY (cluster_name),
+		  KEY domain_name_idx(domain_name(32))
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{

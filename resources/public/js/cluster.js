@@ -768,6 +768,10 @@ function populateSidebar(clusterInfo) {
 		addSidebarInfoPopoverContent(content, false);
 	}
 	{
+		var content = 'Domain: '+clusterInfo.ClusterDomain+'';
+		addSidebarInfoPopoverContent(content, false);
+	}
+	{
 		var content = 'Heuristic lag: '+clusterInfo.HeuristicLag+'s';
 		addSidebarInfoPopoverContent(content, false);
 	}

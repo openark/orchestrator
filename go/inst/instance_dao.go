@@ -420,6 +420,21 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			}
 		}
 	}
+	if instance.ReplicationDepth == 0 && config.Config.DetectClusterDomainQuery != "" && !isMaxScale {
+		// Only need to do on masters
+		domainName := ""
+		err := db.QueryRow(config.Config.DetectClusterDomainQuery).Scan(&domainName)
+		if err != nil {
+			domainName = ""
+			log.Errore(err)
+		}
+		if domainName != "" {
+			WriteClusterDomainName(instance.ClusterName, domainName)
+			if err != nil {
+				log.Errore(err)
+			}
+		}
+	}
 
 Cleanup:
 	if instanceFound {
@@ -1136,6 +1151,7 @@ func ReadClusterInfo(clusterName string) (*ClusterInfo, error) {
 		clusterInfo.ClusterName = m.GetString("cluster_name")
 		clusterInfo.CountInstances = m.GetUint("count_instances")
 		ApplyClusterAlias(clusterInfo)
+		ApplyClusterDomain(clusterInfo)
 		clusterInfo.ReadRecoveryInfo()
 		return nil
 	})
@@ -1171,6 +1187,7 @@ func ReadClustersInfo() ([]ClusterInfo, error) {
 			CountInstances: m.GetUint("count_instances"),
 		}
 		ApplyClusterAlias(&clusterInfo)
+		ApplyClusterDomain(&clusterInfo)
 		clusterInfo.ReadRecoveryInfo()
 
 		clusters = append(clusters, clusterInfo)
