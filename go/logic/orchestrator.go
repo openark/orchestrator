@@ -161,6 +161,7 @@ func ContinuousDiscovery() {
 					inst.ExpireDowntime()
 					inst.ExpireCandidateInstances()
 					inst.ExpireHostnameUnresolve()
+					inst.ExpireClusterDomainName()
 				}
 				if !elected {
 					// Take this opportunity to refresh yourself
