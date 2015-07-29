@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
+	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
 )
 
@@ -65,11 +66,12 @@ func WriteClusterDomainName(clusterName string, domainName string) error {
 
 		_, err = sqlutils.Exec(db, `
 			insert into  
-					cluster_domain_name (cluster_name, domain_name)
+					cluster_domain_name (cluster_name, domain_name, last_registered)
 				values
-					(?, ?)
+					(?, ?, NOW())
 				on duplicate key update
-					domain_name=values(domain_name)
+					domain_name=values(domain_name),
+					last_registered=values(last_registered)
 			`,
 			clusterName,
 			domainName)
@@ -78,6 +80,19 @@ func WriteClusterDomainName(clusterName string, domainName string) error {
 		}
 
 		return nil
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
+// ExpireClusterDomainName expires cluster_domain_name entries that haven't been updated recently.
+func ExpireClusterDomainName() error {
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+        	delete from cluster_domain_name 
+				where last_registered < NOW() - INTERVAL ? MINUTE
+				`, config.Config.ExpiryHostnameResolvesMinutes,
+		)
+		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }

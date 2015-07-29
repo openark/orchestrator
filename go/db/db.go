@@ -458,6 +458,11 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN binlog_server TINYINT UNSIGNED NOT NULL AFTER version
 	`,
+	`
+		ALTER TABLE cluster_domain_name
+			ADD COLUMN last_registered TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			ADD KEY last_registered_idx (last_registered)
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance
