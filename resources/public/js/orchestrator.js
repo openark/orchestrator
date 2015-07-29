@@ -112,7 +112,7 @@ function addAlert(alertText, alertClass) {
     if ($.cookie("anonymize") == "true") {
         return false;
     }
-	if(typeof(alertClass)==='undefined') {
+	if (typeof(alertClass)==='undefined') {
         alertClass = "danger";
     }
 	$("#alerts_container").append(
@@ -730,6 +730,9 @@ $(document).ready(function() {
         addInfo(orchestratorMsg)
         history.pushState(null, document.title, location.href.split("?orchestrator-msg=")[0])
     }
+	if (typeof($.cookie("auto-refresh"))==='undefined') {
+		$.cookie("auto-refresh", "true", { path: '/', expires: 1 });
+	}
     $("#searchInput").focus();
 });
 
