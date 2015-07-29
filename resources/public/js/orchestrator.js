@@ -11,8 +11,17 @@ var errorMapping = {
    		"replicationLagProblem": {"badge": "label-warning", "description": "Replication lag"}
 	};
 
+function updateCountdownDisplay() {
+	if ($.cookie("auto-refresh") == "true") {
+    	$("#refreshCountdown").html('<span class="glyphicon glyphicon-repeat" title="Click to pause"></span> ' + secondsTillRefresh + 's');		
+	} else {
+		secondsTillRefresh = refreshIntervalSeconds;
+    	$("#refreshCountdown").html('<span class="glyphicon glyphicon-pause" title="Click to countdown"></span> ' + secondsTillRefresh + 's');		
+	}	
+}
+
 function startRefreshTimer() {
-    setInterval(function() {
+	var refreshFunction = function() {
     	if (nodeModalVisible) {
     		return;
     	}
@@ -22,8 +31,9 @@ function startRefreshTimer() {
     		showLoader();
     		location.reload(true);
     	}
-    	$("#refreshCountdown").html('<span class="glyphicon glyphicon-repeat"></span> ' + secondsTillRefresh + 's');
-    }, 1*1000);
+    	updateCountdownDisplay();    	
+	}
+    setInterval(refreshFunction, 1*1000);
 }
 
 function resetRefreshTimer() {
@@ -617,15 +627,13 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 		if (indicateLastSeenInStatus) {
 			statusMessage = 'seen ' + instance.SecondsSinceLastSeen.Int64 + ' seconds ago';
 		}
-	    var contentHtml = ''
-				+ instance.Version + " " + instance.Binlog_format
-				;
-	    
+	    var contentHtml = '' + instance.Version;
+	    if (instance.LogBinEnabled) {
+	    	contentHtml += " " + instance.Binlog_format;
+	    }
 	    contentHtml = ''
 	    	+ '<div class="pull-right">' + statusMessage + ' </div>'
-			+ '<p>' 
-			+ contentHtml
-			+ '</p>'
+			+ '<p>' + contentHtml + '</p>'
 			;
 	    if (instance.isCoMaster) {
 	    	contentHtml += '<p><strong>Co master</strong></p>';
@@ -697,7 +705,12 @@ $(document).ready(function() {
         return false;
     });
 	$("#refreshCountdown").click(function() {
-		location.reload(true);
+    	if ($.cookie("auto-refresh") == "true") {
+    		$.cookie("auto-refresh", "false", { path: '/', expires: 1 });
+    	} else {
+    		$.cookie("auto-refresh", "true", { path: '/', expires: 1 });
+    	}
+    	updateCountdownDisplay();
     });
 	if (agentsHttpActive() == "true") {
 		$("#nav_agents").show();
