@@ -125,6 +125,9 @@ function generateInstanceDivs(nodesMap) {
             	addClasses: true, 
             	opacity: 0.67,
             	cancel: "#cluster_container .popover.instance h3 a",
+            	snap: "#cluster_container .popover.instance",
+            	snapMode: "inner",
+            	snapTolerance: 10,
             	start: function(event, ui) {
             		resetRefreshTimer();
             		$("#cluster_container .accept_drop").removeClass("accept_drop");

@@ -55,6 +55,7 @@ type Configuration struct {
 	ActiveNodeExpireSeconds                    uint   // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
 	HostnameResolveMethod                      string // Method by which to "normalize" hostname ("none"/"default"/"cname")
 	MySQLHostnameResolveMethod                 string // Method by which to "normalize" hostname via MySQL server. ("none"/"@@hostname"/"@@report_host"; default "@@hostname")
+	SkipBinlogServerUnresolveCheck             bool   // Skip the double-check that an unresolved hostname resolves back to same hostname for binlog servers
 	ExpiryHostnameResolvesMinutes              int    // Number of minutes after which to expire hostname-resolves
 	RejectHostnameResolvePattern               string // Regexp pattern for resolved hostname that will not be accepted (not cached, not written to db). This is done to avoid storing wrong resolves due to network glitches.
 	ReasonableReplicationLagSeconds            int    // Above this value is considered a problem
@@ -130,6 +131,7 @@ func NewConfiguration() *Configuration {
 		ActiveNodeExpireSeconds:                    60,
 		HostnameResolveMethod:                      "cname",
 		MySQLHostnameResolveMethod:                 "@@hostname",
+		SkipBinlogServerUnresolveCheck:             true,
 		ExpiryHostnameResolvesMinutes:              60,
 		RejectHostnameResolvePattern:               "",
 		ReasonableReplicationLagSeconds:            10,
