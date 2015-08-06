@@ -421,19 +421,24 @@ function normalizeInstanceProblem(instance) {
     instance.problemOrder = 0;
     if (instance.inMaintenanceProblem()) {
     	instance.problem = "in_maintenance";
+    	instance.problemDescription = "This instance is now under maintenance due to some pending operation.\nSee audit page";
     	instance.problemOrder = 1;
     } else if (instance.lastCheckInvalidProblem()) {
     	instance.problem = "last_check_invalid";
+    	instance.problemDescription = "Instance cannot be reached by orchestrator.\nIt might be dead or there may be a network problem";
     	instance.problemOrder = 2;
     } else if (instance.notRecentlyCheckedProblem()) {
     	instance.problem = "not_recently_checked";
+    	instance.problemDescription = "Orchestrator has not made an attempt to reach this instance for a while now.\nThis should generally not happen; consider refreshing or re-discovering this instance";
     	instance.problemOrder = 3;
     } else if (instance.notReplicatingProblem()) {
     	// check slaves only; where not replicating
     	instance.problem = "not_replicating";
+    	instance.problemDescription = "Replication is not running.\nEither stopped manually or is failing on I/O or SQL error.";
     	instance.problemOrder = 4;
     } else if (instance.replicationLagProblem()) {
     	instance.problem = "replication_lag";
+    	instance.problemDescription = "Slave is lagging in replication.\nThis diagnostic is based on either Seconds_behind_master or configured SlaveLagQuery";
     	instance.problemOrder = 5;
     }
     instance.hasProblem = (instance.problem != null) ;
@@ -648,7 +653,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	    }  
 	    if (renderType == "problems") {
 	    	contentHtml += '<p>' 
-	        	+ 'Problem: <strong>'+instance.problem.replace(/_/g, ' ') + '</strong>'
+	        	+ 'Problem: <strong title="'+instance.problemDescription+'">'+instance.problem.replace(/_/g, ' ') + '</strong>'
 	        + '</p>';
 	    }      
 	    popoverElement.find(".popover-content").html(contentHtml);

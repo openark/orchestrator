@@ -104,7 +104,7 @@ func (this *HttpAPI) Discover(params martini.Params, r render.Render, req *http.
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance discovered: %+v", instance.Key)})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance discovered: %+v", instance.Key), Details: instance})
 }
 
 // Refresh synchronuously re-reads a topology instance
