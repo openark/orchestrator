@@ -18,6 +18,12 @@
 package app
 
 import (
+	nethttp "net/http"
+	"os"
+	"os/signal"
+	"strings"
+	"syscall"
+
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/gzip"
@@ -27,11 +33,6 @@ import (
 	"github.com/outbrain/orchestrator/go/http"
 	"github.com/outbrain/orchestrator/go/inst"
 	"github.com/outbrain/orchestrator/go/logic"
-	nethttp "net/http"
-	"os"
-	"os/signal"
-	"strings"
-	"syscall"
 )
 
 // acceptSignals registers for OS signals
@@ -138,11 +139,11 @@ func agentsHttp() {
 	// Serve
 	if config.Config.AgentsUseSSL {
 		log.Info("Serving via SSL")
-		err := nethttp.ListenAndServeTLS(":3001", config.Config.SSLCertFile, config.Config.SSLPrivateKeyFile, m)
+		err := nethttp.ListenAndServeTLS(config.Config.AgentsServerPort, config.Config.SSLCertFile, config.Config.SSLPrivateKeyFile, m)
 		if err != nil {
 			log.Fatale(err)
 		}
 	} else {
-		nethttp.ListenAndServe(":3001", m)
+		nethttp.ListenAndServe(config.Config.AgentsServerPort, m)
 	}
 }
