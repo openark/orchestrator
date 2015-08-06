@@ -132,6 +132,23 @@ func (s *TestSuite) TestBinlogCoordinatesAsKey(c *C) {
 	c.Assert(len(m), Equals, 3)
 }
 
+func (s *TestSuite) TestBinlogFileNumber(c *C) {
+	c1 := inst.BinlogCoordinates{LogFile: "mysql-bin.00017", LogPos: 104}
+	c2 := inst.BinlogCoordinates{LogFile: "mysql-bin.00022", LogPos: 104}
+
+	c.Assert(c1.FileNumberDistance(&c1), Equals, 0)
+	c.Assert(c1.FileNumberDistance(&c2), Equals, 5)
+	c.Assert(c2.FileNumberDistance(&c1), Equals, -5)
+}
+
+func (s *TestSuite) TestBinlogFileNumberDistance(c *C) {
+	c1 := inst.BinlogCoordinates{LogFile: "mysql-bin.00017", LogPos: 104}
+	fileNum, numLen := c1.FileNumber()
+
+	c.Assert(fileNum, Equals, 17)
+	c.Assert(numLen, Equals, 5)
+}
+
 func (s *TestSuite) TestCanReplicateFrom(c *C) {
 	i55 := inst.Instance{Key: key1, Version: "5.5"}
 	i56 := inst.Instance{Key: key2, Version: "5.6"}

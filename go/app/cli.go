@@ -497,6 +497,25 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
+	case cliCommand("flush-binary-logs"):
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			var err error
+			if *config.RuntimeCLIFlags.BinlogFile == "" {
+				err = inst.FlushBinaryLogs(instanceKey, 1)
+			} else {
+				_, err = inst.FlushBinaryLogsTo(instanceKey, *config.RuntimeCLIFlags.BinlogFile)
+			}
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
 	case cliCommand("discover"):
 		{
 			if instanceKey == nil {

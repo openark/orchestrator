@@ -1562,17 +1562,41 @@ func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
 }
 
 // FlushBinaryLogs attempts a 'FLUSH BINARY LOGS' statement on the given instance.
-func FlushBinaryLogs(instanceKey *InstanceKey) error {
-
-	_, err := ExecInstance(instanceKey, `flush binary logs`)
-	if err != nil {
-		return log.Errore(err)
+func FlushBinaryLogs(instanceKey *InstanceKey, count int) error {
+	for i := 0; i < count; i++ {
+		_, err := ExecInstance(instanceKey, `flush binary logs`)
+		if err != nil {
+			return log.Errore(err)
+		}
 	}
 
 	log.Infof("flush-binary-logs on %+v", *instanceKey)
 	AuditOperation("flush-binary-logs", instanceKey, "success")
 
 	return nil
+}
+
+// FlushBinaryLogsTo attempts to 'FLUSH BINARY LOGS' until given binary log is reached
+func FlushBinaryLogsTo(instanceKey *InstanceKey, logFile string) (*Instance, error) {
+
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	distance := instance.SelfBinlogCoordinates.FileNumberDistance(&BinlogCoordinates{LogFile: logFile})
+	if distance < 0 {
+		return nil, log.Errorf("FlushBinaryLogsTo: target log file %+v is smaller than current log file %+v", logFile, instance.SelfBinlogCoordinates.LogFile)
+	}
+	err = FlushBinaryLogs(instanceKey, distance)
+	if err != nil {
+		return instance, err
+	}
+
+	log.Infof("flush-binary-logs-to %+v on %+v", logFile, *instanceKey)
+	AuditOperation("flush-binary-logs-to", instanceKey, "success")
+
+	return instance, nil
 }
 
 // StopSlaveNicely stops a slave such that SQL_thread and IO_thread are aligned (i.e.

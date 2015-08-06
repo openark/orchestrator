@@ -20,6 +20,7 @@ package config
 type CLIFlags struct {
 	Noop               *bool
 	SkipUnresolveCheck *bool
+	BinlogFile         *string
 }
 
 var RuntimeCLIFlags CLIFlags
