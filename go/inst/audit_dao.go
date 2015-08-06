@@ -114,3 +114,19 @@ Cleanup:
 	return res, err
 
 }
+
+// ExpireAudit removes old rows from the audit table
+func ExpireAudit() error {
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+ 		delete from
+				audit
+			where
+				audit_timestamp < NOW() - INTERVAL ? DAY 
+			`,
+			config.Config.AuditPurgeDays,
+		)
+		return err
+	}
+	return ExecDBWriteFunc(writeFunc)
+}

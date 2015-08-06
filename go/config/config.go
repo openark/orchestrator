@@ -67,6 +67,7 @@ type Configuration struct {
 	CandidateInstanceExpireMinutes             uint   // Minutes after which a suggestion to use an instance as a candidate slave (to be preferably promoted on master failover) is expired.
 	AuditLogFile                               string // Name of log file for audit operations. Disabled when empty.
 	AuditPageSize                              int
+	AuditPurgeDays                             uint   // Days after which audit entries are purged from the database
 	RemoveTextFromHostnameDisplay              string // Text to strip off the hostname on cluster/clusters pages
 	ReadOnly                                   bool
 	AuthenticationMethod                       string            // Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "multi" for advanced BasicAuth, "proxy" for forwarded credentials via reverse proxy
@@ -143,6 +144,7 @@ func NewConfiguration() *Configuration {
 		CandidateInstanceExpireMinutes:             60,
 		AuditLogFile:                               "",
 		AuditPageSize:                              20,
+		AuditPurgeDays:                             365,
 		RemoveTextFromHostnameDisplay:              "",
 		ReadOnly:                                   false,
 		AuthenticationMethod:                       "basic",
