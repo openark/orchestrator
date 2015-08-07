@@ -948,8 +948,11 @@ $(document).ready(function () {
     	var alias = clusterInfo.ClusterAlias
     	var visualAlias = (alias ? alias : currentClusterName())
     	document.title = document.title.split(" - ")[0] + " - " + visualAlias;
-    	$("#cluster_container").append('<div class="floating_background">'+visualAlias+'</div>');
-        $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="'+clusterInfo.ClusterAlias+'">Alias: '+alias+'</a></li>');
+    	
+    	if (!($.cookie("anonymize") == "true")) {
+        	$("#cluster_container").append('<div class="floating_background">'+visualAlias+'</div>');
+            $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="'+clusterInfo.ClusterAlias+'">Alias: '+alias+'</a></li>');
+        }
         $("#dropdown-context").append('<li><a href="/web/cluster-pools/'+currentClusterName()+'">Pools</a></li>');    
         if (isCompactDisplay()) {
             $("#dropdown-context").append('<li><a data-command="expand-display" href="'+location.href.split("?")[0]+'?compact=false">Expand display</a></li>');    

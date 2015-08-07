@@ -70,6 +70,20 @@ func (s *TestSuite) TestIsSmallerMajorVersion(c *C) {
 	c.Assert(i55.IsSmallerMajorVersion(&i56), Equals, true)
 }
 
+func (s *TestSuite) TestIsVersion(c *C) {
+	i51 := inst.Instance{Version: "5.1.19"}
+	i55 := inst.Instance{Version: "5.5.17-debug"}
+	i56 := inst.Instance{Version: "5.6.20"}
+	i57 := inst.Instance{Version: "5.7.8-log"}
+
+	c.Assert(i51.IsMySQL51(), Equals, true)
+	c.Assert(i55.IsMySQL55(), Equals, true)
+	c.Assert(i56.IsMySQL56(), Equals, true)
+	c.Assert(i55.IsMySQL56(), Equals, false)
+	c.Assert(i57.IsMySQL57(), Equals, true)
+	c.Assert(i56.IsMySQL57(), Equals, false)
+}
+
 func (s *TestSuite) TestBinlogCoordinates(c *C) {
 	c1 := inst.BinlogCoordinates{LogFile: "mysql-bin.00017", LogPos: 104}
 	c2 := inst.BinlogCoordinates{LogFile: "mysql-bin.00017", LogPos: 104}

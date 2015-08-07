@@ -282,7 +282,27 @@ func (this *Instance) MajorVersion() []string {
 	return strings.Split(this.Version, ".")[:2]
 }
 
-// MajorVersion tests this instance against another and returns true if this instance is of a smaller "major" varsion.
+func (this *Instance) IsMySQL51() bool {
+	return strings.Join(this.MajorVersion(), ".") == "5.1"
+}
+
+func (this *Instance) IsMySQL55() bool {
+	return strings.Join(this.MajorVersion(), ".") == "5.5"
+}
+
+func (this *Instance) IsMySQL56() bool {
+	return strings.Join(this.MajorVersion(), ".") == "5.6"
+}
+
+func (this *Instance) IsMySQL57() bool {
+	return strings.Join(this.MajorVersion(), ".") == "5.7"
+}
+
+func (this *Instance) IsMySQL58() bool {
+	return strings.Join(this.MajorVersion(), ".") == "5.8"
+}
+
+// IsSmallerMajorVersion tests this instance against another and returns true if this instance is of a smaller "major" varsion.
 // e.g. 5.5.36 is NOT a smaller major version as comapred to 5.5.36, but IS as compared to 5.6.9
 func (this *Instance) IsSmallerMajorVersion(other *Instance) bool {
 	thisMajorVersion := this.MajorVersion()
@@ -298,6 +318,12 @@ func (this *Instance) IsSmallerMajorVersion(other *Instance) bool {
 		}
 	}
 	return false
+}
+
+// IsSmallerMajorVersionByString cehcks if this instance has a smaller major version number than given one
+func (this *Instance) IsSmallerMajorVersionByString(otherVersion string) bool {
+	other := &Instance{Version: otherVersion}
+	return this.IsSmallerMajorVersion(other)
 }
 
 // IsMariaDB checkes whether this is any version of MariaDB
@@ -317,6 +343,21 @@ func (this *Instance) IsBinlogServer() bool {
 	}
 	return false
 }
+
+// IsOracleMySQL checkes whether this is an Oracle MySQL distribution
+func (this *Instance) IsOracleMySQL() bool {
+	if this.IsMariaDB() {
+		return false
+	}
+	if this.isMaxScale() {
+		return false
+	}
+	if this.IsBinlogServer() {
+		return false
+	}
+	return true;
+}
+
 
 // IsSlave makes simple heuristics to decide whether this insatnce is a slave of another instance
 func (this *Instance) IsSlave() bool {

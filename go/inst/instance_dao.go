@@ -192,12 +192,17 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			resolvedHostname = instance.Key.Hostname
 		}
 
-		err = db.QueryRow("select variable_value from information_schema.global_status where variable_name='Uptime'").Scan(&instance.Uptime)
+		var placeholder string
+		// show global status works just as well with 5.6 & 5.7 (5.7 moves variables to performance_schema)
+		err = db.QueryRow("show global status like 'Uptime'").Scan(&placeholder, &instance.Uptime)
 		if err != nil {
 			goto Cleanup
 		}
-		// @@gtid_mode only available in Orcale MySQL >= 5.6
-		_ = db.QueryRow("select @@global.gtid_mode = 'ON'").Scan(&instance.SupportsOracleGTID)
+		if instance.IsOracleMySQL() && !instance.IsSmallerMajorVersionByString("5.6") {
+			// @@gtid_mode only available in Orcale MySQL >= 5.6
+			// Previous version just issued this query brute-force, but I don't like errors being issued where they shouldn't.
+			_ = db.QueryRow("select @@global.gtid_mode = 'ON'").Scan(&instance.SupportsOracleGTID)
+		}
 	}
 	if resolvedHostname != instance.Key.Hostname {
 		UpdateResolvedHostname(instance.Key.Hostname, resolvedHostname)
