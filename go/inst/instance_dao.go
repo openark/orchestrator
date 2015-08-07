@@ -157,8 +157,13 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			return nil
 		})
 		if err != nil {
-			// The query should not error (even if it's not maxscale)
-			goto Cleanup
+			log.Errore(err)
+			// We do not "goto Cleanup" here, although it should be the correct flow.
+			// Reason is 5.7's new security feature that requires GRANTs on performance_schema.session_variables.
+			// There is a wrong decisionmaking in this design and the migration path to 5.7 will be difficult.
+			// I don't want orchestrator to put even more burden on this.
+			// If the statement errors, then we are unable to determine that this is maxscale, hence assume it is not.
+			// In which case there would be other queries sent to the server that are not affected by 5.7 behavior, and that will fail.
 		}
 	}
 
@@ -196,7 +201,12 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		// show global status works just as well with 5.6 & 5.7 (5.7 moves variables to performance_schema)
 		err = db.QueryRow("show global status like 'Uptime'").Scan(&placeholder, &instance.Uptime)
 		if err != nil {
-			goto Cleanup
+			log.Errore(err)
+			// We do not "goto Cleanup" here, although it should be the correct flow.
+			// Reason is 5.7's new security feature that requires GRANTs on performance_schema.global_variables.
+			// There is a wrong decisionmaking in this design and the migration path to 5.7 will be difficult.
+			// I don't want orchestrator to put even more burden on this. The 'Uptime' variable is not that important
+			// so as to completely fail reading a 5.7 instance.
 		}
 		if instance.IsOracleMySQL() && !instance.IsSmallerMajorVersionByString("5.6") {
 			// @@gtid_mode only available in Orcale MySQL >= 5.6
@@ -1575,7 +1585,7 @@ func FlushBinaryLogs(instanceKey *InstanceKey, count int) error {
 		}
 	}
 
-	log.Infof("flush-binary-logs on %+v", *instanceKey)
+	log.Infof("flush-binary-logs count=%+v on %+v", count, *instanceKey)
 	AuditOperation("flush-binary-logs", instanceKey, "success")
 
 	return nil
@@ -1583,7 +1593,6 @@ func FlushBinaryLogs(instanceKey *InstanceKey, count int) error {
 
 // FlushBinaryLogsTo attempts to 'FLUSH BINARY LOGS' until given binary log is reached
 func FlushBinaryLogsTo(instanceKey *InstanceKey, logFile string) (*Instance, error) {
-
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
@@ -1594,14 +1603,7 @@ func FlushBinaryLogsTo(instanceKey *InstanceKey, logFile string) (*Instance, err
 		return nil, log.Errorf("FlushBinaryLogsTo: target log file %+v is smaller than current log file %+v", logFile, instance.SelfBinlogCoordinates.LogFile)
 	}
 	err = FlushBinaryLogs(instanceKey, distance)
-	if err != nil {
-		return instance, err
-	}
-
-	log.Infof("flush-binary-logs-to %+v on %+v", logFile, *instanceKey)
-	AuditOperation("flush-binary-logs-to", instanceKey, "success")
-
-	return instance, nil
+	return instance, err
 }
 
 // StopSlaveNicely stops a slave such that SQL_thread and IO_thread are aligned (i.e.
