@@ -43,7 +43,7 @@ func dialTimeout(network, addr string) (net.Conn, error) {
 }
 
 var httpTransport = &http.Transport{
-	TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config.SSLSkipVerify},
+	TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config.AgentSSLSkipVerify},
 	Dial:            dialTimeout,
 	ResponseHeaderTimeout: httpTimeout,
 }

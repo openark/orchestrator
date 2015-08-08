@@ -85,9 +85,19 @@ type Configuration struct {
 	PromotionIgnoreHostnameFilters             []string          // Orchestrator will not promote slaves with hostname matching pattern (via -c recovery; for example, avoid promoting dev-dedicated machines)
 	ServeAgentsHttp                            bool              // Spawn another HTTP interface dedicated for orcehstrator-agent
 	AgentsUseSSL                               bool              // When "true" orchestrator will listen on agents port with SSL as well as connect to agents via SSL
+	AgentsUseMutualTLS                         bool              // When "true" Use mutual TLS for the server to agent communication
+	AgentSSLSkipVerify                         bool              // When using SSL for the Agent, should we ignore SSL certification error
+	AgentSSLPrivateKeyFile                     string            // Name of Agent SSL private key file, applies only when AgentsUseSSL = true
+	AgentSSLCertFile                           string            // Name of Agent SSL certification file, applies only when AgentsUseSSL = true
+	AgentSSLCAFile                             string            // Name of the Agent Certificate Authority file, applies only when AgentsUseSSL = true
+	AgentSSLValidOUs                           []string          // Valid organizational units when using mutual TLS to communicate with the agents
+	UseSSL                                     bool              // Use SSL on the server web port
+	UseMutualTLS                               bool              // When "true" Use mutual TLS for the server's web and API connections
 	SSLSkipVerify                              bool              // When using SSL, should we ignore SSL certification error
-	SSLPrivateKeyFile                          string            // Name of SSL private key file, applies only when AgentsUseSSL = true
-	SSLCertFile                                string            // Name of SSL certification file, applies only when AgentsUseSSL = true
+	SSLPrivateKeyFile                          string            // Name of SSL private key file, applies only when UseSSL = true
+	SSLCertFile                                string            // Name of SSL certification file, applies only when UseSSL = true
+	SSLCAFile                                  string            // Name of the Certificate Authority file, applies only when UseSSL = true
+	SSLValidOUs                                []string          // Valid organizational units when using mutual TLS
 	HttpTimeoutSeconds                         int               // Number of idle seconds before HTTP GET request times out (when accessing orchestrator-agent)
 	AgentPollMinutes                           uint              // Minutes between agent polling
 	UnseenAgentForgetHours                     uint              // Number of hours after which an unseen agent is forgotten
@@ -166,9 +176,19 @@ func NewConfiguration() *Configuration {
 		PromotionIgnoreHostnameFilters:             []string{},
 		ServeAgentsHttp:                            false,
 		AgentsUseSSL:                               false,
+		AgentsUseMutualTLS:                         false,
+		AgentSSLValidOUs:                           []string{},
+		AgentSSLSkipVerify:                         false,
+		AgentSSLPrivateKeyFile:                     "",
+		AgentSSLCertFile:                           "",
+		AgentSSLCAFile:                             "",
+		UseSSL:                                     false,
+		UseMutualTLS:                               false,
+		SSLValidOUs:                                []string{},
 		SSLSkipVerify:                              false,
 		SSLPrivateKeyFile:                          "",
 		SSLCertFile:                                "",
+		SSLCAFile:                                  "",
 		HttpTimeoutSeconds:                         60,
 		AgentPollMinutes:                           60,
 		UnseenAgentForgetHours:                     6,
