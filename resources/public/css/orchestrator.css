@@ -12,6 +12,15 @@
     overflow-x: hidden;
 }
 
+.navbar-nav > li > .dropdown {
+  padding-bottom: 15px;
+  padding-top: 15px;
+}
+
+#move-instance-method button {
+	text-transform: capitalize;
+}
+
 #alerts_container .alert {
     margin-bottom: 4px;
 }
@@ -49,11 +58,20 @@
 	color: inherit;
 }
 
+.popover.instance h3 {
+	overflow: auto;
+}
+
 .popover.instance h3 .pull-left {
-	width:190px;
+	max-width: 190px;
+	width: auto;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	overflow: hidden;
+}
+
+.popover.instance h3 .pull-right {
+	width:auto;
 }
 
 .popover.instance h3 .pull-right > .glyphicon {
@@ -164,6 +182,16 @@
     color: inherit;
 }
 
+.popover.instance.original-dragged {
+    background-color: #808080;	
+}
+
+.popover.instance.original-dragged h3 {
+    background-color: #808080;	
+}
+
+.popover.instance.draggable-msg {
+}
 
 #instance_problems button.btn-stale {
     background-color: #808080;
@@ -189,13 +217,16 @@
     padding: 2px 8px;
 }
 
-
 #instance_problems .popover.instance div.popover-content p {
     margin: 4px 0px;
 }
 
 #instance_problems .popover.instance div.popover-content {
     padding: 4px 8px;
+}
+
+#pools .popover {
+	vertical-align: top;
 }
 
 #pools .popover div.pool-instances-listing {
@@ -205,8 +236,6 @@
 #pools .popover div.pool-instances-listing div {
     margin-top: 8px;
 }
-
-
 
 #node_modal .modal-title {
     font: 12px sans-serif;
@@ -461,4 +490,22 @@
 #orchestratorStatusTable code {
 	font-size: 100%;
 	background-color: inherit;
+}
+
+#searchResults .popover.instance {
+    display: block;
+    position: inherit;
+    max-width: inherit;
+}
+
+#searchResults .popover.instance h3.popover-title {
+    cursor: pointer;
+}
+
+#searchResults .popover.instance {
+   margin: 8px;
+}
+
+#searchResults .popover.instance p {
+   margin: 8px 0px;
 }

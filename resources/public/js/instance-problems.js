@@ -2,7 +2,11 @@
 $(document).ready(function () {
     showLoader();
 
-    $.get("/api/problems", function (instances) {
+    var problemsURI = "/api/problems"; 
+    if (typeof currentClusterName != "undefined") {
+    	problemsURI += "/"+currentClusterName();
+    }    	
+    $.get(problemsURI, function (instances) {
         $.get("/api/maintenance", function (maintenanceList) {
 			normalizeInstances(instances, maintenanceList);
 	        displayProblemInstances(instances);
@@ -25,12 +29,6 @@ $(document).ready(function () {
         var problemInstancesFound = false;
     	instances.forEach(function (instance) {
     		var considerInstance = instance.hasProblem
-    		if (typeof currentClusterName != "undefined") {
-    			// This is a cluster page; we will only consider this instance if it belongs to this cluster
-    			if (instance.ClusterName != currentClusterName()) {
-    				considerInstance = false
-    			}    			
-    		}
     		if (considerInstance) {
 	    		$("#instance_problems ul").append('<li><div xmlns="http://www.w3.org/1999/xhtml" class="popover instance" data-nodeid="'+instance.id+'"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"></div></div></li>');
 
@@ -47,7 +45,7 @@ $(document).ready(function () {
 	    		problemInstancesFound = true;
     		}
     	});        	
-    	if (problemInstancesFound && (autoshowProblems() == "true")) {
+       	if (problemInstancesFound && (autoshowProblems() == "true") && ($.cookie("anonymize") != "true")) {
     		$("#instance_problems .dropdown-toggle").dropdown('toggle');
     	}
     	if (!problemInstancesFound) {

@@ -45,7 +45,7 @@ const (
 	AllIntermediateMasterSlavesFailingToConnectOrDead                  = "AllIntermediateMasterSlavesFailingToConnectOrDead"
 	AllIntermediateMasterSlavesNotReplicating                          = "AllIntermediateMasterSlavesNotReplicating"
 	FirstTierSlaveFailingToConnectToMaster                             = "FirstTierSlaveFailingToConnectToMaster"
-	MaxscaleFailingToConnectToMaster                                   = "MaxscaleFailingToConnectToMaster"
+	BinlogServerFailingToConnectToMaster                               = "BinlogServerFailingToConnectToMaster"
 )
 
 // ReplicationAnalysis notes analysis on replication chain status, per instance
@@ -68,7 +68,7 @@ type ReplicationAnalysis struct {
 	IsDowntimed                         bool
 	DowntimeEndTimestamp                string
 	DowntimeRemainingSeconds            int
-	IsMaxscale                          bool
+	IsBinlogServer                      bool
 }
 
 // GetSlaveHostsAsString serializes all slave keys as a single comma delimited string

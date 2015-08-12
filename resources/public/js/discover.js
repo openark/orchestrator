@@ -20,13 +20,13 @@ function discover(hostname, port) {
     var uri = "/api/discover/"+hostname+"/"+port;
     $.get(uri, function (operationResult) {
         hideLoader();
-        if (operationResult.Code == "ERROR") {
+        if (operationResult.Code == "ERROR" || operationResult.Details == null) {
             addAlert(operationResult.Message)
         } else {
-            //location.reload();
-            addInfo(""+hostname+":"+port
-            		+ " sent for discovery. This should reflect in the topology listing or in topology instances."
-            		+ ' <a href="/web/search?s='+hostname+":"+port+'" class="alert-link">Search</a> for this instance');
+        	var instance = operationResult.Details;
+            addInfo('Discovered <a href="/web/search?s='+instance.Key.Hostname+":"+instance.Key.Port+'" class="alert-link">'
+            		+instance.Key.Hostname+":"+instance.Key.Port+'</a>'
+            	);
         }   
     }, "json"); 
 	

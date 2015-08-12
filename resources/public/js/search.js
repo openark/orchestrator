@@ -18,6 +18,10 @@ $(document).ready(function () {
 
     		var popoverElement = $("#searchResults [data-nodeid='" + instance.id + "'].popover");
     		renderInstanceElement(popoverElement, instance, "search");
+    	    popoverElement.find("h3.popover-title").click(function () {
+    	    	openNodeModal(instance);
+    	    	return false;
+    	    });	
     	});        	
         
         $("div.popover").popover();

@@ -70,6 +70,20 @@ func (s *TestSuite) TestIsSmallerMajorVersion(c *C) {
 	c.Assert(i55.IsSmallerMajorVersion(&i56), Equals, true)
 }
 
+func (s *TestSuite) TestIsVersion(c *C) {
+	i51 := inst.Instance{Version: "5.1.19"}
+	i55 := inst.Instance{Version: "5.5.17-debug"}
+	i56 := inst.Instance{Version: "5.6.20"}
+	i57 := inst.Instance{Version: "5.7.8-log"}
+
+	c.Assert(i51.IsMySQL51(), Equals, true)
+	c.Assert(i55.IsMySQL55(), Equals, true)
+	c.Assert(i56.IsMySQL56(), Equals, true)
+	c.Assert(i55.IsMySQL56(), Equals, false)
+	c.Assert(i57.IsMySQL57(), Equals, true)
+	c.Assert(i56.IsMySQL57(), Equals, false)
+}
+
 func (s *TestSuite) TestBinlogCoordinates(c *C) {
 	c1 := inst.BinlogCoordinates{LogFile: "mysql-bin.00017", LogPos: 104}
 	c2 := inst.BinlogCoordinates{LogFile: "mysql-bin.00017", LogPos: 104}
@@ -130,6 +144,23 @@ func (s *TestSuite) TestBinlogCoordinatesAsKey(c *C) {
 	m[c4] = true
 
 	c.Assert(len(m), Equals, 3)
+}
+
+func (s *TestSuite) TestBinlogFileNumber(c *C) {
+	c1 := inst.BinlogCoordinates{LogFile: "mysql-bin.00017", LogPos: 104}
+	c2 := inst.BinlogCoordinates{LogFile: "mysql-bin.00022", LogPos: 104}
+
+	c.Assert(c1.FileNumberDistance(&c1), Equals, 0)
+	c.Assert(c1.FileNumberDistance(&c2), Equals, 5)
+	c.Assert(c2.FileNumberDistance(&c1), Equals, -5)
+}
+
+func (s *TestSuite) TestBinlogFileNumberDistance(c *C) {
+	c1 := inst.BinlogCoordinates{LogFile: "mysql-bin.00017", LogPos: 104}
+	fileNum, numLen := c1.FileNumber()
+
+	c.Assert(fileNum, Equals, 17)
+	c.Assert(numLen, Equals, 5)
 }
 
 func (s *TestSuite) TestCanReplicateFrom(c *C) {

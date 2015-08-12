@@ -164,7 +164,9 @@ func UnresolveHostname(instanceKey *InstanceKey) (InstanceKey, bool, error) {
 	if err != nil {
 		return *instanceKey, false, log.Errore(err)
 	}
-	if instance.Key.Hostname != instanceKey.Hostname {
+	if instance.IsBinlogServer() && config.Config.SkipBinlogServerUnresolveCheck {
+		// Do nothing. Everything is assumed to be fine.
+	} else if instance.Key.Hostname != instanceKey.Hostname {
 		// Resolve(Unresolve(hostname)) != hostname ==> Bad; reject
 		if *config.RuntimeCLIFlags.SkipUnresolveCheck {
 			return *instanceKey, false, nil

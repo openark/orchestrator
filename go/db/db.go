@@ -320,6 +320,14 @@ var generateSQL = []string{
 		  KEY last_registered_idx (last_registered)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS cluster_domain_name (
+		  cluster_name varchar(128) CHARACTER SET ascii NOT NULL,
+		  domain_name varchar(128) NOT NULL,
+		  PRIMARY KEY (cluster_name),
+		  KEY domain_name_idx(domain_name(32))
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{
@@ -444,6 +452,16 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE topology_recovery
 			ADD KEY end_recovery_idx (end_recovery)
+	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN binlog_server TINYINT UNSIGNED NOT NULL AFTER version
+	`,
+	`
+		ALTER TABLE cluster_domain_name
+			ADD COLUMN last_registered TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			ADD KEY last_registered_idx (last_registered)
 	`,
 }
 

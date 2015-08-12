@@ -1,5 +1,5 @@
 /*
-   Copyright 2014 Outbrain Inc.
+   Copyright 2015 Shlomi Noach, courtesy Booking.com
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -16,17 +16,6 @@
 
 package inst
 
-// Process presents a MySQL executing thread (as observed by PROCESSLIST)
-type Process struct {
-	InstanceHostname string
-	InstancePort     int
-	Id               int64
-	User             string
-	Host             string
-	Db               string
-	Command          string
-	Time             int64
-	State            string
-	Info             string
-	StartedAt        string
+func ApplyClusterDomain(clusterInfo *ClusterInfo) {
+	clusterInfo.ClusterDomain, _ = ReadClusterDomainName(clusterInfo.ClusterName)
 }

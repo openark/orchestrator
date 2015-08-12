@@ -134,27 +134,44 @@ func (this *BinlogCoordinates) SmallerThan(other *BinlogCoordinates) bool {
 	return false
 }
 
-// SmallerThan returns true if this coordinate is strictly smaller than the other.
+// FileSmallerThan returns true if this coordinate's file is strictly smaller than the other's.
 func (this *BinlogCoordinates) FileSmallerThan(other *BinlogCoordinates) bool {
 	return this.LogFile < other.LogFile
+}
+
+// FileNumberDistance returns the numeric distance between this corrdinate's file number and the other's.
+// Effectively it means "how many roatets/FLUSHes would make these coordinates's file reach the other's"
+func (this *BinlogCoordinates) FileNumberDistance(other *BinlogCoordinates) int {
+	thisNumber, _ := this.FileNumber()
+	otherNumber, _ := other.FileNumber()
+	return otherNumber - thisNumber
+}
+
+// FileNumber returns the numeric value of the file, and the length in characters representing the number in the filename.
+// Example: FileNumber() of mysqld.log.000789 is (789, 6)
+func (this *BinlogCoordinates) FileNumber() (int, int) {
+	tokens := strings.Split(this.LogFile, ".")
+	numPart := tokens[len(tokens)-1]
+	numLen := len(numPart)
+	fileNum, err := strconv.Atoi(numPart)
+	if err != nil {
+		return 0, 0
+	}
+	return fileNum, numLen
 }
 
 // PreviousFileCoordinatesBy guesses the filename of the previous binlog/relaylog, by given offset (number of files back)
 func (this *BinlogCoordinates) PreviousFileCoordinatesBy(offset int) (BinlogCoordinates, error) {
 	result := BinlogCoordinates{LogPos: 0, Type: this.Type}
 
-	tokens := strings.Split(this.LogFile, ".")
-	numPart := tokens[len(tokens)-1]
-	numLen := len(numPart)
-	fileNum, err := strconv.Atoi(numPart)
-	if err != nil {
-		return result, err
-	}
+	fileNum, numLen := this.FileNumber()
 	if fileNum == 0 {
 		return result, errors.New("Log file number is zero, cannot detect previous file")
 	}
 	newNumStr := fmt.Sprintf("%d", (fileNum - offset))
 	newNumStr = strings.Repeat("0", numLen-len(newNumStr)) + newNumStr
+
+	tokens := strings.Split(this.LogFile, ".")
 	tokens[len(tokens)-1] = newNumStr
 	result.LogFile = strings.Join(tokens, ".")
 	return result, nil
@@ -169,15 +186,11 @@ func (this *BinlogCoordinates) PreviousFileCoordinates() (BinlogCoordinates, err
 func (this *BinlogCoordinates) NextFileCoordinates() (BinlogCoordinates, error) {
 	result := BinlogCoordinates{LogPos: 0, Type: this.Type}
 
-	tokens := strings.Split(this.LogFile, ".")
-	numPart := tokens[len(tokens)-1]
-	numLen := len(numPart)
-	fileNum, err := strconv.Atoi(numPart)
-	if err != nil {
-		return result, err
-	}
+	fileNum, numLen := this.FileNumber()
 	newNumStr := fmt.Sprintf("%d", (fileNum + 1))
 	newNumStr = strings.Repeat("0", numLen-len(newNumStr)) + newNumStr
+
+	tokens := strings.Split(this.LogFile, ".")
 	tokens[len(tokens)-1] = newNumStr
 	result.LogFile = strings.Join(tokens, ".")
 	return result, nil
@@ -269,7 +282,27 @@ func (this *Instance) MajorVersion() []string {
 	return strings.Split(this.Version, ".")[:2]
 }
 
-// MajorVersion tests this instance against another and returns true if this instance is of a smaller "major" varsion.
+func (this *Instance) IsMySQL51() bool {
+	return strings.Join(this.MajorVersion(), ".") == "5.1"
+}
+
+func (this *Instance) IsMySQL55() bool {
+	return strings.Join(this.MajorVersion(), ".") == "5.5"
+}
+
+func (this *Instance) IsMySQL56() bool {
+	return strings.Join(this.MajorVersion(), ".") == "5.6"
+}
+
+func (this *Instance) IsMySQL57() bool {
+	return strings.Join(this.MajorVersion(), ".") == "5.7"
+}
+
+func (this *Instance) IsMySQL58() bool {
+	return strings.Join(this.MajorVersion(), ".") == "5.8"
+}
+
+// IsSmallerMajorVersion tests this instance against another and returns true if this instance is of a smaller "major" varsion.
 // e.g. 5.5.36 is NOT a smaller major version as comapred to 5.5.36, but IS as compared to 5.6.9
 func (this *Instance) IsSmallerMajorVersion(other *Instance) bool {
 	thisMajorVersion := this.MajorVersion()
@@ -287,14 +320,42 @@ func (this *Instance) IsSmallerMajorVersion(other *Instance) bool {
 	return false
 }
 
+// IsSmallerMajorVersionByString cehcks if this instance has a smaller major version number than given one
+func (this *Instance) IsSmallerMajorVersionByString(otherVersion string) bool {
+	other := &Instance{Version: otherVersion}
+	return this.IsSmallerMajorVersion(other)
+}
+
 // IsMariaDB checkes whether this is any version of MariaDB
 func (this *Instance) IsMariaDB() bool {
 	return strings.Contains(this.Version, "MariaDB")
 }
 
-// IsMariaDB checkes whether this is any version of MaScale
-func (this *Instance) IsMaxScale() bool {
+// isMaxScale checkes whether this is any version of MaxScale
+func (this *Instance) isMaxScale() bool {
 	return strings.Contains(this.Version, "maxscale")
+}
+
+// IsMaxScale checkes whether this is any type of a binlog server (currently only maxscale)
+func (this *Instance) IsBinlogServer() bool {
+	if this.isMaxScale() {
+		return true
+	}
+	return false
+}
+
+// IsOracleMySQL checkes whether this is an Oracle MySQL distribution
+func (this *Instance) IsOracleMySQL() bool {
+	if this.IsMariaDB() {
+		return false
+	}
+	if this.isMaxScale() {
+		return false
+	}
+	if this.IsBinlogServer() {
+		return false
+	}
+	return true
 }
 
 // IsSlave makes simple heuristics to decide whether this insatnce is a slave of another instance
@@ -373,7 +434,7 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	if !other.LogSlaveUpdatesEnabled {
 		return false, fmt.Errorf("instance does not have log_slave_updates enabled: %+v", other.Key)
 	}
-	if this.IsSmallerMajorVersion(other) && !this.IsMaxScale() {
+	if this.IsSmallerMajorVersion(other) && !this.IsBinlogServer() {
 		return false, fmt.Errorf("instance %+v has version %s, which is lower than %s on %+v ", this.Key, this.Version, other.Version, other.Key)
 	}
 	if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
@@ -389,7 +450,7 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 			return false, fmt.Errorf("%+v has replication filters", other.Key)
 		}
 	}
-	if this.ServerID == other.ServerID && !this.IsMaxScale() {
+	if this.ServerID == other.ServerID && !this.IsBinlogServer() {
 		return false, fmt.Errorf("Identical server id: %+v, %+v both have %d", other.Key, this.Key, this.ServerID)
 	}
 	return true, nil

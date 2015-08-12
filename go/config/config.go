@@ -17,9 +17,10 @@
 package config
 
 import (
-	"code.google.com/p/gcfg"
 	"encoding/json"
 	"os"
+
+	"code.google.com/p/gcfg"
 
 	"github.com/outbrain/golib/log"
 )
@@ -30,6 +31,7 @@ import (
 type Configuration struct {
 	Debug                                      bool // set debug mode (similar to --debug option)
 	ListenAddress                              string
+	AgentsServerPort                           string // port orchestrator agents talk back to
 	MySQLTopologyUser                          string
 	MySQLTopologyPassword                      string // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
 	MySQLTopologyCredentialsConfigFile         string
@@ -55,6 +57,7 @@ type Configuration struct {
 	ActiveNodeExpireSeconds                    uint   // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
 	HostnameResolveMethod                      string // Method by which to "normalize" hostname ("none"/"default"/"cname")
 	MySQLHostnameResolveMethod                 string // Method by which to "normalize" hostname via MySQL server. ("none"/"@@hostname"/"@@report_host"; default "@@hostname")
+	SkipBinlogServerUnresolveCheck             bool   // Skip the double-check that an unresolved hostname resolves back to same hostname for binlog servers
 	ExpiryHostnameResolvesMinutes              int    // Number of minutes after which to expire hostname-resolves
 	RejectHostnameResolvePattern               string // Regexp pattern for resolved hostname that will not be accepted (not cached, not written to db). This is done to avoid storing wrong resolves due to network glitches.
 	ReasonableReplicationLagSeconds            int    // Above this value is considered a problem
@@ -66,6 +69,7 @@ type Configuration struct {
 	CandidateInstanceExpireMinutes             uint   // Minutes after which a suggestion to use an instance as a candidate slave (to be preferably promoted on master failover) is expired.
 	AuditLogFile                               string // Name of log file for audit operations. Disabled when empty.
 	AuditPageSize                              int
+	AuditPurgeDays                             uint   // Days after which audit entries are purged from the database
 	RemoveTextFromHostnameDisplay              string // Text to strip off the hostname on cluster/clusters pages
 	ReadOnly                                   bool
 	AuthenticationMethod                       string            // Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "multi" for advanced BasicAuth, "proxy" for forwarded credentials via reverse proxy
@@ -75,6 +79,7 @@ type Configuration struct {
 	PowerAuthUsers                             []string          // On AuthenticationMethod == "proxy", list of users that can make changes. All others are read-only.
 	ClusterNameToAlias                         map[string]string // map between regex matching cluster name to a human friendly alias
 	DetectClusterAliasQuery                    string            // Optional query (executed on topology instance) that returns the alias of a cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all slaves). If provided, must return one row, one column
+	DetectClusterDomainQuery                   string            // Optional query (executed on topology instance) that returns the VIP/CNAME/Alias/whatever domain name for the master of this cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all slaves). If provided, must return one row, one column
 	DataCenterPattern                          string            // Regexp pattern with one group, extracting the datacenter name from the hostname
 	PhysicalEnvironmentPattern                 string            // Regexp pattern with one group, extracting physical environment info from hostname (e.g. combination of datacenter & prod/dev env)
 	PromotionIgnoreHostnameFilters             []string          // Orchestrator will not promote slaves with hostname matching pattern (via -c recovery; for example, avoid promoting dev-dedicated machines)
@@ -113,6 +118,7 @@ func NewConfiguration() *Configuration {
 	return &Configuration{
 		Debug:                                      false,
 		ListenAddress:                              ":3000",
+		AgentsServerPort:                           ":3001",
 		MySQLOrchestratorPort:                      3306,
 		MySQLTopologyMaxPoolConnections:            3,
 		MySQLConnectTimeoutSeconds:                 5,
@@ -129,6 +135,7 @@ func NewConfiguration() *Configuration {
 		ActiveNodeExpireSeconds:                    60,
 		HostnameResolveMethod:                      "cname",
 		MySQLHostnameResolveMethod:                 "@@hostname",
+		SkipBinlogServerUnresolveCheck:             true,
 		ExpiryHostnameResolvesMinutes:              60,
 		RejectHostnameResolvePattern:               "",
 		ReasonableReplicationLagSeconds:            10,
@@ -140,6 +147,7 @@ func NewConfiguration() *Configuration {
 		CandidateInstanceExpireMinutes:             60,
 		AuditLogFile:                               "",
 		AuditPageSize:                              20,
+		AuditPurgeDays:                             365,
 		RemoveTextFromHostnameDisplay:              "",
 		ReadOnly:                                   false,
 		AuthenticationMethod:                       "basic",
@@ -149,6 +157,7 @@ func NewConfiguration() *Configuration {
 		PowerAuthUsers:                             []string{"*"},
 		ClusterNameToAlias:                         make(map[string]string),
 		DetectClusterAliasQuery:                    "",
+		DetectClusterDomainQuery:                   "",
 		DataCenterPattern:                          "",
 		PhysicalEnvironmentPattern:                 "",
 		PromotionIgnoreHostnameFilters:             []string{},
@@ -220,7 +229,7 @@ func read(file_name string) (*Configuration, error) {
 			if err != nil {
 				log.Fatalf("Failed to parse gcfg data from file: %+v", err)
 			} else {
-				log.Debugf("Parsed topology credentials from %s", Config.MySQLOrchestratorCredentialsConfigFile)
+				log.Debugf("Parsed topology credentials from %s", Config.MySQLTopologyCredentialsConfigFile)
 				Config.MySQLTopologyUser = mySQLConfig.Client.User
 				Config.MySQLTopologyPassword = mySQLConfig.Client.Password
 			}

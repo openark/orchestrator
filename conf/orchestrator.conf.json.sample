@@ -1,6 +1,7 @@
 {
   "Debug": true,
   "ListenAddress": ":3000",
+  "AgentsServerPort": ":3001",
   "MySQLTopologyUser": "msandbox",
   "MySQLTopologyPassword": "msandbox",
   "MySQLTopologyCredentialsConfigFile": "",
@@ -41,9 +42,9 @@
     "127.0.0.1": "test suite"
   },
   "DetectClusterAliasQuery": "select substring_index(@@hostname, '.', 1)",
-  "DataCenterPattern": "[.]([^.]+)[.][^.]+[.]booking[.]com",
-  "PhysicalEnvironmentPattern": "[.]([^.]+[.][^.]+)[.]booking[.]com",
-  "RemoveTextFromHostnameDisplay": ".booking.com:3306",
+  "DataCenterPattern": "[.]([^.]+)[.][^.]+[.]mydomain[.]com",
+  "PhysicalEnvironmentPattern": "[.]([^.]+[.][^.]+)[.]mydomain[.]com",
+  "RemoveTextFromHostnameDisplay": ".mydomain.com:3306",
   "ServeAgentsHttp": false,
   "AgentsUseSSL": false,
   "SSLSkipVerify": false,
@@ -65,10 +66,10 @@
   "RecoveryIgnoreHostnameFilters": [
   ],
   "RecoverMasterClusterFilters": [
-  	"kvmuser__"
+  	"_master_pattern_"
   ],
   "RecoverIntermediateMasterClusterFilters": [
-  	"kvmuser__"
+  	"_intermediate_master_pattern_"
   ],
   "OnFailureDetectionProcesses": [
   	"echo 'Detected {failureType} on {failureCluster}. Affected slaves: {countSlaves}' >> /tmp/recovery.log"

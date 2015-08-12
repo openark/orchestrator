@@ -1,4 +1,5 @@
-clusterOperationPseudoGTIDMode = ($.cookie("operation-pgtid-mode") == "true");
+var moveInstanceMethod = $.cookie("move-instance-method") || "smart";
+var droppableIsActive = false;
 
 var renderColors = ["#ff8c00", "#4682b4", "#9acd32", "#dc143c", "#9932cc", "#ffd700", "#191970", "#7fffd4", "#808080", "#dda0dd"];
 var dcColorsMap = {};
@@ -10,20 +11,16 @@ function getInstanceDiv(instanceId) {
 }
 
 function repositionIntanceDivs() {
-    $("[data-fo-id]").each(
-            function () {
-                var id = $(this).attr("data-fo-id");
-                var popoverDiv = getInstanceDiv(id);
+    $("[data-fo-id]").each(function () {
+        var id = $(this).attr("data-fo-id");
+        var popoverDiv = getInstanceDiv(id);
 
-                popoverDiv.attr("x", $(this).attr("x"));
-                $(this).attr("y",
-                    0 - popoverDiv.height() / 2 - 2);
-                popoverDiv.attr("y", $(this).attr("y"));
-                $(this).attr("width",
-                    popoverDiv.width() + 30);
-                $(this).attr("height",
-                    popoverDiv.height() +16);
-            });	
+        popoverDiv.attr("x", $(this).attr("x"));
+        $(this).attr("y", 0 - popoverDiv.height() / 2 - 2);
+        popoverDiv.attr("y", $(this).attr("y"));
+        $(this).attr("width", popoverDiv.width() + 30);
+        $(this).attr("height", popoverDiv.height() +16);
+    });	
     $("div.popover").popover();
     $("div.popover").show();
 }
@@ -35,8 +32,9 @@ function generateInstanceDivs(nodesMap) {
     } 
 
     $("[data-fo-id]").each(function () {
-        var isVirtual = $(this).attr("data-fo-is-virtual") == "true";
-        if (!isVirtual) {
+    	var isVirtual = $(this).attr("data-fo-is-virtual") == "true";
+    	var isAnchor = $(this).attr("data-fo-is-anchor") == "true";
+        if (!isVirtual && !isAnchor) {
 	        $(this).html(
 	        	'<div xmlns="http://www.w3.org/1999/xhtml" class="popover right instance"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"></div></div>'
 	        );
@@ -57,12 +55,13 @@ function generateInstanceDivs(nodesMap) {
     		return false;
     	}
     	$(".popover.instance[data-duplicate-node]").remove();
-    	var duplicate = $(this).clone().appendTo("#cluster_container");
+    	var originalNode = $(this);
+    	var duplicate = originalNode.clone().appendTo("#cluster_container");
     	$(duplicate).attr("data-duplicate-node", "true");
     	$(duplicate).css({"margin-left": "0"});
-    	$(duplicate).css($(this).offset());
-    	$(duplicate).width($(this).width());
-    	$(duplicate).height($(this).height());
+    	$(duplicate).css(originalNode.offset());
+    	$(duplicate).width(originalNode.width());
+    	$(duplicate).height(originalNode.height());
     	$(duplicate).find(".dropdown-toggle").dropdown();
     	$(duplicate).popover();
         $(duplicate).show();
@@ -72,6 +71,10 @@ function generateInstanceDivs(nodesMap) {
         });
         $(".popover.instance[data-duplicate-node] a[data-command=recover-auto]").click(function () {
         	apiCommand("/api/recover/"+nodesMap[draggedNodeId].Key.Hostname+"/"+nodesMap[draggedNodeId].Key.Port);
+        	return true;
+        });
+        $(".popover.instance[data-duplicate-node] a[data-command=recover-auto-lite]").click(function () {
+        	apiCommand("/api/recover-lite/"+nodesMap[draggedNodeId].Key.Hostname+"/"+nodesMap[draggedNodeId].Key.Port);
         	return true;
         });
         $(".popover.instance[data-duplicate-node] a[data-command=match-up-slaves]").click(function () {
@@ -119,33 +122,58 @@ function generateInstanceDivs(nodesMap) {
             	return false;
             });
         } else {
+        	function clearDroppable() {
+        		originalNode.removeClass("original-dragged");
+        		resetRefreshTimer();
+        		$("#cluster_container .accept_drop").removeClass("accept_drop");
+        		$("#cluster_container .accept_drop_warning").removeClass("accept_drop_warning");
+        		droppableIsActive = false;
+        	}
             $(duplicate).draggable({
             	addClasses: true, 
-            	opacity: 0.67,
+            	opacity: 1,
             	cancel: "#cluster_container .popover.instance h3 a",
+            	snap: "#cluster_container .popover.instance",
+            	snapMode: "inner",
+            	snapTolerance: 10,
             	start: function(event, ui) {
-            		resetRefreshTimer();
-            		$("#cluster_container .accept_drop").removeClass("accept_drop");
-             		$("#cluster_container .accept_drop_warning").removeClass("accept_drop_warning");
+            		clearDroppable();
+            		droppableIsActive = true;
+            		originalNode.addClass("original-dragged");
              		$("#cluster_container .popover.instance").droppable({
             			accept: function(draggable) {
+            				if (!droppableIsActive) {
+            					return false
+            				}
             				var draggedNode = nodesMap[draggedNodeId];
             				var targetNode = nodesMap[$(this).attr("data-nodeid")];
-            				var acceptDrop =  moveInstance(draggedNode, targetNode, false);
-            				if (acceptDrop == "ok") {
+            				var acceptDrop = moveInstance(draggedNode, targetNode, false);
+            				if (acceptDrop.accept == "ok") {
             					$(this).addClass("accept_drop");
             				}
-            				if (acceptDrop == "warning") {
+            				if (acceptDrop.accept == "warning") {
             					$(this).addClass("accept_drop_warning");
             				}
-            				return acceptDrop != null;
+           					$(this).attr("data-drop-comment", acceptDrop.accept ? acceptDrop.type : "");
+            				return acceptDrop.accept != null;
             			},
             			hoverClass: "draggable-hovers",
 					    over: function( event, ui ) {
+					    	if ($(this).attr("data-drop-comment")) {
+					    		$(duplicate).addClass("draggable-msg");
+					    		$(duplicate).find(".popover-content").html($(this).attr("data-drop-comment"))
+					    	} else {
+					    		$(duplicate).find(".popover-content").html("Cannot drop here")
+					    	}
+					    },
+					    out: function( event, ui ) {
+				    		$(duplicate).removeClass("draggable-msg");
+					    	$(duplicate).find(".popover-content").html("")
 					    },
 					    drop: function( event, ui ) {
 				            $(".popover.instance[data-duplicate-node]").remove();
 				            moveInstance(nodesMap[draggedNodeId], nodesMap[$(this).attr("data-nodeid")], true);
+				            clearDroppable();
 					    }
             		});
             	},
@@ -153,9 +181,7 @@ function generateInstanceDivs(nodesMap) {
 	        		resetRefreshTimer();
 	        	},
 	        	stop: function(event, ui) {
-	        		resetRefreshTimer();
-            		$("#cluster_container .accept_drop").removeClass("accept_drop");
-            		$("#cluster_container .accept_drop_warning").removeClass("accept_drop_warning");
+	        		clearDroppable();
 	        	}
             });
         	$(duplicate).on("mouseleave", function() {
@@ -165,8 +191,7 @@ function generateInstanceDivs(nodesMap) {
         	});
         	// Don't ask why the following... jqueryUI recognizes the click as start drag, but fails to stop...
         	$(duplicate).on("click", function() {
-            	$("#cluster_container .accept_drop").removeClass("accept_drop");
-            	$("#cluster_container .accept_drop").removeClass("accept_drop_warning");
+        		clearDroppable();
             	return false;
             });	
         }
@@ -176,109 +201,133 @@ function generateInstanceDivs(nodesMap) {
 function moveInstance(node, droppableNode, shouldApply) {
     if (!isAuthorizedForAction()) {
     	// Obviously this is also checked on server side, no need to try stupid hacks
-		return null;
+		return {accept: false} ;
     }
     var isUsingGTID = (node.usingGTID && droppableNode.usingGTID);
-    var gtidBelowFunc = null
-	if (clusterOperationPseudoGTIDMode) {
-		// definitely peudo-gtid match
-		gtidBelowFunc = matchBelow
-	} else if (isUsingGTID) {
-		//gtidBelowFunc = moveBelow
-	}
-	if (gtidBelowFunc != null) {
+	if (moveInstanceMethod == "smart") {
 		// Moving via GTID or Pseudo GTID
 		if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem || droppableNode.isAggregate) {
 			// Obviously can't handle.
-			return null;
+			return {accept: false};
 		}
 		if (!droppableNode.LogSlaveUpdatesEnabled) {
 			// Obviously can't handle.
-			return null;
+			return {accept: false};
 		}
 		
 		if (node.id == droppableNode.id) {
-			return null;
+			return {accept: false};
 		}
 		if (instanceIsDescendant(droppableNode, node)) {
 			// Wrong direction!
-			return null;
+			return {accept: false};
+		}
+		// the general case
+		if (shouldApply) {
+			relocateBelow(node, droppableNode);
+		}
+		return {accept: "warning", type: "relocateBelow " + droppableNode.canonicalTitle};
+	}
+	if (moveInstanceMethod == "pseudo-gtid") {
+		var gtidBelowFunc = matchBelow
+		//~~~TODO: when GTID is fully supported: gtidBelowFunc = moveBelow
+		// Moving via GTID or Pseudo GTID
+		if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem || droppableNode.isAggregate) {
+			// Obviously can't handle.
+			return {accept: false};
+		}
+		if (!droppableNode.LogSlaveUpdatesEnabled) {
+			// Obviously can't handle.
+			return {accept: false};
+		}
+		
+		if (node.id == droppableNode.id) {
+			return {accept: false};
+		}
+		if (instanceIsDescendant(droppableNode, node)) {
+			// Wrong direction!
+			return {accept: false};
 		}
 		if (instanceIsDescendant(node, droppableNode)) {
 			// clearly node cannot be more up to date than droppableNode
 			if (shouldApply) {
 				gtidBelowFunc(node, droppableNode);
 			}
-			return "ok";
+			return {accept: "ok", type: gtidBelowFunc.name + " " + droppableNode.canonicalTitle};
 		}
 		if (isReplicationBehindSibling(node, droppableNode)) {
 			// verified that node isn't more up to date than droppableNode
 			if (shouldApply) {
 				gtidBelowFunc(node, droppableNode);
 			}
-			return "ok";
+			return {accept: "ok", type: gtidBelowFunc.name + " " + droppableNode.canonicalTitle};
 		}
 		// TODO: the general case, where there's no clear family connection, meaning we cannot infer
 		// which instance is more up to date. It's under the user's responsibility!
 		if (shouldApply) {
 			gtidBelowFunc(node, droppableNode);
 		}
-		return "warning";
+		return {accept: "warning", type: gtidBelowFunc.name + " " + droppableNode.canonicalTitle};
 	}
-	// Not pseudo-GTID mode, non GTID mode
-	if (node.isCoMaster) {
-		// Cannot move. RESET SLAVE on one of the co-masters.
-		return null;
-	}
-	if (instancesAreSiblings(node, droppableNode)) {
-		if (node.hasProblem || droppableNode.hasProblem || droppableNode.isAggregate || !droppableNode.LogSlaveUpdatesEnabled) {
-			return null;
+	if (moveInstanceMethod == "classic") {
+		// Not pseudo-GTID mode, non GTID mode
+		if (node.id == droppableNode.id) {
+			return {accept: false};
 		}
-		if (shouldApply) {
-			moveBelow(node, droppableNode);
+		if (node.isCoMaster) {
+			// Cannot move. RESET SLAVE on one of the co-masters.
+			return {accept: false};
 		}
-		return "ok";
-	}
-	if (instanceIsGrandchild(node, droppableNode)) {
-		if (node.hasProblem) {
-			// Typically, when a node has a problem we do not allow moving it up.
-			// But there's a special situation when allowing is desired: when the parent has personal issues,
-			// (say disk issue or otherwise something heavyweight running which slows down replication)
-			// and you want to move up the slave which is only delayed by its master.
-			// So to help out, if the instance is identically at its master's trail, it is allowed to move up.
-			if (!node.isSQLThreadCaughtUpWithIOThread) { 
-				return null;
+		if (instancesAreSiblings(node, droppableNode)) {
+			if (node.hasProblem || droppableNode.hasProblem || droppableNode.isAggregate || !droppableNode.LogSlaveUpdatesEnabled) {
+				return {accept: false};
 			}
-		}
-		if (shouldApply) {
-			moveUp(node, droppableNode);
-		}
-		return "ok";
-	}
-	if (instanceIsChild(node, droppableNode) && !droppableNode.isMaster) {
-		if (node.hasProblem) {
-			// Typically, when a node has a problem we do not allow moving it up.
-			// But there's a special situation when allowing is desired: when
-			// this slave is completely caught up;
-			if (!node.isSQLThreadCaughtUpWithIOThread) { 
-				return null;
+			if (shouldApply) {
+				moveBelow(node, droppableNode);
 			}
+			return {accept: "ok", type: "moveBelow " + droppableNode.canonicalTitle};
 		}
-		if (shouldApply) {
-			enslaveMaster(node, droppableNode);
+		if (instanceIsGrandchild(node, droppableNode)) {
+			if (node.hasProblem) {
+				// Typically, when a node has a problem we do not allow moving it up.
+				// But there's a special situation when allowing is desired: when the parent has personal issues,
+				// (say disk issue or otherwise something heavyweight running which slows down replication)
+				// and you want to move up the slave which is only delayed by its master.
+				// So to help out, if the instance is identically at its master's trail, it is allowed to move up.
+				if (!node.isSQLThreadCaughtUpWithIOThread) { 
+					return {accept: false};
+				}
+			}
+			if (shouldApply) {
+				moveUp(node, droppableNode);
+			}
+			return {accept: "ok", type: "moveUp under " + droppableNode.canonicalTitle};
 		}
-		return "ok";
+		if (instanceIsChild(node, droppableNode) && !droppableNode.isMaster) {
+			if (node.hasProblem) {
+				// Typically, when a node has a problem we do not allow moving it up.
+				// But there's a special situation when allowing is desired: when
+				// this slave is completely caught up;
+				if (!node.isSQLThreadCaughtUpWithIOThread) { 
+					return {accept: false};
+				}
+			}
+			if (shouldApply) {
+				enslaveMaster(node, droppableNode);
+			}
+			return {accept: "ok", type: "enslaveMaster " + droppableNode.canonicalTitle};
+		}
+		if (instanceIsChild(droppableNode, node) && node.isMaster) {
+			if (node.hasProblem) {
+				return {accept: false};
+			}
+			if (shouldApply) {
+				makeCoMaster(node, droppableNode);
+			}
+			return {accept: "ok", type: "makeCoMaster with " + droppableNode.canonicalTitle};
+		}
+		return {accept: false};
 	}
-	if (instanceIsChild(droppableNode, node) && node.isMaster) {
-		if (node.hasProblem) {
-			return null;
-		}
-		if (shouldApply) {
-			makeCoMaster(node, droppableNode);
-		}
-		return "ok";
-	}
-	
 	if (shouldApply) {
 		addAlert(
 				"Cannot move <code><strong>" + 
@@ -289,7 +338,35 @@ function moveInstance(node, droppableNode, shouldApply) {
 				"You may only move a node down below its sibling or up below its grandparent."
 			);
 	}
-	return null;
+	return {accept: false};
+}
+
+function relocateBelow(node, siblingNode) {
+	var message = "<h4>relocate-below</h4>Are you sure you wish to turn <code><strong>" + 
+		node.Key.Hostname + ":" + node.Key.Port +
+		"</strong></code> into a slave of <code><strong>" +
+		siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
+		"</strong></code>?"+
+		"<h4>Note</h4><p>Orchestrator will try and figure out the best relocation path. This may involve multiple steps. " +
+		"<p>In case multiple steps are involved, failure of one would leave your instance hanging in a different location than you expected, " +
+		"but it would still be in a <i>valid</i> state.";
+	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
+		if (confirm) {
+			showLoader();
+			var apiUrl = "/api/relocate-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port;
+		    $.get(apiUrl, function (operationResult) {
+	    			hideLoader();
+	    			if (operationResult.Code == "ERROR") {
+	    				addAlert(operationResult.Message)
+	    			} else {
+	    				reloadWithOperationResult(operationResult);
+	    			}	
+	            }, "json");					
+		}
+		$("#cluster_container .accept_drop").removeClass("accept_drop");
+    	$("#cluster_container .accept_drop").removeClass("accept_drop_warning");
+	}); 
+	return false;
 }
 
 function moveBelow(node, siblingNode) {
@@ -298,7 +375,7 @@ function moveBelow(node, siblingNode) {
 		"</strong></code> into a slave of <code><strong>" +
 		siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
 		"</strong></code>?";
-	bootbox.confirm(message, function(confirm) {
+	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
 		if (confirm) {
 			showLoader();
 			var apiUrl = "/api/move-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port;
@@ -324,7 +401,7 @@ function moveUp(node, grandparentNode) {
 		"</strong></code> into a slave of <code><strong>" +
 		grandparentNode.Key.Hostname + ":" + grandparentNode.Key.Port +
 		"</strong></code>?"
-	bootbox.confirm(message, function(confirm) {
+	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
 		if (confirm) {
 			showLoader();
 			var apiUrl = "/api/move-up/" + node.Key.Hostname + "/" + node.Key.Port;
@@ -350,7 +427,7 @@ function enslaveMaster(node, masterNode) {
 		"</strong></code> master of <code><strong>" +
 		masterNode.Key.Hostname + ":" + masterNode.Key.Port +
 		"</strong></code>?"
-	bootbox.confirm(message, function(confirm) {
+	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
 		if (confirm) {
 			showLoader();
 			var apiUrl = "/api/enslave-master/" + node.Key.Hostname + "/" + node.Key.Port;
@@ -374,7 +451,7 @@ function makeCoMaster(node, childNode) {
 		"</strong></code> and <code><strong>" +
 		childNode.Key.Hostname + ":" + childNode.Key.Port +
 		"</strong></code> co-masters?"
-	bootbox.confirm(message, function(confirm) {
+	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
 		if (confirm) {
 			showLoader();
 			var apiUrl = "/api/make-co-master/" + childNode.Key.Hostname + "/" + childNode.Key.Port;
@@ -400,7 +477,7 @@ function matchBelow(node, otherNode) {
 		"</strong></code> into a slave of <code><strong>" +
 		otherNode.Key.Hostname + ":" + otherNode.Key.Port +
 		"</strong></code>?";
-	bootbox.confirm(message, function(confirm) {
+	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
 		if (confirm) {
 			showLoader();
 			var apiUrl = "/api/match-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
@@ -622,13 +699,14 @@ function postVisualizeInstances(nodesMap) {
 
 
 function refreshClusterOperationModeButton() {
-	if (clusterOperationPseudoGTIDMode) {
-		$("#cluster_operation_mode_button").html("Pseudo-GTID mode");
-		$("#cluster_operation_mode_button").removeClass("btn-success").addClass("btn-warning");
-	} else {
-		$("#cluster_operation_mode_button").html("Classic mode");
-		$("#cluster_operation_mode_button").removeClass("btn-warning").addClass("btn-success");
-	}
+	if (moveInstanceMethod == "smart") {
+		$("#move-instance-method-button").removeClass("btn-success").removeClass("btn-warning").addClass("btn-info");
+	} else if (moveInstanceMethod == "classic") {
+		$("#move-instance-method-button").removeClass("btn-info").removeClass("btn-warning").addClass("btn-success");
+	} else if (moveInstanceMethod == "pseudo-gtid") {
+		$("#move-instance-method-button").removeClass("btn-success").removeClass("btn-info").addClass("btn-warning");
+	} 
+	$("#move-instance-method-button").html(moveInstanceMethod + ' mode <span class="caret"></span>')
 }
 
 function makeMaster(instance) {
@@ -640,7 +718,7 @@ function makeMaster(instance) {
 	+ "if this instance will indeed become the master."
 	+ "<p>Pointing your application servers to the new master is on you."
 	;
-	bootbox.confirm(message, function(confirm) {
+	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
 		if (confirm) {
 	    	showLoader();
 	        $.get("/api/make-master/"+instance.Key.Hostname+"/"+instance.Key.Port, function (operationResult) {
@@ -661,7 +739,7 @@ function makeLocalMaster(instance) {
 	+ "via Pseudo-GTID."
 	+ "<p>The instance will replicate from its grandparent."
 	;
-	bootbox.confirm(message, function(confirm) {
+	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
 		if (confirm) {
 	    	showLoader();
 	        $.get("/api/make-local-master/"+instance.Key.Hostname+"/"+instance.Key.Port, function (operationResult) {
@@ -709,13 +787,27 @@ function showOSCSlaves() {
     }, "json");
 }
 
+
+function anonymizeInstanceId(instanceId) {
+	var tokens = instanceId.split("__");
+    return "instance-"+md5(tokens[1]).substring(0, 4)+":"+tokens[2];
+}
+
+function anonymizeIfNeedBe(message) {
+	if ($.cookie("anonymize") == "true") {
+    	message = message.replace(/<strong>.*?<\/strong>/g, "############");
+    }
+    return message;
+}
+
 function anonymize() {
     var _ = function() {
         var counter = 0;  
-        var port = 3306;
-        $("h3.popover-title .pull-left").each(function() {
-            jQuery(this).html("instance-"+(counter++)+":"+port)
-         });
+        $("[data-fo-id]").each(function() {
+        	var instanceId = $(this).attr("data-fo-id");
+        	$(this).find("h3.popover-title .pull-left").html(anonymizeInstanceId(instanceId));
+        	$(this).find("h3.popover-title").attr("title", anonymizeInstanceId(instanceId));
+        });
         $(".popover-content p").each(function() {
         	tokens = jQuery(this).html().split(" ", 2)
             jQuery(this).html(tokens[0].match(/[^.]+[.][^.]+/) + " " + tokens[1])
@@ -749,6 +841,10 @@ function populateSidebar(clusterInfo) {
 
 	{
 		var content = 'Alias: '+clusterInfo.ClusterAlias+'';
+		addSidebarInfoPopoverContent(content, false);
+	}
+	{
+		var content = 'Domain: '+clusterInfo.ClusterDomain+'';
 		addSidebarInfoPopoverContent(content, false);
 	}
 	{
@@ -786,6 +882,7 @@ function onAnalysisEntry(analysisEntry, instance) {
 	popoverElement.find(".popover-footer .dropdown").append('<ul class="dropdown-menu" aria-labelledby="recover_dropdown_'+instance.id+'"></ul>');
 	var recoveryListing = popoverElement.find(".dropdown ul");
     recoveryListing.append('<li><a href="#" data-btn="auto" data-command="recover-auto">Auto (implies running external hooks/processes)</a></li>');
+    recoveryListing.append('<li><a href="#" data-btn="auto-lite" data-command="recover-auto-lite">Auto (do not execute hooks/processes)</a></li>');
     recoveryListing.append('<li role="separator" class="divider"></li>');
     
     if (!instance.isMaster) {
@@ -924,8 +1021,11 @@ $(document).ready(function () {
     	var alias = clusterInfo.ClusterAlias
     	var visualAlias = (alias ? alias : currentClusterName())
     	document.title = document.title.split(" - ")[0] + " - " + visualAlias;
-    	$("#cluster_container").append('<div class="floating_background">'+visualAlias+'</div>');
-        $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="'+clusterInfo.ClusterAlias+'">Alias: '+alias+'</a></li>');
+    	
+    	if (!($.cookie("anonymize") == "true")) {
+        	$("#cluster_container").append('<div class="floating_background">'+visualAlias+'</div>');
+            $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="'+clusterInfo.ClusterAlias+'">Alias: '+alias+'</a></li>');
+        }
         $("#dropdown-context").append('<li><a href="/web/cluster-pools/'+currentClusterName()+'">Pools</a></li>');    
         if (isCompactDisplay()) {
             $("#dropdown-context").append('<li><a data-command="expand-display" href="'+location.href.split("?")[0]+'?compact=false">Expand display</a></li>');    
@@ -971,17 +1071,13 @@ $(document).ready(function () {
 		;
     	addSidebarInfoPopoverContent(content);
     }, "json");
-    
-    if (isPseudoGTIDModeEnabled()) {
-        $("ul.navbar-nav").append('<li><a class="cluster_operation_mode"><button type="button" class="btn btn-xs" id="cluster_operation_mode_button"></button></a></li>');
-        refreshClusterOperationModeButton();
-        
-	    $("body").on("click", "#cluster_operation_mode_button", function() {
-	    	clusterOperationPseudoGTIDMode = !clusterOperationPseudoGTIDMode;
-	    	$.cookie("operation-pgtid-mode", ""+clusterOperationPseudoGTIDMode, { path: '/', expires: 1 });
-	    	refreshClusterOperationModeButton(); 
-	    });
-    }
+
+    $("#li-move-instance-method").appendTo("ul.navbar-nav");
+    $("#move-instance-method a").click(function() {
+    	moveInstanceMethod = $(this).attr("data-method");
+    	refreshClusterOperationModeButton();
+    	$.cookie("move-instance-method", moveInstanceMethod, { path: '/', expires: 1 });
+    });
     $("#instance_problems_button").attr("title", "Cluster Problems");
     
     $("body").on("click", "a[data-command=change-cluster-alias]", function(event) {    	
@@ -1027,4 +1123,5 @@ $(document).ready(function () {
     	// Read-only users don't get auto-refresh. Sorry!
     	activateRefreshTimer();
     }
+    refreshClusterOperationModeButton();
 });

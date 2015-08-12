@@ -161,6 +161,7 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 
 	moreRowsExpected := true
 	skipRestOfBinlog := false
+	alreadyMatchedAscendingPseudoGTID := false
 	var nextPos int64 = 0
 
 	//	commandToken := math.TernaryString(binlogCoordinates.Type == BinaryLog, "binlog", "relaylog")
@@ -190,9 +191,15 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 			if binlogEntryInfo == entryText {
 				// found it!
 				binlogCoordinates.LogPos = m.GetInt64("Pos")
-			} else if entriesMonotonic {
+			} else if entriesMonotonic && !alreadyMatchedAscendingPseudoGTID {
 				// More heavyweight computation here. Need to verify whether the binlog entry we have is a pseudo-gtid entry
+				// We only want to check for ASCENDING once in the top of the binary log.
+				// If we find the first entry to be higher than the searched one, clearly we are done.
+				// If not, then by virtue of binary logs, we still have to full-scan the entrie binlog sequentially; we
+				// do not check again for ASCENDING (no point), so we save up CPU energy wasted in regexp.
 				if matched, _ := regexp.MatchString(config.Config.PseudoGTIDPattern, binlogEntryInfo); matched {
+					alreadyMatchedAscendingPseudoGTID = true
+					log.Debugf("Matched ascending Pseudo-GTID entry in %+v", binlog)
 					if binlogEntryInfo > entryText {
 						// Entries ascending, and current entry is larger than the one we are searching for.
 						// There is no need to scan further on. We can skip the entire binlog

@@ -4,53 +4,166 @@
 #
 # Requires fpm: https://github.com/jordansissel/fpm
 #
+set -e
 
-release_version="1.4.244"
-release_dir=/tmp/orchestrator-release
-release_files_dir=$release_dir/orchestrator
-release_files_cli_dir=$release_dir/orchestrator-cli
-rm -rf $release_dir/*
-mkdir -p $release_files_dir
-mkdir -p $release_files_dir/usr/local
-mkdir -p $release_files_dir/etc/init.d
-mkdir -p $release_files_cli_dir
-mkdir -p $release_files_cli_dir/usr/bin
+RELEASE_VERSION="1.4.297"
+TOPDIR=/tmp/orchestrator-release
+export RELEASE_VERSION TOPDIR
 
-if [[ ! -x "$( which fpm )" ]]; then
-  echo "Please install fpm and ensure it is in PATH"
-  exit 1
-fi
+usage() {
+  echo
+  echo "Usage: $0 [-t target ] [-a arch ] [-h] [-d]"
+  echo "Options:"
+  echo "-h Show this screen"
+  echo "-t (linux|darwin) Target OS. Default:(linux)"
+  echo "-a (amd64|386) Arch Default:(amd64)"
+  echo "-d debug output"
+  echo
+}
 
-if [[ ! -x "$( which rpmbuild )" ]]; then
-  echo "rpmbuild not in PATH, rpm will not be built"
-fi
+function precheck() {
+  local ok=0 # return err. so shell exit code
 
-cd  $(dirname $0)
-for f in $(find . -name "*.go"); do go fmt $f; done
+  if [[ ! -x "$( which fpm )" ]]; then
+    echo "Please install fpm and ensure it is in PATH"
+    ok=1
+  fi
 
-rsync -av ./resources $release_files_dir/usr/local/orchestrator/
-rsync -av ./conf $release_files_dir/usr/local/orchestrator/
-cp etc/init.d/orchestrator.bash $release_files_dir/etc/init.d/orchestrator
-chmod +x $release_files_dir/etc/init.d/orchestrator
+  if [[ ! -x "$( which rpmbuild )" ]]; then
+    echo "rpmbuild not in PATH, rpm will not be built"
+  fi
 
-go build -o $release_files_dir/usr/local/orchestrator/orchestrator go/cmd/orchestrator/main.go
+  if [[ -z "$GOROOT" || -z "$GOPATH" ]]; then
+    echo "GOROOT or GOPATH not set"
+    ok=1
+  fi
 
-if [[ $? -ne 0 ]] ; then
-	exit 1
-fi
+  if [[ ! -x "$GOROOT/bin/go" ]]; then
+    echo "go binary not found at $GOROOT/bin/go"
+    ok=1
+  fi
 
-cd $release_dir
-# tar packaging
-tar cfz orchestrator-"${release_version}".tar.gz ./orchestrator
-# rpm packaging -- full package
-fpm -v "${release_version}" -f -s dir -t rpm -n orchestrator -C $release_dir/orchestrator --prefix=/ .
-fpm -v "${release_version}" -f -s dir -t deb -n orchestrator -C $release_dir/orchestrator --prefix=/ .
+  return $ok
+}
 
-cp $release_files_dir/usr/local/orchestrator/orchestrator $release_files_cli_dir/usr/bin
-cd $release_dir
-# rpm packaging -- executable only
-fpm -v "${release_version}" -f -s dir -t rpm -n orchestrator-cli -C $release_dir/orchestrator-cli --prefix=/ .
-fpm -v "${release_version}" -f -s dir -t deb -n orchestrator-cli -C $release_dir/orchestrator-cli --prefix=/ .
+function setuptree() {
+  local b
 
-echo "---"
-echo "Done. Find releases in $release_dir"
+  mkdir -p $TOPDIR
+rm -rf $TOPDIR/*
+  b=$( mktemp -d $TOPDIR/orchestratorXXXXXX ) || return 1
+  mkdir -p $b/orchestrator
+  mkdir -p $b/orchestrator/usr/local/orchestrator/
+  mkdir -p $b/orchestrator/etc/init.d
+  mkdir -p $b/orchestrator-cli/usr/bin
+  echo $b
+}
+
+function oinstall() {
+  local builddir
+  builddir="$1"
+
+  cd  $(dirname $0)
+ gofmt -s -w  go/
+  rsync -qa ./resources $builddir/orchestrator/usr/local/orchestrator/
+  rsync -qa ./conf/*.sample $builddir/orchestrator/usr/local/orchestrator/
+  cp etc/init.d/orchestrator.bash $builddir/orchestrator/etc/init.d/orchestrator
+  chmod +x $builddir/orchestrator/etc/init.d/orchestrator
+}
+
+function package() {
+  local target builddir packages
+  target="$1"
+  builddir="$2"
+
+  cd $TOPDIR
+
+  case $target in
+    'linux')
+      echo "Creating Linux Tar package"
+      tar -C $builddir/orchestrator -czf $TOPDIR/orchestrator-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
+
+      echo "Creating Distro full packages"
+      fpm -v "${RELEASE_VERSION}" --epoch 1 -f -s dir -t rpm -n orchestrator -C $builddir/orchestrator --prefix=/ .
+      fpm -v "${RELEASE_VERSION}" --epoch 1 -f -s dir -t deb -n orchestrator -C $builddir/orchestrator --prefix=/ .
+
+      cd $TOPDIR
+      # rpm packaging -- executable only
+      echo "Creating Distro cli packages"
+      cp $builddir/orchestrator/usr/local/orchestrator/orchestrator $builddir/orchestrator-cli/usr/bin
+      fpm -v "${RELEASE_VERSION}" --epoch 1  -f -s dir -t rpm -n orchestrator-cli -C $builddir/orchestrator-cli --prefix=/ .
+      fpm -v "${RELEASE_VERSION}" --epoch 1  -f -s dir -t deb -n orchestrator-cli -C $builddir/orchestrator-cli --prefix=/ .
+      ;;
+    'darwin')
+      echo "Creating Darwin full Package"
+      tar -C $builddir/orchestrator -czf $TOPDIR/orchestrator-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
+      echo "Creating Darwin cli Package"
+      cp $builddir/orchestrator/usr/local/orchestrator/orchestrator $builddir/orchestrator-cli/usr/bin
+      tar -C $builddir/orchestrator-cli -czf $TOPDIR/orchestrator-cli-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
+      ;;
+  esac
+
+  echo "---"
+  echo "Done. Find releases in $TOPDIR"
+}
+
+function build() {
+  local target arch builddir gobuild
+
+  os="$1"
+  arch="$2"
+  builddir="$3"
+  gobuild="go build -o $builddir/orchestrator/usr/local/orchestrator/orchestrator go/cmd/orchestrator/main.go"
+
+  case $os in
+    'linux')
+      GOOS=$os GOARCH=$arch $gobuild
+    ;;
+    'darwin')
+      GOOS=darwin GOARCH=amd64 $gobuild
+    ;;
+  esac
+}
+
+function main() {
+  local target arch builddir
+  target="$1"
+  arch="$2"
+
+  precheck
+  builddir=$( setuptree )
+  oinstall $builddir
+  build $target $arch $builddir
+  package $target $builddir
+  # cleanup
+}
+
+while getopts a:t:dh flag; do
+  case $flag in
+  a)
+    arch=$OPTARG
+    ;;
+  t)
+    target=$OPTARG
+    ;;
+  h)
+    usage
+    exit 0
+    ;;
+  d)
+    debug=1
+    ;;
+  ?)
+    usage
+    exit 2
+    ;;
+  esac
+done
+
+shift $(( OPTIND - 1 ));
+target=${target:-"linux"} # default for target is linux
+arch=${arch:-"amd64"} # default for arch is amd64
+
+[[ $debug -eq 1 ]] && set -x
+main $target $arch
+

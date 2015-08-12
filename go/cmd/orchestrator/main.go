@@ -41,8 +41,9 @@ Cheatsheet:
 	Default port is 3306 (or DefaultInstancePort in config)
 	For some commands this argument can be ommitted altogether, and the
 	value is implicitly the local hostname.
--s (Sibling/Subinstance/deStination)
-	associated instance. Meaning depends on specific command.
+-d (Destination) 
+	destination instance (used when moving replicas around or when failing over)
+-s (Sibling/Subinstance/deStination) - synonym to "-d"
 	
 -c (command):
 	Listed below are all available commands; all of which apply for CLI execution (ignored by HTTP mode).
@@ -557,6 +558,7 @@ func main() {
 	strict := flag.Bool("strict", false, "strict mode (more checks, slower)")
 	instance := flag.String("i", "", "instance, host:port")
 	sibling := flag.String("s", "", "sibling instance, host:port")
+	destination := flag.String("d", "", "destination instance, host:port (synonym to -s)")
 	owner := flag.String("owner", "", "operation owner")
 	reason := flag.String("reason", "", "operation reason")
 	duration := flag.String("duration", "", "maintenance duration (format: 59s, 59m, 23h, 6d, 4w)")
@@ -570,7 +572,12 @@ func main() {
 	stack := flag.Bool("stack", false, "add stack trace upon error")
 	config.RuntimeCLIFlags.SkipUnresolveCheck = flag.Bool("skip-unresolve-check", false, "Skip/ignore checking an unresolve mapping (via hostname_unresolve table) resolves back to same hostname")
 	config.RuntimeCLIFlags.Noop = flag.Bool("noop", false, "Dry run; do not perform destructing operations")
+	config.RuntimeCLIFlags.BinlogFile = flag.String("binlog", "", "Binary log file name")
 	flag.Parse()
+
+	if *destination == "" {
+		*destination = *sibling
+	}
 
 	log.SetLevel(log.ERROR)
 	if *verbose {
@@ -604,7 +611,7 @@ func main() {
 
 	switch {
 	case len(flag.Args()) == 0 || flag.Arg(0) == "cli":
-		app.Cli(*command, *strict, *instance, *sibling, *owner, *reason, *duration, *pattern, *clusterAlias, *pool, *hostnameFlag)
+		app.Cli(*command, *strict, *instance, *destination, *owner, *reason, *duration, *pattern, *clusterAlias, *pool, *hostnameFlag)
 	case flag.Arg(0) == "http":
 		app.Http(*discovery)
 	default:

@@ -103,7 +103,7 @@ func (this *HttpWeb) ClusterPools(params martini.Params, r render.Render, req *h
 		"title":                         "cluster pools",
 		"activePage":                    "cluster_pools",
 		"clusterName":                   params["clusterName"],
-		"autoshow_problems":             true,
+		"autoshow_problems":             false, // because pool screen by default expands all hosts
 		"contextMenuVisible":            true,
 		"pseudoGTIDModeEnabled":         (config.Config.PseudoGTIDPattern != ""),
 		"authorizedForAction":           isAuthorizedForAction(req, user),

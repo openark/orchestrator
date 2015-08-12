@@ -161,6 +161,8 @@ func ContinuousDiscovery() {
 					inst.ExpireDowntime()
 					inst.ExpireCandidateInstances()
 					inst.ExpireHostnameUnresolve()
+					inst.ExpireClusterDomainName()
+					inst.ExpireAudit()
 				}
 				if !elected {
 					// Take this opportunity to refresh yourself
@@ -174,7 +176,7 @@ func ContinuousDiscovery() {
 				if elected {
 					ClearActiveFailureDetections()
 					ClearActiveRecoveries()
-					CheckAndRecover(nil, nil, false)
+					CheckAndRecover(nil, nil, false, false)
 				}
 			}()
 		case <-snapshotTopologiesTick:
@@ -211,7 +213,7 @@ func ContinuousAgentsPoll() {
 
 	tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
 	forgetUnseenTick := time.Tick(time.Hour)
-	for _ = range tick {
+	for range tick {
 		agentsHosts, _ := agent.ReadOutdatedAgentsHosts()
 		log.Debugf("outdated agents hosts: %+v", agentsHosts)
 		for _, hostname := range agentsHosts {

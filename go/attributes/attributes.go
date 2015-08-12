@@ -16,8 +16,6 @@
 
 package attributes
 
-import ()
-
 // HostAttributes presnts attributes submitted by a host
 type HostAttributes struct {
 	Hostname        string

@@ -117,6 +117,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	foundByShowSlaveHosts := false
 	longRunningProcesses := []Process{}
 	resolvedHostname := ""
+	maxScaleMasterHostname := ""
 	isMaxScale := false
 	slaveStatusFound := false
 	var resolveErr error
@@ -124,6 +125,10 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	// Before we even begin anything, declare that we're about to cehck this instance.If anything goes wrong network-wise,
 	// this is our source of truth in terms of instance being inaccessible
 	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
+
+	if !instanceKey.IsValid() {
+		return instance, fmt.Errorf("ReadTopologyInstance will not act on invalid instance key: %+v", *instanceKey)
+	}
 
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 
@@ -152,11 +157,24 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			return nil
 		})
 		if err != nil {
-			// The query should not error (even if it's not maxscale)
-			goto Cleanup
+			log.Errore(err)
+			// We do not "goto Cleanup" here, although it should be the correct flow.
+			// Reason is 5.7's new security feature that requires GRANTs on performance_schema.session_variables.
+			// There is a wrong decision making in this design and the migration path to 5.7 will be difficult.
+			// I don't want orchestrator to put even more burden on this.
+			// If the statement errors, then we are unable to determine that this is maxscale, hence assume it is not.
+			// In which case there would be other queries sent to the server that are not affected by 5.7 behavior, and that will fail.
 		}
 	}
 
+	if isMaxScale && strings.Contains(instance.Version, "1.1.0") {
+		// Buggy buggy maxscale 1.1.0. Reported Master_Host can be corrupted.
+		// Therefore we (currently) take @@hostname (which is masquarading as master host anyhow)
+		err = db.QueryRow("select @@hostname").Scan(&maxScaleMasterHostname)
+		if err != nil {
+			goto Cleanup
+		}
+	}
 	if !isMaxScale {
 		var mysqlHostname, mysqlReportHost string
 		err = db.QueryRow("select @@global.hostname, ifnull(@@global.report_host, ''), @@global.server_id, @@global.version, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
@@ -179,12 +197,22 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			resolvedHostname = instance.Key.Hostname
 		}
 
-		err = db.QueryRow("select variable_value from information_schema.global_status where variable_name='Uptime'").Scan(&instance.Uptime)
+		var placeholder string
+		// show global status works just as well with 5.6 & 5.7 (5.7 moves variables to performance_schema)
+		err = db.QueryRow("show global status like 'Uptime'").Scan(&placeholder, &instance.Uptime)
 		if err != nil {
-			goto Cleanup
+			log.Errore(err)
+			// We do not "goto Cleanup" here, although it should be the correct flow.
+			// Reason is 5.7's new security feature that requires GRANTs on performance_schema.global_variables.
+			// There is a wrong decisionmaking in this design and the migration path to 5.7 will be difficult.
+			// I don't want orchestrator to put even more burden on this. The 'Uptime' variable is not that important
+			// so as to completely fail reading a 5.7 instance.
 		}
-		// @@gtid_mode only available in Orcale MySQL >= 5.6
-		_ = db.QueryRow("select @@global.gtid_mode = 'ON'").Scan(&instance.SupportsOracleGTID)
+		if instance.IsOracleMySQL() && !instance.IsSmallerMajorVersionByString("5.6") {
+			// @@gtid_mode only available in Orcale MySQL >= 5.6
+			// Previous version just issued this query brute-force, but I don't like errors being issued where they shouldn't.
+			_ = db.QueryRow("select @@global.gtid_mode = 'ON'").Scan(&instance.SupportsOracleGTID)
+		}
 	}
 	if resolvedHostname != instance.Key.Hostname {
 		UpdateResolvedHostname(instance.Key.Hostname, resolvedHostname)
@@ -209,6 +237,10 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 
 	err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
 		instance.Slave_IO_Running = (m.GetString("Slave_IO_Running") == "Yes")
+		if isMaxScale && strings.Contains(instance.Version, "1.1.0") {
+			// Covering buggy MaxScale 1.1.0
+			instance.Slave_IO_Running = instance.Slave_IO_Running && (m.GetString("Slave_IO_State") == "Binlog Dump")
+		}
 		instance.Slave_SQL_Running = (m.GetString("Slave_SQL_Running") == "Yes")
 		instance.ReadBinlogCoordinates.LogFile = m.GetString("Master_Log_File")
 		instance.ReadBinlogCoordinates.LogPos = m.GetInt64("Read_Master_Log_Pos")
@@ -224,7 +256,13 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		instance.UsingMariaDBGTID = (m.GetStringD("Using_Gtid", "No") != "No")
 		instance.HasReplicationFilters = ((m.GetStringD("Replicate_Do_DB", "") != "") || (m.GetStringD("Replicate_Ignore_DB", "") != "") || (m.GetStringD("Replicate_Do_Table", "") != "") || (m.GetStringD("Replicate_Ignore_Table", "") != "") || (m.GetStringD("Replicate_Wild_Do_Table", "") != "") || (m.GetStringD("Replicate_Wild_Ignore_Table", "") != ""))
 
-		masterKey, err := NewInstanceKeyFromStrings(m.GetString("Master_Host"), m.GetString("Master_Port"))
+		masterHostname := m.GetString("Master_Host")
+		if isMaxScale && strings.Contains(instance.Version, "1.1.0") {
+			// Buggy buggy maxscale 1.1.0. Reported Master_Host can be corrupted.
+			// Therefore we (currently) take @@hostname (which is masquarading as master host anyhow)
+			masterHostname = maxScaleMasterHostname
+		}
+		masterKey, err := NewInstanceKeyFromStrings(masterHostname, m.GetString("Master_Port"))
 		if err != nil {
 			log.Errore(err)
 		}
@@ -392,6 +430,21 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		}
 		if clusterAlias != "" {
 			err := SetClusterAlias(instance.ClusterName, clusterAlias)
+			if err != nil {
+				log.Errore(err)
+			}
+		}
+	}
+	if instance.ReplicationDepth == 0 && config.Config.DetectClusterDomainQuery != "" && !isMaxScale {
+		// Only need to do on masters
+		domainName := ""
+		err := db.QueryRow(config.Config.DetectClusterDomainQuery).Scan(&domainName)
+		if err != nil {
+			domainName = ""
+			log.Errore(err)
+		}
+		if domainName != "" {
+			WriteClusterDomainName(instance.ClusterName, domainName)
 			if err != nil {
 				log.Errore(err)
 			}
@@ -594,6 +647,36 @@ func ReadSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
 	return readInstancesByCondition(condition, "")
 }
 
+// ReadSlaveInstancesIncludingBinlogServerSubSlaves returns a list of direct slves including any slaves
+// of a binlog server replica
+func ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey *InstanceKey) ([](*Instance), error) {
+	slaves, err := ReadSlaveInstances(masterKey)
+	if err != nil {
+		return slaves, err
+	}
+	for _, slave := range slaves {
+		slave := slave
+		if slave.IsBinlogServer() {
+			binlogServerSlaves, err := ReadSlaveInstancesIncludingBinlogServerSubSlaves(&slave.Key)
+			if err != nil {
+				return slaves, err
+			}
+			slaves = append(slaves, binlogServerSlaves...)
+		}
+	}
+	return slaves, err
+}
+
+// ReadBinlogServerSlaveInstances reads direct slaves of a given master that are binlog servers
+func ReadBinlogServerSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
+	condition := fmt.Sprintf(`
+			master_host = '%s'
+			and master_port = %d
+			and binlog_server = 1
+		`, masterKey.Hostname, masterKey.Port)
+	return readInstancesByCondition(condition, "")
+}
+
 // ReadUnseenInstances reads all instances which were not recently seen
 func ReadUnseenInstances() ([](*Instance), error) {
 	condition := fmt.Sprintf(`
@@ -603,15 +686,18 @@ func ReadUnseenInstances() ([](*Instance), error) {
 }
 
 // ReadProblemInstances reads all instances with problems
-func ReadProblemInstances() ([](*Instance), error) {
+func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 	condition := fmt.Sprintf(`
-			(last_seen < last_checked)
-			or (not ifnull(timestampdiff(second, last_checked, now()) <= %d, false))
-			or (not slave_sql_running)
-			or (not slave_io_running)
-			or (abs(cast(seconds_behind_master as signed) - cast(sql_delay as signed)) > %d)
-			or (abs(cast(slave_lag_seconds as signed) - cast(sql_delay as signed)) > %d)
-		`, config.Config.InstancePollSeconds, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
+			cluster_name LIKE IF('%s' = '', '%%', '%s')
+			and (
+				(last_seen < last_checked)
+				or (not ifnull(timestampdiff(second, last_checked, now()) <= %d, false))
+				or (not slave_sql_running)
+				or (not slave_io_running)
+				or (abs(cast(seconds_behind_master as signed) - cast(sql_delay as signed)) > %d)
+				or (abs(cast(slave_lag_seconds as signed) - cast(sql_delay as signed)) > %d)
+			)
+		`, clusterName, clusterName, config.Config.InstancePollSeconds, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
 	return readInstancesByCondition(condition, "")
 }
 
@@ -647,7 +733,7 @@ func filterOSCInstances(instances [](*Instance)) [](*Instance) {
 				skipThisHost = true
 			}
 		}
-		if instance.IsMaxScale() {
+		if instance.IsBinlogServer() {
 			skipThisHost = true
 		}
 
@@ -1080,6 +1166,7 @@ func ReadClusterInfo(clusterName string) (*ClusterInfo, error) {
 		clusterInfo.ClusterName = m.GetString("cluster_name")
 		clusterInfo.CountInstances = m.GetUint("count_instances")
 		ApplyClusterAlias(clusterInfo)
+		ApplyClusterDomain(clusterInfo)
 		clusterInfo.ReadRecoveryInfo()
 		return nil
 	})
@@ -1115,6 +1202,7 @@ func ReadClustersInfo() ([]ClusterInfo, error) {
 			CountInstances: m.GetUint("count_instances"),
 		}
 		ApplyClusterAlias(&clusterInfo)
+		ApplyClusterDomain(&clusterInfo)
 		clusterInfo.ReadRecoveryInfo()
 
 		clusters = append(clusters, clusterInfo)
@@ -1189,6 +1277,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 	        		uptime=VALUES(uptime),
 	        		server_id=VALUES(server_id),
 					version=VALUES(version),
+					binlog_server=VALUES(binlog_server),
 					read_only=VALUES(read_only),
 					binlog_format=VALUES(binlog_format),
 					log_bin=VALUES(log_bin),
@@ -1237,6 +1326,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
         		uptime,
         		server_id,
 				version,
+				binlog_server,
 				read_only,
 				binlog_format,
 				log_bin,
@@ -1269,7 +1359,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				physical_environment,
 				replication_depth,
 				is_co_master
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
@@ -1279,6 +1369,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			instance.Uptime,
 			instance.ServerID,
 			instance.Version,
+			instance.IsBinlogServer(),
 			instance.ReadOnly,
 			instance.Binlog_format,
 			instance.LogBinEnabled,
@@ -1469,7 +1560,7 @@ func RefreshTopologyInstances(instances [](*Instance)) {
 			})
 		}()
 	}
-	for _ = range instances {
+	for range instances {
 		<-barrier
 	}
 }
@@ -1486,17 +1577,33 @@ func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
 }
 
 // FlushBinaryLogs attempts a 'FLUSH BINARY LOGS' statement on the given instance.
-func FlushBinaryLogs(instanceKey *InstanceKey) error {
-
-	_, err := ExecInstance(instanceKey, `flush binary logs`)
-	if err != nil {
-		return log.Errore(err)
+func FlushBinaryLogs(instanceKey *InstanceKey, count int) error {
+	for i := 0; i < count; i++ {
+		_, err := ExecInstance(instanceKey, `flush binary logs`)
+		if err != nil {
+			return log.Errore(err)
+		}
 	}
 
-	log.Infof("flush-binary-logs on %+v", *instanceKey)
+	log.Infof("flush-binary-logs count=%+v on %+v", count, *instanceKey)
 	AuditOperation("flush-binary-logs", instanceKey, "success")
 
 	return nil
+}
+
+// FlushBinaryLogsTo attempts to 'FLUSH BINARY LOGS' until given binary log is reached
+func FlushBinaryLogsTo(instanceKey *InstanceKey, logFile string) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	distance := instance.SelfBinlogCoordinates.FileNumberDistance(&BinlogCoordinates{LogFile: logFile})
+	if distance < 0 {
+		return nil, log.Errorf("FlushBinaryLogsTo: target log file %+v is smaller than current log file %+v", logFile, instance.SelfBinlogCoordinates.LogFile)
+	}
+	err = FlushBinaryLogs(instanceKey, distance)
+	return instance, err
 }
 
 // StopSlaveNicely stops a slave such that SQL_thread and IO_thread are aligned (i.e.
@@ -1566,7 +1673,7 @@ func StopSlavesNicely(slaves [](*Instance), timeout time.Duration) [](*Instance)
 			})
 		}()
 	}
-	for _ = range slaves {
+	for range slaves {
 		refreshedSlaves = append(refreshedSlaves, <-barrier)
 	}
 	return refreshedSlaves
@@ -1630,7 +1737,7 @@ func StartSlaves(slaves [](*Instance)) {
 			ExecuteOnTopology(func() { StartSlave(&instance.Key) })
 		}()
 	}
-	for _ = range slaves {
+	for range slaves {
 		<-barrier
 	}
 }

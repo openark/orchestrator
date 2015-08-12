@@ -104,7 +104,7 @@ func (this *HttpAPI) Discover(params martini.Params, r render.Render, req *http.
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance discovered: %+v", instance.Key)})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance discovered: %+v", instance.Key), Details: instance})
 }
 
 // Refresh synchronuously re-reads a topology instance
@@ -475,6 +475,33 @@ func (this *HttpAPI) EnslaveMaster(params martini.Params, r render.Render, req *
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("%+v enslaved its master", instanceKey), Details: instance})
 }
 
+// RelocateBelow attempts to move an instance below another, orchestrator choosing the best (potentially multi-step)
+// relocation method
+func (this *HttpAPI) RelocateBelow(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	belowKey, err := this.getInstanceKey(params["belowHost"], params["belowPort"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	instance, err := inst.RelocateBelow(&instanceKey, &belowKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v relocated below %+v", instanceKey, belowKey), Details: instance})
+}
+
 // LastPseudoGTID attempts to find the last pseugo-gtid entry in an instance
 func (this *HttpAPI) LastPseudoGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -617,7 +644,7 @@ func (this *HttpAPI) RegroupSlaves(params martini.Params, r render.Render, req *
 		return
 	}
 
-	lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlaves(&instanceKey, nil)
+	lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlaves(&instanceKey, false, nil)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
@@ -930,7 +957,8 @@ func (this *HttpAPI) Search(params martini.Params, r render.Render, req *http.Re
 
 // Problems provides list of instances with known problems
 func (this *HttpAPI) Problems(params martini.Params, r render.Render, req *http.Request) {
-	instances, err := inst.ReadProblemInstances()
+	clusterName := params["clusterName"]
+	instances, err := inst.ReadProblemInstances(clusterName)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -1444,6 +1472,12 @@ func (this *HttpAPI) ReplicationAnalysis(params martini.Params, r render.Render,
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Analysis"), Details: analysis})
 }
 
+// RecoverLite attempts recovery on a given instance, without executing external processes
+func (this *HttpAPI) RecoverLite(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	params["skipProcesses"] = "true"
+	this.Recover(params, r, req, user)
+}
+
 // Recover attempts recovery on a given instance
 func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -1460,7 +1494,8 @@ func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.R
 		candidateKey = &key
 	}
 
-	actionTaken, _, err := logic.CheckAndRecover(&instanceKey, candidateKey, true)
+	skipProcesses := (req.URL.Query().Get("skipProcesses") == "true") || (params["skipProcesses"] == "true")
+	actionTaken, _, err := logic.CheckAndRecover(&instanceKey, candidateKey, true, skipProcesses)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -1572,6 +1607,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow)
 	m.Get("/api/enslave-siblings/:host/:port", this.EnslaveSiblings)
 	m.Get("/api/enslave-master/:host/:port", this.EnslaveMaster)
+	m.Get("/api/relocate-below/:host/:port/:belowHost/:belowPort", this.RelocateBelow)
 	m.Get("/api/last-pseudo-gtid/:host/:port", this.LastPseudoGTID)
 	m.Get("/api/match-below/:host/:port/:belowHost/:belowPort", this.MatchBelow)
 	m.Get("/api/match-up/:host/:port", this.MatchUp)
@@ -1603,6 +1639,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/search/:searchString", this.Search)
 	m.Get("/api/search", this.Search)
 	m.Get("/api/problems", this.Problems)
+	m.Get("/api/problems/:clusterName", this.Problems)
 	m.Get("/api/long-queries", this.LongQueries)
 	m.Get("/api/long-queries/:filter", this.LongQueries)
 	m.Get("/api/audit", this.Audit)
@@ -1623,6 +1660,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/replication-analysis", this.ReplicationAnalysis)
 	m.Get("/api/recover/:host/:port", this.Recover)
 	m.Get("/api/recover/:host/:port/:candidateHost/:candidatePort", this.Recover)
+	m.Get("/api/recover-lite/:host/:port", this.RecoverLite)
+	m.Get("/api/recover-lite/:host/:port/:candidateHost/:candidatePort", this.RecoverLite)
 	m.Get("/api/automated-recovery-filters", this.AutomatedRecoveryFilters)
 	m.Get("/api/audit-failure-detection", this.AuditFailureDetection)
 	m.Get("/api/audit-failure-detection/:page", this.AuditFailureDetection)
