@@ -17,10 +17,14 @@
 package logic
 
 import (
+	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/go/agent"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/inst"
+	"github.com/rcrowley/go-metrics"
+	"net"
+	"strings"
 	"time"
 )
 
@@ -31,6 +35,13 @@ const (
 // discoveryInstanceKeys is a channel of instanceKey-s that were requested for discovery.
 // It can be continuously updated as discovery process progresses.
 var discoveryInstanceKeys chan inst.InstanceKey = make(chan inst.InstanceKey, maxConcurrency)
+var discoveriesCounter = metrics.NewCounter()
+var failedDiscoveriesCounter = metrics.NewCounter()
+
+func init() {
+	metrics.Register("discoveries.attempt", discoveriesCounter)
+	metrics.Register("discoveries.fail", failedDiscoveriesCounter)
+}
 
 // handleDiscoveryRequests iterates the discoveryInstanceKeys channel and calls upon
 // instance discovery per entry.
@@ -69,11 +80,13 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 		// we've already discovered this one. Skip!
 		goto Cleanup
 	}
+	discoveriesCounter.Inc(1)
 	// First we've ever heard of this instance. Continue investigation:
 	instance, err = inst.ReadTopologyInstance(&instanceKey)
 	// panic can occur (IO stuff). Therefore it may happen
 	// that instance is nil. Check it.
 	if err != nil || instance == nil {
+		failedDiscoveriesCounter.Inc(1)
 		log.Warningf("instance is nil in DiscoverInstance. key=%+v, error=%+v", instanceKey, err)
 		goto Cleanup
 	}
@@ -116,6 +129,31 @@ func StartDiscovery(instanceKey inst.InstanceKey) {
 	}
 }
 
+func initGraphiteMetrics() error {
+	if config.Config.GraphiteAddr == "" {
+		return nil
+	}
+	if config.Config.GraphitePath == "" {
+		return log.Errorf("No graphite path provided (see GraphitePath config variable). Will not log to graphite")
+	}
+	addr, err := net.ResolveTCPAddr("tcp", config.Config.GraphiteAddr)
+	if err != nil {
+		return log.Errore(err)
+	}
+	graphitePathHostname := ThisHostname
+	if config.Config.GraphiteConvertHostnameDotsToUnderscores {
+		graphitePathHostname = strings.Replace(graphitePathHostname, ".", "_", -1)
+	}
+	graphitePath := config.Config.GraphitePath
+	graphitePath = strings.Replace(graphitePath, "{hostname}", graphitePathHostname, -1)
+
+	log.Debugf("Will log to graphite on %+v, %+v", config.Config.GraphiteAddr, graphitePath)
+	go graphite.Graphite(metrics.DefaultRegistry, 1*time.Minute, graphitePath, addr)
+
+	return nil
+
+}
+
 // ContinuousDiscovery starts an asynchronuous infinite discovery process where instances are
 // periodically investigated and their status captured, and long since unseen instances are
 // purged and forgotten.
@@ -131,6 +169,8 @@ func ContinuousDiscovery() {
 	if config.Config.SnapshotTopologiesIntervalHours > 0 {
 		snapshotTopologiesTick = time.Tick(time.Duration(config.Config.SnapshotTopologiesIntervalHours) * time.Hour)
 	}
+
+	go initGraphiteMetrics()
 
 	elected := false
 	_ = CreateElectionAnchor(false)

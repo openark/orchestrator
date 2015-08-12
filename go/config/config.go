@@ -109,6 +109,9 @@ type Configuration struct {
 	PostMasterFailoverProcesses                []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
 	PostIntermediateMasterFailoverProcesses    []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
 	OSCIgnoreHostnameFilters                   []string          // OSC slaves recommendation will ignore slave hostnames matching given patterns
+	GraphiteAddr                               string            // Optional; address of graphite port. If supplied, metrics will be written here
+	GraphitePath                               string            // Prefix for graphite path. May include {hostname} magic placeholder
+	GraphiteConvertHostnameDotsToUnderscores   bool              // If true, then hostname's dots are converted to underscores before being used in graphite path
 }
 
 var Config *Configuration = NewConfiguration()
@@ -187,6 +190,9 @@ func NewConfiguration() *Configuration {
 		PostIntermediateMasterFailoverProcesses:    []string{},
 		PostFailoverProcesses:                      []string{},
 		OSCIgnoreHostnameFilters:                   []string{},
+		GraphiteAddr:                               "",
+		GraphitePath:                               "",
+		GraphiteConvertHostnameDotsToUnderscores:   true,
 	}
 }
 

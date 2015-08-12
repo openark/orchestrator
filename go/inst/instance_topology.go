@@ -667,7 +667,7 @@ func RepointSlavesTo(instanceKey *InstanceKey, pattern string, belowKey *Instanc
 	return RepointTo(slaves, belowKey)
 }
 
-// RepointSlaves sequentially repoints all slaves of a given instance onto its existing master.
+// RepointSlaves repoints all slaves of a given instance onto its existing master.
 func RepointSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), error, []error) {
 	return RepointSlavesTo(instanceKey, pattern, nil)
 }

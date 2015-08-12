@@ -66,7 +66,7 @@ func GetClusterByAlias(alias string) (string, error) {
 			if clusterName == "" {
 				clusterName = mappedName
 			} else {
-				return "", fmt.Errorf("GetClusterByAlias: multiple clusters for alias %s", alias)
+				return clusterName, fmt.Errorf("GetClusterByAlias: multiple clusters for alias %s", alias)
 			}
 		}
 	}
