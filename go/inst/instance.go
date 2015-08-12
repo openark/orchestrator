@@ -355,9 +355,8 @@ func (this *Instance) IsOracleMySQL() bool {
 	if this.IsBinlogServer() {
 		return false
 	}
-	return true;
+	return true
 }
-
 
 // IsSlave makes simple heuristics to decide whether this insatnce is a slave of another instance
 func (this *Instance) IsSlave() bool {

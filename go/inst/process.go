@@ -16,8 +16,6 @@
 
 package inst
 
-import ()
-
 // Process presents a MySQL executing thread (as observed by PROCESSLIST)
 type Process struct {
 	InstanceHostname string

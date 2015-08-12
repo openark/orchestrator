@@ -160,7 +160,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			log.Errore(err)
 			// We do not "goto Cleanup" here, although it should be the correct flow.
 			// Reason is 5.7's new security feature that requires GRANTs on performance_schema.session_variables.
-			// There is a wrong decisionmaking in this design and the migration path to 5.7 will be difficult.
+			// There is a wrong decision making in this design and the migration path to 5.7 will be difficult.
 			// I don't want orchestrator to put even more burden on this.
 			// If the statement errors, then we are unable to determine that this is maxscale, hence assume it is not.
 			// In which case there would be other queries sent to the server that are not affected by 5.7 behavior, and that will fail.
@@ -1560,7 +1560,7 @@ func RefreshTopologyInstances(instances [](*Instance)) {
 			})
 		}()
 	}
-	for _ = range instances {
+	for range instances {
 		<-barrier
 	}
 }
@@ -1673,7 +1673,7 @@ func StopSlavesNicely(slaves [](*Instance), timeout time.Duration) [](*Instance)
 			})
 		}()
 	}
-	for _ = range slaves {
+	for range slaves {
 		refreshedSlaves = append(refreshedSlaves, <-barrier)
 	}
 	return refreshedSlaves
@@ -1737,7 +1737,7 @@ func StartSlaves(slaves [](*Instance)) {
 			ExecuteOnTopology(func() { StartSlave(&instance.Key) })
 		}()
 	}
-	for _ = range slaves {
+	for range slaves {
 		<-barrier
 	}
 }

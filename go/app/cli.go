@@ -294,6 +294,23 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			}
 			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), instance.MasterKey.DisplayString()))
 		}
+	case cliCommand("relocate-below"):
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			if siblingKey == nil {
+				log.Fatal("Cannot deduce sibling:", sibling)
+			}
+			_, err := inst.RelocateBelow(instanceKey, siblingKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), siblingKey.DisplayString()))
+		}
 	case cliCommand("get-candidate-slave"):
 		{
 			if instanceKey == nil {

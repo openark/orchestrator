@@ -146,15 +146,15 @@ func InstancesAreSiblings(instance0, instance1 *Instance) bool {
 }
 
 // InstanceIsMasterOf checks whether an instance is the master of another
-func InstanceIsMasterOf(instance0, instance1 *Instance) bool {
-	if !instance1.IsSlave() {
+func InstanceIsMasterOf(allegedMaster, allegedSlave *Instance) bool {
+	if !allegedSlave.IsSlave() {
 		return false
 	}
-	if instance0.Key.Equals(&instance1.Key) {
+	if allegedMaster.Key.Equals(&allegedSlave.Key) {
 		// same instance...
 		return false
 	}
-	return instance0.Key.Equals(&instance1.MasterKey)
+	return allegedMaster.Key.Equals(&allegedSlave.MasterKey)
 }
 
 // MoveUp will attempt moving instance indicated by instanceKey up the topology hierarchy.
@@ -354,7 +354,7 @@ func MoveUpSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), *Ins
 			}()
 		}()
 	}
-	for _ = range slaves {
+	for range slaves {
 		<-barrier
 	}
 
@@ -630,7 +630,7 @@ func RepointTo(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance), erro
 			})
 		}()
 	}
-	for _ = range slaves {
+	for range slaves {
 		<-barrier
 	}
 
@@ -1398,13 +1398,13 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 						}()
 					}()
 				}
-				for _ = range bucketSlaves {
+				for range bucketSlaves {
 					<-barrier
 				}
 			}()
 		}()
 	}
-	for _ = range slaveBuckets {
+	for range slaveBuckets {
 		<-bucketsBarrier
 	}
 
@@ -1598,7 +1598,7 @@ func RegroupSlaves(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup boo
 			})
 		}()
 	}
-	for _ = range equalSlaves {
+	for range equalSlaves {
 		<-barrier
 	}
 
@@ -1619,7 +1619,7 @@ func RegroupSlaves(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup boo
 			})
 		}()
 	}
-	for _ = range operatedSlaves {
+	for range operatedSlaves {
 		<-barrier
 	}
 
@@ -1697,4 +1697,73 @@ func RegroupSlavesIncludingSubSlavesOfBinlogServers(masterKey *InstanceKey, retu
 		}
 	}
 	return RegroupSlaves(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen)
+}
+
+// relocateBelowInternal is a protentially recursive function which chooses how to relocate an instance below another.
+// It may choose to use Pseudo-GTID, or normal binlog positions, or take advantage of binlog servers,
+// or it may combine any of the above in a multi-step operation.
+func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
+	if canReplicate, err := instance.CanReplicateFrom(other); !canReplicate {
+		return instance, err
+	}
+	if InstanceIsMasterOf(other, instance) {
+		// already the desired setup.
+		return Repoint(&instance.Key, &other.Key)
+	}
+	if other.IsBinlogServer() {
+		// Relocate to its master, then repoint to the binlog server
+		otherMaster, found, err := ReadInstance(&other.MasterKey)
+		if err != nil || !found {
+			return instance, err
+		}
+		if _, err := relocateBelowInternal(instance, otherMaster); err != nil {
+			return instance, err
+		}
+		return Repoint(&instance.Key, &other.Key)
+	}
+	if instance.UsingPseudoGTID && other.UsingPseudoGTID {
+		// We prefer PseudoGTID to anything else because, while it takes longer to run, it does not issue
+		// a STOP SLAVE on any server other than "instance" itself.
+		instance, _, err := MatchBelow(&instance.Key, &other.Key, true, true)
+		return instance, err
+	}
+	if InstancesAreSiblings(instance, other) {
+		return MoveBelow(&instance.Key, &other.Key)
+	}
+	instanceMaster, found, err := ReadInstance(&instance.MasterKey)
+	if err != nil || !found {
+		return instance, err
+	}
+	// See if we need to MoveUp
+	if instanceMaster.MasterKey.Equals(&other.Key) {
+		// Moving to grandparent
+		return MoveUp(&instance.Key)
+	}
+	if instanceMaster.IsBinlogServer() {
+		// Break operation into two: move (repoint) up, then continue
+		if _, err := MoveUp(&instance.Key); err != nil {
+			return instance, err
+		}
+		return relocateBelowInternal(instance, other)
+	}
+	return nil, log.Errorf("Cannot figure out a way to relocate %+v below %+v", instance.Key, other.Key)
+}
+
+// RelocateBelow will attempt moving instance indicated by instanceKey below another instance.
+// Orchestrator will try and figure out the best way to relocate the server. This could span normal
+// binlog-position, pseudo-gtid, repointing, binlog servers...
+func RelocateBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
+	instance, found, err := ReadInstance(instanceKey)
+	if err != nil || !found {
+		return instance, err
+	}
+	other, found, err := ReadInstance(otherKey)
+	if err != nil || !found {
+		return instance, err
+	}
+	instance, err = relocateBelowInternal(instance, other)
+	if err == nil {
+		AuditOperation("relocate-below", instanceKey, fmt.Sprintf("relocated %+v below %+v", *instanceKey, *otherKey))
+	}
+	return instance, err
 }

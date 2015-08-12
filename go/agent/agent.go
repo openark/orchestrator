@@ -16,8 +16,6 @@
 
 package agent
 
-import ()
-
 // LogicalVolume describes an LVM volume
 type LogicalVolume struct {
 	Name            string

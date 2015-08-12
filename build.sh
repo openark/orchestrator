@@ -6,7 +6,7 @@
 #
 set -e
 
-RELEASE_VERSION="1.4.291"
+RELEASE_VERSION="1.4.294"
 TOPDIR=/tmp/orchestrator-release
 export RELEASE_VERSION TOPDIR
 
@@ -64,7 +64,7 @@ function oinstall() {
   builddir="$1"
 
   cd  $(dirname $0)
-  go fmt go/./...
+ gofmt -s -w  go/
   rsync -qa ./resources $builddir/orchestrator/usr/local/orchestrator/
   rsync -qa ./conf/*.sample $builddir/orchestrator/usr/local/orchestrator/
   cp etc/init.d/orchestrator.bash $builddir/orchestrator/etc/init.d/orchestrator

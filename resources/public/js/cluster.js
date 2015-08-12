@@ -1,4 +1,4 @@
-clusterOperationPseudoGTIDMode = ($.cookie("operation-pgtid-mode") == "true");
+moveInstanceMethod = $.cookie("move-instance-method") || "smart";
 
 var renderColors = ["#ff8c00", "#4682b4", "#9acd32", "#dc143c", "#9932cc", "#ffd700", "#191970", "#7fffd4", "#808080", "#dda0dd"];
 var dcColorsMap = {};
@@ -123,7 +123,7 @@ function generateInstanceDivs(nodesMap) {
         } else {
             $(duplicate).draggable({
             	addClasses: true, 
-            	opacity: 0.67,
+            	opacity: 1,
             	cancel: "#cluster_container .popover.instance h3 a",
             	snap: "#cluster_container .popover.instance",
             	snapMode: "inner",
@@ -136,17 +136,28 @@ function generateInstanceDivs(nodesMap) {
             			accept: function(draggable) {
             				var draggedNode = nodesMap[draggedNodeId];
             				var targetNode = nodesMap[$(this).attr("data-nodeid")];
-            				var acceptDrop =  moveInstance(draggedNode, targetNode, false);
-            				if (acceptDrop == "ok") {
+            				var acceptDrop = moveInstance(draggedNode, targetNode, false);
+            				if (acceptDrop.accept == "ok") {
             					$(this).addClass("accept_drop");
             				}
-            				if (acceptDrop == "warning") {
+            				if (acceptDrop.accept == "warning") {
             					$(this).addClass("accept_drop_warning");
             				}
-            				return acceptDrop != null;
+           					$(this).attr("data-drop-comment", acceptDrop.accept ? acceptDrop.type : "");
+            				return acceptDrop.accept != null;
             			},
             			hoverClass: "draggable-hovers",
 					    over: function( event, ui ) {
+					    	if ($(this).attr("data-drop-comment")) {
+					    		$(duplicate).addClass("draggable-msg");
+					    		$(duplicate).find(".popover-content").html($(this).attr("data-drop-comment"))
+					    	} else {
+					    		$(duplicate).find(".popover-content").html("Cannot drop here")
+					    	}
+					    },
+					    out: function( event, ui ) {
+				    		$(duplicate).removeClass("draggable-msg");
+					    	$(duplicate).find(".popover-content").html("")
 					    },
 					    drop: function( event, ui ) {
 				            $(".popover.instance[data-duplicate-node]").remove();
@@ -181,109 +192,133 @@ function generateInstanceDivs(nodesMap) {
 function moveInstance(node, droppableNode, shouldApply) {
     if (!isAuthorizedForAction()) {
     	// Obviously this is also checked on server side, no need to try stupid hacks
-		return null;
+		return {accept: false} ;
     }
     var isUsingGTID = (node.usingGTID && droppableNode.usingGTID);
-    var gtidBelowFunc = null
-	if (clusterOperationPseudoGTIDMode) {
-		// definitely peudo-gtid match
-		gtidBelowFunc = matchBelow
-	} else if (isUsingGTID) {
-		//gtidBelowFunc = moveBelow
-	}
-	if (gtidBelowFunc != null) {
+	if (moveInstanceMethod == "smart") {
 		// Moving via GTID or Pseudo GTID
 		if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem || droppableNode.isAggregate) {
 			// Obviously can't handle.
-			return null;
+			return {accept: false};
 		}
 		if (!droppableNode.LogSlaveUpdatesEnabled) {
 			// Obviously can't handle.
-			return null;
+			return {accept: false};
 		}
 		
 		if (node.id == droppableNode.id) {
-			return null;
+			return {accept: false};
 		}
 		if (instanceIsDescendant(droppableNode, node)) {
 			// Wrong direction!
-			return null;
+			return {accept: false};
+		}
+		// the general case
+		if (shouldApply) {
+			relocateBelow(node, droppableNode);
+		}
+		return {accept: "warning", type: "relocateBelow " + droppableNode.canonicalTitle};
+	}
+	if (moveInstanceMethod == "pseudo-gtid") {
+		var gtidBelowFunc = matchBelow
+		//~~~TODO: when GTID is fully supported: gtidBelowFunc = moveBelow
+		// Moving via GTID or Pseudo GTID
+		if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem || droppableNode.isAggregate) {
+			// Obviously can't handle.
+			return {accept: false};
+		}
+		if (!droppableNode.LogSlaveUpdatesEnabled) {
+			// Obviously can't handle.
+			return {accept: false};
+		}
+		
+		if (node.id == droppableNode.id) {
+			return {accept: false};
+		}
+		if (instanceIsDescendant(droppableNode, node)) {
+			// Wrong direction!
+			return {accept: false};
 		}
 		if (instanceIsDescendant(node, droppableNode)) {
 			// clearly node cannot be more up to date than droppableNode
 			if (shouldApply) {
 				gtidBelowFunc(node, droppableNode);
 			}
-			return "ok";
+			return {accept: "ok", type: gtidBelowFunc.name + " " + droppableNode.canonicalTitle};
 		}
 		if (isReplicationBehindSibling(node, droppableNode)) {
 			// verified that node isn't more up to date than droppableNode
 			if (shouldApply) {
 				gtidBelowFunc(node, droppableNode);
 			}
-			return "ok";
+			return {accept: "ok", type: gtidBelowFunc.name + " " + droppableNode.canonicalTitle};
 		}
 		// TODO: the general case, where there's no clear family connection, meaning we cannot infer
 		// which instance is more up to date. It's under the user's responsibility!
 		if (shouldApply) {
 			gtidBelowFunc(node, droppableNode);
 		}
-		return "warning";
+		return {accept: "warning", type: gtidBelowFunc.name + " " + droppableNode.canonicalTitle};
 	}
-	// Not pseudo-GTID mode, non GTID mode
-	if (node.isCoMaster) {
-		// Cannot move. RESET SLAVE on one of the co-masters.
-		return null;
-	}
-	if (instancesAreSiblings(node, droppableNode)) {
-		if (node.hasProblem || droppableNode.hasProblem || droppableNode.isAggregate || !droppableNode.LogSlaveUpdatesEnabled) {
-			return null;
+	if (moveInstanceMethod == "classic") {
+		// Not pseudo-GTID mode, non GTID mode
+		if (node.id == droppableNode.id) {
+			return {accept: false};
 		}
-		if (shouldApply) {
-			moveBelow(node, droppableNode);
+		if (node.isCoMaster) {
+			// Cannot move. RESET SLAVE on one of the co-masters.
+			return {accept: false};
 		}
-		return "ok";
-	}
-	if (instanceIsGrandchild(node, droppableNode)) {
-		if (node.hasProblem) {
-			// Typically, when a node has a problem we do not allow moving it up.
-			// But there's a special situation when allowing is desired: when the parent has personal issues,
-			// (say disk issue or otherwise something heavyweight running which slows down replication)
-			// and you want to move up the slave which is only delayed by its master.
-			// So to help out, if the instance is identically at its master's trail, it is allowed to move up.
-			if (!node.isSQLThreadCaughtUpWithIOThread) { 
-				return null;
+		if (instancesAreSiblings(node, droppableNode)) {
+			if (node.hasProblem || droppableNode.hasProblem || droppableNode.isAggregate || !droppableNode.LogSlaveUpdatesEnabled) {
+				return {accept: false};
 			}
-		}
-		if (shouldApply) {
-			moveUp(node, droppableNode);
-		}
-		return "ok";
-	}
-	if (instanceIsChild(node, droppableNode) && !droppableNode.isMaster) {
-		if (node.hasProblem) {
-			// Typically, when a node has a problem we do not allow moving it up.
-			// But there's a special situation when allowing is desired: when
-			// this slave is completely caught up;
-			if (!node.isSQLThreadCaughtUpWithIOThread) { 
-				return null;
+			if (shouldApply) {
+				moveBelow(node, droppableNode);
 			}
+			return {accept: "ok", type: "moveBelow " + droppableNode.canonicalTitle};
 		}
-		if (shouldApply) {
-			enslaveMaster(node, droppableNode);
+		if (instanceIsGrandchild(node, droppableNode)) {
+			if (node.hasProblem) {
+				// Typically, when a node has a problem we do not allow moving it up.
+				// But there's a special situation when allowing is desired: when the parent has personal issues,
+				// (say disk issue or otherwise something heavyweight running which slows down replication)
+				// and you want to move up the slave which is only delayed by its master.
+				// So to help out, if the instance is identically at its master's trail, it is allowed to move up.
+				if (!node.isSQLThreadCaughtUpWithIOThread) { 
+					return {accept: false};
+				}
+			}
+			if (shouldApply) {
+				moveUp(node, droppableNode);
+			}
+			return {accept: "ok", type: "moveUp under " + droppableNode.canonicalTitle};
 		}
-		return "ok";
+		if (instanceIsChild(node, droppableNode) && !droppableNode.isMaster) {
+			if (node.hasProblem) {
+				// Typically, when a node has a problem we do not allow moving it up.
+				// But there's a special situation when allowing is desired: when
+				// this slave is completely caught up;
+				if (!node.isSQLThreadCaughtUpWithIOThread) { 
+					return {accept: false};
+				}
+			}
+			if (shouldApply) {
+				enslaveMaster(node, droppableNode);
+			}
+			return {accept: "ok", type: "enslaveMaster " + droppableNode.canonicalTitle};
+		}
+		if (instanceIsChild(droppableNode, node) && node.isMaster) {
+			if (node.hasProblem) {
+				return {accept: false};
+			}
+			if (shouldApply) {
+				makeCoMaster(node, droppableNode);
+			}
+			return {accept: "ok", type: "makeCoMaster with " + droppableNode.canonicalTitle};
+		}
+		return {accept: false};
 	}
-	if (instanceIsChild(droppableNode, node) && node.isMaster) {
-		if (node.hasProblem) {
-			return null;
-		}
-		if (shouldApply) {
-			makeCoMaster(node, droppableNode);
-		}
-		return "ok";
-	}
-	
 	if (shouldApply) {
 		addAlert(
 				"Cannot move <code><strong>" + 
@@ -294,7 +329,35 @@ function moveInstance(node, droppableNode, shouldApply) {
 				"You may only move a node down below its sibling or up below its grandparent."
 			);
 	}
-	return null;
+	return {accept: false};
+}
+
+function relocateBelow(node, siblingNode) {
+	var message = "<h4>relocate-below</h4>Are you sure you wish to turn <code><strong>" + 
+		node.Key.Hostname + ":" + node.Key.Port +
+		"</strong></code> into a slave of <code><strong>" +
+		siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
+		"</strong></code>?"+
+		"<h4>Note</h4><p>Orchestrator will try and figure out the best relocation path. This may involve multiple steps. " +
+		"<p>In case multiple steps are involved, failure of one would leave your instance hanging in a different location than you expected, " +
+		"but it would still be in a <i>valid</i> state.";
+	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
+		if (confirm) {
+			showLoader();
+			var apiUrl = "/api/relocate-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port;
+		    $.get(apiUrl, function (operationResult) {
+	    			hideLoader();
+	    			if (operationResult.Code == "ERROR") {
+	    				addAlert(operationResult.Message)
+	    			} else {
+	    				reloadWithOperationResult(operationResult);
+	    			}	
+	            }, "json");					
+		}
+		$("#cluster_container .accept_drop").removeClass("accept_drop");
+    	$("#cluster_container .accept_drop").removeClass("accept_drop_warning");
+	}); 
+	return false;
 }
 
 function moveBelow(node, siblingNode) {
@@ -627,13 +690,14 @@ function postVisualizeInstances(nodesMap) {
 
 
 function refreshClusterOperationModeButton() {
-	if (clusterOperationPseudoGTIDMode) {
-		$("#cluster_operation_mode_button").html("Pseudo-GTID mode");
-		$("#cluster_operation_mode_button").removeClass("btn-success").addClass("btn-warning");
-	} else {
-		$("#cluster_operation_mode_button").html("Classic mode");
-		$("#cluster_operation_mode_button").removeClass("btn-warning").addClass("btn-success");
-	}
+	if (moveInstanceMethod == "smart") {
+		$("#move-instance-method-button").removeClass("btn-success").removeClass("btn-warning").addClass("btn-info");
+	} else if (moveInstanceMethod == "classic") {
+		$("#move-instance-method-button").removeClass("btn-info").removeClass("btn-warning").addClass("btn-success");
+	} else if (moveInstanceMethod == "pseudo-gtid") {
+		$("#move-instance-method-button").removeClass("btn-success").removeClass("btn-info").addClass("btn-warning");
+	} 
+	$("#move-instance-method-button").html(moveInstanceMethod + ' mode <span class="caret"></span>')
 }
 
 function makeMaster(instance) {
@@ -998,17 +1062,13 @@ $(document).ready(function () {
 		;
     	addSidebarInfoPopoverContent(content);
     }, "json");
-    
-    if (isPseudoGTIDModeEnabled()) {
-        $("ul.navbar-nav").append('<li><a class="cluster_operation_mode"><button type="button" class="btn btn-xs" id="cluster_operation_mode_button"></button></a></li>');
-        refreshClusterOperationModeButton();
-        
-	    $("body").on("click", "#cluster_operation_mode_button", function() {
-	    	clusterOperationPseudoGTIDMode = !clusterOperationPseudoGTIDMode;
-	    	$.cookie("operation-pgtid-mode", ""+clusterOperationPseudoGTIDMode, { path: '/', expires: 1 });
-	    	refreshClusterOperationModeButton(); 
-	    });
-    }
+
+    $("#li-move-instance-method").appendTo("ul.navbar-nav");
+    $("#move-instance-method a").click(function() {
+    	moveInstanceMethod = $(this).attr("data-method");
+    	refreshClusterOperationModeButton();
+    	$.cookie("move-instance-method", moveInstanceMethod, { path: '/', expires: 1 });
+    });
     $("#instance_problems_button").attr("title", "Cluster Problems");
     
     $("body").on("click", "a[data-command=change-cluster-alias]", function(event) {    	
@@ -1054,4 +1114,5 @@ $(document).ready(function () {
     	// Read-only users don't get auto-refresh. Sorry!
     	activateRefreshTimer();
     }
+    refreshClusterOperationModeButton();
 });
