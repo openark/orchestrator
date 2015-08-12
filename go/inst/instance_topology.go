@@ -1047,7 +1047,7 @@ func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("siblings match below this", *instanceKey)); merr != nil {
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("siblings match below this: %+v", *instanceKey)); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
 		goto Cleanup
 	} else {
