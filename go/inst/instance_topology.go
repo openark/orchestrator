@@ -1706,9 +1706,22 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 	if canReplicate, err := instance.CanReplicateFrom(other); !canReplicate {
 		return instance, err
 	}
+	// simplest:
 	if InstanceIsMasterOf(other, instance) {
 		// already the desired setup.
 		return Repoint(&instance.Key, &other.Key)
+	}
+	// Try and take advantage of binlog servers:
+	if InstancesAreSiblings(instance, other) && other.IsBinlogServer() {
+		return MoveBelow(&instance.Key, &other.Key)
+	}
+	instanceMaster, found, err := ReadInstance(&instance.MasterKey)
+	if err != nil || !found {
+		return instance, err
+	}
+	if instanceMaster.MasterKey.Equals(&other.Key) && instanceMaster.IsBinlogServer() {
+		// Moving to grandparent via binlog server
+		return MoveUp(&instance.Key)
 	}
 	if other.IsBinlogServer() {
 		// Relocate to its master, then repoint to the binlog server
@@ -1721,18 +1734,16 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 		}
 		return Repoint(&instance.Key, &other.Key)
 	}
+	// Next, try Pseudo-GTID
 	if instance.UsingPseudoGTID && other.UsingPseudoGTID {
 		// We prefer PseudoGTID to anything else because, while it takes longer to run, it does not issue
 		// a STOP SLAVE on any server other than "instance" itself.
 		instance, _, err := MatchBelow(&instance.Key, &other.Key, true, true)
 		return instance, err
 	}
+	// No Pseudo-GTID; cehck simple binlog file/pos operations:
 	if InstancesAreSiblings(instance, other) {
 		return MoveBelow(&instance.Key, &other.Key)
-	}
-	instanceMaster, found, err := ReadInstance(&instance.MasterKey)
-	if err != nil || !found {
-		return instance, err
 	}
 	// See if we need to MoveUp
 	if instanceMaster.MasterKey.Equals(&other.Key) {
@@ -1746,7 +1757,8 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 		}
 		return relocateBelowInternal(instance, other)
 	}
-	return nil, log.Errorf("Cannot figure out a way to relocate %+v below %+v", instance.Key, other.Key)
+	// Too complex
+	return nil, log.Errorf("Relocating %+v below %+v turns to be too complex; please do it manually", instance.Key, other.Key)
 }
 
 // RelocateBelow will attempt moving instance indicated by instanceKey below another instance.

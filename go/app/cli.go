@@ -78,7 +78,7 @@ func getClusterName(clusterAlias string, instanceKey *inst.InstanceKey) (cluster
 }
 
 // Cli initiates a command line interface, executing requested command.
-func Cli(command string, strict bool, instance string, sibling string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string, hostnameFlag string) {
+func Cli(command string, strict bool, instance string, destination string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string, hostnameFlag string) {
 
 	if instance != "" && !strings.Contains(instance, ":") {
 		instance = fmt.Sprintf("%s:%d", instance, config.Config.DefaultInstancePort)
@@ -92,12 +92,12 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		rawInstanceKey = nil
 	}
 
-	if sibling != "" && !strings.Contains(sibling, ":") {
-		sibling = fmt.Sprintf("%s:%d", sibling, config.Config.DefaultInstancePort)
+	if destination != "" && !strings.Contains(destination, ":") {
+		destination = fmt.Sprintf("%s:%d", destination, config.Config.DefaultInstancePort)
 	}
-	siblingKey, err := inst.ParseInstanceKey(sibling)
+	destinationKey, err := inst.ParseInstanceKey(destination)
 	if err != nil {
-		siblingKey = nil
+		destinationKey = nil
 	}
 
 	if hostname, err := os.Hostname(); err == nil {
@@ -169,14 +169,14 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			if siblingKey == nil {
-				log.Fatal("Cannot deduce sibling:", sibling)
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce sibling:", destination)
 			}
-			_, err := inst.MoveBelow(instanceKey, siblingKey)
+			_, err := inst.MoveBelow(instanceKey, destinationKey)
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), siblingKey.DisplayString()))
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), destinationKey.DisplayString()))
 		}
 	case cliCommand("repoint"):
 		{
@@ -186,8 +186,8 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			// siblingKey can be null, in which case the instance repoints to its existing master
-			instance, err := inst.Repoint(instanceKey, siblingKey)
+			// destinationKey can be null, in which case the instance repoints to its existing master
+			instance, err := inst.Repoint(instanceKey, destinationKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -201,7 +201,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			repointedSlaves, err, errs := inst.RepointSlavesTo(instanceKey, pattern, siblingKey)
+			repointedSlaves, err, errs := inst.RepointSlavesTo(instanceKey, pattern, destinationKey)
 			if err != nil {
 				log.Fatale(err)
 			} else {
@@ -257,14 +257,14 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			if siblingKey == nil {
-				log.Fatal("Cannot deduce sibling:", sibling)
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce destination:", destination)
 			}
-			_, _, err := inst.MatchBelow(instanceKey, siblingKey, true, true)
+			_, _, err := inst.MatchBelow(instanceKey, destinationKey, true, true)
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), siblingKey.DisplayString()))
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), destinationKey.DisplayString()))
 		}
 	case cliCommand("match-up"):
 		{
@@ -302,14 +302,14 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			if siblingKey == nil {
-				log.Fatal("Cannot deduce sibling:", sibling)
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce destination:", destination)
 			}
-			_, err := inst.RelocateBelow(instanceKey, siblingKey)
+			_, err := inst.RelocateBelow(instanceKey, destinationKey)
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), siblingKey.DisplayString()))
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), destinationKey.DisplayString()))
 		}
 	case cliCommand("get-candidate-slave"):
 		{
@@ -326,15 +326,15 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 		}
 	case cliCommand("multi-match-slaves"):
 		{
-			// Move all slaves of "instance" beneath "sibling"
+			// Move all slaves of "instance" beneath "destination"
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			if siblingKey == nil {
-				log.Fatal("Cannot deduce sibling:", sibling)
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce destination:", destination)
 			}
 
-			matchedSlaves, _, err, errs := inst.MultiMatchSlaves(instanceKey, siblingKey, pattern)
+			matchedSlaves, _, err, errs := inst.MultiMatchSlaves(instanceKey, destinationKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {
@@ -386,7 +386,7 @@ func Cli(command string, strict bool, instance string, sibling string, owner str
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			actionTaken, promotedInstance, err := logic.CheckAndRecover(instanceKey, siblingKey, true, (command == "recover-lite"))
+			actionTaken, promotedInstance, err := logic.CheckAndRecover(instanceKey, destinationKey, true, (command == "recover-lite"))
 			if err != nil {
 				log.Fatale(err)
 			}
