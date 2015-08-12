@@ -182,6 +182,14 @@
     color: inherit;
 }
 
+.popover.instance.original-dragged {
+    background-color: #808080;	
+}
+
+.popover.instance.original-dragged h3 {
+    background-color: #808080;	
+}
+
 .popover.instance.draggable-msg {
 }
 

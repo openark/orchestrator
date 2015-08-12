@@ -229,7 +229,7 @@ func read(file_name string) (*Configuration, error) {
 			if err != nil {
 				log.Fatalf("Failed to parse gcfg data from file: %+v", err)
 			} else {
-				log.Debugf("Parsed topology credentials from %s", Config.MySQLOrchestratorCredentialsConfigFile)
+				log.Debugf("Parsed topology credentials from %s", Config.MySQLTopologyCredentialsConfigFile)
 				Config.MySQLTopologyUser = mySQLConfig.Client.User
 				Config.MySQLTopologyPassword = mySQLConfig.Client.Password
 			}

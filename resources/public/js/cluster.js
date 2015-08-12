@@ -1,4 +1,5 @@
-moveInstanceMethod = $.cookie("move-instance-method") || "smart";
+var moveInstanceMethod = $.cookie("move-instance-method") || "smart";
+var droppableIsActive = false;
 
 var renderColors = ["#ff8c00", "#4682b4", "#9acd32", "#dc143c", "#9932cc", "#ffd700", "#191970", "#7fffd4", "#808080", "#dda0dd"];
 var dcColorsMap = {};
@@ -54,12 +55,13 @@ function generateInstanceDivs(nodesMap) {
     		return false;
     	}
     	$(".popover.instance[data-duplicate-node]").remove();
-    	var duplicate = $(this).clone().appendTo("#cluster_container");
+    	var originalNode = $(this);
+    	var duplicate = originalNode.clone().appendTo("#cluster_container");
     	$(duplicate).attr("data-duplicate-node", "true");
     	$(duplicate).css({"margin-left": "0"});
-    	$(duplicate).css($(this).offset());
-    	$(duplicate).width($(this).width());
-    	$(duplicate).height($(this).height());
+    	$(duplicate).css(originalNode.offset());
+    	$(duplicate).width(originalNode.width());
+    	$(duplicate).height(originalNode.height());
     	$(duplicate).find(".dropdown-toggle").dropdown();
     	$(duplicate).popover();
         $(duplicate).show();
@@ -73,7 +75,6 @@ function generateInstanceDivs(nodesMap) {
         });
         $(".popover.instance[data-duplicate-node] a[data-command=recover-auto-lite]").click(function () {
         	apiCommand("/api/recover-lite/"+nodesMap[draggedNodeId].Key.Hostname+"/"+nodesMap[draggedNodeId].Key.Port);
-        	//console.log("auto & skip!")
         	return true;
         });
         $(".popover.instance[data-duplicate-node] a[data-command=match-up-slaves]").click(function () {
@@ -121,6 +122,13 @@ function generateInstanceDivs(nodesMap) {
             	return false;
             });
         } else {
+        	function clearDroppable() {
+        		originalNode.removeClass("original-dragged");
+        		resetRefreshTimer();
+        		$("#cluster_container .accept_drop").removeClass("accept_drop");
+        		$("#cluster_container .accept_drop_warning").removeClass("accept_drop_warning");
+        		droppableIsActive = false;
+        	}
             $(duplicate).draggable({
             	addClasses: true, 
             	opacity: 1,
@@ -129,11 +137,14 @@ function generateInstanceDivs(nodesMap) {
             	snapMode: "inner",
             	snapTolerance: 10,
             	start: function(event, ui) {
-            		resetRefreshTimer();
-            		$("#cluster_container .accept_drop").removeClass("accept_drop");
-             		$("#cluster_container .accept_drop_warning").removeClass("accept_drop_warning");
+            		clearDroppable();
+            		droppableIsActive = true;
+            		originalNode.addClass("original-dragged");
              		$("#cluster_container .popover.instance").droppable({
             			accept: function(draggable) {
+            				if (!droppableIsActive) {
+            					return false
+            				}
             				var draggedNode = nodesMap[draggedNodeId];
             				var targetNode = nodesMap[$(this).attr("data-nodeid")];
             				var acceptDrop = moveInstance(draggedNode, targetNode, false);
@@ -162,6 +173,7 @@ function generateInstanceDivs(nodesMap) {
 					    drop: function( event, ui ) {
 				            $(".popover.instance[data-duplicate-node]").remove();
 				            moveInstance(nodesMap[draggedNodeId], nodesMap[$(this).attr("data-nodeid")], true);
+				            clearDroppable();
 					    }
             		});
             	},
@@ -169,9 +181,7 @@ function generateInstanceDivs(nodesMap) {
 	        		resetRefreshTimer();
 	        	},
 	        	stop: function(event, ui) {
-	        		resetRefreshTimer();
-            		$("#cluster_container .accept_drop").removeClass("accept_drop");
-            		$("#cluster_container .accept_drop_warning").removeClass("accept_drop_warning");
+	        		clearDroppable();
 	        	}
             });
         	$(duplicate).on("mouseleave", function() {
@@ -181,8 +191,7 @@ function generateInstanceDivs(nodesMap) {
         	});
         	// Don't ask why the following... jqueryUI recognizes the click as start drag, but fails to stop...
         	$(duplicate).on("click", function() {
-            	$("#cluster_container .accept_drop").removeClass("accept_drop");
-            	$("#cluster_container .accept_drop").removeClass("accept_drop_warning");
+        		clearDroppable();
             	return false;
             });	
         }
