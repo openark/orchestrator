@@ -502,6 +502,32 @@ func (this *HttpAPI) RelocateBelow(params martini.Params, r render.Render, req *
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v relocated below %+v", instanceKey, belowKey), Details: instance})
 }
 
+// RelocateSlaves attempts to smartly relocate slaves of a given instance below another
+func (this *HttpAPI) RelocateSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	belowKey, err := this.getInstanceKey(params["belowHost"], params["belowPort"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	slaves, err, errs := inst.RelocateSlaves(&instanceKey, &belowKey, req.URL.Query().Get("pattern"))
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Relocated %d slaves of %+v below %+v; %d errors: %+v", len(slaves), instanceKey, belowKey, len(errs), errs), Details: slaves})
+}
+
 // LastPseudoGTID attempts to find the last pseugo-gtid entry in an instance
 func (this *HttpAPI) LastPseudoGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -1608,6 +1634,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/enslave-siblings/:host/:port", this.EnslaveSiblings)
 	m.Get("/api/enslave-master/:host/:port", this.EnslaveMaster)
 	m.Get("/api/relocate-below/:host/:port/:belowHost/:belowPort", this.RelocateBelow)
+	m.Get("/api/relocate-slaves/:host/:port/:belowHost/:belowPort", this.RelocateSlaves)
 	m.Get("/api/last-pseudo-gtid/:host/:port", this.LastPseudoGTID)
 	m.Get("/api/match-below/:host/:port/:belowHost/:belowPort", this.MatchBelow)
 	m.Get("/api/match-up/:host/:port", this.MatchUp)

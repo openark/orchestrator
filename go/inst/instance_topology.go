@@ -1779,3 +1779,96 @@ func RelocateBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	}
 	return instance, err
 }
+
+// relocateSlavesInternal is a protentially recursive function which chooses how to relocate
+// slaves of an instance below another.
+// It may choose to use Pseudo-GTID, or normal binlog positions, or take advantage of binlog servers,
+// or it may combine any of the above in a multi-step operation.
+func relocateSlavesInternal(slaves [](*Instance), instance, other *Instance) ([](*Instance), error, []error) {
+	errs := []error{}
+	var err error
+	// simplest:
+	if instance.Key.Equals(&other.Key) {
+		// already the desired setup.
+		return RepointTo(slaves, &other.Key)
+	}
+	// Try and take advantage of binlog servers:
+	if InstanceIsMasterOf(other, instance) && instance.IsBinlogServer() {
+		// Up from a binlog server
+		return RepointTo(slaves, &other.Key)
+	}
+	if InstanceIsMasterOf(instance, other) && other.IsBinlogServer() {
+		// Down under a binlog server
+		return RepointTo(slaves, &other.Key)
+	}
+	if InstancesAreSiblings(instance, other) && instance.IsBinlogServer() && other.IsBinlogServer() {
+		// Between siblings
+		return RepointTo(slaves, &other.Key)
+	}
+	if other.IsBinlogServer() {
+		// Relocate to binlog server's parent (recursive call), then repoint down
+		otherMaster, found, err := ReadInstance(&other.MasterKey)
+		if err != nil || !found {
+			return nil, err, errs
+		}
+		slaves, err, errs = relocateSlavesInternal(slaves, instance, otherMaster)
+		if err != nil {
+			return slaves, err, errs
+		}
+
+		return RepointTo(slaves, &other.Key)
+	}
+	// Pseudo GTID
+	if other.UsingPseudoGTID {
+		// Which slaves are using Pseudo GTID?
+		var pseudoGTIDSlaves [](*Instance)
+		for _, slave := range slaves {
+			if slave.UsingPseudoGTID {
+				pseudoGTIDSlaves = append(pseudoGTIDSlaves, slave)
+			}
+		}
+
+		slaves, _, err, errs = MultiMatchBelow(pseudoGTIDSlaves, &other.Key, false)
+		return slaves, err, errs
+	}
+
+	// Normal binlog file:pos
+	if InstanceIsMasterOf(other, instance) {
+		// moveUpSlaves -- but not supporint "slaves" argument at this time.
+	}
+
+	// Too complex
+	return nil, log.Errorf("Relocating %+v slaves of %+v below %+v turns to be too complex; please do it manually", len(slaves), instance.Key, other.Key), errs
+}
+
+// RelocateSlaves will attempt moving slaves of an instance indicated by instanceKey below another instance.
+// Orchestrator will try and figure out the best way to relocate the servers. This could span normal
+// binlog-position, pseudo-gtid, repointing, binlog servers...
+func RelocateSlaves(instanceKey, otherKey *InstanceKey, pattern string) (slaves [](*Instance), err error, errs []error) {
+
+	instance, found, err := ReadInstance(instanceKey)
+	if err != nil || !found {
+		return slaves, err, errs
+	}
+	other, found, err := ReadInstance(otherKey)
+	if err != nil || !found {
+		return slaves, err, errs
+	}
+
+	slaves, err = ReadSlaveInstances(instanceKey)
+	if err != nil {
+		return slaves, err, errs
+	}
+	slaves = removeInstance(slaves, otherKey)
+	slaves = filterInstancesByPattern(slaves, pattern)
+	if len(slaves) == 0 {
+		// Nothing to do
+		return slaves, nil, errs
+	}
+	slaves, err, errs = relocateSlavesInternal(slaves, instance, other)
+
+	if err == nil {
+		AuditOperation("relocate-slaves", instanceKey, fmt.Sprintf("relocated %+v slaves of %+v below %+v", len(slaves), *instanceKey, *otherKey))
+	}
+	return slaves, err, errs
+}

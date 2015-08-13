@@ -25,6 +25,86 @@ function repositionIntanceDivs() {
     $("div.popover").show();
 }
 
+// All dragging/dropping code goes here
+function activateDroppable(nodesMap, draggedNodeId, originalNode, duplicate) {
+	function clearDroppable() {
+		originalNode.removeClass("original-dragged");
+		resetRefreshTimer();
+		$("#cluster_container .accept_drop").removeClass("accept_drop");
+		$("#cluster_container .accept_drop_warning").removeClass("accept_drop_warning");
+		droppableIsActive = false;
+	}
+    $(duplicate).draggable({
+    	addClasses: true, 
+    	opacity: 1,
+    	cancel: "#cluster_container .popover.instance h3 a",
+    	snap: "#cluster_container .popover.instance",
+    	snapMode: "inner",
+    	snapTolerance: 10,
+    	start: function(event, ui) {
+    		// dragging begins
+    		clearDroppable();
+    		droppableIsActive = true;
+    		originalNode.addClass("original-dragged");
+     		$("#cluster_container .popover.instance").droppable({
+    			accept: function(draggable) {
+    				// Find the objects that accept a draggable (i.e. valid droppables)
+    				if (!droppableIsActive) {
+    					return false
+    				}
+    				var draggedNode = nodesMap[draggedNodeId];
+    				var targetNode = nodesMap[$(this).attr("data-nodeid")];
+    				var acceptDrop = moveInstance(draggedNode, targetNode, false);
+    				if (acceptDrop.accept == "ok") {
+    					$(this).addClass("accept_drop");
+    				}
+    				if (acceptDrop.accept == "warning") {
+    					$(this).addClass("accept_drop_warning");
+    				}
+   					$(this).attr("data-drop-comment", acceptDrop.accept ? acceptDrop.type : "");
+    				return acceptDrop.accept != null;
+    			},
+    			hoverClass: "draggable-hovers",
+			    over: function( event, ui ) {
+			    	// Called once when dragged object is over another object
+			    	if ($(this).attr("data-drop-comment")) {
+			    		$(duplicate).addClass("draggable-msg");
+			    		$(duplicate).find(".popover-content").html($(this).attr("data-drop-comment"))
+			    	} else {
+			    		$(duplicate).find(".popover-content").html("Cannot drop here")
+			    	}
+			    },
+			    out: function( event, ui ) {
+			    	// Called once when dragged object leaves other object
+		    		$(duplicate).removeClass("draggable-msg");
+			    	$(duplicate).find(".popover-content").html("")
+			    },
+			    drop: function( event, ui ) {
+		            $(".popover.instance[data-duplicate-node]").remove();
+		            moveInstance(nodesMap[draggedNodeId], nodesMap[$(this).attr("data-nodeid")], true);
+		            clearDroppable();
+			    }
+    		});
+    	},
+    	drag: function(event, ui) {
+    		resetRefreshTimer();
+    	},
+    	stop: function(event, ui) {
+    		clearDroppable();
+    	}
+    });
+	$(duplicate).on("mouseleave", function() {
+		if (!$(this).hasClass("ui-draggable-dragging")) {
+    		$(this).remove();
+		}
+	});
+	// Don't ask why the following... jqueryUI recognizes the click as start drag, but fails to stop...
+	$(duplicate).on("click", function() {
+		clearDroppable();
+    	return false;
+    });		
+}
+
 function generateInstanceDivs(nodesMap) {
     nodesList = []
     for (var nodeId in nodesMap) {
@@ -122,78 +202,7 @@ function generateInstanceDivs(nodesMap) {
             	return false;
             });
         } else {
-        	function clearDroppable() {
-        		originalNode.removeClass("original-dragged");
-        		resetRefreshTimer();
-        		$("#cluster_container .accept_drop").removeClass("accept_drop");
-        		$("#cluster_container .accept_drop_warning").removeClass("accept_drop_warning");
-        		droppableIsActive = false;
-        	}
-            $(duplicate).draggable({
-            	addClasses: true, 
-            	opacity: 1,
-            	cancel: "#cluster_container .popover.instance h3 a",
-            	snap: "#cluster_container .popover.instance",
-            	snapMode: "inner",
-            	snapTolerance: 10,
-            	start: function(event, ui) {
-            		clearDroppable();
-            		droppableIsActive = true;
-            		originalNode.addClass("original-dragged");
-             		$("#cluster_container .popover.instance").droppable({
-            			accept: function(draggable) {
-            				if (!droppableIsActive) {
-            					return false
-            				}
-            				var draggedNode = nodesMap[draggedNodeId];
-            				var targetNode = nodesMap[$(this).attr("data-nodeid")];
-            				var acceptDrop = moveInstance(draggedNode, targetNode, false);
-            				if (acceptDrop.accept == "ok") {
-            					$(this).addClass("accept_drop");
-            				}
-            				if (acceptDrop.accept == "warning") {
-            					$(this).addClass("accept_drop_warning");
-            				}
-           					$(this).attr("data-drop-comment", acceptDrop.accept ? acceptDrop.type : "");
-            				return acceptDrop.accept != null;
-            			},
-            			hoverClass: "draggable-hovers",
-					    over: function( event, ui ) {
-					    	if ($(this).attr("data-drop-comment")) {
-					    		$(duplicate).addClass("draggable-msg");
-					    		$(duplicate).find(".popover-content").html($(this).attr("data-drop-comment"))
-					    	} else {
-					    		$(duplicate).find(".popover-content").html("Cannot drop here")
-					    	}
-					    },
-					    out: function( event, ui ) {
-				    		$(duplicate).removeClass("draggable-msg");
-					    	$(duplicate).find(".popover-content").html("")
-					    },
-					    drop: function( event, ui ) {
-				            $(".popover.instance[data-duplicate-node]").remove();
-				            moveInstance(nodesMap[draggedNodeId], nodesMap[$(this).attr("data-nodeid")], true);
-				            clearDroppable();
-					    }
-            		});
-            	},
-	        	drag: function(event, ui) {
-	        		resetRefreshTimer();
-	        	},
-	        	stop: function(event, ui) {
-	        		clearDroppable();
-	        	}
-            });
-        	$(duplicate).on("mouseleave", function() {
-        		if (!$(this).hasClass("ui-draggable-dragging")) {
-	        		$(this).remove();
-        		}
-        	});
-        	// Don't ask why the following... jqueryUI recognizes the click as start drag, but fails to stop...
-        	$(duplicate).on("click", function() {
-        		clearDroppable();
-            	return false;
-            });	
+        	activateDroppable(nodesMap, draggedNodeId, originalNode, duplicate);
         }
     });
 }

@@ -311,6 +311,29 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), destinationKey.DisplayString()))
 		}
+	case cliCommand("relocate-slaves"):
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce destination:", destination)
+			}
+			slaves, err, errs := inst.RelocateSlaves(instanceKey, destinationKey, pattern)
+			if err != nil {
+				log.Fatale(err)
+			} else {
+				for _, e := range errs {
+					log.Errore(e)
+				}
+				for _, slave := range slaves {
+					fmt.Println(slave.Key.DisplayString())
+				}
+			}
+		}
 	case cliCommand("get-candidate-slave"):
 		{
 			if instanceKey == nil {
