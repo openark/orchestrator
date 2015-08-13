@@ -18,11 +18,12 @@ package inst
 
 import (
 	"fmt"
+	"regexp"
+
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
-	"regexp"
 )
 
 // GetReplicationAnalysis will check for replication problems (dead master; unreachable master; etc)
@@ -30,7 +31,7 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 	result := []ReplicationAnalysis{}
 
 	query := fmt.Sprintf(`
-		    SELECT 
+		    SELECT
 		        master_instance.hostname,
 		        master_instance.port,
 		        MIN(master_instance.master_host) AS master_host,
@@ -95,16 +96,16 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		        database_instance_downtime ON (master_instance.hostname = database_instance_downtime.hostname
 		        		AND master_instance.port = database_instance_downtime.port
 		        		AND database_instance_downtime.downtime_active = 1)
-		        	LEFT JOIN 
+		        	LEFT JOIN
 		        cluster_alias ON (cluster_alias.cluster_name = master_instance.cluster_name)
 		    WHERE
 		    	database_instance_maintenance.database_instance_maintenance_id IS NULL
-		    GROUP BY 
-			    master_instance.hostname, 
+		    GROUP BY
+			    master_instance.hostname,
 			    master_instance.port
-		    ORDER BY 
-			    is_master DESC , 
-			    is_cluster_master DESC, 
+		    ORDER BY
+			    is_master DESC ,
+			    is_cluster_master DESC,
 			    count_slaves DESC
 	`, config.Config.InstancePollSeconds)
 
@@ -222,7 +223,7 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 			//
 		} else if a.IsBinlogServer && a.IsFailingToConnectToMaster {
 			a.Analysis = BinlogServerFailingToConnectToMaster
-			a.Description = "Binlog rerver is unable to connect to its master"
+			a.Description = "Binlog server is unable to connect to its master"
 			//
 		} else if a.ReplicationDepth == 1 && a.IsFailingToConnectToMaster {
 			a.Analysis = FirstTierSlaveFailingToConnectToMaster
