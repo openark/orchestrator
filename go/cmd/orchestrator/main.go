@@ -147,7 +147,7 @@ Cheatsheet:
 		DetectPseudoGTIDQuery.
 		Operations via Pseudo-GTID are typically slower, since they involve scanning of binary/relay logs.
 		They impose less constraints on topology locations and affect less servers. Only servers that
-		are being transported have their replication stopped. Their masters or destinations are unaffected.
+		are being relocateed have their replication stopped. Their masters or destinations are unaffected.
 
 		match-up
 			Transport the slave one level up the hierarchy, making it child of its grandparent. This is
@@ -176,12 +176,12 @@ Cheatsheet:
 			Matches a slave beneath another (destination) instance. The choice of destination is almost arbitrary;
 			it must not be a child/descendant of the instance. But otherwise they don't have to be direct siblings,
 			and in fact (if you know what you're doing), they don't actually have to belong to the same topology.
-			The operation expects the transported instance to be "behind" the destination instance. It only finds out
+			The operation expects the relocated instance to be "behind" the destination instance. It only finds out
 			whether this is the case by the end; the operation is cancelled in the event this is not the case.
 			No action taken when destination instance cannot act as master (e.g. has no binary logs, is of incompatible version, incompatible binlog format etc.)
 			Examples:
 			
-			orchestrator -c match-below -i slave.to.transport.com -s instance.that.becomes.its.master
+			orchestrator -c match-below -i slave.to.relocate.com -s instance.that.becomes.its.master
 
 			orchestrator -c match-below -s destination.instance.that.becomes.its.master
 				-i not given, implicitly assumed local hostname
@@ -193,9 +193,9 @@ Cheatsheet:
 			respective position behind the instance (the more slaves, the more savings).
 			The instance itself may be crashed or inaccessible. It is not contacted throughout the operation. Examples:
 			
-			orchestrator -c multi-match-slaves -i instance.whose.slaves.will.transport -s instance.that.becomes.their.master
+			orchestrator -c multi-match-slaves -i instance.whose.slaves.will.relocate -s instance.that.becomes.their.master
 			
-			orchestrator -c multi-match-slaves -i instance.whose.slaves.will.transport -s instance.that.becomes.their.master --pattern=regexp.filter
+			orchestrator -c multi-match-slaves -i instance.whose.slaves.will.relocate -s instance.that.becomes.their.master --pattern=regexp.filter
 				only apply to those instances that match given regex
 			
 		rematch
@@ -225,6 +225,37 @@ Cheatsheet:
 			and if so, output the last Pseudo-GTID entry and its location. Example:
 			
 			orchestrator -c last-pseudo-gtid -i instance.with.possible.pseudo-gtid.injection
+
+	Topology refactoring using arbitrary methods
+		These operations let orchestrator pick the best course of action for relocating slaves. It may choose to use
+        standard binlog file:pos math, or Pseudo-GTID, or take advantage of binlog servers, or combine two or more
+        methods in a multi-step operation.
+        In case a of a multi-step operation, failure may result in slaves only moving halfway to destination point. Nonetheless
+        they will be in a valid position.
+
+		relocate-below
+			Relocate a slave beneath another (destination) instance. The choice of destination is almost arbitrary;
+			it must not be a child/descendant of the instance, but otherwise it can be anywhere, and can be a normal slave
+            or a binlog server. Orchestrator will choose the best course of action to relocate the slave.
+			No action taken when destination instance cannot act as master (e.g. has no binary logs, is of incompatible version, incompatible binlog format etc.)
+			Examples:
+
+			orchestrator -c relocate-below -i slave.to.relocate.com -d instance.that.becomes.its.master
+
+			orchestrator -c relocate-below -d destination.instance.that.becomes.its.master
+				-i not given, implicitly assumed local hostname
+
+		relocate-slaves
+			Relocates all or part of the slaves of a given instance under another (destination) instance. This is 
+            typically much faster than relocating slaves one by one.
+            Orchestrator chooses the best course of action to relocation the slaves. It may choose a multi-step operations.
+            Some slaves may succeed and some may fail the operation.
+			The instance (slaves' master) itself may be crashed or inaccessible. It is not contacted throughout the operation. Examples:
+
+			orchestrator -c relocate-slaves -i instance.whose.slaves.will.relocate -d instance.that.becomes.their.master
+
+			orchestrator -c relocate-slaves -i instance.whose.slaves.will.relocate -s instance.that.becomes.their.master --pattern=regexp.filter
+				only apply to those instances that match given regex
 
 	General replication commands
 		These commands issue various statements that relate to replication.
