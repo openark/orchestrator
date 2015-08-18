@@ -220,7 +220,11 @@ function openNodeModal(node) {
     addNodeModalDataAttribute("Has binary logs", booleanString(node.LogBinEnabled));
     var td = addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
     $('#node_modal button[data-btn=enslave-siblings]').appendTo(td.find("div"))
-        
+
+    var td = addNodeModalDataAttribute("GTID", booleanString(node.usingGTID));
+    $('#node_modal button[data-btn=enable-gtid]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=disable-gtid]').appendTo(td.find("div"))
+
     addNodeModalDataAttribute("Uptime", node.Uptime);
     addNodeModalDataAttribute("Cluster",
             '<a href="/web/cluster/'+node.ClusterName+'">'+node.ClusterName+'</a>');
@@ -278,6 +282,12 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=set-writeable]').click(function(){
     	apiCommand("/api/set-writeable/"+node.Key.Hostname+"/"+node.Key.Port);
     });
+    $('#node_modal button[data-btn=enable-gtid]').click(function(){
+    	apiCommand("/api/enable-gtid/"+node.Key.Hostname+"/"+node.Key.Port);
+    });
+    $('#node_modal button[data-btn=disable-gtid]').click(function(){
+    	apiCommand("/api/disable-gtid/"+node.Key.Hostname+"/"+node.Key.Port);
+    });
     $('#node_modal button[data-btn=forget-instance]').click(function(){
     	var message = "<p>Are you sure you wish to forget <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
 			"</strong></code>?" +
@@ -325,6 +335,14 @@ function openNodeModal(node) {
     	$('#node_modal button[data-btn=set-writeable]').show();
     } else {
     	$('#node_modal button[data-btn=set-read-only]').show();
+    }
+
+	$('#node_modal button[data-btn=enable-gtid]').hide();
+	$('#node_modal button[data-btn=disable-gtid]').hide();
+    if (node.usingGTID) {
+    	$('#node_modal button[data-btn=disable-gtid]').show();
+    } else {
+    	$('#node_modal button[data-btn=enable-gtid]').show();
     }
 
     $('#node_modal button[data-btn=move-up-slaves]').hide();

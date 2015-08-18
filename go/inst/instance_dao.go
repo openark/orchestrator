@@ -44,6 +44,14 @@ const topologyConcurrency = 100
 
 var topologyConcurrencyChan = make(chan bool, topologyConcurrency)
 
+type OperationGTIDHint string
+
+const (
+	GTIDHintDeny    OperationGTIDHint = "NoGTID"
+	GTIDHintNeutral                   = "GTIDHintNeutral"
+	GTIDHintForce                     = "GTIDHintForce"
+)
+
 // InstancesByCountSlaveHosts is a sortable type for Instance
 type InstancesByCountSlaveHosts [](*Instance)
 
@@ -1796,7 +1804,7 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 }
 
 // ChangeMasterTo changes the given instance's master according to given input.
-func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinlogCoordinates *BinlogCoordinates, skipUnresolve bool) (*Instance, error) {
+func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinlogCoordinates *BinlogCoordinates, skipUnresolve bool, gtidHint OperationGTIDHint) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
@@ -1823,28 +1831,31 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 		return instance, fmt.Errorf("noop: aborting CHANGE MASTER TO operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
 
-	if instance.UsingMariaDBGTID {
+	changedViaGTID := false
+	if (instance.UsingMariaDBGTID && gtidHint != GTIDHintDeny) || (instance.IsMariaDB() && gtidHint == GTIDHintForce) {
 		// MariaDB has a bug: a CHANGE MASTER TO statement does not work properly with prepared statement... :P
 		// See https://mariadb.atlassian.net/browse/MDEV-7640
 		// This is the reason for ExecInstanceNoPrepare
 		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d",
 			changeToMasterKey.Hostname, changeToMasterKey.Port))
-	} else if instance.UsingOracleGTID {
+		changedViaGTID = true
+	} else if (instance.UsingOracleGTID && gtidHint != GTIDHintDeny) || (instance.SupportsOracleGTID && gtidHint == GTIDHintForce) {
 		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_auto_position=1",
 			changeToMasterKey.Hostname, changeToMasterKey.Port))
+		changedViaGTID = true
 	} else if instance.SupportsOracleGTID {
 		// Supports, but not using
 		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d, master_auto_position=0",
 			changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
 	} else {
-		// Normal
+		// Normal binlog file:pos
 		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d",
 			changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
 	}
 	if err != nil {
 		return instance, log.Errore(err)
 	}
-	log.Infof("ChangeMasterTo: Changed master on %+v to: %+v, %+v", *instanceKey, changeToMasterKey, masterBinlogCoordinates)
+	log.Infof("ChangeMasterTo: Changed master on %+v to: %+v, %+v. GTID: %+v", *instanceKey, changeToMasterKey, masterBinlogCoordinates, changedViaGTID)
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
