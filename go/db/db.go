@@ -463,6 +463,11 @@ var generateSQLPatches = []string{
 			ADD COLUMN last_registered TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			ADD KEY last_registered_idx (last_registered)
 	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN supports_oracle_gtid TINYINT UNSIGNED NOT NULL AFTER oracle_gtid
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance

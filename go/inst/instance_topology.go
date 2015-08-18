@@ -391,13 +391,6 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
 		return Repoint(instanceKey, &sibling.Key)
 	}
 
-	isOracleGTID := (instance.UsingOracleGTID && sibling.UsingOracleGTID)
-	isMariaDBGTID := (instance.UsingMariaDBGTID && sibling.UsingMariaDBGTID)
-
-	if isOracleGTID || isMariaDBGTID {
-		//~~~return MoveBelowViaGTID(instance, sibling)
-	}
-
 	rinstance, _, _ := ReadInstance(&instance.Key)
 	if canMove, merr := rinstance.CanMove(); !canMove {
 		return instance, merr
@@ -471,8 +464,8 @@ Cleanup:
 
 // MoveBelowViaGTID will attempt moving instance indicated by instanceKey below another instance using either Oracle GTID or MaroaDB GTID.
 func MoveBelowViaGTID(instance, otherInstance *Instance) (*Instance, error) {
-	isOracleGTID := (instance.UsingOracleGTID && otherInstance.UsingOracleGTID)
-	isMariaDBGTID := (instance.UsingMariaDBGTID && otherInstance.UsingMariaDBGTID)
+	isOracleGTID := (instance.UsingOracleGTID && otherInstance.SupportsOracleGTID)
+	isMariaDBGTID := (instance.UsingMariaDBGTID && otherInstance.IsMariaDB())
 
 	instanceKey := &instance.Key
 	otherInstanceKey := &otherInstance.Key
@@ -490,7 +483,7 @@ func MoveBelowViaGTID(instance, otherInstance *Instance) (*Instance, error) {
 	if canReplicate, err := instance.CanReplicateFrom(otherInstance); !canReplicate {
 		return instance, err
 	}
-	log.Infof("Will move %+v below %+v", instanceKey, otherInstanceKey)
+	log.Infof("Will move %+v below %+v via GTID", instanceKey, otherInstanceKey)
 
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("move below %+v", *otherInstanceKey)); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
@@ -1734,6 +1727,14 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 		}
 		return Repoint(&instance.Key, &other.Key)
 	}
+	// Next, try GTID
+	isOracleGTID := (instance.UsingOracleGTID && other.SupportsOracleGTID)
+	isMariaDBGTID := (instance.UsingMariaDBGTID && other.IsMariaDB())
+
+	if isOracleGTID || isMariaDBGTID {
+		return MoveBelowViaGTID(instance, other)
+	}
+
 	// Next, try Pseudo-GTID
 	if instance.UsingPseudoGTID && other.UsingPseudoGTID {
 		// We prefer PseudoGTID to anything else because, while it takes longer to run, it does not issue

@@ -526,6 +526,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.Slave_SQL_Running = m.GetBool("slave_sql_running")
 	instance.Slave_IO_Running = m.GetBool("slave_io_running")
 	instance.HasReplicationFilters = m.GetBool("has_replication_filters")
+	instance.SupportsOracleGTID = m.GetBool("supports_oracle_gtid")
 	instance.UsingOracleGTID = m.GetBool("oracle_gtid")
 	instance.UsingMariaDBGTID = m.GetBool("mariadb_gtid")
 	instance.UsingPseudoGTID = m.GetBool("pseudo_gtid")
@@ -1289,6 +1290,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 					slave_sql_running=VALUES(slave_sql_running),
 					slave_io_running=VALUES(slave_io_running),
 					has_replication_filters=VALUES(has_replication_filters),
+					supports_oracle_gtid=VALUES(supports_oracle_gtid),
 					oracle_gtid=VALUES(oracle_gtid),
 					mariadb_gtid=VALUES(mariadb_gtid),
 					pseudo_gtid=values(pseudo_gtid),
@@ -1338,6 +1340,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				slave_sql_running,
 				slave_io_running,
 				has_replication_filters,
+				supports_oracle_gtid,
 				oracle_gtid,
 				mariadb_gtid,
 				pseudo_gtid,
@@ -1359,7 +1362,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				physical_environment,
 				replication_depth,
 				is_co_master
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
@@ -1381,6 +1384,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			instance.Slave_SQL_Running,
 			instance.Slave_IO_Running,
 			instance.HasReplicationFilters,
+			instance.SupportsOracleGTID,
 			instance.UsingOracleGTID,
 			instance.UsingMariaDBGTID,
 			instance.UsingPseudoGTID,
@@ -1828,7 +1832,12 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	} else if instance.UsingOracleGTID {
 		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_auto_position=1",
 			changeToMasterKey.Hostname, changeToMasterKey.Port))
+	} else if instance.SupportsOracleGTID {
+		// Supports, but not using
+		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d, master_auto_position=0",
+			changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
 	} else {
+		// Normal
 		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d",
 			changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
 	}

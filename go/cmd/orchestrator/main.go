@@ -236,7 +236,7 @@ Cheatsheet:
 		relocate-below
 			Relocate a slave beneath another (destination) instance. The choice of destination is almost arbitrary;
 			it must not be a child/descendant of the instance, but otherwise it can be anywhere, and can be a normal slave
-            or a binlog server. Orchestrator will choose the best course of action to relocate the slave.
+			or a binlog server. Orchestrator will choose the best course of action to relocate the slave.
 			No action taken when destination instance cannot act as master (e.g. has no binary logs, is of incompatible version, incompatible binlog format etc.)
 			Examples:
 
@@ -247,10 +247,11 @@ Cheatsheet:
 
 		relocate-slaves
 			Relocates all or part of the slaves of a given instance under another (destination) instance. This is 
-            typically much faster than relocating slaves one by one.
-            Orchestrator chooses the best course of action to relocation the slaves. It may choose a multi-step operations.
-            Some slaves may succeed and some may fail the operation.
-			The instance (slaves' master) itself may be crashed or inaccessible. It is not contacted throughout the operation. Examples:
+			typically much faster than relocating slaves one by one.
+			Orchestrator chooses the best course of action to relocation the slaves. It may choose a multi-step operations.
+			Some slaves may succeed and some may fail the operation.
+			The instance (slaves' master) itself may be crashed or inaccessible. It is not contacted throughout the operation. 
+			Examples:
 
 			orchestrator -c relocate-slaves -i instance.whose.slaves.will.relocate -d instance.that.becomes.their.master
 
@@ -587,9 +588,9 @@ func main() {
 	configFile := flag.String("config", "", "config file name")
 	command := flag.String("c", "", "command (discover|forget|continuous|move-up|move-below|begin-maintenance|end-maintenance|clusters|topology)")
 	strict := flag.Bool("strict", false, "strict mode (more checks, slower)")
-	instance := flag.String("i", "", "instance, host:port")
-	sibling := flag.String("s", "", "sibling instance, host:port")
-	destination := flag.String("d", "", "destination instance, host:port (synonym to -s)")
+	instance := flag.String("i", "", "instance, host_fqdn[:port] (e.g. db.company.com:3306, db.company.com)")
+	sibling := flag.String("s", "", "sibling instance, host_fqdn[:port]")
+	destination := flag.String("d", "", "destination instance, host_fqdn[:port] (synonym to -s)")
 	owner := flag.String("owner", "", "operation owner")
 	reason := flag.String("reason", "", "operation reason")
 	duration := flag.String("duration", "", "maintenance duration (format: 59s, 59m, 23h, 6d, 4w)")
