@@ -73,6 +73,7 @@ func Verify(r *nethttp.Request) error {
 	return errors.New("Invalid OU")
 }
 
+// TODO: make this testable?
 func VerifyOUs() martini.Handler {
 	return func(res nethttp.ResponseWriter, req *nethttp.Request, c martini.Context) {
 		if config.Config.UseMutualTLS {
@@ -99,8 +100,11 @@ func AppendKeyPair(tlsConfig *tls.Config, certFile string, keyFile string) error
 
 // ListenAndServeTLS acts identically to http.ListenAndServeTLS, except that it
 // expects TLS configuration.
+// TODO: refactor so this is testable?
 func ListenAndServeTLS(addr string, handler nethttp.Handler, tlsConfig *tls.Config) error {
 	if addr == "" {
+		// On unix Listen calls getaddrinfo to parse the port, so named ports are fine as long
+		// as they exist in /etc/services
 		addr = ":https"
 	}
 	l, err := tls.Listen("tcp", addr, tlsConfig)
