@@ -142,7 +142,8 @@ function activateInstanceChildrenDraggableDroppable(nodesMap, draggedNodeId, ori
 	 			var popoverElement = getInstanceDiv(instance.id);
 	 			popoverElement.addClass("original-dragged");
 	 		})
-	 		$(".instance-trailer").hide();
+	 		$(".instance-trailer[data-nodeid="+draggedNodeId+"]").addClass("original-dragged");
+	 		$(".instance-trailer[data-nodeid!="+draggedNodeId+"]").hide();
 	 		
 	  		$("#cluster_container .popover.instance").droppable({
 	 			accept: function(draggable) {
