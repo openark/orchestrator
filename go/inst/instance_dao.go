@@ -1832,21 +1832,37 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	}
 
 	changedViaGTID := false
-	if (instance.UsingMariaDBGTID && gtidHint != GTIDHintDeny) || (instance.IsMariaDB() && gtidHint == GTIDHintForce) {
+	if instance.UsingMariaDBGTID && gtidHint != GTIDHintDeny {
 		// MariaDB has a bug: a CHANGE MASTER TO statement does not work properly with prepared statement... :P
 		// See https://mariadb.atlassian.net/browse/MDEV-7640
 		// This is the reason for ExecInstanceNoPrepare
+		// Keep on using GTID
 		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d",
 			changeToMasterKey.Hostname, changeToMasterKey.Port))
 		changedViaGTID = true
-	} else if (instance.UsingOracleGTID && gtidHint != GTIDHintDeny) || (instance.SupportsOracleGTID && gtidHint == GTIDHintForce) {
+	} else if instance.UsingMariaDBGTID && gtidHint == GTIDHintDeny {
+		// Make sure to not use GTID
+		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d, master_use_gtid=no",
+			changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
+	} else if instance.IsMariaDB() && gtidHint == GTIDHintForce {
+		// Is MariaDB; not using GTID, turn into GTID
+		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_use_gtid=slave_pos",
+			changeToMasterKey.Hostname, changeToMasterKey.Port))
+		changedViaGTID = true
+	} else if instance.UsingOracleGTID && gtidHint != GTIDHintDeny {
+		// Is Oracle; already uses GTID; keep using it.
+		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d",
+			changeToMasterKey.Hostname, changeToMasterKey.Port))
+		changedViaGTID = true
+	} else if instance.UsingOracleGTID && gtidHint == GTIDHintDeny {
+		// Is Oracle; already uses GTID
+		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d, master_auto_position=0",
+			changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
+	} else if instance.SupportsOracleGTID && gtidHint == GTIDHintForce {
+		// Is Oracle; not using GTID right now; turn into GTID
 		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_auto_position=1",
 			changeToMasterKey.Hostname, changeToMasterKey.Port))
 		changedViaGTID = true
-	} else if instance.SupportsOracleGTID {
-		// Supports, but not using
-		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d, master_auto_position=0",
-			changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
 	} else {
 		// Normal binlog file:pos
 		_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d",

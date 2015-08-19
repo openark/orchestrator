@@ -151,6 +151,10 @@ function activateInstanceChildrenDraggableDroppable(nodesMap, draggedNodeId, ori
 	 				if (!droppableIsActive) {
 	 					return false
 	 				}
+	 				if ($(this).is("[data-duplicate-node]")) {
+	 					// The duplicate of the node whose children we are dragging.
+	 					return false;
+	 				}
 	 				var targetNode = nodesMap[$(this).attr("data-nodeid")];
 	 				
 	 				var acceptDrop = moveChildren(draggedNode, targetNode, false);
@@ -160,7 +164,7 @@ function activateInstanceChildrenDraggableDroppable(nodesMap, draggedNodeId, ori
 	 				if (acceptDrop.accept == "warning") {
 	 					$(this).addClass("accept_drop_warning");
 	 				}
-						$(this).attr("data-drop-comment", acceptDrop.accept ? acceptDrop.type : "");
+	 				$(this).attr("data-drop-comment", acceptDrop.accept ? acceptDrop.type : "");
 	 				return acceptDrop.accept != null;
 	 			},
 	 			hoverClass: "draggable-hovers",
