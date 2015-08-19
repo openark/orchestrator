@@ -182,7 +182,7 @@
     color: inherit;
 }
 
-.popover.instance.original-dragged {
+.popover.original-dragged {
     background-color: #808080;	
 }
 
@@ -429,6 +429,22 @@
     color: #ffffff;
 }
 
+.instance-trailer {
+    position: relative;
+    display: block;
+    width: 16px;
+    cursor: move;
+}
+
+.instance-trailer div {
+	position: relative;
+	top: 50%;
+	transform: translateY(-50%);
+}
+
+#cluster_container .instance-trailer[data-duplicate-node] {
+    position: absolute;
+}
 
 #main_container.container, #main_container .container {
     width: inherit;

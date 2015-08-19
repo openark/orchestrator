@@ -20,15 +20,25 @@ function repositionIntanceDivs() {
         popoverDiv.attr("y", $(this).attr("y"));
         $(this).attr("width", popoverDiv.width() + 30);
         $(this).attr("height", popoverDiv.height() +16);
+        $(this).css("max-height", popoverDiv.height() +16);
     });	
     $("div.popover").popover();
     $("div.popover").show();
+
+    $(".instance-trailer").each(function() {
+		var popoverDiv = $(this).prev();
+		$(this).css("left", popoverDiv.outerWidth(true)-parseInt($(this).css("border-left-width")));
+		$(this).css("margin-left", 0);
+		$(this).css("margin-top", 0);
+		$(this).css("top", 0 - popoverDiv.outerHeight(true));
+		$(this).css("height", popoverDiv.outerHeight(true));
+	});
 }
 
-// All dragging/dropping code goes here
-function activateDroppable(nodesMap, draggedNodeId, originalNode, duplicate) {
+// All instance dragging/dropping code goes here
+function activateInstanceDraggableDroppable(nodesMap, draggedNodeId, originalNode, duplicate) {
 	function clearDroppable() {
-		originalNode.removeClass("original-dragged");
+		$(".original-dragged").removeClass("original-dragged");
 		resetRefreshTimer();
 		$("#cluster_container .accept_drop").removeClass("accept_drop");
 		$("#cluster_container .accept_drop_warning").removeClass("accept_drop_warning");
@@ -105,6 +115,95 @@ function activateDroppable(nodesMap, draggedNodeId, originalNode, duplicate) {
     });		
 }
 
+
+//All instance dragging/dropping code goes here
+function activateInstanceChildrenDraggableDroppable(nodesMap, draggedNodeId, originalNode, duplicate) {
+	function clearDroppable() {
+		$(".original-dragged").removeClass("original-dragged");
+		$(".instance-trailer").show();
+		resetRefreshTimer();
+		$("#cluster_container .accept_drop").removeClass("accept_drop");
+		$("#cluster_container .accept_drop_warning").removeClass("accept_drop_warning");
+		droppableIsActive = false;
+	}
+	var draggedNode = nodesMap[draggedNodeId];
+	$(duplicate).draggable({
+	 	addClasses: true, 
+	 	opacity: 1,
+	 	snap: "#cluster_container .popover.instance",
+	 	snapMode: "inner",
+	 	snapTolerance: 10,
+	 	start: function(event, ui) {
+	 		// dragging begins
+	 		clearDroppable();
+	 		droppableIsActive = true;
+
+	 		draggedNode.children.forEach(function f(instance) {
+	 			var popoverElement = getInstanceDiv(instance.id);
+	 			popoverElement.addClass("original-dragged");
+	 		})
+	 		$(".instance-trailer").hide();
+	 		
+	  		$("#cluster_container .popover.instance").droppable({
+	 			accept: function(draggable) {
+	 				// Find the objects that accept a draggable (i.e. valid droppables)
+	 				if (!droppableIsActive) {
+	 					return false
+	 				}
+	 				var targetNode = nodesMap[$(this).attr("data-nodeid")];
+	 				
+	 				var acceptDrop = moveChildren(draggedNode, targetNode, false);
+	 				if (acceptDrop.accept == "ok") {
+	 					$(this).addClass("accept_drop");
+	 				}
+	 				if (acceptDrop.accept == "warning") {
+	 					$(this).addClass("accept_drop_warning");
+	 				}
+						$(this).attr("data-drop-comment", acceptDrop.accept ? acceptDrop.type : "");
+	 				return acceptDrop.accept != null;
+	 			},
+	 			hoverClass: "draggable-hovers",
+				    over: function( event, ui ) {
+				    	// Called once when dragged object is over another object
+				    	if ($(this).attr("data-drop-comment")) {
+				    		$(duplicate).addClass("draggable-msg");
+				    		$(duplicate).find(".popover-content").html($(this).attr("data-drop-comment"))
+				    	} else {
+				    		$(duplicate).find(".popover-content").html("Cannot drop here")
+				    	}
+				    },
+				    out: function( event, ui ) {
+				    	// Called once when dragged object leaves other object
+			    		$(duplicate).removeClass("draggable-msg");
+				    	$(duplicate).find(".popover-content").html("")
+				    },
+				    drop: function( event, ui ) {
+			            $(".instance-trailer[data-duplicate-node]").remove();
+			            moveChildren(nodesMap[draggedNodeId], nodesMap[$(this).attr("data-nodeid")], true);
+			            clearDroppable();
+				    }
+	 		});
+	 	},
+	 	drag: function(event, ui) {
+	 		resetRefreshTimer();
+	 	},
+	 	stop: function(event, ui) {
+	 		clearDroppable();
+	 	}
+	});
+	$(duplicate).on("mouseleave", function() {
+		if (!$(this).hasClass("ui-draggable-dragging")) {
+			$(this).remove();
+		}
+	});
+	// Don't ask why the following... jqueryUI recognizes the click as start drag, but fails to stop...
+	$(duplicate).on("click", function() {
+		clearDroppable();
+ 	return false;
+ });		
+}
+
+
 function generateInstanceDivs(nodesMap) {
     nodesList = []
     for (var nodeId in nodesMap) {
@@ -122,11 +221,17 @@ function generateInstanceDivs(nodesMap) {
     });
     nodesList.forEach(function (node) {
     	var popoverElement = getInstanceDiv(node.id);
-   		renderInstanceElement(popoverElement, node, "cluster");
+    	if (popoverElement) {
+    		renderInstanceElement(popoverElement, node, "cluster");
+    		if (node.children && !node.isMaster) {
+	    		$(popoverElement).after(
+	    			'<div class="popover left instance-trailer" data-nodeid="'+node.id+'"><div><span class="glyphicon glyphicon-chevron-left" title="Drag and drop slaves of this instance"></span></div></div>'
+	    		);
+    		}
+    	}
     });
-
-    $("[data-fo-id]").on("mouseenter", ".popover[data-nodeid]", function() {
-    	if ($(".popover.instance[data-duplicate-node]").hasClass("ui-draggable-dragging")) {
+    $("[data-fo-id]").on("mouseenter", ".popover.instance[data-nodeid]", function() {
+    	if ($("[data-duplicate-node]").hasClass("ui-draggable-dragging")) {
     		// Do not remove & recreate while dragging. Ignore any mouseenter
     		return false;
     	}
@@ -202,11 +307,48 @@ function generateInstanceDivs(nodesMap) {
             	return false;
             });
         } else {
-        	activateDroppable(nodesMap, draggedNodeId, originalNode, duplicate);
+        	activateInstanceDraggableDroppable(nodesMap, draggedNodeId, originalNode, duplicate);
         }
+    });
+    
+    $("body").on("mouseenter", ".instance-trailer[data-nodeid]", function() {
+    	if ($("[data-duplicate-node]").hasClass("ui-draggable-dragging")) {
+    		// Do not remove & recreate while dragging. Ignore any mouseenter
+    		return false;
+    	}
+    	var draggedNodeId = $(this).attr("data-nodeid");
+    	if (draggedNodeId == $(".instance-trailer[data-duplicate-node]").attr("data-nodeid")) {
+    		return false;
+    	}
+
+    	$(".instance-trailer[data-duplicate-node]").remove();
+    	var originalElement = $(this); // The trailer, a small div
+    	var originalNode = $(originalElement).prev(); // However we copy the instance node element
+    	var duplicate = originalNode.clone().appendTo("#cluster_container");
+    	$(duplicate).attr("data-duplicate-node", "true");
+    	$(duplicate).css({"margin-left": "0"});
+    	$(duplicate).css(originalElement.offset());
+    	$(duplicate).width(originalNode.width());
+    	$(duplicate).height(originalNode.height());
+    	$(duplicate).find("h3 .pull-left").css('font-style', 'italic').prepend("slaves of ");
+    	$(duplicate).find("h3 .pull-right").html('<span class="glyphicon glyphicon-chevron-left"></span>');
+    	$(duplicate).find(".popover-content").html("<p>Drag "+nodesMap[draggedNodeId].children.length+" slave(s) of this instance</p>");
+    	$(duplicate).find(".popover-footer").remove();
+    	$(duplicate).popover();
+        $(duplicate).show();
+
+        if (!isAuthorizedForAction()) {
+        	return false;
+        }
+        activateInstanceChildrenDraggableDroppable(nodesMap, draggedNodeId, originalElement, duplicate);
     });
 }
 
+// moveInstance checks whether an instance (node) can be dropped on another (droppableNode).
+// The function consults with the current moveInstanceMethod; the type of action taken is based on that.
+// For example, actions can be repoint, match-below, relocate-below, move-up, enslave-master etc.
+// When shouldApply is false nothing gets executed, and the function merely serves as a predictive
+// to the possibility of the drop.
 function moveInstance(node, droppableNode, shouldApply) {
     if (!isAuthorizedForAction()) {
     	// Obviously this is also checked on server side, no need to try stupid hacks
@@ -350,6 +492,134 @@ function moveInstance(node, droppableNode, shouldApply) {
 	return {accept: false};
 }
 
+
+// moveChildren checks whether an children of an instance (node) can be dropped on another (droppableNode).
+// The function consults with the current moveInstanceMethod; the type of action taken is based on that.
+// For example, actions can be repoint-slaves, multi-match-slaves, relocate-slaves, move-up-slaves etc.
+// When shouldApply is false nothing gets executed, and the function merely serves as a predictive
+// to the possibility of the drop.
+function moveChildren(node, droppableNode, shouldApply) {
+    if (!isAuthorizedForAction()) {
+    	// Obviously this is also checked on server side, no need to try stupid hacks
+		return {accept: false} ;
+    }
+    var isUsingGTID = (node.usingGTID && droppableNode.usingGTID);
+	if (moveInstanceMethod == "smart") {
+		// Moving via GTID or Pseudo GTID
+		if (droppableNode.hasConnectivityProblem || droppableNode.isAggregate) {
+			// Obviously can't handle.
+			return {accept: false};
+		}
+		if (!droppableNode.LogSlaveUpdatesEnabled) {
+			// Obviously can't handle.
+			return {accept: false};
+		}
+		
+		if (node.id == droppableNode.id) {
+			if (shouldApply) {
+				relocateSlaves(node, droppableNode);
+			}
+			return {accept: "ok", type: "relocate < " + droppableNode.canonicalTitle};
+		}
+		if (instanceIsDescendant(droppableNode, node) && node.children.length <= 1) {
+			// Can generally move slaves onto one of them, but there needs to be at least two slaves...
+			// Otherwise we;re trying to mvoe a slave under itself which is clearly an error.
+			return {accept: false};
+		}
+		// the general case
+		if (shouldApply) {
+			relocateSlaves(node, droppableNode);
+		}
+		return {accept: "warning", type: "relocate < " + droppableNode.canonicalTitle};
+	}
+
+	if (moveInstanceMethod == "pseudo-gtid") {
+		var gtidBelowFunc = matchSlaves
+		//~~~TODO: when GTID is fully supported: gtidBelowFunc = moveBelow
+		// Moving via GTID or Pseudo GTID
+		if (droppableNode.hasConnectivityProblem || droppableNode.isAggregate) {
+			// Obviously can't handle.
+			return {accept: false};
+		}
+		if (!droppableNode.LogSlaveUpdatesEnabled) {
+			// Obviously can't handle.
+			return {accept: false};
+		}		
+		if (node.id == droppableNode.id) {
+			if (shouldApply) {
+				gtidBelowFunc(node, droppableNode);
+			}
+			return {accept: "ok", type: gtidBelowFunc.name + " < " + droppableNode.canonicalTitle};
+		}
+		if (instanceIsDescendant(droppableNode, node) && node.children.length <= 1) {
+			// Can generally move slaves onto one of them, but there needs to be at least two slaves...
+			// Otherwise we;re trying to mvoe a slave under itself which is clearly an error.
+			// Wrong direction!
+			return {accept: false};
+		}
+		if (instanceIsDescendant(node, droppableNode)) {
+			// clearly node cannot be more up to date than droppableNode
+			if (shouldApply) {
+				gtidBelowFunc(node, droppableNode);
+			}
+			return {accept: "ok", type: gtidBelowFunc.name + " < " + droppableNode.canonicalTitle};
+		}
+		// TODO: the general case, where there's no clear family connection, meaning we cannot infer
+		// which instance is more up to date. It's under the user's responsibility!
+		if (shouldApply) {
+			gtidBelowFunc(node, droppableNode);
+		}
+		return {accept: "warning", type: gtidBelowFunc.name + " < " + droppableNode.canonicalTitle};
+	}
+	if (moveInstanceMethod == "classic") {
+		// Not pseudo-GTID mode, non GTID mode
+		if (node.id == droppableNode.id) {
+			if (shouldApply) {
+				repointSlaves(node);
+			}
+			return {accept: "ok", type: "repointSlaves < " + droppableNode.canonicalTitle};
+		}
+		if (instanceIsChild(node, droppableNode)) {
+			if (shouldApply) {
+				moveUpSlaves(node, droppableNode);
+			}
+			return {accept: "ok", type: "moveUpSlaves < " + droppableNode.canonicalTitle};
+		}
+		return {accept: false};
+	}
+	if (shouldApply) {
+		addAlert(
+				"Cannot move slaves of <code><strong>" + 
+					node.Key.Hostname + ":" + node.Key.Port +
+					"</strong></code> under <code><strong>" +
+					droppableNode.Key.Hostname + ":" + droppableNode.Key.Port +
+					"</strong></code>. " +
+				"You may only repoint or move up the slaves of an instance. Otherwise try Smart Mode."
+			);
+	}
+	return {accept: false};
+}
+
+
+function executeMoveOperation(message, apiUrl) {
+	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
+		if (confirm) {
+			showLoader();
+			$.get(apiUrl, function (operationResult) {
+	    			hideLoader();
+	    			if (operationResult.Code == "ERROR") {
+	    				addAlert(operationResult.Message)
+	    			} else {
+	    				reloadWithOperationResult(operationResult);
+	    			}	
+	            }, "json");					
+		}
+		$("#cluster_container .accept_drop").removeClass("accept_drop");
+    	$("#cluster_container .accept_drop").removeClass("accept_drop_warning");
+	}); 
+	return false;	
+}
+
 function relocateBelow(node, siblingNode) {
 	var message = "<h4>relocate-below</h4>Are you sure you wish to turn <code><strong>" + 
 		node.Key.Hostname + ":" + node.Key.Port +
@@ -359,23 +629,49 @@ function relocateBelow(node, siblingNode) {
 		"<h4>Note</h4><p>Orchestrator will try and figure out the best relocation path. This may involve multiple steps. " +
 		"<p>In case multiple steps are involved, failure of one would leave your instance hanging in a different location than you expected, " +
 		"but it would still be in a <i>valid</i> state.";
-	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
-		if (confirm) {
-			showLoader();
-			var apiUrl = "/api/relocate-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port;
-		    $.get(apiUrl, function (operationResult) {
-	    			hideLoader();
-	    			if (operationResult.Code == "ERROR") {
-	    				addAlert(operationResult.Message)
-	    			} else {
-	    				reloadWithOperationResult(operationResult);
-	    			}	
-	            }, "json");					
-		}
-		$("#cluster_container .accept_drop").removeClass("accept_drop");
-    	$("#cluster_container .accept_drop").removeClass("accept_drop_warning");
-	}); 
-	return false;
+	var apiUrl = "/api/relocate-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port;
+	return executeMoveOperation(message, apiUrl);
+}
+
+function relocateSlaves(node, siblingNode) {
+	var message = "<h4>relocate-slaves</h4>Are you sure you wish to relocate slaves of <code><strong>" + 
+		node.Key.Hostname + ":" + node.Key.Port +
+		"</strong></code> below <code><strong>" +
+		siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
+		"</strong></code>?"+
+		"<h4>Note</h4><p>Orchestrator will try and figure out the best relocation path. This may involve multiple steps. " +
+		"<p>In case multiple steps are involved, failure of one may leave some instances hanging in a different location than you expected, " +
+		"but they would still be in a <i>valid</i> state.";
+	var apiUrl = "/api/relocate-slaves/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port;
+	return executeMoveOperation(message, apiUrl);
+}
+
+function repointSlaves(node, siblingNode) {
+	var message = "<h4>repoint-slaves</h4>Are you sure you wish to repoint slaves of <code><strong>" + 
+		node.Key.Hostname + ":" + node.Key.Port +
+		"</strong></code>?";
+	var apiUrl = "/api/repoint-slaves/" + node.Key.Hostname + "/" + node.Key.Port;
+	return executeMoveOperation(message, apiUrl);
+}
+
+function moveUpSlaves(node, masterNode) {
+	var message = "<h4>move-up-slaves</h4>Are you sure you wish to move up slaves of <code><strong>" + 
+		node.Key.Hostname + ":" + node.Key.Port +
+		"</strong></code> below <code><strong>" +
+		masterNode.Key.Hostname + ":" + masterNode.Key.Port +
+		"</strong></code>?";
+	var apiUrl = "/api/move-up-slaves/" + node.Key.Hostname + "/" + node.Key.Port;
+	return executeMoveOperation(message, apiUrl);
+}
+
+function matchSlaves(node, otherNode) {
+	var message = "<h4>multi-match-slaves</h4>Are you sure you wish to match slaves of <code><strong>" + 
+		node.Key.Hostname + ":" + node.Key.Port +
+		"</strong></code> below <code><strong>" +
+		otherNode.Key.Hostname + ":" + otherNode.Key.Port +
+		"</strong></code>?";
+	var apiUrl = "/api/multi-match-slaves/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
+	return executeMoveOperation(message, apiUrl);
 }
 
 function moveBelow(node, siblingNode) {
@@ -384,74 +680,28 @@ function moveBelow(node, siblingNode) {
 		"</strong></code> into a slave of <code><strong>" +
 		siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
 		"</strong></code>?";
-	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
-		if (confirm) {
-			showLoader();
-			var apiUrl = "/api/move-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port;
-		    $.get(apiUrl, function (operationResult) {
-	    			hideLoader();
-	    			if (operationResult.Code == "ERROR") {
-	    				addAlert(operationResult.Message)
-	    			} else {
-	    				reloadWithOperationResult(operationResult);
-	    			}	
-	            }, "json");					
-		}
-		$("#cluster_container .accept_drop").removeClass("accept_drop");
-    	$("#cluster_container .accept_drop").removeClass("accept_drop_warning");
-	}); 
-	return false;
+	var apiUrl = "/api/move-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port;
+	return executeMoveOperation(message, apiUrl);
 }
-
 
 function moveUp(node, grandparentNode) {
 	var message = "<h4>move-up</h4>Are you sure you wish to turn <code><strong>" + 
 		node.Key.Hostname + ":" + node.Key.Port +
 		"</strong></code> into a slave of <code><strong>" +
 		grandparentNode.Key.Hostname + ":" + grandparentNode.Key.Port +
-		"</strong></code>?"
-	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
-		if (confirm) {
-			showLoader();
-			var apiUrl = "/api/move-up/" + node.Key.Hostname + "/" + node.Key.Port;
-		    $.get(apiUrl, function (operationResult) {
-	    			hideLoader();
-	    			if (operationResult.Code == "ERROR") {
-	    				addAlert(operationResult.Message)
-	    			} else {
-	    				reloadWithOperationResult(operationResult);
-	    			}	
-	            }, "json");					
-		}
-		$("#cluster_container .accept_drop").removeClass("accept_drop");
-	}); 
-	return false;
+		"</strong></code>?";
+	var apiUrl = "/api/move-up/" + node.Key.Hostname + "/" + node.Key.Port;
+	return executeMoveOperation(message, apiUrl);
 }
-
-
 
 function enslaveMaster(node, masterNode) {
 	var message = "<h4>enslave-master</h4>Are you sure you wish to make <code><strong>" + 
 		node.Key.Hostname + ":" + node.Key.Port +
 		"</strong></code> master of <code><strong>" +
 		masterNode.Key.Hostname + ":" + masterNode.Key.Port +
-		"</strong></code>?"
-	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
-		if (confirm) {
-			showLoader();
-			var apiUrl = "/api/enslave-master/" + node.Key.Hostname + "/" + node.Key.Port;
-		    $.get(apiUrl, function (operationResult) {
-	    			hideLoader();
-	    			if (operationResult.Code == "ERROR") {
-	    				addAlert(operationResult.Message)
-	    			} else {
-	    				reloadWithOperationResult(operationResult);
-	    			}	
-	            }, "json");					
-		}
-		$("#cluster_container .accept_drop").removeClass("accept_drop");
-	}); 
-	return false;
+		"</strong></code>?";
+	var apiUrl = "/api/enslave-master/" + node.Key.Hostname + "/" + node.Key.Port;
+	return executeMoveOperation(message, apiUrl);
 }
 
 function makeCoMaster(node, childNode) {
@@ -459,25 +709,10 @@ function makeCoMaster(node, childNode) {
 		node.Key.Hostname + ":" + node.Key.Port +
 		"</strong></code> and <code><strong>" +
 		childNode.Key.Hostname + ":" + childNode.Key.Port +
-		"</strong></code> co-masters?"
-	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
-		if (confirm) {
-			showLoader();
-			var apiUrl = "/api/make-co-master/" + childNode.Key.Hostname + "/" + childNode.Key.Port;
-		    $.get(apiUrl, function (operationResult) {
-	    			hideLoader();
-	    			if (operationResult.Code == "ERROR") {
-	    				addAlert(operationResult.Message)
-	    			} else {
-	    				reloadWithOperationResult(operationResult);
-	    			}	
-	            }, "json");					
-		}
-		$("#cluster_container .accept_drop").removeClass("accept_drop");
-	}); 
-	return false;
+		"</strong></code> co-masters?";
+	var apiUrl = "/api/make-co-master/" + childNode.Key.Hostname + "/" + childNode.Key.Port;
+	return executeMoveOperation(message, apiUrl);
 }
-
 
 
 function matchBelow(node, otherNode) {
@@ -486,22 +721,8 @@ function matchBelow(node, otherNode) {
 		"</strong></code> into a slave of <code><strong>" +
 		otherNode.Key.Hostname + ":" + otherNode.Key.Port +
 		"</strong></code>?";
-	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
-		if (confirm) {
-			showLoader();
-			var apiUrl = "/api/match-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
-		    $.get(apiUrl, function (operationResult) {
-	    			hideLoader();
-	    			if (operationResult.Code == "ERROR") {
-	    				addAlert(operationResult.Message)
-	    			} else {
-	    				reloadWithOperationResult(operationResult);
-	    			}	
-	            }, "json");					
-		}
-		$("#cluster_container .accept_drop").removeClass("accept_drop");
-	}); 
-	return false;
+	var apiUrl = "/api/match-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
+	return executeMoveOperation(message, apiUrl);
 }
 
 
@@ -700,10 +921,10 @@ function postVisualizeInstances(nodesMap) {
         dcColorsMap[knownDCs[i]] = renderColors[i % renderColors.length];
     }
     instances.forEach(function (instance) {
-    	var draggedNodeId = $(this).attr("data-nodeid"); 
     	$(".popover.instance[data-nodeid="+instance.id+"]").attr("data-dc-color", dcColorsMap[instance.DataCenter]);
+    	$(".instance-trailer[data-nodeid="+instance.id+"]").attr("data-dc-color", dcColorsMap[instance.DataCenter]);
     });
-    repositionIntanceDivs()
+    repositionIntanceDivs();
 }
 
 
@@ -826,9 +1047,13 @@ function anonymize() {
 }
 
 function colorize_dc() {
-    $(".popover.instance[data-dc-color]").each(function () {
+    $(".popover[data-dc-color]").each(function () {
         $(this).css("border-color", $(this).attr("data-dc-color"));
         $(this).css("border-width", 2);
+    });	
+    $(".popover.instance-trailer[data-dc-color]").each(function () {
+   		$(this).css("margin-top", -2);
+   		$(this).css("height", $(this).prev().outerHeight(true));
     });	
 }
 
