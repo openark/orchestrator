@@ -228,7 +228,7 @@ function generateInstanceDivs(nodesMap) {
     	var popoverElement = getInstanceDiv(node.id);
     	if (popoverElement) {
     		renderInstanceElement(popoverElement, node, "cluster");
-    		if (node.children && !node.isMaster) {
+    		if (node.children) {
 	    		$(popoverElement).after(
 	    			'<div class="popover left instance-trailer" data-nodeid="'+node.id+'"><div><span class="glyphicon glyphicon-chevron-left" title="Drag and drop slaves of this instance"></span></div></div>'
 	    		);
@@ -1253,6 +1253,13 @@ $(document).ready(function () {
                	    	indicateClusterPoolInstances(clusterPoolInstances, instancesMap);
                     }, "json");                	
                 }
+                if (reloadPageHint.hint == "refresh") {
+                	var instanceId = getInstanceId(reloadPageHint.hostname, reloadPageHint.port);
+            		var instance = instancesMap[instanceId]        	
+            		if (instance) { 
+            			openNodeModal(instance);
+            		}
+                }
         	}, "json");
     	}, "json");
     }, "json");
@@ -1284,7 +1291,6 @@ $(document).ready(function () {
         	$("#dropdown-context a[data-command=colorize-dc]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
         } 
         populateSidebar(clusterInfo);
-
     }, "json");
     
     $.get("/api/active-cluster-recovery/"+currentClusterName(), function (recoveries) {

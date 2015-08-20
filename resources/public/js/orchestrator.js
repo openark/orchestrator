@@ -3,6 +3,12 @@ var refreshIntervalSeconds = 60 ; // seconds
 var secondsTillRefresh = refreshIntervalSeconds; 
 var nodeModalVisible = false;
 
+reloadPageHint = {
+		hint: "",
+		hostname: "",
+		port: ""
+}
+
 var errorMapping = {
    		"inMaintenanceProblem": {"badge": "label-info", "description": "In maintenance"}, 
    		"lastCheckInvalidProblem": {"badge": "label-fatal", "description": "Last check invalid"}, 
@@ -128,27 +134,34 @@ function addInfo(alertText) {
 	return addAlert(alertText, "info");
 }
 
-function apiCommand(uri) {
+function apiCommand(uri, hint) {
 	showLoader();
     $.get(uri, function (operationResult) {
 		hideLoader();
 		if (operationResult.Code == "ERROR") {
 			addAlert(operationResult.Message)
 		} else {
-			reloadWithOperationResult(operationResult);
+			reloadWithOperationResult(operationResult, hint);
 		}	
     }, "json");	
     return false;
 }
 
 
-function reloadWithMessage(msg) {
-    window.location.href = window.location.href.split("#")[0].split("?")[0] + "?orchestrator-msg="+ encodeURIComponent(msg);
+function reloadWithMessage(msg, details, hint) {
+	var hostname = "";
+	var port = "";
+	if (details) {
+		hostname = details.Hostname || hostname
+		port = details.Port || port
+	}
+	hint = hint || "";
+    window.location.href = window.location.href.split("#")[0].split("?")[0] + "?orchestrator-msg="+ encodeURIComponent(msg)+"&hostname="+hostname+"&port="+port+"&hint="+hint;
 }
 
-function reloadWithOperationResult(operationResult) {
+function reloadWithOperationResult(operationResult, hint) {
     var msg = operationResult.Message;
-    reloadWithMessage(msg);
+    reloadWithMessage(msg, operationResult.Details, hint);
 }
 
 
@@ -177,6 +190,9 @@ function addModalAlert(alertText) {
 }
 
 function openNodeModal(node) {
+	if (!node) {
+		return false;
+	}
 	if (node.isAggregate) {
 		return false;
 	}
@@ -249,7 +265,7 @@ function openNodeModal(node) {
     	apiCommand("/api/end-maintenance/"+node.Key.Hostname+"/"+node.Key.Port);
     });
     $('#node_modal button[data-btn=refresh-instance]').click(function(){
-    	apiCommand("/api/refresh/"+node.Key.Hostname+"/"+node.Key.Port);
+    	apiCommand("/api/refresh/"+node.Key.Hostname+"/"+node.Key.Port, "refresh");
     });
     $('#node_modal button[data-btn=skip-query]').click(function(){
     	apiCommand("/api/skip-query/"+node.Key.Hostname+"/"+node.Key.Port);
@@ -751,6 +767,12 @@ $(document).ready(function() {
     var orchestratorMsg = getParameterByName("orchestrator-msg")
     if (orchestratorMsg) {
         addInfo(orchestratorMsg)
+       
+        reloadPageHint = {
+    		hint: getParameterByName("hint"),
+    		hostname: getParameterByName("hostname"),
+    		port: getParameterByName("port")
+        }
         history.pushState(null, document.title, location.href.split("?orchestrator-msg=")[0])
     }
 	if (typeof($.cookie("auto-refresh"))==='undefined') {

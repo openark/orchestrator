@@ -126,7 +126,7 @@ func (this *HttpAPI) Refresh(params martini.Params, r render.Render, req *http.R
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance refreshed: %+v", instanceKey)})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance refreshed: %+v", instanceKey), Details: instanceKey})
 }
 
 // Forget removes an instance entry fro backend database
