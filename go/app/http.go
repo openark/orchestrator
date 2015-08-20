@@ -105,23 +105,40 @@ func standardHttp(discovery bool) {
 		HTMLContentType: "text/html",
 	}))
 	m.Use(martini.Static("resources/public"))
+	m.Use(http.VerifyOUs())
 
 	inst.SetMaintenanceOwner(logic.ThisHostname)
 
-	log.Info("Starting HTTP")
-
 	if discovery {
+		log.Info("Starting Discovery")
 		go logic.ContinuousDiscovery()
 	}
 	inst.ReadClusterAliases()
 
+	log.Info("Registering endpoints")
 	http.API.RegisterRequests(m)
 	http.Web.RegisterRequests(m)
 
 	// Serve
-	if err := nethttp.ListenAndServe(config.Config.ListenAddress, m); err != nil {
-		log.Fatale(err)
+	if config.Config.UseSSL {
+		log.Info("Starting HTTPS listener")
+		tlsConfig, err := http.NewTLSConfig(config.Config.SSLCAFile, config.Config.UseMutualTLS)
+		if err != nil {
+			log.Fatale(err)
+		}
+		if err = http.AppendKeyPair(tlsConfig, config.Config.SSLCertFile, config.Config.SSLPrivateKeyFile); err != nil {
+			log.Fatale(err)
+		}
+		if err = http.ListenAndServeTLS(config.Config.ListenAddress, m, tlsConfig); err != nil {
+			log.Fatale(err)
+		}
+	} else {
+		log.Info("Starting HTTP listener")
+		if err = nethttp.ListenAndServe(config.Config.ListenAddress, m); err != nil {
+			log.Fatale(err)
+		}
 	}
+	log.Info("Web server started")
 }
 
 // agentsHttp startes serving agents API requests
@@ -139,7 +156,7 @@ func agentsHttp() {
 	// Serve
 	if config.Config.AgentsUseSSL {
 		log.Info("Serving via SSL")
-		err := nethttp.ListenAndServeTLS(config.Config.AgentsServerPort, config.Config.SSLCertFile, config.Config.SSLPrivateKeyFile, m)
+		err := nethttp.ListenAndServeTLS(config.Config.AgentsServerPort, config.Config.AgentSSLCertFile, config.Config.AgentSSLPrivateKeyFile, m)
 		if err != nil {
 			log.Fatale(err)
 		}
