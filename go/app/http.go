@@ -134,7 +134,7 @@ func standardHttp(discovery bool) {
 		}
 	} else {
 		log.Info("Starting HTTP listener")
-		if err = nethttp.ListenAndServe(config.Config.ListenAddress, m); err != nil {
+		if err := nethttp.ListenAndServe(config.Config.ListenAddress, m); err != nil {
 			log.Fatale(err)
 		}
 	}
