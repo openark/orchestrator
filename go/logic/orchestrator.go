@@ -203,6 +203,7 @@ func ContinuousDiscovery() {
 					inst.ExpireHostnameUnresolve()
 					inst.ExpireClusterDomainName()
 					inst.ExpireAudit()
+					inst.ExpireMasterPositionEquivalence()
 				}
 				if !elected {
 					// Take this opportunity to refresh yourself

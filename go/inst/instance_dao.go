@@ -1831,6 +1831,9 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 		return instance, fmt.Errorf("noop: aborting CHANGE MASTER TO operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
 
+	originalMasterKey := &instance.MasterKey
+	originalExecBinlogCoordinates := &instance.ExecBinlogCoordinates
+
 	changedViaGTID := false
 	if instance.UsingMariaDBGTID && gtidHint != GTIDHintDeny {
 		// MariaDB has a bug: a CHANGE MASTER TO statement does not work properly with prepared statement... :P
@@ -1871,6 +1874,8 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	if err != nil {
 		return instance, log.Errore(err)
 	}
+	WriteMasterPositionEquivalence(originalMasterKey, originalExecBinlogCoordinates, changeToMasterKey, masterBinlogCoordinates)
+
 	log.Infof("ChangeMasterTo: Changed master on %+v to: %+v, %+v. GTID: %+v", *instanceKey, changeToMasterKey, masterBinlogCoordinates, changedViaGTID)
 
 	instance, err = ReadTopologyInstance(instanceKey)
@@ -2195,4 +2200,40 @@ func ReadClusterCandidateInstances(clusterName string) ([](*Instance), error) {
 			and (hostname, port) in (select hostname, port from candidate_database_instance)
 			`, clusterName)
 	return readInstancesByCondition(condition, "")
+}
+
+func WriteMasterPositionEquivalence(master1Key *InstanceKey, master1BinlogCoordinates *BinlogCoordinates,
+	master2Key *InstanceKey, master2BinlogCoordinates *BinlogCoordinates) error {
+	if master1Key.Equals(master2Key) {
+		// Not interesting
+		return nil
+	}
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+        	insert into master_position_equivalence (
+        			master1_hostname, master1_port, master1_binary_log_file, master1_binary_log_pos,
+        			master2_hostname, master2_port, master2_binary_log_file, master2_binary_log_pos,
+        			last_suggested)
+        		values (?, ?, ?, ?, ?, ?, ?, ?, NOW()) 
+        		on duplicate key update last_suggested=values(last_suggested)
+				
+				`, master1Key.Hostname, master1Key.Port, master1BinlogCoordinates.LogFile, master1BinlogCoordinates.LogPos,
+			master2Key.Hostname, master2Key.Port, master2BinlogCoordinates.LogFile, master2BinlogCoordinates.LogPos,
+		)
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
+// ExpireMasterPositionEquivalence expires old master_position_equivalence
+func ExpireMasterPositionEquivalence() error {
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+        	delete from master_position_equivalence 
+				where last_suggested < NOW() - INTERVAL ? HOUR
+				`, config.Config.UnseenInstanceForgetHours,
+		)
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
 }

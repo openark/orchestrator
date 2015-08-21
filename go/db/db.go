@@ -328,6 +328,24 @@ var generateSQL = []string{
 		  KEY domain_name_idx(domain_name(32))
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+        CREATE TABLE IF NOT EXISTS master_position_equivalence (
+          equivalence_id bigint unsigned not null auto_increment,
+          master1_hostname varchar(128) CHARACTER SET ascii NOT NULL,
+          master1_port smallint(5) unsigned NOT NULL,
+          master1_binary_log_file varchar(128) CHARACTER SET ascii NOT NULL,
+          master1_binary_log_pos bigint(20) unsigned NOT NULL,
+          master2_hostname varchar(128) CHARACTER SET ascii NOT NULL,
+          master2_port smallint(5) unsigned NOT NULL,
+          master2_binary_log_file varchar(128) CHARACTER SET ascii NOT NULL,
+          master2_binary_log_pos bigint(20) unsigned NOT NULL,
+          last_suggested TIMESTAMP NOT NULL,
+          PRIMARY KEY (equivalence_id),
+          UNIQUE KEY equivalence_uidx (master1_hostname, master1_port, master1_binary_log_file, master1_binary_log_pos, master2_hostname, master2_port),
+          KEY master2_idx (master2_hostname, master2_port, master2_binary_log_file, master2_binary_log_pos),
+          KEY last_suggested_idx(last_suggested)
+        ) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{
