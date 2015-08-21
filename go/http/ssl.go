@@ -10,7 +10,6 @@ import (
 
 	"github.com/go-martini/martini"
 	"github.com/outbrain/golib/log"
-	"github.com/outbrain/orchestrator/go/config"
 )
 
 // Determine if a string element is in a string array
@@ -54,7 +53,7 @@ func NewTLSConfig(caFile string, mutualTLS bool) (*tls.Config, error) {
 
 // Verify that the OU of the presented client certificate matches the list
 // of Valid OUs
-func Verify(r *nethttp.Request) error {
+func Verify(r *nethttp.Request, validOUs []string) error {
 	if r.TLS == nil {
 		return errors.New("no TLS")
 	}
@@ -63,7 +62,7 @@ func Verify(r *nethttp.Request) error {
 		log.Debug("All OUs:", strings.Join(s, " "))
 		for _, ou := range s {
 			log.Debug("Client presented OU:", ou)
-			if HasString(ou, config.Config.SSLValidOUs) {
+			if HasString(ou, validOUs) {
 				log.Debug("Found valid OU:", ou)
 				return nil
 			}
@@ -74,13 +73,11 @@ func Verify(r *nethttp.Request) error {
 }
 
 // TODO: make this testable?
-func VerifyOUs() martini.Handler {
+func VerifyOUs(validOUs []string) martini.Handler {
 	return func(res nethttp.ResponseWriter, req *nethttp.Request, c martini.Context) {
-		if config.Config.UseMutualTLS {
-			log.Debug("Verifying client OU")
-			if err := Verify(req); err != nil {
-				nethttp.Error(res, err.Error(), nethttp.StatusUnauthorized)
-			}
+		log.Debug("Verifying client OU")
+		if err := Verify(req, validOUs); err != nil {
+			nethttp.Error(res, err.Error(), nethttp.StatusUnauthorized)
 		}
 	}
 }

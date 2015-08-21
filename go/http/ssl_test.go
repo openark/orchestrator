@@ -10,7 +10,6 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/http"
 )
 
@@ -57,12 +56,14 @@ func TestNewTLSConfig(t *testing.T) {
 }
 
 func TestVerify(t *testing.T) {
+	var validOUs []string
+
 	req, err := nethttp.NewRequest("GET", "http://example.com/foo", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := http.Verify(req); err == nil {
+	if err := http.Verify(req, validOUs); err == nil {
 		t.Errorf("Did not fail on lack of TLS config")
 	}
 
@@ -75,7 +76,7 @@ func TestVerify(t *testing.T) {
 	var tcs tls.ConnectionState
 	req.TLS = &tcs
 
-	if err := http.Verify(req); err == nil {
+	if err := http.Verify(req, validOUs); err == nil {
 		t.Errorf("Found a valid OU without any being available")
 	}
 
@@ -87,9 +88,9 @@ func TestVerify(t *testing.T) {
 	req.TLS.VerifiedChains = [][]*x509.Certificate{req.TLS.PeerCertificates}
 
 	// Look for fake OU
-	config.Config.SSLValidOUs = []string{"testing"}
+	validOUs = []string{"testing"}
 
-	if err := http.Verify(req); err != nil {
+	if err := http.Verify(req, validOUs); err != nil {
 		t.Errorf("Failed to verify certificate OU")
 	}
 }
