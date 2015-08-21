@@ -6,33 +6,30 @@ var dcColorsMap = {};
 
 
 function getInstanceDiv(instanceId) {
-    var popoverDiv = $("[data-fo-id='" + instanceId + "'] div.popover");
+    var popoverDiv = $("[data-fo-id='" + instanceId + "']").data("instance-popover");
 	return popoverDiv
+}
+
+function repositionIntanceDiv(nodeWrapper) {
+    var id = $(nodeWrapper).attr("data-fo-id");
+    var popoverDiv = getInstanceDiv(id);
+    var pos = getSvgPos(nodeWrapper);
+    pos.left += 20;
+    pos.top -= popoverDiv.height()/2 + 2;
+    popoverDiv.css({left:pos.left+"px", top:pos.top+"px"});
+
+    popoverDiv.popover();
+    popoverDiv.show();
+
+    $(popoverDiv).find(".instance-trailer").each(function() {
+		$(this).css("height", popoverDiv.outerHeight(true));
+	});
 }
 
 function repositionIntanceDivs() {
     $("[data-fo-id]").each(function () {
-        var id = $(this).attr("data-fo-id");
-        var popoverDiv = getInstanceDiv(id);
-
-        popoverDiv.attr("x", $(this).attr("x"));
-        $(this).attr("y", 0 - popoverDiv.height() / 2 - 2);
-        popoverDiv.attr("y", $(this).attr("y"));
-        $(this).attr("width", popoverDiv.width() + 30);
-        $(this).attr("height", popoverDiv.height() +16);
-        $(this).css("max-height", popoverDiv.height() +16);
-    });	
-    $("div.popover").popover();
-    $("div.popover").show();
-
-    $(".instance-trailer").each(function() {
-		var popoverDiv = $(this).prev();
-		$(this).css("left", popoverDiv.outerWidth(true)-parseInt($(this).css("border-left-width")));
-		$(this).css("margin-left", 0);
-		$(this).css("margin-top", 0);
-		$(this).css("top", 0 - popoverDiv.outerHeight(true));
-		$(this).css("height", popoverDiv.outerHeight(true));
-	});
+    	repositionIntanceDiv(this);
+    });
 }
 
 // All instance dragging/dropping code goes here
@@ -42,20 +39,26 @@ function activateInstanceDraggableDroppable(nodesMap, draggedNodeId, originalNod
 		resetRefreshTimer();
 		$("#cluster_container .accept_drop").removeClass("accept_drop");
 		$("#cluster_container .accept_drop_warning").removeClass("accept_drop_warning");
+		$(".being-dragged").removeClass("being-dragged");
+		$(".instance-trailer").show();
 		droppableIsActive = false;
 	}
     $(duplicate).draggable({
     	addClasses: true, 
     	opacity: 1,
-    	cancel: "#cluster_container .popover.instance h3 a",
+    	cancel: "#cluster_container .popover.instance h3 a,.instance-trailer",
     	snap: "#cluster_container .popover.instance",
     	snapMode: "inner",
     	snapTolerance: 10,
+    	containment: $("#cluster_container"),
     	start: function(event, ui) {
+            console.log("drag start", event.target);
     		// dragging begins
     		clearDroppable();
     		droppableIsActive = true;
     		originalNode.addClass("original-dragged");
+    		duplicate.addClass("being-dragged");
+    		$(".instance-trailer").hide();
      		$("#cluster_container .popover.instance").droppable({
     			accept: function(draggable) {
     				// Find the objects that accept a draggable (i.e. valid droppables)
@@ -124,6 +127,7 @@ function activateInstanceChildrenDraggableDroppable(nodesMap, draggedNodeId, ori
 		resetRefreshTimer();
 		$("#cluster_container .accept_drop").removeClass("accept_drop");
 		$("#cluster_container .accept_drop_warning").removeClass("accept_drop_warning");
+		$(".being-dragged").removeClass("being-dragged");
 		droppableIsActive = false;
 	}
 	var draggedNode = nodesMap[draggedNodeId];
@@ -134,6 +138,8 @@ function activateInstanceChildrenDraggableDroppable(nodesMap, draggedNodeId, ori
 	 	snapMode: "inner",
 	 	snapTolerance: 10,
 	 	start: function(event, ui) {
+            //TODO: $(event.target).closest(".popup").is(".dfsdfsd")
+            console.log("drag start", event.target);
 	 		// dragging begins
 	 		clearDroppable();
 	 		droppableIsActive = true;
@@ -141,7 +147,8 @@ function activateInstanceChildrenDraggableDroppable(nodesMap, draggedNodeId, ori
 	 		draggedNode.children.forEach(function f(instance) {
 	 			var popoverElement = getInstanceDiv(instance.id);
 	 			popoverElement.addClass("original-dragged");
-	 		})
+	 		});
+            duplicate.addClass("being-dragged");
 	 		$(".instance-trailer[data-nodeid="+draggedNodeId+"]").addClass("original-dragged");
 	 		$(".instance-trailer[data-nodeid!="+draggedNodeId+"]").hide();
 	 		
@@ -208,34 +215,27 @@ function activateInstanceChildrenDraggableDroppable(nodesMap, draggedNodeId, ori
  });		
 }
 
+function generateInstanceDiv(nodeWrapper, nodesMap) {
+	var isVirtual = $(nodeWrapper).attr("data-fo-is-virtual") == "true";
+	var isAnchor = $(nodeWrapper).attr("data-fo-is-anchor") == "true";
+    if (!isVirtual && !isAnchor) {
+    	var popoverElement = $('<div class="popover right instance"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"></div></div>').appendTo("#cluster_container");
+    	$(popoverElement).hide();
+    	$(nodeWrapper).data("instance-popover", popoverElement);
+    	
+    	var id = $(nodeWrapper).attr("data-fo-id");
+    	var node = nodesMap[id];
+		renderInstanceElement(popoverElement, node, "cluster");
+		if (node.children) {
+            $(popoverElement).append('<div class="popover left instance-trailer" data-nodeid="'+node.id+'"><div><span class="glyphicon glyphicon-chevron-left" title="Drag and drop slaves of this instance"></span></div></div>');
+		}
+	    //repositionIntanceDiv(nodeWrapper);
+    }	
+}
 
-function generateInstanceDivs(nodesMap) {
-    nodesList = []
-    for (var nodeId in nodesMap) {
-        nodesList.push(nodesMap[nodeId]);
-    } 
 
-    $("[data-fo-id]").each(function () {
-    	var isVirtual = $(this).attr("data-fo-is-virtual") == "true";
-    	var isAnchor = $(this).attr("data-fo-is-anchor") == "true";
-        if (!isVirtual && !isAnchor) {
-	        $(this).html(
-	        	'<div xmlns="http://www.w3.org/1999/xhtml" class="popover right instance"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"></div></div>'
-	        );
-        }
-    });
-    nodesList.forEach(function (node) {
-    	var popoverElement = getInstanceDiv(node.id);
-    	if (popoverElement) {
-    		renderInstanceElement(popoverElement, node, "cluster");
-    		if (node.children) {
-	    		$(popoverElement).after(
-	    			'<div class="popover left instance-trailer" data-nodeid="'+node.id+'"><div><span class="glyphicon glyphicon-chevron-left" title="Drag and drop slaves of this instance"></span></div></div>'
-	    		);
-    		}
-    	}
-    });
-    $("[data-fo-id]").on("mouseenter", ".popover.instance[data-nodeid]", function() {
+function prepareDraggable(nodesMap) {
+    $("body").on("mouseenter", ".popover.instance[data-nodeid]", function() {
     	if ($("[data-duplicate-node]").hasClass("ui-draggable-dragging")) {
     		// Do not remove & recreate while dragging. Ignore any mouseenter
     		return false;
@@ -248,8 +248,7 @@ function generateInstanceDivs(nodesMap) {
     	var originalNode = $(this);
     	var duplicate = originalNode.clone().appendTo("#cluster_container");
     	$(duplicate).attr("data-duplicate-node", "true");
-    	$(duplicate).css({"margin-left": "0"});
-    	$(duplicate).css(originalNode.offset());
+    	$(duplicate).css({top:originalNode[0].style.top, left:originalNode[0].style.left});
     	$(duplicate).width(originalNode.width());
     	$(duplicate).height(originalNode.height());
     	$(duplicate).find(".dropdown-toggle").dropdown();
@@ -315,38 +314,38 @@ function generateInstanceDivs(nodesMap) {
         	activateInstanceDraggableDroppable(nodesMap, draggedNodeId, originalNode, duplicate);
         }
     });
-    
-    $("body").on("mouseenter", ".instance-trailer[data-nodeid]", function() {
-    	if ($("[data-duplicate-node]").hasClass("ui-draggable-dragging")) {
-    		// Do not remove & recreate while dragging. Ignore any mouseenter
-    		return false;
-    	}
-    	var draggedNodeId = $(this).attr("data-nodeid");
-    	if (draggedNodeId == $(".instance-trailer[data-duplicate-node]").attr("data-nodeid")) {
-    		return false;
-    	}
+    // $("body").on("mouseenter", ".instance-trailer[data-nodeid]", function() {
+    	// if ($("[data-duplicate-node]").hasClass("ui-draggable-dragging")) {
+    		// // Do not remove & recreate while dragging. Ignore any mouseenter
+    		// return false;
+    	// }
+    	// var draggedNodeId = $(this).attr("data-nodeid");
+    	// if (draggedNodeId == $(".instance-trailer[data-duplicate-node]").attr("data-nodeid")) {
+    		// return false;
+    	// }
+        // //console.log("mouseenter3");
 
-    	$(".instance-trailer[data-duplicate-node]").remove();
-    	var originalElement = $(this); // The trailer, a small div
-    	var originalNode = $(originalElement).prev(); // However we copy the instance node element
-    	var duplicate = originalNode.clone().appendTo("#cluster_container");
-    	$(duplicate).attr("data-duplicate-node", "true");
-    	$(duplicate).css({"margin-left": "0"});
-    	$(duplicate).css(originalElement.offset());
-    	$(duplicate).width(originalNode.width());
-    	$(duplicate).height(originalNode.height());
-    	$(duplicate).find("h3 .pull-left").css('font-style', 'italic').prepend("slaves of ");
-    	$(duplicate).find("h3 .pull-right").html('<span class="glyphicon glyphicon-chevron-left"></span>');
-    	$(duplicate).find(".popover-content").html("<p>Drag "+nodesMap[draggedNodeId].children.length+" slave(s) of this instance</p>");
-    	$(duplicate).find(".popover-footer").remove();
-    	$(duplicate).popover();
-        $(duplicate).show();
+    	// $(".instance-trailer[data-duplicate-node]").remove();
+    	// var originalElement = $(this); // The trailer, a small div
+    	// var originalNode = $(originalElement).parent(); // However we copy the instance node element
+    	// var duplicate = originalNode.clone().appendTo("#cluster_container");
+    	// $(duplicate).attr("data-duplicate-node", "true");
+    	// $(duplicate).css({"margin-left": "0"});
+    	// $(duplicate).css({top:originalNode[0].style.top, left:originalNode[0].offsetLeft + originalElement[0].offsetLeft + 50});
+    	// $(duplicate).width(originalNode.width());
+    	// $(duplicate).height(originalNode.height());
+    	// $(duplicate).find("h3 .pull-left").css('font-style', 'italic').prepend("slaves of ");
+    	// $(duplicate).find("h3 .pull-right").html('<span class="glyphicon glyphicon-chevron-left"></span>');
+    	// $(duplicate).find(".popover-content").html("<p>Drag "+nodesMap[draggedNodeId].children.length+" slave(s) of this instance</p>");
+    	// $(duplicate).find(".popover-footer").remove();
+    	// $(duplicate).popover();
+        // $(duplicate).show();
 
-        if (!isAuthorizedForAction()) {
-        	return false;
-        }
-        activateInstanceChildrenDraggableDroppable(nodesMap, draggedNodeId, originalElement, duplicate);
-    });
+        // if (!isAuthorizedForAction()) {
+        	// return false;
+        // }
+        // activateInstanceChildrenDraggableDroppable(nodesMap, draggedNodeId, originalElement, duplicate);
+    // });
 }
 
 // moveInstance checks whether an instance (node) can be dropped on another (droppableNode).
@@ -929,7 +928,7 @@ function postVisualizeInstances(nodesMap) {
     	$(".popover.instance[data-nodeid="+instance.id+"]").attr("data-dc-color", dcColorsMap[instance.DataCenter]);
     	$(".instance-trailer[data-nodeid="+instance.id+"]").attr("data-dc-color", dcColorsMap[instance.DataCenter]);
     });
-    repositionIntanceDivs();
+    window.setTimeout(repositionIntanceDivs, 10);   
 }
 
 
@@ -944,6 +943,7 @@ function refreshClusterOperationModeButton() {
 	$("#move-instance-method-button").html(moveInstanceMethod + ' mode <span class="caret"></span>')
 }
 
+// This is legacy and will be removed
 function makeMaster(instance) {
 	var message = "Are you sure you wish to make <code><strong>" + instance.Key.Hostname+":"+instance.Key.Port + "</strong></code> the new master?"
 	+ "<p>Siblings of <code><strong>" + instance.Key.Hostname+":"+instance.Key.Port + "</strong></code> will turn to be its children, "
@@ -953,40 +953,19 @@ function makeMaster(instance) {
 	+ "if this instance will indeed become the master."
 	+ "<p>Pointing your application servers to the new master is on you."
 	;
-	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
-		if (confirm) {
-	    	showLoader();
-	        $.get("/api/make-master/"+instance.Key.Hostname+"/"+instance.Key.Port, function (operationResult) {
-				hideLoader();
-				if (operationResult.Code == "ERROR") {
-					addAlert(operationResult.Message)
-				} else {
-    				reloadWithOperationResult(operationResult);
-				}	
-	        }, "json");
-		}
-	});
+	var apiUrl = "/api/make-master/"+instance.Key.Hostname+"/"+instance.Key.Port;
+	return executeMoveOperation(message, apiUrl);
 }
 
+//This is legacy and will be removed
 function makeLocalMaster(instance) {
 	var message = "Are you sure you wish to make <code><strong>" + instance.Key.Hostname+":"+instance.Key.Port + "</strong></code> a local master?"
 	+ "<p>Siblings of <code><strong>" + instance.Key.Hostname+":"+instance.Key.Port + "</strong></code> will turn to be its children, "
 	+ "via Pseudo-GTID."
 	+ "<p>The instance will replicate from its grandparent."
 	;
-	bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
-		if (confirm) {
-	    	showLoader();
-	        $.get("/api/make-local-master/"+instance.Key.Hostname+"/"+instance.Key.Port, function (operationResult) {
-				hideLoader();
-				if (operationResult.Code == "ERROR") {
-					addAlert(operationResult.Message)
-				} else {
-                    reloadWithOperationResult(operationResult);
-				}	
-	        }, "json");
-		}
-	});
+	var apiUrl = "/api/make-local-master/"+instance.Key.Hostname+"/"+instance.Key.Port;
+	return executeMoveOperation(message, apiUrl);
 }
 
 
@@ -1058,7 +1037,7 @@ function colorize_dc() {
     });	
     $(".popover.instance-trailer[data-dc-color]").each(function () {
    		$(this).css("margin-top", -2);
-   		$(this).css("height", $(this).prev().outerHeight(true));
+   		$(this).css("height", $(this).parent().outerHeight(true));
     });	
 }
 
@@ -1227,8 +1206,8 @@ $(document).ready(function () {
         	    	instancesMap = compactInstances(instances, instancesMap);
         	    }
                 analyzeClusterInstances(instancesMap);
-                visualizeInstances(instancesMap);
-                generateInstanceDivs(instancesMap);
+                visualizeInstances(instancesMap, generateInstanceDiv);
+                prepareDraggable(instancesMap);
                 reviewReplicationAnalysis(replicationAnalysis, instancesMap);
                 postVisualizeInstances(instancesMap);
                 if ($.cookie("anonymize") == "true") {
@@ -1370,3 +1349,18 @@ $(document).ready(function () {
     }
     refreshClusterOperationModeButton();
 });
+
+function getHtmlPos(el) {
+    return {left:el.offsetLeft, top:el.offsetTop};
+}
+
+function getSvgPos(el) {
+    var svg = $(el).closest("svg")[0];
+    var pt = svg.createSVGPoint();
+    var matrix = el.getCTM();
+    var box = el.getBBox();
+    pt.x = box.x;
+    pt.y = box.y;
+    var pt2 = pt.matrixTransform(matrix);
+    return {left:pt2.x, top:pt2.y};
+}
