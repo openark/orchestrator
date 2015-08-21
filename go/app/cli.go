@@ -835,20 +835,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case cliCommand("which-cluster"):
 		{
-			if instanceKey == nil {
-				instanceKey = thisInstanceKey
-			}
-			if instanceKey == nil {
-				log.Fatalf("Unable to get cluster: unresolved instance")
-			}
-			instance, _, err := inst.ReadInstance(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if instance == nil {
-				log.Fatalf("Instance not found: %+v", *instanceKey)
-			}
-			fmt.Println(instance.ClusterName)
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			fmt.Println(clusterName)
 		}
 	case cliCommand("which-cluster-instances"):
 		{
