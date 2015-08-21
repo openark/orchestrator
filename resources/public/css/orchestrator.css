@@ -429,8 +429,6 @@ body {
 }
 
 .being-dragged[data-duplicate-node] {
-	margin-top: -80px;
-	margin-left: -4px;
 }
 
 #cluster_container .popover.instance[data-duplicate-node] {
