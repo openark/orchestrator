@@ -6,7 +6,7 @@ var dcColorsMap = {};
 
 
 function getInstanceDiv(instanceId) {
-    var popoverDiv = $(".popover.instance[data-nodeid='" + instanceId + "']");
+    var popoverDiv = $("#cluster_container .popover.instance[data-nodeid='" + instanceId + "']");
 	return popoverDiv
 }
 
@@ -1370,6 +1370,9 @@ function getHtmlPos(el) {
 
 function getSvgPos(el) {
     var svg = $(el).closest("svg")[0];
+    if (!svg) {
+    	return false;
+    }
     var pt = svg.createSVGPoint();
     var matrix = el.getCTM();
     var box = el.getBBox();
