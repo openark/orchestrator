@@ -6,15 +6,18 @@ var dcColorsMap = {};
 
 
 function getInstanceDiv(instanceId) {
-    var popoverDiv = $("[data-fo-id='" + instanceId + "']").data("instance-popover");
+    var popoverDiv = $(".popover.instance[data-nodeid='" + instanceId + "']");
 	return popoverDiv
 }
 
-function repositionIntanceDiv(svgInstanceWrapper) {
-    var id = $(svgInstanceWrapper).attr("data-fo-id");
+function repositionIntanceDiv(id) {
+    if (!id) {
+    	return false;
+    }
+ 
     var popoverDiv = getInstanceDiv(id);
     {
-	    var pos = getSvgPos(svgInstanceWrapper);
+	    var pos = getSvgPos($(popoverDiv).data("svg-instance-wrapper"));
 	    pos.left += 20;
 	    pos.top -= popoverDiv.height()/2 + 2;
 	    popoverDiv.css({left:pos.left+"px", top:pos.top+"px"});
@@ -31,7 +34,7 @@ function repositionIntanceDiv(svgInstanceWrapper) {
 
 function repositionIntanceDivs() {
     $("[data-fo-id]").each(function () {
-    	repositionIntanceDiv(this);
+    	repositionIntanceDiv($(this).attr("data-fo-id"));
     });
 }
 
@@ -229,6 +232,7 @@ function generateInstanceDiv(svgInstanceWrapper, nodesMap) {
     	var popoverElement = $('<div class="popover right instance"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"></div></div>').appendTo("#cluster_container");
     	$(popoverElement).hide();
     	$(svgInstanceWrapper).data("instance-popover", popoverElement);
+    	$(popoverElement).data("svg-instance-wrapper", svgInstanceWrapper);
     	
     	var id = $(svgInstanceWrapper).attr("data-fo-id");
     	var node = nodesMap[id];
@@ -237,7 +241,6 @@ function generateInstanceDiv(svgInstanceWrapper, nodesMap) {
             var trailerElement = $('<div class="popover left instance-trailer" data-nodeid="'+node.id+'"><div><span class="glyphicon glyphicon-chevron-left" title="Drag and drop slaves of this instance"></span></div></div>').appendTo("#cluster_container");
             popoverElement.data("instance-trailer", trailerElement);
 		}
-	    //repositionIntanceDiv(svgInstanceWrapper);
     }	
 }
 
@@ -941,7 +944,6 @@ function postVisualizeInstances(nodesMap) {
     	$(".popover.instance[data-nodeid="+instance.id+"]").attr("data-dc-color", dcColorsMap[instance.DataCenter]);
     	$(".instance-trailer[data-nodeid="+instance.id+"]").attr("data-dc-color", dcColorsMap[instance.DataCenter]);
     });
-    window.setTimeout(repositionIntanceDivs, 50);   
 }
 
 

@@ -167,7 +167,9 @@ function visualizeInstances(nodesMap, onSvgInstanceWrapper) {
         // Transition nodes to their new position.
         var nodeUpdate = node.transition().duration(duration).attr("transform", function (d) {
             return "translate(" + d.y + "," + d.x + ")";
-        });        
+        }).each("end", function (d) {
+        	repositionIntanceDiv(d.id);        
+        });
         nodeUpdate.select("circle").attr("r", function (d) {
         	if (d.isVirtual) {
         		return 0;
