@@ -207,6 +207,13 @@ body {
 .popover.instance.draggable-msg {
 }
 
+#instance_problems {
+	z-index: 10;	
+	position: absolute;
+	right: 0px;
+	padding-right: 15px;
+}
+
 #instance_problems button.btn-stale {
     background-color: #808080;
     color: #ffffff;

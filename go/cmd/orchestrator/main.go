@@ -172,7 +172,7 @@ Cheatsheet:
 			orchestrator -c match-up-slaves -i slave.whose.subslaves.will.match.up.com[:3306] --pattern=regexp.filter
 				only apply to those instances that match given regex
 
-		match-below
+		match
 			Matches a slave beneath another (destination) instance. The choice of destination is almost arbitrary;
 			it must not be a child/descendant of the instance. But otherwise they don't have to be direct siblings,
 			and in fact (if you know what you're doing), they don't actually have to belong to the same topology.
@@ -181,23 +181,27 @@ Cheatsheet:
 			No action taken when destination instance cannot act as master (e.g. has no binary logs, is of incompatible version, incompatible binlog format etc.)
 			Examples:
 			
-			orchestrator -c match-below -i slave.to.relocate.com -s instance.that.becomes.its.master
+			orchestrator -c match -i slave.to.relocate.com -s instance.that.becomes.its.master
 
-			orchestrator -c match-below -s destination.instance.that.becomes.its.master
+			orchestrator -c match -s destination.instance.that.becomes.its.master
 				-i not given, implicitly assumed local hostname
+
+			(this command was previously named "match-below")
 			
-		multi-match-slaves
+		match-slaves
 			Matches all slaves of a given instance under another (destination) instance. This is a (faster) shortcut
 			to matching said slaves one by one under the destination instance. In fact, this bulk operation is highly
 			optimized and can execute in orders of magnitue faster, depeding on the nu,ber of slaves involved and their
 			respective position behind the instance (the more slaves, the more savings).
 			The instance itself may be crashed or inaccessible. It is not contacted throughout the operation. Examples:
 			
-			orchestrator -c multi-match-slaves -i instance.whose.slaves.will.relocate -s instance.that.becomes.their.master
+			orchestrator -c match-slaves -i instance.whose.slaves.will.relocate -s instance.that.becomes.their.master
 			
-			orchestrator -c multi-match-slaves -i instance.whose.slaves.will.relocate -s instance.that.becomes.their.master --pattern=regexp.filter
+			orchestrator -c match-slaves -i instance.whose.slaves.will.relocate -s instance.that.becomes.their.master --pattern=regexp.filter
 				only apply to those instances that match given regex
 			
+			(this command was previously named "multi-match-slaves")
+
 		rematch
 			Reconnect a slave onto its master, via PSeudo-GTID. The use case for this operation is a non-crash-safe
 			replication configuration (e.g. MySQL 5.5) with sync_binlog=1 and log_slave_updates. This operation
@@ -233,17 +237,19 @@ Cheatsheet:
         In case a of a multi-step operation, failure may result in slaves only moving halfway to destination point. Nonetheless
         they will be in a valid position.
 
-		relocate-below
+		relocate
 			Relocate a slave beneath another (destination) instance. The choice of destination is almost arbitrary;
 			it must not be a child/descendant of the instance, but otherwise it can be anywhere, and can be a normal slave
 			or a binlog server. Orchestrator will choose the best course of action to relocate the slave.
 			No action taken when destination instance cannot act as master (e.g. has no binary logs, is of incompatible version, incompatible binlog format etc.)
 			Examples:
 
-			orchestrator -c relocate-below -i slave.to.relocate.com -d instance.that.becomes.its.master
+			orchestrator -c relocate -i slave.to.relocate.com -d instance.that.becomes.its.master
 
-			orchestrator -c relocate-below -d destination.instance.that.becomes.its.master
+			orchestrator -c relocate -d destination.instance.that.becomes.its.master
 				-i not given, implicitly assumed local hostname
+				
+			(this command was previously named "relocate-below")
 
 		relocate-slaves
 			Relocates all or part of the slaves of a given instance under another (destination) instance. This is 
@@ -269,6 +275,11 @@ Cheatsheet:
 			Issues a START SLAVE; command. Example:
 
 			orchestrator -c start-slave -i slave.to.be.started.com
+			
+		restart-slave
+			Issues STOP SLAVE + START SLAVE; Example:
+
+			orchestrator -c restart-slave -i slave.to.be.started.com
 			
 		skip-query
 			On a failed replicating slave, skips a single query and attempts to resume replication.
