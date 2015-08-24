@@ -1735,6 +1735,20 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
+// RestartSlave stops & starts replication on a given instance
+func RestartSlave(instanceKey *InstanceKey) (instance *Instance, err error) {
+	instance, err = StopSlave(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	instance, err = StartSlave(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	return instance, nil
+
+}
+
 // StartSlaves will do concurrent start-slave
 func StartSlaves(slaves [](*Instance)) {
 	// use concurrency but wait for all to complete

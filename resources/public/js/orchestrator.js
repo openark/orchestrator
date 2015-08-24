@@ -211,6 +211,7 @@ function openNodeModal(node) {
         
         td = addNodeModalDataAttribute("Replication running", booleanString(node.replicationRunning));
         $('#node_modal button[data-btn=start-slave]').appendTo(td.find("div"))
+        $('#node_modal button[data-btn=restart-slave]').appendTo(td.find("div"))
         $('#node_modal [data-btn-group=stop-slave]').appendTo(td.find("div"))
         
         if (!node.replicationRunning) {
@@ -273,6 +274,9 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=start-slave]').click(function(){
     	apiCommand("/api/start-slave/"+node.Key.Hostname+"/"+node.Key.Port);
     });
+    $('#node_modal button[data-btn=restart-slave]').click(function(){
+    	apiCommand("/api/restart-slave/"+node.Key.Hostname+"/"+node.Key.Port);
+    });
     $('#node_modal [data-btn=stop-slave]').click(function(){
     	apiCommand("/api/stop-slave/"+node.Key.Hostname+"/"+node.Key.Port);
     });
@@ -331,13 +335,14 @@ function openNodeModal(node) {
     }
 	$('#node_modal button[data-btn=skip-query]').hide();
 	$('#node_modal button[data-btn=start-slave]').hide();
+	$('#node_modal button[data-btn=restart-slave]').hide();
 	$('#node_modal [data-btn-group=stop-slave]').hide();
 	
     if (node.MasterKey.Hostname) {
         if (node.replicationRunning || node.replicationAttemptingToRun) {
         	$('#node_modal [data-btn-group=stop-slave]').show();
-        } 
-        if (!node.replicationRunning) {
+        	$('#node_modal button[data-btn=restart-slave]').show();
+        } else if (!node.replicationRunning) {
         	$('#node_modal button[data-btn=start-slave]').show();
         }
         if (!node.Slave_SQL_Running && node.LastSQLError) {

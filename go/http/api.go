@@ -829,6 +829,27 @@ func (this *HttpAPI) StartSlave(params martini.Params, r render.Render, req *htt
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave started: %+v", instance.Key), Details: instance})
 }
 
+// RestartSlave stops & starts replication on given instance
+func (this *HttpAPI) RestartSlave(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, err := inst.RestartSlave(&instanceKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave restarted: %+v", instance.Key), Details: instance})
+}
+
 // StopSlave stops replication on given instance
 func (this *HttpAPI) StopSlave(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -1731,6 +1752,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/end-downtime/:host/:port", this.EndDowntime)
 	m.Get("/api/skip-query/:host/:port", this.SkipQuery)
 	m.Get("/api/start-slave/:host/:port", this.StartSlave)
+	m.Get("/api/restart-slave/:host/:port", this.RestartSlave)
 	m.Get("/api/stop-slave/:host/:port", this.StopSlave)
 	m.Get("/api/stop-slave-nice/:host/:port", this.StopSlaveNicely)
 	m.Get("/api/set-read-only/:host/:port", this.SetReadOnly)
