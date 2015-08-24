@@ -8,32 +8,19 @@
 	    <meta name="author" content="">
 	    <link rel="shortcut icon" href="../../assets/ico/favicon.ico">
 	    <title>Orchestrator - {{.title}}</title>
-        <script type="text/javascript" src="/js/jquery-1.11.0.min.js"></script>
+        <script type="text/javascript" src="/js/jquery.min.js"></script>
         <script type="text/javascript" src="/js/jquery.cookie-1.4.1.min.js"></script>
         <script src="/js/orchestrator.js"></script>
         <link href="/bootstrap/css/bootstrap.min.css" rel="stylesheet">
         <link href="/css/orchestrator.css" rel="stylesheet">
         
         <style type="text/css">
-            body {
-                padding-top: 80px;
-                background-color: #eeeeee;
-                background-image:url('/images/tile.png');
-                background-repeat:repeat;
-            }
-            .navbar-brand {
-                padding: 4px 15px;
-            }
-
-			.table {
-			    font-size: 13px;
+			.ajaxLoader {
+			    visibility: hidden;
 			}
-            .ajaxLoader {
-                visibility: hidden;
-            }
-            #nav_agents {
-                display: none;
-            }
+			#nav_agents {
+			    display: none;
+			}
         </style>
 
 	    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
@@ -139,6 +126,7 @@
 	</div>
 	
 	<div class="container" id="main_container">
+		<div id="main_container_spacer"></div>
         <div id="alerts_container"></div>
 	    <div class="pull-right" id="instance_problems">
 			<div class="dropdown pull-right">

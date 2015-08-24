@@ -6,6 +6,20 @@
     font-size: inherit;
 }
 
+body {
+    background-color: #eeeeee;
+    background-image:url('/images/tile.png');
+    background-repeat:repeat;
+    padding-top:80px;
+}
+.navbar-brand {
+    padding: 4px 15px;
+}
+
+.table {
+    font-size: 13px;
+}
+
 #dropdown-clusters.dropdown-menu {
     height: auto;
     max-height: 600px;
@@ -37,7 +51,7 @@
     stroke: #ccc;
     stroke-width: 1.5px;
 }
-.node .nodeWrapper {
+.node .svgInstanceWrapper {
     font: 10px sans-serif;
     width: 276px;
 }
@@ -373,10 +387,16 @@
 	margin-bottom: 8px;	
 }
 
+#cluster_container {
+    overflow-x: visible;
+    overflow-y: visible;
+    position:relative;
+}
+
 #cluster_container .popover.instance {
     font: 10px sans-serif;
     display: block;
-    position: inherit;
+    position: absolute;
     width: 276px;
     cursor: move;
 }
@@ -408,6 +428,9 @@
     padding: 2px 8px;
 }
 
+.being-dragged[data-duplicate-node] {
+}
+
 #cluster_container .popover.instance[data-duplicate-node] {
     position: absolute;
     box-shadow: 0 5px 10px rgba(0, 0, 0, 0.66);
@@ -430,16 +453,24 @@
 }
 
 .instance-trailer {
-    position: relative;
+    font: 10px sans-serif;
+    position: absolute;
     display: block;
     width: 16px;
     cursor: move;
+    left:auto;
+    right:-16px;
+}
+
+.popover.left.instance-trailer {
+    margin-left:0px;
 }
 
 .instance-trailer div {
 	position: relative;
 	top: 50%;
 	transform: translateY(-50%);
+	margin-left: -1px;
 }
 
 #cluster_container .instance-trailer[data-duplicate-node] {
@@ -457,10 +488,6 @@
 	font-size: 50px;
 	color: #d0d0d0;
 	padding-left: 32px;
-}
-
-#cluster_container {
-    overflow: auto;
 }
 
 .container.clusters .popover.instance {

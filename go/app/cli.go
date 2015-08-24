@@ -249,7 +249,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
-	case cliCommand("match-below"):
+	case cliCommand("match"), cliCommand("match-below"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -294,7 +294,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), instance.MasterKey.DisplayString()))
 		}
-	case cliCommand("relocate-below"):
+	case cliCommand("relocate"), cliCommand("relocate-below"):
 		{
 			if instanceKey == nil {
 				instanceKey = thisInstanceKey
@@ -347,7 +347,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(instance.Key.DisplayString())
 			}
 		}
-	case cliCommand("multi-match-slaves"):
+	case cliCommand("match-slaves"), cliCommand("multi-match-slaves"):
 		{
 			// Move all slaves of "instance" beneath "destination"
 			if instanceKey == nil {

@@ -1,4 +1,4 @@
-function visualizeInstances(nodesMap) {
+function visualizeInstances(nodesMap, onSvgInstanceWrapper) {
     nodesList = []
     for (var nodeId in nodesMap) {
         nodesList.push(nodesMap[nodeId]);
@@ -78,6 +78,7 @@ function visualizeInstances(nodesMap) {
 
     var i = 0;
     var duration = 750;
+    duration=0;
 
     var tree = d3.layout.tree().size([svgHeight, svgWidth]);
 
@@ -101,6 +102,7 @@ function visualizeInstances(nodesMap) {
     root.x0 = svgHeight / 2;
     root.y0 = 0;
     update(root);
+    //repositionIntanceDivs();
 
     function update(source) {
         // Compute the new tree layout.
@@ -127,7 +129,11 @@ function visualizeInstances(nodesMap) {
         // Enter any new nodes at the parent's previous position.
         var nodeEnter = node.enter().append("g").attr("class", "node").attr("transform", function (d) {
                 return "translate(" + source.y0 + "," + source.x0 + ")";
-            }).each(function() {this.parentNode.insertBefore(this, this.parentNode.firstChild);});
+            }).each(
+            	function() {
+            		this.parentNode.insertBefore(this, this.parentNode.firstChild);
+            	}
+            );
 
         nodeEnter.append("circle").attr("data-nodeid", function (d) {
         	if (d.isVirtual) {
@@ -141,7 +147,7 @@ function visualizeInstances(nodesMap) {
             return d._children ? "lightsteelblue" : "#fff";
         }).on("click", click);
 
-        nodeEnter.append("foreignObject").attr("class", "nodeWrapper").attr("data-fo-id", function (d) {
+        var fo = nodeEnter.append("g").attr("class", "svgInstanceWrapper").attr("data-fo-id", function (d) {
             return d.id
         }).attr("data-fo-is-virtual", function (d) {
             return d.isVirtual
@@ -151,8 +157,12 @@ function visualizeInstances(nodesMap) {
             return d.children || d._children ? "end" : "start";
         }).attr("x", function (d) {
             return 4;
-        }).attr("requiredFeatures", "http://www.w3.org/TR/SVG11/feature#Extensibility")
+        }).attr("requiredFeatures", "http://www.w3.org/TR/SVG11/feature#Extensibility");
         
+        $("#cluster_container .popover.instance").remove();
+        $("g.svgInstanceWrapper").each(function() {
+        	onSvgInstanceWrapper(this, nodesMap);
+        }) 	
         
         // Transition nodes to their new position.
         var nodeUpdate = node.transition().duration(duration).attr("transform", function (d) {
@@ -227,7 +237,6 @@ function visualizeInstances(nodesMap) {
             d._children = null;
         }
         update(d);
-        generateInstanceDivs(nodesMap);
-        repositionIntanceDivs();
+        //repositionIntanceDivs();
     }
 }
