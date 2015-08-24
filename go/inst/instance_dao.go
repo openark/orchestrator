@@ -1876,7 +1876,7 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	}
 	WriteMasterPositionEquivalence(originalMasterKey, originalExecBinlogCoordinates, changeToMasterKey, masterBinlogCoordinates)
 
-	log.Infof("ChangeMasterTo: Changed master on %+v to: %+v, %+v. GTID: %+v", *instanceKey, changeToMasterKey, masterBinlogCoordinates, changedViaGTID)
+	log.Infof("ChangeMasterTo: Changed master on %+v to: %+v, %+v. GTID: %+v", *instanceKey, masterKey, masterBinlogCoordinates, changedViaGTID)
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err

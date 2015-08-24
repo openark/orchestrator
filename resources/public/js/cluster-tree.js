@@ -77,8 +77,7 @@ function visualizeInstances(nodesMap, onSvgInstanceWrapper) {
     svgHeight = Math.max(svgHeight, maxNodesAtDepth * verticalSpacing);
 
     var i = 0;
-    var duration = 750;
-    duration=0;
+    var duration = 0;
 
     var tree = d3.layout.tree().size([svgHeight, svgWidth]);
 
