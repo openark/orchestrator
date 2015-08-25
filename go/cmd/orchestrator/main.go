@@ -49,6 +49,40 @@ Cheatsheet:
 	Listed below are all available commands; all of which apply for CLI execution (ignored by HTTP mode).
 	Different flags are required for different commands; see specific documentation per commmand.
 
+	Topology refactoring, generic aka "smart" commands
+		These operations let orchestrator pick the best course of action for relocating slaves. It may choose to use
+        standard binlog file:pos math, GTID, Pseudo-GTID, or take advantage of binlog servers, or combine two or more
+        methods in a multi-step operation.
+        In case a of a multi-step operation, failure may result in slaves only moving halfway to destination point. Nonetheless
+        they will be in a valid position.
+
+		relocate
+			Relocate a slave beneath another (destination) instance. The choice of destination is almost arbitrary;
+			it must not be a child/descendant of the instance, but otherwise it can be anywhere, and can be a normal slave
+			or a binlog server. Orchestrator will choose the best course of action to relocate the slave.
+			No action taken when destination instance cannot act as master (e.g. has no binary logs, is of incompatible version, incompatible binlog format etc.)
+			Examples:
+
+			orchestrator -c relocate -i slave.to.relocate.com -d instance.that.becomes.its.master
+
+			orchestrator -c relocate -d destination.instance.that.becomes.its.master
+				-i not given, implicitly assumed local hostname
+				
+			(this command was previously named "relocate-below")
+
+		relocate-slaves
+			Relocates all or part of the slaves of a given instance under another (destination) instance. This is 
+			typically much faster than relocating slaves one by one.
+			Orchestrator chooses the best course of action to relocation the slaves. It may choose a multi-step operations.
+			Some slaves may succeed and some may fail the operation.
+			The instance (slaves' master) itself may be crashed or inaccessible. It is not contacted throughout the operation. 
+			Examples:
+
+			orchestrator -c relocate-slaves -i instance.whose.slaves.will.relocate -d instance.that.becomes.their.master
+
+			orchestrator -c relocate-slaves -i instance.whose.slaves.will.relocate -s instance.that.becomes.their.master --pattern=regexp.filter
+				only apply to those instances that match given regex
+
 	Topology refactoring using classic MySQL replication commands
 		(ie STOP SLAVE; START SLAVE UNTIL; CHANGE MASTER TO; ...)
 		These commands require connected topology: slaves that are up and running; a lagging, stopped or 
@@ -230,42 +264,21 @@ Cheatsheet:
 			
 			orchestrator -c last-pseudo-gtid -i instance.with.possible.pseudo-gtid.injection
 
-	Topology refactoring using arbitrary methods
-		These operations let orchestrator pick the best course of action for relocating slaves. It may choose to use
-        standard binlog file:pos math, or Pseudo-GTID, or take advantage of binlog servers, or combine two or more
-        methods in a multi-step operation.
-        In case a of a multi-step operation, failure may result in slaves only moving halfway to destination point. Nonetheless
-        they will be in a valid position.
-
-		relocate
-			Relocate a slave beneath another (destination) instance. The choice of destination is almost arbitrary;
-			it must not be a child/descendant of the instance, but otherwise it can be anywhere, and can be a normal slave
-			or a binlog server. Orchestrator will choose the best course of action to relocate the slave.
-			No action taken when destination instance cannot act as master (e.g. has no binary logs, is of incompatible version, incompatible binlog format etc.)
-			Examples:
-
-			orchestrator -c relocate -i slave.to.relocate.com -d instance.that.becomes.its.master
-
-			orchestrator -c relocate -d destination.instance.that.becomes.its.master
-				-i not given, implicitly assumed local hostname
-				
-			(this command was previously named "relocate-below")
-
-		relocate-slaves
-			Relocates all or part of the slaves of a given instance under another (destination) instance. This is 
-			typically much faster than relocating slaves one by one.
-			Orchestrator chooses the best course of action to relocation the slaves. It may choose a multi-step operations.
-			Some slaves may succeed and some may fail the operation.
-			The instance (slaves' master) itself may be crashed or inaccessible. It is not contacted throughout the operation. 
-			Examples:
-
-			orchestrator -c relocate-slaves -i instance.whose.slaves.will.relocate -d instance.that.becomes.their.master
-
-			orchestrator -c relocate-slaves -i instance.whose.slaves.will.relocate -s instance.that.becomes.their.master --pattern=regexp.filter
-				only apply to those instances that match given regex
-
 	General replication commands
 		These commands issue various statements that relate to replication.
+		
+		enable-gtid
+			If possible, enable GTID replication. This works on Oracle (>= 5.6, gtid-mode=1) and MariaDB (>= 10.0).
+			Replication is stopped for a short duration so as to reconfigure as GTID. In case of error replication remains
+			stopped. Example:
+			
+			orchestrator -c enable-gtid -i slave.compatible.with.gtid.com
+			
+		disable-gtid
+			Assuming slave replicates via GTID, disable GTID replication and resume standard file:pos replication. Example:
+
+			orchestrator -c disable-gtid -i slave.replicating.via.gtid.com
+		
 		stop-slave
 			Issues a STOP SLAVE; command. Example:
 
@@ -537,7 +550,22 @@ Cheatsheet:
 			orchestrator -c end-downtime -i downtimed.instance.com
 	
 	Crash recovery commands
-	
+						
+		recover
+			Do auto-recovery given a dead instance. Orchestrator chooses the best course of action.
+			The given instance must be acknowledged as dead and have slaves, or else there's nothing to do.
+			See "replication-analysis" command. 
+			Orchestrator executes external processes as configured by *Processes variables.
+			--debug is your friend. Example:
+			
+			orchestrator -c recover -i dead.instance.com --debug
+			
+		recover-lite
+			Do auto-recovery given a dead instance. Orchestrator chooses the best course of action, exactly 
+			as in "-c recover".	Orchestratir will *not* execute external processes.
+			
+			orchestrator -c recover-lite -i dead.instance.com --debug
+
 		replication-analysis
 			Request an analysis of potential crash incidents in all known topologies. 
 			Output format is not yet stabilized and may change in the future. Do not trust the output
@@ -565,14 +593,6 @@ Cheatsheet:
 			
 			orchestrator -c register-candidate
 				-i not given, implicitly assumed local hostname
-						
-		recover
-			Do auto-recovery given a dead instance. Orchestrator chooses the best course of action.
-			The given instance must be acknowledged as dead and have slaves, or else there's nothing to do.
-			--debug is your friend. Example:
-			
-			orchestrator -c recover -i dead.instance.com --debug
-			
 			
 	Misc commands
 	

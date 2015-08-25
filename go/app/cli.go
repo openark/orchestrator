@@ -260,7 +260,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
-			_, _, err := inst.MatchBelow(instanceKey, destinationKey, true, true)
+			_, _, err := inst.MatchBelow(instanceKey, destinationKey, true)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -274,7 +274,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			instance, _, err := inst.MatchUp(instanceKey, true, true)
+			instance, _, err := inst.MatchUp(instanceKey, true)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -288,7 +288,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			instance, _, err := inst.RematchSlave(instanceKey, true, true)
+			instance, _, err := inst.RematchSlave(instanceKey, true)
 			if err != nil {
 				log.Fatale(err)
 			}

@@ -352,7 +352,7 @@ function prepareDraggable(nodesMap) {
     	$(duplicate).find("h3 .pull-left").html(numSlavesMessage);
     	$(duplicate).find("h3 .pull-right").html('<span class="glyphicon glyphicon-chevron-left"></span>');
     	$(duplicate).append('<div class="popover-content"></div>');
-    	$(duplicate).find(".popover-content").html("");
+    	$(duplicate).find(".popover-content").html("Drag to move slaves");
     	$(duplicate).find(".popover-footer").remove();
     	$(duplicate).popover();
         $(duplicate).show();

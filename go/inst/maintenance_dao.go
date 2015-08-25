@@ -102,7 +102,7 @@ func BeginBoundedMaintenance(instanceKey *InstanceKey, owner string, reason stri
 	}
 
 	if affected, _ := res.RowsAffected(); affected == 0 {
-		err = fmt.Errorf("Cannot begin maintenance for instance: %+v", instanceKey)
+		err = fmt.Errorf("Cannot begin maintenance for instance: %+v; maintenance reason: %+v", instanceKey, reason)
 	} else {
 		// success
 		maintenanceToken, _ = res.LastInsertId()

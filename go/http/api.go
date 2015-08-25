@@ -643,7 +643,7 @@ func (this *HttpAPI) MatchBelow(params martini.Params, r render.Render, req *htt
 		return
 	}
 
-	instance, matchedCoordinates, err := inst.MatchBelow(&instanceKey, &belowKey, true, true)
+	instance, matchedCoordinates, err := inst.MatchBelow(&instanceKey, &belowKey, true)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -664,7 +664,7 @@ func (this *HttpAPI) MatchUp(params martini.Params, r render.Render, req *http.R
 		return
 	}
 
-	instance, matchedCoordinates, err := inst.MatchUp(&instanceKey, true, true)
+	instance, matchedCoordinates, err := inst.MatchUp(&instanceKey, true)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return

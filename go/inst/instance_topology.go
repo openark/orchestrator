@@ -497,12 +497,6 @@ func MoveBelowViaGTID(instance, otherInstance *Instance) (*Instance, error) {
 	} else {
 		defer EndMaintenance(maintenanceToken)
 	}
-	if maintenanceToken, merr := BeginMaintenance(otherInstanceKey, GetMaintenanceOwner(), fmt.Sprintf("%+v moves below this", *instanceKey)); merr != nil {
-		err = fmt.Errorf("Cannot begin maintenance on %+v", *otherInstanceKey)
-		goto Cleanup
-	} else {
-		defer EndMaintenance(maintenanceToken)
-	}
 
 	instance, err = StopSlave(instanceKey)
 	if err != nil {
@@ -522,6 +516,58 @@ Cleanup:
 	AuditOperation("move-below-gtid", instanceKey, fmt.Sprintf("moved %+v below %+v", *instanceKey, *otherInstanceKey))
 
 	return instance, err
+}
+
+// MoveSlavesViaGTID moves a list of slaves under another instance via GTID, returning those slaves
+// that could not be moved (do not use GTID)
+func MoveSlavesViaGTID(slaves [](*Instance), other *Instance) (movedSlaves [](*Instance), unmovedSlaves [](*Instance), err error, errs []error) {
+	slaves = removeInstance(slaves, &other.Key)
+	if len(slaves) == 0 {
+		// Nothing to do
+		return movedSlaves, unmovedSlaves, nil, errs
+	}
+
+	log.Infof("Will move %+v slaves below %+v via GTID", len(slaves), other.Key)
+
+	barrier := make(chan *InstanceKey)
+	slaveMutex := make(chan bool, 1)
+	for _, slave := range slaves {
+		slave := slave
+
+		// Parallelize repoints
+		go func() {
+			defer func() { barrier <- &slave.Key }()
+			ExecuteOnTopology(func() {
+				var slaveErr error
+				if _, _, canMove := canMoveViaGTID(slave, other); canMove {
+					slave, slaveErr = MoveBelowViaGTID(slave, other)
+				} else {
+					slaveErr = fmt.Errorf("%+v cannot move below %+v via GTID", slave.Key, other.Key)
+				}
+				func() {
+					// Instantaneous mutex.
+					slaveMutex <- true
+					defer func() { <-slaveMutex }()
+					if slaveErr == nil {
+						movedSlaves = append(movedSlaves, slave)
+					} else {
+						unmovedSlaves = append(unmovedSlaves, slave)
+						errs = append(errs, slaveErr)
+					}
+				}()
+			})
+		}()
+	}
+	for range slaves {
+		<-barrier
+	}
+	if len(errs) == len(slaves) {
+		// All returned with error
+		return movedSlaves, unmovedSlaves, log.Error("Error on all operations"), errs
+	}
+	AuditOperation("move-slaves-gtid", &other.Key, fmt.Sprintf("moved %d/%d slaves below %+v via GTID", len(movedSlaves), len(slaves), other.Key))
+
+	return movedSlaves, unmovedSlaves, err, errs
 }
 
 // Repoint connects a slave to a master using its exact same executing coordinates.
@@ -939,7 +985,7 @@ func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordin
 // The "other instance" could be the sibling of the moving instance any of its ancestors. It may actually be
 // a cousin of some sort (though unlikely). The only important thing is that the "other instance" is more
 // advanced in replication than given instance.
-func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance bool, requireOtherMaintenance bool) (*Instance, *BinlogCoordinates, error) {
+func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance bool) (*Instance, *BinlogCoordinates, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, nil, err
@@ -979,14 +1025,6 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	if requireInstanceMaintenance {
 		if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("match below %+v", *otherKey)); merr != nil {
 			err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
-			goto Cleanup
-		} else {
-			defer EndMaintenance(maintenanceToken)
-		}
-	}
-	if requireOtherMaintenance {
-		if maintenanceToken, merr := BeginMaintenance(otherKey, GetMaintenanceOwner(), fmt.Sprintf("%+v matches below this", *instanceKey)); merr != nil {
-			err = fmt.Errorf("Cannot begin maintenance on %+v", *otherKey)
 			goto Cleanup
 		} else {
 			defer EndMaintenance(maintenanceToken)
@@ -1054,7 +1092,7 @@ Cleanup:
 }
 
 // RematchSlave will re-match a slave to its master, using pseudo-gtid
-func RematchSlave(instanceKey *InstanceKey, requireInstanceMaintenance bool, requireOtherMaintenance bool) (*Instance, *BinlogCoordinates, error) {
+func RematchSlave(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instance, *BinlogCoordinates, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, nil, err
@@ -1063,7 +1101,7 @@ func RematchSlave(instanceKey *InstanceKey, requireInstanceMaintenance bool, req
 	if err != nil || !found {
 		return instance, nil, err
 	}
-	return MatchBelow(instanceKey, &masterInstance.Key, requireInstanceMaintenance, requireOtherMaintenance)
+	return MatchBelow(instanceKey, &masterInstance.Key, requireInstanceMaintenance)
 }
 
 // MakeMaster will take an instance, make all its siblings its slaves (via pseudo-GTID) and make it master
@@ -1237,7 +1275,7 @@ func MakeLocalMaster(instanceKey *InstanceKey) (*Instance, error) {
 		goto Cleanup
 	}
 
-	_, _, err = MatchBelow(instanceKey, &grandparentInstance.Key, true, true)
+	_, _, err = MatchBelow(instanceKey, &grandparentInstance.Key, true)
 	if err != nil {
 		goto Cleanup
 	}
@@ -1313,6 +1351,15 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 	slaves = removeInstance(slaves, belowKey)
 	slaves = removeBinlogServerInstances(slaves)
 
+	for _, slave := range slaves {
+		if maintenanceToken, merr := BeginMaintenance(&slave.Key, GetMaintenanceOwner(), fmt.Sprintf("%+v match below %+v as part of MultiMatchBelow", slave.Key, *belowKey)); merr != nil {
+			errs = append(errs, fmt.Errorf("Cannot begin maintenance on %+v", slave.Key))
+			slaves = removeInstance(slaves, &slave.Key)
+		} else {
+			defer EndMaintenance(maintenanceToken)
+		}
+	}
+
 	belowInstance, err := ReadTopologyInstance(belowKey)
 	if err != nil {
 		// Can't access the server below which we need to match ==> can't move slaves
@@ -1354,12 +1401,6 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 	// Now go over the buckets, and try a single slave from each bucket
 	// (though if one results with an error, synchronuously-for-that-bucket continue to the next slave in bucket)
 
-	if maintenanceToken, merr := BeginMaintenance(&belowInstance.Key, GetMaintenanceOwner(), fmt.Sprintf("slaves multi match below this: %+v", belowInstance.Key)); merr != nil {
-		err = fmt.Errorf("Cannot begin maintenance on %+v", belowInstance.Key)
-		return res, belowInstance, err, errs
-	} else {
-		defer EndMaintenance(maintenanceToken)
-	}
 	for execCoordinates, bucketSlaves := range slaveBuckets {
 		execCoordinates := execCoordinates
 		bucketSlaves := bucketSlaves
@@ -1375,7 +1416,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 					var matchedCoordinates *BinlogCoordinates
 					log.Debugf("MultiMatchBelow: attempting slave %+v in bucket %+v", slave.Key, execCoordinates)
 					ExecuteOnTopology(func() {
-						_, matchedCoordinates, slaveErr = MatchBelow(&slave.Key, &belowInstance.Key, true, false)
+						_, matchedCoordinates, slaveErr = MatchBelow(&slave.Key, &belowInstance.Key, false)
 					})
 					log.Debugf("MultiMatchBelow: match result: %+v, %+v", matchedCoordinates, slaveErr)
 
@@ -1521,7 +1562,7 @@ func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey, pattern str
 }
 
 // MatchUp will move a slave up the replication chain, so that it becomes sibling of its master, via Pseudo-GTID
-func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool, requireOtherMaintenance bool) (*Instance, *BinlogCoordinates, error) {
+func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instance, *BinlogCoordinates, error) {
 	instance, found, err := ReadInstance(instanceKey)
 	if err != nil || !found {
 		return nil, nil, err
@@ -1538,7 +1579,7 @@ func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool, requireO
 		return instance, nil, fmt.Errorf("master is not a slave itself: %+v", master.Key)
 	}
 
-	return MatchBelow(instanceKey, &master.MasterKey, requireInstanceMaintenance, requireOtherMaintenance)
+	return MatchBelow(instanceKey, &master.MasterKey, requireInstanceMaintenance)
 }
 
 // MatchUpSlaves will move all slaves of given master up the replication chain,
@@ -1792,7 +1833,7 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 	if instance.UsingPseudoGTID && other.UsingPseudoGTID {
 		// We prefer PseudoGTID to anything else because, while it takes longer to run, it does not issue
 		// a STOP SLAVE on any server other than "instance" itself.
-		instance, _, err := MatchBelow(&instance.Key, &other.Key, true, true)
+		instance, _, err := MatchBelow(&instance.Key, &other.Key, true)
 		return instance, err
 	}
 	// No Pseudo-GTID; cehck simple binlog file/pos operations:
@@ -1874,28 +1915,16 @@ func relocateSlavesInternal(slaves [](*Instance), instance, other *Instance) ([]
 	}
 	// GTID
 	{
-		// Move as much as we can via GTID
-		var gtidSlaves [](*Instance)
-		var nonGTIDSlaves [](*Instance)
-		for _, slave := range slaves {
-			if _, _, canMove := canMoveViaGTID(slave, other); canMove {
-				gtidSlaves = append(gtidSlaves, slave)
-			} else {
-				nonGTIDSlaves = append(nonGTIDSlaves, slave)
-			}
-		}
-		for i := range gtidSlaves {
-			gtidSlaves[i], _ = MoveBelowViaGTID(gtidSlaves[i], other)
-		}
+		movedSlaves, unmovedSlaves, err, errs := MoveSlavesViaGTID(slaves, other)
 
-		if len(gtidSlaves) == len(slaves) {
+		if len(movedSlaves) == len(slaves) {
 			// Moved (or tried moving) everything via GTID
-			return gtidSlaves, err, errs
-		} else if len(gtidSlaves) > 0 {
+			return movedSlaves, err, errs
+		} else if len(movedSlaves) > 0 {
 			// something was moved via GTID; let's try further on
-			return relocateSlavesInternal(nonGTIDSlaves, instance, other)
+			return relocateSlavesInternal(unmovedSlaves, instance, other)
 		}
-		// Otherwise we don't have any GTIDs, we continue
+		// Otherwise nothing was moved via GTID. Maybe we don't have any GTIDs, we continue.
 	}
 
 	// Pseudo GTID
