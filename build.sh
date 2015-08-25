@@ -50,7 +50,7 @@ function setuptree() {
   local b
 
   mkdir -p $TOPDIR
-rm -rf $TOPDIR/*
+  rm -rf $TOPDIR/*
   b=$( mktemp -d $TOPDIR/orchestratorXXXXXX ) || return 1
   mkdir -p $b/orchestrator
   mkdir -p $b/orchestrator/usr/local/orchestrator/
