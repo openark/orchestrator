@@ -77,12 +77,10 @@ func Verify(r *nethttp.Request) error {
 func VerifyOUs() martini.Handler {
 	return func(res nethttp.ResponseWriter, req *nethttp.Request, c martini.Context) {
 		if config.Config.UseMutualTLS {
-			log.Info("Verifying client OU")
+			log.Debug("Verifying client OU")
 			if err := Verify(req); err != nil {
 				nethttp.Error(res, err.Error(), nethttp.StatusUnauthorized)
 			}
-		} else {
-			log.Debug("Mutual TLS disabled, skipping OU check")
 		}
 	}
 }
