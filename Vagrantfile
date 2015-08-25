@@ -15,7 +15,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     vb.customize ['modifyvm', :id, '--nictype2', 'virtio']
   end
 
-  config.vm.synced_folder '.', '/vagrant', type: 'rsync'
+  config.vm.synced_folder '.', '/orchestrator', type: 'rsync'
 
   (0..4).each do |n|
     name = (n > 0 ? ("db" + n.to_s) : "admin")

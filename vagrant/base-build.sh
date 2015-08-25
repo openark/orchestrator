@@ -108,7 +108,7 @@ chown -R vagrant:vagrant /home/vagrant/.ssh
 sudo service iptables stop
 
 if [[ $HOSTNAME == 'admin' ]]; then
-  bash /vagrant/vagrant/admin-build.sh
+  bash /orchestrator/vagrant/admin-build.sh
 else
-  bash /vagrant/vagrant/$HOSTNAME-build.sh
+  bash /orchestrator/vagrant/$HOSTNAME-build.sh
 fi

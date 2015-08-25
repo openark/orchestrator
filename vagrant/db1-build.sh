@@ -1,17 +1,5 @@
-sudo cat <<-EOF > /etc/my.cnf
-[mysqld]
-datadir=/var/lib/mysql
-socket=/var/lib/mysql/mysql.sock
-user=mysql
-# Disabling symbolic-links is recommended to prevent assorted security risks
-symbolic-links=0
-server_id=1
-log_bin
-
-[mysqld_safe]
-log-error=/var/log/mysqld.log
-pid-file=/var/run/mysqld/mysqld.pid
-EOF
+sudo rm -rf /etc/my.cnf
+sudo cp /orchestrator/vagrant/db1-my.cnf /etc/my.cnf
 
 sudo service mysql start
 
