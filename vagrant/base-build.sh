@@ -2,19 +2,19 @@
 
 if [[ -e /etc/redhat-release ]]; then
   # Percona's Yum Repository
-  sudo yum --nogpgcheck -y install http://www.percona.com/downloads/percona-release/redhat/0.1-3/percona-release-0.1-3.noarch.rpm
+  sudo yum -y install http://www.percona.com/downloads/percona-release/redhat/0.1-3/percona-release-0.1-3.noarch.rpm
 
   # No reason not to install this stuff in all the places :)
-  sudo yum --nogpgcheck -y install Percona-Server-server-56 Percona-Server-shared-56 Percona-Server-client-56 Percona-Server-shared-compat
-  sudo yum --nogpgcheck -y install percona-toolkit percona-xtrabackup
+  sudo yum -y install Percona-Server-server-56 Percona-Server-shared-56 Percona-Server-client-56 Percona-Server-shared-compat
+  sudo yum -y install percona-toolkit percona-xtrabackup
 
   # All the project dependencies to build
-  sudo yum --nogpgcheck -y install ruby-devel gcc rpm-build git
+  sudo yum -y install ruby-devel gcc rpm-build git
   gem install fpm
 
   # Go (via EPEL)
-  sudo yum --nogpgcheck -y install epel-release
-  sudo yum --nogpgcheck -y install golang
+  sudo yum -y install epel-release
+  sudo yum -y install golang
 elif [[ -e /etc/debian_version ]]; then
   sudo echo exit 101 > /usr/sbin/policy-rc.d
   sudo chmod +x /usr/sbin/policy-rc.d
