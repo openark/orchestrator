@@ -1,11 +1,11 @@
 [mysqld]
 datadir=/var/lib/mysql
-socket=/var/lib/mysql/mysql.sock
 user=mysql
 # Disabling symbolic-links is recommended to prevent assorted security risks
 symbolic-links=0
 server_id=2
 log_bin
+log-slave-updates
 
 [mysqld_safe]
 log-error=/var/log/mysqld.log
