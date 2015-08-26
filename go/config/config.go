@@ -35,13 +35,23 @@ type Configuration struct {
 	MySQLTopologyUser                          string
 	MySQLTopologyPassword                      string // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
 	MySQLTopologyCredentialsConfigFile         string
-	MySQLTopologyMaxPoolConnections            int // Max concurrent connections on any topology instance
+	MySQLTopologySSLPrivateKeyFile             string // Private key file used to authenticate with a Topology mysql instance with TLS
+	MySQLTopologySSLCertFile                   string // Certificate PEM file used to authenticate with a Topology mysql instance with TLS
+	MySQLTopologySSLCAFile                     string // Certificate Authority PEM file used to authenticate with a Topology mysql instance with TLS
+	MySQLTopologySSLSkipVerify                 bool   // If true, do not strictly validate mutual TLS certs for Topology mysql instances
+	MySQLTopologyUseMutualTLS                  bool   // Turn on TLS authentication with the Topology MySQL instances
+	MySQLTopologyMaxPoolConnections            int    // Max concurrent connections on any topology instance
 	MySQLOrchestratorHost                      string
 	MySQLOrchestratorPort                      uint
 	MySQLOrchestratorDatabase                  string
 	MySQLOrchestratorUser                      string
 	MySQLOrchestratorPassword                  string
 	MySQLOrchestratorCredentialsConfigFile     string // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
+	MySQLOrchestratorSSLPrivateKeyFile         string // Private key file used to authenticate with the Orchestrator mysql instance with TLS
+	MySQLOrchestratorSSLCertFile               string // Certificate PEM file used to authenticate with the Orchestrator mysql instance with TLS
+	MySQLOrchestratorSSLCAFile                 string // Certificate Authority PEM file used to authenticate with the Orchestrator mysql instance with TLS
+	MySQLOrchestratorSSLSkipVerify             bool   // If true, do not strictly validate mutual TLS certs for the Orchestrator mysql instances
+	MySQLOrchestratorUseMutualTLS              bool   // Turn on TLS authentication with the Orchestrator MySQL instance
 	MySQLConnectTimeoutSeconds                 int    // Number of seconds before connection is aborted (driver-side)
 	DefaultInstancePort                        int    // In case port was not specified on command line
 	SkipOrchestratorDatabaseUpdate             bool   // When false, orchestrator will attempt to create & update all tables in backend database; when true, this is skipped. It makes sense to skip on command-line invocations and to enable for http or occasional invocations, or just after upgrades
@@ -134,6 +144,8 @@ func NewConfiguration() *Configuration {
 		AgentsServerPort:                           ":3001",
 		MySQLOrchestratorPort:                      3306,
 		MySQLTopologyMaxPoolConnections:            3,
+		MySQLTopologyUseMutualTLS:                  false,
+		MySQLOrchestratorUseMutualTLS:              false,
 		MySQLConnectTimeoutSeconds:                 5,
 		DefaultInstancePort:                        3306,
 		SkipOrchestratorDatabaseUpdate:             false,

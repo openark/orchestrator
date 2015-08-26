@@ -1,4 +1,4 @@
-package http
+package ssl
 
 import (
 	"crypto/tls"
@@ -27,9 +27,8 @@ func HasString(elem string, arr []string) bool {
 func NewTLSConfig(caFile string, mutualTLS bool) (*tls.Config, error) {
 	var c tls.Config
 
-	// No sslv3 or tls 1.0
+	// TLS 1.0 at a minimum (for mysql)
 	c.MinVersion = tls.VersionTLS10
-	c.MaxVersion = tls.VersionTLS12
 	c.PreferServerCipherSuites = true
 
 	if mutualTLS {

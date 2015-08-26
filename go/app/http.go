@@ -33,6 +33,7 @@ import (
 	"github.com/outbrain/orchestrator/go/http"
 	"github.com/outbrain/orchestrator/go/inst"
 	"github.com/outbrain/orchestrator/go/logic"
+	"github.com/outbrain/orchestrator/go/ssl"
 )
 
 // acceptSignals registers for OS signals
@@ -106,7 +107,7 @@ func standardHttp(discovery bool) {
 	}))
 	m.Use(martini.Static("resources/public"))
 	if config.Config.UseMutualTLS {
-		m.Use(http.VerifyOUs(config.Config.SSLValidOUs))
+		m.Use(ssl.VerifyOUs(config.Config.SSLValidOUs))
 	}
 
 	inst.SetMaintenanceOwner(logic.ThisHostname)
@@ -124,14 +125,15 @@ func standardHttp(discovery bool) {
 	// Serve
 	if config.Config.UseSSL {
 		log.Info("Starting HTTPS listener")
-		tlsConfig, err := http.NewTLSConfig(config.Config.SSLCAFile, config.Config.UseMutualTLS)
+		tlsConfig, err := ssl.NewTLSConfig(config.Config.SSLCAFile, config.Config.UseMutualTLS)
 		if err != nil {
 			log.Fatale(err)
 		}
-		if err = http.AppendKeyPair(tlsConfig, config.Config.SSLCertFile, config.Config.SSLPrivateKeyFile); err != nil {
+		tlsConfig.InsecureSkipVerify = config.Config.SSLSkipVerify
+		if err = ssl.AppendKeyPair(tlsConfig, config.Config.SSLCertFile, config.Config.SSLPrivateKeyFile); err != nil {
 			log.Fatale(err)
 		}
-		if err = http.ListenAndServeTLS(config.Config.ListenAddress, m, tlsConfig); err != nil {
+		if err = ssl.ListenAndServeTLS(config.Config.ListenAddress, m, tlsConfig); err != nil {
 			log.Fatale(err)
 		}
 	} else {
@@ -149,7 +151,7 @@ func agentsHttp() {
 	m.Use(gzip.All())
 	m.Use(render.Renderer())
 	if config.Config.AgentsUseMutualTLS {
-		m.Use(http.VerifyOUs(config.Config.AgentSSLValidOUs))
+		m.Use(ssl.VerifyOUs(config.Config.AgentSSLValidOUs))
 	}
 
 	log.Info("Starting agents listener")
@@ -161,14 +163,15 @@ func agentsHttp() {
 	// Serve
 	if config.Config.AgentsUseSSL {
 		log.Info("Starting agent HTTPS listener")
-		tlsConfig, err := http.NewTLSConfig(config.Config.AgentSSLCAFile, config.Config.AgentsUseMutualTLS)
+		tlsConfig, err := ssl.NewTLSConfig(config.Config.AgentSSLCAFile, config.Config.AgentsUseMutualTLS)
 		if err != nil {
 			log.Fatale(err)
 		}
-		if err = http.AppendKeyPair(tlsConfig, config.Config.AgentSSLCertFile, config.Config.AgentSSLPrivateKeyFile); err != nil {
+		tlsConfig.InsecureSkipVerify = config.Config.AgentSSLSkipVerify
+		if err = ssl.AppendKeyPair(tlsConfig, config.Config.AgentSSLCertFile, config.Config.AgentSSLPrivateKeyFile); err != nil {
 			log.Fatale(err)
 		}
-		if err = http.ListenAndServeTLS(config.Config.AgentsServerPort, m, tlsConfig); err != nil {
+		if err = ssl.ListenAndServeTLS(config.Config.AgentsServerPort, m, tlsConfig); err != nil {
 			log.Fatale(err)
 		}
 	} else {
