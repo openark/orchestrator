@@ -1,4 +1,4 @@
-if [[ -e /etc/centos-release ]]; then
+if [[ -e /etc/redhat-release ]]; then
   sudo rm -rf /etc/my.cnf
   sudo cp /orchestrator/vagrant/db4-my.cnf /etc/my.cnf
   sudo service mysql start

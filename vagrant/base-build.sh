@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [[ -e /etc/centos-release ]]; then
+if [[ -e /etc/redhat-release ]]; then
   # Percona's Yum Repository
   sudo yum --nogpgcheck -y install http://www.percona.com/downloads/percona-release/redhat/0.1-3/percona-release-0.1-3.noarch.rpm
 
@@ -130,7 +130,7 @@ EOF
 chmod go-rwx /home/vagrant/.ssh/*
 chown -R vagrant:vagrant /home/vagrant/.ssh
 
-if [[ -e /etc/centos-release ]]; then
+if [[ -e /etc/redhat-release ]]; then
   sudo service iptables stop
 fi
 
