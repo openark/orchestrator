@@ -6,6 +6,12 @@ BOX = ENV['VAGRANT_BOX'].nil? || ENV['VAGRANT_BOX'].empty? ? 'nrel/CentOS-6.6-x8
 
 VAGRANTFILE_API_VERSION = "2"
 
+system("
+    if [ #{ARGV[0]} = 'up' ]; then
+      ssh-keygen -t rsa -b 768 -N '' -q -f vagrant/vagrant-ssh-key
+    fi
+")
+
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.box = BOX
   config.vm.box_download_insecure = true

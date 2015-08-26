@@ -66,3 +66,11 @@ Ubuntu
 %> export VAGRANT_SERVER_URL="https://atlas.hashicorp.com"
 %> export VAGRANT_BOX='chef/ubuntu-12.04'
 %> vagrant up
+
+TO DO
+=====
+
+- Support other MySQL's (5.5, 5.7, MariaDB)
+- Support customizable replication configurations
+- Better my.cnf templates
+
