@@ -245,6 +245,7 @@ type Instance struct {
 	LastIOError            string
 	SecondsBehindMaster    sql.NullInt64
 	SQLDelay               uint
+	ExecutedGtidSet        string
 
 	SlaveLagSeconds     sql.NullInt64
 	SlaveHosts          InstanceKeyMap
@@ -376,6 +377,36 @@ func (this *Instance) SQLThreadUpToDate() bool {
 // UsingGTID returns true when this slave is currently replicating via GTID (either Oracle or MariaDB)
 func (this *Instance) UsingGTID() bool {
 	return this.UsingOracleGTID || this.UsingMariaDBGTID
+}
+
+// NextGTID returns the next (Oracle) GTID to be executed. Useful for skipping queries
+func (this *Instance) NextGTID() (string, error) {
+	if this.ExecutedGtidSet == "" {
+		return "", fmt.Errorf("No value found in Executed_Gtid_Set; cannot compute NextGTID")
+	}
+
+	firstToken := func(s string, delimiter string) string {
+		tokens := strings.Split(s, delimiter)
+		return tokens[0]
+	}
+	lastToken := func(s string, delimiter string) string {
+		tokens := strings.Split(s, delimiter)
+		return tokens[len(tokens)-1]
+	}
+	// executed GTID set: 4f6d62ed-df65-11e3-b395-60672090eb04:1,b9b4712a-df64-11e3-b391-60672090eb04:1-6
+	executedGTIDsFromMaster := lastToken(this.ExecutedGtidSet, ",")
+	// executedGTIDsFromMaster: b9b4712a-df64-11e3-b391-60672090eb04:1-6
+	executedRange := lastToken(executedGTIDsFromMaster, ":")
+	// executedRange: 1-6
+	lastExecutedNumberToken := lastToken(executedRange, "-")
+	// lastExecutedNumber: 6
+	lastExecutedNumber, err := strconv.Atoi(lastExecutedNumberToken)
+	if err != nil {
+		return "", err
+	}
+	nextNumber := lastExecutedNumber + 1
+	nextGTID := fmt.Sprintf("%s:%d", firstToken(executedGTIDsFromMaster, ":"), nextNumber)
+	return nextGTID, nil
 }
 
 // AddSlaveKey adds a slave to the list of this instance's slaves.

@@ -214,3 +214,24 @@ func (s *TestSuite) TestParseInstanceKey(c *C) {
 	c.Assert(i.Hostname, Equals, "127.0.0.1")
 	c.Assert(i.Port, Equals, 3306)
 }
+
+func (s *TestSuite) TestNextGTID(c *C) {
+	{
+		i := inst.Instance{ExecutedGtidSet: "4f6d62ed-df65-11e3-b395-60672090eb04:1,b9b4712a-df64-11e3-b391-60672090eb04:1-6"}
+		nextGTID, err := i.NextGTID()
+		c.Assert(err, IsNil)
+		c.Assert(nextGTID, Equals, "b9b4712a-df64-11e3-b391-60672090eb04:7")
+	}
+	{
+		i := inst.Instance{ExecutedGtidSet: "b9b4712a-df64-11e3-b391-60672090eb04:1-6"}
+		nextGTID, err := i.NextGTID()
+		c.Assert(err, IsNil)
+		c.Assert(nextGTID, Equals, "b9b4712a-df64-11e3-b391-60672090eb04:7")
+	}
+	{
+		i := inst.Instance{ExecutedGtidSet: "b9b4712a-df64-11e3-b391-60672090eb04:6"}
+		nextGTID, err := i.NextGTID()
+		c.Assert(err, IsNil)
+		c.Assert(nextGTID, Equals, "b9b4712a-df64-11e3-b391-60672090eb04:7")
+	}
+}

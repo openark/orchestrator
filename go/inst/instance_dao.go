@@ -101,6 +101,23 @@ func ExecInstanceNoPrepare(instanceKey *InstanceKey, query string, args ...inter
 	return res, err
 }
 
+// EmptyCommitInstance issues an empty COMMIT on a given instance
+func EmptyCommitInstance(instanceKey *InstanceKey) error {
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return err
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return err
+}
+
 // ScanInstanceRow executes a read-a-single-row query on a given MySQL topology instance
 func ScanInstanceRow(instanceKey *InstanceKey, query string, dest ...interface{}) error {
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
@@ -261,6 +278,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		instance.LastIOError = m.GetString("Last_IO_Error")
 		instance.SQLDelay = m.GetUintD("SQL_Delay", 0)
 		instance.UsingOracleGTID = (m.GetIntD("Auto_Position", 0) == 1)
+		instance.ExecutedGtidSet = m.GetStringD("Executed_Gtid_Set", "")
 		instance.UsingMariaDBGTID = (m.GetStringD("Using_Gtid", "No") != "No")
 		instance.HasReplicationFilters = ((m.GetStringD("Replicate_Do_DB", "") != "") || (m.GetStringD("Replicate_Ignore_DB", "") != "") || (m.GetStringD("Replicate_Do_Table", "") != "") || (m.GetStringD("Replicate_Ignore_Table", "") != "") || (m.GetStringD("Replicate_Wild_Do_Table", "") != "") || (m.GetStringD("Replicate_Wild_Ignore_Table", "") != ""))
 
@@ -536,6 +554,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.HasReplicationFilters = m.GetBool("has_replication_filters")
 	instance.SupportsOracleGTID = m.GetBool("supports_oracle_gtid")
 	instance.UsingOracleGTID = m.GetBool("oracle_gtid")
+	instance.ExecutedGtidSet = m.GetString("executed_gtid_set")
 	instance.UsingMariaDBGTID = m.GetBool("mariadb_gtid")
 	instance.UsingPseudoGTID = m.GetBool("pseudo_gtid")
 	instance.SelfBinlogCoordinates.LogFile = m.GetString("binary_log_file")
@@ -1300,6 +1319,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 					has_replication_filters=VALUES(has_replication_filters),
 					supports_oracle_gtid=VALUES(supports_oracle_gtid),
 					oracle_gtid=VALUES(oracle_gtid),
+					executed_gtid_set=VALUES(executed_gtid_set),
 					mariadb_gtid=VALUES(mariadb_gtid),
 					pseudo_gtid=values(pseudo_gtid),
 					master_log_file=VALUES(master_log_file),
@@ -1350,6 +1370,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				has_replication_filters,
 				supports_oracle_gtid,
 				oracle_gtid,
+				executed_gtid_set,
 				mariadb_gtid,
 				pseudo_gtid,
 				master_log_file,
@@ -1370,7 +1391,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				physical_environment,
 				replication_depth,
 				is_co_master
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
@@ -1394,6 +1415,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			instance.HasReplicationFilters,
 			instance.SupportsOracleGTID,
 			instance.UsingOracleGTID,
+			instance.ExecutedGtidSet,
 			instance.UsingMariaDBGTID,
 			instance.UsingPseudoGTID,
 			instance.ReadBinlogCoordinates.LogFile,
@@ -1929,6 +1951,33 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
+// skipQueryClassic skips a query in normal binlog file:pos replication
+func skipQueryClassic(instance *Instance) error {
+	_, err := ExecInstance(&instance.Key, `set global sql_slave_skip_counter := 1`)
+	return err
+}
+
+// skipQueryOracleGtid skips a single query in an Oracle GTID replicating slave, by injecting an empty transaction
+func skipQueryOracleGtid(instance *Instance) error {
+	nextGtid, err := instance.NextGTID()
+	if err != nil {
+		return err
+	}
+	if nextGtid == "" {
+		return fmt.Errorf("Empty NextGTID() in skipQueryGtid() for %+v", instance.Key)
+	}
+	if _, err := ExecInstanceNoPrepare(&instance.Key, fmt.Sprintf(`SET GTID_NEXT='%s'`, nextGtid)); err != nil {
+		return err
+	}
+	if err := EmptyCommitInstance(&instance.Key); err != nil {
+		return err
+	}
+	if _, err := ExecInstanceNoPrepare(&instance.Key, `SET GTID_NEXT='AUTOMATIC'`); err != nil {
+		return err
+	}
+	return nil
+}
+
 // SkipQuery skip a single query in a failed replication instance
 func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -1940,7 +1989,7 @@ func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
 	}
 	if instance.Slave_SQL_Running {
-		return instance, fmt.Errorf("Slave_SQL_is running on %+v", instanceKey)
+		return instance, fmt.Errorf("Slave SQL thread is running on %+v", instanceKey)
 	}
 	if instance.LastSQLError == "" {
 		return instance, fmt.Errorf("No SQL error on %+v", instanceKey)
@@ -1951,10 +2000,17 @@ func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	log.Debugf("Skipping one query on %+v", instanceKey)
-	_, err = ExecInstance(instanceKey, `set global sql_slave_skip_counter := 1`)
+	if instance.UsingOracleGTID {
+		err = skipQueryOracleGtid(instance)
+	} else if instance.UsingMariaDBGTID {
+		return instance, log.Errorf("%+v is replicating with MariaDB GTID. To skip a query first disable GTID, then skip, then enable GTID again", *instanceKey)
+	} else {
+		err = skipQueryClassic(instance)
+	}
 	if err != nil {
 		return instance, log.Errore(err)
 	}
+	AuditOperation("skip-query", instanceKey, "Skipped one query")
 	return StartSlave(instanceKey)
 }
 

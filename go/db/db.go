@@ -486,6 +486,11 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN supports_oracle_gtid TINYINT UNSIGNED NOT NULL AFTER oracle_gtid
 	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN executed_gtid_set text CHARACTER SET ascii NOT NULL AFTER oracle_gtid
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance
