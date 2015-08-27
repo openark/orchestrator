@@ -1,2 +1,10 @@
 conf/orchestrator.conf.json
-
+.vagrant/
+vagrant/admin-post-install.sh
+vagrant/db-post-install.sh
+vagrant/db1-post-install.sh
+vagrant/db2-post-install.sh
+vagrant/db3-post-install.sh
+vagrant/db4-post-install.sh
+vagrant/vagrant-ssh-key
+vagrant/vagrant-ssh-key.pub
