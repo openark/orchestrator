@@ -81,6 +81,14 @@ function getInstanceId(host, port) {
     return "instance__" + host.replace(/[.]/g, "_") + "__" + port
 }
 
+
+function canonizeInstanceTitle(title) {
+    if (typeof removeTextFromHostnameDisplay != "undefined" && removeTextFromHostnameDisplay()) {
+        return title.replace(removeTextFromHostnameDisplay(), '');
+    } 
+	return title;
+}
+
 function commonSuffixLength(strings) {
 	if (strings.length == 0) {
 		return 0;
@@ -222,7 +230,24 @@ function openNodeModal(node) {
         addNodeModalDataAttribute("Seconds behind master", node.SecondsBehindMaster.Valid ? node.SecondsBehindMaster.Int64 : "null");
         addNodeModalDataAttribute("Replication lag", node.SlaveLagSeconds.Valid ? node.SlaveLagSeconds.Int64 : "null");
         addNodeModalDataAttribute("SQL delay", node.SQLDelay);
+
+        $('#node_modal [data-btn-group=move-equivalent]').hide();
+        var td = addNodeModalDataAttribute("Master coordinates", node.ExecBinlogCoordinates.LogFile+":"+node.ExecBinlogCoordinates.LogPos);
+        $('#node_modal [data-btn-group=move-equivalent]').appendTo(td.find("div"))
+        $('#node_modal [data-btn-group=move-equivalent] ul').empty();
+		$.get("/api/master-equivalent/"+node.MasterKey.Hostname+"/"+node.MasterKey.Port+"/"+node.ExecBinlogCoordinates.LogFile+"/"+node.ExecBinlogCoordinates.LogPos, function(equivalenceResult) {
+			if (!equivalenceResult.Details) {
+				return false;
+			}
+			equivalenceResult.Details.forEach(function(equivalence) {
+		    	var title = canonizeInstanceTitle(equivalence.Key.Hostname+':'+equivalence.Key.Port);
+		    	$('#node_modal [data-btn-group=move-equivalent] ul').append('<li><a href="#" data-btn="move-equivalent" data-hostname="'+equivalence.Key.Hostname+'" data-port="'+equivalence.Key.Port+'">'+title+'</a></li>');
+		    });
+
+			$('#node_modal [data-btn-group=move-equivalent]').show();
+		}, "json");
     }
+    addNodeModalDataAttribute("Self coordinates", node.SelfBinlogCoordinates.LogFile+":"+node.SelfBinlogCoordinates.LogPos);
     var td = addNodeModalDataAttribute("Num slaves", node.SlaveHosts.length);
     $('#node_modal button[data-btn=move-up-slaves]').appendTo(td.find("div"))
     $('#node_modal button[data-btn=match-up-slaves]').appendTo(td.find("div"))
@@ -243,6 +268,7 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=disable-gtid]').appendTo(td.find("div"))
 
     addNodeModalDataAttribute("Uptime", node.Uptime);
+
     addNodeModalDataAttribute("Cluster",
             '<a href="/web/cluster/'+node.ClusterName+'">'+node.ClusterName+'</a>');
     addNodeModalDataAttribute("Agent",
@@ -319,6 +345,12 @@ function openNodeModal(node) {
 			}
 		}); 
     	return false;
+    });
+
+    $("body").on("click", "#node_modal a[data-btn=move-equivalent]", function(event) {
+    	var targetHostname = $(event.target).attr("data-hostname");
+    	var targetPort = $(event.target).attr("data-port");
+    	apiCommand("/api/move-equivalent/"+node.Key.Hostname+"/"+node.Key.Port+"/"+targetHostname+"/"+targetPort);
     });
 
     if (node.inMaintenance) {
@@ -512,16 +544,13 @@ function normalizeInstances(instances, maintenanceList) {
     var hostNames = instances.map(function (instance) {
         return instance.title
     });
-    if (typeof removeTextFromHostnameDisplay != "undefined" && removeTextFromHostnameDisplay()) {
-        instances.forEach(function (instance) {
-        	instance.canonicalTitle = instance.title.replace(removeTextFromHostnameDisplay(), '');
-        });
-    } else {
-        var suffixLength = commonSuffixLength(hostNames);
-        instances.forEach(function (instance) {
-        	instance.canonicalTitle = instance.title.substring(0, instance.title.length - suffixLength);
-        });
-    }
+    var suffixLength = commonSuffixLength(hostNames);
+    instances.forEach(function (instance) {
+    	instance.canonicalTitle = canonizeInstanceTitle(instance.title)
+    	if (instance.canonicalTitle == instance.title) {
+	       	instance.canonicalTitle = instance.title.substring(0, instance.title.length - suffixLength);
+    	}
+    });
     var instancesMap = instances.reduce(function (map, instance) {
         map[instance.id] = instance;
         return map;

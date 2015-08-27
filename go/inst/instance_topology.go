@@ -157,6 +157,52 @@ func InstanceIsMasterOf(allegedMaster, allegedSlave *Instance) bool {
 	return allegedMaster.Key.Equals(&allegedSlave.MasterKey)
 }
 
+// MoveEquivalent will attempt moving instance indicated by instanceKey below another instance,
+// based on known master coordinates equivalence
+func MoveEquivalent(instanceKey, otherKey *InstanceKey) (*Instance, error) {
+	instance, found, err := ReadInstance(instanceKey)
+	if err != nil || !found {
+		return instance, err
+	}
+	// Are there equivalent coordinates to this instance?
+	instanceCoordinates := &InstanceBinlogCoordinates{Key: instance.MasterKey, Coordinates: instance.ExecBinlogCoordinates}
+	binlogCoordinates, err := GetEquivalentBinlogCoordinatesFor(instanceCoordinates, otherKey)
+	if err != nil {
+		return instance, err
+	}
+	if binlogCoordinates == nil {
+		return instance, fmt.Errorf("No equivalent coordinates found for %+v replicating from %+v at %+v", instance.Key, instance.MasterKey, instance.ExecBinlogCoordinates)
+	}
+	// For performance reasons, we did all the above before even checking the slave is stopped or stopping it at all.
+	// This allows us to quickly skip the entire operation should there NOT be coordinates.
+	// To elaborate: if the slave is actually running AND making progress, it is unlikely/impossible for it to have
+	// equivalent coordinates, as the current coordinates are like to have never been seen.
+	// This excludes the case, for example, that the master is itself not replicating.
+	// Now if we DO get to happen on equivalent coordinates, we need to double check. For CHANGE MASTER to happen we must
+	// stop the slave anyhow. But then let's verify the position hasn't changed.
+	knownExecBinlogCoordinates := instance.ExecBinlogCoordinates
+	instance, err = StopSlave(instanceKey)
+	if err != nil {
+		goto Cleanup
+	}
+	if !instance.ExecBinlogCoordinates.Equals(&knownExecBinlogCoordinates) {
+		// Seems like things were still running... We don't have an equivalence point
+		err = fmt.Errorf("MoveEquivalent(): ExecBinlogCoordinates changed after stopping replication on %+v; aborting", instance.Key)
+		goto Cleanup
+	}
+	instance, err = ChangeMasterTo(instanceKey, otherKey, binlogCoordinates, false, GTIDHintNeutral)
+
+Cleanup:
+	instance, _ = StartSlave(instanceKey)
+
+	if err == nil {
+		message := fmt.Sprintf("moved %+v via equivalence coordinates below %+v", *instanceKey, *otherKey)
+		log.Debugf(message)
+		AuditOperation("move-equivalent", instanceKey, message)
+	}
+	return instance, err
+}
+
 // MoveUp will attempt moving instance indicated by instanceKey up the topology hierarchy.
 // It will perform all safety and sanity checks and will tamper with this instance's replication
 // as well as its master.
@@ -1800,6 +1846,10 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 	if InstanceIsMasterOf(other, instance) {
 		// already the desired setup.
 		return Repoint(&instance.Key, &other.Key, GTIDHintNeutral)
+	}
+	// Do we have record of equivalent coordinates?
+	if movedInstance, err := MoveEquivalent(&instance.Key, &other.Key); err == nil {
+		return movedInstance, nil
 	}
 	// Try and take advantage of binlog servers:
 	if InstancesAreSiblings(instance, other) && other.IsBinlogServer() {
