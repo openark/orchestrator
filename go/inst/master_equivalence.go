@@ -16,9 +16,6 @@
 
 package inst
 
-import (
-)
-
 // InstanceBinlogCoordinates is a convenice wrapper for instance key + binlog coordinates
 type InstanceBinlogCoordinates struct {
 	Key         InstanceKey

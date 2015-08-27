@@ -240,11 +240,17 @@ function openNodeModal(node) {
 				return false;
 			}
 			equivalenceResult.Details.forEach(function(equivalence) {
+				if (equivalence.Key.Hostname == node.Key.Hostname && equivalence.Key.Port == node.Key.Port) {
+					// This very instance; will not move below itself
+					return;
+				}
 		    	var title = canonizeInstanceTitle(equivalence.Key.Hostname+':'+equivalence.Key.Port);
 		    	$('#node_modal [data-btn-group=move-equivalent] ul').append('<li><a href="#" data-btn="move-equivalent" data-hostname="'+equivalence.Key.Hostname+'" data-port="'+equivalence.Key.Port+'">'+title+'</a></li>');
 		    });
 
-			$('#node_modal [data-btn-group=move-equivalent]').show();
+			if ($('#node_modal [data-btn-group=move-equivalent] ul li').length) {
+				$('#node_modal [data-btn-group=move-equivalent]').show();
+			}
 		}, "json");
     }
     addNodeModalDataAttribute("Self coordinates", node.SelfBinlogCoordinates.LogFile+":"+node.SelfBinlogCoordinates.LogPos);

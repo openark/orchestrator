@@ -1310,7 +1310,7 @@ $(document).ready(function () {
     	addSidebarInfoPopoverContent(content);
     }, "json");
 
-    $("#li-move-instance-method").appendTo("ul.navbar-nav");
+    $("#li-move-instance-method").appendTo("ul.navbar-nav").show();
     $("#move-instance-method a").click(function() {
     	moveInstanceMethod = $(this).attr("data-method");
     	refreshClusterOperationModeButton();
