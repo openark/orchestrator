@@ -178,6 +178,23 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), destinationKey.DisplayString()))
 		}
+	case cliCommand("move-equivalent"):
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce sibling:", destination)
+			}
+			_, err := inst.MoveEquivalent(instanceKey, destinationKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), destinationKey.DisplayString()))
+		}
 	case cliCommand("repoint"):
 		{
 			if instanceKey == nil {
