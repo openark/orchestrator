@@ -118,6 +118,17 @@ Cheatsheet:
 
             orchestrator -c move-below -d sibling.slave.under.which.to.move.com
                 -i not given, implicitly assumed local hostname
+                
+        move-equivalent
+            Moves a slave beneath another server, based on previously recorded "equivalence coordinates". Such coordinates
+            are obtained whenever orchestrator issues a CHANGE MASTER TO. The "before" and "after" masters coordinates are
+            persisted. In such cases where the newly relocated slave is unable to replicate (e.g. firewall issues) it is then
+            easy to revert the relocation via "move-equivalent".
+            The command works if and only if orchestrator has an exact mapping between the slave's current replication coordinates 
+            and some other coordinates.
+            Example:
+            
+            orchestrator -c move-equivalent -i slave.to.revert.master.position.com -d master.to.move.to.com              
             
         enslave-siblings
             Turn all siblings of a slave into its sub-slaves. No action taken for siblings that cannot become
