@@ -337,7 +337,15 @@ Cheatsheet:
             
             orchestrator -c set-writeable
                 -i not given, implicitly assumed local hostname
+
+        flush-binary-logs
+            Flush binary logs on an instance. Examples:
             
+            orchestrator -c flush-binary-logs -i instance.with.binary.logs.com
+            
+            orchestrator -c flush-binary-logs -i instance.with.binary.logs.com --binlog=mysql-bin.002048
+                Flushes binary logs until reaching given number. Fails when current number is larger than input
+                        
     Pool commands
         Orchestrator provides with getter/setter commands for handling pools. It does not on its own investigate pools,
         but merely accepts and provides association of an instance (host:port) and a pool (any_name).
@@ -573,6 +581,8 @@ Cheatsheet:
             
             orchestrator -c replication-analysis
 
+    Instance meta commands
+    
         register-candidate
             Indicate that a specific instance is a preferred candidate for master promotion. Upon a dead master
             recovery, orchestrator will do its best to promote instances that are marked as candidates. However
@@ -593,6 +603,26 @@ Cheatsheet:
             
             orchestrator -c register-candidate
                 -i not given, implicitly assumed local hostname
+            
+        register-hostname-unresolve
+            Assigns the given instance a virtual (aka "unresolved") name. When moving slaves under an instance with assigned 
+            "unresolve" name, orchestrator issues a CHANGE MASTER TO MASTER_HOST='<the unresovled name instead of the fqdn>' ...
+            This is useful in cases where your master is behind virtual IP (e.g. active/passive masters with shared storage or DRBD,
+            e.g. binlog servers sharing common VIP).
+            A "repoint" command is useful after "register-hostname-unresolve": you can repoint slaves of the instance to their exact
+            same location, and orchestrator will swap the fqdn of their master with the unresolved name.
+            Such registration must be periodic. Orchestrator automatically expires such registration after ExpiryHostnameResolvesMinutes.
+            Example:
+                        
+            orchestrator -c register-hostname-unresolve -i instance.fqdn.com --hostname=virtual.name.com                   
+            
+        deregister-hostname-unresolve
+            Explicitly deregister/dosassociate a hostname with an "unresolved" name. Orchestrator merely remvoes the association, but does
+            not touch any slave at this point. A "repoint" command can be useful right after calling this command to change slave's master host
+            name (assumed to be an "unresolved" name, such as a VIP) with the real fqdn of the master host.   
+            Example:
+                        
+            orchestrator -c deregister-hostname-unresolve -i instance.fqdn.com                 
             
     Misc commands
     
