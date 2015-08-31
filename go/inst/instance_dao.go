@@ -172,6 +172,9 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 				if originalVersion == "" {
 					originalVersion = m.GetString("value")
 				}
+				if originalVersion == "" {
+					originalVersion = "0.0.0"
+				}
 				instance.Version = originalVersion + "-maxscale"
 				instance.ServerID = 0
 				instance.Uptime = 0
