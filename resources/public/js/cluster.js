@@ -374,6 +374,7 @@ function moveInstance(node, droppableNode, shouldApply) {
     	// Obviously this is also checked on server side, no need to try stupid hacks
 		return {accept: false} ;
     }
+    var droppableTitle = getInstanceDiv(droppableNode.id).find("h3 .pull-left").html();
     var isUsingGTID = (node.usingGTID && droppableNode.usingGTID);
 	if (moveInstanceMethod == "smart") {
 		// Moving via GTID or Pseudo GTID
@@ -397,7 +398,7 @@ function moveInstance(node, droppableNode, shouldApply) {
 		if (shouldApply) {
 			relocate(node, droppableNode);
 		}
-		return {accept: "warning", type: "relocate < " + droppableNode.canonicalTitle};
+		return {accept: "warning", type: "relocate < " + droppableTitle};
 	}
 	if (moveInstanceMethod == "pseudo-gtid") {
 		var gtidBelowFunc = matchBelow
@@ -424,21 +425,21 @@ function moveInstance(node, droppableNode, shouldApply) {
 			if (shouldApply) {
 				gtidBelowFunc(node, droppableNode);
 			}
-			return {accept: "ok", type: gtidBelowFunc.name + " " + droppableNode.canonicalTitle};
+			return {accept: "ok", type: gtidBelowFunc.name + " " + droppableTitle};
 		}
 		if (isReplicationBehindSibling(node, droppableNode)) {
 			// verified that node isn't more up to date than droppableNode
 			if (shouldApply) {
 				gtidBelowFunc(node, droppableNode);
 			}
-			return {accept: "ok", type: gtidBelowFunc.name + " " + droppableNode.canonicalTitle};
+			return {accept: "ok", type: gtidBelowFunc.name + " " + droppableTitle};
 		}
 		// TODO: the general case, where there's no clear family connection, meaning we cannot infer
 		// which instance is more up to date. It's under the user's responsibility!
 		if (shouldApply) {
 			gtidBelowFunc(node, droppableNode);
 		}
-		return {accept: "warning", type: gtidBelowFunc.name + " " + droppableNode.canonicalTitle};
+		return {accept: "warning", type: gtidBelowFunc.name + " " + droppableTitle};
 	}
 	if (moveInstanceMethod == "classic") {
 		// Not pseudo-GTID mode, non GTID mode
@@ -456,7 +457,7 @@ function moveInstance(node, droppableNode, shouldApply) {
 			if (shouldApply) {
 				moveBelow(node, droppableNode);
 			}
-			return {accept: "ok", type: "moveBelow " + droppableNode.canonicalTitle};
+			return {accept: "ok", type: "moveBelow " + droppableTitle};
 		}
 		if (instanceIsGrandchild(node, droppableNode)) {
 			if (node.hasProblem) {
@@ -472,7 +473,7 @@ function moveInstance(node, droppableNode, shouldApply) {
 			if (shouldApply) {
 				moveUp(node, droppableNode);
 			}
-			return {accept: "ok", type: "moveUp under " + droppableNode.canonicalTitle};
+			return {accept: "ok", type: "moveUp under " + droppableTitle};
 		}
 		if (instanceIsChild(node, droppableNode) && !droppableNode.isMaster) {
 			if (node.hasProblem) {
@@ -486,7 +487,7 @@ function moveInstance(node, droppableNode, shouldApply) {
 			if (shouldApply) {
 				enslaveMaster(node, droppableNode);
 			}
-			return {accept: "ok", type: "enslaveMaster " + droppableNode.canonicalTitle};
+			return {accept: "ok", type: "enslaveMaster " + droppableTitle};
 		}
 		if (instanceIsChild(droppableNode, node) && node.isMaster) {
 			if (node.hasProblem) {
@@ -495,7 +496,7 @@ function moveInstance(node, droppableNode, shouldApply) {
 			if (shouldApply) {
 				makeCoMaster(node, droppableNode);
 			}
-			return {accept: "ok", type: "makeCoMaster with " + droppableNode.canonicalTitle};
+			return {accept: "ok", type: "makeCoMaster with " + droppableTitle};
 		}
 		return {accept: false};
 	}
@@ -523,6 +524,7 @@ function moveChildren(node, droppableNode, shouldApply) {
     	// Obviously this is also checked on server side, no need to try stupid hacks
 		return {accept: false} ;
     }
+    var droppableTitle = getInstanceDiv(droppableNode.id).find("h3 .pull-left").html();
     var isUsingGTID = (node.usingGTID && droppableNode.usingGTID);
 	if (moveInstanceMethod == "smart") {
 		// Moving via GTID or Pseudo GTID
@@ -539,7 +541,7 @@ function moveChildren(node, droppableNode, shouldApply) {
 			if (shouldApply) {
 				relocateSlaves(node, droppableNode);
 			}
-			return {accept: "ok", type: "relocate < " + droppableNode.canonicalTitle};
+			return {accept: "ok", type: "relocate < " + droppableTitle};
 		}
 		if (instanceIsDescendant(droppableNode, node) && node.children.length <= 1) {
 			// Can generally move slaves onto one of them, but there needs to be at least two slaves...
@@ -550,7 +552,7 @@ function moveChildren(node, droppableNode, shouldApply) {
 		if (shouldApply) {
 			relocateSlaves(node, droppableNode);
 		}
-		return {accept: "warning", type: "relocate < " + droppableNode.canonicalTitle};
+		return {accept: "warning", type: "relocate < " + droppableTitle};
 	}
 
 	if (moveInstanceMethod == "pseudo-gtid") {
@@ -569,7 +571,7 @@ function moveChildren(node, droppableNode, shouldApply) {
 			if (shouldApply) {
 				gtidBelowFunc(node, droppableNode);
 			}
-			return {accept: "ok", type: gtidBelowFunc.name + " < " + droppableNode.canonicalTitle};
+			return {accept: "ok", type: gtidBelowFunc.name + " < " + droppableTitle};
 		}
 		if (instanceIsDescendant(droppableNode, node) && node.children.length <= 1) {
 			// Can generally move slaves onto one of them, but there needs to be at least two slaves...
@@ -582,14 +584,14 @@ function moveChildren(node, droppableNode, shouldApply) {
 			if (shouldApply) {
 				gtidBelowFunc(node, droppableNode);
 			}
-			return {accept: "ok", type: gtidBelowFunc.name + " < " + droppableNode.canonicalTitle};
+			return {accept: "ok", type: gtidBelowFunc.name + " < " + droppableTitle};
 		}
 		// TODO: the general case, where there's no clear family connection, meaning we cannot infer
 		// which instance is more up to date. It's under the user's responsibility!
 		if (shouldApply) {
 			gtidBelowFunc(node, droppableNode);
 		}
-		return {accept: "warning", type: gtidBelowFunc.name + " < " + droppableNode.canonicalTitle};
+		return {accept: "warning", type: gtidBelowFunc.name + " < " + droppableTitle};
 	}
 	if (moveInstanceMethod == "classic") {
 		// Not pseudo-GTID mode, non GTID mode
@@ -597,13 +599,13 @@ function moveChildren(node, droppableNode, shouldApply) {
 			if (shouldApply) {
 				repointSlaves(node);
 			}
-			return {accept: "ok", type: "repointSlaves < " + droppableNode.canonicalTitle};
+			return {accept: "ok", type: "repointSlaves < " + droppableTitle};
 		}
 		if (instanceIsChild(node, droppableNode)) {
 			if (shouldApply) {
 				moveUpSlaves(node, droppableNode);
 			}
-			return {accept: "ok", type: "moveUpSlaves < " + droppableNode.canonicalTitle};
+			return {accept: "ok", type: "moveUpSlaves < " + droppableTitle};
 		}
 		return {accept: false};
 	}
@@ -1033,8 +1035,8 @@ function anonymize() {
     var _ = function() {
         $("#cluster_container .instance[data-nodeid]").each(function() {
         	var instanceId = $(this).attr("data-nodeid");
-        	$(this).find("h3.popover-title .pull-left").html(anonymizeInstanceId(instanceId));
-        	$(this).find("h3.popover-title").attr("title", anonymizeInstanceId(instanceId));
+        	$(this).find("h3 .pull-left").html(anonymizeInstanceId(instanceId));
+        	$(this).find("h3").attr("title", anonymizeInstanceId(instanceId));
         });
         $(".popover-content p").each(function() {
         	tokens = jQuery(this).html().split(" ", 2)
