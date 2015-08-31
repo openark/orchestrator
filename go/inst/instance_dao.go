@@ -168,7 +168,11 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		err = sqlutils.QueryRowsMap(db, "show variables like 'maxscale%'", func(m sqlutils.RowMap) error {
 			variableName := m.GetString("Variable_name")
 			if variableName == "MAXSCALE_VERSION" {
-				instance.Version = m.GetString("value") + "-maxscale"
+				originalVersion := m.GetString("Value")
+				if originalVersion == "" {
+					originalVersion = m.GetString("value")
+				}
+				instance.Version = originalVersion + "-maxscale"
 				instance.ServerID = 0
 				instance.Uptime = 0
 				instance.Binlog_format = "INHERIT"

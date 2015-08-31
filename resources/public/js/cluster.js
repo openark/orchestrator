@@ -1031,9 +1031,8 @@ function anonymizeIfNeedBe(message) {
 
 function anonymize() {
     var _ = function() {
-        var counter = 0;  
-        $("[data-fo-id]").each(function() {
-        	var instanceId = $(this).attr("data-fo-id");
+        $("#cluster_container .instance[data-nodeid]").each(function() {
+        	var instanceId = $(this).attr("data-nodeid");
         	$(this).find("h3.popover-title .pull-left").html(anonymizeInstanceId(instanceId));
         	$(this).find("h3.popover-title").attr("title", anonymizeInstanceId(instanceId));
         });
@@ -1328,7 +1327,7 @@ $(document).ready(function () {
     	if ($.cookie("pool-indicator") == "true") {
     		$.cookie("pool-indicator", "false", { path: '/', expires: 1 });
     		location.reload();
-    		return
+    		return;
         }
     	$.cookie("pool-indicator", "true", { path: '/', expires: 1 });
 		location.reload();
@@ -1337,7 +1336,7 @@ $(document).ready(function () {
     	if ($.cookie("anonymize") == "true") {
     		$.cookie("anonymize", "false", { path: '/', expires: 1 });
     		location.reload();
-    		return
+    		return;
         }
     	anonymize();
     	$("#dropdown-context a[data-command=anonymize]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
@@ -1347,7 +1346,7 @@ $(document).ready(function () {
     	if ($.cookie("colorize-dc") == "true") {
     		$.cookie("colorize-dc", "false", { path: '/', expires: 1 });
     		location.reload();
-    		return
+    		return;
         }
     	colorize_dc();
     	$("#dropdown-context a[data-command=colorize-dc]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
