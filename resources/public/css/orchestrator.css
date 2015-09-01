@@ -355,7 +355,7 @@ body {
 #cluster_sidebar {
 	float:left;
 	position: absolute;
-	z-index:9999;
+	z-index: 10001;
 }
 
 #cluster_sidebar li {

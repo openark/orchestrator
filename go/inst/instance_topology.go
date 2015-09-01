@@ -519,8 +519,8 @@ func canMoveViaGTID(instance, otherInstance *Instance) (isOracleGTID bool, isMar
 	return isOracleGTID, isMariaDBGTID, isOracleGTID || isMariaDBGTID
 }
 
-// MoveBelowViaGTID will attempt moving instance indicated by instanceKey below another instance using either Oracle GTID or MariaDB GTID.
-func MoveBelowViaGTID(instance, otherInstance *Instance) (*Instance, error) {
+// moveInstanceBelowViaGTID will attempt moving given instance below another instance using either Oracle GTID or MariaDB GTID.
+func moveInstanceBelowViaGTID(instance, otherInstance *Instance) (*Instance, error) {
 	_, _, canMove := canMoveViaGTID(instance, otherInstance)
 
 	instanceKey := &instance.Key
@@ -568,9 +568,22 @@ Cleanup:
 	return instance, err
 }
 
-// MoveSlavesViaGTID moves a list of slaves under another instance via GTID, returning those slaves
+// MoveBelowGTID will attempt moving instance indicated by instanceKey below another instance using either Oracle GTID or MariaDB GTID.
+func MoveBelowGTID(instanceKey, otherKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, err
+	}
+	other, err := ReadTopologyInstance(otherKey)
+	if err != nil {
+		return instance, err
+	}
+	return moveInstanceBelowViaGTID(instance, other)
+}
+
+// moveSlavesViaGTID moves a list of slaves under another instance via GTID, returning those slaves
 // that could not be moved (do not use GTID)
-func MoveSlavesViaGTID(slaves [](*Instance), other *Instance) (movedSlaves [](*Instance), unmovedSlaves [](*Instance), err error, errs []error) {
+func moveSlavesViaGTID(slaves [](*Instance), other *Instance) (movedSlaves [](*Instance), unmovedSlaves [](*Instance), err error, errs []error) {
 	slaves = removeInstance(slaves, &other.Key)
 	if len(slaves) == 0 {
 		// Nothing to do
@@ -590,7 +603,7 @@ func MoveSlavesViaGTID(slaves [](*Instance), other *Instance) (movedSlaves [](*I
 			ExecuteOnTopology(func() {
 				var slaveErr error
 				if _, _, canMove := canMoveViaGTID(slave, other); canMove {
-					slave, slaveErr = MoveBelowViaGTID(slave, other)
+					slave, slaveErr = moveInstanceBelowViaGTID(slave, other)
 				} else {
 					slaveErr = fmt.Errorf("%+v cannot move below %+v via GTID", slave.Key, other.Key)
 				}
@@ -616,6 +629,29 @@ func MoveSlavesViaGTID(slaves [](*Instance), other *Instance) (movedSlaves [](*I
 		return movedSlaves, unmovedSlaves, log.Error("Error on all operations"), errs
 	}
 	AuditOperation("move-slaves-gtid", &other.Key, fmt.Sprintf("moved %d/%d slaves below %+v via GTID", len(movedSlaves), len(slaves), other.Key))
+
+	return movedSlaves, unmovedSlaves, err, errs
+}
+
+// MoveSlavesGTID will (attempt to) move all slaves of given master below given instance.
+func MoveSlavesGTID(masterKey *InstanceKey, belowKey *InstanceKey, pattern string) (movedSlaves [](*Instance), unmovedSlaves [](*Instance), err error, errs []error) {
+	belowInstance, err := ReadTopologyInstance(belowKey)
+	if err != nil {
+		// Can't access "below" ==> can't move slaves beneath it
+		return movedSlaves, unmovedSlaves, err, errs
+	}
+
+	// slaves involved
+	slaves, err := ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey)
+	if err != nil {
+		return movedSlaves, unmovedSlaves, err, errs
+	}
+	slaves = filterInstancesByPattern(slaves, pattern)
+	movedSlaves, unmovedSlaves, err, errs = moveSlavesViaGTID(slaves, belowInstance)
+
+	if len(unmovedSlaves) > 0 {
+		err = fmt.Errorf("MultiMatchSlaves: only moved %d out of %d slaves of %+v; error is: %+v", len(movedSlaves), len(slaves), *masterKey, err)
+	}
 
 	return movedSlaves, unmovedSlaves, err, errs
 }
@@ -1880,7 +1916,7 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 	}
 	// Next, try GTID
 	if _, _, canMove := canMoveViaGTID(instance, other); canMove {
-		return MoveBelowViaGTID(instance, other)
+		return moveInstanceBelowViaGTID(instance, other)
 	}
 
 	// Next, try Pseudo-GTID
@@ -1969,7 +2005,7 @@ func relocateSlavesInternal(slaves [](*Instance), instance, other *Instance) ([]
 	}
 	// GTID
 	{
-		movedSlaves, unmovedSlaves, err, errs := MoveSlavesViaGTID(slaves, other)
+		movedSlaves, unmovedSlaves, err, errs := moveSlavesViaGTID(slaves, other)
 
 		if len(movedSlaves) == len(slaves) {
 			// Moved (or tried moving) everything via GTID

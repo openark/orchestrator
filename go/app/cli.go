@@ -590,6 +590,46 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), destinationKey.DisplayString()))
 		}
+	case cliCommand("move-gtid"):
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce sibling:", destination)
+			}
+			_, err := inst.MoveBelowGTID(instanceKey, destinationKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), destinationKey.DisplayString()))
+		}
+	case cliCommand("move-slaves-gtid"):
+		{
+			if instanceKey == nil {
+				instanceKey = thisInstanceKey
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce destination:", destination)
+			}
+			movedSlaves, _, err, errs := inst.MoveSlavesGTID(instanceKey, destinationKey, pattern)
+			if err != nil {
+				log.Fatale(err)
+			} else {
+				for _, e := range errs {
+					log.Errore(e)
+				}
+				for _, slave := range movedSlaves {
+					fmt.Println(slave.Key.DisplayString())
+				}
+			}
+		}
 	case cliCommand("repoint"):
 		{
 			if instanceKey == nil {
