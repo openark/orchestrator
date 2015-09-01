@@ -241,6 +241,17 @@ function generateInstanceDiv(svgInstanceWrapper, nodesMap) {
             var trailerElement = $('<div class="popover left instance-trailer" data-nodeid="'+node.id+'"><div><span class="glyphicon glyphicon-chevron-left" title="Drag and drop slaves of this instance"></span></div></div>').appendTo("#cluster_container");
             popoverElement.data("instance-trailer", trailerElement);
 		}
+	    if ($.cookie("colorize-dc") == "true") {
+	    	var dcColor = dcColorsMap[node.DataCenter];
+	        $(popoverElement).css("border-color", dcColor);
+	        $(popoverElement).css("border-width", 2);
+
+	        var trailerElement = $(popoverElement).data("instance-trailer");
+	        if (trailerElement) {
+		        $(trailerElement).css("border-color", dcColor);
+		        $(trailerElement).css("border-width", 2);
+	        }
+	    }
     }	
 }
 
@@ -963,7 +974,7 @@ function analyzeClusterInstances(nodesMap) {
     });
 }
 
-function postVisualizeInstances(nodesMap) {
+function preVisualizeInstances(nodesMap) {
     // DC colors
     var knownDCs = [];
     instances.forEach(function (instance) {
@@ -978,10 +989,6 @@ function postVisualizeInstances(nodesMap) {
     for (i = 0 ; i < knownDCs.length ; ++i) {
         dcColorsMap[knownDCs[i]] = renderColors[i % renderColors.length];
     }
-    instances.forEach(function (instance) {
-    	$(".popover.instance[data-nodeid="+instance.id+"]").attr("data-dc-color", dcColorsMap[instance.DataCenter]);
-    	$(".instance-trailer[data-nodeid="+instance.id+"]").attr("data-dc-color", dcColorsMap[instance.DataCenter]);
-    });
 }
 
 
@@ -1082,16 +1089,6 @@ function anonymize() {
          });
     }();
 	$("#cluster_container div.floating_background").html("");	
-}
-
-function colorize_dc() {
-    $(".popover[data-dc-color]").each(function () {
-        $(this).css("border-color", $(this).attr("data-dc-color"));
-        $(this).css("border-width", 2);
-    });	
-    $(".popover.instance-trailer[data-dc-color]").each(function () {
-   		$(this).css("height", getInstanceDiv($(this).attr("data-nodeid")).outerHeight(true));
-    });	
 }
 
 function addSidebarInfoPopoverContent(content, prepend) {
@@ -1259,15 +1256,12 @@ $(document).ready(function () {
         	    	instancesMap = compactInstances(instances, instancesMap);
         	    }
                 analyzeClusterInstances(instancesMap);
+                preVisualizeInstances(instancesMap);
                 visualizeInstances(instancesMap, generateInstanceDiv);
                 prepareDraggable(instancesMap);
                 reviewReplicationAnalysis(replicationAnalysis, instancesMap);
-                postVisualizeInstances(instancesMap);
                 if ($.cookie("anonymize") == "true") {
                 	anonymize();
-                }
-                if ($.cookie("colorize-dc") == "true") {
-                	colorize_dc();
                 }
                 
                 instances.forEach(function (instance) {
@@ -1385,12 +1379,11 @@ $(document).ready(function () {
     $("body").on("click", "a[data-command=colorize-dc]", function(event) {
     	if ($.cookie("colorize-dc") == "true") {
     		$.cookie("colorize-dc", "false", { path: '/', expires: 1 });
-    		location.reload();
-    		return;
+        } else {
+        	$.cookie("colorize-dc", "true", { path: '/', expires: 1 });
         }
-    	colorize_dc();
-    	$("#dropdown-context a[data-command=colorize-dc]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
-    	$.cookie("colorize-dc", "true", { path: '/', expires: 1 });
+		location.reload();
+		return;
     });    
 
     $("[data-toggle=popover]").popover();
