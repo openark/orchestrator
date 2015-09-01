@@ -101,7 +101,6 @@ function visualizeInstances(nodesMap, onSvgInstanceWrapper) {
     root.x0 = svgHeight / 2;
     root.y0 = 0;
     update(root);
-    //repositionIntanceDivs();
 
     function update(source) {
         // Compute the new tree layout.
@@ -159,6 +158,7 @@ function visualizeInstances(nodesMap, onSvgInstanceWrapper) {
         }).attr("requiredFeatures", "http://www.w3.org/TR/SVG11/feature#Extensibility");
         
         $("#cluster_container .popover.instance").remove();
+        $("#cluster_container .instance-trailer").remove();
         $("g.svgInstanceWrapper").each(function() {
         	onSvgInstanceWrapper(this, nodesMap);
         }) 	
@@ -238,6 +238,5 @@ function visualizeInstances(nodesMap, onSvgInstanceWrapper) {
             d._children = null;
         }
         update(d);
-        //repositionIntanceDivs();
     }
 }

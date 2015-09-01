@@ -235,14 +235,14 @@ function generateInstanceDiv(svgInstanceWrapper, nodesMap) {
     	$(popoverElement).data("svg-instance-wrapper", svgInstanceWrapper);
     	
     	var id = $(svgInstanceWrapper).attr("data-fo-id");
-    	var node = nodesMap[id];
-		renderInstanceElement(popoverElement, node, "cluster");
-		if (node.children) {
-            var trailerElement = $('<div class="popover left instance-trailer" data-nodeid="'+node.id+'"><div><span class="glyphicon glyphicon-chevron-left" title="Drag and drop slaves of this instance"></span></div></div>').appendTo("#cluster_container");
+    	var instance = nodesMap[id];
+		renderInstanceElement(popoverElement, instance, "cluster");
+		if (instance.children) {
+            var trailerElement = $('<div class="popover left instance-trailer" data-nodeid="'+instance.id+'"><div><span class="glyphicon glyphicon-chevron-left" title="Drag and drop slaves of this instance"></span></div></div>').appendTo("#cluster_container");
             popoverElement.data("instance-trailer", trailerElement);
 		}
 	    if ($.cookie("colorize-dc") == "true") {
-	    	var dcColor = dcColorsMap[node.DataCenter];
+	    	var dcColor = dcColorsMap[instance.DataCenter];
 	        $(popoverElement).css("border-color", dcColor);
 	        $(popoverElement).css("border-width", 2);
 
