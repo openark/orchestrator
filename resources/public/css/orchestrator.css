@@ -266,6 +266,10 @@ body {
     font-size: 12px;
 }
 
+#node_modal .hidden-zone {
+	display: none;
+}
+
 .modal-content .btn {
     font-size: 11px;
     line-height: 16px;

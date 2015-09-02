@@ -205,6 +205,7 @@ function openNodeModal(node) {
 		return false;
 	}
 	nodeModalVisible = true;
+    var hiddenZone = $('#node_modal .hidden-zone');
     $('#node_modal #modalDataAttributesTable button[data-btn][data-grouped!=true]').appendTo("#node_modal .modal-footer");
     $('#node_modal #modalDataAttributesTable [data-btn-group]').appendTo("#node_modal .modal-footer");
     $('#node_modal .modal-title').html(node.title);
@@ -213,6 +214,7 @@ function openNodeModal(node) {
     if (node.UnresolvedHostname) {
     	addNodeModalDataAttribute("Unresolved hostname", node.UnresolvedHostname);
     }
+    $('#node_modal [data-btn-group=move-equivalent]').appendTo(hiddenZone);
     if (node.MasterKey.Hostname) {
         var td = addNodeModalDataAttribute("Master", node.masterTitle);
         $('#node_modal button[data-btn=reset-slave]').appendTo(td.find("div"))
@@ -231,9 +233,7 @@ function openNodeModal(node) {
         addNodeModalDataAttribute("Replication lag", node.SlaveLagSeconds.Valid ? node.SlaveLagSeconds.Int64 : "null");
         addNodeModalDataAttribute("SQL delay", node.SQLDelay);
 
-        $('#node_modal [data-btn-group=move-equivalent]').hide();
-        var td = addNodeModalDataAttribute("Master coordinates", node.ExecBinlogCoordinates.LogFile+":"+node.ExecBinlogCoordinates.LogPos);
-        $('#node_modal [data-btn-group=move-equivalent]').appendTo(td.find("div"))
+        var masterCoordinatesEl = addNodeModalDataAttribute("Master coordinates", node.ExecBinlogCoordinates.LogFile+":"+node.ExecBinlogCoordinates.LogPos);
         $('#node_modal [data-btn-group=move-equivalent] ul').empty();
 		$.get("/api/master-equivalent/"+node.MasterKey.Hostname+"/"+node.MasterKey.Port+"/"+node.ExecBinlogCoordinates.LogFile+"/"+node.ExecBinlogCoordinates.LogPos, function(equivalenceResult) {
 			if (!equivalenceResult.Details) {
@@ -249,9 +249,12 @@ function openNodeModal(node) {
 		    });
 
 			if ($('#node_modal [data-btn-group=move-equivalent] ul li').length) {
-				$('#node_modal [data-btn-group=move-equivalent]').show();
+		        $('#node_modal [data-btn-group=move-equivalent]').appendTo(masterCoordinatesEl.find("div"));
 			}
 		}, "json");
+    } else {
+        $('#node_modal button[data-btn=reset-slave]').appendTo(hiddenZone);
+        $('#node_modal button[data-btn=skip-query]').appendTo(hiddenZone);
     }
     if (node.LogBinEnabled) {
     	addNodeModalDataAttribute("Self coordinates", node.SelfBinlogCoordinates.LogFile+":"+node.SelfBinlogCoordinates.LogPos);
