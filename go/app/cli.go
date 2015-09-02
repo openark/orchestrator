@@ -816,6 +816,22 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 		}
+	case cliCommand("regroup-slaves-gtid"):
+		{
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+
+			lostSlaves, movedSlaves, promotedSlave, err := inst.RegroupSlavesGTID(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) })
+			if promotedSlave == nil {
+				log.Fatalf("Could not regroup slaves of %+v; error: %+v", *instanceKey, err)
+			}
+			fmt.Println(fmt.Sprintf("%s lost: %d, moved: %d",
+				promotedSlave.Key.DisplayString(), len(lostSlaves), len(movedSlaves)))
+			if err != nil {
+				log.Fatale(err)
+			}
+		}
 		// cluster
 	case cliCommand("clusters"):
 		{

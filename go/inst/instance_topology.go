@@ -1887,6 +1887,32 @@ func RegroupSlavesIncludingSubSlavesOfBinlogServers(masterKey *InstanceKey, retu
 	return RegroupSlaves(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen)
 }
 
+// RegroupSlavesGTID will choose a candidate slave of a given instance, and enslave its siblings using GTID
+func RegroupSlavesGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance)) ([](*Instance), [](*Instance), *Instance, error) {
+	var emptySlaves [](*Instance)
+	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err := GetCandidateSlave(masterKey, true)
+	if err != nil {
+		if !returnSlaveEvenOnFailureToRegroup {
+			candidateSlave = nil
+		}
+		return emptySlaves, emptySlaves, candidateSlave, err
+	}
+
+	if onCandidateSlaveChosen != nil {
+		onCandidateSlaveChosen(candidateSlave)
+	}
+
+	slavesToMove := append(equalSlaves, laterSlaves...)
+	log.Debugf("RegroupSlavesGTID: working on %d slaves", len(slavesToMove))
+
+	movedSlaves, unmovedSlaves, err, _ := moveSlavesViaGTID(slavesToMove, candidateSlave)
+	unmovedSlaves = append(unmovedSlaves, aheadSlaves...)
+	StartSlave(&candidateSlave.Key)
+
+	log.Debugf("RegroupSlavesGTID: done")
+	return unmovedSlaves, movedSlaves, candidateSlave, err
+}
+
 // relocateBelowInternal is a protentially recursive function which chooses how to relocate an instance below another.
 // It may choose to use Pseudo-GTID, or normal binlog positions, or take advantage of binlog servers,
 // or it may combine any of the above in a multi-step operation.

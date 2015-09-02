@@ -832,6 +832,29 @@ func (this *HttpAPI) RegroupSlaves(params martini.Params, r render.Render, req *
 		promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalSlaves), len(aheadSlaves)), Details: promotedSlave.Key})
 }
 
+// RegroupSlavesGTID attempts to pick a slave of a given instance and make it enslave its siblings, efficiently, using GTID
+func (this *HttpAPI) RegroupSlavesGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	lostSlaves, movedSlaves, promotedSlave, err := inst.RegroupSlavesGTID(&instanceKey, false, nil)
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("promoted slave: %s, lost: %d, moved: %d",
+		promotedSlave.Key.DisplayString(), len(lostSlaves), len(movedSlaves)), Details: promotedSlave.Key})
+}
+
 // MakeMaster attempts to make the given instance a master, and match its siblings to be its slaves
 func (this *HttpAPI) MakeMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -1879,6 +1902,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/multi-match-slaves/:host/:port/:belowHost/:belowPort", this.MultiMatchSlaves)
 	m.Get("/api/match-up-slaves/:host/:port", this.MatchUpSlaves)
 	m.Get("/api/regroup-slaves/:host/:port", this.RegroupSlaves)
+	m.Get("/api/regroup-slaves-gtid/:host/:port", this.RegroupSlavesGTID)
 	m.Get("/api/make-master/:host/:port", this.MakeMaster)
 	m.Get("/api/make-local-master/:host/:port", this.MakeLocalMaster)
 	// Cluster
