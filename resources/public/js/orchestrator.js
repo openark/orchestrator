@@ -253,7 +253,9 @@ function openNodeModal(node) {
 			}
 		}, "json");
     }
-    addNodeModalDataAttribute("Self coordinates", node.SelfBinlogCoordinates.LogFile+":"+node.SelfBinlogCoordinates.LogPos);
+    if (node.LogBinEnabled) {
+    	addNodeModalDataAttribute("Self coordinates", node.SelfBinlogCoordinates.LogFile+":"+node.SelfBinlogCoordinates.LogPos);
+    }
     var td = addNodeModalDataAttribute("Num slaves", node.SlaveHosts.length);
     $('#node_modal button[data-btn=move-up-slaves]').appendTo(td.find("div"))
     $('#node_modal button[data-btn=match-up-slaves]').appendTo(td.find("div"))
@@ -264,10 +266,12 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=set-read-only]').appendTo(td.find("div"))
     $('#node_modal button[data-btn=set-writeable]').appendTo(td.find("div"))
 
-    addNodeModalDataAttribute("Binlog format", node.Binlog_format);
     addNodeModalDataAttribute("Has binary logs", booleanString(node.LogBinEnabled));
-    var td = addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
-    $('#node_modal button[data-btn=enslave-siblings]').appendTo(td.find("div"))
+    if (node.LogBinEnabled) {
+    	addNodeModalDataAttribute("Binlog format", node.Binlog_format);
+        var td = addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
+        $('#node_modal button[data-btn=enslave-siblings]').appendTo(td.find("div"))
+    }
 
     var td = addNodeModalDataAttribute("GTID", booleanString(node.usingGTID));
     $('#node_modal button[data-btn=enable-gtid]').appendTo(td.find("div"))
