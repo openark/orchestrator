@@ -512,7 +512,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
-			slaves, err, errs := inst.RelocateSlaves(instanceKey, destinationKey, pattern)
+			slaves, _, err, errs := inst.RelocateSlaves(instanceKey, destinationKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {

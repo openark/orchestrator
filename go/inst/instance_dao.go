@@ -486,6 +486,9 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 
 Cleanup:
 	if instanceFound {
+		instance.IsLastCheckValid = true
+		instance.IsRecentlyChecked = true
+		instance.IsUpToDate = true
 		_ = writeInstance(instance, instanceFound, err)
 		WriteLongRunningProcesses(&instance.Key, longRunningProcesses)
 	} else {

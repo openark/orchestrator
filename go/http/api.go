@@ -644,7 +644,7 @@ func (this *HttpAPI) RelocateSlaves(params martini.Params, r render.Render, req 
 		return
 	}
 
-	slaves, err, errs := inst.RelocateSlaves(&instanceKey, &belowKey, req.URL.Query().Get("pattern"))
+	slaves, _, err, errs := inst.RelocateSlaves(&instanceKey, &belowKey, req.URL.Query().Get("pattern"))
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
