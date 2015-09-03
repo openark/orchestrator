@@ -7,6 +7,9 @@ $(document).ready(function () {
     	problemsURI += "/"+currentClusterName();
     }    	
     $.get(problemsURI, function (instances) {
+    	if (instances == null) {
+    		instances = [];
+    	}
         $.get("/api/maintenance", function (maintenanceList) {
 			normalizeInstances(instances, maintenanceList);
 	        displayProblemInstances(instances);

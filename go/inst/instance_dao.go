@@ -592,6 +592,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.IsLastCheckValid = m.GetBool("is_last_check_valid")
 	instance.SecondsSinceLastSeen = m.GetNullInt64("seconds_since_last_seen")
 	instance.IsCandidate = m.GetBool("is_candidate")
+	instance.IsDowntimed = m.GetBool("is_downtimed")
 	instance.UnresolvedHostname = m.GetString("unresolved_hostname")
 
 	instance.ReadSlaveHostsFromJson(slaveHostsJSON)
@@ -618,11 +619,16 @@ func readInstancesByCondition(condition string, sort string) ([](*Instance), err
 			(last_checked <= last_seen) is true as is_last_check_valid,
 			timestampdiff(second, last_seen, now()) as seconds_since_last_seen,
 			candidate_database_instance.last_suggested is not null as is_candidate,
-			ifnull(unresolved_hostname, '') as unresolved_hostname 
+			ifnull(unresolved_hostname, '') as unresolved_hostname,
+			(
+	    		database_instance_downtime.downtime_active IS NULL
+	    		or database_instance_downtime.end_timestamp < NOW()
+	    	) is false as is_downtimed			 
 		from 
 			database_instance 
 			left join candidate_database_instance using (hostname, port)
 			left join hostname_unresolve using (hostname)
+			left join database_instance_downtime using (hostname, port)
 		where
 			%s
 		order by
@@ -736,7 +742,17 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 				or (abs(cast(slave_lag_seconds as signed) - cast(sql_delay as signed)) > %d)
 			)
 		`, clusterName, clusterName, config.Config.InstancePollSeconds, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
-	return readInstancesByCondition(condition, "")
+	instances, err := readInstancesByCondition(condition, "")
+	if err != nil {
+		return instances, err
+	}
+	var nonDowntimedInstances [](*Instance)
+	for _, instance := range instances {
+		if !instance.IsDowntimed {
+			nonDowntimedInstances = append(nonDowntimedInstances, instance)
+		}
+	}
+	return nonDowntimedInstances, nil
 }
 
 // SearchInstances reads all instances qualifying for some searchString

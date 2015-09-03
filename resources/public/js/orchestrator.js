@@ -687,10 +687,10 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-heart" title="Candidate"></span> ');
 	    } 
 	    if (instance.inMaintenanceProblem()) {
-	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench"></span> ');
+	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench" title="In maintenance"></span> ');
 	    } 
 	    if (instance.IsDowntimed) {
-	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-volume-off"></span> ');
+	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-volume-off" title="Downtimed"></span> ');
 	    } 
 	
 	    if (instance.lastCheckInvalidProblem()) {

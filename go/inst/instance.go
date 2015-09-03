@@ -262,6 +262,7 @@ type Instance struct {
 	CountMySQLSnapshots  int
 
 	IsCandidate        bool
+	IsDowntimed        bool
 	UnresolvedHostname string
 }
 
