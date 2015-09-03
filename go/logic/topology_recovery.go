@@ -40,6 +40,14 @@ type TopologyRecovery struct {
 	ProcessingNodeToken    string
 }
 
+type MasterRecoveryType string
+
+const (
+	MasterRecoveryGTID         MasterRecoveryType = "MasterRecoveryGTID"
+	MasterRecoveryPseudoGTID                      = "MasterRecoveryPseudoGTID"
+	MasterRecoveryBinlogServer                    = "MasterRecoveryBinlogServer"
+)
+
 var emergencyReadTopologyInstanceMap = cache.New(time.Duration(config.Config.DiscoveryPollSeconds)*time.Second, time.Duration(config.Config.DiscoveryPollSeconds)*time.Second)
 
 // InstancesByCountSlaves sorts instances by umber of slaves, descending
@@ -101,7 +109,7 @@ func executeProcesses(processes []string, description string, analysisEntry inst
 	return err
 }
 
-func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (bool, *inst.Instance, error) {
+func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (success bool, promotedSlave *inst.Instance, err error) {
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	if ok, err := AttemptRecoveryRegistration(&analysisEntry); !ok {
 		log.Debugf("topology_recovery: found an active or recent recovery on %+v. Will not issue another RecoverDeadMaster.", *failedInstanceKey)
@@ -116,14 +124,31 @@ func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses boo
 	}
 
 	log.Debugf("topology_recovery: RecoverDeadMaster: will recover %+v", *failedInstanceKey)
-	_, _, _, candidateSlave, err := inst.RegroupSlavesIncludingSubSlavesOfBinlogServers(failedInstanceKey, true, nil)
 
-	ResolveRecovery(failedInstanceKey, &candidateSlave.Key)
+	var masterRecoveryType MasterRecoveryType = MasterRecoveryPseudoGTID
+	if (analysisEntry.OracleGTIDImmediateTopology || analysisEntry.MariaDBGTIDImmediateTopology) && !analysisEntry.PseudoGTIDImmediateTopology {
+		masterRecoveryType = MasterRecoveryGTID
+	} else if analysisEntry.BinlogServerImmediateTopology {
+		masterRecoveryType = MasterRecoveryBinlogServer
+	}
+	log.Debugf("topology_recovery: RecoverDeadMaster: masterRecoveryType=%+v", masterRecoveryType)
+	switch masterRecoveryType {
+	case MasterRecoveryGTID:
+		{
+			_, _, promotedSlave, err = inst.RegroupSlavesGTID(failedInstanceKey, true, nil)
+		}
+	case MasterRecoveryPseudoGTID:
+		{
+			_, _, _, promotedSlave, err = inst.RegroupSlavesIncludingSubSlavesOfBinlogServers(failedInstanceKey, true, nil)
+		}
+	}
 
-	log.Debugf("topology_recovery: - RecoverDeadMaster: candidate slave is %+v", candidateSlave.Key)
-	inst.AuditOperation("recover-dead-master", failedInstanceKey, fmt.Sprintf("master: %+v", candidateSlave.Key))
+	ResolveRecovery(failedInstanceKey, &promotedSlave.Key)
 
-	return true, candidateSlave, err
+	log.Debugf("topology_recovery: - RecoverDeadMaster: candidate slave is %+v", promotedSlave.Key)
+	inst.AuditOperation("recover-dead-master", failedInstanceKey, fmt.Sprintf("master: %+v", promotedSlave.Key))
+
+	return true, promotedSlave, err
 }
 
 // replacePromotedSlaveWithCandidate is called after an intermediate master has died and been replaced by some promotedSlave.

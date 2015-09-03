@@ -26,9 +26,12 @@ $(document).ready(function () {
         }
         instances.sort(SortByProblemOrder);
 
-        var problemInstancesFound = false;
+        var countProblemInstances = 0;
     	instances.forEach(function (instance) {
     		var considerInstance = instance.hasProblem
+    		if (countProblemInstances >= 1000) {
+    			considerInstance = false;
+    		}
     		if (considerInstance) {
 	    		$("#instance_problems ul").append('<li><div xmlns="http://www.w3.org/1999/xhtml" class="popover instance" data-nodeid="'+instance.id+'"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"></div></div></li>');
 
@@ -38,17 +41,17 @@ $(document).ready(function () {
 	    	    	openNodeModal(instance);
 	    	    	return false;
 	    	    });	
-	    	    if (!problemInstancesFound) {
+	    	    if (countProblemInstances == 0) {
 	    	    	// First problem instance
 	    	    	$("#instance_problems_button").addClass("btn-" + instance.renderHint)
 	    	    }
-	    		problemInstancesFound = true;
+	    		countProblemInstances += 1;
     		}
     	});        	
-       	if (problemInstancesFound && (autoshowProblems() == "true") && ($.cookie("anonymize") != "true")) {
+       	if (countProblemInstances > 0 && (autoshowProblems() == "true") && ($.cookie("anonymize") != "true")) {
     		$("#instance_problems .dropdown-toggle").dropdown('toggle');
     	}
-    	if (!problemInstancesFound) {
+    	if (countProblemInstances == 0) {
     		$("#instance_problems").hide();
     	}
         

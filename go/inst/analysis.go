@@ -69,6 +69,10 @@ type ReplicationAnalysis struct {
 	DowntimeEndTimestamp                string
 	DowntimeRemainingSeconds            int
 	IsBinlogServer                      bool
+	PseudoGTIDImmediateTopology         bool
+	OracleGTIDImmediateTopology         bool
+	MariaDBGTIDImmediateTopology        bool
+	BinlogServerImmediateTopology       bool
 }
 
 // GetSlaveHostsAsString serializes all slave keys as a single comma delimited string

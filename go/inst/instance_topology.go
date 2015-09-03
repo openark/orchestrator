@@ -1917,8 +1917,8 @@ func RegroupSlavesGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup
 // It may choose to use Pseudo-GTID, or normal binlog positions, or take advantage of binlog servers,
 // or it may combine any of the above in a multi-step operation.
 func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
-	if canReplicate, err := instance.CanReplicateFrom(other); !canReplicate {
-		return instance, err
+	if canReplicate, _ := instance.CanReplicateFrom(other); !canReplicate {
+		return instance, log.Errorf("%+v cannot replicate from %+v", instance.Key, other.Key)
 	}
 	// simplest:
 	if InstanceIsMasterOf(other, instance) {
@@ -1926,8 +1926,10 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 		return Repoint(&instance.Key, &other.Key, GTIDHintNeutral)
 	}
 	// Do we have record of equivalent coordinates?
-	if movedInstance, err := MoveEquivalent(&instance.Key, &other.Key); err == nil {
-		return movedInstance, nil
+	if !instance.IsBinlogServer() {
+		if movedInstance, err := MoveEquivalent(&instance.Key, &other.Key); err == nil {
+			return movedInstance, nil
+		}
 	}
 	// Try and take advantage of binlog servers:
 	if InstancesAreSiblings(instance, other) && other.IsBinlogServer() {
@@ -1951,6 +1953,12 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 			return instance, err
 		}
 		return Repoint(&instance.Key, &other.Key, GTIDHintDeny)
+	}
+	if instance.IsBinlogServer() {
+		// Can only move within the binlog-server family tree
+		// And these have been covered just now: move up from a master binlog server, move below a binling binlog server.
+		// sure, the family can be more complex, but we keep these operations atomic
+		return nil, log.Errorf("Relocating binlog server %+v below %+v turns to be too complex; please do it manually", instance.Key, other.Key)
 	}
 	// Next, try GTID
 	if _, _, canMove := canMoveViaGTID(instance, other); canMove {
@@ -1990,11 +1998,11 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 func RelocateBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	instance, found, err := ReadInstance(instanceKey)
 	if err != nil || !found {
-		return instance, err
+		return instance, log.Errorf("Error reading %+v", *instanceKey)
 	}
 	other, found, err := ReadInstance(otherKey)
 	if err != nil || !found {
-		return instance, err
+		return instance, log.Errorf("Error reading %+v", *otherKey)
 	}
 	instance, err = relocateBelowInternal(instance, other)
 	if err == nil {
@@ -2084,11 +2092,11 @@ func RelocateSlaves(instanceKey, otherKey *InstanceKey, pattern string) (slaves 
 
 	instance, found, err := ReadInstance(instanceKey)
 	if err != nil || !found {
-		return slaves, other, err, errs
+		return slaves, other, log.Errorf("Error reading %+v", *instanceKey), errs
 	}
 	other, found, err = ReadInstance(otherKey)
 	if err != nil || !found {
-		return slaves, other, err, errs
+		return slaves, other, log.Errorf("Error reading %+v", *otherKey), errs
 	}
 
 	slaves, err = ReadSlaveInstances(instanceKey)

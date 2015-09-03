@@ -79,7 +79,22 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		    	) AS downtime_remaining_seconds,
 		    	MIN(
 		    		master_instance.binlog_server
-		    	) AS is_binlog_server
+		    	) AS is_binlog_server,
+		    	MIN(
+		    		master_instance.pseudo_gtid
+		    	) AS is_pseudo_gtid,
+		    	MIN(
+		    		master_instance.supports_oracle_gtid
+		    	) AS supports_oracle_gtid,
+		    	SUM(
+		    		slave_instance.oracle_gtid
+		    	) AS count_oracle_gtid_slaves,
+		    	SUM(
+		    		slave_instance.binlog_server
+		    	) AS count_binlog_server_slaves,
+		    	MIN(
+		    		master_instance.mariadb_gtid
+		    	) AS is_mariadb_gtid
 		    FROM
 		        database_instance master_instance
 		            LEFT JOIN
@@ -139,6 +154,13 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		instance := &Instance{}
 		instance.ReadSlaveHostsFromJson(m.GetString("slave_hosts"))
 		a.SlaveHosts = instance.SlaveHosts
+
+		countOracleGTIDSlaves := m.GetUint("count_oracle_gtid_slaves")
+		a.OracleGTIDImmediateTopology = m.GetBool("supports_oracle_gtid") && countOracleGTIDSlaves == a.CountValidSlaves && a.CountValidSlaves > 0
+		a.PseudoGTIDImmediateTopology = m.GetBool("is_pseudo_gtid")
+		a.MariaDBGTIDImmediateTopology = m.GetBool("is_mariadb_gtid")
+		countBinlogServerSlaves := m.GetUint("count_binlog_server_slaves")
+		a.BinlogServerImmediateTopology = countBinlogServerSlaves == a.CountValidSlaves && a.CountValidSlaves > 0
 
 		if a.IsMaster && !a.LastCheckValid && a.CountSlaves == 0 {
 			a.Analysis = DeadMasterWithoutSlaves
