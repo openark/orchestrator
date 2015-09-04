@@ -855,6 +855,29 @@ func (this *HttpAPI) RegroupSlavesGTID(params martini.Params, r render.Render, r
 		promotedSlave.Key.DisplayString(), len(lostSlaves), len(movedSlaves)), Details: promotedSlave.Key})
 }
 
+// RegroupSlavesBinlogServers attempts to pick a slave of a given instance and make it enslave its siblings, efficiently, using GTID
+func (this *HttpAPI) RegroupSlavesBinlogServers(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	promotedBinlogServer, err := inst.RegroupSlavesBinlogServers(&instanceKey, false, nil)
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("promoted binlog server: %s",
+		promotedBinlogServer.Key.DisplayString()), Details: promotedBinlogServer.Key})
+}
+
 // MakeMaster attempts to make the given instance a master, and match its siblings to be its slaves
 func (this *HttpAPI) MakeMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -1903,6 +1926,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/match-up-slaves/:host/:port", this.MatchUpSlaves)
 	m.Get("/api/regroup-slaves/:host/:port", this.RegroupSlaves)
 	m.Get("/api/regroup-slaves-gtid/:host/:port", this.RegroupSlavesGTID)
+	m.Get("/api/regroup-slaves-bls/:host/:port", this.RegroupSlavesBinlogServers)
 	m.Get("/api/make-master/:host/:port", this.MakeMaster)
 	m.Get("/api/make-local-master/:host/:port", this.MakeLocalMaster)
 	// Cluster

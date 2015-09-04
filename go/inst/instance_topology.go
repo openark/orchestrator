@@ -1913,6 +1913,31 @@ func RegroupSlavesGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup
 	return unmovedSlaves, movedSlaves, candidateSlave, err
 }
 
+// RegroupSlavesBinlogServers works on a binlog-servers topology. It picks the most up-to-date BLS and repoints all other
+// BLS below it
+func RegroupSlavesBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance)) (promotedBinlogServer *Instance, err error) {
+
+	promotedBinlogServer, err = getMostUpToDateActiveBinlogServer(masterKey)
+	if err != nil {
+		if !returnSlaveEvenOnFailureToRegroup {
+			promotedBinlogServer = nil
+		}
+		return promotedBinlogServer, err
+	}
+	if onCandidateSlaveChosen != nil {
+		onCandidateSlaveChosen(promotedBinlogServer)
+	}
+	_, err, _ = RepointSlavesTo(masterKey, "", &promotedBinlogServer.Key)
+
+	if err != nil {
+		if !returnSlaveEvenOnFailureToRegroup {
+			promotedBinlogServer = nil
+		}
+		return promotedBinlogServer, err
+	}
+	return promotedBinlogServer, nil
+}
+
 // relocateBelowInternal is a protentially recursive function which chooses how to relocate an instance below another.
 // It may choose to use Pseudo-GTID, or normal binlog positions, or take advantage of binlog servers,
 // or it may combine any of the above in a multi-step operation.

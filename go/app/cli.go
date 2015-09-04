@@ -832,6 +832,21 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 		}
+	case cliCommand("regroup-slaves-bls"):
+		{
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+
+			promotedBinlogServer, err := inst.RegroupSlavesBinlogServers(instanceKey, false, nil)
+			if promotedBinlogServer == nil {
+				log.Fatalf("Could not regroup binlog server slaves of %+v; error: %+v", *instanceKey, err)
+			}
+			fmt.Println(promotedBinlogServer.Key.DisplayString())
+			if err != nil {
+				log.Fatale(err)
+			}
+		}
 		// cluster
 	case cliCommand("clusters"):
 		{

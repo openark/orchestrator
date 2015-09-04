@@ -1710,6 +1710,12 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	}
 	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave`)
 	if err != nil {
+		// Patch; current MaxScale behavior for STOP SLAVE is to throw an error if slave already stopped.
+		if instance.isMaxScale() && err.Error() == "Error 1199: Slave connection is not running" {
+			err = nil
+		}
+	}
+	if err != nil {
 		return instance, log.Errore(err)
 	}
 
@@ -1757,6 +1763,13 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave`)
 	if err != nil {
+		// Patch; current MaxScale behavior for STOP SLAVE is to throw an error if slave already stopped.
+		if instance.isMaxScale() && err.Error() == "Error 1199: Slave connection is not running" {
+			err = nil
+		}
+	}
+	if err != nil {
+
 		return instance, log.Errore(err)
 	}
 	instance, err = ReadTopologyInstance(instanceKey)
