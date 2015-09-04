@@ -1,4 +1,4 @@
-package http_test
+package ssl_test
 
 import (
 	"crypto/tls"
@@ -10,18 +10,18 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/outbrain/orchestrator/go/http"
+	"github.com/outbrain/orchestrator/go/ssl"
 )
 
 func TestHasString(t *testing.T) {
 	elem := "foo"
 	a1 := []string{"bar", "foo", "baz"}
 	a2 := []string{"bar", "fuu", "baz"}
-	good := http.HasString(elem, a1)
+	good := ssl.HasString(elem, a1)
 	if !good {
 		t.Errorf("Didn't find %s in array %s", elem, strings.Join(a1, ", "))
 	}
-	bad := http.HasString(elem, a2)
+	bad := ssl.HasString(elem, a2)
 	if bad {
 		t.Errorf("Unexpectedly found %s in array %s", elem, strings.Join(a2, ", "))
 	}
@@ -32,7 +32,7 @@ func TestNewTLSConfig(t *testing.T) {
 	fakeCA := writeFakeFile(pemCertificate)
 	defer syscall.Unlink(fakeCA)
 
-	conf, err := http.NewTLSConfig(fakeCA, true)
+	conf, err := ssl.NewTLSConfig(fakeCA, true)
 	if err != nil {
 		t.Errorf("Could not create new TLS config: %s", err)
 	}
@@ -43,7 +43,7 @@ func TestNewTLSConfig(t *testing.T) {
 		t.Errorf("ClientCA empty even though cert provided")
 	}
 
-	conf, err = http.NewTLSConfig("", false)
+	conf, err = ssl.NewTLSConfig("", false)
 	if err != nil {
 		t.Errorf("Could not create new TLS config: %s", err)
 	}
@@ -63,7 +63,7 @@ func TestVerify(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := http.Verify(req, validOUs); err == nil {
+	if err := ssl.Verify(req, validOUs); err == nil {
 		t.Errorf("Did not fail on lack of TLS config")
 	}
 
@@ -76,7 +76,7 @@ func TestVerify(t *testing.T) {
 	var tcs tls.ConnectionState
 	req.TLS = &tcs
 
-	if err := http.Verify(req, validOUs); err == nil {
+	if err := ssl.Verify(req, validOUs); err == nil {
 		t.Errorf("Found a valid OU without any being available")
 	}
 
@@ -90,13 +90,13 @@ func TestVerify(t *testing.T) {
 	// Look for fake OU
 	validOUs = []string{"testing"}
 
-	if err := http.Verify(req, validOUs); err != nil {
+	if err := ssl.Verify(req, validOUs); err != nil {
 		t.Errorf("Failed to verify certificate OU")
 	}
 }
 
 func TestAppendKeyPair(t *testing.T) {
-	c, err := http.NewTLSConfig("", false)
+	c, err := ssl.NewTLSConfig("", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestAppendKeyPair(t *testing.T) {
 	pemPKFile := writeFakeFile(pemPrivateKey)
 	defer syscall.Unlink(pemPKFile)
 
-	if err := http.AppendKeyPair(c, pemCertFile, pemPKFile); err != nil {
+	if err := ssl.AppendKeyPair(c, pemCertFile, pemPKFile); err != nil {
 		t.Errorf("Failed to append certificate and key to tls config")
 	}
 }

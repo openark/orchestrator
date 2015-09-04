@@ -19,10 +19,12 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
+
+	"github.com/go-sql-driver/mysql"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
+	"github.com/outbrain/orchestrator/go/ssl"
 )
 
 // generateSQL & generateSQLPatches are lists of SQL statements required to build the orchestrator backend
@@ -496,16 +498,47 @@ var generateSQLPatches = []string{
 // OpenTopology returns a DB instance to access a topology instance
 func OpenTopology(host string, port int) (*sql.DB, error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/?timeout=%ds", config.Config.MySQLTopologyUser, config.Config.MySQLTopologyPassword, host, port, config.Config.MySQLConnectTimeoutSeconds)
+	if config.Config.MySQLTopologyUseMutualTLS {
+		mysql_uri, _ = SetupMySQLTopologyTLS(mysql_uri)
+	}
 	db, _, err := sqlutils.GetDB(mysql_uri)
 	db.SetMaxOpenConns(config.Config.MySQLTopologyMaxPoolConnections)
 	db.SetMaxIdleConns(config.Config.MySQLTopologyMaxPoolConnections)
 	return db, err
 }
 
+// Track if a TLS has already been configured for topology
+var topologyTLSConfigured bool = false
+
+// Create a TLS configuration from the config supplied CA, Certificate, and Private key.
+// Register the TLS config with the mysql drivers as the "topology" config
+// Modify the supplied URI to call the TLS config
+// TODO: Way to have password mixed with TLS for various nodes in the topology.  Currently everything is TLS or everything is password
+func SetupMySQLTopologyTLS(uri string) (string, error) {
+	if !topologyTLSConfigured {
+		tlsConfig, err := ssl.NewTLSConfig(config.Config.MySQLTopologySSLCAFile, !config.Config.MySQLTopologySSLSkipVerify)
+		if err != nil {
+			return "", log.Fatalf("Can't create TLS configuration for Topology connection %s: %s", uri, err)
+		}
+		tlsConfig.InsecureSkipVerify = config.Config.MySQLTopologySSLSkipVerify
+		if err = ssl.AppendKeyPair(tlsConfig, config.Config.MySQLTopologySSLCertFile, config.Config.MySQLTopologySSLPrivateKeyFile); err != nil {
+			return "", log.Fatalf("Can't setup TLS key pairs for %s: %s", uri, err)
+		}
+		if err = mysql.RegisterTLSConfig("topology", tlsConfig); err != nil {
+			return "", log.Fatalf("Can't register mysql TLS config for topology: %s", err)
+		}
+		topologyTLSConfigured = true
+	}
+	return fmt.Sprintf("%s&tls=topology", uri), nil
+}
+
 // OpenTopology returns the DB instance for the orchestrator backed database
 func OpenOrchestrator() (*sql.DB, error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds", config.Config.MySQLOrchestratorUser, config.Config.MySQLOrchestratorPassword,
 		config.Config.MySQLOrchestratorHost, config.Config.MySQLOrchestratorPort, config.Config.MySQLOrchestratorDatabase, config.Config.MySQLConnectTimeoutSeconds)
+	if config.Config.MySQLOrchestratorUseMutualTLS {
+		mysql_uri, _ = SetupMySQLOrchestratorTLS(mysql_uri)
+	}
 	db, fromCache, err := sqlutils.GetDB(mysql_uri)
 	if err == nil && !fromCache {
 		if !config.Config.SkipOrchestratorDatabaseUpdate {
@@ -514,6 +547,30 @@ func OpenOrchestrator() (*sql.DB, error) {
 		db.SetMaxIdleConns(10)
 	}
 	return db, err
+}
+
+// Track if a TLS has already been configured for Orchestrator
+var orchestratorTLSConfigured bool = false
+
+// Create a TLS configuration from the config supplied CA, Certificate, and Private key.
+// Register the TLS config with the mysql drivers as the "orchestrator" config
+// Modify the supplied URI to call the TLS config
+func SetupMySQLOrchestratorTLS(uri string) (string, error) {
+	if !orchestratorTLSConfigured {
+		tlsConfig, err := ssl.NewTLSConfig(config.Config.MySQLOrchestratorSSLCAFile, true)
+		if err != nil {
+			return "", log.Fatalf("Can't create TLS configuration for Orchestrator connection %s: %s", uri, err)
+		}
+		tlsConfig.InsecureSkipVerify = config.Config.MySQLOrchestratorSSLSkipVerify
+		if err = ssl.AppendKeyPair(tlsConfig, config.Config.MySQLOrchestratorSSLCertFile, config.Config.MySQLOrchestratorSSLPrivateKeyFile); err != nil {
+			return "", log.Fatalf("Can't setup TLS key pairs for %s: %s", uri, err)
+		}
+		if err = mysql.RegisterTLSConfig("orchestrator", tlsConfig); err != nil {
+			return "", log.Fatalf("Can't register mysql TLS config for orchestrator: %s", err)
+		}
+		orchestratorTLSConfigured = true
+	}
+	return fmt.Sprintf("%s&tls=orchestrator", uri), nil
 }
 
 // initOrchestratorDB attempts to create/upgrade the orchestrator backend database. It is created once in the
