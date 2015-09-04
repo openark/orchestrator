@@ -94,6 +94,7 @@ body {
 
 .popover.instance h3 .glyphicon {
     position: inherit;
+    cursor: default;
 }
 
 .popover.instance h3 a .glyphicon {

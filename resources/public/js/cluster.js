@@ -52,7 +52,7 @@ function activateInstanceDraggableDroppable(nodesMap, draggedNodeId, originalNod
     $(duplicate).draggable({
     	addClasses: true, 
     	opacity: 1,
-    	cancel: "#cluster_container .popover.instance h3 a,.instance-trailer",
+    	cancel: "#cluster_container .popover.instance h3 a,#cluster_container .popover.instance h3 span,.instance-trailer",
     	snap: "#cluster_container .popover.instance",
     	snapMode: "inner",
     	snapTolerance: 10,
