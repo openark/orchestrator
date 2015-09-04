@@ -261,11 +261,12 @@ type Instance struct {
 	SecondsSinceLastSeen sql.NullInt64
 	CountMySQLSnapshots  int
 
-	IsCandidate        bool
-	IsDowntimed        bool
-	DowntimeReason     string
-	DowntimeOwner      string
-	UnresolvedHostname string
+	IsCandidate          bool
+	IsDowntimed          bool
+	DowntimeReason       string
+	DowntimeOwner        string
+	DowntimeEndTimestamp string
+	UnresolvedHostname   string
 }
 
 // NewInstance creates a new, empty instance

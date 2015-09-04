@@ -208,15 +208,17 @@ function openNodeModal(node) {
     var hiddenZone = $('#node_modal .hidden-zone');
     $('#node_modal #modalDataAttributesTable button[data-btn][data-grouped!=true]').appendTo("#node_modal .modal-footer");
     $('#node_modal #modalDataAttributesTable [data-btn-group]').appendTo("#node_modal .modal-footer");
-    var modalTitle = node.title;
-    if (node.IsDowntimed) {
-    	var downtimeMessage = 'Downtimed by '+node.DowntimeOwner+': '+node.DowntimeReason;
-    	modalTitle += '<div class="downtime-message">'+downtimeMessage+'</div>';
-    } 
-    $('#node_modal .modal-title').html(modalTitle);
+
+    $('#node_modal .modal-title').html(node.title);
 
     $('#modalDataAttributesTable').html("");
 
+    if (node.IsDowntimed) {
+    	var td = addNodeModalDataAttribute("Downtime", node.DowntimeOwner+': '+node.DowntimeReason+' ('+node.DowntimeEndTimestamp+')');
+        $('#node_modal [data-btn=end-downtime]').appendTo(td.find("div"));
+    } else {
+        $('#node_modal [data-btn=end-downtime]').appendTo(hiddenZone);
+    }
     if (node.UnresolvedHostname) {
     	addNodeModalDataAttribute("Unresolved hostname", node.UnresolvedHostname);
     }
@@ -447,6 +449,9 @@ function openNodeModal(node) {
     }
     $('#node_modal button[data-btn=enslave-siblings]').click(function(){
     	apiCommand("/api/enslave-siblings/"+node.Key.Hostname+"/"+node.Key.Port);
+    });
+    $('#node_modal button[data-btn=end-downtime]').click(function(){
+    	apiCommand("/api/end-downtime/"+node.Key.Hostname+"/"+node.Key.Port);
     });
 
     $('#node_modal button[data-btn=recover]').hide();
@@ -696,7 +701,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench" title="In maintenance"></span> ');
 	    } 
 	    if (instance.IsDowntimed) {
-	    	var downtimeMessage = 'Downtimed by '+instance.DowntimeOwner+': '+instance.DowntimeReason;
+	    	var downtimeMessage = 'Downtimed by '+instance.DowntimeOwner+': '+instance.DowntimeReason+'.\nEnds: '+instance.DowntimeEndTimestamp;
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-volume-off" title="'+downtimeMessage+'"></span> ');
 	    } 
 	

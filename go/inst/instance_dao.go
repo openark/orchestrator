@@ -595,6 +595,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.IsDowntimed = m.GetBool("is_downtimed")
 	instance.DowntimeReason = m.GetString("downtime_reason")
 	instance.DowntimeOwner = m.GetString("downtime_owner")
+	instance.DowntimeEndTimestamp = m.GetString("downtime_end_timestamp")
 	instance.UnresolvedHostname = m.GetString("unresolved_hostname")
 
 	instance.ReadSlaveHostsFromJson(slaveHostsJSON)
@@ -627,7 +628,8 @@ func readInstancesByCondition(condition string, sort string) ([](*Instance), err
 	    		or database_instance_downtime.end_timestamp < NOW()
 	    	) is false as is_downtimed,
 	    	ifnull(database_instance_downtime.reason, '') as downtime_reason,
-	    	ifnull(database_instance_downtime.owner, '') as downtime_owner
+	    	ifnull(database_instance_downtime.owner, '') as downtime_owner,
+	    	ifnull(database_instance_downtime.end_timestamp, '') as downtime_end_timestamp
 		from 
 			database_instance 
 			left join candidate_database_instance using (hostname, port)
