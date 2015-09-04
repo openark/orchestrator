@@ -263,6 +263,8 @@ type Instance struct {
 
 	IsCandidate        bool
 	IsDowntimed        bool
+	DowntimeReason     string
+	DowntimeOwner      string
 	UnresolvedHostname string
 }
 

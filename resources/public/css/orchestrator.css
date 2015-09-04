@@ -262,6 +262,11 @@ body {
     font: 12px sans-serif;
 }
 
+#node_modal .modal-title .downtime-message {
+    padding-top: 8px;
+    font-weight: bold;
+}
+
 #node_modal .modal-content {
     font-size: 12px;
 }

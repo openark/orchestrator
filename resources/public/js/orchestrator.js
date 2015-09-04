@@ -208,7 +208,13 @@ function openNodeModal(node) {
     var hiddenZone = $('#node_modal .hidden-zone');
     $('#node_modal #modalDataAttributesTable button[data-btn][data-grouped!=true]').appendTo("#node_modal .modal-footer");
     $('#node_modal #modalDataAttributesTable [data-btn-group]').appendTo("#node_modal .modal-footer");
-    $('#node_modal .modal-title').html(node.title);
+    var modalTitle = node.title;
+    if (node.IsDowntimed) {
+    	var downtimeMessage = 'Downtimed by '+node.DowntimeOwner+': '+node.DowntimeReason;
+    	modalTitle += '<div class="downtime-message">'+downtimeMessage+'</div>';
+    } 
+    $('#node_modal .modal-title').html(modalTitle);
+
     $('#modalDataAttributesTable').html("");
 
     if (node.UnresolvedHostname) {
@@ -690,7 +696,8 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench" title="In maintenance"></span> ');
 	    } 
 	    if (instance.IsDowntimed) {
-	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-volume-off" title="Downtimed"></span> ');
+	    	var downtimeMessage = 'Downtimed by '+instance.DowntimeOwner+': '+instance.DowntimeReason;
+	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-volume-off" title="'+downtimeMessage+'"></span> ');
 	    } 
 	
 	    if (instance.lastCheckInvalidProblem()) {
