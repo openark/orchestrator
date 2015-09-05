@@ -141,9 +141,14 @@ func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses boo
 		{
 			_, _, _, promotedSlave, err = inst.RegroupSlavesIncludingSubSlavesOfBinlogServers(failedInstanceKey, true, nil)
 		}
+	case MasterRecoveryBinlogServer:
+		{
+			promotedBinlogServer, err := inst.RegroupSlavesBinlogServers(failedInstanceKey, true, nil)
+			if err != nil {
+				log.Debugf("Promoted binlog server: %+v", promotedBinlogServer.Key)
+			}
+		}
 	}
-
-	ResolveRecovery(failedInstanceKey, &promotedSlave.Key)
 
 	log.Debugf("topology_recovery: - RecoverDeadMaster: candidate slave is %+v", promotedSlave.Key)
 	inst.AuditOperation("recover-dead-master", failedInstanceKey, fmt.Sprintf("master: %+v", promotedSlave.Key))
@@ -264,6 +269,8 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		promotedSlave, _ = replacePromotedSlaveWithCandidate(&analysisEntry.AnalyzedInstanceKey, promotedSlave, candidateInstanceKey)
 	}
 	if actionTaken && promotedSlave != nil {
+		ResolveRecovery(&analysisEntry.AnalyzedInstanceKey, &promotedSlave.Key)
+
 		if !skipProcesses {
 			// Execute post master-failover processes
 			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", analysisEntry, promotedSlave, false)
