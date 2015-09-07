@@ -128,6 +128,8 @@ type Configuration struct {
 	PostFailoverProcesses                      []string          // Processes to execute after doing a failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}, {slaveHosts}
 	PostMasterFailoverProcesses                []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
 	PostIntermediateMasterFailoverProcesses    []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
+	DetachLostSlavesAfterMasterFailover        bool              // Should slaves that are not to be lost in master recovery (i.e. were more up-to-date than promoted slave) be forcibly detached
+	MasterFailoverLostInstancesDowntimeMinutes uint              // Number of minutes to downtime any server that was lost after a master failover (including failed master & lost slaves). 0 to disable
 	OSCIgnoreHostnameFilters                   []string          // OSC slaves recommendation will ignore slave hostnames matching given patterns
 	GraphiteAddr                               string            // Optional; address of graphite port. If supplied, metrics will be written here
 	GraphitePath                               string            // Prefix for graphite path. May include {hostname} magic placeholder
@@ -221,6 +223,8 @@ func NewConfiguration() *Configuration {
 		PostMasterFailoverProcesses:                []string{},
 		PostIntermediateMasterFailoverProcesses:    []string{},
 		PostFailoverProcesses:                      []string{},
+		DetachLostSlavesAfterMasterFailover:        true,
+		MasterFailoverLostInstancesDowntimeMinutes: 0,
 		OSCIgnoreHostnameFilters:                   []string{},
 		GraphiteAddr:                               "",
 		GraphitePath:                               "",

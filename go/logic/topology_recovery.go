@@ -149,14 +149,21 @@ func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses boo
 			promotedSlave, err = inst.RegroupSlavesBinlogServers(failedInstanceKey, true, nil)
 		}
 	}
-	if len(lostSlaves) > 0 {
-		log.Debugf("topology_recovery: - RecoverDeadMaster: found %+v lost slaves; detaching them", len(lostSlaves))
+	if promotedSlave != nil && len(lostSlaves) > 0 && config.Config.DetachLostSlavesAfterMasterFailover {
+		log.Debugf("topology_recovery: - RecoverDeadMaster: lost %+v slaves during recovery process; detaching them", len(lostSlaves))
 		go func() {
 			for _, slave := range lostSlaves {
 				slave := slave
 				inst.DetachSlaveOperation(&slave.Key)
 			}
 		}()
+	}
+	if config.Config.MasterFailoverLostInstancesDowntimeMinutes > 0 {
+		inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), "RecoverDeadMaster indicates this instance is lost", config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
+		for _, slave := range lostSlaves {
+			slave := slave
+			inst.BeginDowntime(&slave.Key, inst.GetMaintenanceOwner(), "RecoverDeadMaster indicates this instance is lost", config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
+		}
 	}
 
 	if promotedSlave == nil {

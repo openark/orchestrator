@@ -19,22 +19,16 @@ package inst
 import (
 	"fmt"
 	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
 )
 
 // BeginDowntime will make mark an instance as downtimed (or override existing downtime period)
 func BeginDowntime(instanceKey *InstanceKey, owner string, reason string, durationSeconds uint) error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
 	if durationSeconds == 0 {
 		durationSeconds = config.Config.MaintenanceExpireMinutes * 60
 	}
-	_, err = sqlutils.Exec(db, `
+	_, err := db.ExecOrchestrator(`
 			insert 
 				into database_instance_downtime (
 					hostname, port, downtime_active, begin_timestamp, end_timestamp, owner, reason
@@ -65,12 +59,7 @@ func BeginDowntime(instanceKey *InstanceKey, owner string, reason string, durati
 
 // EndDowntime will remove downtime flag from an instance
 func EndDowntime(instanceKey *InstanceKey) error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	res, err := sqlutils.Exec(db, `
+	res, err := db.ExecOrchestrator(`
 			update
 				database_instance_downtime
 			set  
@@ -99,13 +88,8 @@ func EndDowntime(instanceKey *InstanceKey) error {
 
 // ExpireDowntime will remove the maintenance flag on old downtimes
 func ExpireDowntime() error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
 	{
-		res, err := sqlutils.Exec(db, `
+		res, err := db.ExecOrchestrator(`
 			delete from
 				database_instance_downtime
 			where
@@ -122,7 +106,7 @@ func ExpireDowntime() error {
 		}
 	}
 	{
-		res, err := sqlutils.Exec(db, `
+		res, err := db.ExecOrchestrator(`
 			update
 				database_instance_downtime
 			set  
@@ -140,5 +124,5 @@ func ExpireDowntime() error {
 		}
 	}
 
-	return err
+	return nil
 }
