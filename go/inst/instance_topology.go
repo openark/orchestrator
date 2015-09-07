@@ -1705,13 +1705,18 @@ func isGenerallyValidAsCandidateSlave(slave *Instance) bool {
 		// Can't regroup under a binlog server because it does not support pseudo-gtid related queries such as SHOW BINLOG EVENTS
 		return false
 	}
+
+	return true
+}
+
+func isBannedFromBeingCandidateSlave(slave *Instance) bool {
 	for _, filter := range config.Config.PromotionIgnoreHostnameFilters {
 		if matched, _ := regexp.MatchString(filter, slave.Key.Hostname); matched {
-			return false
+			return true
 		}
 	}
 
-	return true
+	return false
 }
 
 // GetCandidateSlave chooses the best slave to promote given a (possibly dead) master
@@ -1730,14 +1735,28 @@ func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instan
 	}
 	for _, slave := range slaves {
 		slave := slave
-		if isGenerallyValidAsCandidateSlave(slave) {
+		if isGenerallyValidAsCandidateSlave(slave) && !isBannedFromBeingCandidateSlave(slave) {
 			// this is the one
 			candidateSlave = slave
 			break
 		}
 	}
 	if candidateSlave == nil {
-		return slaves[0], slaves[1:], equalSlaves, laterSlaves, fmt.Errorf("No slaves found with log_slave_updates for %+v", *masterKey)
+		// Unable to find a candidate, so will not regroup.
+		// Pick a (single) slave which is not banned.
+		for _, slave := range slaves {
+			slave := slave
+			if !isBannedFromBeingCandidateSlave(slave) {
+				// this is the one
+				candidateSlave = slave
+				break
+			}
+		}
+		if candidateSlave != nil {
+			slaves = removeInstance(slaves, &candidateSlave.Key)
+		}
+
+		return candidateSlave, slaves, equalSlaves, laterSlaves, fmt.Errorf("GetCandidateSlave: no candidate slaves found %+v", *masterKey)
 	}
 	slaves = removeInstance(slaves, &candidateSlave.Key)
 	for _, slave := range slaves {
@@ -1812,6 +1831,7 @@ func RegroupSlaves(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup boo
 	}
 
 	log.Debugf("RegroupSlaves: done")
+	// aheadSlaves are lost (they were ahead in replication as compared to promoted slave)
 	return aheadSlaves, equalSlaves, laterSlaves, instance, err
 }
 

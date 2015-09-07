@@ -37,12 +37,14 @@ const (
 var discoveryInstanceKeys chan inst.InstanceKey = make(chan inst.InstanceKey, maxConcurrency)
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
+var discoveryQueueLengthGauge = metrics.NewGauge()
 
 var isElectedNode = false
 
 func init() {
 	metrics.Register("discoveries.attempt", discoveriesCounter)
 	metrics.Register("discoveries.fail", failedDiscoveriesCounter)
+	metrics.Register("discoveries.queue_length", discoveryQueueLengthGauge)
 	isElectedNode = false
 }
 
@@ -194,6 +196,7 @@ func ContinuousDiscovery() {
 				} else {
 					log.Debugf("Not elected as active node; polling")
 				}
+				discoveryQueueLengthGauge.Update(int64(len(discoveryInstanceKeys)))
 			}()
 		case <-forgetUnseenTick:
 			// See if we should also forget objects (lower frequency)
