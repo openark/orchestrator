@@ -1706,14 +1706,13 @@ func (this *HttpAPI) GrabElection(params martini.Params, r render.Render, req *h
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	success, err := logic.GrabElection()
-	if err != nil || !success {
+	err := logic.GrabElection()
+	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Unable to grab election: %+v", err)})
 		return
 	}
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Node elected as leader")})
-
 }
 
 // Reelect causes re-elections for an active node

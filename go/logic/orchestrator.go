@@ -38,37 +38,40 @@ var discoveryInstanceKeys chan inst.InstanceKey = make(chan inst.InstanceKey, ma
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
 
+var isElectedNode = false
+
 func init() {
 	metrics.Register("discoveries.attempt", discoveriesCounter)
 	metrics.Register("discoveries.fail", failedDiscoveriesCounter)
+	isElectedNode = false
 }
 
 // handleDiscoveryRequests iterates the discoveryInstanceKeys channel and calls upon
 // instance discovery per entry.
 func handleDiscoveryRequests(pendingTokens chan bool, completedTokens chan bool) {
 	for instanceKey := range discoveryInstanceKeys {
-		AccountedDiscoverInstance(instanceKey, pendingTokens, completedTokens)
+		accountedDiscoverInstance(instanceKey, pendingTokens, completedTokens)
 	}
 }
 
-// AccountedDiscoverInstance will call upon DiscoverInstance and will keep track of
+// accountedDiscoverInstance will call upon DiscoverInstance and will keep track of
 // discovery tokens such that management of multiple discoveries can figure out
 // whether all instances in a topology are accounted for.
-func AccountedDiscoverInstance(instanceKey inst.InstanceKey, pendingTokens chan bool, completedTokens chan bool) {
+func accountedDiscoverInstance(instanceKey inst.InstanceKey, pendingTokens chan bool, completedTokens chan bool) {
 	if pendingTokens != nil {
 		pendingTokens <- true
 	}
 	go func() {
-		DiscoverInstance(instanceKey)
+		discoverInstance(instanceKey)
 		if completedTokens != nil {
 			completedTokens <- true
 		}
 	}()
 }
 
-// DiscoverInstance will attempt discovering an instance (unless it is already up to date) and will
+// discoverInstance will attempt discovering an instance (unless it is already up to date) and will
 // list down its master and slaves (if any) for further discovery.
-func DiscoverInstance(instanceKey inst.InstanceKey) {
+func discoverInstance(instanceKey inst.InstanceKey) {
 	instanceKey.Formalize()
 	if !instanceKey.IsValid() {
 		return
@@ -87,11 +90,17 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	// that instance is nil. Check it.
 	if err != nil || instance == nil {
 		failedDiscoveriesCounter.Inc(1)
-		log.Warningf("instance is nil in DiscoverInstance. key=%+v, error=%+v", instanceKey, err)
+		log.Warningf("instance is nil in discoverInstance. key=%+v, error=%+v", instanceKey, err)
 		goto Cleanup
 	}
 
 	log.Debugf("Discovered host: %+v, master: %+v", instance.Key, instance.MasterKey)
+
+	if !isElectedNode {
+		// Maybe this node was elected before, but isn't elected anymore.
+		// If not elected, stop drilling down to further investigate slaves.
+		return
+	}
 
 	// Investigate slaves:
 	for _, slaveKey := range instance.SlaveHosts.GetInstanceKeys() {
@@ -114,7 +123,7 @@ func StartDiscovery(instanceKey inst.InstanceKey) {
 	pendingTokens := make(chan bool, maxConcurrency)
 	completedTokens := make(chan bool, maxConcurrency)
 
-	AccountedDiscoverInstance(instanceKey, pendingTokens, completedTokens)
+	accountedDiscoverInstance(instanceKey, pendingTokens, completedTokens)
 	go handleDiscoveryRequests(pendingTokens, completedTokens)
 
 	// Block until all are complete
@@ -172,24 +181,24 @@ func ContinuousDiscovery() {
 
 	go initGraphiteMetrics()
 
-	elected := false
-	_ = CreateElectionAnchor(false)
 	for {
 		select {
 		case <-tick:
-			if elected, _ = AttemptElection(); elected {
-				instanceKeys, _ := inst.ReadOutdatedInstanceKeys()
-				log.Debugf("outdated keys: %+v", instanceKeys)
-				for _, instanceKey := range instanceKeys {
-					discoveryInstanceKeys <- instanceKey
+			go func() {
+				if isElectedNode, _ = attemptElection(); isElectedNode {
+					instanceKeys, _ := inst.ReadOutdatedInstanceKeys()
+					log.Debugf("outdated keys: %+v", instanceKeys)
+					for _, instanceKey := range instanceKeys {
+						discoveryInstanceKeys <- instanceKey
+					}
+				} else {
+					log.Debugf("Not elected as active node; polling")
 				}
-			} else {
-				log.Debugf("Not elected as active node; polling")
-			}
+			}()
 		case <-forgetUnseenTick:
 			// See if we should also forget objects (lower frequency)
 			go func() {
-				if elected {
+				if isElectedNode {
 					inst.ForgetLongUnseenInstances()
 					inst.ForgetUnseenInstancesDifferentlyResolved()
 					inst.ForgetExpiredHostnameResolves()
@@ -205,7 +214,7 @@ func ContinuousDiscovery() {
 					inst.ExpireAudit()
 					inst.ExpireMasterPositionEquivalence()
 				}
-				if !elected {
+				if !isElectedNode {
 					// Take this opportunity to refresh yourself
 					inst.LoadHostnameResolveCacheFromDatabase()
 				}
@@ -214,7 +223,7 @@ func ContinuousDiscovery() {
 			}()
 		case <-recoverTick:
 			go func() {
-				if elected {
+				if isElectedNode {
 					ClearActiveFailureDetections()
 					ClearActiveRecoveries()
 					CheckAndRecover(nil, nil, false, false)
