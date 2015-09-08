@@ -117,7 +117,7 @@ function Cluster() {
             snapTolerance: 10,
             helper: "clone",
             zIndex: 100,
-            containment: $("#cluster_container"),
+            containment: "#cluster_container",
             start: instance_dragStart,
             drag: instance_drag,
             stop: instance_dragStop,

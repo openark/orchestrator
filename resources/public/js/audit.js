@@ -1,16 +1,28 @@
 
 $(document).ready(function () {
     showLoader();
-    $.get("/api/audit/"+currentPage(), function (auditEntries) {
+    var apiUri = "/api/audit/"+currentPage();
+    if (auditHostname()) {
+    	apiUri = "/api/audit/instance/"+auditHostname()+"/"+auditPort()+"/"+currentPage();
+    }
+    $.get(apiUri, function (auditEntries) {
             displayAudit(auditEntries);
     	}, "json");
     function displayAudit(auditEntries) {
+    	var baseWebUri = "/web/audit/";
+    	if (auditHostname()) {
+    		baseWebUri += "instance/"+auditHostname()+"/"+auditPort()+"/";
+        }
         hideLoader();
         auditEntries.forEach(function (audit) {
     		var row = jQuery('<tr/>');
     		jQuery('<td/>', { text: audit.AuditTimestamp }).appendTo(row);
     		jQuery('<td/>', { text: audit.AuditType }).appendTo(row);
-    		jQuery('<td/>', { text: audit.AuditInstanceKey.Hostname+":"+audit.AuditInstanceKey.Port }).appendTo(row);
+    		if (audit.AuditInstanceKey.Hostname) {
+    			$('<a/>',  { text: audit.AuditInstanceKey.Hostname+":"+audit.AuditInstanceKey.Port , href: "/web/audit/instance/"+audit.AuditInstanceKey.Hostname+"/"+audit.AuditInstanceKey.Port}).wrap($("<td/>")).parent().appendTo(row);
+    		} else {
+    			jQuery('<td/>', { text: audit.AuditInstanceKey.Hostname+":"+audit.AuditInstanceKey.Port }).appendTo(row);
+    		}
     		jQuery('<td/>', { text: audit.Message }).appendTo(row);
     		row.appendTo('#audit tbody');    		
     	});
@@ -21,10 +33,10 @@ $(document).ready(function () {
         	$("#audit .pager .next").addClass("disabled");        	
         }
         $("#audit .pager .previous").not(".disabled").find("a").click(function() {
-            window.location.href = "/web/audit/"+(currentPage() - 1);
+            window.location.href = baseWebUri+(currentPage() - 1);
         });
         $("#audit .pager .next").not(".disabled").find("a").click(function() {
-            window.location.href = "/web/audit/"+(currentPage() + 1);
+            window.location.href = baseWebUri+(currentPage() + 1);
         });
         $("#audit .pager .disabled a").click(function() {
             return false;

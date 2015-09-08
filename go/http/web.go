@@ -173,6 +173,8 @@ func (this *HttpWeb) Audit(params martini.Params, r render.Render, req *http.Req
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
 		"page":                page,
+		"auditHostname":       params["host"],
+		"auditPort":           params["port"],
 	})
 }
 
@@ -336,6 +338,8 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/long-queries", this.LongQueries)
 	m.Get("/web/audit", this.Audit)
 	m.Get("/web/audit/:page", this.Audit)
+	m.Get("/web/audit/instance/:host/:port", this.Audit)
+	m.Get("/web/audit/instance/:host/:port/:page", this.Audit)
 	m.Get("/web/audit-recovery", this.AuditRecovery)
 	m.Get("/web/audit-recovery/:page", this.AuditRecovery)
 	m.Get("/web/audit-failure-detection", this.AuditFailureDetection)

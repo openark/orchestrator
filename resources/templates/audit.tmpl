@@ -31,5 +31,11 @@
     function currentPage() {
         return parseInt("{{.page}}");
     }
+    function auditHostname() {
+        return "{{.auditHostname}}";
+    }
+    function auditPort() {
+        return parseInt("{{.auditPort}}");
+    }
 </script>
 <script src="/js/audit.js"></script>

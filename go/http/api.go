@@ -1257,7 +1257,12 @@ func (this *HttpAPI) Audit(params martini.Params, r render.Render, req *http.Req
 	if err != nil || page < 0 {
 		page = 0
 	}
-	audits, err := inst.ReadRecentAudit(page)
+	var auditedInstanceKey *inst.InstanceKey
+	if instanceKey, err := this.getInstanceKey(params["host"], params["port"]); err == nil {
+		auditedInstanceKey = &instanceKey
+	}
+
+	audits, err := inst.ReadRecentAudit(auditedInstanceKey, page)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -1946,6 +1951,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/long-queries/:filter", this.LongQueries)
 	m.Get("/api/audit", this.Audit)
 	m.Get("/api/audit/:page", this.Audit)
+	m.Get("/api/audit/instance/:host/:port", this.Audit)
+	m.Get("/api/audit/instance/:host/:port/:page", this.Audit)
 	// Meta
 	m.Get("/api/maintenance", this.Maintenance)
 	m.Get("/api/headers", this.Headers)
