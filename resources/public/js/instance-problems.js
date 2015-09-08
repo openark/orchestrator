@@ -36,11 +36,13 @@ $(document).ready(function () {
     			considerInstance = false;
     		}
     		if (considerInstance) {
-	    		$("#instance_problems ul").append('<li><div xmlns="http://www.w3.org/1999/xhtml" class="popover instance" data-nodeid="'+instance.id+'"><div class="arrow"></div><h3 class="popover-title"></h3><div class="popover-content"></div></div></li>');
+                var li = $("<li/>");
+                var instanceEl = Instance.createElement(instance).addClass("instance-problem").appendTo(li);
+	    		$("#instance_problems ul").append(li); 
 
-	    		var popoverElement = $("#instance_problems [data-nodeid='" + instance.id + "'].popover");
-	    		renderInstanceElement(popoverElement, instance, "problems");
-	    	    popoverElement.click(function () {
+	    		//var popoverElement = $("#instance_problems [data-nodeid='" + instance.id + "'].popover");
+	    		renderInstanceElement(instanceEl, instance, "problems"); //popoverElement
+	    	    instanceEl.click(function () {
 	    	    	openNodeModal(instance);
 	    	    	return false;
 	    	    });	

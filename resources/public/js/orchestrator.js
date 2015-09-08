@@ -575,10 +575,10 @@ function normalizeInstances(instances, maintenanceList) {
 	       	instance.canonicalTitle = instance.title.substring(0, instance.title.length - suffixLength);
     	}
     });
-    var instancesMap = instances.reduce(function (map, instance) {
-        map[instance.id] = instance;
-        return map;
-    }, {});
+    var instancesMap = {};
+    instances.forEach(function (instance) {
+        instancesMap[instance.id] = instance;
+    });
     // mark maintenance instances
     maintenanceList.forEach(function (maintenanceEntry) {
         var instanceId = getInstanceId(maintenanceEntry.Key.Hostname, maintenanceEntry.Key.Port)
@@ -749,7 +749,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	        	+ 'Problem: <strong title="'+instance.problemDescription+'">'+instance.problem.replace(/_/g, ' ') + '</strong>'
 	        + '</p>';
 	    }      
-	    popoverElement.find(".popover-content").html(contentHtml);
+	    popoverElement.find(".instance-content").html(contentHtml);
 	}
     // if (instance.isCandidateMaster) {
     // popoverElement.append('<h4 class="popover-footer"><strong>Master

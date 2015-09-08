@@ -1,4 +1,4 @@
-function visualizeInstances(nodesMap, onSvgInstanceWrapper) {
+function visualizeInstances(nodesMap, onSvgInstanceWrapper, clusterControl) {
     nodesList = []
     for (var nodeId in nodesMap) {
         nodesList.push(nodesMap[nodeId]);
@@ -70,7 +70,7 @@ function visualizeInstances(nodesMap, onSvgInstanceWrapper) {
         left: 60
     };
     var horizontalSpacing = 320;
-    var verticalSpacing = 80;
+    var verticalSpacing = 100;
     var svgWidth = $("#cluster_container").width() - margin.right - margin.left;
     svgWidth = Math.min(svgWidth, (maxDepth + 1) * horizontalSpacing);
     var svgHeight = $("#cluster_container").height() - margin.top - margin.bottom;
@@ -79,18 +79,18 @@ function visualizeInstances(nodesMap, onSvgInstanceWrapper) {
     var i = 0;
     var duration = 0;
 
-    var tree = d3.layout.tree().size([svgHeight, svgWidth]);
+    var tree = d3.layout.tree();
+    tree = tree.size([svgHeight, svgWidth]);
 
     var diagonal = d3.svg.diagonal().projection(function (d) {
         return [d.y, d.x];
     });
 
-    var svg = d3.select("#cluster_container").append("svg").attr("width",
-            svgWidth + margin.right + margin.left).attr("height",
-            svgHeight + margin.top + margin.bottom).attr("xmlns", "http://www.w3.org/2000/svg").attr("version", "1.1").append("g")
-        .attr(
-            "transform",
-            "translate(" + margin.left + "," + margin.top + ")");
+    var svg = d3.select("#cluster_container").append("svg")
+        .attr("width", svgWidth + margin.right + margin.left)
+        .attr("height", svgHeight + margin.top + margin.bottom)
+        .attr("xmlns", "http://www.w3.org/2000/svg").attr("version", "1.1").append("g")
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
     var root = null;
     nodesList.forEach(function (node) {
@@ -103,9 +103,11 @@ function visualizeInstances(nodesMap, onSvgInstanceWrapper) {
     update(root);
 
     function update(source) {
+        nodesList.where(function(t){return t.x!=0;}).forEach(function (t) { t.prevX = t.x; t.prevY = t.y; });
         // Compute the new tree layout.
         var nodes = tree.nodes(root).reverse();
         var links = tree.links(nodes);
+        nodesList.where(function(t){return t.prevX!=null;}).forEach(function (t) { t.x = t.prevX; t.y = t.prevY; });
 
         // Normalize for fixed-depth.
         nodes.forEach(function (d) {
@@ -157,18 +159,19 @@ function visualizeInstances(nodesMap, onSvgInstanceWrapper) {
             return 4;
         }).attr("requiredFeatures", "http://www.w3.org/TR/SVG11/feature#Extensibility");
         
-        $("#cluster_container .popover.instance").remove();
-        $("#cluster_container .instance-trailer").remove();
+        $("#cluster_container .instance").remove();
         $("g.svgInstanceWrapper").each(function() {
         	onSvgInstanceWrapper(this, nodesMap);
         }) 	
         
         // Transition nodes to their new position.
-        var nodeUpdate = node.transition().duration(duration).attr("transform", function (d) {
+        var nodeUpdate = node
+            //.transition()
+            //.duration(duration)
+            .attr("transform", function (d) {
             return "translate(" + d.y + "," + d.x + ")";
-        }).each("end", function (d) {
-        	repositionIntanceDiv(d.id);
         });
+        
         nodeUpdate.select("circle").attr("r", function (d) {
         	if (d.isVirtual) {
         		return 0;
@@ -226,6 +229,12 @@ function visualizeInstances(nodesMap, onSvgInstanceWrapper) {
             d.x0 = d.x;
             d.y0 = d.y;
         });
+
+        nodeUpdate.each(function (d) {
+        	//window.setTimeout(function(){clusterControl.repositionIntanceDiv(d.id);}, 100);
+            clusterControl.repositionIntanceDiv(d.id);
+        });
+
     } 
 
    // Toggle children on click.
