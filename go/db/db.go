@@ -493,6 +493,16 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN executed_gtid_set text CHARACTER SET ascii NOT NULL AFTER oracle_gtid
 	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN server_uuid varchar(64) CHARACTER SET ascii NOT NULL AFTER server_id
+	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN suggested_cluster_alias varchar(128) CHARACTER SET ascii NOT NULL AFTER cluster_name
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance

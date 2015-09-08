@@ -159,11 +159,13 @@ func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses boo
 		}()
 	}
 	if config.Config.MasterFailoverLostInstancesDowntimeMinutes > 0 {
-		inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), "RecoverDeadMaster indicates this instance is lost", config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
-		for _, slave := range lostSlaves {
-			slave := slave
-			inst.BeginDowntime(&slave.Key, inst.GetMaintenanceOwner(), "RecoverDeadMaster indicates this instance is lost", config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
-		}
+		go func() {
+			inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), "RecoverDeadMaster indicates this instance is lost", config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
+			for _, slave := range lostSlaves {
+				slave := slave
+				inst.BeginDowntime(&slave.Key, inst.GetMaintenanceOwner(), "RecoverDeadMaster indicates this instance is lost", config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
+			}
+		}()
 	}
 
 	if promotedSlave == nil {

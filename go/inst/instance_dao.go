@@ -171,6 +171,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 				}
 				instance.Version = originalVersion + "-maxscale"
 				instance.ServerID = 0
+				instance.ServerUUID = ""
 				instance.Uptime = 0
 				instance.Binlog_format = "INHERIT"
 				instance.ReadOnly = true
@@ -456,6 +457,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			clusterAlias = ""
 			log.Errore(err)
 		}
+		instance.SuggestedClusterAlias = clusterAlias
 		if clusterAlias != "" {
 			err := SetClusterAlias(instance.ClusterName, clusterAlias)
 			if err != nil {
@@ -547,6 +549,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.Key.Port = m.GetInt("port")
 	instance.Uptime = m.GetUint("uptime")
 	instance.ServerID = m.GetUint("server_id")
+	instance.ServerUUID = m.GetString("server_uuid")
 	instance.Version = m.GetString("version")
 	instance.ReadOnly = m.GetBool("read_only")
 	instance.Binlog_format = m.GetString("binlog_format")
@@ -579,6 +582,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.SQLDelay = m.GetUint("sql_delay")
 	slaveHostsJSON := m.GetString("slave_hosts")
 	instance.ClusterName = m.GetString("cluster_name")
+	instance.SuggestedClusterAlias = m.GetString("suggested_cluster_alias")
 	instance.DataCenter = m.GetString("data_center")
 	instance.PhysicalEnvironment = m.GetString("physical_environment")
 	instance.ReplicationDepth = m.GetUint("replication_depth")
@@ -1332,6 +1336,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 	        		last_attempted_check=VALUES(last_attempted_check),
 	        		uptime=VALUES(uptime),
 	        		server_id=VALUES(server_id),
+	        		server_uuid=VALUES(server_uuid),
 					version=VALUES(version),
 					binlog_server=VALUES(binlog_server),
 					read_only=VALUES(read_only),
@@ -1364,6 +1369,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 					num_slave_hosts=VALUES(num_slave_hosts),
 					slave_hosts=VALUES(slave_hosts),
 					cluster_name=VALUES(cluster_name),
+					suggested_cluster_alias=VALUES(suggested_cluster_alias),
 					data_center=VALUES(data_center),
 					physical_environment=values(physical_environment),
 					replication_depth=VALUES(replication_depth),
@@ -1383,6 +1389,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
         		last_attempted_check,
         		uptime,
         		server_id,
+        		server_uuid,
 				version,
 				binlog_server,
 				read_only,
@@ -1415,11 +1422,12 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				num_slave_hosts,
 				slave_hosts,
 				cluster_name,
+				suggested_cluster_alias,
 				data_center,
 				physical_environment,
 				replication_depth,
 				is_co_master
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
@@ -1428,6 +1436,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			instance.Key.Port,
 			instance.Uptime,
 			instance.ServerID,
+			instance.ServerUUID,
 			instance.Version,
 			instance.IsBinlogServer(),
 			instance.ReadOnly,
@@ -1460,6 +1469,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			len(instance.SlaveHosts),
 			instance.GetSlaveHostsAsJson(),
 			instance.ClusterName,
+			instance.SuggestedClusterAlias,
 			instance.DataCenter,
 			instance.PhysicalEnvironment,
 			instance.ReplicationDepth,

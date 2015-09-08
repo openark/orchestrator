@@ -33,6 +33,7 @@ type Instance struct {
 	Key                    InstanceKey
 	Uptime                 uint
 	ServerID               uint
+	ServerUUID             string
 	Version                string
 	ReadOnly               bool
 	Binlog_format          string
@@ -57,13 +58,14 @@ type Instance struct {
 	SQLDelay               uint
 	ExecutedGtidSet        string
 
-	SlaveLagSeconds     sql.NullInt64
-	SlaveHosts          InstanceKeyMap
-	ClusterName         string
-	DataCenter          string
-	PhysicalEnvironment string
-	ReplicationDepth    uint
-	IsCoMaster          bool
+	SlaveLagSeconds       sql.NullInt64
+	SlaveHosts            InstanceKeyMap
+	ClusterName           string
+	SuggestedClusterAlias string
+	DataCenter            string
+	PhysicalEnvironment   string
+	ReplicationDepth      uint
+	IsCoMaster            bool
 
 	IsLastCheckValid     bool
 	IsUpToDate           bool

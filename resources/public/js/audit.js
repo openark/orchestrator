@@ -19,7 +19,8 @@ $(document).ready(function () {
     		jQuery('<td/>', { text: audit.AuditTimestamp }).appendTo(row);
     		jQuery('<td/>', { text: audit.AuditType }).appendTo(row);
     		if (audit.AuditInstanceKey.Hostname) {
-    			$('<a/>',  { text: audit.AuditInstanceKey.Hostname+":"+audit.AuditInstanceKey.Port , href: "/web/audit/instance/"+audit.AuditInstanceKey.Hostname+"/"+audit.AuditInstanceKey.Port}).wrap($("<td/>")).parent().appendTo(row);
+    			var uri = "/web/audit/instance/"+audit.AuditInstanceKey.Hostname+"/"+audit.AuditInstanceKey.Port;
+    			$('<a/>',  { text: audit.AuditInstanceKey.Hostname+":"+audit.AuditInstanceKey.Port , href: uri}).wrap($("<td/>")).parent().appendTo(row);
     		} else {
     			jQuery('<td/>', { text: audit.AuditInstanceKey.Hostname+":"+audit.AuditInstanceKey.Port }).appendTo(row);
     		}
