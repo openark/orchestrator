@@ -24,6 +24,7 @@ import (
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/math"
 	"github.com/outbrain/orchestrator/go/config"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -102,6 +103,12 @@ func (this *InstanceKey) IsValid() bool {
 // DisplayString returns a user-friendly string representation of this key
 func (this *InstanceKey) DisplayString() string {
 	return fmt.Sprintf("%s:%d", this.Hostname, this.Port)
+}
+
+var detachPattern *regexp.Regexp
+
+func init() {
+	detachPattern, _ = regexp.Compile(`//([^/:]+):([\d]+)`) // e.g. `//binlog.01234:567890`
 }
 
 type BinlogType int
@@ -201,6 +208,15 @@ func (this *BinlogCoordinates) DisplayString() string {
 	return fmt.Sprintf("%s:%d", this.LogFile, this.LogPos)
 }
 
+// FileSmallerThan returns true if this coordinate's file is strictly smaller than the other's.
+func (this *BinlogCoordinates) DetachedCoordinates() (isDetached bool, detachedLogFile string, detachedLogPos string) {
+	detachedCoordinatesSubmatch := detachPattern.FindStringSubmatch(this.LogFile)
+	if len(detachedCoordinatesSubmatch) == 0 {
+		return false, "", ""
+	}
+	return true, detachedCoordinatesSubmatch[1], detachedCoordinatesSubmatch[2]
+}
+
 // InstanceKeyMap is a convenience struct for listing InstanceKey-s
 type InstanceKeyMap map[InstanceKey]bool
 
@@ -240,6 +256,7 @@ type Instance struct {
 	UsingPseudoGTID        bool
 	ReadBinlogCoordinates  BinlogCoordinates
 	ExecBinlogCoordinates  BinlogCoordinates
+	IsDetached             bool
 	RelaylogCoordinates    BinlogCoordinates
 	LastSQLError           string
 	LastIOError            string

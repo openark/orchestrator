@@ -260,6 +260,14 @@ function openNodeModal(node) {
 		        $('#node_modal [data-btn-group=move-equivalent]').appendTo(masterCoordinatesEl.find("div"));
 			}
 		}, "json");
+        if (node.IsDetached) {
+            $('#node_modal button[data-btn=detach-slave]').appendTo(hiddenZone)
+            $('#node_modal button[data-btn=reattach-slave]').appendTo(masterCoordinatesEl.find("div"))
+        } else {
+            $('#node_modal button[data-btn=detach-slave]').appendTo(masterCoordinatesEl.find("div"))
+            $('#node_modal button[data-btn=reattach-slave]').appendTo(hiddenZone)
+        }
+	
     } else {
         $('#node_modal button[data-btn=reset-slave]').appendTo(hiddenZone);
         $('#node_modal button[data-btn=skip-query]').appendTo(hiddenZone);
@@ -329,6 +337,12 @@ function openNodeModal(node) {
     });
     $('#node_modal [data-btn=stop-slave-nice]').click(function(){
     	apiCommand("/api/stop-slave-nice/"+node.Key.Hostname+"/"+node.Key.Port);
+    });
+    $('#node_modal button[data-btn=detach-slave]').click(function(){
+    	apiCommand("/api/detach-slave/"+node.Key.Hostname+"/"+node.Key.Port);
+    });
+    $('#node_modal button[data-btn=reattach-slave]').click(function(){
+    	apiCommand("/api/reattach-slave/"+node.Key.Hostname+"/"+node.Key.Port);
     });
     $('#node_modal button[data-btn=reset-slave]').click(function(){
     	var message = "<p>Are you sure you wish to reset <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
@@ -699,6 +713,9 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	    } 
 	    if (instance.inMaintenanceProblem()) {
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench" title="In maintenance"></span> ');
+	    } 
+	    if (instance.IsDetached) {
+	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-remove-sign" title="Replication forcibly detached"></span> ');
 	    } 
 	    if (instance.IsDowntimed) {
 	    	var downtimeMessage = 'Downtimed by '+instance.DowntimeOwner+': '+instance.DowntimeReason+'.\nEnds: '+instance.DowntimeEndTimestamp;

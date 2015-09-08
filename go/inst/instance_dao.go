@@ -37,8 +37,6 @@ const backendDBConcurrency = 20
 var instanceReadChan = make(chan bool, backendDBConcurrency)
 var instanceWriteChan = make(chan bool, backendDBConcurrency)
 
-var detachPattern *regexp.Regexp
-
 // Max concurrency for bulk topology operations
 const topologyConcurrency = 100
 
@@ -59,10 +57,6 @@ func (this InstancesByCountSlaveHosts) Len() int      { return len(this) }
 func (this InstancesByCountSlaveHosts) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
 func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
-}
-
-func init() {
-	detachPattern, _ = regexp.Compile(`//([^/:]+):([\d]+)`) // e.g. `//binlog.01234:567890`
 }
 
 // ExecuteOnTopology will execute given function while maintaining concurrency limit
@@ -278,6 +272,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		instance.ReadBinlogCoordinates.LogPos = m.GetInt64("Read_Master_Log_Pos")
 		instance.ExecBinlogCoordinates.LogFile = m.GetString("Relay_Master_Log_File")
 		instance.ExecBinlogCoordinates.LogPos = m.GetInt64("Exec_Master_Log_Pos")
+		instance.IsDetached, _, _ = instance.ExecBinlogCoordinates.DetachedCoordinates()
 		instance.RelaylogCoordinates.LogFile = m.GetString("Relay_Log_File")
 		instance.RelaylogCoordinates.LogPos = m.GetInt64("Relay_Log_Pos")
 		instance.RelaylogCoordinates.Type = RelayLog
@@ -573,6 +568,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.ReadBinlogCoordinates.LogPos = m.GetInt64("read_master_log_pos")
 	instance.ExecBinlogCoordinates.LogFile = m.GetString("relay_master_log_file")
 	instance.ExecBinlogCoordinates.LogPos = m.GetInt64("exec_master_log_pos")
+	instance.IsDetached, _, _ = instance.ExecBinlogCoordinates.DetachedCoordinates()
 	instance.RelaylogCoordinates.LogFile = m.GetString("relay_log_file")
 	instance.RelaylogCoordinates.LogPos = m.GetInt64("relay_log_pos")
 	instance.RelaylogCoordinates.Type = RelayLog
@@ -2071,8 +2067,9 @@ func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, fmt.Errorf("Cannot detach slave on: %+v because slave is running", instanceKey)
 	}
 
-	detachedCoordinatesSubmatch := detachPattern.FindStringSubmatch(instance.ExecBinlogCoordinates.LogFile)
-	if len(detachedCoordinatesSubmatch) != 0 {
+	isDetached, _, _ := instance.ExecBinlogCoordinates.DetachedCoordinates()
+
+	if isDetached {
 		return instance, fmt.Errorf("Cannot (need not) detach slave on: %+v because slave is already detached", instanceKey)
 	}
 
@@ -2104,8 +2101,9 @@ func ReattachSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, fmt.Errorf("Cannot (need not) reattach slave on: %+v because slave is running", instanceKey)
 	}
 
-	detachedCoordinatesSubmatch := detachPattern.FindStringSubmatch(instance.ExecBinlogCoordinates.LogFile)
-	if len(detachedCoordinatesSubmatch) == 0 {
+	isDetached, detachedLogFile, detachedLogPos := instance.ExecBinlogCoordinates.DetachedCoordinates()
+
+	if !isDetached {
 		return instance, fmt.Errorf("Cannot reattach slave on: %+v because slave is not detached", instanceKey)
 	}
 
@@ -2113,7 +2111,7 @@ func ReattachSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, fmt.Errorf("noop: aborting reattach-slave operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
 
-	_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf(`change master to master_log_file='%s', master_log_pos=%s`, detachedCoordinatesSubmatch[1], detachedCoordinatesSubmatch[2]))
+	_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf(`change master to master_log_file='%s', master_log_pos=%s`, detachedLogFile, detachedLogPos))
 	if err != nil {
 		return instance, log.Errore(err)
 	}
