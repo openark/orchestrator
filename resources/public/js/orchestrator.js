@@ -300,6 +300,8 @@ function openNodeModal(node) {
 
     addNodeModalDataAttribute("Cluster",
             '<a href="/web/cluster/'+node.ClusterName+'">'+node.ClusterName+'</a>');
+    addNodeModalDataAttribute("Audit",
+            '<a href="/web/audit/instance/'+node.Key.Hostname+'/'+node.Key.Port+'">'+node.title+'</a>');
     addNodeModalDataAttribute("Agent",
             '<a href="/web/agent/'+node.Key.Hostname+'">'+node.Key.Hostname+'</a>');
     addNodeModalDataAttribute("Long queries",
