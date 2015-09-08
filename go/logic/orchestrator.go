@@ -209,6 +209,7 @@ func ContinuousDiscovery() {
 					inst.ReviewUnseenInstances()
 					inst.InjectUnseenMasters()
 					inst.ResolveUnknownMasterHostnameResolves()
+					inst.UpdateClusterAliases()
 					inst.ExpireMaintenance()
 					inst.ExpireDowntime()
 					inst.ExpireCandidateInstances()

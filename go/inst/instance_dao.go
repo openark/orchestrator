@@ -236,9 +236,11 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			// so as to completely fail reading a 5.7 instance.
 		}
 		if instance.IsOracleMySQL() && !instance.IsSmallerMajorVersionByString("5.6") {
+			// Stuff only supported on Oracle MySQL >= 5.6
+			// ...
 			// @@gtid_mode only available in Orcale MySQL >= 5.6
 			// Previous version just issued this query brute-force, but I don't like errors being issued where they shouldn't.
-			_ = db.QueryRow("select @@global.gtid_mode = 'ON'").Scan(&instance.SupportsOracleGTID)
+			_ = db.QueryRow("select @@global.gtid_mode = 'ON', @@global.server_uuid").Scan(&instance.SupportsOracleGTID, &instance.ServerUUID)
 		}
 	}
 	if resolvedHostname != instance.Key.Hostname {
@@ -458,12 +460,6 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			log.Errore(err)
 		}
 		instance.SuggestedClusterAlias = clusterAlias
-		if clusterAlias != "" {
-			err := SetClusterAlias(instance.ClusterName, clusterAlias)
-			if err != nil {
-				log.Errore(err)
-			}
-		}
 	}
 	if instance.ReplicationDepth == 0 && config.Config.DetectClusterDomainQuery != "" && !isMaxScale {
 		// Only need to do on masters

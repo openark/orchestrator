@@ -503,6 +503,11 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN suggested_cluster_alias varchar(128) CHARACTER SET ascii NOT NULL AFTER cluster_name
 	`,
+	`
+		ALTER TABLE cluster_alias
+			ADD COLUMN last_registered TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			ADD KEY last_registered_idx (last_registered)
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance
