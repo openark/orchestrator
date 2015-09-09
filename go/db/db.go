@@ -508,6 +508,18 @@ var generateSQLPatches = []string{
 			ADD COLUMN last_registered TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			ADD KEY last_registered_idx (last_registered)
 	`,
+	`
+		ALTER TABLE 
+			topology_recovery
+			ADD COLUMN is_successful TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER processcing_node_token
+	`,
+	`
+		ALTER TABLE 
+			topology_recovery
+			ADD COLUMN acknowledged TINYINT UNSIGNED NOT NULL DEFAULT 0,
+			ADD COLUMN acknowledged_by varchar(128) CHARACTER SET utf8 NOT NULL,
+			ADD COLUMN acknowledge_comment text CHARACTER SET utf8 NOT NULL
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance
