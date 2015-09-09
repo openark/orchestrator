@@ -151,9 +151,7 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		a.IsBinlogServer = m.GetBool("is_binlog_server")
 		a.ClusterDetails.ReadRecoveryInfo()
 
-		instance := &Instance{}
-		instance.ReadSlaveHostsFromJson(m.GetString("slave_hosts"))
-		a.SlaveHosts = instance.SlaveHosts
+		a.SlaveHosts.ReadJson(m.GetString("slave_hosts"))
 
 		countOracleGTIDSlaves := m.GetUint("count_oracle_gtid_slaves")
 		a.OracleGTIDImmediateTopology = m.GetBool("supports_oracle_gtid") && countOracleGTIDSlaves == a.CountValidSlaves && a.CountValidSlaves > 0

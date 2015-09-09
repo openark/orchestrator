@@ -18,9 +18,7 @@ package inst
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/math"
 	"github.com/outbrain/orchestrator/go/config"
 	"strconv"
@@ -227,28 +225,7 @@ func (this *Instance) NextGTID() (string, error) {
 
 // AddSlaveKey adds a slave to the list of this instance's slaves.
 func (this *Instance) AddSlaveKey(slaveKey *InstanceKey) {
-	this.SlaveHosts[*slaveKey] = true
-}
-
-// GetSlaveHostsAsJson Marshals slaves list a JSON
-func (this *Instance) GetSlaveHostsAsJson() string {
-	blob, _ := this.SlaveHosts.MarshalJSON()
-	return string(blob)
-}
-
-// ReadSlaveHostsFromJson unmarshalls a json to read list of slaves
-func (this *Instance) ReadSlaveHostsFromJson(jsonString string) error {
-	var keys []InstanceKey
-	err := json.Unmarshal([]byte(jsonString), &keys)
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	this.SlaveHosts = make(map[InstanceKey]bool)
-	for _, key := range keys {
-		this.AddSlaveKey(&key)
-	}
-	return err
+	this.SlaveHosts.AddKey(*slaveKey)
 }
 
 // GetNextBinaryLog returns the successive, if any, binary log file to the one given

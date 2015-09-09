@@ -215,6 +215,25 @@ func (s *TestSuite) TestParseInstanceKey(c *C) {
 	c.Assert(i.Port, Equals, 3306)
 }
 
+func (s *TestSuite) TestInstanceKeyMapToJSON(c *C) {
+	m := inst.InstanceKeyMap{}
+	m.AddKey(key1)
+	m.AddKey(key2)
+	json, err := m.ToJSON()
+	c.Assert(err, IsNil)
+	ok := (json == `[{"Hostname":"host1","Port":3306},{"Hostname":"host2","Port":3306}]`) || (json == `[{"Hostname":"host2","Port":3306},{"Hostname":"host1","Port":3306}]`)
+	c.Assert(ok, Equals, true)
+}
+
+func (s *TestSuite) TestInstanceKeyMapReadJSON(c *C) {
+	json := `[{"Hostname":"host1","Port":3306},{"Hostname":"host2","Port":3306}]`
+	m := inst.InstanceKeyMap{}
+	m.ReadJson(json)
+	c.Assert(len(m), Equals, 2)
+	c.Assert(m[key1], Equals, true)
+	c.Assert(m[key2], Equals, true)
+}
+
 func (s *TestSuite) TestNextGTID(c *C) {
 	{
 		i := inst.Instance{ExecutedGtidSet: "4f6d62ed-df65-11e3-b395-60672090eb04:1,b9b4712a-df64-11e3-b391-60672090eb04:1-6"}

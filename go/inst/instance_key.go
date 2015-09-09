@@ -104,6 +104,11 @@ func (this *InstanceKey) DisplayString() string {
 type InstanceKeyMap map[InstanceKey]bool
 
 // GetInstanceKeys returns keys in this map in the form of an array
+func (this *InstanceKeyMap) AddKey(key InstanceKey) {
+	(*this)[key] = true
+}
+
+// GetInstanceKeys returns keys in this map in the form of an array
 func (this *InstanceKeyMap) GetInstanceKeys() []InstanceKey {
 	res := []InstanceKey{}
 	for key := range *this {
@@ -115,4 +120,30 @@ func (this *InstanceKeyMap) GetInstanceKeys() []InstanceKey {
 // MarshalJSON will marshal this map as JSON
 func (this *InstanceKeyMap) MarshalJSON() ([]byte, error) {
 	return json.Marshal(this.GetInstanceKeys())
+}
+
+// MarshalJSON will marshal this map as JSON
+func (this *InstanceKeyMap) ToJSON() (string, error) {
+	bytes, err := this.MarshalJSON()
+	return string(bytes), err
+}
+
+// MarshalJSON will marshal this map as JSON
+func (this *InstanceKeyMap) ToJSONString() string {
+	s, _ := this.ToJSON()
+	return s
+}
+
+// ReadJson unmarshalls a json into this map
+func (this *InstanceKeyMap) ReadJson(jsonString string) error {
+	var keys []InstanceKey
+	err := json.Unmarshal([]byte(jsonString), &keys)
+	if err != nil {
+		return err
+	}
+
+	for _, key := range keys {
+		this.AddKey(key)
+	}
+	return err
 }

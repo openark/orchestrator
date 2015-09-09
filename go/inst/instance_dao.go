@@ -594,7 +594,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.DowntimeEndTimestamp = m.GetString("downtime_end_timestamp")
 	instance.UnresolvedHostname = m.GetString("unresolved_hostname")
 
-	instance.ReadSlaveHostsFromJson(slaveHostsJSON)
+	instance.SlaveHosts.ReadJson(slaveHostsJSON)
 	return instance
 }
 
@@ -1463,7 +1463,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			instance.SlaveLagSeconds,
 			instance.SQLDelay,
 			len(instance.SlaveHosts),
-			instance.GetSlaveHostsAsJson(),
+			instance.SlaveHosts.ToJSONString(),
 			instance.ClusterName,
 			instance.SuggestedClusterAlias,
 			instance.DataCenter,
