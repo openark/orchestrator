@@ -216,7 +216,7 @@ func (s *TestSuite) TestParseInstanceKey(c *C) {
 }
 
 func (s *TestSuite) TestInstanceKeyMapToJSON(c *C) {
-	m := inst.InstanceKeyMap{}
+	m := inst.NewInstanceKeyMap()
 	m.AddKey(key1)
 	m.AddKey(key2)
 	json, err := m.ToJSON()

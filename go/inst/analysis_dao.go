@@ -61,7 +61,7 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		                    AND slave_instance.slave_sql_running = 1),
 		                0) AS count_slaves_failing_to_connect_to_master,
 		        MIN(master_instance.replication_depth) AS replication_depth,
-		        MIN(master_instance.slave_hosts) AS slave_hosts,
+		        GROUP_CONCAT(slave_instance.Hostname, ':', slave_instance.Port) as slave_hosts,
 		        MIN(
 		            master_instance.slave_sql_running = 1
 		            AND master_instance.slave_io_running = 0
@@ -151,8 +151,8 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		a.IsBinlogServer = m.GetBool("is_binlog_server")
 		a.ClusterDetails.ReadRecoveryInfo()
 
-		a.SlaveHosts = InstanceKeyMap{}
-		a.SlaveHosts.ReadJson(m.GetString("slave_hosts"))
+		a.SlaveHosts = *NewInstanceKeyMap()
+		a.SlaveHosts.ReadCommaDelimitedList(m.GetString("slave_hosts"))
 
 		countOracleGTIDSlaves := m.GetUint("count_oracle_gtid_slaves")
 		a.OracleGTIDImmediateTopology = m.GetBool("supports_oracle_gtid") && countOracleGTIDSlaves == a.CountValidSlaves && a.CountValidSlaves > 0
