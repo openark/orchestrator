@@ -674,10 +674,10 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 
 	if (instance.isAggregate) {
 		popoverElement.find("h3 div.pull-right span").remove();
-	    popoverElement.find(".popover-content").append('<div>Instances: <div class="pull-right"></div></div>');
+	    popoverElement.find(".instance-content").append('<div>Instances: <div class="pull-right"></div></div>');
 	    
 	    function addInstancesBadge(count, badgeClass, title) {
-	    	popoverElement.find(".popover-content .pull-right").append('<span class="badge '+badgeClass+'" title="' + title + '"">' + count + '</span> ');
+	    	popoverElement.find(".instance-content .pull-right").append('<span class="badge '+badgeClass+'" title="' + title + '"">' + count + '</span> ');
 	    }
 	    addInstancesBadge(instance.aggregatedInstances.length, "label-primary", "Aggregated instances");
 	    for (var problemType in instance.aggregatedProblems) {

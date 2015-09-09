@@ -34,10 +34,10 @@ func ApplyClusterAlias(clusterInfo *ClusterInfo) {
 		}
 	}
 	clusterAliasMapMutex.Lock()
+	defer clusterAliasMapMutex.Unlock()
 	if alias, ok := clusterAliasMap[clusterInfo.ClusterName]; ok {
 		clusterInfo.ClusterAlias = alias
 	}
-	clusterAliasMapMutex.Unlock()
 }
 
 // SetClusterAlias will write (and override) a single cluster name mapping
@@ -47,8 +47,9 @@ func SetClusterAlias(clusterName string, alias string) error {
 		return err
 	}
 	clusterAliasMapMutex.Lock()
+	defer clusterAliasMapMutex.Unlock()
 	clusterAliasMap[clusterName] = alias
-	clusterAliasMapMutex.Unlock()
+
 	return nil
 }
 

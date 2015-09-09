@@ -48,8 +48,8 @@ Cleanup:
 		log.Errore(err)
 	}
 	clusterAliasMapMutex.Lock()
+	defer clusterAliasMapMutex.Unlock()
 	clusterAliasMap = updatedMap
-	clusterAliasMapMutex.Unlock()
 	return err
 
 }

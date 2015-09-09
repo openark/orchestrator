@@ -807,53 +807,76 @@ function Cluster() {
     }
 
     function compactInstances(instances, instancesMap) {
-        instances.forEach(function (instance) {
-            if (instance.children) {
-                // Aggregating children who are childless
-                childlessChildren = instance.children.filter(function (child) {
-                    return (!child.children || child.children.length == 0)
-                });
-                if (childlessChildren.length == 0)
-                    return;
-                // OK, more than one childless child. Aggregate!
-                var aggregatedChild = childlessChildren[0]
-                aggregatedChild.isAggregate = true;
-                aggregatedChild.title = "[aggregation]";
-                aggregatedChild.canonicalTitle = aggregatedChild.title;
-                var aggregatedProblems = {}
-                aggregatedChild.aggregatedInstances = childlessChildren; // includes itself
-
-                function incrementProblems(problemType) {
-                    if (aggregatedProblems[problemType] > 0) {
-                        aggregatedProblems[problemType] = aggregatedProblems[problemType] + 1;
-                    } else {
-                        aggregatedProblems[problemType] = 1;
-                    }
+    	function aggregateInstances(parentInstance, dataCenter, instances) {
+    		if (!instances) {
+    			return false;
+    		}
+    		if (instances.length < 2) {
+    			return false;
+    		}
+    		var aggergateInstance = instances[0];
+    		aggergateInstance.isAggregate = true;
+    		aggergateInstance.title = "[aggregation]";
+    		if (dataCenter) {
+    			aggergateInstance.title = "[aggregation in "+dataCenter+"]";
+    		}
+    		aggergateInstance.canonicalTitle = aggergateInstance.title;
+            aggergateInstance.aggregatedInstances = instances; // includes itself
+    		
+            var aggregatedProblems = {}
+            function incrementProblems(problemType) {
+                if (aggregatedProblems[problemType] > 0) {
+                    aggregatedProblems[problemType] = aggregatedProblems[problemType] + 1;
+                } else {
+                    aggregatedProblems[problemType] = 1;
                 }
-                aggregatedChild.aggregatedProblems = aggregatedProblems;
-
-                childlessChildren.forEach(function (instance) {
-                    if (instance.inMaintenanceProblem()) {
-                        incrementProblems(instance.ClusterName, "inMaintenanceProblem")
-                    }
-                    if (instance.lastCheckInvalidProblem()) {
-                        incrementProblems("lastCheckInvalidProblem")
-                    } else if (instance.notRecentlyCheckedProblem()) {
-                        incrementProblems("notRecentlyCheckedProblem")
-                    } else if (instance.notReplicatingProblem()) {
-                        incrementProblems("notReplicatingProblem")
-                    } else if (instance.replicationLagProblem()) {
-                        incrementProblems("replicationLagProblem")
-                    }
-                });
-
-                childlessChildren.forEach(function (child) {
-                    if (!child.isAggregate) {
-                        instance.children.remove(child);
-                        delete instancesMap[child.id];
-                    }
-                });
             }
+            instances.forEach(function (instance) {
+                if (instance.inMaintenanceProblem()) {
+                    incrementProblems(instance.ClusterName, "inMaintenanceProblem")
+                }
+                if (instance.lastCheckInvalidProblem()) {
+                    incrementProblems("lastCheckInvalidProblem")
+                } else if (instance.notRecentlyCheckedProblem()) {
+                    incrementProblems("notRecentlyCheckedProblem")
+                } else if (instance.notReplicatingProblem()) {
+                    incrementProblems("notReplicatingProblem")
+                } else if (instance.replicationLagProblem()) {
+                    incrementProblems("replicationLagProblem")
+                }
+            });
+            aggergateInstance.aggregatedProblems = aggregatedProblems;
+
+            instances.forEach(function (instance) {
+                if (!instance.isAggregate) {
+                	parentInstance.children.remove(instance);
+                    delete instancesMap[instance.id];
+                }
+            });
+            return true;
+    	}
+        instances.forEach(function (instance) {
+            if (!instance.children) {
+            	return false;
+            }
+            // Aggregating children who are childless
+            childlessChildren = instance.children.filter(function (child) {
+                return (!child.children || child.children.length == 0)
+            });
+            
+            var dcInstances = {};
+            childlessChildren.forEach(function (instance) {
+            	if (!dcInstances[instance.DataCenter]) {
+            		dcInstances[instance.DataCenter] = [];
+            	}
+           		dcInstances[instance.DataCenter].push(instance);
+            });
+            for (var dc in dcInstances) {
+                if (dcInstances.hasOwnProperty(dc)) {
+                    aggregateInstances(instance, dc, dcInstances[dc])
+                }
+            }
+            return true;
         });
         return instancesMap;
     }
