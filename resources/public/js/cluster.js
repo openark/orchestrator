@@ -193,7 +193,14 @@ function Cluster() {
         if (node.children) {
             var trailerEl = $('<div class="instance-trailer" data-nodeid="' + node.id + '"><div><span class="glyphicon glyphicon-chevron-left" title="Drag and drop slaves of this instance"></span></div></div>').appendTo(instanceEl);
             instanceEl.data("instance-trailer", trailerEl);
-            var numSlaves = node.children.length;
+            var numSlaves = 0;
+            node.children.forEach(function(slave) {
+            	if (slave.isAggregate) {
+            		numSlaves += slave.aggregatedInstances.length;
+            	} else {
+            		numSlaves += 1;
+            	}
+            });
             var numSlavesMessage = ((numSlaves == 1) ? "1 slave" : "" + numSlaves + " slaves");
             trailerEl.getAppend(".instance-trailer-title").text(numSlavesMessage);
             trailerEl.getAppend(".instance-trailer-content").text("Drag to move slaves");
@@ -1263,7 +1270,7 @@ function Cluster() {
             }
             $("#dropdown-context").append('<li><a href="/web/cluster-pools/' + currentClusterName() + '">Pools</a></li>');
             if (isCompactDisplay()) {
-                $("#dropdown-context").append('<li><a data-command="expand-display" href="' + location.href.split("?")[0] + '?compact=false">Expand display</a></li>');
+                $("#dropdown-context").append('<li><a data-command="expand-display" href="' + location.href.split("?")[0] + '?compact=false"><span class="glyphicon glyphicon-ok small"></span> Compact display</a></li>');
             } else {
                 $("#dropdown-context").append('<li><a data-command="compact-display" href="' + location.href.split("?")[0] + '?compact=true">Compact display</a></li>');
             }
