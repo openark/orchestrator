@@ -1070,6 +1070,10 @@ function Cluster() {
             addSidebarInfoPopoverContent(content, false);
         }
         {
+            var content = '<a href="/web/audit-recovery/cluster/'+clusterInfo.ClusterName+'">Recovery history</a>';
+            addSidebarInfoPopoverContent(content, false);
+        }
+        {
             var content = '';
             if (clusterInfo.HasAutomatedMasterRecovery === true) {
                 content += '<span class="glyphicon glyphicon-heart text-info" title="Automated master recovery for this cluster ENABLED"></span>';
@@ -1229,7 +1233,7 @@ function Cluster() {
                 getData("/api/recently-active-instance-recovery/" + instance.Key.Hostname + "/" + instance.Key.Port, function (recoveries) {
                     // Result is an array: either empty (no active recovery) or with multiple entries
                     recoveries.forEach(function (recoveryEntry) {
-                        addInfo("<strong>" + instance.title + "</strong> has just recently been promoted as result of <strong>" + recoveryEntry.AnalysisEntry.Analysis + "</strong>. It may still take some time to rebuild topology graph.");
+                        addInfo('<strong>' + instance.title + '</strong> has just recently ('+recoveryEntry.RecoveryEndTimestamp+') been promoted as result of <strong>' + recoveryEntry.AnalysisEntry.Analysis + '</strong>. It may still take some time to rebuild topology graph.');
                     });
                 });
             }
@@ -1292,13 +1296,13 @@ function Cluster() {
         getData("/api/active-cluster-recovery/" + currentClusterName(), function (recoveries) {
             // Result is an array: either empty (no active recovery) or with multiple entries
             recoveries.forEach(function (recoveryEntry) {
-                addInfo("<strong>" + recoveryEntry.AnalysisEntry.Analysis + " active recovery in progress.</strong> Topology is subject to change in the next moments.");
+                addInfo('<strong><a href="/web/audit-recovery/cluster/'+currentClusterName()+'">' + recoveryEntry.AnalysisEntry.Analysis + ' active recovery in progress</strong></a>. Topology is subject to change in the next moments.');
             });
         });
         getData("/api/recently-active-cluster-recovery/" + currentClusterName(), function (recoveries) {
             // Result is an array: either empty (no active recovery) or with multiple entries
             recoveries.forEach(function (recoveryEntry) {
-                addInfo("This cluster just recently recovered from <strong>" + recoveryEntry.AnalysisEntry.Analysis + "</strong>. It may still take some time to rebuild topology graph.");
+                addInfo('This cluster just recently ('+recoveryEntry.RecoveryEndTimestamp+') recovered from <strong><a href="/web/audit-recovery/cluster/'+currentClusterName()+'">' + recoveryEntry.AnalysisEntry.Analysis + '</strong></a>. It may still take some time to rebuild topology graph.');
             });
         });
         getData("/api/cluster-osc-slaves/" + currentClusterName(), function (instances) {

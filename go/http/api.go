@@ -1826,7 +1826,7 @@ func (this *HttpAPI) AuditRecovery(params martini.Params, r render.Render, req *
 	if err != nil || page < 0 {
 		page = 0
 	}
-	audits, err := logic.ReadRecentRecoveries(page)
+	audits, err := logic.ReadRecentRecoveries(params["clusterName"], page)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -1978,6 +1978,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/audit-failure-detection/:page", this.AuditFailureDetection)
 	m.Get("/api/audit-recovery", this.AuditRecovery)
 	m.Get("/api/audit-recovery/:page", this.AuditRecovery)
+	m.Get("/api/audit-recovery/cluster/:clusterName", this.AuditRecovery)
+	m.Get("/api/audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
 	m.Get("/api/active-cluster-recovery/:clusterName", this.ActiveClusterRecovery)
 	m.Get("/api/recently-active-cluster-recovery/:clusterName", this.RecentlyActiveClusterRecovery)
 	m.Get("/api/recently-active-instance-recovery/:host/:port", this.RecentlyActiveInstanceRecovery)

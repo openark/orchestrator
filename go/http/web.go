@@ -192,6 +192,7 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
 		"page":                page,
+		"clusterName":         params["clusterName"],
 	})
 }
 
@@ -342,6 +343,8 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/audit/instance/:host/:port/:page", this.Audit)
 	m.Get("/web/audit-recovery", this.AuditRecovery)
 	m.Get("/web/audit-recovery/:page", this.AuditRecovery)
+	m.Get("/web/audit-recovery/cluster/:clusterName", this.AuditRecovery)
+	m.Get("/web/audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
 	m.Get("/web/audit-failure-detection", this.AuditFailureDetection)
 	m.Get("/web/audit-failure-detection/:page", this.AuditFailureDetection)
 	m.Get("/web/agents", this.Agents)

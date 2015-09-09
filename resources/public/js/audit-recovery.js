@@ -1,11 +1,20 @@
 
 $(document).ready(function () {
     showLoader();
-    $.get("/api/audit-recovery/"+currentPage(), function (auditEntries) {
+    var apiUri = "/api/audit-recovery/"+currentPage();
+    if (auditCluster()) {
+    	apiUri = "/api/audit-recovery/cluster/"+auditCluster()+"/"+currentPage();
+    }
+    $.get(apiUri, function (auditEntries) {
             displayAudit(auditEntries);
     	}, "json");
     function displayAudit(auditEntries) {
-        hideLoader();
+    	var baseWebUri = "/web/audit-recovery/";
+    	if (auditCluster()) {
+    		baseWebUri += "cluster/"+auditCluster()+"/";
+        }
+
+    	hideLoader();
         auditEntries.forEach(function (audit) {
         	var analyzedInstanceDisplay = audit.AnalysisEntry.AnalyzedInstanceKey.Hostname+":"+audit.AnalysisEntry.AnalyzedInstanceKey.Port;
         	var sucessorInstanceDisplay = audit.SuccessorKey.Hostname+":"+audit.SuccessorKey.Port;
@@ -27,10 +36,10 @@ $(document).ready(function () {
         	$("#audit .pager .next").addClass("disabled");        	
         }
         $("#audit .pager .previous").not(".disabled").find("a").click(function() {
-            window.location.href = "/web/audit-recovery/"+(currentPage() - 1);
+            window.location.href = baseWebUri+(currentPage() - 1);
         });
         $("#audit .pager .next").not(".disabled").find("a").click(function() {
-            window.location.href = "/web/audit-recovery/"+(currentPage() + 1);
+            window.location.href = baseWebUri+(currentPage() + 1);
         });
         $("#audit .pager .disabled a").click(function() {
             return false;

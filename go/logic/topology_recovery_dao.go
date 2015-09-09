@@ -293,12 +293,19 @@ func ReadCompletedRecoveries(page int) ([]TopologyRecovery, error) {
 }
 
 // ReadCRecoveries reads latest recovery entreis from topology_recovery
-func ReadRecentRecoveries(page int) ([]TopologyRecovery, error) {
+func ReadRecentRecoveries(clusterName string, page int) ([]TopologyRecovery, error) {
+	whereClause := ""
+	if clusterName != "" {
+		whereClause = fmt.Sprintf(`
+		where 
+			cluster_name='%s'`,
+			clusterName)
+	}
 	limit := fmt.Sprintf(`
 		limit %d
 		offset %d`,
 		config.Config.AuditPageSize, page*config.Config.AuditPageSize)
-	return readRecoveries(``, limit)
+	return readRecoveries(whereClause, limit)
 }
 
 // readRecoveries reads recovery entry/audit entires from topology_recovery
