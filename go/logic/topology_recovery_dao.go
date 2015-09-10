@@ -153,13 +153,16 @@ func ClearActiveRecoveries() error {
 
 // ResolveRecovery is called on completion of a recovery process and updates the recovery status.
 // It does not clear the "active period" as this still takes place in order to avoid flapping.
-func ResolveRecovery(failedKey *inst.InstanceKey, successorKey *inst.InstanceKey) error {
+func ResolveRecovery(failedKey *inst.InstanceKey, successorInstance *inst.Instance) error {
 
-	if successorKey == nil {
-		successorKey = &inst.InstanceKey{}
+	isSuccessful := (successorInstance != nil)
+	var successorKey inst.InstanceKey
+	if successorInstance != nil {
+		successorKey = successorInstance.Key
 	}
 	_, err := db.ExecOrchestrator(`
 			update topology_recovery set 
+				is_successful = ?,
 				successor_hostname = ?,
 				successor_port = ?,
 				end_recovery = NOW()
@@ -169,7 +172,7 @@ func ResolveRecovery(failedKey *inst.InstanceKey, successorKey *inst.InstanceKey
 				AND in_active_period = 1
 				AND processing_node_hostname = ?
 				AND processcing_node_token = ?
-			`, successorKey.Hostname, successorKey.Port,
+			`, isSuccessful, successorKey.Hostname, successorKey.Port,
 		failedKey.Hostname, failedKey.Port, ThisHostname, ProcessToken.Hash,
 	)
 	return log.Errore(err)

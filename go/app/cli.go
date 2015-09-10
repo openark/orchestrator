@@ -838,7 +838,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			promotedBinlogServer, err := inst.RegroupSlavesBinlogServers(instanceKey, false, nil)
+			promotedBinlogServer, err := inst.RegroupSlavesBinlogServers(instanceKey, false)
 			if promotedBinlogServer == nil {
 				log.Fatalf("Could not regroup binlog server slaves of %+v; error: %+v", *instanceKey, err)
 			}

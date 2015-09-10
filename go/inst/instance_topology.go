@@ -1692,7 +1692,7 @@ func MatchUpSlaves(masterKey *InstanceKey, pattern string) ([](*Instance), *Inst
 
 func isGenerallyValidAsCandidateSlave(slave *Instance) bool {
 	if !slave.IsLastCheckValid {
-		// something wrong with this slave irhgt now. We shouldn't hope to be able to promote it
+		// something wrong with this slave right now. We shouldn't hope to be able to promote it
 		return false
 	}
 	if !slave.LogBinEnabled {
@@ -1709,13 +1709,33 @@ func isGenerallyValidAsCandidateSlave(slave *Instance) bool {
 	return true
 }
 
+// isValidAsCandidateMasterInBinlogServerTopology let's us know whether a given slave is generally
+// valid to promote to be master.
+func isValidAsCandidateMasterInBinlogServerTopology(slave *Instance) bool {
+	if !slave.IsLastCheckValid {
+		// something wrong with this slave right now. We shouldn't hope to be able to promote it
+		return false
+	}
+	if !slave.LogBinEnabled {
+		return false
+	}
+	if slave.LogSlaveUpdatesEnabled {
+		// That's right: we *disallow* log-slave-updates
+		return false
+	}
+	if slave.IsBinlogServer() {
+		return false
+	}
+
+	return true
+}
+
 func isBannedFromBeingCandidateSlave(slave *Instance) bool {
 	for _, filter := range config.Config.PromotionIgnoreHostnameFilters {
 		if matched, _ := regexp.MatchString(filter, slave.Key.Hostname); matched {
 			return true
 		}
 	}
-
 	return false
 }
 
@@ -1935,7 +1955,7 @@ func RegroupSlavesGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup
 
 // RegroupSlavesBinlogServers works on a binlog-servers topology. It picks the most up-to-date BLS and repoints all other
 // BLS below it
-func RegroupSlavesBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance)) (promotedBinlogServer *Instance, err error) {
+func RegroupSlavesBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool) (promotedBinlogServer *Instance, err error) {
 
 	promotedBinlogServer, err = getMostUpToDateActiveBinlogServer(masterKey)
 	if err != nil {
@@ -1943,9 +1963,6 @@ func RegroupSlavesBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailure
 			promotedBinlogServer = nil
 		}
 		return promotedBinlogServer, err
-	}
-	if onCandidateSlaveChosen != nil {
-		onCandidateSlaveChosen(promotedBinlogServer)
 	}
 	_, err, _ = RepointSlavesTo(masterKey, "", &promotedBinlogServer.Key)
 

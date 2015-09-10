@@ -79,6 +79,7 @@ func replaceCommandPlaceholders(command string, analysisEntry inst.ReplicationAn
 	command = strings.Replace(command, "{autoIntermediateMasterRecovery}", fmt.Sprint(analysisEntry.ClusterDetails.HasAutomatedIntermediateMasterRecovery), -1)
 	command = strings.Replace(command, "{orchestratorHost}", ThisHostname, -1)
 
+	command = strings.Replace(command, "{isSuccessful}", fmt.Sprint(successorInstance != nil), -1)
 	if successorInstance != nil {
 		command = strings.Replace(command, "{successorHost}", successorInstance.Key.Hostname, -1)
 		command = strings.Replace(command, "{successorPort}", fmt.Sprintf("%d", successorInstance.Key.Port), -1)
@@ -146,7 +147,7 @@ func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses boo
 		}
 	case MasterRecoveryBinlogServer:
 		{
-			promotedSlave, err = inst.RegroupSlavesBinlogServers(failedInstanceKey, true, nil)
+			promotedSlave, err = inst.RegroupSlavesBinlogServers(failedInstanceKey, true)
 		}
 	}
 	if promotedSlave != nil && len(lostSlaves) > 0 && config.Config.DetachLostSlavesAfterMasterFailover {
@@ -290,16 +291,14 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 	if promotedSlave != nil {
 		promotedSlave, _ = replacePromotedSlaveWithCandidate(&analysisEntry.AnalyzedInstanceKey, promotedSlave, candidateInstanceKey)
 	}
+	// And this is the end; whether successful or not, we're done.
+	ResolveRecovery(&analysisEntry.AnalyzedInstanceKey, promotedSlave)
 	if promotedSlave != nil {
-		ResolveRecovery(&analysisEntry.AnalyzedInstanceKey, &promotedSlave.Key)
-
+		// Success!
 		if !skipProcesses {
 			// Execute post master-failover processes
 			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", analysisEntry, promotedSlave, lostSlaves, false)
 		}
-	} else {
-		// Failure
-		ResolveRecovery(&analysisEntry.AnalyzedInstanceKey, nil)
 	}
 
 	return (promotedSlave != nil), promotedSlave, err
@@ -402,7 +401,7 @@ func GetCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *inst.In
 	return nil, log.Errorf("topology_recovery: cannot find candidate sibling of %+v", intermediateMasterInstance.Key)
 }
 
-func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (actionTaken bool, successorInstance *inst.Instance, err error) {
+func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (recoveryResolved bool, successorInstance *inst.Instance, err error) {
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	if ok, err := AttemptRecoveryRegistration(&analysisEntry); !ok {
 		log.Debugf("topology_recovery: found an active or recent recovery on %+v. Will not issue another RecoverDeadIntermediateMaster.", *failedInstanceKey)
@@ -421,32 +420,37 @@ func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, skipP
 	if err != nil {
 		return false, nil, err
 	}
-	// Plan A: find a replacement intermediate master in same Data Center
+	// Find possible candidate
 	candidateSiblingOfIntermediateMaster, err := GetCandidateSiblingOfIntermediateMaster(intermediateMasterInstance)
-
 	relocateSlavesToCandidateSibling := func() {
 		if candidateSiblingOfIntermediateMaster == nil {
 			return
 		}
-		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will attempt a candidate intermediate master: %+v", candidateSiblingOfIntermediateMaster.Key)
 		// We have a candidate
-		if relocatedSlaves, candidateSibling, err, errs := inst.RelocateSlaves(failedInstanceKey, &candidateSiblingOfIntermediateMaster.Key, ""); err == nil {
-			ResolveRecovery(failedInstanceKey, &candidateSibling.Key)
+		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will attempt a candidate intermediate master: %+v", candidateSiblingOfIntermediateMaster.Key)
+		relocatedSlaves, candidateSibling, err, errs := inst.RelocateSlaves(failedInstanceKey, &candidateSiblingOfIntermediateMaster.Key, "")
 
+		if len(relocatedSlaves) == 0 {
+			log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: failed to move any slave to candidate intermediate master (%+v)", candidateSibling.Key)
+			return
+		}
+		if err != nil || len(errs) > 0 {
+			log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) did not complete: %+v", candidateSibling.Key, err)
+			return
+		}
+		if err == nil {
+			recoveryResolved = true
 			successorInstance = candidateSibling
-			actionTaken = true
 
 			log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) went with %d errors", candidateSibling.Key, len(errs))
 			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Done. Relocated %d slaves under candidate sibling: %+v; %d errors: %+v", len(relocatedSlaves), candidateSibling.Key, len(errs), errs))
-		} else {
-			log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) did not complete: %+v", candidateSibling.Key, err)
-			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Relocated %d slaves under candidate sibling: %+v; %d errors: %+v", len(relocatedSlaves), candidateSibling.Key, len(errs), errs))
 		}
 	}
+	// Plan A: find a replacement intermediate master in same Data Center
 	if candidateSiblingOfIntermediateMaster != nil && candidateSiblingOfIntermediateMaster.DataCenter == intermediateMasterInstance.DataCenter {
 		relocateSlavesToCandidateSibling()
 	}
-	if !actionTaken {
+	if !recoveryResolved {
 		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will next attempt regrouping of slaves")
 		// Plan B: regroup (we wish to reduce cross-DC replication streams)
 		_, _, _, _, err = inst.RegroupSlaves(failedInstanceKey, true, nil)
@@ -459,7 +463,7 @@ func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, skipP
 			relocateSlavesToCandidateSibling()
 		}
 	}
-	if !actionTaken {
+	if !recoveryResolved {
 		// Do we still have leftovers? Some slaves couldn't move? Couldn't regroup? Only left with regroup's resulting leader?
 		// nothing moved?
 		// We don't care much if regroup made it or not. We prefer that it made it, in whcih case we only need to relocate up
@@ -473,19 +477,18 @@ func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, skipP
 		relocatedSlaves, successorInstance, err, errs = inst.RelocateSlaves(failedInstanceKey, &analysisEntry.AnalyzedInstanceMasterKey, "")
 
 		if len(relocatedSlaves) > 0 {
-			actionTaken = true
+			recoveryResolved = true
 			log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: relocated up to %+v", successorInstance.Key)
 			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Done. Relocated slaves under: %+v %d errors: %+v", successorInstance.Key, len(errs), errs))
 		} else {
 			err = log.Errorf("topology_recovery: RecoverDeadIntermediateMaster failed to match up any slave from %+v", *failedInstanceKey)
 		}
 	}
-	if successorInstance != nil {
-		ResolveRecovery(failedInstanceKey, &successorInstance.Key)
-	} else {
-		ResolveRecovery(failedInstanceKey, nil)
+	if !recoveryResolved {
+		successorInstance = nil
 	}
-	return actionTaken, successorInstance, err
+	ResolveRecovery(failedInstanceKey, successorInstance)
+	return recoveryResolved, successorInstance, err
 }
 
 // checkAndRecoverDeadIntermediateMaster checks a given analysis, decides whether to take action, and possibly takes action
@@ -597,6 +600,10 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 	replicationAnalysis, err := inst.GetReplicationAnalysis(true)
 	if err != nil {
 		return false, nil, log.Errore(err)
+	}
+	if *config.RuntimeCLIFlags.Noop {
+		log.Debugf("--noop provided; will not execute processes")
+		skipProcesses = true
 	}
 	for _, analysisEntry := range replicationAnalysis {
 		if specificInstance != nil {

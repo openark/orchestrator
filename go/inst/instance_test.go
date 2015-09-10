@@ -216,7 +216,7 @@ func (s *TestSuite) TestParseInstanceKey(c *C) {
 }
 
 func (s *TestSuite) TestInstanceKeyMapToJSON(c *C) {
-	m := inst.NewInstanceKeyMap()
+	m := *inst.NewInstanceKeyMap()
 	m.AddKey(key1)
 	m.AddKey(key2)
 	json, err := m.ToJSON()
@@ -227,11 +227,21 @@ func (s *TestSuite) TestInstanceKeyMapToJSON(c *C) {
 
 func (s *TestSuite) TestInstanceKeyMapReadJSON(c *C) {
 	json := `[{"Hostname":"host1","Port":3306},{"Hostname":"host2","Port":3306}]`
-	m := inst.InstanceKeyMap{}
+	m := *inst.NewInstanceKeyMap()
 	m.ReadJson(json)
 	c.Assert(len(m), Equals, 2)
 	c.Assert(m[key1], Equals, true)
 	c.Assert(m[key2], Equals, true)
+}
+
+func (s *TestSuite) TestInstanceKeyMapToCommaDelimitedList(c *C) {
+	m := *inst.NewInstanceKeyMap()
+	m.AddKey(key1)
+	m.AddKey(key2)
+	res := m.ToCommaDelimitedList()
+
+	ok := (res == `host1:3306,host2:3306`) || (res == `host2:3306,host1:3306`)
+	c.Assert(ok, Equals, true)
 }
 
 func (s *TestSuite) TestNextGTID(c *C) {

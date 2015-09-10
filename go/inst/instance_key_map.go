@@ -66,6 +66,15 @@ func (this *InstanceKeyMap) ToJSONString() string {
 	return s
 }
 
+// MarshalJSON will marshal this map as JSON
+func (this *InstanceKeyMap) ToCommaDelimitedList() string {
+	keyDisplays := []string{}
+	for key := range *this {
+		keyDisplays = append(keyDisplays, key.DisplayString())
+	}
+	return strings.Join(keyDisplays, ",")
+}
+
 // ReadJson unmarshalls a json into this map
 func (this *InstanceKeyMap) ReadJson(jsonString string) error {
 	var keys []InstanceKey

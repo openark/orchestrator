@@ -867,7 +867,7 @@ func (this *HttpAPI) RegroupSlavesBinlogServers(params martini.Params, r render.
 		return
 	}
 
-	promotedBinlogServer, err := inst.RegroupSlavesBinlogServers(&instanceKey, false, nil)
+	promotedBinlogServer, err := inst.RegroupSlavesBinlogServers(&instanceKey, false)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
