@@ -38,7 +38,7 @@ var instanceReadChan = make(chan bool, backendDBConcurrency)
 var instanceWriteChan = make(chan bool, backendDBConcurrency)
 
 // Max concurrency for bulk topology operations
-const topologyConcurrency = 100
+const topologyConcurrency = 128
 
 var topologyConcurrencyChan = make(chan bool, topologyConcurrency)
 
@@ -1645,18 +1645,18 @@ func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
 }
 
 // FlushBinaryLogs attempts a 'FLUSH BINARY LOGS' statement on the given instance.
-func FlushBinaryLogs(instanceKey *InstanceKey, count int) error {
+func FlushBinaryLogs(instanceKey *InstanceKey, count int) (*Instance, error) {
 	for i := 0; i < count; i++ {
 		_, err := ExecInstance(instanceKey, `flush binary logs`)
 		if err != nil {
-			return log.Errore(err)
+			return nil, log.Errore(err)
 		}
 	}
 
 	log.Infof("flush-binary-logs count=%+v on %+v", count, *instanceKey)
 	AuditOperation("flush-binary-logs", instanceKey, "success")
 
-	return nil
+	return ReadTopologyInstance(instanceKey)
 }
 
 // FlushBinaryLogsTo attempts to 'FLUSH BINARY LOGS' until given binary log is reached
@@ -1670,8 +1670,29 @@ func FlushBinaryLogsTo(instanceKey *InstanceKey, logFile string) (*Instance, err
 	if distance < 0 {
 		return nil, log.Errorf("FlushBinaryLogsTo: target log file %+v is smaller than current log file %+v", logFile, instance.SelfBinlogCoordinates.LogFile)
 	}
-	err = FlushBinaryLogs(instanceKey, distance)
-	return instance, err
+	return FlushBinaryLogs(instanceKey, distance)
+}
+
+// FlushBinaryLogsTo attempts to 'PURGE BINARY LOGS' until given binary log is reached
+func PurgeBinaryLogsTo(instanceKey *InstanceKey, logFile string) (*Instance, error) {
+	_, err := ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("purge binary logs to '%s'", logFile))
+	if err != nil {
+		return nil, log.Errore(err)
+	}
+
+	log.Infof("purge-binary-logs to=%+v on %+v", logFile, *instanceKey)
+	AuditOperation("purge-binary-logs", instanceKey, "success")
+
+	return ReadTopologyInstance(instanceKey)
+}
+
+// FlushBinaryLogsTo attempts to 'PURGE BINARY LOGS' until given binary log is reached
+func PurgeBinaryLogsToCurrent(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	return PurgeBinaryLogsTo(instanceKey, instance.SelfBinlogCoordinates.LogFile)
 }
 
 // StopSlaveNicely stops a slave such that SQL_thread and IO_thread are aligned (i.e.
@@ -1963,6 +1984,30 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
+}
+
+// SkipToNextBinaryLog changes master position to beginning of next binlog
+// USE WITH CARE!
+// Use case is binlog servers where the master was gone & replaced by another.
+func SkipToNextBinaryLog(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	nextFileCoordinates, err := instance.ExecBinlogCoordinates.NextFileCoordinates()
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	nextFileCoordinates.LogPos = 4
+	log.Debugf("Will skip replication on %+v to next binary log: %+v", instance.Key, nextFileCoordinates.LogFile)
+
+	instance, err = ChangeMasterTo(&instance.Key, &instance.MasterKey, &nextFileCoordinates, false, GTIDHintNeutral)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	AuditOperation("skip-binlog", instanceKey, fmt.Sprintf("Skipped replication to next binary log: %+v", nextFileCoordinates.LogFile))
+	return StartSlave(instanceKey)
 }
 
 // ResetSlave resets a slave, breaking the replication

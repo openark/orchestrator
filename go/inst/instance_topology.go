@@ -300,7 +300,7 @@ func MoveUpSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), *Ins
 	res := [](*Instance){}
 	errs := []error{}
 	slaveMutex := make(chan bool, 1)
-	var barrier chan *Instance
+	var barrier chan *InstanceKey
 
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -350,13 +350,13 @@ func MoveUpSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), *Ins
 		goto Cleanup
 	}
 
-	barrier = make(chan *Instance)
+	barrier = make(chan *InstanceKey)
 	for _, slave := range slaves {
 		slave := slave
 		go func() {
 			defer func() {
-				slave, _ := StartSlave(&slave.Key)
-				barrier <- slave
+				defer func() { barrier <- &slave.Key }()
+				StartSlave(&slave.Key)
 			}()
 
 			var slaveErr error
@@ -728,6 +728,7 @@ func RepointTo(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance), erro
 	res := [](*Instance){}
 	errs := []error{}
 
+	slaves = removeInstance(slaves, belowKey)
 	if len(slaves) == 0 {
 		// Nothing to do
 		return res, nil, errs
@@ -1386,8 +1387,12 @@ Cleanup:
 
 // sortedSlaves returns the list of slaves of a given master, sorted by exec coordinates
 // (most up-to-date slave first)
-func sortedSlaves(masterKey *InstanceKey, shouldStopSlaves bool) ([](*Instance), error) {
-	slaves, err := ReadSlaveInstances(masterKey)
+func sortedSlaves(masterKey *InstanceKey, shouldStopSlaves bool, includeBinlogServerSubSlaves bool) (slaves [](*Instance), err error) {
+	if includeBinlogServerSubSlaves {
+		slaves, err = ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey)
+	} else {
+		slaves, err = ReadSlaveInstances(masterKey)
+	}
 	if err != nil {
 		return slaves, err
 	}
@@ -1690,7 +1695,7 @@ func MatchUpSlaves(masterKey *InstanceKey, pattern string) ([](*Instance), *Inst
 	return MultiMatchSlaves(masterKey, &masterInstance.MasterKey, pattern)
 }
 
-func isGenerallyValidAsCandidateSlave(slave *Instance) bool {
+func isGenerallyValidAsBinlogSource(slave *Instance) bool {
 	if !slave.IsLastCheckValid {
 		// something wrong with this slave right now. We shouldn't hope to be able to promote it
 		return false
@@ -1699,6 +1704,15 @@ func isGenerallyValidAsCandidateSlave(slave *Instance) bool {
 		return false
 	}
 	if !slave.LogSlaveUpdatesEnabled {
+		return false
+	}
+
+	return true
+}
+
+func isGenerallyValidAsCandidateSlave(slave *Instance) bool {
+	if !isGenerallyValidAsBinlogSource(slave) {
+		// does not have binary logs
 		return false
 	}
 	if slave.IsBinlogServer() {
@@ -1746,7 +1760,7 @@ func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instan
 	equalSlaves := [](*Instance){}
 	laterSlaves := [](*Instance){}
 
-	slaves, err := sortedSlaves(masterKey, forRematchPurposes)
+	slaves, err := sortedSlaves(masterKey, forRematchPurposes, false)
 	if err != nil {
 		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err
 	}
@@ -1791,6 +1805,33 @@ func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instan
 	}
 	log.Debugf("sortedSlaves: candidate: %+v, ahead: %d, equal: %d, late: %d", candidateSlave.Key, len(aheadSlaves), len(equalSlaves), len(laterSlaves))
 	return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, nil
+}
+
+// GetCandidateSlaveOfBinlogServerTopology chooses the best slave to promote given a (possibly dead) master
+func GetCandidateSlaveOfBinlogServerTopology(masterKey *InstanceKey) (candidateSlave *Instance, err error) {
+	slaves, err := sortedSlaves(masterKey, false, true)
+	if err != nil {
+		return candidateSlave, err
+	}
+	if len(slaves) == 0 {
+		return candidateSlave, fmt.Errorf("No slaves found for %+v", *masterKey)
+	}
+	for _, slave := range slaves {
+		slave := slave
+		if candidateSlave != nil {
+			break
+		}
+		if isValidAsCandidateMasterInBinlogServerTopology(slave) && !isBannedFromBeingCandidateSlave(slave) {
+			// this is the one
+			candidateSlave = slave
+		}
+	}
+	if candidateSlave != nil {
+		log.Debugf("GetCandidateSlaveOfBinlogServerTopology: returning %+v as candidate slave for %+v", candidateSlave.Key, *masterKey)
+	} else {
+		log.Debugf("GetCandidateSlaveOfBinlogServerTopology: no candidate slave found for %+v", *masterKey)
+	}
+	return candidateSlave, err
 }
 
 // RegroupSlaves will choose a candidate slave of a given instance, and enslave its siblings using
@@ -1851,12 +1892,12 @@ func RegroupSlaves(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup boo
 	}
 
 	log.Debugf("RegroupSlaves: done")
+	AuditOperation("regroup-slaves", masterKey, fmt.Sprintf("regrouped %+v slaves below %+v", len(operatedSlaves), *masterKey))
 	// aheadSlaves are lost (they were ahead in replication as compared to promoted slave)
 	return aheadSlaves, equalSlaves, laterSlaves, instance, err
 }
 
-func getMostUpToDateActiveBinlogServer(masterKey *InstanceKey) (mostAdvancedBinlogServer *Instance, err error) {
-	var binlogServerSlaves [](*Instance)
+func getMostUpToDateActiveBinlogServer(masterKey *InstanceKey) (mostAdvancedBinlogServer *Instance, binlogServerSlaves [](*Instance), err error) {
 	if binlogServerSlaves, err = ReadBinlogServerSlaveInstances(masterKey); err == nil && len(binlogServerSlaves) > 0 {
 		// Pick the most advanced binlog sever that is good to go
 		for _, binlogServer := range binlogServerSlaves {
@@ -1870,60 +1911,74 @@ func getMostUpToDateActiveBinlogServer(masterKey *InstanceKey) (mostAdvancedBinl
 			}
 		}
 	}
-	return mostAdvancedBinlogServer, err
+	return mostAdvancedBinlogServer, binlogServerSlaves, err
 }
 
-// RegroupSlaves will choose a candidate slave of a given instance, and enslave its siblings using
-// either simple CHANGE MASTER TO, where possible, or pseudo-gtid
+// RegroupSlavesIncludingSubSlavesOfBinlogServers works in a mixed standard/binlog-server topology. This kind of topology shouldn't really exist,
+// but life is hard. To transition binlog servers into your topology you live sometimes with this hybrid solution.
 func RegroupSlavesIncludingSubSlavesOfBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance)) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
-
-	if mostAdvancedBinlogServer, _ := getMostUpToDateActiveBinlogServer(masterKey); mostAdvancedBinlogServer != nil {
-		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: mostAdvancedBinlogServer is %+v", mostAdvancedBinlogServer.Key)
-		if allSlaves, err := ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey); err == nil {
-			slavesBehindMostAdvancedBinlogServer := [](*Instance){}
-			foundPotentialPromotedSlaveAheadOfBinlogServer := false
-			for _, slave := range allSlaves {
-				slave := slave
-				if slave.ExecBinlogCoordinates.SmallerThan(&mostAdvancedBinlogServer.ExecBinlogCoordinates) {
-					slavesBehindMostAdvancedBinlogServer = append(slavesBehindMostAdvancedBinlogServer, slave)
-				} else if isGenerallyValidAsCandidateSlave(slave) && !foundPotentialPromotedSlaveAheadOfBinlogServer {
-					// We have a slave with log-slave-updates that is *ahead* of most-up-to-date binlog server.
-					// This means all slaves behind binlog servers are able to match below said slave via pseudo-gtid.
-					// This keeps us on safe grounds. We don't need to make further precautionary checks or waits
-					// on binlog server slaves.
-					foundPotentialPromotedSlaveAheadOfBinlogServer = true
-					log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: Found %+v to be ahead of most up to date binlog server %+v", slave.Key, mostAdvancedBinlogServer.Key)
-				}
-			}
-			// Everything that stopped replicating on an earlier point than the mostAdvancedBinlogServer will be
-			// directed at mostAdvancedBinlogServer to continue replicating as much as possible
-			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: will repoint %+v slaves that are behind replication as compared to %+v below it", len(slavesBehindMostAdvancedBinlogServer), mostAdvancedBinlogServer.Key)
-			RepointTo(slavesBehindMostAdvancedBinlogServer, &mostAdvancedBinlogServer.Key)
-
-			if foundPotentialPromotedSlaveAheadOfBinlogServer {
-				// We on safe grounds. But let's spend a very short time to allow slaves to align up to the binlog server
-				if config.Config.SlaveStartPostWaitMilliseconds > 0 {
-					time.Sleep(time.Duration(config.Config.SlaveStartPostWaitMilliseconds) * time.Millisecond)
-					// on one hand, we just wasted time. On the other hand, we hope all slaves are now aligned, so are in same exec binlog positions, which means
-					// less computation for pseudo-gtid
-				}
-			} else {
-				// Make sure a good candidate slave is aligned with the binlog server. We spend time on this now.
-				// This slave would be able to enslave all its siblings (ie all slaves that were behind binlog server)
-				log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: Haven't found a slave to promote that is ahead of most up to date binlog server %+v. Will find a suitable slave behind the binlog server.", mostAdvancedBinlogServer.Key)
-				if candidateSlaveOfBinlogServer, _, _, _, err := GetCandidateSlave(&mostAdvancedBinlogServer.Key, false); err == nil && candidateSlaveOfBinlogServer != nil {
-					log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: will start %+v until most-up-to-date binlog server %+v coordinates", candidateSlaveOfBinlogServer.Key, mostAdvancedBinlogServer.Key)
-					StartSlaveUntilMasterCoordinates(&candidateSlaveOfBinlogServer.Key, &mostAdvancedBinlogServer.ExecBinlogCoordinates)
-				}
-			}
-
-			// Remember all slaves involved were either direct slaves of masterKey or slaves of binlog server slaves
-			// of masterKey. It is thus safe to move everything (ie normal slaves) around. We will now repoint everything
-			// to masterKey, thus all the slaves are now aligned as siblings. We can now continue with a normal regroup.
-			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: will align up all slaves and subslaves of binlog servers of %+v ", *masterKey)
-			RepointTo(allSlaves, masterKey)
+	// First, handle binlog server issues:
+	func() error {
+		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: starting on slves of %+v", *masterKey)
+		// Find the most up to date binlog server:
+		mostUpToDateBinlogServer, binlogServerSlaves, err := getMostUpToDateActiveBinlogServer(masterKey)
+		if err != nil {
+			return log.Errore(err)
 		}
-	}
+		if mostUpToDateBinlogServer == nil {
+			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: no binlog server replicates from %+v", *masterKey)
+			// No binlog server; proceed as normal
+			return nil
+		}
+		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: most up to date binlog server of %+v: %+v", *masterKey, mostUpToDateBinlogServer.Key)
+
+		// Find the most up to date candidate slave:
+		candidateSlave, _, _, _, err := GetCandidateSlave(masterKey, true)
+		if err != nil {
+			return log.Errore(err)
+		}
+		if candidateSlave == nil {
+			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: no candidate slave for %+v", *masterKey)
+			// Let the followup code handle that
+			return nil
+		}
+		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: candidate slave of %+v: %+v", *masterKey, candidateSlave.Key)
+
+		if candidateSlave.ExecBinlogCoordinates.SmallerThan(&mostUpToDateBinlogServer.ExecBinlogCoordinates) {
+			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: candidate slave %+v coordinates smaller than binlog server %+v", candidateSlave.Key, mostUpToDateBinlogServer.Key)
+			// Need to align under binlog server...
+			candidateSlave, err = Repoint(&candidateSlave.Key, &mostUpToDateBinlogServer.Key, GTIDHintDeny)
+			if err != nil {
+				return log.Errore(err)
+			}
+			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: repointed candidate slave %+v under binlog server %+v", candidateSlave.Key, mostUpToDateBinlogServer.Key)
+			candidateSlave, err = StartSlaveUntilMasterCoordinates(&candidateSlave.Key, &mostUpToDateBinlogServer.ExecBinlogCoordinates)
+			if err != nil {
+				return log.Errore(err)
+			}
+			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: aligned candidate slave %+v under binlog server %+v", candidateSlave.Key, mostUpToDateBinlogServer.Key)
+			// and move back
+			candidateSlave, err = Repoint(&candidateSlave.Key, masterKey, GTIDHintDeny)
+			if err != nil {
+				return log.Errore(err)
+			}
+			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: repointed candidate slave %+v under master %+v", candidateSlave.Key, *masterKey)
+			return nil
+		}
+		// Either because it _was_ like that, or we _made_ it so,
+		// candidate slave is as/more up to date than all binlog servers
+		for _, binlogServer := range binlogServerSlaves {
+			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: matching slaves of binlog server %+v below %+v", binlogServer.Key, candidateSlave.Key)
+			// Right now sequentially.
+			// At this point just do what you can, don't return an error
+			MultiMatchSlaves(&binlogServer.Key, &candidateSlave.Key, "")
+			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: done matching slaves of binlog server %+v below %+v", binlogServer.Key, candidateSlave.Key)
+		}
+		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: done handling binlog regrouping for %+v; will proceed with normal RegroupSlaves", *masterKey)
+		AuditOperation("regroup-slaves-including-bls", masterKey, fmt.Sprintf("matched slaves of binlog server slaves of %+v under %+v", *masterKey, candidateSlave.Key))
+		return nil
+	}()
+	// Proceed to normal regroup:
 	return RegroupSlaves(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen)
 }
 
@@ -1950,28 +2005,33 @@ func RegroupSlavesGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup
 	StartSlave(&candidateSlave.Key)
 
 	log.Debugf("RegroupSlavesGTID: done")
+	AuditOperation("regroup-slaves-gtid", masterKey, fmt.Sprintf("regrouped slaves of %+v via GTID; promoted %+v", *masterKey, candidateSlave.Key))
 	return unmovedSlaves, movedSlaves, candidateSlave, err
 }
 
 // RegroupSlavesBinlogServers works on a binlog-servers topology. It picks the most up-to-date BLS and repoints all other
 // BLS below it
 func RegroupSlavesBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool) (promotedBinlogServer *Instance, err error) {
+	var binlogServerSlaves [](*Instance)
+	promotedBinlogServer, binlogServerSlaves, err = getMostUpToDateActiveBinlogServer(masterKey)
 
-	promotedBinlogServer, err = getMostUpToDateActiveBinlogServer(masterKey)
-	if err != nil {
+	resultOnError := func(err error) (*Instance, error) {
 		if !returnSlaveEvenOnFailureToRegroup {
 			promotedBinlogServer = nil
 		}
 		return promotedBinlogServer, err
 	}
-	_, err, _ = RepointSlavesTo(masterKey, "", &promotedBinlogServer.Key)
 
 	if err != nil {
-		if !returnSlaveEvenOnFailureToRegroup {
-			promotedBinlogServer = nil
-		}
-		return promotedBinlogServer, err
+		return resultOnError(err)
 	}
+
+	_, err, _ = RepointTo(binlogServerSlaves, &promotedBinlogServer.Key)
+
+	if err != nil {
+		return resultOnError(err)
+	}
+	AuditOperation("regroup-slaves-bls", masterKey, fmt.Sprintf("regrouped binlog server slaves of %+v; promoted %+v", *masterKey, promotedBinlogServer.Key))
 	return promotedBinlogServer, nil
 }
 

@@ -326,9 +326,13 @@ function Cluster() {
                 // Obviously can't handle.
                 return { accept: false };
             }
-            if (!droppableNode.LogSlaveUpdatesEnabled) {
-                // Obviously can't handle.
-                return { accept: false };
+            if (droppableNode.MasterKey.Hostname && droppableNode.MasterKey.Hostname != "_") {
+            	// droppableNode has master
+	            if (!droppableNode.LogSlaveUpdatesEnabled) {
+	                // Obviously can't handle.
+	                return { accept: false };
+	            }
+	            // It's OK for the master itself to not have log_slave_updates
             }
 
             if (node.id == droppableNode.id) {
@@ -360,9 +364,13 @@ function Cluster() {
                 // Obviously can't handle.
                 return { accept: false };
             }
-            if (!droppableNode.LogSlaveUpdatesEnabled) {
-                // Obviously can't handle.
-                return { accept: false };
+            if (droppableNode.MasterKey.Hostname && droppableNode.MasterKey.Hostname != "_") {
+            	// droppableNode has master
+	            if (!droppableNode.LogSlaveUpdatesEnabled) {
+	                // Obviously can't handle.
+	                return { accept: false };
+	            }
+	            // It's OK for the master itself to not have log_slave_updates
             }
 
             if (node.id == droppableNode.id) {
@@ -483,9 +491,13 @@ function Cluster() {
                 // Obviously can't handle.
                 return { accept: false };
             }
-            if (!droppableNode.LogSlaveUpdatesEnabled) {
-                // Obviously can't handle.
-                return { accept: false };
+            if (droppableNode.MasterKey.Hostname && droppableNode.MasterKey.Hostname != "_") {
+            	// droppableNode has master
+	            if (!droppableNode.LogSlaveUpdatesEnabled) {
+	                // Obviously can't handle.
+	                return { accept: false };
+	            }
+	            // It's OK for the master itself to not have log_slave_updates
             }
 
             if (node.id == droppableNode.id) {
@@ -522,9 +534,13 @@ function Cluster() {
                 // Obviously can't handle.
                 return { accept: false };
             }
-            if (!droppableNode.LogSlaveUpdatesEnabled) {
-                // Obviously can't handle.
-                return { accept: false };
+            if (droppableNode.MasterKey.Hostname && droppableNode.MasterKey.Hostname != "_") {
+            	// droppableNode has master
+	            if (!droppableNode.LogSlaveUpdatesEnabled) {
+	                // Obviously can't handle.
+	                return { accept: false };
+	            }
+	            // It's OK for the master itself to not have log_slave_updates
             }
             if (node.id == droppableNode.id) {
                 if (shouldApply) {

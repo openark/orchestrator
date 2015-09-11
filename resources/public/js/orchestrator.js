@@ -271,6 +271,8 @@ function openNodeModal(node) {
     } else {
         $('#node_modal button[data-btn=reset-slave]').appendTo(hiddenZone);
         $('#node_modal button[data-btn=skip-query]').appendTo(hiddenZone);
+        $('#node_modal button[data-btn=detach-slave]').appendTo(hiddenZone)
+        $('#node_modal button[data-btn=reattach-slave]').appendTo(hiddenZone)
     }
     if (node.LogBinEnabled) {
     	addNodeModalDataAttribute("Self coordinates", node.SelfBinlogCoordinates.LogFile+":"+node.SelfBinlogCoordinates.LogPos);

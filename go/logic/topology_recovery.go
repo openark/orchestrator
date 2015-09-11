@@ -112,6 +112,64 @@ func executeProcesses(processes []string, description string, analysisEntry inst
 	return err
 }
 
+func recoverDeadMasterInBinlogServerTopology(failedMasterKey *inst.InstanceKey) (promotedSlave *inst.Instance, err error) {
+	var promotedBinlogServer *inst.Instance
+
+	promotedBinlogServer, err = inst.RegroupSlavesBinlogServers(failedMasterKey, true)
+	if err != nil {
+		return nil, log.Errore(err)
+	}
+	promotedBinlogServer, err = inst.StopSlave(&promotedBinlogServer.Key)
+	if err != nil {
+		return promotedSlave, log.Errore(err)
+	}
+	// Find candidate slave
+	promotedSlave, err = inst.GetCandidateSlaveOfBinlogServerTopology(&promotedBinlogServer.Key)
+	if err != nil {
+		return promotedSlave, log.Errore(err)
+	}
+	// Align it with binlog server coordinates
+	promotedSlave, err = inst.StopSlave(&promotedSlave.Key)
+	if err != nil {
+		return promotedSlave, log.Errore(err)
+	}
+	promotedSlave, err = inst.StartSlaveUntilMasterCoordinates(&promotedSlave.Key, &promotedBinlogServer.ExecBinlogCoordinates)
+	if err != nil {
+		return promotedSlave, log.Errore(err)
+	}
+	promotedSlave, err = inst.StopSlave(&promotedSlave.Key)
+	if err != nil {
+		return promotedSlave, log.Errore(err)
+	}
+	// Detach, flush binary logs forward
+	promotedSlave, err = inst.ResetSlave(&promotedSlave.Key)
+	if err != nil {
+		return promotedSlave, log.Errore(err)
+	}
+	promotedSlave, err = inst.FlushBinaryLogsTo(&promotedSlave.Key, promotedBinlogServer.ExecBinlogCoordinates.LogFile)
+	if err != nil {
+		return promotedSlave, log.Errore(err)
+	}
+	promotedSlave, err = inst.FlushBinaryLogs(&promotedSlave.Key, 1)
+	if err != nil {
+		return promotedSlave, log.Errore(err)
+	}
+	promotedSlave, err = inst.PurgeBinaryLogsToCurrent(&promotedSlave.Key)
+	if err != nil {
+		return promotedSlave, log.Errore(err)
+	}
+	// Reconnect binlog servers to promoted slave (now master):
+	promotedBinlogServer, err = inst.SkipToNextBinaryLog(&promotedBinlogServer.Key)
+	if err != nil {
+		return promotedSlave, log.Errore(err)
+	}
+	promotedBinlogServer, err = inst.Repoint(&promotedBinlogServer.Key, &promotedSlave.Key, inst.GTIDHintDeny)
+	if err != nil {
+		return nil, log.Errore(err)
+	}
+	return promotedSlave, err
+}
+
 func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (promotedSlave *inst.Instance, lostSlaves [](*inst.Instance), err error) {
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	if ok, err := AttemptRecoveryRegistration(&analysisEntry); !ok {
@@ -147,7 +205,7 @@ func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses boo
 		}
 	case MasterRecoveryBinlogServer:
 		{
-			promotedSlave, err = inst.RegroupSlavesBinlogServers(failedInstanceKey, true)
+			promotedSlave, err = recoverDeadMasterInBinlogServerTopology(failedInstanceKey)
 		}
 	}
 	if promotedSlave != nil && len(lostSlaves) > 0 && config.Config.DetachLostSlavesAfterMasterFailover {

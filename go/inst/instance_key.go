@@ -86,6 +86,9 @@ func (this *InstanceKey) Formalize() *InstanceKey {
 
 // Equals tests equality between this key and another key
 func (this *InstanceKey) Equals(other *InstanceKey) bool {
+	if other == nil {
+		return false
+	}
 	return this.Hostname == other.Hostname && this.Port == other.Port
 }
 

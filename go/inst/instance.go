@@ -255,8 +255,12 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	if !other.LogBinEnabled {
 		return false, fmt.Errorf("instance does not have binary logs enabled: %+v", other.Key)
 	}
-	if !other.LogSlaveUpdatesEnabled {
-		return false, fmt.Errorf("instance does not have log_slave_updates enabled: %+v", other.Key)
+	if other.IsSlave() {
+		if !other.LogSlaveUpdatesEnabled {
+			return false, fmt.Errorf("instance does not have log_slave_updates enabled: %+v", other.Key)
+		}
+		// OK for a master to not have log_slave_updates
+		// Not OK for a slave, for it has to relay the logs.
 	}
 	if this.IsSmallerMajorVersion(other) && !this.IsBinlogServer() {
 		return false, fmt.Errorf("instance %+v has version %s, which is lower than %s on %+v ", this.Key, this.Version, other.Version, other.Key)
