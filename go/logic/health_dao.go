@@ -18,6 +18,7 @@ package logic
 
 import (
 	"fmt"
+
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/db"
@@ -104,4 +105,23 @@ Cleanup:
 		log.Errore(err)
 	}
 	return res, err
+}
+
+// Just check to make sure we can connect to the database
+func SimpleHealthTest() (*HealthStatus, error) {
+	health := HealthStatus{Healthy: false, Hostname: ThisHostname, Token: ProcessToken.Hash}
+
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		health.Error = err
+		return &health, log.Errore(err)
+	}
+
+	if err = db.Ping(); err != nil {
+		health.Error = err
+		return &health, log.Errore(err)
+	} else {
+		health.Healthy = true
+		return &health, nil
+	}
 }

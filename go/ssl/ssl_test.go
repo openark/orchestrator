@@ -4,12 +4,14 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"io/ioutil"
 	nethttp "net/http"
 	"strings"
 	"syscall"
 	"testing"
 
+	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/ssl"
 )
 
@@ -52,6 +54,24 @@ func TestNewTLSConfig(t *testing.T) {
 	}
 	if conf.ClientCAs != nil {
 		t.Errorf("Filling in ClientCA somehow without a cert")
+	}
+}
+
+func TestStatus(t *testing.T) {
+	var validOUs []string
+	url := fmt.Sprintf("http://example.com%s", config.Config.StatusEndpoint)
+
+	req, err := nethttp.NewRequest("GET", url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config.Config.StatusOUVerify = false
+	if err := ssl.Verify(req, validOUs); err != nil {
+		t.Errorf("Failed even with verification off")
+	}
+	config.Config.StatusOUVerify = true
+	if err := ssl.Verify(req, validOUs); err == nil {
+		t.Errorf("Did not fail on with bad verification")
 	}
 }
 
