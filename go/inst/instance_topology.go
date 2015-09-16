@@ -626,7 +626,7 @@ func moveSlavesViaGTID(slaves [](*Instance), other *Instance) (movedSlaves [](*I
 	}
 	if len(errs) == len(slaves) {
 		// All returned with error
-		return movedSlaves, unmovedSlaves, log.Error("Error on all operations"), errs
+		return movedSlaves, unmovedSlaves, fmt.Errorf("moveSlavesViaGTID: Error on all %+v operations", len(errs)), errs
 	}
 	AuditOperation("move-slaves-gtid", &other.Key, fmt.Sprintf("moved %d/%d slaves below %+v via GTID", len(movedSlaves), len(slaves), other.Key))
 
@@ -648,6 +648,9 @@ func MoveSlavesGTID(masterKey *InstanceKey, belowKey *InstanceKey, pattern strin
 	}
 	slaves = filterInstancesByPattern(slaves, pattern)
 	movedSlaves, unmovedSlaves, err, errs = moveSlavesViaGTID(slaves, belowInstance)
+	if err != nil {
+		log.Errore(err)
+	}
 
 	if len(unmovedSlaves) > 0 {
 		err = fmt.Errorf("MoveSlavesGTID: only moved %d out of %d slaves of %+v; error is: %+v", len(movedSlaves), len(slaves), *masterKey, err)
@@ -2001,6 +2004,9 @@ func RegroupSlavesGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup
 	log.Debugf("RegroupSlavesGTID: working on %d slaves", len(slavesToMove))
 
 	movedSlaves, unmovedSlaves, err, _ := moveSlavesViaGTID(slavesToMove, candidateSlave)
+	if err != nil {
+		log.Errore(err)
+	}
 	unmovedSlaves = append(unmovedSlaves, aheadSlaves...)
 	StartSlave(&candidateSlave.Key)
 

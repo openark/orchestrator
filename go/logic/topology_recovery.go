@@ -67,6 +67,7 @@ func (this InstancesByCountSlaves) Less(i, j int) bool {
 
 // replaceCommandPlaceholders replaxces agreed-upon placeholders with analysis data
 func replaceCommandPlaceholders(command string, analysisEntry inst.ReplicationAnalysis, successorInstance *inst.Instance, lostSlaves [](*inst.Instance)) string {
+
 	command = strings.Replace(command, "{failureType}", string(analysisEntry.Analysis), -1)
 	command = strings.Replace(command, "{failureDescription}", analysisEntry.Description, -1)
 	command = strings.Replace(command, "{failedHost}", analysisEntry.AnalyzedInstanceKey.Hostname, -1)
@@ -85,7 +86,10 @@ func replaceCommandPlaceholders(command string, analysisEntry inst.ReplicationAn
 		command = strings.Replace(command, "{successorPort}", fmt.Sprintf("%d", successorInstance.Key.Port), -1)
 	}
 
-	command = strings.Replace(command, "{slaveHosts}", analysisEntry.GetSlaveHostsAsString(), -1)
+	lostSlavesKeyMap := inst.NewInstanceKeyMap()
+	lostSlavesKeyMap.AddInstances(lostSlaves)
+	command = strings.Replace(command, "{lostSlaves}", lostSlavesKeyMap.ToCommaDelimitedList(), -1)
+	command = strings.Replace(command, "{slaveHosts}", analysisEntry.SlaveHosts.ToCommaDelimitedList(), -1)
 
 	return command
 }
@@ -167,9 +171,43 @@ func recoverDeadMasterInBinlogServerTopology(failedMasterKey *inst.InstanceKey) 
 	if err != nil {
 		return nil, log.Errore(err)
 	}
+
+	func() {
+		// Move binlog server slaves up to replicate from master.
+		// This can only be done once a BLS has skipped to the next binlog
+		// We do this asynchronuously. The master is already promoted and we're happy.
+		binlogServerSlaves, err := inst.ReadBinlogServerSlaveInstances(&promotedBinlogServer.Key)
+		if err != nil {
+			return
+		}
+		maxBinlogServersToPromote := 3
+		for i, binlogServerSlave := range binlogServerSlaves {
+			binlogServerSlave := binlogServerSlave
+			if i >= maxBinlogServersToPromote {
+				return
+			}
+			go func() {
+				binlogServerSlave, err = inst.StopSlave(&binlogServerSlave.Key)
+				if err != nil {
+					return
+				}
+				// Make sure the BLS has the "next binlog" -- the one the master flushed & purged to. Otherwise the BLS
+				// will request a binlog the master does not have
+				if binlogServerSlave.ExecBinlogCoordinates.SmallerThan(&promotedBinlogServer.ExecBinlogCoordinates) {
+					binlogServerSlave, err = inst.StartSlaveUntilMasterCoordinates(&binlogServerSlave.Key, &promotedBinlogServer.ExecBinlogCoordinates)
+					if err != nil {
+						return
+					}
+				}
+				inst.Repoint(&binlogServerSlave.Key, &promotedSlave.Key, inst.GTIDHintDeny)
+			}()
+		}
+	}()
+
 	return promotedSlave, err
 }
 
+// RecoverDeadMaster recovers a dead master, complete logic inside
 func RecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (promotedSlave *inst.Instance, lostSlaves [](*inst.Instance), err error) {
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	if ok, err := AttemptRecoveryRegistration(&analysisEntry); !ok {
@@ -362,6 +400,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 	return (promotedSlave != nil), promotedSlave, err
 }
 
+// isGeneralyValidAsCandidateSiblingOfIntermediateMaster sees that basic server configuration and state are valid
 func isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instance) bool {
 	if !sibling.LogBinEnabled {
 		return false
@@ -378,6 +417,7 @@ func isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instanc
 	return true
 }
 
+// isValidAsCandidateSiblingOfIntermediateMaster checks to see that the given sibling is capable to take over instance's slaves
 func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *inst.Instance, sibling *inst.Instance) bool {
 	if sibling.Key.Equals(&intermediateMasterInstance.Key) {
 		// same instance
@@ -459,6 +499,7 @@ func GetCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *inst.In
 	return nil, log.Errorf("topology_recovery: cannot find candidate sibling of %+v", intermediateMasterInstance.Key)
 }
 
+// RecoverDeadIntermediateMaster performs intermediate master recovery; complete logic inside
 func RecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (recoveryResolved bool, successorInstance *inst.Instance, err error) {
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	if ok, err := AttemptRecoveryRegistration(&analysisEntry); !ok {

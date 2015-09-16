@@ -16,10 +16,6 @@
 
 package inst
 
-import (
-	"strings"
-)
-
 type AnalysisCode string
 
 const (
@@ -75,26 +71,8 @@ type ReplicationAnalysis struct {
 	BinlogServerImmediateTopology       bool
 }
 
-// GetSlaveHostsAsString serializes all slave keys as a single comma delimited string
-func (this *ReplicationAnalysis) GetSlaveHostsAsString() string {
-	slaveHostsStrings := []string{}
-	for slaveKey := range this.SlaveHosts {
-		slaveHostsStrings = append(slaveHostsStrings, slaveKey.DisplayString())
-	}
-	return strings.Join(slaveHostsStrings, ",")
-}
-
 // ReadSlaveHostsFromString parses and reads slave keys from comma delimited string
 func (this *ReplicationAnalysis) ReadSlaveHostsFromString(slaveHostsString string) error {
-	this.SlaveHosts = make(map[InstanceKey]bool)
-
-	slaveHostsStrings := strings.Split(slaveHostsString, ",")
-	for _, slaveKeyString := range slaveHostsStrings {
-		slaveKey, err := ParseInstanceKey(slaveKeyString)
-		if err != nil {
-			return err
-		}
-		this.SlaveHosts[*slaveKey] = true
-	}
-	return nil
+	this.SlaveHosts = *NewInstanceKeyMap()
+	return this.SlaveHosts.ReadCommaDelimitedList(slaveHostsString)
 }

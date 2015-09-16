@@ -234,6 +234,13 @@ func (s *TestSuite) TestInstanceKeyMapReadJSON(c *C) {
 	c.Assert(m[key2], Equals, true)
 }
 
+func (s *TestSuite) TestEmptyInstanceKeyMapToCommaDelimitedList(c *C) {
+	m := *inst.NewInstanceKeyMap()
+	res := m.ToCommaDelimitedList()
+
+	c.Assert(res, Equals, "")
+}
+
 func (s *TestSuite) TestInstanceKeyMapToCommaDelimitedList(c *C) {
 	m := *inst.NewInstanceKeyMap()
 	m.AddKey(key1)

@@ -683,7 +683,9 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	    }
 	    addInstancesBadge(instance.aggregatedInstances.length, "label-primary", "Aggregated instances");
 	    for (var problemType in instance.aggregatedProblems) {
-	    	addInstancesBadge(instance.aggregatedProblems[problemType], errorMapping[problemType]["badge"], errorMapping[problemType]["description"]);
+	    	if (errorMapping[problemType]) {
+		    	addInstancesBadge(instance.aggregatedProblems[problemType], errorMapping[problemType]["badge"], errorMapping[problemType]["description"]);
+	    	}
 	    }
 	}
 	if (!instance.isAggregate) {

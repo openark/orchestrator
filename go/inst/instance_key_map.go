@@ -28,15 +28,22 @@ func NewInstanceKeyMap() *InstanceKeyMap {
 	return &InstanceKeyMap{}
 }
 
-// GetInstanceKeys returns keys in this map in the form of an array
+// AddKey adds a single key to this map
 func (this *InstanceKeyMap) AddKey(key InstanceKey) {
 	(*this)[key] = true
 }
 
-// GetInstanceKeys returns keys in this map in the form of an array
+// AddKeys adds all given keys to this map
 func (this *InstanceKeyMap) AddKeys(keys []InstanceKey) {
 	for _, key := range keys {
 		this.AddKey(key)
+	}
+}
+
+// AddInstances adds keys of all given instances to this map
+func (this *InstanceKeyMap) AddInstances(instances [](*Instance)) {
+	for _, instance := range instances {
+		this.AddKey(instance.Key)
 	}
 }
 
