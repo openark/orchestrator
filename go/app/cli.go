@@ -147,15 +147,22 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case cliCommand("resolve"):
 		{
-			if instanceKey == nil {
+			if rawInstanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			if conn, err := net.Dial("tcp", instanceKey.DisplayString()); err == nil {
+			if conn, err := net.Dial("tcp", rawInstanceKey.DisplayString()); err == nil {
+				log.Debugf("tcp test is good; got connection %+v", conn)
 				conn.Close()
 			} else {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			if cname, err := inst.GetCNAME(rawInstanceKey.Hostname); err == nil {
+				log.Debugf("GetCNAME() %+v, %+v", cname, err)
+				rawInstanceKey.Hostname = cname
+				fmt.Println(rawInstanceKey.DisplayString())
+			} else {
+				log.Fatale(err)
+			}
 		}
 	case cliCommand("register-hostname-unresolve"):
 		{

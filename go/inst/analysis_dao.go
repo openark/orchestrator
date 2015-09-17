@@ -118,6 +118,12 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		    GROUP BY
 			    master_instance.hostname,
 			    master_instance.port
+			HAVING 
+				is_last_check_valid = 0
+				OR count_slaves_failing_to_connect_to_master > 0
+				OR count_valid_slaves < count_slaves
+				OR count_valid_replicating_slaves < count_slaves
+				OR is_failing_to_connect_to_master
 		    ORDER BY
 			    is_master DESC ,
 			    is_cluster_master DESC,

@@ -218,10 +218,8 @@ func ContinuousDiscovery() {
 					inst.ExpireAudit()
 					inst.ExpireMasterPositionEquivalence()
 				}
-				if !isElectedNode {
-					// Take this opportunity to refresh yourself
-					inst.LoadHostnameResolveCacheFromDatabase()
-				}
+				// Take this opportunity to refresh yourself
+				inst.LoadHostnameResolveCacheFromDatabase()
 				inst.ReadClusterAliases()
 				HealthTest()
 			}()

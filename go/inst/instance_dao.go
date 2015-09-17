@@ -224,9 +224,20 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			resolvedHostname = instance.Key.Hostname
 		}
 
-		var placeholder string
+		if instance.IsOracleMySQL() && !instance.IsSmallerMajorVersionByString("5.6") {
+			// Stuff only supported on Oracle MySQL >= 5.6
+			// ...
+			// @@gtid_mode only available in Orcale MySQL >= 5.6
+			// Previous version just issued this query brute-force, but I don't like errors being issued where they shouldn't.
+			_ = db.QueryRow("select @@global.gtid_mode = 'ON', @@global.server_uuid").Scan(&instance.SupportsOracleGTID, &instance.ServerUUID)
+		}
+	}
+	{
 		// show global status works just as well with 5.6 & 5.7 (5.7 moves variables to performance_schema)
-		err = db.QueryRow("show global status like 'Uptime'").Scan(&placeholder, &instance.Uptime)
+		err = sqlutils.QueryRowsMap(db, "show global status like 'Uptime'", func(m sqlutils.RowMap) error {
+			instance.Uptime = m.GetUint("Value")
+			return nil
+		})
 		if err != nil {
 			log.Errore(err)
 			// We do not "goto Cleanup" here, although it should be the correct flow.
@@ -234,13 +245,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			// There is a wrong decisionmaking in this design and the migration path to 5.7 will be difficult.
 			// I don't want orchestrator to put even more burden on this. The 'Uptime' variable is not that important
 			// so as to completely fail reading a 5.7 instance.
-		}
-		if instance.IsOracleMySQL() && !instance.IsSmallerMajorVersionByString("5.6") {
-			// Stuff only supported on Oracle MySQL >= 5.6
-			// ...
-			// @@gtid_mode only available in Orcale MySQL >= 5.6
-			// Previous version just issued this query brute-force, but I don't like errors being issued where they shouldn't.
-			_ = db.QueryRow("select @@global.gtid_mode = 'ON', @@global.server_uuid").Scan(&instance.SupportsOracleGTID, &instance.ServerUUID)
+			// This is supposed to be fixed in 5.7.9
 		}
 	}
 	if resolvedHostname != instance.Key.Hostname {

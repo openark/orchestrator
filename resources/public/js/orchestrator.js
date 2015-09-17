@@ -63,6 +63,17 @@ function hideLoader() {
     $(".ajaxLoader").css('visibility', 'hidden');
 }
 
+function visualizeBrand() {
+	var img = $("<img>");
+
+	img.attr("src", "/images/outbrain-logo-s.png").attr("alt", "Outbrain");
+
+	if (document.domain && document.domain.indexOf("booking.com") >= 0) {
+		img.attr("src", "/images/booking-logo-s.png").attr("alt", "Booking.com");
+	}
+	$(".navbar-brand").prepend(img)
+}
+
 function showContextMenu() {
     $("[data-nav-page=context]").css('visibility', 'visible');
 }
@@ -809,6 +820,8 @@ function getParameterByName(name) {
 
 
 $(document).ready(function() {
+	visualizeBrand();
+	
 	$(".navbar-nav li").removeClass("active");
 	$(".navbar-nav li[data-nav-page='" + activePage() + "']").addClass("active");
 	
