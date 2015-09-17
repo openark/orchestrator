@@ -233,11 +233,10 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 	{
+		var dummy string
 		// show global status works just as well with 5.6 & 5.7 (5.7 moves variables to performance_schema)
-		err = sqlutils.QueryRowsMap(db, "show global status like 'Uptime'", func(m sqlutils.RowMap) error {
-			instance.Uptime = m.GetUint("Value")
-			return nil
-		})
+		err = db.QueryRow("show global status like 'Uptime'").Scan(&dummy, &instance.Uptime)
+
 		if err != nil {
 			log.Errore(err)
 			// We do not "goto Cleanup" here, although it should be the correct flow.
