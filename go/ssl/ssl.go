@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-martini/martini"
 	"github.com/outbrain/golib/log"
+	"github.com/outbrain/orchestrator/go/config"
 )
 
 // Determine if a string element is in a string array
@@ -53,8 +54,11 @@ func NewTLSConfig(caFile string, mutualTLS bool) (*tls.Config, error) {
 // Verify that the OU of the presented client certificate matches the list
 // of Valid OUs
 func Verify(r *nethttp.Request, validOUs []string) error {
+	if strings.Contains(r.URL.String(), config.Config.StatusEndpoint) && !config.Config.StatusOUVerify {
+		return nil
+	}
 	if r.TLS == nil {
-		return errors.New("no TLS")
+		return errors.New("No TLS")
 	}
 	for _, chain := range r.TLS.VerifiedChains {
 		s := chain[0].Subject.OrganizationalUnit

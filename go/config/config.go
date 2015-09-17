@@ -108,6 +108,9 @@ type Configuration struct {
 	SSLCertFile                                string            // Name of SSL certification file, applies only when UseSSL = true
 	SSLCAFile                                  string            // Name of the Certificate Authority file, applies only when UseSSL = true
 	SSLValidOUs                                []string          // Valid organizational units when using mutual TLS
+	StatusEndpoint                             string            // Override the status endpoint.  Defaults to '/api/status'
+	StatusSimpleHealth                         bool              // If true, calling the status endpoint will use the simplified health check
+	StatusOUVerify                             bool              // If true, try to verify OUs when Mutual TLS is on.  Defaults to false
 	HttpTimeoutSeconds                         int               // Number of idle seconds before HTTP GET request times out (when accessing orchestrator-agent)
 	AgentPollMinutes                           uint              // Minutes between agent polling
 	UnseenAgentForgetHours                     uint              // Number of hours after which an unseen agent is forgotten
@@ -144,6 +147,9 @@ func NewConfiguration() *Configuration {
 		Debug:                                      false,
 		ListenAddress:                              ":3000",
 		AgentsServerPort:                           ":3001",
+		StatusEndpoint:                             "/api/status",
+		StatusSimpleHealth:                         true,
+		StatusOUVerify:                             false,
 		MySQLOrchestratorPort:                      3306,
 		MySQLTopologyMaxPoolConnections:            3,
 		MySQLTopologyUseMutualTLS:                  false,

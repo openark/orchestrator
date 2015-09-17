@@ -19,12 +19,13 @@ package http
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/auth"
-	"github.com/martini-contrib/render"
 	"net"
 	"net/http"
 	"strconv"
+
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/auth"
+	"github.com/martini-contrib/render"
 
 	"github.com/outbrain/orchestrator/go/agent"
 	"github.com/outbrain/orchestrator/go/config"
@@ -1705,6 +1706,27 @@ func (this *HttpAPI) LBCheck(params martini.Params, r render.Render, req *http.R
 	r.JSON(200, "OK")
 }
 
+// A configurable endpoint that can be for regular status checks or whatever.  While similar to
+// Health() this returns 500 on failure.  This will prevent issues for those that have come to
+// expect a 200
+// It might be a good idea to deprecate the current Health() behavior and roll this in at some
+// point
+func (this *HttpAPI) StatusCheck(params martini.Params, r render.Render, req *http.Request) {
+	// SimpleHealthTest just checks to see if we can connect to the database.  Lighter weight if you intend to call it a lot
+	var health *logic.HealthStatus
+	var err error
+	if config.Config.StatusSimpleHealth {
+		health, err = logic.SimpleHealthTest()
+	} else {
+		health, err = logic.HealthTest()
+	}
+	if err != nil {
+		r.JSON(500, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Application node is unhealthy %+v", err), Details: health})
+		return
+	}
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Application node is healthy"), Details: health})
+}
+
 // GrabElection forcibly grabs leadership. Use with care!!
 func (this *HttpAPI) GrabElection(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -1999,4 +2021,6 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/agent-seed-states/:seedId", this.AgentSeedStates)
 	m.Get("/api/agent-abort-seed/:seedId", this.AbortSeed)
 	m.Get("/api/seeds", this.Seeds)
+	// Configurable status check endpoint
+	m.Get(config.Config.StatusEndpoint, this.StatusCheck)
 }
