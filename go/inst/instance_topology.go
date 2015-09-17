@@ -19,6 +19,7 @@ package inst
 import (
 	"fmt"
 	"github.com/outbrain/golib/log"
+	"github.com/outbrain/golib/math"
 	"github.com/outbrain/orchestrator/go/config"
 	"regexp"
 	"sort"
@@ -104,8 +105,25 @@ func ASCIITopology(instanceKey *InstanceKey, historyTimestampPattern string) (st
 	if masterInstance == nil {
 		return "", nil
 	}
-	resultArray := getASCIITopologyEntry(0, masterInstance, replicationMap, historyTimestampPattern == "")
-	result := strings.Join(resultArray, "\n")
+	// Get entries:
+	entries := getASCIITopologyEntry(0, masterInstance, replicationMap, historyTimestampPattern == "")
+	// Beautify: make sure the "[...]" part is nicely aligned for all instances.
+	{
+		maxIndent := 0
+		for _, entry := range entries {
+			maxIndent = math.MaxInt(maxIndent, strings.Index(entry, "["))
+		}
+		for i, entry := range entries {
+			entryIndent := strings.Index(entry, "[")
+			if maxIndent > entryIndent {
+				tokens := strings.Split(entry, "[")
+				newEntry := fmt.Sprintf("%s%s[%s", tokens[0], strings.Repeat(" ", maxIndent-entryIndent), tokens[1])
+				entries[i] = newEntry
+			}
+		}
+	}
+	// Turn into string
+	result := strings.Join(entries, "\n")
 	return result, nil
 }
 

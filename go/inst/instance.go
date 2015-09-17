@@ -375,6 +375,12 @@ func (this *Instance) HumanReadableDescription() string {
 	if this.LogSlaveUpdatesEnabled {
 		tokens = append(tokens, ">>")
 	}
+	if this.UsingGTID() {
+		tokens = append(tokens, "GTID")
+	}
+	if this.UsingPseudoGTID {
+		tokens = append(tokens, "P-GTID")
+	}
 	description := fmt.Sprintf("[%s]", strings.Join(tokens, ","))
 	return description
 }
