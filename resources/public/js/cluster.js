@@ -1049,8 +1049,9 @@ function Cluster() {
                 $(this).find("h3 .pull-left").html(anonymizeInstanceId(instanceId));
                 $(this).find("h3").attr("title", anonymizeInstanceId(instanceId));
             });
-            $(".instance-content p").each(function () {
-                tokens = jQuery(this).html().split(" ", 2)
+            $(".instance-content .instance-basic-info").each(function () {
+                tokens = jQuery(this).html().split(" ", 2);
+                tokens.push("");
                 jQuery(this).html(tokens[0].match(/[^.]+[.][^.]+/) + " " + tokens[1])
             });
         }();

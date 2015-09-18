@@ -293,6 +293,9 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=match-up-slaves]').appendTo(td.find("div"))
     $('#node_modal button[data-btn=regroup-slaves]').appendTo(td.find("div"))
     addNodeModalDataAttribute("Server ID", node.ServerID);
+    if (node.ServerUUID) {
+    	addNodeModalDataAttribute("Server UUID", node.ServerUUID);
+    }
     addNodeModalDataAttribute("Version", node.Version);
     var td = addNodeModalDataAttribute("Read only", booleanString(node.ReadOnly));
     $('#node_modal button[data-btn=set-read-only]').appendTo(td.find("div"))
@@ -765,7 +768,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	    }
 	    contentHtml = ''
 	    	+ '<div class="pull-right">' + statusMessage + ' </div>'
-			+ '<p>' + contentHtml + '</p>'
+			+ '<p class="instance-basic-info">' + contentHtml + '</p>'
 			;
 	    if (instance.isCoMaster) {
 	    	contentHtml += '<p><strong>Co master</strong></p>';
