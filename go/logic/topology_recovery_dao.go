@@ -256,7 +256,7 @@ func ReadActiveClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
 	return readRecoveries(whereClause, ``)
 }
 
-// ReadRecentlyActiveInstanceRecovery reads recently completed entries for a given cluster
+// ReadRecentlyActiveClusterRecovery reads recently completed entries for a given cluster
 func ReadRecentlyActiveClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
 	whereClause := fmt.Sprintf(`
 		where 
