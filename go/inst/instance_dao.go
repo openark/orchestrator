@@ -251,6 +251,10 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		UpdateResolvedHostname(instance.Key.Hostname, resolvedHostname)
 		instance.Key.Hostname = resolvedHostname
 	}
+	if instance.Key.Hostname == "" {
+		err = fmt.Errorf("ReadTopologyInstance: empty hostname. Bailing out")
+		goto Cleanup
+	}
 	if config.Config.DataCenterPattern != "" {
 		if pattern, err := regexp.Compile(config.Config.DataCenterPattern); err == nil {
 			match := pattern.FindStringSubmatch(instance.Key.Hostname)

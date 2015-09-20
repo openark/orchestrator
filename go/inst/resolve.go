@@ -115,6 +115,9 @@ func ResolveHostname(hostname string) (string, error) {
 // Returns false when the key already existed with same resolved value (similar
 // to AFFECTED_ROWS() in mysql)
 func UpdateResolvedHostname(hostname string, resolvedHostname string) bool {
+	if resolvedHostname == "" {
+		return false
+	}
 	if existingResolvedHostname, found := hostnameResolvesLightweightCache.Get(hostname); found && (existingResolvedHostname == resolvedHostname) {
 		return false
 	}
