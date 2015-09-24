@@ -190,6 +190,7 @@ func readRecoveries(whereCondition string, limit string) ([]TopologyRecovery, er
             start_active_period,
             IFNULL(end_active_period_unixtime, 0) as end_active_period_unixtime,
             IFNULL(end_recovery, '') AS end_recovery,
+            is_successful,
             processing_node_hostname,
             processcing_node_token,
             ifnull(successor_hostname, '') as successor_hostname,
@@ -218,6 +219,7 @@ func readRecoveries(whereCondition string, limit string) ([]TopologyRecovery, er
 		topologyRecovery.IsActive = m.GetBool("is_active")
 		topologyRecovery.RecoveryStartTimestamp = m.GetString("start_active_period")
 		topologyRecovery.RecoveryEndTimestamp = m.GetString("end_recovery")
+		topologyRecovery.IsSuccessful = m.GetBool("is_successful")
 		topologyRecovery.ProcessingNodeHostname = m.GetString("processing_node_hostname")
 		topologyRecovery.ProcessingNodeToken = m.GetString("processcing_node_token")
 

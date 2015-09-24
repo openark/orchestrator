@@ -26,7 +26,13 @@ $(document).ready(function () {
     		$('<a/>',  { text: audit.AnalysisEntry.ClusterDetails.ClusterAlias, href: "/web/cluster/alias/"+audit.AnalysisEntry.ClusterDetails.ClusterAlias}).wrap($("<td/>")).parent().appendTo(row);
     		$('<td/>', { text: audit.RecoveryStartTimestamp }).appendTo(row);
     		$('<td/>', { text: audit.RecoveryEndTimestamp }).appendTo(row);
-    		$('<a/>',  { text: sucessorInstanceDisplay, href: "/web/search/" + sucessorInstanceDisplay }).wrap($("<td/>")).parent().appendTo(row);
+    		if (audit.RecoveryEndTimestamp && !audit.IsSuccessful && !audit.SuccessorKey.Hostname) {
+        		$('<td/>', { text: "FAIL" }).appendTo(row);
+    		} else if (audit.SuccessorKey.Hostname) {
+    			$('<a/>',  { text: sucessorInstanceDisplay, href: "/web/search/" + sucessorInstanceDisplay }).wrap($("<td/>")).parent().appendTo(row);
+    		} else {
+    			$('<td/>', { text: "pending" }).appendTo(row);
+    		}
     		row.appendTo('#audit tbody');
     	});
         if (currentPage() <= 0) {

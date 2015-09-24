@@ -34,6 +34,7 @@ type TopologyRecovery struct {
 	AnalysisEntry          inst.ReplicationAnalysis
 	SuccessorKey           inst.InstanceKey
 	IsActive               bool
+	IsSuccessful           bool
 	RecoveryStartTimestamp string
 	RecoveryEndTimestamp   string
 	ProcessingNodeHostname string
