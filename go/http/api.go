@@ -1804,12 +1804,12 @@ func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.R
 	}
 
 	skipProcesses := (req.URL.Query().Get("skipProcesses") == "true") || (params["skipProcesses"] == "true")
-	actionTaken, _, err := logic.CheckAndRecover(&instanceKey, candidateKey, true, skipProcesses)
+	recoveryAttempted, _, err := logic.CheckAndRecover(&instanceKey, candidateKey, true, skipProcesses)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	if actionTaken {
+	if recoveryAttempted {
 		r.JSON(200, &APIResponse{Code: OK, Message: "Action taken", Details: instanceKey})
 	} else {
 		r.JSON(200, &APIResponse{Code: OK, Message: "No action taken", Details: instanceKey})
