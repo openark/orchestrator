@@ -113,6 +113,7 @@ type Configuration struct {
 	StatusOUVerify                             bool              // If true, try to verify OUs when Mutual TLS is on.  Defaults to false
 	HttpTimeoutSeconds                         int               // Number of idle seconds before HTTP GET request times out (when accessing orchestrator-agent)
 	AgentPollMinutes                           uint              // Minutes between agent polling
+	AgentAutoDiscover                          bool              // If true, instances should automatically discover when an agent is submitted
 	UnseenAgentForgetHours                     uint              // Number of hours after which an unseen agent is forgotten
 	StaleSeedFailMinutes                       uint              // Number of minutes after which a stale (no progress) seed is considered failed.
 	SeedAcceptableBytesDiff                    int64             // Difference in bytes between seed source & target data size that is still considered as successful copy
@@ -212,6 +213,7 @@ func NewConfiguration() *Configuration {
 		SSLCAFile:                                  "",
 		HttpTimeoutSeconds:                         60,
 		AgentPollMinutes:                           60,
+		AgentAutoDiscover:                          false,
 		UnseenAgentForgetHours:                     6,
 		StaleSeedFailMinutes:                       60,
 		SeedAcceptableBytesDiff:                    8192,
