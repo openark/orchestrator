@@ -18,11 +18,12 @@ package http
 
 import (
 	"fmt"
-	"github.com/go-martini/martini"
-	"github.com/martini-contrib/render"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/go-martini/martini"
+	"github.com/martini-contrib/render"
 
 	"github.com/outbrain/orchestrator/go/agent"
 	"github.com/outbrain/orchestrator/go/attributes"
@@ -115,6 +116,10 @@ func (this *HttpAgentsAPI) AgentsInstances(params martini.Params, r render.Rende
 	return ""
 }
 
+func (this *HttpAgentsAPI) AgentPing(params martini.Params, r render.Render, req *http.Request) {
+	r.JSON(200, "OK")
+}
+
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAgentsAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/submit-agent/:host/:port/:token", this.SubmitAgent)
@@ -122,4 +127,5 @@ func (this *HttpAgentsAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/host-attribute/attr/:attr/", this.GetHostAttributeByAttributeName)
 	m.Get("/api/agents-hosts", this.AgentsHosts)
 	m.Get("/api/agents-instances", this.AgentsInstances)
+	m.Get("/api/agent-ping", this.AgentPing)
 }
