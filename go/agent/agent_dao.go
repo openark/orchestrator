@@ -24,7 +24,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -123,12 +122,7 @@ func DiscoverAgentInstance(hostname string, port int) error {
 		return err
 	}
 
-	instanceKey, err := inst.NewInstanceKeyFromStrings(hostname, strconv.FormatInt(agent.MySQLPort, 10))
-	if err != nil {
-		log.Errorf("Failed to build instance key for %s:%d", hostname, agent.MySQLPort)
-		return err
-	}
-
+	instanceKey := agent.GetInstance()
 	instance, err := inst.ReadTopologyInstance(instanceKey)
 	if err != nil {
 		log.Errorf("Failed to read topology for %v", instanceKey)
