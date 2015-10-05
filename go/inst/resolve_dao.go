@@ -149,6 +149,38 @@ Cleanup:
 	return unresolvedHostname, err
 }
 
+// readMissingHostnamesToResolve gets those (unresolved, e.g. VIP) hostnames that *should* be present in
+// the hostname_resolve table, but aren't. 
+func readMissingHostnamesToResolve(hostname string) (string, error) {
+	unresolvedHostname := hostname
+
+	query := `
+   		select 
+   				hostname_unresolve.unresolved_hostname 
+   			from 
+   				database_instance 
+   				join hostname_unresolve on (database_instance.hostname = hostname_unresolve.hostname) 
+   				left join hostname_resolve on (database_instance.hostname = hostname_resolve.resolved_hostname) 
+   			where 
+   				hostname_resolve.hostname is null
+	   		`
+	db, err := db.OpenOrchestrator()
+	if err != nil {
+		goto Cleanup
+	}
+
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		unresolvedHostname = m.GetString("unresolved_hostname")
+		return nil
+	})
+Cleanup:
+
+	if err != nil {
+		log.Errore(err)
+	}
+	return unresolvedHostname, err
+}
+
 // WriteHostnameUnresolve upserts an entry in hostname_unresolve
 func WriteHostnameUnresolve(instanceKey *InstanceKey, unresolvedHostname string) error {
 	writeFunc := func() error {

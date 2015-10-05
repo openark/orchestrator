@@ -101,3 +101,8 @@ func (this *InstanceKey) IsValid() bool {
 func (this *InstanceKey) DisplayString() string {
 	return fmt.Sprintf("%s:%d", this.Hostname, this.Port)
 }
+
+// String returns a user-friendly string representation of this key
+func (this InstanceKey) String() string {
+	return this.DisplayString()
+}

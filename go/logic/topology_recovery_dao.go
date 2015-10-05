@@ -23,6 +23,7 @@ import (
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
 	"github.com/outbrain/orchestrator/go/inst"
+	"github.com/outbrain/orchestrator/go/process"
 )
 
 // AttemptFailureDetectionRegistration tries to add a failure-detection entry; if this fails that means the problem has already been detected
@@ -62,7 +63,7 @@ func AttemptFailureDetectionRegistration(analysisEntry *inst.ReplicationAnalysis
 					?,
 					?
 				)
-			`, analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port, ThisHostname, ProcessToken.Hash,
+			`, analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port, process.ThisHostname, process.ProcessToken.Hash,
 		string(analysisEntry.Analysis), analysisEntry.ClusterDetails.ClusterName, analysisEntry.ClusterDetails.ClusterAlias, analysisEntry.CountSlaves, analysisEntry.SlaveHosts.ToCommaDelimitedList(),
 	)
 	if err != nil {
@@ -125,7 +126,7 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis) (bool,
 					?,
 					?
 				)
-			`, analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port, ThisHostname, ProcessToken.Hash,
+			`, analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port, process.ThisHostname, process.ProcessToken.Hash,
 		string(analysisEntry.Analysis), analysisEntry.ClusterDetails.ClusterName, analysisEntry.ClusterDetails.ClusterAlias, analysisEntry.CountSlaves, analysisEntry.SlaveHosts.ToCommaDelimitedList(),
 	)
 	if err != nil {
@@ -173,7 +174,7 @@ func ResolveRecovery(failedKey *inst.InstanceKey, successorInstance *inst.Instan
 				AND processing_node_hostname = ?
 				AND processcing_node_token = ?
 			`, isSuccessful, successorKey.Hostname, successorKey.Port,
-		failedKey.Hostname, failedKey.Port, ThisHostname, ProcessToken.Hash,
+		failedKey.Hostname, failedKey.Port, process.ThisHostname, process.ProcessToken.Hash,
 	)
 	return log.Errore(err)
 }

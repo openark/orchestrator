@@ -1,5 +1,5 @@
 /*
-   Copyright 2015 Shlomi Noach, courtesy Booking.com
+   Copyright 2014 Outbrain Inc.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -14,19 +14,36 @@
    limitations under the License.
 */
 
-package logic
+package process
 
 import (
-	"github.com/outbrain/golib/log"
-	"os"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 )
 
-var ThisHostname string
+func GetHash(input []byte) string {
+	hasher := sha256.New()
+	hasher.Write(input)
+	return hex.EncodeToString(hasher.Sum(nil))
+}
 
-func init() {
-	var err error
-	ThisHostname, err = os.Hostname()
-	if err != nil {
-		log.Fatalf("Cannot resolve self hostname; required. Aborting. %+v", err)
+func GetRandomData() []byte {
+	size := 64
+	rb := make([]byte, size)
+	_, _ = rand.Read(rb)
+	return rb
+}
+
+// Token is used to identify and validate requests to this service
+type Token struct {
+	Hash string
+}
+
+var ProcessToken *Token = NewToken()
+
+func NewToken() *Token {
+	return &Token{
+		Hash: GetHash(GetRandomData()),
 	}
 }

@@ -31,6 +31,7 @@ import (
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/inst"
 	"github.com/outbrain/orchestrator/go/logic"
+	"github.com/outbrain/orchestrator/go/process"
 )
 
 // APIResponseCode is an OK/ERROR response code
@@ -1691,7 +1692,7 @@ func (this *HttpAPI) Headers(params martini.Params, r render.Render, req *http.R
 
 // Health performs a self test
 func (this *HttpAPI) Health(params martini.Params, r render.Render, req *http.Request) {
-	health, err := logic.HealthTest()
+	health, err := process.HealthTest()
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Application node is unhealthy %+v", err), Details: health})
 		return
@@ -1713,12 +1714,12 @@ func (this *HttpAPI) LBCheck(params martini.Params, r render.Render, req *http.R
 // point
 func (this *HttpAPI) StatusCheck(params martini.Params, r render.Render, req *http.Request) {
 	// SimpleHealthTest just checks to see if we can connect to the database.  Lighter weight if you intend to call it a lot
-	var health *logic.HealthStatus
+	var health *process.HealthStatus
 	var err error
 	if config.Config.StatusSimpleHealth {
-		health, err = logic.SimpleHealthTest()
+		health, err = process.SimpleHealthTest()
 	} else {
-		health, err = logic.HealthTest()
+		health, err = process.HealthTest()
 	}
 	if err != nil {
 		r.JSON(500, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Application node is unhealthy %+v", err), Details: health})
@@ -1733,7 +1734,7 @@ func (this *HttpAPI) GrabElection(params martini.Params, r render.Render, req *h
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	err := logic.GrabElection()
+	err := process.GrabElection()
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Unable to grab election: %+v", err)})
 		return
@@ -1748,7 +1749,7 @@ func (this *HttpAPI) Reelect(params martini.Params, r render.Render, req *http.R
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	err := logic.Reelect()
+	err := process.Reelect()
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Unable to re-elect: %+v", err)})
 		return

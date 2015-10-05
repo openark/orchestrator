@@ -695,10 +695,14 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	    function addInstancesBadge(count, badgeClass, title) {
 	    	popoverElement.find(".instance-content .pull-right").append('<span class="badge '+badgeClass+'" title="' + title + '"">' + count + '</span> ');
 	    }
-	    addInstancesBadge(instance.aggregatedInstances.length, "label-primary", "Aggregated instances");
+	    var instancesHint = instance.aggregatedProblems[""].join("\n");
+	    addInstancesBadge(instance.aggregatedInstances.length, "label-primary", "Aggregated instances\n"+instancesHint);
+
 	    for (var problemType in instance.aggregatedProblems) {
 	    	if (errorMapping[problemType]) {
-		    	addInstancesBadge(instance.aggregatedProblems[problemType], errorMapping[problemType]["badge"], errorMapping[problemType]["description"]);
+	    		var description = errorMapping[problemType]["description"];
+	    		var instancesHint = instance.aggregatedProblems[problemType].join("\n");
+		    	addInstancesBadge(instance.aggregatedProblems[problemType].length, errorMapping[problemType]["badge"], description+"\n"+instancesHint);
 	    	}
 	    }
 	}

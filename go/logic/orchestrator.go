@@ -17,14 +17,13 @@
 package logic
 
 import (
-	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/go/agent"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/inst"
-	"github.com/rcrowley/go-metrics"
-	"net"
-	"strings"
+	"github.com/outbrain/orchestrator/go/process"
+	orchestrator_metrics "github.com/outbrain/orchestrator/go/metrics"
+	"github.com/rcrowley/go-metrics" 
 	"time"
 )
 
@@ -140,31 +139,6 @@ func StartDiscovery(instanceKey inst.InstanceKey) {
 	}
 }
 
-func initGraphiteMetrics() error {
-	if config.Config.GraphiteAddr == "" {
-		return nil
-	}
-	if config.Config.GraphitePath == "" {
-		return log.Errorf("No graphite path provided (see GraphitePath config variable). Will not log to graphite")
-	}
-	addr, err := net.ResolveTCPAddr("tcp", config.Config.GraphiteAddr)
-	if err != nil {
-		return log.Errore(err)
-	}
-	graphitePathHostname := ThisHostname
-	if config.Config.GraphiteConvertHostnameDotsToUnderscores {
-		graphitePathHostname = strings.Replace(graphitePathHostname, ".", "_", -1)
-	}
-	graphitePath := config.Config.GraphitePath
-	graphitePath = strings.Replace(graphitePath, "{hostname}", graphitePathHostname, -1)
-
-	log.Debugf("Will log to graphite on %+v, %+v", config.Config.GraphiteAddr, graphitePath)
-	go graphite.Graphite(metrics.DefaultRegistry, 1*time.Minute, graphitePath, addr)
-
-	return nil
-
-}
-
 // ContinuousDiscovery starts an asynchronuous infinite discovery process where instances are
 // periodically investigated and their status captured, and long since unseen instances are
 // purged and forgotten.
@@ -181,13 +155,13 @@ func ContinuousDiscovery() {
 		snapshotTopologiesTick = time.Tick(time.Duration(config.Config.SnapshotTopologiesIntervalHours) * time.Hour)
 	}
 
-	go initGraphiteMetrics()
+	go orchestrator_metrics.InitGraphiteMetrics()
 
 	for {
 		select {
 		case <-tick:
 			go func() {
-				if isElectedNode, _ = attemptElection(); isElectedNode {
+				if isElectedNode, _ = process.AttemptElection(); isElectedNode {
 					instanceKeys, _ := inst.ReadOutdatedInstanceKeys()
 					log.Debugf("outdated keys: %+v", instanceKeys)
 					for _, instanceKey := range instanceKeys {
@@ -223,7 +197,7 @@ func ContinuousDiscovery() {
 					inst.LoadHostnameResolveCacheFromDatabase()
 				}
 				inst.ReadClusterAliases()
-				HealthTest()
+				process.HealthTest()
 			}()
 		case <-recoverTick:
 			go func() {

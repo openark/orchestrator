@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package logic
+package process
 
 import (
 	"fmt"

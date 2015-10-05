@@ -135,11 +135,9 @@ function Cluster() {
         var opts2 = Q.copy(opts);
         opts.cancel = "button,a";
         $(trailerEl).draggable(opts);
-        //console.info("draggable", instanceEl[0], trailerEl[0]);
     }
 
     function instance_dragStart(e, ui) {
-        //console.log("instance_dragStart");
         var instanceEl = $(e.target).closest(".instance");
         var trailerEl = instanceEl_getTrailerEl(instanceEl);
 
@@ -184,7 +182,6 @@ function Cluster() {
         var node = nodesMap[id];
 
         var instanceEl = Instance.createElement(node).addClass("instance-diagram arrow_box").appendTo("#cluster_container");
-        //console.log("generateInstanceDiv", instanceEl);
         $(instanceEl).hide();
         $(svgInstanceWrapper).data("instance-popover", instanceEl);
         $(instanceEl).data("svg-instance-wrapper", svgInstanceWrapper);
@@ -837,6 +834,30 @@ function Cluster() {
     		if (instances.length < 2) {
     			return false;
     		}
+    		
+            var aggregatedProblems = {}
+            function incrementProblems(problemType, title) {
+                if (aggregatedProblems[problemType]) {
+                    aggregatedProblems[problemType].push(title);
+                } else {
+                    aggregatedProblems[problemType] = [title];
+                }
+            }
+            instances.forEach(function (instance) {
+                incrementProblems("", instance.title)
+                if (instance.inMaintenanceProblem()) {
+                    incrementProblems("inMaintenanceProblem", instance.title)
+                }
+                if (instance.lastCheckInvalidProblem()) {
+                    incrementProblems("lastCheckInvalidProblem", instance.title)
+                } else if (instance.notRecentlyCheckedProblem()) {
+                    incrementProblems("notRecentlyCheckedProblem", instance.title)
+                } else if (instance.notReplicatingProblem()) {
+                    incrementProblems("notReplicatingProblem", instance.title)
+                } else if (instance.replicationLagProblem()) {
+                    incrementProblems("replicationLagProblem", instance.title)
+                }
+            });
     		var aggergateInstance = instances[0];
     		aggergateInstance.isAggregate = true;
     		aggergateInstance.title = "[aggregation]";
@@ -845,29 +866,6 @@ function Cluster() {
     		}
     		aggergateInstance.canonicalTitle = aggergateInstance.title;
             aggergateInstance.aggregatedInstances = instances; // includes itself
-    		
-            var aggregatedProblems = {}
-            function incrementProblems(problemType) {
-                if (aggregatedProblems[problemType] > 0) {
-                    aggregatedProblems[problemType] = aggregatedProblems[problemType] + 1;
-                } else {
-                    aggregatedProblems[problemType] = 1;
-                }
-            }
-            instances.forEach(function (instance) {
-                if (instance.inMaintenanceProblem()) {
-                    incrementProblems(instance.ClusterName, "inMaintenanceProblem")
-                }
-                if (instance.lastCheckInvalidProblem()) {
-                    incrementProblems("lastCheckInvalidProblem")
-                } else if (instance.notRecentlyCheckedProblem()) {
-                    incrementProblems("notRecentlyCheckedProblem")
-                } else if (instance.notReplicatingProblem()) {
-                    incrementProblems("notReplicatingProblem")
-                } else if (instance.replicationLagProblem()) {
-                    incrementProblems("replicationLagProblem")
-                }
-            });
             aggergateInstance.aggregatedProblems = aggregatedProblems;
 
             instances.forEach(function (instance) {
@@ -1291,9 +1289,9 @@ function Cluster() {
             }
             $("#dropdown-context").append('<li><a href="/web/cluster-pools/' + currentClusterName() + '">Pools</a></li>');
             if (isCompactDisplay()) {
-                $("#dropdown-context").append('<li><a data-command="expand-display" href="' + location.href.split("?")[0] + '?compact=false"><span class="glyphicon glyphicon-ok small"></span> Compact display</a></li>');
+                $("#dropdown-context").append('<li><a data-command="expand-display" href="' + location.href.split("?")[0].split("#")[0] + '?compact=false"><span class="glyphicon glyphicon-ok small"></span> Compact display</a></li>');
             } else {
-                $("#dropdown-context").append('<li><a data-command="compact-display" href="' + location.href.split("?")[0] + '?compact=true">Compact display</a></li>');
+                $("#dropdown-context").append('<li><a data-command="compact-display" href="' + location.href.split("?")[0].split("#")[0] + '?compact=true">Compact display</a></li>');
             }
             $("#dropdown-context").append('<li><a data-command="pool-indicator">Pool indicator</a></li>');
             $("#dropdown-context").append('<li><a data-command="colorize-dc">Colorize DC</a></li>');

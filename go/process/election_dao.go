@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package logic
+package process
 
 import (
 	"github.com/outbrain/golib/log"
@@ -23,8 +23,8 @@ import (
 	"github.com/outbrain/orchestrator/go/db"
 )
 
-// attemptElection tries to grab leadership (become active node)
-func attemptElection() (bool, error) {
+// AttemptElection tries to grab leadership (become active node)
+func AttemptElection() (bool, error) {
 	sqlResult, err := db.ExecOrchestrator(`
 			insert ignore into active_node (
 					anchor, hostname, token, last_seen_active

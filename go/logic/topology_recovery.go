@@ -22,6 +22,7 @@ import (
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/inst"
 	"github.com/outbrain/orchestrator/go/os"
+	"github.com/outbrain/orchestrator/go/process"
 	"github.com/pmylund/go-cache"
 	"sort"
 	"strings"
@@ -79,7 +80,7 @@ func replaceCommandPlaceholders(command string, analysisEntry inst.ReplicationAn
 	command = strings.Replace(command, "{isDowntimed}", fmt.Sprint(analysisEntry.IsDowntimed), -1)
 	command = strings.Replace(command, "{autoMasterRecovery}", fmt.Sprint(analysisEntry.ClusterDetails.HasAutomatedMasterRecovery), -1)
 	command = strings.Replace(command, "{autoIntermediateMasterRecovery}", fmt.Sprint(analysisEntry.ClusterDetails.HasAutomatedIntermediateMasterRecovery), -1)
-	command = strings.Replace(command, "{orchestratorHost}", ThisHostname, -1)
+	command = strings.Replace(command, "{orchestratorHost}", process.ThisHostname, -1)
 
 	command = strings.Replace(command, "{isSuccessful}", fmt.Sprint(successorInstance != nil), -1)
 	if successorInstance != nil {

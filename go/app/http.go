@@ -33,6 +33,7 @@ import (
 	"github.com/outbrain/orchestrator/go/http"
 	"github.com/outbrain/orchestrator/go/inst"
 	"github.com/outbrain/orchestrator/go/logic"
+	"github.com/outbrain/orchestrator/go/process"
 	"github.com/outbrain/orchestrator/go/ssl"
 )
 
@@ -110,7 +111,7 @@ func standardHttp(discovery bool) {
 		m.Use(ssl.VerifyOUs(config.Config.SSLValidOUs))
 	}
 
-	inst.SetMaintenanceOwner(logic.ThisHostname)
+	inst.SetMaintenanceOwner(process.ThisHostname)
 
 	if discovery {
 		log.Info("Starting Discovery")
