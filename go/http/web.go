@@ -98,6 +98,28 @@ func (this *HttpWeb) ClusterByAlias(params martini.Params, r render.Render, req 
 	this.Cluster(params, r, req, user)
 }
 
+func (this *HttpWeb) ClusterByInstance(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, found, err := inst.ReadInstance(&instanceKey)
+	if (!found) || (err != nil) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot read instance: %+v", instanceKey)})
+		return
+	}
+
+	// Willing to accept the case of multiple clusters; we just present one
+	if instance.ClusterName == "" && err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	params["clusterName"] = instance.ClusterName
+	this.Cluster(params, r, req, user)
+}
+
 func (this *HttpWeb) ClusterPools(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/cluster_pools", map[string]interface{}{
 		"agentsHttpActive":              config.Config.ServeAgentsHttp,
@@ -332,6 +354,7 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/clusters-analysis", this.ClustersAnalysis)
 	m.Get("/web/cluster/:clusterName", this.Cluster)
 	m.Get("/web/cluster/alias/:clusterAlias", this.ClusterByAlias)
+	m.Get("/web/cluster/instance/:host/:port", this.ClusterByInstance)
 	m.Get("/web/cluster-pools/:clusterName", this.ClusterPools)
 	m.Get("/web/search/:searchString", this.Search)
 	m.Get("/web/search", this.Search)

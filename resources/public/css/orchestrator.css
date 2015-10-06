@@ -280,6 +280,12 @@ body {
     padding: 4px 14px;
 }
 
+.instance-content .tooltip-inner {
+	text-align: left;
+	min-width: 420px;
+	white-space: nowrap;
+}
+
 #pools .popover {
     vertical-align: top;
 }

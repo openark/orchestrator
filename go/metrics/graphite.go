@@ -27,6 +27,9 @@ import (
 	"time"
 )
 
+var graphiteCallbackTick = time.Tick(time.Minute)
+var graphiteTickCallbacks [](func())
+
 func InitGraphiteMetrics() error {
 	if config.Config.GraphiteAddr == "" {
 		return nil
@@ -46,8 +49,20 @@ func InitGraphiteMetrics() error {
 	graphitePath = strings.Replace(graphitePath, "{hostname}", graphitePathHostname, -1)
 
 	log.Debugf("Will log to graphite on %+v, %+v", config.Config.GraphiteAddr, graphitePath)
-	go graphite.Graphite(metrics.DefaultRegistry, 1*time.Minute, graphitePath, addr)
+
+	go func() {
+		graphite.Graphite(metrics.DefaultRegistry, 1*time.Minute, graphitePath, addr)
+		for range graphiteCallbackTick {
+			for _, f := range graphiteTickCallbacks {
+				go f()
+			}
+		}
+	}()
 
 	return nil
 
+}
+
+func OnGraphiteTick(f func()) {
+	graphiteTickCallbacks = append(graphiteTickCallbacks, f)
 }

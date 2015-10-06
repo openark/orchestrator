@@ -150,7 +150,7 @@ Cleanup:
 }
 
 // readMissingHostnamesToResolve gets those (unresolved, e.g. VIP) hostnames that *should* be present in
-// the hostname_resolve table, but aren't. 
+// the hostname_resolve table, but aren't.
 func readMissingHostnamesToResolve(hostname string) (string, error) {
 	unresolvedHostname := hostname
 

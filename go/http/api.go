@@ -1135,7 +1135,7 @@ func (this *HttpAPI) Cluster(params martini.Params, r render.Render, req *http.R
 	r.JSON(200, instances)
 }
 
-// Cluster provides list of instances in given cluster
+// ClusterByAlias provides list of instances in given cluster
 func (this *HttpAPI) ClusterByAlias(params martini.Params, r render.Render, req *http.Request) {
 	clusterName, err := inst.GetClusterByAlias(params["clusterAlias"])
 	if err != nil {
@@ -1144,6 +1144,23 @@ func (this *HttpAPI) ClusterByAlias(params martini.Params, r render.Render, req 
 	}
 
 	params["clusterName"] = clusterName
+	this.Cluster(params, r, req)
+}
+
+// ClusterByInstance provides list of instances in cluster an instance belongs to
+func (this *HttpAPI) ClusterByInstance(params martini.Params, r render.Render, req *http.Request) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, found, err := inst.ReadInstance(&instanceKey)
+	if (!found) || (err != nil) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot read instance: %+v", instanceKey)})
+		return
+	}
+
+	params["clusterName"] = instance.ClusterName
 	this.Cluster(params, r, req)
 }
 
@@ -1959,6 +1976,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	// Cluster
 	m.Get("/api/cluster/:clusterName", this.Cluster)
 	m.Get("/api/cluster/alias/:clusterAlias", this.ClusterByAlias)
+	m.Get("/api/cluster/instance/:host/:port", this.ClusterByInstance)
 	m.Get("/api/cluster-info/:clusterName", this.ClusterInfo)
 	m.Get("/api/cluster-info/alias/:clusterAlias", this.ClusterInfoByAlias)
 	m.Get("/api/cluster-osc-slaves/:clusterName", this.ClusterOSCSlaves)

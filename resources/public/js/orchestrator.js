@@ -693,16 +693,17 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	    popoverElement.find(".instance-content").append('<div>Instances: <div class="pull-right"></div></div>');
 	    
 	    function addInstancesBadge(count, badgeClass, title) {
-	    	popoverElement.find(".instance-content .pull-right").append('<span class="badge '+badgeClass+'" title="' + title + '"">' + count + '</span> ');
+	    	popoverElement.find(".instance-content .pull-right").append('<span class="badge '+badgeClass+'" data-toggle="tooltip" data-placement="bottom" data-html="true" title="' + title + '">' + count + '</span> ');
+	    	popoverElement.find('[data-toggle="tooltip"]').tooltip();
 	    }
-	    var instancesHint = instance.aggregatedProblems[""].join("\n");
-	    addInstancesBadge(instance.aggregatedInstances.length, "label-primary", "Aggregated instances\n"+instancesHint);
+	    var instancesHint = instance.aggregatedProblems[""].join("<br>");
+	    addInstancesBadge(instance.aggregatedInstances.length, "label-primary", "Aggregated instances<br>"+instancesHint);
 
 	    for (var problemType in instance.aggregatedProblems) {
 	    	if (errorMapping[problemType]) {
 	    		var description = errorMapping[problemType]["description"];
-	    		var instancesHint = instance.aggregatedProblems[problemType].join("\n");
-		    	addInstancesBadge(instance.aggregatedProblems[problemType].length, errorMapping[problemType]["badge"], description+"\n"+instancesHint);
+	    		var instancesHint = instance.aggregatedProblems[problemType].join("<br>");
+		    	addInstancesBadge(instance.aggregatedProblems[problemType].length, errorMapping[problemType]["badge"], description+"<br>"+instancesHint);
 	    	}
 	    }
 	}

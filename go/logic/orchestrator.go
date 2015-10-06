@@ -18,12 +18,13 @@ package logic
 
 import (
 	"github.com/outbrain/golib/log"
+	"github.com/outbrain/golib/math"
 	"github.com/outbrain/orchestrator/go/agent"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/inst"
+	ometrics "github.com/outbrain/orchestrator/go/metrics"
 	"github.com/outbrain/orchestrator/go/process"
-	orchestrator_metrics "github.com/outbrain/orchestrator/go/metrics"
-	"github.com/rcrowley/go-metrics" 
+	"github.com/rcrowley/go-metrics"
 	"time"
 )
 
@@ -34,17 +35,24 @@ const (
 // discoveryInstanceKeys is a channel of instanceKey-s that were requested for discovery.
 // It can be continuously updated as discovery process progresses.
 var discoveryInstanceKeys chan inst.InstanceKey = make(chan inst.InstanceKey, maxConcurrency)
+
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
 var discoveryQueueLengthGauge = metrics.NewGauge()
+var isElectedGauge = metrics.NewGauge()
 
 var isElectedNode = false
 
 func init() {
+	isElectedNode = false
+
 	metrics.Register("discoveries.attempt", discoveriesCounter)
 	metrics.Register("discoveries.fail", failedDiscoveriesCounter)
 	metrics.Register("discoveries.queue_length", discoveryQueueLengthGauge)
-	isElectedNode = false
+	metrics.Register("elect.is_elected", isElectedGauge)
+
+	ometrics.OnGraphiteTick(func() { discoveryQueueLengthGauge.Update(int64(len(discoveryInstanceKeys))) })
+	ometrics.OnGraphiteTick(func() { isElectedGauge.Update(int64(math.TernaryInt(isElectedNode, 1, 0))) })
 }
 
 // handleDiscoveryRequests iterates the discoveryInstanceKeys channel and calls upon
@@ -155,7 +163,7 @@ func ContinuousDiscovery() {
 		snapshotTopologiesTick = time.Tick(time.Duration(config.Config.SnapshotTopologiesIntervalHours) * time.Hour)
 	}
 
-	go orchestrator_metrics.InitGraphiteMetrics()
+	go ometrics.InitGraphiteMetrics()
 
 	for {
 		select {
@@ -170,7 +178,6 @@ func ContinuousDiscovery() {
 				} else {
 					log.Debugf("Not elected as active node; polling")
 				}
-				discoveryQueueLengthGauge.Update(int64(len(discoveryInstanceKeys)))
 			}()
 		case <-forgetUnseenTick:
 			// See if we should also forget objects (lower frequency)
