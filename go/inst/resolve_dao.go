@@ -151,12 +151,11 @@ Cleanup:
 
 // readMissingHostnamesToResolve gets those (unresolved, e.g. VIP) hostnames that *should* be present in
 // the hostname_resolve table, but aren't.
-func readMissingHostnamesToResolve(hostname string) (string, error) {
-	unresolvedHostname := hostname
-
+func readMissingKeysToResolve() (result InstanceKeyMap, err error) {
 	query := `
    		select 
-   				hostname_unresolve.unresolved_hostname 
+   				hostname_unresolve.unresolved_hostname,
+   				database_instance.port
    			from 
    				database_instance 
    				join hostname_unresolve on (database_instance.hostname = hostname_unresolve.hostname) 
@@ -170,7 +169,8 @@ func readMissingHostnamesToResolve(hostname string) (string, error) {
 	}
 
 	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-		unresolvedHostname = m.GetString("unresolved_hostname")
+		instanceKey := InstanceKey{Hostname: m.GetString("unresolved_hostname"), Port: m.GetInt("port")}
+		result.AddKey(instanceKey)
 		return nil
 	})
 Cleanup:
@@ -178,7 +178,7 @@ Cleanup:
 	if err != nil {
 		log.Errore(err)
 	}
-	return unresolvedHostname, err
+	return result, err
 }
 
 // WriteHostnameUnresolve upserts an entry in hostname_unresolve

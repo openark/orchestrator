@@ -140,6 +140,20 @@ func LoadHostnameResolveCacheFromDatabase() error {
 	return nil
 }
 
+func FlushNontrivialResolveCacheToDatabase() error {
+	if strings.ToLower(config.Config.HostnameResolveMethod) == "none" {
+		return log.Errorf("FlushNontrivialResolveCacheToDatabase() called, but HostnameResolveMethod is %+v", config.Config.HostnameResolveMethod)
+	}
+	items, _ := HostnameResolveCache()
+	for hostname := range items {
+		resolvedHostname, found := hostnameResolvesLightweightCache.Get(hostname)
+		if found && (resolvedHostname.(string) != hostname) {
+			WriteResolvedHostname(hostname, resolvedHostname.(string))
+		}
+	}
+	return nil
+}
+
 func ResetHostnameResolveCache() error {
 	err := deleteHostnameResolves()
 	hostnameResolvesLightweightCache.Flush()

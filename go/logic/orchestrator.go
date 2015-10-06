@@ -183,40 +183,41 @@ func ContinuousDiscovery() {
 			// See if we should also forget objects (lower frequency)
 			go func() {
 				if isElectedNode {
-					inst.ForgetLongUnseenInstances()
-					inst.ForgetUnseenInstancesDifferentlyResolved()
-					inst.ForgetExpiredHostnameResolves()
-					inst.DeleteInvalidHostnameResolves()
-					inst.ReviewUnseenInstances()
-					inst.InjectUnseenMasters()
-					inst.ResolveUnknownMasterHostnameResolves()
-					inst.UpdateClusterAliases()
-					inst.ExpireMaintenance()
-					inst.ExpireDowntime()
-					inst.ExpireCandidateInstances()
-					inst.ExpireHostnameUnresolve()
-					inst.ExpireClusterDomainName()
-					inst.ExpireAudit()
-					inst.ExpireMasterPositionEquivalence()
+					go inst.ForgetLongUnseenInstances()
+					go inst.ForgetUnseenInstancesDifferentlyResolved()
+					go inst.ForgetExpiredHostnameResolves()
+					go inst.DeleteInvalidHostnameResolves()
+					go inst.ReviewUnseenInstances()
+					go inst.InjectUnseenMasters()
+					go inst.ResolveUnknownMasterHostnameResolves()
+					go inst.UpdateClusterAliases()
+					go inst.ExpireMaintenance()
+					go inst.ExpireDowntime()
+					go inst.ExpireCandidateInstances()
+					go inst.ExpireHostnameUnresolve()
+					go inst.ExpireClusterDomainName()
+					go inst.ExpireAudit()
+					go inst.ExpireMasterPositionEquivalence()
+					go inst.FlushNontrivialResolveCacheToDatabase()
 				}
 				if !isElectedNode {
 					// Take this opportunity to refresh yourself
 					inst.LoadHostnameResolveCacheFromDatabase()
 				}
-				inst.ReadClusterAliases()
-				process.HealthTest()
+				go inst.ReadClusterAliases()
+				go process.HealthTest()
 			}()
 		case <-recoverTick:
 			go func() {
 				if isElectedNode {
-					ClearActiveFailureDetections()
-					ClearActiveRecoveries()
-					CheckAndRecover(nil, nil, false, false)
+					go ClearActiveFailureDetections()
+					go ClearActiveRecoveries()
+					go CheckAndRecover(nil, nil, false, false)
 				}
 			}()
 		case <-snapshotTopologiesTick:
 			go func() {
-				inst.SnapshotTopologies()
+				go inst.SnapshotTopologies()
 			}()
 		}
 	}
