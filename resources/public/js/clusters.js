@@ -12,6 +12,9 @@ $(document).ready(function () {
     
     $.get("/api/clusters-info", function (clusters) {
         $.get("/api/problems", function (problemInstances) {
+        	if (problemInstances == null) {
+        		problemInstances = [];
+        	}
         	normalizeInstances(problemInstances, []);
 	    	displayClusters(clusters, problemInstances);
         }, "json");

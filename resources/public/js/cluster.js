@@ -80,6 +80,10 @@ function Cluster() {
 
         var popoverDiv = getInstanceDiv(id);
         var wrapper = $(popoverDiv).data("svg-instance-wrapper");
+        if (!wrapper) {
+        	// Can happen for virtual node
+        	return false;
+        }
         var circle = wrapper.previousElementSibling;
         var pos = getSvgPos(circle);
         pos.left += 25;
