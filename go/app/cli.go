@@ -1041,12 +1041,12 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			recoveryAttempted, promotedInstance, err := logic.CheckAndRecover(instanceKey, destinationKey, true, (command == "recover-lite"))
+			recoveryAttempted, promotedInstanceKey, err := logic.CheckAndRecover(instanceKey, destinationKey, true, (command == "recover-lite"))
 			if err != nil {
 				log.Fatale(err)
 			}
 			if recoveryAttempted {
-				fmt.Println(promotedInstance.Key.DisplayString())
+				fmt.Println(promotedInstanceKey.DisplayString())
 			}
 		}
 	case cliCommand("replication-analysis"):

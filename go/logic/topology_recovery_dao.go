@@ -24,6 +24,7 @@ import (
 	"github.com/outbrain/orchestrator/go/db"
 	"github.com/outbrain/orchestrator/go/inst"
 	"github.com/outbrain/orchestrator/go/process"
+	"strings"
 )
 
 // AttemptFailureDetectionRegistration tries to add a failure-detection entry; if this fails that means the problem has already been detected
@@ -90,11 +91,11 @@ func ClearActiveFailureDetections() error {
 }
 
 // AttemptRecoveryRegistration tries to add a recovery entry; if this fails that means recovery is already in place.
-func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis) (bool, error) {
+func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis) (*TopologyRecovery, error) {
 
 	db, err := db.OpenOrchestrator()
 	if err != nil {
-		return false, log.Errore(err)
+		return nil, log.Errore(err)
 	}
 
 	sqlResult, err := sqlutils.Exec(db, `
@@ -130,10 +131,19 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis) (bool,
 		string(analysisEntry.Analysis), analysisEntry.ClusterDetails.ClusterName, analysisEntry.ClusterDetails.ClusterAlias, analysisEntry.CountSlaves, analysisEntry.SlaveHosts.ToCommaDelimitedList(),
 	)
 	if err != nil {
-		return false, log.Errore(err)
+		return nil, log.Errore(err)
 	}
 	rows, err := sqlResult.RowsAffected()
-	return (err == nil && rows > 0), err
+	if err != nil {
+		return nil, log.Errore(err)
+	}
+	if rows == 0 {
+		return nil, nil
+	}
+	// Suucess
+	topologyRecovery := NewTopologyRecovery(*analysisEntry)
+	topologyRecovery.Id, _ = sqlResult.LastInsertId()
+	return topologyRecovery, nil
 }
 
 // ClearActiveRecoveries clears the "in_active_period" flag for old-enough recoveries, thereby allowing for
@@ -154,27 +164,34 @@ func ClearActiveRecoveries() error {
 
 // ResolveRecovery is called on completion of a recovery process and updates the recovery status.
 // It does not clear the "active period" as this still takes place in order to avoid flapping.
-func ResolveRecovery(failedKey *inst.InstanceKey, successorInstance *inst.Instance) error {
+func ResolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst.Instance) error {
 
-	isSuccessful := (successorInstance != nil)
-	var successorKey inst.InstanceKey
+	isSuccessful := false
+	var successorKeyToWrite inst.InstanceKey
 	if successorInstance != nil {
-		successorKey = successorInstance.Key
+		topologyRecovery.SuccessorKey = &successorInstance.Key
+		isSuccessful = true
+		successorKeyToWrite = successorInstance.Key
 	}
 	_, err := db.ExecOrchestrator(`
 			update topology_recovery set 
 				is_successful = ?,
 				successor_hostname = ?,
 				successor_port = ?,
+				lost_slaves = ?,
+				participating_instances = ?,
+				all_errors = ?,
 				end_recovery = NOW()
 			where
-				hostname = ?
-				AND port = ?
+				recovery_id = ?
 				AND in_active_period = 1
 				AND processing_node_hostname = ?
 				AND processcing_node_token = ?
-			`, isSuccessful, successorKey.Hostname, successorKey.Port,
-		failedKey.Hostname, failedKey.Port, process.ThisHostname, process.ProcessToken.Hash,
+			`, isSuccessful, successorKeyToWrite.Hostname, successorKeyToWrite.Port,
+		topologyRecovery.LostSlaves.ToCommaDelimitedList(),
+		topologyRecovery.ParticipatingInstanceKeys.ToCommaDelimitedList(),
+		strings.Join(topologyRecovery.AllErrors, "\n"),
+		topologyRecovery.Id, process.ThisHostname, process.ProcessToken.Hash,
 	)
 	return log.Errore(err)
 }
@@ -200,7 +217,10 @@ func readRecoveries(whereCondition string, limit string) ([]TopologyRecovery, er
             cluster_name,
             cluster_alias,
             count_affected_slaves,
-            slave_hosts		
+            slave_hosts,
+            participating_instances,
+            lost_slaves,
+            all_errors
 		from 
 			topology_recovery
 		%s
@@ -214,7 +234,7 @@ func readRecoveries(whereCondition string, limit string) ([]TopologyRecovery, er
 	}
 
 	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-		topologyRecovery := TopologyRecovery{}
+		topologyRecovery := *NewTopologyRecovery(inst.ReplicationAnalysis{})
 		topologyRecovery.Id = m.GetInt64("recovery_id")
 
 		topologyRecovery.IsActive = m.GetBool("is_active")
@@ -232,10 +252,15 @@ func readRecoveries(whereCondition string, limit string) ([]TopologyRecovery, er
 		topologyRecovery.AnalysisEntry.CountSlaves = m.GetUint("count_affected_slaves")
 		topologyRecovery.AnalysisEntry.ReadSlaveHostsFromString(m.GetString("slave_hosts"))
 
+		topologyRecovery.SuccessorKey = &inst.InstanceKey{}
 		topologyRecovery.SuccessorKey.Hostname = m.GetString("successor_hostname")
 		topologyRecovery.SuccessorKey.Port = m.GetInt("successor_port")
 
 		topologyRecovery.AnalysisEntry.ClusterDetails.ReadRecoveryInfo()
+
+		topologyRecovery.AllErrors = strings.Split(m.GetString("all_errors"), "\n")
+		topologyRecovery.LostSlaves.ReadCommaDelimitedList(m.GetString("lost_slaves"))
+		topologyRecovery.ParticipatingInstanceKeys.ReadCommaDelimitedList(m.GetString("participating_instances"))
 
 		res = append(res, topologyRecovery)
 		return nil

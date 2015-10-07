@@ -520,6 +520,13 @@ var generateSQLPatches = []string{
 			ADD COLUMN acknowledged_by varchar(128) CHARACTER SET utf8 NOT NULL,
 			ADD COLUMN acknowledge_comment text CHARACTER SET utf8 NOT NULL
 	`,
+	`
+		ALTER TABLE 
+			topology_recovery
+			ADD COLUMN participating_instances text CHARACTER SET ascii NOT NULL after slave_hosts,
+			ADD COLUMN lost_slaves text CHARACTER SET ascii NOT NULL after participating_instances,
+			ADD COLUMN all_errors text CHARACTER SET ascii NOT NULL after lost_slaves
+	`,
 }
 
 // OpenTopology returns a DB instance to access a topology instance

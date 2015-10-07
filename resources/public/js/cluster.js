@@ -778,8 +778,12 @@ function Cluster() {
         return true;
     }
 
-
-    function instanceIsDescendant(node, nodeAtQuestion) {
+    function instanceIsDescendant(node, nodeAtQuestion, depth) {
+    	depth = depth || 0;
+    	if (depth > node.ReplicationDepth + 1) {
+    		// Safety check for master-master topologies: avoid infinite loop
+    		return false;
+    	}
         if (nodeAtQuestion == null) {
             return false;
         }
@@ -792,7 +796,7 @@ function Cluster() {
         if (node.masterNode.id == nodeAtQuestion.id) {
             return true;
         }
-        return instanceIsDescendant(node.masterNode, nodeAtQuestion)
+        return instanceIsDescendant(node.masterNode, nodeAtQuestion, depth+1)
     }
 
     // Returns true when the two instances are siblings, and 'node' is behind or at same position
