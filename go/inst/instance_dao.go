@@ -24,6 +24,7 @@ import (
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
+	"github.com/rcrowley/go-metrics"
 	"regexp"
 	"sort"
 	"strings"
@@ -57,6 +58,16 @@ func (this InstancesByCountSlaveHosts) Len() int      { return len(this) }
 func (this InstancesByCountSlaveHosts) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
 func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
+}
+
+var readTopologyInstanceCounter = metrics.NewCounter()
+var readInstanceCounter = metrics.NewCounter()
+var writeInstanceCounter = metrics.NewCounter()
+
+func init() {
+	metrics.Register("instance.read_topology", readTopologyInstanceCounter)
+	metrics.Register("instance.read", readInstanceCounter)
+	metrics.Register("instance.write", writeInstanceCounter)
 }
 
 // ExecuteOnTopology will execute given function while maintaining concurrency limit
@@ -486,6 +497,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 Cleanup:
+	readTopologyInstanceCounter.Inc(1)
 	if instanceFound {
 		instance.IsLastCheckValid = true
 		instance.IsRecentlyChecked = true
@@ -674,6 +686,7 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 	instances, err := readInstancesByCondition(condition, "")
 	// We know there will be at most one (hostname & port are PK)
 	// And we expect to find one
+	readInstanceCounter.Inc(1)
 	if len(instances) == 0 {
 		return nil, false, err
 	}
@@ -1491,6 +1504,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 		} else {
 			log.Debugf("writeInstance: will not update database_instance due to error: %+v", lastError)
 		}
+		writeInstanceCounter.Inc(1)
 		return nil
 	}
 	return ExecDBWriteFunc(writeFunc)

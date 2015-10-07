@@ -43,6 +43,7 @@ type TopologyRecovery struct {
 	RecoveryEndTimestamp      string
 	ProcessingNodeHostname    string
 	ProcessingNodeToken       string
+	PostponedFunctions        [](func() error)
 }
 
 func NewTopologyRecovery(replicationAnalysis inst.ReplicationAnalysis) *TopologyRecovery {
@@ -52,6 +53,7 @@ func NewTopologyRecovery(replicationAnalysis inst.ReplicationAnalysis) *Topology
 	topologyRecovery.LostSlaves = *inst.NewInstanceKeyMap()
 	topologyRecovery.ParticipatingInstanceKeys = *inst.NewInstanceKeyMap()
 	topologyRecovery.AllErrors = []string{}
+	topologyRecovery.PostponedFunctions = [](func() error){}
 	return topologyRecovery
 }
 
@@ -66,6 +68,10 @@ func (this *TopologyRecovery) AddErrors(errs []error) {
 	for _, err := range errs {
 		this.AddError(err)
 	}
+}
+
+func (this *TopologyRecovery) AddPostponedFunction(f func() error) {
+	this.PostponedFunctions = append(this.PostponedFunctions, f)
 }
 
 type MasterRecoveryType string
@@ -142,7 +148,9 @@ func executeProcesses(processes []string, description string, topologyRecovery *
 	return err
 }
 
-func recoverDeadMasterInBinlogServerTopology(failedMasterKey *inst.InstanceKey) (promotedSlave *inst.Instance, err error) {
+func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery) (promotedSlave *inst.Instance, err error) {
+	failedMasterKey := &topologyRecovery.AnalysisEntry.AnalyzedInstanceKey
+
 	var promotedBinlogServer *inst.Instance
 
 	promotedBinlogServer, err = inst.RegroupSlavesBinlogServers(failedMasterKey, true)
@@ -201,7 +209,7 @@ func recoverDeadMasterInBinlogServerTopology(failedMasterKey *inst.InstanceKey) 
 	func() {
 		// Move binlog server slaves up to replicate from master.
 		// This can only be done once a BLS has skipped to the next binlog
-		// We do this asynchronuously. The master is already promoted and we're happy.
+		// We postpone this operation. The master is already promoted and we're happy.
 		binlogServerSlaves, err := inst.ReadBinlogServerSlaveInstances(&promotedBinlogServer.Key)
 		if err != nil {
 			return
@@ -212,21 +220,23 @@ func recoverDeadMasterInBinlogServerTopology(failedMasterKey *inst.InstanceKey) 
 			if i >= maxBinlogServersToPromote {
 				return
 			}
-			go func() {
-				binlogServerSlave, err = inst.StopSlave(&binlogServerSlave.Key)
+			postponedFunction := func() error {
+				binlogServerSlave, err := inst.StopSlave(&binlogServerSlave.Key)
 				if err != nil {
-					return
+					return err
 				}
 				// Make sure the BLS has the "next binlog" -- the one the master flushed & purged to. Otherwise the BLS
 				// will request a binlog the master does not have
 				if binlogServerSlave.ExecBinlogCoordinates.SmallerThan(&promotedBinlogServer.ExecBinlogCoordinates) {
 					binlogServerSlave, err = inst.StartSlaveUntilMasterCoordinates(&binlogServerSlave.Key, &promotedBinlogServer.ExecBinlogCoordinates)
 					if err != nil {
-						return
+						return err
 					}
 				}
-				inst.Repoint(&binlogServerSlave.Key, &promotedSlave.Key, inst.GTIDHintDeny)
-			}()
+				_, err = inst.Repoint(&binlogServerSlave.Key, &promotedSlave.Key, inst.GTIDHintDeny)
+				return err
+			}
+			topologyRecovery.AddPostponedFunction(postponedFunction)
 		}
 	}()
 
@@ -266,28 +276,32 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 		}
 	case MasterRecoveryBinlogServer:
 		{
-			promotedSlave, err = recoverDeadMasterInBinlogServerTopology(failedInstanceKey)
+			promotedSlave, err = recoverDeadMasterInBinlogServerTopology(topologyRecovery)
 		}
 	}
 	topologyRecovery.AddError(err)
 
 	if promotedSlave != nil && len(lostSlaves) > 0 && config.Config.DetachLostSlavesAfterMasterFailover {
-		log.Debugf("topology_recovery: - RecoverDeadMaster: lost %+v slaves during recovery process; detaching them", len(lostSlaves))
-		go func() {
+		postponedFunction := func() error {
+			log.Debugf("topology_recovery: - RecoverDeadMaster: lost %+v slaves during recovery process; detaching them", len(lostSlaves))
 			for _, slave := range lostSlaves {
 				slave := slave
 				inst.DetachSlaveOperation(&slave.Key)
 			}
-		}()
+			return nil
+		}
+		topologyRecovery.AddPostponedFunction(postponedFunction)
 	}
 	if config.Config.MasterFailoverLostInstancesDowntimeMinutes > 0 {
-		go func() {
+		postponedFunction := func() error {
 			inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), "RecoverDeadMaster indicates this instance is lost", config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
 			for _, slave := range lostSlaves {
 				slave := slave
 				inst.BeginDowntime(&slave.Key, inst.GetMaintenanceOwner(), "RecoverDeadMaster indicates this instance is lost", config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
 			}
-		}()
+			return nil
+		}
+		topologyRecovery.AddPostponedFunction(postponedFunction)
 	}
 
 	if promotedSlave == nil {
@@ -755,6 +769,12 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 			// Execute general post failover processes
 			executeProcesses(config.Config.PostFailoverProcesses, "PostFailoverProcesses", topologyRecovery, false)
 		}
+	}
+	if len(topologyRecovery.PostponedFunctions) > 0 {
+		log.Debugf("executeCheckAndRecoverFunction: executing %+v postponed functions", len(topologyRecovery.PostponedFunctions))
+	}
+	for _, postponedFunction := range topologyRecovery.PostponedFunctions {
+		postponedFunction()
 	}
 	return recoveryAttempted, topologyRecovery, err
 }

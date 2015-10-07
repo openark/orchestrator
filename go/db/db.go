@@ -348,6 +348,24 @@ var generateSQL = []string{
           KEY last_suggested_idx(last_suggested)
         ) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS async_request (
+		  request_id bigint unsigned NOT NULL AUTO_INCREMENT,
+		  command varchar(128) charset ascii not null,
+		  hostname varchar(128) NOT NULL,
+		  port smallint(5) unsigned NOT NULL,
+		  destination_hostname varchar(128) NOT NULL,
+		  destination_port smallint(5) unsigned NOT NULL,
+		  pattern text CHARACTER SET utf8 NOT NULL,
+		  gtid_hint varchar(32) charset ascii not null,
+		  begin_timestamp timestamp NULL DEFAULT NULL,
+		  end_timestamp timestamp NULL DEFAULT NULL,
+		  story text CHARACTER SET utf8 NOT NULL,
+		  PRIMARY KEY (request_id),
+		  KEY begin_timestamp_idx (begin_timestamp),
+		  KEY end_timestamp_idx (end_timestamp)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{
