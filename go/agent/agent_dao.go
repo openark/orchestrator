@@ -106,7 +106,30 @@ func SubmitAgent(hostname string, port int, token string) (string, error) {
 		return "", log.Errore(err)
 	}
 
+	// Try to discover topology instances when an agent submits
+	if config.Config.AgentAutoDiscover {
+		DiscoverAgentInstance(hostname, port)
+	}
+
 	return hostname, err
+}
+
+// If a mysql port is available, try to discover against it
+func DiscoverAgentInstance(hostname string, port int) error {
+	agent, err := GetAgent(hostname)
+	if err != nil {
+		log.Errorf("Couldn't get agent for %s: %v", hostname, err)
+		return err
+	}
+
+	instanceKey := agent.GetInstance()
+	instance, err := inst.ReadTopologyInstance(instanceKey)
+	if err != nil {
+		log.Errorf("Failed to read topology for %v", instanceKey)
+		return err
+	}
+	log.Infof("Discovered Agent Instance: %v", instance.Key)
+	return nil
 }
 
 // ForgetLongUnseenAgents will remove entries of all agents that have long since been last seen.

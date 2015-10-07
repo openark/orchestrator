@@ -16,6 +16,8 @@
 
 package agent
 
+import "github.com/outbrain/orchestrator/go/inst"
+
 // LogicalVolume describes an LVM volume
 type LogicalVolume struct {
 	Name            string
@@ -72,4 +74,9 @@ type SeedOperationState struct {
 	StateTimestamp string
 	Action         string
 	ErrorMessage   string
+}
+
+// Build an instance key for a given agent
+func (this *Agent) GetInstance() *inst.InstanceKey {
+	return &inst.InstanceKey{Hostname: this.Hostname, Port: int(this.MySQLPort)}
 }
