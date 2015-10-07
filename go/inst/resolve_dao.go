@@ -22,7 +22,22 @@ import (
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
+	"github.com/rcrowley/go-metrics"
 )
+
+var writeResolvedHostnameCounter = metrics.NewCounter()
+var writeUnresolvedHostnameCounter = metrics.NewCounter()
+var readResolvedHostnameCounter = metrics.NewCounter()
+var readUnresolvedHostnameCounter = metrics.NewCounter()
+var readAllResolvedHostnamesCounter = metrics.NewCounter()
+
+func init() {
+	metrics.Register("resolve.write_resolved", writeResolvedHostnameCounter)
+	metrics.Register("resolve.write_unresolved", writeUnresolvedHostnameCounter)
+	metrics.Register("resolve.read_resolved", readResolvedHostnameCounter)
+	metrics.Register("resolve.read_unresolved", readUnresolvedHostnameCounter)
+	metrics.Register("resolve.read_resolved_all", readAllResolvedHostnamesCounter)
+}
 
 // WriteResolvedHostname stores a hostname and the resolved hostname to backend database
 func WriteResolvedHostname(hostname string, resolvedHostname string) error {
@@ -56,7 +71,7 @@ func WriteResolvedHostname(hostname string, resolvedHostname string) error {
 				resolvedHostname)
 		}
 		log.Debugf("WriteResolvedHostname: resolved %s to %s", hostname, resolvedHostname)
-
+		writeResolvedHostnameCounter.Inc(1)
 		return nil
 	}
 	return ExecDBWriteFunc(writeFunc)
@@ -84,6 +99,7 @@ func ReadResolvedHostname(hostname string) (string, error) {
 		return nil
 	})
 Cleanup:
+	readResolvedHostnameCounter.Inc(1)
 
 	if err != nil {
 		log.Errore(err)
@@ -112,6 +128,7 @@ func readAllHostnameResolves() ([]HostnameResolve, error) {
 		return nil
 	})
 Cleanup:
+	readAllResolvedHostnamesCounter.Inc(1)
 
 	if err != nil {
 		log.Errore(err)
@@ -142,6 +159,7 @@ func readUnresolvedHostname(hostname string) (string, error) {
 		return nil
 	})
 Cleanup:
+	readUnresolvedHostnameCounter.Inc(1)
 
 	if err != nil {
 		log.Errore(err)
@@ -206,6 +224,7 @@ func WriteHostnameUnresolve(instanceKey *InstanceKey, unresolvedHostname string)
         	values (?, ?, NOW())
 				`, instanceKey.Hostname, unresolvedHostname,
 		)
+		writeUnresolvedHostnameCounter.Inc(1)
 		return nil
 	}
 	return ExecDBWriteFunc(writeFunc)
