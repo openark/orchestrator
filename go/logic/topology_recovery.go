@@ -31,6 +31,8 @@ import (
 
 // TopologyRecovery represents an entry in the topology_recovery table
 type TopologyRecovery struct {
+	inst.PostponedFunctionsContainer
+
 	Id                        int64
 	AnalysisEntry             inst.ReplicationAnalysis
 	SuccessorKey              *inst.InstanceKey
@@ -68,10 +70,6 @@ func (this *TopologyRecovery) AddErrors(errs []error) {
 	for _, err := range errs {
 		this.AddError(err)
 	}
-}
-
-func (this *TopologyRecovery) AddPostponedFunction(f func() error) {
-	this.PostponedFunctions = append(this.PostponedFunctions, f)
 }
 
 type MasterRecoveryType string
@@ -272,7 +270,7 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 		}
 	case MasterRecoveryPseudoGTID:
 		{
-			lostSlaves, _, _, promotedSlave, err = inst.RegroupSlavesIncludingSubSlavesOfBinlogServers(failedInstanceKey, true, nil)
+			lostSlaves, _, _, promotedSlave, err = inst.RegroupSlavesIncludingSubSlavesOfBinlogServers(failedInstanceKey, true, nil, &topologyRecovery.PostponedFunctionsContainer)
 		}
 	case MasterRecoveryBinlogServer:
 		{
@@ -599,7 +597,7 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 	if !recoveryResolved {
 		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will next attempt regrouping of slaves")
 		// Plan B: regroup (we wish to reduce cross-DC replication streams)
-		_, _, _, regroupPromotedSlave, err := inst.RegroupSlaves(failedInstanceKey, true, nil)
+		_, _, _, regroupPromotedSlave, err := inst.RegroupSlaves(failedInstanceKey, true, nil, nil)
 		if err != nil {
 			topologyRecovery.AddError(err)
 			log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: regroup failed on: %+v", err)
@@ -770,12 +768,7 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 			executeProcesses(config.Config.PostFailoverProcesses, "PostFailoverProcesses", topologyRecovery, false)
 		}
 	}
-	if len(topologyRecovery.PostponedFunctions) > 0 {
-		log.Debugf("executeCheckAndRecoverFunction: executing %+v postponed functions", len(topologyRecovery.PostponedFunctions))
-	}
-	for _, postponedFunction := range topologyRecovery.PostponedFunctions {
-		postponedFunction()
-	}
+	topologyRecovery.InvokePostponed()
 	return recoveryAttempted, topologyRecovery, err
 }
 

@@ -103,6 +103,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	if hostname, err := os.Hostname(); err == nil {
 		thisInstanceKey = &inst.InstanceKey{Hostname: hostname, Port: int(config.Config.DefaultInstancePort)}
 	}
+	postponedFunctionsContainer := inst.NewPostponedFunctionsContainer()
 
 	if len(owner) == 0 {
 		// get os username as owner
@@ -832,7 +833,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlaves(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) })
+			lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlaves(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
+			postponedFunctionsContainer.InvokePostponed()
 			if promotedSlave == nil {
 				log.Fatalf("Could not regroup slaves of %+v; error: %+v", *instanceKey, err)
 			}

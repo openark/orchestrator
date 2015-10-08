@@ -1252,7 +1252,7 @@ func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	_, _, err, _ = MultiMatchBelow(siblings, instanceKey, false)
+	_, _, err, _ = MultiMatchBelow(siblings, instanceKey, false, nil)
 	if err != nil {
 		goto Cleanup
 	}
@@ -1391,7 +1391,7 @@ func MakeLocalMaster(instanceKey *InstanceKey) (*Instance, error) {
 		goto Cleanup
 	}
 
-	_, _, err, _ = MultiMatchBelow(siblings, instanceKey, false)
+	_, _, err, _ = MultiMatchBelow(siblings, instanceKey, false, nil)
 	if err != nil {
 		goto Cleanup
 	}
@@ -1458,7 +1458,7 @@ func removeBinlogServerInstances(instances [](*Instance)) [](*Instance) {
 
 // MultiMatchBelow will efficiently match multiple slaves below a given instance.
 // It is assumed that all given slaves are siblings
-func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyStopped bool) ([](*Instance), *Instance, error, []error) {
+func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyStopped bool, postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), *Instance, error, []error) {
 	res := [](*Instance){}
 	errs := []error{}
 	slaveMutex := make(chan bool, 1)
@@ -1534,9 +1534,23 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 					var slaveErr error
 					var matchedCoordinates *BinlogCoordinates
 					log.Debugf("MultiMatchBelow: attempting slave %+v in bucket %+v", slave.Key, execCoordinates)
-					ExecuteOnTopology(func() {
-						_, matchedCoordinates, slaveErr = MatchBelow(&slave.Key, &belowInstance.Key, false)
-					})
+					matchFunc := func() error {
+						ExecuteOnTopology(func() {
+							_, matchedCoordinates, slaveErr = MatchBelow(&slave.Key, &belowInstance.Key, false)
+						})
+						return nil
+					}
+					if postponedFunctionsContainer != nil &&
+						config.Config.PostponeSlaveRecoveryOnLagMinutes > 0 &&
+						slave.SQLDelay > config.Config.PostponeSlaveRecoveryOnLagMinutes*60 &&
+						len(bucketSlaves) == 1 {
+						// This slave is the only one in the bucket, AND it's lagging very much, AND
+						// we're configured to postpone operation on this slave so as not to delay everyone else.
+						(*postponedFunctionsContainer).AddPostponedFunction(matchFunc)
+						return
+						// We bail out and trust our invoker to later call upon this postponed function
+					}
+					matchFunc()
 					log.Debugf("MultiMatchBelow: match result: %+v, %+v", matchedCoordinates, slaveErr)
 
 					if slaveErr == nil {
@@ -1568,7 +1582,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 				return
 			}
 			log.Debugf("MultiMatchBelow: bucket %+v coordinates are: %+v. Proceeding to match all bucket slaves", execCoordinates, *bucketMatchedCoordinates)
-			// At this point our bucket is complete.
+			// At this point our bucket has a known salvaged slave.
 			// We don't wait for the other buckets -- we immediately work out all the other slaves in this bucket.
 			// (perhaps another bucket is busy matching a 24h delayed-replica; we definitely don't want to hold on that)
 			func() {
@@ -1671,7 +1685,7 @@ func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey, pattern str
 		return res, belowInstance, err, errs
 	}
 	slaves = filterInstancesByPattern(slaves, pattern)
-	matchedSlaves, belowInstance, err, errs := MultiMatchBelow(slaves, &belowInstance.Key, false)
+	matchedSlaves, belowInstance, err, errs := MultiMatchBelow(slaves, &belowInstance.Key, false, nil)
 
 	if len(matchedSlaves) != len(slaves) {
 		err = fmt.Errorf("MultiMatchSlaves: only matched %d out of %d slaves of %+v; error is: %+v", len(matchedSlaves), len(slaves), *masterKey, err)
@@ -1857,7 +1871,7 @@ func GetCandidateSlaveOfBinlogServerTopology(masterKey *InstanceKey) (candidateS
 
 // RegroupSlaves will choose a candidate slave of a given instance, and enslave its siblings using
 // either simple CHANGE MASTER TO, where possible, or pseudo-gtid
-func RegroupSlaves(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance)) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
+func RegroupSlaves(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
 	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err := GetCandidateSlave(masterKey, true)
 	if err != nil {
 		if !returnSlaveEvenOnFailureToRegroup {
@@ -1893,7 +1907,7 @@ func RegroupSlaves(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup boo
 
 	log.Debugf("RegroupSlaves: multi matching %d later slaves", len(laterSlaves))
 	// As for the laterSlaves, we'll have to apply pseudo GTID
-	laterSlaves, instance, err, _ := MultiMatchBelow(laterSlaves, &candidateSlave.Key, true)
+	laterSlaves, instance, err, _ := MultiMatchBelow(laterSlaves, &candidateSlave.Key, true, postponedFunctionsContainer)
 
 	operatedSlaves := append(equalSlaves, candidateSlave)
 	operatedSlaves = append(operatedSlaves, laterSlaves...)
@@ -1937,7 +1951,7 @@ func getMostUpToDateActiveBinlogServer(masterKey *InstanceKey) (mostAdvancedBinl
 
 // RegroupSlavesIncludingSubSlavesOfBinlogServers works in a mixed standard/binlog-server topology. This kind of topology shouldn't really exist,
 // but life is hard. To transition binlog servers into your topology you live sometimes with this hybrid solution.
-func RegroupSlavesIncludingSubSlavesOfBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance)) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
+func RegroupSlavesIncludingSubSlavesOfBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
 	// First, handle binlog server issues:
 	func() error {
 		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: starting on slaves of %+v", *masterKey)
@@ -2000,7 +2014,7 @@ func RegroupSlavesIncludingSubSlavesOfBinlogServers(masterKey *InstanceKey, retu
 		return nil
 	}()
 	// Proceed to normal regroup:
-	return RegroupSlaves(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen)
+	return RegroupSlaves(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen, postponedFunctionsContainer)
 }
 
 // RegroupSlavesGTID will choose a candidate slave of a given instance, and enslave its siblings using GTID
@@ -2218,7 +2232,7 @@ func relocateSlavesInternal(slaves [](*Instance), instance, other *Instance) ([]
 				pseudoGTIDSlaves = append(pseudoGTIDSlaves, slave)
 			}
 		}
-		pseudoGTIDSlaves, _, err, errs = MultiMatchBelow(pseudoGTIDSlaves, &other.Key, false)
+		pseudoGTIDSlaves, _, err, errs = MultiMatchBelow(pseudoGTIDSlaves, &other.Key, false, nil)
 		return pseudoGTIDSlaves, err, errs
 	}
 
