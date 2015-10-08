@@ -592,6 +592,9 @@ function createVirtualInstance() {
 }
 
 function normalizeInstances(instances, maintenanceList) {
+	if (!instances) {
+		instances = [];
+	}
     instances.forEach(function(instance) {
     	normalizeInstance(instance);
     });

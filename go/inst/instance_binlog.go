@@ -19,7 +19,9 @@ package inst
 import (
 	"errors"
 	"github.com/outbrain/golib/log"
+	"github.com/outbrain/orchestrator/go/config"
 	"regexp"
+	"strings"
 )
 
 // Event entries may contains table IDs (can be different for same tables on different servers)
@@ -149,6 +151,12 @@ func (this *BinlogEventCursor) nextRealEvent() (*BinlogEvent, error) {
 		// Recursion will not be deep here. A few entries (end-of-binlog followed by start-of-bin-log) are possible,
 		// but we really don't expect a huge sequence of those.
 		return this.nextRealEvent()
+	}
+	for _, skipSubstring := range config.Config.SkipBinlogEventsContaining {
+		if strings.Index(event.Info, skipSubstring) >= 0 {
+			// Recursion might go deeper here.
+			return this.nextRealEvent()
+		}
 	}
 	event.NormalizeInfo()
 	return event, err

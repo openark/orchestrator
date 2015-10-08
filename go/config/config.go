@@ -122,6 +122,7 @@ type Configuration struct {
 	DetectPseudoGTIDQuery                      string            // Optional query which is used to authoritatively decide whether pseudo gtid is enabled on instance
 	BinlogEventsChunkSize                      int               // Chunk size (X) for SHOW BINLOG|RELAYLOG EVENTS LIMIT ?,X statements. Smaller means less locking and mroe work to be done
 	BufferBinlogEvents                         bool              // Should we used buffered read on SHOW BINLOG|RELAYLOG EVENTS -- releases the database lock sooner (recommended)
+	SkipBinlogEventsContaining                 []string          // When scanning/comparing binlogs for Pseudo-GTID, skip entries containing given texts. These are NOT regular expressions (would consume too much CPU while scanning binlogs), just substrings to find.
 	FailureDetectionPeriodBlockMinutes         int               // The time for which an instance's failure discovery is kept "active", so as to avoid concurrent "discoveries" of the instance's failure; this preceeds any recovery process, if any.
 	RecoveryPeriodBlockMinutes                 int               // The time for which an instance's recovery is kept "active", so as to avoid concurrent recoveries on smae instance as well as flapping
 	RecoveryIgnoreHostnameFilters              []string          // Recovery analysis will completely ignore hosts matching given patterns
@@ -222,6 +223,7 @@ func NewConfiguration() *Configuration {
 		DetectPseudoGTIDQuery:                      "",
 		BinlogEventsChunkSize:                      10000,
 		BufferBinlogEvents:                         true,
+		SkipBinlogEventsContaining:                 []string{},
 		FailureDetectionPeriodBlockMinutes:         60,
 		RecoveryPeriodBlockMinutes:                 60,
 		RecoveryIgnoreHostnameFilters:              []string{},
