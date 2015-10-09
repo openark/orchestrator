@@ -19,7 +19,7 @@ $(document).ready(function () {
         	var analyzedInstanceDisplay = audit.AnalysisEntry.AnalyzedInstanceKey.Hostname+":"+audit.AnalysisEntry.AnalyzedInstanceKey.Port;
         	var sucessorInstanceDisplay = audit.SuccessorKey.Hostname+":"+audit.SuccessorKey.Port;
     		var row = jQuery('<tr/>');
-    		$('<td/>', { text: audit.AnalysisEntry.Analysis }).prepend('<span class="pull-right glyphicon glyphicon-info-sign text-primary" data-toggle="tooltip" data-placement="right" data-html="true" title="..."></span>').appendTo(row);
+    		$('<td/>', { text: audit.AnalysisEntry.Analysis }).prepend('<span class="more-recovery-info pull-right glyphicon glyphicon-info-sign text-primary" data-toggle="tooltip" data-placement="right" data-html="true" title=""></span>').appendTo(row);
     		$('<a/>',  { text: analyzedInstanceDisplay, href: "/web/search/" + analyzedInstanceDisplay }).wrap($("<td/>")).parent().appendTo(row);
     		$('<td/>', { text: audit.AnalysisEntry.CountSlaves }).appendTo(row);
     		$('<a/>',  { text: audit.AnalysisEntry.ClusterDetails.ClusterName, href: "/web/cluster/"+audit.AnalysisEntry.ClusterDetails.ClusterName}).wrap($("<td/>")).parent().appendTo(row);
@@ -33,6 +33,29 @@ $(document).ready(function () {
     		} else {
     			$('<td/>', { text: "pending" }).appendTo(row);
     		}
+    		var moreInfo = "<h6>"+audit.AnalysisEntry.Analysis+"</h6>";
+    		if (audit.LostSlaves.length > 0) {
+    			moreInfo += "Lost slaves:<ul>";
+        		audit.LostSlaves.forEach(function(instanceKey) {
+        			moreInfo += "<li>"+getInstanceTitle(instanceKey.Hostname, instanceKey.Port);    			
+        		});
+        		moreInfo += "</ul>";
+    		}
+    		if (audit.ParticipatingInstanceKeys.length > 0) {
+    			moreInfo += "Participating instances:<ul>";
+        		audit.ParticipatingInstanceKeys.forEach(function(instanceKey) {
+        			moreInfo += "<li>"+getInstanceTitle(instanceKey.Hostname, instanceKey.Port);    			
+        		});
+        		moreInfo += "</ul>";
+    		}
+    		if (audit.AllErrors.length > 0 && audit.AllErrors[0]) {
+    			moreInfo += "All errors:<ul>";
+        		audit.AllErrors.forEach(function(err) {
+        			moreInfo += "<li>"+err;    			
+        		});
+        		moreInfo += "</ul>";
+    		}
+    		row.find(".more-recovery-info").attr("title", moreInfo);
     		row.find('[data-toggle="tooltip"]').tooltip();
     		row.appendTo('#audit tbody');
     	});

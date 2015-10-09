@@ -356,6 +356,12 @@ body {
     white-space: nowrap;
 }
 
+#audit table .tooltip-inner {
+	text-align: left;
+	min-width: 420px;
+	white-space: nowrap;
+}
+
 .table-unbordered > tbody > tr > td {
     border: 0px;
 }

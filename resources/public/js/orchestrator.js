@@ -100,6 +100,12 @@ function canonizeInstanceTitle(title) {
 	return title;
 }
 
+function getInstanceTitle(host, port) {
+    return canonizeInstanceTitle(host+":"+port);
+}
+
+
+
 function commonSuffixLength(strings) {
 	if (strings.length == 0) {
 		return 0;
