@@ -92,7 +92,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
-	if _, found := recentDiscoveryOperationKeys.Get(instanceKey.DisplayString()); found {
+	if existsInCacheError := recentDiscoveryOperationKeys.Add(instanceKey.DisplayString(), true, cache.DefaultExpiration); existsInCacheError != nil {
 		// Just recently attempted
 		return
 	}
@@ -101,9 +101,8 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 
 	if found && instance.IsUpToDate && instance.IsLastCheckValid {
 		// we've already discovered this one. Skip!
-		goto Cleanup
+		return
 	}
-	recentDiscoveryOperationKeys.Set(instanceKey.DisplayString(), true, cache.DefaultExpiration)
 	discoveriesCounter.Inc(1)
 	// First we've ever heard of this instance. Continue investigation:
 	instance, err = inst.ReadTopologyInstance(&instanceKey)
@@ -112,7 +111,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	if err != nil || instance == nil {
 		failedDiscoveriesCounter.Inc(1)
 		log.Warningf("instance is nil in discoverInstance. key=%+v, error=%+v", instanceKey, err)
-		goto Cleanup
+		return
 	}
 
 	log.Debugf("Discovered host: %+v, master: %+v", instance.Key, instance.MasterKey)
@@ -129,8 +128,6 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	}
 	// Investigate master:
 	discoveryInstanceKeys <- instance.MasterKey
-
-Cleanup:
 }
 
 // Start discovery begins a one time asynchronuous discovery process for the given
