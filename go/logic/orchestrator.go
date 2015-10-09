@@ -26,6 +26,9 @@ import (
 	"github.com/outbrain/orchestrator/go/process"
 	"github.com/pmylund/go-cache"
 	"github.com/rcrowley/go-metrics"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -59,6 +62,22 @@ func init() {
 	ometrics.OnGraphiteTick(func() { discoveryQueueLengthGauge.Update(int64(len(discoveryInstanceKeys))) })
 	ometrics.OnGraphiteTick(func() { discoveryRecentCountGauge.Update(int64(recentDiscoveryOperationKeys.ItemCount())) })
 	ometrics.OnGraphiteTick(func() { isElectedGauge.Update(int64(math.TernaryInt(isElectedNode, 1, 0))) })
+}
+
+// acceptSignals registers for OS signals
+func acceptSignals() {
+	c := make(chan os.Signal, 1)
+
+	signal.Notify(c, syscall.SIGHUP)
+	go func() {
+		for sig := range c {
+			switch sig {
+			case syscall.SIGHUP:
+				log.Debugf("Received SIGHUP. Reloading configuration")
+				config.Reload()
+			}
+		}
+	}()
 }
 
 // handleDiscoveryRequests iterates the discoveryInstanceKeys channel and calls upon
@@ -173,6 +192,7 @@ func ContinuousDiscovery() {
 	}
 
 	go ometrics.InitGraphiteMetrics()
+	go acceptSignals()
 
 	for {
 		select {
