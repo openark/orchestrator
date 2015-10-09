@@ -24,6 +24,7 @@ import (
 	"github.com/outbrain/orchestrator/go/os"
 	"github.com/outbrain/orchestrator/go/process"
 	"github.com/pmylund/go-cache"
+	"github.com/rcrowley/go-metrics"
 	"sort"
 	"strings"
 	"time"
@@ -95,6 +96,22 @@ func (this InstancesByCountSlaves) Less(i, j int) bool {
 		return !this[i].ExecBinlogCoordinates.SmallerThan(&this[j].ExecBinlogCoordinates)
 	}
 	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
+}
+
+var recoverDeadMasterCounter = metrics.NewCounter()
+var recoverDeadMasterSuccessCounter = metrics.NewCounter()
+var recoverDeadMasterFailureCounter = metrics.NewCounter()
+var recoverDeadIntermediateMasterCounter = metrics.NewCounter()
+var recoverDeadIntermediateMasterSuccessCounter = metrics.NewCounter()
+var recoverDeadIntermediateMasterFailureCounter = metrics.NewCounter()
+
+func init() {
+	metrics.Register("recover.dead_master.start", recoverDeadMasterCounter)
+	metrics.Register("recover.dead_master.success", recoverDeadMasterSuccessCounter)
+	metrics.Register("recover.dead_master.fail", recoverDeadMasterFailureCounter)
+	metrics.Register("recover.dead_intermediate_master.start", recoverDeadIntermediateMasterCounter)
+	metrics.Register("recover.dead_intermediate_master.success", recoverDeadIntermediateMasterSuccessCounter)
+	metrics.Register("recover.dead_intermediate_master.fail", recoverDeadIntermediateMasterFailureCounter)
 }
 
 // replaceCommandPlaceholders replaxces agreed-upon placeholders with analysis data
@@ -425,6 +442,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 
 	// That's it! We must do recovery!
 	log.Debugf("topology_recovery: will handle DeadMaster event on %+v", analysisEntry.ClusterDetails.ClusterName)
+	recoverDeadMasterCounter.Inc(1)
 	promotedSlave, lostSlaves, err := RecoverDeadMaster(topologyRecovery, skipProcesses)
 	topologyRecovery.LostSlaves.AddInstances(lostSlaves)
 
@@ -436,10 +454,13 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 	ResolveRecovery(topologyRecovery, promotedSlave)
 	if promotedSlave != nil {
 		// Success!
+		recoverDeadMasterSuccessCounter.Inc(1)
 		if !skipProcesses {
 			// Execute post master-failover processes
 			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
 		}
+	} else {
+		recoverDeadMasterFailureCounter.Inc(1)
 	}
 
 	return true, topologyRecovery, err
@@ -655,13 +676,19 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 	}
 
 	// That's it! We must do recovery!
+	recoverDeadIntermediateMasterCounter.Inc(1)
 	promotedSlave, err := RecoverDeadIntermediateMaster(topologyRecovery, skipProcesses)
 	if promotedSlave != nil {
+		// success
+		recoverDeadIntermediateMasterSuccessCounter.Inc(1)
+
 		if !skipProcesses {
 			// Execute post intermediate-master-failover processes
 			topologyRecovery.SuccessorKey = &promotedSlave.Key
 			executeProcesses(config.Config.PostIntermediateMasterFailoverProcesses, "PostIntermediateMasterFailoverProcesses", topologyRecovery, false)
 		}
+	} else {
+		recoverDeadIntermediateMasterFailureCounter.Inc(1)
 	}
 	return true, topologyRecovery, err
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/outbrain/orchestrator/go/inst"
 	ometrics "github.com/outbrain/orchestrator/go/metrics"
 	"github.com/outbrain/orchestrator/go/process"
+	"github.com/pmylund/go-cache"
 	"github.com/rcrowley/go-metrics"
 	"time"
 )
@@ -39,9 +40,12 @@ var discoveryInstanceKeys chan inst.InstanceKey = make(chan inst.InstanceKey, ma
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
 var discoveryQueueLengthGauge = metrics.NewGauge()
+var discoveryRecentCountGauge = metrics.NewGauge()
 var isElectedGauge = metrics.NewGauge()
 
 var isElectedNode = false
+
+var recentDiscoveryOperationKeys = cache.New(time.Duration(config.Config.DiscoveryPollSeconds/2)*time.Second, time.Second)
 
 func init() {
 	isElectedNode = false
@@ -49,9 +53,11 @@ func init() {
 	metrics.Register("discoveries.attempt", discoveriesCounter)
 	metrics.Register("discoveries.fail", failedDiscoveriesCounter)
 	metrics.Register("discoveries.queue_length", discoveryQueueLengthGauge)
+	metrics.Register("discoveries.recent_count", discoveryRecentCountGauge)
 	metrics.Register("elect.is_elected", isElectedGauge)
 
 	ometrics.OnGraphiteTick(func() { discoveryQueueLengthGauge.Update(int64(len(discoveryInstanceKeys))) })
+	ometrics.OnGraphiteTick(func() { discoveryRecentCountGauge.Update(int64(recentDiscoveryOperationKeys.ItemCount())) })
 	ometrics.OnGraphiteTick(func() { isElectedGauge.Update(int64(math.TernaryInt(isElectedNode, 1, 0))) })
 }
 
@@ -86,12 +92,18 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
+	if _, found := recentDiscoveryOperationKeys.Get(instanceKey.DisplayString()); found {
+		// Just recently attempted
+		return
+	}
+
 	instance, found, err := inst.ReadInstance(&instanceKey)
 
 	if found && instance.IsUpToDate && instance.IsLastCheckValid {
 		// we've already discovered this one. Skip!
 		goto Cleanup
 	}
+	recentDiscoveryOperationKeys.Set(instanceKey.DisplayString(), true, cache.DefaultExpiration)
 	discoveriesCounter.Inc(1)
 	// First we've ever heard of this instance. Continue investigation:
 	instance, err = inst.ReadTopologyInstance(&instanceKey)

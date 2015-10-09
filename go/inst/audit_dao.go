@@ -22,9 +22,16 @@ import (
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
+	"github.com/rcrowley/go-metrics"
 	"os"
 	"time"
 )
+
+var auditOperationCounter = metrics.NewCounter()
+
+func init() {
+	metrics.Register("audit.write", auditOperationCounter)
+}
 
 // AuditOperation creates and writes a new audit entry by given params
 func AuditOperation(auditType string, instanceKey *InstanceKey, message string) error {
@@ -67,6 +74,7 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 	if err != nil {
 		return log.Errore(err)
 	}
+	auditOperationCounter.Inc(1)
 
 	return err
 }
