@@ -104,6 +104,9 @@ var recoverDeadMasterFailureCounter = metrics.NewCounter()
 var recoverDeadIntermediateMasterCounter = metrics.NewCounter()
 var recoverDeadIntermediateMasterSuccessCounter = metrics.NewCounter()
 var recoverDeadIntermediateMasterFailureCounter = metrics.NewCounter()
+var recoverDeadCoMasterCounter = metrics.NewCounter()
+var recoverDeadCoMasterSuccessCounter = metrics.NewCounter()
+var recoverDeadCoMasterFailureCounter = metrics.NewCounter()
 
 func init() {
 	metrics.Register("recover.dead_master.start", recoverDeadMasterCounter)
@@ -112,6 +115,9 @@ func init() {
 	metrics.Register("recover.dead_intermediate_master.start", recoverDeadIntermediateMasterCounter)
 	metrics.Register("recover.dead_intermediate_master.success", recoverDeadIntermediateMasterSuccessCounter)
 	metrics.Register("recover.dead_intermediate_master.fail", recoverDeadIntermediateMasterFailureCounter)
+	metrics.Register("recover.dead_co_master.start", recoverDeadCoMasterCounter)
+	metrics.Register("recover.dead_co_master.success", recoverDeadCoMasterSuccessCounter)
+	metrics.Register("recover.dead_co_master.fail", recoverDeadCoMasterFailureCounter)
 }
 
 // replaceCommandPlaceholders replaxces agreed-upon placeholders with analysis data
@@ -693,6 +699,76 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 	return true, topologyRecovery, err
 }
 
+// RecoverDeadCoMaster recovers a dead co-master, complete logic inside
+func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (otherCoMaster *inst.Instance, err error) {
+	analysisEntry := &topologyRecovery.AnalysisEntry
+	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
+	otherCoMasterKey := &analysisEntry.AnalyzedInstanceMasterKey
+
+	inst.AuditOperation("recover-dead-co-master", failedInstanceKey, "problem found; will recover")
+	if !skipProcesses {
+		if err := executeProcesses(config.Config.PreFailoverProcesses, "PreFailoverProcesses", topologyRecovery, true); err != nil {
+			return nil, topologyRecovery.AddError(err)
+		}
+	}
+
+	log.Debugf("topology_recovery: RecoverDeadCoMaster: will recover %+v", *failedInstanceKey)
+
+	var errs []error
+	_, otherCoMaster, err, errs = inst.RelocateSlaves(failedInstanceKey, otherCoMasterKey, "")
+	topologyRecovery.AddError(err)
+	topologyRecovery.AddErrors(errs)
+	topologyRecovery.ParticipatingInstanceKeys.AddKey(*otherCoMasterKey)
+
+	if config.Config.MasterFailoverLostInstancesDowntimeMinutes > 0 {
+		postponedFunction := func() error {
+			inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), "RecoverDeadCoMaster indicates this instance is lost", config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
+			return nil
+		}
+		topologyRecovery.AddPostponedFunction(postponedFunction)
+	}
+
+	ResolveRecovery(topologyRecovery, otherCoMaster)
+	if otherCoMaster == nil {
+		log.Debugf("topology_recovery: - RecoverDeadCoMaster: Failure: no slave promoted.")
+		inst.AuditOperation("recover-dead-co-master", failedInstanceKey, "Failure: no slave promoted.")
+	} else {
+		log.Debugf("topology_recovery: - RecoverDeadCoMaster: promoted co-master is %+v", otherCoMaster.Key)
+		inst.AuditOperation("recover-dead-co-master", failedInstanceKey, fmt.Sprintf("master: %+v", otherCoMaster.Key))
+	}
+	return otherCoMaster, err
+}
+
+// checkAndRecoverDeadCoMaster checks a given analysis, decides whether to take action, and possibly takes action
+// Returns true when action was taken.
+func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool, skipProcesses bool) (bool, *TopologyRecovery, error) {
+	if !(skipFilters || analysisEntry.ClusterDetails.HasAutomatedMasterRecovery) {
+		return false, nil, nil
+	}
+	topologyRecovery, err := AttemptRecoveryRegistration(&analysisEntry)
+	if topologyRecovery == nil {
+		log.Debugf("topology_recovery: found an active or recent recovery on %+v. Will not issue another RecoverDeadCoMaster.", analysisEntry.AnalyzedInstanceKey)
+		return false, nil, err
+	}
+
+	// That's it! We must do recovery!
+	recoverDeadCoMasterCounter.Inc(1)
+	coMaster, err := RecoverDeadCoMaster(topologyRecovery, skipProcesses)
+	if coMaster != nil {
+		// success
+		recoverDeadCoMasterSuccessCounter.Inc(1)
+
+		if !skipProcesses {
+			// Execute post intermediate-master-failover processes
+			topologyRecovery.SuccessorKey = &coMaster.Key
+			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
+		}
+	} else {
+		recoverDeadCoMasterFailureCounter.Inc(1)
+	}
+	return true, topologyRecovery, err
+}
+
 // checkAndRecoverGenericProblem is a general=purpose recovery function
 func checkAndRecoverGenericProblem(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool, skipProcesses bool) (bool, *TopologyRecovery, error) {
 	return false, nil, nil
@@ -756,7 +832,7 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	case inst.AllIntermediateMasterSlavesFailingToConnectOrDead:
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
 	case inst.DeadCoMaster:
-		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
+		checkAndRecoverFunction = checkAndRecoverDeadCoMaster
 	case inst.DeadMasterAndSlaves:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
 	case inst.UnreachableMaster:
