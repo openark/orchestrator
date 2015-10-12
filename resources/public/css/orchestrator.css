@@ -356,10 +356,23 @@ body {
     white-space: nowrap;
 }
 
-#audit table .tooltip-inner {
-	text-align: left;
-	min-width: 420px;
-	white-space: nowrap;
+#audit table .more-recovery-info {
+    cursor: pointer;
+}
+
+#audit table .popover {
+    max-width: 1024px;
+}
+
+#audit table .popover .popover-content {
+    max-height: 512px;
+    overflow: auto;
+}
+
+#audit table .popover code {
+    white-space: normal;
+    color: inherit;
+    background-color: inherit;
 }
 
 .table-unbordered > tbody > tr > td {
