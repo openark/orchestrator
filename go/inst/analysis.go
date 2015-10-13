@@ -31,6 +31,7 @@ const (
 	AllMasterSlavesNotReplicatingOrDead                                = "AllMasterSlavesNotReplicatingOrDead"
 	MasterWithoutSlaves                                                = "MasterWithoutSlaves"
 	DeadCoMaster                                                       = "DeadCoMaster"
+	DeadCoMasterAndSomeSlaves                                          = "DeadCoMasterAndSomeSlaves"
 	UnreachableCoMaster                                                = "UnreachableCoMaster"
 	AllCoMasterSlavesNotReplicating                                    = "AllCoMasterSlavesNotReplicating"
 	DeadIntermediateMaster                                             = "DeadIntermediateMaster"

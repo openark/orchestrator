@@ -700,7 +700,7 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 }
 
 // RecoverDeadCoMaster recovers a dead co-master, complete logic inside
-func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (otherCoMaster *inst.Instance, err error) {
+func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (otherCoMaster *inst.Instance, lostSlaves [](*inst.Instance), err error) {
 	analysisEntry := &topologyRecovery.AnalysisEntry
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	otherCoMasterKey := &analysisEntry.AnalyzedInstanceMasterKey
@@ -708,40 +708,77 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 	inst.AuditOperation("recover-dead-co-master", failedInstanceKey, "problem found; will recover")
 	if !skipProcesses {
 		if err := executeProcesses(config.Config.PreFailoverProcesses, "PreFailoverProcesses", topologyRecovery, true); err != nil {
-			return nil, topologyRecovery.AddError(err)
+			return nil, lostSlaves, topologyRecovery.AddError(err)
 		}
 	}
 
 	log.Debugf("topology_recovery: RecoverDeadCoMaster: will recover %+v", *failedInstanceKey)
 
-	var errs []error
-	_, otherCoMaster, err, errs = inst.RelocateSlaves(failedInstanceKey, otherCoMasterKey, "")
-	topologyRecovery.AddError(err)
-	topologyRecovery.AddErrors(errs)
-	topologyRecovery.ParticipatingInstanceKeys.AddKey(*otherCoMasterKey)
+	var coMasterRecoveryType MasterRecoveryType = MasterRecoveryPseudoGTID
+	if (analysisEntry.OracleGTIDImmediateTopology || analysisEntry.MariaDBGTIDImmediateTopology) && !analysisEntry.PseudoGTIDImmediateTopology {
+		coMasterRecoveryType = MasterRecoveryGTID
+	}
 
+	log.Debugf("topology_recovery: RecoverDeadCoMaster: coMasterRecoveryType=%+v", coMasterRecoveryType)
+
+	var promotedSlave *inst.Instance
+	switch coMasterRecoveryType {
+	case MasterRecoveryGTID:
+		{
+			lostSlaves, _, promotedSlave, err = inst.RegroupSlavesGTID(failedInstanceKey, true, nil)
+		}
+	case MasterRecoveryPseudoGTID:
+		{
+			lostSlaves, _, _, promotedSlave, err = inst.RegroupSlavesIncludingSubSlavesOfBinlogServers(failedInstanceKey, true, nil, &topologyRecovery.PostponedFunctionsContainer)
+		}
+	}
+	topologyRecovery.AddError(err)
+
+	if promotedSlave != nil {
+		topologyRecovery.ParticipatingInstanceKeys.AddKey(promotedSlave.Key)
+		promotedSlave, err = replacePromotedSlaveWithCandidate(failedInstanceKey, promotedSlave, otherCoMasterKey)
+		topologyRecovery.AddError(err)
+	}
+	if promotedSlave != nil {
+		if promotedSlave.Key.Equals(otherCoMasterKey) {
+			topologyRecovery.ParticipatingInstanceKeys.AddKey(*otherCoMasterKey)
+			otherCoMaster = promotedSlave
+		} else {
+			err = log.Errorf("RecoverDeadCoMaster: could not manage to promote other-co-master %+v; was only able to promote %+v", *otherCoMasterKey, promotedSlave.Key)
+			promotedSlave = nil
+		}
+	}
+
+	if promotedSlave != nil && len(lostSlaves) > 0 && config.Config.DetachLostSlavesAfterMasterFailover {
+		postponedFunction := func() error {
+			log.Debugf("topology_recovery: - RecoverDeadCoMaster: lost %+v slaves during recovery process; detaching them", len(lostSlaves))
+			for _, slave := range lostSlaves {
+				slave := slave
+				inst.DetachSlaveOperation(&slave.Key)
+			}
+			return nil
+		}
+		topologyRecovery.AddPostponedFunction(postponedFunction)
+	}
 	if config.Config.MasterFailoverLostInstancesDowntimeMinutes > 0 {
 		postponedFunction := func() error {
 			inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), "RecoverDeadCoMaster indicates this instance is lost", config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
+			for _, slave := range lostSlaves {
+				slave := slave
+				inst.BeginDowntime(&slave.Key, inst.GetMaintenanceOwner(), "RecoverDeadCoMaster indicates this instance is lost", config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
+			}
 			return nil
 		}
 		topologyRecovery.AddPostponedFunction(postponedFunction)
 	}
 
-	ResolveRecovery(topologyRecovery, otherCoMaster)
-	if otherCoMaster == nil {
-		log.Debugf("topology_recovery: - RecoverDeadCoMaster: Failure: no slave promoted.")
-		inst.AuditOperation("recover-dead-co-master", failedInstanceKey, "Failure: no slave promoted.")
-	} else {
-		log.Debugf("topology_recovery: - RecoverDeadCoMaster: promoted co-master is %+v", otherCoMaster.Key)
-		inst.AuditOperation("recover-dead-co-master", failedInstanceKey, fmt.Sprintf("master: %+v", otherCoMaster.Key))
-	}
-	return otherCoMaster, err
+	return otherCoMaster, lostSlaves, err
 }
 
 // checkAndRecoverDeadCoMaster checks a given analysis, decides whether to take action, and possibly takes action
 // Returns true when action was taken.
 func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipFilters bool, skipProcesses bool) (bool, *TopologyRecovery, error) {
+	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	if !(skipFilters || analysisEntry.ClusterDetails.HasAutomatedMasterRecovery) {
 		return false, nil, nil
 	}
@@ -753,7 +790,16 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 
 	// That's it! We must do recovery!
 	recoverDeadCoMasterCounter.Inc(1)
-	coMaster, err := RecoverDeadCoMaster(topologyRecovery, skipProcesses)
+	coMaster, lostSlaves, err := RecoverDeadCoMaster(topologyRecovery, skipProcesses)
+	ResolveRecovery(topologyRecovery, coMaster)
+	if coMaster == nil {
+		log.Debugf("topology_recovery: - RecoverDeadCoMaster: Failure: no slave promoted.")
+		inst.AuditOperation("recover-dead-co-master", failedInstanceKey, "Failure: no slave promoted.")
+	} else {
+		log.Debugf("topology_recovery: - RecoverDeadCoMaster: promoted co-master is %+v", coMaster.Key)
+		inst.AuditOperation("recover-dead-co-master", failedInstanceKey, fmt.Sprintf("master: %+v", coMaster.Key))
+	}
+	topologyRecovery.LostSlaves.AddInstances(lostSlaves)
 	if coMaster != nil {
 		// success
 		recoverDeadCoMasterSuccessCounter.Inc(1)
@@ -832,6 +878,8 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	case inst.AllIntermediateMasterSlavesFailingToConnectOrDead:
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
 	case inst.DeadCoMaster:
+		checkAndRecoverFunction = checkAndRecoverDeadCoMaster
+	case inst.DeadCoMasterAndSomeSlaves:
 		checkAndRecoverFunction = checkAndRecoverDeadCoMaster
 	case inst.DeadMasterAndSlaves:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)

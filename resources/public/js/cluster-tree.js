@@ -98,6 +98,13 @@ function visualizeInstances(nodesMap, onSvgInstanceWrapper, clusterControl) {
     		root = node;
     	} 
     });
+    if (root == null) {
+        nodesList.forEach(function (node) {
+        	if (node.isCoMaster) {
+        		root = node;
+        	} 
+        });
+    }
     root.x0 = svgHeight / 2;
     root.y0 = 0;
     update(root);

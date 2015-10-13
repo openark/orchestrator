@@ -207,6 +207,10 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 			a.Analysis = DeadCoMaster
 			a.Description = "Co-master cannot be reached by orchestrator and none of its slaves is replicating"
 			//
+		} else if a.IsCoMaster && !a.LastCheckValid && a.CountSlaves > 0 && a.CountValidSlaves < a.CountSlaves && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
+			a.Analysis = DeadCoMasterAndSomeSlaves
+			a.Description = "Co-master cannot be reached by orchestrator; some of its slaves are unreachable and none of its reachable slaves is replicating"
+			//
 		} else if a.IsCoMaster && !a.LastCheckValid && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves > 0 {
 			a.Analysis = UnreachableCoMaster
 			a.Description = "Co-master cannot be reached by orchestrator but it has replicating slaves; possibly a network/host issue"
