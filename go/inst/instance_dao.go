@@ -133,12 +133,21 @@ func ScanInstanceRow(instanceKey *InstanceKey, query string, dest ...interface{}
 	return err
 }
 
+// logReadTopologyInstanceError logs an error, if applicable, for a ReadTopologyInstance operation,
+// providing context and hint as for the source of the error.
+func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return log.Errorf("Error reading %+v (%+v): %+v", *instanceKey, hint, err)
+}
+
 // ReadTopologyInstance connects to a topology MySQL instance and reads its configuration and
 // replication status. It writes read info into orchestrator's backend.
 func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	defer func() {
 		if err := recover(); err != nil {
-			log.Errorf("Unexpected error: %+v", err)
+			logReadTopologyInstanceError(instanceKey, "Unexpected, aborting", fmt.Errorf("%+v", err))
 		}
 	}()
 
@@ -195,7 +204,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			return nil
 		})
 		if err != nil {
-			log.Errore(err)
+			logReadTopologyInstanceError(instanceKey, "show variables", err)
 			// We do not "goto Cleanup" here, although it should be the correct flow.
 			// Reason is 5.7's new security feature that requires GRANTs on performance_schema.session_variables.
 			// There is a wrong decision making in this design and the migration path to 5.7 will be difficult.
@@ -249,7 +258,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		err = db.QueryRow("show global status like 'Uptime'").Scan(&dummy, &instance.Uptime)
 
 		if err != nil {
-			log.Errore(err)
+			logReadTopologyInstanceError(instanceKey, "show global status like 'Uptime'", err)
+
 			// We do not "goto Cleanup" here, although it should be the correct flow.
 			// Reason is 5.7's new security feature that requires GRANTs on performance_schema.global_variables.
 			// There is a wrong decisionmaking in this design and the migration path to 5.7 will be difficult.
@@ -263,7 +273,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		instance.Key.Hostname = resolvedHostname
 	}
 	if instance.Key.Hostname == "" {
-		err = fmt.Errorf("ReadTopologyInstance: empty hostname. Bailing out")
+		err = fmt.Errorf("ReadTopologyInstance: empty hostname (%+v). Bailing out", *instanceKey)
 		goto Cleanup
 	}
 	if config.Config.DataCenterPattern != "" {
@@ -314,11 +324,11 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		}
 		masterKey, err := NewInstanceKeyFromStrings(masterHostname, m.GetString("Master_Port"))
 		if err != nil {
-			log.Errore(err)
+			logReadTopologyInstanceError(instanceKey, "NewInstanceKeyFromStrings", err)
 		}
 		masterKey.Hostname, resolveErr = ResolveHostname(masterKey.Hostname)
 		if resolveErr != nil {
-			log.Errore(resolveErr)
+			logReadTopologyInstanceError(instanceKey, "ResolveHostname", resolveErr)
 		}
 		instance.MasterKey = *masterKey
 		instance.SecondsBehindMaster = m.GetNullInt64("Seconds_Behind_Master")
@@ -384,7 +394,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			})
 
 		if err != nil {
-			log.Errore(err)
+			logReadTopologyInstanceError(instanceKey, "show slave hosts", err)
 		}
 	}
 	if !foundByShowSlaveHosts && !isMaxScale {
@@ -400,7 +410,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			func(m sqlutils.RowMap) error {
 				cname, resolveErr := ResolveHostname(m.GetString("slave_hostname"))
 				if resolveErr != nil {
-					log.Errore(resolveErr)
+					logReadTopologyInstanceError(instanceKey, "ResolveHostname: processlist", resolveErr)
 				}
 				slaveKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
 				instance.AddSlaveKey(&slaveKey)
@@ -408,7 +418,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			})
 
 		if err != nil {
-			log.Errore(err)
+			logReadTopologyInstanceError(instanceKey, "processlist", err)
 		}
 	}
 
@@ -454,7 +464,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			})
 
 		if err != nil {
-			log.Errore(err)
+			logReadTopologyInstanceError(instanceKey, "processlist, long queries", err)
 		}
 	}
 
@@ -462,13 +472,13 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		err := db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SlaveLagSeconds)
 		if err != nil {
 			instance.SlaveLagSeconds = instance.SecondsBehindMaster
-			log.Errore(err)
+			logReadTopologyInstanceError(instanceKey, "SlaveLagQuery", err)
 		}
 	}
 
 	instance.ClusterName, instance.ReplicationDepth, instance.IsCoMaster, err = ReadClusterNameByMaster(&instance.Key, &instance.MasterKey)
 	if err != nil {
-		log.Errore(err)
+		logReadTopologyInstanceError(instanceKey, "ReadClusterNameByMaster", err)
 	}
 	if instance.ReplicationDepth == 0 && config.Config.DetectClusterAliasQuery != "" && !isMaxScale {
 		// Only need to do on masters
@@ -476,7 +486,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
 		if err != nil {
 			clusterAlias = ""
-			log.Errore(err)
+			logReadTopologyInstanceError(instanceKey, "DetectClusterAliasQuery", err)
 		}
 		instance.SuggestedClusterAlias = clusterAlias
 	}
@@ -486,12 +496,12 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		err := db.QueryRow(config.Config.DetectClusterDomainQuery).Scan(&domainName)
 		if err != nil {
 			domainName = ""
-			log.Errore(err)
+			logReadTopologyInstanceError(instanceKey, "DetectClusterDomainQuery", err)
 		}
 		if domainName != "" {
 			WriteClusterDomainName(instance.ClusterName, domainName)
 			if err != nil {
-				log.Errore(err)
+				logReadTopologyInstanceError(instanceKey, "WriteClusterDomainName", err)
 			}
 		}
 	}
@@ -508,7 +518,7 @@ Cleanup:
 		_ = UpdateInstanceLastChecked(&instance.Key)
 	}
 	if err != nil {
-		log.Errore(err)
+		logReadTopologyInstanceError(instanceKey, "Cleanup", err)
 	}
 	return instance, err
 }
