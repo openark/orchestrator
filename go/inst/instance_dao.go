@@ -346,20 +346,6 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		goto Cleanup
 	}
 
-	instance.UsingPseudoGTID = false
-	if config.Config.DetectPseudoGTIDQuery != "" && !isMaxScale {
-		resultData, err := sqlutils.QueryResultData(db, config.Config.DetectPseudoGTIDQuery)
-		if err == nil {
-			if len(resultData) > 0 {
-				if len(resultData[0]) > 0 {
-					if resultData[0][0].Valid && resultData[0][0].String == "1" {
-						instance.UsingPseudoGTID = true
-					}
-				}
-			}
-		}
-	}
-
 	if instance.LogBinEnabled {
 		err = sqlutils.QueryRowsMap(db, "show master status", func(m sqlutils.RowMap) error {
 			var err error
@@ -382,7 +368,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	// Get slaves, either by SHOW SLAVE HOSTS or via PROCESSLIST
 	// MaxScale does not support PROCESSLIST, so SHOW SLAVE HOSTS is the only option
 	if config.Config.DiscoverByShowSlaveHosts || isMaxScale {
-		err = sqlutils.QueryRowsMap(db, `show slave hosts`,
+		err := sqlutils.QueryRowsMap(db, `show slave hosts`,
 			func(m sqlutils.RowMap) error {
 				slaveKey, err := NewInstanceKeyFromStrings(m.GetString("Host"), m.GetString("Port"))
 				slaveKey.Hostname, resolveErr = ResolveHostname(slaveKey.Hostname)
@@ -393,14 +379,12 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 				return err
 			})
 
-		if err != nil {
-			logReadTopologyInstanceError(instanceKey, "show slave hosts", err)
-		}
+		logReadTopologyInstanceError(instanceKey, "show slave hosts", err)
 	}
 	if !foundByShowSlaveHosts && !isMaxScale {
 		// Either not configured to read SHOW SLAVE HOSTS or nothing was there.
 		// Discover by processlist
-		err = sqlutils.QueryRowsMap(db, `
+		err := sqlutils.QueryRowsMap(db, `
         	select 
         		substring_index(host, ':', 1) as slave_hostname 
         	from 
@@ -417,9 +401,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 				return err
 			})
 
-		if err != nil {
-			logReadTopologyInstanceError(instanceKey, "processlist", err)
-		}
+		logReadTopologyInstanceError(instanceKey, "processlist", err)
 	}
 
 	if config.Config.ReadLongRunningQueries && !isMaxScale {
@@ -463,8 +445,21 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 				return nil
 			})
 
-		if err != nil {
-			logReadTopologyInstanceError(instanceKey, "processlist, long queries", err)
+		logReadTopologyInstanceError(instanceKey, "processlist, long queries", err)
+	}
+
+	instance.UsingPseudoGTID = false
+	if config.Config.DetectPseudoGTIDQuery != "" && !isMaxScale {
+		if resultData, err := sqlutils.QueryResultData(db, config.Config.DetectPseudoGTIDQuery); err == nil {
+			if len(resultData) > 0 {
+				if len(resultData[0]) > 0 {
+					if resultData[0][0].Valid && resultData[0][0].String == "1" {
+						instance.UsingPseudoGTID = true
+					}
+				}
+			}
+		} else {
+			logReadTopologyInstanceError(instanceKey, "DetectPseudoGTIDQuery", err)
 		}
 	}
 
@@ -475,9 +470,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			logReadTopologyInstanceError(instanceKey, "SlaveLagQuery", err)
 		}
 	}
-
-	instance.ClusterName, instance.ReplicationDepth, instance.IsCoMaster, err = ReadClusterNameByMaster(&instance.Key, &instance.MasterKey)
-	if err != nil {
+	{
+		instance.ClusterName, instance.ReplicationDepth, instance.IsCoMaster, err = ReadClusterNameByMaster(&instance.Key, &instance.MasterKey)
 		logReadTopologyInstanceError(instanceKey, "ReadClusterNameByMaster", err)
 	}
 	if instance.ReplicationDepth == 0 && config.Config.DetectClusterAliasQuery != "" && !isMaxScale {
@@ -493,34 +487,30 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	if instance.ReplicationDepth == 0 && config.Config.DetectClusterDomainQuery != "" && !isMaxScale {
 		// Only need to do on masters
 		domainName := ""
-		err := db.QueryRow(config.Config.DetectClusterDomainQuery).Scan(&domainName)
-		if err != nil {
+		if err := db.QueryRow(config.Config.DetectClusterDomainQuery).Scan(&domainName); err != nil {
 			domainName = ""
 			logReadTopologyInstanceError(instanceKey, "DetectClusterDomainQuery", err)
 		}
 		if domainName != "" {
-			WriteClusterDomainName(instance.ClusterName, domainName)
-			if err != nil {
-				logReadTopologyInstanceError(instanceKey, "WriteClusterDomainName", err)
-			}
+			err := WriteClusterDomainName(instance.ClusterName, domainName)
+			logReadTopologyInstanceError(instanceKey, "WriteClusterDomainName", err)
 		}
 	}
 
 Cleanup:
 	readTopologyInstanceCounter.Inc(1)
+	logReadTopologyInstanceError(instanceKey, "Cleanup", err)
 	if instanceFound {
 		instance.IsLastCheckValid = true
 		instance.IsRecentlyChecked = true
 		instance.IsUpToDate = true
 		_ = writeInstance(instance, instanceFound, err)
 		WriteLongRunningProcesses(&instance.Key, longRunningProcesses)
+		return instance, nil
 	} else {
 		_ = UpdateInstanceLastChecked(&instance.Key)
+		return nil, fmt.Errorf("Failed ReadTopologyInstance")
 	}
-	if err != nil {
-		logReadTopologyInstanceError(instanceKey, "Cleanup", err)
-	}
-	return instance, err
 }
 
 // ReadClusterNameByMaster will return the cluster name for a given instance by looking at its master

@@ -127,7 +127,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	instance, err = inst.ReadTopologyInstance(&instanceKey)
 	// panic can occur (IO stuff). Therefore it may happen
 	// that instance is nil. Check it.
-	if err != nil || instance == nil {
+	if instance == nil {
 		failedDiscoveriesCounter.Inc(1)
 		log.Warningf("instance is nil in discoverInstance. key=%+v, error=%+v", instanceKey, err)
 		return
