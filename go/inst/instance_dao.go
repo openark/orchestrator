@@ -779,13 +779,22 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 	if err != nil {
 		return instances, err
 	}
-	var nonDowntimedInstances [](*Instance)
+	var reportedInstances [](*Instance)
 	for _, instance := range instances {
-		if !instance.IsDowntimed {
-			nonDowntimedInstances = append(nonDowntimedInstances, instance)
+		skip := false
+		if instance.IsDowntimed {
+			skip = true
+		}
+		for _, filter := range config.Config.ProblemIgnoreHostnameFilters {
+			if matched, _ := regexp.MatchString(filter, instance.Key.Hostname); matched {
+				skip = true
+			}
+		}
+		if !skip {
+			reportedInstances = append(reportedInstances, instance)
 		}
 	}
-	return nonDowntimedInstances, nil
+	return reportedInstances, nil
 }
 
 // SearchInstances reads all instances qualifying for some searchString

@@ -46,38 +46,39 @@ type Configuration struct {
 	MySQLOrchestratorDatabase                  string
 	MySQLOrchestratorUser                      string
 	MySQLOrchestratorPassword                  string
-	MySQLOrchestratorCredentialsConfigFile     string // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
-	MySQLOrchestratorSSLPrivateKeyFile         string // Private key file used to authenticate with the Orchestrator mysql instance with TLS
-	MySQLOrchestratorSSLCertFile               string // Certificate PEM file used to authenticate with the Orchestrator mysql instance with TLS
-	MySQLOrchestratorSSLCAFile                 string // Certificate Authority PEM file used to authenticate with the Orchestrator mysql instance with TLS
-	MySQLOrchestratorSSLSkipVerify             bool   // If true, do not strictly validate mutual TLS certs for the Orchestrator mysql instances
-	MySQLOrchestratorUseMutualTLS              bool   // Turn on TLS authentication with the Orchestrator MySQL instance
-	MySQLConnectTimeoutSeconds                 int    // Number of seconds before connection is aborted (driver-side)
-	DefaultInstancePort                        int    // In case port was not specified on command line
-	SkipOrchestratorDatabaseUpdate             bool   // When false, orchestrator will attempt to create & update all tables in backend database; when true, this is skipped. It makes sense to skip on command-line invocations and to enable for http or occasional invocations, or just after upgrades
-	SlaveLagQuery                              string // custom query to check on slave lg (e.g. heartbeat table)
-	SlaveStartPostWaitMilliseconds             int    // Time to wait after START SLAVE before re-readong instance (give slave chance to connect to master)
-	DiscoverByShowSlaveHosts                   bool   // Attempt SHOW SLAVE HOSTS before PROCESSLIST
-	InstancePollSeconds                        uint   // Number of seconds between instance reads
-	ReadLongRunningQueries                     bool   // Whether orchestrator should read and record current long running executing queries.
-	UnseenInstanceForgetHours                  uint   // Number of hours after which an unseen instance is forgotten
-	SnapshotTopologiesIntervalHours            uint   // Interval in hour between snapshot-topologies invocation. Default: 0 (disabled)
-	DiscoveryPollSeconds                       uint   // Auto/continuous discovery of instances sleep time between polls
-	InstanceBulkOperationsWaitTimeoutSeconds   uint   // Time to wait on a single instance when doing bulk (many instances) operation
-	ActiveNodeExpireSeconds                    uint   // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
-	HostnameResolveMethod                      string // Method by which to "normalize" hostname ("none"/"default"/"cname")
-	MySQLHostnameResolveMethod                 string // Method by which to "normalize" hostname via MySQL server. ("none"/"@@hostname"/"@@report_host"; default "@@hostname")
-	SkipBinlogServerUnresolveCheck             bool   // Skip the double-check that an unresolved hostname resolves back to same hostname for binlog servers
-	ExpiryHostnameResolvesMinutes              int    // Number of minutes after which to expire hostname-resolves
-	RejectHostnameResolvePattern               string // Regexp pattern for resolved hostname that will not be accepted (not cached, not written to db). This is done to avoid storing wrong resolves due to network glitches.
-	ReasonableReplicationLagSeconds            int    // Above this value is considered a problem
-	VerifyReplicationFilters                   bool   // Include replication filters check before approving topology refactoring
-	MaintenanceOwner                           string // (Default) name of maintenance owner to use if none provided
-	ReasonableMaintenanceReplicationLagSeconds int    // Above this value move-up and move-below are blocked
-	MaintenanceExpireMinutes                   uint   // Minutes after which a maintenance flag is considered stale and is cleared
-	MaintenancePurgeDays                       uint   // Days after which maintenance entries are purged from the database
-	CandidateInstanceExpireMinutes             uint   // Minutes after which a suggestion to use an instance as a candidate slave (to be preferably promoted on master failover) is expired.
-	AuditLogFile                               string // Name of log file for audit operations. Disabled when empty.
+	MySQLOrchestratorCredentialsConfigFile     string   // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
+	MySQLOrchestratorSSLPrivateKeyFile         string   // Private key file used to authenticate with the Orchestrator mysql instance with TLS
+	MySQLOrchestratorSSLCertFile               string   // Certificate PEM file used to authenticate with the Orchestrator mysql instance with TLS
+	MySQLOrchestratorSSLCAFile                 string   // Certificate Authority PEM file used to authenticate with the Orchestrator mysql instance with TLS
+	MySQLOrchestratorSSLSkipVerify             bool     // If true, do not strictly validate mutual TLS certs for the Orchestrator mysql instances
+	MySQLOrchestratorUseMutualTLS              bool     // Turn on TLS authentication with the Orchestrator MySQL instance
+	MySQLConnectTimeoutSeconds                 int      // Number of seconds before connection is aborted (driver-side)
+	DefaultInstancePort                        int      // In case port was not specified on command line
+	SkipOrchestratorDatabaseUpdate             bool     // When false, orchestrator will attempt to create & update all tables in backend database; when true, this is skipped. It makes sense to skip on command-line invocations and to enable for http or occasional invocations, or just after upgrades
+	SlaveLagQuery                              string   // custom query to check on slave lg (e.g. heartbeat table)
+	SlaveStartPostWaitMilliseconds             int      // Time to wait after START SLAVE before re-readong instance (give slave chance to connect to master)
+	DiscoverByShowSlaveHosts                   bool     // Attempt SHOW SLAVE HOSTS before PROCESSLIST
+	InstancePollSeconds                        uint     // Number of seconds between instance reads
+	ReadLongRunningQueries                     bool     // Whether orchestrator should read and record current long running executing queries.
+	UnseenInstanceForgetHours                  uint     // Number of hours after which an unseen instance is forgotten
+	SnapshotTopologiesIntervalHours            uint     // Interval in hour between snapshot-topologies invocation. Default: 0 (disabled)
+	DiscoveryPollSeconds                       uint     // Auto/continuous discovery of instances sleep time between polls
+	InstanceBulkOperationsWaitTimeoutSeconds   uint     // Time to wait on a single instance when doing bulk (many instances) operation
+	ActiveNodeExpireSeconds                    uint     // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
+	HostnameResolveMethod                      string   // Method by which to "normalize" hostname ("none"/"default"/"cname")
+	MySQLHostnameResolveMethod                 string   // Method by which to "normalize" hostname via MySQL server. ("none"/"@@hostname"/"@@report_host"; default "@@hostname")
+	SkipBinlogServerUnresolveCheck             bool     // Skip the double-check that an unresolved hostname resolves back to same hostname for binlog servers
+	ExpiryHostnameResolvesMinutes              int      // Number of minutes after which to expire hostname-resolves
+	RejectHostnameResolvePattern               string   // Regexp pattern for resolved hostname that will not be accepted (not cached, not written to db). This is done to avoid storing wrong resolves due to network glitches.
+	ReasonableReplicationLagSeconds            int      // Above this value is considered a problem
+	ProblemIgnoreHostnameFilters               []string // Will minimize problem visualization for hostnames matching given regexp filters
+	VerifyReplicationFilters                   bool     // Include replication filters check before approving topology refactoring
+	MaintenanceOwner                           string   // (Default) name of maintenance owner to use if none provided
+	ReasonableMaintenanceReplicationLagSeconds int      // Above this value move-up and move-below are blocked
+	MaintenanceExpireMinutes                   uint     // Minutes after which a maintenance flag is considered stale and is cleared
+	MaintenancePurgeDays                       uint     // Days after which maintenance entries are purged from the database
+	CandidateInstanceExpireMinutes             uint     // Minutes after which a suggestion to use an instance as a candidate slave (to be preferably promoted on master failover) is expired.
+	AuditLogFile                               string   // Name of log file for audit operations. Disabled when empty.
 	AuditPageSize                              int
 	AuditPurgeDays                             uint   // Days after which audit entries are purged from the database
 	RemoveTextFromHostnameDisplay              string // Text to strip off the hostname on cluster/clusters pages
@@ -176,6 +177,7 @@ func NewConfiguration() *Configuration {
 		ExpiryHostnameResolvesMinutes:              60,
 		RejectHostnameResolvePattern:               "",
 		ReasonableReplicationLagSeconds:            10,
+		ProblemIgnoreHostnameFilters:               []string{},
 		VerifyReplicationFilters:                   false,
 		MaintenanceOwner:                           "orchestrator",
 		ReasonableMaintenanceReplicationLagSeconds: 20,
