@@ -18,6 +18,7 @@ package inst
 
 import (
 	"errors"
+	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/pmylund/go-cache"
@@ -69,6 +70,9 @@ func ResolveHostname(hostname string) (string, error) {
 	hostname = strings.TrimSpace(hostname)
 	if hostname == "" {
 		return hostname, errors.New("Will not resolve empty hostname")
+	}
+	if strings.Contains(hostname, ",") {
+		return hostname, fmt.Errorf("Will not resolve multi-hostname: %+v", hostname)
 	}
 	// First go to lightweight cache
 	if resolvedHostname, found := hostnameResolvesLightweightCache.Get(hostname); found {
