@@ -45,20 +45,20 @@ create event if not exists
       DECLARE lock_result INT;
       DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
     
-      set @connection_id := connection_id();
-      set @now := now();
-      set @rand := floor(rand()*(1 << 32));
-      set @pseudo_gtid_hint := concat_ws(':', lpad(hex(unix_timestamp(@now)), 8, '0'), lpad(hex(@connection_id), 16, '0'), lpad(hex(@rand), 8, '0'));
-      set @_create_statement := concat('drop ', 'view if exists `meta`.`_pseudo_gtid_', 'hint__asc:', @pseudo_gtid_hint, '`');
-      PREPARE st FROM @_create_statement;
-      EXECUTE st;
-      DEALLOCATE PREPARE st;
-      
-      /*!50600
-      SET innodb_lock_wait_timeout = 1;
-      */
       SET lock_result = GET_LOCK('pseudo_gtid_status', 0); 
       IF lock_result = 1 THEN
+        set @connection_id := connection_id();
+        set @now := now();
+        set @rand := floor(rand()*(1 << 32));
+        set @pseudo_gtid_hint := concat_ws(':', lpad(hex(unix_timestamp(@now)), 8, '0'), lpad(hex(@connection_id), 16, '0'), lpad(hex(@rand), 8, '0'));
+        set @_create_statement := concat('drop ', 'view if exists `meta`.`_pseudo_gtid_', 'hint__asc:', @pseudo_gtid_hint, '`');
+        PREPARE st FROM @_create_statement;
+        EXECUTE st;
+        DEALLOCATE PREPARE st;
+
+        /*!50600
+        SET innodb_lock_wait_timeout = 1;
+        */
         set @serverid := @@server_id;
         set @hostname := @@hostname;
         set @port := @@port;

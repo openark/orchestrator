@@ -23,6 +23,7 @@ import (
 	"github.com/outbrain/golib/math"
 	"github.com/outbrain/orchestrator/go/app"
 	"github.com/outbrain/orchestrator/go/config"
+	"os"
 	"runtime"
 )
 
@@ -30,6 +31,10 @@ const prompt string = `
 orchestrator [-c command] [-i instance] [--verbose|--debug] [... cli ] | http
 
 Cheatsheet:
+	See all possible commands:
+
+		orchestrator -c list
+
     Run orchestrator in HTTP mode:
     
         orchestrator --debug http
@@ -355,7 +360,7 @@ Cheatsheet:
             Issuing this on an already detached slave will do nothing.
             
         reattach-slave
-            Undo a detahc-slave operation. Reverses the binlog change into the original values, and 
+            Undo a detach-slave operation. Reverses the binlog change into the original values, and 
             resumes replication. Example:
             
             orchestrator -c reattach-slave -i detahced.slave.whose.replication.will.amend.com
@@ -748,6 +753,12 @@ func main() {
 	case flag.Arg(0) == "http":
 		app.Http(*discovery)
 	default:
-		log.Error("Usage: orchestrator --options... [cli|http]")
+		fmt.Fprintln(os.Stderr, `Usage: 
+  orchestrator --options... [cli|http]
+See complete list of commands:
+  orchestrator -c list
+Full blown documentation:
+  orchestrator
+		`)
 	}
 }
