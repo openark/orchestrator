@@ -50,7 +50,13 @@ func commandsListing() string {
 }
 
 func availableCommandsUsage() string {
-	return fmt.Sprintf("Available commands (-c):\n%+v\nRun 'orchestrator' for full blown documentation\n", commandsListing())
+	return fmt.Sprintf(`Available commands (-c):
+%+v
+Run 'orchestrator' for full blown documentation
+
+Usage for most commands:
+	orchestrator -c <command> [-i <instance.fqdn>] [-d <destination.fqdn>] [--verbose|--debug]
+`, commandsListing())
 }
 
 func getInstanceKey(instanceKey *inst.InstanceKey) *inst.InstanceKey {
@@ -1103,7 +1109,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			fmt.Println("hostname resolve cache cleared")
 		}
 		// Help
-	case "list":
+	case "help":
 		{
 			fmt.Fprintf(os.Stderr, availableCommandsUsage())
 		}
