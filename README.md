@@ -3,13 +3,13 @@ orchestrator [[Manual]](https://github.com/outbrain/orchestrator/wiki/Orchestrat
 
 _Orchestrator_ is a MySQL replication topology management and visualization tool, allowing for:
 
-### Discovery
+#### Discovery
 
 _orchestrator_ actively crawls through your topologies and maps them. It reads basic MySQL info such as replication status and configuration. 
 
 It provides with slick visualization of your topologies, including replication problems, even in the face of failures.
 
-### Refactoring
+#### Refactoring
 
 _orchestrator_ understands replication rules. It knows about binlog file:position, GTID, Pseudo GTID, Binlog Servers.
 
@@ -18,7 +18,7 @@ safe: _orchestrator_ will reject an illegal refactoring attempt.
 
 Find grained control is achieved by various command line options.
 
-### Recovery
+#### Recovery
 
 _Orchestrator_ uses a holistic approach to detect master and intermediate master failures. Based on information gained from
 the topology itself, it recognizes a variety of failure scenarios.
@@ -30,7 +30,7 @@ Recovery process utilizes _orchestrator's_ understanding of the topology and of 
 recovery itself.
 
 
-### The interface
+#### The interface
 
 _Orchestrator_ supports:
 
@@ -40,7 +40,7 @@ _Orchestrator_ supports:
 
 ![Orcehstrator screenshot](https://github.com/outbrain/orchestrator/wiki/images/orchestrator-simple.png)
 
-### More
+#### More
 
 - Auditing
 - Supports Pseudo-GTID
