@@ -717,10 +717,13 @@ Cheatsheet:
             
         reset-internal-db-deployment
             Clear internal db deployment history, use if somehow corrupted internal deployment history.
-            Orchestrator does housekeeping for its own database schema, and verifies proposed deployment vs deployment history.
-            In case of contradiction between the two orchestrator bails out. Such a contradiction is possible in the event of two
-            orchestrator instances simultaneously trying to deploy db changes (this is being worked on) 
-            By resetting history orchestrator redeploys its schema (without causing data loss).
+            When configured with '"SmartOrchestratorDatabaseUpdate": true', Orchestrator does housekeeping for its 
+            own database schema, and verifies proposed deployment vs deployment history.
+            In case of contradiction between the two orchestrator bails out. Such a contradiction should not occur, and may 
+            signify an inconsistency in the orchestrator code itself.  
+            By resetting history orchestrator redeploys its schema (without causing data loss) and accepts the new instructions
+            as the de-factor deployment rule.
+            
     `
 
 // main is the application's entry point. It will either spawn a CLI or HTTP itnerfaces.

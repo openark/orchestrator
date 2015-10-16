@@ -33,8 +33,11 @@ var internalDBDeploymentSQL = []string{
 		  deployment_id int unsigned NOT NULL AUTO_INCREMENT,
 		  deployment_type enum('base', 'patch'),
 		  deploy_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		  sql_statement TEXT,
-		  PRIMARY KEY (deployment_id)
+		  sql_statement TEXT CHARSET ascii NOT NULL,
+		  statement_digest VARCHAR(128) CHARSET ascii NOT NULL,
+		  statement_index INT UNSIGNED NOT NULL,
+		  PRIMARY KEY (deployment_id),
+		  UNIQUE KEY sql_index_uidx (statement_digest, statement_index)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 }
@@ -618,6 +621,9 @@ func OpenOrchestrator() (*sql.DB, error) {
 
 // readInternalDeployments reads orchestrator db deployment statements that are known to have been executed
 func readInternalDeployments() (baseDeployments []string, patchDeployments []string, err error) {
+	if !config.Config.SmartOrchestratorDatabaseUpdate {
+		return baseDeployments, patchDeployments, nil
+	}
 	query := fmt.Sprintf(`
 		select 
 			deployment_type, 
@@ -659,13 +665,16 @@ func readInternalDeployments() (baseDeployments []string, patchDeployments []str
 }
 
 // writeInternalDeployment will persist a successful deployment
-func writeInternalDeployment(db *sql.DB, deploymentType string, sqlStatement string) error {
+func writeInternalDeployment(db *sql.DB, deploymentType string, sqlStatement string, statementIndex int) error {
+	if !config.Config.SmartOrchestratorDatabaseUpdate {
+		return nil
+	}
 	query := `
-        	insert into _orchestrator_db_deployment (
-				deployment_type, sql_statement) VALUES (
-				?, ?)
+        	insert ignore into _orchestrator_db_deployment (
+				deployment_type, sql_statement, statement_digest, statement_index) VALUES (
+				?, ?, CONCAT(SHA1(?), ':', LEFT(REPLACE(REPLACE(REPLACE(?, ' ', ''), '\n', ' '), '\t', ''), 60)), ?)
 				`
-	if _, err := execInternal(db, query, deploymentType, sqlStatement); err != nil {
+	if _, err := execInternal(db, query, deploymentType, sqlStatement, sqlStatement, sqlStatement, statementIndex); err != nil {
 		log.Fatalf("Unable to write to _orchestrator_db_deployment: %+v", err)
 	}
 	return nil
@@ -720,7 +729,10 @@ func deployIfNotAlreadyDeployed(db *sql.DB, queries []string, deployedQueries []
 		if queryAlreadyExecuted {
 			continue
 		}
-		log.Debugf("initOrchestratorDB executing: %.80s", strings.TrimSpace(strings.Replace(query, "\n", "", -1)))
+		if config.Config.SmartOrchestratorDatabaseUpdate {
+			log.Debugf("initOrchestratorDB executing: %.80s", strings.TrimSpace(strings.Replace(query, "\n", "", -1)))
+		}
+
 		if fatalOnError {
 			if _, err := execInternal(db, query); err != nil {
 				return log.Fatalf("Cannot initiate orchestrator: %+v", err)
@@ -728,7 +740,7 @@ func deployIfNotAlreadyDeployed(db *sql.DB, queries []string, deployedQueries []
 		} else {
 			execInternalSilently(db, query)
 		}
-		writeInternalDeployment(db, deploymentType, query)
+		writeInternalDeployment(db, deploymentType, query, i)
 	}
 	return nil
 }
