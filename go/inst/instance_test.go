@@ -38,6 +38,9 @@ var _ = Suite(&TestSuite{})
 var key1 inst.InstanceKey = inst.InstanceKey{Hostname: "host1", Port: 3306}
 var key2 inst.InstanceKey = inst.InstanceKey{Hostname: "host2", Port: 3306}
 
+var instance1 inst.Instance = inst.Instance{Key: key1}
+var instance2 inst.Instance = inst.Instance{Key: key2}
+
 func (s *TestSuite) TestInstanceKeyEquals(c *C) {
 	i1 := inst.Instance{
 		Key: inst.InstanceKey{
@@ -269,5 +272,32 @@ func (s *TestSuite) TestNextGTID(c *C) {
 		nextGTID, err := i.NextGTID()
 		c.Assert(err, IsNil)
 		c.Assert(nextGTID, Equals, "b9b4712a-df64-11e3-b391-60672090eb04:7")
+	}
+}
+
+func (s *TestSuite) TestRemoveInstance(c *C) {
+	{
+		instances := [](*inst.Instance){&instance1, &instance2}
+		c.Assert(len(instances), Equals, 2)
+		instances = inst.RemoveNilInstances(instances)
+		c.Assert(len(instances), Equals, 2)
+	}
+	{
+		instances := [](*inst.Instance){&instance1, nil, &instance2}
+		c.Assert(len(instances), Equals, 3)
+		instances = inst.RemoveNilInstances(instances)
+		c.Assert(len(instances), Equals, 2)
+	}
+	{
+		instances := [](*inst.Instance){&instance1, &instance2}
+		c.Assert(len(instances), Equals, 2)
+		instances = inst.RemoveInstance(instances, &key1)
+		c.Assert(len(instances), Equals, 1)
+		instances = inst.RemoveInstance(instances, &key1)
+		c.Assert(len(instances), Equals, 1)
+		instances = inst.RemoveInstance(instances, &key2)
+		c.Assert(len(instances), Equals, 0)
+		instances = inst.RemoveInstance(instances, &key2)
+		c.Assert(len(instances), Equals, 0)
 	}
 }

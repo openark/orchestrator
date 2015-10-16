@@ -27,21 +27,6 @@ import (
 	"time"
 )
 
-// InstancesByExecBinlogCoordinates is a sortabel type for BinlogCoordinates
-type InstancesByExecBinlogCoordinates [](*Instance)
-
-func (this InstancesByExecBinlogCoordinates) Len() int      { return len(this) }
-func (this InstancesByExecBinlogCoordinates) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
-func (this InstancesByExecBinlogCoordinates) Less(i, j int) bool {
-	if this[i].ExecBinlogCoordinates.Equals(&this[j].ExecBinlogCoordinates) {
-		// Secondary sorting: "smaller" if not logging slave updates
-		if this[j].LogSlaveUpdatesEnabled && !this[i].LogSlaveUpdatesEnabled {
-			return true
-		}
-	}
-	return this[i].ExecBinlogCoordinates.SmallerThan(&this[j].ExecBinlogCoordinates)
-}
-
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
 func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance), extendedOutput bool) []string {
@@ -125,20 +110,6 @@ func ASCIITopology(instanceKey *InstanceKey, historyTimestampPattern string) (st
 	// Turn into string
 	result := strings.Join(entries, "\n")
 	return result, nil
-}
-
-// filterInstancesByPattern will filter given array of instances according to regular expression pattern
-func filterInstancesByPattern(instances [](*Instance), pattern string) [](*Instance) {
-	if pattern == "" {
-		return instances
-	}
-	filtered := [](*Instance){}
-	for _, instance := range instances {
-		if matched, _ := regexp.MatchString(pattern, instance.Key.DisplayString()); matched {
-			filtered = append(filtered, instance)
-		}
-	}
-	return filtered
 }
 
 // GetInstanceMaster synchronously reaches into the replication topology
@@ -602,7 +573,7 @@ func MoveBelowGTID(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 // moveSlavesViaGTID moves a list of slaves under another instance via GTID, returning those slaves
 // that could not be moved (do not use GTID)
 func moveSlavesViaGTID(slaves [](*Instance), other *Instance) (movedSlaves [](*Instance), unmovedSlaves [](*Instance), err error, errs []error) {
-	slaves = removeInstance(slaves, &other.Key)
+	slaves = RemoveInstance(slaves, &other.Key)
 	if len(slaves) == 0 {
 		// Nothing to do
 		return movedSlaves, unmovedSlaves, nil, errs
@@ -749,7 +720,7 @@ func RepointTo(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance), erro
 	res := [](*Instance){}
 	errs := []error{}
 
-	slaves = removeInstance(slaves, belowKey)
+	slaves = RemoveInstance(slaves, belowKey)
 	if len(slaves) == 0 {
 		// Nothing to do
 		return res, nil, errs
@@ -806,7 +777,7 @@ func RepointSlavesTo(instanceKey *InstanceKey, pattern string, belowKey *Instanc
 	if err != nil {
 		return res, err, errs
 	}
-	slaves = removeInstance(slaves, belowKey)
+	slaves = RemoveInstance(slaves, belowKey)
 	slaves = filterInstancesByPattern(slaves, pattern)
 	if len(slaves) == 0 {
 		// Nothing to do
@@ -1424,6 +1395,7 @@ func sortedSlaves(masterKey *InstanceKey, shouldStopSlaves bool, includeBinlogSe
 		log.Debugf("sortedSlaves: stopping %d slaves nicely", len(slaves))
 		slaves = StopSlavesNicely(slaves, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
 	}
+	slaves = RemoveNilInstances(slaves)
 
 	sort.Sort(sort.Reverse(InstancesByExecBinlogCoordinates(slaves)))
 	for _, slave := range slaves {
@@ -1431,29 +1403,6 @@ func sortedSlaves(masterKey *InstanceKey, shouldStopSlaves bool, includeBinlogSe
 	}
 
 	return slaves, err
-}
-
-// removeInstance will remove an instance from a list of instances
-func removeInstance(instances [](*Instance), instanceKey *InstanceKey) [](*Instance) {
-	if instanceKey == nil {
-		return instances
-	}
-	for i := len(instances) - 1; i >= 0; i-- {
-		if instances[i].Key.Equals(instanceKey) {
-			instances = append(instances[:i], instances[i+1:]...)
-		}
-	}
-	return instances
-}
-
-// removeBinlogServerInstances will remove all binlog servers from given lsit
-func removeBinlogServerInstances(instances [](*Instance)) [](*Instance) {
-	for i := len(instances) - 1; i >= 0; i-- {
-		if instances[i].IsBinlogServer() {
-			instances = append(instances[:i], instances[i+1:]...)
-		}
-	}
-	return instances
 }
 
 // MultiMatchBelow will efficiently match multiple slaves below a given instance.
@@ -1467,13 +1416,13 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 		return res, nil, fmt.Errorf("PseudoGTIDPattern not configured; cannot use Pseudo-GTID"), errs
 	}
 
-	slaves = removeInstance(slaves, belowKey)
-	slaves = removeBinlogServerInstances(slaves)
+	slaves = RemoveInstance(slaves, belowKey)
+	slaves = RemoveBinlogServerInstances(slaves)
 
 	for _, slave := range slaves {
 		if maintenanceToken, merr := BeginMaintenance(&slave.Key, GetMaintenanceOwner(), fmt.Sprintf("%+v match below %+v as part of MultiMatchBelow", slave.Key, *belowKey)); merr != nil {
 			errs = append(errs, fmt.Errorf("Cannot begin maintenance on %+v", slave.Key))
-			slaves = removeInstance(slaves, &slave.Key)
+			slaves = RemoveInstance(slaves, &slave.Key)
 		} else {
 			defer EndMaintenance(maintenanceToken)
 		}
@@ -1500,6 +1449,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 		// We will wait for them (up to a timeout) to do so.
 		slaves = StopSlavesNicely(slaves, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
 	}
+	slaves = RemoveNilInstances(slaves)
 	sort.Sort(sort.Reverse(InstancesByExecBinlogCoordinates(slaves)))
 
 	// Optimizations:
@@ -1822,12 +1772,12 @@ func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instan
 			}
 		}
 		if candidateSlave != nil {
-			slaves = removeInstance(slaves, &candidateSlave.Key)
+			slaves = RemoveInstance(slaves, &candidateSlave.Key)
 		}
 
 		return candidateSlave, slaves, equalSlaves, laterSlaves, fmt.Errorf("GetCandidateSlave: no candidate slaves found %+v", *masterKey)
 	}
-	slaves = removeInstance(slaves, &candidateSlave.Key)
+	slaves = RemoveInstance(slaves, &candidateSlave.Key)
 	for _, slave := range slaves {
 		slave := slave
 		if slave.ExecBinlogCoordinates.SmallerThan(&candidateSlave.ExecBinlogCoordinates) {
@@ -2263,7 +2213,7 @@ func RelocateSlaves(instanceKey, otherKey *InstanceKey, pattern string) (slaves 
 	if err != nil {
 		return slaves, other, err, errs
 	}
-	slaves = removeInstance(slaves, otherKey)
+	slaves = RemoveInstance(slaves, otherKey)
 	slaves = filterInstancesByPattern(slaves, pattern)
 	if len(slaves) == 0 {
 		// Nothing to do

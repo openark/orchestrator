@@ -19,7 +19,7 @@ $(document).ready(function () {
         	var analyzedInstanceDisplay = audit.AnalysisEntry.AnalyzedInstanceKey.Hostname+":"+audit.AnalysisEntry.AnalyzedInstanceKey.Port;
         	var sucessorInstanceDisplay = audit.SuccessorKey.Hostname+":"+audit.SuccessorKey.Port;
     		var row = jQuery('<tr/>');
-    		$('<td/>', { text: audit.AnalysisEntry.Analysis }).prepend('<span class="more-recovery-info pull-right glyphicon glyphicon-info-sign text-primary" data-toggle="popover" data-placement="right" data-html="true" title="" data-content=""></span>').appendTo(row);
+    		$('<td/>', { text: audit.AnalysisEntry.Analysis }).prepend('<span class="more-recovery-info pull-right glyphicon glyphicon-info-sign text-primary" data-toggle="popover" data-html="true" title="" data-content=""></span>').appendTo(row);
     		$('<a/>',  { text: analyzedInstanceDisplay, href: "/web/search/" + analyzedInstanceDisplay }).wrap($("<td/>")).parent().appendTo(row);
     		$('<td/>', { text: audit.AnalysisEntry.CountSlaves }).appendTo(row);
     		$('<a/>',  { text: audit.AnalysisEntry.ClusterDetails.ClusterName, href: "/web/cluster/"+audit.AnalysisEntry.ClusterDetails.ClusterName}).wrap($("<td/>")).parent().appendTo(row);

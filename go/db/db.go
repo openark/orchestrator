@@ -19,16 +19,28 @@ package db
 import (
 	"database/sql"
 	"fmt"
-
 	"github.com/go-sql-driver/mysql"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/ssl"
+	"strings"
 )
 
-// generateSQL & generateSQLPatches are lists of SQL statements required to build the orchestrator backend
-var generateSQL = []string{
+var internalDBDeploymentSQL = []string{
+	`
+		CREATE TABLE IF NOT EXISTS _orchestrator_db_deployment (
+		  deployment_id int unsigned NOT NULL AUTO_INCREMENT,
+		  deployment_type enum('base', 'patch'),
+		  deploy_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  sql_statement TEXT,
+		  PRIMARY KEY (deployment_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+}
+
+// generateSQLBase & generateSQLPatches are lists of SQL statements required to build the orchestrator backend
+var generateSQLBase = []string{
 	`
         CREATE TABLE IF NOT EXISTS database_instance (
           hostname varchar(128) CHARACTER SET ascii NOT NULL,
@@ -547,6 +559,12 @@ var generateSQLPatches = []string{
 	`,
 }
 
+// Track if a TLS has already been configured for topology
+var topologyTLSConfigured bool = false
+
+// Track if a TLS has already been configured for Orchestrator
+var orchestratorTLSConfigured bool = false
+
 // OpenTopology returns a DB instance to access a topology instance
 func OpenTopology(host string, port int) (*sql.DB, error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/?timeout=%ds", config.Config.MySQLTopologyUser, config.Config.MySQLTopologyPassword, host, port, config.Config.MySQLConnectTimeoutSeconds)
@@ -558,9 +576,6 @@ func OpenTopology(host string, port int) (*sql.DB, error) {
 	db.SetMaxIdleConns(config.Config.MySQLTopologyMaxPoolConnections)
 	return db, err
 }
-
-// Track if a TLS has already been configured for topology
-var topologyTLSConfigured bool = false
 
 // Create a TLS configuration from the config supplied CA, Certificate, and Private key.
 // Register the TLS config with the mysql drivers as the "topology" config
@@ -601,8 +616,60 @@ func OpenOrchestrator() (*sql.DB, error) {
 	return db, err
 }
 
-// Track if a TLS has already been configured for Orchestrator
-var orchestratorTLSConfigured bool = false
+// readInternalDeployments reads orchestrator db deployment statements that are known to have been executed
+func readInternalDeployments() (baseDeployments []string, patchDeployments []string, err error) {
+	query := fmt.Sprintf(`
+		select 
+			deployment_type, 
+			sql_statement  
+		from 
+			_orchestrator_db_deployment
+		order by
+			deployment_id
+		`)
+	db, err := OpenOrchestrator()
+	if err != nil {
+		log.Fatalf("Cannot initiate orchestrator internal deployment: %+v", err)
+	}
+
+	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		deploymentType := m.GetString("deployment_type")
+		sqlStatement := m.GetString("sql_statement")
+
+		if deploymentType == "base" {
+			baseDeployments = append(baseDeployments, sqlStatement)
+		} else if deploymentType == "patch" {
+			patchDeployments = append(patchDeployments, sqlStatement)
+		} else {
+			log.Fatalf("Unknown deployment type (%+v) encountered in _orchestrator_db_deployment", deploymentType)
+		}
+
+		return nil
+	})
+	if err != nil {
+		log.Debugf("Deploying internal orchestrator tables to fix the above; this is a one time operation")
+		// Table does not exist? Create it for first time
+		for _, query := range internalDBDeploymentSQL {
+			if _, err = execInternal(db, query); err != nil {
+				log.Fatalf("Cannot initiate orchestrator internal deployment: %+v", err)
+			}
+		}
+	}
+	return baseDeployments, patchDeployments, nil
+}
+
+// writeInternalDeployment will persist a successful deployment
+func writeInternalDeployment(db *sql.DB, deploymentType string, sqlStatement string) error {
+	query := `
+        	insert into _orchestrator_db_deployment (
+				deployment_type, sql_statement) VALUES (
+				?, ?)
+				`
+	if _, err := execInternal(db, query, deploymentType, sqlStatement); err != nil {
+		log.Fatalf("Unable to write to _orchestrator_db_deployment: %+v", err)
+	}
+	return nil
+}
 
 // Create a TLS configuration from the config supplied CA, Certificate, and Private key.
 // Register the TLS config with the mysql drivers as the "orchestrator" config
@@ -625,20 +692,43 @@ func SetupMySQLOrchestratorTLS(uri string) (string, error) {
 	return fmt.Sprintf("%s&tls=orchestrator", uri), nil
 }
 
+// deployIfNotAlreadyDeployed will issue given sql queries that are not already known to be deployed.
+// This iterates both lists (to-run and already-deployed) and also verifies no contraditions.
+func deployIfNotAlreadyDeployed(db *sql.DB, queries []string, deployedQueries []string, deploymentType string, fatalOnError bool) error {
+	for i, query := range queries {
+		queryAlreadyExecuted := false
+		// While iterating 'queries', also iterate 'deployedQueries'. Expect identity
+		if len(deployedQueries) > i {
+			if deployedQueries[i] != query {
+				log.Fatalf("initOrchestratorDB() PANIC: non matching %s queries between deployment requests and _orchestrator_db_deployment", deploymentType)
+			}
+			queryAlreadyExecuted = true
+		}
+		if queryAlreadyExecuted {
+			continue
+		}
+		log.Debugf("initOrchestratorDB executing: %.80s", strings.TrimSpace(strings.Replace(query, "\n", "", -1)))
+		if fatalOnError {
+			if _, err := execInternal(db, query); err != nil {
+				return log.Fatalf("Cannot initiate orchestrator: %+v", err)
+			}
+		} else {
+			execInternalSilently(db, query)
+		}
+		writeInternalDeployment(db, deploymentType, query)
+	}
+	return nil
+}
+
 // initOrchestratorDB attempts to create/upgrade the orchestrator backend database. It is created once in the
 // application's lifetime.
 func initOrchestratorDB(db *sql.DB) error {
 	log.Debug("Initializing orchestrator")
-	for _, query := range generateSQL {
-		_, err := execInternal(db, query)
-		if err != nil {
-			return log.Fatalf("Cannot initiate orchestrator: %+v", err)
-		}
-	}
-	for _, query := range generateSQLPatches {
-		// Patches are allowed to fail.
-		_, _ = execInternalSilently(db, query)
-	}
+
+	baseDeployments, patchDeployments, _ := readInternalDeployments()
+	deployIfNotAlreadyDeployed(db, generateSQLBase, baseDeployments, "base", true)
+	deployIfNotAlreadyDeployed(db, generateSQLPatches, patchDeployments, "patch", false)
+
 	return nil
 }
 
