@@ -30,6 +30,7 @@ import (
 // strictly expected from user.
 type Configuration struct {
 	Debug                                      bool // set debug mode (similar to --debug option)
+	EnableSyslog                               bool // Should logs be directed (in addition) to syslog daemon?
 	ListenAddress                              string
 	AgentsServerPort                           string // port orchestrator agents talk back to
 	MySQLTopologyUser                          string
@@ -151,6 +152,7 @@ var readFileNames []string
 func NewConfiguration() *Configuration {
 	return &Configuration{
 		Debug:                                      false,
+		EnableSyslog:                               false,
 		ListenAddress:                              ":3000",
 		AgentsServerPort:                           ":3001",
 		StatusEndpoint:                             "/api/status",

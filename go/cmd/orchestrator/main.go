@@ -777,6 +777,10 @@ func main() {
 	if config.Config.Debug {
 		log.SetLevel(log.DEBUG)
 	}
+	if config.Config.EnableSyslog {
+		log.EnableSyslogWriter("orchestrator")
+		log.SetSyslogLevel(log.INFO)
+	}
 
 	if len(flag.Args()) == 0 && *command == "" {
 		// No command, no argument: just prompt
