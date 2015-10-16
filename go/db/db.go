@@ -671,6 +671,19 @@ func writeInternalDeployment(db *sql.DB, deploymentType string, sqlStatement str
 	return nil
 }
 
+// ResetInternalDeployment will clear existing deployment history (and the effect will be a complete re-deployment
+// the next run). This is made available for possible operational errors, a red button
+func ResetInternalDeployment() error {
+	db, err := OpenOrchestrator()
+	if err != nil {
+		log.Fatalf("Cannot reset orchestrator internal deployment: %+v", err)
+	}
+	if _, err := execInternal(db, `delete from _orchestrator_db_deployment`); err != nil {
+		log.Fatalf("Unable to clear _orchestrator_db_deployment: %+v", err)
+	}
+	return nil
+}
+
 // Create a TLS configuration from the config supplied CA, Certificate, and Private key.
 // Register the TLS config with the mysql drivers as the "orchestrator" config
 // Modify the supplied URI to call the TLS config
@@ -700,7 +713,7 @@ func deployIfNotAlreadyDeployed(db *sql.DB, queries []string, deployedQueries []
 		// While iterating 'queries', also iterate 'deployedQueries'. Expect identity
 		if len(deployedQueries) > i {
 			if deployedQueries[i] != query {
-				log.Fatalf("initOrchestratorDB() PANIC: non matching %s queries between deployment requests and _orchestrator_db_deployment", deploymentType)
+				log.Fatalf("initOrchestratorDB() PANIC: non matching %s queries between deployment requests and _orchestrator_db_deployment. Please execute 'orchestrator -c reset-internal-db-deployment'", deploymentType)
 			}
 			queryAlreadyExecuted = true
 		}

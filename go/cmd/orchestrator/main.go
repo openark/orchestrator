@@ -714,6 +714,13 @@ Cheatsheet:
             Utility command to resolve a CNAME and return resolved hostname name. Example:
             
             orchestrator -c resolve -i cname.to.resolve
+            
+        reset-internal-db-deployment
+            Clear internal db deployment history, use if somehow corrupted internal deployment history.
+            Orchestrator does housekeeping for its own database schema, and verifies proposed deployment vs deployment history.
+            In case of contradiction between the two orchestrator bails out. Such a contradiction is possible in the event of two
+            orchestrator instances simultaneously trying to deploy db changes (this is being worked on) 
+            By resetting history orchestrator redeploys its schema (without causing data loss).
     `
 
 // main is the application's entry point. It will either spawn a CLI or HTTP itnerfaces.

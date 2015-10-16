@@ -21,6 +21,7 @@ import (
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/util"
 	"github.com/outbrain/orchestrator/go/config"
+	"github.com/outbrain/orchestrator/go/db"
 	"github.com/outbrain/orchestrator/go/inst"
 	"github.com/outbrain/orchestrator/go/logic"
 	"net"
@@ -1107,6 +1108,12 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			fmt.Println("hostname resolve cache cleared")
+		}
+	case cliCommand("reset-internal-db-deployment", `Clear internal db deployment history, use if somehow corrupted internal deployment history`):
+		{
+			config.Config.SkipOrchestratorDatabaseUpdate = true
+			db.ResetInternalDeployment()
+			fmt.Println("Internal db deployment history reset. Next orchestrator execution will rebuild internal db structure (no data will be lost)")
 		}
 		// Help
 	case "help":
