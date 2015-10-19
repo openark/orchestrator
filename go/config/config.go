@@ -81,6 +81,7 @@ type Configuration struct {
 	MaintenancePurgeDays                       uint     // Days after which maintenance entries are purged from the database
 	CandidateInstanceExpireMinutes             uint     // Minutes after which a suggestion to use an instance as a candidate slave (to be preferably promoted on master failover) is expired.
 	AuditLogFile                               string   // Name of log file for audit operations. Disabled when empty.
+	AuditToSyslog                              bool     // If true, audit messages are written to syslog
 	AuditPageSize                              int
 	AuditPurgeDays                             uint   // Days after which audit entries are purged from the database
 	RemoveTextFromHostnameDisplay              string // Text to strip off the hostname on cluster/clusters pages
@@ -189,6 +190,7 @@ func NewConfiguration() *Configuration {
 		MaintenancePurgeDays:                       365,
 		CandidateInstanceExpireMinutes:             60,
 		AuditLogFile:                               "",
+		AuditToSyslog:                              false,
 		AuditPageSize:                              20,
 		AuditPurgeDays:                             365,
 		RemoveTextFromHostnameDisplay:              "",

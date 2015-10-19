@@ -23,6 +23,7 @@ import (
 	"github.com/outbrain/golib/math"
 	"github.com/outbrain/orchestrator/go/app"
 	"github.com/outbrain/orchestrator/go/config"
+	"github.com/outbrain/orchestrator/go/inst"
 	"os"
 	"runtime"
 )
@@ -780,6 +781,9 @@ func main() {
 	if config.Config.EnableSyslog {
 		log.EnableSyslogWriter("orchestrator")
 		log.SetSyslogLevel(log.INFO)
+	}
+	if config.Config.AuditToSyslog {
+		inst.EnableAuditSyslog()
 	}
 
 	if len(flag.Args()) == 0 && *command == "" {

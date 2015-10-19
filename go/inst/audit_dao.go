@@ -23,14 +23,27 @@ import (
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
 	"github.com/rcrowley/go-metrics"
+	"log/syslog"
 	"os"
 	"time"
 )
+
+// syslogWriter is optional, and defaults to nil (disabled)
+var syslogWriter *syslog.Writer
 
 var auditOperationCounter = metrics.NewCounter()
 
 func init() {
 	metrics.Register("audit.write", auditOperationCounter)
+}
+
+// EnableSyslogWriter enables, if possible, writes to syslog. These will execute _in addition_ to normal logging
+func EnableAuditSyslog() (err error) {
+	syslogWriter, err = syslog.New(syslog.LOG_ERR, "orchestrator")
+	if err != nil {
+		syslogWriter = nil
+	}
+	return err
 }
 
 // AuditOperation creates and writes a new audit entry by given params
@@ -41,16 +54,26 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 	}
 
 	if config.Config.AuditLogFile != "" {
-		f, err := os.OpenFile(config.Config.AuditLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
-		if err != nil {
-			return log.Errore(err)
-		}
+		go func() error {
+			f, err := os.OpenFile(config.Config.AuditLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+			if err != nil {
+				return log.Errore(err)
+			}
 
-		defer f.Close()
-		text := fmt.Sprintf("%s\t%s\t%s\t%d\t%s\t\n", time.Now().Format(log.TimeFormat), auditType, instanceKey.Hostname, instanceKey.Port, message)
-		if _, err = f.WriteString(text); err != nil {
-			return log.Errore(err)
-		}
+			defer f.Close()
+			text := fmt.Sprintf("%s\t%s\t%s\t%d\t%s\t\n", time.Now().Format(log.TimeFormat), auditType, instanceKey.Hostname, instanceKey.Port, message)
+			if _, err = f.WriteString(text); err != nil {
+				return log.Errore(err)
+			}
+			return nil
+		}()
+	}
+
+	if syslogWriter != nil {
+		go func() {
+			syslogMessage := fmt.Sprintf("auditType:%s instance:%s message:%s", auditType, instanceKey.DisplayString(), message)
+			syslogWriter.Info(syslogMessage)
+		}()
 	}
 
 	db, err := db.OpenOrchestrator()
