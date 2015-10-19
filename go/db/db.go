@@ -27,6 +27,17 @@ import (
 	"strings"
 )
 
+type DummySqlResult struct {
+}
+
+func (this DummySqlResult) LastInsertId() (int64, error) {
+	return 0, nil
+}
+
+func (this DummySqlResult) RowsAffected() (int64, error) {
+	return 1, nil
+}
+
 var internalDBDeploymentSQL = []string{
 	`
 		CREATE TABLE IF NOT EXISTS _orchestrator_db_deployment (
@@ -604,6 +615,9 @@ func SetupMySQLTopologyTLS(uri string) (string, error) {
 
 // OpenTopology returns the DB instance for the orchestrator backed database
 func OpenOrchestrator() (*sql.DB, error) {
+	if config.Config.DatabaselessMode__experimental {
+		return nil, nil
+	}
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds", config.Config.MySQLOrchestratorUser, config.Config.MySQLOrchestratorPassword,
 		config.Config.MySQLOrchestratorHost, config.Config.MySQLOrchestratorPort, config.Config.MySQLOrchestratorDatabase, config.Config.MySQLConnectTimeoutSeconds)
 	if config.Config.MySQLOrchestratorUseMutualTLS {
@@ -771,6 +785,9 @@ func execInternal(db *sql.DB, query string, args ...interface{}) (sql.Result, er
 
 // ExecOrchestrator will execute given query on the orchestrator backend database.
 func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
+	if config.Config.DatabaselessMode__experimental {
+		return DummySqlResult{}, nil
+	}
 	db, err := OpenOrchestrator()
 	if err != nil {
 		return nil, err
@@ -781,6 +798,9 @@ func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
 
 // QueryRowsMapOrchestrator
 func QueryOrchestratorRowsMap(query string, on_row func(sqlutils.RowMap) error) error {
+	if config.Config.DatabaselessMode__experimental {
+		return nil
+	}
 	db, err := OpenOrchestrator()
 	if err != nil {
 		return err
@@ -791,6 +811,9 @@ func QueryOrchestratorRowsMap(query string, on_row func(sqlutils.RowMap) error) 
 
 // QueryOrchestratorRowsMapBuffered
 func QueryOrchestratorRowsMapBuffered(query string, on_row func(sqlutils.RowMap) error) error {
+	if config.Config.DatabaselessMode__experimental {
+		return nil
+	}
 	db, err := OpenOrchestrator()
 	if err != nil {
 		return err

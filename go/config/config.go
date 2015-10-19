@@ -42,6 +42,7 @@ type Configuration struct {
 	MySQLTopologySSLSkipVerify                 bool   // If true, do not strictly validate mutual TLS certs for Topology mysql instances
 	MySQLTopologyUseMutualTLS                  bool   // Turn on TLS authentication with the Topology MySQL instances
 	MySQLTopologyMaxPoolConnections            int    // Max concurrent connections on any topology instance
+	DatabaselessMode__experimental             bool   // !!!EXPERIMENTAL!!! Orchestrator will execute without speaking to a backend database; super-standalone mode
 	MySQLOrchestratorHost                      string
 	MySQLOrchestratorPort                      uint
 	MySQLOrchestratorDatabase                  string
@@ -162,6 +163,7 @@ func NewConfiguration() *Configuration {
 		MySQLOrchestratorPort:                      3306,
 		MySQLTopologyMaxPoolConnections:            3,
 		MySQLTopologyUseMutualTLS:                  false,
+		DatabaselessMode__experimental:             false,
 		MySQLOrchestratorUseMutualTLS:              false,
 		MySQLConnectTimeoutSeconds:                 5,
 		DefaultInstancePort:                        3306,

@@ -518,6 +518,9 @@ Cleanup:
 // It is a non-recursive function and so-called-recursion is performed upon periodic reading of
 // instances.
 func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (clusterName string, replicationDepth uint, isCoMaster bool, err error) {
+	if config.Config.DatabaselessMode__experimental {
+		return "", 0, false, nil
+	}
 	db, err := db.OpenOrchestrator()
 	if err != nil {
 		return "", 0, false, log.Errore(err)
@@ -674,6 +677,11 @@ func readInstancesByCondition(condition string, sort string) ([](*Instance), err
 
 // ReadInstance reads an instance from the orchestrator backend database
 func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
+	if config.Config.DatabaselessMode__experimental {
+		instance, err := ReadTopologyInstance(instanceKey)
+		return instance, (err == nil), err
+	}
+
 	condition := fmt.Sprintf(`
 			hostname = '%s'
 			and port = %d

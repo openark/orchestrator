@@ -179,6 +179,10 @@ func StartDiscovery(instanceKey inst.InstanceKey) {
 // periodically investigated and their status captured, and long since unseen instances are
 // purged and forgotten.
 func ContinuousDiscovery() {
+	if config.Config.DatabaselessMode__experimental {
+		log.Fatal("Cannot execute continuous mode in databaseless mode")
+	}
+
 	log.Infof("Starting continuous discovery")
 	inst.LoadHostnameResolveCacheFromDatabase()
 	go handleDiscoveryRequests(nil, nil)
