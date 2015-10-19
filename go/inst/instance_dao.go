@@ -623,11 +623,6 @@ func readInstancesByCondition(condition string, sort string) ([](*Instance), err
 	readFunc := func() ([](*Instance), error) {
 		instances := [](*Instance){}
 
-		db, err := db.OpenOrchestrator()
-		if err != nil {
-			return instances, log.Errore(err)
-		}
-
 		if sort == "" {
 			sort = `hostname, port`
 		}
@@ -657,7 +652,7 @@ func readInstancesByCondition(condition string, sort string) ([](*Instance), err
 			%s
 			`, condition, sort)
 
-		err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+		err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 			instance := readInstanceRow(m)
 			instances = append(instances, instance)
 			return nil
@@ -940,11 +935,7 @@ func GetClusterHeuristicLag(clusterName string) (int64, error) {
 // updateInstanceClusterName
 func updateInstanceClusterName(instance *Instance) error {
 	writeFunc := func() error {
-		db, err := db.OpenOrchestrator()
-		if err != nil {
-			return log.Errore(err)
-		}
-		_, err = sqlutils.Exec(db, `
+		_, err := db.ExecOrchestrator(`
 			update 
 				database_instance 
 			set 
@@ -999,11 +990,8 @@ func ReviewUnseenInstances() error {
 // seem to be replicating.
 func readUnseenMasterKeys() ([]InstanceKey, error) {
 	res := []InstanceKey{}
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return res, log.Errore(err)
-	}
-	err = sqlutils.QueryRowsMap(db, `
+
+	err := db.QueryOrchestratorRowsMap(`
 			SELECT DISTINCT
 			    slave_instance.master_host, slave_instance.master_port
 			FROM
@@ -1064,12 +1052,7 @@ func InjectUnseenMasters() error {
 // appears on the hostname_resolved table; this means some time in the past their hostname was unresovled, and now
 // resovled to a different value; the old hostname is never accessed anymore and the old entry should be removed.
 func ForgetUnseenInstancesDifferentlyResolved() error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	sqlResult, err := sqlutils.Exec(db, `
+	sqlResult, err := db.ExecOrchestrator(`
 		DELETE FROM 
 			database_instance
 		USING
@@ -1096,11 +1079,7 @@ func ForgetUnseenInstancesDifferentlyResolved() error {
 // last time we saw this hostname and it resolves into THAT")
 func readUnknownMasterHostnameResolves() (map[string]string, error) {
 	res := make(map[string]string)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return res, log.Errore(err)
-	}
-	err = sqlutils.QueryRowsMap(db, `
+	err := db.QueryOrchestratorRowsMap(`
 			SELECT DISTINCT
 			    slave_instance.master_host, hostname_resolve_history.resolved_hostname
 			FROM
@@ -1160,16 +1139,11 @@ func ReadCountMySQLSnapshots(hostnames []string) (map[string]int, error) {
 		order by
 			hostname
 		`, sqlutils.InClauseStringValues(hostnames))
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
 
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		res[m.GetString("hostname")] = m.GetInt("count_mysql_snapshots")
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		log.Errore(err)
@@ -1207,11 +1181,6 @@ func PopulateInstancesAgents(instances [](*Instance)) error {
 func ReadClusters() ([]string, error) {
 	clusterNames := []string{}
 
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return clusterNames, log.Errore(err)
-	}
-
 	query := fmt.Sprintf(`
 		select 
 			cluster_name
@@ -1220,22 +1189,17 @@ func ReadClusters() ([]string, error) {
 		group by
 			cluster_name`)
 
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		clusterNames = append(clusterNames, m.GetString("cluster_name"))
 		return nil
 	})
 
-	return clusterNames, err
+	return clusterNames, log.Errore(err)
 }
 
 // ReadClusterInfo reads some info about a given cluster
 func ReadClusterInfo(clusterName string) (*ClusterInfo, error) {
 	clusterInfo := &ClusterInfo{}
-
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return clusterInfo, log.Errore(err)
-	}
 
 	query := fmt.Sprintf(`
 		select 
@@ -1248,7 +1212,7 @@ func ReadClusterInfo(clusterName string) (*ClusterInfo, error) {
 		group by
 			cluster_name`, clusterName)
 
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		clusterInfo.ClusterName = m.GetString("cluster_name")
 		clusterInfo.CountInstances = m.GetUint("count_instances")
 		ApplyClusterAlias(clusterInfo)
@@ -1268,11 +1232,6 @@ func ReadClusterInfo(clusterName string) (*ClusterInfo, error) {
 func ReadClustersInfo() ([]ClusterInfo, error) {
 	clusters := []ClusterInfo{}
 
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return clusters, log.Errore(err)
-	}
-
 	query := fmt.Sprintf(`
 		select 
 			cluster_name,
@@ -1282,7 +1241,7 @@ func ReadClustersInfo() ([]ClusterInfo, error) {
 		group by
 			cluster_name`)
 
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		clusterInfo := ClusterInfo{
 			ClusterName:    m.GetString("cluster_name"),
 			CountInstances: m.GetUint("count_instances"),
@@ -1319,12 +1278,8 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 			)
 			`,
 		config.Config.InstancePollSeconds, config.Config.InstancePollSeconds)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
 
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
 		if merr != nil {
 			log.Errore(merr)
@@ -1334,7 +1289,6 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 		// We don;t return an error because we want to keep filling the outdated instances list.
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		log.Errore(err)
@@ -1347,11 +1301,6 @@ Cleanup:
 func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError error) error {
 
 	writeFunc := func() error {
-		db, err := db.OpenOrchestrator()
-		if err != nil {
-			return log.Errore(err)
-		}
-
 		insertIgnore := ""
 		onDuplicateKeyUpdate := ""
 		if instanceWasActuallyFound {
@@ -1457,7 +1406,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
-		_, err = sqlutils.Exec(db, insertQuery,
+		_, err := db.ExecOrchestrator(insertQuery,
 			instance.Key.Hostname,
 			instance.Key.Port,
 			instance.Uptime,
@@ -1506,8 +1455,8 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 		}
 
 		if instanceWasActuallyFound && lastError == nil {
-			sqlutils.Exec(db, `
-        	update database_instance set last_seen = NOW() where hostname=? and port=?
+			db.ExecOrchestrator(`
+        		update database_instance set last_seen = NOW() where hostname=? and port=?
         	`, instance.Key.Hostname, instance.Key.Port,
 			)
 		} else {
@@ -1523,12 +1472,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 // for a given instance
 func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
 	writeFunc := func() error {
-		db, err := db.OpenOrchestrator()
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		_, err = sqlutils.Exec(db, `
+		_, err := db.ExecOrchestrator(`
         	update 
         		database_instance 
         	set
@@ -1558,12 +1502,7 @@ func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
 // we have a "hanging" issue.
 func UpdateInstanceLastAttemptedCheck(instanceKey *InstanceKey) error {
 	writeFunc := func() error {
-		db, err := db.OpenOrchestrator()
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		_, err = sqlutils.Exec(db, `
+		_, err := db.ExecOrchestrator(`
         	update 
         		database_instance 
         	set
@@ -1586,12 +1525,7 @@ func UpdateInstanceLastAttemptedCheck(instanceKey *InstanceKey) error {
 // ForgetInstance removes an instance entry from the orchestrator backed database.
 // It may be auto-rediscovered through topology or requested for discovery by multiple means.
 func ForgetInstance(instanceKey *InstanceKey) error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	_, err = sqlutils.Exec(db, `
+	_, err := db.ExecOrchestrator(`
 			delete 
 				from database_instance 
 			where 
@@ -1605,12 +1539,7 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 
 // ForgetLongUnseenInstances will remove entries of all instacnes that have long since been last seen.
 func ForgetLongUnseenInstances() error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	sqlResult, err := sqlutils.Exec(db, `
+	sqlResult, err := db.ExecOrchestrator(`
 			delete 
 				from database_instance 
 			where 
@@ -2274,12 +2203,7 @@ func KillQuery(instanceKey *InstanceKey, process int64) (*Instance, error) {
 // SnapshotTopologies records topology graph for all existing topologies
 func SnapshotTopologies() error {
 	writeFunc := func() error {
-		db, err := db.OpenOrchestrator()
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		_, err = sqlutils.Exec(db, `
+		_, err := db.ExecOrchestrator(`
         	insert into 
         		database_instance_topology_history (snapshot_unix_timestamp,
         			hostname, port, master_host, master_port, cluster_name)
@@ -2303,11 +2227,6 @@ func SnapshotTopologies() error {
 func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern string) ([](*Instance), error) {
 	instances := [](*Instance){}
 
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return instances, log.Errore(err)
-	}
-
 	query := fmt.Sprintf(`
 		select 
 			*
@@ -2319,7 +2238,7 @@ func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern str
 		order by
 			hostname, port`, historyTimestampPattern, clusterName)
 
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		instance := NewInstance()
 
 		instance.Key.Hostname = m.GetString("hostname")
@@ -2340,12 +2259,7 @@ func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern str
 // RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.
 func RegisterCandidateInstance(instanceKey *InstanceKey) error {
 	writeFunc := func() error {
-		db, err := db.OpenOrchestrator()
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		_, err = sqlutils.Exec(db, `
+		_, err := db.ExecOrchestrator(`
         	insert into candidate_database_instance (
         		hostname,
         		port,
@@ -2369,12 +2283,7 @@ func RegisterCandidateInstance(instanceKey *InstanceKey) error {
 // RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.
 func ExpireCandidateInstances() error {
 	writeFunc := func() error {
-		db, err := db.OpenOrchestrator()
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		_, err = sqlutils.Exec(db, `
+		_, err := db.ExecOrchestrator(`
         	delete from candidate_database_instance 
 				where last_suggested < NOW() - INTERVAL ? MINUTE
 				`, config.Config.CandidateInstanceExpireMinutes,

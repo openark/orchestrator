@@ -48,12 +48,7 @@ func readResponse(res *http.Response, err error) ([]byte, error) {
 
 // SetHostAttributes
 func SetHostAttributes(hostname string, attributeName string, attributeValue string) error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	_, err = sqlutils.Exec(db, `
+	_, err := db.ExecOrchestrator(`
 			replace 
 				into host_attributes (
 					hostname, attribute_name, attribute_value, submit_timestamp, expire_timestamp
@@ -87,12 +82,8 @@ func getHostAttributesByClause(whereClause string) ([]HostAttributes, error) {
 		order by
 			hostname, attribute_name
 		`, whereClause)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
 
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		hostAttributes := HostAttributes{}
 		hostAttributes.Hostname = m.GetString("hostname")
 		hostAttributes.AttributeName = m.GetString("attribute_name")
@@ -103,7 +94,6 @@ func getHostAttributesByClause(whereClause string) ([]HostAttributes, error) {
 		res = append(res, hostAttributes)
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		log.Errore(err)

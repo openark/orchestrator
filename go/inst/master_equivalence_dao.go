@@ -84,12 +84,7 @@ func GetEquivalentMasterCoordinates(instanceCoordinates *InstanceBinlogCoordinat
 		instanceCoordinates.Coordinates.LogFile,
 		instanceCoordinates.Coordinates.LogPos)
 
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err = db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		equivalentCoordinates := InstanceBinlogCoordinates{}
 		equivalentCoordinates.Key.Hostname = m.GetString("hostname")
 		equivalentCoordinates.Key.Port = m.GetInt("port")
@@ -99,7 +94,6 @@ func GetEquivalentMasterCoordinates(instanceCoordinates *InstanceBinlogCoordinat
 		result = append(result, &equivalentCoordinates)
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		return nil, err

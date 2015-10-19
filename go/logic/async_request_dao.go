@@ -73,12 +73,7 @@ func ReadPendingAsyncRequests(limit int) (res [](*AsyncRequest), err error) {
 			request_id asc
 		%s
 		`, limitClause)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err = db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		asyncRequest := NewEmptyAsyncRequest()
 		asyncRequest.Id = m.GetInt64("request_id")
 		asyncRequest.Command = m.GetString("command")
@@ -100,7 +95,6 @@ func ReadPendingAsyncRequests(limit int) (res [](*AsyncRequest), err error) {
 		res = append(res, asyncRequest)
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		log.Errore(err)

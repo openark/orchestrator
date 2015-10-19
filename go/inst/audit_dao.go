@@ -76,12 +76,7 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 		}()
 	}
 
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	_, err = sqlutils.Exec(db, `
+	_, err := db.ExecOrchestrator(`
 			insert 
 				into audit (
 					audit_timestamp, audit_type, hostname, port, message
@@ -125,12 +120,7 @@ func ReadRecentAudit(instanceKey *InstanceKey, page int) ([]Audit, error) {
 		limit %d
 		offset %d
 		`, whereCondition, config.Config.AuditPageSize, page*config.Config.AuditPageSize)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		audit := Audit{}
 		audit.AuditId = m.GetInt64("audit_id")
 		audit.AuditTimestamp = m.GetString("audit_timestamp")
@@ -140,9 +130,8 @@ func ReadRecentAudit(instanceKey *InstanceKey, page int) ([]Audit, error) {
 		audit.Message = m.GetString("message")
 
 		res = append(res, audit)
-		return err
+		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		log.Errore(err)

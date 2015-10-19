@@ -38,13 +38,7 @@ type HealthStatus struct {
 func HealthTest() (*HealthStatus, error) {
 	health := HealthStatus{Healthy: false, Hostname: ThisHostname, Token: ProcessToken.Hash}
 
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		health.Error = err
-		return &health, log.Errore(err)
-	}
-
-	sqlResult, err := sqlutils.Exec(db, `
+	sqlResult, err := db.ExecOrchestrator(`
 			insert into node_health 
 				(hostname, token, last_seen_active)
 			values
@@ -90,17 +84,11 @@ func readAvailableNodes() ([]string, error) {
 		order by
 			hostname
 		`)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
 
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		res = append(res, m.GetString("node"))
 		return nil
 	})
-Cleanup:
-
 	if err != nil {
 		log.Errore(err)
 	}

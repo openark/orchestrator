@@ -85,12 +85,7 @@ func readResponse(res *http.Response, err error) ([]byte, error) {
 
 // SubmitAgent submits a new agent for listing
 func SubmitAgent(hostname string, port int, token string) (string, error) {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return "", log.Errore(err)
-	}
-
-	_, err = sqlutils.Exec(db, `
+	_, err := db.ExecOrchestrator(`
 			replace 
 				into host_agent (
 					hostname, port, token, last_submitted
@@ -134,12 +129,7 @@ func DiscoverAgentInstance(hostname string, port int) error {
 
 // ForgetLongUnseenAgents will remove entries of all agents that have long since been last seen.
 func ForgetLongUnseenAgents() error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	_, err = sqlutils.Exec(db, `
+	_, err := db.ExecOrchestrator(`
 			delete 
 				from host_agent 
 			where 
@@ -161,17 +151,11 @@ func ReadOutdatedAgentsHosts() ([]string, error) {
 			IFNULL(last_checked < now() - interval %d minute, true)
 			`,
 		config.Config.AgentPollMinutes)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		hostname := m.GetString("hostname")
 		res = append(res, hostname)
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		log.Errore(err)
@@ -194,12 +178,7 @@ func ReadAgents() ([]Agent, error) {
 		order by
 			hostname
 		`
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		agent := Agent{}
 		agent.Hostname = m.GetString("hostname")
 		agent.Port = m.GetInt("port")
@@ -210,7 +189,6 @@ func ReadAgents() ([]Agent, error) {
 		res = append(res, agent)
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		log.Errore(err)
@@ -235,12 +213,7 @@ func readAgentBasicInfo(hostname string) (Agent, string, error) {
 		where
 			hostname = '%s'
 		`, hostname)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return agent, "", err
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		agent.Hostname = m.GetString("hostname")
 		agent.Port = m.GetInt("port")
 		agent.LastSubmitted = m.GetString("last_submitted")
@@ -249,6 +222,9 @@ func readAgentBasicInfo(hostname string) (Agent, string, error) {
 
 		return nil
 	})
+	if err != nil {
+		return agent, "", err
+	}
 
 	if token == "" {
 		return agent, "", log.Errorf("Cannot get agent/token: %s", hostname)
@@ -259,12 +235,7 @@ func readAgentBasicInfo(hostname string) (Agent, string, error) {
 // UpdateAgentLastChecked updates the last_check timestamp in the orchestrator backed database
 // for a given agent
 func UpdateAgentLastChecked(hostname string) error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	_, err = sqlutils.Exec(db, `
+	_, err := db.ExecOrchestrator(`
         	update 
         		host_agent 
         	set
@@ -282,12 +253,7 @@ func UpdateAgentLastChecked(hostname string) error {
 
 // UpdateAgentInfo  updates some agent state in backend table
 func UpdateAgentInfo(hostname string, agent Agent) error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	_, err = sqlutils.Exec(db, `
+	_, err := db.ExecOrchestrator(`
         	update 
         		host_agent 
         	set
@@ -545,12 +511,7 @@ func PostCopy(hostname string) (Agent, error) {
 
 // SubmitSeedEntry submits a new seed operation entry, returning its unique ID
 func SubmitSeedEntry(targetHostname string, sourceHostname string) (int64, error) {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return 0, log.Errore(err)
-	}
-
-	res, err := sqlutils.Exec(db, `
+	res, err := db.ExecOrchestrator(`
 			insert 
 				into agent_seed (
 					target_hostname, source_hostname, start_timestamp
@@ -571,12 +532,7 @@ func SubmitSeedEntry(targetHostname string, sourceHostname string) (int64, error
 
 // updateSeedComplete updates the seed entry, signing for completion
 func updateSeedComplete(seedId int64, seedError error) error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	_, err = sqlutils.Exec(db, `
+	_, err := db.ExecOrchestrator(`
 			update 
 				agent_seed
 					set end_timestamp = NOW(),
@@ -597,12 +553,7 @@ func updateSeedComplete(seedId int64, seedError error) error {
 
 // submitSeedStateEntry submits a seed state: a single step in the overall seed process
 func submitSeedStateEntry(seedId int64, action string, errorMessage string) (int64, error) {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return 0, log.Errore(err)
-	}
-
-	res, err := sqlutils.Exec(db, `
+	res, err := db.ExecOrchestrator(`
 			insert 
 				into agent_seed_state (
 					agent_seed_id, state_timestamp, state_action, error_message
@@ -624,12 +575,7 @@ func submitSeedStateEntry(seedId int64, action string, errorMessage string) (int
 
 // updateSeedStateEntry updates seed step state
 func updateSeedStateEntry(seedStateId int64, reason error) error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	_, err = sqlutils.Exec(db, `
+	_, err := db.ExecOrchestrator(`
 			update 
 				agent_seed_state
 					set error_message = ?
@@ -648,12 +594,7 @@ func updateSeedStateEntry(seedStateId int64, reason error) error {
 
 // FailStaleSeeds marks as failed seeds where no progress have been seen recently
 func FailStaleSeeds() error {
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	_, err = sqlutils.Exec(db, `
+	_, err := db.ExecOrchestrator(`
 				update 
 						agent_seed 
 					set 
@@ -853,12 +794,7 @@ func readSeeds(whereCondition string, limit string) ([]SeedOperation, error) {
 			agent_seed_id desc
 		%s
 		`, whereCondition, limit)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		seedOperation := SeedOperation{}
 		seedOperation.SeedId = m.GetInt64("agent_seed_id")
 		seedOperation.TargetHostname = m.GetString("target_hostname")
@@ -871,7 +807,6 @@ func readSeeds(whereCondition string, limit string) ([]SeedOperation, error) {
 		res = append(res, seedOperation)
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		log.Errore(err)
@@ -936,12 +871,7 @@ func ReadSeedStates(seedId int64) ([]SeedOperationState, error) {
 		order by
 			agent_seed_state_id desc
 		`, seedId)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		seedState := SeedOperationState{}
 		seedState.SeedStateId = m.GetInt64("agent_seed_state_id")
 		seedState.SeedId = m.GetInt64("agent_seed_id")
@@ -952,7 +882,6 @@ func ReadSeedStates(seedId int64) ([]SeedOperationState, error) {
 		res = append(res, seedState)
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		log.Errore(err)

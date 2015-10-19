@@ -29,13 +29,7 @@ import (
 
 // AttemptFailureDetectionRegistration tries to add a failure-detection entry; if this fails that means the problem has already been detected
 func AttemptFailureDetectionRegistration(analysisEntry *inst.ReplicationAnalysis) (bool, error) {
-
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return false, log.Errore(err)
-	}
-
-	sqlResult, err := sqlutils.Exec(db, `
+	sqlResult, err := db.ExecOrchestrator(`
 			insert ignore 
 				into topology_failure_detection (
 					hostname, 
@@ -92,13 +86,7 @@ func ClearActiveFailureDetections() error {
 
 // AttemptRecoveryRegistration tries to add a recovery entry; if this fails that means recovery is already in place.
 func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis) (*TopologyRecovery, error) {
-
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return nil, log.Errore(err)
-	}
-
-	sqlResult, err := sqlutils.Exec(db, `
+	sqlResult, err := db.ExecOrchestrator(`
 			insert ignore 
 				into topology_recovery (
 					hostname, 
@@ -228,12 +216,7 @@ func readRecoveries(whereCondition string, limit string) ([]TopologyRecovery, er
 			recovery_id desc
 		%s
 		`, whereCondition, limit)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		topologyRecovery := *NewTopologyRecovery(inst.ReplicationAnalysis{})
 		topologyRecovery.Id = m.GetInt64("recovery_id")
 
@@ -265,7 +248,6 @@ func readRecoveries(whereCondition string, limit string) ([]TopologyRecovery, er
 		res = append(res, topologyRecovery)
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		log.Errore(err)
@@ -364,12 +346,7 @@ func readFailureDetections(whereCondition string, limit string) ([]TopologyRecov
 			detection_id desc
 		%s
 		`, whereCondition, limit)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		failureDetection := TopologyRecovery{}
 		failureDetection.Id = m.GetInt64("detection_id")
 
@@ -391,7 +368,6 @@ func readFailureDetections(whereCondition string, limit string) ([]TopologyRecov
 		res = append(res, failureDetection)
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		log.Errore(err)

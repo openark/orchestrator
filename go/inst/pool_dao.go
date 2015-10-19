@@ -69,12 +69,7 @@ func ReadClusterPoolInstances(clusterName string) (*PoolInstancesMap, error) {
 		where
 			database_instance.cluster_name = '%s'
 		`, clusterName)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		pool := m.GetString("pool")
 		hostname := m.GetString("hostname")
 		port := m.GetInt("port")
@@ -84,7 +79,6 @@ func ReadClusterPoolInstances(clusterName string) (*PoolInstancesMap, error) {
 		poolInstancesMap[pool] = append(poolInstancesMap[pool], &InstanceKey{Hostname: hostname, Port: port})
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		return nil, err
@@ -106,12 +100,7 @@ func ReadAllClusterPoolInstances() ([](*ClusterPoolInstance), error) {
 			join database_instance_pool using (hostname, port)
 			left join cluster_alias using (cluster_name)
 		`)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		clusterPoolInstance := ClusterPoolInstance{
 			ClusterName:  m.GetString("cluster_name"),
 			ClusterAlias: m.GetString("alias"),
@@ -122,7 +111,6 @@ func ReadAllClusterPoolInstances() ([](*ClusterPoolInstance), error) {
 		result = append(result, &clusterPoolInstance)
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		return nil, err

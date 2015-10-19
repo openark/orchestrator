@@ -33,17 +33,10 @@ func ReadClusterAliases() error {
 		from 
 			cluster_alias
 		`)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		updatedMap[m.GetString("cluster_name")] = m.GetString("alias")
-		return err
+		return nil
 	})
-Cleanup:
-
 	if err != nil {
 		log.Errore(err)
 	}
@@ -65,17 +58,10 @@ func ReadClusterByAlias(alias string) (string, error) {
 		where
 			alias = '%s'
 		`, alias)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		clusterName = m.GetString("cluster_name")
 		return nil
 	})
-Cleanup:
-
 	if err != nil {
 		return "", err
 	}

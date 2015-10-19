@@ -89,16 +89,11 @@ func ReadResolvedHostname(hostname string) (string, error) {
 		where
 			hostname = '%s'
 		`, hostname)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
 
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		resolvedHostname = m.GetString("resolved_hostname")
 		return nil
 	})
-Cleanup:
 	readResolvedHostnameCounter.Inc(1)
 
 	if err != nil {
@@ -116,18 +111,12 @@ func readAllHostnameResolves() ([]HostnameResolve, error) {
 		from 
 			hostname_resolve
 		`)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		hostnameResolve := HostnameResolve{hostname: m.GetString("hostname"), resolvedHostname: m.GetString("resolved_hostname")}
 
 		res = append(res, hostnameResolve)
 		return nil
 	})
-Cleanup:
 	readAllResolvedHostnamesCounter.Inc(1)
 
 	if err != nil {
@@ -149,16 +138,11 @@ func readUnresolvedHostname(hostname string) (string, error) {
 	   		where
 	   			hostname = '%s'
 	   		`, hostname)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
 
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		unresolvedHostname = m.GetString("unresolved_hostname")
 		return nil
 	})
-Cleanup:
 	readUnresolvedHostnameCounter.Inc(1)
 
 	if err != nil {
@@ -181,17 +165,12 @@ func readMissingKeysToResolve() (result InstanceKeyMap, err error) {
    			where 
    				hostname_resolve.hostname is null
 	   		`
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
 
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err = db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		instanceKey := InstanceKey{Hostname: m.GetString("unresolved_hostname"), Port: m.GetInt("port")}
 		result.AddKey(instanceKey)
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		log.Errore(err)
@@ -272,6 +251,7 @@ func ForgetExpiredHostnameResolves() error {
 // - infinite loop resolves (A->B and B->A), remove earlier mapping
 func DeleteInvalidHostnameResolves() error {
 	var invalidHostnames []string
+
 	query := `
 		select 
 		    early.hostname
@@ -282,12 +262,8 @@ func DeleteInvalidHostnameResolves() error {
 		    latest.hostname != latest.resolved_hostname 
 		    and latest.resolved_timestamp > early.resolved_timestamp
 	   	`
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return err
-	}
 
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		invalidHostnames = append(invalidHostnames, m.GetString("hostname"))
 		return nil
 	})
@@ -296,7 +272,7 @@ func DeleteInvalidHostnameResolves() error {
 	}
 
 	for _, invalidHostname := range invalidHostnames {
-		_, err = sqlutils.Exec(db, `
+		_, err = db.ExecOrchestrator(`
 			delete 
 				from hostname_resolve 
 			where 

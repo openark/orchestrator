@@ -757,13 +757,13 @@ func initOrchestratorDB(db *sql.DB) error {
 	return nil
 }
 
-// ExecOrchestrator will execute given query on the orchestrator backend database.
+// execInternalSilently
 func execInternalSilently(db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
 	res, err := sqlutils.ExecSilently(db, query, args...)
 	return res, err
 }
 
-// ExecOrchestrator will execute given query on the orchestrator backend database.
+// execInternal
 func execInternal(db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
 	res, err := sqlutils.ExecSilently(db, query, args...)
 	return res, err
@@ -777,4 +777,24 @@ func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
 	}
 	res, err := sqlutils.Exec(db, query, args...)
 	return res, err
+}
+
+// QueryRowsMapOrchestrator
+func QueryOrchestratorRowsMap(query string, on_row func(sqlutils.RowMap) error) error {
+	db, err := OpenOrchestrator()
+	if err != nil {
+		return err
+	}
+
+	return sqlutils.QueryRowsMap(db, query, on_row)
+}
+
+// QueryOrchestratorRowsMapBuffered
+func QueryOrchestratorRowsMapBuffered(query string, on_row func(sqlutils.RowMap) error) error {
+	db, err := OpenOrchestrator()
+	if err != nil {
+		return err
+	}
+
+	return sqlutils.QueryRowsMapBuffered(db, query, on_row)
 }

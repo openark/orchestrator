@@ -35,17 +35,10 @@ func ReadClusterDomainName(clusterName string) (string, error) {
 		where
 			cluster_name = '%s'
 		`, clusterName)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		domainName = m.GetString("domain_name")
 		return nil
 	})
-Cleanup:
-
 	if err != nil {
 		return "", err
 	}
@@ -59,12 +52,7 @@ Cleanup:
 // WriteClusterDomainName will write (and override) the domain name of a cluster
 func WriteClusterDomainName(clusterName string, domainName string) error {
 	writeFunc := func() error {
-		db, err := db.OpenOrchestrator()
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		_, err = sqlutils.Exec(db, `
+		_, err := db.ExecOrchestrator(`
 			insert into  
 					cluster_domain_name (cluster_name, domain_name, last_registered)
 				values

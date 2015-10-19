@@ -75,17 +75,11 @@ func ElectedNode() (hostname string, token string, isElected bool, err error) {
 		where
 			anchor = 1
 		`
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err = db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		hostname = m.GetString("hostname")
 		token = m.GetString("token")
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		log.Errore(err)

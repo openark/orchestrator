@@ -26,12 +26,7 @@ import (
 // WriteLongRunningProcesses rewrites current state of long running processes for given instance
 func WriteLongRunningProcesses(instanceKey *InstanceKey, processes []Process) error {
 	writeFunc := func() error {
-		db, err := db.OpenOrchestrator()
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		_, err = sqlutils.Exec(db, `
+		_, err := db.ExecOrchestrator(`
 			delete from 
 					database_instance_long_running_queries
 				where
@@ -45,7 +40,7 @@ func WriteLongRunningProcesses(instanceKey *InstanceKey, processes []Process) er
 		}
 
 		for _, process := range processes {
-			_, merr := sqlutils.Exec(db, `
+			_, merr := db.ExecOrchestrator(`
 	        	insert into database_instance_long_running_queries (
 	        		hostname,
 	        		port,
@@ -120,12 +115,7 @@ func ReadLongRunningProcesses(filter string) ([]Process, error) {
 		order by
 			process_time_seconds desc
 		`, filterClause)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		process := Process{}
 		process.InstanceHostname = m.GetString("hostname")
 		process.InstancePort = m.GetInt("port")
@@ -142,7 +132,6 @@ func ReadLongRunningProcesses(filter string) ([]Process, error) {
 		longRunningProcesses = append(longRunningProcesses, process)
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		log.Errore(err)

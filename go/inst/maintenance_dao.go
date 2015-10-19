@@ -44,12 +44,7 @@ func ReadActiveMaintenance() ([]Maintenance, error) {
 		order by
 			database_instance_maintenance_id
 		`)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		maintenance := Maintenance{}
 		maintenance.MaintenanceId = m.GetUint("database_instance_maintenance_id")
 		maintenance.Key.Hostname = m.GetString("hostname")
@@ -61,9 +56,8 @@ func ReadActiveMaintenance() ([]Maintenance, error) {
 		maintenance.Reason = m.GetString("reason")
 
 		res = append(res, maintenance)
-		return err
+		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		log.Errore(err)
@@ -151,12 +145,7 @@ func ReadMaintenanceInstanceKey(maintenanceToken int64) (*InstanceKey, error) {
 		where
 			database_instance_maintenance_id = %d `,
 		maintenanceToken)
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
 		if merr != nil {
 			return merr
@@ -165,7 +154,6 @@ func ReadMaintenanceInstanceKey(maintenanceToken int64) (*InstanceKey, error) {
 		res = instanceKey
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		log.Errore(err)

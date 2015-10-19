@@ -130,12 +130,7 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 			    count_slaves DESC
 	`, config.Config.InstancePollSeconds)
 
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		goto Cleanup
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		a := ReplicationAnalysis{Analysis: NoProblem}
 
 		a.IsMaster = m.GetBool("is_master")
@@ -282,7 +277,6 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		}
 		return nil
 	})
-Cleanup:
 
 	if err != nil {
 		log.Errore(err)
