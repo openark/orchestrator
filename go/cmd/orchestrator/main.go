@@ -751,6 +751,9 @@ func main() {
 	config.RuntimeCLIFlags.BinlogFile = flag.String("binlog", "", "Binary log file name")
 	flag.Parse()
 
+	if *destination != "" && *sibling != "" {
+		log.Fatalf("-s and -d are synonyms, yet both were specified. You're probably doing the wrong thing.")
+	}
 	if *destination == "" {
 		*destination = *sibling
 	}
