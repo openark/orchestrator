@@ -30,6 +30,12 @@ import (
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
 func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance), extendedOutput bool) []string {
+	if instance == nil {
+		return []string{}
+	}
+	if instance.IsCoMaster && depth > 1 {
+		return []string{}
+	}
 	prefix := ""
 	if depth > 0 {
 		prefix = strings.Repeat(" ", (depth-1)*2)
@@ -87,11 +93,19 @@ func ASCIITopology(instanceKey *InstanceKey, historyTimestampPattern string) (st
 			masterInstance = instance
 		}
 	}
-	if masterInstance == nil {
-		return "", nil
-	}
 	// Get entries:
-	entries := getASCIITopologyEntry(0, masterInstance, replicationMap, historyTimestampPattern == "")
+	var entries []string
+	if masterInstance != nil {
+		// Single master
+		entries = getASCIITopologyEntry(0, masterInstance, replicationMap, historyTimestampPattern == "")
+	} else {
+		// Co-masters? For visualization we put each in its own branch while ignoring its other co-masters.
+		for _, instance := range instances {
+			if instance.IsCoMaster {
+				entries = append(entries, getASCIITopologyEntry(1, instance, replicationMap, historyTimestampPattern == "")...)
+			}
+		}
+	}
 	// Beautify: make sure the "[...]" part is nicely aligned for all instances.
 	{
 		maxIndent := 0
