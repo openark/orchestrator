@@ -1066,7 +1066,7 @@ function Cluster() {
 
     function addSidebarInfoPopoverContent(content, prepend) {
         if (prepend === true) {
-            var wrappedContent = '<div>' + content + '</div>';
+            var wrappedContent = '<div>' + content + '<div style="clear: both;"></div></div>';
             $("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content",
                 wrappedContent + $("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content"));
 
@@ -1101,14 +1101,61 @@ function Cluster() {
             if (clusterInfo.HasAutomatedMasterRecovery === true) {
                 content += '<span class="glyphicon glyphicon-heart text-info" title="Automated master recovery for this cluster ENABLED"></span>';
             } else {
-                content += '<span class="glyphicon glyphicon-heart text-muted" title="Automated master recovery for this cluster DISABLED"></span>';
+                content += '<span class="glyphicon glyphicon-heart text-muted pull-right" title="Automated master recovery for this cluster DISABLED"></span>';
             }
             if (clusterInfo.HasAutomatedIntermediateMasterRecovery === true) {
                 content += '<span class="glyphicon glyphicon-heart-empty text-info" title="Automated intermediate master recovery for this cluster ENABLED"></span>';
             } else {
-                content += '<span class="glyphicon glyphicon-heart-empty text-muted" title="Automated intermediate master recovery for this cluster DISABLED"></span>';
+                content += '<span class="glyphicon glyphicon-heart-empty text-muted pull-right" title="Automated intermediate master recovery for this cluster DISABLED"></span>';
             }
             addSidebarInfoPopoverContent(content, true);
+        }
+        // Colorize-dc
+        {
+		    var glyph = $("#cluster_sidebar [data-bullet=colorize-dc] .glyphicon");
+        	if ($.cookie("colorize-dc") == "true") {
+		    	glyph.addClass("text-info");
+		    	glyph.attr("title", "Disable colors");        		
+        	} else {
+		    	glyph.addClass("text-muted");
+		    	glyph.attr("title", "Color by data center");
+        	}
+        }
+        {
+		    // Compact display
+		    var anchor = $("#cluster_sidebar [data-bullet=compact] a");
+		    var glyph = $(anchor).find(".glyphicon")
+		    if (isCompactDisplay()) {
+		    	anchor.attr("href", location.href.split("?")[0].split("#")[0] + '?compact=false')
+		    	glyph.addClass("text-info");
+		    	glyph.attr("title", "Disable compact display");
+		    } else {
+		    	anchor.attr("href", location.href.split("?")[0].split("#")[0] + '?compact=true')
+		    	glyph.addClass("text-muted");
+		    	glyph.attr("title", "Enable compact display");
+		    }
+		}
+        // Pool indicator
+        {
+		    var glyph = $("#cluster_sidebar [data-bullet=pool-indicator] .glyphicon");
+        	if ($.cookie("pool-indicator") == "true") {
+		    	glyph.addClass("text-info");
+		    	glyph.attr("title", "Disable pool indication");        		
+        	} else {
+		    	glyph.addClass("text-muted");
+		    	glyph.attr("title", "Enable pool indication");
+        	}
+        }
+        // Anonymize
+        {
+		    var glyph = $("#cluster_sidebar [data-bullet=anonymize] .glyphicon");
+        	if ($.cookie("anonymize") == "true") {
+		    	glyph.addClass("text-info");
+		    	glyph.attr("title", "Cancel anonymize");        		
+        	} else {
+		    	glyph.addClass("text-muted");
+		    	glyph.attr("title", "Anonymize display");
+        	}
         }
     }
 
@@ -1369,9 +1416,8 @@ function Cluster() {
                 location.reload();
                 return
             }
-            anonymize();
-            $("#dropdown-context a[data-command=anonymize]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
             $.cookie("anonymize", "true", { path: '/', expires: 1 });
+            location.reload();
         });
         $("body").on("click", "a[data-command=colorize-dc]", function (event) {
             if ($.cookie("colorize-dc") == "true") {

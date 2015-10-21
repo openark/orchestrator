@@ -439,8 +439,12 @@ body {
     cursor: pointer;
 }
 
-#cluster_sidebar li span.glyphicon {
+#cluster_sidebar li[data-bullet=info] span.glyphicon {
     font-size: 2em;
+}
+
+#cluster_sidebar li a .glyphicon {
+    cursor: pointer;
 }
 
 #cluster_sidebar .nav li > a {
@@ -467,6 +471,9 @@ body {
     margin-bottom: 8px;
 }
 
+#cluster_sidebar .text-indicate {
+    color: #e68545;
+}
 
 .arrow_box {
     position: relative;

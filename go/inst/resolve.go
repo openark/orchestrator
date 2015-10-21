@@ -64,7 +64,7 @@ func resolveHostname(hostname string) (string, error) {
 	return hostname, nil
 }
 
-// Attempt to resolve a hostname. This may returned a database cached hostname or otherwise
+// Attempt to resolve a hostname. This may return a database cached hostname or otherwise
 // it may resolve the hostname via CNAME
 func ResolveHostname(hostname string) (string, error) {
 	hostname = strings.TrimSpace(hostname)

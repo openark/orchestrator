@@ -54,6 +54,8 @@ func (this *ClusterInfo) filtersMatchCluster(filters []string) bool {
 			if matched, _ := regexp.MatchString(aliasPattern, this.ClusterAlias); matched {
 				return true
 			}
+		} else if filter == "*" {
+			return true
 		} else if matched, _ := regexp.MatchString(filter, this.ClusterName); matched && filter != "" {
 			return true
 		}
