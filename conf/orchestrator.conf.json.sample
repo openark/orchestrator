@@ -139,5 +139,5 @@
   "UnseenInstanceForgetHours": 240,
   "UseMutualTLS": false,
   "UseSSL": false,
-  "VerifyReplicationFilters": false,
+  "VerifyReplicationFilters": false
 }
