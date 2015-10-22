@@ -1,90 +1,143 @@
 {
   "Debug": true,
-  "ListenAddress": ":3000",
+  "ActiveNodeExpireSeconds": 60,
+  "AgentAutoDiscover": false,
+  "AgentPollMinutes": 60,
   "AgentsServerPort": ":3001",
-  "MySQLTopologyUser": "msandbox",
-  "MySQLTopologyPassword": "msandbox",
-  "MySQLTopologyCredentialsConfigFile": "",
-  "MySQLOrchestratorHost": "127.0.0.1",
-  "MySQLOrchestratorPort": 5622,
-  "MySQLOrchestratorDatabase": "orchestrator",
-  "MySQLOrchestratorUser": "msandbox",
-  "MySQLOrchestratorPassword": "msandbox",
-  "MySQLOrchestratorCredentialsConfigFile": "",
-  "MySQLConnectTimeoutSeconds": 1,
-  "MySQLTopologyMaxPoolConnections": 3,
-  "SlaveLagQuery": "",
-  "DiscoverByShowSlaveHosts": true,
-  "DiscoveryPollSeconds": 5,
-  "InstancePollSeconds": 12,
-  "InstanceBulkOperationsWaitTimeoutSeconds":10,
-  "ActiveNodeExpireSeconds": 20,
-  "HostnameResolveMethod": "default",
-  "MySQLHostnameResolveMethod": "default",
-  "ExpiryHostnameResolvesMinutes": 60,
-  "RejectHostnameResolvePattern": "",
-  "UnseenInstanceForgetHours": 240,
-  "CandidateInstanceExpireMinutes": 60,
-  "SnapshotTopologiesIntervalHours": 0,
-  "ReasonableReplicationLagSeconds": 10,
-  "VerifyReplicationFilters": false,
-  "ReasonableMaintenanceReplicationLagSeconds": 20,
+  "AgentsUseMutualTLS": false,
+  "AgentsUseSSL": false,
+  "AgentSSLCAFile": "",
+  "AgentSSLCertFile": "",
+  "AgentSSLPrivateKeyFile:": "",
+  "AgentSSLSkipVerify": false,
+  "AgentSSLValidOUs": [
+  ],
   "AuditLogFile": "/tmp/orchestrator-audit.log",
   "AuditPageSize": 20,
-  "SlaveStartPostWaitMilliseconds": 1000,
-  "ReadOnly": false,
-  "AuthenticationMethod": "",
-  "HTTPAuthUser": "",
-  "HTTPAuthPassword": "",
+  "AuditPurgeDays": 365,
+  "AuditToSyslog": false,
   "AuthUserHeader": "",
-  "PowerAuthUsers": ["*"],
+  "AuthenticationMethod": "",
+  "BinlogEventsChunkSize": 10000,
+  "BufferBinlogEvents": true,
+  "CandidateInstanceExpireMinutes": 60,
   "ClusterNameToAlias": {
     "127.0.0.1": "test suite"
   },
-  "DetectClusterAliasQuery": "select substring_index(@@hostname, '.', 1)",
   "DataCenterPattern": "[.]([^.]+)[.][^.]+[.]mydomain[.]com",
-  "PhysicalEnvironmentPattern": "[.]([^.]+[.][^.]+)[.]mydomain[.]com",
-  "RemoveTextFromHostnameDisplay": ".mydomain.com:3306",
-  "ServeAgentsHttp": false,
-  "AgentsUseSSL": false,
-  "SSLSkipVerify": false,
-  "SSLPrivateKeyFile": "",
-  "SSLCertFile": "",
-  "AgentPollMinutes": 60,
-  "UnseenAgentForgetHours": 6,
-  "StaleSeedFailMinutes": 60,
-  "SeedAcceptableBytesDiff": 8192,
-  "PseudoGTIDPattern": "drop view if exists .*?`_pseudo_gtid_hint__",
-  "PseudoGTIDMonotonicHint": "asc:",
-  "DetectPseudoGTIDQuery": "select count(*) as pseudo_gtid_exists from meta.pseudo_gtid_status where anchor = 1 and time_generated > now() - interval 2 day",
-  "BinlogEventsChunkSize": 10000,
-  "RecoveryPeriodBlockMinutes": 60,
-  "PromotionIgnoreHostnameFilters": [
-  ], 
+  "DatabaselessMode__experimental": false,
+  "DefaultInstancePort": 3306,
+  "DetachLostSlavesAfterMasterFailover": true,
+  "DetectClusterAliasQuery": "SELECT SUBSTRING_INDEX(@@hostname, '.', 1)",
+  "DetectClusterDomainQuery": "",
+  "DetectPseudoGTIDQuery": "SELECT COUNT(*) as pseudo_gtid_exists FROM meta.pseudo_gtid_status WHERE anchor = 1 AND time_generated > NOW() - INTERVAL 2 DAY",
+  "DiscoverByShowSlaveHosts": true,
+  "DiscoveryPollSeconds": 5,
+  "EnableSyslog": false,
+  "ExpiryHostnameResolvesMinutes": 60,
+  "FailureDetectionPeriodBlockMinutes": 60,
+  "GraphiteAddr: "",
+  "GraphiteConvertHostnameDotsToUnderscores": true,
+  "GraphitePath": "",
+  "HTTPAuthPassword": "",
+  "HTTPAuthUser": "",
+  "HostnameResolveMethod": "default",
+  "HttpTimeoutSeconds": 60,
+  "InstanceBulkOperationsWaitTimeoutSeconds": 10,
+  "InstancePollSeconds": 12,
+  "ListenAddress": ":3000",
+  "MaintenanceExpireMinutes": 10,
+  "MaintenanceOwner: "orchestrator",
+  "MaintenancePurgeDays": 365,
+  "MasterFailoverLostInstancesDowntimeMinutes": 0,
+  "MySQLConnectTimeoutSeconds": 1,
+  "MySQLHostnameResolveMethod": "default",
+  "MySQLOrchestratorCredentialsConfigFile": "",
+  "MySQLOrchestratorDatabase": "orchestrator",
+  "MySQLOrchestratorHost": "127.0.0.1",
+  "MySQLOrchestratorPassword": "orc_server_user_password",
+  "MySQLOrchestratorPort": 3306,
+  "MySQLOrchestratorSSLCAFile": "",
+  "MySQLOrchestratorSSLCertFile": "",
+  "MySQLOrchestratorSSLPrivateKeyFile": "",
+  "MySQLOrchestratorSSLSkipVerify": true,
+  "MySQLOrchestratorUseMutualTLS": false,
+  "MySQLOrchestratorUser": "orc_server_user",
+  "MySQLTopologyCredentialsConfigFile": "",
+  "MySQLTopologyMaxPoolConnections": 3,
+  "MySQLTopologyPassword": "orc_client_user_password",
+  "MySQLTopologySSLCAFile": "",
+  "MySQLTopologySSLCertFile": "",
+  "MySQLTopologySSLPrivateKeyFile": "",
+  "MySQLTopologySSLSkipVerify": true,
+  "MySQLTopologyUseMutualTLS": false,
+  "MySQLTopologyUser": "orc_client_user",
   "OSCIgnoreHostnameFilters": [
+  ],
+  "OnFailureDetectionProcesses": [
+    "echo 'Detected {failureType} on {failureCluster}. Affected slaves: {countSlaves}' >> /tmp/recovery.log"
+  ],
+  "PhysicalEnvironmentPattern": "[.]([^.]+[.][^.]+)[.]mydomain[.]com",
+  "PostFailoverProcesses": [
+    "echo '(for all types) Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
+  ],
+  "PostIntermediateMasterFailoverProcesses": [
+    "echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
+  ],
+  "PostMasterFailoverProcesses": [
+    "echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Promoted: {successorHost}:{successorPort}' >> /tmp/recovery.log"
+  ],
+  "PostUnsuccessfulFailoverProcesses": [
+  ],
+  "PostponeSlaveRecoveryOnLagMinutes": 0,
+  "PowerAuthUsers": ["*"],
+  "PreFailoverProcesses": [
+    "echo 'Will recover from {failureType} on {failureCluster}' >> /tmp/recovery.log"
+  ],
+  "ProblemIgnoreHostnameFilters": [
+  ],
+  "PromotionIgnoreHostnameFilters": [
+  ],
+  "PseudoGTIDMonotonicHint": "asc:",
+  "PseudoGTIDPattern": "drop view if exists .*?`_pseudo_gtid_hint__",
+  "ReadLongRunningQueries": true,
+  "ReadOnly": false,
+  "ReasonableMaintenanceReplicationLagSeconds": 20,
+  "ReasonableReplicationLagSeconds": 10,
+  "RecoverIntermediateMasterClusterFilters": [
+    "_intermediate_master_pattern_"
+  ],
+  "RecoverMasterClusterFilters": [
+    "_master_pattern_"
   ],
   "RecoveryIgnoreHostnameFilters": [
   ],
-  "RecoverMasterClusterFilters": [
-  	"_master_pattern_"
+  "RecoveryPeriodBlockMinutes": 60,
+  "RejectHostnameResolvePattern": "",
+  "RemoveTextFromHostnameDisplay": ".mydomain.com:3306",
+  "SSLCAFile": "",
+  "SSLCertFile": "",
+  "SSLPrivateKeyFile": "",
+  "SSLSkipVerify": false,
+  "SSLValidOUs": [
   ],
-  "RecoverIntermediateMasterClusterFilters": [
-  	"_intermediate_master_pattern_"
+  "SeedAcceptableBytesDiff": 8192,
+  "ServeAgentsHttp": false,
+  "SkipBinlogEventsContaining": [
   ],
-  "OnFailureDetectionProcesses": [
-  	"echo 'Detected {failureType} on {failureCluster}. Affected slaves: {countSlaves}' >> /tmp/recovery.log"
-  ], 
-  "PreFailoverProcesses": [
-  	"echo 'Will recover from {failureType} on {failureCluster}' >> /tmp/recovery.log"
-  ],
-  "PostFailoverProcesses": [
-  	"echo '(for all types) Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
-  ],
-  "PostMasterFailoverProcesses": [
-  	"echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Promoted: {successorHost}:{successorPort}' >> /tmp/recovery.log"
-  ],
-  "PostIntermediateMasterFailoverProcesses": [
-  	"echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
-  ]
+  "SkipBinlogServerUnresolveCheck": true,
+  "SkipOrchestratorDatabaseUpdate": false,
+  "SlaveLagQuery": "",
+  "SlaveStartPostWaitMilliseconds": 1000,
+  "SmartOrchestratorDatabaseUpdate": false,
+  "SnapshotTopologiesIntervalHours": 0,
+  "StaleSeedFailMinutes": 60,
+  "StatusEndpoint": "/api/status",
+  "StatusOUVerify": false,
+  "StatusSimpleHealth": true,
+  "UnseenAgentForgetHours": 6,
+  "UnseenInstanceForgetHours": 240,
+  "UseMutualTLS": false,
+  "UseSSL": false,
+  "VerifyReplicationFilters": false,
 }
-
