@@ -326,11 +326,9 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 	}
 
 	if promotedSlave == nil {
-		log.Debugf("topology_recovery: - RecoverDeadMaster: Failure: no slave promoted.")
 		inst.AuditOperation("recover-dead-master", failedInstanceKey, "Failure: no slave promoted.")
 	} else {
-		log.Debugf("topology_recovery: - RecoverDeadMaster: promoted slave is %+v", promotedSlave.Key)
-		inst.AuditOperation("recover-dead-master", failedInstanceKey, fmt.Sprintf("master: %+v", promotedSlave.Key))
+		inst.AuditOperation("recover-dead-master", failedInstanceKey, fmt.Sprintf("promoted slave: %+v", promotedSlave.Key))
 	}
 	return promotedSlave, lostSlaves, err
 }
@@ -578,7 +576,6 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 	recoveryResolved := false
 
 	inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, "problem found; will recover")
-	log.Debugf("topology_recovery: RecoverDeadIntermediateMaster: will recover %+v", *failedInstanceKey)
 	if !skipProcesses {
 		if err := executeProcesses(config.Config.PreFailoverProcesses, "PreFailoverProcesses", topologyRecovery, true); err != nil {
 			return nil, topologyRecovery.AddError(err)
@@ -613,8 +610,7 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 			recoveryResolved = true
 			successorInstance = candidateSibling
 
-			log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) went with %d errors", candidateSibling.Key, len(errs))
-			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Done. Relocated %d slaves under candidate sibling: %+v; %d errors: %+v", len(relocatedSlaves), candidateSibling.Key, len(errs), errs))
+			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Relocated %d slaves under candidate sibling: %+v; %d errors: %+v", len(relocatedSlaves), candidateSibling.Key, len(errs), errs))
 		}
 	}
 	// Plan A: find a replacement intermediate master in same Data Center
@@ -655,8 +651,7 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 
 		if len(relocatedSlaves) > 0 {
 			recoveryResolved = true
-			log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: relocated up to %+v", successorInstance.Key)
-			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Done. Relocated slaves under: %+v %d errors: %+v", successorInstance.Key, len(errs), errs))
+			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Relocated slaves under: %+v %d errors: %+v", successorInstance.Key, len(errs), errs))
 		} else {
 			err = log.Errorf("topology_recovery: RecoverDeadIntermediateMaster failed to match up any slave from %+v", *failedInstanceKey)
 			topologyRecovery.AddError(err)
@@ -793,11 +788,9 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 	coMaster, lostSlaves, err := RecoverDeadCoMaster(topologyRecovery, skipProcesses)
 	ResolveRecovery(topologyRecovery, coMaster)
 	if coMaster == nil {
-		log.Debugf("topology_recovery: - RecoverDeadCoMaster: Failure: no slave promoted.")
 		inst.AuditOperation("recover-dead-co-master", failedInstanceKey, "Failure: no slave promoted.")
 	} else {
-		log.Debugf("topology_recovery: - RecoverDeadCoMaster: promoted co-master is %+v", coMaster.Key)
-		inst.AuditOperation("recover-dead-co-master", failedInstanceKey, fmt.Sprintf("master: %+v", coMaster.Key))
+		inst.AuditOperation("recover-dead-co-master", failedInstanceKey, fmt.Sprintf("promoted co-master: %+v", coMaster.Key))
 	}
 	topologyRecovery.LostSlaves.AddInstances(lostSlaves)
 	if coMaster != nil {

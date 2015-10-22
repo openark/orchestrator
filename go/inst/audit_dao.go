@@ -52,6 +52,10 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 	if instanceKey == nil {
 		instanceKey = &InstanceKey{}
 	}
+	clusterName := ""
+	if instanceKey.Hostname != "" {
+		clusterName, _ = GetClusterName(instanceKey)
+	}
 
 	if config.Config.AuditLogFile != "" {
 		go func() error {
@@ -61,37 +65,37 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 			}
 
 			defer f.Close()
-			text := fmt.Sprintf("%s\t%s\t%s\t%d\t%s\t\n", time.Now().Format(log.TimeFormat), auditType, instanceKey.Hostname, instanceKey.Port, message)
+			text := fmt.Sprintf("%s\t%s\t%s\t%d\t[%s]\t%s\t\n", time.Now().Format(log.TimeFormat), auditType, instanceKey.Hostname, instanceKey.Port, clusterName, message)
 			if _, err = f.WriteString(text); err != nil {
 				return log.Errore(err)
 			}
 			return nil
 		}()
 	}
-
-	if syslogWriter != nil {
-		go func() {
-			syslogMessage := fmt.Sprintf("auditType:%s instance:%s message:%s", auditType, instanceKey.DisplayString(), message)
-			syslogWriter.Info(syslogMessage)
-		}()
-	}
-
 	_, err := db.ExecOrchestrator(`
 			insert 
 				into audit (
-					audit_timestamp, audit_type, hostname, port, message
+					audit_timestamp, audit_type, hostname, port, cluster_name, message
 				) VALUES (
-					NOW(), ?, ?, ?, ?
+					NOW(), ?, ?, ?, ?, ?
 				)
 			`,
 		auditType,
 		instanceKey.Hostname,
 		instanceKey.Port,
+		clusterName,
 		message,
 	)
 	if err != nil {
 		return log.Errore(err)
 	}
+	logMessage := fmt.Sprintf("auditType:%s instance:%s cluster:%s message:%s", auditType, instanceKey.DisplayString(), clusterName, message)
+	if syslogWriter != nil {
+		go func() {
+			syslogWriter.Info(logMessage)
+		}()
+	}
+	log.Debugf(logMessage)
 	auditOperationCounter.Inc(1)
 
 	return err

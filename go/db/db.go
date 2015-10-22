@@ -571,6 +571,10 @@ var generateSQLPatches = []string{
 			ADD COLUMN lost_slaves text CHARACTER SET ascii NOT NULL after participating_instances,
 			ADD COLUMN all_errors text CHARACTER SET ascii NOT NULL after lost_slaves
 	`,
+	`
+		ALTER TABLE audit
+			ADD COLUMN cluster_name varchar(128) CHARACTER SET ascii NOT NULL DEFAULT '' AFTER port
+	`,
 }
 
 // Track if a TLS has already been configured for topology

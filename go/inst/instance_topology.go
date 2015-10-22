@@ -909,7 +909,7 @@ Cleanup:
 	}
 
 	// and we're done (pending deferred functions)
-	AuditOperation("reset slave", instanceKey, fmt.Sprintf("%+v replication reset", *instanceKey))
+	AuditOperation("reset-slave", instanceKey, fmt.Sprintf("%+v replication reset", *instanceKey))
 
 	return instance, err
 }
@@ -950,7 +950,7 @@ Cleanup:
 	}
 
 	// and we're done (pending deferred functions)
-	AuditOperation("detach slave", instanceKey, fmt.Sprintf("%+v replication detached", *instanceKey))
+	AuditOperation("detach-slave", instanceKey, fmt.Sprintf("%+v replication detached", *instanceKey))
 
 	return instance, err
 }
@@ -991,7 +991,7 @@ Cleanup:
 	}
 
 	// and we're done (pending deferred functions)
-	AuditOperation("reattach slave", instanceKey, fmt.Sprintf("%+v replication reattached", *instanceKey))
+	AuditOperation("reattach-slave", instanceKey, fmt.Sprintf("%+v replication reattached", *instanceKey))
 
 	return instance, err
 }
@@ -1654,6 +1654,7 @@ func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey, pattern str
 	if len(matchedSlaves) != len(slaves) {
 		err = fmt.Errorf("MultiMatchSlaves: only matched %d out of %d slaves of %+v; error is: %+v", len(matchedSlaves), len(slaves), *masterKey, err)
 	}
+	AuditOperation("multi-match-slaves", masterKey, fmt.Sprintf("matched %d slaves under %+v", len(matchedSlaves), *belowKey))
 
 	return matchedSlaves, belowInstance, err, errs
 }

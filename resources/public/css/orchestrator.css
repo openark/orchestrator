@@ -302,8 +302,9 @@ body {
     padding-bottom: 0px;
 }
 
-#node_modal .modal-title {
-    font: 12px sans-serif;
+#node_modal .modal-title code {
+    background-color: inherit;
+    font-weight: bold;
 }
 
 #node_modal .modal-title .downtime-message {
@@ -426,7 +427,7 @@ body {
 
 #cluster_sidebar {
     float: left;
-    position: absolute;
+    position: fixed;
     left: 15px;
     z-index:100;
 }

@@ -226,7 +226,7 @@ function openNodeModal(node) {
     $('#node_modal #modalDataAttributesTable button[data-btn][data-grouped!=true]').appendTo("#node_modal .modal-footer");
     $('#node_modal #modalDataAttributesTable [data-btn-group]').appendTo("#node_modal .modal-footer");
 
-    $('#node_modal .modal-title').html(node.title);
+    $('#node_modal .modal-title').html('<code class="text-primary">'+node.title+"</code>");
 
     $('#modalDataAttributesTable').html("");
 

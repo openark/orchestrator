@@ -24,6 +24,7 @@ import (
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
+	"github.com/pmylund/go-cache"
 	"github.com/rcrowley/go-metrics"
 	"regexp"
 	"sort"
@@ -59,6 +60,9 @@ func (this InstancesByCountSlaveHosts) Swap(i, j int) { this[i], this[j] = this[
 func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
 }
+
+// instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
+var instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.DiscoveryPollSeconds/2)*time.Second, time.Second)
 
 var readTopologyInstanceCounter = metrics.NewCounter()
 var readInstanceCounter = metrics.NewCounter()
@@ -1183,6 +1187,29 @@ func PopulateInstancesAgents(instances [](*Instance)) error {
 	}
 
 	return nil
+}
+
+func GetClusterName(instanceKey *InstanceKey) (clusterName string, err error) {
+	if clusterName, found := instanceKeyInformativeClusterName.Get(instanceKey.DisplayString()); found {
+		return clusterName.(string), nil
+	}
+	query := fmt.Sprintf(`
+		select 
+			ifnull(max(cluster_name), '') as cluster_name
+		from 
+			database_instance 
+		where
+			hostname = '%s'
+			and port = %d
+			`, instanceKey.Hostname, instanceKey.Port)
+
+	err = db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+		clusterName = m.GetString("cluster_name")
+		instanceKeyInformativeClusterName.Set(instanceKey.DisplayString(), clusterName, cache.DefaultExpiration)
+		return nil
+	})
+
+	return clusterName, log.Errore(err)
 }
 
 // ReadClusters reads names of all known clusters
