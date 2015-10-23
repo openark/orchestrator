@@ -218,7 +218,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 			if destinationKey == nil {
-				log.Fatal("Cannot deduce sibling:", destination)
+				log.Fatal("Cannot deduce destination/sibling:", destination)
 			}
 			_, err := inst.MoveBelow(instanceKey, destinationKey)
 			if err != nil {
@@ -235,7 +235,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 			if destinationKey == nil {
-				log.Fatal("Cannot deduce sibling:", destination)
+				log.Fatal("Cannot deduce destination:", destination)
 			}
 			_, err := inst.MoveEquivalent(instanceKey, destinationKey)
 			if err != nil {
@@ -352,7 +352,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 			if destinationKey == nil {
-				log.Fatal("Cannot deduce sibling:", destination)
+				log.Fatal("Cannot deduce destination:", destination)
 			}
 			_, err := inst.MoveBelowGTID(instanceKey, destinationKey)
 			if err != nil {
@@ -503,27 +503,6 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-		}
-	case cliCommand("last-pseudo-gtid", `Find latest Pseudo-GTID entry in instance's binary logs`):
-		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatalf("Unresolved instance")
-			}
-			instance, err := inst.ReadTopologyInstance(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if instance == nil {
-				log.Fatalf("Instance not found: %+v", *instanceKey)
-			}
-			coordinates, text, err := inst.FindLastPseudoGTIDEntry(instance, instance.RelaylogCoordinates, strict, nil)
-			if err != nil {
-				log.Fatale(err)
-			}
-			fmt.Println(fmt.Sprintf("%+v:%s", *coordinates, text))
 		}
 		// General replication commands
 	case cliCommand("enable-gtid", `If possible, turn on GTID replication`):
@@ -680,6 +659,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
+		// Binary log operations
 	case cliCommand("flush-binary-logs", `Flush binary logs on an instance`):
 		{
 			if instanceKey == nil {
@@ -717,6 +697,94 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			fmt.Println(instanceKey.DisplayString())
+		}
+	case cliCommand("last-pseudo-gtid", `Find latest Pseudo-GTID entry in instance's binary logs`):
+		{
+			if instanceKey == nil {
+				instanceKey = assignThisInstanceKey()
+			}
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance, err := inst.ReadTopologyInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			coordinates, text, err := inst.FindLastPseudoGTIDEntry(instance, instance.RelaylogCoordinates, nil, strict, nil)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(fmt.Sprintf("%+v:%s", *coordinates, text))
+		}
+	case cliCommand("find-binlog-entry", `Get binlog file:pos of entry given by --pattern (exact full match, not a regular expression) in a given instance`):
+		{
+			if pattern == "" {
+				log.Fatal("No pattern given")
+			}
+			if instanceKey == nil {
+				instanceKey = assignThisInstanceKey()
+			}
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance, err := inst.ReadTopologyInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			coordinates, err := inst.SearchEntryInInstanceBinlogs(instance, pattern, false)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(fmt.Sprintf("%+v", *coordinates))
+		}
+	case cliCommand("correlate-binlog-pos", `Given an instance (-i) and binlog coordinates (--binlog=file:pos), find the correlated coordinates in another instance (-d)`):
+		{
+			if instanceKey == nil {
+				instanceKey = assignThisInstanceKey()
+			}
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance, err := inst.ReadTopologyInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			if !instance.LogBinEnabled {
+				log.Fatalf("Instance does not have binary logs: %+v", *instanceKey)
+			}
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce target instance:", destination)
+			}
+			otherInstance, err := inst.ReadTopologyInstance(destinationKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if otherInstance == nil {
+				log.Fatalf("Instance not found: %+v", *destinationKey)
+			}
+			var binlogCoordinates *inst.BinlogCoordinates
+			if *config.RuntimeCLIFlags.BinlogFile == "" {
+				binlogCoordinates = &instance.SelfBinlogCoordinates
+			} else {
+				if binlogCoordinates, err = inst.ParseBinlogCoordinates(*config.RuntimeCLIFlags.BinlogFile); err != nil {
+					log.Fatalf("Expecing --binlog argument as file:pos")
+				}
+			}
+
+			coordinates, _, err := inst.CorrelateBinlogCoordinates(instance, binlogCoordinates, otherInstance)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(fmt.Sprintf("%+v", *coordinates))
 		}
 		// Pool
 	case cliCommand("submit-pool-instances", `Submit a pool name with a list of instances in that pool`):

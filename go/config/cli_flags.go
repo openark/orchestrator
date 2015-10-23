@@ -21,6 +21,7 @@ type CLIFlags struct {
 	Noop               *bool
 	SkipUnresolveCheck *bool
 	BinlogFile         *string
+	Databaseless       *bool
 }
 
 var RuntimeCLIFlags CLIFlags

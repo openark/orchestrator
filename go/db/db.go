@@ -575,6 +575,10 @@ var generateSQLPatches = []string{
 		ALTER TABLE audit
 			ADD COLUMN cluster_name varchar(128) CHARACTER SET ascii NOT NULL DEFAULT '' AFTER port
 	`,
+	`
+		ALTER TABLE candidate_database_instance
+			ADD COLUMN priority TINYINT SIGNED NOT NULL DEFAULT 1 comment 'positive promote, nagative unpromotes'
+	`,
 }
 
 // Track if a TLS has already been configured for topology

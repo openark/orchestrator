@@ -32,9 +32,9 @@ import (
 const maxEmptyBinlogFiles int = 10
 const maxEventInfoDisplayLength int = 200
 
-var instancePseudoGTIDEntryCache = cache.New(time.Duration(10)*time.Minute, time.Minute)
+var instanceBinlogEntryCache = cache.New(time.Duration(10)*time.Minute, time.Minute)
 
-func getInstancePseudoGTIDKey(instance *Instance, entry string) string {
+func getInstanceBinlogEntryKey(instance *Instance, entry string) string {
 	return fmt.Sprintf("%s;%s", instance.Key.DisplayString(), entry)
 }
 
@@ -101,19 +101,19 @@ func getLastPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, bin
 	return &binlogCoordinates, entryText, err
 }
 
-func getLastPseudoGTIDEntryInInstance(instance *Instance, exhaustiveSearch bool) (*BinlogCoordinates, string, error) {
+func getLastPseudoGTIDEntryInInstance(instance *Instance, maxBinlogCoordinates *BinlogCoordinates, exhaustiveSearch bool) (*BinlogCoordinates, string, error) {
 	// Look for last GTID in instance:
 	currentBinlog := instance.SelfBinlogCoordinates
 
 	var err error = nil
 	for err == nil {
 		log.Debugf("Searching for latest pseudo gtid entry in binlog %+v of %+v", currentBinlog.LogFile, instance.Key)
-		resultCoordinates, entryInfo, err := getLastPseudoGTIDEntryInBinlog(&instance.Key, currentBinlog.LogFile, BinaryLog, nil)
+		resultCoordinates, entryInfo, err := getLastPseudoGTIDEntryInBinlog(&instance.Key, currentBinlog.LogFile, BinaryLog, maxBinlogCoordinates)
 		if err != nil {
 			return nil, "", err
 		}
 		if resultCoordinates != nil {
-			log.Debugf("Found pseudo gtid entry in %+v: %+v", instance.Key, resultCoordinates)
+			log.Debugf("Found pseudo gtid entry in %+v, %+v", instance.Key, resultCoordinates)
 			return resultCoordinates, entryInfo, err
 		}
 		if !exhaustiveSearch {
@@ -136,7 +136,7 @@ func getLastPseudoGTIDEntryInRelayLogs(instance *Instance, recordedInstanceRelay
 		if resultCoordinates, entryInfo, err := getLastPseudoGTIDEntryInBinlog(&instance.Key, currentRelayLog.LogFile, RelayLog, &recordedInstanceRelayLogCoordinates); err != nil {
 			return nil, "", err
 		} else if resultCoordinates != nil {
-			log.Debugf("Found pseudo gtid entry in %+v: %+v", instance.Key, resultCoordinates)
+			log.Debugf("Found pseudo gtid entry in %+v, %+v", instance.Key, resultCoordinates)
 			return resultCoordinates, entryInfo, err
 		}
 		if !exhaustiveSearch {
@@ -147,11 +147,11 @@ func getLastPseudoGTIDEntryInRelayLogs(instance *Instance, recordedInstanceRelay
 	return nil, "", log.Errorf("Cannot find pseudo GTID entry in relay logs of %+v", instance.Key)
 }
 
-// Given a binlog entry text (query), search it in the given binary log of a given instance
-func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entryText string, entriesMonotonic bool) (BinlogCoordinates, bool, error) {
+// SearchEntryInBinlog Given a binlog entry text (query), search it in the given binary log of a given instance
+func SearchEntryInBinlog(instanceKey *InstanceKey, binlog string, entryText string, monotonicPseudoGTIDEntries bool) (BinlogCoordinates, bool, error) {
 	binlogCoordinates := BinlogCoordinates{LogFile: binlog, LogPos: 0, Type: BinaryLog}
 	if binlog == "" {
-		return binlogCoordinates, false, log.Errorf("SearchPseudoGTIDEntryInBinlog: empty binlog file name for %+v", *instanceKey)
+		return binlogCoordinates, false, log.Errorf("SearchEntryInBinlog: empty binlog file name for %+v", *instanceKey)
 	}
 
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
@@ -191,7 +191,9 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 			if binlogEntryInfo == entryText {
 				// found it!
 				binlogCoordinates.LogPos = m.GetInt64("Pos")
-			} else if entriesMonotonic && !alreadyMatchedAscendingPseudoGTID {
+			} else if monotonicPseudoGTIDEntries && !alreadyMatchedAscendingPseudoGTID {
+				// This part assumes we're searching for Pseudo-GTID.Typically that is the case, however this function can
+				// also be used for generic searches through the binary log.
 				// More heavyweight computation here. Need to verify whether the binlog entry we have is a pseudo-gtid entry
 				// We only want to check for ASCENDING once in the top of the binary log.
 				// If we find the first entry to be higher than the searched one, clearly we are done.
@@ -222,10 +224,10 @@ func SearchPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, entr
 	return binlogCoordinates, (binlogCoordinates.LogPos != 0), err
 }
 
-// SearchPseudoGTIDEntryInInstance will search for a specific text entry within the binary logs of a given instance.
-func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string, entriesMonotonic bool) (*BinlogCoordinates, error) {
-	cacheKey := getInstancePseudoGTIDKey(instance, entryText)
-	coords, found := instancePseudoGTIDEntryCache.Get(cacheKey)
+// SearchEntryInInstanceBinlogs will search for a specific text entry within the binary logs of a given instance.
+func SearchEntryInInstanceBinlogs(instance *Instance, entryText string, monotonicPseudoGTIDEntries bool) (*BinlogCoordinates, error) {
+	cacheKey := getInstanceBinlogEntryKey(instance, entryText)
+	coords, found := instanceBinlogEntryCache.Get(cacheKey)
 	if found {
 		// This is wonderful. We can skip the tedious GTID search in the binary log
 		log.Debugf("Found instance Pseudo GTID entry coordinates in cache: %+v, %+v, %+v", instance.Key, entryText, coords)
@@ -233,7 +235,7 @@ func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string, entri
 	}
 
 	// Look for GTID entry in given instance:
-	log.Debugf("Searching for given pseudo gtid entry in %+v. entriesMonotonic=%+v", instance.Key, entriesMonotonic)
+	log.Debugf("Searching for given pseudo gtid entry in %+v. monotonicPseudoGTIDEntries=%+v", instance.Key, monotonicPseudoGTIDEntries)
 	currentBinlog := instance.SelfBinlogCoordinates
 	var err error = nil
 	for {
@@ -257,13 +259,13 @@ func SearchPseudoGTIDEntryInInstance(instance *Instance, entryText string, entri
 		}
 		var resultCoordinates BinlogCoordinates
 		var found bool = false
-		resultCoordinates, found, err = SearchPseudoGTIDEntryInBinlog(&instance.Key, currentBinlog.LogFile, entryText, entriesMonotonic)
+		resultCoordinates, found, err = SearchEntryInBinlog(&instance.Key, currentBinlog.LogFile, entryText, monotonicPseudoGTIDEntries)
 		if err != nil {
 			break
 		}
 		if found {
 			log.Debugf("Matched entry in %+v: %+v", instance.Key, resultCoordinates)
-			instancePseudoGTIDEntryCache.Set(cacheKey, &resultCoordinates, 0)
+			instanceBinlogEntryCache.Set(cacheKey, &resultCoordinates, 0)
 			return &resultCoordinates, nil
 		}
 		// Got here? Unfound. Keep looking
@@ -350,7 +352,7 @@ func getNextBinlogEventsChunk(instance *Instance, startingCoordinates BinlogCoor
 // If "other" runs out that means "instance" is more advanced in replication than "other", in which case we can't
 // turn it into a slave of "other".
 // Otherwise "instance" will point to the *next* binlog entry in "other"
-func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates BinlogCoordinates, recordedInstanceRelayLogCoordinates BinlogCoordinates,
+func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates BinlogCoordinates, recordedInstanceRelayLogCoordinates BinlogCoordinates, maxBinlogCoordinates *BinlogCoordinates,
 	other *Instance, otherCoordinates BinlogCoordinates) (*BinlogCoordinates, int, error) {
 
 	fetchNextEvents := func(binlogCoordinates BinlogCoordinates) ([]BinlogEvent, error) {
@@ -378,6 +380,8 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 		// We expect entries on both to match, sequentially, until instance's binlogs/relaylogs are exhausted.
 		var instanceEventInfo string
 		var otherEventInfo string
+		var eventCoordinates BinlogCoordinates
+		var otherEventCoordinates BinlogCoordinates
 		{
 			// Extract next binlog/relaylog entry from instance:
 			event, err := instanceCursor.nextRealEvent()
@@ -439,6 +443,7 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 			}
 
 			instanceEventInfo = event.Info
+			eventCoordinates = event.Coordinates
 			coordinatesStr := fmt.Sprintf("%+v", event.Coordinates)
 			if len(coordinatesStr) > beautifyCoordinatesLength {
 				beautifyCoordinatesLength = len(coordinatesStr)
@@ -457,6 +462,7 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 				return nil, 0, log.Errorf("Unexpected end of binary logs for assumed master (%+v). This means the instance which attempted to be a slave (%+v) was more advanced. Try the other way round", other.Key, instance.Key)
 			}
 			otherEventInfo = event.Info
+			otherEventCoordinates = event.Coordinates
 			coordinatesStr := fmt.Sprintf("%+v", event.Coordinates)
 			if len(coordinatesStr) > beautifyCoordinatesLength {
 				beautifyCoordinatesLength = len(coordinatesStr)
@@ -469,6 +475,15 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 			return nil, 0, log.Errorf("Mismatching entries, aborting: %+v <-> %+v", instanceEventInfo, otherEventInfo)
 		}
 		countMatchedEvents++
+		if maxBinlogCoordinates != nil {
+			// Not searching till end of binary logs/relay log exec pos. Instead, we're stopping at an instructed position.
+			if eventCoordinates.Equals(maxBinlogCoordinates) {
+				log.Debugf("maxBinlogCoordinates specified as %+v and reached. Stopping", *maxBinlogCoordinates)
+				return &otherEventCoordinates, countMatchedEvents, nil
+			} else if maxBinlogCoordinates.SmallerThan(&eventCoordinates) {
+				return nil, 0, log.Errorf("maxBinlogCoordinates (%+v) exceeded but not met", *maxBinlogCoordinates)
+			}
+		}
 	}
 	// Won't get here
 }

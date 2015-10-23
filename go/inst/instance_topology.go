@@ -1048,7 +1048,7 @@ func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
 
 // FindLastPseudoGTIDEntry will search an instance's binary logs or relay logs for the last pseudo-GTID entry,
 // and return found coordinates as well as entry text
-func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordinates BinlogCoordinates, exhaustiveSearch bool, expectedBinlogFormat *string) (*BinlogCoordinates, string, error) {
+func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordinates BinlogCoordinates, maxBinlogCoordinates *BinlogCoordinates, exhaustiveSearch bool, expectedBinlogFormat *string) (*BinlogCoordinates, string, error) {
 	var instancePseudoGtidText string
 	var instancePseudoGtidCoordinates *BinlogCoordinates
 	var err error
@@ -1062,7 +1062,7 @@ func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordin
 		// for relay logs.
 		// Also, if master has STATEMENT binlog format, and the slave has ROW binlog format, then comparing binlog entries would urely fail if based on the slave's binary logs.
 		// Instead, we revert to the relay logs.
-		instancePseudoGtidCoordinates, instancePseudoGtidText, err = getLastPseudoGTIDEntryInInstance(instance, exhaustiveSearch)
+		instancePseudoGtidCoordinates, instancePseudoGtidText, err = getLastPseudoGTIDEntryInInstance(instance, maxBinlogCoordinates, exhaustiveSearch)
 	}
 	if err != nil || instancePseudoGtidCoordinates == nil {
 		// Unable to find pseudo GTID in binary logs.
@@ -1071,6 +1071,45 @@ func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordin
 		instancePseudoGtidCoordinates, instancePseudoGtidText, err = getLastPseudoGTIDEntryInRelayLogs(instance, recordedInstanceRelayLogCoordinates, exhaustiveSearch)
 	}
 	return instancePseudoGtidCoordinates, instancePseudoGtidText, err
+}
+
+// CorrelateBinlogCoordinates
+func CorrelateBinlogCoordinates(instance *Instance, binlogCoordinates *BinlogCoordinates, otherInstance *Instance) (*BinlogCoordinates, int, error) {
+
+	recordedInstanceRelayLogCoordinates := instance.RelaylogCoordinates
+	instancePseudoGtidCoordinates, instancePseudoGtidText, err := FindLastPseudoGTIDEntry(instance, recordedInstanceRelayLogCoordinates, binlogCoordinates, true, &otherInstance.Binlog_format)
+
+	if err != nil {
+		return nil, 0, err
+	}
+	entriesMonotonic := (config.Config.PseudoGTIDMonotonicHint != "") && strings.Contains(instancePseudoGtidText, config.Config.PseudoGTIDMonotonicHint)
+	otherInstancePseudoGtidCoordinates, err := SearchEntryInInstanceBinlogs(otherInstance, instancePseudoGtidText, entriesMonotonic)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// We've found a match: the latest Pseudo GTID position within instance and its identical twin in otherInstance
+	// We now iterate the events in both, up to the completion of events in instance (recall that we looked for
+	// the last entry in instance, hence, assuming pseudo GTID entries are frequent, the amount of entries to read
+	// from instance is not long)
+	// The result of the iteration will be either:
+	// - bad conclusion that instance is actually more advanced than otherInstance (we find more entries in instance
+	//   following the pseudo gtid than we can match in otherInstance), hence we cannot ask instance to replicate
+	//   from otherInstance
+	// - good result: both instances are exactly in same shape (have replicated the exact same number of events since
+	//   the last pseudo gtid). Since they are identical, it is easy to point instance into otherInstance.
+	// - good result: the first position within otherInstance where instance has not replicated yet. It is easy to point
+	//   instance into otherInstance.
+	nextBinlogCoordinatesToMatch, countMatchedEvents, err := GetNextBinlogCoordinatesToMatch(instance, *instancePseudoGtidCoordinates,
+		recordedInstanceRelayLogCoordinates, binlogCoordinates, otherInstance, *otherInstancePseudoGtidCoordinates)
+	if err != nil {
+		return nil, 0, err
+	}
+	if countMatchedEvents == 0 {
+		err = fmt.Errorf("Unexpected: 0 events processed while iterating logs. Something went wrong; aborting. nextBinlogCoordinatesToMatch: %+v", nextBinlogCoordinatesToMatch)
+		return nil, 0, err
+	}
+	return nextBinlogCoordinatesToMatch, countMatchedEvents, nil
 }
 
 // MatchBelow will attempt moving instance indicated by instanceKey below its the one indicated by otherKey.
@@ -1136,13 +1175,13 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	// a FLUSH LOGS/FLUSH RELAY LOGS (or a START SLAVE, though that's an altogether different problem) etc.
 	// We want to be on the safe side; we don't utterly trust that we are the only ones playing with the instance.
 	recordedInstanceRelayLogCoordinates = instance.RelaylogCoordinates
-	instancePseudoGtidCoordinates, instancePseudoGtidText, err = FindLastPseudoGTIDEntry(instance, recordedInstanceRelayLogCoordinates, true, &otherInstance.Binlog_format)
+	instancePseudoGtidCoordinates, instancePseudoGtidText, err = FindLastPseudoGTIDEntry(instance, recordedInstanceRelayLogCoordinates, nil, true, &otherInstance.Binlog_format)
 
 	if err != nil {
 		goto Cleanup
 	}
 	entriesMonotonic = (config.Config.PseudoGTIDMonotonicHint != "") && strings.Contains(instancePseudoGtidText, config.Config.PseudoGTIDMonotonicHint)
-	otherInstancePseudoGtidCoordinates, err = SearchPseudoGTIDEntryInInstance(otherInstance, instancePseudoGtidText, entriesMonotonic)
+	otherInstancePseudoGtidCoordinates, err = SearchEntryInInstanceBinlogs(otherInstance, instancePseudoGtidText, entriesMonotonic)
 	if err != nil {
 		goto Cleanup
 	}
@@ -1160,7 +1199,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	// - good result: the first position within otherInstance where instance has not replicated yet. It is easy to point
 	//   instance into otherInstance.
 	nextBinlogCoordinatesToMatch, countMatchedEvents, err = GetNextBinlogCoordinatesToMatch(instance, *instancePseudoGtidCoordinates,
-		recordedInstanceRelayLogCoordinates, otherInstance, *otherInstancePseudoGtidCoordinates)
+		recordedInstanceRelayLogCoordinates, nil, otherInstance, *otherInstancePseudoGtidCoordinates)
 	if err != nil {
 		goto Cleanup
 	}

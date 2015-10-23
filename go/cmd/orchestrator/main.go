@@ -323,12 +323,6 @@ Cheatsheet:
             orchestrator -c regroup-slaves -i instance.with.slaves.one.of.which.will.turn.local.master.if.possible
             
             --debug is your friend.
-            
-        last-pseudo-gtid
-            Information command; an authoritative way of detecting whether a Pseudo-GTID event exist for an instance,
-            and if so, output the last Pseudo-GTID entry and its location. Example:
-            
-            orchestrator -c last-pseudo-gtid -i instance.with.possible.pseudo-gtid.injection
 
     General replication commands
         These commands issue various statements that relate to replication.
@@ -404,6 +398,9 @@ Cheatsheet:
             orchestrator -c set-writeable
                 -i not given, implicitly assumed local hostname
 
+	Binlog commands
+		Commands that investigate/work on binary logs
+		
         flush-binary-logs
             Flush binary logs on an instance. Examples:
             
@@ -418,7 +415,37 @@ Cheatsheet:
             orchestrator -c purge-binary-logs -i instance.with.binary.logs.com --binlog mysql-bin.002048
             
                 Purges binary logs until given log
-                        
+            
+        last-pseudo-gtid
+            Information command; an authoritative way of detecting whether a Pseudo-GTID event exist for an instance,
+            and if so, output the last Pseudo-GTID entry and its location. Example:
+            
+            orchestrator -c last-pseudo-gtid -i instance.with.possible.pseudo-gtid.injection
+
+		find-binlog-entry
+			Get binlog file:pos of entry given by --pattern (exact full match, not a regular expression) in a given instance.
+			This will search the instance's binary logs starting with most recent, and terminate as soon as an exact match is found.
+			The given input is not a regular expression. It must fully match the entry (not a substring). 
+			This is most useful when looking for uniquely identifyable values, such as Pseudo-GTID. Example:
+			
+			orchestrator -c find-binlog-entry -i instance.to.search.on.com --pattern "insert into my_data (my_column) values ('distinct_value_01234_56789')"
+			
+				Prints out the binlog file:pos where the entry is found, or errors if unfound.
+			
+		correlate-binlog-pos
+			Given an instance (-i) and binlog coordinates (--binlog=file:pos), find the correlated coordinates in another instance (-d).
+			"Correlated coordinates" are those that present the same point-in-time of sequence of binary log events, untangling
+			the mess of different binlog file:pos coordinates on different servers.
+			This operation relies on Pseudo-GTID: your servers must have been pre-injected with PSeudo-GTID entries as these are
+			being used as binlog markers in the correlation process.
+			You must provide a valid file:pos in the binlogs of the source instance (-i), and in response get the correlated
+			coordinates in the binlogs of the destination instance (-d). This operation does not work on relay logs.
+			Example:
+			
+			-c correlate-binlog-pos  -i instance.with.binary.log.com --binlog=mysql-bin.002366:14127 -d other.instance.with.binary.logs.com
+			
+				Prints out correlated coordinates, e.g.: "mysql-bin.002302:14220", or errors out.
+			                        
     Pool commands
         Orchestrator provides with getter/setter commands for handling pools. It does not on its own investigate pools,
         but merely accepts and provides association of an instance (host:port) and a pool (any_name).
@@ -730,7 +757,7 @@ Cheatsheet:
 // main is the application's entry point. It will either spawn a CLI or HTTP itnerfaces.
 func main() {
 	configFile := flag.String("config", "", "config file name")
-	command := flag.String("c", "", "command (discover|forget|continuous|move-up|move-below|begin-maintenance|end-maintenance|clusters|topology)")
+	command := flag.String("c", "", "command, required. See full list of commands via 'orchestrator -c help'")
 	strict := flag.Bool("strict", false, "strict mode (more checks, slower)")
 	instance := flag.String("i", "", "instance, host_fqdn[:port] (e.g. db.company.com:3306, db.company.com)")
 	sibling := flag.String("s", "", "sibling instance, host_fqdn[:port]")
@@ -743,9 +770,11 @@ func main() {
 	pool := flag.String("pool", "", "Pool logical name (applies for pool-related commands)")
 	hostnameFlag := flag.String("hostname", "", "Hostname/fqdn/CNAME/VIP (applies for hostname/resolve related commands)")
 	discovery := flag.Bool("discovery", true, "auto discovery mode")
+	quiet := flag.Bool("quiet", false, "quiet")
 	verbose := flag.Bool("verbose", false, "verbose")
 	debug := flag.Bool("debug", false, "debug mode (very verbose)")
 	stack := flag.Bool("stack", false, "add stack trace upon error")
+	config.RuntimeCLIFlags.Databaseless = flag.Bool("databaseless", false, "EXPERIMENTAL! Work without backend database")
 	config.RuntimeCLIFlags.SkipUnresolveCheck = flag.Bool("skip-unresolve-check", false, "Skip/ignore checking an unresolve mapping (via hostname_unresolve table) resolves back to same hostname")
 	config.RuntimeCLIFlags.Noop = flag.Bool("noop", false, "Dry run; do not perform destructing operations")
 	config.RuntimeCLIFlags.BinlogFile = flag.String("binlog", "", "Binary log file name")
@@ -778,8 +807,15 @@ func main() {
 	} else {
 		config.Read("/etc/orchestrator.conf.json", "conf/orchestrator.conf.json", "orchestrator.conf.json")
 	}
+	if *config.RuntimeCLIFlags.Databaseless {
+		config.Config.DatabaselessMode__experimental = true
+	}
 	if config.Config.Debug {
 		log.SetLevel(log.DEBUG)
+	}
+	if *quiet {
+		// Override!!
+		log.SetLevel(log.ERROR)
 	}
 	if config.Config.EnableSyslog {
 		log.EnableSyslogWriter("orchestrator")
