@@ -382,6 +382,9 @@ Cheatsheet:
 
             Issuing this on an attached (i.e. normal) slave will do nothing.
     
+    General instance commands
+        Applying general instance configuration and state
+
         set-read-only
             Turn an instance read-only, via SET GLOBAL read_only := 1. Examples:
             
@@ -398,9 +401,9 @@ Cheatsheet:
             orchestrator -c set-writeable
                 -i not given, implicitly assumed local hostname
 
-	Binlog commands
-		Commands that investigate/work on binary logs
-		
+    Binlog commands
+        Commands that investigate/work on binary logs
+        
         flush-binary-logs
             Flush binary logs on an instance. Examples:
             
@@ -422,30 +425,30 @@ Cheatsheet:
             
             orchestrator -c last-pseudo-gtid -i instance.with.possible.pseudo-gtid.injection
 
-		find-binlog-entry
-			Get binlog file:pos of entry given by --pattern (exact full match, not a regular expression) in a given instance.
-			This will search the instance's binary logs starting with most recent, and terminate as soon as an exact match is found.
-			The given input is not a regular expression. It must fully match the entry (not a substring). 
-			This is most useful when looking for uniquely identifyable values, such as Pseudo-GTID. Example:
-			
-			orchestrator -c find-binlog-entry -i instance.to.search.on.com --pattern "insert into my_data (my_column) values ('distinct_value_01234_56789')"
-			
-				Prints out the binlog file:pos where the entry is found, or errors if unfound.
-			
-		correlate-binlog-pos
-			Given an instance (-i) and binlog coordinates (--binlog=file:pos), find the correlated coordinates in another instance (-d).
-			"Correlated coordinates" are those that present the same point-in-time of sequence of binary log events, untangling
-			the mess of different binlog file:pos coordinates on different servers.
-			This operation relies on Pseudo-GTID: your servers must have been pre-injected with PSeudo-GTID entries as these are
-			being used as binlog markers in the correlation process.
-			You must provide a valid file:pos in the binlogs of the source instance (-i), and in response get the correlated
-			coordinates in the binlogs of the destination instance (-d). This operation does not work on relay logs.
-			Example:
-			
-			-c correlate-binlog-pos  -i instance.with.binary.log.com --binlog=mysql-bin.002366:14127 -d other.instance.with.binary.logs.com
-			
-				Prints out correlated coordinates, e.g.: "mysql-bin.002302:14220", or errors out.
-			                        
+        find-binlog-entry
+            Get binlog file:pos of entry given by --pattern (exact full match, not a regular expression) in a given instance.
+            This will search the instance's binary logs starting with most recent, and terminate as soon as an exact match is found.
+            The given input is not a regular expression. It must fully match the entry (not a substring). 
+            This is most useful when looking for uniquely identifyable values, such as Pseudo-GTID. Example:
+            
+            orchestrator -c find-binlog-entry -i instance.to.search.on.com --pattern "insert into my_data (my_column) values ('distinct_value_01234_56789')"
+            
+                Prints out the binlog file:pos where the entry is found, or errors if unfound.
+            
+        correlate-binlog-pos
+            Given an instance (-i) and binlog coordinates (--binlog=file:pos), find the correlated coordinates in another instance (-d).
+            "Correlated coordinates" are those that present the same point-in-time of sequence of binary log events, untangling
+            the mess of different binlog file:pos coordinates on different servers.
+            This operation relies on Pseudo-GTID: your servers must have been pre-injected with PSeudo-GTID entries as these are
+            being used as binlog markers in the correlation process.
+            You must provide a valid file:pos in the binlogs of the source instance (-i), and in response get the correlated
+            coordinates in the binlogs of the destination instance (-d). This operation does not work on relay logs.
+            Example:
+            
+            -c correlate-binlog-pos  -i instance.with.binary.log.com --binlog=mysql-bin.002366:14127 -d other.instance.with.binary.logs.com
+            
+                Prints out correlated coordinates, e.g.: "mysql-bin.002302:14220", or errors out.
+                                    
     Pool commands
         Orchestrator provides with getter/setter commands for handling pools. It does not on its own investigate pools,
         but merely accepts and provides association of an instance (host:port) and a pool (any_name).
@@ -680,6 +683,28 @@ Cheatsheet:
             for automated parsing. Use web API instead, at this time. Example:
             
             orchestrator -c replication-analysis
+            
+        ack-cluster-recoveries
+            Acknowledge recoveries for a given cluster; this unblocks pending future recoveries.
+            Acknowledging a recovery requires a comment (supply via --reason). Acknowledgement clears the in-active-period
+            flag for affected recoveries, which in turn affects any blocking recoveries. 
+            Multiple recoveries may be affected. Only unacknowledged recoveries will be affected.
+            Examples: 
+            
+            orchestrator -c ack-cluster-recoveries -i instance.in.a.cluster.com --reason="dba has taken taken necessary steps"
+                 Cluster is indicated by any of its members. The recovery need not necessarily be on/to given instance.
+            
+            orchestrator -c ack-cluster-recoveries -alias some_alias --reason="dba has taken taken necessary steps"
+                 Cluster indicated by alias
+                 
+        ack-instance-recoveries
+            Acknowledge recoveries for a given instance; this unblocks pending future recoveries.
+            Acknowledging a recovery requires a comment (supply via --reason). Acknowledgement clears the in-active-period
+            flag for affected recoveries, which in turn affects any blocking recoveries. 
+            Multiple recoveries may be affected. Only unacknowledged recoveries will be affected.
+            Example: 
+            
+            orchestrator -c ack-cluster-recoveries -i instance.that.failed.com --reason="dba has taken taken necessary steps"
 
     Instance meta commands
     
