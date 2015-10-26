@@ -47,6 +47,10 @@ type TopologyRecovery struct {
 	ProcessingNodeHostname    string
 	ProcessingNodeToken       string
 	PostponedFunctions        [](func() error)
+	Acknowledged              bool
+	AcknowledgedAt            string
+	AcknowledgedBy            string
+	AcknowledgedComment       string
 }
 
 func NewTopologyRecovery(replicationAnalysis inst.ReplicationAnalysis) *TopologyRecovery {
@@ -438,7 +442,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 	if !(skipFilters || analysisEntry.ClusterDetails.HasAutomatedMasterRecovery) {
 		return false, nil, nil
 	}
-	topologyRecovery, err := AttemptRecoveryRegistration(&analysisEntry)
+	topologyRecovery, err := AttemptRecoveryRegistration(&analysisEntry, true, true)
 	if topologyRecovery == nil {
 		log.Debugf("topology_recovery: found an active or recent recovery on %+v. Will not issue another RecoverDeadMaster.", analysisEntry.AnalyzedInstanceKey)
 		return false, nil, err
@@ -670,7 +674,7 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 	if !(skipFilters || analysisEntry.ClusterDetails.HasAutomatedIntermediateMasterRecovery) {
 		return false, nil, nil
 	}
-	topologyRecovery, err := AttemptRecoveryRegistration(&analysisEntry)
+	topologyRecovery, err := AttemptRecoveryRegistration(&analysisEntry, true, true)
 	if topologyRecovery == nil {
 		log.Debugf("topology_recovery: found an active or recent recovery on %+v. Will not issue another RecoverDeadIntermediateMaster.", analysisEntry.AnalyzedInstanceKey)
 		return false, nil, err
@@ -777,7 +781,7 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 	if !(skipFilters || analysisEntry.ClusterDetails.HasAutomatedMasterRecovery) {
 		return false, nil, nil
 	}
-	topologyRecovery, err := AttemptRecoveryRegistration(&analysisEntry)
+	topologyRecovery, err := AttemptRecoveryRegistration(&analysisEntry, true, true)
 	if topologyRecovery == nil {
 		log.Debugf("topology_recovery: found an active or recent recovery on %+v. Will not issue another RecoverDeadCoMaster.", analysisEntry.AnalyzedInstanceKey)
 		return false, nil, err

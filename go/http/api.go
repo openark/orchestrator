@@ -1918,6 +1918,61 @@ func (this *HttpAPI) RecentlyActiveInstanceRecovery(params martini.Params, r ren
 	r.JSON(200, recoveries)
 }
 
+// ClusterInfo provides details of a given cluster
+func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r render.Render, req *http.Request) {
+	var err error
+	clusterName := params["clusterName"]
+	if params["clusterAlias"] != "" {
+		clusterName, err = inst.GetClusterByAlias(params["clusterAlias"])
+	}
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	countAcnowledgedRecoveries, err := logic.AcknowledgeClusterRecoveries(clusterName, params["owner"], params["reason"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, countAcnowledgedRecoveries)
+}
+
+// ClusterInfo provides details of a given cluster
+func (this *HttpAPI) AcknowledgeInstanceRecoveries(params martini.Params, r render.Render, req *http.Request) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	countAcnowledgedRecoveries, err := logic.AcknowledgeInstanceRecoveries(&instanceKey, params["owner"], params["reason"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, countAcnowledgedRecoveries)
+}
+
+// ClusterInfo provides details of a given cluster
+func (this *HttpAPI) AcknowledgeRecovery(params martini.Params, r render.Render, req *http.Request) {
+	recoveryId, err := strconv.ParseInt(params["recoveryId"], 10, 0)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	countAcnowledgedRecoveries, err := logic.AcknowledgeRecovery(recoveryId, params["owner"], params["reason"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, countAcnowledgedRecoveries)
+}
+
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	// Instance meta
@@ -2024,6 +2079,10 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/active-cluster-recovery/:clusterName", this.ActiveClusterRecovery)
 	m.Get("/api/recently-active-cluster-recovery/:clusterName", this.RecentlyActiveClusterRecovery)
 	m.Get("/api/recently-active-instance-recovery/:host/:port", this.RecentlyActiveInstanceRecovery)
+	m.Get("/api/ack-recovery/cluster/:clusterName/:owner/:reason", this.AcknowledgeClusterRecoveries)
+	m.Get("/api/ack-recovery/cluster/alias/:clusterAlias/:owner/:reason", this.AcknowledgeClusterRecoveries)
+	m.Get("/api/ack-recovery/instance/:host/:port/:owner/:reason", this.AcknowledgeInstanceRecoveries)
+	m.Get("/api/ack-recovery/:recoveryId/:owner/:reason", this.AcknowledgeInstanceRecoveries)
 	// Agents
 	m.Get("/api/agents", this.Agents)
 	m.Get("/api/agent/:host", this.Agent)

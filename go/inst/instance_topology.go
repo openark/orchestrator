@@ -1076,6 +1076,9 @@ func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordin
 // CorrelateBinlogCoordinates
 func CorrelateBinlogCoordinates(instance *Instance, binlogCoordinates *BinlogCoordinates, otherInstance *Instance) (*BinlogCoordinates, int, error) {
 
+	// We record the relay log coordinates just after the instance stopped since the coordinates can change upon
+	// a FLUSH LOGS/FLUSH RELAY LOGS (or a START SLAVE, though that's an altogether different problem) etc.
+	// We want to be on the safe side; we don't utterly trust that we are the only ones playing with the instance.
 	recordedInstanceRelayLogCoordinates := instance.RelaylogCoordinates
 	instancePseudoGtidCoordinates, instancePseudoGtidText, err := FindLastPseudoGTIDEntry(instance, recordedInstanceRelayLogCoordinates, binlogCoordinates, true, &otherInstance.Binlog_format)
 
@@ -1141,13 +1144,8 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	if canReplicate, err := instance.CanReplicateFrom(otherInstance); !canReplicate {
 		return instance, nil, err
 	}
-	var instancePseudoGtidText string
-	var instancePseudoGtidCoordinates *BinlogCoordinates
-	var otherInstancePseudoGtidCoordinates *BinlogCoordinates
 	var nextBinlogCoordinatesToMatch *BinlogCoordinates
-	var recordedInstanceRelayLogCoordinates BinlogCoordinates
 	var countMatchedEvents int
-	var entriesMonotonic bool
 
 	if otherInstance.IsBinlogServer() {
 		// A Binlog Server does not do all the SHOW BINLOG EVENTS stuff
@@ -1171,38 +1169,9 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	if err != nil {
 		goto Cleanup
 	}
-	// We record the relay log coordinates just after the instance stopped since the coordinates can change upon
-	// a FLUSH LOGS/FLUSH RELAY LOGS (or a START SLAVE, though that's an altogether different problem) etc.
-	// We want to be on the safe side; we don't utterly trust that we are the only ones playing with the instance.
-	recordedInstanceRelayLogCoordinates = instance.RelaylogCoordinates
-	instancePseudoGtidCoordinates, instancePseudoGtidText, err = FindLastPseudoGTIDEntry(instance, recordedInstanceRelayLogCoordinates, nil, true, &otherInstance.Binlog_format)
 
-	if err != nil {
-		goto Cleanup
-	}
-	entriesMonotonic = (config.Config.PseudoGTIDMonotonicHint != "") && strings.Contains(instancePseudoGtidText, config.Config.PseudoGTIDMonotonicHint)
-	otherInstancePseudoGtidCoordinates, err = SearchEntryInInstanceBinlogs(otherInstance, instancePseudoGtidText, entriesMonotonic)
-	if err != nil {
-		goto Cleanup
-	}
+	nextBinlogCoordinatesToMatch, countMatchedEvents, err = CorrelateBinlogCoordinates(instance, nil, otherInstance)
 
-	// We've found a match: the latest Pseudo GTID position within instance and its identical twin in otherInstance
-	// We now iterate the events in both, up to the completion of events in instance (recall that we looked for
-	// the last entry in instance, hence, assuming pseudo GTID entries are frequent, the amount of entries to read
-	// from instance is not long)
-	// The result of the iteration will be either:
-	// - bad conclusion that instance is actually more advanced than otherInstance (we find more entries in instance
-	//   following the pseudo gtid than we can match in otherInstance), hence we cannot ask instance to replicate
-	//   from otherInstance
-	// - good result: both instances are exactly in same shape (have replicated the exact same number of events since
-	//   the last pseudo gtid). Since they are identical, it is easy to point instance into otherInstance.
-	// - good result: the first position within otherInstance where instance has not replicated yet. It is easy to point
-	//   instance into otherInstance.
-	nextBinlogCoordinatesToMatch, countMatchedEvents, err = GetNextBinlogCoordinatesToMatch(instance, *instancePseudoGtidCoordinates,
-		recordedInstanceRelayLogCoordinates, nil, otherInstance, *otherInstancePseudoGtidCoordinates)
-	if err != nil {
-		goto Cleanup
-	}
 	if countMatchedEvents == 0 {
 		err = fmt.Errorf("Unexpected: 0 events processed while iterating logs. Something went wrong; aborting. nextBinlogCoordinatesToMatch: %+v", nextBinlogCoordinatesToMatch)
 		goto Cleanup

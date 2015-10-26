@@ -376,6 +376,10 @@ body {
     background-color: inherit;
 }
 
+#audit span.acknowledge-indicator {
+	padding-right: 8px;
+}
+
 .table-unbordered > tbody > tr > td {
     border: 0px;
 }

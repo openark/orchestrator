@@ -579,6 +579,12 @@ var generateSQLPatches = []string{
 		ALTER TABLE candidate_database_instance
 			ADD COLUMN priority TINYINT SIGNED NOT NULL DEFAULT 1 comment 'positive promote, nagative unpromotes'
 	`,
+	`
+		ALTER TABLE 
+			topology_recovery
+			ADD COLUMN acknowledged_at TIMESTAMP NULL after acknowledged,
+			ADD KEY acknowledged_idx (acknowledged, acknowledged_at)
+	`,
 }
 
 // Track if a TLS has already been configured for topology

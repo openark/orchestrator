@@ -85,7 +85,30 @@ func ClearActiveFailureDetections() error {
 }
 
 // AttemptRecoveryRegistration tries to add a recovery entry; if this fails that means recovery is already in place.
-func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis) (*TopologyRecovery, error) {
+func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, failIfFailedInstanceInActiveRecovery bool, failIfClusterInActiveRecovery bool) (*TopologyRecovery, error) {
+	if failIfFailedInstanceInActiveRecovery {
+		// Let's check if this instance has just been promoted recently and is still in active period.
+		// If so, we reject recovery registration to avoid flapping.
+		recoveries, err := ReadInActivePeriodSuccessorInstanceRecovery(&analysisEntry.AnalyzedInstanceKey)
+		if err != nil {
+			return nil, log.Errore(err)
+		}
+		if len(recoveries) > 0 {
+			return nil, log.Errorf("AttemptRecoveryRegistration: instance %+v has recently been promoted (by failover of %+v) and is in active period. It will not be failed over. You may acknowledge the failure on %+v (-c ack-instance-recoveries) to remove this blockage", analysisEntry.AnalyzedInstanceKey, recoveries[0].AnalysisEntry.AnalyzedInstanceKey, recoveries[0].AnalysisEntry.AnalyzedInstanceKey)
+		}
+	}
+	if failIfClusterInActiveRecovery {
+		// Let's check if this cluster has just experienced a failover and is still in active period.
+		// If so, we reject recovery registration to avoid flapping.
+		recoveries, err := ReadInActivePeriodClusterRecovery(analysisEntry.ClusterDetails.ClusterName)
+		if err != nil {
+			return nil, log.Errore(err)
+		}
+		if len(recoveries) > 0 {
+			return nil, log.Errorf("AttemptRecoveryRegistration: cluster %+v has recently experienced a failover (of %+v) and is in active period. It will not be failed over again. You may acknowledge the failure on this cluster (-c ack-cluster-recoveries) or on %+v (-c ack-instance-recoveries) to remove this blockage", analysisEntry.ClusterDetails.ClusterName, recoveries[0].AnalysisEntry.AnalyzedInstanceKey, recoveries[0].AnalysisEntry.AnalyzedInstanceKey)
+		}
+	}
+
 	sqlResult, err := db.ExecOrchestrator(`
 			insert ignore 
 				into topology_recovery (
@@ -145,9 +168,56 @@ func ClearActiveRecoveries() error {
 				in_active_period = 1
 				AND start_active_period < NOW() - INTERVAL ? MINUTE
 			`,
-		config.Config.FailureDetectionPeriodBlockMinutes,
+		config.Config.RecoveryPeriodBlockMinutes,
 	)
 	return log.Errore(err)
+}
+func acknowledgeRecoveries(owner string, comment string, whereClause string) (countAcknowledgedEntries int64, err error) {
+	query := fmt.Sprintf(`
+			update topology_recovery set 
+				in_active_period = 0,
+				end_active_period_unixtime = IF(end_active_period_unixtime = 0, UNIX_TIMESTAMP(), end_active_period_unixtime),
+				acknowledged = 1,
+				acknowledged_at = NOW(),
+				acknowledged_by = ?,
+				acknowledge_comment = ?
+			where
+				acknowledged = 0
+				and
+				%s
+		`, whereClause)
+	sqlResult, err := db.ExecOrchestrator(query, owner, comment)
+	if err != nil {
+		return 0, log.Errore(err)
+	}
+	rows, err := sqlResult.RowsAffected()
+	return rows, log.Errore(err)
+}
+
+// AcknowledgeRecovery acknowledges a particular recovery.
+// This also implied clearing their active period, which in turn enables further recoveries on those topologies
+func AcknowledgeRecovery(recoveryId int64, owner string, comment string) (countAcknowledgedEntries int64, err error) {
+	whereClause := fmt.Sprintf(`recovery_id = %d`, recoveryId)
+	return acknowledgeRecoveries(owner, comment, whereClause)
+}
+
+// AcknowledgeClusterRecoveries marks active recoveries for given cluster as acknowledged.
+// This also implied clearing their active period, which in turn enables further recoveries on those topologies
+func AcknowledgeClusterRecoveries(clusterName string, owner string, comment string) (countAcknowledgedEntries int64, err error) {
+	whereClause := fmt.Sprintf(`
+			cluster_name = '%s'
+		`, clusterName)
+	return acknowledgeRecoveries(owner, comment, whereClause)
+}
+
+// AcknowledgeInstanceRecoveries marks active recoveries for given instane as acknowledged.
+// This also implied clearing their active period, which in turn enables further recoveries on those topologies
+func AcknowledgeInstanceRecoveries(instanceKey *inst.InstanceKey, owner string, comment string) (countAcknowledgedEntries int64, err error) {
+	whereClause := fmt.Sprintf(`
+			hostname = '%s'
+			and port = %d
+		`, instanceKey.Hostname, instanceKey.Port)
+	return acknowledgeRecoveries(owner, comment, whereClause)
 }
 
 // ResolveRecovery is called on completion of a recovery process and updates the recovery status.
@@ -208,7 +278,11 @@ func readRecoveries(whereCondition string, limit string) ([]TopologyRecovery, er
             slave_hosts,
             participating_instances,
             lost_slaves,
-            all_errors
+            all_errors,
+            acknowledged,
+            acknowledged_at,
+            acknowledged_by,
+            acknowledge_comment
 		from 
 			topology_recovery
 		%s
@@ -245,6 +319,11 @@ func readRecoveries(whereCondition string, limit string) ([]TopologyRecovery, er
 		topologyRecovery.LostSlaves.ReadCommaDelimitedList(m.GetString("lost_slaves"))
 		topologyRecovery.ParticipatingInstanceKeys.ReadCommaDelimitedList(m.GetString("participating_instances"))
 
+		topologyRecovery.Acknowledged = m.GetBool("acknowledged")
+		topologyRecovery.AcknowledgedAt = m.GetString("acknowledged_at")
+		topologyRecovery.AcknowledgedBy = m.GetString("acknowledged_by")
+		topologyRecovery.AcknowledgedComment = m.GetString("acknowledge_comment")
+
 		res = append(res, topologyRecovery)
 		return nil
 	})
@@ -259,8 +338,19 @@ func readRecoveries(whereCondition string, limit string) ([]TopologyRecovery, er
 func ReadActiveClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
 	whereClause := fmt.Sprintf(`
 		where 
-			in_active_period=1 
+			in_active_period=1
 			and end_recovery is null
+			and cluster_name='%s'`,
+		clusterName)
+	return readRecoveries(whereClause, ``)
+}
+
+// ReadInActivePeriodClusterRecovery reads recoveries (possibly complete!) that are in active period.
+// (may be used to block further recoveries on this cluster)
+func ReadInActivePeriodClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
+	whereClause := fmt.Sprintf(`
+		where 
+			in_active_period=1
 			and cluster_name='%s'`,
 		clusterName)
 	return readRecoveries(whereClause, ``)
@@ -270,9 +360,21 @@ func ReadActiveClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
 func ReadRecentlyActiveClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
 	whereClause := fmt.Sprintf(`
 		where 
-			end_recovery > now() - interval 5 minute 
+			end_recovery > now() - interval 5 minute
 			and cluster_name='%s'`,
 		clusterName)
+	return readRecoveries(whereClause, ``)
+}
+
+// ReadInActivePeriodSuccessorInstanceRecovery reads completed recoveries for a given instance, where said instance
+// was promoted as result, still in active period (may be used to block further recoveries should this instance die)
+func ReadInActivePeriodSuccessorInstanceRecovery(instanceKey *inst.InstanceKey) ([]TopologyRecovery, error) {
+	whereClause := fmt.Sprintf(`
+		where 
+			in_active_period=1
+			and 
+				successor_hostname='%s' and successor_port=%d`,
+		instanceKey.Hostname, instanceKey.Port)
 	return readRecoveries(whereClause, ``)
 }
 
@@ -280,7 +382,7 @@ func ReadRecentlyActiveClusterRecovery(clusterName string) ([]TopologyRecovery, 
 func ReadRecentlyActiveInstanceRecovery(instanceKey *inst.InstanceKey) ([]TopologyRecovery, error) {
 	whereClause := fmt.Sprintf(`
 		where 
-			end_recovery > now() - interval 5 minute 
+			end_recovery > now() - interval 5 minute
 			and 
 				successor_hostname='%s' and successor_port=%d`,
 		instanceKey.Hostname, instanceKey.Port)
@@ -291,7 +393,7 @@ func ReadRecentlyActiveInstanceRecovery(instanceKey *inst.InstanceKey) ([]Topolo
 func ReadActiveRecoveries() ([]TopologyRecovery, error) {
 	return readRecoveries(`
 		where 
-			in_active_period=1 
+			in_active_period=1
 			and end_recovery is null`,
 		``)
 }
@@ -305,7 +407,7 @@ func ReadCompletedRecoveries(page int) ([]TopologyRecovery, error) {
 	return readRecoveries(`where end_recovery is not null`, limit)
 }
 
-// ReadCRecoveries reads latest recovery entreis from topology_recovery
+// ReadCRecoveries reads latest recovery entries from topology_recovery
 func ReadRecentRecoveries(clusterName string, page int) ([]TopologyRecovery, error) {
 	whereClause := ""
 	if clusterName != "" {

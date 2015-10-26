@@ -18,8 +18,16 @@ $(document).ready(function () {
         auditEntries.forEach(function (audit) {
         	var analyzedInstanceDisplay = audit.AnalysisEntry.AnalyzedInstanceKey.Hostname+":"+audit.AnalysisEntry.AnalyzedInstanceKey.Port;
         	var sucessorInstanceDisplay = audit.SuccessorKey.Hostname+":"+audit.SuccessorKey.Port;
-    		var row = jQuery('<tr/>');
-    		$('<td/>', { text: audit.AnalysisEntry.Analysis }).prepend('<span class="more-recovery-info pull-right glyphicon glyphicon-info-sign text-primary" data-toggle="popover" data-html="true" title="" data-content=""></span>').appendTo(row);
+    		var row = $('<tr/>');
+    		var ack = $('<span class="pull-left glyphicon acknowledge-indicator" title=""></span>');
+    		if (audit.Acknowledged) {
+    			ack.addClass("glyphicon-ok-sign").addClass("text-primary");
+    			ack.attr("title", "Acknowledged by "+audit.AcknowledgedBy+" at "+audit.AcknowledgedAt+": "+audit.AcknowledgedComment);
+    		} else {
+    			ack.addClass("glyphicon-question-sign").addClass("text-danger");
+    			ack.attr("title", "Unacknowledged");
+    		}
+    		$('<td/>', { text: audit.AnalysisEntry.Analysis }).prepend(ack).prepend('<span class="more-recovery-info pull-right glyphicon glyphicon-info-sign text-primary" data-toggle="popover" data-html="true" title="" data-content=""></span>').appendTo(row);
     		$('<a/>',  { text: analyzedInstanceDisplay, href: "/web/search/" + analyzedInstanceDisplay }).wrap($("<td/>")).parent().appendTo(row);
     		$('<td/>', { text: audit.AnalysisEntry.CountSlaves }).appendTo(row);
     		$('<a/>',  { text: audit.AnalysisEntry.ClusterDetails.ClusterName, href: "/web/cluster/"+audit.AnalysisEntry.ClusterDetails.ClusterName}).wrap($("<td/>")).parent().appendTo(row);
