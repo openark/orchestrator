@@ -188,7 +188,7 @@ func ContinuousDiscovery() {
 	go handleDiscoveryRequests(nil, nil)
 	tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
 	forgetUnseenTick := time.Tick(time.Minute)
-	recoverTick := time.Tick(10 * time.Second)
+	recoverTick := time.Tick(time.Duration(config.Config.RecoveryPollSeconds) * time.Second)
 
 	var snapshotTopologiesTick <-chan time.Time
 	if config.Config.SnapshotTopologiesIntervalHours > 0 {

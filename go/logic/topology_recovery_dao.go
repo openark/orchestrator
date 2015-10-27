@@ -216,6 +216,9 @@ func RegisterBlockedRecoveries(analysisEntry *inst.ReplicationAnalysis, blocking
 
 // ExpireBlockedRecoveries clears listing of blocked recoveries that are no longer actually blocked.
 func ExpireBlockedRecoveries() error {
+	// Older recovery is acknowledged by now, hence blocked recovery should be released.
+	// Do NOTE that the data in blocked_topology_recovery is only used for auditing: it is NOT the data
+	// based on which we make automated decisions.
 	_, err := db.ExecOrchestrator(`
 			delete 
 				from blocked_topology_recovery 
@@ -226,8 +229,23 @@ func ExpireBlockedRecoveries() error {
 					acknowledged is null
 			`,
 	)
-
-	return log.Errore(err)
+	if err != nil {
+		return log.Errore(err)
+	}
+	// Some oversampling, if a problem has not been noticed for some time (e.g. the server came up alive
+	// before action was taken), expire it.
+	// Recall that RegisterBlockedRecoveries continuously updated the last_blocked_timestamp column.
+	_, err = db.ExecOrchestrator(`
+			delete 
+				from blocked_topology_recovery 
+				where 
+					last_blocked_timestamp < NOW() - interval ? second
+			`, (config.Config.RecoveryPollSeconds * 5),
+	)
+	if err != nil {
+		return log.Errore(err)
+	}
+	return nil
 }
 
 // acknowledgeRecoveries sets acknowledged* details and clears the in_active_period flags from a set of entries

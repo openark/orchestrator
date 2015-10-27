@@ -129,6 +129,7 @@ type Configuration struct {
 	BufferBinlogEvents                         bool              // Should we used buffered read on SHOW BINLOG|RELAYLOG EVENTS -- releases the database lock sooner (recommended)
 	SkipBinlogEventsContaining                 []string          // When scanning/comparing binlogs for Pseudo-GTID, skip entries containing given texts. These are NOT regular expressions (would consume too much CPU while scanning binlogs), just substrings to find.
 	FailureDetectionPeriodBlockMinutes         int               // The time for which an instance's failure discovery is kept "active", so as to avoid concurrent "discoveries" of the instance's failure; this preceeds any recovery process, if any.
+	RecoveryPollSeconds                        int               // Interval between checks for a recovery scenario and initiation of a recovery process
 	RecoveryPeriodBlockMinutes                 int               // The time for which an instance's recovery is kept "active", so as to avoid concurrent recoveries on smae instance as well as flapping
 	RecoveryIgnoreHostnameFilters              []string          // Recovery analysis will completely ignore hosts matching given patterns
 	RecoverMasterClusterFilters                []string          // Only do master recovery on clusters matching these regexp patterns (of course the ".*" pattern matches everything)
@@ -236,6 +237,7 @@ func NewConfiguration() *Configuration {
 		BufferBinlogEvents:                         true,
 		SkipBinlogEventsContaining:                 []string{},
 		FailureDetectionPeriodBlockMinutes:         60,
+		RecoveryPollSeconds:                        10,
 		RecoveryPeriodBlockMinutes:                 60,
 		RecoveryIgnoreHostnameFilters:              []string{},
 		RecoverMasterClusterFilters:                []string{},

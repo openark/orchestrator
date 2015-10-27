@@ -597,6 +597,11 @@ var generateSQLPatches = []string{
 			ADD COLUMN acknowledged_at TIMESTAMP NULL after acknowledged,
 			ADD KEY acknowledged_idx (acknowledged, acknowledged_at)
 	`,
+	`
+		ALTER TABLE 
+			blocked_topology_recovery
+			ADD KEY last_blocked_idx (last_blocked_timestamp)
+	`,
 }
 
 // Track if a TLS has already been configured for topology
