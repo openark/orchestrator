@@ -22,7 +22,8 @@ $(document).ready(function () {
     		var ack = $('<span class="pull-left glyphicon acknowledge-indicator" title=""></span>');
     		if (audit.Acknowledged) {
     			ack.addClass("glyphicon-ok-sign").addClass("text-primary");
-    			ack.attr("title", "Acknowledged by "+audit.AcknowledgedBy+" at "+audit.AcknowledgedAt+": "+audit.AcknowledgedComment);
+    			var ackTitle = "Acknowledged by "+audit.AcknowledgedBy+" at "+audit.AcknowledgedAt+": "+audit.AcknowledgedComment;
+    			ack.attr("title", ackTitle);
     		} else {
     			ack.addClass("glyphicon-question-sign").addClass("text-danger").addClass("unacknowledged");
     			ack.attr("data-recovery-id", audit.Id);
@@ -43,24 +44,31 @@ $(document).ready(function () {
     			$('<td/>', { text: "pending" }).appendTo(row);
     		}
     		var moreInfo = "";
+    		if (audit.Acknowledged) {
+    			moreInfo += '<div>Acknowledged by '+audit.AcknowledgedBy+', '+audit.AcknowledgedAt+'<ul>';
+    			moreInfo += "<li>"+audit.AcknowledgedComment+"</li>";    		
+    			moreInfo += '</ul></div>';
+    		} else {
+    			moreInfo += '<div><strong>Unacknowledged</strong></div>';
+    		}
     		if (audit.LostSlaves.length > 0) {
     			moreInfo += "<div>Lost slaves:<ul>";
         		audit.LostSlaves.forEach(function(instanceKey) {
-        			moreInfo += "<li><code>"+getInstanceTitle(instanceKey.Hostname, instanceKey.Port)+"</code>";    			
+        			moreInfo += "<li><code>"+getInstanceTitle(instanceKey.Hostname, instanceKey.Port)+"</code></li>";    			
         		});
         		moreInfo += "</ul></div>";
     		}
     		if (audit.ParticipatingInstanceKeys.length > 0) {
     			moreInfo += "<div>Participating instances:<ul>";
         		audit.ParticipatingInstanceKeys.forEach(function(instanceKey) {
-        			moreInfo += "<li><code>"+getInstanceTitle(instanceKey.Hostname, instanceKey.Port)+"</code>";    			
+        			moreInfo += "<li><code>"+getInstanceTitle(instanceKey.Hostname, instanceKey.Port)+"</code></li>";    			
         		});
         		moreInfo += "</ul></div>";
     		}
     		if (audit.AnalysisEntry.SlaveHosts.length > 0) {
     			moreInfo += '<div>'+audit.AnalysisEntry.CountSlaves+' slave hosts :<ul>';
         		audit.AnalysisEntry.SlaveHosts.forEach(function(instanceKey) {
-        			moreInfo += "<li><code>"+getInstanceTitle(instanceKey.Hostname, instanceKey.Port)+"</code>";    			
+        			moreInfo += "<li><code>"+getInstanceTitle(instanceKey.Hostname, instanceKey.Port)+"</code></li>";    			
         		});
         		moreInfo += "</ul></div>";
     		}
