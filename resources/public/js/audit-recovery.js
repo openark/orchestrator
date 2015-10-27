@@ -6,8 +6,8 @@ $(document).ready(function () {
     	apiUri = "/api/audit-recovery/cluster/"+auditCluster()+"/"+currentPage();
     }
     $.get(apiUri, function (auditEntries) {
-            displayAudit(auditEntries);
-    	}, "json");
+    	displayAudit(auditEntries);
+    }, "json");
     function displayAudit(auditEntries) {
     	var baseWebUri = "/web/audit-recovery/";
     	if (auditCluster()) {
@@ -24,8 +24,9 @@ $(document).ready(function () {
     			ack.addClass("glyphicon-ok-sign").addClass("text-primary");
     			ack.attr("title", "Acknowledged by "+audit.AcknowledgedBy+" at "+audit.AcknowledgedAt+": "+audit.AcknowledgedComment);
     		} else {
-    			ack.addClass("glyphicon-question-sign").addClass("text-danger");
-    			ack.attr("title", "Unacknowledged");
+    			ack.addClass("glyphicon-question-sign").addClass("text-danger").addClass("unacknowledged");
+    			ack.attr("data-recovery-id", audit.Id);
+    			ack.attr("title", "Unacknowledged. Click to acknowledge");
     		}
     		$('<td/>', { text: audit.AnalysisEntry.Analysis }).prepend(ack).prepend('<span class="more-recovery-info pull-right glyphicon glyphicon-info-sign text-primary" data-toggle="popover" data-html="true" title="" data-content=""></span>').appendTo(row);
     		$('<a/>',  { text: analyzedInstanceDisplay, href: "/web/search/" + analyzedInstanceDisplay }).wrap($("<td/>")).parent().appendTo(row);
@@ -90,6 +91,27 @@ $(document).ready(function () {
         });
         $("#audit .pager .disabled a").click(function() {
             return false;
+        });
+        
+        $("body").on("click", ".acknowledge-indicator.unacknowledged", function (event) {
+        	var recoveryId = $(event.target).attr("data-recovery-id");
+            bootbox.prompt({
+                title: "Acknowledge recovery",
+                value: "comment",
+                callback: function (result) {
+                    if (result !== null) {
+                        showLoader();
+                        $.get("/api/ack-recovery/"+recoveryId+"?comment="+encodeURIComponent(result), function (operationResult) {
+                            hideLoader();
+                            if (operationResult.Code == "ERROR") {
+                                addAlert(operationResult.Message)
+                            } else {
+                                location.reload();
+                            }
+                        }, "json");
+                    }
+                }
+            });
         });
     }
 });	

@@ -380,6 +380,10 @@ body {
 	padding-right: 8px;
 }
 
+#audit span.acknowledge-indicator.unacknowledged {
+	cursor: pointer;
+}
+
 .table-unbordered > tbody > tr > td {
     border: 0px;
 }

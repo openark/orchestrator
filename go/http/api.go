@@ -1943,7 +1943,12 @@ func (this *HttpAPI) RecentlyActiveInstanceRecovery(params martini.Params, r ren
 }
 
 // ClusterInfo provides details of a given cluster
-func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r render.Render, req *http.Request) {
+func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+
 	var err error
 	clusterName := params["clusterName"]
 	if params["clusterAlias"] != "" {
@@ -1954,7 +1959,16 @@ func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r rende
 		return
 	}
 
-	countAcnowledgedRecoveries, err := logic.AcknowledgeClusterRecoveries(clusterName, params["owner"], params["reason"])
+	comment := req.URL.Query().Get("comment")
+	if comment == "" {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("No acknowledge comment given")})
+		return
+	}
+	userId := getUserId(req, user)
+	if userId == "" {
+		userId = inst.GetMaintenanceOwner()
+	}
+	countAcnowledgedRecoveries, err := logic.AcknowledgeClusterRecoveries(clusterName, userId, comment)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -1964,14 +1978,28 @@ func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r rende
 }
 
 // ClusterInfo provides details of a given cluster
-func (this *HttpAPI) AcknowledgeInstanceRecoveries(params martini.Params, r render.Render, req *http.Request) {
+func (this *HttpAPI) AcknowledgeInstanceRecoveries(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
 
-	countAcnowledgedRecoveries, err := logic.AcknowledgeInstanceRecoveries(&instanceKey, params["owner"], params["reason"])
+	comment := req.URL.Query().Get("comment")
+	if comment == "" {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("No acknowledge comment given")})
+		return
+	}
+	userId := getUserId(req, user)
+	if userId == "" {
+		userId = inst.GetMaintenanceOwner()
+	}
+	countAcnowledgedRecoveries, err := logic.AcknowledgeInstanceRecoveries(&instanceKey, userId, comment)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -1981,14 +2009,27 @@ func (this *HttpAPI) AcknowledgeInstanceRecoveries(params martini.Params, r rend
 }
 
 // ClusterInfo provides details of a given cluster
-func (this *HttpAPI) AcknowledgeRecovery(params martini.Params, r render.Render, req *http.Request) {
+func (this *HttpAPI) AcknowledgeRecovery(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+
 	recoveryId, err := strconv.ParseInt(params["recoveryId"], 10, 0)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-
-	countAcnowledgedRecoveries, err := logic.AcknowledgeRecovery(recoveryId, params["owner"], params["reason"])
+	comment := req.URL.Query().Get("comment")
+	if comment == "" {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("No acknowledge comment given")})
+		return
+	}
+	userId := getUserId(req, user)
+	if userId == "" {
+		userId = inst.GetMaintenanceOwner()
+	}
+	countAcnowledgedRecoveries, err := logic.AcknowledgeRecovery(recoveryId, userId, comment)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -2116,10 +2157,10 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/active-cluster-recovery/:clusterName", this.ActiveClusterRecovery)
 	m.Get("/api/recently-active-cluster-recovery/:clusterName", this.RecentlyActiveClusterRecovery)
 	m.Get("/api/recently-active-instance-recovery/:host/:port", this.RecentlyActiveInstanceRecovery)
-	m.Get("/api/ack-recovery/cluster/:clusterName/:owner/:reason", this.AcknowledgeClusterRecoveries)
-	m.Get("/api/ack-recovery/cluster/alias/:clusterAlias/:owner/:reason", this.AcknowledgeClusterRecoveries)
-	m.Get("/api/ack-recovery/instance/:host/:port/:owner/:reason", this.AcknowledgeInstanceRecoveries)
-	m.Get("/api/ack-recovery/:recoveryId/:owner/:reason", this.AcknowledgeInstanceRecoveries)
+	m.Get("/api/ack-recovery/cluster/:clusterName", this.AcknowledgeClusterRecoveries)
+	m.Get("/api/ack-recovery/cluster/alias/:clusterAlias", this.AcknowledgeClusterRecoveries)
+	m.Get("/api/ack-recovery/instance/:host/:port", this.AcknowledgeInstanceRecoveries)
+	m.Get("/api/ack-recovery/:recoveryId", this.AcknowledgeRecovery)
 	m.Get("/api/blocked-recoveries", this.BlockedRecoveries)
 	m.Get("/api/blocked-recoveries/cluster/:clusterName", this.BlockedRecoveries)
 	// Agents

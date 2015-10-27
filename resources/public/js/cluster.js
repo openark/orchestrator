@@ -1378,7 +1378,7 @@ function Cluster() {
         getData("/api/blocked-recoveries/cluster/" + currentClusterName(), function (blockedRecoveries) {
             // Result is an array: either empty (no active recovery) or with multiple entries
         	blockedRecoveries.forEach(function (blockedRecovery) {
-                addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on '+getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port)+' is blocked due to previous recovery');
+                addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on '+getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port)+' is blocked due to a <a href="/web/audit-recovery/cluster/'+blockedRecovery.ClusterName+'">previous recovery</a>');
             });
         });
         getData("/api/cluster-osc-slaves/" + currentClusterName(), function (instances) {
