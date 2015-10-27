@@ -485,13 +485,17 @@ func ReadCompletedRecoveries(page int) ([]TopologyRecovery, error) {
 }
 
 // ReadCRecoveries reads latest recovery entries from topology_recovery
-func ReadRecentRecoveries(clusterName string, page int) ([]TopologyRecovery, error) {
+func ReadRecentRecoveries(clusterName string, unacknowledgedOnly bool, page int) ([]TopologyRecovery, error) {
+	whereConditions := []string{}
 	whereClause := ""
+	if unacknowledgedOnly {
+		whereConditions = append(whereConditions, `acknowledged=0`)
+	}
 	if clusterName != "" {
-		whereClause = fmt.Sprintf(`
-		where 
-			cluster_name='%s'`,
-			clusterName)
+		whereConditions = append(whereConditions, fmt.Sprintf(`cluster_name='%s'`, clusterName))
+	}
+	if len(whereConditions) > 0 {
+		whereClause = fmt.Sprintf("where %s", strings.Join(whereConditions, " and "))
 	}
 	limit := fmt.Sprintf(`
 		limit %d

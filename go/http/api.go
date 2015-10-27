@@ -1890,7 +1890,8 @@ func (this *HttpAPI) AuditRecovery(params martini.Params, r render.Render, req *
 	if err != nil || page < 0 {
 		page = 0
 	}
-	audits, err := logic.ReadRecentRecoveries(params["clusterName"], page)
+	unacknowledgedOnly := (req.URL.Query().Get("unacknowledged") == "true")
+	audits, err := logic.ReadRecentRecoveries(params["clusterName"], unacknowledgedOnly, page)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
