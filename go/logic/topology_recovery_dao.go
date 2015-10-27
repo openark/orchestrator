@@ -94,6 +94,7 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, failIf
 			return nil, log.Errore(err)
 		}
 		if len(recoveries) > 0 {
+			RegisterBlockedRecoveries(analysisEntry, recoveries)
 			return nil, log.Errorf("AttemptRecoveryRegistration: instance %+v has recently been promoted (by failover of %+v) and is in active period. It will not be failed over. You may acknowledge the failure on %+v (-c ack-instance-recoveries) to remove this blockage", analysisEntry.AnalyzedInstanceKey, recoveries[0].AnalysisEntry.AnalyzedInstanceKey, recoveries[0].AnalysisEntry.AnalyzedInstanceKey)
 		}
 	}
@@ -105,6 +106,7 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, failIf
 			return nil, log.Errore(err)
 		}
 		if len(recoveries) > 0 {
+			RegisterBlockedRecoveries(analysisEntry, recoveries)
 			return nil, log.Errorf("AttemptRecoveryRegistration: cluster %+v has recently experienced a failover (of %+v) and is in active period. It will not be failed over again. You may acknowledge the failure on this cluster (-c ack-cluster-recoveries) or on %+v (-c ack-instance-recoveries) to remove this blockage", analysisEntry.ClusterDetails.ClusterName, recoveries[0].AnalysisEntry.AnalyzedInstanceKey, recoveries[0].AnalysisEntry.AnalyzedInstanceKey)
 		}
 	}
@@ -172,6 +174,63 @@ func ClearActiveRecoveries() error {
 	)
 	return log.Errore(err)
 }
+
+// RegisterBlockedRecoveries writes down currently blocked recoveries, and indicates what recovery they are blocked on.
+// Recoveries are blocked thru the in_active_period flag, which comes to avoid flapping.
+func RegisterBlockedRecoveries(analysisEntry *inst.ReplicationAnalysis, blockingRecoveries []TopologyRecovery) error {
+	for _, recovery := range blockingRecoveries {
+		_, err := db.ExecOrchestrator(`
+			insert 
+				into blocked_topology_recovery (
+					hostname, 
+					port, 
+					cluster_name,
+					analysis,
+					last_blocked_timestamp,
+					blocking_recovery_id
+				) values (
+					?,
+					?,
+					?,
+					?,
+					NOW(),
+					?
+				)
+				on duplicate key update
+					cluster_name=values(cluster_name),
+					analysis=values(analysis),
+					last_blocked_timestamp=values(last_blocked_timestamp),
+					blocking_recovery_id=values(blocking_recovery_id)
+			`, analysisEntry.AnalyzedInstanceKey.Hostname,
+			analysisEntry.AnalyzedInstanceKey.Port,
+			analysisEntry.ClusterDetails.ClusterName,
+			string(analysisEntry.Analysis),
+			recovery.Id,
+		)
+		if err != nil {
+			log.Errore(err)
+		}
+	}
+	return nil
+}
+
+// ExpireBlockedRecoveries clears listing of blocked recoveries that are no longer actually blocked.
+func ExpireBlockedRecoveries() error {
+	_, err := db.ExecOrchestrator(`
+			delete 
+				from blocked_topology_recovery 
+				using 
+					blocked_topology_recovery 
+					left join topology_recovery on (blocking_recovery_id = topology_recovery.recovery_id and acknowledged = 0) 
+				where 
+					acknowledged is null
+			`,
+	)
+
+	return log.Errore(err)
+}
+
+// acknowledgeRecoveries sets acknowledged* details and clears the in_active_period flags from a set of entries
 func acknowledgeRecoveries(owner string, comment string, whereClause string) (countAcknowledgedEntries int64, err error) {
 	query := fmt.Sprintf(`
 			update topology_recovery set 

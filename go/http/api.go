@@ -810,8 +810,8 @@ func (this *HttpAPI) MatchUpSlaves(params martini.Params, r render.Render, req *
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Matched up %d slaves of %+v below %+v; %d errors: %+v", len(slaves), instanceKey, newMaster.Key, len(errs), errs), Details: newMaster.Key})
 }
 
-// RegroupSlaves attempts to pick a slave of a given instance and make it enslave its siblings, efficiently,
-// using pseudo-gtid if necessary
+// RegroupSlaves attempts to pick a slave of a given instance and make it enslave its siblings, using any
+// method possible (GTID, Pseudo-GTID, binlog servers)
 func (this *HttpAPI) RegroupSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -824,6 +824,30 @@ func (this *HttpAPI) RegroupSlaves(params martini.Params, r render.Render, req *
 	}
 
 	lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlaves(&instanceKey, false, nil, nil)
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("promoted slave: %s, lost: %d, trivial: %d, pseudo-gtid: %d",
+		promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalSlaves), len(aheadSlaves)), Details: promotedSlave.Key})
+}
+
+// RegroupSlaves attempts to pick a slave of a given instance and make it enslave its siblings, efficiently,
+// using pseudo-gtid if necessary
+func (this *HttpAPI) RegroupSlavesPseudoGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlavesPseudoGTID(&instanceKey, false, nil, nil)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
@@ -869,7 +893,7 @@ func (this *HttpAPI) RegroupSlavesBinlogServers(params martini.Params, r render.
 		return
 	}
 
-	promotedBinlogServer, err := inst.RegroupSlavesBinlogServers(&instanceKey, false)
+	_, promotedBinlogServer, err := inst.RegroupSlavesBinlogServers(&instanceKey, false)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
@@ -1822,7 +1846,7 @@ func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.R
 	}
 
 	skipProcesses := (req.URL.Query().Get("skipProcesses") == "true") || (params["skipProcesses"] == "true")
-	recoveryAttempted, _, err := logic.CheckAndRecover(&instanceKey, candidateKey, true, skipProcesses)
+	recoveryAttempted, _, err := logic.CheckAndRecover(&instanceKey, candidateKey, skipProcesses)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -2024,6 +2048,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/multi-match-slaves/:host/:port/:belowHost/:belowPort", this.MultiMatchSlaves)
 	m.Get("/api/match-up-slaves/:host/:port", this.MatchUpSlaves)
 	m.Get("/api/regroup-slaves/:host/:port", this.RegroupSlaves)
+	m.Get("/api/regroup-slaves-pgtid/:host/:port", this.RegroupSlavesPseudoGTID)
 	m.Get("/api/regroup-slaves-gtid/:host/:port", this.RegroupSlavesGTID)
 	m.Get("/api/regroup-slaves-bls/:host/:port", this.RegroupSlavesBinlogServers)
 	m.Get("/api/make-master/:host/:port", this.MakeMaster)

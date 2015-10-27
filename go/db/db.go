@@ -392,6 +392,18 @@ var generateSQLBase = []string{
 		  KEY end_timestamp_idx (end_timestamp)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS blocked_topology_recovery (
+		  hostname varchar(128) NOT NULL,
+		  port smallint(5) unsigned NOT NULL,
+		  cluster_name varchar(128) NOT NULL,
+		  analysis varchar(128) NOT NULL,
+		  last_blocked_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  blocking_recovery_id bigint unsigned,
+		  PRIMARY KEY (hostname, port),
+		  KEY cluster_blocked_idx (cluster_name, last_blocked_timestamp)
+		) ENGINE=InnoDB CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{

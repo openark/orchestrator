@@ -245,7 +245,8 @@ func ContinuousDiscovery() {
 				if isElectedNode {
 					go ClearActiveFailureDetections()
 					go ClearActiveRecoveries()
-					go CheckAndRecover(nil, nil, false, false)
+					go ExpireBlockedRecoveries()
+					go CheckAndRecover(nil, nil, false)
 				}
 			}()
 		case <-snapshotTopologiesTick:

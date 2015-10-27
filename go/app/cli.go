@@ -184,6 +184,24 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				}
 			}
 		}
+	case registerCliCommand("regroup-slaves", "Smart relocation", `Given an instance, pick one of its slave and make it local master of its siblings`):
+		{
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+
+			lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlaves(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
+			postponedFunctionsContainer.InvokePostponed()
+			if promotedSlave == nil {
+				log.Fatalf("Could not regroup slaves of %+v; error: %+v", *instanceKey, err)
+			}
+			fmt.Println(fmt.Sprintf("%s lost: %d, trivial: %d, pseudo-gtid: %d",
+				promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalSlaves), len(aheadSlaves)))
+			if err != nil {
+				log.Fatale(err)
+			}
+		}
+		// General replication commands
 		// move, binlog file:pos
 	case registerCliCommand("move-up", "Classic file:pos relocation", `Move a slave one level up the topology`):
 		{
@@ -341,7 +359,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			promotedBinlogServer, err := inst.RegroupSlavesBinlogServers(instanceKey, false)
+			_, promotedBinlogServer, err := inst.RegroupSlavesBinlogServers(instanceKey, false)
 			if promotedBinlogServer == nil {
 				log.Fatalf("Could not regroup binlog server slaves of %+v; error: %+v", *instanceKey, err)
 			}
@@ -495,13 +513,13 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				}
 			}
 		}
-	case registerCliCommand("regroup-slaves", "Pseudo-GTID relocation", `Given an instance, pick one of its slave and make it local master of its siblings, using Pseudo-GTID.`):
+	case registerCliCommand("regroup-slaves-pgtid", "Pseudo-GTID relocation", `Given an instance, pick one of its slave and make it local master of its siblings, using Pseudo-GTID.`):
 		{
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlaves(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
+			lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlavesPseudoGTID(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
 			postponedFunctionsContainer.InvokePostponed()
 			if promotedSlave == nil {
 				log.Fatalf("Could not regroup slaves of %+v; error: %+v", *instanceKey, err)
@@ -1080,7 +1098,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			recoveryAttempted, promotedInstanceKey, err := logic.CheckAndRecover(instanceKey, destinationKey, true, (command == "recover-lite"))
+			recoveryAttempted, promotedInstanceKey, err := logic.CheckAndRecover(instanceKey, destinationKey, (command == "recover-lite"))
 			if err != nil {
 				log.Fatale(err)
 			}

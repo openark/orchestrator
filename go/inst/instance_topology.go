@@ -1844,7 +1844,7 @@ func GetCandidateSlaveOfBinlogServerTopology(masterKey *InstanceKey) (candidateS
 
 // RegroupSlaves will choose a candidate slave of a given instance, and enslave its siblings using
 // either simple CHANGE MASTER TO, where possible, or pseudo-gtid
-func RegroupSlaves(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
+func RegroupSlavesPseudoGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
 	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err := GetCandidateSlave(masterKey, true)
 	if err != nil {
 		if !returnSlaveEvenOnFailureToRegroup {
@@ -1924,7 +1924,7 @@ func getMostUpToDateActiveBinlogServer(masterKey *InstanceKey) (mostAdvancedBinl
 
 // RegroupSlavesIncludingSubSlavesOfBinlogServers works in a mixed standard/binlog-server topology. This kind of topology shouldn't really exist,
 // but life is hard. To transition binlog servers into your topology you live sometimes with this hybrid solution.
-func RegroupSlavesIncludingSubSlavesOfBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
+func RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
 	// First, handle binlog server issues:
 	func() error {
 		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: starting on slaves of %+v", *masterKey)
@@ -1987,7 +1987,7 @@ func RegroupSlavesIncludingSubSlavesOfBinlogServers(masterKey *InstanceKey, retu
 		return nil
 	}()
 	// Proceed to normal regroup:
-	return RegroupSlaves(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen, postponedFunctionsContainer)
+	return RegroupSlavesPseudoGTID(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen, postponedFunctionsContainer)
 }
 
 // RegroupSlavesGTID will choose a candidate slave of a given instance, and enslave its siblings using GTID
@@ -2022,28 +2022,80 @@ func RegroupSlavesGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup
 
 // RegroupSlavesBinlogServers works on a binlog-servers topology. It picks the most up-to-date BLS and repoints all other
 // BLS below it
-func RegroupSlavesBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool) (promotedBinlogServer *Instance, err error) {
+func RegroupSlavesBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool) (repointedBinlogServers [](*Instance), promotedBinlogServer *Instance, err error) {
 	var binlogServerSlaves [](*Instance)
 	promotedBinlogServer, binlogServerSlaves, err = getMostUpToDateActiveBinlogServer(masterKey)
 
-	resultOnError := func(err error) (*Instance, error) {
+	resultOnError := func(err error) ([](*Instance), *Instance, error) {
 		if !returnSlaveEvenOnFailureToRegroup {
 			promotedBinlogServer = nil
 		}
-		return promotedBinlogServer, err
+		return repointedBinlogServers, promotedBinlogServer, err
 	}
 
 	if err != nil {
 		return resultOnError(err)
 	}
 
-	_, err, _ = RepointTo(binlogServerSlaves, &promotedBinlogServer.Key)
+	repointedBinlogServers, err, _ = RepointTo(binlogServerSlaves, &promotedBinlogServer.Key)
 
 	if err != nil {
 		return resultOnError(err)
 	}
 	AuditOperation("regroup-slaves-bls", masterKey, fmt.Sprintf("regrouped binlog server slaves of %+v; promoted %+v", *masterKey, promotedBinlogServer.Key))
-	return promotedBinlogServer, nil
+	return repointedBinlogServers, promotedBinlogServer, nil
+}
+
+// RegroupSlaves is a "smart" method of promoting one slave over the others ("promoting" it on top of its siblings)
+// This method decides which strategy to use: GTID, Pseudo-GTID, Binlog Servers.
+func RegroupSlaves(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool,
+	onCandidateSlaveChosen func(*Instance),
+	postponedFunctionsContainer *PostponedFunctionsContainer) (
+	aheadSlaves [](*Instance), equalSlaves [](*Instance), laterSlaves [](*Instance), instance *Instance, err error) {
+	//
+	var emptySlaves [](*Instance)
+
+	slaves, err := ReadSlaveInstances(masterKey)
+	if err != nil {
+		return emptySlaves, emptySlaves, emptySlaves, instance, err
+	}
+	if len(slaves) == 0 {
+		return emptySlaves, emptySlaves, emptySlaves, instance, err
+	}
+	if len(slaves) == 1 {
+		return emptySlaves, emptySlaves, emptySlaves, slaves[0], err
+	}
+	allGTID := true
+	allBinlogServers := true
+	allPseudoGTID := true
+	for _, slave := range slaves {
+		if !slave.UsingGTID() {
+			allGTID = false
+		}
+		if !slave.IsBinlogServer() {
+			allBinlogServers = false
+		}
+		if !slave.UsingPseudoGTID {
+			allPseudoGTID = false
+		}
+	}
+	if allGTID {
+		log.Debugf("RegroupSlaves: using GTID to regroup slaves of %+v", *masterKey)
+		unmovedSlaves, movedSlaves, candidateSlave, err := RegroupSlavesGTID(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen)
+		return unmovedSlaves, emptySlaves, movedSlaves, candidateSlave, err
+	}
+	if allBinlogServers {
+		log.Debugf("RegroupSlaves: using binlog servers to regroup slaves of %+v", *masterKey)
+		movedSlaves, candidateSlave, err := RegroupSlavesBinlogServers(masterKey, returnSlaveEvenOnFailureToRegroup)
+		return emptySlaves, emptySlaves, movedSlaves, candidateSlave, err
+	}
+	if allPseudoGTID {
+		log.Debugf("RegroupSlaves: using Pseudo-GTID to regroup slaves of %+v", *masterKey)
+		return RegroupSlavesPseudoGTID(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen, postponedFunctionsContainer)
+	}
+	// And, as last resort, we do PseudoGTID & binlog servers
+	log.Warningf("RegroupSlaves: unsure what method to invoke for %+v; trying Pseudo-GTID+Binlog Servers", *masterKey)
+	return RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen, postponedFunctionsContainer)
 }
 
 // relocateBelowInternal is a protentially recursive function which chooses how to relocate an instance below another.
