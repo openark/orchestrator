@@ -30,6 +30,15 @@ import (
 	"time"
 )
 
+// BlockedTopologyRecovery represents an entry in the blocked_topology_recovery table
+type BlockedTopologyRecovery struct {
+	FailedInstanceKey    inst.InstanceKey
+	ClusterName          string
+	Analysis             inst.AnalysisCode
+	LastBlockedTimestamp string
+	BlockingRecoveryId   int64
+}
+
 // TopologyRecovery represents an entry in the topology_recovery table
 type TopologyRecovery struct {
 	inst.PostponedFunctionsContainer

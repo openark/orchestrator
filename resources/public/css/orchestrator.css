@@ -681,6 +681,10 @@ body {
     max-width: 430px;
 }
 
+#clusters_analysis .popover-content span.glyphicon {
+	font-family: "Glyphicons Halflings";
+}
+
 #main_container.container, #main_container .container {
     width: inherit;
 }
@@ -722,6 +726,10 @@ body {
 
 .container.clusters .popover.instance .popover-content div.downtimed {
     background-color: #e7e7e7;
+}
+
+.container.clusters .popover.instance .popover-content div.blocked {
+    background-color: #ebccd1;
 }
 
 .container.clusters .popover.instance .popover-content span.badge {

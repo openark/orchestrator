@@ -1375,6 +1375,12 @@ function Cluster() {
                 addInfo('This cluster just recently ('+recoveryEntry.RecoveryEndTimestamp+') recovered from <strong><a href="/web/audit-recovery/cluster/'+currentClusterName()+'">' + recoveryEntry.AnalysisEntry.Analysis + '</strong></a>. It may still take some time to rebuild topology graph.');
             });
         });
+        getData("/api/blocked-recoveries/cluster/" + currentClusterName(), function (blockedRecoveries) {
+            // Result is an array: either empty (no active recovery) or with multiple entries
+        	blockedRecoveries.forEach(function (blockedRecovery) {
+                addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on '+getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port)+' is blocked due to previous recovery');
+            });
+        });
         getData("/api/cluster-osc-slaves/" + currentClusterName(), function (instances) {
             var instancesMap = normalizeInstances(instances, Array());
             var instancesTitles = Array();

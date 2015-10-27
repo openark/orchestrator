@@ -1997,6 +1997,18 @@ func (this *HttpAPI) AcknowledgeRecovery(params martini.Params, r render.Render,
 	r.JSON(200, countAcnowledgedRecoveries)
 }
 
+// BlockedRecoveries reads list of currently blocked recoveries, optionally filtered by cluster name
+func (this *HttpAPI) BlockedRecoveries(params martini.Params, r render.Render, req *http.Request) {
+	blockedRecoveries, err := logic.ReadBlockedRecoveries(params["clusterName"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, blockedRecoveries)
+}
+
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	// Instance meta
@@ -2108,6 +2120,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/ack-recovery/cluster/alias/:clusterAlias/:owner/:reason", this.AcknowledgeClusterRecoveries)
 	m.Get("/api/ack-recovery/instance/:host/:port/:owner/:reason", this.AcknowledgeInstanceRecoveries)
 	m.Get("/api/ack-recovery/:recoveryId/:owner/:reason", this.AcknowledgeInstanceRecoveries)
+	m.Get("/api/blocked-recoveries", this.BlockedRecoveries)
+	m.Get("/api/blocked-recoveries/cluster/:clusterName", this.BlockedRecoveries)
 	// Agents
 	m.Get("/api/agents", this.Agents)
 	m.Get("/api/agent/:host", this.Agent)

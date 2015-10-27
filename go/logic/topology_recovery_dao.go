@@ -562,3 +562,43 @@ func ReadRecentFailureDetections(page int) ([]TopologyRecovery, error) {
 		config.Config.AuditPageSize, page*config.Config.AuditPageSize)
 	return readFailureDetections(``, limit)
 }
+
+// ReadBlockedRecoveries reads blocked recovery entries, potentially filtered by cluster name (empty to unfilter)
+func ReadBlockedRecoveries(clusterName string) ([]BlockedTopologyRecovery, error) {
+	res := []BlockedTopologyRecovery{}
+	whereClause := ""
+	if clusterName != "" {
+		whereClause = fmt.Sprintf(`where cluster_name = '%s'`, clusterName)
+	}
+	query := fmt.Sprintf(`
+		select 
+				hostname,
+				port,
+				cluster_name,
+				analysis,
+				last_blocked_timestamp,
+				blocking_recovery_id
+			from
+				blocked_topology_recovery
+			%s
+			order by
+				last_blocked_timestamp desc
+		`, whereClause)
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+		blockedTopologyRecovery := BlockedTopologyRecovery{}
+		blockedTopologyRecovery.FailedInstanceKey.Hostname = m.GetString("hostname")
+		blockedTopologyRecovery.FailedInstanceKey.Port = m.GetInt("port")
+		blockedTopologyRecovery.ClusterName = m.GetString("cluster_name")
+		blockedTopologyRecovery.Analysis = inst.AnalysisCode(m.GetString("analysis"))
+		blockedTopologyRecovery.LastBlockedTimestamp = m.GetString("last_blocked_timestamp")
+		blockedTopologyRecovery.BlockingRecoveryId = m.GetInt64("blocking_recovery_id")
+
+		res = append(res, blockedTopologyRecovery)
+		return nil
+	})
+
+	if err != nil {
+		log.Errore(err)
+	}
+	return res, err
+}

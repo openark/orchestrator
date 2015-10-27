@@ -4,9 +4,17 @@ $(document).ready(function () {
     
     $.get("/api/clusters-info", function (clusters) {
         $.get("/api/replication-analysis", function (replicationAnalysis) {
-	    	displayClustersAnalysis(clusters, replicationAnalysis);
+            $.get("/api/blocked-recoveries", function (blockedRecoveries) {
+            	displayClustersAnalysis(clusters, replicationAnalysis, blockedRecoveries);
+            }, "json");
         }, "json");
     }, "json");
+    $.get("/api/blocked-recoveries", function (blockedRecoveries) {
+        // Result is an array: either empty (no active recovery) or with multiple entries
+    	blockedRecoveries.forEach(function (blockedRecovery) {
+            addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on '+getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port)+' is blocked due to previous recovery');
+        });
+    });
     
     function sortByCountInstances(cluster1, cluster2) {
     	if (cluster2.allAnalysisDowntimed && !cluster1.allAnalysisDowntimed) {
@@ -22,7 +30,11 @@ $(document).ready(function () {
     	return cluster1.ClusterName.localeCompare(cluster2.ClusterName);
     }
     
-    function displayClustersAnalysis(clusters, replicationAnalysis) {
+    function getBlockedRecoveryKey(hostname, port, analysis) {
+    	return hostname+":"+port+":"+analysis;
+    }
+    
+    function displayClustersAnalysis(clusters, replicationAnalysis, blockedRecoveries) {
         hideLoader();
         
         var clustersMap = {};
@@ -47,20 +59,31 @@ $(document).ready(function () {
         	return (cluster.analysisEntries.length > 0);
         });
 
-	    function displayInstancesBadge(popoverElement, text, count, badgeClass, title) {
+        
+    	var blockedrecoveriesMap = {}
+    	blockedRecoveries.forEach(function (blockedRecovery) {
+    		var blockedKey = getBlockedRecoveryKey(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port, blockedRecovery.Analysis);
+    		blockedrecoveriesMap[blockedKey] = true;
+        });
+
+    	function displayInstancesBadge(popoverElement, text, count, badgeClass, title) {
 	    	popoverElement.find(".popover-content>div").append('<div>'+text+':<div class="pull-right"><span class="badge '+badgeClass+'" title="' + title + '">' + count + '</span></div></div>');
 	    }
 	    function displayAnalysisEntry(analysisEntry, popoverElement) {
 	    	if (!(analysisEntry.Analysis in interestingAnalysis)) {
 	    		return;
 	    	}
+	    	var blockedKey = getBlockedRecoveryKey(analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port, analysisEntry.Analysis);
 	    	var displayText = '<hr/><span><strong>'+analysisEntry.Analysis 
 	    		+ (analysisEntry.IsDowntimed ? '<br/>[<i>downtime till '+analysisEntry.DowntimeEndTimestamp+'</i>]': '')
+	    		+ (blockedrecoveriesMap[blockedKey] ? '<br/><span class="glyphicon glyphicon-exclamation-sign text-danger"></span> Blocked' : '')
 	    		+ "</strong></span>" 
 	    		+ "<br/>" + "<span>" + analysisEntry.AnalyzedInstanceKey.Hostname+":"+analysisEntry.AnalyzedInstanceKey.Port+ "</span>" 
 	    		;
 	    	if (analysisEntry.IsDowntimed) {
 	    		displayText = '<div class="downtimed">'+displayText+'</div>';
+	    	} else if (blockedrecoveriesMap[blockedKey]) {
+	    		displayText = '<div class="blocked">'+displayText+'</div>';
 	    	}
 	    	popoverElement.find(".popover-content>div").append('<div class="divider"></div><div>' 
 	    			+ displayText +	'</div> ');
@@ -82,7 +105,7 @@ $(document).ready(function () {
     	    displayInstancesBadge(popoverElement, "Instances", cluster.CountInstances, "label-primary", "Total instances in cluster");
     	    
     	    cluster.analysisEntries.forEach(function (analysisEntry) {
-    	    	displayAnalysisEntry(analysisEntry, popoverElement)
+    	    	displayAnalysisEntry(analysisEntry, popoverElement);
             });
         }
 
