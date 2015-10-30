@@ -2102,8 +2102,8 @@ func RegroupSlaves(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup boo
 // It may choose to use Pseudo-GTID, or normal binlog positions, or take advantage of binlog servers,
 // or it may combine any of the above in a multi-step operation.
 func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
-	if canReplicate, _ := instance.CanReplicateFrom(other); !canReplicate {
-		return instance, log.Errorf("%+v cannot replicate from %+v", instance.Key, other.Key)
+	if canReplicate, err := instance.CanReplicateFrom(other); !canReplicate {
+		return instance, log.Errorf("%+v cannot replicate from %+v. Reason: %+v", instance.Key, other.Key, err)
 	}
 	// simplest:
 	if InstanceIsMasterOf(other, instance) {

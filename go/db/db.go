@@ -602,6 +602,10 @@ var generateSQLPatches = []string{
 			blocked_topology_recovery
 			ADD KEY last_blocked_idx (last_blocked_timestamp)
 	`,
+	`
+		ALTER TABLE candidate_database_instance
+			ADD COLUMN promotion_rule enum('must', 'prefer', 'neutral', 'prefer_not', 'must_not') NOT NULL DEFAULT 'neutral'
+	`,
 }
 
 // Track if a TLS has already been configured for topology

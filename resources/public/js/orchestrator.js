@@ -295,8 +295,6 @@ function openNodeModal(node) {
     	addNodeModalDataAttribute("Self coordinates", node.SelfBinlogCoordinates.LogFile+":"+node.SelfBinlogCoordinates.LogPos);
     }
     var td = addNodeModalDataAttribute("Num slaves", node.SlaveHosts.length);
-    $('#node_modal button[data-btn=move-up-slaves]').appendTo(td.find("div"))
-    $('#node_modal button[data-btn=match-up-slaves]').appendTo(td.find("div"))
     $('#node_modal button[data-btn=regroup-slaves]').appendTo(td.find("div"))
     addNodeModalDataAttribute("Server ID", node.ServerID);
     if (node.ServerUUID) {
@@ -388,10 +386,26 @@ function openNodeModal(node) {
     	apiCommand("/api/set-writeable/"+node.Key.Hostname+"/"+node.Key.Port);
     });
     $('#node_modal button[data-btn=enable-gtid]').click(function(){
-    	apiCommand("/api/enable-gtid/"+node.Key.Hostname+"/"+node.Key.Port);
+    	var message = "<p>Are you sure you wish to enable GTID on <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+    		"</strong></code>?" +
+			"<p>Replication <i>might</i> break as consequence"
+		;
+    	bootbox.confirm(message, function(confirm) {
+			if (confirm) {
+				apiCommand("/api/enable-gtid/"+node.Key.Hostname+"/"+node.Key.Port);
+			}
+		}); 
     });
     $('#node_modal button[data-btn=disable-gtid]').click(function(){
-    	apiCommand("/api/disable-gtid/"+node.Key.Hostname+"/"+node.Key.Port);
+    	var message = "<p>Are you sure you wish to disable GTID on <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+			"</strong></code>?" +
+			"<p>Replication <i>might</i> break as consequence"
+		;
+		bootbox.confirm(message, function(confirm) {
+			if (confirm) {
+				apiCommand("/api/disable-gtid/"+node.Key.Hostname+"/"+node.Key.Port);
+			}
+		});
     });
     $('#node_modal button[data-btn=forget-instance]').click(function(){
     	var message = "<p>Are you sure you wish to forget <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
@@ -457,28 +471,20 @@ function openNodeModal(node) {
     	$('#node_modal button[data-btn=enable-gtid]').show();
     }
 
-    $('#node_modal button[data-btn=move-up-slaves]').hide();
-    if (!node.lastCheckInvalidProblem()) {
-        if (node.SlaveHosts.length > 0) {
-            $('#node_modal button[data-btn=move-up-slaves]').show();
-        }
-    }
-    $('#node_modal button[data-btn=move-up-slaves]').click(function(){
-    	apiCommand("/api/move-up-slaves/"+node.Key.Hostname+"/"+node.Key.Port);
-    });
-    $('#node_modal button[data-btn=match-up-slaves]').hide();
     $('#node_modal button[data-btn=regroup-slaves]').hide();
-    if (node.UsingPseudoGTID) {
-        $('#node_modal button[data-btn=match-up-slaves]').show();
-        if (node.SlaveHosts.length > 1) {
-            $('#node_modal button[data-btn=regroup-slaves]').show();
-        }
+    if (node.SlaveHosts.length > 1) {
+        $('#node_modal button[data-btn=regroup-slaves]').show();
     }
-    $('#node_modal button[data-btn=match-up-slaves]').click(function(){
-    	apiCommand("/api/match-up-slaves/"+node.Key.Hostname+"/"+node.Key.Port);
-    });
     $('#node_modal button[data-btn=regroup-slaves]').click(function(){
-    	apiCommand("/api/regroup-slaves/"+node.Key.Hostname+"/"+node.Key.Port);
+    	var message = "<p>Are you sure you wish to regroup slaves of <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+			"</strong></code>?" +
+			"<p>This will attempt to promote one slave over its siblings"
+		;
+		bootbox.confirm(message, function(confirm) {
+			if (confirm) {
+				apiCommand("/api/regroup-slaves/"+node.Key.Hostname+"/"+node.Key.Port);
+			}
+		});
     });
 
    	$('#node_modal button[data-btn=enslave-siblings]').hide();
@@ -486,7 +492,15 @@ function openNodeModal(node) {
     	$('#node_modal button[data-btn=enslave-siblings]').show();
     }
     $('#node_modal button[data-btn=enslave-siblings]').click(function(){
-    	apiCommand("/api/enslave-siblings/"+node.Key.Hostname+"/"+node.Key.Port);
+    	var message = "<p>Are you sure you want <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+			"</strong></code> to enslave its siblings?" +
+			"<p>This will stop replication on this slave and on its siblings throughout the operation"
+		;
+		bootbox.confirm(message, function(confirm) {
+			if (confirm) {
+				apiCommand("/api/enslave-siblings/"+node.Key.Hostname+"/"+node.Key.Port);
+			}
+		});    	
     });
     $('#node_modal button[data-btn=end-downtime]').click(function(){
     	apiCommand("/api/end-downtime/"+node.Key.Hostname+"/"+node.Key.Port);
