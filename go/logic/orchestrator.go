@@ -186,10 +186,10 @@ func ContinuousDiscovery() {
 	log.Infof("Starting continuous discovery")
 	inst.LoadHostnameResolveCacheFromDatabase()
 	go handleDiscoveryRequests(nil, nil)
-	tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
-	forgetUnseenTick := time.Tick(time.Minute)
-	recoverTick := time.Tick(time.Duration(config.Config.RecoveryPollSeconds) * time.Second)
 
+	discoveryTick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
+	caretakingTick := time.Tick(time.Minute)
+	recoveryTick := time.Tick(time.Duration(config.Config.RecoveryPollSeconds) * time.Second)
 	var snapshotTopologiesTick <-chan time.Time
 	if config.Config.SnapshotTopologiesIntervalHours > 0 {
 		snapshotTopologiesTick = time.Tick(time.Duration(config.Config.SnapshotTopologiesIntervalHours) * time.Hour)
@@ -200,20 +200,25 @@ func ContinuousDiscovery() {
 
 	for {
 		select {
-		case <-tick:
+		case <-discoveryTick:
 			go func() {
+				wasAlreadyElected := isElectedNode
 				if isElectedNode, _ = process.AttemptElection(); isElectedNode {
 					instanceKeys, _ := inst.ReadOutdatedInstanceKeys()
 					log.Debugf("outdated keys: %+v", instanceKeys)
 					for _, instanceKey := range instanceKeys {
 						discoveryInstanceKeys <- instanceKey
 					}
+					if !wasAlreadyElected {
+						// Just turned to be leader!
+						go process.HealthTest()
+					}
 				} else {
 					log.Debugf("Not elected as active node; polling")
 				}
 			}()
-		case <-forgetUnseenTick:
-			// See if we should also forget objects (lower frequency)
+		case <-caretakingTick:
+			// Various periodic internal maintenance tasks
 			go func() {
 				if isElectedNode {
 					go inst.ForgetLongUnseenInstances()
@@ -240,7 +245,7 @@ func ContinuousDiscovery() {
 				go inst.ReadClusterAliases()
 				go process.HealthTest()
 			}()
-		case <-recoverTick:
+		case <-recoveryTick:
 			go func() {
 				if isElectedNode {
 					go ClearActiveFailureDetections()
@@ -282,7 +287,7 @@ func ContinuousAgentsPoll() {
 	go discoverSeededAgents()
 
 	tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
-	forgetUnseenTick := time.Tick(time.Hour)
+	caretakingTick := time.Tick(time.Hour)
 	for range tick {
 		agentsHosts, _ := agent.ReadOutdatedAgentsHosts()
 		log.Debugf("outdated agents hosts: %+v", agentsHosts)
@@ -291,7 +296,7 @@ func ContinuousAgentsPoll() {
 		}
 		// See if we should also forget agents (lower frequency)
 		select {
-		case <-forgetUnseenTick:
+		case <-caretakingTick:
 			agent.ForgetLongUnseenAgents()
 			agent.FailStaleSeeds()
 		default:
