@@ -28,11 +28,13 @@ var clusterAliasMap = make(map[string]string)
 var clusterAliasMapMutex = &sync.Mutex{}
 
 func ApplyClusterAlias(clusterInfo *ClusterInfo) {
+	// First try out the hard-wired config:
 	for pattern := range config.Config.ClusterNameToAlias {
 		if matched, _ := regexp.MatchString(pattern, clusterInfo.ClusterName); matched {
 			clusterInfo.ClusterAlias = config.Config.ClusterNameToAlias[pattern]
 		}
 	}
+	// Now override by whatever data we have in our database
 	clusterAliasMapMutex.Lock()
 	defer clusterAliasMapMutex.Unlock()
 	if alias, ok := clusterAliasMap[clusterInfo.ClusterName]; ok {

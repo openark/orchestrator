@@ -236,6 +236,13 @@ body {
     padding: 8px 14px;
 }
 
+
+#clusters .instance h3 .pull-right > .glyphicon {
+	margin-right: 2px;
+	font-size: 12px;
+	color: #31708f;
+}
+
 #instance_problems {
     z-index: 10;
     position: absolute;

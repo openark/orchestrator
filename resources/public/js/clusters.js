@@ -71,11 +71,25 @@ $(document).ready(function () {
               	var title = cluster.ClusterName.replace(removeTextFromHostnameDisplay(), '');
                 popoverElement.find("h3 .pull-left a span").html(title);
             } 
-    		if (cluster.ClusterAlias != "") {
+            var compactClusterUri = '/web/cluster/'+cluster.ClusterName+'?compact=true';
+    		if (cluster.ClusterAlias) {
                 popoverElement.find("h3 .pull-left a span").addClass("small");
                 popoverElement.find("h3 .pull-left").prepend('<a href="/web/cluster/alias/'+encodeURIComponent(cluster.ClusterAlias)+'"><strong>'+cluster.ClusterAlias+'</strong></a><br/>');
-                popoverElement.find("h3 .pull-right").append('<a href="/web/cluster/alias/'+encodeURIComponent(cluster.ClusterAlias)+'?compact=true"><span class="glyphicon glyphicon-compressed" title="Compact display"></span></a>');
+                compactClusterUri = '/web/cluster/alias/'+encodeURIComponent(cluster.ClusterAlias)+'?compact=true';
     		}
+            popoverElement.find("h3 .pull-right").append('<a href="'+compactClusterUri+'"><span class="glyphicon glyphicon-compressed" title="Compact display"></span></a>');
+            if (cluster.HasAutomatedIntermediateMasterRecovery === true) {
+            	popoverElement.find("h3 .pull-right").prepend('<span class="glyphicon glyphicon-heart-empty text-info" title="Automated intermediate master recovery for this cluster ENABLED"></span>');
+            }
+            if (cluster.HasAutomatedMasterRecovery === true) {
+            	popoverElement.find("h3 .pull-right").prepend('<span class="glyphicon glyphicon-heart text-info" title="Automated master recovery for this cluster ENABLED"></span>');
+            }
+
+
+
+
+            
+            
     	    var contentHtml = ''
     				+ '<div>Instances: <div class="pull-right"></div></div>'
     			;
