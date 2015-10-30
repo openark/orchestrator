@@ -11,12 +11,14 @@ $(document).ready(function () {
 	};
     
     $.get("/api/clusters-info", function (clusters) {
-        $.get("/api/problems", function (problemInstances) {
-        	if (problemInstances == null) {
-        		problemInstances = [];
-        	}
-        	normalizeInstances(problemInstances, []);
-	    	displayClusters(clusters, problemInstances);
+    	$.get("/api/replication-analysis", function (replicationAnalysis) {
+	        $.get("/api/problems", function (problemInstances) {
+	        	if (problemInstances == null) {
+	        		problemInstances = [];
+	        	}
+	        	normalizeInstances(problemInstances, []);
+		    	displayClusters(clusters, replicationAnalysis, problemInstances);
+	        }, "json");
         }, "json");
     }, "json");
     function sortByCountInstances(cluster1, cluster2) {
@@ -27,7 +29,7 @@ $(document).ready(function () {
     	return cluster1.ClusterName.localeCompare(cluster2.ClusterName);
     }
     
-    function displayClusters(clusters, problemInstances) {
+    function displayClusters(clusters, replicationAnalysis, problemInstances) {
         hideLoader();
         
         clusters.sort(sortByCountInstances);
@@ -35,7 +37,18 @@ $(document).ready(function () {
         clusters.forEach(function (cluster) {
         	clustersProblems[cluster.ClusterName] = {};
         });
-        
+
+        var clustersAnalysisProblems = {};
+        replicationAnalysis.Details.forEach(function (analysisEntry) {
+            if (!(analysisEntry.Analysis in interestingAnalysis)) {
+                return;
+            }
+            if (!clustersAnalysisProblems[analysisEntry.ClusterDetails.ClusterName]) {
+            	clustersAnalysisProblems[analysisEntry.ClusterDetails.ClusterName] = [];
+            }
+            clustersAnalysisProblems[analysisEntry.ClusterDetails.ClusterName].push(analysisEntry);
+        });
+
 	    function addInstancesBadge(clusterName, count, badgeClass, title) {
 	    	$("#clusters [data-cluster-name='" + clusterName + "'].popover").find(".popover-content .pull-right").append('<span class="badge '+badgeClass+'" title="' + title + '">' + count + '</span> ');
 	    }
@@ -77,6 +90,13 @@ $(document).ready(function () {
                 popoverElement.find("h3 .pull-left").prepend('<a href="/web/cluster/alias/'+encodeURIComponent(cluster.ClusterAlias)+'"><strong>'+cluster.ClusterAlias+'</strong></a><br/>');
                 compactClusterUri = '/web/cluster/alias/'+encodeURIComponent(cluster.ClusterAlias)+'?compact=true';
     		}
+    		if (clustersAnalysisProblems[cluster.ClusterName]) {
+    			clustersAnalysisProblems[cluster.ClusterName].forEach(function (analysisEntry) {
+    				console.log(analysisEntry)
+    				popoverElement.find("h3 .pull-left").prepend('<span class="glyphicon glyphicon-exclamation-sign text-danger" title="'+analysisEntry.Analysis+': '+getInstanceTitle(analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port)+'"></span>');
+    	        });
+    			    			
+    		}
             popoverElement.find("h3 .pull-right").append('<a href="'+compactClusterUri+'"><span class="glyphicon glyphicon-compressed" title="Compact display"></span></a>');
             if (cluster.HasAutomatedIntermediateMasterRecovery === true) {
             	popoverElement.find("h3 .pull-right").prepend('<span class="glyphicon glyphicon-heart-empty text-info" title="Automated intermediate master recovery for this cluster ENABLED"></span>');
@@ -84,11 +104,6 @@ $(document).ready(function () {
             if (cluster.HasAutomatedMasterRecovery === true) {
             	popoverElement.find("h3 .pull-right").prepend('<span class="glyphicon glyphicon-heart text-info" title="Automated master recovery for this cluster ENABLED"></span>');
             }
-
-
-
-
-            
             
     	    var contentHtml = ''
     				+ '<div>Instances: <div class="pull-right"></div></div>'
