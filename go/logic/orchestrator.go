@@ -211,7 +211,7 @@ func ContinuousDiscovery() {
 					}
 					if !wasAlreadyElected {
 						// Just turned to be leader!
-						go process.HealthTest()
+						go process.RegisterNode("")
 					}
 				} else {
 					log.Debugf("Not elected as active node; polling")
@@ -243,7 +243,6 @@ func ContinuousDiscovery() {
 					inst.LoadHostnameResolveCacheFromDatabase()
 				}
 				go inst.ReadClusterAliases()
-				go process.HealthTest()
 			}()
 		case <-recoveryTick:
 			go func() {
@@ -251,6 +250,7 @@ func ContinuousDiscovery() {
 					go ClearActiveFailureDetections()
 					go ClearActiveRecoveries()
 					go ExpireBlockedRecoveries()
+					go AcknowledgeCrashedRecoveries()
 					go CheckAndRecover(nil, nil, false)
 				}
 			}()

@@ -249,11 +249,18 @@ func ExpireBlockedRecoveries() error {
 }
 
 // acknowledgeRecoveries sets acknowledged* details and clears the in_active_period flags from a set of entries
-func acknowledgeRecoveries(owner string, comment string, whereClause string) (countAcknowledgedEntries int64, err error) {
+func acknowledgeRecoveries(owner string, comment string, markEndRecovery bool, whereClause string) (countAcknowledgedEntries int64, err error) {
+	additionalSet := ``
+	if markEndRecovery {
+		additionalSet = `
+				end_recovery=IFNULL(end_recovery, NOW()),
+			`
+	}
 	query := fmt.Sprintf(`
 			update topology_recovery set 
 				in_active_period = 0,
 				end_active_period_unixtime = IF(end_active_period_unixtime = 0, UNIX_TIMESTAMP(), end_active_period_unixtime),
+				%s
 				acknowledged = 1,
 				acknowledged_at = NOW(),
 				acknowledged_by = ?,
@@ -262,7 +269,7 @@ func acknowledgeRecoveries(owner string, comment string, whereClause string) (co
 				acknowledged = 0
 				and
 				%s
-		`, whereClause)
+		`, additionalSet, whereClause)
 	sqlResult, err := db.ExecOrchestrator(query, owner, comment)
 	if err != nil {
 		return 0, log.Errore(err)
@@ -275,7 +282,7 @@ func acknowledgeRecoveries(owner string, comment string, whereClause string) (co
 // This also implied clearing their active period, which in turn enables further recoveries on those topologies
 func AcknowledgeRecovery(recoveryId int64, owner string, comment string) (countAcknowledgedEntries int64, err error) {
 	whereClause := fmt.Sprintf(`recovery_id = %d`, recoveryId)
-	return acknowledgeRecoveries(owner, comment, whereClause)
+	return acknowledgeRecoveries(owner, comment, false, whereClause)
 }
 
 // AcknowledgeClusterRecoveries marks active recoveries for given cluster as acknowledged.
@@ -284,7 +291,7 @@ func AcknowledgeClusterRecoveries(clusterName string, owner string, comment stri
 	whereClause := fmt.Sprintf(`
 			cluster_name = '%s'
 		`, clusterName)
-	return acknowledgeRecoveries(owner, comment, whereClause)
+	return acknowledgeRecoveries(owner, comment, false, whereClause)
 }
 
 // AcknowledgeInstanceRecoveries marks active recoveries for given instane as acknowledged.
@@ -294,7 +301,18 @@ func AcknowledgeInstanceRecoveries(instanceKey *inst.InstanceKey, owner string, 
 			hostname = '%s'
 			and port = %d
 		`, instanceKey.Hostname, instanceKey.Port)
-	return acknowledgeRecoveries(owner, comment, whereClause)
+	return acknowledgeRecoveries(owner, comment, false, whereClause)
+}
+
+// AcknowledgeCrashedRecoveries marks recoveries whose processing nodes has crashed as acknowledged.
+func AcknowledgeCrashedRecoveries() (countAcknowledgedEntries int64, err error) {
+	whereClause := `
+			in_active_period = 1
+			and (processing_node_hostname, processcing_node_token) not in (
+				select hostname, token from node_health
+			)
+		`
+	return acknowledgeRecoveries("orchestrator", "detected crashed recovery", true, whereClause)
 }
 
 // ResolveRecovery is called on completion of a recovery process and updates the recovery status.

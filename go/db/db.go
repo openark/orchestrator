@@ -606,6 +606,15 @@ var generateSQLPatches = []string{
 		ALTER TABLE candidate_database_instance
 			ADD COLUMN promotion_rule enum('must', 'prefer', 'neutral', 'prefer_not', 'must_not') NOT NULL DEFAULT 'neutral'
 	`,
+	`
+		ALTER TABLE node_health
+			DROP PRIMARY KEY,
+			ADD PRIMARY KEY (hostname, token)
+	`,
+	`
+		ALTER TABLE node_health
+			ADD COLUMN extra_info varchar(128) CHARACTER SET utf8 NOT NULL
+	`,
 }
 
 // Track if a TLS has already been configured for topology

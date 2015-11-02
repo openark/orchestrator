@@ -17,12 +17,15 @@
 package process
 
 import (
+	"database/sql"
 	"fmt"
-
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/db"
+	"time"
 )
+
+const registrationPollSeconds = 10
 
 type HealthStatus struct {
 	Healthy        bool
@@ -34,21 +37,27 @@ type HealthStatus struct {
 	AvailableNodes []string
 }
 
+// RegisterNode writes down this node in the node_health table
+func RegisterNode(extraInfo string) (sql.Result, error) {
+	return db.ExecOrchestrator(`
+			insert into node_health 
+				(hostname, token, last_seen_active, extra_info)
+			values
+				(?, ?, NOW(), ?)
+			on duplicate key update
+				token=values(token),
+				last_seen_active=values(last_seen_active),
+				extra_info=if(values(extra_info) != '', values(extra_info), extra_info)
+			`,
+		ThisHostname, ProcessToken.Hash, extraInfo,
+	)
+}
+
 // HealthTest attempts to write to the backend database and get a result
 func HealthTest() (*HealthStatus, error) {
 	health := HealthStatus{Healthy: false, Hostname: ThisHostname, Token: ProcessToken.Hash}
 
-	sqlResult, err := db.ExecOrchestrator(`
-			insert into node_health 
-				(hostname, token, last_seen_active)
-			values
-				(?, ?, NOW())
-			on duplicate key update
-				token=values(token),
-				last_seen_active=values(last_seen_active)
-			`,
-		ThisHostname, ProcessToken.Hash,
-	)
+	sqlResult, err := RegisterNode("")
 	if err != nil {
 		health.Error = err
 		return &health, log.Errore(err)
@@ -72,6 +81,34 @@ func HealthTest() (*HealthStatus, error) {
 	return &health, nil
 }
 
+func ContinuousRegistration(extraInfo string) {
+	registrationTick := time.Tick(time.Duration(registrationPollSeconds) * time.Second)
+	tickOperation := func() {
+		RegisterNode(extraInfo)
+		expireAvailableNodes()
+	}
+	go func() {
+		go tickOperation()
+		for range registrationTick {
+			go tickOperation()
+		}
+	}()
+}
+
+// expireAvailableNodes is an aggressive puring method to remove node entries who have skipped
+// their keepalive for two times
+func expireAvailableNodes() error {
+	_, err := db.ExecOrchestrator(`
+			delete 
+				from node_health 
+			where
+				last_seen_active < now() - interval ? second
+			`,
+		registrationPollSeconds*2,
+	)
+	return log.Errore(err)
+}
+
 func readAvailableNodes() ([]string, error) {
 	res := []string{}
 	query := fmt.Sprintf(`
@@ -80,10 +117,10 @@ func readAvailableNodes() ([]string, error) {
 		from 
 			node_health
 		where
-			last_seen_active > now() - interval 5 minute
+			last_seen_active > now() - interval %d second
 		order by
 			hostname
-		`)
+		`, registrationPollSeconds*2)
 
 	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		res = append(res, m.GetString("node"))

@@ -24,8 +24,16 @@ import (
 	"github.com/outbrain/orchestrator/go/app"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/inst"
+	"github.com/outbrain/orchestrator/go/process"
 	"os"
 	"runtime"
+)
+
+type OrchestratorExecutionMode string
+
+const (
+	CliMode  OrchestratorExecutionMode = "CLIMode"
+	HttpMode                           = "HttpMode"
 )
 
 const prompt string = `
@@ -856,11 +864,12 @@ func main() {
 		return
 	}
 
+	var executionMode OrchestratorExecutionMode
 	switch {
 	case len(flag.Args()) == 0 || flag.Arg(0) == "cli":
-		app.Cli(*command, *strict, *instance, *destination, *owner, *reason, *duration, *pattern, *clusterAlias, *pool, *hostnameFlag)
+		executionMode = CliMode
 	case flag.Arg(0) == "http":
-		app.Http(*discovery)
+		executionMode = HttpMode
 	default:
 		fmt.Fprintln(os.Stderr, `Usage: 
   orchestrator --options... [cli|http]
@@ -869,5 +878,14 @@ See complete list of commands:
 Full blown documentation:
   orchestrator
 `)
+		os.Exit(1)
+	}
+
+	process.ContinuousRegistration(string(executionMode))
+	switch executionMode {
+	case CliMode:
+		app.Cli(*command, *strict, *instance, *destination, *owner, *reason, *duration, *pattern, *clusterAlias, *pool, *hostnameFlag)
+	case HttpMode:
+		app.Http(*discovery)
 	}
 }
