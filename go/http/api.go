@@ -2053,23 +2053,47 @@ func (this *HttpAPI) BlockedRecoveries(params martini.Params, r render.Render, r
 
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
-	// Instance meta
-	m.Get("/api/instance/:host/:port", this.Instance)
-	m.Get("/api/discover/:host/:port", this.Discover)
-	m.Get("/api/refresh/:host/:port", this.Refresh)
-	m.Get("/api/forget/:host/:port", this.Forget)
-	m.Get("/api/resolve/:host/:port", this.Resolve)
-	// Instance
-	m.Get("/api/last-pseudo-gtid/:host/:port", this.LastPseudoGTID)
-	m.Get("/api/begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance)
-	m.Get("/api/end-maintenance/:host/:port", this.EndMaintenanceByInstanceKey)
-	m.Get("/api/end-maintenance/:maintenanceKey", this.EndMaintenance)
-	m.Get("/api/begin-downtime/:host/:port/:owner/:reason", this.BeginDowntime)
-	m.Get("/api/end-downtime/:host/:port", this.EndDowntime)
-	m.Get("/api/set-read-only/:host/:port", this.SetReadOnly)
-	m.Get("/api/set-writeable/:host/:port", this.SetWriteable)
-	m.Get("/api/kill-query/:host/:port/:process", this.KillQuery)
-	// Replication
+	// Smart relocation:
+	m.Get("/api/relocate/:host/:port/:belowHost/:belowPort", this.RelocateBelow)
+	m.Get("/api/relocate-below/:host/:port/:belowHost/:belowPort", this.RelocateBelow)
+	m.Get("/api/relocate-slaves/:host/:port/:belowHost/:belowPort", this.RelocateSlaves)
+	m.Get("/api/regroup-slaves/:host/:port", this.RegroupSlaves)
+
+	// Classic file:pos relocation:
+	m.Get("/api/move-up/:host/:port", this.MoveUp)
+	m.Get("/api/move-up-slaves/:host/:port", this.MoveUpSlaves)
+	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow)
+	m.Get("/api/move-equivalent/:host/:port/:belowHost/:belowPort", this.MoveEquivalent)
+	m.Get("/api/repoint-slaves/:host/:port", this.RepointSlaves)
+	m.Get("/api/make-co-master/:host/:port", this.MakeCoMaster)
+	m.Get("/api/enslave-siblings/:host/:port", this.EnslaveSiblings)
+	m.Get("/api/enslave-master/:host/:port", this.EnslaveMaster)
+	m.Get("/api/master-equivalent/:host/:port/:logFile/:logPos", this.MasterEquivalent)
+
+	// Binlog server relocation:
+	m.Get("/api/regroup-slaves-bls/:host/:port", this.RegroupSlavesBinlogServers)
+
+	// GTID relocation:
+	m.Get("/api/move-below-gtid/:host/:port/:belowHost/:belowPort", this.MoveBelowGTID)
+	m.Get("/api/move-slaves-gtid/:host/:port/:belowHost/:belowPort", this.MoveSlavesGTID)
+	m.Get("/api/regroup-slaves-gtid/:host/:port", this.RegroupSlavesGTID)
+
+	// Pseudo-GTID relocation:
+	m.Get("/api/match/:host/:port/:belowHost/:belowPort", this.MatchBelow)
+	m.Get("/api/match-below/:host/:port/:belowHost/:belowPort", this.MatchBelow)
+	m.Get("/api/match-up/:host/:port", this.MatchUp)
+	m.Get("/api/match-slaves/:host/:port/:belowHost/:belowPort", this.MultiMatchSlaves)
+	m.Get("/api/multi-match-slaves/:host/:port/:belowHost/:belowPort", this.MultiMatchSlaves)
+	m.Get("/api/match-up-slaves/:host/:port", this.MatchUpSlaves)
+	m.Get("/api/regroup-slaves-pgtid/:host/:port", this.RegroupSlavesPseudoGTID)
+	// Legacy, need to revisit:
+	m.Get("/api/make-master/:host/:port", this.MakeMaster)
+	m.Get("/api/make-local-master/:host/:port", this.MakeLocalMaster)
+
+	// Replication, general:
+	m.Get("/api/enable-gtid/:host/:port", this.EnableGTID)
+	m.Get("/api/disable-gtid/:host/:port", this.DisableGTID)
+	m.Get("/api/skip-query/:host/:port", this.SkipQuery)
 	m.Get("/api/start-slave/:host/:port", this.StartSlave)
 	m.Get("/api/restart-slave/:host/:port", this.RestartSlave)
 	m.Get("/api/stop-slave/:host/:port", this.StopSlave)
@@ -2077,36 +2101,23 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/reset-slave/:host/:port", this.ResetSlave)
 	m.Get("/api/detach-slave/:host/:port", this.DetachSlave)
 	m.Get("/api/reattach-slave/:host/:port", this.ReattachSlave)
-	m.Get("/api/master-equivalent/:host/:port/:logFile/:logPos", this.MasterEquivalent)
-	m.Get("/api/skip-query/:host/:port", this.SkipQuery)
-	m.Get("/api/enable-gtid/:host/:port", this.EnableGTID)
-	m.Get("/api/disable-gtid/:host/:port", this.DisableGTID)
-	// Move
-	m.Get("/api/move-up/:host/:port", this.MoveUp)
-	m.Get("/api/move-up-slaves/:host/:port", this.MoveUpSlaves)
-	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow)
-	m.Get("/api/move-below-gtid/:host/:port/:belowHost/:belowPort", this.MoveBelowGTID)
-	m.Get("/api/move-slaves-gtid/:host/:port/:belowHost/:belowPort", this.MoveSlavesGTID)
-	m.Get("/api/move-equivalent/:host/:port/:belowHost/:belowPort", this.MoveEquivalent)
-	m.Get("/api/repoint-slaves/:host/:port", this.RepointSlaves)
-	m.Get("/api/make-co-master/:host/:port", this.MakeCoMaster)
-	m.Get("/api/enslave-siblings/:host/:port", this.EnslaveSiblings)
-	m.Get("/api/enslave-master/:host/:port", this.EnslaveMaster)
-	m.Get("/api/relocate/:host/:port/:belowHost/:belowPort", this.RelocateBelow)
-	m.Get("/api/relocate-below/:host/:port/:belowHost/:belowPort", this.RelocateBelow)
-	m.Get("/api/relocate-slaves/:host/:port/:belowHost/:belowPort", this.RelocateSlaves)
-	m.Get("/api/match/:host/:port/:belowHost/:belowPort", this.MatchBelow)
-	m.Get("/api/match-below/:host/:port/:belowHost/:belowPort", this.MatchBelow)
-	m.Get("/api/match-up/:host/:port", this.MatchUp)
-	m.Get("/api/match-slaves/:host/:port/:belowHost/:belowPort", this.MultiMatchSlaves)
-	m.Get("/api/multi-match-slaves/:host/:port/:belowHost/:belowPort", this.MultiMatchSlaves)
-	m.Get("/api/match-up-slaves/:host/:port", this.MatchUpSlaves)
-	m.Get("/api/regroup-slaves/:host/:port", this.RegroupSlaves)
-	m.Get("/api/regroup-slaves-pgtid/:host/:port", this.RegroupSlavesPseudoGTID)
-	m.Get("/api/regroup-slaves-gtid/:host/:port", this.RegroupSlavesGTID)
-	m.Get("/api/regroup-slaves-bls/:host/:port", this.RegroupSlavesBinlogServers)
-	m.Get("/api/make-master/:host/:port", this.MakeMaster)
-	m.Get("/api/make-local-master/:host/:port", this.MakeLocalMaster)
+
+	// Instance:
+	m.Get("/api/set-read-only/:host/:port", this.SetReadOnly)
+	m.Get("/api/set-writeable/:host/:port", this.SetWriteable)
+	m.Get("/api/kill-query/:host/:port/:process", this.KillQuery)
+
+	// Binary logs:
+	m.Get("/api/last-pseudo-gtid/:host/:port", this.LastPseudoGTID)
+
+	// Pools:
+	m.Get("/api/submit-pool-instances/:pool", this.SubmitPoolInstances)
+	m.Get("/api/cluster-pool-instances/:clusterName", this.ReadClusterPoolInstances)
+
+	// Information:
+	m.Get("/api/search/:searchString", this.Search)
+	m.Get("/api/search", this.Search)
+
 	// Cluster
 	m.Get("/api/cluster/:clusterName", this.Cluster)
 	m.Get("/api/cluster/alias/:clusterAlias", this.ClusterByAlias)
@@ -2117,32 +2128,19 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/set-cluster-alias/:clusterName", this.SetClusterAlias)
 	m.Get("/api/clusters", this.Clusters)
 	m.Get("/api/clusters-info", this.ClustersInfo)
-	// General
-	m.Get("/api/search/:searchString", this.Search)
-	m.Get("/api/search", this.Search)
-	m.Get("/api/problems", this.Problems)
-	m.Get("/api/problems/:clusterName", this.Problems)
-	m.Get("/api/long-queries", this.LongQueries)
-	m.Get("/api/long-queries/:filter", this.LongQueries)
-	m.Get("/api/audit", this.Audit)
-	m.Get("/api/audit/:page", this.Audit)
-	m.Get("/api/audit/instance/:host/:port", this.Audit)
-	m.Get("/api/audit/instance/:host/:port/:page", this.Audit)
-	// Meta
-	m.Get("/api/maintenance", this.Maintenance)
-	m.Get("/api/headers", this.Headers)
-	m.Get("/api/health", this.Health)
-	m.Get("/api/lb-check", this.LBCheck)
-	m.Get("/api/grab-election", this.GrabElection)
-	m.Get("/api/reelect", this.Reelect)
-	m.Get("/api/reload-configuration", this.ReloadConfiguration)
-	m.Get("/api/reload-cluster-alias", this.ReloadClusterAlias)
-	m.Get("/api/hostname-resolve-cache", this.HostnameResolveCache)
-	m.Get("/api/reset-hostname-resolve-cache", this.ResetHostnameResolveCache)
-	// Pool
-	m.Get("/api/submit-pool-instances/:pool", this.SubmitPoolInstances)
-	m.Get("/api/cluster-pool-instances/:clusterName", this.ReadClusterPoolInstances)
-	// Recovery
+
+	// Instance management:
+	m.Get("/api/instance/:host/:port", this.Instance)
+	m.Get("/api/discover/:host/:port", this.Discover)
+	m.Get("/api/refresh/:host/:port", this.Refresh)
+	m.Get("/api/forget/:host/:port", this.Forget)
+	m.Get("/api/begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance)
+	m.Get("/api/end-maintenance/:host/:port", this.EndMaintenanceByInstanceKey)
+	m.Get("/api/end-maintenance/:maintenanceKey", this.EndMaintenance)
+	m.Get("/api/begin-downtime/:host/:port/:owner/:reason", this.BeginDowntime)
+	m.Get("/api/end-downtime/:host/:port", this.EndDowntime)
+
+	// Recovery:
 	m.Get("/api/replication-analysis", this.ReplicationAnalysis)
 	m.Get("/api/recover/:host/:port", this.Recover)
 	m.Get("/api/recover/:host/:port/:candidateHost/:candidatePort", this.Recover)
@@ -2164,6 +2162,30 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/ack-recovery/:recoveryId", this.AcknowledgeRecovery)
 	m.Get("/api/blocked-recoveries", this.BlockedRecoveries)
 	m.Get("/api/blocked-recoveries/cluster/:clusterName", this.BlockedRecoveries)
+
+	// General
+	m.Get("/api/problems", this.Problems)
+	m.Get("/api/problems/:clusterName", this.Problems)
+	m.Get("/api/long-queries", this.LongQueries)
+	m.Get("/api/long-queries/:filter", this.LongQueries)
+	m.Get("/api/audit", this.Audit)
+	m.Get("/api/audit/:page", this.Audit)
+	m.Get("/api/audit/instance/:host/:port", this.Audit)
+	m.Get("/api/audit/instance/:host/:port/:page", this.Audit)
+	m.Get("/api/resolve/:host/:port", this.Resolve)
+
+	// Meta
+	m.Get("/api/maintenance", this.Maintenance)
+	m.Get("/api/headers", this.Headers)
+	m.Get("/api/health", this.Health)
+	m.Get("/api/lb-check", this.LBCheck)
+	m.Get("/api/grab-election", this.GrabElection)
+	m.Get("/api/reelect", this.Reelect)
+	m.Get("/api/reload-configuration", this.ReloadConfiguration)
+	m.Get("/api/reload-cluster-alias", this.ReloadClusterAlias)
+	m.Get("/api/hostname-resolve-cache", this.HostnameResolveCache)
+	m.Get("/api/reset-hostname-resolve-cache", this.ResetHostnameResolveCache)
+
 	// Agents
 	m.Get("/api/agents", this.Agents)
 	m.Get("/api/agent/:host", this.Agent)
@@ -2180,6 +2202,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/agent-seed-states/:seedId", this.AgentSeedStates)
 	m.Get("/api/agent-abort-seed/:seedId", this.AbortSeed)
 	m.Get("/api/seeds", this.Seeds)
+
 	// Configurable status check endpoint
 	m.Get(config.Config.StatusEndpoint, this.StatusCheck)
 }
