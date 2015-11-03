@@ -881,7 +881,9 @@ Full blown documentation:
 		os.Exit(1)
 	}
 
-	process.ContinuousRegistration(string(executionMode))
+	if *command != "help" {
+		process.ContinuousRegistration(string(executionMode))
+	}
 	switch executionMode {
 	case CliMode:
 		app.Cli(*command, *strict, *instance, *destination, *owner, *reason, *duration, *pattern, *clusterAlias, *pool, *hostnameFlag)

@@ -615,6 +615,37 @@ var generateSQLPatches = []string{
 		ALTER TABLE node_health
 			ADD COLUMN extra_info varchar(128) CHARACTER SET utf8 NOT NULL
 	`,
+	`
+		ALTER TABLE agent_seed
+			MODIFY end_timestamp timestamp NOT NULL DEFAULT '1971-01-01 00:00:00'
+	`,
+	`
+		ALTER TABLE active_node
+			MODIFY last_seen_active timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+	`,
+
+	`
+		ALTER TABLE node_health
+			MODIFY last_seen_active timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+	`,
+	`
+		ALTER TABLE candidate_database_instance
+			MODIFY last_suggested timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+	`,
+	`
+		ALTER TABLE master_position_equivalence
+			MODIFY last_suggested timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN last_attempted_check TIMESTAMP NOT NULL DEFAULT '1971-01-01 00:00:00' AFTER last_checked
+	`,
+	`
+		ALTER TABLE 
+			database_instance
+			MODIFY last_attempted_check TIMESTAMP NOT NULL DEFAULT '1971-01-01 00:00:00'
+	`,
 }
 
 // Track if a TLS has already been configured for topology
@@ -775,6 +806,27 @@ func SetupMySQLOrchestratorTLS(uri string) (string, error) {
 // deployIfNotAlreadyDeployed will issue given sql queries that are not already known to be deployed.
 // This iterates both lists (to-run and already-deployed) and also verifies no contraditions.
 func deployIfNotAlreadyDeployed(db *sql.DB, queries []string, deployedQueries []string, deploymentType string, fatalOnError bool) error {
+	tx, err := db.Begin()
+	if err != nil {
+		log.Fatale(err)
+	}
+	// Ugly workaround ahead.
+	// Origin of this workaround is the existence of some "timestamp NOT NULL," column definitions,
+	// where in NO_ZERO_IN_DATE,NO_ZERO_DATE sql_mode are invalid (since default is implicitly "0")
+	// This means installation of orchestrator fails on such configured servers, and in particular on 5.7
+	// where this setting is the dfault.
+	// For purpose of backwards compatability, what we do is force sql_mode to be more relaxed, create the schemas
+	// along with the "invalid" definition, and then go ahead and fix those definitions via following ALTER statements.
+	// My bad.
+	originalSqlMode := ""
+	err = tx.QueryRow(`select @@session.sql_mode`).Scan(&originalSqlMode)
+	if _, err := tx.Exec(`set @@session.sql_mode=REPLACE(@@session.sql_mode, 'NO_ZERO_DATE', '')`); err != nil {
+		log.Fatale(err)
+	}
+	if _, err := tx.Exec(`set @@session.sql_mode=REPLACE(@@session.sql_mode, 'NO_ZERO_IN_DATE', '')`); err != nil {
+		log.Fatale(err)
+	}
+
 	for i, query := range queries {
 		queryAlreadyExecuted := false
 		// While iterating 'queries', also iterate 'deployedQueries'. Expect identity
@@ -787,18 +839,28 @@ func deployIfNotAlreadyDeployed(db *sql.DB, queries []string, deployedQueries []
 		if queryAlreadyExecuted {
 			continue
 		}
+		if i == 0 {
+			log.Debugf("sql_mode is: %+v", originalSqlMode)
+		}
 		if config.Config.SmartOrchestratorDatabaseUpdate {
 			log.Debugf("initOrchestratorDB executing: %.80s", strings.TrimSpace(strings.Replace(query, "\n", "", -1)))
 		}
 
 		if fatalOnError {
-			if _, err := execInternal(db, query); err != nil {
+			if _, err := tx.Exec(query); err != nil {
 				return log.Fatalf("Cannot initiate orchestrator: %+v", err)
 			}
 		} else {
-			execInternalSilently(db, query)
+			tx.Exec(query)
+			// And ignore any error
 		}
 		writeInternalDeployment(db, deploymentType, query, i)
+	}
+	if _, err := tx.Exec(`set session sql_mode=?`, originalSqlMode); err != nil {
+		log.Fatale(err)
+	}
+	if err := tx.Commit(); err != nil {
+		log.Fatale(err)
 	}
 	return nil
 }
