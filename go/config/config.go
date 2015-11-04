@@ -169,7 +169,7 @@ func NewConfiguration() *Configuration {
 		MySQLConnectTimeoutSeconds:                 5,
 		DefaultInstancePort:                        3306,
 		SkipOrchestratorDatabaseUpdate:             false,
-		SmartOrchestratorDatabaseUpdate:            false,
+		SmartOrchestratorDatabaseUpdate:            true,
 		InstancePollSeconds:                        60,
 		ReadLongRunningQueries:                     true,
 		UnseenInstanceForgetHours:                  240,

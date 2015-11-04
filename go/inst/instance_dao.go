@@ -162,6 +162,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	resolvedHostname := ""
 	maxScaleMasterHostname := ""
 	isMaxScale := false
+	isMaxScale110 := false
 	slaveStatusFound := false
 	var resolveErr error
 
@@ -219,11 +220,23 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if isMaxScale && strings.Contains(instance.Version, "1.1.0") {
+		isMaxScale110 = true
+	}
+	if isMaxScale110 {
 		// Buggy buggy maxscale 1.1.0. Reported Master_Host can be corrupted.
 		// Therefore we (currently) take @@hostname (which is masquarading as master host anyhow)
 		err = db.QueryRow("select @@hostname").Scan(&maxScaleMasterHostname)
 		if err != nil {
 			goto Cleanup
+		}
+	}
+	if isMaxScale {
+		if isMaxScale110 {
+			// Only this is supported:
+			db.QueryRow("select @@server_id").Scan(&instance.ServerID)
+		} else {
+			db.QueryRow("select @@global.server_id").Scan(&instance.ServerID)
+			db.QueryRow("select @@global.server_uuid").Scan(&instance.ServerUUID)
 		}
 	}
 	if !isMaxScale {
@@ -299,7 +312,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 
 	err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
 		instance.Slave_IO_Running = (m.GetString("Slave_IO_Running") == "Yes")
-		if isMaxScale && strings.Contains(instance.Version, "1.1.0") {
+		if isMaxScale110 {
 			// Covering buggy MaxScale 1.1.0
 			instance.Slave_IO_Running = instance.Slave_IO_Running && (m.GetString("Slave_IO_State") == "Binlog Dump")
 		}
@@ -321,7 +334,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		instance.HasReplicationFilters = ((m.GetStringD("Replicate_Do_DB", "") != "") || (m.GetStringD("Replicate_Ignore_DB", "") != "") || (m.GetStringD("Replicate_Do_Table", "") != "") || (m.GetStringD("Replicate_Ignore_Table", "") != "") || (m.GetStringD("Replicate_Wild_Do_Table", "") != "") || (m.GetStringD("Replicate_Wild_Ignore_Table", "") != ""))
 
 		masterHostname := m.GetString("Master_Host")
-		if isMaxScale && strings.Contains(instance.Version, "1.1.0") {
+		if isMaxScale110 {
 			// Buggy buggy maxscale 1.1.0. Reported Master_Host can be corrupted.
 			// Therefore we (currently) take @@hostname (which is masquarading as master host anyhow)
 			masterHostname = maxScaleMasterHostname

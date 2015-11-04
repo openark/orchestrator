@@ -89,6 +89,8 @@ func handleDiscoveryRequests(pendingTokens chan bool, completedTokens chan bool)
 		// Just don't process the queue when not elected.
 		if isElectedNode {
 			accountedDiscoverInstance(instanceKey, pendingTokens, completedTokens)
+		} else {
+			log.Debugf("Node apparently demoted. Skipping discovery of %+v. Remaining queue size: %+v", instanceKey, len(discoveryInstanceKeys))
 		}
 	}
 }
@@ -138,7 +140,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
-	log.Debugf("Discovered host: %+v, master: %+v", instance.Key, instance.MasterKey)
+	log.Debugf("Discovered host: %+v, master: %+v, version: %+v", instance.Key, instance.MasterKey, instance.Version)
 
 	if !isElectedNode {
 		// Maybe this node was elected before, but isn't elected anymore.
