@@ -808,6 +808,7 @@ func main() {
 	debug := flag.Bool("debug", false, "debug mode (very verbose)")
 	stack := flag.Bool("stack", false, "add stack trace upon error")
 	config.RuntimeCLIFlags.Databaseless = flag.Bool("databaseless", false, "EXPERIMENTAL! Work without backend database")
+	config.RuntimeCLIFlags.SkipUnresolve = flag.Bool("skip-unresolve", false, "Do not unresolve a host name")
 	config.RuntimeCLIFlags.SkipUnresolveCheck = flag.Bool("skip-unresolve-check", false, "Skip/ignore checking an unresolve mapping (via hostname_unresolve table) resolves back to same hostname")
 	config.RuntimeCLIFlags.Noop = flag.Bool("noop", false, "Dry run; do not perform destructing operations")
 	config.RuntimeCLIFlags.BinlogFile = flag.String("binlog", "", "Binary log file name")

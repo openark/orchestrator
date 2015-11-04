@@ -170,6 +170,9 @@ func HostnameResolveCache() (map[string]*cache.Item, error) {
 }
 
 func UnresolveHostname(instanceKey *InstanceKey) (InstanceKey, bool, error) {
+	if *config.RuntimeCLIFlags.SkipUnresolve {
+		return *instanceKey, false, nil
+	}
 	unresolvedHostname, err := readUnresolvedHostname(instanceKey.Hostname)
 	if err != nil {
 		return *instanceKey, false, log.Errore(err)

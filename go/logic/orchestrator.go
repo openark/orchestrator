@@ -84,7 +84,12 @@ func acceptSignals() {
 // instance discovery per entry.
 func handleDiscoveryRequests(pendingTokens chan bool, completedTokens chan bool) {
 	for instanceKey := range discoveryInstanceKeys {
-		accountedDiscoverInstance(instanceKey, pendingTokens, completedTokens)
+		// Possibly this used to be the elected node, but has been demoted, while still
+		// the queue is full.
+		// Just don't process the queue when not elected.
+		if isElectedNode {
+			accountedDiscoverInstance(instanceKey, pendingTokens, completedTokens)
+		}
 	}
 }
 

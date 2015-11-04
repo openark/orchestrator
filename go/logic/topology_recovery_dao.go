@@ -110,6 +110,12 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, failIf
 			return nil, log.Errorf("AttemptRecoveryRegistration: cluster %+v has recently experienced a failover (of %+v) and is in active period. It will not be failed over again. You may acknowledge the failure on this cluster (-c ack-cluster-recoveries) or on %+v (-c ack-instance-recoveries) to remove this blockage", analysisEntry.ClusterDetails.ClusterName, recoveries[0].AnalysisEntry.AnalyzedInstanceKey, recoveries[0].AnalysisEntry.AnalyzedInstanceKey)
 		}
 	}
+	if !failIfFailedInstanceInActiveRecovery {
+		// Implicitly acknowledge this instance's possibly existing active recovery, provided they are completed.
+		AcknowledgeInstanceCompletedRecoveries(&analysisEntry.AnalyzedInstanceKey, "orchestrator", fmt.Sprintf("implicit acknowledge due to user invocation of recovery on same instance: %+v", analysisEntry.AnalyzedInstanceKey))
+		// The fact we only acknowledge a completed recovery solves the possible case of two DBAs simultaneously
+		// trying to recover the same instance at the same time
+	}
 
 	sqlResult, err := db.ExecOrchestrator(`
 			insert ignore 
@@ -153,7 +159,7 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, failIf
 	if rows == 0 {
 		return nil, nil
 	}
-	// Suucess
+	// Success
 	topologyRecovery := NewTopologyRecovery(*analysisEntry)
 	topologyRecovery.Id, _ = sqlResult.LastInsertId()
 	return topologyRecovery, nil
@@ -234,13 +240,13 @@ func ExpireBlockedRecoveries() error {
 	}
 	// Some oversampling, if a problem has not been noticed for some time (e.g. the server came up alive
 	// before action was taken), expire it.
-	// Recall that RegisterBlockedRecoveries continuously updated the last_blocked_timestamp column.
+	// Recall that RegisterBlockedRecoveries continuously updates the last_blocked_timestamp column.
 	_, err = db.ExecOrchestrator(`
 			delete 
 				from blocked_topology_recovery 
 				where 
 					last_blocked_timestamp < NOW() - interval ? second
-			`, (config.Config.RecoveryPollSeconds * 5),
+			`, (config.Config.RecoveryPollSeconds * 2),
 	)
 	if err != nil {
 		return log.Errore(err)
@@ -304,10 +310,22 @@ func AcknowledgeInstanceRecoveries(instanceKey *inst.InstanceKey, owner string, 
 	return acknowledgeRecoveries(owner, comment, false, whereClause)
 }
 
+// AcknowledgeInstanceCompletedRecoveries marks active and COMPLETED recoveries for given instane as acknowledged.
+// This also implied clearing their active period, which in turn enables further recoveries on those topologies
+func AcknowledgeInstanceCompletedRecoveries(instanceKey *inst.InstanceKey, owner string, comment string) (countAcknowledgedEntries int64, err error) {
+	whereClause := fmt.Sprintf(`
+			hostname = '%s'
+			and port = %d
+			and end_recovery is not null
+		`, instanceKey.Hostname, instanceKey.Port)
+	return acknowledgeRecoveries(owner, comment, false, whereClause)
+}
+
 // AcknowledgeCrashedRecoveries marks recoveries whose processing nodes has crashed as acknowledged.
 func AcknowledgeCrashedRecoveries() (countAcknowledgedEntries int64, err error) {
 	whereClause := `
 			in_active_period = 1
+			and end_recovery is null
 			and (processing_node_hostname, processcing_node_token) not in (
 				select hostname, token from node_health
 			)
