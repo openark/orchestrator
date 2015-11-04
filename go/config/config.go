@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"os"
 
-	"code.google.com/p/gcfg"
+	"gopkg.in/gcfg.v1"
 
 	"github.com/outbrain/golib/log"
 )
