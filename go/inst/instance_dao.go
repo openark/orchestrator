@@ -78,14 +78,14 @@ func init() {
 // on topology servers. It is safe in the sense that we will not leak tokens.
 func ExecuteOnTopology(f func()) {
 	topologyConcurrencyChan <- true
-	defer func() { <-topologyConcurrencyChan }()
+	defer func() { recover(); <-topologyConcurrencyChan }()
 	f()
 }
 
 // ExecDBWriteFunc chooses how to execute a write onto the database: whether synchronuously or not
 func ExecDBWriteFunc(f func() error) error {
 	instanceWriteChan <- true
-	defer func() { <-instanceWriteChan }()
+	defer func() { recover(); <-instanceWriteChan }()
 	res := f()
 	return res
 }

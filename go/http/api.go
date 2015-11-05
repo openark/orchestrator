@@ -1807,6 +1807,7 @@ func (this *HttpAPI) ReloadConfiguration(params martini.Params, r render.Render,
 		return
 	}
 	config.Reload()
+	inst.AuditOperation("reload-configuration", nil, "Triggered via API")
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Config reloaded")})
 

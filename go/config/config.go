@@ -128,6 +128,7 @@ type Configuration struct {
 	BinlogEventsChunkSize                      int               // Chunk size (X) for SHOW BINLOG|RELAYLOG EVENTS LIMIT ?,X statements. Smaller means less locking and mroe work to be done
 	BufferBinlogEvents                         bool              // Should we used buffered read on SHOW BINLOG|RELAYLOG EVENTS -- releases the database lock sooner (recommended)
 	SkipBinlogEventsContaining                 []string          // When scanning/comparing binlogs for Pseudo-GTID, skip entries containing given texts. These are NOT regular expressions (would consume too much CPU while scanning binlogs), just substrings to find.
+	ReduceReplicationAnalysisCount             bool              // When true, replication analysis will only report instances where possibility of handled problems is possible in the first place (e.g. will not report most leaf nodes, that are mostly uninteresting). When false, provides an entry for every known instance
 	FailureDetectionPeriodBlockMinutes         int               // The time for which an instance's failure discovery is kept "active", so as to avoid concurrent "discoveries" of the instance's failure; this preceeds any recovery process, if any.
 	RecoveryPollSeconds                        int               // Interval between checks for a recovery scenario and initiation of a recovery process
 	RecoveryPeriodBlockMinutes                 int               // The time for which an instance's recovery is kept "active", so as to avoid concurrent recoveries on smae instance as well as flapping
@@ -170,7 +171,7 @@ func NewConfiguration() *Configuration {
 		MySQLConnectTimeoutSeconds:                 5,
 		DefaultInstancePort:                        3306,
 		SkipOrchestratorDatabaseUpdate:             false,
-		SmartOrchestratorDatabaseUpdate:            true,
+		SmartOrchestratorDatabaseUpdate:            false,
 		InstancePollSeconds:                        60,
 		ReadLongRunningQueries:                     true,
 		UnseenInstanceForgetHours:                  240,
@@ -237,6 +238,7 @@ func NewConfiguration() *Configuration {
 		BinlogEventsChunkSize:                      10000,
 		BufferBinlogEvents:                         true,
 		SkipBinlogEventsContaining:                 []string{},
+		ReduceReplicationAnalysisCount:             true,
 		FailureDetectionPeriodBlockMinutes:         60,
 		RecoveryPollSeconds:                        10,
 		RecoveryPeriodBlockMinutes:                 60,

@@ -36,6 +36,8 @@ import (
 
 // Http starts serving
 func Http(discovery bool) {
+	process.ContinuousRegistration(process.OrchestratorExecutionHttpMode)
+
 	martini.Env = martini.Prod
 	if config.Config.ServeAgentsHttp {
 		go agentsHttp()

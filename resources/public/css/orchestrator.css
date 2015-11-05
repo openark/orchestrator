@@ -372,6 +372,20 @@ body {
     cursor: pointer;
 }
 
+#audit table .more-detection-info {
+    cursor: pointer;
+}
+
+#audit table .popover-title ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+#audit table .popover-title ul li code {
+    padding-left: 0;
+    font-weight: bold;
+}
+
 #audit table .popover {
     max-width: 1024px;
 }

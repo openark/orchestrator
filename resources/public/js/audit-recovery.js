@@ -16,8 +16,8 @@ $(document).ready(function () {
 
     	hideLoader();
         auditEntries.forEach(function (audit) {
-        	var analyzedInstanceDisplay = audit.AnalysisEntry.AnalyzedInstanceKey.Hostname+":"+audit.AnalysisEntry.AnalyzedInstanceKey.Port;
-        	var sucessorInstanceDisplay = audit.SuccessorKey.Hostname+":"+audit.SuccessorKey.Port;
+        	var analyzedInstanceDisplay = getInstanceTitle(audit.AnalysisEntry.AnalyzedInstanceKey.Hostname, audit.AnalysisEntry.AnalyzedInstanceKey.Port);
+        	var sucessorInstanceDisplay = getInstanceTitle(audit.SuccessorKey.Hostname, audit.SuccessorKey.Port);
     		var row = $('<tr/>');
     		var ack = $('<span class="pull-left glyphicon acknowledge-indicator" title=""></span>');
     		if (audit.Acknowledged) {

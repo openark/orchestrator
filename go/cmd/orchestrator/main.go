@@ -24,7 +24,6 @@ import (
 	"github.com/outbrain/orchestrator/go/app"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/inst"
-	"github.com/outbrain/orchestrator/go/process"
 	"os"
 	"runtime"
 )
@@ -824,7 +823,6 @@ func main() {
 	if *stack {
 		log.SetPrintStackTrace(*stack)
 	}
-
 	log.Info("starting")
 
 	runtime.GOMAXPROCS(math.MinInt(4, runtime.NumCPU()))
@@ -858,12 +856,11 @@ func main() {
 		return
 	}
 
-	var executionMode process.OrchestratorExecutionMode
 	switch {
 	case len(flag.Args()) == 0 || flag.Arg(0) == "cli":
-		executionMode = process.OrchestratorExecutionCliMode
+		app.Cli(*command, *strict, *instance, *destination, *owner, *reason, *duration, *pattern, *clusterAlias, *pool, *hostnameFlag)
 	case flag.Arg(0) == "http":
-		executionMode = process.OrchestratorExecutionHttpMode
+		app.Http(*discovery)
 	default:
 		fmt.Fprintln(os.Stderr, `Usage: 
   orchestrator --options... [cli|http]
@@ -873,15 +870,5 @@ Full blown documentation:
   orchestrator
 `)
 		os.Exit(1)
-	}
-
-	if *command != "help" {
-		process.ContinuousRegistration(string(executionMode))
-	}
-	switch executionMode {
-	case process.OrchestratorExecutionCliMode:
-		app.Cli(*command, *strict, *instance, *destination, *owner, *reason, *duration, *pattern, *clusterAlias, *pool, *hostnameFlag)
-	case process.OrchestratorExecutionHttpMode:
-		app.Http(*discovery)
 	}
 }

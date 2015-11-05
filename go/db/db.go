@@ -404,6 +404,27 @@ var generateSQLBase = []string{
 		  KEY cluster_blocked_idx (cluster_name, last_blocked_timestamp)
 		) ENGINE=InnoDB CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS database_instance_last_analysis (
+		  hostname varchar(128) NOT NULL,
+		  port smallint(5) unsigned NOT NULL,
+		  analysis_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  analysis varchar(128) NOT NULL,
+		  PRIMARY KEY (hostname, port),
+		  KEY analysis_timestamp_idx(analysis_timestamp)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS database_instance_analysis_changelog (
+          changelog_id bigint unsigned not null auto_increment,
+		  hostname varchar(128) NOT NULL,
+		  port smallint(5) unsigned NOT NULL,
+		  analysis_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  analysis varchar(128) NOT NULL,
+		  PRIMARY KEY (changelog_id),
+		  KEY analysis_timestamp_idx(analysis_timestamp)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{
@@ -645,6 +666,11 @@ var generateSQLPatches = []string{
 		ALTER TABLE 
 			database_instance
 			MODIFY last_attempted_check TIMESTAMP NOT NULL DEFAULT '1971-01-01 00:00:00'
+	`,
+	`
+		ALTER TABLE 
+			database_instance_analysis_changelog
+			ADD KEY instance_timestamp_idx (hostname, port, analysis_timestamp)
 	`,
 }
 

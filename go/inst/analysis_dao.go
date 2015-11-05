@@ -30,6 +30,17 @@ import (
 func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
+	analysisQueryReductionClause := ``
+	if config.Config.ReduceReplicationAnalysisCount {
+		analysisQueryReductionClause = `
+			HAVING 
+				is_last_check_valid = 0
+				OR count_slaves_failing_to_connect_to_master > 0
+				OR count_valid_slaves < count_slaves
+				OR count_valid_replicating_slaves < count_slaves
+				OR is_failing_to_connect_to_master
+	`
+	}
 	query := fmt.Sprintf(`
 		    SELECT
 		        master_instance.hostname,
@@ -118,17 +129,12 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		    GROUP BY
 			    master_instance.hostname,
 			    master_instance.port
-			HAVING 
-				is_last_check_valid = 0
-				OR count_slaves_failing_to_connect_to_master > 0
-				OR count_valid_slaves < count_slaves
-				OR count_valid_replicating_slaves < count_slaves
-				OR is_failing_to_connect_to_master
+			%s
 		    ORDER BY
 			    is_master DESC ,
 			    is_cluster_master DESC,
 			    count_slaves DESC
-	`, config.Config.InstancePollSeconds)
+	`, config.Config.InstancePollSeconds, analysisQueryReductionClause)
 
 	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		a := ReplicationAnalysis{Analysis: NoProblem}
@@ -275,6 +281,10 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 				result = append(result, a)
 			}
 		}
+		if a.CountSlaves > 0 {
+			// Interesting enough for analysis
+			AuditInstanceAnalysisInChangelog(&a.AnalyzedInstanceKey, a.Analysis)
+		}
 		return nil
 	})
 
@@ -282,5 +292,57 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		log.Errore(err)
 	}
 	return result, err
+}
 
+// AuditInstanceAnalysisInChangelog will write down an instance's analysis in the database_instance_analysis_changelog table.
+// To not repeat recurring analysis code, the database_instance_last_analysis table is used, so that only changes to
+// analysis codes are written.
+func AuditInstanceAnalysisInChangelog(instanceKey *InstanceKey, analysisCode AnalysisCode) error {
+	sqlResult, err := db.ExecOrchestrator(`
+			insert ignore into database_instance_last_analysis (
+					hostname, port, analysis_timestamp, analysis
+				) values (
+					?, ?, now(), ?
+				) on duplicate key update
+					analysis = values(analysis),
+					analysis_timestamp = if(analysis = values(analysis), analysis_timestamp, values(analysis_timestamp))					
+			`,
+		instanceKey.Hostname, instanceKey.Port, string(analysisCode),
+	)
+	if err != nil {
+		return log.Errore(err)
+	}
+	rows, err := sqlResult.RowsAffected()
+	if err != nil {
+		return log.Errore(err)
+	}
+	lastAnalysisChanged := (rows > 0)
+
+	if !lastAnalysisChanged {
+		return nil
+	}
+
+	_, err = db.ExecOrchestrator(`
+			insert into database_instance_analysis_changelog (
+					hostname, port, analysis_timestamp, analysis
+				) values (
+					?, ?, now(), ?
+				) 					
+			`,
+		instanceKey.Hostname, instanceKey.Port, string(analysisCode),
+	)
+	return log.Errore(err)
+}
+
+// ExpireInstanceAnalysisChangelog removes old-enough analysis entries from the changelog
+func ExpireInstanceAnalysisChangelog() error {
+	_, err := db.ExecOrchestrator(`
+			delete 
+				from database_instance_analysis_changelog 
+			where
+				analysis_timestamp < now() - interval ? hour
+			`,
+		config.Config.UnseenInstanceForgetHours,
+	)
+	return log.Errore(err)
 }

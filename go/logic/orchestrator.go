@@ -75,6 +75,7 @@ func acceptSignals() {
 			case syscall.SIGHUP:
 				log.Debugf("Received SIGHUP. Reloading configuration")
 				config.Reload()
+				inst.AuditOperation("reload-configuration", nil, "Triggered via SIGHUP")
 			}
 		}
 	}()
@@ -258,6 +259,7 @@ func ContinuousDiscovery() {
 					go ClearActiveRecoveries()
 					go ExpireBlockedRecoveries()
 					go AcknowledgeCrashedRecoveries()
+					go inst.ExpireInstanceAnalysisChangelog()
 					go CheckAndRecover(nil, nil, false)
 				}
 			}()
