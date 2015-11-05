@@ -338,6 +338,13 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 		topologyRecovery.AddPostponedFunction(postponedFunction)
 	}
 
+	if promotedSlave != nil && config.Config.ApplyMySQLPromotionAfterMasterFailover {
+		log.Debugf("topology_recovery: - RecoverDeadMaster: will apply MySQL changes to promoted master")
+		inst.StopSlave(&promotedSlave.Key)
+		inst.DetachSlave(&promotedSlave.Key)
+		inst.SetReadOnly(&promotedSlave.Key, false)
+	}
+
 	if promotedSlave == nil {
 		inst.AuditOperation("recover-dead-master", failedInstanceKey, "Failure: no slave promoted.")
 	} else {

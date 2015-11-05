@@ -141,6 +141,7 @@ type Configuration struct {
 	PostMasterFailoverProcesses                []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
 	PostIntermediateMasterFailoverProcesses    []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
 	DetachLostSlavesAfterMasterFailover        bool              // Should slaves that are not to be lost in master recovery (i.e. were more up-to-date than promoted slave) be forcibly detached
+	ApplyMySQLPromotionAfterMasterFailover     bool              // Should orchestrator take upon itself to apply MySQL master promotion: set read_only=0, detach replication, etc.
 	MasterFailoverLostInstancesDowntimeMinutes uint              // Number of minutes to downtime any server that was lost after a master failover (including failed master & lost slaves). 0 to disable
 	PostponeSlaveRecoveryOnLagMinutes          uint              // On crash recovery, slaves that are lagging more than given minutes are only resurrected late in the recovery process, after master/IM has been elected and processes executed. Value of 0 disables this feature
 	OSCIgnoreHostnameFilters                   []string          // OSC slaves recommendation will ignore slave hostnames matching given patterns
@@ -249,6 +250,7 @@ func NewConfiguration() *Configuration {
 		PostFailoverProcesses:                      []string{},
 		PostUnsuccessfulFailoverProcesses:          []string{},
 		DetachLostSlavesAfterMasterFailover:        true,
+		ApplyMySQLPromotionAfterMasterFailover:     false,
 		MasterFailoverLostInstancesDowntimeMinutes: 0,
 		PostponeSlaveRecoveryOnLagMinutes:          0,
 		OSCIgnoreHostnameFilters:                   []string{},

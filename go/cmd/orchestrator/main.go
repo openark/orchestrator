@@ -29,13 +29,6 @@ import (
 	"runtime"
 )
 
-type OrchestratorExecutionMode string
-
-const (
-	CliMode  OrchestratorExecutionMode = "CLIMode"
-	HttpMode                           = "HttpMode"
-)
-
 const prompt string = `
 orchestrator [-c command] [-i instance] [-d destination] [--verbose|--debug] [... cli ] | http
 
@@ -865,12 +858,12 @@ func main() {
 		return
 	}
 
-	var executionMode OrchestratorExecutionMode
+	var executionMode process.OrchestratorExecutionMode
 	switch {
 	case len(flag.Args()) == 0 || flag.Arg(0) == "cli":
-		executionMode = CliMode
+		executionMode = process.OrchestratorExecutionCliMode
 	case flag.Arg(0) == "http":
-		executionMode = HttpMode
+		executionMode = process.OrchestratorExecutionHttpMode
 	default:
 		fmt.Fprintln(os.Stderr, `Usage: 
   orchestrator --options... [cli|http]
@@ -886,9 +879,9 @@ Full blown documentation:
 		process.ContinuousRegistration(string(executionMode))
 	}
 	switch executionMode {
-	case CliMode:
+	case process.OrchestratorExecutionCliMode:
 		app.Cli(*command, *strict, *instance, *destination, *owner, *reason, *duration, *pattern, *clusterAlias, *pool, *hostnameFlag)
-	case HttpMode:
+	case process.OrchestratorExecutionHttpMode:
 		app.Http(*discovery)
 	}
 }

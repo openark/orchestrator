@@ -37,6 +37,13 @@ type HealthStatus struct {
 	AvailableNodes []string
 }
 
+type OrchestratorExecutionMode string
+
+const (
+	OrchestratorExecutionCliMode  OrchestratorExecutionMode = "CLIMode"
+	OrchestratorExecutionHttpMode                           = "HttpMode"
+)
+
 // RegisterNode writes down this node in the node_health table
 func RegisterNode(extraInfo string) (sql.Result, error) {
 	return db.ExecOrchestrator(`
@@ -76,7 +83,7 @@ func HealthTest() (*HealthStatus, error) {
 	health.ActiveNode = fmt.Sprintf("%s;%s", activeHostname, activeToken)
 	health.IsActiveNode = isActive
 
-	health.AvailableNodes, err = readAvailableNodes()
+	health.AvailableNodes, err = readAvailableNodes(true)
 
 	return &health, nil
 }
@@ -109,8 +116,12 @@ func expireAvailableNodes() error {
 	return log.Errore(err)
 }
 
-func readAvailableNodes() ([]string, error) {
+func readAvailableNodes(onlyHttpNodes bool) ([]string, error) {
 	res := []string{}
+	extraConditions := ``
+	if onlyHttpNodes {
+		extraConditions = fmt.Sprintf(`%s and extra_info = '%s'`, extraConditions, string(OrchestratorExecutionHttpMode))
+	}
 	query := fmt.Sprintf(`
 		select 
 			concat(hostname, ';', token) as node
@@ -118,9 +129,10 @@ func readAvailableNodes() ([]string, error) {
 			node_health
 		where
 			last_seen_active > now() - interval %d second
+			%s
 		order by
 			hostname
-		`, registrationPollSeconds*2)
+		`, registrationPollSeconds*2, extraConditions)
 
 	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		res = append(res, m.GetString("node"))
