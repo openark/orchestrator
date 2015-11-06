@@ -2,9 +2,16 @@
 $(document).ready(function () {
     showLoader();
     $.get("/api/audit-failure-detection/"+currentPage(), function (auditEntries) {
-            displayAudit(auditEntries);
-    	}, "json");
-    function displayAudit(auditEntries) {
+        $.get("/api/replication-analysis-changelog", function (analysisChangelog) {
+        	displayAudit(auditEntries, analysisChangelog);
+        }, "json");
+    }, "json");
+    function displayAudit(auditEntries, analysisChangelog) {
+    	var changelogMap = {}
+    	analysisChangelog.forEach(function (changelogEntry) {
+    		changelogMap[getInstanceId(changelogEntry.AnalyzedInstanceKey.Hostname, changelogEntry.AnalyzedInstanceKey.Port)] = changelogEntry.Changelog;
+    	});
+    	
         hideLoader();
         auditEntries.forEach(function (audit) {
         	var analyzedInstanceDisplay = audit.AnalysisEntry.AnalyzedInstanceKey.Hostname+":"+audit.AnalysisEntry.AnalyzedInstanceKey.Port;
@@ -17,10 +24,19 @@ $(document).ready(function () {
     		$('<td/>', { text: audit.RecoveryStartTimestamp }).appendTo(row);
 
     		var moreInfo = "";
+    		moreInfo += '<div>Detected: '+audit.RecoveryStartTimestamp+'</div>';
     		if (audit.AnalysisEntry.SlaveHosts.length > 0) {
     			moreInfo += '<div>'+audit.AnalysisEntry.CountSlaves+' slave hosts :<ul>';
         		audit.AnalysisEntry.SlaveHosts.forEach(function(instanceKey) {
         			moreInfo += "<li><code>"+getInstanceTitle(instanceKey.Hostname, instanceKey.Port)+"</code></li>";    			
+        		});
+        		moreInfo += "</ul></div>";
+    		}
+    		var changelog = changelogMap[getInstanceId(audit.AnalysisEntry.AnalyzedInstanceKey.Hostname, audit.AnalysisEntry.AnalyzedInstanceKey.Port)];
+    		if (changelog) {
+    			moreInfo += '<div>Changelog :<ul>';
+    			changelog.split(",").reverse().forEach(function(changelogEntry) {
+        			moreInfo += "<li><code>"+changelogEntry.replace(/;/g, ' ').replace(/([^ ]+)$/g, '<strong>$1</strong>')+"</code></li>";    			
         		});
         		moreInfo += "</ul></div>";
     		}

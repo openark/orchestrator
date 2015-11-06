@@ -72,6 +72,11 @@ type ReplicationAnalysis struct {
 	BinlogServerImmediateTopology       bool
 }
 
+type ReplicationAnalysisChangelog struct {
+	AnalyzedInstanceKey InstanceKey
+	Changelog           string
+}
+
 // ReadSlaveHostsFromString parses and reads slave keys from comma delimited string
 func (this *ReplicationAnalysis) ReadSlaveHostsFromString(slaveHostsString string) error {
 	this.SlaveHosts = *NewInstanceKeyMap()

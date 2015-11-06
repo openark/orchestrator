@@ -349,3 +349,33 @@ func ExpireInstanceAnalysisChangelog() error {
 	)
 	return log.Errore(err)
 }
+
+// readRecoveries reads recovery entry/audit entires from topology_recovery
+func ReadReplicationAnalysisChangelog() ([]ReplicationAnalysisChangelog, error) {
+	res := []ReplicationAnalysisChangelog{}
+	query := `
+		select 
+            hostname,
+            port,
+			group_concat(analysis_timestamp,';',analysis order by changelog_id) as changelog
+		from 
+			database_instance_analysis_changelog
+		group by
+			hostname, port
+		`
+	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+		analysisChangelog := ReplicationAnalysisChangelog{}
+
+		analysisChangelog.AnalyzedInstanceKey.Hostname = m.GetString("hostname")
+		analysisChangelog.AnalyzedInstanceKey.Port = m.GetInt("port")
+		analysisChangelog.Changelog = m.GetString("changelog")
+
+		res = append(res, analysisChangelog)
+		return nil
+	})
+
+	if err != nil {
+		log.Errore(err)
+	}
+	return res, err
+}

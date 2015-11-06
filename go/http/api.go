@@ -1885,6 +1885,18 @@ func (this *HttpAPI) AuditFailureDetection(params martini.Params, r render.Rende
 	r.JSON(200, audits)
 }
 
+// ReadReplicationAnalysisChangelog lists instances and their analysis changelog
+func (this *HttpAPI) ReadReplicationAnalysisChangelog(params martini.Params, r render.Render, req *http.Request) {
+	changelogs, err := inst.ReadReplicationAnalysisChangelog()
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, changelogs)
+}
+
 // AuditRecovery provides list of topology-recovery entries
 func (this *HttpAPI) AuditRecovery(params martini.Params, r render.Render, req *http.Request) {
 	page, err := strconv.Atoi(params["page"])
@@ -2150,6 +2162,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/automated-recovery-filters", this.AutomatedRecoveryFilters)
 	m.Get("/api/audit-failure-detection", this.AuditFailureDetection)
 	m.Get("/api/audit-failure-detection/:page", this.AuditFailureDetection)
+	m.Get("/api/replication-analysis-changelog", this.ReadReplicationAnalysisChangelog)
 	m.Get("/api/audit-recovery", this.AuditRecovery)
 	m.Get("/api/audit-recovery/:page", this.AuditRecovery)
 	m.Get("/api/audit-recovery/cluster/:clusterName", this.AuditRecovery)
