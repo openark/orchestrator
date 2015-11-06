@@ -39,8 +39,11 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 				OR count_valid_slaves < count_slaves
 				OR count_valid_replicating_slaves < count_slaves
 				OR is_failing_to_connect_to_master
+				OR count_slaves > 0
 	`
 	}
+	// "OR count_slaves > 0" above is a recent addition, which, granted, makes some previous conditions redundant.
+	// It gives more output, and more "NoProblem" messages that I am now interested in for purpose of auditing in database_instance_analysis_changelog
 	query := fmt.Sprintf(`
 		    SELECT
 		        master_instance.hostname,

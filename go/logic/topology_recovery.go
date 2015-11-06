@@ -475,7 +475,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 
 		if config.Config.ApplyMySQLPromotionAfterMasterFailover {
 			log.Debugf("topology_recovery: - RecoverDeadMaster: will apply MySQL changes to promoted master")
-			inst.DetachSlaveOperation(&promotedSlave.Key)
+			inst.ResetSlaveOperation(&promotedSlave.Key)
 			inst.SetReadOnly(&promotedSlave.Key, false)
 		}
 		if !skipProcesses {
