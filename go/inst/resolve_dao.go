@@ -17,7 +17,6 @@
 package inst
 
 import (
-	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
@@ -81,16 +80,16 @@ func WriteResolvedHostname(hostname string, resolvedHostname string) error {
 func ReadResolvedHostname(hostname string) (string, error) {
 	var resolvedHostname string = ""
 
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			resolved_hostname
 		from 
 			hostname_resolve
 		where
-			hostname = '%s'
-		`, hostname)
+			hostname = ?
+		`
 
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestrator(query, sqlutils.Args(hostname), func(m sqlutils.RowMap) error {
 		resolvedHostname = m.GetString("resolved_hostname")
 		return nil
 	})
@@ -104,13 +103,13 @@ func ReadResolvedHostname(hostname string) (string, error) {
 
 func readAllHostnameResolves() ([]HostnameResolve, error) {
 	res := []HostnameResolve{}
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			hostname, 
 			resolved_hostname  
 		from 
 			hostname_resolve
-		`)
+		`
 	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		hostnameResolve := HostnameResolve{hostname: m.GetString("hostname"), resolvedHostname: m.GetString("resolved_hostname")}
 
@@ -130,16 +129,16 @@ func readAllHostnameResolves() ([]HostnameResolve, error) {
 func readUnresolvedHostname(hostname string) (string, error) {
 	unresolvedHostname := hostname
 
-	query := fmt.Sprintf(`
+	query := `
 	   		select
 	   			unresolved_hostname
 	   		from
 	   			hostname_unresolve
 	   		where
-	   			hostname = '%s'
-	   		`, hostname)
+	   			hostname = ?
+	   		`
 
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestrator(query, sqlutils.Args(hostname), func(m sqlutils.RowMap) error {
 		unresolvedHostname = m.GetString("unresolved_hostname")
 		return nil
 	})

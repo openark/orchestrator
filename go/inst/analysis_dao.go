@@ -54,7 +54,7 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
 		        MIN(
 		        		master_instance.last_checked <= master_instance.last_seen
-		        		AND master_instance.last_attempted_check <= master_instance.last_seen + INTERVAL (2 * %d) SECOND
+		        		AND master_instance.last_attempted_check <= master_instance.last_seen + INTERVAL (2 * ?) SECOND
 		        	) IS TRUE AS is_last_check_valid,
 		        MIN(master_instance.master_host IN ('' , '_')
 		            OR master_instance.master_port = 0) AS is_master,
@@ -103,12 +103,24 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		    	SUM(
 		    		slave_instance.oracle_gtid
 		    	) AS count_oracle_gtid_slaves,
+		        IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
+		                    AND slave_instance.oracle_gtid != 0),
+		                0) AS count_valid_oracle_gtid_slaves,
 		    	SUM(
 		    		slave_instance.binlog_server
 		    	) AS count_binlog_server_slaves,
+		        IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
+		                    AND slave_instance.binlog_server != 0),
+		                0) AS count_valid_binlog_server_slaves,
 		    	MIN(
 		    		master_instance.mariadb_gtid
-		    	) AS is_mariadb_gtid
+		    	) AS is_mariadb_gtid,
+		    	SUM(
+		    		slave_instance.mariadb_gtid
+		    	) AS count_mariadb_gtid_slaves,
+		        IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
+		                    AND slave_instance.mariadb_gtid != 0),
+		                0) AS count_valid_mariadb_gtid_slaves
 		    FROM
 		        database_instance master_instance
 		            LEFT JOIN
@@ -137,9 +149,9 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 			    is_master DESC ,
 			    is_cluster_master DESC,
 			    count_slaves DESC
-	`, config.Config.InstancePollSeconds, analysisQueryReductionClause)
-
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+	`, analysisQueryReductionClause)
+	args := sqlutils.Args(config.Config.InstancePollSeconds)
+	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		a := ReplicationAnalysis{Analysis: NoProblem}
 
 		a.IsMaster = m.GetBool("is_master")
@@ -164,12 +176,13 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		a.SlaveHosts = *NewInstanceKeyMap()
 		a.SlaveHosts.ReadCommaDelimitedList(m.GetString("slave_hosts"))
 
-		countOracleGTIDSlaves := m.GetUint("count_oracle_gtid_slaves")
-		a.OracleGTIDImmediateTopology = m.GetBool("supports_oracle_gtid") && countOracleGTIDSlaves == a.CountValidSlaves && a.CountValidSlaves > 0
+		countValidOracleGTIDSlaves := m.GetUint("count_valid_oracle_gtid_slaves")
+		a.OracleGTIDImmediateTopology = countValidOracleGTIDSlaves == a.CountValidSlaves && a.CountValidSlaves > 0
+		countValidMariaDBGTIDSlaves := m.GetUint("count_valid_mariadb_gtid_slaves")
+		a.MariaDBGTIDImmediateTopology = countValidMariaDBGTIDSlaves == a.CountValidSlaves && a.CountValidSlaves > 0
+		countValidBinlogServerSlaves := m.GetUint("count_valid_binlog_server_slaves")
+		a.BinlogServerImmediateTopology = countValidBinlogServerSlaves == a.CountValidSlaves && a.CountValidSlaves > 0
 		a.PseudoGTIDImmediateTopology = m.GetBool("is_pseudo_gtid")
-		a.MariaDBGTIDImmediateTopology = m.GetBool("is_mariadb_gtid")
-		countBinlogServerSlaves := m.GetUint("count_binlog_server_slaves")
-		a.BinlogServerImmediateTopology = countBinlogServerSlaves == a.CountValidSlaves && a.CountValidSlaves > 0
 
 		if a.IsMaster && !a.LastCheckValid && a.CountSlaves == 0 {
 			a.Analysis = DeadMasterWithoutSlaves

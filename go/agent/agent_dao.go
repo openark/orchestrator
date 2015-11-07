@@ -142,16 +142,15 @@ func ForgetLongUnseenAgents() error {
 // ReadOutdatedAgentsHosts returns agents that need to be updated
 func ReadOutdatedAgentsHosts() ([]string, error) {
 	res := []string{}
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			hostname 
 		from 
 			host_agent 
 		where
-			IFNULL(last_checked < now() - interval %d minute, true)
-			`,
-		config.Config.AgentPollMinutes)
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+			IFNULL(last_checked < now() - interval ? minute, true)
+			`
+	err := db.QueryOrchestrator(query, sqlutils.Args(config.Config.AgentPollMinutes), func(m sqlutils.RowMap) error {
 		hostname := m.GetString("hostname")
 		res = append(res, hostname)
 		return nil
@@ -201,7 +200,7 @@ func ReadAgents() ([]Agent, error) {
 func readAgentBasicInfo(hostname string) (Agent, string, error) {
 	agent := Agent{}
 	token := ""
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			hostname,
 			port,
@@ -211,9 +210,9 @@ func readAgentBasicInfo(hostname string) (Agent, string, error) {
 		from 
 			host_agent
 		where
-			hostname = '%s'
-		`, hostname)
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+			hostname = ?
+		`
+	err := db.QueryOrchestrator(query, sqlutils.Args(hostname), func(m sqlutils.RowMap) error {
 		agent.Hostname = m.GetString("hostname")
 		agent.Port = m.GetInt("port")
 		agent.LastSubmitted = m.GetString("last_submitted")
@@ -776,7 +775,7 @@ func Seed(targetHostname string, sourceHostname string) (int64, error) {
 }
 
 // readSeeds reads seed from the backend table
-func readSeeds(whereCondition string, limit string) ([]SeedOperation, error) {
+func readSeeds(whereCondition string, args []interface{}, limit string) ([]SeedOperation, error) {
 	res := []SeedOperation{}
 	query := fmt.Sprintf(`
 		select 
@@ -794,7 +793,7 @@ func readSeeds(whereCondition string, limit string) ([]SeedOperation, error) {
 			agent_seed_id desc
 		%s
 		`, whereCondition, limit)
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		seedOperation := SeedOperation{}
 		seedOperation.SeedId = m.GetInt64("agent_seed_id")
 		seedOperation.TargetHostname = m.GetString("target_hostname")
@@ -816,48 +815,48 @@ func readSeeds(whereCondition string, limit string) ([]SeedOperation, error) {
 
 // ReadActiveSeedsForHost reads active seeds where host participates either as source or target
 func ReadActiveSeedsForHost(hostname string) ([]SeedOperation, error) {
-	whereCondition := fmt.Sprintf(`
+	whereCondition := `
 		where
 			is_complete = 0
 			and (
-				target_hostname = '%s'
-				or source_hostname = '%s'
+				target_hostname = ?
+				or source_hostname = ?
 			)
-		`, hostname, hostname)
-	return readSeeds(whereCondition, "")
+		`
+	return readSeeds(whereCondition, sqlutils.Args(hostname, hostname), "")
 }
 
 // ReadRecentCompletedSeedsForHost reads active seeds where host participates either as source or target
 func ReadRecentCompletedSeedsForHost(hostname string) ([]SeedOperation, error) {
-	whereCondition := fmt.Sprintf(`
+	whereCondition := `
 		where
 			is_complete = 1
 			and (
-				target_hostname = '%s'
-				or source_hostname = '%s'
+				target_hostname = ?
+				or source_hostname = ?
 			)
-		`, hostname, hostname)
-	return readSeeds(whereCondition, "limit 10")
+		`
+	return readSeeds(whereCondition, sqlutils.Args(hostname, hostname), "limit 10")
 }
 
 // AgentSeedDetails reads details from backend table
 func AgentSeedDetails(seedId int64) ([]SeedOperation, error) {
-	whereCondition := fmt.Sprintf(`
+	whereCondition := `
 		where
-			agent_seed_id = %d
-		`, seedId)
-	return readSeeds(whereCondition, "")
+			agent_seed_id = ?
+		`
+	return readSeeds(whereCondition, sqlutils.Args(seedId), "")
 }
 
 // ReadRecentSeeds reads seeds from backend table.
 func ReadRecentSeeds() ([]SeedOperation, error) {
-	return readSeeds("", "limit 100")
+	return readSeeds(``, sqlutils.Args(), "limit 100")
 }
 
 // SeedOperationState reads states for a given seed operation
 func ReadSeedStates(seedId int64) ([]SeedOperationState, error) {
 	res := []SeedOperationState{}
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			agent_seed_state_id,
 			agent_seed_id,
@@ -867,11 +866,11 @@ func ReadSeedStates(seedId int64) ([]SeedOperationState, error) {
 		from 
 			agent_seed_state
 		where
-			agent_seed_id = %d
+			agent_seed_id = ?
 		order by
 			agent_seed_state_id desc
-		`, seedId)
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+		`
+	err := db.QueryOrchestrator(query, sqlutils.Args(seedId), func(m sqlutils.RowMap) error {
 		seedState := SeedOperationState{}
 		seedState.SeedStateId = m.GetInt64("agent_seed_state_id")
 		seedState.SeedId = m.GetInt64("agent_seed_id")

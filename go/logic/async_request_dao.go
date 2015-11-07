@@ -50,9 +50,11 @@ func WriteAsyncRequest(asyncRequest *AsyncRequest) error {
 }
 
 func ReadPendingAsyncRequests(limit int) (res [](*AsyncRequest), err error) {
-	limitClause := ""
+	limitClause := ``
+	args := sqlutils.Args()
 	if limit > 0 {
-		limitClause = fmt.Sprintf("limit %d", limit)
+		limitClause = `limit ?`
+		args = append(args, limit)
 	}
 	query := fmt.Sprintf(`
 		select 
@@ -73,7 +75,7 @@ func ReadPendingAsyncRequests(limit int) (res [](*AsyncRequest), err error) {
 			request_id asc
 		%s
 		`, limitClause)
-	err = db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		asyncRequest := NewEmptyAsyncRequest()
 		asyncRequest.Id = m.GetInt64("request_id")
 		asyncRequest.Command = m.GetString("command")

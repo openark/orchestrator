@@ -17,7 +17,6 @@
 package inst
 
 import (
-	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/db"
@@ -60,16 +59,16 @@ func writePoolInstances(pool string, instanceKeys [](*InstanceKey)) error {
 func ReadClusterPoolInstances(clusterName string) (*PoolInstancesMap, error) {
 	var poolInstancesMap = make(PoolInstancesMap)
 
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			database_instance_pool.*
 		from 
 			database_instance
 			join database_instance_pool using (hostname, port)
 		where
-			database_instance.cluster_name = '%s'
-		`, clusterName)
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+			database_instance.cluster_name = ?
+		`
+	err := db.QueryOrchestrator(query, sqlutils.Args(clusterName), func(m sqlutils.RowMap) error {
 		pool := m.GetString("pool")
 		hostname := m.GetString("hostname")
 		port := m.GetInt("port")
@@ -90,7 +89,7 @@ func ReadClusterPoolInstances(clusterName string) (*PoolInstancesMap, error) {
 
 func ReadAllClusterPoolInstances() ([](*ClusterPoolInstance), error) {
 	var result [](*ClusterPoolInstance) = [](*ClusterPoolInstance){}
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			cluster_name,
 			ifnull(alias, cluster_name) as alias,
@@ -99,7 +98,7 @@ func ReadAllClusterPoolInstances() ([](*ClusterPoolInstance), error) {
 			database_instance
 			join database_instance_pool using (hostname, port)
 			left join cluster_alias using (cluster_name)
-		`)
+		`
 	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		clusterPoolInstance := ClusterPoolInstance{
 			ClusterName:  m.GetString("cluster_name"),

@@ -104,9 +104,11 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 // ReadRecentAudit returns a list of audit entries order chronologically descending, using page number.
 func ReadRecentAudit(instanceKey *InstanceKey, page int) ([]Audit, error) {
 	res := []Audit{}
-	var whereCondition string
+	args := sqlutils.Args()
+	whereCondition := ``
 	if instanceKey != nil {
-		whereCondition = fmt.Sprintf(`where hostname='%s' and port='%d'`, instanceKey.Hostname, instanceKey.Port)
+		whereCondition = `where hostname=? and port=?`
+		args = append(args, instanceKey.Hostname, instanceKey.Port)
 	}
 	query := fmt.Sprintf(`
 		select 
@@ -121,10 +123,11 @@ func ReadRecentAudit(instanceKey *InstanceKey, page int) ([]Audit, error) {
 		%s
 		order by
 			audit_timestamp desc
-		limit %d
-		offset %d
-		`, whereCondition, config.Config.AuditPageSize, page*config.Config.AuditPageSize)
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+		limit ?
+		offset ?
+		`, whereCondition)
+	args = append(args, config.Config.AuditPageSize, page*config.Config.AuditPageSize)
+	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		audit := Audit{}
 		audit.AuditId = m.GetInt64("audit_id")
 		audit.AuditTimestamp = m.GetString("audit_timestamp")

@@ -17,7 +17,6 @@
 package inst
 
 import (
-	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
@@ -48,7 +47,7 @@ func WriteMasterPositionEquivalence(master1Key *InstanceKey, master1BinlogCoordi
 }
 
 func GetEquivalentMasterCoordinates(instanceCoordinates *InstanceBinlogCoordinates) (result [](*InstanceBinlogCoordinates), err error) {
-	query := fmt.Sprintf(`
+	query := `
 		select 
 				master1_hostname as hostname,
 				master1_port as port,
@@ -57,10 +56,10 @@ func GetEquivalentMasterCoordinates(instanceCoordinates *InstanceBinlogCoordinat
 			from 
 				master_position_equivalence
 			where
-				master2_hostname = '%s'
-				and master2_port = '%d'
-				and master2_binary_log_file = '%s'
-				and master2_binary_log_pos = '%d'
+				master2_hostname = ?
+				and master2_port = ?
+				and master2_binary_log_file = ?
+				and master2_binary_log_pos = ?
 		union
 		select 
 				master2_hostname as hostname,
@@ -70,11 +69,12 @@ func GetEquivalentMasterCoordinates(instanceCoordinates *InstanceBinlogCoordinat
 			from 
 				master_position_equivalence
 			where
-				master1_hostname = '%s'
-				and master1_port = '%d'
-				and master1_binary_log_file = '%s'
-				and master1_binary_log_pos = '%d'
-		`,
+				master1_hostname = ?
+				and master1_port = ?
+				and master1_binary_log_file = ?
+				and master1_binary_log_pos = ?
+		`
+	args := sqlutils.Args(
 		instanceCoordinates.Key.Hostname,
 		instanceCoordinates.Key.Port,
 		instanceCoordinates.Coordinates.LogFile,
@@ -82,9 +82,10 @@ func GetEquivalentMasterCoordinates(instanceCoordinates *InstanceBinlogCoordinat
 		instanceCoordinates.Key.Hostname,
 		instanceCoordinates.Key.Port,
 		instanceCoordinates.Coordinates.LogFile,
-		instanceCoordinates.Coordinates.LogPos)
+		instanceCoordinates.Coordinates.LogPos,
+	)
 
-	err = db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		equivalentCoordinates := InstanceBinlogCoordinates{}
 		equivalentCoordinates.Key.Hostname = m.GetString("hostname")
 		equivalentCoordinates.Key.Port = m.GetInt("port")

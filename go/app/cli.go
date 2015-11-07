@@ -683,6 +683,33 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
+	case registerCliCommand("master-pos-wait", "Replication, general", `Wait until slave reaches given replication coordinates (--binlog=file:pos)`):
+		{
+			if instanceKey == nil {
+				instanceKey = assignThisInstanceKey()
+			}
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance, err := inst.ReadTopologyInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			var binlogCoordinates *inst.BinlogCoordinates
+
+			if binlogCoordinates, err = inst.ParseBinlogCoordinates(*config.RuntimeCLIFlags.BinlogFile); err != nil {
+				log.Fatalf("Expecing --binlog argument as file:pos")
+			}
+			_, err = inst.MasterPosWait(instanceKey, binlogCoordinates)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
+		// Pool
 	case registerCliCommand("set-read-only", "Instance", `Turn an instance read-only, via SET GLOBAL read_only := 1`):
 		{
 			if instanceKey == nil {

@@ -639,7 +639,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 }
 
 // readInstancesByCondition is a generic function to read instances from the backend database
-func readInstancesByCondition(condition string, sort string) ([](*Instance), error) {
+func readInstancesByCondition(condition string, args []interface{}, sort string) ([](*Instance), error) {
 	readFunc := func() ([](*Instance), error) {
 		instances := [](*Instance){}
 
@@ -672,7 +672,7 @@ func readInstancesByCondition(condition string, sort string) ([](*Instance), err
 			%s
 			`, condition, sort)
 
-		err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+		err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 			instance := readInstanceRow(m)
 			instances = append(instances, instance)
 			return nil
@@ -699,11 +699,11 @@ func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 		return instance, (err == nil), err
 	}
 
-	condition := fmt.Sprintf(`
-			hostname = '%s'
-			and port = %d
-		`, instanceKey.Hostname, instanceKey.Port)
-	instances, err := readInstancesByCondition(condition, "")
+	condition := `
+			hostname = ?
+			and port = ?
+		`
+	instances, err := readInstancesByCondition(condition, sqlutils.Args(instanceKey.Hostname, instanceKey.Port), "")
 	// We know there will be at most one (hostname & port are PK)
 	// And we expect to find one
 	readInstanceCounter.Inc(1)
@@ -721,17 +721,17 @@ func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 	if strings.Index(clusterName, "'") >= 0 {
 		return [](*Instance){}, log.Errorf("Invalid cluster name: %s", clusterName)
 	}
-	condition := fmt.Sprintf(`cluster_name = '%s'`, clusterName)
-	return readInstancesByCondition(condition, "")
+	condition := `cluster_name = ?`
+	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
 }
 
 // ReadSlaveInstances reads slaves of a given master
 func ReadSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
-	condition := fmt.Sprintf(`
-			master_host = '%s'
-			and master_port = %d
-		`, masterKey.Hostname, masterKey.Port)
-	return readInstancesByCondition(condition, "")
+	condition := `
+			master_host = ?
+			and master_port = ?
+		`
+	return readInstancesByCondition(condition, sqlutils.Args(masterKey.Hostname, masterKey.Port), "")
 }
 
 // ReadSlaveInstancesIncludingBinlogServerSubSlaves returns a list of direct slves including any slaves
@@ -756,36 +756,36 @@ func ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey *InstanceKey) ([
 
 // ReadBinlogServerSlaveInstances reads direct slaves of a given master that are binlog servers
 func ReadBinlogServerSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
-	condition := fmt.Sprintf(`
-			master_host = '%s'
-			and master_port = %d
+	condition := `
+			master_host = ?
+			and master_port = ?
 			and binlog_server = 1
-		`, masterKey.Hostname, masterKey.Port)
-	return readInstancesByCondition(condition, "")
+		`
+	return readInstancesByCondition(condition, sqlutils.Args(masterKey.Hostname, masterKey.Port), "")
 }
 
 // ReadUnseenInstances reads all instances which were not recently seen
 func ReadUnseenInstances() ([](*Instance), error) {
-	condition := fmt.Sprintf(`
-			last_seen < last_checked
-		`)
-	return readInstancesByCondition(condition, "")
+	condition := `last_seen < last_checked`
+	return readInstancesByCondition(condition, sqlutils.Args(), "")
 }
 
 // ReadProblemInstances reads all instances with problems
 func ReadProblemInstances(clusterName string) ([](*Instance), error) {
-	condition := fmt.Sprintf(`
-			cluster_name LIKE IF('%s' = '', '%%', '%s')
+	condition := `
+			cluster_name LIKE IF(? = '', '%', ?)
 			and (
 				(last_seen < last_checked)
-				or (not ifnull(timestampdiff(second, last_checked, now()) <= %d, false))
+				or (not ifnull(timestampdiff(second, last_checked, now()) <= ?, false))
 				or (not slave_sql_running)
 				or (not slave_io_running)
-				or (abs(cast(seconds_behind_master as signed) - cast(sql_delay as signed)) > %d)
-				or (abs(cast(slave_lag_seconds as signed) - cast(sql_delay as signed)) > %d)
+				or (abs(cast(seconds_behind_master as signed) - cast(sql_delay as signed)) > ?)
+				or (abs(cast(slave_lag_seconds as signed) - cast(sql_delay as signed)) > ?)
 			)
-		`, clusterName, clusterName, config.Config.InstancePollSeconds, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
-	instances, err := readInstancesByCondition(condition, "")
+		`
+
+	args := sqlutils.Args(clusterName, clusterName, config.Config.InstancePollSeconds, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
+	instances, err := readInstancesByCondition(condition, args, "")
 	if err != nil {
 		return instances, err
 	}
@@ -810,23 +810,31 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 // SearchInstances reads all instances qualifying for some searchString
 func SearchInstances(searchString string) ([](*Instance), error) {
 	searchString = strings.TrimSpace(searchString)
-	condition := fmt.Sprintf(`
-			locate('%s', hostname) > 0
-			or locate('%s', cluster_name) > 0
-			or locate('%s', version) > 0
-			or locate('%s', concat(hostname, ':', port)) > 0
-			or concat(server_id, '') = '%s'
-			or concat(port, '') = '%s'
-		`, searchString, searchString, searchString, searchString, searchString, searchString)
-	return readInstancesByCondition(condition, `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
+	condition := `
+			locate(?, hostname) > 0
+			or locate(?, cluster_name) > 0
+			or locate(?, version) > 0
+			or locate(?, concat(hostname, ':', port)) > 0
+			or concat(server_id, '') = ?
+			or concat(port, '') = ?
+		`
+	args := sqlutils.Args(searchString, searchString, searchString, searchString, searchString, searchString)
+	return readInstancesByCondition(condition, args, `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
 }
 
 // FindInstances reads all instances whose name matches given pattern
 func FindInstances(regexpPattern string) ([](*Instance), error) {
-	condition := fmt.Sprintf(`
-			hostname rlike '%s'
-		`, regexpPattern)
-	return readInstancesByCondition(condition, `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
+	condition := `hostname rlike ?`
+	return readInstancesByCondition(condition, sqlutils.Args(regexpPattern), `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
+}
+
+// ReadClusterCandidateInstances reads cluster instances which are also marked as candidates
+func ReadClusterCandidateInstances(clusterName string) ([](*Instance), error) {
+	condition := `
+			cluster_name = ?
+			and (hostname, port) in (select hostname, port from candidate_database_instance)
+			`
+	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
 }
 
 // filterOSCInstances will filter the given list such that only slaves fit for OSC control remain.
@@ -864,12 +872,12 @@ func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
 	}
 	{
 		// Pick up to two busiest IMs
-		condition := fmt.Sprintf(`
+		condition := `
 			replication_depth = 1
 			and num_slave_hosts > 0
-			and cluster_name = '%s'
-		`, clusterName)
-		intermediateMasters, err = readInstancesByCondition(condition, "")
+			and cluster_name = ?
+		`
+		intermediateMasters, err = readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
 		if err != nil {
 			return result, err
 		}
@@ -909,11 +917,11 @@ func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
 	}
 	{
 		// Get 2 3rd tier slaves, if possible
-		condition := fmt.Sprintf(`
+		condition := `
 			replication_depth = 3
-			and cluster_name = '%s'
-		`, clusterName)
-		slaves, err := readInstancesByCondition(condition, "")
+			and cluster_name = ?
+		`
+		slaves, err := readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
 		if err != nil {
 			return result, err
 		}
@@ -924,12 +932,12 @@ func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
 	}
 	{
 		// Get 2 1st tier leaf slaves, if possible
-		condition := fmt.Sprintf(`
+		condition := `
 			replication_depth = 1
 			and num_slave_hosts = 0
-			and cluster_name = '%s'
-		`, clusterName)
-		slaves, err := readInstancesByCondition(condition, "")
+			and cluster_name = ?
+		`
+		slaves, err := readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
 		if err != nil {
 			return result, err
 		}
@@ -1206,17 +1214,16 @@ func GetClusterName(instanceKey *InstanceKey) (clusterName string, err error) {
 	if clusterName, found := instanceKeyInformativeClusterName.Get(instanceKey.DisplayString()); found {
 		return clusterName.(string), nil
 	}
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			ifnull(max(cluster_name), '') as cluster_name
 		from 
 			database_instance 
 		where
-			hostname = '%s'
-			and port = %d
-			`, instanceKey.Hostname, instanceKey.Port)
-
-	err = db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+			hostname = ?
+			and port = ?
+			`
+	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port), func(m sqlutils.RowMap) error {
 		clusterName = m.GetString("cluster_name")
 		instanceKeyInformativeClusterName.Set(instanceKey.DisplayString(), clusterName, cache.DefaultExpiration)
 		return nil
@@ -1229,13 +1236,13 @@ func GetClusterName(instanceKey *InstanceKey) (clusterName string, err error) {
 func ReadClusters() ([]string, error) {
 	clusterNames := []string{}
 
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			cluster_name
 		from 
 			database_instance 
 		group by
-			cluster_name`)
+			cluster_name`
 
 	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		clusterNames = append(clusterNames, m.GetString("cluster_name"))
@@ -1249,18 +1256,18 @@ func ReadClusters() ([]string, error) {
 func ReadClusterInfo(clusterName string) (*ClusterInfo, error) {
 	clusterInfo := &ClusterInfo{}
 
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			cluster_name,
 			count(*) as count_instances
 		from 
 			database_instance 
 		where
-			cluster_name='%s'
+			cluster_name=?
 		group by
-			cluster_name`, clusterName)
+			cluster_name`
 
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestrator(query, sqlutils.Args(clusterName), func(m sqlutils.RowMap) error {
 		clusterInfo.ClusterName = m.GetString("cluster_name")
 		clusterInfo.CountInstances = m.GetUint("count_instances")
 		ApplyClusterAlias(clusterInfo)
@@ -1280,14 +1287,14 @@ func ReadClusterInfo(clusterName string) (*ClusterInfo, error) {
 func ReadClustersInfo() ([]ClusterInfo, error) {
 	clusters := []ClusterInfo{}
 
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			cluster_name,
 			count(*) as count_instances
 		from 
 			database_instance 
 		group by
-			cluster_name`)
+			cluster_name`
 
 	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		clusterInfo := ClusterInfo{
@@ -1313,7 +1320,7 @@ func ReadClustersInfo() ([]ClusterInfo, error) {
 // the instance.
 func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 	res := []InstanceKey{}
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			hostname, port 
 		from 
@@ -1321,13 +1328,13 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 		where
 			if (
 				last_attempted_check <= last_checked,
-				last_checked < now() - interval %d second,
-				last_checked < now() - interval (%d * 2) second
+				last_checked < now() - interval ? second,
+				last_checked < now() - interval (? * 2) second
 			)
-			`,
-		config.Config.InstancePollSeconds, config.Config.InstancePollSeconds)
+			`
+	args := sqlutils.Args(config.Config.InstancePollSeconds, config.Config.InstancePollSeconds)
 
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
 		if merr != nil {
 			log.Errore(merr)
@@ -2188,8 +2195,7 @@ func MasterPosWait(instanceKey *InstanceKey, binlogCoordinates *BinlogCoordinate
 		return instance, log.Errore(err)
 	}
 
-	_, err = ExecInstance(instanceKey, fmt.Sprintf("select master_pos_wait('%s', %d)",
-		binlogCoordinates.LogFile, binlogCoordinates.LogPos))
+	_, err = ExecInstance(instanceKey, `select master_pos_wait(?, ?)`, binlogCoordinates.LogFile, binlogCoordinates.LogPos)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -2275,18 +2281,18 @@ func SnapshotTopologies() error {
 func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern string) ([](*Instance), error) {
 	instances := [](*Instance){}
 
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			*
 		from 
 			database_instance_topology_history 
 		where
-			snapshot_unix_timestamp rlike '%s'
-			and cluster_name ='%s' 
+			snapshot_unix_timestamp rlike ?
+			and cluster_name = ?
 		order by
-			hostname, port`, historyTimestampPattern, clusterName)
+			hostname, port`
 
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestrator(query, sqlutils.Args(historyTimestampPattern, clusterName), func(m sqlutils.RowMap) error {
 		instance := NewInstance()
 
 		instance.Key.Hostname = m.GetString("hostname")
@@ -2343,13 +2349,4 @@ func ExpireCandidateInstances() error {
 		return nil
 	}
 	return ExecDBWriteFunc(writeFunc)
-}
-
-// ReadClusterCandidateInstances reads cluster instances which are also marked as candidates
-func ReadClusterCandidateInstances(clusterName string) ([](*Instance), error) {
-	condition := fmt.Sprintf(`
-			cluster_name = '%s'
-			and (hostname, port) in (select hostname, port from candidate_database_instance)
-			`, clusterName)
-	return readInstancesByCondition(condition, "")
 }

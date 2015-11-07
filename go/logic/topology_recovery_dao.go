@@ -255,7 +255,7 @@ func ExpireBlockedRecoveries() error {
 }
 
 // acknowledgeRecoveries sets acknowledged* details and clears the in_active_period flags from a set of entries
-func acknowledgeRecoveries(owner string, comment string, markEndRecovery bool, whereClause string) (countAcknowledgedEntries int64, err error) {
+func acknowledgeRecoveries(owner string, comment string, markEndRecovery bool, whereClause string, args []interface{}) (countAcknowledgedEntries int64, err error) {
 	additionalSet := ``
 	if markEndRecovery {
 		additionalSet = `
@@ -276,7 +276,8 @@ func acknowledgeRecoveries(owner string, comment string, markEndRecovery bool, w
 				and
 				%s
 		`, additionalSet, whereClause)
-	sqlResult, err := db.ExecOrchestrator(query, owner, comment)
+	args = append(sqlutils.Args(owner, comment), args...)
+	sqlResult, err := db.ExecOrchestrator(query, args...)
 	if err != nil {
 		return 0, log.Errore(err)
 	}
@@ -287,38 +288,36 @@ func acknowledgeRecoveries(owner string, comment string, markEndRecovery bool, w
 // AcknowledgeRecovery acknowledges a particular recovery.
 // This also implied clearing their active period, which in turn enables further recoveries on those topologies
 func AcknowledgeRecovery(recoveryId int64, owner string, comment string) (countAcknowledgedEntries int64, err error) {
-	whereClause := fmt.Sprintf(`recovery_id = %d`, recoveryId)
-	return acknowledgeRecoveries(owner, comment, false, whereClause)
+	whereClause := `recovery_id = ?`
+	return acknowledgeRecoveries(owner, comment, false, whereClause, sqlutils.Args(recoveryId))
 }
 
 // AcknowledgeClusterRecoveries marks active recoveries for given cluster as acknowledged.
 // This also implied clearing their active period, which in turn enables further recoveries on those topologies
 func AcknowledgeClusterRecoveries(clusterName string, owner string, comment string) (countAcknowledgedEntries int64, err error) {
-	whereClause := fmt.Sprintf(`
-			cluster_name = '%s'
-		`, clusterName)
-	return acknowledgeRecoveries(owner, comment, false, whereClause)
+	whereClause := `cluster_name = ?`
+	return acknowledgeRecoveries(owner, comment, false, whereClause, sqlutils.Args(clusterName))
 }
 
 // AcknowledgeInstanceRecoveries marks active recoveries for given instane as acknowledged.
 // This also implied clearing their active period, which in turn enables further recoveries on those topologies
 func AcknowledgeInstanceRecoveries(instanceKey *inst.InstanceKey, owner string, comment string) (countAcknowledgedEntries int64, err error) {
-	whereClause := fmt.Sprintf(`
-			hostname = '%s'
-			and port = %d
-		`, instanceKey.Hostname, instanceKey.Port)
-	return acknowledgeRecoveries(owner, comment, false, whereClause)
+	whereClause := `
+			hostname = ?
+			and port = ?
+		`
+	return acknowledgeRecoveries(owner, comment, false, whereClause, sqlutils.Args(instanceKey.Hostname, instanceKey.Port))
 }
 
 // AcknowledgeInstanceCompletedRecoveries marks active and COMPLETED recoveries for given instane as acknowledged.
 // This also implied clearing their active period, which in turn enables further recoveries on those topologies
 func AcknowledgeInstanceCompletedRecoveries(instanceKey *inst.InstanceKey, owner string, comment string) (countAcknowledgedEntries int64, err error) {
-	whereClause := fmt.Sprintf(`
-			hostname = '%s'
-			and port = %d
+	whereClause := `
+			hostname = ?
+			and port = ?
 			and end_recovery is not null
-		`, instanceKey.Hostname, instanceKey.Port)
-	return acknowledgeRecoveries(owner, comment, false, whereClause)
+		`
+	return acknowledgeRecoveries(owner, comment, false, whereClause, sqlutils.Args(instanceKey.Hostname, instanceKey.Port))
 }
 
 // AcknowledgeCrashedRecoveries marks recoveries whose processing nodes has crashed as acknowledged.
@@ -330,7 +329,7 @@ func AcknowledgeCrashedRecoveries() (countAcknowledgedEntries int64, err error) 
 				select hostname, token from node_health
 			)
 		`
-	return acknowledgeRecoveries("orchestrator", "detected crashed recovery", true, whereClause)
+	return acknowledgeRecoveries("orchestrator", "detected crashed recovery", true, whereClause, sqlutils.Args())
 }
 
 // ResolveRecovery is called on completion of a recovery process and updates the recovery status.
@@ -368,7 +367,7 @@ func ResolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst
 }
 
 // readRecoveries reads recovery entry/audit entires from topology_recovery
-func readRecoveries(whereCondition string, limit string) ([]TopologyRecovery, error) {
+func readRecoveries(whereCondition string, limit string, args []interface{}) ([]TopologyRecovery, error) {
 	res := []TopologyRecovery{}
 	query := fmt.Sprintf(`
 		select 
@@ -403,7 +402,7 @@ func readRecoveries(whereCondition string, limit string) ([]TopologyRecovery, er
 			recovery_id desc
 		%s
 		`, whereCondition, limit)
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		topologyRecovery := *NewTopologyRecovery(inst.ReplicationAnalysis{})
 		topologyRecovery.Id = m.GetInt64("recovery_id")
 
@@ -449,57 +448,52 @@ func readRecoveries(whereCondition string, limit string) ([]TopologyRecovery, er
 
 // ReadActiveRecoveries reads active recovery entry/audit entires from topology_recovery
 func ReadActiveClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
-	whereClause := fmt.Sprintf(`
+	whereClause := `
 		where 
 			in_active_period=1
 			and end_recovery is null
-			and cluster_name='%s'`,
-		clusterName)
-	return readRecoveries(whereClause, ``)
+			and cluster_name=?`
+	return readRecoveries(whereClause, ``, sqlutils.Args(clusterName))
 }
 
 // ReadInActivePeriodClusterRecovery reads recoveries (possibly complete!) that are in active period.
 // (may be used to block further recoveries on this cluster)
 func ReadInActivePeriodClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
-	whereClause := fmt.Sprintf(`
+	whereClause := `
 		where 
 			in_active_period=1
-			and cluster_name='%s'`,
-		clusterName)
-	return readRecoveries(whereClause, ``)
+			and cluster_name=?`
+	return readRecoveries(whereClause, ``, sqlutils.Args(clusterName))
 }
 
 // ReadRecentlyActiveClusterRecovery reads recently completed entries for a given cluster
 func ReadRecentlyActiveClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
-	whereClause := fmt.Sprintf(`
+	whereClause := `
 		where 
 			end_recovery > now() - interval 5 minute
-			and cluster_name='%s'`,
-		clusterName)
-	return readRecoveries(whereClause, ``)
+			and cluster_name=?`
+	return readRecoveries(whereClause, ``, sqlutils.Args(clusterName))
 }
 
 // ReadInActivePeriodSuccessorInstanceRecovery reads completed recoveries for a given instance, where said instance
 // was promoted as result, still in active period (may be used to block further recoveries should this instance die)
 func ReadInActivePeriodSuccessorInstanceRecovery(instanceKey *inst.InstanceKey) ([]TopologyRecovery, error) {
-	whereClause := fmt.Sprintf(`
+	whereClause := `
 		where 
 			in_active_period=1
 			and 
-				successor_hostname='%s' and successor_port=%d`,
-		instanceKey.Hostname, instanceKey.Port)
-	return readRecoveries(whereClause, ``)
+				successor_hostname=? and successor_port=?`
+	return readRecoveries(whereClause, ``, sqlutils.Args(instanceKey.Hostname, instanceKey.Port))
 }
 
 // ReadRecentlyActiveInstanceRecovery reads recently completed entries for a given instance
 func ReadRecentlyActiveInstanceRecovery(instanceKey *inst.InstanceKey) ([]TopologyRecovery, error) {
-	whereClause := fmt.Sprintf(`
+	whereClause := `
 		where 
 			end_recovery > now() - interval 5 minute
 			and 
-				successor_hostname='%s' and successor_port=%d`,
-		instanceKey.Hostname, instanceKey.Port)
-	return readRecoveries(whereClause, ``)
+				successor_hostname=? and successor_port=?`
+	return readRecoveries(whereClause, ``, sqlutils.Args(instanceKey.Hostname, instanceKey.Port))
 }
 
 // ReadActiveRecoveries reads active recovery entry/audit entires from topology_recovery
@@ -508,40 +502,41 @@ func ReadActiveRecoveries() ([]TopologyRecovery, error) {
 		where 
 			in_active_period=1
 			and end_recovery is null`,
-		``)
+		``, sqlutils.Args())
 }
 
 // ReadCompletedRecoveries reads completed recovery entry/audit entires from topology_recovery
 func ReadCompletedRecoveries(page int) ([]TopologyRecovery, error) {
-	limit := fmt.Sprintf(`
-		limit %d
-		offset %d`,
-		config.Config.AuditPageSize, page*config.Config.AuditPageSize)
-	return readRecoveries(`where end_recovery is not null`, limit)
+	limit := `
+		limit ?
+		offset ?`
+	return readRecoveries(`where end_recovery is not null`, limit, sqlutils.Args(config.Config.AuditPageSize, page*config.Config.AuditPageSize))
 }
 
 // ReadCRecoveries reads latest recovery entries from topology_recovery
 func ReadRecentRecoveries(clusterName string, unacknowledgedOnly bool, page int) ([]TopologyRecovery, error) {
 	whereConditions := []string{}
 	whereClause := ""
+	args := sqlutils.Args()
 	if unacknowledgedOnly {
 		whereConditions = append(whereConditions, `acknowledged=0`)
 	}
 	if clusterName != "" {
-		whereConditions = append(whereConditions, fmt.Sprintf(`cluster_name='%s'`, clusterName))
+		whereConditions = append(whereConditions, `cluster_name=?`)
+		args = append(args, clusterName)
 	}
 	if len(whereConditions) > 0 {
 		whereClause = fmt.Sprintf("where %s", strings.Join(whereConditions, " and "))
 	}
-	limit := fmt.Sprintf(`
-		limit %d
-		offset %d`,
-		config.Config.AuditPageSize, page*config.Config.AuditPageSize)
-	return readRecoveries(whereClause, limit)
+	limit := `
+		limit ?
+		offset ?`
+	args = append(args, config.Config.AuditPageSize, page*config.Config.AuditPageSize)
+	return readRecoveries(whereClause, limit, args)
 }
 
 // readRecoveries reads recovery entry/audit entires from topology_recovery
-func readFailureDetections(whereCondition string, limit string) ([]TopologyRecovery, error) {
+func readFailureDetections(whereCondition string, limit string, args []interface{}) ([]TopologyRecovery, error) {
 	res := []TopologyRecovery{}
 	query := fmt.Sprintf(`
 		select 
@@ -565,7 +560,7 @@ func readFailureDetections(whereCondition string, limit string) ([]TopologyRecov
 			detection_id desc
 		%s
 		`, whereCondition, limit)
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		failureDetection := TopologyRecovery{}
 		failureDetection.Id = m.GetInt64("detection_id")
 
@@ -596,19 +591,20 @@ func readFailureDetections(whereCondition string, limit string) ([]TopologyRecov
 
 // ReadCRecoveries reads latest recovery entreis from topology_recovery
 func ReadRecentFailureDetections(page int) ([]TopologyRecovery, error) {
-	limit := fmt.Sprintf(`
-		limit %d
-		offset %d`,
-		config.Config.AuditPageSize, page*config.Config.AuditPageSize)
-	return readFailureDetections(``, limit)
+	limit := `
+		limit ?
+		offset ?`
+	return readFailureDetections(``, limit, sqlutils.Args(config.Config.AuditPageSize, page*config.Config.AuditPageSize))
 }
 
 // ReadBlockedRecoveries reads blocked recovery entries, potentially filtered by cluster name (empty to unfilter)
 func ReadBlockedRecoveries(clusterName string) ([]BlockedTopologyRecovery, error) {
 	res := []BlockedTopologyRecovery{}
 	whereClause := ""
+	args := sqlutils.Args()
 	if clusterName != "" {
-		whereClause = fmt.Sprintf(`where cluster_name = '%s'`, clusterName)
+		whereClause = `where cluster_name = ?`
+		args = append(args, clusterName)
 	}
 	query := fmt.Sprintf(`
 		select 
@@ -624,7 +620,7 @@ func ReadBlockedRecoveries(clusterName string) ([]BlockedTopologyRecovery, error
 			order by
 				last_blocked_timestamp desc
 		`, whereClause)
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		blockedTopologyRecovery := BlockedTopologyRecovery{}
 		blockedTopologyRecovery.FailedInstanceKey.Hostname = m.GetString("hostname")
 		blockedTopologyRecovery.FailedInstanceKey.Port = m.GetInt("port")

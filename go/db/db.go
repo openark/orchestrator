@@ -27,6 +27,10 @@ import (
 	"strings"
 )
 
+var (
+	EmptyArgs []interface{}
+)
+
 type DummySqlResult struct {
 }
 
@@ -941,6 +945,19 @@ func QueryOrchestratorRowsMap(query string, on_row func(sqlutils.RowMap) error) 
 	return sqlutils.QueryRowsMap(db, query, on_row)
 }
 
+// QueryOrchestrator
+func QueryOrchestrator(query string, argsArray []interface{}, on_row func(sqlutils.RowMap) error) error {
+	if config.Config.DatabaselessMode__experimental {
+		return nil
+	}
+	db, err := OpenOrchestrator()
+	if err != nil {
+		return err
+	}
+
+	return log.Criticale(sqlutils.QueryRowsMap(db, query, on_row, argsArray...))
+}
+
 // QueryOrchestratorRowsMapBuffered
 func QueryOrchestratorRowsMapBuffered(query string, on_row func(sqlutils.RowMap) error) error {
 	if config.Config.DatabaselessMode__experimental {
@@ -952,4 +969,20 @@ func QueryOrchestratorRowsMapBuffered(query string, on_row func(sqlutils.RowMap)
 	}
 
 	return sqlutils.QueryRowsMapBuffered(db, query, on_row)
+}
+
+// QueryOrchestratorBuffered
+func QueryOrchestratorBuffered(query string, argsArray []interface{}, on_row func(sqlutils.RowMap) error) error {
+	if config.Config.DatabaselessMode__experimental {
+		return nil
+	}
+	db, err := OpenOrchestrator()
+	if err != nil {
+		return err
+	}
+
+	if argsArray == nil {
+		argsArray = EmptyArgs
+	}
+	return log.Criticale(sqlutils.QueryRowsMapBuffered(db, query, on_row, argsArray...))
 }

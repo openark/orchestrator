@@ -27,15 +27,15 @@ import (
 // ReadClusterDomainName reads the domain name associated with a cluster, if any
 func ReadClusterDomainName(clusterName string) (string, error) {
 	domainName := ""
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			domain_name
 		from 
 			cluster_domain_name
 		where
-			cluster_name = '%s'
-		`, clusterName)
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+			cluster_name = ?
+		`
+	err := db.QueryOrchestrator(query, sqlutils.Args(clusterName), func(m sqlutils.RowMap) error {
 		domainName = m.GetString("domain_name")
 		return nil
 	})

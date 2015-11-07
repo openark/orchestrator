@@ -27,7 +27,7 @@ import (
 // ReadActiveMaintenance returns the list of currently active maintenance entries
 func ReadActiveMaintenance() ([]Maintenance, error) {
 	res := []Maintenance{}
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			database_instance_maintenance_id,
 			hostname,
@@ -43,7 +43,7 @@ func ReadActiveMaintenance() ([]Maintenance, error) {
 			maintenance_active = 1
 		order by
 			database_instance_maintenance_id
-		`)
+		`
 	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		maintenance := Maintenance{}
 		maintenance.MaintenanceId = m.GetUint("database_instance_maintenance_id")
@@ -137,15 +137,16 @@ func EndMaintenanceByInstanceKey(instanceKey *InstanceKey) error {
 // ReadMaintenanceInstanceKey will return the instanceKey for active maintenance by maintenanceToken
 func ReadMaintenanceInstanceKey(maintenanceToken int64) (*InstanceKey, error) {
 	var res *InstanceKey
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			hostname, port 
 		from 
 			database_instance_maintenance 
 		where
-			database_instance_maintenance_id = %d `,
-		maintenanceToken)
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+			database_instance_maintenance_id = ?
+			`
+
+	err := db.QueryOrchestrator(query, sqlutils.Args(maintenanceToken), func(m sqlutils.RowMap) error {
 		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
 		if merr != nil {
 			return merr

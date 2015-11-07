@@ -118,23 +118,23 @@ func expireAvailableNodes() error {
 
 func readAvailableNodes(onlyHttpNodes bool) ([]string, error) {
 	res := []string{}
-	extraConditions := ``
+	extraInfo := ""
 	if onlyHttpNodes {
-		extraConditions = fmt.Sprintf(`%s and extra_info = '%s'`, extraConditions, string(OrchestratorExecutionHttpMode))
+		extraInfo = string(OrchestratorExecutionHttpMode)
 	}
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			concat(hostname, ';', token) as node
 		from 
 			node_health
 		where
-			last_seen_active > now() - interval %d second
-			%s
+			last_seen_active > now() - interval ? second
+			and ? in (extra_info, '')
 		order by
 			hostname
-		`, registrationPollSeconds*2, extraConditions)
+		`
 
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestrator(query, sqlutils.Args(registrationPollSeconds*2, extraInfo), func(m sqlutils.RowMap) error {
 		res = append(res, m.GetString("node"))
 		return nil
 	})

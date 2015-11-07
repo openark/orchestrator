@@ -36,7 +36,15 @@ $(document).ready(function () {
     		if (changelog) {
     			moreInfo += '<div>Changelog :<ul>';
     			changelog.split(",").reverse().forEach(function(changelogEntry) {
-        			moreInfo += "<li><code>"+changelogEntry.replace(/;/g, ' ').replace(/([^ ]+)$/g, '<strong>$1</strong>')+"</code></li>";    			
+    				var changelogEntryTokens = changelogEntry.split(';');
+    				var changelogEntryTimestamp = changelogEntryTokens[0];
+    				var changelogEntryAnalysis = changelogEntryTokens[1];
+
+    				if (changelogEntryTimestamp > audit.RecoveryStartTimestamp) {
+    					// This entry is newer than the detection time; irrelevant
+    					return;
+    				}
+        			moreInfo += "<li><code>"+changelogEntryTimestamp + " <strong>" + changelogEntryAnalysis + "</strong></code></li>";
         		});
         		moreInfo += "</ul></div>";
     		}

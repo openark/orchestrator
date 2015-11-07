@@ -292,7 +292,7 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 	log.Debugf("topology_recovery: RecoverDeadMaster: will recover %+v", *failedInstanceKey)
 
 	var masterRecoveryType MasterRecoveryType = MasterRecoveryPseudoGTID
-	if (analysisEntry.OracleGTIDImmediateTopology || analysisEntry.MariaDBGTIDImmediateTopology) && !analysisEntry.PseudoGTIDImmediateTopology {
+	if analysisEntry.OracleGTIDImmediateTopology || analysisEntry.MariaDBGTIDImmediateTopology {
 		masterRecoveryType = MasterRecoveryGTID
 	} else if analysisEntry.BinlogServerImmediateTopology {
 		masterRecoveryType = MasterRecoveryBinlogServer
@@ -729,7 +729,7 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 	log.Debugf("topology_recovery: RecoverDeadCoMaster: will recover %+v", *failedInstanceKey)
 
 	var coMasterRecoveryType MasterRecoveryType = MasterRecoveryPseudoGTID
-	if (analysisEntry.OracleGTIDImmediateTopology || analysisEntry.MariaDBGTIDImmediateTopology) && !analysisEntry.PseudoGTIDImmediateTopology {
+	if analysisEntry.OracleGTIDImmediateTopology || analysisEntry.MariaDBGTIDImmediateTopology {
 		coMasterRecoveryType = MasterRecoveryGTID
 	}
 

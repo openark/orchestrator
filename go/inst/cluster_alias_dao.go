@@ -26,13 +26,13 @@ import (
 // ReadClusterAliases reads the entrie cluster name aliases mapping
 func ReadClusterAliases() error {
 	updatedMap := make(map[string]string)
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			cluster_name,
 			alias
 		from 
 			cluster_alias
-		`)
+		`
 	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		updatedMap[m.GetString("cluster_name")] = m.GetString("alias")
 		return nil
@@ -47,18 +47,18 @@ func ReadClusterAliases() error {
 
 }
 
-// ReadClusterAliases reads the entrie cluster name aliases mapping
+// ReadClusterByAlias
 func ReadClusterByAlias(alias string) (string, error) {
 	clusterName := ""
-	query := fmt.Sprintf(`
+	query := `
 		select 
 			cluster_name
 		from 
 			cluster_alias
 		where
-			alias = '%s'
-		`, alias)
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+			alias = ?
+		`
+	err := db.QueryOrchestrator(query, sqlutils.Args(alias), func(m sqlutils.RowMap) error {
 		clusterName = m.GetString("cluster_name")
 		return nil
 	})
