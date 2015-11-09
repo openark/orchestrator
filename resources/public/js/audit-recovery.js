@@ -5,6 +5,9 @@ $(document).ready(function () {
     if (auditCluster()) {
     	apiUri = "/api/audit-recovery/cluster/"+auditCluster()+"/"+currentPage();
     }
+    if (recoveryId() > 0) {
+    	apiUri = "/api/audit-recovery/id/"+recoveryId();
+    }
     $.get(apiUri, function (auditEntries) {
     	displayAudit(auditEntries);
     }, "json");
@@ -29,7 +32,10 @@ $(document).ready(function () {
     			ack.attr("data-recovery-id", audit.Id);
     			ack.attr("title", "Unacknowledged. Click to acknowledge");
     		}
-    		$('<td/>', { text: audit.AnalysisEntry.Analysis }).prepend(ack).prepend('<span class="more-recovery-info pull-right glyphicon glyphicon-info-sign text-primary" data-toggle="popover" data-html="true" title="" data-content=""></span>').appendTo(row);
+    		var moreInfoElement = $('<span class="more-recovery-info pull-right glyphicon glyphicon-info-sign text-primary" title="More info"></span>');
+    		moreInfoElement.attr("data-recovery-id", audit.Id);
+    		
+    		$('<td/>', { text: audit.AnalysisEntry.Analysis }).prepend(ack).prepend(moreInfoElement).appendTo(row);
     		$('<a/>',  { text: analyzedInstanceDisplay, href: "/web/search/" + analyzedInstanceDisplay }).wrap($("<td/>")).parent().appendTo(row);
     		$('<td/>', { text: audit.AnalysisEntry.CountSlaves }).appendTo(row);
     		$('<a/>',  { text: audit.AnalysisEntry.ClusterDetails.ClusterName, href: "/web/cluster/"+audit.AnalysisEntry.ClusterDetails.ClusterName}).wrap($("<td/>")).parent().appendTo(row);
@@ -79,12 +85,22 @@ $(document).ready(function () {
         		});
         		moreInfo += "</ul>";
     		}
-    		moreInfo += "<div>Proccessed by <code>"+audit.ProcessingNodeHostname+"</code></div>";
-    		row.find(".more-recovery-info").attr("title", audit.AnalysisEntry.Analysis);
-    		row.find(".more-recovery-info").attr("data-content", moreInfo);
-    		row.find('[data-toggle="popover"]').popover();
+    		moreInfo += '<div><a href="/web/audit-failure-detection/id/' + audit.LastDetectionId + '">Related discovery</a></div>';
+    		moreInfo += '<div>Proccessed by <code>'+audit.ProcessingNodeHostname+'</code></div>';
+    		row.appendTo('#audit tbody');
+    		
+    		var row = $('<tr/>');
+    		row.addClass("more-info");
+			row.attr("data-recovery-id-more-info", audit.Id);
+    		$('<td colspan="8"/>').append(moreInfo).appendTo(row);
+    		if (audit.Acknowledged) {
+    			row.hide()
+    		}
     		row.appendTo('#audit tbody');
     	});
+        if (auditEntries.length == 1) {
+        	$("[data-recovery-id-more-info]").show();
+        }
         if (currentPage() <= 0) {
         	$("#audit .pager .previous").addClass("disabled");
         }
@@ -100,7 +116,10 @@ $(document).ready(function () {
         $("#audit .pager .disabled a").click(function() {
             return false;
         });
-        
+        $("body").on("click", ".more-recovery-info", function (event) {
+        	var recoveryId = $(event.target).attr("data-recovery-id");
+            $('[data-recovery-id-more-info='+recoveryId+']').slideToggle();        
+        });
         $("body").on("click", ".acknowledge-indicator.unacknowledged", function (event) {
         	var recoveryId = $(event.target).attr("data-recovery-id");
             bootbox.prompt({

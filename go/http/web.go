@@ -205,6 +205,10 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 	if err != nil {
 		page = 0
 	}
+	recoveryId, err := strconv.ParseInt(params["id"], 10, 0)
+	if err != nil {
+		recoveryId = 0
+	}
 
 	r.HTML(200, "templates/audit_recovery", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
@@ -215,6 +219,7 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 		"autoshow_problems":   false,
 		"page":                page,
 		"clusterName":         params["clusterName"],
+		"recoveryId":          recoveryId,
 	})
 }
 
@@ -222,6 +227,10 @@ func (this *HttpWeb) AuditFailureDetection(params martini.Params, r render.Rende
 	page, err := strconv.Atoi(params["page"])
 	if err != nil {
 		page = 0
+	}
+	detectionId, err := strconv.ParseInt(params["id"], 10, 0)
+	if err != nil {
+		detectionId = 0
 	}
 
 	r.HTML(200, "templates/audit_failure_detection", map[string]interface{}{
@@ -232,6 +241,7 @@ func (this *HttpWeb) AuditFailureDetection(params martini.Params, r render.Rende
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
 		"page":                page,
+		"detectionId":         detectionId,
 	})
 }
 
@@ -366,10 +376,12 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/audit/instance/:host/:port/:page", this.Audit)
 	m.Get("/web/audit-recovery", this.AuditRecovery)
 	m.Get("/web/audit-recovery/:page", this.AuditRecovery)
+	m.Get("/web/audit-recovery/id/:id", this.AuditRecovery)
 	m.Get("/web/audit-recovery/cluster/:clusterName", this.AuditRecovery)
 	m.Get("/web/audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
 	m.Get("/web/audit-failure-detection", this.AuditFailureDetection)
 	m.Get("/web/audit-failure-detection/:page", this.AuditFailureDetection)
+	m.Get("/web/audit-failure-detection/id/:id", this.AuditFailureDetection)
 	m.Get("/web/agents", this.Agents)
 	m.Get("/web/agent/:host", this.Agent)
 	m.Get("/web/seed-details/:seedId", this.AgentSeedDetails)

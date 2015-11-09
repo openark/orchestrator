@@ -376,26 +376,13 @@ body {
     cursor: pointer;
 }
 
-#audit table .popover-title ul {
+#audit table .more-info ul {
     list-style: none;
-    padding-left: 0;
 }
 
-#audit table .popover-title ul li code {
+#audit table .more-info code {
     padding-left: 0;
     font-weight: bold;
-}
-
-#audit table .popover {
-    max-width: 1024px;
-}
-
-#audit table .popover .popover-content {
-    max-height: 512px;
-    overflow: auto;
-}
-
-#audit table .popover code {
     white-space: normal;
     color: inherit;
     background-color: inherit;

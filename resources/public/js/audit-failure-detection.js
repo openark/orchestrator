@@ -1,7 +1,11 @@
 
 $(document).ready(function () {
     showLoader();
-    $.get("/api/audit-failure-detection/"+currentPage(), function (auditEntries) {
+    var uri = "/api/audit-failure-detection/"+currentPage();
+    if (detectionId() > 0) {
+    	uri = "/api/audit-failure-detection/id/"+detectionId();
+    }
+    $.get(uri, function (auditEntries) {
         $.get("/api/replication-analysis-changelog", function (analysisChangelog) {
         	displayAudit(auditEntries, analysisChangelog);
         }, "json");
@@ -16,7 +20,10 @@ $(document).ready(function () {
         auditEntries.forEach(function (audit) {
         	var analyzedInstanceDisplay = audit.AnalysisEntry.AnalyzedInstanceKey.Hostname+":"+audit.AnalysisEntry.AnalyzedInstanceKey.Port;
     		var row = jQuery('<tr/>');
-    		$('<td/>', { text: audit.AnalysisEntry.Analysis }).prepend('<span class="more-detection-info pull-right glyphicon glyphicon-info-sign text-primary" data-toggle="popover" data-html="true" title="" data-content=""></span>').appendTo(row);
+    		var moreInfoElement = $('<span class="more-detection-info pull-right glyphicon glyphicon-info-sign text-primary" title="More info"></span>');
+    		moreInfoElement.attr("data-detection-id", audit.Id);
+
+    		$('<td/>', { text: audit.AnalysisEntry.Analysis }).prepend(moreInfoElement).appendTo(row);
     		$('<a/>',  { text: analyzedInstanceDisplay, href: "/web/search/" + analyzedInstanceDisplay }).wrap($("<td/>")).parent().appendTo(row);
     		$('<td/>', { text: audit.AnalysisEntry.CountSlaves }).appendTo(row);
     		$('<a/>',  { text: audit.AnalysisEntry.ClusterDetails.ClusterName, href: "/web/cluster/"+audit.AnalysisEntry.ClusterDetails.ClusterName}).wrap($("<td/>")).parent().appendTo(row);
@@ -48,13 +55,20 @@ $(document).ready(function () {
         		});
         		moreInfo += "</ul></div>";
     		}
-    		moreInfo += "<div>Proccessed by <code>"+audit.ProcessingNodeHostname+"</code></div>";
-    		row.find(".more-detection-info").attr("title", audit.AnalysisEntry.Analysis+'<ul><li><code>'+analyzedInstanceDisplay+'</code></li></ul>');
-    		row.find(".more-detection-info").attr("data-content", moreInfo);
-    		row.find('[data-toggle="popover"]').popover();    		
+    		moreInfo += '<div><a href="/web/audit-recovery/id/' + audit.RelatedRecoveryId + '">Related recovery</a></div>';    		
     		
+    		moreInfo += "<div>Proccessed by <code>"+audit.ProcessingNodeHostname+"</code></div>";    		
     		row.appendTo('#audit tbody');
+    		
+    		var row = $('<tr/>');
+			row.attr("data-detection-id-more-info", audit.Id);
+			row.addClass("more-info");
+    		$('<td colspan="6"/>').append(moreInfo).appendTo(row);
+    		row.hide().appendTo('#audit tbody');
     	});
+        if (auditEntries.length == 1) {
+        	$("[data-detection-id-more-info]").show();
+        }
         if (currentPage() <= 0) {
         	$("#audit .pager .previous").addClass("disabled");
         }
@@ -69,6 +83,10 @@ $(document).ready(function () {
         });
         $("#audit .pager .disabled a").click(function() {
             return false;
+        });
+        $("body").on("click", ".more-detection-info", function (event) {
+        	var detectionId = $(event.target).attr("data-detection-id");
+            $('[data-detection-id-more-info='+detectionId+']').slideToggle();        
         });
     }
 });	

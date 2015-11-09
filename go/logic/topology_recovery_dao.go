@@ -131,7 +131,8 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, failIf
 					cluster_name,
 					cluster_alias,
 					count_affected_slaves,
-					slave_hosts
+					slave_hosts,
+					last_detection_id
 				) values (
 					?,
 					?,
@@ -144,10 +145,12 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, failIf
 					?,
 					?,
 					?,
-					?
+					?,
+					(select ifnull(max(detection_id), 0) from topology_failure_detection where hostname=? and port=?)
 				)
 			`, analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port, process.ThisHostname, process.ProcessToken.Hash,
 		string(analysisEntry.Analysis), analysisEntry.ClusterDetails.ClusterName, analysisEntry.ClusterDetails.ClusterAlias, analysisEntry.CountSlaves, analysisEntry.SlaveHosts.ToCommaDelimitedList(),
+		analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port,
 	)
 	if err != nil {
 		return nil, log.Errore(err)
@@ -394,7 +397,8 @@ func readRecoveries(whereCondition string, limit string, args []interface{}) ([]
             acknowledged,
             acknowledged_at,
             acknowledged_by,
-            acknowledge_comment
+            acknowledge_comment,
+            last_detection_id
 		from 
 			topology_recovery
 		%s
@@ -435,6 +439,8 @@ func readRecoveries(whereCondition string, limit string, args []interface{}) ([]
 		topologyRecovery.AcknowledgedAt = m.GetString("acknowledged_at")
 		topologyRecovery.AcknowledgedBy = m.GetString("acknowledged_by")
 		topologyRecovery.AcknowledgedComment = m.GetString("acknowledge_comment")
+
+		topologyRecovery.LastDetectionId = m.GetInt64("last_detection_id")
 
 		res = append(res, topologyRecovery)
 		return nil
@@ -513,6 +519,12 @@ func ReadCompletedRecoveries(page int) ([]TopologyRecovery, error) {
 	return readRecoveries(`where end_recovery is not null`, limit, sqlutils.Args(config.Config.AuditPageSize, page*config.Config.AuditPageSize))
 }
 
+// ReadRecovery reads completed recovery entry/audit entires from topology_recovery
+func ReadRecovery(recoveryId int64) ([]TopologyRecovery, error) {
+	whereClause := `where recovery_id = ?`
+	return readRecoveries(whereClause, ``, sqlutils.Args(recoveryId))
+}
+
 // ReadCRecoveries reads latest recovery entries from topology_recovery
 func ReadRecentRecoveries(clusterName string, unacknowledgedOnly bool, page int) ([]TopologyRecovery, error) {
 	whereConditions := []string{}
@@ -552,7 +564,8 @@ func readFailureDetections(whereCondition string, limit string, args []interface
             cluster_name,
             cluster_alias,
             count_affected_slaves,
-            slave_hosts		
+            slave_hosts,
+            (select max(recovery_id) from topology_recovery where topology_recovery.last_detection_id = detection_id) as related_recovery_id
 		from 
 			topology_failure_detection
 		%s
@@ -577,6 +590,8 @@ func readFailureDetections(whereCondition string, limit string, args []interface
 		failureDetection.AnalysisEntry.CountSlaves = m.GetUint("count_affected_slaves")
 		failureDetection.AnalysisEntry.ReadSlaveHostsFromString(m.GetString("slave_hosts"))
 
+		failureDetection.RelatedRecoveryId = m.GetInt64("related_recovery_id")
+
 		failureDetection.AnalysisEntry.ClusterDetails.ReadRecoveryInfo()
 
 		res = append(res, failureDetection)
@@ -589,12 +604,18 @@ func readFailureDetections(whereCondition string, limit string, args []interface
 	return res, err
 }
 
-// ReadCRecoveries reads latest recovery entreis from topology_recovery
+// ReadRecentFailureDetections
 func ReadRecentFailureDetections(page int) ([]TopologyRecovery, error) {
 	limit := `
 		limit ?
 		offset ?`
 	return readFailureDetections(``, limit, sqlutils.Args(config.Config.AuditPageSize, page*config.Config.AuditPageSize))
+}
+
+// ReadFailureDetection
+func ReadFailureDetection(detectionId int64) ([]TopologyRecovery, error) {
+	whereClause := `where detection_id = ?`
+	return readFailureDetections(whereClause, ``, sqlutils.Args(detectionId))
 }
 
 // ReadBlockedRecoveries reads blocked recovery entries, potentially filtered by cluster name (empty to unfilter)

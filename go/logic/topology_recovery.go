@@ -60,6 +60,8 @@ type TopologyRecovery struct {
 	AcknowledgedAt            string
 	AcknowledgedBy            string
 	AcknowledgedComment       string
+	LastDetectionId           int64
+	RelatedRecoveryId         int64
 }
 
 func NewTopologyRecovery(replicationAnalysis inst.ReplicationAnalysis) *TopologyRecovery {

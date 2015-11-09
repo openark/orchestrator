@@ -676,6 +676,12 @@ var generateSQLPatches = []string{
 			database_instance_analysis_changelog
 			ADD KEY instance_timestamp_idx (hostname, port, analysis_timestamp)
 	`,
+	`
+		ALTER TABLE 
+			topology_recovery
+			ADD COLUMN last_detection_id bigint unsigned NOT NULL, 
+			ADD KEY last_detection_idx (last_detection_id)
+	`,
 }
 
 // Track if a TLS has already been configured for topology

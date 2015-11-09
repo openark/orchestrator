@@ -1871,11 +1871,19 @@ func (this *HttpAPI) AutomatedRecoveryFilters(params martini.Params, r render.Re
 
 // AuditFailureDetection provides list of topology_failure_detection entries
 func (this *HttpAPI) AuditFailureDetection(params martini.Params, r render.Render, req *http.Request) {
-	page, err := strconv.Atoi(params["page"])
-	if err != nil || page < 0 {
-		page = 0
+
+	var audits []logic.TopologyRecovery
+	var err error
+
+	if detectionId, derr := strconv.ParseInt(params["id"], 10, 0); derr == nil && detectionId > 0 {
+		audits, err = logic.ReadFailureDetection(detectionId)
+	} else {
+		page, derr := strconv.Atoi(params["page"])
+		if derr != nil || page < 0 {
+			page = 0
+		}
+		audits, err = logic.ReadRecentFailureDetections(page)
 	}
-	audits, err := logic.ReadRecentFailureDetections(page)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -1899,12 +1907,19 @@ func (this *HttpAPI) ReadReplicationAnalysisChangelog(params martini.Params, r r
 
 // AuditRecovery provides list of topology-recovery entries
 func (this *HttpAPI) AuditRecovery(params martini.Params, r render.Render, req *http.Request) {
-	page, err := strconv.Atoi(params["page"])
-	if err != nil || page < 0 {
-		page = 0
+	var audits []logic.TopologyRecovery
+	var err error
+
+	if recoveryId, derr := strconv.ParseInt(params["id"], 10, 0); derr == nil && recoveryId > 0 {
+		audits, err = logic.ReadRecovery(recoveryId)
+	} else {
+		page, derr := strconv.Atoi(params["page"])
+		if derr != nil || page < 0 {
+			page = 0
+		}
+		unacknowledgedOnly := (req.URL.Query().Get("unacknowledged") == "true")
+		audits, err = logic.ReadRecentRecoveries(params["clusterName"], unacknowledgedOnly, page)
 	}
-	unacknowledgedOnly := (req.URL.Query().Get("unacknowledged") == "true")
-	audits, err := logic.ReadRecentRecoveries(params["clusterName"], unacknowledgedOnly, page)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -2162,9 +2177,11 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/automated-recovery-filters", this.AutomatedRecoveryFilters)
 	m.Get("/api/audit-failure-detection", this.AuditFailureDetection)
 	m.Get("/api/audit-failure-detection/:page", this.AuditFailureDetection)
+	m.Get("/api/audit-failure-detection/id/:id", this.AuditFailureDetection)
 	m.Get("/api/replication-analysis-changelog", this.ReadReplicationAnalysisChangelog)
 	m.Get("/api/audit-recovery", this.AuditRecovery)
 	m.Get("/api/audit-recovery/:page", this.AuditRecovery)
+	m.Get("/api/audit-recovery/id/:id", this.AuditRecovery)
 	m.Get("/api/audit-recovery/cluster/:clusterName", this.AuditRecovery)
 	m.Get("/api/audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
 	m.Get("/api/active-cluster-recovery/:clusterName", this.ActiveClusterRecovery)
