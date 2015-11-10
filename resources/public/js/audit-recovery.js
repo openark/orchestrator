@@ -85,7 +85,7 @@ $(document).ready(function () {
         		});
         		moreInfo += "</ul>";
     		}
-    		moreInfo += '<div><a href="/web/audit-failure-detection/id/' + audit.LastDetectionId + '">Related discovery</a></div>';
+    		moreInfo += '<div><a href="/web/audit-failure-detection/id/' + audit.LastDetectionId + '">Related detection</a></div>';
     		moreInfo += '<div>Proccessed by <code>'+audit.ProcessingNodeHostname+'</code></div>';
     		row.appendTo('#audit tbody');
     		

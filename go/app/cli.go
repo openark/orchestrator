@@ -165,7 +165,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		os.Exit(0)
 	}
 
-	process.ContinuousRegistration(string(process.OrchestratorExecutionCliMode))
+	process.ContinuousRegistration(string(process.OrchestratorExecutionCliMode), command)
 
 	// begin commands
 	switch command {

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
+	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
 	"time"
 )
@@ -45,7 +46,17 @@ const (
 )
 
 // RegisterNode writes down this node in the node_health table
-func RegisterNode(extraInfo string) (sql.Result, error) {
+func RegisterNode(extraInfo string, command string, firstTime bool) (sql.Result, error) {
+	if firstTime {
+		db.ExecOrchestrator(`
+			insert ignore into node_health_history 
+				(hostname, token, first_seen_active, extra_info, command)
+			values
+				(?, ?, NOW(), ?, ?)
+			`,
+			ThisHostname, ProcessToken.Hash, extraInfo, command,
+		)
+	}
 	return db.ExecOrchestrator(`
 			insert into node_health 
 				(hostname, token, last_seen_active, extra_info)
@@ -64,7 +75,7 @@ func RegisterNode(extraInfo string) (sql.Result, error) {
 func HealthTest() (*HealthStatus, error) {
 	health := HealthStatus{Healthy: false, Hostname: ThisHostname, Token: ProcessToken.Hash}
 
-	sqlResult, err := RegisterNode("")
+	sqlResult, err := RegisterNode("", "", false)
 	if err != nil {
 		health.Error = err
 		return &health, log.Errore(err)
@@ -88,16 +99,17 @@ func HealthTest() (*HealthStatus, error) {
 	return &health, nil
 }
 
-func ContinuousRegistration(extraInfo string) {
-	registrationTick := time.Tick(time.Duration(registrationPollSeconds) * time.Second)
-	tickOperation := func() {
-		RegisterNode(extraInfo)
+func ContinuousRegistration(extraInfo string, command string) {
+	tickOperation := func(firstTime bool) {
+		RegisterNode(extraInfo, command, firstTime)
 		expireAvailableNodes()
 	}
+	// First one is synchronous
+	tickOperation(true)
 	go func() {
-		go tickOperation()
+		registrationTick := time.Tick(time.Duration(registrationPollSeconds) * time.Second)
 		for range registrationTick {
-			go tickOperation()
+			go tickOperation(false)
 		}
 	}()
 }
@@ -112,6 +124,19 @@ func expireAvailableNodes() error {
 				last_seen_active < now() - interval ? second
 			`,
 		registrationPollSeconds*2,
+	)
+	return log.Errore(err)
+}
+
+// ExpireNodesHistory cleans up the nodes history
+func ExpireNodesHistory() error {
+	_, err := db.ExecOrchestrator(`
+			delete 
+				from node_health_history 
+			where
+				first_seen_active < now() - interval ? hour
+			`,
+		config.Config.UnseenInstanceForgetHours,
 	)
 	return log.Errore(err)
 }

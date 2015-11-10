@@ -83,32 +83,17 @@ func acceptSignals() {
 
 // handleDiscoveryRequests iterates the discoveryInstanceKeys channel and calls upon
 // instance discovery per entry.
-func handleDiscoveryRequests(pendingTokens chan bool, completedTokens chan bool) {
+func handleDiscoveryRequests() {
 	for instanceKey := range discoveryInstanceKeys {
 		// Possibly this used to be the elected node, but has been demoted, while still
 		// the queue is full.
 		// Just don't process the queue when not elected.
 		if isElectedNode {
-			accountedDiscoverInstance(instanceKey, pendingTokens, completedTokens)
+			go discoverInstance(instanceKey)
 		} else {
 			log.Debugf("Node apparently demoted. Skipping discovery of %+v. Remaining queue size: %+v", instanceKey, len(discoveryInstanceKeys))
 		}
 	}
-}
-
-// accountedDiscoverInstance will call upon DiscoverInstance and will keep track of
-// discovery tokens such that management of multiple discoveries can figure out
-// whether all instances in a topology are accounted for.
-func accountedDiscoverInstance(instanceKey inst.InstanceKey, pendingTokens chan bool, completedTokens chan bool) {
-	if pendingTokens != nil {
-		pendingTokens <- true
-	}
-	go func() {
-		discoverInstance(instanceKey)
-		if completedTokens != nil {
-			completedTokens <- true
-		}
-	}()
 }
 
 // discoverInstance will attempt discovering an instance (unless it is already up to date) and will
@@ -145,7 +130,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 
 	if !isElectedNode {
 		// Maybe this node was elected before, but isn't elected anymore.
-		// If not elected, stop drilling down to further investigate slaves.
+		// If not elected, stop drilling up/down the topology
 		return
 	}
 
@@ -155,32 +140,6 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	}
 	// Investigate master:
 	discoveryInstanceKeys <- instance.MasterKey
-}
-
-// Start discovery begins a one time asynchronuous discovery process for the given
-// instance and all of its topology connected instances.
-// That is, the instance will be investigated for master and slaves, and the routines will follow on
-// each and every such found master/slave.
-// In essense, assuming all slaves in a replication topology are running, and given a single instance
-// in such topology, this function will detect the entire topology.
-func StartDiscovery(instanceKey inst.InstanceKey) {
-	log.Infof("Starting discovery at %+v", instanceKey)
-	pendingTokens := make(chan bool, maxConcurrency)
-	completedTokens := make(chan bool, maxConcurrency)
-
-	accountedDiscoverInstance(instanceKey, pendingTokens, completedTokens)
-	go handleDiscoveryRequests(pendingTokens, completedTokens)
-
-	// Block until all are complete
-	for {
-		select {
-		case <-pendingTokens:
-			<-completedTokens
-		default:
-			inst.AuditOperation("start-discovery", &instanceKey, "")
-			return
-		}
-	}
 }
 
 // ContinuousDiscovery starts an asynchronuous infinite discovery process where instances are
@@ -193,7 +152,7 @@ func ContinuousDiscovery() {
 
 	log.Infof("Starting continuous discovery")
 	inst.LoadHostnameResolveCacheFromDatabase()
-	go handleDiscoveryRequests(nil, nil)
+	go handleDiscoveryRequests()
 
 	discoveryTick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
 	caretakingTick := time.Tick(time.Minute)
@@ -215,11 +174,11 @@ func ContinuousDiscovery() {
 					instanceKeys, _ := inst.ReadOutdatedInstanceKeys()
 					log.Debugf("outdated keys: %+v", instanceKeys)
 					for _, instanceKey := range instanceKeys {
-						discoveryInstanceKeys <- instanceKey
+						go func() { discoveryInstanceKeys <- instanceKey }()
 					}
 					if !wasAlreadyElected {
 						// Just turned to be leader!
-						go process.RegisterNode("")
+						go process.RegisterNode("", "", false)
 					}
 				} else {
 					log.Debugf("Not elected as active node; polling")
@@ -245,10 +204,11 @@ func ContinuousDiscovery() {
 					go inst.ExpireAudit()
 					go inst.ExpireMasterPositionEquivalence()
 					go inst.FlushNontrivialResolveCacheToDatabase()
+					go process.ExpireNodesHistory()
 				}
 				if !isElectedNode {
 					// Take this opportunity to refresh yourself
-					inst.LoadHostnameResolveCacheFromDatabase()
+					go inst.LoadHostnameResolveCacheFromDatabase()
 				}
 				go inst.ReadClusterAliases()
 			}()
@@ -315,7 +275,7 @@ func ContinuousAgentsPoll() {
 
 func discoverSeededAgents() {
 	for seededAgent := range agent.SeededAgents {
-		instanceKey := inst.InstanceKey{Hostname: seededAgent.Hostname, Port: int(seededAgent.MySQLPort)}
-		go StartDiscovery(instanceKey)
+		instanceKey := &inst.InstanceKey{Hostname: seededAgent.Hostname, Port: int(seededAgent.MySQLPort)}
+		go inst.ReadTopologyInstance(instanceKey)
 	}
 }

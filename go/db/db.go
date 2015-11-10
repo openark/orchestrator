@@ -429,6 +429,18 @@ var generateSQLBase = []string{
 		  KEY analysis_timestamp_idx(analysis_timestamp)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS node_health_history (
+		  history_id bigint unsigned not null auto_increment,
+		  hostname varchar(128) CHARACTER SET ascii NOT NULL,
+		  token varchar(128) NOT NULL,
+		  first_seen_active timestamp NOT NULL,
+		  extra_info varchar(128) CHARACTER SET utf8 NOT NULL,
+		  PRIMARY KEY (history_id),
+		  UNIQUE KEY hostname_token_idx(hostname, token),
+		  KEY first_seen_active_idx(first_seen_active)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{
@@ -681,6 +693,10 @@ var generateSQLPatches = []string{
 			topology_recovery
 			ADD COLUMN last_detection_id bigint unsigned NOT NULL, 
 			ADD KEY last_detection_idx (last_detection_id)
+	`,
+	`
+		ALTER TABLE node_health_history
+			ADD COLUMN command varchar(128) CHARACTER SET utf8 NOT NULL
 	`,
 }
 
