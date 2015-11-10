@@ -59,15 +59,15 @@ func RegisterNode(extraInfo string, command string, firstTime bool) (sql.Result,
 	}
 	return db.ExecOrchestrator(`
 			insert into node_health 
-				(hostname, token, last_seen_active, extra_info)
+				(hostname, token, last_seen_active, extra_info, command)
 			values
-				(?, ?, NOW(), ?)
+				(?, ?, NOW(), ?, ?)
 			on duplicate key update
 				token=values(token),
 				last_seen_active=values(last_seen_active),
 				extra_info=if(values(extra_info) != '', values(extra_info), extra_info)
 			`,
-		ThisHostname, ProcessToken.Hash, extraInfo,
+		ThisHostname, ProcessToken.Hash, extraInfo, command,
 	)
 }
 

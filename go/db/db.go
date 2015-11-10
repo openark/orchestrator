@@ -698,6 +698,10 @@ var generateSQLPatches = []string{
 		ALTER TABLE node_health_history
 			ADD COLUMN command varchar(128) CHARACTER SET utf8 NOT NULL
 	`,
+	`
+		ALTER TABLE node_health
+			ADD COLUMN command varchar(128) CHARACTER SET utf8 NOT NULL
+	`,
 }
 
 // Track if a TLS has already been configured for topology
