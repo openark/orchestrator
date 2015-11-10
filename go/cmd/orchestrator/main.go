@@ -445,7 +445,7 @@ Cheatsheet:
             coordinates in the binlogs of the destination instance (-d). This operation does not work on relay logs.
             Example:
             
-            -c correlate-binlog-pos  -i instance.with.binary.log.com --binlog=mysql-bin.002366:14127 -d other.instance.with.binary.logs.com
+            orchestrator -c correlate-binlog-pos  -i instance.with.binary.log.com --binlog=mysql-bin.002366:14127 -d other.instance.with.binary.logs.com
             
                 Prints out correlated coordinates, e.g.: "mysql-bin.002302:14220", or errors out.
                                     
