@@ -945,7 +945,7 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 
 // CheckAndRecover is the main entry point for the recovery mechanism
 func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *inst.InstanceKey, skipProcesses bool) (recoveryAttempted bool, promotedSlaveKey *inst.InstanceKey, err error) {
-	replicationAnalysis, err := inst.GetReplicationAnalysis(true)
+	replicationAnalysis, err := inst.GetReplicationAnalysis("", true, true)
 	if err != nil {
 		return false, nil, log.Errore(err)
 	}

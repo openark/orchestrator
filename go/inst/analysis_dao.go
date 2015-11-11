@@ -18,16 +18,19 @@ package inst
 
 import (
 	"fmt"
-	"regexp"
-
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
+	"github.com/pmylund/go-cache"
+	"regexp"
+	"time"
 )
 
+var recentInstantAnalysis = cache.New(time.Duration(config.Config.RecoveryPollSeconds*2)*time.Second, time.Second)
+
 // GetReplicationAnalysis will check for replication problems (dead master; unreachable master; etc)
-func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error) {
+func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnalysis bool) ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
 	analysisQueryReductionClause := ``
@@ -141,6 +144,7 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 		        cluster_alias ON (cluster_alias.cluster_name = master_instance.cluster_name)
 		    WHERE
 		    	database_instance_maintenance.database_instance_maintenance_id IS NULL
+		    	AND ? IN ('', master_instance.cluster_name)
 		    GROUP BY
 			    master_instance.hostname,
 			    master_instance.port
@@ -150,7 +154,7 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 			    is_cluster_master DESC,
 			    count_slaves DESC
 	`, analysisQueryReductionClause)
-	args := sqlutils.Args(config.Config.InstancePollSeconds)
+	args := sqlutils.Args(config.Config.InstancePollSeconds, clusterName)
 	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		a := ReplicationAnalysis{Analysis: NoProblem}
 
@@ -297,9 +301,9 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 				result = append(result, a)
 			}
 		}
-		if a.CountSlaves > 0 {
+		if a.CountSlaves > 0 && auditAnalysis {
 			// Interesting enough for analysis
-			AuditInstanceAnalysisInChangelog(&a.AnalyzedInstanceKey, a.Analysis)
+			go AuditInstanceAnalysisInChangelog(&a.AnalyzedInstanceKey, a.Analysis)
 		}
 		return nil
 	})
@@ -314,6 +318,12 @@ func GetReplicationAnalysis(includeDowntimed bool) ([]ReplicationAnalysis, error
 // To not repeat recurring analysis code, the database_instance_last_analysis table is used, so that only changes to
 // analysis codes are written.
 func AuditInstanceAnalysisInChangelog(instanceKey *InstanceKey, analysisCode AnalysisCode) error {
+	if lastWrittenAnalysis, found := recentInstantAnalysis.Get(instanceKey.DisplayString()); found {
+		if lastWrittenAnalysis == analysisCode {
+			// Surely nothing new.
+			return nil
+		}
+	}
 	sqlResult, err := db.ExecOrchestrator(`
 			insert ignore into database_instance_last_analysis (
 					hostname, port, analysis_timestamp, analysis
@@ -347,6 +357,9 @@ func AuditInstanceAnalysisInChangelog(instanceKey *InstanceKey, analysisCode Ana
 			`,
 		instanceKey.Hostname, instanceKey.Port, string(analysisCode),
 	)
+	if err == nil {
+		recentInstantAnalysis.Set(instanceKey.DisplayString(), analysisCode, cache.DefaultExpiration)
+	}
 	return log.Errore(err)
 }
 

@@ -1325,7 +1325,7 @@ function Cluster() {
     function domReady() {
         getData("/api/cluster/" + currentClusterName(), function (instances) {
             _instances = instances;
-            getData("/api/replication-analysis", function (replicationAnalysis) {
+            getData("/api/replication-analysis/" + currentClusterName(), function (replicationAnalysis) {
                 _replicationAnalysis = replicationAnalysis;
                 getData("/api/maintenance", function (maintenanceList) {
                     _maintenanceList = maintenanceList;

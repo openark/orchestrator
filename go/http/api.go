@@ -1815,7 +1815,7 @@ func (this *HttpAPI) ReloadConfiguration(params martini.Params, r render.Render,
 
 // ReplicationAnalysis retuens list of issues
 func (this *HttpAPI) ReplicationAnalysis(params martini.Params, r render.Render, req *http.Request) {
-	analysis, err := inst.GetReplicationAnalysis(true)
+	analysis, err := inst.GetReplicationAnalysis(params["clusterName"], true, false)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get analysis: %+v", err)})
 		return
@@ -2170,6 +2170,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 
 	// Recovery:
 	m.Get("/api/replication-analysis", this.ReplicationAnalysis)
+	m.Get("/api/replication-analysis/:clusterName", this.ReplicationAnalysis)
 	m.Get("/api/recover/:host/:port", this.Recover)
 	m.Get("/api/recover/:host/:port/:candidateHost/:candidatePort", this.Recover)
 	m.Get("/api/recover-lite/:host/:port", this.RecoverLite)
