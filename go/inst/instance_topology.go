@@ -2134,6 +2134,7 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 		if err != nil || !found {
 			return instance, err
 		}
+		log.Debugf("Relocating to a binlog server; will first attempt to relocate to the binlog server's master: %+v, and then repoint down", otherMaster.Key)
 		if _, err := relocateBelowInternal(instance, otherMaster); err != nil {
 			return instance, err
 		}

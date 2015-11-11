@@ -6,7 +6,7 @@
 #
 set -e
 
-RELEASE_VERSION="1.4.500"
+RELEASE_VERSION="1.4.501"
 TOPDIR=/tmp/orchestrator-release
 export RELEASE_VERSION TOPDIR
 
