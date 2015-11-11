@@ -114,8 +114,8 @@ func UpdateClusterAliases() error {
 				        or database_instance_downtime.end_timestamp < NOW()
 					  ) is false
 				    )
-				group by 
-				  suggested_cluster_alias
+				  group by 
+				    suggested_cluster_alias
 			`)
 		if err == nil {
 			err = ReadClusterAliases()
