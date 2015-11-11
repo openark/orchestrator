@@ -142,31 +142,17 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	}
 	inst.SetMaintenanceOwner(owner)
 
-	preDatabaseCommandHandled := true
+	skipDatabaseCommands := false
 	switch command {
-	case "reset-internal-db-deployment": //, "Meta, internal", `Clear internal db deployment history, use if somehow corrupted internal deployment history`):
-		{
-			config.Config.SkipOrchestratorDatabaseUpdate = true
-			db.ResetInternalDeployment()
-			fmt.Println("Internal db deployment history reset. Next orchestrator execution will rebuild internal db structure (no data will be lost)")
-		}
-		// Help
+	case "reset-internal-db-deployment":
+		skipDatabaseCommands = true
 	case "help":
-		{
-			fmt.Fprintf(os.Stderr, availableCommandsUsage())
-		}
-	default:
-		{
-			preDatabaseCommandHandled = false
-		}
-	}
-	if preDatabaseCommandHandled {
-		// We're done
-		os.Exit(0)
+		skipDatabaseCommands = true
 	}
 
-	process.ContinuousRegistration(string(process.OrchestratorExecutionCliMode), command)
-
+	if !skipDatabaseCommands {
+		process.ContinuousRegistration(string(process.OrchestratorExecutionCliMode), command)
+	}
 	// begin commands
 	switch command {
 	// smart mode
@@ -1280,6 +1266,17 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			fmt.Println("hostname resolve cache cleared")
+		}
+	case registerCliCommand("reset-internal-db-deployment", "Meta, internal", `Clear internal db deployment history, use if somehow corrupted internal deployment history`):
+		{
+			config.Config.SkipOrchestratorDatabaseUpdate = true
+			db.ResetInternalDeployment()
+			fmt.Println("Internal db deployment history reset. Next orchestrator execution will rebuild internal db structure (no data will be lost)")
+		}
+		// Help
+	case "help":
+		{
+			fmt.Fprintf(os.Stderr, availableCommandsUsage())
 		}
 	default:
 		log.Fatalf("Unknown command: \"%s\". %s", command, availableCommandsUsage())
