@@ -177,9 +177,9 @@ func ClearActiveRecoveries() error {
 				end_active_period_unixtime = UNIX_TIMESTAMP()
 			where
 				in_active_period = 1
-				AND start_active_period < NOW() - INTERVAL ? MINUTE
+				AND start_active_period < NOW() - INTERVAL ? SECOND
 			`,
-		config.Config.RecoveryPeriodBlockMinutes,
+		config.Config.RecoveryPeriodBlockSeconds,
 	)
 	return log.Errore(err)
 }

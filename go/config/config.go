@@ -131,7 +131,8 @@ type Configuration struct {
 	ReduceReplicationAnalysisCount             bool              // When true, replication analysis will only report instances where possibility of handled problems is possible in the first place (e.g. will not report most leaf nodes, that are mostly uninteresting). When false, provides an entry for every known instance
 	FailureDetectionPeriodBlockMinutes         int               // The time for which an instance's failure discovery is kept "active", so as to avoid concurrent "discoveries" of the instance's failure; this preceeds any recovery process, if any.
 	RecoveryPollSeconds                        int               // Interval between checks for a recovery scenario and initiation of a recovery process
-	RecoveryPeriodBlockMinutes                 int               // The time for which an instance's recovery is kept "active", so as to avoid concurrent recoveries on smae instance as well as flapping
+	RecoveryPeriodBlockMinutes                 int               // (supported for backwards compatibility but please use newer `RecoveryPeriodBlockSeconds` instead) The time for which an instance's recovery is kept "active", so as to avoid concurrent recoveries on smae instance as well as flapping
+	RecoveryPeriodBlockSeconds                 int               // (overrides `RecoveryPeriodBlockMinutes`) The time for which an instance's recovery is kept "active", so as to avoid concurrent recoveries on smae instance as well as flapping
 	RecoveryIgnoreHostnameFilters              []string          // Recovery analysis will completely ignore hosts matching given patterns
 	RecoverMasterClusterFilters                []string          // Only do master recovery on clusters matching these regexp patterns (of course the ".*" pattern matches everything)
 	RecoverIntermediateMasterClusterFilters    []string          // Only do IM recovery on clusters matching these regexp patterns (of course the ".*" pattern matches everything)
@@ -242,6 +243,7 @@ func NewConfiguration() *Configuration {
 		FailureDetectionPeriodBlockMinutes:         60,
 		RecoveryPollSeconds:                        10,
 		RecoveryPeriodBlockMinutes:                 60,
+		RecoveryPeriodBlockSeconds:                 0,
 		RecoveryIgnoreHostnameFilters:              []string{},
 		RecoverMasterClusterFilters:                []string{},
 		RecoverIntermediateMasterClusterFilters:    []string{},
@@ -262,6 +264,47 @@ func NewConfiguration() *Configuration {
 	}
 }
 
+func postReadAdjustments() {
+	if Config.MySQLOrchestratorCredentialsConfigFile != "" {
+		mySQLConfig := struct {
+			Client struct {
+				User     string
+				Password string
+			}
+		}{}
+		err := gcfg.ReadFileInto(&mySQLConfig, Config.MySQLOrchestratorCredentialsConfigFile)
+		if err != nil {
+			log.Fatalf("Failed to parse gcfg data from file: %+v", err)
+		} else {
+			log.Debugf("Parsed orchestrator credentials from %s", Config.MySQLOrchestratorCredentialsConfigFile)
+			Config.MySQLOrchestratorUser = mySQLConfig.Client.User
+			Config.MySQLOrchestratorPassword = mySQLConfig.Client.Password
+		}
+	}
+	if Config.MySQLTopologyCredentialsConfigFile != "" {
+		mySQLConfig := struct {
+			Client struct {
+				User     string
+				Password string
+			}
+		}{}
+		err := gcfg.ReadFileInto(&mySQLConfig, Config.MySQLTopologyCredentialsConfigFile)
+		if err != nil {
+			log.Fatalf("Failed to parse gcfg data from file: %+v", err)
+		} else {
+			log.Debugf("Parsed topology credentials from %s", Config.MySQLTopologyCredentialsConfigFile)
+			Config.MySQLTopologyUser = mySQLConfig.Client.User
+			Config.MySQLTopologyPassword = mySQLConfig.Client.Password
+		}
+	}
+	if Config.RecoveryPeriodBlockSeconds == 0 && Config.RecoveryPeriodBlockMinutes > 0 {
+		// RecoveryPeriodBlockSeconds is a newer addition that overrides RecoveryPeriodBlockMinutes
+		// The code does not consider RecoveryPeriodBlockMinutes anymore, but RecoveryPeriodBlockMinutes
+		// still supported in config file for backwards compatibility
+		Config.RecoveryPeriodBlockSeconds = Config.RecoveryPeriodBlockMinutes * 60
+	}
+}
+
 // read reads configuration from given file, or silently skips if the file does not exist.
 // If the file does exist, then it is expected to be in valid JSON format or the function bails out.
 func read(file_name string) (*Configuration, error) {
@@ -274,39 +317,7 @@ func read(file_name string) (*Configuration, error) {
 		} else {
 			log.Fatal("Cannot read config file:", file_name, err)
 		}
-		if Config.MySQLOrchestratorCredentialsConfigFile != "" {
-			mySQLConfig := struct {
-				Client struct {
-					User     string
-					Password string
-				}
-			}{}
-			err := gcfg.ReadFileInto(&mySQLConfig, Config.MySQLOrchestratorCredentialsConfigFile)
-			if err != nil {
-				log.Fatalf("Failed to parse gcfg data from file: %+v", err)
-			} else {
-				log.Debugf("Parsed orchestrator credentials from %s", Config.MySQLOrchestratorCredentialsConfigFile)
-				Config.MySQLOrchestratorUser = mySQLConfig.Client.User
-				Config.MySQLOrchestratorPassword = mySQLConfig.Client.Password
-			}
-		}
-		if Config.MySQLTopologyCredentialsConfigFile != "" {
-			mySQLConfig := struct {
-				Client struct {
-					User     string
-					Password string
-				}
-			}{}
-			err := gcfg.ReadFileInto(&mySQLConfig, Config.MySQLTopologyCredentialsConfigFile)
-			if err != nil {
-				log.Fatalf("Failed to parse gcfg data from file: %+v", err)
-			} else {
-				log.Debugf("Parsed topology credentials from %s", Config.MySQLTopologyCredentialsConfigFile)
-				Config.MySQLTopologyUser = mySQLConfig.Client.User
-				Config.MySQLTopologyPassword = mySQLConfig.Client.Password
-			}
-		}
-
+		postReadAdjustments()
 	}
 	return Config, err
 }

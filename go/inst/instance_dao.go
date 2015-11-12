@@ -2260,10 +2260,10 @@ func SnapshotTopologies() error {
 		_, err := db.ExecOrchestrator(`
         	insert into 
         		database_instance_topology_history (snapshot_unix_timestamp,
-        			hostname, port, master_host, master_port, cluster_name)
+        			hostname, port, master_host, master_port, cluster_name, version)
         	select
         		UNIX_TIMESTAMP(NOW()),
-        		hostname, port, master_host, master_port, cluster_name
+        		hostname, port, master_host, master_port, cluster_name, version
 			from
 				database_instance
 				`,

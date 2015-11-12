@@ -23,9 +23,18 @@ import (
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
 	"github.com/pmylund/go-cache"
+	"github.com/rcrowley/go-metrics"
 	"regexp"
 	"time"
 )
+
+var analysisChangeWriteAttemptCounter = metrics.NewCounter()
+var analysisChangeWriteCounter = metrics.NewCounter()
+
+func init() {
+	metrics.Register("analysis.change.write.attempt", analysisChangeWriteAttemptCounter)
+	metrics.Register("analysis.change.write", analysisChangeWriteCounter)
+}
 
 var recentInstantAnalysis = cache.New(time.Duration(config.Config.RecoveryPollSeconds*2)*time.Second, time.Second)
 
@@ -303,7 +312,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		}
 		if a.CountSlaves > 0 && auditAnalysis {
 			// Interesting enough for analysis
-			go AuditInstanceAnalysisInChangelog(&a.AnalyzedInstanceKey, a.Analysis)
+			go auditInstanceAnalysisInChangelog(&a.AnalyzedInstanceKey, a.Analysis)
 		}
 		return nil
 	})
@@ -314,16 +323,22 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 	return result, err
 }
 
-// AuditInstanceAnalysisInChangelog will write down an instance's analysis in the database_instance_analysis_changelog table.
+// auditInstanceAnalysisInChangelog will write down an instance's analysis in the database_instance_analysis_changelog table.
 // To not repeat recurring analysis code, the database_instance_last_analysis table is used, so that only changes to
 // analysis codes are written.
-func AuditInstanceAnalysisInChangelog(instanceKey *InstanceKey, analysisCode AnalysisCode) error {
+func auditInstanceAnalysisInChangelog(instanceKey *InstanceKey, analysisCode AnalysisCode) error {
 	if lastWrittenAnalysis, found := recentInstantAnalysis.Get(instanceKey.DisplayString()); found {
 		if lastWrittenAnalysis == analysisCode {
 			// Surely nothing new.
+			// And let's expand the timeout
+			recentInstantAnalysis.Set(instanceKey.DisplayString(), analysisCode, cache.DefaultExpiration)
 			return nil
 		}
 	}
+	// Passed the cache; but does database agree that there's a change? Here's a persistent cache; this comes here
+	// to verify no two orchestrator services are doing this without coordinating (namely, one dies, the other taking its place
+	// and has no familiarity of the former's cache)
+	analysisChangeWriteAttemptCounter.Inc(1)
 	sqlResult, err := db.ExecOrchestrator(`
 			insert ignore into database_instance_last_analysis (
 					hostname, port, analysis_timestamp, analysis
@@ -342,6 +357,7 @@ func AuditInstanceAnalysisInChangelog(instanceKey *InstanceKey, analysisCode Ana
 	if err != nil {
 		return log.Errore(err)
 	}
+	recentInstantAnalysis.Set(instanceKey.DisplayString(), analysisCode, cache.DefaultExpiration)
 	lastAnalysisChanged := (rows > 0)
 
 	if !lastAnalysisChanged {
@@ -358,7 +374,7 @@ func AuditInstanceAnalysisInChangelog(instanceKey *InstanceKey, analysisCode Ana
 		instanceKey.Hostname, instanceKey.Port, string(analysisCode),
 	)
 	if err == nil {
-		recentInstantAnalysis.Set(instanceKey.DisplayString(), analysisCode, cache.DefaultExpiration)
+		analysisChangeWriteCounter.Inc(1)
 	}
 	return log.Errore(err)
 }
