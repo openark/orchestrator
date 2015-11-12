@@ -407,8 +407,24 @@ function Cluster() {
             if (node.id == droppableNode.id) {
                 return { accept: false };
             }
+            if (instanceIsChild(droppableNode, node) && node.isCoMaster) {
+                // We may allow a co-master to change its othe rco-master under some conditions, 
+            	// see MakeCoMaster() in instance_topology.go
+            	if (!droppableNode.ReadOnly) {
+            		return { accept: false };
+            	}
+            	var coMaster = node.masterNode;
+            	if (coMaster.id == droppableNode.id) {
+                    return { accept: false };
+                }
+            	if (coMaster.lastCheckInvalidProblem() || coMaster.notRecentlyCheckedProblem() || coMaster.ReadOnly) {
+                    if (shouldApply) {
+                        makeCoMaster(node, droppableNode);
+                    }
+                    return { accept: "ok", type: "makeCoMaster with " + droppableTitle };
+            	}
+            }
             if (node.isCoMaster) {
-                // Cannot move. RESET SLAVE on one of the co-masters.
                 return { accept: false };
             }
             if (instancesAreSiblings(node, droppableNode)) {

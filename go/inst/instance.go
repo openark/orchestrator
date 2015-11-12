@@ -325,12 +325,6 @@ func (this *Instance) CanMoveAsCoMaster() (bool, error) {
 	if !this.IsRecentlyChecked {
 		return false, fmt.Errorf("%+v: not recently checked", this.Key)
 	}
-	if this.Slave_SQL_Running {
-		return false, fmt.Errorf("%+v: instance is replicating", this.Key)
-	}
-	if this.Slave_IO_Running {
-		return false, fmt.Errorf("%+v: instance is replicating", this.Key)
-	}
 	return true, nil
 }
 

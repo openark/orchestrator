@@ -817,25 +817,41 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		return instance, err
 	}
+	if canMove, merr := instance.CanMove(); !canMove {
+		return instance, merr
+	}
 	master, err := GetInstanceMaster(instance)
 	if err != nil {
 		return instance, err
 	}
-
-	rinstance, _, _ := ReadInstance(&master.Key)
-	if canMove, merr := rinstance.CanMoveAsCoMaster(); !canMove {
+	log.Debugf("Will check whether %+v's master (%+v) can become its co-master", instance.Key, master.Key)
+	if canMove, merr := master.CanMoveAsCoMaster(); !canMove {
 		return instance, merr
 	}
-	rinstance, _, _ = ReadInstance(instanceKey)
-	if canMove, merr := rinstance.CanMove(); !canMove {
-		return instance, merr
-	}
-
 	if instanceKey.Equals(&master.MasterKey) {
-		return instance, fmt.Errorf("instance  %+v is already co master of %+v", instanceKey, master.Key)
+		return instance, fmt.Errorf("instance %+v is already co master of %+v", instance.Key, master.Key)
 	}
-	if _, found, _ := ReadInstance(&master.MasterKey); found {
-		return instance, fmt.Errorf("master %+v already has known master: %+v", master.Key, master.MasterKey)
+	if !instance.ReadOnly {
+		return instance, fmt.Errorf("instance %+v is not read-only; first make it read-only before making it co-master", instance.Key)
+	}
+	if master.IsCoMaster {
+		// We allow breaking of an existing co-master replication. Here's the breakdown:
+		// Ideally, this would not eb allowed, and we would first require the user to RESET SLAVE on 'master'
+		// prior to making it participate as co-master with our 'instance'.
+		// However there's the problem that upon RESET SLAVE we lose the replication's user/password info.
+		// Thus, we come up with the following rule:
+		// If S replicates from M1, and M1<->M2 are co masters, we allow S to become co-master of M1 (S<->M1) if:
+		// - M1 is writeable
+		// - M2 is read-only or is unreachable/invalid
+		// - S  is read-only
+		// And so we will be replacing one read-only co-master with another.
+		otherCoMaster, found, _ := ReadInstance(&master.MasterKey)
+		if found && otherCoMaster.IsLastCheckValid && !otherCoMaster.ReadOnly {
+			return instance, fmt.Errorf("master %+v is already co-master with %+v, and %+v is alive, and not read-only; cowardly refusing to demote it. Please set it as read-only beforehand", master.Key, otherCoMaster.Key, otherCoMaster.Key)
+		}
+		// OK, good to go.
+	} else if _, found, _ := ReadInstance(&master.MasterKey); found {
+		return instance, fmt.Errorf("%+v is not a real master; it replicates from: %+v", master.Key, master.MasterKey)
 	}
 	if canReplicate, err := master.CanReplicateFrom(instance); !canReplicate {
 		return instance, err
@@ -857,6 +873,10 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 
 	// the coMaster used to be merely a slave. Just point master into *some* position
 	// within coMaster...
+	master, err = StopSlave(&master.Key)
+	if err != nil {
+		goto Cleanup
+	}
 	master, err = ChangeMasterTo(&master.Key, instanceKey, &instance.SelfBinlogCoordinates, false, GTIDHintNeutral)
 	if err != nil {
 		goto Cleanup
