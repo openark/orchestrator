@@ -136,6 +136,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 
 	// Investigate slaves:
 	for _, slaveKey := range instance.SlaveHosts.GetInstanceKeys() {
+		slaveKey := slaveKey
 		discoveryInstanceKeys <- slaveKey
 	}
 	// Investigate master:
@@ -165,6 +166,9 @@ func ContinuousDiscovery() {
 	go ometrics.InitGraphiteMetrics()
 	go acceptSignals()
 
+	if *config.RuntimeCLIFlags.GrabElection {
+		process.GrabElection()
+	}
 	for {
 		select {
 		case <-discoveryTick:
@@ -174,6 +178,7 @@ func ContinuousDiscovery() {
 					instanceKeys, _ := inst.ReadOutdatedInstanceKeys()
 					log.Debugf("outdated keys: %+v", instanceKeys)
 					for _, instanceKey := range instanceKeys {
+						instanceKey := instanceKey
 						go func() { discoveryInstanceKeys <- instanceKey }()
 					}
 					if !wasAlreadyElected {

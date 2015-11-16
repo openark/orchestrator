@@ -74,6 +74,7 @@ func ResolveHostname(hostname string) (string, error) {
 	if strings.Contains(hostname, ",") {
 		return hostname, fmt.Errorf("Will not resolve multi-hostname: %+v", hostname)
 	}
+
 	// First go to lightweight cache
 	if resolvedHostname, found := hostnameResolvesLightweightCache.Get(hostname); found {
 		return resolvedHostname.(string), nil

@@ -421,7 +421,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 		return promotedSlave, nil
 	}
 	if promotedSlave.Key.Equals(candidateInstanceKey) {
-		// Sanity. It IS the candidate
+		// Sanity. It IS the candidate, nothing to promote...
 		return promotedSlave, nil
 	}
 
@@ -716,7 +716,7 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 }
 
 // RecoverDeadCoMaster recovers a dead co-master, complete logic inside
-func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (otherCoMaster *inst.Instance, lostSlaves [](*inst.Instance), err error) {
+func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (promotedSlave *inst.Instance, lostSlaves [](*inst.Instance), err error) {
 	analysisEntry := &topologyRecovery.AnalysisEntry
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	otherCoMasterKey := &analysisEntry.AnalyzedInstanceMasterKey
@@ -737,7 +737,6 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 
 	log.Debugf("topology_recovery: RecoverDeadCoMaster: coMasterRecoveryType=%+v", coMasterRecoveryType)
 
-	var promotedSlave *inst.Instance
 	switch coMasterRecoveryType {
 	case MasterRecoveryGTID:
 		{
@@ -752,16 +751,31 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 
 	if promotedSlave != nil {
 		topologyRecovery.ParticipatingInstanceKeys.AddKey(promotedSlave.Key)
-		promotedSlave, err = replacePromotedSlaveWithCandidate(failedInstanceKey, promotedSlave, otherCoMasterKey)
+		if config.Config.CoMasterRecoveryMustPromoteOtherCoMaster {
+			log.Debugf("topology_recovery: CoMasterRecoveryMustPromoteOtherCoMaster is true. Verifying that %+v is/can be promoted", *otherCoMasterKey)
+			promotedSlave, err = replacePromotedSlaveWithCandidate(failedInstanceKey, promotedSlave, otherCoMasterKey)
+		} else {
+			promotedSlave, err = replacePromotedSlaveWithCandidate(failedInstanceKey, promotedSlave, nil)
+		}
 		topologyRecovery.AddError(err)
 	}
 	if promotedSlave != nil {
-		if promotedSlave.Key.Equals(otherCoMasterKey) {
-			topologyRecovery.ParticipatingInstanceKeys.AddKey(*otherCoMasterKey)
-			otherCoMaster = promotedSlave
-		} else {
-			err = log.Errorf("RecoverDeadCoMaster: could not manage to promote other-co-master %+v; was only able to promote %+v", *otherCoMasterKey, promotedSlave.Key)
+		if config.Config.CoMasterRecoveryMustPromoteOtherCoMaster && !promotedSlave.Key.Equals(otherCoMasterKey) {
+			err = log.Errorf("RecoverDeadCoMaster: could not manage to promote other-co-master %+v; was only able to promote %+v; CoMasterRecoveryMustPromoteOtherCoMaster is true, therefore failing", *otherCoMasterKey, promotedSlave.Key)
 			promotedSlave = nil
+		}
+	}
+	if promotedSlave != nil {
+		topologyRecovery.ParticipatingInstanceKeys.AddKey(promotedSlave.Key)
+	}
+
+	if promotedSlave != nil && !promotedSlave.Key.Equals(otherCoMasterKey) {
+		// make promoted slave co-master of the other co-master
+		otherCoMaster, found, _ := inst.ReadInstance(otherCoMasterKey)
+		if found && otherCoMaster.MasterKey.Equals(&promotedSlave.Key) {
+			// TODO
+		} else {
+			err = log.Errorf("RecoverDeadCoMaster: GRRRR. We promoted %+v which was not the _other_ co-master (%+v), however the co-master didn't turn to be its slave. This freaks out because we can't reliably make promoted slave co-master with the other co-master.", promotedSlave.Key, *otherCoMasterKey)
 		}
 	}
 
@@ -788,7 +802,7 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 		topologyRecovery.AddPostponedFunction(postponedFunction)
 	}
 
-	return otherCoMaster, lostSlaves, err
+	return promotedSlave, lostSlaves, err
 }
 
 // checkAndRecoverDeadCoMaster checks a given analysis, decides whether to take action, and possibly takes action
@@ -806,26 +820,25 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 
 	// That's it! We must do recovery!
 	recoverDeadCoMasterCounter.Inc(1)
-	coMaster, lostSlaves, err := RecoverDeadCoMaster(topologyRecovery, skipProcesses)
-	ResolveRecovery(topologyRecovery, coMaster)
-	if coMaster == nil {
+	promotedSlave, lostSlaves, err := RecoverDeadCoMaster(topologyRecovery, skipProcesses)
+	ResolveRecovery(topologyRecovery, promotedSlave)
+	if promotedSlave == nil {
 		inst.AuditOperation("recover-dead-co-master", failedInstanceKey, "Failure: no slave promoted.")
 	} else {
-		inst.AuditOperation("recover-dead-co-master", failedInstanceKey, fmt.Sprintf("promoted co-master: %+v", coMaster.Key))
+		inst.AuditOperation("recover-dead-co-master", failedInstanceKey, fmt.Sprintf("promoted: %+v", promotedSlave.Key))
 	}
 	topologyRecovery.LostSlaves.AddInstances(lostSlaves)
-	if coMaster != nil {
+	if promotedSlave != nil {
 		// success
 		recoverDeadCoMasterSuccessCounter.Inc(1)
 
 		if config.Config.ApplyMySQLPromotionAfterMasterFailover {
 			log.Debugf("topology_recovery: - RecoverDeadMaster: will apply MySQL changes to promoted master")
-			inst.DetachSlaveOperation(&coMaster.Key)
-			inst.SetReadOnly(&coMaster.Key, false)
+			inst.SetReadOnly(&promotedSlave.Key, false)
 		}
 		if !skipProcesses {
 			// Execute post intermediate-master-failover processes
-			topologyRecovery.SuccessorKey = &coMaster.Key
+			topologyRecovery.SuccessorKey = &promotedSlave.Key
 			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
 		}
 	} else {

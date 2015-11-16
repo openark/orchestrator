@@ -804,6 +804,7 @@ func main() {
 	config.RuntimeCLIFlags.SkipUnresolveCheck = flag.Bool("skip-unresolve-check", false, "Skip/ignore checking an unresolve mapping (via hostname_unresolve table) resolves back to same hostname")
 	config.RuntimeCLIFlags.Noop = flag.Bool("noop", false, "Dry run; do not perform destructing operations")
 	config.RuntimeCLIFlags.BinlogFile = flag.String("binlog", "", "Binary log file name")
+	config.RuntimeCLIFlags.GrabElection = flag.Bool("grab-election", false, "Grab leadership (only applies to continuous mode)")
 	flag.Parse()
 
 	if *destination != "" && *sibling != "" {

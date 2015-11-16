@@ -23,6 +23,7 @@ type CLIFlags struct {
 	SkipUnresolveCheck *bool
 	BinlogFile         *string
 	Databaseless       *bool
+	GrabElection       *bool
 }
 
 var RuntimeCLIFlags CLIFlags
