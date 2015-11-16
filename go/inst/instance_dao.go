@@ -407,7 +407,9 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
         	from 
         		information_schema.processlist 
         	where 
-        		command='Binlog Dump'`,
+        		command='Binlog Dump'
+        		or command='Binlog Dump GTID'
+        		`,
 			func(m sqlutils.RowMap) error {
 				cname, resolveErr := ResolveHostname(m.GetString("slave_hostname"))
 				if resolveErr != nil {
@@ -442,6 +444,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 				    and id != connection_id()
 				    and user != 'system user' 
 				    and command != 'Binlog dump'
+				    and command != 'Binlog Dump GTID'
 				    and user != 'event_scheduler'
 				  order by
 				    time desc
