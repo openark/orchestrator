@@ -40,6 +40,23 @@ type CliCommand struct {
 	Description string
 }
 
+// The following characters can be used to split instance names.
+const instanceSeparatorChars = " ,"
+
+// split the instance name where separated by instanceSeparatorChars characters
+func splitBySeparator(instance string) []string {
+	f := func(c rune) bool {
+		for i := range instanceSeparatorChars {
+			if c == rune(instanceSeparatorChars[i]) {
+				return true
+			}
+		}
+		return false
+	}
+
+	return strings.FieldsFunc(instance, f)
+}
+
 func registerCliCommand(command string, section string, description string) string {
 	knownCommands = append(knownCommands, CliCommand{Command: command, Section: section, Description: description})
 	return command
@@ -65,7 +82,7 @@ func availableCommandsUsage() string {
 Run 'orchestrator' for full blown documentation
 
 Usage for most commands:
-	orchestrator -c <command> [-i <instance.fqdn>] [-d <destination.fqdn>] [--verbose|--debug]
+	orchestrator -c <command> [-i <instance.fqdn>[,<instance.fqdn>]* ] [-d <destination.fqdn>] [--verbose|--debug]
 `, commandsListing())
 }
 
@@ -104,9 +121,31 @@ func assignThisInstanceKey() *inst.InstanceKey {
 	return thisInstanceKey
 }
 
+// Common code to deduce the instance's instanceKey if not defined.
+func deduceInstanceKeyIfNeeded(instance string, instanceKey *inst.InstanceKey) *inst.InstanceKey {
+	if instanceKey == nil {
+		instanceKey = assignThisInstanceKey()
+	}
+	if instanceKey == nil {
+		log.Fatal("Cannot deduce instance:", instance)
+	}
+	return instanceKey
+}
+
 // Cli initiates a command line interface, executing requested command.
 func Cli(command string, strict bool, instance string, destination string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string, hostnameFlag string) {
+	// Check if we have been provided multiple instance names and
+	// process them sequentially.
+	if instance != "" && strings.ContainsAny(instance, instanceSeparatorChars) {
+		instances := splitBySeparator(instance)
 
+		// Run the same command for each entry in instances
+		// - attempt to parallelise later when this is appropriate
+		for i := range instances {
+			Cli(command, strict, instances[i], destination, owner, reason, duration, pattern, clusterAlias, pool, hostnameFlag)
+		}
+		return
+	}
 	if instance != "" && !strings.Contains(instance, ":") {
 		instance = fmt.Sprintf("%s:%d", instance, config.Config.DefaultInstancePort)
 	}
@@ -158,12 +197,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	// smart mode
 	case registerCliCommand("relocate", "Smart relocation", `Relocate a slave beneath another instance`), registerCliCommand("relocate-below", "Smart relocation", `Synonym to 'relocate', will be deprecated`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
@@ -175,12 +209,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("relocate-slaves", "Smart relocation", `Relocates all or part of the slaves of a given instance under another instance`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
@@ -217,12 +246,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		// move, binlog file:pos
 	case registerCliCommand("move-up", "Classic file:pos relocation", `Move a slave one level up the topology`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			instance, err := inst.MoveUp(instanceKey)
 			if err != nil {
 				log.Fatale(err)
@@ -249,12 +273,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("move-below", "Classic file:pos relocation", `Moves a slave beneath its sibling. Both slaves must be actively replicating from same master.`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination/sibling:", destination)
 			}
@@ -266,12 +285,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("move-equivalent", "Classic file:pos relocation", `Moves a slave beneath another server, based on previously recorded "equivalence coordinates"`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
@@ -283,12 +297,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("repoint", "Classic file:pos relocation", `Make the given instance replicate from another instance without changing the binglog coordinates. Use with care`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			// destinationKey can be null, in which case the instance repoints to its existing master
 			instance, err := inst.Repoint(instanceKey, destinationKey, inst.GTIDHintNeutral)
 			if err != nil {
@@ -298,12 +307,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("repoint-slaves", "Classic file:pos relocation", `Repoint all slaves of given instance to replicate back from the instance. Use with care`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			repointedSlaves, err, errs := inst.RepointSlavesTo(instanceKey, pattern, destinationKey)
 			if err != nil {
 				log.Fatale(err)
@@ -340,12 +344,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("make-co-master", "Classic file:pos relocation", `Create a master-master replication. Given instance is a slave which replicates directly from a master.`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			_, err := inst.MakeCoMaster(instanceKey)
 			if err != nil {
 				log.Fatale(err)
@@ -383,12 +382,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	// move, GTID
 	case registerCliCommand("move-gtid", "GTID relocation", `Move a slave beneath another instance.`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
@@ -400,12 +394,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("move-slaves-gtid", "GTID relocation", `Moves all slaves of a given instance under another (destination) instance using GTID`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
@@ -441,12 +430,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("match", "Pseudo-GTID relocation", `Matches a slave beneath another (destination) instance using Pseudo-GTID`),
 		registerCliCommand("match-below", "Pseudo-GTID relocation", `Synonym to 'match', will be deprecated`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
@@ -458,12 +442,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("match-up", "Pseudo-GTID relocation", `Transport the slave one level up the hierarchy, making it child of its grandparent, using Pseudo-GTID`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			instance, _, err := inst.MatchUp(instanceKey, true)
 			if err != nil {
 				log.Fatale(err)
@@ -472,12 +451,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("rematch", "Pseudo-GTID relocation", `Reconnect a slave onto its master, via PSeudo-GTID.`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			instance, _, err := inst.RematchSlave(instanceKey, true)
 			if err != nil {
 				log.Fatale(err)
@@ -545,12 +519,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		// General replication commands
 	case registerCliCommand("enable-gtid", "Replication, general", `If possible, turn on GTID replication`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			_, err := inst.EnableGTID(instanceKey)
 			if err != nil {
 				log.Fatale(err)
@@ -559,12 +528,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("disable-gtid", "Replication, general", `Turn off GTID replication, back to file:pos replication`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			_, err := inst.DisableGTID(instanceKey)
 			if err != nil {
 				log.Fatale(err)
@@ -573,12 +537,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("skip-query", "Replication, general", `Skip a single statement on a slave; either when running with GTID or without`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			_, err := inst.SkipQuery(instanceKey)
 			if err != nil {
 				log.Fatale(err)
@@ -587,12 +546,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("stop-slave", "Replication, general", `Issue a STOP SLAVE on an instance`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			_, err := inst.StopSlave(instanceKey)
 			if err != nil {
 				log.Fatale(err)
@@ -601,12 +555,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("start-slave", "Replication, general", `Issue a START SLAVE on an instance`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			_, err := inst.StartSlave(instanceKey)
 			if err != nil {
 				log.Fatale(err)
@@ -615,12 +564,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("restart-slave", "Replication, general", `STOP and START SLAVE on an instance`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			_, err := inst.RestartSlave(instanceKey)
 			if err != nil {
 				log.Fatale(err)
@@ -629,12 +573,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("reset-slave", "Replication, general", `Issues a RESET SLAVE command; use with care`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			_, err := inst.ResetSlaveOperation(instanceKey)
 			if err != nil {
 				log.Fatale(err)
@@ -643,12 +582,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("detach-slave", "Replication, general", `Stops replication and modified binlog position into an impossible, yet reversible, value.`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			_, err := inst.DetachSlaveOperation(instanceKey)
 			if err != nil {
 				log.Fatale(err)
@@ -657,12 +591,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("reattach-slave", "Replication, general", `Undo a detach-slave operation`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			_, err := inst.ReattachSlaveOperation(instanceKey)
 			if err != nil {
 				log.Fatale(err)
@@ -698,12 +627,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		// Pool
 	case registerCliCommand("set-read-only", "Instance", `Turn an instance read-only, via SET GLOBAL read_only := 1`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			_, err := inst.SetReadOnly(instanceKey, true)
 			if err != nil {
 				log.Fatale(err)
@@ -712,12 +636,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("set-writeable", "Instance", `Turn an instance writeable, via SET GLOBAL read_only := 0`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			_, err := inst.SetReadOnly(instanceKey, false)
 			if err != nil {
 				log.Fatale(err)
@@ -727,12 +646,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		// Binary log operations
 	case registerCliCommand("flush-binary-logs", "Binary logs", `Flush binary logs on an instance`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			var err error
 			if *config.RuntimeCLIFlags.BinlogFile == "" {
 				_, err = inst.FlushBinaryLogs(instanceKey, 1)
@@ -746,12 +660,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("purge-binary-logs", "Binary logs", `Purge binary logs of an instance`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			var err error
 			if *config.RuntimeCLIFlags.BinlogFile == "" {
 				log.Fatal("expecting --binlog value")
@@ -898,12 +807,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("topology", "Information", `Show an ascii-graph of a replication topology, given a member of that topology`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			output, err := inst.ASCIITopology(instanceKey, pattern)
 			if err != nil {
 				log.Fatale(err)
@@ -1016,12 +920,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		// Instance management
 	case registerCliCommand("discover", "Instance management", `Lookup an instance, investigate it`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			instance, err := inst.ReadTopologyInstance(instanceKey)
 			if err != nil {
 				log.Fatale(err)
@@ -1044,12 +943,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("begin-maintenance", "Instance management", `Request a maintenance lock on an instance`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			if reason == "" {
 				log.Fatal("--reason option required")
 			}
@@ -1075,12 +969,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("end-maintenance", "Instance management", `Remove maintenance lock from an instance`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			err := inst.EndMaintenanceByInstanceKey(instanceKey)
 			if err != nil {
 				log.Fatale(err)
@@ -1089,12 +978,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("begin-downtime", "Instance management", `Mark an instance as downtimed`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			if reason == "" {
 				log.Fatal("--reason option required")
 			}
@@ -1118,12 +1002,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("end-downtime", "Instance management", `Indicate an instance is no longer downtimed`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			err := inst.EndDowntime(instanceKey)
 			if err != nil {
 				log.Fatale(err)
@@ -1172,12 +1051,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if reason == "" {
 				log.Fatal("--reason option required (comment your ack)")
 			}
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 
 			countRecoveries, err := logic.AcknowledgeInstanceRecoveries(instanceKey, inst.GetMaintenanceOwner(), reason)
 			if err != nil {
@@ -1188,12 +1062,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	// Instance meta
 	case registerCliCommand("register-candidate", "Instance, meta", `Indicate that a specific instance is a preferred candidate for master promotion`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			err := inst.RegisterCandidateInstance(instanceKey)
 			if err != nil {
 				log.Fatale(err)
@@ -1202,12 +1071,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("register-hostname-unresolve", "Instance, meta", `Assigns the given instance a virtual (aka "unresolved") name`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			err := inst.RegisterHostnameUnresolve(instanceKey, hostnameFlag)
 			if err != nil {
 				log.Fatale(err)
@@ -1216,12 +1080,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("deregister-hostname-unresolve", "Instance, meta", `Explicitly deregister/dosassociate a hostname with an "unresolved" name`):
 		{
-			if instanceKey == nil {
-				instanceKey = assignThisInstanceKey()
-			}
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
 			err := inst.DeregisterHostnameUnresolve(instanceKey)
 			if err != nil {
 				log.Fatale(err)
