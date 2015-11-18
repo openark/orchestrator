@@ -628,6 +628,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.IsCoMaster = m.GetBool("is_co_master")
 	instance.IsUpToDate = (m.GetUint("seconds_since_last_checked") <= config.Config.InstancePollSeconds)
 	instance.IsRecentlyChecked = (m.GetUint("seconds_since_last_checked") <= config.Config.InstancePollSeconds*5)
+	instance.LastSeenTimestamp = m.GetString("last_seen")
 	instance.IsLastCheckValid = m.GetBool("is_last_check_valid")
 	instance.SecondsSinceLastSeen = m.GetNullInt64("seconds_since_last_seen")
 	instance.IsCandidate = m.GetBool("is_candidate")
@@ -1664,6 +1665,10 @@ func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
 
 // FlushBinaryLogs attempts a 'FLUSH BINARY LOGS' statement on the given instance.
 func FlushBinaryLogs(instanceKey *InstanceKey, count int) (*Instance, error) {
+	if *config.RuntimeCLIFlags.Noop {
+		return nil, fmt.Errorf("noop: aborting flush-binary-logs operation on %+v; signalling error but nothing went wrong.", *instanceKey)
+	}
+
 	for i := 0; i < count; i++ {
 		_, err := ExecInstance(instanceKey, `flush binary logs`)
 		if err != nil {
@@ -1693,6 +1698,10 @@ func FlushBinaryLogsTo(instanceKey *InstanceKey, logFile string) (*Instance, err
 
 // FlushBinaryLogsTo attempts to 'PURGE BINARY LOGS' until given binary log is reached
 func PurgeBinaryLogsTo(instanceKey *InstanceKey, logFile string) (*Instance, error) {
+	if *config.RuntimeCLIFlags.Noop {
+		return nil, fmt.Errorf("noop: aborting purge-binary-logs operation on %+v; signalling error but nothing went wrong.", *instanceKey)
+	}
+
 	_, err := ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("purge binary logs to '%s'", logFile))
 	if err != nil {
 		return nil, log.Errore(err)

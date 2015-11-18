@@ -65,6 +65,7 @@ type Instance struct {
 	ReplicationDepth      uint
 	IsCoMaster            bool
 
+	LastSeenTimestamp    string
 	IsLastCheckValid     bool
 	IsUpToDate           bool
 	IsRecentlyChecked    bool

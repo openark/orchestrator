@@ -230,6 +230,7 @@ function openNodeModal(node) {
 
     $('#modalDataAttributesTable').html("");
 
+	addNodeModalDataAttribute("Last seen", node.LastSeenTimestamp+ " ("+node.SecondsSinceLastSeen.Int64+"s ago)");
     if (node.IsDowntimed) {
     	var td = addNodeModalDataAttribute("Downtime", node.DowntimeOwner+': '+node.DowntimeReason+' ('+node.DowntimeEndTimestamp+')');
         $('#node_modal [data-btn=end-downtime]').appendTo(td.find("div"));
