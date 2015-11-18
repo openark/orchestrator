@@ -667,7 +667,7 @@ func MoveSlavesGTID(masterKey *InstanceKey, belowKey *InstanceKey, pattern strin
 // Two use cases:
 // - masterKey is nil: use case is corrupted relay logs on slave
 // - masterKey is not nil: using Binlog servers (coordinates remain the same)
-func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gitdHint OperationGTIDHint) (*Instance, error) {
+func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gtidHint OperationGTIDHint) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
@@ -679,7 +679,7 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gitdHint Operatio
 	if masterKey == nil {
 		masterKey = &instance.MasterKey
 	}
-	// With repoint we *prefer* the master to be alive, but we don't structly require it.
+	// With repoint we *prefer* the master to be alive, but we don't strictly require it.
 	// The use case for the master being alive is with hostname-resolve or hostname-unresolve: asking the slave
 	// to reconnect to its same master while changing the MASTER_HOST in CHANGE MASTER TO due to DNS changes etc.
 	master, err := ReadTopologyInstance(masterKey)
@@ -692,6 +692,14 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gitdHint Operatio
 	}
 	if canReplicate, err := instance.CanReplicateFrom(master); !canReplicate {
 		return instance, err
+	}
+
+	// if a binlog server check it is sufficiently up to date
+	if master.IsBinlogServer() {
+		// "Repoint" operation trusts the user. But only so much. Repoiting to a binlog server which is not yet there is strictly wrong.
+		if !instance.ExecBinlogCoordinates.SmallerThanOrEquals(&master.SelfBinlogCoordinates) {
+			return instance, fmt.Errorf("repoint: binlog server %+v is not sufficiently up to date to repoint %+v below it", *masterKey, *instanceKey)
+		}
 	}
 
 	log.Infof("Will repoint %+v to master %+v", *instanceKey, *masterKey)
@@ -711,7 +719,7 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gitdHint Operatio
 	// See above, we are relaxed about the master being accessible/inaccessible.
 	// If accessible, we wish to do hostname-unresolve. If inaccessible, we can skip the test and not fail the
 	// ChangeMasterTo operation. This is why we pass "!masterIsAccessible" below.
-	instance, err = ChangeMasterTo(instanceKey, masterKey, &instance.ExecBinlogCoordinates, !masterIsAccessible, gitdHint)
+	instance, err = ChangeMasterTo(instanceKey, masterKey, &instance.ExecBinlogCoordinates, !masterIsAccessible, gtidHint)
 	if err != nil {
 		goto Cleanup
 	}
@@ -2153,6 +2161,9 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 		otherMaster, found, err := ReadInstance(&other.MasterKey)
 		if err != nil || !found {
 			return instance, err
+		}
+		if !other.IsLastCheckValid {
+			return instance, log.Errorf("Binlog server %+v is not reachable. It would take two steps to relocate %+v below it, and I won't even do the first step.", other.Key, instance.Key)
 		}
 		log.Debugf("Relocating to a binlog server; will first attempt to relocate to the binlog server's master: %+v, and then repoint down", otherMaster.Key)
 		if _, err := relocateBelowInternal(instance, otherMaster); err != nil {

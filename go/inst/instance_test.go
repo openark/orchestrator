@@ -103,6 +103,9 @@ func (s *TestSuite) TestBinlogCoordinates(c *C) {
 	c.Assert(c3.SmallerThan(&c2), Equals, false)
 	c.Assert(c4.SmallerThan(&c2), Equals, false)
 	c.Assert(c4.SmallerThan(&c3), Equals, false)
+
+	c.Assert(c1.SmallerThanOrEquals(&c2), Equals, true)
+	c.Assert(c1.SmallerThanOrEquals(&c3), Equals, true)
 }
 
 func (s *TestSuite) TestBinlogPrevious(c *C) {
