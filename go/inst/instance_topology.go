@@ -2154,7 +2154,7 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 	}
 	if instanceMaster.MasterKey.Equals(&other.Key) && instanceMaster.IsBinlogServer() {
 		// Moving to grandparent via binlog server
-		return MoveUp(&instance.Key)
+		return Repoint(&instance.Key, &instanceMaster.MasterKey, GTIDHintDeny)
 	}
 	if other.IsBinlogServer() {
 		// Relocate to its master, then repoint to the binlog server
