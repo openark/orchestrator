@@ -17,7 +17,6 @@
 package inst
 
 import (
-	"database/sql"
 	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/math"
@@ -421,8 +420,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 	{
-		instance.ClusterName, instance.ReplicationDepth, instance.IsCoMaster, err = ReadClusterNameByMaster(&instance.Key, &instance.MasterKey)
-		logReadTopologyInstanceError(instanceKey, "ReadClusterNameByMaster", err)
+		err = ReadInstanceClusterAttributes(instance)
+		logReadTopologyInstanceError(instanceKey, "ReadInstanceClusterAttributes", err)
 	}
 	if instance.ReplicationDepth == 0 && config.Config.DetectClusterAliasQuery != "" && !isMaxScale {
 		// Only need to do on masters
@@ -463,51 +462,75 @@ Cleanup:
 	}
 }
 
-// ReadClusterNameByMaster will return the cluster name for a given instance by looking at its master
+// ReadInstanceClusterAttributes will return the cluster name for a given instance by looking at its master
 // and getting it from there.
 // It is a non-recursive function and so-called-recursion is performed upon periodic reading of
 // instances.
-func ReadClusterNameByMaster(instanceKey *InstanceKey, masterKey *InstanceKey) (clusterName string, replicationDepth uint, isCoMaster bool, err error) {
+func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 	if config.Config.DatabaselessMode__experimental {
-		return "", 0, false, nil
-	}
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		return "", 0, false, log.Errore(err)
+		return nil
 	}
 
-	clusterNameByInstanceKey := fmt.Sprintf("%s:%d", instanceKey.Hostname, instanceKey.Port)
 	var masterMasterKey InstanceKey
-	err = db.QueryRow(`
-       	select 
-       		if (
-       			max(cluster_name) != '',
-       			max(cluster_name),
-	       		ifnull(concat(max(hostname), ':', max(port)), '')
-	       	) as cluster_name,
-	       	ifnull(max(replication_depth)+1, 0) as replication_depth,
-	       	ifnull(max(master_host), '') as master_master_host,
-	       	ifnull(max(master_port), 0) as master_master_port
+	var masterClusterName string
+	var masterReplicationDepth uint
+	masterDataFound := false
+
+	// Read the cluster_name of the _master_ of our instance, derive it from there.
+	query := `
+      	select 
+			cluster_name,
+	       	replication_depth,
+	       	master_host,
+	       	master_port
        	from database_instance 
 		 	where hostname=? and port=?
-		 	group by hostname, port`,
-		masterKey.Hostname, masterKey.Port).Scan(&clusterName, &replicationDepth, &masterMasterKey.Hostname, &masterMasterKey.Port)
+	`
+	args := sqlutils.Args(instance.MasterKey.Hostname, instance.MasterKey.Port)
 
-	if err != nil && err != sql.ErrNoRows {
-		return "", 0, false, log.Errore(err)
+	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
+		masterClusterName = m.GetString("cluster_name")
+		masterReplicationDepth = m.GetUint("replication_depth")
+		masterMasterKey.Hostname = m.GetString("master_host")
+		masterMasterKey.Port = m.GetInt("master_port")
+		masterDataFound = true
+		return nil
+	})
+	if err != nil {
+		return log.Errore(err)
 	}
+
+	var replicationDepth uint = 0
+	var clusterName string
+	if masterDataFound {
+		replicationDepth = masterReplicationDepth + 1
+		clusterName = masterClusterName
+	}
+	clusterNameByInstanceKey := instance.Key.StringCode()
 	if clusterName == "" {
+		// Nothing from master; we set it to be named after the instance itself
 		clusterName = clusterNameByInstanceKey
 	}
-	isCoMaster = false
-	if masterMasterKey.Equals(instanceKey) {
+
+	isCoMaster := false
+	if masterMasterKey.Equals(&instance.Key) {
+		// co-master calls for special case, in fear of the infinite loop
 		isCoMaster = true
+		clusterNameByCoMasterKey := instance.MasterKey.StringCode()
+		if clusterName != clusterNameByInstanceKey && clusterName != clusterNameByCoMasterKey {
+			// Can be caused by a co-master topology failover
+			log.Errorf("ReadInstanceClusterAttributes: in co-master topology %s is not in (%s, %s). Forcing it to become one of them", clusterName, clusterNameByInstanceKey, clusterNameByCoMasterKey)
+			clusterName = math.TernaryString(instance.Key.SmallerThan(&instance.MasterKey), clusterNameByInstanceKey, clusterNameByCoMasterKey)
+		}
 		if clusterName == clusterNameByInstanceKey {
 			// circular replication. Avoid infinite ++ on replicationDepth
 			replicationDepth = 0
 		} // While the other stays "1"
 	}
-	return clusterName, replicationDepth, isCoMaster, nil
+	instance.ClusterName = clusterName
+	instance.ReplicationDepth = replicationDepth
+	instance.IsCoMaster = isCoMaster
+	return nil
 }
 
 // readInstanceRow reads a single instance row from the orchestrator backend database.
@@ -936,14 +959,11 @@ func ReviewUnseenInstances() error {
 			continue
 		}
 		instance.MasterKey.Hostname = masterHostname
-		clusterName, replicationDepth, isCoMaster, err := ReadClusterNameByMaster(&instance.Key, &instance.MasterKey)
+		savedClusterName := instance.ClusterName
 
-		if err != nil {
+		if err := ReadInstanceClusterAttributes(instance); err != nil {
 			log.Errore(err)
-		} else if clusterName != instance.ClusterName {
-			instance.ClusterName = clusterName
-			instance.ReplicationDepth = replicationDepth
-			instance.IsCoMaster = isCoMaster
+		} else if instance.ClusterName != savedClusterName {
 			updateInstanceClusterName(instance)
 			operations++
 		}
@@ -1003,7 +1023,7 @@ func InjectUnseenMasters() error {
 	operations := 0
 	for _, masterKey := range unseenMasterKeys {
 		masterKey := masterKey
-		clusterName := fmt.Sprintf("%s:%d", masterKey.Hostname, masterKey.Port)
+		clusterName := masterKey.StringCode()
 		// minimal details:
 		instance := Instance{Key: masterKey, Version: "Unknown", ClusterName: clusterName}
 		if err := writeInstance(&instance, false, nil); err == nil {

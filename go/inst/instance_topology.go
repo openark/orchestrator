@@ -908,7 +908,7 @@ func ResetSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, err
 	}
 
-	log.Infof("Will reset %+v", instanceKey)
+	log.Infof("Will reset slave on %+v", instanceKey)
 
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "reset slave"); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
@@ -1024,6 +1024,95 @@ Cleanup:
 	return instance, err
 }
 
+// DetachSlaveMasterHost detaches a slave from its master by corrupting the Master_Host (in such way that is reversible)
+func DetachSlaveMasterHost(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, err
+	}
+	if !instance.IsSlave() {
+		return instance, fmt.Errorf("instance is not a slave: %+v", *instanceKey)
+	}
+	if instance.MasterKey.IsDetached() {
+		return instance, fmt.Errorf("instance already detached: %+v", *instanceKey)
+	}
+	detachedMasterKey := instance.MasterKey.DetachedKey()
+
+	log.Infof("Will detach master host on %+v. Detached key is %+v", *instanceKey, *detachedMasterKey)
+
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "detach-slave-master-host"); merr != nil {
+		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
+
+	instance, err = StopSlave(instanceKey)
+	if err != nil {
+		goto Cleanup
+	}
+
+	instance, err = ChangeMasterTo(instanceKey, detachedMasterKey, &instance.ExecBinlogCoordinates, true, GTIDHintNeutral)
+	if err != nil {
+		goto Cleanup
+	}
+
+Cleanup:
+	instance, _ = StartSlave(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	// and we're done (pending deferred functions)
+	AuditOperation("repoint", instanceKey, fmt.Sprintf("slave %+v detached from master into %+v", *instanceKey, *detachedMasterKey))
+
+	return instance, err
+}
+
+// ReattachSlaveMasterHost reattaches a slave back onto its master by undoing a DetachSlaveMasterHost operation
+func ReattachSlaveMasterHost(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, err
+	}
+	if !instance.IsSlave() {
+		return instance, fmt.Errorf("instance is not a slave: %+v", *instanceKey)
+	}
+	if !instance.MasterKey.IsDetached() {
+		return instance, fmt.Errorf("instance does not seem to be detached: %+v", *instanceKey)
+	}
+
+	reattachedMasterKey := instance.MasterKey.ReattachedKey()
+
+	log.Infof("Will reattach master host on %+v. Reattached key is %+v", *instanceKey, *reattachedMasterKey)
+
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "reattach-slave-master-host"); merr != nil {
+		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
+
+	instance, err = StopSlave(instanceKey)
+	if err != nil {
+		goto Cleanup
+	}
+
+	instance, err = ChangeMasterTo(instanceKey, reattachedMasterKey, &instance.ExecBinlogCoordinates, true, GTIDHintNeutral)
+	if err != nil {
+		goto Cleanup
+	}
+
+Cleanup:
+	instance, _ = StartSlave(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	// and we're done (pending deferred functions)
+	AuditOperation("repoint", instanceKey, fmt.Sprintf("slave %+v reattached to master $+v", *instanceKey, *reattachedMasterKey))
+
+	return instance, err
+}
+
 // EnableGTID will attempt to enable GTID-mode (either Oracle or MariaDB)
 func EnableGTID(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -1070,6 +1159,62 @@ func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	AuditOperation("disable-gtid", instanceKey, fmt.Sprintf("disabled GTID on %+v", *instanceKey))
+
+	return instance, err
+}
+
+// ResetMasterGTIDOperation will issue a safe RESET MASTER on a slave that replicates via GTID:
+// It will make sure the gtid_purged set matches the executed set value as read just before the RESET.
+// this will enable new slaves to be attached to given instance without complaints about missing/purged entries.
+// This function requires that the instance does not have slaves.
+func ResetMasterGTIDOperation(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, err
+	}
+	if !instance.UsingOracleGTID {
+		return instance, log.Errorf("reset-master-gtid requested for %+v but it is not using oracle-gtid", *instanceKey)
+	}
+	if len(instance.SlaveHosts) > 0 {
+		return instance, log.Errorf("reset-master-gtid will not operate on %+v because it has %+v slaves. Expecting no slaves", *instanceKey, len(instance.SlaveHosts))
+	}
+
+	log.Infof("Will reset master on %+v", instanceKey)
+
+	var executedGtidSet string
+	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "reset-master-gtid"); merr != nil {
+		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
+		goto Cleanup
+	} else {
+		defer EndMaintenance(maintenanceToken)
+	}
+
+	if instance.IsSlave() {
+		instance, err = StopSlave(instanceKey)
+		if err != nil {
+			goto Cleanup
+		}
+	}
+	executedGtidSet = instance.ExecutedGtidSet
+
+	instance, err = ResetMaster(instanceKey)
+	if err != nil {
+		goto Cleanup
+	}
+	err = setGTIDPurged(instance, executedGtidSet)
+	if err != nil {
+		goto Cleanup
+	}
+
+Cleanup:
+	instance, _ = StartSlave(instanceKey)
+
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	// and we're done (pending deferred functions)
+	AuditOperation("reset-master-gtid", instanceKey, fmt.Sprintf("%+v master reset", *instanceKey))
 
 	return instance, err
 }

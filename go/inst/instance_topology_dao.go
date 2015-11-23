@@ -550,6 +550,37 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
+// ResetMaster issues a RESET MASTER statement on given instance. Use with extreme care!
+func ResetMaster(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	if instance.SlaveRunning() {
+		return instance, fmt.Errorf("Cannot reset master on: %+v because slave is running", instanceKey)
+	}
+
+	if *config.RuntimeCLIFlags.Noop {
+		return instance, fmt.Errorf("noop: aborting reset-master operation on %+v; signalling error but nothing went wrong.", *instanceKey)
+	}
+
+	_, err = ExecInstanceNoPrepare(instanceKey, `reset master`)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	log.Infof("Reset master %+v", instanceKey)
+
+	instance, err = ReadTopologyInstance(instanceKey)
+	return instance, err
+}
+
+// skipQueryClassic skips a query in normal binlog file:pos replication
+func setGTIDPurged(instance *Instance, gtidPurged string) error {
+	_, err := ExecInstance(&instance.Key, fmt.Sprintf(`set global gtid_purged := '%s'`, gtidPurged))
+	return err
+}
+
 // skipQueryClassic skips a query in normal binlog file:pos replication
 func skipQueryClassic(instance *Instance) error {
 	_, err := ExecInstance(&instance.Key, `set global sql_slave_skip_counter := 1`)
@@ -648,7 +679,7 @@ func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
-// ReattachSlave restores a detahced slave back into replication
+// ReattachSlave restores a detached slave back into replication
 func ReattachSlave(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {

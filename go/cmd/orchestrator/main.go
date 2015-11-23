@@ -367,7 +367,7 @@ Cheatsheet:
             orchestrator -c reset-slave -i slave.to.reset.com
             
         detach-slave
-            Stops replication and modified binlog position into an impossible, yet reversible, value.
+            Stops replication and modifies binlog position into an impossible, yet reversible, value.
             This effectively means the replication becomes broken. See reattach-slave. Example:
             
             orchestrator -c detach-slave -i slave.whose.replication.will.break.com
@@ -379,6 +379,22 @@ Cheatsheet:
             resumes replication. Example:
             
             orchestrator -c reattach-slave -i detahced.slave.whose.replication.will.amend.com
+
+            Issuing this on an attached (i.e. normal) slave will do nothing.
+    
+        detach-slave-master-host
+            Stops replication and modifies Master_Host into an impossible, yet reversible, value.
+            This effectively means the replication becomes broken. See reattach-slave-master-host. Example:
+            
+            orchestrator -c detach-slave-master-host -i slave.whose.replication.will.break.com
+            
+            Issuing this on an already detached slave will do nothing.
+            
+        reattach-slave-master-host
+            Undo a detach-slave-master-host operation. Reverses the hostname change into the original value, and 
+            resumes replication. Example:
+            
+            orchestrator -c reattach-slave-master-host -i detahced.slave.whose.replication.will.amend.com
 
             Issuing this on an attached (i.e. normal) slave will do nothing.
     

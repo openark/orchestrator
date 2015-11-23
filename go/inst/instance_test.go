@@ -221,6 +221,32 @@ func (s *TestSuite) TestParseInstanceKey(c *C) {
 	c.Assert(i.Port, Equals, 3306)
 }
 
+func (s *TestSuite) TestInstanceKeyValid(c *C) {
+	c.Assert(key1.IsValid(), Equals, true)
+	i, err := inst.ParseInstanceKey("_:3306")
+	c.Assert(err, IsNil)
+	c.Assert(i.IsValid(), Equals, false)
+	i, err = inst.ParseInstanceKey("//myhost:3306")
+	c.Assert(err, IsNil)
+	c.Assert(i.IsValid(), Equals, false)
+}
+
+func (s *TestSuite) TestInstanceKeyDetach(c *C) {
+	c.Assert(key1.IsDetached(), Equals, false)
+	detached1 := key1.DetachedKey()
+	c.Assert(detached1.IsDetached(), Equals, true)
+	detached2 := key1.DetachedKey()
+	c.Assert(detached2.IsDetached(), Equals, true)
+	c.Assert(detached1.Equals(detached2), Equals, true)
+
+	reattached1 := detached1.ReattachedKey()
+	c.Assert(reattached1.IsDetached(), Equals, false)
+	c.Assert(reattached1.Equals(&key1), Equals, true)
+	reattached2 := reattached1.ReattachedKey()
+	c.Assert(reattached2.IsDetached(), Equals, false)
+	c.Assert(reattached1.Equals(reattached2), Equals, true)
+}
+
 func (s *TestSuite) TestInstanceKeyMapToJSON(c *C) {
 	m := *inst.NewInstanceKeyMap()
 	m.AddKey(key1)

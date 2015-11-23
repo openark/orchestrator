@@ -1126,6 +1126,10 @@ function Cluster() {
             }
             addSidebarInfoPopoverContent(content, true);
         }
+        {
+        	var content = '<strong>'+currentClusterName()+'</strong>';
+            addSidebarInfoPopoverContent(content, true);
+        }
         // Colorize-dc
         {
 		    var glyph = $("#cluster_sidebar [data-bullet=colorize-dc] .glyphicon");

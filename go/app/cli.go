@@ -641,7 +641,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
-	case registerCliCommand("detach-slave", "Replication, general", `Stops replication and modified binlog position into an impossible, yet reversible, value.`):
+	case registerCliCommand("detach-slave", "Replication, general", `Stops replication and modifies binlog position into an impossible, yet reversible, value.`):
 		{
 			if instanceKey == nil {
 				instanceKey = assignThisInstanceKey()
@@ -664,6 +664,34 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 			_, err := inst.ReattachSlaveOperation(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
+	case registerCliCommand("detach-slave-master-host", "Replication, general", `Stops replication and modifies Master_Host into an impossible, yet reversible, value.`):
+		{
+			if instanceKey == nil {
+				instanceKey = assignThisInstanceKey()
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			_, err := inst.DetachSlaveMasterHost(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
+	case registerCliCommand("reattach-slave-master-host", "Replication, general", `Undo a detach-slave-master-host operation`):
+		{
+			if instanceKey == nil {
+				instanceKey = assignThisInstanceKey()
+			}
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			_, err := inst.ReattachSlaveMasterHost(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1142,6 +1170,9 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			if recoveryAttempted {
+				if promotedInstanceKey == nil {
+					log.Fatalf("Recovery attempted yet no slave promoted")
+				}
 				fmt.Println(promotedInstanceKey.DisplayString())
 			}
 		}

@@ -29,6 +29,8 @@ type InstanceKey struct {
 	Port     int
 }
 
+const detachHint = "//"
+
 // ParseInstanceKey will parse an InstanceKey from a string representation such as 127.0.0.1:3306
 func NewRawInstanceKey(hostPort string) (*InstanceKey, error) {
 	tokens := strings.SplitN(hostPort, ":", 2)
@@ -92,17 +94,61 @@ func (this *InstanceKey) Equals(other *InstanceKey) bool {
 	return this.Hostname == other.Hostname && this.Port == other.Port
 }
 
+// SmallerThan returns true if this key is dictionary-smaller than another.
+// This is used for consistent sorting/ordering; there's nothing magical about it.
+func (this *InstanceKey) SmallerThan(other *InstanceKey) bool {
+	if this.Hostname < other.Hostname {
+		return true
+	}
+	if this.Hostname == other.Hostname && this.Port < other.Port {
+		return true
+	}
+	return false
+}
+
+// IsDetached returns 'true' when this hostname is logically "detached"
+func (this *InstanceKey) IsDetached() bool {
+	return strings.HasPrefix(this.Hostname, detachHint)
+}
+
 // IsValid uses simple heuristics to see whether this key represents an actual instance
 func (this *InstanceKey) IsValid() bool {
+	if this.Hostname == "_" {
+		return false
+	}
+	if this.IsDetached() {
+		return false
+	}
 	return len(this.Hostname) > 0 && this.Port > 0
+}
+
+// DetachedKey returns an instance key whose hostname is detahced: invalid, but recoverable
+func (this *InstanceKey) DetachedKey() *InstanceKey {
+	if this.IsDetached() {
+		return this
+	}
+	return &InstanceKey{Hostname: fmt.Sprintf("%s%s", detachHint, this.Hostname), Port: this.Port}
+}
+
+// ReattachedKey returns an instance key whose hostname is detahced: invalid, but recoverable
+func (this *InstanceKey) ReattachedKey() *InstanceKey {
+	if !this.IsDetached() {
+		return this
+	}
+	return &InstanceKey{Hostname: this.Hostname[len(detachHint):], Port: this.Port}
+}
+
+// StringCode returns an official string representation of this key
+func (this *InstanceKey) StringCode() string {
+	return fmt.Sprintf("%s:%d", this.Hostname, this.Port)
 }
 
 // DisplayString returns a user-friendly string representation of this key
 func (this *InstanceKey) DisplayString() string {
-	return fmt.Sprintf("%s:%d", this.Hostname, this.Port)
+	return this.StringCode()
 }
 
 // String returns a user-friendly string representation of this key
 func (this InstanceKey) String() string {
-	return this.DisplayString()
+	return this.StringCode()
 }

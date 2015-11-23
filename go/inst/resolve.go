@@ -74,6 +74,9 @@ func ResolveHostname(hostname string) (string, error) {
 	if strings.Contains(hostname, ",") {
 		return hostname, fmt.Errorf("Will not resolve multi-hostname: %+v", hostname)
 	}
+	if (&InstanceKey{Hostname: hostname}).IsDetached() {
+		return hostname, fmt.Errorf("Will not resolve detached hostname: %+v", hostname)
+	}
 
 	// First go to lightweight cache
 	if resolvedHostname, found := hostnameResolvesLightweightCache.Get(hostname); found {

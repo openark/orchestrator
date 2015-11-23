@@ -720,7 +720,10 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 	analysisEntry := &topologyRecovery.AnalysisEntry
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	otherCoMasterKey := &analysisEntry.AnalyzedInstanceMasterKey
-
+	otherCoMaster, found, _ := inst.ReadInstance(otherCoMasterKey)
+	if otherCoMaster == nil || !found {
+		return nil, lostSlaves, topologyRecovery.AddError(log.Errorf("RecoverDeadCoMaster: could not read info for co-master %+v of %+v", *otherCoMasterKey, *failedInstanceKey))
+	}
 	inst.AuditOperation("recover-dead-co-master", failedInstanceKey, "problem found; will recover")
 	if !skipProcesses {
 		if err := executeProcesses(config.Config.PreFailoverProcesses, "PreFailoverProcesses", topologyRecovery, true); err != nil {
@@ -749,19 +752,33 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 	}
 	topologyRecovery.AddError(err)
 
+	mustPromoteOtherCoMaster := config.Config.CoMasterRecoveryMustPromoteOtherCoMaster
+	if !otherCoMaster.ReadOnly {
+		log.Debugf("topology_recovery: RecoverDeadCoMaster: other co-master %+v is writeable hence has to be promoted", otherCoMaster.Key)
+		mustPromoteOtherCoMaster = true
+	}
+	log.Debugf("topology_recovery: RecoverDeadCoMaster: mustPromoteOtherCoMaster? %+v", mustPromoteOtherCoMaster)
+
 	if promotedSlave != nil {
 		topologyRecovery.ParticipatingInstanceKeys.AddKey(promotedSlave.Key)
-		if config.Config.CoMasterRecoveryMustPromoteOtherCoMaster {
-			log.Debugf("topology_recovery: CoMasterRecoveryMustPromoteOtherCoMaster is true. Verifying that %+v is/can be promoted", *otherCoMasterKey)
+		if mustPromoteOtherCoMaster {
+			log.Debugf("topology_recovery: mustPromoteOtherCoMaster. Verifying that %+v is/can be promoted", *otherCoMasterKey)
 			promotedSlave, err = replacePromotedSlaveWithCandidate(failedInstanceKey, promotedSlave, otherCoMasterKey)
 		} else {
+			// We are allowed to promote any server
 			promotedSlave, err = replacePromotedSlaveWithCandidate(failedInstanceKey, promotedSlave, nil)
+
+			if promotedSlave.DataCenter == otherCoMaster.DataCenter &&
+				promotedSlave.PhysicalEnvironment == otherCoMaster.PhysicalEnvironment && false {
+				// and _still_ we prefer to promote the co-master! They're in same env & DC so no worries about geo issues!
+				promotedSlave, err = replacePromotedSlaveWithCandidate(failedInstanceKey, promotedSlave, otherCoMasterKey)
+			}
 		}
 		topologyRecovery.AddError(err)
 	}
 	if promotedSlave != nil {
-		if config.Config.CoMasterRecoveryMustPromoteOtherCoMaster && !promotedSlave.Key.Equals(otherCoMasterKey) {
-			err = log.Errorf("RecoverDeadCoMaster: could not manage to promote other-co-master %+v; was only able to promote %+v; CoMasterRecoveryMustPromoteOtherCoMaster is true, therefore failing", *otherCoMasterKey, promotedSlave.Key)
+		if mustPromoteOtherCoMaster && !promotedSlave.Key.Equals(otherCoMasterKey) {
+			topologyRecovery.AddError(log.Errorf("RecoverDeadCoMaster: could not manage to promote other-co-master %+v; was only able to promote %+v; CoMasterRecoveryMustPromoteOtherCoMaster is true, therefore failing", *otherCoMasterKey, promotedSlave.Key))
 			promotedSlave = nil
 		}
 	}
@@ -769,14 +786,23 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 		topologyRecovery.ParticipatingInstanceKeys.AddKey(promotedSlave.Key)
 	}
 
+	// OK, we may have someone promoted. Either this was the other co-master or another slave.
+	// Noting down that we DO NOT attempt to set a new co-master topology. We are good with remaining with a single master.
+	// I tried solving the "let's promote a slave and create a new co-master setup" but this turns so complex due to various factors.
+	// I see this as risky and not worth the questionable benefit.
+	// Maybe future me is a smarter person and finds a simple solution. Unlikely. I'm getting dumber.
+	//
+	// ...
+	// Now that we're convinved, take a look at what we can be left with:
+	// Say we started with M1<->M2<-S1, with M2 failing, and we promoted S1.
+	// We now have M1->S1 (because S1 is promoted), S1->M2 (because that's what it remembers), M2->M1 (because that's what it remembers)
+	// !! This is an evil 3-node circle that must be broken.
+	// config.Config.ApplyMySQLPromotionAfterMasterFailover, if true, will cause it to break, because we would RESET SLAVE on S1
+	// but we want to make sure the circle is broken no matter what.
+	// So in the case we promoted not-the-other-co-master, we issue a detach-slave-master-host, which is a reversible operation
 	if promotedSlave != nil && !promotedSlave.Key.Equals(otherCoMasterKey) {
-		// make promoted slave co-master of the other co-master
-		otherCoMaster, found, _ := inst.ReadInstance(otherCoMasterKey)
-		if found && otherCoMaster.MasterKey.Equals(&promotedSlave.Key) {
-			// TODO
-		} else {
-			err = log.Errorf("RecoverDeadCoMaster: GRRRR. We promoted %+v which was not the _other_ co-master (%+v), however the co-master didn't turn to be its slave. This freaks out because we can't reliably make promoted slave co-master with the other co-master.", promotedSlave.Key, *otherCoMasterKey)
-		}
+		_, err = inst.DetachSlaveMasterHost(&promotedSlave.Key)
+		topologyRecovery.AddError(log.Errore(err))
 	}
 
 	if promotedSlave != nil && len(lostSlaves) > 0 && config.Config.DetachLostSlavesAfterMasterFailover {
