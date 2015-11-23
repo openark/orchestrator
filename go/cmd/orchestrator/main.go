@@ -19,13 +19,14 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+	"runtime"
+
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/math"
 	"github.com/outbrain/orchestrator/go/app"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/inst"
-	"os"
-	"runtime"
 )
 
 const prompt string = `
@@ -859,7 +860,7 @@ func main() {
 
 	switch {
 	case len(flag.Args()) == 0 || flag.Arg(0) == "cli":
-		app.Cli(*command, *strict, *instance, *destination, *owner, *reason, *duration, *pattern, *clusterAlias, *pool, *hostnameFlag)
+		app.CliWrapper(*command, *strict, *instance, *destination, *owner, *reason, *duration, *pattern, *clusterAlias, *pool, *hostnameFlag)
 	case flag.Arg(0) == "http":
 		app.Http(*discovery)
 	default:

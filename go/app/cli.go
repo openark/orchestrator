@@ -18,6 +18,12 @@ package app
 
 import (
 	"fmt"
+	"net"
+	"os"
+	"os/user"
+	"regexp"
+	"strings"
+
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/util"
 	"github.com/outbrain/orchestrator/go/config"
@@ -25,10 +31,6 @@ import (
 	"github.com/outbrain/orchestrator/go/inst"
 	"github.com/outbrain/orchestrator/go/logic"
 	"github.com/outbrain/orchestrator/go/process"
-	"net"
-	"os"
-	"os/user"
-	"strings"
 )
 
 var thisInstanceKey *inst.InstanceKey
@@ -38,23 +40,6 @@ type CliCommand struct {
 	Command     string
 	Section     string
 	Description string
-}
-
-// The following characters can be used to split instance names.
-const instanceSeparatorChars = " ,\n\r\t"
-
-// split the instance name where separated by instanceSeparatorChars characters
-func splitBySeparator(instance string) []string {
-	f := func(c rune) bool {
-		for i := range instanceSeparatorChars {
-			if c == rune(instanceSeparatorChars[i]) {
-				return true
-			}
-		}
-		return false
-	}
-
-	return strings.FieldsFunc(instance, f)
 }
 
 func registerCliCommand(command string, section string, description string) string {
@@ -132,20 +117,19 @@ func deduceInstanceKeyIfNeeded(instance string, instanceKey *inst.InstanceKey) *
 	return instanceKey
 }
 
+// CliWrapper is called from main and allows for the instance parameter
+// to take multiple instance names separated by a comma or whitespace.
+func CliWrapper(command string, strict bool, instances string, destination string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string, hostnameFlag string) {
+	r := regexp.MustCompile(`[ ,\r\n\t]+`)
+	for _, instance := range r.Split(instances, -1) {
+		if instance != "" {
+			Cli(command, strict, instance, destination, owner, reason, duration, pattern, clusterAlias, pool, hostnameFlag)
+		}
+	}
+}
+
 // Cli initiates a command line interface, executing requested command.
 func Cli(command string, strict bool, instance string, destination string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string, hostnameFlag string) {
-	// Check if we have been provided multiple instance names and
-	// process them sequentially.
-	if instance != "" && strings.ContainsAny(instance, instanceSeparatorChars) {
-		instances := splitBySeparator(instance)
-
-		// Run the same command for each entry in instances
-		// - attempt to parallelise later when this is appropriate
-		for i := range instances {
-			Cli(command, strict, instances[i], destination, owner, reason, duration, pattern, clusterAlias, pool, hostnameFlag)
-		}
-		return
-	}
 	if instance != "" && !strings.Contains(instance, ":") {
 		instance = fmt.Sprintf("%s:%d", instance, config.Config.DefaultInstancePort)
 	}
