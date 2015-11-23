@@ -41,7 +41,7 @@ type CliCommand struct {
 }
 
 // The following characters can be used to split instance names.
-const instanceSeparatorChars = " ,"
+const instanceSeparatorChars = " ,\n\r\t"
 
 // split the instance name where separated by instanceSeparatorChars characters
 func splitBySeparator(instance string) []string {
