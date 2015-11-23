@@ -121,8 +121,9 @@ func deduceInstanceKeyIfNeeded(instance string, instanceKey *inst.InstanceKey) *
 // to take multiple instance names separated by a comma or whitespace.
 func CliWrapper(command string, strict bool, instances string, destination string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string, hostnameFlag string) {
 	r := regexp.MustCompile(`[ ,\r\n\t]+`)
-	for _, instance := range r.Split(instances, -1) {
-		if instance != "" {
+	tokens := r.Split(instances, -1)
+	for _, instance := range tokens {
+		if instance != "" || len(tokens) == 1 {
 			Cli(command, strict, instance, destination, owner, reason, duration, pattern, clusterAlias, pool, hostnameFlag)
 		}
 	}
