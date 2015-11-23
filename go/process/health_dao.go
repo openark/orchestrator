@@ -45,6 +45,8 @@ const (
 	OrchestratorExecutionHttpMode                           = "HttpMode"
 )
 
+var continuousRegistrationInitiated bool = false
+
 // RegisterNode writes down this node in the node_health table
 func RegisterNode(extraInfo string, command string, firstTime bool) (sql.Result, error) {
 	if firstTime {
@@ -100,6 +102,14 @@ func HealthTest() (*HealthStatus, error) {
 }
 
 func ContinuousRegistration(extraInfo string, command string) {
+	if continuousRegistrationInitiated {
+		// This is a simple mechanism to make sure this function is not being called multiple times in the lifespan of this process.
+		// It is not concurrency-protected.
+		// Original use case: multiple instances as in "-i instance1,instance2,instance3" flag
+		return
+	}
+	continuousRegistrationInitiated = true
+
 	tickOperation := func(firstTime bool) {
 		RegisterNode(extraInfo, command, firstTime)
 		expireAvailableNodes()
