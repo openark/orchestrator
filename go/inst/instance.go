@@ -55,6 +55,7 @@ type Instance struct {
 	SecondsBehindMaster    sql.NullInt64
 	SQLDelay               uint
 	ExecutedGtidSet        string
+	GtidPurged             string
 
 	SlaveLagSeconds       sql.NullInt64
 	SlaveHosts            InstanceKeyMap

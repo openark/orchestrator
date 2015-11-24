@@ -195,7 +195,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			// ...
 			// @@gtid_mode only available in Orcale MySQL >= 5.6
 			// Previous version just issued this query brute-force, but I don't like errors being issued where they shouldn't.
-			_ = db.QueryRow("select @@global.gtid_mode = 'ON', @@global.server_uuid").Scan(&instance.SupportsOracleGTID, &instance.ServerUUID)
+			_ = db.QueryRow("select @@global.gtid_mode = 'ON', @@global.server_uuid, @@global.gtid_purged").Scan(&instance.SupportsOracleGTID, &instance.ServerUUID, &instance.GtidPurged)
 		}
 	}
 	{
@@ -555,6 +555,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.SupportsOracleGTID = m.GetBool("supports_oracle_gtid")
 	instance.UsingOracleGTID = m.GetBool("oracle_gtid")
 	instance.ExecutedGtidSet = m.GetString("executed_gtid_set")
+	instance.GtidPurged = m.GetString("gtid_purged")
 	instance.UsingMariaDBGTID = m.GetBool("mariadb_gtid")
 	instance.UsingPseudoGTID = m.GetBool("pseudo_gtid")
 	instance.SelfBinlogCoordinates.LogFile = m.GetString("binary_log_file")
@@ -1337,6 +1338,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 					supports_oracle_gtid=VALUES(supports_oracle_gtid),
 					oracle_gtid=VALUES(oracle_gtid),
 					executed_gtid_set=VALUES(executed_gtid_set),
+					gtid_purged=VALUES(gtid_purged),
 					mariadb_gtid=VALUES(mariadb_gtid),
 					pseudo_gtid=values(pseudo_gtid),
 					master_log_file=VALUES(master_log_file),
@@ -1390,6 +1392,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				supports_oracle_gtid,
 				oracle_gtid,
 				executed_gtid_set,
+				gtid_purged,
 				mariadb_gtid,
 				pseudo_gtid,
 				master_log_file,
@@ -1411,7 +1414,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				physical_environment,
 				replication_depth,
 				is_co_master
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
@@ -1437,6 +1440,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			instance.SupportsOracleGTID,
 			instance.UsingOracleGTID,
 			instance.ExecutedGtidSet,
+			instance.GtidPurged,
 			instance.UsingMariaDBGTID,
 			instance.UsingPseudoGTID,
 			instance.ReadBinlogCoordinates.LogFile,

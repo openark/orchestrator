@@ -706,6 +706,11 @@ var generateSQLPatches = []string{
 		ALTER TABLE database_instance_topology_history
 			ADD COLUMN version varchar(128) CHARACTER SET ascii NOT NULL
 	`,
+	`
+		ALTER TABLE 
+			database_instance
+			ADD COLUMN gtid_purged text CHARACTER SET ascii NOT NULL AFTER executed_gtid_set
+	`,
 }
 
 // Track if a TLS has already been configured for topology
