@@ -577,6 +577,10 @@ func ResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 
 // skipQueryClassic skips a query in normal binlog file:pos replication
 func setGTIDPurged(instance *Instance, gtidPurged string) error {
+	if *config.RuntimeCLIFlags.Noop {
+		return fmt.Errorf("noop: aborting set-gtid-purged operation on %+v; signalling error but nothing went wrong.", instance.Key)
+	}
+
 	_, err := ExecInstance(&instance.Key, fmt.Sprintf(`set global gtid_purged := '%s'`, gtidPurged))
 	return err
 }

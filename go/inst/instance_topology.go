@@ -719,6 +719,9 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gtidHint Operatio
 	// See above, we are relaxed about the master being accessible/inaccessible.
 	// If accessible, we wish to do hostname-unresolve. If inaccessible, we can skip the test and not fail the
 	// ChangeMasterTo operation. This is why we pass "!masterIsAccessible" below.
+	if instance.ExecBinlogCoordinates.IsEmpty() {
+		instance.ExecBinlogCoordinates.LogFile = "orchestrator-unknown-log-file"
+	}
 	instance, err = ChangeMasterTo(instanceKey, masterKey, &instance.ExecBinlogCoordinates, !masterIsAccessible, gtidHint)
 	if err != nil {
 		goto Cleanup
@@ -1167,7 +1170,7 @@ func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
 // It will make sure the gtid_purged set matches the executed set value as read just before the RESET.
 // this will enable new slaves to be attached to given instance without complaints about missing/purged entries.
 // This function requires that the instance does not have slaves.
-func ResetMasterGTIDOperation(instanceKey *InstanceKey) (*Instance, error) {
+func ResetMasterGTIDOperation(instanceKey *InstanceKey, removeSelfUUID bool, uuidToRemove string) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
@@ -1181,7 +1184,7 @@ func ResetMasterGTIDOperation(instanceKey *InstanceKey) (*Instance, error) {
 
 	log.Infof("Will reset master on %+v", instanceKey)
 
-	var executedGtidSet string
+	var oracleGtidSet *OracleGtidSet
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "reset-master-gtid"); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
 		goto Cleanup
@@ -1195,13 +1198,28 @@ func ResetMasterGTIDOperation(instanceKey *InstanceKey) (*Instance, error) {
 			goto Cleanup
 		}
 	}
-	executedGtidSet = instance.ExecutedGtidSet
+
+	oracleGtidSet, err = ParseGtidSet(instance.ExecutedGtidSet)
+	if err != nil {
+		goto Cleanup
+	}
+	if removeSelfUUID {
+		uuidToRemove = instance.ServerUUID
+	}
+	if uuidToRemove != "" {
+		removed := oracleGtidSet.RemoveUUID(uuidToRemove)
+		if removed {
+			log.Debugf("Will remove UUID %s", uuidToRemove)
+		} else {
+			log.Debugf("UUID %s not found", uuidToRemove)
+		}
+	}
 
 	instance, err = ResetMaster(instanceKey)
 	if err != nil {
 		goto Cleanup
 	}
-	err = setGTIDPurged(instance, executedGtidSet)
+	err = setGTIDPurged(instance, oracleGtidSet.String())
 	if err != nil {
 		goto Cleanup
 	}

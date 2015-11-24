@@ -21,13 +21,12 @@ import (
 	"strings"
 )
 
-// OracleGtidSetEntry represents an entry in a set of GTID ranges, 
+// OracleGtidSetEntry represents an entry in a set of GTID ranges,
 // for example, the entry: "316d193c-70e5-11e5-adb2-ecf4bb2262ff:1-8935:8984-6124596" (may include gaps)
 type OracleGtidSetEntry struct {
 	UUID   string
 	Ranges string
 }
-
 
 // NewOracleGtidSetEntry parses a single entry text
 func NewOracleGtidSetEntry(gtidRangeString string) (*OracleGtidSetEntry, error) {
@@ -35,6 +34,12 @@ func NewOracleGtidSetEntry(gtidRangeString string) (*OracleGtidSetEntry, error) 
 	tokens := strings.SplitN(gtidRangeString, ":", 2)
 	if len(tokens) != 2 {
 		return nil, fmt.Errorf("Cannot parse OracleGtidSetEntry from %s", gtidRangeString)
+	}
+	if tokens[0] == "" {
+		return nil, fmt.Errorf("Unexpected UUID: %s", tokens[0])
+	}
+	if tokens[1] == "" {
+		return nil, fmt.Errorf("Unexpected GTID range: %s", tokens[1])
 	}
 	gtidRange := &OracleGtidSetEntry{UUID: tokens[0], Ranges: tokens[1]}
 	return gtidRange, nil

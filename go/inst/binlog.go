@@ -76,6 +76,11 @@ func (this *BinlogCoordinates) Equals(other *BinlogCoordinates) bool {
 	return this.LogFile == other.LogFile && this.LogPos == other.LogPos && this.Type == other.Type
 }
 
+// IsEmpty returns true if the log file is empty, unnamed
+func (this *BinlogCoordinates) IsEmpty() bool {
+	return this.LogFile == ""
+}
+
 // SmallerThan returns true if this coordinate is strictly smaller than the other.
 func (this *BinlogCoordinates) SmallerThan(other *BinlogCoordinates) bool {
 	if this.LogFile < other.LogFile {
