@@ -42,17 +42,34 @@ var recentInstantAnalysis = cache.New(time.Duration(config.Config.RecoveryPollSe
 func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnalysis bool) ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
+	args := sqlutils.Args(config.Config.InstancePollSeconds, clusterName)
 	analysisQueryReductionClause := ``
 	if config.Config.ReduceReplicationAnalysisCount {
 		analysisQueryReductionClause = `
 			HAVING 
-				is_last_check_valid = 0
-				OR count_slaves_failing_to_connect_to_master > 0
-				OR count_valid_slaves < count_slaves
-				OR count_valid_replicating_slaves < count_slaves
-				OR is_failing_to_connect_to_master
-				OR count_slaves > 0
-	`
+				(MIN(
+		        		master_instance.last_checked <= master_instance.last_seen
+		        		AND master_instance.last_attempted_check <= master_instance.last_seen + INTERVAL (2 * ?) SECOND
+		        	) IS TRUE /* AS is_last_check_valid */) = 0
+				OR (IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
+		                    AND slave_instance.slave_io_running = 0
+		                    AND slave_instance.last_io_error RLIKE 'error (connecting|reconnecting) to master'
+		                    AND slave_instance.slave_sql_running = 1),
+		                0) /* AS count_slaves_failing_to_connect_to_master */ > 0)
+				OR (IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen),
+		                0) /* AS count_valid_slaves */ < COUNT(slave_instance.server_id) /* AS count_slaves */)
+				OR (IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
+		                    AND slave_instance.slave_io_running != 0
+		                    AND slave_instance.slave_sql_running != 0),
+		                0) /* AS count_valid_replicating_slaves */ < COUNT(slave_instance.server_id) /* AS count_slaves */)
+				OR (MIN(
+		            master_instance.slave_sql_running = 1
+		            AND master_instance.slave_io_running = 0
+		            AND master_instance.last_io_error RLIKE 'error (connecting|reconnecting) to master'
+		          ) /* AS is_failing_to_connect_to_master */)
+				OR (COUNT(slave_instance.server_id) /* AS count_slaves */ > 0)
+			`
+		args = append(args, config.Config.InstancePollSeconds)
 	}
 	// "OR count_slaves > 0" above is a recent addition, which, granted, makes some previous conditions redundant.
 	// It gives more output, and more "NoProblem" messages that I am now interested in for purpose of auditing in database_instance_analysis_changelog
@@ -163,7 +180,6 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			    is_cluster_master DESC,
 			    count_slaves DESC
 	`, analysisQueryReductionClause)
-	args := sqlutils.Args(config.Config.InstancePollSeconds, clusterName)
 	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		a := ReplicationAnalysis{Analysis: NoProblem}
 

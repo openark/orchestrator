@@ -313,7 +313,7 @@ function openNodeModal(node) {
         $('#node_modal button[data-btn=enslave-siblings]').appendTo(td.find("div"))
     }
 
-    var td = addNodeModalDataAttribute("GTID", booleanString(node.usingGTID));
+    var td = addNodeModalDataAttribute("GTID based replication", booleanString(node.usingGTID));
     $('#node_modal button[data-btn=enable-gtid]').appendTo(td.find("div"))
     $('#node_modal button[data-btn=disable-gtid]').appendTo(td.find("div"))
 
