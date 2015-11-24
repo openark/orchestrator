@@ -227,7 +227,7 @@ func (s *TestSuite) TestInstanceKeyValid(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(i.IsValid(), Equals, false)
 	i, err = inst.ParseInstanceKey("//myhost:3306")
-	c.Assert(err, IsNil)
+	c.Assert(err, Not(IsNil))
 	c.Assert(i.IsValid(), Equals, false)
 }
 
@@ -302,6 +302,52 @@ func (s *TestSuite) TestNextGTID(c *C) {
 		c.Assert(err, IsNil)
 		c.Assert(nextGTID, Equals, "b9b4712a-df64-11e3-b391-60672090eb04:7")
 	}
+}
+
+func (s *TestSuite) TestOracleGTIDSet(c *C) {
+	gtidSetString := `230ea8ea-81e3-11e4-972a-e25ec4bd140a:1-10539,
+316d193c-70e5-11e5-adb2-ecf4bb2262ff:1-8935:8984-6124596,
+321f5c0d-70e5-11e5-adb2-ecf4bb2262ff:1-56`
+	gtidSet, err := inst.ParseGtidSet(gtidSetString)
+	c.Assert(err, IsNil)
+	c.Assert(len(gtidSet.GtidEntries), Equals, 3)
+	c.Assert(gtidSet.String(), Equals, `230ea8ea-81e3-11e4-972a-e25ec4bd140a:1-10539,
+316d193c-70e5-11e5-adb2-ecf4bb2262ff:1-8935:8984-6124596,
+321f5c0d-70e5-11e5-adb2-ecf4bb2262ff:1-56`)
+
+	c.Assert(gtidSet.GtidEntries[0].UUID, Equals, `230ea8ea-81e3-11e4-972a-e25ec4bd140a`)
+	c.Assert(gtidSet.GtidEntries[1].UUID, Equals, `316d193c-70e5-11e5-adb2-ecf4bb2262ff`)
+	c.Assert(gtidSet.GtidEntries[2].UUID, Equals, `321f5c0d-70e5-11e5-adb2-ecf4bb2262ff`)
+	c.Assert(gtidSet.GtidEntries[1].Ranges, Equals, `1-8935:8984-6124596`)
+
+	removed := gtidSet.RemoveUUID(`ffffffff-70e5-11e5-adb2-ecf4bb2262ff`)
+	c.Assert(removed, Equals, false)
+	c.Assert(len(gtidSet.GtidEntries), Equals, 3)
+
+	removed = gtidSet.RemoveUUID(`316d193c-70e5-11e5-adb2-ecf4bb2262ff`)
+	c.Assert(removed, Equals, true)
+	c.Assert(len(gtidSet.GtidEntries), Equals, 2)
+
+	c.Assert(gtidSet.String(), Equals, `230ea8ea-81e3-11e4-972a-e25ec4bd140a:1-10539,
+321f5c0d-70e5-11e5-adb2-ecf4bb2262ff:1-56`)
+
+	removed = gtidSet.RemoveUUID(`316d193c-70e5-11e5-adb2-ecf4bb2262ff`)
+	c.Assert(removed, Equals, false)
+	c.Assert(len(gtidSet.GtidEntries), Equals, 2)
+
+	removed = gtidSet.RemoveUUID(`321f5c0d-70e5-11e5-adb2-ecf4bb2262ff`)
+	c.Assert(removed, Equals, true)
+	c.Assert(len(gtidSet.GtidEntries), Equals, 1)
+	c.Assert(gtidSet.String(), Equals, `230ea8ea-81e3-11e4-972a-e25ec4bd140a:1-10539`)
+
+	removed = gtidSet.RemoveUUID(`230ea8ea-81e3-11e4-972a-e25ec4bd140a`)
+	c.Assert(removed, Equals, true)
+	c.Assert(len(gtidSet.GtidEntries), Equals, 0)
+
+	removed = gtidSet.RemoveUUID(`230ea8ea-81e3-11e4-972a-e25ec4bd140a`)
+	c.Assert(removed, Equals, false)
+	c.Assert(len(gtidSet.GtidEntries), Equals, 0)
+	c.Assert(gtidSet.String(), Equals, ``)
 }
 
 func (s *TestSuite) TestRemoveInstance(c *C) {
