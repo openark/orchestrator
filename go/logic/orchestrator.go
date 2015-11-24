@@ -152,7 +152,7 @@ func ContinuousDiscovery() {
 	}
 
 	log.Infof("Starting continuous discovery")
-	inst.LoadHostnameResolveCacheFromDatabase()
+	inst.LoadHostnameResolveCache()
 	go handleDiscoveryRequests()
 
 	discoveryTick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
@@ -213,7 +213,7 @@ func ContinuousDiscovery() {
 				}
 				if !isElectedNode {
 					// Take this opportunity to refresh yourself
-					go inst.LoadHostnameResolveCacheFromDatabase()
+					go inst.LoadHostnameResolveCache()
 				}
 				go inst.ReadClusterAliases()
 			}()

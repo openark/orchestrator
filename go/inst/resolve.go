@@ -42,6 +42,10 @@ func init() {
 var hostnameResolvesLightweightCache = cache.New(time.Duration(config.Config.ExpiryHostnameResolvesMinutes)*time.Minute, time.Minute)
 var hostnameResolvesLightweightCacheLoadedOnceFromDB bool = false
 
+func HostnameResolveMethodIsNone() bool {
+	return strings.ToLower(config.Config.HostnameResolveMethod) == "none"
+}
+
 // GetCNAME resolves an IP or hostname into a normalized valid CNAME
 func GetCNAME(hostname string) (string, error) {
 	res, err := net.LookupCNAME(hostname)
@@ -88,7 +92,7 @@ func ResolveHostname(hostname string) (string, error) {
 		// However cli does not do so.
 		// Anyway, it seems like the cache was not loaded from DB. Before doing real resolves,
 		// let's try and get the resolved hostname from database.
-		if strings.ToLower(config.Config.HostnameResolveMethod) != "none" {
+		if !HostnameResolveMethodIsNone() {
 			if resolvedHostname, err := ReadResolvedHostname(hostname); err == nil && resolvedHostname != "" {
 				hostnameResolvesLightweightCache.Set(hostname, resolvedHostname, 0)
 				return resolvedHostname, nil
@@ -130,13 +134,20 @@ func UpdateResolvedHostname(hostname string, resolvedHostname string) bool {
 		return false
 	}
 	hostnameResolvesLightweightCache.Set(hostname, resolvedHostname, 0)
-	if strings.ToLower(config.Config.HostnameResolveMethod) != "none" {
+	if !HostnameResolveMethodIsNone() {
 		WriteResolvedHostname(hostname, resolvedHostname)
 	}
 	return true
 }
 
-func LoadHostnameResolveCacheFromDatabase() error {
+func LoadHostnameResolveCache() error {
+	if !HostnameResolveMethodIsNone() {
+		return loadHostnameResolveCacheFromDatabase()
+	}
+	return nil
+}
+
+func loadHostnameResolveCacheFromDatabase() error {
 	allHostnamesResolves, err := readAllHostnameResolves()
 	if err != nil {
 		return err
@@ -149,7 +160,7 @@ func LoadHostnameResolveCacheFromDatabase() error {
 }
 
 func FlushNontrivialResolveCacheToDatabase() error {
-	if strings.ToLower(config.Config.HostnameResolveMethod) == "none" {
+	if !HostnameResolveMethodIsNone() {
 		return log.Errorf("FlushNontrivialResolveCacheToDatabase() called, but HostnameResolveMethod is %+v", config.Config.HostnameResolveMethod)
 	}
 	items, _ := HostnameResolveCache()
