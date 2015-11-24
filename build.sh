@@ -34,13 +34,13 @@ function precheck() {
     echo "rpmbuild not in PATH, rpm will not be built"
   fi
 
-  if [[ -z "$GOROOT" || -z "$GOPATH" ]]; then
-    echo "GOROOT or GOPATH not set"
+  if [[ -z "$GOPATH" ]]; then
+    echo "GOPATH not set"
     ok=1
   fi
 
-  if [[ ! -x "$GOROOT/bin/go" ]]; then
-    echo "go binary not found at $GOROOT/bin/go"
+  if [[ ! -x "$( which go )" ]]; then
+    echo "go binary not found in PATH"
     ok=1
   fi
 
