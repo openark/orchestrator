@@ -152,22 +152,31 @@
 	                </div>
 	                <div class="modal-body">
 	                    <div class="panel panel-info">
-	                        <div class="panel-heading" data-panel-type="maintenance"></div>
+	                        <div class="panel-heading" data-panel-type="downtime"></div>
 	                        <div class="panel-body">
-	                            <div class="" data-panel-type="begin-maintenance">
+	                            <div class="" data-panel-type="begin-downtime">
 	                                <form class="form-inline" role="form">
-	                                    <input type="text" class="form-control input-sm" id="beginMaintenanceOwner" placeholder="owner name" />
-	                                    <input type="text" class="form-control input-sm" id="beginMaintenanceReason" placeholder="reason" />
-	                                    <button type="button" class="btn btn-info pull-right" data-btn="begin-maintenance">
-	                                        <span class="glyphicon glyphicon-wrench"></span> Begin maintenance
+	                                    <input type="text" class="form-control input-sm" id="beginDowntimeOwner" placeholder="owner name" />
+	                                    <input type="text" class="form-control input-sm" id="beginDowntimeReason" placeholder="reason" />
+	                                    <select class="form-control input-sm" id="beginDowntimeDuration">
+										    <option value="10m">10m</option>
+										    <option value="30m">30m</option>
+										    <option value="1h">1h</option>
+										    <option value="4h">4h</option>
+										    <option value="24h">24h</option>
+										    <option value="2d">2d</option>
+										    <option value="7d">7d</option>
+										</select>
+	                                    <button type="button" class="btn btn-info pull-right" data-btn="begin-downtime">
+	                                        <span class="glyphicon glyphicon-volume-off"></span> Begin downtime
 	                                    </button>
 	                                </form>
 	                            </div>
-	                            <div class="" data-panel-type="end-maintenance">
-	                                <div class="pull-left" data-description="maintenance-status">
+	                            <div class="" data-panel-type="end-downtime">
+	                                <div class="pull-left" data-description="downtime-status">
 	                                </div>
-	                                <button type="button" class="btn btn-default pull-right" data-btn="end-maintenance">
-	                                    <span class="glyphicon glyphicon-wrench"></span> End maintenance
+	                                <button type="button" class="btn btn-default pull-right" data-btn="end-downtime">
+	                                    <span class="glyphicon glyphicon-volume-up"></span> End downtime
 	                                </button>
 	                            </div>
 	                        </div>

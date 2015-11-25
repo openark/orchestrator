@@ -124,7 +124,7 @@ $(document).ready(function () {
         	var recoveryId = $(event.target).attr("data-recovery-id");
             bootbox.prompt({
                 title: "Acknowledge recovery",
-                value: "comment",
+                placeholder: "comment",
                 callback: function (result) {
                     if (result !== null) {
                         showLoader();

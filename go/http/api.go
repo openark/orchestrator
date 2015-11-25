@@ -27,6 +27,8 @@ import (
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/render"
 
+	"github.com/outbrain/golib/util"
+
 	"github.com/outbrain/orchestrator/go/agent"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/inst"
@@ -260,7 +262,20 @@ func (this *HttpAPI) BeginDowntime(params martini.Params, r render.Render, req *
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	err = inst.BeginDowntime(&instanceKey, params["owner"], params["reason"], 0)
+
+	var durationSeconds int = 0
+	if params["duration"] != "" {
+		durationSeconds, err = util.SimpleTimeToSeconds(params["duration"])
+		if durationSeconds < 0 {
+			err = fmt.Errorf("Duration value must be non-negative. Given value: %d", durationSeconds)
+		}
+		if err != nil {
+			r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+			return
+		}
+	}
+
+	err = inst.BeginDowntime(&instanceKey, params["owner"], params["reason"], uint(durationSeconds))
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error(), Details: instanceKey})
@@ -2166,6 +2181,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/end-maintenance/:host/:port", this.EndMaintenanceByInstanceKey)
 	m.Get("/api/end-maintenance/:maintenanceKey", this.EndMaintenance)
 	m.Get("/api/begin-downtime/:host/:port/:owner/:reason", this.BeginDowntime)
+	m.Get("/api/begin-downtime/:host/:port/:owner/:reason/:duration", this.BeginDowntime)
 	m.Get("/api/end-downtime/:host/:port", this.EndDowntime)
 
 	// Recovery:

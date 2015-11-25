@@ -2320,6 +2320,11 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 		return Repoint(&instance.Key, &instanceMaster.MasterKey, GTIDHintDeny)
 	}
 	if other.IsBinlogServer() {
+		if instanceMaster.IsBinlogServer() && InstancesAreSiblings(instanceMaster, other) {
+			// Special case: this is a binlog server family; we move under the uncle, in one single step
+			return Repoint(&instance.Key, &other.Key, GTIDHintDeny)
+		}
+
 		// Relocate to its master, then repoint to the binlog server
 		otherMaster, found, err := ReadInstance(&other.MasterKey)
 		if err != nil || !found {
@@ -2328,6 +2333,7 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 		if !other.IsLastCheckValid {
 			return instance, log.Errorf("Binlog server %+v is not reachable. It would take two steps to relocate %+v below it, and I won't even do the first step.", other.Key, instance.Key)
 		}
+
 		log.Debugf("Relocating to a binlog server; will first attempt to relocate to the binlog server's master: %+v, and then repoint down", otherMaster.Key)
 		if _, err := relocateBelowInternal(instance, otherMaster); err != nil {
 			return instance, err

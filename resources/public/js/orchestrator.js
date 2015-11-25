@@ -231,12 +231,6 @@ function openNodeModal(node) {
     $('#modalDataAttributesTable').html("");
 
 	addNodeModalDataAttribute("Last seen", node.LastSeenTimestamp+ " ("+node.SecondsSinceLastSeen.Int64+"s ago)");
-    if (node.IsDowntimed) {
-    	var td = addNodeModalDataAttribute("Downtime", node.DowntimeOwner+': '+node.DowntimeReason+' ('+node.DowntimeEndTimestamp+')');
-        $('#node_modal [data-btn=end-downtime]').appendTo(td.find("div"));
-    } else {
-        $('#node_modal [data-btn=end-downtime]').appendTo(hiddenZone);
-    }
     if (node.UnresolvedHostname) {
     	addNodeModalDataAttribute("Unresolved hostname", node.UnresolvedHostname);
     }
@@ -330,18 +324,16 @@ function openNodeModal(node) {
     
     $('#node_modal [data-btn]').unbind("click");
     
-    $('#node_modal button[data-btn=begin-maintenance]').click(function() {
-    	if (!$("#beginMaintenanceOwner").val()) {
+    $("#beginDowntimeOwner").val(getUserId());
+    $('#node_modal button[data-btn=begin-downtime]').click(function() {
+    	if (!$("#beginDowntimeOwner").val()) {
     		return addModalAlert("You must fill the owner field");
     	}
-    	if (!$("#beginMaintenanceReason").val()) {
+    	if (!$("#beginDowntimeReason").val()) {
     		return addModalAlert("You must fill the reason field");
     	}
-    	var uri = "/api/begin-maintenance/"+node.Key.Hostname+"/"+node.Key.Port + "/" + $("#beginMaintenanceOwner").val() + "/" + $("#beginMaintenanceReason").val();
+    	var uri = "/api/begin-downtime/"+node.Key.Hostname+"/"+node.Key.Port + "/" + $("#beginDowntimeOwner").val() + "/" + $("#beginDowntimeReason").val() + "/" + $("#beginDowntimeDuration").val();
     	apiCommand(uri);
-    });
-    $('#node_modal button[data-btn=end-maintenance]').click(function(){
-    	apiCommand("/api/end-maintenance/"+node.Key.Hostname+"/"+node.Key.Port);
     });
     $('#node_modal button[data-btn=refresh-instance]').click(function(){
     	apiCommand("/api/refresh/"+node.Key.Hostname+"/"+node.Key.Port, "refresh");
@@ -427,17 +419,17 @@ function openNodeModal(node) {
     	apiCommand("/api/move-equivalent/"+node.Key.Hostname+"/"+node.Key.Port+"/"+targetHostname+"/"+targetPort);
     });
 
-    if (node.inMaintenance) {
-    	$('#node_modal [data-panel-type=maintenance]').html("In maintenance");
-    	$('#node_modal [data-description=maintenance-status]').html(
-    			"Started " + node.maintenanceEntry.BeginTimestamp + " by "+node.maintenanceEntry.Owner + ".<br/>Reason: "+node.maintenanceEntry.Reason
+    if (node.IsDowntimed) {
+    	$('#node_modal [data-panel-type=downtime]').html("Downtimed by <strong>"+node.DowntimeOwner+"</strong> until "+node.DowntimeEndTimestamp);
+    	$('#node_modal [data-description=downtime-status]').html(
+    		node.DowntimeReason
     	);    	
-    	$('#node_modal [data-panel-type=begin-maintenance]').hide();
-    	$('#node_modal [data-panel-type=end-maintenance]').show();
+    	$('#node_modal [data-panel-type=begin-downtime]').hide();
+    	$('#node_modal [data-panel-type=end-downtime]').show();
     } else {
-    	$('#node_modal [data-panel-type=maintenance]').html("Maintenance");
-    	$('#node_modal [data-panel-type=begin-maintenance]').show();
-    	$('#node_modal [data-panel-type=end-maintenance]').hide();
+    	$('#node_modal [data-panel-type=downtime]').html("Downtime");
+    	$('#node_modal [data-panel-type=begin-downtime]').show();
+    	$('#node_modal [data-panel-type=end-downtime]').hide();
     }
 	$('#node_modal button[data-btn=skip-query]').hide();
 	$('#node_modal button[data-btn=start-slave]').hide();

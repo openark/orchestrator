@@ -337,6 +337,11 @@ body {
     padding: 5px 9px;
 }
 
+#node_modal [data-panel-type=begin-downtime] .btn {
+	width: auto;
+	display: inline-block;
+}
+
 #modalDataAttributesTable tbody tr td {
     padding: 3px;
 }
