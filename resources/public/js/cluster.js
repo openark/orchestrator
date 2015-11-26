@@ -371,6 +371,9 @@ function Cluster() {
                 // Obviously can't handle.
                 return { accept: false };
             }
+            if (node.isAggregate) {
+                return { accept: false };
+            }
             if (droppableNode.MasterKey.Hostname && droppableNode.MasterKey.Hostname != "_") {
             	// droppableNode has master
 	            if (!droppableNode.LogSlaveUpdatesEnabled) {
@@ -411,6 +414,9 @@ function Cluster() {
         if (moveInstanceMethod == "classic") {
             // Not pseudo-GTID mode, non GTID mode
             if (node.id == droppableNode.id) {
+                return { accept: false };
+            }
+            if (node.isAggregate) {
                 return { accept: false };
             }
             if (instanceIsChild(droppableNode, node) && node.isCoMaster) {
