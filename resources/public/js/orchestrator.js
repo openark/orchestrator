@@ -181,7 +181,11 @@ function reloadWithMessage(msg, details, hint) {
 		port = details.Port || port
 	}
 	hint = hint || "";
-    window.location.href = window.location.href.split("#")[0].split("?")[0] + "?orchestrator-msg="+ encodeURIComponent(msg)+"&hostname="+hostname+"&port="+port+"&hint="+hint;
+	var newUri = window.location.href.split("#")[0].split("?")[0] + "?orchestrator-msg="+ encodeURIComponent(msg)+"&hostname="+hostname+"&port="+port+"&hint="+hint;  
+	if (isCompactDisplay && isCompactDisplay()) {
+		newUri += "&compact=true";
+	}
+    window.location.href = newUri;
 }
 
 function reloadWithOperationResult(operationResult, hint) {

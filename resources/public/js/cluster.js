@@ -127,7 +127,7 @@ function Cluster() {
             stop: instance_dragStop,
         };
 
-        if (nodesMap[draggedNodeId].lastCheckInvalidProblem() || nodesMap[draggedNodeId].notRecentlyCheckedProblem() || nodesMap[draggedNodeId].isAggregate) {
+        if (nodesMap[draggedNodeId].lastCheckInvalidProblem() || nodesMap[draggedNodeId].notRecentlyCheckedProblem()) {
             instanceEl.find("h3").click(function () {
                 openNodeModal(nodesMap[draggedNodeId]);
                 return false;
@@ -342,6 +342,12 @@ function Cluster() {
             if (instanceIsDescendant(droppableNode, node)) {
                 // Wrong direction!
                 return { accept: false };
+            }
+            if (node.isAggregate) {
+                if (shouldApply) {
+                    relocateSlaves(node.masterNode, droppableNode, node.aggregatedInstancesPattern);
+                }
+                return { accept: "warning", type: "relocate ["+node.aggregatedInstances.length+"] < " + droppableTitle };
             }
             // the general case
             if (shouldApply) {
@@ -647,7 +653,8 @@ function Cluster() {
         return executeMoveOperation(message, apiUrl);
     }
 
-    function relocateSlaves(node, siblingNode) {
+    function relocateSlaves(node, siblingNode, pattern) {
+    	pattern = pattern || "";
         var message = "<h4>relocate-slaves</h4>Are you sure you wish to relocate slaves of <code><strong>" +
             node.Key.Hostname + ":" + node.Key.Port +
             "</strong></code> below <code><strong>" +
@@ -656,7 +663,7 @@ function Cluster() {
             "<h4>Note</h4><p>Orchestrator will try and figure out the best relocation path. This may involve multiple steps. " +
             "<p>In case multiple steps are involved, failure of one may leave some instances hanging in a different location than you expected, " +
             "but they would still be in a <i>valid</i> state.";
-        var apiUrl = "/api/relocate-slaves/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port;
+        var apiUrl = "/api/relocate-slaves/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port + "?pattern="+encodeURIComponent(pattern);
         return executeMoveOperation(message, apiUrl);
     }
 
@@ -850,6 +857,7 @@ function Cluster() {
         return parseInt(logFileTokens[logFileTokens.length - 1])
     }
 
+    // compactInstances aggregates sibling instances of same DC such that they are visualized as a single box. 
     function compactInstances(instances, instancesMap) {
     	function aggregateInstances(parentInstance, dataCenter, instances) {
     		if (!instances) {
@@ -867,8 +875,10 @@ function Cluster() {
                     aggregatedProblems[problemType] = [title];
                 }
             }
+            var instanceFullNames = [];
             instances.forEach(function (instance) {
                 incrementProblems("", instance.title)
+                instanceFullNames.push(getInstanceTitle(instance.Key.Hostname, instance.Key.Port));
                 if (instance.inMaintenanceProblem()) {
                     incrementProblems("inMaintenanceProblem", instance.title)
                 }
@@ -891,6 +901,7 @@ function Cluster() {
     		aggergateInstance.canonicalTitle = aggergateInstance.title;
             aggergateInstance.aggregatedInstances = instances; // includes itself
             aggergateInstance.aggregatedProblems = aggregatedProblems;
+            aggergateInstance.aggregatedInstancesPattern = "("+instanceFullNames.join("|")+")";
 
             instances.forEach(function (instance) {
                 if (!instance.isAggregate) {
