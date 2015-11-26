@@ -700,6 +700,7 @@ body {
 #clusters_analysis .popover {
     width: 430px;
     max-width: 430px;
+    vertical-align: top;
 }
 
 #clusters_analysis .popover-content span.glyphicon {
