@@ -17,14 +17,16 @@
 package db
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"fmt"
+	"strings"
+
 	"github.com/go-sql-driver/mysql"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/ssl"
-	"strings"
 )
 
 var (
@@ -738,6 +740,8 @@ func OpenTopology(host string, port int) (*sql.DB, error) {
 func SetupMySQLTopologyTLS(uri string) (string, error) {
 	if !topologyTLSConfigured {
 		tlsConfig, err := ssl.NewTLSConfig(config.Config.MySQLTopologySSLCAFile, !config.Config.MySQLTopologySSLSkipVerify)
+		// Drop to TLS 1.0 for talking to MySQL
+		tlsConfig.MinVersion = tls.VersionTLS10
 		if err != nil {
 			return "", log.Fatalf("Can't create TLS configuration for Topology connection %s: %s", uri, err)
 		}
@@ -853,6 +857,8 @@ func ResetInternalDeployment() error {
 func SetupMySQLOrchestratorTLS(uri string) (string, error) {
 	if !orchestratorTLSConfigured {
 		tlsConfig, err := ssl.NewTLSConfig(config.Config.MySQLOrchestratorSSLCAFile, true)
+		// Drop to TLS 1.0 for talking to MySQL
+		tlsConfig.MinVersion = tls.VersionTLS10
 		if err != nil {
 			return "", log.Fatalf("Can't create TLS configuration for Orchestrator connection %s: %s", uri, err)
 		}
