@@ -6,9 +6,10 @@
 #
 set -e
 
-RELEASE_VERSION="1.4.550"
+RELEASE_VERSION="1.4.551"
 TOPDIR=/tmp/orchestrator-release
 export RELEASE_VERSION TOPDIR
+export GO15VENDOREXPERIMENT=1
 
 usage() {
   echo
@@ -26,12 +27,12 @@ function precheck() {
   local ok=0 # return err. so shell exit code
 
   if [[ ! -x "$( which fpm )" ]]; then
-    echo "Please install fpm and ensure it is in PATH"
+    echo "Please install fpm and ensure it is in PATH (typically: 'gem install fpm')"
     ok=1
   fi
 
   if [[ ! -x "$( which rpmbuild )" ]]; then
-    echo "rpmbuild not in PATH, rpm will not be built"
+    echo "rpmbuild not in PATH, rpm will not be built (OS/X: 'brew install rpm')"
   fi
 
   if [[ -z "$GOPATH" ]]; then
@@ -41,6 +42,11 @@ function precheck() {
 
   if [[ ! -x "$( which go )" ]]; then
     echo "go binary not found in PATH"
+    ok=1
+  fi
+
+  if [[ $(go version | egrep "go1[.][01234]") ]]; then
+    echo "go version is too low. Must use 1.5 or above"
     ok=1
   fi
 
@@ -175,4 +181,3 @@ prefix=${prefix:-"/usr/local"}
 
 [[ $debug -eq 1 ]] && set -x
 main "$target" "$arch" "$prefix"
-
