@@ -172,6 +172,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		skipDatabaseCommands = true
 	case "help":
 		skipDatabaseCommands = true
+	case "dump-config":
+		skipDatabaseCommands = true
 	}
 
 	if !skipDatabaseCommands {
@@ -1150,6 +1152,11 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			fmt.Println("hostname resolve cache cleared")
+		}
+	case registerCliCommand("dump-config", "Meta", `Print out configuration in JSON format`):
+		{
+			jsonString := config.Config.ToJSONString()
+			fmt.Println(jsonString)
 		}
 	case registerCliCommand("reset-internal-db-deployment", "Meta, internal", `Clear internal db deployment history, use if somehow corrupted internal deployment history`):
 		{
