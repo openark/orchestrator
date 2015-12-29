@@ -17,6 +17,11 @@
 package logic
 
 import (
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/math"
 	"github.com/outbrain/orchestrator/go/agent"
@@ -26,10 +31,6 @@ import (
 	"github.com/outbrain/orchestrator/go/process"
 	"github.com/pmylund/go-cache"
 	"github.com/rcrowley/go-metrics"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
 
 const (
@@ -193,6 +194,7 @@ func ContinuousDiscovery() {
 			// Various periodic internal maintenance tasks
 			go func() {
 				if isElectedNode {
+					go inst.RecordInstanceCoordinatesHistory()
 					go inst.ForgetLongUnseenInstances()
 					go inst.ForgetUnseenInstancesDifferentlyResolved()
 					go inst.ForgetExpiredHostnameResolves()

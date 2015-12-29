@@ -18,6 +18,11 @@ package inst
 
 import (
 	"fmt"
+	"regexp"
+	"sort"
+	"strings"
+	"time"
+
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/math"
 	"github.com/outbrain/golib/sqlutils"
@@ -25,10 +30,6 @@ import (
 	"github.com/outbrain/orchestrator/go/db"
 	"github.com/pmylund/go-cache"
 	"github.com/rcrowley/go-metrics"
-	"regexp"
-	"sort"
-	"strings"
-	"time"
 )
 
 const backendDBConcurrency = 20
@@ -331,11 +332,11 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		// Either not configured to read SHOW SLAVE HOSTS or nothing was there.
 		// Discover by processlist
 		err := sqlutils.QueryRowsMap(db, `
-        	select 
-        		substring_index(host, ':', 1) as slave_hostname 
-        	from 
-        		information_schema.processlist 
-        	where 
+        	select
+        		substring_index(host, ':', 1) as slave_hostname
+        	from
+        		information_schema.processlist
+        	where
         		command='Binlog Dump'
         		or command='Binlog Dump GTID'
         		`,
@@ -355,7 +356,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	if config.Config.ReadLongRunningQueries && !isMaxScale {
 		// Get long running processes
 		err := sqlutils.QueryRowsMap(db, `
-				  select 
+				  select
 				    id,
 				    user,
 				    host,
@@ -365,13 +366,13 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 				    state,
 				    left(processlist.info, 1024) as info,
 				    now() - interval time second as started_at
-				  from 
-				    information_schema.processlist 
+				  from
+				    information_schema.processlist
 				  where
 				    time > 60
 				    and command != 'Sleep'
 				    and id != connection_id()
-				    and user != 'system user' 
+				    and user != 'system user'
 				    and command != 'Binlog dump'
 				    and command != 'Binlog Dump GTID'
 				    and user != 'event_scheduler'
@@ -478,12 +479,12 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 
 	// Read the cluster_name of the _master_ of our instance, derive it from there.
 	query := `
-      	select 
+      	select
 			cluster_name,
 	       	replication_depth,
 	       	master_host,
 	       	master_port
-       	from database_instance 
+       	from database_instance
 		 	where hostname=? and port=?
 	`
 	args := sqlutils.Args(instance.MasterKey.Hostname, instance.MasterKey.Port)
@@ -605,7 +606,7 @@ func readInstancesByCondition(condition string, args []interface{}, sort string)
 			sort = `hostname, port`
 		}
 		query := fmt.Sprintf(`
-		select 
+		select
 			*,
 			timestampdiff(second, last_checked, now()) as seconds_since_last_checked,
 			(last_checked <= last_seen) is true as is_last_check_valid,
@@ -619,8 +620,8 @@ func readInstancesByCondition(condition string, args []interface{}, sort string)
 	    	ifnull(database_instance_downtime.reason, '') as downtime_reason,
 	    	ifnull(database_instance_downtime.owner, '') as downtime_owner,
 	    	ifnull(database_instance_downtime.end_timestamp, '') as downtime_end_timestamp
-		from 
-			database_instance 
+		from
+			database_instance
 			left join candidate_database_instance using (hostname, port)
 			left join hostname_unresolve using (hostname)
 			left join database_instance_downtime using (hostname, port)
@@ -927,11 +928,11 @@ func GetClusterHeuristicLag(clusterName string) (int64, error) {
 func updateInstanceClusterName(instance *Instance) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-			update 
-				database_instance 
-			set 
-				cluster_name=? 
-			where 
+			update
+				database_instance
+			set
+				cluster_name=?
+			where
 				hostname=? and port=?
         	`, instance.ClusterName, instance.Key.Hostname, instance.Key.Port,
 		)
@@ -1041,7 +1042,7 @@ func InjectUnseenMasters() error {
 // resovled to a different value; the old hostname is never accessed anymore and the old entry should be removed.
 func ForgetUnseenInstancesDifferentlyResolved() error {
 	sqlResult, err := db.ExecOrchestrator(`
-		DELETE FROM 
+		DELETE FROM
 			database_instance
 		USING
 		    hostname_resolve
@@ -1117,10 +1118,10 @@ func ReadCountMySQLSnapshots(hostnames []string) (map[string]int, error) {
 		return res, nil
 	}
 	query := fmt.Sprintf(`
-		select 
+		select
 			hostname,
 			count_mysql_snapshots
-		from 
+		from
 			host_agent
 		where
 			hostname in (%s)
@@ -1170,10 +1171,10 @@ func GetClusterName(instanceKey *InstanceKey) (clusterName string, err error) {
 		return clusterName.(string), nil
 	}
 	query := `
-		select 
+		select
 			ifnull(max(cluster_name), '') as cluster_name
-		from 
-			database_instance 
+		from
+			database_instance
 		where
 			hostname = ?
 			and port = ?
@@ -1192,10 +1193,10 @@ func ReadClusters() ([]string, error) {
 	clusterNames := []string{}
 
 	query := `
-		select 
+		select
 			cluster_name
-		from 
-			database_instance 
+		from
+			database_instance
 		group by
 			cluster_name`
 
@@ -1212,11 +1213,11 @@ func ReadClusterInfo(clusterName string) (*ClusterInfo, error) {
 	clusterInfo := &ClusterInfo{}
 
 	query := `
-		select 
+		select
 			cluster_name,
 			count(*) as count_instances
-		from 
-			database_instance 
+		from
+			database_instance
 		where
 			cluster_name=?
 		group by
@@ -1243,11 +1244,11 @@ func ReadClustersInfo() ([]ClusterInfo, error) {
 	clusters := []ClusterInfo{}
 
 	query := `
-		select 
+		select
 			cluster_name,
 			count(*) as count_instances
-		from 
-			database_instance 
+		from
+			database_instance
 		group by
 			cluster_name`
 
@@ -1276,10 +1277,10 @@ func ReadClustersInfo() ([]ClusterInfo, error) {
 func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 	res := []InstanceKey{}
 	query := `
-		select 
-			hostname, port 
-		from 
-			database_instance 
+		select
+			hostname, port
+		from
+			database_instance
 		where
 			if (
 				last_attempted_check <= last_checked,
@@ -1486,11 +1487,11 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	update 
-        		database_instance 
+        	update
+        		database_instance
         	set
         		last_checked = NOW()
-			where 
+			where
 				hostname = ?
 				and port = ?`,
 			instanceKey.Hostname,
@@ -1516,11 +1517,11 @@ func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
 func UpdateInstanceLastAttemptedCheck(instanceKey *InstanceKey) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	update 
-        		database_instance 
+        	update
+        		database_instance
         	set
         		last_attempted_check = NOW()
-			where 
+			where
 				hostname = ?
 				and port = ?`,
 			instanceKey.Hostname,
@@ -1539,9 +1540,9 @@ func UpdateInstanceLastAttemptedCheck(instanceKey *InstanceKey) error {
 // It may be auto-rediscovered through topology or requested for discovery by multiple means.
 func ForgetInstance(instanceKey *InstanceKey) error {
 	_, err := db.ExecOrchestrator(`
-			delete 
-				from database_instance 
-			where 
+			delete
+				from database_instance
+			where
 				hostname = ? and port = ?`,
 		instanceKey.Hostname,
 		instanceKey.Port,
@@ -1553,9 +1554,9 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 // ForgetLongUnseenInstances will remove entries of all instacnes that have long since been last seen.
 func ForgetLongUnseenInstances() error {
 	sqlResult, err := db.ExecOrchestrator(`
-			delete 
-				from database_instance 
-			where 
+			delete
+				from database_instance
+			where
 				last_seen < NOW() - interval ? hour`,
 		config.Config.UnseenInstanceForgetHours,
 	)
@@ -1574,7 +1575,7 @@ func ForgetLongUnseenInstances() error {
 func SnapshotTopologies() error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	insert into 
+        	insert into
         		database_instance_topology_history (snapshot_unix_timestamp,
         			hostname, port, master_host, master_port, cluster_name, version)
         	select
@@ -1598,10 +1599,10 @@ func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern str
 	instances := [](*Instance){}
 
 	query := `
-		select 
+		select
 			*
-		from 
-			database_instance_topology_history 
+		from
+			database_instance_topology_history
 		where
 			snapshot_unix_timestamp rlike ?
 			and cluster_name = ?
@@ -1654,7 +1655,7 @@ func RegisterCandidateInstance(instanceKey *InstanceKey) error {
 func ExpireCandidateInstances() error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	delete from candidate_database_instance 
+        	delete from candidate_database_instance
 				where last_suggested < NOW() - INTERVAL ? MINUTE
 				`, config.Config.CandidateInstanceExpireMinutes,
 		)
@@ -1665,4 +1666,64 @@ func ExpireCandidateInstances() error {
 		return nil
 	}
 	return ExecDBWriteFunc(writeFunc)
+}
+
+// RecordInstanceCoordinatesHistory snapshots the binlog coordinates of instances
+func RecordInstanceCoordinatesHistory() error {
+	{
+		writeFunc := func() error {
+			_, err := db.ExecOrchestrator(`
+        	delete from database_instance_coordinates_history
+			where
+				recorded_timestamp < NOW() - INTERVAL 10 MINUTE
+				`,
+			)
+			return log.Errore(err)
+		}
+		ExecDBWriteFunc(writeFunc)
+	}
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+        	insert into
+        		database_instance_coordinates_history (
+					hostname, port,	recorded_timestamp,
+					binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
+				)
+        	select
+        		hostname, port, NOW(),
+				binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
+			from
+				database_instance
+			where
+				binary_log_file != ''
+				OR relay_log_file != ''
+				`,
+		)
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
+// GetHeuristiclyRecentCoordinatesForInstance returns valid and reasonably recent coordinates for given instance.
+func GetHeuristiclyRecentCoordinatesForInstance(instanceKey *InstanceKey) (selfCoordinates *BinlogCoordinates, relayLogCoordinates *BinlogCoordinates, err error) {
+	query := `
+		select
+			binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
+		from
+			database_instance_coordinates_history
+		where
+			hostname = ?
+			and port = ?
+			and recorded_timestamp < NOW() - INTERVAL 1 MINUTE
+		order by
+			recorded_timestamp desc
+			limit 1
+			`
+	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port), func(m sqlutils.RowMap) error {
+		selfCoordinates = &BinlogCoordinates{LogFile: m.GetString("binary_log_file"), LogPos: m.GetInt64("binary_log_pos")}
+		relayLogCoordinates = &BinlogCoordinates{LogFile: m.GetString("relay_log_file"), LogPos: m.GetInt64("relay_log_pos")}
+
+		return nil
+	})
+	return selfCoordinates, relayLogCoordinates, err
 }
