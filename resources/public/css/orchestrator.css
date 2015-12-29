@@ -13,8 +13,14 @@ body {
     padding-top: 80px;
 }
 
-.navbar-brand {
-    padding: 4px 15px;
+.orchestrator-brand {
+    height: 32px;
+    margin-top: 9px;
+    padding: 0px 15px;
+}
+
+.orchestrator-brand img {
+    padding: 0px 8px;
 }
 
 .table {

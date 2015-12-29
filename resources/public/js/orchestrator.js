@@ -1,6 +1,6 @@
 
 var refreshIntervalSeconds = 60 ; // seconds
-var secondsTillRefresh = refreshIntervalSeconds; 
+var secondsTillRefresh = refreshIntervalSeconds;
 var nodeModalVisible = false;
 
 reloadPageHint = {
@@ -10,20 +10,20 @@ reloadPageHint = {
 }
 
 var errorMapping = {
-   		"inMaintenanceProblem": {"badge": "label-info", "description": "In maintenance"}, 
-   		"lastCheckInvalidProblem": {"badge": "label-fatal", "description": "Last check invalid"}, 
-   		"notRecentlyCheckedProblem": {"badge": "label-stale", "description": "Not recently checked (stale)"}, 
-   		"notReplicatingProblem": {"badge": "label-danger", "description": "Not replicating"}, 
+   		"inMaintenanceProblem": {"badge": "label-info", "description": "In maintenance"},
+   		"lastCheckInvalidProblem": {"badge": "label-fatal", "description": "Last check invalid"},
+   		"notRecentlyCheckedProblem": {"badge": "label-stale", "description": "Not recently checked (stale)"},
+   		"notReplicatingProblem": {"badge": "label-danger", "description": "Not replicating"},
    		"replicationLagProblem": {"badge": "label-warning", "description": "Replication lag"}
 	};
 
 function updateCountdownDisplay() {
 	if ($.cookie("auto-refresh") == "true") {
-    	$("#refreshCountdown").html('<span class="glyphicon glyphicon-repeat" title="Click to pause"></span> ' + secondsTillRefresh + 's');		
+    	$("#refreshCountdown").html('<span class="glyphicon glyphicon-repeat" title="Click to pause"></span> ' + secondsTillRefresh + 's');
 	} else {
 		secondsTillRefresh = refreshIntervalSeconds;
-    	$("#refreshCountdown").html('<span class="glyphicon glyphicon-pause" title="Click to countdown"></span> ' + secondsTillRefresh + 's');		
-	}	
+    	$("#refreshCountdown").html('<span class="glyphicon glyphicon-pause" title="Click to countdown"></span> ' + secondsTillRefresh + 's');
+	}
 }
 
 function startRefreshTimer() {
@@ -37,7 +37,7 @@ function startRefreshTimer() {
     		showLoader();
     		location.reload(true);
     	}
-    	updateCountdownDisplay();    	
+    	updateCountdownDisplay();
 	}
     setInterval(refreshFunction, 1*1000);
 }
@@ -55,7 +55,7 @@ function activateRefreshTimer() {
     	resetRefreshTimer();
     });
 }
-		
+
 function showLoader() {
     $(".ajaxLoader").css('visibility', 'visible');
 }
@@ -66,12 +66,15 @@ function hideLoader() {
 function visualizeBrand() {
 	var img = $("<img>");
 
-	img.attr("src", "/images/outbrain-logo-s.png").attr("alt", "Outbrain");
+	img.attr("src", "/images/octocat-logo-32.png").attr("alt", "GitHub");
 
-	if (document.domain && document.domain.indexOf("booking.com") >= 0) {
-		img.attr("src", "/images/booking-logo-s.png").attr("alt", "Booking.com");
+	if (document.domain && document.domain.indexOf("outbrain.com") >= 0) {
+		img.attr("src", "/images/outbrain-logo-32.png").attr("alt", "Outbrain");
 	}
-	$(".navbar-brand").prepend(img)
+	if (document.domain && document.domain.indexOf("booking.com") >= 0) {
+		img.attr("src", "/images/booking-logo-32.png").attr("alt", "Booking.com");
+	}
+	$(".orchestrator-brand").prepend(img)
 }
 
 function showContextMenu() {
@@ -96,7 +99,7 @@ function getInstanceId(host, port) {
 function canonizeInstanceTitle(title) {
     if (typeof removeTextFromHostnameDisplay != "undefined" && removeTextFromHostnameDisplay()) {
         return title.replace(removeTextFromHostnameDisplay(), '');
-    } 
+    }
 	return title;
 }
 
@@ -167,8 +170,8 @@ function apiCommand(uri, hint) {
 			addAlert(operationResult.Message)
 		} else {
 			reloadWithOperationResult(operationResult, hint);
-		}	
-    }, "json");	
+		}
+    }, "json");
     return false;
 }
 
@@ -181,7 +184,7 @@ function reloadWithMessage(msg, details, hint) {
 		port = details.Port || port
 	}
 	hint = hint || "";
-	var newUri = window.location.href.split("#")[0].split("?")[0] + "?orchestrator-msg="+ encodeURIComponent(msg)+"&hostname="+hostname+"&port="+port+"&hint="+hint;  
+	var newUri = window.location.href.split("#")[0].split("?")[0] + "?orchestrator-msg="+ encodeURIComponent(msg)+"&hostname="+hostname+"&port="+port+"&hint="+hint;
 	if (isCompactDisplay && isCompactDisplay()) {
 		newUri += "&compact=true";
 	}
@@ -242,12 +245,12 @@ function openNodeModal(node) {
     if (node.MasterKey.Hostname) {
         var td = addNodeModalDataAttribute("Master", node.masterTitle);
         $('#node_modal button[data-btn=reset-slave]').appendTo(td.find("div"))
-        
+
         td = addNodeModalDataAttribute("Replication running", booleanString(node.replicationRunning));
         $('#node_modal button[data-btn=start-slave]').appendTo(td.find("div"))
         $('#node_modal button[data-btn=restart-slave]').appendTo(td.find("div"))
         $('#node_modal [data-btn-group=stop-slave]').appendTo(td.find("div"))
-        
+
         if (!node.replicationRunning) {
             td = addNodeModalDataAttribute("Last SQL error", node.LastSQLError);
             $('#node_modal button[data-btn=skip-query]').appendTo(td.find("div"))
@@ -283,7 +286,7 @@ function openNodeModal(node) {
             $('#node_modal button[data-btn=detach-slave]').appendTo(masterCoordinatesEl.find("div"))
             $('#node_modal button[data-btn=reattach-slave]').appendTo(hiddenZone)
         }
-	
+
     } else {
         $('#node_modal button[data-btn=reset-slave]').appendTo(hiddenZone);
         $('#node_modal button[data-btn=skip-query]').appendTo(hiddenZone);
@@ -325,9 +328,9 @@ function openNodeModal(node) {
             '<a href="/web/agent/'+node.Key.Hostname+'">'+node.Key.Hostname+'</a>');
     addNodeModalDataAttribute("Long queries",
             '<a href="/web/long-queries?filter='+node.Key.Hostname+'">on '+node.Key.Hostname+'</a>');
-    
+
     $('#node_modal [data-btn]').unbind("click");
-    
+
     $("#beginDowntimeOwner").val(getUserId());
     $('#node_modal button[data-btn=begin-downtime]').click(function() {
     	if (!$("#beginDowntimeOwner").val()) {
@@ -373,7 +376,7 @@ function openNodeModal(node) {
 			if (confirm) {
 		    	apiCommand("/api/reset-slave/"+node.Key.Hostname+"/"+node.Key.Port);
 			}
-		}); 
+		});
 		return false;
     });
     $('#node_modal button[data-btn=set-read-only]').click(function(){
@@ -391,7 +394,7 @@ function openNodeModal(node) {
 			if (confirm) {
 				apiCommand("/api/enable-gtid/"+node.Key.Hostname+"/"+node.Key.Port);
 			}
-		}); 
+		});
     });
     $('#node_modal button[data-btn=disable-gtid]').click(function(){
     	var message = "<p>Are you sure you wish to disable GTID on <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
@@ -413,7 +416,7 @@ function openNodeModal(node) {
 			if (confirm) {
 		    	apiCommand("/api/forget/"+node.Key.Hostname+"/"+node.Key.Port);
 			}
-		}); 
+		});
     	return false;
     });
 
@@ -427,7 +430,7 @@ function openNodeModal(node) {
     	$('#node_modal [data-panel-type=downtime]').html("Downtimed by <strong>"+node.DowntimeOwner+"</strong> until "+node.DowntimeEndTimestamp);
     	$('#node_modal [data-description=downtime-status]').html(
     		node.DowntimeReason
-    	);    	
+    	);
     	$('#node_modal [data-panel-type=begin-downtime]').hide();
     	$('#node_modal [data-panel-type=end-downtime]').show();
     } else {
@@ -439,7 +442,7 @@ function openNodeModal(node) {
 	$('#node_modal button[data-btn=start-slave]').hide();
 	$('#node_modal button[data-btn=restart-slave]').hide();
 	$('#node_modal [data-btn-group=stop-slave]').hide();
-	
+
     if (node.MasterKey.Hostname) {
         if (node.replicationRunning || node.replicationAttemptingToRun) {
         	$('#node_modal [data-btn-group=stop-slave]').show();
@@ -497,7 +500,7 @@ function openNodeModal(node) {
 			if (confirm) {
 				apiCommand("/api/enslave-siblings/"+node.Key.Hostname+"/"+node.Key.Port);
 			}
-		});    	
+		});
     });
     $('#node_modal button[data-btn=end-downtime]').click(function(){
     	apiCommand("/api/end-downtime/"+node.Key.Hostname+"/"+node.Key.Port);
@@ -532,7 +535,7 @@ function normalizeInstance(instance) {
     instance.replicationLagReasonable = Math.abs(instance.SlaveLagSeconds.Int64 - instance.SQLDelay) <= 10;
     instance.isSeenRecently = instance.SecondsSinceLastSeen.Valid && instance.SecondsSinceLastSeen.Int64 <= 3600;
     instance.usingGTID = instance.UsingOracleGTID || instance.UsingMariaDBGTID;
-    instance.isMaxScale = (instance.Version.indexOf("maxscale") >= 0); 
+    instance.isMaxScale = (instance.Version.indexOf("maxscale") >= 0);
 
     // used by cluster-tree
     instance.children = [];
@@ -550,7 +553,7 @@ function normalizeInstance(instance) {
     instance.isVirtual = false;
     instance.isAnchor = false;
     instance.isAggregate = false;
-    
+
     instance.renderHint = "";
 }
 
@@ -669,7 +672,7 @@ function normalizeInstances(instances, maintenanceList) {
     		instance.isSQLThreadCaughtUpWithIOThread = false;
     	}
     });
-    
+
     instances.forEach(function (instance) {
     	if (instance.isMaster && instance.parent != null && instance.parent.parent != null && instance.parent.parent.id == instance.id) {
     	    // In case there's a master-master setup, introduce a virtual node
@@ -677,7 +680,7 @@ function normalizeInstances(instances, maintenanceList) {
     		// This is for visualization purposes...
     	    var virtualCoMastersRoot = createVirtualInstance();
     		coMaster = instance.parent;
-    		
+
     		function setAsCoMaster(instance, coMaster) {
         		instance.isCoMaster = true;
         		instance.hasMaster = true;
@@ -687,7 +690,7 @@ function normalizeInstances(instances, maintenanceList) {
         		var index = coMaster.children.indexOf(instance);
         		if (index >= 0)
         			coMaster.children.splice(index, 1);
-        			
+
         		instance.parent = virtualCoMastersRoot;
         		virtualCoMastersRoot.children.push(instance);
     		}
@@ -695,7 +698,7 @@ function normalizeInstances(instances, maintenanceList) {
     		setAsCoMaster(coMaster, instance);
 
     		instancesMap[virtualCoMastersRoot.id] = virtualCoMastersRoot;
-    	} 
+    	}
     });
     return instancesMap;
 }
@@ -711,7 +714,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	if (instance.isAggregate) {
 		popoverElement.find("h3 div.pull-right span").remove();
 	    popoverElement.find(".instance-content").append('<div>Instances: <div class="pull-right"></div></div>');
-	    
+
 	    function addInstancesBadge(count, badgeClass, title) {
 	    	popoverElement.find(".instance-content .pull-right").append('<span class="badge '+badgeClass+'" data-toggle="tooltip" data-placement="bottom" data-html="true" title="' + title + '">' + count + '</span> ');
 	    	popoverElement.find('[data-toggle="tooltip"]').tooltip();
@@ -731,42 +734,42 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	    if (instance.isFirstChildInDisplay) {
 	    	popoverElement.addClass("first-child-in-display");
 	        popoverElement.attr("data-first-child-in-display", "true");
-	    } 
+	    }
 	    if (instance.usingGTID) {
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using GTID"></span> ');
-	    } 
+	    }
 	    if (instance.UsingPseudoGTID) {
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using Pseudo GTID"></span> ');
-	    } 
+	    }
 	    if (!instance.ReadOnly) {
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-pencil" title="Writeable"></span> ');
-	    } 
+	    }
 	    if (instance.isMostAdvancedOfSiblings) {
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-star" title="Most advanced slave"></span> ');
-	    } 
+	    }
 	    if (instance.CountMySQLSnapshots > 0) {
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-camera" title="'+instance.CountMySQLSnapshots +' snapshots"></span> ');
-	    } 
+	    }
 	    if (instance.HasReplicationFilters) {
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-filter" title="Using replication filters"></span> ');
-	    } 
+	    }
 	    if (instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled && !(instance.isMaster && !instance.isCoMaster)) {
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-forward" title="Logs slave updates"></span> ');
-	    } 
+	    }
 	    if (instance.IsCandidate) {
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-heart" title="Candidate"></span> ');
-	    } 
+	    }
 	    if (instance.inMaintenanceProblem()) {
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench" title="In maintenance"></span> ');
-	    } 
+	    }
 	    if (instance.IsDetached) {
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-remove-sign" title="Replication forcibly detached"></span> ');
-	    } 
+	    }
 	    if (instance.IsDowntimed) {
 	    	var downtimeMessage = 'Downtimed by '+instance.DowntimeOwner+': '+instance.DowntimeReason+'.\nEnds: '+instance.DowntimeEndTimestamp;
 	    	popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-volume-off" title="'+downtimeMessage+'"></span> ');
-	    } 
-	
+	    }
+
 	    if (instance.lastCheckInvalidProblem()) {
 	    	instance.renderHint = "fatal";
 	    	indicateLastSeenInStatus = true;
@@ -802,15 +805,15 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	    	contentHtml += '<p><strong>Master</strong></p>';
 	    }
 	    if (renderType == "search") {
-	    	contentHtml += '<p>' 
+	    	contentHtml += '<p>'
 	        	+ 'Cluster: <a href="/web/cluster/'+instance.ClusterName+'">'+instance.ClusterName+'</a>'
 	        + '</p>';
-	    }  
+	    }
 	    if (renderType == "problems") {
-	    	contentHtml += '<p>' 
+	    	contentHtml += '<p>'
 	        	+ 'Problem: <strong title="'+instance.problemDescription+'">'+instance.problem.replace(/_/g, ' ') + '</strong>'
 	        + '</p>';
-	    }      
+	    }
 	    popoverElement.find(".instance-content").html(contentHtml);
 	}
     // if (instance.isCandidateMaster) {
@@ -825,18 +828,18 @@ function renderInstanceElement(popoverElement, instance, renderType) {
 	// data-command="make-local-master"><span class="glyphicon
 	// glyphicon-play"></span> Make local master</button></div></h4>');
     // }
-    
+
     popoverElement.find("h3 a").click(function () {
     	openNodeModal(instance);
     	return false;
-    });	
+    });
 }
 
 var onClustersListeners = [];
 
 function onClusters(func) {
 	onClustersListeners.push(func);
-} 
+}
 
 
 function getParameterByName(name) {
@@ -849,16 +852,16 @@ function getParameterByName(name) {
 
 $(document).ready(function() {
 	visualizeBrand();
-	
+
 	$(".navbar-nav li").removeClass("active");
 	$(".navbar-nav li[data-nav-page='" + activePage() + "']").addClass("active");
-	
+
 	$.get("/api/clusters-info", function(clusters) {
-		clusters.forEach(function(cluster) {             
+		clusters.forEach(function(cluster) {
     		var title = '<span class="small">' + cluster.ClusterName + '</span>';
     		title = ((cluster.ClusterAlias != "") ? '<strong>' + cluster.ClusterAlias + '</strong>, ' + title : title);
 	        $("#dropdown-clusters").append('<li><a href="/web/cluster/'+cluster.ClusterName+'">'+title+'</a></li>');
-	    });                 
+	    });
 		onClustersListeners.forEach(function(func) {
 			func(clusters);
 		});
@@ -890,7 +893,7 @@ $(document).ready(function() {
     var orchestratorMsg = getParameterByName("orchestrator-msg")
     if (orchestratorMsg) {
         addInfo(orchestratorMsg)
-       
+
         reloadPageHint = {
     		hint: getParameterByName("hint"),
     		hostname: getParameterByName("hostname"),
@@ -903,6 +906,3 @@ $(document).ready(function() {
 	}
     $("#searchInput").focus();
 });
-
-
-
