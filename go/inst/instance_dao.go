@@ -280,6 +280,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		instance.SecondsBehindMaster = m.GetNullInt64("Seconds_Behind_Master")
 		// And until told otherwise:
 		instance.SlaveLagSeconds = instance.SecondsBehindMaster
+		instance.AllowTLS = (m.GetString("Master_SSL_Allowed") == "Yes")
 		// Not breaking the flow even on error
 		slaveStatusFound = true
 		return nil
@@ -591,6 +592,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.DowntimeOwner = m.GetString("downtime_owner")
 	instance.DowntimeEndTimestamp = m.GetString("downtime_end_timestamp")
 	instance.UnresolvedHostname = m.GetString("unresolved_hostname")
+	instance.AllowTLS = m.GetBool("allow_tls")
 
 	instance.SlaveHosts.ReadJson(slaveHostsJSON)
 	return instance
@@ -1359,7 +1361,8 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 					data_center=VALUES(data_center),
 					physical_environment=values(physical_environment),
 					replication_depth=VALUES(replication_depth),
-					is_co_master=VALUES(is_co_master)
+					is_co_master=VALUES(is_co_master),
+					allow_tls=VALUES(allow_tls)
 				`
 		} else {
 			// Scenario: some slave reported a master of his; but the master cannot be contacted.
@@ -1413,8 +1416,9 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				data_center,
 				physical_environment,
 				replication_depth,
-				is_co_master
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				is_co_master,
+				allow_tls
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
@@ -1462,6 +1466,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			instance.PhysicalEnvironment,
 			instance.ReplicationDepth,
 			instance.IsCoMaster,
+			instance.AllowTLS,
 		)
 		if err != nil {
 			return log.Errore(err)

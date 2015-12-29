@@ -713,6 +713,11 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN gtid_purged text CHARACTER SET ascii NOT NULL AFTER executed_gtid_set
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN allow_tls TINYINT UNSIGNED NOT NULL AFTER sql_delay
+	`,
 }
 
 // Track if a TLS has already been configured for topology

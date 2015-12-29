@@ -79,6 +79,7 @@ type Instance struct {
 	DowntimeOwner        string
 	DowntimeEndTimestamp string
 	UnresolvedHostname   string
+	AllowTLS             bool
 }
 
 // NewInstance creates a new, empty instance

@@ -317,6 +317,8 @@ function openNodeModal(node) {
 
     addNodeModalDataAttribute("Uptime", node.Uptime);
 
+    addNodeModalDataAttribute("Allow TLS", node.AllowTLS);
+
     addNodeModalDataAttribute("Cluster",
             '<a href="/web/cluster/'+node.ClusterName+'">'+node.ClusterName+'</a>');
     addNodeModalDataAttribute("Audit",
