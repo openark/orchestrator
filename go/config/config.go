@@ -153,6 +153,12 @@ type Configuration struct {
 	GraphiteConvertHostnameDotsToUnderscores   bool              // If true, then hostname's dots are converted to underscores before being used in graphite path
 }
 
+// ToJSONString will marshal this configuration as JSON
+func (this *Configuration) ToJSONString() string {
+	b, _ := json.Marshal(this)
+	return string(b)
+}
+
 var Config *Configuration = NewConfiguration()
 var readFileNames []string
 
