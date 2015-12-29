@@ -735,7 +735,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instance == nil {
 				log.Fatalf("Instance not found: %+v", *instanceKey)
 			}
-			coordinates, err := inst.SearchEntryInInstanceBinlogs(instance, pattern, false)
+			coordinates, err := inst.SearchEntryInInstanceBinlogs(instance, pattern, false, nil)
 			if err != nil {
 				log.Fatale(err)
 			}
