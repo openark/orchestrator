@@ -432,11 +432,13 @@ function openNodeModal(node) {
     		node.DowntimeReason
     	);
     	$('#node_modal [data-panel-type=begin-downtime]').hide();
+		$('#node_modal button[data-btn=begin-downtime]').hide();
     	$('#node_modal [data-panel-type=end-downtime]').show();
     } else {
     	$('#node_modal [data-panel-type=downtime]').html("Downtime");
     	$('#node_modal [data-panel-type=begin-downtime]').show();
     	$('#node_modal [data-panel-type=end-downtime]').hide();
+		$('#node_modal button[data-btn=end-downtime]').hide();
     }
 	$('#node_modal button[data-btn=skip-query]').hide();
 	$('#node_modal button[data-btn=start-slave]').hide();
@@ -513,6 +515,11 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=recover]').click(function(){
     	apiCommand("/api/recover/"+node.Key.Hostname+"/"+node.Key.Port);
     });
+
+	if (!isAuthorizedForAction()) {
+		$('#node_modal button[data-btn]').hide();
+		$('#node_modal [data-btn-group]').hide();
+	}
 
     $('#node_modal').modal({})
     $('#node_modal').unbind('hidden.bs.modal');
