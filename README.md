@@ -38,7 +38,7 @@ _Orchestrator_ supports:
 - Web API (HTTP GET access)
 - Web interface, a _slick_ one.
 
-![Orcehstrator screenshot](https://github.com/outbrain/orchestrator/wiki/images/orchestrator-simple.png)
+![Orcehstrator screenshot](https://github.com/github/orchestrator/wiki/images/orchestrator-introduction-screenshot.png)
 
 #### More
 
@@ -54,4 +54,4 @@ _Orchestrator_ supports:
 
 Read the [Orchestrator Manual](https://github.com/outbrain/orchestrator/wiki/Orchestrator-Manual) for comprehensive documentation.
 
-Authored by [Shlomi Noach](https://github.com/shlomi-noach) at [GitHub](http://github.com). Previously at [Booking.com](http://booking.com) and [Outbrain](http://outbrain.com) 
+Authored by [Shlomi Noach](https://github.com/shlomi-noach) at [GitHub](http://github.com). Previously at [Booking.com](http://booking.com) and [Outbrain](http://outbrain.com)
