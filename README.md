@@ -1,4 +1,4 @@
-orchestrator [[Manual]](https://github.com/outbrain/orchestrator/wiki/Orchestrator-Manual)
+orchestrator [[Manual]](https://github.com/github/orchestrator/wiki/Orchestrator-Manual)
 ============
 
 _Orchestrator_ is a MySQL replication topology management and visualization tool, allowing for:
@@ -52,6 +52,6 @@ _Orchestrator_ supports:
 - When working with [orchestrator-agent](https://github.com/outbrain/orchestrator-agent), seed new/corrupt instances
 - More...
 
-Read the [Orchestrator Manual](https://github.com/outbrain/orchestrator/wiki/Orchestrator-Manual) for comprehensive documentation.
+Read the [Orchestrator Manual](https://github.com/github/orchestrator/wiki/Orchestrator-Manual) for comprehensive documentation.
 
 Authored by [Shlomi Noach](https://github.com/shlomi-noach) at [GitHub](http://github.com). Previously at [Booking.com](http://booking.com) and [Outbrain](http://outbrain.com)
