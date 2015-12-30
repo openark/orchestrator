@@ -6,7 +6,7 @@
 #
 set -e
 
-RELEASE_VERSION="1.4.551"
+RELEASE_VERSION="1.4.552"
 TOPDIR=/tmp/orchestrator-release
 export RELEASE_VERSION TOPDIR
 export GO15VENDOREXPERIMENT=1
@@ -75,7 +75,7 @@ function oinstall() {
   cd  $(dirname $0)
   gofmt -s -w  go/
   rsync -qa ./resources $builddir/orchestrator${prefix}/orchestrator/
-  rsync -qa ./conf/*.sample $builddir/orchestrator${prefix}/orchestrator/
+  rsync -qa ./conf/orchestrator-sample.* $builddir/orchestrator${prefix}/orchestrator/
   cp etc/init.d/orchestrator.bash $builddir/orchestrator/etc/init.d/orchestrator
   chmod +x $builddir/orchestrator/etc/init.d/orchestrator
 }
@@ -123,14 +123,15 @@ function build() {
   arch="$2"
   builddir="$3"
   prefix="$4"
-  gobuild="go build -o $builddir/orchestrator${prefix}/orchestrator/orchestrator go/cmd/orchestrator/main.go"
+  ldflags="-X main.AppVersion=${RELEASE_VERSION}"
+  gobuild="go build -ldflags \"$ldflags\" -o $builddir/orchestrator${prefix}/orchestrator/orchestrator go/cmd/orchestrator/main.go"
 
   case $os in
     'linux')
-      GOOS=$os GOARCH=$arch $gobuild
+      echo "GOOS=$os GOARCH=$arch $gobuild" | bash
     ;;
     'darwin')
-      GOOS=darwin GOARCH=amd64 $gobuild
+      echo "GOOS=darwin GOARCH=amd64 $gobuild" | bash
     ;;
   esac
 }
