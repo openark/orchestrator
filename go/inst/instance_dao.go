@@ -684,6 +684,19 @@ func ReadClusterInstances(clusterName string) ([](*Instance), error) {
 	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
 }
 
+// ReadClusterWriteableMaster returns the/a writeable master of this cluster
+// Typically, the cluster name indicates the master of the cluster. However, in circular
+// master-master replication one master can assume the name of the cluster, and it is
+// not guaranteed that it is the writeable one.
+func ReadClusterWriteableMaster(clusterName string) ([](*Instance), error) {
+	condition := `
+		cluster_name = ?
+		and read_only = 0
+		and (replication_depth = 0 or is_co_master)
+	`
+	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "replication_depth asc")
+}
+
 // ReadSlaveInstances reads slaves of a given master
 func ReadSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
 	condition := `
