@@ -5,7 +5,7 @@ _Orchestrator_ is a MySQL replication topology management and visualization tool
 
 #### Discovery
 
-_orchestrator_ actively crawls through your topologies and maps them. It reads basic MySQL info such as replication status and configuration. 
+_orchestrator_ actively crawls through your topologies and maps them. It reads basic MySQL info such as replication status and configuration.
 
 It provides with slick visualization of your topologies, including replication problems, even in the face of failures.
 
@@ -54,5 +54,4 @@ _Orchestrator_ supports:
 
 Read the [Orchestrator Manual](https://github.com/outbrain/orchestrator/wiki/Orchestrator-Manual) for comprehensive documentation.
 
-Authored by [Shlomi Noach](https://github.com/shlomi-noach) at [Booking.com](http://booking.com) and previously at [Outbrain](http://outbrain.com) 
-
+Authored by [Shlomi Noach](https://github.com/shlomi-noach) at [GitHub](http://github.com). Previously at [Booking.com](http://booking.com) and [Outbrain](http://outbrain.com) 
