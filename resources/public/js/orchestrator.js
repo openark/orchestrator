@@ -514,6 +514,10 @@ function openNodeModal(node) {
     	apiCommand("/api/recover/"+node.Key.Hostname+"/"+node.Key.Port);
     });
 
+	if (!isAuthorizedForAction()) {
+		$('#node_modal #modalDataAttributesTable button').appendTo(hiddenZone);
+	}
+
     $('#node_modal').modal({})
     $('#node_modal').unbind('hidden.bs.modal');
     $('#node_modal').on('hidden.bs.modal', function () {
