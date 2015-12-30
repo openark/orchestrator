@@ -18,6 +18,7 @@ package inst
 
 import (
 	"fmt"
+
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/db"
@@ -27,10 +28,10 @@ import (
 func ReadClusterAliases() error {
 	updatedMap := make(map[string]string)
 	query := `
-		select 
+		select
 			cluster_name,
 			alias
-		from 
+		from
 			cluster_alias
 		`
 	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
@@ -51,14 +52,15 @@ func ReadClusterAliases() error {
 func ReadClusterByAlias(alias string) (string, error) {
 	clusterName := ""
 	query := `
-		select 
+		select
 			cluster_name
-		from 
+		from
 			cluster_alias
 		where
 			alias = ?
+			or cluster_name = ?
 		`
-	err := db.QueryOrchestrator(query, sqlutils.Args(alias), func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestrator(query, sqlutils.Args(alias, alias), func(m sqlutils.RowMap) error {
 		clusterName = m.GetString("cluster_name")
 		return nil
 	})
@@ -76,7 +78,7 @@ func ReadClusterByAlias(alias string) (string, error) {
 func WriteClusterAlias(clusterName string, alias string) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-			replace into  
+			replace into
 					cluster_alias (cluster_name, alias)
 				values
 					(?, ?)
@@ -96,25 +98,25 @@ func WriteClusterAlias(clusterName string, alias string) error {
 func UpdateClusterAliases() error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-			replace into  
+			replace into
 					cluster_alias (alias, cluster_name, last_registered)
-				select 
-				    suggested_cluster_alias, 
+				select
+				    suggested_cluster_alias,
 				    substring_index(group_concat(cluster_name order by cluster_name), ',', 1) as cluster_name,
 				    NOW()
-				  from 
-				    database_instance 
+				  from
+				    database_instance
 				    left join database_instance_downtime using (hostname, port)
-				  where 
-				    suggested_cluster_alias!='' 
+				  where
+				    suggested_cluster_alias!=''
 				    and not (
-				      (hostname, port) in (select hostname, port from topology_recovery where start_active_period >= now() - interval 11111 day) 
+				      (hostname, port) in (select hostname, port from topology_recovery where start_active_period >= now() - interval 11111 day)
 				      and (
 				        database_instance_downtime.downtime_active IS NULL
 				        or database_instance_downtime.end_timestamp < NOW()
 					  ) is false
 				    )
-				  group by 
+				  group by
 				    suggested_cluster_alias
 			`)
 		if err == nil {

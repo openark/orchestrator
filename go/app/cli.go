@@ -860,6 +860,18 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			clusterName := getClusterName(clusterAlias, instanceKey)
 			fmt.Println(clusterName)
 		}
+	case registerCliCommand("which-cluster-master", "Information", `Output the name of the master in a given cluster`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			masters, err := inst.ReadClusterWriteableMaster(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if len(masters) == 0 {
+				log.Fatalf("No writeable masters found for cluster %+v", clusterName)
+			}
+			fmt.Println(masters[0].Key.DisplayString())
+		}
 	case registerCliCommand("which-cluster-instances", "Information", `Output the list of instances participating in same cluster as given instance`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
