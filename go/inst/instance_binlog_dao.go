@@ -420,7 +420,7 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 		var otherEventCoordinates BinlogCoordinates
 		{
 			// Extract next binlog/relaylog entry from instance:
-			event, err := instanceCursor.nextRealEvent()
+			event, err := instanceCursor.nextRealEvent(0)
 			if err != nil {
 				return nil, 0, log.Errore(err)
 			}
@@ -488,7 +488,7 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 		}
 		{
 			// Extract next binlog/relaylog entry from otherInstance (intended master):
-			event, err := otherCursor.nextRealEvent()
+			event, err := otherCursor.nextRealEvent(0)
 			if err != nil {
 				return nil, 0, log.Errore(err)
 			}
