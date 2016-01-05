@@ -24,11 +24,14 @@ usage() {
 }
 
 function precheck() {
+  local target
   local ok=0 # return err. so shell exit code
 
-  if [[ ! -x "$( which fpm )" ]]; then
-    echo "Please install fpm and ensure it is in PATH (typically: 'gem install fpm')"
-    ok=1
+  if [[ "$target" == "linux" ]]; then
+    if [[ ! -x "$( which fpm )" ]]; then
+      echo "Please install fpm and ensure it is in PATH (typically: 'gem install fpm')"
+      ok=1
+    fi
   fi
 
   if [[ ! -x "$( which rpmbuild )" ]]; then
@@ -146,7 +149,7 @@ function main() {
   arch="$2"
   prefix="$3"
 
-  precheck
+  precheck "$target"
   builddir=$( setuptree "$prefix" )
   oinstall "$builddir" "$prefix"
   build "$target" "$arch" "$builddir" "$prefix"
