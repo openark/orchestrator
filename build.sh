@@ -32,10 +32,10 @@ function precheck() {
       echo "Please install fpm and ensure it is in PATH (typically: 'gem install fpm')"
       ok=1
     fi
-  fi
 
-  if [[ ! -x "$( which rpmbuild )" ]]; then
-    echo "rpmbuild not in PATH, rpm will not be built (OS/X: 'brew install rpm')"
+    if [[ ! -x "$( which rpmbuild )" ]]; then
+      echo "rpmbuild not in PATH, rpm will not be built (OS/X: 'brew install rpm')"
+    fi
   fi
 
   if [[ -z "$GOPATH" ]]; then
