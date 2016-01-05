@@ -6,7 +6,7 @@
 #
 set -e
 
-RELEASE_VERSION="1.4.552"
+RELEASE_VERSION="1.4.553"
 TOPDIR=/tmp/orchestrator-release
 export RELEASE_VERSION TOPDIR
 export GO15VENDOREXPERIMENT=1
@@ -24,15 +24,18 @@ usage() {
 }
 
 function precheck() {
+  local target
   local ok=0 # return err. so shell exit code
 
-  if [[ ! -x "$( which fpm )" ]]; then
-    echo "Please install fpm and ensure it is in PATH (typically: 'gem install fpm')"
-    ok=1
-  fi
+  if [[ "$target" == "linux" ]]; then
+    if [[ ! -x "$( which fpm )" ]]; then
+      echo "Please install fpm and ensure it is in PATH (typically: 'gem install fpm')"
+      ok=1
+    fi
 
-  if [[ ! -x "$( which rpmbuild )" ]]; then
-    echo "rpmbuild not in PATH, rpm will not be built (OS/X: 'brew install rpm')"
+    if [[ ! -x "$( which rpmbuild )" ]]; then
+      echo "rpmbuild not in PATH, rpm will not be built (OS/X: 'brew install rpm')"
+    fi
   fi
 
   if [[ -z "$GOPATH" ]]; then
@@ -91,6 +94,10 @@ function package() {
   cd $TOPDIR
 
   case $target in
+    'tar')
+      echo "Creating Linux Tar package"
+      tar -C $builddir/orchestrator -czf $TOPDIR/orchestrator-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
+      ;;
     'linux')
       echo "Creating Linux Tar package"
       tar -C $builddir/orchestrator -czf $TOPDIR/orchestrator-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
@@ -144,7 +151,7 @@ function main() {
   arch="$2"
   prefix="$3"
 
-  precheck
+  precheck "$target"
   builddir=$( setuptree "$prefix" )
   oinstall "$builddir" "$prefix"
   build "$target" "$arch" "$builddir" "$prefix"
