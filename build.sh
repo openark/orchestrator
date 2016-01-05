@@ -6,7 +6,7 @@
 #
 set -e
 
-RELEASE_VERSION="1.4.552"
+RELEASE_VERSION="1.4.553"
 TOPDIR=/tmp/orchestrator-release
 export RELEASE_VERSION TOPDIR
 export GO15VENDOREXPERIMENT=1
@@ -89,6 +89,10 @@ function package() {
   cd $TOPDIR
 
   case $target in
+    'tar')
+      echo "Creating Linux Tar package"
+      tar -C $builddir/orchestrator -czf $TOPDIR/orchestrator-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
+      ;;
     'linux')
       echo "Creating Linux Tar package"
       tar -C $builddir/orchestrator -czf $TOPDIR/orchestrator-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
