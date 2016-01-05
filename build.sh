@@ -89,6 +89,10 @@ function package() {
   cd $TOPDIR
 
   case $target in
+    'tar')
+      echo "Creating Linux Tar package"
+      tar -C $builddir/orchestrator -czf $TOPDIR/orchestrator-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
+      ;;
     'linux')
       echo "Creating Linux Tar package"
       tar -C $builddir/orchestrator -czf $TOPDIR/orchestrator-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
