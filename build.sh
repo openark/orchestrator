@@ -50,6 +50,8 @@ function precheck() {
     ok=1
   fi
 
+  go version
+
   return $ok
 }
 
