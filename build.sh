@@ -126,7 +126,7 @@ function build() {
   builddir="$3"
   prefix="$4"
   ldflags="-X main.AppVersion=${RELEASE_VERSION}"
-  echo "Building"
+  echo "Building via $(go version)"
   gobuild="go build -ldflags \"$ldflags\" -o $builddir/orchestrator${prefix}/orchestrator/orchestrator go/cmd/orchestrator/main.go"
 
   case $os in
