@@ -140,7 +140,8 @@ function build() {
     ;;
   esac
   echo "Build complete"
-  cp $builddir/orchestrator${prefix}/orchestrator/orchestrator $builddir/orchestrator${prefix}/orchestrator-cli/usr/bin && echo "orchestrator-cli copied"
+  cp $builddir/orchestrator${prefix}/orchestrator/orchestrator $builddir/orchestrator-cli/usr/bin && echo "orchestrator-cli copied"
+  find $builddir/ -name orchestrator
 }
 
 function main() {
