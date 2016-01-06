@@ -195,3 +195,5 @@ prefix=${prefix:-"/usr/local"}
 
 [[ $debug -eq 1 ]] && set -x
 main "$target" "$arch" "$prefix" "$build_only"
+
+echo "orchestrator build done"
