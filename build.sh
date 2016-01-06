@@ -53,9 +53,6 @@ function precheck() {
     ok=1
   fi
 
-  echo "building on $(hostname)"
-  go version
-
   return $ok
 }
 
