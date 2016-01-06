@@ -157,6 +157,7 @@ function main() {
   build "$target" "$arch" "$builddir" "$prefix"
   [[ $build_only -eq 0 ]] && package "$target" "$builddir" "$prefix"
   # cleanup
+  echo "main complete $?"
 }
 
 build_only=0
@@ -197,4 +198,4 @@ prefix=${prefix:-"/usr/local"}
 [[ $debug -eq 1 ]] && set -x
 main "$target" "$arch" "$prefix" "$build_only"
 
-echo "orchestrator build done"
+echo "orchestrator build done $?"
