@@ -28,8 +28,8 @@ import (
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
-	"github.com/outbrain/orchestrator/vendor/github.com/pmylund/go-cache"
-	"github.com/outbrain/orchestrator/vendor/github.com/rcrowley/go-metrics"
+	"github.com/pmylund/go-cache"
+	"github.com/rcrowley/go-metrics"
 )
 
 const backendDBConcurrency = 20
