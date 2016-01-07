@@ -6,7 +6,7 @@
 #
 set -e
 
-RELEASE_VERSION="1.4.553"
+RELEASE_VERSION="1.4.554"
 TOPDIR=/tmp/orchestrator-release
 export RELEASE_VERSION TOPDIR
 export GO15VENDOREXPERIMENT=1
@@ -21,6 +21,7 @@ usage() {
   echo "-d debug output"
   echo "-b build only, do not generate packages"
   echo "-p build prefix Default:(/usr/local)"
+  echo "-s release subversion"
   echo
 }
 
@@ -92,6 +93,8 @@ function package() {
 
   cd $TOPDIR
 
+  echo "Release version is ${RELEASE_VERSION}"
+
   case $target in
     'linux')
       echo "Creating Linux Tar package"
@@ -127,8 +130,6 @@ function build() {
   prefix="$4"
   ldflags="-X main.AppVersion=${RELEASE_VERSION}"
   echo "Building via $(go version)"
-  echo "pwd is $(pwd)"
-  echo "GOPATH is ${GOPATH}"
   gobuild="go build -ldflags \"$ldflags\" -o $builddir/orchestrator${prefix}/orchestrator/orchestrator go/cmd/orchestrator/main.go"
 
   case $os in
@@ -139,9 +140,8 @@ function build() {
       echo "GOOS=darwin GOARCH=amd64 $gobuild" | bash
     ;;
   esac
-  echo "Build complete"
-  cp $builddir/orchestrator${prefix}/orchestrator/orchestrator $builddir/orchestrator-cli/usr/bin && echo "orchestrator-cli copied"
-  find $builddir/ -name orchestrator
+  [[ $(find $builddir/orchestrator${prefix}/orchestrator/ -type f -name orchestrator) ]] &&  echo "orchestrator binary created" || (echo "Failed to generate orchestrator binary" ; exit 1)
+  cp $builddir/orchestrator${prefix}/orchestrator/orchestrator $builddir/orchestrator-cli/usr/bin && echo "binary copied to orchestrator-cli" || (echo "Failed to copy orchestrator binary to orchestrator-cli" ; exit 1)
 }
 
 function main() {
@@ -155,13 +155,14 @@ function main() {
   builddir=$( setuptree "$prefix" )
   oinstall "$builddir" "$prefix"
   build "$target" "$arch" "$builddir" "$prefix"
-  [[ $build_only -eq 0 ]] && package "$target" "$builddir" "$prefix"
-  # cleanup
-  echo "main complete $?"
+  [[ $? == 0 ]] || return 1
+  if [[ $build_only -eq 0 ]]; then
+    package "$target" "$builddir" "$prefix"
+  fi
 }
 
 build_only=0
-while getopts a:t:p:dbh flag; do
+while getopts a:t:p:s:dbh flag; do
   case $flag in
   a)
     arch="$OPTARG"
@@ -183,6 +184,9 @@ while getopts a:t:p:dbh flag; do
   p)
     prefix="$OPTARG"
     ;;
+  s)
+    RELEASE_VERSION="${RELEASE_VERSION}_${OPTARG}"
+    ;;
   ?)
     usage
     exit 2
@@ -198,4 +202,4 @@ prefix=${prefix:-"/usr/local"}
 [[ $debug -eq 1 ]] && set -x
 main "$target" "$arch" "$prefix" "$build_only"
 
-echo "orchestrator build done $?"
+echo "orchestrator build done; exit status is $?"
