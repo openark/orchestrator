@@ -28,8 +28,8 @@ import (
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
-	"github.com/pmylund/go-cache"
-	"github.com/rcrowley/go-metrics"
+	"github.com/outbrain/orchestrator/vendor/github.com/pmylund/go-cache"
+	"github.com/outbrain/orchestrator/vendor/github.com/rcrowley/go-metrics"
 )
 
 const backendDBConcurrency = 20
@@ -1699,11 +1699,11 @@ func RecordInstanceCoordinatesHistory() error {
 		_, err := db.ExecOrchestrator(`
         	insert into
         		database_instance_coordinates_history (
-					hostname, port,	recorded_timestamp,
+					hostname, port,	last_seen, recorded_timestamp,
 					binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
 				)
         	select
-        		hostname, port, NOW(),
+        		hostname, port, last_seen, NOW(),
 				binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
 			from
 				database_instance
