@@ -909,7 +909,9 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instance == nil {
 				log.Fatalf("Instance not found: %+v", *instanceKey)
 			}
-			fmt.Println(instance.MasterKey.DisplayString())
+			if instance.MasterKey.IsValid() {
+				fmt.Println(instance.MasterKey.DisplayString())
+			}
 		}
 	case registerCliCommand("which-slaves", "Information", `Output the fully-qualified hostname:port list of slaves of a given instance`):
 		{
