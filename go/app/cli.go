@@ -71,30 +71,33 @@ Usage for most commands:
 `, commandsListing())
 }
 
+// getClusterName will make a best effort to deduce a cluster name using either a given alias
+// or an instanceKey. First attempt is at alias, and if that doesn't work, we try instanceKey.
 func getClusterName(clusterAlias string, instanceKey *inst.InstanceKey) (clusterName string) {
 	var err error
 	if clusterAlias != "" {
 		clusterName, err = inst.ReadClusterByAlias(clusterAlias)
-		if err != nil {
-			log.Fatale(err)
+		if err == nil && clusterName != "" {
+			return clusterName
 		}
-	} else {
-		// deduce cluster by instance
-		if instanceKey == nil {
-			instanceKey = thisInstanceKey
-		}
-		if instanceKey == nil {
-			log.Fatalf("Unable to get cluster instances: unresolved instance")
-		}
-		instance, _, err := inst.ReadInstance(instanceKey)
-		if err != nil {
-			log.Fatale(err)
-		}
-		if instance == nil {
-			log.Fatalf("Instance not found: %+v", *instanceKey)
-		}
-		clusterName = instance.ClusterName
 	}
+
+	// deduce cluster by instance
+	if instanceKey == nil {
+		instanceKey = thisInstanceKey
+	}
+	if instanceKey == nil {
+		log.Fatalf("Unable to get cluster instances: unresolved instance")
+	}
+	instance, _, err := inst.ReadInstance(instanceKey)
+	if err != nil {
+		log.Fatale(err)
+	}
+	if instance == nil {
+		log.Fatalf("Instance not found: %+v", *instanceKey)
+	}
+	clusterName = instance.ClusterName
+
 	if clusterName == "" {
 		log.Fatalf("Unable to determine cluster name")
 	}
