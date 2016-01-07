@@ -648,6 +648,22 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
+	case registerCliCommand("restart-slave-statements", "Replication, general", `Get a list of statements to execute to stop then restore slave to same execution state. Provide --statement for injected statement`):
+		{
+			if instanceKey == nil {
+				instanceKey = assignThisInstanceKey()
+			}
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			statements, err := inst.GetSlaveRestartPreserveStatements(instanceKey, *config.RuntimeCLIFlags.Statement)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, statement := range statements {
+				fmt.Println(statement)
+			}
+		}
 		// Pool
 	case registerCliCommand("set-read-only", "Instance", `Turn an instance read-only, via SET GLOBAL read_only := 1`):
 		{

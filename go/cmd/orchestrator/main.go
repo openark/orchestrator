@@ -409,6 +409,16 @@ Cheatsheet:
 
             Issuing this on an attached (i.e. normal) slave will do nothing.
 
+		restart-slave-statements
+			Prints a list of statements to execute to stop then restore slave to same execution state.
+			Provide --statement for injected statement.
+			This is useful for issuing a command that can only be executed whiel slave is stopped. Such
+			commands are any of CHANGE MASTER TO.
+			Orchestrator will not execute given commands, only print them as courtesy. It may not have
+			the privileges to execute them in the first place. Example:
+
+			orchestrator -c restart-slave-statements -i some.slave.com -statement="change master to master_heartbeat_period=5"
+
     General instance commands
         Applying general instance configuration and state
 
@@ -831,6 +841,7 @@ func main() {
 	config.RuntimeCLIFlags.SkipUnresolveCheck = flag.Bool("skip-unresolve-check", false, "Skip/ignore checking an unresolve mapping (via hostname_unresolve table) resolves back to same hostname")
 	config.RuntimeCLIFlags.Noop = flag.Bool("noop", false, "Dry run; do not perform destructing operations")
 	config.RuntimeCLIFlags.BinlogFile = flag.String("binlog", "", "Binary log file name")
+	config.RuntimeCLIFlags.Statement = flag.String("statement", "", "Statement/hint")
 	config.RuntimeCLIFlags.GrabElection = flag.Bool("grab-election", false, "Grab leadership (only applies to continuous mode)")
 	config.RuntimeCLIFlags.Version = flag.Bool("version", false, "Print version and exit")
 	flag.Parse()

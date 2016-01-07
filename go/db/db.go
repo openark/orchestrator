@@ -931,7 +931,7 @@ func deployIfNotAlreadyDeployed(db *sql.DB, queries []string, deployedQueries []
 			continue
 		}
 		if i == 0 {
-			log.Debugf("sql_mode is: %+v", originalSqlMode)
+			//log.Debugf("sql_mode is: %+v", originalSqlMode)
 		}
 		if config.Config.SmartOrchestratorDatabaseUpdate {
 			log.Debugf("initOrchestratorDB executing: %.80s", strings.TrimSpace(strings.Replace(query, "\n", "", -1)))
