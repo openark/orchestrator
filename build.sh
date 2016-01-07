@@ -6,7 +6,7 @@
 #
 set -e
 
-RELEASE_VERSION="1.4.553"
+RELEASE_VERSION="1.4.554"
 TOPDIR=/tmp/orchestrator-release
 export RELEASE_VERSION TOPDIR
 export GO15VENDOREXPERIMENT=1
@@ -19,7 +19,9 @@ usage() {
   echo "-t (linux|darwin) Target OS Default:(linux)"
   echo "-a (amd64|386) Arch Default:(amd64)"
   echo "-d debug output"
+  echo "-b build only, do not generate packages"
   echo "-p build prefix Default:(/usr/local)"
+  echo "-s release subversion"
   echo
 }
 
@@ -91,11 +93,9 @@ function package() {
 
   cd $TOPDIR
 
+  echo "Release version is ${RELEASE_VERSION}"
+
   case $target in
-    'tar')
-      echo "Creating Linux Tar package"
-      tar -C $builddir/orchestrator -czf $TOPDIR/orchestrator-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
-      ;;
     'linux')
       echo "Creating Linux Tar package"
       tar -C $builddir/orchestrator -czf $TOPDIR/orchestrator-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
@@ -107,7 +107,6 @@ function package() {
       cd $TOPDIR
       # rpm packaging -- executable only
       echo "Creating Distro cli packages"
-      cp $builddir/orchestrator${prefix}/orchestrator/orchestrator $builddir/orchestrator-cli/usr/bin
       fpm -v "${RELEASE_VERSION}" --epoch 1  -f -s dir -t rpm -n orchestrator-cli -C $builddir/orchestrator-cli --prefix=/ .
       fpm -v "${RELEASE_VERSION}" --epoch 1  -f -s dir -t deb -n orchestrator-cli -C $builddir/orchestrator-cli --prefix=/ .
       ;;
@@ -115,7 +114,6 @@ function package() {
       echo "Creating Darwin full Package"
       tar -C $builddir/orchestrator -czf $TOPDIR/orchestrator-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
       echo "Creating Darwin cli Package"
-      cp $builddir/orchestrator${prefix}/orchestrator/orchestrator $builddir/orchestrator-cli/usr/bin
       tar -C $builddir/orchestrator-cli -czf $TOPDIR/orchestrator-cli-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
       ;;
   esac
@@ -131,6 +129,7 @@ function build() {
   builddir="$3"
   prefix="$4"
   ldflags="-X main.AppVersion=${RELEASE_VERSION}"
+  echo "Building via $(go version)"
   gobuild="go build -ldflags \"$ldflags\" -o $builddir/orchestrator${prefix}/orchestrator/orchestrator go/cmd/orchestrator/main.go"
 
   case $os in
@@ -141,23 +140,29 @@ function build() {
       echo "GOOS=darwin GOARCH=amd64 $gobuild" | bash
     ;;
   esac
+  [[ $(find $builddir/orchestrator${prefix}/orchestrator/ -type f -name orchestrator) ]] &&  echo "orchestrator binary created" || (echo "Failed to generate orchestrator binary" ; exit 1)
+  cp $builddir/orchestrator${prefix}/orchestrator/orchestrator $builddir/orchestrator-cli/usr/bin && echo "binary copied to orchestrator-cli" || (echo "Failed to copy orchestrator binary to orchestrator-cli" ; exit 1)
 }
 
 function main() {
-  local target arch builddir prefix
+  local target arch builddir prefix build_only
   target="$1"
   arch="$2"
   prefix="$3"
+  build_only=$4
 
   precheck "$target"
   builddir=$( setuptree "$prefix" )
   oinstall "$builddir" "$prefix"
   build "$target" "$arch" "$builddir" "$prefix"
-  package "$target" "$builddir" "$prefix"
-  # cleanup
+  [[ $? == 0 ]] || return 1
+  if [[ $build_only -eq 0 ]]; then
+    package "$target" "$builddir" "$prefix"
+  fi
 }
 
-while getopts a:t:p:dh flag; do
+build_only=0
+while getopts a:t:p:s:dbh flag; do
   case $flag in
   a)
     arch="$OPTARG"
@@ -172,8 +177,15 @@ while getopts a:t:p:dh flag; do
   d)
     debug=1
     ;;
+  b)
+    echo "Build only; no packaging"
+    build_only=1
+    ;;
   p)
     prefix="$OPTARG"
+    ;;
+  s)
+    RELEASE_VERSION="${RELEASE_VERSION}_${OPTARG}"
     ;;
   ?)
     usage
@@ -188,4 +200,6 @@ arch=${arch:-"amd64"} # default for arch is amd64
 prefix=${prefix:-"/usr/local"}
 
 [[ $debug -eq 1 ]] && set -x
-main "$target" "$arch" "$prefix"
+main "$target" "$arch" "$prefix" "$build_only"
+
+echo "orchestrator build done; exit status is $?"
