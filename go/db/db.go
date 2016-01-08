@@ -731,7 +731,7 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE
 			database_instance_coordinates_history
-			ADD COLUMN last_seen timestamp NOT NULL AFTER port
+			ADD COLUMN last_seen timestamp NOT NULL AFTER recorded_timestamp
 	`,
 }
 
