@@ -18,6 +18,7 @@ package inst
 
 import (
 	"regexp"
+	"strings"
 )
 
 // InstancesByExecBinlogCoordinates is a sortabel type for BinlogCoordinates
@@ -87,4 +88,13 @@ func RemoveNilInstances(instances [](*Instance)) [](*Instance) {
 		}
 	}
 	return instances
+}
+
+// SemicolonTerminated is a utility function that makes sure a statement is terminated with
+// a semicolon, if it isn't already
+func SemicolonTerminated(statement string) string {
+	statement = strings.TrimSpace(statement)
+	statement = strings.TrimRight(statement, ";")
+	statement = statement + ";"
+	return statement
 }

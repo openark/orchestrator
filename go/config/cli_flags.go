@@ -25,6 +25,7 @@ type CLIFlags struct {
 	Databaseless       *bool
 	GrabElection       *bool
 	Version            *bool
+	Statement          *string
 }
 
 var RuntimeCLIFlags CLIFlags
