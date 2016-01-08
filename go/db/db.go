@@ -731,7 +731,7 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE
 			database_instance_coordinates_history
-			ADD COLUMN last_seen timestamp NOT NULL AFTER recorded_timestamp
+			ADD COLUMN last_seen timestamp NOT NULL DEFAULT '1971-01-01 00:00:00' AFTER recorded_timestamp
 	`,
 }
 
