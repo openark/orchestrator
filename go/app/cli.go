@@ -857,6 +857,17 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(output)
 		}
+	case registerCliCommand("all-instances", "Information", `The complete list of known instances`):
+		{
+			instances, err := inst.FindInstances(".")
+			if err != nil {
+				log.Fatale(err)
+			} else {
+				for _, instance := range instances {
+					fmt.Println(instance.Key.DisplayString())
+				}
+			}
+		}
 	case registerCliCommand("which-instance", "Information", `Output the fully-qualified hostname:port representation of the given instance, or error if unknown`):
 		{
 			if instanceKey == nil {
