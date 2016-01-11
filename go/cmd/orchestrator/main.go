@@ -531,6 +531,12 @@ Cheatsheet:
             and not from synchronuous investigation of the instances. The generated topology may include
             instances that are dead, or whose replication is broken.
 
+        all-instances
+            List the complete known set of instances. Similar to '-c find -pattern "."'
+			Example:
+
+            orchestrator -c all-instances
+
         which-instance
             Output the fully-qualified hostname:port representation of the given instance, or error if unknown
             to orchestrator. Examples:
