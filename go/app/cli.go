@@ -848,6 +848,17 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(strings.Join(clusters, "\n"))
 			}
 		}
+	case registerCliCommand("all-clusters-masters", "Information", `List of writeable masters, one per cluster`):
+		{
+			instances, err := inst.ReadWriteableClustersMasters()
+			if err != nil {
+				log.Fatale(err)
+			} else {
+				for _, instance := range instances {
+					fmt.Println(instance.Key.DisplayString())
+				}
+			}
+		}
 	case registerCliCommand("topology", "Information", `Show an ascii-graph of a replication topology, given a member of that topology`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey)
