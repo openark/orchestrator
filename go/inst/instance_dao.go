@@ -1609,7 +1609,7 @@ func ForgetLongUnseenInstances() error {
 func SnapshotTopologies() error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	insert into
+        	insert ignore into
         		database_instance_topology_history (snapshot_unix_timestamp,
         			hostname, port, master_host, master_port, cluster_name, version)
         	select

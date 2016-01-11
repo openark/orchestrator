@@ -26,7 +26,7 @@ import (
 func WriteLongRunningProcesses(instanceKey *InstanceKey, processes []Process) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-			delete from 
+			delete from
 					database_instance_long_running_queries
 				where
 					hostname = ?
@@ -40,7 +40,7 @@ func WriteLongRunningProcesses(instanceKey *InstanceKey, processes []Process) er
 
 		for _, process := range processes {
 			_, merr := db.ExecOrchestrator(`
-	        	insert into database_instance_long_running_queries (
+	        	insert ignore into database_instance_long_running_queries (
 	        		hostname,
 	        		port,
 	        		process_id,
@@ -88,7 +88,7 @@ func ReadLongRunningProcesses(filter string) ([]Process, error) {
 		filter = "%"
 	}
 	query := `
-		select 
+		select
 			hostname,
 			port,
 			process_id,
@@ -100,7 +100,7 @@ func ReadLongRunningProcesses(filter string) ([]Process, error) {
 			process_time_seconds,
 			process_state,
 			process_info
-		from 
+		from
 			database_instance_long_running_queries
 		where
 			hostname like ?
