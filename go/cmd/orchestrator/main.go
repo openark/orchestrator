@@ -519,6 +519,16 @@ Cheatsheet:
             orchesrtator -c clusters
                 -i not given, implicitly assumed local hostname
 
+        all-clusters-masters
+            List of writeable masters, one per cluster.
+			For most single-master topologies, this is trivially the master.
+			For active-active master-master topologies, this ensures only one of
+			the masters is returned.
+
+			Example:
+
+            orchestrator -c all-clusters-masters
+
         topology
             Show an ascii-graph of a replication topology, given a member of that topology. Example:
 

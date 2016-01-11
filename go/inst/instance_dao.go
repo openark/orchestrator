@@ -697,6 +697,27 @@ func ReadClusterWriteableMaster(clusterName string) ([](*Instance), error) {
 	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "replication_depth asc")
 }
 
+// ReadWriteableClustersMasters returns writeable masters of all clusters, but only one
+// per cluster, in similar logic to ReadClusterWriteableMaster
+func ReadWriteableClustersMasters() (instances [](*Instance), err error) {
+	condition := `
+		read_only = 0
+		and (replication_depth = 0 or is_co_master)
+	`
+	allMasters, err := readInstancesByCondition(condition, sqlutils.Args(), "cluster_name asc, replication_depth asc")
+	if err != nil {
+		return instances, err
+	}
+	visitedClusters := make(map[string]bool)
+	for _, instance := range allMasters {
+		if !visitedClusters[instance.ClusterName] {
+			visitedClusters[instance.ClusterName] = true
+			instances = append(instances, instance)
+		}
+	}
+	return instances, err
+}
+
 // ReadSlaveInstances reads slaves of a given master
 func ReadSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
 	condition := `
