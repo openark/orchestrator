@@ -195,6 +195,7 @@ func ContinuousDiscovery() {
 			go func() {
 				if isElectedNode {
 					go inst.RecordInstanceCoordinatesHistory()
+					go inst.RecordInstanceBinlogFileHistory()
 					go inst.ForgetLongUnseenInstances()
 					go inst.ForgetUnseenInstancesDifferentlyResolved()
 					go inst.ForgetExpiredHostnameResolves()

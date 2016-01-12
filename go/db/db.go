@@ -458,6 +458,20 @@ var generateSQLBase = []string{
 		  KEY recorded_timestmp_idx (recorded_timestamp)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS database_instance_binlog_files_history (
+          history_id bigint unsigned not null auto_increment,
+		  hostname varchar(128) NOT NULL,
+		  port smallint(5) unsigned NOT NULL,
+		  binary_log_file varchar(128) NOT NULL,
+		  binary_log_pos bigint(20) unsigned NOT NULL,
+		  first_seen timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  last_seen timestamp NOT NULL DEFAULT '1971-01-01 00:00:00',
+		  PRIMARY KEY (history_id),
+		  UNIQUE KEY hostname_port_file_idx (hostname, port, binary_log_file),
+		  KEY last_seen_idx (last_seen)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{
