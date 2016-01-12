@@ -19,10 +19,15 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"regexp"
 
 	"gopkg.in/gcfg.v1"
 
 	"github.com/outbrain/golib/log"
+)
+
+var (
+	envVariableRegexp = regexp.MustCompile("[$][{](.*)[}]")
 )
 
 // Configuration makes for orchestrator configuration input, which can be provided by user via JSON formatted file.
@@ -293,6 +298,14 @@ func postReadAdjustments() {
 			Config.MySQLOrchestratorPassword = mySQLConfig.Client.Password
 		}
 	}
+	{
+		// We accept password in the form "${SOME_ENV_VARIABLE}" in which case we pull
+		// the given variable from os env
+		submatch := envVariableRegexp.FindStringSubmatch(Config.MySQLOrchestratorPassword)
+		if len(submatch) > 1 {
+			Config.MySQLOrchestratorPassword = os.Getenv(submatch[1])
+		}
+	}
 	if Config.MySQLTopologyCredentialsConfigFile != "" {
 		mySQLConfig := struct {
 			Client struct {
@@ -309,6 +322,15 @@ func postReadAdjustments() {
 			Config.MySQLTopologyPassword = mySQLConfig.Client.Password
 		}
 	}
+	{
+		// We accept password in the form "${SOME_ENV_VARIABLE}" in which case we pull
+		// the given variable from os env
+		submatch := envVariableRegexp.FindStringSubmatch(Config.MySQLTopologyPassword)
+		if len(submatch) > 1 {
+			Config.MySQLTopologyPassword = os.Getenv(submatch[1])
+		}
+	}
+
 	if Config.RecoveryPeriodBlockSeconds == 0 && Config.RecoveryPeriodBlockMinutes > 0 {
 		// RecoveryPeriodBlockSeconds is a newer addition that overrides RecoveryPeriodBlockMinutes
 		// The code does not consider RecoveryPeriodBlockMinutes anymore, but RecoveryPeriodBlockMinutes
