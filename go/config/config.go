@@ -63,6 +63,7 @@ type Configuration struct {
 	DiscoverByShowSlaveHosts                     bool     // Attempt SHOW SLAVE HOSTS before PROCESSLIST
 	InstancePollSeconds                          uint     // Number of seconds between instance reads
 	ReadLongRunningQueries                       bool     // Whether orchestrator should read and record current long running executing queries.
+	BinlogFileHistoryDays                        int      // When > 0, amount of days for which orchestrator records per-instance binlog files & sizes
 	UnseenInstanceForgetHours                    uint     // Number of hours after which an unseen instance is forgotten
 	SnapshotTopologiesIntervalHours              uint     // Interval in hour between snapshot-topologies invocation. Default: 0 (disabled)
 	DiscoveryPollSeconds                         uint     // Auto/continuous discovery of instances sleep time between polls
@@ -183,6 +184,7 @@ func NewConfiguration() *Configuration {
 		SmartOrchestratorDatabaseUpdate:              false,
 		InstancePollSeconds:                          60,
 		ReadLongRunningQueries:                       true,
+		BinlogFileHistoryDays:                        0,
 		UnseenInstanceForgetHours:                    240,
 		SnapshotTopologiesIntervalHours:              0,
 		SlaveStartPostWaitMilliseconds:               1000,

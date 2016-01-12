@@ -1761,3 +1761,42 @@ func GetHeuristiclyRecentCoordinatesForInstance(instanceKey *InstanceKey) (selfC
 	})
 	return selfCoordinates, relayLogCoordinates, err
 }
+
+// RecordInstanceBinlogFileHistory snapshots the binlog coordinates of instances
+func RecordInstanceBinlogFileHistory() error {
+	{
+		writeFunc := func() error {
+			_, err := db.ExecOrchestrator(`
+        	delete from database_instance_binlog_files_history
+			where
+				last_seen < NOW() - INTERVAL ? DAY
+				`, config.Config.BinlogFileHistoryDays,
+			)
+			return log.Errore(err)
+		}
+		ExecDBWriteFunc(writeFunc)
+	}
+	if config.Config.BinlogFileHistoryDays == 0 {
+		return nil
+	}
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+        	insert into
+        		database_instance_binlog_files_history (
+					hostname, port,	first_seen, last_seen, binary_log_file, binary_log_pos
+				)
+        	select
+        		hostname, port, last_seen, last_seen, binary_log_file, binary_log_pos
+			from
+				database_instance
+			where
+				binary_log_file != ''
+			on duplicate key update
+				last_seen = VALUES(last_seen),
+				binary_log_pos = VALUES(binary_log_pos)
+				`,
+		)
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
