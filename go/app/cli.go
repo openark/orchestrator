@@ -83,8 +83,9 @@ func getClusterName(clusterAlias string, instanceKey *inst.InstanceKey) (cluster
 	}
 
 	// deduce cluster by instance
+	instanceKey = assignFuzzyInstanceKeyIfPossible(instanceKey)
 	if instanceKey == nil {
-		instanceKey = thisInstanceKey
+		instanceKey = assignThisInstanceKey()
 	}
 	if instanceKey == nil {
 		log.Fatalf("Unable to get cluster instances: unresolved instance")
