@@ -811,6 +811,13 @@ Cheatsheet:
 
             orchestrator -c continuous
 
+				active-nodes
+						List orchestrator nodes or processes that are actively running or have most recently
+						executed. Output is in hostname:token format, where "token" is an internal unique identifier
+						of an orchestrator process. Example:
+
+						orchestrator -c active-nodes
+
         reset-hostname-resolve-cache
             Clear the hostname resolve cache; it will be refilled by following host discoveries
 

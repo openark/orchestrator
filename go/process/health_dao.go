@@ -51,7 +51,7 @@ var continuousRegistrationInitiated bool = false
 func RegisterNode(extraInfo string, command string, firstTime bool) (sql.Result, error) {
 	if firstTime {
 		db.ExecOrchestrator(`
-			insert ignore into node_health_history 
+			insert ignore into node_health_history
 				(hostname, token, first_seen_active, extra_info, command)
 			values
 				(?, ?, NOW(), ?, ?)
@@ -60,7 +60,7 @@ func RegisterNode(extraInfo string, command string, firstTime bool) (sql.Result,
 		)
 	}
 	return db.ExecOrchestrator(`
-			insert into node_health 
+			insert into node_health
 				(hostname, token, last_seen_active, extra_info, command)
 			values
 				(?, ?, NOW(), ?, ?)
@@ -96,7 +96,7 @@ func HealthTest() (*HealthStatus, error) {
 	health.ActiveNode = fmt.Sprintf("%s;%s", activeHostname, activeToken)
 	health.IsActiveNode = isActive
 
-	health.AvailableNodes, err = readAvailableNodes(true)
+	health.AvailableNodes, err = ReadAvailableNodes(true)
 
 	return &health, nil
 }
@@ -128,8 +128,8 @@ func ContinuousRegistration(extraInfo string, command string) {
 // their keepalive for two times
 func expireAvailableNodes() error {
 	_, err := db.ExecOrchestrator(`
-			delete 
-				from node_health 
+			delete
+				from node_health
 			where
 				last_seen_active < now() - interval ? second
 			`,
@@ -141,8 +141,8 @@ func expireAvailableNodes() error {
 // ExpireNodesHistory cleans up the nodes history
 func ExpireNodesHistory() error {
 	_, err := db.ExecOrchestrator(`
-			delete 
-				from node_health_history 
+			delete
+				from node_health_history
 			where
 				first_seen_active < now() - interval ? hour
 			`,
@@ -151,16 +151,16 @@ func ExpireNodesHistory() error {
 	return log.Errore(err)
 }
 
-func readAvailableNodes(onlyHttpNodes bool) ([]string, error) {
+func ReadAvailableNodes(onlyHttpNodes bool) ([]string, error) {
 	res := []string{}
 	extraInfo := ""
 	if onlyHttpNodes {
 		extraInfo = string(OrchestratorExecutionHttpMode)
 	}
 	query := `
-		select 
+		select
 			concat(hostname, ';', token) as node
-		from 
+		from
 			node_health
 		where
 			last_seen_active > now() - interval ? second
