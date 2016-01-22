@@ -1190,6 +1190,16 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		{
 			logic.ContinuousDiscovery()
 		}
+	case registerCliCommand("active-nodes", "Meta", `List currently active orchestrator nodes`):
+		{
+			nodes, err := process.ReadAvailableNodes(false)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, node := range nodes {
+				fmt.Println(node)
+			}
+		}
 	case registerCliCommand("resolve", "Meta", `Resolve given hostname`):
 		{
 			if rawInstanceKey == nil {
