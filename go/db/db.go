@@ -472,6 +472,19 @@ var generateSQLBase = []string{
 		  KEY last_seen_idx (last_seen)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+	  CREATE TABLE IF NOT EXISTS access_token (
+	    access_token_id bigint unsigned not null auto_increment,
+	    public_token varchar(128) NOT NULL,
+	    secret_token varchar(128) NOT NULL,
+	    generated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	    generated_by varchar(128) CHARACTER SET utf8 NOT NULL,
+			is_acquired tinyint unsigned NOT NULL DEFAULT '0',
+	    PRIMARY KEY (access_token_id),
+	    UNIQUE KEY public_token_idx (public_token),
+	    KEY generated_at_idx (generated_at)
+	  ) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{

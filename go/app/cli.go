@@ -1200,6 +1200,14 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(node)
 			}
 		}
+	case registerCliCommand("access-token", "Meta", `Get a HTTP access token`):
+		{
+			publicToken, err := process.GenerateAccessToken(owner)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(publicToken)
+		}
 	case registerCliCommand("resolve", "Meta", `Resolve given hostname`):
 		{
 			if rawInstanceKey == nil {

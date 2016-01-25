@@ -46,6 +46,16 @@ func (this *HttpWeb) getInstanceKey(host string, port string) (inst.InstanceKey,
 	return instanceKey, err
 }
 
+func (this *HttpWeb) AccessToken(params martini.Params, r render.Render, req *http.Request, resp http.ResponseWriter, user auth.User) {
+	publicToken := req.URL.Query().Get("publicToken")
+	err := authenticateToken(publicToken, resp)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	r.Redirect("/")
+}
+
 func (this *HttpWeb) Clusters(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/clusters", map[string]interface{}{
 		"agentsHttpActive":              config.Config.ServeAgentsHttp,
@@ -353,6 +363,7 @@ func (this *HttpWeb) Status(params martini.Params, r render.Render, req *http.Re
 
 // RegisterRequests makes for the de-facto list of known Web calls
 func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
+	m.Get("/web/access-token", this.AccessToken)
 	m.Get("/", this.Clusters)
 	m.Get("/web", this.Clusters)
 	m.Get("/web/home", this.About)
