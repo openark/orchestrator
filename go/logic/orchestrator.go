@@ -39,7 +39,7 @@ const (
 
 // discoveryInstanceKeys is a channel of instanceKey-s that were requested for discovery.
 // It can be continuously updated as discovery process progresses.
-var discoveryInstanceKeys chan inst.InstanceKey = make(chan inst.InstanceKey, maxConcurrency)
+var discoveryInstanceKeys = make(chan inst.InstanceKey, maxConcurrency)
 
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
@@ -213,6 +213,7 @@ func ContinuousDiscovery() {
 					go inst.ExpireMasterPositionEquivalence()
 					go inst.FlushNontrivialResolveCacheToDatabase()
 					go process.ExpireNodesHistory()
+					go process.ExpireAccessTokens()
 				}
 				if !isElectedNode {
 					// Take this opportunity to refresh yourself

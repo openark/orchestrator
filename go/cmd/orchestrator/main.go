@@ -818,6 +818,17 @@ Cheatsheet:
 
 						orchestrator -c active-nodes
 
+				acceess-token
+						When running HTTP with "AuthenticationMethod" : "token", receive a new access token.
+						This token must be utilized within "AccessTokenUseExpirySeconds" and can then be used
+						until "AccessTokenExpiryMinutes" have passed.
+						In "token" authentication method a user is read-only unless able to provide with a fresh token.
+						A token may only be used once (two users must get two distinct tokens).
+						Submitting a token is done via "/web/access-token?publicToken=<received_token>". The token is then stored
+						in HTTP cookie.
+
+						orchestrator -c access-token
+
         reset-hostname-resolve-cache
             Clear the hostname resolve cache; it will be refilled by following host discoveries
 

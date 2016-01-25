@@ -6,7 +6,7 @@
 #
 set -e
 
-RELEASE_VERSION="1.4.561"
+RELEASE_VERSION="1.4.562"
 TOPDIR=/tmp/orchestrator-release
 export RELEASE_VERSION TOPDIR
 export GO15VENDOREXPERIMENT=1
@@ -63,7 +63,7 @@ function setuptree() {
   prefix="$1"
 
   mkdir -p $TOPDIR
-  rm -rf $TOPDIR/*
+  rm -rf ${TOPDIR:?}/*
   b=$( mktemp -d $TOPDIR/orchestratorXXXXXX ) || return 1
   mkdir -p $b/orchestrator
   mkdir -p $b/orchestrator${prefix}/orchestrator/

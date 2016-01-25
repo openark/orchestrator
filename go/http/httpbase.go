@@ -17,10 +17,13 @@
 package http
 
 import (
-	"github.com/martini-contrib/auth"
-	"github.com/outbrain/orchestrator/go/config"
+	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/martini-contrib/auth"
+	"github.com/outbrain/orchestrator/go/config"
+	"github.com/outbrain/orchestrator/go/process"
 )
 
 func getProxyAuthUser(req *http.Request) string {
@@ -62,12 +65,35 @@ func isAuthorizedForAction(req *http.Request, user auth.User) bool {
 			}
 			return false
 		}
+	case "token":
+		{
+			cookie, err := req.Cookie("access-token")
+			if err != nil {
+				return false
+			}
+
+			publicToken := strings.Split(cookie.Value, ":")[0]
+			secretToken := strings.Split(cookie.Value, ":")[1]
+			result, _ := process.TokenIsValid(publicToken, secretToken)
+			return result
+		}
 	default:
 		{
 			// Default: no authentication method
 			return true
 		}
 	}
+}
+
+func authenticateToken(publicToken string, resp http.ResponseWriter) error {
+	secretToken, err := process.AcquireAccessToken(publicToken)
+	if err != nil {
+		return err
+	}
+	cookieValue := fmt.Sprintf("%s:%s", publicToken, secretToken)
+	cookie := &http.Cookie{Name: "access-token", Value: cookieValue, Path: "/"}
+	http.SetCookie(resp, cookie)
+	return nil
 }
 
 // getUserId returns the authenticated user id, if available, depending on authertication method.
@@ -88,6 +114,10 @@ func getUserId(req *http.Request, user auth.User) string {
 	case "proxy":
 		{
 			return getProxyAuthUser(req)
+		}
+	case "token":
+		{
+			return ""
 		}
 	default:
 		{

@@ -93,11 +93,13 @@ type Configuration struct {
 	AuditPurgeDays                               uint   // Days after which audit entries are purged from the database
 	RemoveTextFromHostnameDisplay                string // Text to strip off the hostname on cluster/clusters pages
 	ReadOnly                                     bool
-	AuthenticationMethod                         string            // Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "multi" for advanced BasicAuth, "proxy" for forwarded credentials via reverse proxy
+	AuthenticationMethod                         string            // Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "multi" for advanced BasicAuth, "proxy" for forwarded credentials via reverse proxy, "token" for token based access
 	HTTPAuthUser                                 string            // Username for HTTP Basic authentication (blank disables authentication)
 	HTTPAuthPassword                             string            // Password for HTTP Basic authentication
 	AuthUserHeader                               string            // HTTP header indicating auth user, when AuthenticationMethod is "proxy"
 	PowerAuthUsers                               []string          // On AuthenticationMethod == "proxy", list of users that can make changes. All others are read-only.
+	AccessTokenUseExpirySeconds                  uint              // Time by which an issued token must be used
+	AccessTokenExpiryMinutes                     uint              // Time after which HTTP access token expires
 	ClusterNameToAlias                           map[string]string // map between regex matching cluster name to a human friendly alias
 	DetectClusterAliasQuery                      string            // Optional query (executed on topology instance) that returns the alias of a cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all slaves). If provided, must return one row, one column
 	DetectClusterDomainQuery                     string            // Optional query (executed on topology instance) that returns the VIP/CNAME/Alias/whatever domain name for the master of this cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all slaves). If provided, must return one row, one column
@@ -221,6 +223,8 @@ func NewConfiguration() *Configuration {
 		HTTPAuthPassword:                             "",
 		AuthUserHeader:                               "X-Forwarded-User",
 		PowerAuthUsers:                               []string{"*"},
+		AccessTokenUseExpirySeconds:                  60,
+		AccessTokenExpiryMinutes:                     1440,
 		ClusterNameToAlias:                           make(map[string]string),
 		DetectClusterAliasQuery:                      "",
 		DetectClusterDomainQuery:                     "",
