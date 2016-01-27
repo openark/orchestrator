@@ -140,6 +140,12 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		})
 		if err != nil {
 			logReadTopologyInstanceError(instanceKey, "show variables like 'maxscale%'", err)
+
+			// FIXME: We should catch this and drop the instance from orchestrator if the host name really does not exist.
+			// 2016-01-27 10:57:02 ERROR dial tcp: lookup somehost.domain.com: no such host
+			// 2016-01-27 10:57:02 ERROR Error reading somehost.domain.com:3306 (show variables): dial tcp: lookup somehost.domain.com: no such host
+			// Not doing so pollutes the logging for some time.
+
 			// We do not "goto Cleanup" here, although it should be the correct flow.
 			// Reason is 5.7's new security feature that requires GRANTs on performance_schema.session_variables.
 			// There is a wrong decision making in this design and the migration path to 5.7 will be difficult.
