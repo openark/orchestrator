@@ -760,6 +760,16 @@ var generateSQLPatches = []string{
 			database_instance_coordinates_history
 			ADD COLUMN last_seen timestamp NOT NULL DEFAULT '1971-01-01 00:00:00' AFTER recorded_timestamp
 	`,
+	`
+		ALTER TABLE
+			access_token
+			ADD COLUMN is_reentrant TINYINT UNSIGNED NOT NULL default 0
+	`,
+	`
+		ALTER TABLE
+			access_token
+			ADD COLUMN acquired_at timestamp NOT NULL DEFAULT '1971-01-01 00:00:00'
+	`,
 }
 
 // Track if a TLS has already been configured for topology

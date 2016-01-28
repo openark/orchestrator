@@ -31,9 +31,9 @@ func GenerateAccessToken(owner string) (publicToken string, err error) {
 
 	_, err = db.ExecOrchestrator(`
 			insert into access_token (
-					public_token, secret_token, generated_at, generated_by, is_acquired
+					public_token, secret_token, generated_at, generated_by, is_acquired, is_reentrant
 				) values (
-					?, ?, now(), ?, 0
+					?, ?, now(), ?, 0, 0
 				)
 			`,
 		publicToken, secretToken, owner,
@@ -51,11 +51,17 @@ func AcquireAccessToken(publicToken string) (secretToken string, err error) {
 	sqlResult, err := db.ExecOrchestrator(`
 			update access_token
 				set
-					is_acquired=1
+					is_acquired=1,
+					acquired_at=now()
 				where
 					public_token=?
-					and is_acquired=0
-					and generated_at > now() - interval ? second
+					and (
+						(
+							is_acquired=0
+							and generated_at > now() - interval ? second
+						)
+						or is_reentrant=1
+					)
 			`,
 		publicToken, config.Config.AccessTokenUseExpirySeconds,
 	)
@@ -90,7 +96,10 @@ func TokenIsValid(publicToken string, secretToken string) (result bool, err erro
 		  where
 				public_token=?
 				and secret_token=?
-				and generated_at >= now() - interval ? minute
+				and (
+					generated_at >= now() - interval ? minute
+					or is_reentrant = 1
+				)
 		`
 	err = db.QueryOrchestrator(query, sqlutils.Args(publicToken, secretToken, config.Config.AccessTokenExpiryMinutes), func(m sqlutils.RowMap) error {
 		result = m.GetInt("valid_token") > 0
@@ -106,6 +115,7 @@ func ExpireAccessTokens() error {
 				from access_token
 			where
 				generated_at < now() - interval ? minute
+				and is_reentrant = 0
 			`,
 		config.Config.AccessTokenExpiryMinutes,
 	)
