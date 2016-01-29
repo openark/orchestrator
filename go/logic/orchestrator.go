@@ -100,9 +100,12 @@ func handleDiscoveryRequests() {
 	}
 }
 
-// discoverInstance will attempt discovering an instance (unless it is already up to date) and will
-// list down its master and slaves (if any) for further discovery.
+// discoverInstance will attempt discovering an instance (unless it is
+// already up to date) and will // list down its master and slaves (if any)
+// for further discovery.
 func discoverInstance(instanceKey inst.InstanceKey) {
+	start := time.Now()
+
 	instanceKey.Formalize()
 	if !instanceKey.IsValid() {
 		return
@@ -126,17 +129,21 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	// that instance is nil. Check it.
 	if instance == nil {
 		failedDiscoveriesCounter.Inc(1)
-		log.Warningf("instance is nil in discoverInstance. key=%+v, error=%+v", instanceKey, err)
+		log.Warningf("discoverInstance(%+v) instance is nil in %.3fs, error=%+v", instanceKey, time.Since(start).Seconds(), err)
 		return
 	}
 
-	log.Debugf("Discovered host: %+v, master: %+v, version: %+v", instance.Key, instance.MasterKey, instance.Version)
+	log.Debugf("Discovered host: %+v, master: %+v, version: %+v in %.3fs", instance.Key, instance.MasterKey, instance.Version, time.Since(start).Seconds())
 
 	if atomic.LoadInt64(&isElectedNode) == 0 {
 		// Maybe this node was elected before, but isn't elected anymore.
 		// If not elected, stop drilling up/down the topology
 		return
 	}
+
+	// Investigate master and slaves asynchronously to ensure we
+	// do not block processing other instances while adding these servers
+	// to the queue.
 
 	// Investigate slaves:
 	for _, slaveKey := range instance.SlaveHosts.GetInstanceKeys() {
