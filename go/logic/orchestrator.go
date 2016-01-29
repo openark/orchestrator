@@ -34,12 +34,12 @@ import (
 )
 
 const (
-	maxConcurrency = 5
+	discoveryInstanceChannelCapacity = 10 // size here not critical as channel read by separate go routines.
 )
 
 // discoveryInstanceKeys is a channel of instanceKey-s that were requested for discovery.
 // It can be continuously updated as discovery process progresses.
-var discoveryInstanceKeys = make(chan inst.InstanceKey, maxConcurrency)
+var discoveryInstanceKeys = make(chan inst.InstanceKey, discoveryInstanceChannelCapacity)
 
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
@@ -85,8 +85,9 @@ func acceptSignals() {
 	}()
 }
 
-// handleDiscoveryRequests iterates the discoveryInstanceKeys channel and calls upon
-// instance discovery per entry.
+// handleDiscoveryRequests iterates the discoveryInstanceKeys channel
+// and calls upon instance discovery per entry. These requests will
+// be handled by separate go routines so concurrency should be high.
 func handleDiscoveryRequests() {
 	for instanceKey := range discoveryInstanceKeys {
 		// Possibly this used to be the elected node, but has been demoted, while still
