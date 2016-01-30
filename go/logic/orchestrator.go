@@ -34,7 +34,7 @@ import (
 )
 
 const (
-	discoveryInstanceChannelCapacity = 10 // size here not critical as channel read by separate go routines.
+	discoveryInstanceChannelCapacity = 5 // size here not critical as channel read by separate go routines.
 )
 
 // discoveryInstanceKeys is a channel of instanceKey-s that were requested for discovery.
