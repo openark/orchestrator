@@ -112,7 +112,9 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
+	DiscoverStart(instanceKey)
 	if existsInCacheError := recentDiscoveryOperationKeys.Add(instanceKey.DisplayString(), true, cache.DefaultExpiration); existsInCacheError != nil {
+		DiscoverEnd(instanceKey)
 		// Just recently attempted
 		return
 	}
@@ -120,6 +122,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	instance, found, err := inst.ReadInstance(&instanceKey)
 
 	if found && instance.IsUpToDate && instance.IsLastCheckValid {
+		DiscoverEnd(instanceKey)
 		// we've already discovered this one. Skip!
 		return
 	}
@@ -129,11 +132,13 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	// panic can occur (IO stuff). Therefore it may happen
 	// that instance is nil. Check it.
 	if instance == nil {
+		DiscoverEnd(instanceKey)
 		failedDiscoveriesCounter.Inc(1)
 		log.Warningf("discoverInstance(%+v) instance is nil in %.3fs, error=%+v", instanceKey, time.Since(start).Seconds(), err)
 		return
 	}
 
+	DiscoverEnd(instanceKey)
 	log.Debugf("Discovered host: %+v, master: %+v, version: %+v in %.3fs", instance.Key, instance.MasterKey, instance.Version, time.Since(start).Seconds())
 
 	if atomic.LoadInt64(&isElectedNode) == 0 {
@@ -224,7 +229,12 @@ func ContinuousDiscovery() {
 						go process.RegisterNode("", "", false)
 					}
 				} else {
-					log.Debugf("Not elected as active node; polling")
+					hostname, token, _, err := process.ElectedNode()
+					if err == nil {
+						log.Debugf("Inactive node. Active node is: %v[%v]; polling", hostname, token)
+					} else {
+						log.Debugf("Inactive node. Unable to determine active node: %v; polling", err)
+					}
 				}
 			}()
 		case <-instancePollTick:
