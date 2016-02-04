@@ -122,6 +122,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	instance, found, err := inst.ReadInstance(&instanceKey)
 
 	if found && instance.IsUpToDate && instance.IsLastCheckValid {
+		recentDiscoveryOperationKeys.Delete(instanceKey.DisplayString())
 		DiscoverEnd(instanceKey)
 		// we've already discovered this one. Skip!
 		return
@@ -132,12 +133,14 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	// panic can occur (IO stuff). Therefore it may happen
 	// that instance is nil. Check it.
 	if instance == nil {
+		recentDiscoveryOperationKeys.Delete(instanceKey.DisplayString())
 		DiscoverEnd(instanceKey)
 		failedDiscoveriesCounter.Inc(1)
 		log.Warningf("discoverInstance(%+v) instance is nil in %.3fs, error=%+v", instanceKey, time.Since(start).Seconds(), err)
 		return
 	}
 
+	recentDiscoveryOperationKeys.Delete(instanceKey.DisplayString())
 	DiscoverEnd(instanceKey)
 	log.Debugf("Discovered host: %+v, master: %+v, version: %+v in %.3fs", instance.Key, instance.MasterKey, instance.Version, time.Since(start).Seconds())
 
