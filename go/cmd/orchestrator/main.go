@@ -576,6 +576,18 @@ Cheatsheet:
             orchestrator -c which-cluster-instances -alias some_alias
                 assuming some_alias is a known cluster alias (see ClusterNameToAlias or DetectClusterAliasQuery configuration)
 
+        which-cluster-domain
+            Output the domain name of given cluster, indicated by instance or alias. This depends on
+						the DetectClusterDomainQuery configuration. Example:
+
+            orchestrator -c which-cluster-domain -i instance.to.check.com
+
+            orchestrator -c which-cluster-domain
+                -i not given, implicitly assumed local hostname
+
+            orchestrator -c which-cluster-domain -alias some_alias
+                assuming some_alias is a known cluster alias (see ClusterNameToAlias or DetectClusterAliasQuery configuration)
+
         which-cluster-osc-slaves
             Output a list of slaves in same cluster as given instance, that would server as good candidates as control slaves
             for a pt-online-schema-change operation.
