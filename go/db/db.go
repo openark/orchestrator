@@ -485,6 +485,20 @@ var generateSQLBase = []string{
 	    KEY generated_at_idx (generated_at)
 	  ) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS database_instance_recent_relaylog_history (
+		  hostname varchar(128) NOT NULL,
+		  port smallint(5) unsigned NOT NULL,
+			current_relay_log_file varchar(128) NOT NULL,
+		  current_relay_log_pos bigint(20) unsigned NOT NULL,
+			current_seen timestamp NOT NULL DEFAULT '1971-01-01 00:00:00',
+			prev_relay_log_file varchar(128) NOT NULL,
+		  prev_relay_log_pos bigint(20) unsigned NOT NULL,
+			prev_seen timestamp NOT NULL DEFAULT '1971-01-01 00:00:00',
+			PRIMARY KEY (hostname, port),
+		  KEY current_seen_idx (current_seen)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{
