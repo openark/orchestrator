@@ -1810,3 +1810,37 @@ func RecordInstanceBinlogFileHistory() error {
 	}
 	return ExecDBWriteFunc(writeFunc)
 }
+
+// UpdateInstanceRecentRelaylogHistory updates the database_instance_recent_relaylog_history
+// table listing the current relaylog coordinates and the one-before.
+// This information can be used to diagnoze a stale-replication scenario (for example, master is locked down
+// and although slaves are connected, they're not making progress)
+func UpdateInstanceRecentRelaylogHistory() error {
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+        	insert into
+        		database_instance_recent_relaylog_history (
+							hostname, port,
+							current_relay_log_file, current_relay_log_pos, current_seen,
+							prev_relay_log_file, prev_relay_log_pos
+						)
+						select
+								hostname, port,
+								relay_log_file, relay_log_pos, last_seen,
+								'', 0
+							from database_instance
+							where
+								relay_log_file != ''
+						on duplicate key update
+							prev_relay_log_file = current_relay_log_file,
+							prev_relay_log_pos = current_relay_log_pos,
+							prev_seen = current_seen,
+							current_relay_log_file = values(current_relay_log_file),
+							current_relay_log_pos = values (current_relay_log_pos),
+							current_seen = values(current_seen)
+				`,
+		)
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
+}

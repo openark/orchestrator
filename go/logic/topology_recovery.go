@@ -873,7 +873,7 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 	return true, topologyRecovery, err
 }
 
-// checkAndRecoverGenericProblem is a general=purpose recovery function
+// checkAndRecoverGenericProblem is a general-purpose recovery function
 func checkAndRecoverGenericProblem(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (bool, *TopologyRecovery, error) {
 	return false, nil, nil
 }
@@ -945,10 +945,13 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	case inst.UnreachableMaster:
 		go emergentlyReadTopologyInstanceSlaves(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 	case inst.AllMasterSlavesNotReplicating:
-		//checkAndRecoverFunction = checkAndRecoverGenericProblem
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 	case inst.FirstTierSlaveFailingToConnectToMaster:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
+	case inst.UnreachableMasterWithStaleSlaves:
+		checkAndRecoverFunction = checkAndRecoverGenericProblem
+	case inst.AllMasterSlavesStale:
+		checkAndRecoverFunction = checkAndRecoverGenericProblem
 	}
 
 	if checkAndRecoverFunction == nil {

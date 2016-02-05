@@ -24,11 +24,13 @@ const (
 	DeadMaster                                                         = "DeadMaster"
 	DeadMasterAndSlaves                                                = "DeadMasterAndSlaves"
 	DeadMasterAndSomeSlaves                                            = "DeadMasterAndSomeSlaves"
+	UnreachableMasterWithStaleSlaves                                   = "UnreachableMasterWithStaleSlaves"
 	UnreachableMaster                                                  = "UnreachableMaster"
 	MasterSingleSlaveNotReplicating                                    = "MasterSingleSlaveNotReplicating"
 	MasterSingleSlaveDead                                              = "MasterSingleSlaveDead"
 	AllMasterSlavesNotReplicating                                      = "AllMasterSlavesNotReplicating"
 	AllMasterSlavesNotReplicatingOrDead                                = "AllMasterSlavesNotReplicatingOrDead"
+	AllMasterSlavesStale                                               = "AllMasterSlavesStale"
 	MasterWithoutSlaves                                                = "MasterWithoutSlaves"
 	DeadCoMaster                                                       = "DeadCoMaster"
 	DeadCoMasterAndSomeSlaves                                          = "DeadCoMasterAndSomeSlaves"
@@ -57,6 +59,7 @@ type ReplicationAnalysis struct {
 	CountValidSlaves                    uint
 	CountValidReplicatingSlaves         uint
 	CountSlavesFailingToConnectToMaster uint
+	CountStaleSlaves                    uint
 	ReplicationDepth                    uint
 	SlaveHosts                          InstanceKeyMap
 	IsFailingToConnectToMaster          bool
