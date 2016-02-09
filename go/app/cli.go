@@ -872,15 +872,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("topology", "Information", `Show an ascii-graph of a replication topology, given a member of that topology`):
 		{
-			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			instance, _, err := inst.ReadInstance(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if instance == nil {
-				log.Fatalf("Instance not found: %+v", *instanceKey)
-			}
-			output, err := inst.ASCIITopology(instanceKey, pattern)
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			output, err := inst.ASCIITopology(clusterName, pattern)
 			if err != nil {
 				log.Fatale(err)
 			}

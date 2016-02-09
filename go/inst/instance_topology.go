@@ -58,17 +58,13 @@ func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*In
 	return result
 }
 
-// ASCIITopology returns a string representation of the topology of given instance.
-func ASCIITopology(instanceKey *InstanceKey, historyTimestampPattern string) (string, error) {
-	instance, found, err := ReadInstance(instanceKey)
-	if err != nil || !found {
-		return "", err
-	}
+// ASCIITopology returns a string representation of the topology of given cluster.
+func ASCIITopology(clusterName string, historyTimestampPattern string) (result string, err error) {
 	var instances [](*Instance)
 	if historyTimestampPattern == "" {
-		instances, err = ReadClusterInstances(instance.ClusterName)
+		instances, err = ReadClusterInstances(clusterName)
 	} else {
-		instances, err = ReadHistoryClusterInstances(instance.ClusterName, historyTimestampPattern)
+		instances, err = ReadHistoryClusterInstances(clusterName, historyTimestampPattern)
 	}
 	if err != nil {
 		return "", err
@@ -123,7 +119,7 @@ func ASCIITopology(instanceKey *InstanceKey, historyTimestampPattern string) (st
 		}
 	}
 	// Turn into string
-	result := strings.Join(entries, "\n")
+	result = strings.Join(entries, "\n")
 	return result, nil
 }
 
