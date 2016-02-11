@@ -946,7 +946,6 @@ func main() {
 		fmt.Println(prompt)
 		return
 	}
-
 	switch {
 	case len(flag.Args()) == 0 || flag.Arg(0) == "cli":
 		app.CliWrapper(*command, *strict, *instance, *destination, *owner, *reason, *duration, *pattern, *clusterAlias, *pool, *hostnameFlag)
