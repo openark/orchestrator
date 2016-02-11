@@ -131,6 +131,7 @@ type Configuration struct {
 	StaleSeedFailMinutes                         uint              // Number of minutes after which a stale (no progress) seed is considered failed.
 	SeedAcceptableBytesDiff                      int64             // Difference in bytes between seed source & target data size that is still considered as successful copy
 	PseudoGTIDPattern                            string            // Pattern to look for in binary logs that makes for a unique entry (pseudo GTID). When empty, Pseudo-GTID based refactoring is disabled.
+	PseudoGTIDPatternIsFixedSubstring            bool              // If true, then PseudoGTIDPattern is not treated as regular expression but as fixed substring, and can boost search time
 	PseudoGTIDMonotonicHint                      string            // subtring in Pseudo-GTID entry which indicates Pseudo-GTID entries are expected to be monotonically increasing
 	DetectPseudoGTIDQuery                        string            // Optional query which is used to authoritatively decide whether pseudo gtid is enabled on instance
 	PseudoGTIDCoordinatesHistoryHeuristicMinutes int               // Significantly reducing Pseudo-GTID lookup time, this indicates the most recent N minutes binlog position where search for Pseudo-GTID will heuristically begin (there is a fallback on fullscan if unsuccessful)
@@ -253,6 +254,7 @@ func NewConfiguration() *Configuration {
 		StaleSeedFailMinutes:                         60,
 		SeedAcceptableBytesDiff:                      8192,
 		PseudoGTIDPattern:                            "",
+		PseudoGTIDPatternIsFixedSubstring:            false,
 		PseudoGTIDMonotonicHint:                      "",
 		DetectPseudoGTIDQuery:                        "",
 		PseudoGTIDCoordinatesHistoryHeuristicMinutes: 2,
