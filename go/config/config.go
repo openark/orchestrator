@@ -169,10 +169,11 @@ func (this *Configuration) ToJSONString() string {
 	return string(b)
 }
 
-var Config *Configuration = NewConfiguration()
+// Config is *the* configuration instance, used globally to get configuration data
+var Config = newConfiguration()
 var readFileNames []string
 
-func NewConfiguration() *Configuration {
+func newConfiguration() *Configuration {
 	return &Configuration{
 		Debug:                                        false,
 		EnableSyslog:                                 false,
@@ -347,15 +348,15 @@ func postReadAdjustments() {
 
 // read reads configuration from given file, or silently skips if the file does not exist.
 // If the file does exist, then it is expected to be in valid JSON format or the function bails out.
-func read(file_name string) (*Configuration, error) {
-	file, err := os.Open(file_name)
+func read(fileName string) (*Configuration, error) {
+	file, err := os.Open(fileName)
 	if err == nil {
 		decoder := json.NewDecoder(file)
 		err := decoder.Decode(Config)
 		if err == nil {
-			log.Infof("Read config: %s", file_name)
+			log.Infof("Read config: %s", fileName)
 		} else {
-			log.Fatal("Cannot read config file:", file_name, err)
+			log.Fatal("Cannot read config file:", fileName, err)
 		}
 		postReadAdjustments()
 	}
@@ -364,27 +365,28 @@ func read(file_name string) (*Configuration, error) {
 
 // Read reads configuration from zero, either, some or all given files, in order of input.
 // A file can override configuration provided in previous file.
-func Read(file_names ...string) *Configuration {
-	for _, file_name := range file_names {
-		read(file_name)
+func Read(fileNames ...string) *Configuration {
+	for _, fileName := range fileNames {
+		read(fileName)
 	}
-	readFileNames = file_names
+	readFileNames = fileNames
 	return Config
 }
 
 // ForceRead reads configuration from given file name or bails out if it fails
-func ForceRead(file_name string) *Configuration {
-	_, err := read(file_name)
+func ForceRead(fileName string) *Configuration {
+	_, err := read(fileName)
 	if err != nil {
-		log.Fatal("Cannot read config file:", file_name, err)
+		log.Fatal("Cannot read config file:", fileName, err)
 	}
-	readFileNames = []string{file_name}
+	readFileNames = []string{fileName}
 	return Config
 }
 
+// Reload re-reads configuration from last used files
 func Reload() *Configuration {
-	for _, file_name := range readFileNames {
-		read(file_name)
+	for _, fileName := range readFileNames {
+		read(fileName)
 	}
 	return Config
 }
