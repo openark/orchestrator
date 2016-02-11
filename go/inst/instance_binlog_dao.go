@@ -236,7 +236,13 @@ func SearchEntryInBinlog(instanceKey *InstanceKey, binlog string, entryText stri
 				// If we find the first entry to be higher than the searched one, clearly we are done.
 				// If not, then by virtue of binary logs, we still have to full-scan the entrie binlog sequentially; we
 				// do not check again for ASCENDING (no point), so we save up CPU energy wasted in regexp.
-				if matched, _ := regexp.MatchString(config.Config.PseudoGTIDPattern, binlogEntryInfo); matched {
+				pseudoGTIDFound := false
+				if config.Config.PseudoGTIDPatternIsFixedSubstring {
+					pseudoGTIDFound = strings.Contains(binlogEntryInfo, config.Config.PseudoGTIDPattern)
+				} else {
+					pseudoGTIDFound, _ = regexp.MatchString(config.Config.PseudoGTIDPattern, binlogEntryInfo)
+				}
+				if pseudoGTIDFound {
 					alreadyMatchedAscendingPseudoGTID = true
 					log.Debugf("Matched ascending Pseudo-GTID entry in %+v", binlog)
 					if binlogEntryInfo > entryText {
