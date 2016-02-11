@@ -82,7 +82,13 @@ func getLastPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, bin
 			moreRowsExpected = true
 			nextPos = m.GetInt64("End_log_pos")
 			binlogEntryInfo := m.GetString("Info")
-			if matched, _ := regexp.MatchString(config.Config.PseudoGTIDPattern, binlogEntryInfo); matched {
+			pseudoGTIDFound := false
+			if config.Config.PseudoGTIDPatternIsFixedSubstring {
+				pseudoGTIDFound = strings.Contains(binlogEntryInfo, config.Config.PseudoGTIDPattern)
+			} else {
+				pseudoGTIDFound, _ = regexp.MatchString(config.Config.PseudoGTIDPattern, binlogEntryInfo)
+			}
+			if pseudoGTIDFound {
 				if maxCoordinates != nil && maxCoordinates.SmallerThan(&BinlogCoordinates{LogFile: binlog, LogPos: m.GetInt64("Pos")}) {
 					// past the limitation
 					moreRowsExpected = false
