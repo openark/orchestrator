@@ -34,6 +34,16 @@ const maxEmptyBinlogFiles int = 10
 const maxEventInfoDisplayLength int = 200
 
 var instanceBinlogEntryCache = cache.New(time.Duration(10)*time.Minute, time.Minute)
+var pseudoGTIDRegexp *regexp.Regexp
+
+func InitPseudoGTIDPattern() {
+	if !config.Config.PseudoGTIDPatternIsFixedSubstring {
+		var err error
+		if pseudoGTIDRegexp, err = regexp.Compile(config.Config.PseudoGTIDPattern); err != nil {
+			log.Fatalf("Corrupted regular expression in PseudoGTIDPattern: %+v", config.Config.PseudoGTIDPattern)
+		}
+	}
+}
 
 func getInstanceBinlogEntryKey(instance *Instance, entry string) string {
 	return fmt.Sprintf("%s;%s", instance.Key.DisplayString(), entry)
@@ -86,7 +96,7 @@ func getLastPseudoGTIDEntryInBinlog(instanceKey *InstanceKey, binlog string, bin
 			if config.Config.PseudoGTIDPatternIsFixedSubstring {
 				pseudoGTIDFound = strings.Contains(binlogEntryInfo, config.Config.PseudoGTIDPattern)
 			} else {
-				pseudoGTIDFound, _ = regexp.MatchString(config.Config.PseudoGTIDPattern, binlogEntryInfo)
+				pseudoGTIDFound = pseudoGTIDRegexp.MatchString(binlogEntryInfo)
 			}
 			if pseudoGTIDFound {
 				if maxCoordinates != nil && maxCoordinates.SmallerThan(&BinlogCoordinates{LogFile: binlog, LogPos: m.GetInt64("Pos")}) {
@@ -240,7 +250,7 @@ func SearchEntryInBinlog(instanceKey *InstanceKey, binlog string, entryText stri
 				if config.Config.PseudoGTIDPatternIsFixedSubstring {
 					pseudoGTIDFound = strings.Contains(binlogEntryInfo, config.Config.PseudoGTIDPattern)
 				} else {
-					pseudoGTIDFound, _ = regexp.MatchString(config.Config.PseudoGTIDPattern, binlogEntryInfo)
+					pseudoGTIDFound = pseudoGTIDRegexp.MatchString(binlogEntryInfo)
 				}
 				if pseudoGTIDFound {
 					alreadyMatchedAscendingPseudoGTID = true
