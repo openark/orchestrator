@@ -35,11 +35,21 @@ const maxEventInfoDisplayLength int = 200
 
 var instanceBinlogEntryCache = cache.New(time.Duration(10)*time.Minute, time.Minute)
 
-func CompilePseudoGTIDPattern() (pseudoGTIDRegexp *regexp.Regexp, err error) {
+func compilePseudoGTIDPattern() (pseudoGTIDRegexp *regexp.Regexp, err error) {
+	log.Debugf("PseudoGTIDPatternIsFixedSubstring: %+v", config.Config.PseudoGTIDPatternIsFixedSubstring)
 	if config.Config.PseudoGTIDPatternIsFixedSubstring {
 		return nil, nil
 	}
+	log.Debugf("Compiling PseudoGTIDPattern")
 	return regexp.Compile(config.Config.PseudoGTIDPattern)
+}
+
+// pseudoGTIDMatches attempts to match given string with pseudo GTID pattern/text.
+func pseudoGTIDMatches(pseudoGTIDRegexp *regexp.Regexp, binlogEntryInfo string) (found bool) {
+	if config.Config.PseudoGTIDPatternIsFixedSubstring {
+		return strings.Contains(binlogEntryInfo, config.Config.PseudoGTIDPattern)
+	}
+	return pseudoGTIDRegexp.MatchString(binlogEntryInfo)
 }
 
 func getInstanceBinlogEntryKey(instance *Instance, entry string) string {
@@ -89,13 +99,7 @@ func getLastPseudoGTIDEntryInBinlog(pseudoGTIDRegexp *regexp.Regexp, instanceKey
 			moreRowsExpected = true
 			nextPos = m.GetInt64("End_log_pos")
 			binlogEntryInfo := m.GetString("Info")
-			pseudoGTIDFound := false
-			if config.Config.PseudoGTIDPatternIsFixedSubstring {
-				pseudoGTIDFound = strings.Contains(binlogEntryInfo, config.Config.PseudoGTIDPattern)
-			} else {
-				pseudoGTIDFound = pseudoGTIDRegexp.MatchString(binlogEntryInfo)
-			}
-			if pseudoGTIDFound {
+			if pseudoGTIDMatches(pseudoGTIDRegexp, binlogEntryInfo) {
 				if maxCoordinates != nil && maxCoordinates.SmallerThan(&BinlogCoordinates{LogFile: binlog, LogPos: m.GetInt64("Pos")}) {
 					// past the limitation
 					moreRowsExpected = false
@@ -122,7 +126,7 @@ func getLastPseudoGTIDEntryInBinlog(pseudoGTIDRegexp *regexp.Regexp, instanceKey
 }
 
 func getLastPseudoGTIDEntryInInstance(instance *Instance, minBinlogCoordinates *BinlogCoordinates, maxBinlogCoordinates *BinlogCoordinates, exhaustiveSearch bool) (*BinlogCoordinates, string, error) {
-	pseudoGTIDRegexp, err := CompilePseudoGTIDPattern()
+	pseudoGTIDRegexp, err := compilePseudoGTIDPattern()
 	if err != nil {
 		return nil, "", err
 	}
@@ -141,6 +145,7 @@ func getLastPseudoGTIDEntryInInstance(instance *Instance, minBinlogCoordinates *
 			return resultCoordinates, entryInfo, err
 		}
 		if !exhaustiveSearch {
+			log.Debugf("Not an exhaustive search. Bailing out")
 			break
 		}
 		if minBinlogCoordinates != nil && minBinlogCoordinates.LogFile == currentBinlog.LogFile {
@@ -165,7 +170,7 @@ func getLastPseudoGTIDEntryInRelayLogs(instance *Instance, minBinlogCoordinates 
 	// Since MySQL does not provide with a SHOW RELAY LOGS command, we heuristically srtart from current
 	// relay log (indiciated by Relay_log_file) and walk backwards.
 	// Eventually we will hit a relay log name which does not exist.
-	pseudoGTIDRegexp, err := CompilePseudoGTIDPattern()
+	pseudoGTIDRegexp, err := compilePseudoGTIDPattern()
 	if err != nil {
 		return nil, "", err
 	}
@@ -252,13 +257,7 @@ func SearchEntryInBinlog(pseudoGTIDRegexp *regexp.Regexp, instanceKey *InstanceK
 				// If we find the first entry to be higher than the searched one, clearly we are done.
 				// If not, then by virtue of binary logs, we still have to full-scan the entrie binlog sequentially; we
 				// do not check again for ASCENDING (no point), so we save up CPU energy wasted in regexp.
-				pseudoGTIDFound := false
-				if config.Config.PseudoGTIDPatternIsFixedSubstring {
-					pseudoGTIDFound = strings.Contains(binlogEntryInfo, config.Config.PseudoGTIDPattern)
-				} else {
-					pseudoGTIDFound = pseudoGTIDRegexp.MatchString(binlogEntryInfo)
-				}
-				if pseudoGTIDFound {
+				if pseudoGTIDMatches(pseudoGTIDRegexp, binlogEntryInfo) {
 					alreadyMatchedAscendingPseudoGTID = true
 					log.Debugf("Matched ascending Pseudo-GTID entry in %+v", binlog)
 					if binlogEntryInfo > entryText {
@@ -285,7 +284,7 @@ func SearchEntryInBinlog(pseudoGTIDRegexp *regexp.Regexp, instanceKey *InstanceK
 
 // SearchEntryInInstanceBinlogs will search for a specific text entry within the binary logs of a given instance.
 func SearchEntryInInstanceBinlogs(instance *Instance, entryText string, monotonicPseudoGTIDEntries bool, minBinlogCoordinates *BinlogCoordinates) (*BinlogCoordinates, error) {
-	pseudoGTIDRegexp, err := CompilePseudoGTIDPattern()
+	pseudoGTIDRegexp, err := compilePseudoGTIDPattern()
 	if err != nil {
 		return nil, err
 	}
