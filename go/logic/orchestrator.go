@@ -196,13 +196,15 @@ func ContinuousDiscovery() {
 				// This tick does NOT do instance poll (these are handled by the oversmapling discoveryTick)
 				// But rather should invoke such routinely operations that need to be as (or roughly as) frequent
 				// as instance poll
-				go inst.UpdateInstanceRecentRelaylogHistory()
+				if isElectedNode {
+					go inst.UpdateInstanceRecentRelaylogHistory()
+					go inst.RecordInstanceCoordinatesHistory()
+				}
 			}()
 		case <-caretakingTick:
 			// Various periodic internal maintenance tasks
 			go func() {
 				if isElectedNode {
-					go inst.RecordInstanceCoordinatesHistory()
 					go inst.RecordInstanceBinlogFileHistory()
 					go inst.ForgetLongUnseenInstances()
 					go inst.ForgetUnseenInstancesDifferentlyResolved()
