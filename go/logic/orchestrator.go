@@ -26,6 +26,7 @@ import (
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/go/agent"
 	"github.com/outbrain/orchestrator/go/config"
+	"github.com/outbrain/orchestrator/go/discovery"
 	"github.com/outbrain/orchestrator/go/inst"
 	ometrics "github.com/outbrain/orchestrator/go/metrics"
 	"github.com/outbrain/orchestrator/go/process"
@@ -89,6 +90,24 @@ func acceptSignals() {
 // and calls upon instance discovery per entry. These requests will
 // be handled by separate go routines so concurrency should be high.
 func handleDiscoveryRequests() {
+	log.Infof("handleDiscoveryRequests() DiscoveryMaxConcurrency: %v", config.Config.DiscoveryMaxConcurrency)
+	if config.Config.DiscoveryMaxConcurrency > 0 {
+		handleDiscoveryRequestsWithConcurrency(config.Config.DiscoveryMaxConcurrency)
+	} else {
+		handleDiscoveryRequestsWithoutConcurrencyLimits()
+	}
+}
+
+// Handle the discovery requests with the maximum given concurrency
+func handleDiscoveryRequestsWithConcurrency(maxConcurrency uint) {
+	q := discovery.NewQueue(maxConcurrency, discoveryInstanceKeys, discoverInstance)
+	q.HandleRequests()
+}
+
+// handleDiscoveryRequests iterates the discoveryInstanceKeys channel
+// and calls upon instance discovery per entry. These requests will
+// be handled by separate go routines so concurrency should be high.
+func handleDiscoveryRequestsWithoutConcurrencyLimits() {
 	for instanceKey := range discoveryInstanceKeys {
 		// Possibly this used to be the elected node, but has been demoted, while still
 		// the queue is full.

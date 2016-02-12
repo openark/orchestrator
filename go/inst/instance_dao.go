@@ -289,7 +289,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		}
 		masterKey.Hostname, resolveErr = ResolveHostname(masterKey.Hostname)
 		if resolveErr != nil {
-			logReadTopologyInstanceError(instanceKey, fmt.Sprintf("ResolveHostname(%+v)", masterKey.Hostname), resolveErr)
+			logReadTopologyInstanceError(instanceKey, fmt.Sprintf("ResolveHostname(%q)", masterKey.Hostname), resolveErr)
 		}
 		instance.MasterKey = *masterKey
 		instance.IsDetachedMaster = instance.MasterKey.IsDetached()
