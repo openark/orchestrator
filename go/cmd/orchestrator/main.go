@@ -849,7 +849,7 @@ func main() {
 	if *stack {
 		log.SetPrintStackTrace(*stack)
 	}
-	log.Info("starting")
+	log.Info("starting orchestrator") // FIXME and add the version which is currently in build.sh
 
 	runtime.GOMAXPROCS(math.MinInt(4, runtime.NumCPU()))
 

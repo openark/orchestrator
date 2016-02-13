@@ -72,7 +72,7 @@ func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err err
 	if err == nil {
 		return nil
 	}
-	return log.Errorf("Error reading %+v (%+v): %+v", *instanceKey, hint, err)
+	return log.Errorf("ReadTopologyInstance(%+v) %+v: %+v", *instanceKey, hint, err)
 }
 
 // ReadTopologyInstance connects to a topology MySQL instance and reads its configuration and
@@ -138,7 +138,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			return nil
 		})
 		if err != nil {
-			logReadTopologyInstanceError(instanceKey, "show variables", err)
+			logReadTopologyInstanceError(instanceKey, "show variables like 'maxscale%'", err)
 			// We do not "goto Cleanup" here, although it should be the correct flow.
 			// Reason is 5.7's new security feature that requires GRANTs on performance_schema.session_variables.
 			// There is a wrong decision making in this design and the migration path to 5.7 will be difficult.
@@ -274,7 +274,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		}
 		masterKey.Hostname, resolveErr = ResolveHostname(masterKey.Hostname)
 		if resolveErr != nil {
-			logReadTopologyInstanceError(instanceKey, "ResolveHostname", resolveErr)
+			logReadTopologyInstanceError(instanceKey, fmt.Sprintf("ResolveHostname(%+v)", masterKey.Hostname), resolveErr)
 		}
 		instance.MasterKey = *masterKey
 		instance.SecondsBehindMaster = m.GetNullInt64("Seconds_Behind_Master")
