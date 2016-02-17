@@ -49,7 +49,7 @@ var isElectedGauge = metrics.NewGauge()
 
 var isElectedNode = false
 
-var recentDiscoveryOperationKeys = cache.New(time.Duration(config.Config.DiscoveryPollSeconds/2)*time.Second, time.Second)
+var recentDiscoveryOperationKeys = cache.New(time.Duration(math.MaxInt(int(config.Config.InstancePollSeconds-2), 1))*time.Second, time.Second)
 
 func init() {
 	isElectedNode = false
