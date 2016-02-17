@@ -154,7 +154,24 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 				    	) AS count_mariadb_gtid_slaves,
 		        IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
                   AND slave_instance.mariadb_gtid != 0),
-              0) AS count_valid_mariadb_gtid_slaves
+              0) AS count_valid_mariadb_gtid_slaves,
+						IFNULL(SUM(slave_instance.log_bin
+							  AND slave_instance.log_slave_updates
+								AND slave_instance.binlog_format = 'STATEMENT'),
+              0) AS count_statement_based_loggin_slaves,
+						IFNULL(SUM(slave_instance.log_bin
+								AND slave_instance.log_slave_updates
+								AND slave_instance.binlog_format = 'MIXED'),
+              0) AS count_mixed_based_loggin_slaves,
+						IFNULL(SUM(slave_instance.log_bin
+								AND slave_instance.log_slave_updates
+								AND slave_instance.binlog_format = 'ROW'),
+              0) AS count_row_based_loggin_slaves,
+						COUNT(DISTINCT IF(
+							slave_instance.log_bin AND slave_instance.log_slave_updates,
+								substring_index(slave_instance.version, '.', 2),
+								NULL)
+						) AS count_distinct_logging_major_versions
 		    FROM
 		        database_instance master_instance
 		            LEFT JOIN
@@ -222,6 +239,11 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		countValidBinlogServerSlaves := m.GetUint("count_valid_binlog_server_slaves")
 		a.BinlogServerImmediateTopology = countValidBinlogServerSlaves == a.CountValidSlaves && a.CountValidSlaves > 0
 		a.PseudoGTIDImmediateTopology = m.GetBool("is_pseudo_gtid")
+
+		a.CountStatementBasedLoggingSlaves = m.GetUint("count_statement_based_loggin_slaves")
+		a.CountMixedBasedLoggingSlaves = m.GetUint("count_mixed_based_loggin_slaves")
+		a.CountRowBasedLoggingSlaves = m.GetUint("count_row_based_loggin_slaves")
+		a.CountDistinctMajorVersionsLoggingSlaves = m.GetUint("count_distinct_logging_major_versions")
 
 		if a.IsMaster && !a.LastCheckValid && a.CountSlaves == 0 {
 			a.Analysis = DeadMasterWithoutSlaves
@@ -330,7 +352,10 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		//			a.Description = "Master has no slaves"
 		//		}
 
-		if a.Analysis != NoProblem {
+		appendAnalysis := func(analysis *ReplicationAnalysis) {
+			if a.Analysis == NoProblem && len(a.StructureAnalysis) == 0 {
+				return
+			}
 			skipThisHost := false
 			for _, filter := range config.Config.RecoveryIgnoreHostnameFilters {
 				if matched, _ := regexp.MatchString(filter, a.AnalyzedInstanceKey.Hostname); matched {
@@ -344,6 +369,25 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 				result = append(result, a)
 			}
 		}
+
+		{
+			// Moving on to structure analysis
+			// We also do structural checks. See if there's potential danger in promotions
+			if a.CountStatementBasedLoggingSlaves > 0 && a.CountMixedBasedLoggingSlaves > 0 {
+				a.StructureAnalysis = append(a.StructureAnalysis, StatementAndMixedLoggingSlavesStructureWarning)
+			}
+			if a.CountStatementBasedLoggingSlaves > 0 && a.CountRowBasedLoggingSlaves > 0 {
+				a.StructureAnalysis = append(a.StructureAnalysis, StatementAndRowLoggingSlavesStructureWarning)
+			}
+			if a.CountMixedBasedLoggingSlaves > 0 && a.CountRowBasedLoggingSlaves > 0 {
+				a.StructureAnalysis = append(a.StructureAnalysis, MixedAndRowLoggingSlavesStructureWarning)
+			}
+			if a.CountDistinctMajorVersionsLoggingSlaves > 1 {
+				a.StructureAnalysis = append(a.StructureAnalysis, MultipleMajorVersionsLoggingSlaves)
+			}
+		}
+		appendAnalysis(&a)
+
 		if a.CountSlaves > 0 && auditAnalysis {
 			// Interesting enough for analysis
 			go auditInstanceAnalysisInChangelog(&a.AnalyzedInstanceKey, a.Analysis)

@@ -424,6 +424,10 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		err = ReadInstanceClusterAttributes(instance)
 		logReadTopologyInstanceError(instanceKey, "ReadInstanceClusterAttributes", err)
 	}
+	{
+		err = ReadInstancePromotionRule(instance)
+		logReadTopologyInstanceError(instanceKey, "ReadInstanceClusterAttributes", err)
+	}
 	if instance.ReplicationDepth == 0 && config.Config.DetectClusterAliasQuery != "" && !isMaxScale {
 		// Only need to do on masters
 		clusterAlias := ""
@@ -479,13 +483,13 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 
 	// Read the cluster_name of the _master_ of our instance, derive it from there.
 	query := `
-      	select
-			cluster_name,
-	       	replication_depth,
-	       	master_host,
-	       	master_port
-       	from database_instance
-		 	where hostname=? and port=?
+			select
+					cluster_name,
+					replication_depth,
+					master_host,
+					master_port
+				from database_instance
+				where hostname=? and port=?
 	`
 	args := sqlutils.Args(instance.MasterKey.Hostname, instance.MasterKey.Port)
 
@@ -532,6 +536,29 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 	instance.ReplicationDepth = replicationDepth
 	instance.IsCoMaster = isCoMaster
 	return nil
+}
+
+func ReadInstancePromotionRule(instance *Instance) (err error) {
+	if config.Config.DatabaselessMode__experimental {
+		return nil
+	}
+
+	var promotionRule CandidatePromotionRule = NeutralPromoteRule
+	// Read the cluster_name of the _master_ of our instance, derive it from there.
+	query := `
+			select
+					ifnull(nullif(promotion_rule, ''), 'neutral') as promotion_rule
+				from candidate_database_instance
+				where hostname=? and port=?
+	`
+	args := sqlutils.Args(instance.Key.Hostname, instance.Key.Port)
+
+	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
+		promotionRule = CandidatePromotionRule(m.GetString("promotion_rule"))
+		return nil
+	})
+	instance.PromotionRule = promotionRule
+	return log.Errore(err)
 }
 
 // readInstanceRow reads a single instance row from the orchestrator backend database.
@@ -587,6 +614,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.IsLastCheckValid = m.GetBool("is_last_check_valid")
 	instance.SecondsSinceLastSeen = m.GetNullInt64("seconds_since_last_seen")
 	instance.IsCandidate = m.GetBool("is_candidate")
+	instance.PromotionRule = CandidatePromotionRule(m.GetString("promotion_rule"))
 	instance.IsDowntimed = m.GetBool("is_downtimed")
 	instance.DowntimeReason = m.GetString("downtime_reason")
 	instance.DowntimeOwner = m.GetString("downtime_owner")
@@ -611,7 +639,9 @@ func readInstancesByCondition(condition string, args []interface{}, sort string)
 			timestampdiff(second, last_checked, now()) as seconds_since_last_checked,
 			(last_checked <= last_seen) is true as is_last_check_valid,
 			timestampdiff(second, last_seen, now()) as seconds_since_last_seen,
-			candidate_database_instance.last_suggested is not null as is_candidate,
+			candidate_database_instance.last_suggested is not null
+				/* [Work In Progress!] and candidate_database_instance.promotion_rule in ('must', 'prefer') */ as is_candidate,
+			ifnull(nullif(candidate_database_instance.promotion_rule, ''), 'neutral') as promotion_rule,
 			ifnull(unresolved_hostname, '') as unresolved_hostname,
 			(
 	    		database_instance_downtime.downtime_active IS NULL
@@ -835,7 +865,11 @@ func FindFuzzyInstances(fuzzyInstanceKey *InstanceKey) ([](*Instance), error) {
 func ReadClusterCandidateInstances(clusterName string) ([](*Instance), error) {
 	condition := `
 			cluster_name = ?
-			and (hostname, port) in (select hostname, port from candidate_database_instance)
+			and (hostname, port) in (
+				select hostname, port
+					from candidate_database_instance
+					/* [Work In Progress!] where promotion_rule in ('must', 'prefer') */
+			)
 			`
 	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
 }
@@ -1672,19 +1706,21 @@ func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern str
 }
 
 // RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.
-func RegisterCandidateInstance(instanceKey *InstanceKey) error {
+func RegisterCandidateInstance(instanceKey *InstanceKey, promotionRule CandidatePromotionRule) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	insert into candidate_database_instance (
-        		hostname,
-        		port,
-        		last_suggested)
-        	values (?, ?, NOW())
-        	on duplicate key update
-        		hostname=values(hostname),
-        		port=values(port),
-        		last_suggested=now()
-				`, instanceKey.Hostname, instanceKey.Port,
+				insert into candidate_database_instance (
+						hostname,
+						port,
+						last_suggested,
+						promotion_rule)
+					values (?, ?, NOW(), ?)
+					on duplicate key update
+						hostname=values(hostname),
+						port=values(port),
+						last_suggested=now(),
+						promotion_rule=values(promotion_rule)
+				`, instanceKey.Hostname, instanceKey.Port, string(promotionRule),
 		)
 		if err != nil {
 			return log.Errore(err)

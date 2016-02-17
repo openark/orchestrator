@@ -25,6 +25,18 @@ import (
 	"strings"
 )
 
+// CandidatePromotionRule describe the promotion preference/rule for an instance.
+// It maps to promotion_rule column in candidate_database_instance
+type CandidatePromotionRule string
+
+const (
+	MustPromoteRule      CandidatePromotionRule = "must"
+	PreferPromoteRule                           = "prefer"
+	NeutralPromoteRule                          = "neutral"
+	PreferNotPromoteRule                        = "prefer_not"
+	MustNotPromoteRule                          = "must_not"
+)
+
 // Instance represents a database instance, including its current configuration & status.
 // It presents important replication configuration and detailed replication status.
 type Instance struct {
@@ -74,6 +86,7 @@ type Instance struct {
 	CountMySQLSnapshots  int
 
 	IsCandidate          bool
+	PromotionRule        CandidatePromotionRule
 	IsDowntimed          bool
 	DowntimeReason       string
 	DowntimeOwner        string

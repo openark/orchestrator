@@ -420,7 +420,7 @@ function Cluster() {
                 return { accept: false };
             }
             if (instanceIsChild(droppableNode, node) && node.isCoMaster) {
-                // We may allow a co-master to change its othe rco-master under some conditions, 
+                // We may allow a co-master to change its othe rco-master under some conditions,
             	// see MakeCoMaster() in instance_topology.go
             	if (!droppableNode.ReadOnly) {
             		return { accept: false };
@@ -752,7 +752,7 @@ function Cluster() {
     }
 
     function moveBelowGTID(node, otherNode) {
-	    var message = "<h4>GTID MODE, move-below</h4>Are you sure you wish to turn <code><strong>" + 
+	    var message = "<h4>GTID MODE, move-below</h4>Are you sure you wish to turn <code><strong>" +
 		    node.Key.Hostname + ":" + node.Key.Port +
 		    "</strong></code> into a slave of <code><strong>" +
 		    otherNode.Key.Hostname + ":" + otherNode.Key.Port +
@@ -762,7 +762,7 @@ function Cluster() {
     }
 
     function moveSlavesGTID(node, otherNode) {
-	    var message = "<h4>GTID MODE, move-slaves</h4>Are you sure you wish to move slaves of <code><strong>" + 
+	    var message = "<h4>GTID MODE, move-slaves</h4>Are you sure you wish to move slaves of <code><strong>" +
 		    node.Key.Hostname + ":" + node.Key.Port +
 		    "</strong></code> below <code><strong>" +
 		    otherNode.Key.Hostname + ":" + otherNode.Key.Port +
@@ -863,7 +863,7 @@ function Cluster() {
         return parseInt(logFileTokens[logFileTokens.length - 1])
     }
 
-    // compactInstances aggregates sibling instances of same DC such that they are visualized as a single box. 
+    // compactInstances aggregates sibling instances of same DC such that they are visualized as a single box.
     function compactInstances(instances, instancesMap) {
     	function aggregateInstances(parentInstance, dataCenter, instances) {
     		if (!instances) {
@@ -872,7 +872,7 @@ function Cluster() {
     		if (instances.length < 2) {
     			return false;
     		}
-    		
+
             var aggregatedProblems = {}
             function incrementProblems(problemType, title) {
                 if (aggregatedProblems[problemType]) {
@@ -925,7 +925,7 @@ function Cluster() {
             childlessChildren = instance.children.filter(function (child) {
                 return (!child.children || child.children.length == 0)
             });
-            
+
             var dcInstances = {};
             childlessChildren.forEach(function (instance) {
             	if (!dcInstances[instance.DataCenter]) {
@@ -964,7 +964,7 @@ function Cluster() {
                         child.isMostAdvancedOfSiblings = true;
                         if (instance.isMaster && !instance.isCoMaster) {
                             // Moreover, the instance is the (only) master!
-                            // Therefore its most advanced slaves are candidate masters 
+                            // Therefore its most advanced slaves are candidate masters
                             child.isCandidateMaster = true;
                         }
                     }
@@ -1006,7 +1006,7 @@ function Cluster() {
 		    $("#move-instance-method-button").removeClass("btn-success").removeClass("btn-info").removeClass("btn-warning").addClass("btn-primary");
 	    } else if (moveInstanceMethod == "pseudo-gtid") {
 		    $("#move-instance-method-button").removeClass("btn-success").removeClass("btn-primary").removeClass("btn-info").addClass("btn-warning");
-	    } 
+	    }
 	    $("#move-instance-method-button").html(moveInstanceMethod + ' mode <span class="caret"></span>')
     }
 
@@ -1152,7 +1152,7 @@ function Cluster() {
 		    var glyph = $("#cluster_sidebar [data-bullet=colorize-dc] .glyphicon");
         	if ($.cookie("colorize-dc") == "true") {
 		    	glyph.addClass("text-info");
-		    	glyph.attr("title", "Disable colors");        		
+		    	glyph.attr("title", "Disable colors");
         	} else {
 		    	glyph.addClass("text-muted");
 		    	glyph.attr("title", "Color by data center");
@@ -1177,7 +1177,7 @@ function Cluster() {
 		    var glyph = $("#cluster_sidebar [data-bullet=pool-indicator] .glyphicon");
         	if ($.cookie("pool-indicator") == "true") {
 		    	glyph.addClass("text-info");
-		    	glyph.attr("title", "Disable pool indication");        		
+		    	glyph.attr("title", "Disable pool indication");
         	} else {
 		    	glyph.addClass("text-muted");
 		    	glyph.attr("title", "Enable pool indication");
@@ -1188,7 +1188,7 @@ function Cluster() {
 		    var glyph = $("#cluster_sidebar [data-bullet=anonymize] .glyphicon");
         	if ($.cookie("anonymize") == "true") {
 		    	glyph.addClass("text-info");
-		    	glyph.attr("title", "Cancel anonymize");        		
+		    	glyph.attr("title", "Cancel anonymize");
         	} else {
 		    	glyph.addClass("text-muted");
 		    	glyph.attr("title", "Anonymize display");
@@ -1202,8 +1202,16 @@ function Cluster() {
             + "</strong></span>"
             + "<br/>" + "<span>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</span>"
         ;
+        if (analysisEntry.IsStructureAnalysis) {
+          content  = '<div class="pull-left glyphicon glyphicon-exclamation-sign text-warning"></div>' + content;
+        } else {
+          content  = '<div class="pull-left glyphicon glyphicon-exclamation-sign text-danger"></div>' + content;
+        }
         addSidebarInfoPopoverContent(content);
 
+        if(analysisEntry.IsStructureAnalysis) {
+          return;
+        }
         var popoverElement = getInstanceDiv(instance.id);
 
         popoverElement.append('<h4 class="popover-footer"><div class="dropdown"></div></h4>');
@@ -1272,22 +1280,31 @@ function Cluster() {
     function reviewReplicationAnalysis(replicationAnalysis) {
         var instancesMap = _instancesMap;
         var clusterHasReplicationAnalysisIssue = false;
+        var clusterHasStructureAnalysisIssue = false;
         replicationAnalysis.Details.forEach(function (analysisEntry) {
-            if (!(analysisEntry.Analysis in interestingAnalysis)) {
-                return;
+            if (analysisEntry.ClusterDetails.ClusterName != currentClusterName()) {
+              return;
             }
-            if (analysisEntry.ClusterDetails.ClusterName == currentClusterName()) {
+            var instanceId = getInstanceId(analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port);
+            var instance = instancesMap[instanceId]
+            if (analysisEntry.Analysis in interestingAnalysis) {
                 clusterHasReplicationAnalysisIssue = true;
-
-                var instanceId = getInstanceId(analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port);
-                var instance = instancesMap[instanceId]
                 onAnalysisEntry(analysisEntry, instance);
             }
+            analysisEntry.StructureAnalysis = analysisEntry.StructureAnalysis || [];
+            analysisEntry.StructureAnalysis.forEach(function(structureAnalysis) {
+              clusterHasStructureAnalysisIssue = true;
+              analysisEntry.Analysis = structureAnalysis;
+              analysisEntry.IsStructureAnalysis = true;
+              onAnalysisEntry(analysisEntry, instance);
+            });
         });
         if (clusterHasReplicationAnalysisIssue) {
-            $("#cluster_sidebar [data-bullet=info] div span").addClass("text-danger");
+            $("#cluster_sidebar [data-bullet=info] div span").addClass("text-danger").addClass("glyphicon-exclamation-sign");;
+        } else if (clusterHasStructureAnalysisIssue) {
+            $("#cluster_sidebar [data-bullet=info] div span").addClass("text-warning").addClass("glyphicon-exclamation-sign");;
         } else {
-            $("#cluster_sidebar [data-bullet=info] div span").addClass("text-info");
+            $("#cluster_sidebar [data-bullet=info] div span").addClass("text-info").addClass("glyphicon-info-sign");
         }
     }
 
@@ -1509,4 +1526,3 @@ function getSvgPos(el) {
 }
 
 var _page = new Cluster();
-
