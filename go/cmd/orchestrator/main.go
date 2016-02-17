@@ -889,6 +889,12 @@ func main() {
 	config.RuntimeCLIFlags.BinlogFile = flag.String("binlog", "", "Binary log file name")
 	config.RuntimeCLIFlags.Statement = flag.String("statement", "", "Statement/hint")
 	config.RuntimeCLIFlags.GrabElection = flag.Bool("grab-election", false, "Grab leadership (only applies to continuous mode)")
+	{
+		// TODO: this is still not fully implemented. I am unsure it will, and I may remove this. Work In Progress, sorry I'm pushing this into master
+		preferDummy := "prefer"
+		config.RuntimeCLIFlags.PromotionRule = &preferDummy
+		//config.RuntimeCLIFlags.PromotionRule = flag.String("promotion-rule", "prefer", "Promotion rule for register-andidate (must|prefer|neutral|prefer_not|must_not)")
+	}
 	config.RuntimeCLIFlags.Version = flag.Bool("version", false, "Print version and exit")
 	flag.Parse()
 

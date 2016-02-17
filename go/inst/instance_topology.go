@@ -1944,6 +1944,10 @@ func isValidAsCandidateMasterInBinlogServerTopology(slave *Instance) bool {
 }
 
 func isBannedFromBeingCandidateSlave(slave *Instance) bool {
+	if slave.PromotionRule == MustNotPromoteRule {
+		log.Debugf("instance %+v is banned because of promotion rule", slave.Key)
+		return true
+	}
 	for _, filter := range config.Config.PromotionIgnoreHostnameFilters {
 		if matched, _ := regexp.MatchString(filter, slave.Key.Hostname); matched {
 			return true

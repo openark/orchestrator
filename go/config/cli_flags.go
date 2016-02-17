@@ -26,6 +26,7 @@ type CLIFlags struct {
 	GrabElection       *bool
 	Version            *bool
 	Statement          *string
+	PromotionRule      *string
 }
 
 var RuntimeCLIFlags CLIFlags
