@@ -42,23 +42,31 @@ import (
 
 // Queue is a container for processing the orchestrator discovery requests.
 type Queue struct {
-	concurrency    uint                      // The number of active go routines processing discovery requests.
-	done           chan inst.InstanceKey     // Channel used by the active go routines to say they have finished processing.
-	inputChan      <-chan inst.InstanceKey   // Input channel we are reading the discovery requests from.
-	knownKeys      map[inst.InstanceKey]bool // This has 2 uses: to indicate if there is a request in the
-						 // queue (so not being processed) or to indicate that the request
-                                                 // is actively being dealth with.  That state is not explicitly
-                                                 // stored as it is not really needed.
-	lock           sync.Mutex                // lock while making changes
-	maxConcurrency uint                      // The maximum number of go routines allowed to handle the queue at once.
-                                                 // This is a configuration parameter provided when creating the Queue.
-	processor      func(i inst.InstanceKey)  // process to run on each received key
-	queue          []inst.InstanceKey        // This holds the discover requests (the instance name) which need to be
-                                                 // processed. but which are not currently being processed. All requests
-                                                 // are initially added to the end of this queue, and then the top element
-                                                 // will be popped off if the number of active go routines (defined by
-                                                 // concurrency) is less than the maximum specified value at which point
-                                                 // it will be processed by a new go routine.
+	// The number of active go routines processing discovery requests.
+	concurrency uint
+	// Channel used by the active go routines to say they have finished processing.
+	done chan inst.InstanceKey
+	// Input channel we are reading the discovery requests from.
+	inputChan <-chan inst.InstanceKey
+	// This has 2 uses: to indicate if there is a request in the queue
+	// (so not being processed) or to indicate that the request is actively
+	// being dealth with.  That state is not explicitly stored as it is not
+	// really needed.
+	knownKeys map[inst.InstanceKey]bool
+	// lock while making changes
+	lock sync.Mutex
+	// The maximum number of go routines allowed to handle the queue at once.
+	// This is a configuration parameter provided when creating the Queue.
+	maxConcurrency uint
+	// process to run on each received key
+	processor func(i inst.InstanceKey)
+	// This holds the discover requests (the instance name) which need to be
+	// processed. but which are not currently being processed. All requests
+	// are initially added to the end of this queue, and then the top element
+	// will be popped off if the number of active go routines (defined by
+	// concurrency) is less than the maximum specified value at which point
+	// it will be processed by a new go routine.
+	queue []inst.InstanceKey
 }
 
 var emptyKey = inst.InstanceKey{}
