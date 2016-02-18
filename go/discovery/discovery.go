@@ -14,15 +14,22 @@
    limitations under the License.
 */
 
-// package discovery manages a queue as described: an ordered
-// queue with no duplicates.
-// The configured processor function is called on an entry that's
-// received and this happens in parallel until we reach maxCapacity
-// go-routines are running in parallel.  Any new requests get queued
-// and processed as a go routine becomes free.  The queue is processed
-// in FIFO order.  If a request is received for an element that is
-// already in the queue or being processed then it will be silently
-// ignored.
+/*
+
+package discovery manages a queue of discovery requests: an ordered
+queue with no duplicates.
+
+The configured processor function is called on an entry that's
+received and this happens in parallel until maxCapacity go-routines
+are running in parallel.
+
+Any new requests get queued and processed as a go routine becomes
+free.  The queue is processed in FIFO order.  If a request is
+received for an instance that is already in the queue or already
+being processed then it will be silently ignored.
+
+*/
+
 package discovery
 
 import (
@@ -33,20 +40,30 @@ import (
 	"github.com/outbrain/orchestrator/go/inst"
 )
 
+// Queue is a container for processing the orchestrator discovery requests.
 type Queue struct {
-	concurrency    uint                      // current concurrency
-	done           chan inst.InstanceKey     // for synchronising completed discoveries
-	inputChan      <-chan inst.InstanceKey   // input channel we are reading from
-	knownKeys      map[inst.InstanceKey]bool // pending instances so we don't queue anything up more than one
+	concurrency    uint                      // The number of active go routines processing discovery requests.
+	done           chan inst.InstanceKey     // Channel used by the active go routines to say they have finished processing.
+	inputChan      <-chan inst.InstanceKey   // Input channel we are reading the discovery requests from.
+	knownKeys      map[inst.InstanceKey]bool // This has 2 uses: to indicate if there is a request in the
+						 // queue (so not being processed) or to indicate that the request
+                                                 // is actively being dealth with.  That state is not explicitly
+                                                 // stored as it is not really needed.
 	lock           sync.Mutex                // lock while making changes
-	maxConcurrency uint                      // maximum concurrency of the queue
+	maxConcurrency uint                      // The maximum number of go routines allowed to handle the queue at once.
+                                                 // This is a configuration parameter provided when creating the Queue.
 	processor      func(i inst.InstanceKey)  // process to run on each received key
-	queue          []inst.InstanceKey        // instances in fifo order so we process in the order received.
+	queue          []inst.InstanceKey        // This holds the discover requests (the instance name) which need to be
+                                                 // processed. but which are not currently being processed. All requests
+                                                 // are initially added to the end of this queue, and then the top element
+                                                 // will be popped off if the number of active go routines (defined by
+                                                 // concurrency) is less than the maximum specified value at which point
+                                                 // it will be processed by a new go routine.
 }
 
 var emptyKey = inst.InstanceKey{}
 
-// provide a channel to read from and a function to run on the instance to be processed
+// NewQueue creates a new Queue entry.
 func NewQueue(maxConcurrency uint, inputChan chan inst.InstanceKey, processor func(i inst.InstanceKey)) *Queue {
 	log.Infof("Queue.NewQueue()")
 	q := new(Queue)
