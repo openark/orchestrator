@@ -24,6 +24,9 @@ type CLIFlags struct {
 	BinlogFile         *string
 	Databaseless       *bool
 	GrabElection       *bool
+	Version            *bool
+	Statement          *string
+	PromotionRule      *string
 }
 
 var RuntimeCLIFlags CLIFlags

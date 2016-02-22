@@ -17,6 +17,11 @@
 package logic
 
 import (
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/math"
 	"github.com/outbrain/orchestrator/go/agent"
@@ -26,10 +31,6 @@ import (
 	"github.com/outbrain/orchestrator/go/process"
 	"github.com/pmylund/go-cache"
 	"github.com/rcrowley/go-metrics"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
 
 const (
@@ -38,7 +39,7 @@ const (
 
 // discoveryInstanceKeys is a channel of instanceKey-s that were requested for discovery.
 // It can be continuously updated as discovery process progresses.
-var discoveryInstanceKeys chan inst.InstanceKey = make(chan inst.InstanceKey, maxConcurrency)
+var discoveryInstanceKeys = make(chan inst.InstanceKey, maxConcurrency)
 
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
@@ -48,7 +49,7 @@ var isElectedGauge = metrics.NewGauge()
 
 var isElectedNode = false
 
-var recentDiscoveryOperationKeys = cache.New(time.Duration(config.Config.DiscoveryPollSeconds/2)*time.Second, time.Second)
+var recentDiscoveryOperationKeys = cache.New(time.Duration(math.MaxInt(int(config.Config.InstancePollSeconds-2), 1))*time.Second, time.Second)
 
 func init() {
 	isElectedNode = false
@@ -156,6 +157,7 @@ func ContinuousDiscovery() {
 	go handleDiscoveryRequests()
 
 	discoveryTick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
+	instancePollTick := time.Tick(time.Duration(config.Config.InstancePollSeconds) * time.Second)
 	caretakingTick := time.Tick(time.Minute)
 	recoveryTick := time.Tick(time.Duration(config.Config.RecoveryPollSeconds) * time.Second)
 	var snapshotTopologiesTick <-chan time.Time
@@ -189,10 +191,21 @@ func ContinuousDiscovery() {
 					log.Debugf("Not elected as active node; polling")
 				}
 			}()
+		case <-instancePollTick:
+			go func() {
+				// This tick does NOT do instance poll (these are handled by the oversmapling discoveryTick)
+				// But rather should invoke such routinely operations that need to be as (or roughly as) frequent
+				// as instance poll
+				if isElectedNode {
+					go inst.UpdateInstanceRecentRelaylogHistory()
+					go inst.RecordInstanceCoordinatesHistory()
+				}
+			}()
 		case <-caretakingTick:
 			// Various periodic internal maintenance tasks
 			go func() {
 				if isElectedNode {
+					go inst.RecordInstanceBinlogFileHistory()
 					go inst.ForgetLongUnseenInstances()
 					go inst.ForgetUnseenInstancesDifferentlyResolved()
 					go inst.ForgetExpiredHostnameResolves()
@@ -210,6 +223,7 @@ func ContinuousDiscovery() {
 					go inst.ExpireMasterPositionEquivalence()
 					go inst.FlushNontrivialResolveCacheToDatabase()
 					go process.ExpireNodesHistory()
+					go process.ExpireAccessTokens()
 				}
 				if !isElectedNode {
 					// Take this opportunity to refresh yourself

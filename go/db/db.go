@@ -136,7 +136,7 @@ var generateSQLBase = []string{
           PRIMARY KEY (audit_id),
           KEY audit_timestamp_idx (audit_timestamp),
           KEY host_port_idx (hostname, port, audit_timestamp)
-        ) ENGINE=InnoDB DEFAULT CHARSET=latin1 
+        ) ENGINE=InnoDB DEFAULT CHARSET=latin1
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS host_agent (
@@ -443,86 +443,142 @@ var generateSQLBase = []string{
 		  KEY first_seen_active_idx(first_seen_active)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS database_instance_coordinates_history (
+          history_id bigint unsigned not null auto_increment,
+		  hostname varchar(128) NOT NULL,
+		  port smallint(5) unsigned NOT NULL,
+		  recorded_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  binary_log_file varchar(128) NOT NULL,
+		  binary_log_pos bigint(20) unsigned NOT NULL,
+		  relay_log_file varchar(128) NOT NULL,
+		  relay_log_pos bigint(20) unsigned NOT NULL,
+		  PRIMARY KEY (history_id),
+		  KEY hostname_port_recorded_timestmp_idx (hostname, port, recorded_timestamp),
+		  KEY recorded_timestmp_idx (recorded_timestamp)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS database_instance_binlog_files_history (
+          history_id bigint unsigned not null auto_increment,
+		  hostname varchar(128) NOT NULL,
+		  port smallint(5) unsigned NOT NULL,
+		  binary_log_file varchar(128) NOT NULL,
+		  binary_log_pos bigint(20) unsigned NOT NULL,
+		  first_seen timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  last_seen timestamp NOT NULL DEFAULT '1971-01-01 00:00:00',
+		  PRIMARY KEY (history_id),
+		  UNIQUE KEY hostname_port_file_idx (hostname, port, binary_log_file),
+		  KEY last_seen_idx (last_seen)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+	  CREATE TABLE IF NOT EXISTS access_token (
+	    access_token_id bigint unsigned not null auto_increment,
+	    public_token varchar(128) NOT NULL,
+	    secret_token varchar(128) NOT NULL,
+	    generated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	    generated_by varchar(128) CHARACTER SET utf8 NOT NULL,
+			is_acquired tinyint unsigned NOT NULL DEFAULT '0',
+	    PRIMARY KEY (access_token_id),
+	    UNIQUE KEY public_token_idx (public_token),
+	    KEY generated_at_idx (generated_at)
+	  ) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS database_instance_recent_relaylog_history (
+		  hostname varchar(128) NOT NULL,
+		  port smallint(5) unsigned NOT NULL,
+			current_relay_log_file varchar(128) NOT NULL,
+		  current_relay_log_pos bigint(20) unsigned NOT NULL,
+			current_seen timestamp NOT NULL DEFAULT '1971-01-01 00:00:00',
+			prev_relay_log_file varchar(128) NOT NULL,
+		  prev_relay_log_pos bigint(20) unsigned NOT NULL,
+			prev_seen timestamp NOT NULL DEFAULT '1971-01-01 00:00:00',
+			PRIMARY KEY (hostname, port),
+		  KEY current_seen_idx (current_seen)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN read_only TINYINT UNSIGNED NOT NULL AFTER version
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN last_sql_error TEXT NOT NULL AFTER exec_master_log_pos
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN last_io_error TEXT NOT NULL AFTER last_sql_error
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN last_attempted_check TIMESTAMP AFTER last_checked
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN oracle_gtid TINYINT UNSIGNED NOT NULL AFTER slave_io_running
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN mariadb_gtid TINYINT UNSIGNED NOT NULL AFTER oracle_gtid
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN relay_log_file varchar(128) CHARACTER SET ascii NOT NULL AFTER exec_master_log_pos
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN relay_log_pos bigint unsigned NOT NULL AFTER relay_log_file
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD INDEX master_host_port_idx (master_host, master_port)
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN pseudo_gtid TINYINT UNSIGNED NOT NULL AFTER mariadb_gtid
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN replication_depth TINYINT UNSIGNED NOT NULL AFTER cluster_name
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN has_replication_filters TINYINT UNSIGNED NOT NULL AFTER slave_io_running
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN data_center varchar(32) CHARACTER SET ascii NOT NULL AFTER cluster_name
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN physical_environment varchar(32) CHARACTER SET ascii NOT NULL AFTER data_center
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance_maintenance
 			ADD KEY active_timestamp_idx (maintenance_active, begin_timestamp)
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN uptime INT UNSIGNED NOT NULL AFTER last_seen
 	`,
@@ -532,22 +588,22 @@ var generateSQLPatches = []string{
 			ADD UNIQUE KEY alias_uidx (alias)
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN is_co_master TINYINT UNSIGNED NOT NULL AFTER replication_depth
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance_maintenance
 			ADD KEY active_end_timestamp_idx (maintenance_active, end_timestamp)
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN sql_delay INT UNSIGNED NOT NULL AFTER slave_lag_seconds
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			topology_recovery
 			ADD COLUMN analysis              varchar(128) CHARACTER SET ascii NOT NULL,
 			ADD COLUMN cluster_name          varchar(128) CHARACTER SET ascii NOT NULL,
@@ -569,7 +625,7 @@ var generateSQLPatches = []string{
 			ADD KEY end_recovery_idx (end_recovery)
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN binlog_server TINYINT UNSIGNED NOT NULL AFTER version
 	`,
@@ -579,22 +635,22 @@ var generateSQLPatches = []string{
 			ADD KEY last_registered_idx (last_registered)
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN supports_oracle_gtid TINYINT UNSIGNED NOT NULL AFTER oracle_gtid
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN executed_gtid_set text CHARACTER SET ascii NOT NULL AFTER oracle_gtid
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN server_uuid varchar(64) CHARACTER SET ascii NOT NULL AFTER server_id
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN suggested_cluster_alias varchar(128) CHARACTER SET ascii NOT NULL AFTER cluster_name
 	`,
@@ -604,19 +660,19 @@ var generateSQLPatches = []string{
 			ADD KEY last_registered_idx (last_registered)
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			topology_recovery
 			ADD COLUMN is_successful TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER processcing_node_token
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			topology_recovery
 			ADD COLUMN acknowledged TINYINT UNSIGNED NOT NULL DEFAULT 0,
 			ADD COLUMN acknowledged_by varchar(128) CHARACTER SET utf8 NOT NULL,
 			ADD COLUMN acknowledge_comment text CHARACTER SET utf8 NOT NULL
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			topology_recovery
 			ADD COLUMN participating_instances text CHARACTER SET ascii NOT NULL after slave_hosts,
 			ADD COLUMN lost_slaves text CHARACTER SET ascii NOT NULL after participating_instances,
@@ -631,13 +687,13 @@ var generateSQLPatches = []string{
 			ADD COLUMN priority TINYINT SIGNED NOT NULL DEFAULT 1 comment 'positive promote, nagative unpromotes'
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			topology_recovery
 			ADD COLUMN acknowledged_at TIMESTAMP NULL after acknowledged,
 			ADD KEY acknowledged_idx (acknowledged, acknowledged_at)
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			blocked_topology_recovery
 			ADD KEY last_blocked_idx (last_blocked_timestamp)
 	`,
@@ -676,24 +732,24 @@ var generateSQLPatches = []string{
 			MODIFY last_suggested timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN last_attempted_check TIMESTAMP NOT NULL DEFAULT '1971-01-01 00:00:00' AFTER last_checked
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			MODIFY last_attempted_check TIMESTAMP NOT NULL DEFAULT '1971-01-01 00:00:00'
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance_analysis_changelog
 			ADD KEY instance_timestamp_idx (hostname, port, analysis_timestamp)
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			topology_recovery
-			ADD COLUMN last_detection_id bigint unsigned NOT NULL, 
+			ADD COLUMN last_detection_id bigint unsigned NOT NULL,
 			ADD KEY last_detection_idx (last_detection_id)
 	`,
 	`
@@ -709,9 +765,24 @@ var generateSQLPatches = []string{
 			ADD COLUMN version varchar(128) CHARACTER SET ascii NOT NULL
 	`,
 	`
-		ALTER TABLE 
+		ALTER TABLE
 			database_instance
 			ADD COLUMN gtid_purged text CHARACTER SET ascii NOT NULL AFTER executed_gtid_set
+	`,
+	`
+		ALTER TABLE
+			database_instance_coordinates_history
+			ADD COLUMN last_seen timestamp NOT NULL DEFAULT '1971-01-01 00:00:00' AFTER recorded_timestamp
+	`,
+	`
+		ALTER TABLE
+			access_token
+			ADD COLUMN is_reentrant TINYINT UNSIGNED NOT NULL default 0
+	`,
+	`
+		ALTER TABLE
+			access_token
+			ADD COLUMN acquired_at timestamp NOT NULL DEFAULT '1971-01-01 00:00:00'
 	`,
 }
 
@@ -783,10 +854,10 @@ func readInternalDeployments() (baseDeployments []string, patchDeployments []str
 		return baseDeployments, patchDeployments, nil
 	}
 	query := fmt.Sprintf(`
-		select 
-			deployment_type, 
-			sql_statement  
-		from 
+		select
+			deployment_type,
+			sql_statement
+		from
 			_orchestrator_db_deployment
 		order by
 			deployment_id
@@ -911,7 +982,7 @@ func deployIfNotAlreadyDeployed(db *sql.DB, queries []string, deployedQueries []
 			continue
 		}
 		if i == 0 {
-			log.Debugf("sql_mode is: %+v", originalSqlMode)
+			//log.Debugf("sql_mode is: %+v", originalSqlMode)
 		}
 		if config.Config.SmartOrchestratorDatabaseUpdate {
 			log.Debugf("initOrchestratorDB executing: %.80s", strings.TrimSpace(strings.Replace(query, "\n", "", -1)))

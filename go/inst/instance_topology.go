@@ -18,13 +18,14 @@ package inst
 
 import (
 	"fmt"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/math"
-	"github.com/outbrain/orchestrator/go/config"
 	"regexp"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/outbrain/golib/log"
+	"github.com/outbrain/golib/math"
+	"github.com/outbrain/orchestrator/go/config"
 )
 
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
@@ -57,17 +58,13 @@ func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*In
 	return result
 }
 
-// ASCIITopology returns a string representation of the topology of given instance.
-func ASCIITopology(instanceKey *InstanceKey, historyTimestampPattern string) (string, error) {
-	instance, found, err := ReadInstance(instanceKey)
-	if err != nil || !found {
-		return "", err
-	}
+// ASCIITopology returns a string representation of the topology of given cluster.
+func ASCIITopology(clusterName string, historyTimestampPattern string) (result string, err error) {
 	var instances [](*Instance)
 	if historyTimestampPattern == "" {
-		instances, err = ReadClusterInstances(instance.ClusterName)
+		instances, err = ReadClusterInstances(clusterName)
 	} else {
-		instances, err = ReadHistoryClusterInstances(instance.ClusterName, historyTimestampPattern)
+		instances, err = ReadHistoryClusterInstances(clusterName, historyTimestampPattern)
 	}
 	if err != nil {
 		return "", err
@@ -122,7 +119,7 @@ func ASCIITopology(instanceKey *InstanceKey, historyTimestampPattern string) (st
 		}
 	}
 	// Turn into string
-	result := strings.Join(entries, "\n")
+	result = strings.Join(entries, "\n")
 	return result, nil
 }
 
@@ -792,7 +789,7 @@ func RepointTo(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance), erro
 	return res, nil, errs
 }
 
-// RepointSlaves repoints slaves of a given instance (possibly filtered) onto another master.
+// RepointSlavesTo repoints slaves of a given instance (possibly filtered) onto another master.
 // Binlog Server is the major use case
 func RepointSlavesTo(instanceKey *InstanceKey, pattern string, belowKey *InstanceKey) ([](*Instance), error, []error) {
 	res := [](*Instance){}
@@ -1111,7 +1108,7 @@ Cleanup:
 		return instance, log.Errore(err)
 	}
 	// and we're done (pending deferred functions)
-	AuditOperation("repoint", instanceKey, fmt.Sprintf("slave %+v reattached to master $+v", *instanceKey, *reattachedMasterKey))
+	AuditOperation("repoint", instanceKey, fmt.Sprintf("slave %+v reattached to master %+v", *instanceKey, *reattachedMasterKey))
 
 	return instance, err
 }
@@ -1239,11 +1236,13 @@ Cleanup:
 
 // FindLastPseudoGTIDEntry will search an instance's binary logs or relay logs for the last pseudo-GTID entry,
 // and return found coordinates as well as entry text
-func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordinates BinlogCoordinates, maxBinlogCoordinates *BinlogCoordinates, exhaustiveSearch bool, expectedBinlogFormat *string) (*BinlogCoordinates, string, error) {
-	var instancePseudoGtidText string
-	var instancePseudoGtidCoordinates *BinlogCoordinates
-	var err error
+func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordinates BinlogCoordinates, maxBinlogCoordinates *BinlogCoordinates, exhaustiveSearch bool, expectedBinlogFormat *string) (instancePseudoGtidCoordinates *BinlogCoordinates, instancePseudoGtidText string, err error) {
 
+	if config.Config.PseudoGTIDPattern == "" {
+		return instancePseudoGtidCoordinates, instancePseudoGtidText, fmt.Errorf("PseudoGTIDPattern not configured; cannot use Pseudo-GTID")
+	}
+
+	minBinlogCoordinates, minRelaylogCoordinates, err := GetHeuristiclyRecentCoordinatesForInstance(&instance.Key)
 	if instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled && (expectedBinlogFormat == nil || instance.Binlog_format == *expectedBinlogFormat) {
 		// Well no need to search this instance's binary logs if it doesn't have any...
 		// With regard log-slave-updates, some edge cases are possible, like having this instance's log-slave-updates
@@ -1253,20 +1252,20 @@ func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordin
 		// for relay logs.
 		// Also, if master has STATEMENT binlog format, and the slave has ROW binlog format, then comparing binlog entries would urely fail if based on the slave's binary logs.
 		// Instead, we revert to the relay logs.
-		instancePseudoGtidCoordinates, instancePseudoGtidText, err = getLastPseudoGTIDEntryInInstance(instance, maxBinlogCoordinates, exhaustiveSearch)
+		instancePseudoGtidCoordinates, instancePseudoGtidText, err = getLastPseudoGTIDEntryInInstance(instance, minBinlogCoordinates, maxBinlogCoordinates, exhaustiveSearch)
 	}
 	if err != nil || instancePseudoGtidCoordinates == nil {
 		// Unable to find pseudo GTID in binary logs.
 		// Then MAYBE we are lucky enough (chances are we are, if this slave did not crash) that we can
 		// extract the Pseudo GTID entry from the last (current) relay log file.
-		instancePseudoGtidCoordinates, instancePseudoGtidText, err = getLastPseudoGTIDEntryInRelayLogs(instance, recordedInstanceRelayLogCoordinates, exhaustiveSearch)
+		instancePseudoGtidCoordinates, instancePseudoGtidText, err = getLastPseudoGTIDEntryInRelayLogs(instance, minRelaylogCoordinates, recordedInstanceRelayLogCoordinates, exhaustiveSearch)
 	}
 	return instancePseudoGtidCoordinates, instancePseudoGtidText, err
 }
 
-// CorrelateBinlogCoordinates
+// CorrelateBinlogCoordinates find out, if possible, the binlog coordinates of given otherInstance that correlate
+// with given coordinates of given instance.
 func CorrelateBinlogCoordinates(instance *Instance, binlogCoordinates *BinlogCoordinates, otherInstance *Instance) (*BinlogCoordinates, int, error) {
-
 	// We record the relay log coordinates just after the instance stopped since the coordinates can change upon
 	// a FLUSH LOGS/FLUSH RELAY LOGS (or a START SLAVE, though that's an altogether different problem) etc.
 	// We want to be on the safe side; we don't utterly trust that we are the only ones playing with the instance.
@@ -1277,7 +1276,8 @@ func CorrelateBinlogCoordinates(instance *Instance, binlogCoordinates *BinlogCoo
 		return nil, 0, err
 	}
 	entriesMonotonic := (config.Config.PseudoGTIDMonotonicHint != "") && strings.Contains(instancePseudoGtidText, config.Config.PseudoGTIDMonotonicHint)
-	otherInstancePseudoGtidCoordinates, err := SearchEntryInInstanceBinlogs(otherInstance, instancePseudoGtidText, entriesMonotonic)
+	minBinlogCoordinates, _, err := GetHeuristiclyRecentCoordinatesForInstance(&otherInstance.Key)
+	otherInstancePseudoGtidCoordinates, err := SearchEntryInInstanceBinlogs(otherInstance, instancePseudoGtidText, entriesMonotonic, minBinlogCoordinates)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1944,6 +1944,10 @@ func isValidAsCandidateMasterInBinlogServerTopology(slave *Instance) bool {
 }
 
 func isBannedFromBeingCandidateSlave(slave *Instance) bool {
+	if slave.PromotionRule == MustNotPromoteRule {
+		log.Debugf("instance %+v is banned because of promotion rule", slave.Key)
+		return true
+	}
 	for _, filter := range config.Config.PromotionIgnoreHostnameFilters {
 		if matched, _ := regexp.MatchString(filter, slave.Key.Hostname); matched {
 			return true
@@ -2033,8 +2037,7 @@ func GetCandidateSlaveOfBinlogServerTopology(masterKey *InstanceKey) (candidateS
 	return candidateSlave, err
 }
 
-// RegroupSlaves will choose a candidate slave of a given instance, and enslave its siblings using
-// either simple CHANGE MASTER TO, where possible, or pseudo-gtid
+// RegroupSlavesPseudoGTID will choose a candidate slave of a given instance, and enslave its siblings using pseudo-gtid
 func RegroupSlavesPseudoGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
 	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err := GetCandidateSlave(masterKey, true)
 	if err != nil {
@@ -2113,8 +2116,9 @@ func getMostUpToDateActiveBinlogServer(masterKey *InstanceKey) (mostAdvancedBinl
 	return mostAdvancedBinlogServer, binlogServerSlaves, err
 }
 
-// RegroupSlavesIncludingSubSlavesOfBinlogServers works in a mixed standard/binlog-server topology. This kind of topology shouldn't really exist,
-// but life is hard. To transition binlog servers into your topology you live sometimes with this hybrid solution.
+// RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers uses Pseugo-GTID to regroup slaves
+// of given instance. The function also drill in to slaves of binlog servers that are replicating from given instance,
+// and other recursive binlog servers, as long as they're in the same binlog-server-family.
 func RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
 	// First, handle binlog server issues:
 	func() error {

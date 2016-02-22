@@ -13,8 +13,14 @@ body {
     padding-top: 80px;
 }
 
-.navbar-brand {
-    padding: 4px 15px;
+.orchestrator-brand {
+    height: 32px;
+    margin-top: 9px;
+    padding: 0px 15px;
+}
+
+.orchestrator-brand img {
+    padding: 0px 8px;
 }
 
 .table {
@@ -126,6 +132,10 @@ body {
 
 .instance h3.label-warning .glyphicon {
     color: #ffffff;
+}
+
+.glyphicon.text-warning {
+    color: #f0ad4e;
 }
 
 .instance h3.label-danger {
@@ -490,6 +500,11 @@ body {
 #cluster_sidebar li .popover hr {
     margin-top: 8px;
     margin-bottom: 8px;
+}
+
+#cluster_sidebar li div.glyphicon {
+    font-size: 24px;
+    padding-right: 8px;
 }
 
 #cluster_sidebar li .popover pre {

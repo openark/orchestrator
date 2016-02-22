@@ -25,7 +25,7 @@ import (
 	"github.com/outbrain/orchestrator/go/inst"
 )
 
-// AttemptFailureDetectionRegistration tries to add a failure-detection entry; if this fails that means the problem has already been detected
+// WriteAsyncRequest
 func WriteAsyncRequest(asyncRequest *AsyncRequest) error {
 	if asyncRequest.OperatedInstanceKey == nil {
 		return log.Errorf("WriteAsyncRequest received asyncRequest.OperatedInstanceKey for command %+v", asyncRequest.Command)
@@ -57,17 +57,17 @@ func ReadPendingAsyncRequests(limit int) (res [](*AsyncRequest), err error) {
 		args = append(args, limit)
 	}
 	query := fmt.Sprintf(`
-		select 
+		select
 			request_id,
 			command,
 			hostname,
 			port,
 			destination_hostname,
 			destination_port,
-			pattern,    
+			pattern,
 			gtid_hint,
 			story
-		from 
+		from
 			async_request
 		where
 			begin_timestamp IS NULL
@@ -108,11 +108,11 @@ func BeginAsyncRequest(asyncRequest *AsyncRequest) (bool, error) {
 	sqlResult, err := db.ExecOrchestrator(`
 			update
 				async_request
-			set  
-				begin_timestamp = NOW()				
+			set
+				begin_timestamp = NOW()
 			where
 				request_id = ?
-				and begin_timestamp IS NULL 
+				and begin_timestamp IS NULL
 			`, asyncRequest.Id,
 	)
 	if err != nil {
@@ -128,11 +128,11 @@ func ExpireAsyncRequests() error {
 	_, err := db.ExecOrchestrator(`
 			update
 				async_request
-			set  
-				end_timestamp = NOW()				
+			set
+				end_timestamp = NOW()
 			where
 				end_timestamp IS NULL
-				and begin_timestamp < NOW() - INTERVAL ? MINUTE 
+				and begin_timestamp < NOW() - INTERVAL ? MINUTE
 			`, config.Config.MaintenanceExpireMinutes,
 	)
 	if err != nil {
@@ -143,7 +143,7 @@ func ExpireAsyncRequests() error {
 				async_request
 			where
 				end_timestamp IS NOT NULL
-				and begin_timestamp < NOW() - INTERVAL ? DAY 
+				and begin_timestamp < NOW() - INTERVAL ? DAY
 			`, config.Config.MaintenancePurgeDays,
 	)
 	return log.Errore(err)

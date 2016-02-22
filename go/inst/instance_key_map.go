@@ -61,19 +61,19 @@ func (this *InstanceKeyMap) MarshalJSON() ([]byte, error) {
 	return json.Marshal(this.GetInstanceKeys())
 }
 
-// MarshalJSON will marshal this map as JSON
+// ToJSON will marshal this map as JSON
 func (this *InstanceKeyMap) ToJSON() (string, error) {
 	bytes, err := this.MarshalJSON()
 	return string(bytes), err
 }
 
-// MarshalJSON will marshal this map as JSON
+// ToJSONString will marshal this map as JSON
 func (this *InstanceKeyMap) ToJSONString() string {
 	s, _ := this.ToJSON()
 	return s
 }
 
-// MarshalJSON will marshal this map as JSON
+// ToCommaDelimitedList will export this map in comma delimited format
 func (this *InstanceKeyMap) ToCommaDelimitedList() string {
 	keyDisplays := []string{}
 	for key := range *this {

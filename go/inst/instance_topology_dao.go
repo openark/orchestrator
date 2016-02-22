@@ -143,6 +143,36 @@ func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
+// GetSlaveRestartPreserveStatements returns a sequence of statements that make sure a slave is stopped
+// and then returned to the same state. For example, if the slave was fully running, this will issue
+// a STOP on both io_thread and sql_thread, followed by START on both. If one of them is not running
+// at the time this function is called, said thread will be neither stopped nor started.
+// The caller may provide an injected statememt, to be executed while the slave is stopped.
+// This is useful for CHANGE MASTER TO commands, that unfortunately must take place while the slave
+// is completely stopped.
+func GetSlaveRestartPreserveStatements(instanceKey *InstanceKey, injectedStatement string) (statements []string, err error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return statements, err
+	}
+	if instance.Slave_IO_Running {
+		statements = append(statements, SemicolonTerminated(`stop slave io_thread`))
+	}
+	if instance.Slave_SQL_Running {
+		statements = append(statements, SemicolonTerminated(`stop slave sql_thread`))
+	}
+	if injectedStatement != "" {
+		statements = append(statements, SemicolonTerminated(injectedStatement))
+	}
+	if instance.Slave_SQL_Running {
+		statements = append(statements, SemicolonTerminated(`start slave sql_thread`))
+	}
+	if instance.Slave_IO_Running {
+		statements = append(statements, SemicolonTerminated(`start slave io_thread`))
+	}
+	return statements, err
+}
+
 // FlushBinaryLogs attempts a 'FLUSH BINARY LOGS' statement on the given instance.
 func FlushBinaryLogs(instanceKey *InstanceKey, count int) (*Instance, error) {
 	if *config.RuntimeCLIFlags.Noop {

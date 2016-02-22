@@ -1,17 +1,17 @@
--- 
+--
 -- This is a suggestion for Pseudo-GTID injection and configuration.
 -- The Pseudo-GTID injected here is using both DDL & DML. This includes:
 -- - Generation of `meta` schema
 -- - Generation of `pseudo_gtid_status` table
 -- - Generation of `create_pseudo_gtid_event` event (executes every 5 second)
 -- - Enabling of event_scheduler (you will need to make sure you have "event_scheduler=1" in my.cnf)
--- 
+--
 -- replace "meta" with any other schema you prefer
 
 
 --
 --  The following to be added to orchestrator.conf.json
--- 
+--
 --  "PseudoGTIDPattern": "drop view if exists .*?`_pseudo_gtid_hint__",
 --  "PseudoGTIDMonotonicHint": "asc:",
 --  "DetectPseudoGTIDQuery": "select count(*) as pseudo_gtid_exists from meta.pseudo_gtid_status where anchor = 1 and time_generated > now() - interval 2 day",
@@ -44,8 +44,8 @@ create event if not exists
     begin
       DECLARE lock_result INT;
       DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
-    
-      SET lock_result = GET_LOCK('pseudo_gtid_status', 0); 
+
+      SET lock_result = GET_LOCK('pseudo_gtid_status', 0);
       IF lock_result = 1 THEN
         set @connection_id := connection_id();
         set @now := now();
@@ -64,22 +64,22 @@ create event if not exists
         set @port := @@port;
         set @pseudo_gtid := concat('pseudo-gtid://', @hostname, ':', @port, '/', @serverid, '/', date(@now), '/', time(@now), '/', @rand);
         insert into pseudo_gtid_status (
-             anchor, 
-             originating_mysql_host, 
-             originating_mysql_port, 
-             originating_server_id, 
-             time_generated, 
+             anchor,
+             originating_mysql_host,
+             originating_mysql_port,
+             originating_server_id,
+             time_generated,
              pseudo_gtid_uri,
              pseudo_gtid_hint
           )
       	  values (1, @hostname, @port, @serverid, @now, @pseudo_gtid, @pseudo_gtid_hint)
-      	  on duplicate key update 
-      		  originating_mysql_host = values(originating_mysql_host), 
-      		  originating_mysql_port = values(originating_mysql_port), 
-      		  originating_server_id = values(originating_server_id), 
-      		  time_generated = values(time_generated), 
+      	  on duplicate key update
+      		  originating_mysql_host = values(originating_mysql_host),
+      		  originating_mysql_port = values(originating_mysql_port),
+      		  originating_server_id = values(originating_server_id),
+      		  time_generated = values(time_generated),
        		  pseudo_gtid_uri = values(pseudo_gtid_uri),
-       		  pseudo_gtid_hint = values(pseudo_gtid_hint)	
+       		  pseudo_gtid_hint = values(pseudo_gtid_hint)
         ;
         SET lock_result = RELEASE_LOCK('pseudo_gtid_status');
       END IF;
@@ -89,4 +89,3 @@ $$
 delimiter ;
 
 set global event_scheduler := 1;
-
