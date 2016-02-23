@@ -690,7 +690,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(statement)
 			}
 		}
-		// Pool
+		// Instance
 	case registerCliCommand("set-read-only", "Instance", `Turn an instance read-only, via SET GLOBAL read_only := 1`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
@@ -833,6 +833,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("cluster-pool-instances", "Pools", `List all pools and their associated instances`):
 		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			log.Debugf("clusterName: %+v", clusterName)
 			clusterPoolInstances, err := inst.ReadAllClusterPoolInstances()
 			if err != nil {
 				log.Fatale(err)

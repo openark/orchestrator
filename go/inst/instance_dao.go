@@ -1025,20 +1025,70 @@ func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
 	return result, nil
 }
 
-// GetClusterHeuristicLag returns a heuristic lag for a cluster, based on its OSC slaves
-func GetClusterHeuristicLag(clusterName string) (int64, error) {
-	instances, err := GetClusterOSCSlaves(clusterName)
-	if err != nil {
-		return 0, err
-	}
+// GetInstancesMaxLag returns the maximum lag in a set of instances
+func GetInstancesMaxLag(instances [](*Instance)) int64 {
 	var maxLag int64
 	for _, clusterInstance := range instances {
 		if clusterInstance.SlaveLagSeconds.Valid && clusterInstance.SlaveLagSeconds.Int64 > maxLag {
 			maxLag = clusterInstance.SlaveLagSeconds.Int64
 		}
 	}
-	return maxLag, nil
+	return maxLag
+}
 
+// GetClusterHeuristicLag returns a heuristic lag for a cluster, based on its OSC slaves
+func GetClusterHeuristicLag(clusterName string) (int64, error) {
+	instances, err := GetClusterOSCSlaves(clusterName)
+	if err != nil {
+		return 0, err
+	}
+	return GetInstancesMaxLag(instances), nil
+}
+
+// GetHeuristicClusterPoolInstances returns instances of a cluster which are also pooled. If `pool` argument
+// is empty, all pools are considered, otherwise, only instances of given pool are considered.
+func GetHeuristicClusterPoolInstances(clusterName string, pool string) (result [](*Instance), err error) {
+	instances, err := ReadClusterInstances(clusterName)
+	if err != nil {
+		return result, err
+	}
+
+	pooledInstanceKeys := NewInstanceKeyMap()
+	clusterPoolInstances, err := ReadClusterPoolInstances(clusterName, pool)
+	if err != nil {
+		return result, err
+	}
+	for _, clusterPoolInstance := range clusterPoolInstances {
+		pooledInstanceKeys.AddKey(InstanceKey{Hostname: clusterPoolInstance.Hostname, Port: clusterPoolInstance.Port})
+	}
+
+	for _, instance := range instances {
+		skipThisHost := false
+		if instance.IsBinlogServer() {
+			skipThisHost = true
+		}
+		if !instance.IsLastCheckValid {
+			skipThisHost = true
+		}
+		if !pooledInstanceKeys.HasKey(instance.Key) {
+			skipThisHost = true
+		}
+		if !skipThisHost {
+			result = append(result, instance)
+		}
+	}
+
+	return result, err
+}
+
+// GetHeuristicClusterPoolInstancesLag returns a heuristic lag for the instances participating
+// in a cluster pool (or all the cluster's pools)
+func GetHeuristicClusterPoolInstancesLag(clusterName string, pool string) (int64, error) {
+	instances, err := GetHeuristicClusterPoolInstances(clusterName, pool)
+	if err != nil {
+		return 0, err
+	}
+	return GetInstancesMaxLag(instances), nil
 }
 
 // updateInstanceClusterName
@@ -1866,19 +1916,19 @@ func RecordInstanceBinlogFileHistory() error {
 	}
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	insert into
-        		database_instance_binlog_files_history (
+      	insert into
+      		database_instance_binlog_files_history (
 					hostname, port,	first_seen, last_seen, binary_log_file, binary_log_pos
 				)
-        	select
-        		hostname, port, last_seen, last_seen, binary_log_file, binary_log_pos
-			from
-				database_instance
-			where
-				binary_log_file != ''
-			on duplicate key update
-				last_seen = VALUES(last_seen),
-				binary_log_pos = VALUES(binary_log_pos)
+      	select
+      		hostname, port, last_seen, last_seen, binary_log_file, binary_log_pos
+				from
+					database_instance
+				where
+					binary_log_file != ''
+				on duplicate key update
+					last_seen = VALUES(last_seen),
+					binary_log_pos = VALUES(binary_log_pos)
 				`,
 		)
 		return log.Errore(err)
