@@ -861,6 +861,45 @@ func FindFuzzyInstances(fuzzyInstanceKey *InstanceKey) ([](*Instance), error) {
 	return readInstancesByCondition(condition, sqlutils.Args(fuzzyInstanceKey.Hostname, fuzzyInstanceKey.Port), `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
 }
 
+// ReadFuzzyInstanceKey accepts a fuzzy instance key and expects to return a single, fully qualified,
+// known instance key.
+func ReadFuzzyInstanceKey(fuzzyInstanceKey *InstanceKey) *InstanceKey {
+	if fuzzyInstanceKey == nil {
+		return nil
+	}
+	if fuzzyInstanceKey.Hostname != "" {
+		// Fuzzy instance search
+		if fuzzyInstances, _ := FindFuzzyInstances(fuzzyInstanceKey); len(fuzzyInstances) == 1 {
+			return &(fuzzyInstances[0].Key)
+		}
+	}
+	return nil
+}
+
+// ReadFuzzyInstanceKeyIfPossible accepts a fuzzy instance key and hopes to return a single, fully qualified,
+// known instance key, or else the original given key
+func ReadFuzzyInstanceKeyIfPossible(fuzzyInstanceKey *InstanceKey) *InstanceKey {
+	if instanceKey := ReadFuzzyInstanceKey(fuzzyInstanceKey); instanceKey != nil {
+		return instanceKey
+	}
+	return fuzzyInstanceKey
+}
+
+// ReadFuzzyInstance accepts a fuzzy instance key and expects to return a single instance.
+// Multiple instances matching the fuzzy keys are not allowed.
+func ReadFuzzyInstance(fuzzyInstanceKey *InstanceKey) (*Instance, error) {
+	if fuzzyInstanceKey == nil {
+		return nil, log.Errorf("ReadFuzzyInstance received nil input")
+	}
+	if fuzzyInstanceKey.Hostname != "" {
+		// Fuzzy instance search
+		if fuzzyInstances, _ := FindFuzzyInstances(fuzzyInstanceKey); len(fuzzyInstances) == 1 {
+			return fuzzyInstances[0], nil
+		}
+	}
+	return nil, log.Errorf("Cannot determine fuzzy instance %+v", *fuzzyInstanceKey)
+}
+
 // ReadClusterCandidateInstances reads cluster instances which are also marked as candidates
 func ReadClusterCandidateInstances(clusterName string) ([](*Instance), error) {
 	condition := `

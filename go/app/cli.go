@@ -83,7 +83,7 @@ func getClusterName(clusterAlias string, instanceKey *inst.InstanceKey) (cluster
 	}
 
 	// deduce cluster by instance
-	instanceKey = assignFuzzyInstanceKeyIfPossible(instanceKey)
+	instanceKey = inst.ReadFuzzyInstanceKeyIfPossible(instanceKey)
 	if instanceKey == nil {
 		instanceKey = assignThisInstanceKey()
 	}
@@ -104,20 +104,10 @@ func assignThisInstanceKey() *inst.InstanceKey {
 	return thisInstanceKey
 }
 
-func assignFuzzyInstanceKeyIfPossible(instanceKey *inst.InstanceKey) *inst.InstanceKey {
-	if instanceKey != nil && instanceKey.Hostname != "" {
-		// Fuzzy instance search
-		if fuzzyInstances, _ := inst.FindFuzzyInstances(instanceKey); len(fuzzyInstances) == 1 {
-			instanceKey = &fuzzyInstances[0].Key
-		}
-	}
-	return instanceKey
-}
-
 // Common code to deduce the instance's instanceKey if not defined.
 func deduceInstanceKeyIfNeeded(instance string, instanceKey *inst.InstanceKey, allowFuzzyMatch bool) *inst.InstanceKey {
 	if allowFuzzyMatch {
-		instanceKey = assignFuzzyInstanceKeyIfPossible(instanceKey)
+		instanceKey = inst.ReadFuzzyInstanceKeyIfPossible(instanceKey)
 	}
 	if instanceKey == nil {
 		instanceKey = assignThisInstanceKey()
@@ -179,7 +169,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	if err != nil {
 		destinationKey = nil
 	}
-	destinationKey = assignFuzzyInstanceKeyIfPossible(destinationKey)
+	destinationKey = inst.ReadFuzzyInstanceKeyIfPossible(destinationKey)
 
 	if hostname, err := os.Hostname(); err == nil {
 		thisInstanceKey = &inst.InstanceKey{Hostname: hostname, Port: int(config.Config.DefaultInstancePort)}
