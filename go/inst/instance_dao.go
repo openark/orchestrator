@@ -1026,14 +1026,16 @@ func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
 }
 
 // GetInstancesMaxLag returns the maximum lag in a set of instances
-func GetInstancesMaxLag(instances [](*Instance)) int64 {
-	var maxLag int64
+func GetInstancesMaxLag(instances [](*Instance)) (maxLag int64, err error) {
+	if len(instances) == 0 {
+		return 0, log.Errorf("No instances found in GetInstancesMaxLag")
+	}
 	for _, clusterInstance := range instances {
 		if clusterInstance.SlaveLagSeconds.Valid && clusterInstance.SlaveLagSeconds.Int64 > maxLag {
 			maxLag = clusterInstance.SlaveLagSeconds.Int64
 		}
 	}
-	return maxLag
+	return maxLag, nil
 }
 
 // GetClusterHeuristicLag returns a heuristic lag for a cluster, based on its OSC slaves
@@ -1042,7 +1044,7 @@ func GetClusterHeuristicLag(clusterName string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return GetInstancesMaxLag(instances), nil
+	return GetInstancesMaxLag(instances)
 }
 
 // GetHeuristicClusterPoolInstances returns instances of a cluster which are also pooled. If `pool` argument
@@ -1088,7 +1090,7 @@ func GetHeuristicClusterPoolInstancesLag(clusterName string, pool string) (int64
 	if err != nil {
 		return 0, err
 	}
-	return GetInstancesMaxLag(instances), nil
+	return GetInstancesMaxLag(instances)
 }
 
 // updateInstanceClusterName
