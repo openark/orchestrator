@@ -40,6 +40,7 @@ func ApplyPoolInstances(pool string, instancesList string) error {
 		for _, instanceString := range instancesStrings {
 
 			instanceKey, err := ParseInstanceKeyLoose(instanceString)
+			instanceKey = ReadFuzzyInstanceKeyIfPossible(instanceKey)
 			log.Debugf("%+v", instanceKey)
 			if err != nil {
 				return log.Errore(err)

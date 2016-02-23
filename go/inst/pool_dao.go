@@ -60,9 +60,9 @@ func ReadClusterPoolInstances(clusterName string) (*PoolInstancesMap, error) {
 	var poolInstancesMap = make(PoolInstancesMap)
 
 	query := `
-		select 
+		select
 			database_instance_pool.*
-		from 
+		from
 			database_instance
 			join database_instance_pool using (hostname, port)
 		where
@@ -90,11 +90,11 @@ func ReadClusterPoolInstances(clusterName string) (*PoolInstancesMap, error) {
 func ReadAllClusterPoolInstances() ([](*ClusterPoolInstance), error) {
 	var result [](*ClusterPoolInstance) = [](*ClusterPoolInstance){}
 	query := `
-		select 
+		select
 			cluster_name,
 			ifnull(alias, cluster_name) as alias,
 			database_instance_pool.*
-		from 
+		from
 			database_instance
 			join database_instance_pool using (hostname, port)
 			left join cluster_alias using (cluster_name)
