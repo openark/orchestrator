@@ -144,6 +144,13 @@ func validateInstanceIsFound(instanceKey *inst.InstanceKey) (instance *inst.Inst
 func CliWrapper(command string, strict bool, instances string, destination string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string, hostnameFlag string) {
 	r := regexp.MustCompile(`[ ,\r\n\t]+`)
 	tokens := r.Split(instances, -1)
+	switch command {
+	case "submit-pool-instances":
+		{
+			// These commands unsplit the tokens (they expect a comma delimited list of instances)
+			tokens = []string{instances}
+		}
+	}
 	for _, instance := range tokens {
 		if instance != "" || len(tokens) == 1 {
 			Cli(command, strict, instance, destination, owner, reason, duration, pattern, clusterAlias, pool, hostnameFlag)
