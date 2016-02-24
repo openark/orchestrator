@@ -230,6 +230,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 				instance.DataCenter = match[1]
 			}
 		}
+		// This can be overriden by later invocation of DetectDataCenterQuery
 	}
 	if config.Config.PhysicalEnvironmentPattern != "" {
 		if pattern, err := regexp.Compile(config.Config.PhysicalEnvironmentPattern); err == nil {
@@ -238,6 +239,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 				instance.PhysicalEnvironment = match[1]
 			}
 		}
+		// This can be overriden by later invocation of DetectPhysicalEnvironmentQuery
 	}
 
 	err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
@@ -420,6 +422,17 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			logReadTopologyInstanceError(instanceKey, "SlaveLagQuery", err)
 		}
 	}
+
+	if config.Config.DetectDataCenterQuery != "" && !isMaxScale {
+		err := db.QueryRow(config.Config.DetectDataCenterQuery).Scan(&instance.DataCenter)
+		logReadTopologyInstanceError(instanceKey, "DetectDataCenterQuery", err)
+	}
+
+	if config.Config.DetectPhysicalEnvironmentQuery != "" && !isMaxScale {
+		err := db.QueryRow(config.Config.DetectPhysicalEnvironmentQuery).Scan(&instance.PhysicalEnvironment)
+		logReadTopologyInstanceError(instanceKey, "DetectPhysicalEnvironmentQuery", err)
+	}
+
 	{
 		err = ReadInstanceClusterAttributes(instance)
 		logReadTopologyInstanceError(instanceKey, "ReadInstanceClusterAttributes", err)
