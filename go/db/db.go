@@ -784,6 +784,11 @@ var generateSQLPatches = []string{
 			access_token
 			ADD COLUMN acquired_at timestamp NOT NULL DEFAULT '1971-01-01 00:00:00'
 	`,
+	`
+		ALTER TABLE
+			database_instance_pool
+			ADD COLUMN registered_at timestamp NOT NULL DEFAULT '1971-01-01 00:00:00'
+	`,
 }
 
 // Track if a TLS has already been configured for topology

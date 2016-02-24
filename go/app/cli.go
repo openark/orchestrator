@@ -83,7 +83,7 @@ func getClusterName(clusterAlias string, instanceKey *inst.InstanceKey) (cluster
 	}
 
 	// deduce cluster by instance
-	instanceKey = assignFuzzyInstanceKeyIfPossible(instanceKey)
+	instanceKey = inst.ReadFuzzyInstanceKeyIfPossible(instanceKey)
 	if instanceKey == nil {
 		instanceKey = assignThisInstanceKey()
 	}
@@ -104,20 +104,10 @@ func assignThisInstanceKey() *inst.InstanceKey {
 	return thisInstanceKey
 }
 
-func assignFuzzyInstanceKeyIfPossible(instanceKey *inst.InstanceKey) *inst.InstanceKey {
-	if instanceKey != nil && instanceKey.Hostname != "" {
-		// Fuzzy instance search
-		if fuzzyInstances, _ := inst.FindFuzzyInstances(instanceKey); len(fuzzyInstances) == 1 {
-			instanceKey = &fuzzyInstances[0].Key
-		}
-	}
-	return instanceKey
-}
-
 // Common code to deduce the instance's instanceKey if not defined.
 func deduceInstanceKeyIfNeeded(instance string, instanceKey *inst.InstanceKey, allowFuzzyMatch bool) *inst.InstanceKey {
 	if allowFuzzyMatch {
-		instanceKey = assignFuzzyInstanceKeyIfPossible(instanceKey)
+		instanceKey = inst.ReadFuzzyInstanceKeyIfPossible(instanceKey)
 	}
 	if instanceKey == nil {
 		instanceKey = assignThisInstanceKey()
@@ -144,6 +134,13 @@ func validateInstanceIsFound(instanceKey *inst.InstanceKey) (instance *inst.Inst
 func CliWrapper(command string, strict bool, instances string, destination string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string, hostnameFlag string) {
 	r := regexp.MustCompile(`[ ,\r\n\t]+`)
 	tokens := r.Split(instances, -1)
+	switch command {
+	case "submit-pool-instances":
+		{
+			// These commands unsplit the tokens (they expect a comma delimited list of instances)
+			tokens = []string{instances}
+		}
+	}
 	for _, instance := range tokens {
 		if instance != "" || len(tokens) == 1 {
 			Cli(command, strict, instance, destination, owner, reason, duration, pattern, clusterAlias, pool, hostnameFlag)
@@ -172,7 +169,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	if err != nil {
 		destinationKey = nil
 	}
-	destinationKey = assignFuzzyInstanceKeyIfPossible(destinationKey)
+	destinationKey = inst.ReadFuzzyInstanceKeyIfPossible(destinationKey)
 
 	if hostname, err := os.Hostname(); err == nil {
 		thisInstanceKey = &inst.InstanceKey{Hostname: hostname, Port: int(config.Config.DefaultInstancePort)}
@@ -693,7 +690,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(statement)
 			}
 		}
-		// Pool
+		// Instance
 	case registerCliCommand("set-read-only", "Instance", `Turn an instance read-only, via SET GLOBAL read_only := 1`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
@@ -836,6 +833,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("cluster-pool-instances", "Pools", `List all pools and their associated instances`):
 		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			log.Debugf("clusterName: %+v", clusterName)
 			clusterPoolInstances, err := inst.ReadAllClusterPoolInstances()
 			if err != nil {
 				log.Fatale(err)

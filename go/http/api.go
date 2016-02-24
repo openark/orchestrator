@@ -1390,20 +1390,65 @@ func (this *HttpAPI) SubmitPoolInstances(params martini.Params, r render.Render,
 }
 
 // SubmitPoolHostnames (re-)applies the list of hostnames for a given pool
-func (this *HttpAPI) ReadClusterPoolInstances(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpAPI) ReadClusterPoolInstancesMap(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
 	clusterName := params["clusterName"]
+	pool := params["pool"]
 
-	poolInstancesMap, err := inst.ReadClusterPoolInstances(clusterName)
+	poolInstancesMap, err := inst.ReadClusterPoolInstancesMap(clusterName, pool)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Read pool instances for cluster %s", clusterName), Details: poolInstancesMap})
+}
+
+// GetHeuristicClusterPoolInstances returns instances belonging to a cluster's pool
+func (this *HttpAPI) GetHeuristicClusterPoolInstances(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	clusterName, err := inst.ReadClusterByAlias(params["clusterName"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	pool := params["pool"]
+
+	instances, err := inst.GetHeuristicClusterPoolInstances(clusterName, pool)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Heuristic pool instances for cluster %s", clusterName), Details: instances})
+}
+
+// GetHeuristicClusterPoolInstances returns instances belonging to a cluster's pool
+func (this *HttpAPI) GetHeuristicClusterPoolInstancesLag(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	clusterName, err := inst.ReadClusterByAlias(params["clusterName"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	pool := params["pool"]
+
+	lag, err := inst.GetHeuristicClusterPoolInstancesLag(clusterName, pool)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Heuristic pool lag for cluster %s", clusterName), Details: lag})
 }
 
 // ReloadClusterAlias clears in-memory hostname resovle cache
@@ -2016,14 +2061,14 @@ func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r rende
 		return
 	}
 
-	var err error
 	clusterName := params["clusterName"]
 	if params["clusterAlias"] != "" {
+		var err error
 		clusterName, err = inst.GetClusterByAlias(params["clusterAlias"])
-	}
-	if err != nil {
-		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
-		return
+		if err != nil {
+			r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+			return
+		}
 	}
 
 	comment := req.URL.Query().Get("comment")
@@ -2178,7 +2223,12 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 
 	// Pools:
 	m.Get("/api/submit-pool-instances/:pool", this.SubmitPoolInstances)
-	m.Get("/api/cluster-pool-instances/:clusterName", this.ReadClusterPoolInstances)
+	m.Get("/api/cluster-pool-instances/:clusterName", this.ReadClusterPoolInstancesMap)
+	m.Get("/api/cluster-pool-instances/:clusterName/:pool", this.ReadClusterPoolInstancesMap)
+	m.Get("/api/heuristic-cluster-pool-instances/:clusterName", this.GetHeuristicClusterPoolInstances)
+	m.Get("/api/heuristic-cluster-pool-instances/:clusterName/:pool", this.GetHeuristicClusterPoolInstances)
+	m.Get("/api/heuristic-cluster-pool-lag/:clusterName", this.GetHeuristicClusterPoolInstancesLag)
+	m.Get("/api/heuristic-cluster-pool-lag/:clusterName/:pool", this.GetHeuristicClusterPoolInstancesLag)
 
 	// Information:
 	m.Get("/api/search/:searchString", this.Search)

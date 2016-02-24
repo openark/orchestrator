@@ -17,8 +17,11 @@
 package inst
 
 import (
-	"github.com/outbrain/golib/log"
 	"strings"
+
+	"github.com/outbrain/orchestrator/go/config"
+
+	"github.com/outbrain/golib/log"
 )
 
 // PoolInstancesMap lists instance keys per pool name
@@ -40,6 +43,9 @@ func ApplyPoolInstances(pool string, instancesList string) error {
 		for _, instanceString := range instancesStrings {
 
 			instanceKey, err := ParseInstanceKeyLoose(instanceString)
+			if config.Config.SupportFuzzyPoolHostnames {
+				instanceKey = ReadFuzzyInstanceKeyIfPossible(instanceKey)
+			}
 			log.Debugf("%+v", instanceKey)
 			if err != nil {
 				return log.Errore(err)

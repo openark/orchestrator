@@ -47,6 +47,12 @@ func (this *InstanceKeyMap) AddInstances(instances [](*Instance)) {
 	}
 }
 
+// HasKey checks if given key is within the map
+func (this *InstanceKeyMap) HasKey(key InstanceKey) bool {
+	_, ok := (*this)[key]
+	return ok
+}
+
 // GetInstanceKeys returns keys in this map in the form of an array
 func (this *InstanceKeyMap) GetInstanceKeys() []InstanceKey {
 	res := []InstanceKey{}

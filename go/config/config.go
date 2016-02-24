@@ -105,6 +105,7 @@ type Configuration struct {
 	DetectClusterDomainQuery                     string            // Optional query (executed on topology instance) that returns the VIP/CNAME/Alias/whatever domain name for the master of this cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all slaves). If provided, must return one row, one column
 	DataCenterPattern                            string            // Regexp pattern with one group, extracting the datacenter name from the hostname
 	PhysicalEnvironmentPattern                   string            // Regexp pattern with one group, extracting physical environment info from hostname (e.g. combination of datacenter & prod/dev env)
+	SupportFuzzyPoolHostnames                    bool              // Should "submit-pool-instances" command be able to pass list of fuzzy instances (fuzzy means non-fqdn, but unique enough to recognize). Defaults 'true', implies more queries on backend db
 	PromotionIgnoreHostnameFilters               []string          // Orchestrator will not promote slaves with hostname matching pattern (via -c recovery; for example, avoid promoting dev-dedicated machines)
 	ServeAgentsHttp                              bool              // Spawn another HTTP interface dedicated for orcehstrator-agent
 	AgentsUseSSL                                 bool              // When "true" orchestrator will listen on agents port with SSL as well as connect to agents via SSL
@@ -232,6 +233,7 @@ func newConfiguration() *Configuration {
 		DetectClusterDomainQuery:                     "",
 		DataCenterPattern:                            "",
 		PhysicalEnvironmentPattern:                   "",
+		SupportFuzzyPoolHostnames:                    true,
 		PromotionIgnoreHostnameFilters:               []string{},
 		ServeAgentsHttp:                              false,
 		AgentsUseSSL:                                 false,
