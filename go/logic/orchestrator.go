@@ -49,7 +49,7 @@ var isElectedGauge = metrics.NewGauge()
 
 var isElectedNode = false
 
-var recentDiscoveryOperationKeys = cache.New(time.Duration(math.MaxInt(int(config.Config.InstancePollSeconds-2), 1))*time.Second, time.Second)
+var recentDiscoveryOperationKeys *cache.Cache
 
 func init() {
 	isElectedNode = false
@@ -61,7 +61,12 @@ func init() {
 	metrics.Register("elect.is_elected", isElectedGauge)
 
 	ometrics.OnGraphiteTick(func() { discoveryQueueLengthGauge.Update(int64(len(discoveryInstanceKeys))) })
-	ometrics.OnGraphiteTick(func() { discoveryRecentCountGauge.Update(int64(recentDiscoveryOperationKeys.ItemCount())) })
+	ometrics.OnGraphiteTick(func() {
+		if recentDiscoveryOperationKeys == nil {
+			return
+		}
+		discoveryRecentCountGauge.Update(int64(recentDiscoveryOperationKeys.ItemCount()))
+	})
 	ometrics.OnGraphiteTick(func() { isElectedGauge.Update(int64(math.TernaryInt(isElectedNode, 1, 0))) })
 }
 
@@ -153,6 +158,8 @@ func ContinuousDiscovery() {
 	}
 
 	log.Infof("Starting continuous discovery")
+	recentDiscoveryOperationKeys = cache.New(time.Duration(math.MaxInt(int(config.Config.InstancePollSeconds-2), 1))*time.Second, time.Second)
+
 	inst.LoadHostnameResolveCache()
 	go handleDiscoveryRequests()
 
