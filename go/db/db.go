@@ -499,6 +499,14 @@ var generateSQLBase = []string{
 		  KEY current_seen_idx (current_seen)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS orchestrator_metadata (
+		  anchor tinyint unsigned NOT NULL,
+		  last_deployed_version varchar(128) CHARACTER SET ascii NOT NULL,
+		  last_deployed_timestamp timestamp NOT NULL,
+		  PRIMARY KEY (anchor)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{
@@ -927,6 +935,36 @@ func ResetInternalDeployment() error {
 	return nil
 }
 
+// readOrchestratorMetadata reads the orchestrator_metadata table
+func readOrchestratorMetadata(db *sql.DB) (lastDeployedVersion string, err error) {
+	query := `
+		select
+			ifnull(max(last_deployed_version), '') as last_deployed_version
+		from
+			orchestrator_metadata
+		where
+			anchor=1
+		`
+	err = db.QueryRow(query).Scan(&lastDeployedVersion)
+	return lastDeployedVersion, err
+}
+
+// writeOrchestratorMetadata updates the orchestrator_metadata table upon successful deployment
+func writeOrchestratorMetadata(db *sql.DB) error {
+	query := `
+    	replace into orchestrator_metadata (
+				anchor, last_deployed_version, last_deployed_timestamp
+			) values (
+				1, ?, NOW()
+			)
+				`
+	if _, err := execInternal(db, query, config.RuntimeCLIFlags.ConfiguredVersion); err != nil {
+		log.Fatalf("Unable to write to orchestrator_metadata: %+v", err)
+	}
+	log.Debugf("Migrated database schema to version %+v", config.RuntimeCLIFlags.ConfiguredVersion)
+	return nil
+}
+
 // Create a TLS configuration from the config supplied CA, Certificate, and Private key.
 // Register the TLS config with the mysql drivers as the "orchestrator" config
 // Modify the supplied URI to call the TLS config
@@ -1017,10 +1055,15 @@ func deployIfNotAlreadyDeployed(db *sql.DB, queries []string, deployedQueries []
 func initOrchestratorDB(db *sql.DB) error {
 	log.Debug("Initializing orchestrator")
 
+	version, err := readOrchestratorMetadata(db)
+	if version == config.RuntimeCLIFlags.ConfiguredVersion && version != "" && err == nil {
+		// Already deployed with this version
+		return nil
+	}
 	baseDeployments, patchDeployments, _ := readInternalDeployments()
 	deployIfNotAlreadyDeployed(db, generateSQLBase, baseDeployments, "base", true)
 	deployIfNotAlreadyDeployed(db, generateSQLPatches, patchDeployments, "patch", false)
-
+	writeOrchestratorMetadata(db)
 	return nil
 }
 
