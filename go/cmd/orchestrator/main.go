@@ -503,6 +503,25 @@ Cheatsheet:
 
             orchestrator -c cluster-pool-instances
 
+				which-heuristic-cluster-pool-instances
+						List instances belonging to a cluster, which are also in some pool or in a specific given pool.
+						Not all instances are listed: unreachable, downtimed instances ar left out. Only those that should be
+						responsive and healthy are listed. This serves applications in getting information about instances
+						that could be queried (this complements a proxy behavior in providing the *list* of instances).
+						Examples:
+
+						orchestrator -c which-heuristic-cluster-pool-instances --alias mycluster
+								Get the instances of a specific cluster, no specific pool
+
+						orchestrator -c which-heuristic-cluster-pool-instances --alias mycluster --pool some_pool
+								Get the instances of a specific cluster and which belong to a given pool
+
+						orchestrator -c which-heuristic-cluster-pool-instances -i instance.belonging.to.a.cluster
+								Cluster inferred by given instance
+
+						orchestrator -c which-heuristic-cluster-pool-instances
+								Cluster inferred by local hostname
+
     Information commands
         These commands provide/store information about topologies, replication connections, or otherwise orchstrator's
         "inventory".
