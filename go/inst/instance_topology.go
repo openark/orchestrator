@@ -881,9 +881,27 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 
 	// the coMaster used to be merely a slave. Just point master into *some* position
 	// within coMaster...
-	master, err = StopSlave(&master.Key)
-	if err != nil {
-		goto Cleanup
+	if master.IsSlave() {
+		// this is the case of a co-master. For masters, the StopSlave operation throws an error, and
+		// there's really no point in doing it.
+		master, err = StopSlave(&master.Key)
+		if err != nil {
+			goto Cleanup
+		}
+	}
+	if instance.ReplicationCredentialsAvailable && !master.HasReplicationCredentials {
+		// Yay! We can get credentials from the slave!
+		log.Debugf(".....potential for getting credentials from slave!")
+		replicationUser, replicationPassword, err := ReadReplicationCredentials(&instance.Key)
+		if err != nil {
+			goto Cleanup
+		}
+		log.Debugf(".....got credentials! will now apply")
+		_, err = ChangeMasterCredentials(&master.Key, replicationUser, replicationPassword)
+		if err != nil {
+			goto Cleanup
+		}
+		log.Debugf(".....we're good!")
 	}
 	master, err = ChangeMasterTo(&master.Key, instanceKey, &instance.SelfBinlogCoordinates, false, GTIDHintNeutral)
 	if err != nil {

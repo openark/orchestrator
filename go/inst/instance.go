@@ -69,14 +69,16 @@ type Instance struct {
 	ExecutedGtidSet        string
 	GtidPurged             string
 
-	SlaveLagSeconds       sql.NullInt64
-	SlaveHosts            InstanceKeyMap
-	ClusterName           string
-	SuggestedClusterAlias string
-	DataCenter            string
-	PhysicalEnvironment   string
-	ReplicationDepth      uint
-	IsCoMaster            bool
+	SlaveLagSeconds                 sql.NullInt64
+	SlaveHosts                      InstanceKeyMap
+	ClusterName                     string
+	SuggestedClusterAlias           string
+	DataCenter                      string
+	PhysicalEnvironment             string
+	ReplicationDepth                uint
+	IsCoMaster                      bool
+	HasReplicationCredentials       bool
+	ReplicationCredentialsAvailable bool
 
 	LastSeenTimestamp    string
 	IsLastCheckValid     bool

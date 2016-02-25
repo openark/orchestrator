@@ -143,10 +143,14 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	// Investigate slaves:
 	for _, slaveKey := range instance.SlaveHosts.GetInstanceKeys() {
 		slaveKey := slaveKey
-		discoveryInstanceKeys <- slaveKey
+		if slaveKey.IsValid() {
+			discoveryInstanceKeys <- slaveKey
+		}
 	}
 	// Investigate master:
-	discoveryInstanceKeys <- instance.MasterKey
+	if instance.MasterKey.IsValid() {
+		discoveryInstanceKeys <- instance.MasterKey
+	}
 }
 
 // ContinuousDiscovery starts an asynchronuous infinite discovery process where instances are
@@ -158,7 +162,7 @@ func ContinuousDiscovery() {
 	}
 
 	log.Infof("Starting continuous discovery")
-	recentDiscoveryOperationKeys = cache.New(time.Duration(math.MaxInt(int(config.Config.InstancePollSeconds-2), 1))*time.Second, time.Second)
+	recentDiscoveryOperationKeys = cache.New(time.Duration(config.Config.DiscoveryPollSeconds)*time.Second, time.Second)
 
 	inst.LoadHostnameResolveCache()
 	go handleDiscoveryRequests()
@@ -188,7 +192,12 @@ func ContinuousDiscovery() {
 					log.Debugf("outdated keys: %+v", instanceKeys)
 					for _, instanceKey := range instanceKeys {
 						instanceKey := instanceKey
-						go func() { discoveryInstanceKeys <- instanceKey }()
+
+						go func() {
+							if instanceKey.IsValid() {
+								discoveryInstanceKeys <- instanceKey
+							}
+						}()
 					}
 					if !wasAlreadyElected {
 						// Just turned to be leader!

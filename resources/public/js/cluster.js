@@ -384,6 +384,20 @@ function Cluster() {
           accept: false
         };
       }
+      if (instanceIsChild(droppableNode, node) && node.isMaster && !node.isCoMaster) {
+        if (node.hasProblem) {
+          return {
+            accept: false
+          };
+        }
+        if (shouldApply) {
+          makeCoMaster(node, droppableNode);
+        }
+        return {
+          accept: "ok",
+          type: "makeCoMaster with " + droppableTitle
+        };
+      }
       if (instanceIsDescendant(droppableNode, node)) {
         // Wrong direction!
         return {
@@ -447,6 +461,20 @@ function Cluster() {
           accept: false
         };
       }
+      if (instanceIsChild(droppableNode, node) && node.isMaster && !node.isCoMaster) {
+        if (node.hasProblem) {
+          return {
+            accept: false
+          };
+        }
+        if (shouldApply) {
+          makeCoMaster(node, droppableNode);
+        }
+        return {
+          accept: "ok",
+          type: "makeCoMaster with " + droppableTitle
+        };
+      }
       if (instanceIsDescendant(droppableNode, node)) {
         // Wrong direction!
         return {
@@ -496,7 +524,7 @@ function Cluster() {
         };
       }
       if (instanceIsChild(droppableNode, node) && node.isCoMaster) {
-        // We may allow a co-master to change its othe rco-master under some conditions,
+        // We may allow a co-master to change its other co-master under some conditions,
         // see MakeCoMaster() in instance_topology.go
         if (!droppableNode.ReadOnly) {
           return {
@@ -578,7 +606,7 @@ function Cluster() {
           type: "enslaveMaster " + droppableTitle
         };
       }
-      if (instanceIsChild(droppableNode, node) && node.isMaster) {
+      if (instanceIsChild(droppableNode, node) && node.isMaster && !node.isCoMaster) {
         if (node.hasProblem) {
           return {
             accept: false
