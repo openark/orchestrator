@@ -946,6 +946,7 @@ func main() {
 	if config.Config.AuditToSyslog {
 		inst.EnableAuditSyslog()
 	}
+	config.RuntimeCLIFlags.ConfiguredVersion = AppVersion
 
 	if len(flag.Args()) == 0 && *command == "" {
 		// No command, no argument: just prompt

@@ -27,6 +27,7 @@ type CLIFlags struct {
 	Version            *bool
 	Statement          *string
 	PromotionRule      *string
+	ConfiguredVersion  string
 }
 
 var RuntimeCLIFlags CLIFlags
