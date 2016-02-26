@@ -384,6 +384,20 @@ function Cluster() {
           accept: false
         };
       }
+      if (instanceIsChild(droppableNode, node) && node.isMaster && !node.isCoMaster) {
+        if (node.hasProblem) {
+          return {
+            accept: false
+          };
+        }
+        if (shouldApply) {
+          makeCoMaster(node, droppableNode);
+        }
+        return {
+          accept: "ok",
+          type: "makeCoMaster with " + droppableTitle
+        };
+      }
       if (instanceIsDescendant(droppableNode, node)) {
         // Wrong direction!
         return {
@@ -447,6 +461,20 @@ function Cluster() {
           accept: false
         };
       }
+      if (instanceIsChild(droppableNode, node) && node.isMaster && !node.isCoMaster) {
+        if (node.hasProblem) {
+          return {
+            accept: false
+          };
+        }
+        if (shouldApply) {
+          makeCoMaster(node, droppableNode);
+        }
+        return {
+          accept: "ok",
+          type: "makeCoMaster with " + droppableTitle
+        };
+      }
       if (instanceIsDescendant(droppableNode, node)) {
         // Wrong direction!
         return {
@@ -496,7 +524,7 @@ function Cluster() {
         };
       }
       if (instanceIsChild(droppableNode, node) && node.isCoMaster) {
-        // We may allow a co-master to change its othe rco-master under some conditions,
+        // We may allow a co-master to change its other co-master under some conditions,
         // see MakeCoMaster() in instance_topology.go
         if (!droppableNode.ReadOnly) {
           return {
@@ -578,7 +606,7 @@ function Cluster() {
           type: "enslaveMaster " + droppableTitle
         };
       }
-      if (instanceIsChild(droppableNode, node) && node.isMaster) {
+      if (instanceIsChild(droppableNode, node) && node.isMaster && !node.isCoMaster) {
         if (node.hasProblem) {
           return {
             accept: false
@@ -1354,7 +1382,7 @@ function Cluster() {
     if (!instance.isMaster) {
       recoveryListing.append('<li><a href="#" data-btn="match-up-slaves" data-command="match-up-slaves">Match up slaves to <code>' + instance.masterTitle + '</code></a></li>');
     }
-    if (instance.children.length > 1) {
+    if (instance.children && instance.children.length > 1) {
       recoveryListing.append('<li><a href="#" data-btn="regroup-slaves" data-command="regroup-slaves">Regroup slaves (auto pick best slave, only heals topology, no external processes)</a></li>');
     }
     if (instance.isMaster) {

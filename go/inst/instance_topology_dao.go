@@ -444,6 +444,37 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 	return instance, err
 }
 
+// ChangeMasterCredentials issues a CHANGE MASTER TO... MASTER_USER=, MASTER_PASSWORD=...
+func ChangeMasterCredentials(instanceKey *InstanceKey, masterUser string, masterPassword string) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	if masterUser == "" {
+		return instance, log.Errorf("Empty user in ChangeMasterCredentials() for %+v", *instanceKey)
+	}
+
+	if instance.SlaveRunning() {
+		return instance, fmt.Errorf("ChangeMasterTo: Cannot change master on: %+v because slave is running", *instanceKey)
+	}
+	log.Debugf("ChangeMasterTo: will attempt changing master credentials on %+v", *instanceKey)
+
+	if *config.RuntimeCLIFlags.Noop {
+		return instance, fmt.Errorf("noop: aborting CHANGE MASTER TO operation on %+v; signalling error but nothing went wrong.", *instanceKey)
+	}
+	_, err = ExecInstanceNoPrepare(instanceKey, fmt.Sprintf("change master to master_user='%s', master_password='%s'",
+		masterUser, masterPassword))
+
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	log.Infof("ChangeMasterTo: Changed master credentials on %+v", *instanceKey)
+
+	instance, err = ReadTopologyInstance(instanceKey)
+	return instance, err
+}
+
 // ChangeMasterTo changes the given instance's master according to given input.
 func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinlogCoordinates *BinlogCoordinates, skipUnresolve bool, gtidHint OperationGTIDHint) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -760,6 +791,25 @@ func MasterPosWait(instanceKey *InstanceKey, binlogCoordinates *BinlogCoordinate
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
+}
+
+// Attempt to read and return replication credentials from the mysql.slave_master_info system table
+func ReadReplicationCredentials(instanceKey *InstanceKey) (replicationUser string, replicationPassword string, err error) {
+	query := `
+		select
+			ifnull(max(User_name), '') as user,
+			ifnull(max(User_password), '') as password
+		from
+			mysql.slave_master_info
+	`
+	err = ScanInstanceRow(instanceKey, query, &replicationUser, &replicationPassword)
+	if err != nil {
+		return replicationUser, replicationPassword, err
+	}
+	if replicationUser == "" {
+		err = fmt.Errorf("Cannot find credentials in mysql.slave_master_info")
+	}
+	return replicationUser, replicationPassword, err
 }
 
 // SetReadOnly sets or clears the instance's global read_only variable
