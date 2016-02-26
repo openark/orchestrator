@@ -105,7 +105,6 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
-
 	if err != nil {
 		goto Cleanup
 	}
@@ -169,6 +168,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			db.QueryRow("select @@global.server_uuid").Scan(&instance.ServerUUID)
 		}
 	}
+
 	if !isMaxScale {
 		var mysqlHostname, mysqlReportHost string
 		err = db.QueryRow("select @@global.hostname, ifnull(@@global.report_host, ''), @@global.server_id, @@global.version, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
@@ -192,11 +192,15 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		}
 
 		if instance.IsOracleMySQL() && !instance.IsSmallerMajorVersionByString("5.6") {
+			var masterInfoRepositoryOnTable bool
 			// Stuff only supported on Oracle MySQL >= 5.6
 			// ...
 			// @@gtid_mode only available in Orcale MySQL >= 5.6
 			// Previous version just issued this query brute-force, but I don't like errors being issued where they shouldn't.
-			_ = db.QueryRow("select @@global.gtid_mode = 'ON', @@global.server_uuid, @@global.gtid_purged").Scan(&instance.SupportsOracleGTID, &instance.ServerUUID, &instance.GtidPurged)
+			_ = db.QueryRow("select @@global.gtid_mode = 'ON', @@global.server_uuid, @@global.gtid_purged, @@global.master_info_repository = 'TABLE'").Scan(&instance.SupportsOracleGTID, &instance.ServerUUID, &instance.GtidPurged, &masterInfoRepositoryOnTable)
+			if masterInfoRepositoryOnTable {
+				_ = db.QueryRow("select count(*) > 0 and MAX(User_name) != '' from mysql.slave_master_info").Scan(&instance.ReplicationCredentialsAvailable)
+			}
 		}
 	}
 	{
@@ -243,6 +247,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
+		instance.HasReplicationCredentials = (m.GetString("Master_User") != "")
 		instance.Slave_IO_Running = (m.GetString("Slave_IO_Running") == "Yes")
 		if isMaxScale110 {
 			// Covering buggy MaxScale 1.1.0
@@ -621,6 +626,8 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.PhysicalEnvironment = m.GetString("physical_environment")
 	instance.ReplicationDepth = m.GetUint("replication_depth")
 	instance.IsCoMaster = m.GetBool("is_co_master")
+	instance.ReplicationCredentialsAvailable = m.GetBool("replication_credentials_available")
+	instance.HasReplicationCredentials = m.GetBool("has_replication_credentials")
 	instance.IsUpToDate = (m.GetUint("seconds_since_last_checked") <= config.Config.InstancePollSeconds)
 	instance.IsRecentlyChecked = (m.GetUint("seconds_since_last_checked") <= config.Config.InstancePollSeconds*5)
 	instance.LastSeenTimestamp = m.GetString("last_seen")
@@ -1500,11 +1507,11 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			// Data is real
 			onDuplicateKeyUpdate = `
 				on duplicate key update
-	        		last_checked=VALUES(last_checked),
-	        		last_attempted_check=VALUES(last_attempted_check),
-	        		uptime=VALUES(uptime),
-	        		server_id=VALUES(server_id),
-	        		server_uuid=VALUES(server_uuid),
+      		last_checked=VALUES(last_checked),
+      		last_attempted_check=VALUES(last_attempted_check),
+      		uptime=VALUES(uptime),
+      		server_id=VALUES(server_id),
+      		server_uuid=VALUES(server_uuid),
 					version=VALUES(version),
 					binlog_server=VALUES(binlog_server),
 					read_only=VALUES(read_only),
@@ -1542,7 +1549,9 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 					data_center=VALUES(data_center),
 					physical_environment=values(physical_environment),
 					replication_depth=VALUES(replication_depth),
-					is_co_master=VALUES(is_co_master)
+					is_co_master=VALUES(is_co_master),
+					replication_credentials_available=VALUES(replication_credentials_available),
+					has_replication_credentials=VALUES(has_replication_credentials)
 				`
 		} else {
 			// Scenario: some slave reported a master of his; but the master cannot be contacted.
@@ -1551,14 +1560,14 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			insertIgnore = `ignore`
 		}
 		insertQuery := fmt.Sprintf(`
-        	insert %s into database_instance (
-        		hostname,
-        		port,
-        		last_checked,
-        		last_attempted_check,
-        		uptime,
-        		server_id,
-        		server_uuid,
+    	insert %s into database_instance (
+    		hostname,
+    		port,
+    		last_checked,
+    		last_attempted_check,
+    		uptime,
+    		server_id,
+    		server_uuid,
 				version,
 				binlog_server,
 				read_only,
@@ -1596,8 +1605,10 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				data_center,
 				physical_environment,
 				replication_depth,
-				is_co_master
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				is_co_master,
+				replication_credentials_available,
+				has_replication_credentials
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
@@ -1645,6 +1656,8 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			instance.PhysicalEnvironment,
 			instance.ReplicationDepth,
 			instance.IsCoMaster,
+			instance.ReplicationCredentialsAvailable,
+			instance.HasReplicationCredentials,
 		)
 		if err != nil {
 			return log.Errore(err)

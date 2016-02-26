@@ -797,6 +797,16 @@ var generateSQLPatches = []string{
 			database_instance_pool
 			ADD COLUMN registered_at timestamp NOT NULL DEFAULT '1971-01-01 00:00:00'
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN replication_credentials_available TINYINT UNSIGNED NOT NULL
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN has_replication_credentials TINYINT UNSIGNED NOT NULL
+	`,
 }
 
 // Track if a TLS has already been configured for topology
