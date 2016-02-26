@@ -49,7 +49,7 @@ _Orchestrator_ supports:
 - MySQL-Pool association
 - Run as a service; orchestrator multi-service HA
 - HTTP security/authentication methods
-- When working with [orchestrator-agent](https://github.com/outbrain/orchestrator-agent), seed new/corrupt instances
+- When working with [orchestrator-agent](https://github.com/github/orchestrator-agent), seed new/corrupt instances
 - More...
 
 Read the [Orchestrator Manual](https://github.com/github/orchestrator/wiki/Orchestrator-Manual) for comprehensive documentation.
