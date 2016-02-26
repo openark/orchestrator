@@ -1382,7 +1382,7 @@ function Cluster() {
     if (!instance.isMaster) {
       recoveryListing.append('<li><a href="#" data-btn="match-up-slaves" data-command="match-up-slaves">Match up slaves to <code>' + instance.masterTitle + '</code></a></li>');
     }
-    if (instance.children.length > 1) {
+    if (instance.children && instance.children.length > 1) {
       recoveryListing.append('<li><a href="#" data-btn="regroup-slaves" data-command="regroup-slaves">Regroup slaves (auto pick best slave, only heals topology, no external processes)</a></li>');
     }
     if (instance.isMaster) {
