@@ -25,7 +25,7 @@ FAQ
 
 Q: By default, there are still a lot of steps that I have to do within each virtual machine to get going
 
-A: That is by design.  Vagrant will execute `db-post-install.sh`, `dbX-post-install.sh`, and `admin-post-install.sh` in the vagrant/ directory (they are .gitignore'd) for any custom work that you want to have done (i.e. build Orchestrator, etc etc)
+A: That is by design.  Vagrant will execute `db-post-install.sh`, `dbX-post-install.sh`, and `admin-post-install.sh` in the `vagrant/` directory (they are `.gitignore`'d) for any custom work that you want to have done (i.e. build Orchestrator, etc etc)
 
 Q: I run some other distribution of Linux.  Why don't you support that?
 
