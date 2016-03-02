@@ -57,19 +57,19 @@ cp /orchestrator/vagrant/vagrant-ssh-key.pub /home/vagrant/.ssh/id_rsa.pub
 cat <<EOF > /home/vagrant/.ssh/config
 Host admin
   User vagrant
-  IdentifyFile /home/vagrant/.ssh/id_rsa
+  IdentityFile /home/vagrant/.ssh/id_rsa
 Host db1
   User vagrant
-  IdentifyFile /home/vagrant/.ssh/id_rsa
+  IdentityFile /home/vagrant/.ssh/id_rsa
 Host db2
   User vagrant
-  IdentifyFile /home/vagrant/.ssh/id_rsa
+  IdentityFile /home/vagrant/.ssh/id_rsa
 Host db3
   User vagrant
-  IdentifyFile /home/vagrant/.ssh/id_rsa
+  IdentityFile /home/vagrant/.ssh/id_rsa
 Host db4
   User vagrant
-  IdentifyFile /home/vagrant/.ssh/id_rsa
+  IdentityFile /home/vagrant/.ssh/id_rsa
 EOF
 
 chmod go-rwx /home/vagrant/.ssh/*
