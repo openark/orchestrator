@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	nethttp "net/http"
+	"reflect"
 	"strings"
 	"syscall"
 	"testing"
@@ -115,6 +116,30 @@ func TestVerify(t *testing.T) {
 	}
 }
 
+func TestReadPEMData(t *testing.T) {
+	pemCertFile := writeFakeFile(pemCertificate)
+	defer syscall.Unlink(pemCertFile)
+	pemPKFile := writeFakeFile(pemPrivateKey)
+	defer syscall.Unlink(pemPKFile)
+	pemPKWPFile := writeFakeFile(pemPrivateKeyWithPass)
+	defer syscall.Unlink(pemPKWPFile)
+	_, err := ssl.ReadPEMData(pemCertFile, []byte{})
+	if err != nil {
+		t.Errorf("Failed to decode certificate: %s", err)
+	}
+	pemNoPassBytes, err := ssl.ReadPEMData(pemPKFile, []byte{})
+	if err != nil {
+		t.Errorf("Failed to decode private key: %s", err)
+	}
+	pemPassBytes, err := ssl.ReadPEMData(pemPKWPFile, []byte("testing"))
+	if err != nil {
+		t.Errorf("Failed to decode private key with password: %s", err)
+	}
+	if reflect.DeepEqual(pemPassBytes, pemNoPassBytes) {
+		t.Errorf("PEM encoding failed after password removal")
+	}
+}
+
 func TestAppendKeyPair(t *testing.T) {
 	c, err := ssl.NewTLSConfig("", false)
 	if err != nil {
@@ -126,7 +151,35 @@ func TestAppendKeyPair(t *testing.T) {
 	defer syscall.Unlink(pemPKFile)
 
 	if err := ssl.AppendKeyPair(c, pemCertFile, pemPKFile); err != nil {
-		t.Errorf("Failed to append certificate and key to tls config")
+		t.Errorf("Failed to append certificate and key to tls config: %s", err)
+	}
+}
+
+func TestAppendKeyPairWithPassword(t *testing.T) {
+	c, err := ssl.NewTLSConfig("", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pemCertFile := writeFakeFile(pemCertificate)
+	defer syscall.Unlink(pemCertFile)
+	pemPKFile := writeFakeFile(pemPrivateKeyWithPass)
+	defer syscall.Unlink(pemPKFile)
+
+	if err := ssl.AppendKeyPairWithPassword(c, pemCertFile, pemPKFile, []byte("testing")); err != nil {
+		t.Errorf("Failed to append certificate and key to tls config: %s", err)
+	}
+}
+
+func TestIsEncryptedPEM(t *testing.T) {
+	pemPKFile := writeFakeFile(pemPrivateKey)
+	defer syscall.Unlink(pemPKFile)
+	pemPKWPFile := writeFakeFile(pemPrivateKeyWithPass)
+	defer syscall.Unlink(pemPKWPFile)
+	if ssl.IsEncryptedPEM(pemPKFile) {
+		t.Errorf("Incorrectly identified unencrypted PEM as encrypted")
+	}
+	if !ssl.IsEncryptedPEM(pemPKWPFile) {
+		t.Errorf("Incorrectly identified encrypted PEM as unencrypted")
 	}
 }
 
@@ -160,5 +213,17 @@ RTUCIQDasvGASLqmjeffBNLTXV2A5g4t+kLVCpsEIZAycV5GswIhANEPLmax0ME/
 EO+ZJ79TJKN5yiGBRsv5yvx5UiHxajEXAiAhAol5N4EUyq6I9w1rYdhPMGpLfk7A
 IU2snfRJ6Nq2CQIgFrPsWRCkV+gOYcajD17rEqmuLrdIRexpg8N1DOSXoJ8CIGlS
 tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
------END RSA PRIVATE KEY-----
-`
+-----END RSA PRIVATE KEY-----`
+
+const pemPrivateKeyWithPass = `-----BEGIN RSA PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: DES-EDE3-CBC,FD644BD0352E76B2
+
+kNrv1zBj4sznRilLFfuiEZ2ri5mBtRHMnkADR7KSgaj59QQnjaqmzg/f03dlXRW5
+Y/s24lLm2Eq+GynzO4A17ywPCm7NzrOvR7j7tNfLZJgSOZMlcFTLxs2DhkvhJ0ja
+2hMhCRZ+snBviJfptL8Swgw82avfb23qC3/oftN0B9n52dPDeT3X4Oy65PzZ99wv
+6CrclBksg52NiW434GqPYOJs8pxgRjK3DDUuLY6BYZhevZM6bUHmuHxMcgQY8ReO
+AXSSOPxOi8BjvkayuqzwnCCnzwplx7RaGbW1fxw5p+ZhzXfT2vVZM04hj6ROBu9a
+mDwEqqpWyxdu1BoaaaWfPH1cVfVg2c+xKJMeH8MydcvKCIoAoe4Hn3rhmjvBrpi1
+MWn27KvytPxwq6tCE9nEotIUxc1SFsGakaCNcUkFAy8=
+-----END RSA PRIVATE KEY-----`
