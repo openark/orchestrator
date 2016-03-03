@@ -34,8 +34,12 @@ import (
 	"github.com/outbrain/orchestrator/go/ssl"
 )
 
+var sslPEMPassword []byte
+var agentSSLPEMPassword []byte
+
 // Http starts serving
 func Http(discovery bool) {
+	promptForSSLPasswords()
 	process.ContinuousRegistration(process.OrchestratorExecutionHttpMode, "")
 
 	martini.Env = martini.Prod
@@ -43,6 +47,21 @@ func Http(discovery bool) {
 		go agentsHttp()
 	}
 	standardHttp(discovery)
+}
+
+// Iterate over the private keys and get passwords for them
+// Don't prompt for a password a second time if the files are the same
+func promptForSSLPasswords() {
+	if ssl.IsEncryptedPEM(config.Config.SSLPrivateKeyFile) {
+		sslPEMPassword = ssl.GetPEMPassword(config.Config.SSLPrivateKeyFile)
+	}
+	if ssl.IsEncryptedPEM(config.Config.AgentSSLPrivateKeyFile) {
+		if config.Config.AgentSSLPrivateKeyFile == config.Config.SSLPrivateKeyFile {
+			agentSSLPEMPassword = sslPEMPassword
+		} else {
+			agentSSLPEMPassword = ssl.GetPEMPassword(config.Config.AgentSSLPrivateKeyFile)
+		}
+	}
 }
 
 // standardHttp starts serving HTTP or HTTPS (api/web) requests, to be used by normal clients
@@ -112,7 +131,7 @@ func standardHttp(discovery bool) {
 			log.Fatale(err)
 		}
 		tlsConfig.InsecureSkipVerify = config.Config.SSLSkipVerify
-		if err = ssl.AppendKeyPair(tlsConfig, config.Config.SSLCertFile, config.Config.SSLPrivateKeyFile); err != nil {
+		if err = ssl.AppendKeyPairWithPassword(tlsConfig, config.Config.SSLCertFile, config.Config.SSLPrivateKeyFile, sslPEMPassword); err != nil {
 			log.Fatale(err)
 		}
 		if err = ssl.ListenAndServeTLS(config.Config.ListenAddress, m, tlsConfig); err != nil {
@@ -150,7 +169,7 @@ func agentsHttp() {
 			log.Fatale(err)
 		}
 		tlsConfig.InsecureSkipVerify = config.Config.AgentSSLSkipVerify
-		if err = ssl.AppendKeyPair(tlsConfig, config.Config.AgentSSLCertFile, config.Config.AgentSSLPrivateKeyFile); err != nil {
+		if err = ssl.AppendKeyPairWithPassword(tlsConfig, config.Config.AgentSSLCertFile, config.Config.AgentSSLPrivateKeyFile, agentSSLPEMPassword); err != nil {
 			log.Fatale(err)
 		}
 		if err = ssl.ListenAndServeTLS(config.Config.AgentsServerPort, m, tlsConfig); err != nil {
