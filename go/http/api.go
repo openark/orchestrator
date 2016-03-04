@@ -1930,6 +1930,18 @@ func (this *HttpAPI) RegisterCandidate(params martini.Params, r render.Render, r
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
+	switch params["promotionRule"] {
+	case "prefer", "neutral", "must_not":
+		{
+			// OK
+		}
+	default:
+		{
+			r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Invalid promotionRule: %+v", params["promotionRule"])})
+			return
+		}
+	}
+
 	promotionRule := inst.CandidatePromotionRule(params["promotionRule"])
 
 	err = inst.RegisterCandidateInstance(&instanceKey, promotionRule)

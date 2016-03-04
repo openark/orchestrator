@@ -660,7 +660,7 @@ func readInstancesByCondition(condition string, args []interface{}, sort string)
 			(last_checked <= last_seen) is true as is_last_check_valid,
 			timestampdiff(second, last_seen, now()) as seconds_since_last_seen,
 			candidate_database_instance.last_suggested is not null
-				/* [Work In Progress!] and candidate_database_instance.promotion_rule in ('must', 'prefer') */ as is_candidate,
+				 and candidate_database_instance.promotion_rule in ('must', 'prefer') as is_candidate,
 			ifnull(nullif(candidate_database_instance.promotion_rule, ''), 'neutral') as promotion_rule,
 			ifnull(unresolved_hostname, '') as unresolved_hostname,
 			(
@@ -927,7 +927,7 @@ func ReadClusterCandidateInstances(clusterName string) ([](*Instance), error) {
 			and (hostname, port) in (
 				select hostname, port
 					from candidate_database_instance
-					/* [Work In Progress!] where promotion_rule in ('must', 'prefer') */
+					where promotion_rule in ('must', 'prefer')
 			)
 			`
 	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
