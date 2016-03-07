@@ -27,7 +27,6 @@ import (
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/util"
 	"github.com/outbrain/orchestrator/go/config"
-	"github.com/outbrain/orchestrator/go/db"
 	"github.com/outbrain/orchestrator/go/inst"
 	"github.com/outbrain/orchestrator/go/logic"
 	"github.com/outbrain/orchestrator/go/process"
@@ -188,7 +187,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 
 	skipDatabaseCommands := false
 	switch command {
-	case "reset-internal-db-deployment":
+	case "redeploy-internal-db":
 		skipDatabaseCommands = true
 	case "help":
 		skipDatabaseCommands = true
@@ -1243,11 +1242,11 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			jsonString := config.Config.ToJSONString()
 			fmt.Println(jsonString)
 		}
-	case registerCliCommand("reset-internal-db-deployment", "Meta, internal", `Clear internal db deployment history, use if somehow corrupted internal deployment history`):
+	case registerCliCommand("redeploy-internal-db", "Meta, internal", `Force internal schema migration to current backend structure`):
 		{
-			config.Config.SkipOrchestratorDatabaseUpdate = true
-			db.ResetInternalDeployment()
-			fmt.Println("Internal db deployment history reset. Next orchestrator execution will rebuild internal db structure (no data will be lost)")
+			config.RuntimeCLIFlags.ConfiguredVersion = ""
+			inst.ReadClusters()
+			fmt.Println("Redeployed internal db")
 		}
 		// Help
 	case "help":
