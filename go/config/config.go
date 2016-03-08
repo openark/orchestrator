@@ -163,6 +163,7 @@ type Configuration struct {
 	GraphiteAddr                                 string            // Optional; address of graphite port. If supplied, metrics will be written here
 	GraphitePath                                 string            // Prefix for graphite path. May include {hostname} magic placeholder
 	GraphiteConvertHostnameDotsToUnderscores     bool              // If true, then hostname's dots are converted to underscores before being used in graphite path
+	GraphitePollSeconds                          int               // Graphite writes interval. 0 disables.
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -289,6 +290,7 @@ func newConfiguration() *Configuration {
 		GraphiteAddr:                                 "",
 		GraphitePath:                                 "",
 		GraphiteConvertHostnameDotsToUnderscores:     true,
+		GraphitePollSeconds:                          60,
 	}
 }
 
