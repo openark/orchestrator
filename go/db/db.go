@@ -491,6 +491,13 @@ var generateSQLBase = []string{
 		  PRIMARY KEY (anchor)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS orchestrator_db_deployments (
+		  deployed_version varchar(128) CHARACTER SET ascii NOT NULL,
+		  deployed_timestamp timestamp NOT NULL,
+		  PRIMARY KEY (deployed_version)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 var generateSQLPatches = []string{
@@ -855,27 +862,27 @@ func OpenOrchestrator() (*sql.DB, error) {
 	return db, err
 }
 
-// readOrchestratorMetadata reads the orchestrator_metadata table
-func readOrchestratorMetadata(db *sql.DB) (lastDeployedVersion string, err error) {
+// versionIsDeployed checks if given version has already been deployed
+func versionIsDeployed(db *sql.DB) (result bool, err error) {
 	query := `
 		select
-			ifnull(max(last_deployed_version), '') as last_deployed_version
+			count(*) as is_deployed
 		from
-			orchestrator_metadata
+			orchestrator_db_deployments
 		where
-			anchor=1
+			deployed_version = ?
 		`
-	err = db.QueryRow(query).Scan(&lastDeployedVersion)
-	return lastDeployedVersion, err
+	err = db.QueryRow(query, config.RuntimeCLIFlags.ConfiguredVersion).Scan(&result)
+	return result, err
 }
 
-// writeOrchestratorMetadata updates the orchestrator_metadata table upon successful deployment
-func writeOrchestratorMetadata(db *sql.DB) error {
+// registerOrchestratorDeployment updates the orchestrator_metadata table upon successful deployment
+func registerOrchestratorDeployment(db *sql.DB) error {
 	query := `
-    	replace into orchestrator_metadata (
-				anchor, last_deployed_version, last_deployed_timestamp
+    	replace into orchestrator_db_deployments (
+				deployed_version, deployed_timestamp
 			) values (
-				1, ?, NOW()
+				?, NOW()
 			)
 				`
 	if _, err := execInternal(db, query, config.RuntimeCLIFlags.ConfiguredVersion); err != nil {
@@ -960,15 +967,15 @@ func deployStatements(db *sql.DB, queries []string, fatalOnError bool) error {
 func initOrchestratorDB(db *sql.DB) error {
 	log.Debug("Initializing orchestrator")
 
-	version, err := readOrchestratorMetadata(db)
-	if version == config.RuntimeCLIFlags.ConfiguredVersion && version != "" && err == nil {
+	versionAlreadyDeployed, err := versionIsDeployed(db)
+	if versionAlreadyDeployed && config.RuntimeCLIFlags.ConfiguredVersion != "" && err == nil {
 		// Already deployed with this version
 		return nil
 	}
 	log.Debugf("Migrating database schema")
 	deployStatements(db, generateSQLBase, true)
 	deployStatements(db, generateSQLPatches, false)
-	writeOrchestratorMetadata(db)
+	registerOrchestratorDeployment(db)
 	return nil
 }
 
