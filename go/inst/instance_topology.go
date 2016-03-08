@@ -40,7 +40,7 @@ func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*In
 	prefix := ""
 	if depth > 0 {
 		prefix = strings.Repeat(" ", (depth-1)*2)
-		if instance.SlaveRunning() {
+		if instance.SlaveRunning() && instance.IsLastCheckValid && instance.IsRecentlyChecked {
 			prefix += "+ "
 		} else {
 			prefix += "- "
