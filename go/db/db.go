@@ -873,6 +873,9 @@ func versionIsDeployed(db *sql.DB) (result bool, err error) {
 			deployed_version = ?
 		`
 	err = db.QueryRow(query, config.RuntimeCLIFlags.ConfiguredVersion).Scan(&result)
+	// err means the table 'orchestrator_db_deployments' does not even exist, in which case we proceed
+	// to deploy.
+	// If there's another error to this, like DB gone bad, then we're about to find out anyway.
 	return result, err
 }
 
