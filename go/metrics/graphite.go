@@ -27,11 +27,14 @@ import (
 	"time"
 )
 
-var graphiteCallbackTick = time.Tick(time.Minute)
 var graphiteTickCallbacks [](func())
 
+// InitGraphiteMetrics is called once in the lifetime of the app, after config has been loaded
 func InitGraphiteMetrics() error {
 	if config.Config.GraphiteAddr == "" {
+		return nil
+	}
+	if config.Config.GraphitePollSeconds <= 0 {
 		return nil
 	}
 	if config.Config.GraphitePath == "" {
@@ -50,6 +53,7 @@ func InitGraphiteMetrics() error {
 
 	log.Debugf("Will log to graphite on %+v, %+v", config.Config.GraphiteAddr, graphitePath)
 
+	graphiteCallbackTick := time.Tick(time.Duration(config.Config.GraphitePollSeconds) * time.Second)
 	go func() {
 		go graphite.Graphite(metrics.DefaultRegistry, 1*time.Minute, graphitePath, addr)
 		for range graphiteCallbackTick {
@@ -60,7 +64,6 @@ func InitGraphiteMetrics() error {
 	}()
 
 	return nil
-
 }
 
 func OnGraphiteTick(f func()) {
