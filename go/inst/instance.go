@@ -359,31 +359,58 @@ func (this *Instance) CanMoveViaMatch() (bool, error) {
 // StatusString returns a human readable description of this instance's status
 func (this *Instance) StatusString() string {
 	if !this.IsLastCheckValid {
-		return "last check invalid"
+		return "invalid"
 	}
 	if !this.IsRecentlyChecked {
-		return "not recently checked"
+		return "unchecked"
 	}
 	if this.IsSlave() && !(this.Slave_SQL_Running && this.Slave_IO_Running) {
-		return "not replicating"
-	}
-	if this.IsSlave() && !this.SecondsBehindMaster.Valid {
-		return "cannot determine slave lag"
+		return "nonreplicating"
 	}
 	if this.IsSlave() && this.SecondsBehindMaster.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
-		return "lags too much"
+		return "lag"
 	}
-	return "OK"
+	return "ok"
+}
+
+// LagStatusString returns a human readable representation of current lag
+func (this *Instance) LagStatusString() string {
+	if !this.IsLastCheckValid {
+		return "unknown"
+	}
+	if !this.IsRecentlyChecked {
+		return "unknown"
+	}
+	if this.IsSlave() && !(this.Slave_SQL_Running && this.Slave_IO_Running) {
+		return "null"
+	}
+	if this.IsSlave() && !this.SecondsBehindMaster.Valid {
+		return "null"
+	}
+	if this.IsSlave() && this.SecondsBehindMaster.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
+		return fmt.Sprintf("%+vs", this.SecondsBehindMaster.Int64)
+	}
+	return fmt.Sprintf("%+vs", this.SecondsBehindMaster.Int64)
 }
 
 // HumanReadableDescription returns a simple readable string describing the status, version,
 // etc. properties of this instance
 func (this *Instance) HumanReadableDescription() string {
 	tokens := []string{}
+	tokens = append(tokens, this.LagStatusString())
 	tokens = append(tokens, this.StatusString())
 	tokens = append(tokens, this.Version)
-	tokens = append(tokens, this.Binlog_format)
-	if this.LogSlaveUpdatesEnabled {
+	if this.ReadOnly {
+		tokens = append(tokens, "ro")
+	} else {
+		tokens = append(tokens, "rw")
+	}
+	if this.LogBinEnabled {
+		tokens = append(tokens, this.Binlog_format)
+	} else {
+		tokens = append(tokens, "nobinlog")
+	}
+	if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
 		tokens = append(tokens, ">>")
 	}
 	if this.UsingGTID() {
