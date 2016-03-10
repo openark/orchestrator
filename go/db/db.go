@@ -798,6 +798,11 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN has_replication_credentials TINYINT UNSIGNED NOT NULL
 	`,
+	`
+			ALTER TABLE
+				database_instance
+				ADD COLUMN allow_tls TINYINT UNSIGNED NOT NULL AFTER sql_delay
+	`,
 }
 
 // Track if a TLS has already been configured for topology

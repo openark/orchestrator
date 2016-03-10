@@ -297,7 +297,6 @@ function openNodeModal(node) {
       $('#node_modal button[data-btn=detach-slave]').appendTo(masterCoordinatesEl.find("div"))
       $('#node_modal button[data-btn=reattach-slave]').appendTo(hiddenZone)
     }
-
   } else {
     $('#node_modal button[data-btn=reset-slave]').appendTo(hiddenZone);
     $('#node_modal button[data-btn=skip-query]').appendTo(hiddenZone);
@@ -330,7 +329,7 @@ function openNodeModal(node) {
   $('#node_modal button[data-btn=disable-gtid]').appendTo(td.find("div"))
 
   addNodeModalDataAttribute("Uptime", node.Uptime);
-
+  addNodeModalDataAttribute("Allow TLS", node.AllowTLS);
   addNodeModalDataAttribute("Cluster",
     '<a href="/web/cluster/' + node.ClusterName + '">' + node.ClusterName + '</a>');
   addNodeModalDataAttribute("Audit",
