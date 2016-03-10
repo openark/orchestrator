@@ -1020,3 +1020,20 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 	}
 	return recoveryAttempted, promotedSlaveKey, err
 }
+
+// ForceExecuteRecovery can be called to issue a recovery process even if analysis says there is no recovery case.
+// The caller of this function injects the type of analysis it wishes the function to assume.
+// By calling this function one takes responsibility for one's actions.
+func ForceExecuteRecovery(clusterName string, analysisCode inst.AnalysisCode, failedInstanceKey *inst.InstanceKey, candidateInstanceKey *inst.InstanceKey, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
+	clusterInfo, err := inst.ReadClusterInfo(clusterName)
+	if err != nil {
+		return recoveryAttempted, topologyRecovery, err
+	}
+
+	analysisEntry := inst.ReplicationAnalysis{
+		Analysis:            analysisCode,
+		ClusterDetails:      *clusterInfo,
+		AnalyzedInstanceKey: *failedInstanceKey,
+	}
+	return executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, true, skipProcesses)
+}
