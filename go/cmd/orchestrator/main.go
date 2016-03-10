@@ -761,6 +761,30 @@ Cheatsheet:
 
             orchestrator -c recover-lite -i dead.instance.com --debug
 
+				force-master-takeover
+						Forcibly discard master and promote another (direct child) instance instead, even if everything is running well.
+						This allows for planned switchover.
+						NOTE:
+						- You must specify the instance to promote via "-d"
+						- Promoted instance must be a direct child of the existing master
+						- This will not work in a master-master configuration
+						- Orchestrator just treats this command as a DeadMaster failover scenario
+						- It is STRONGLY suggested that you first relocate everything below your chosen instance-to-promote.
+						  It *is* a planned failover thing.
+						- Otherwise orchestrator will do its thing in moving instances around, hopefully promoting your requested
+						  server on top.
+						- Orchestrator will issue all relevant pre-failover and post-failover external processes.
+						- At this time orchestrator will not issue 'SET GLOBAL read_only=1' on the existing master, nor will
+						  it issue a 'FLUSH TABLES WITH READ LOCK'. This is being investigated.
+						Examples:
+
+						orchestrator -c force-master-takeover -alias mycluster -d immediate.child.of.master.com
+								Indicate cluster by alias. Orchestrator automatically figures out the master
+
+						orchestrator -c force-master-takeover -i instance.in.relevant.cluster.com -d immediate.child.of.master.com
+								Indicate cluster by an instance. You don't structly need to specify the master, orchestrator
+								will infer the master's identify.
+
         replication-analysis
             Request an analysis of potential crash incidents in all known topologies.
             Output format is not yet stabilized and may change in the future. Do not trust the output
@@ -870,15 +894,11 @@ Cheatsheet:
 
             orchestrator -c resolve -i cname.to.resolve
 
-        reset-internal-db-deployment
-            Clear internal db deployment history, use if somehow corrupted internal deployment history.
-            When configured with '"SmartOrchestratorDatabaseUpdate": true', Orchestrator does housekeeping for its
-            own database schema, and verifies proposed deployment vs deployment history.
-            In case of contradiction between the two orchestrator bails out. Such a contradiction should not occur, and may
-            signify an inconsistency in the orchestrator code itself.
-            By resetting history orchestrator redeploys its schema (without causing data loss) and accepts the new instructions
-            as the de-factor deployment rule.
-
+        redeploy-internal-db
+						Force internal schema migration to current backend structure. Orchestrator keeps track of the deployed
+						versions and will not reissue a migration for a version already deployed. Normally you should not use
+						this command, and it is provided mostly for building and testing purposes. Nonetheless it is safe to
+						use and at most it wastes some cycles.
     `
 
 // main is the application's entry point. It will either spawn a CLI or HTTP itnerfaces.
