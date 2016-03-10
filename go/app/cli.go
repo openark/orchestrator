@@ -1117,6 +1117,44 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(promotedInstanceKey.DisplayString())
 			}
 		}
+	case registerCliCommand("force-master-takeover", "Recovery", `Forcibly discard master and promote another (direct child) instance instead, even if everything is running well`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			clusterMasters, err := inst.ReadClusterWriteableMaster(clusterName)
+			if err != nil {
+				log.Fatalf("Cannot deduce cluster master for %+v", clusterName)
+			}
+			var clusterMaster *inst.Instance
+			if len(clusterMasters) == 1 {
+				clusterMaster = clusterMasters[0]
+			} else {
+				log.Fatalf("Cannot deduce cluster master for %+v", clusterName)
+			}
+
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce destination, the instance to promote in place of the master. Please provide with -d")
+			}
+			destination := validateInstanceIsFound(destinationKey)
+			if !destination.MasterKey.Equals(&clusterMaster.Key) {
+				log.Fatalf("You may only promote a direct child of the master %+v. The master of %+v is %+v.", clusterMaster.Key, destination.Key, destination.MasterKey)
+			}
+			log.Debugf("Will demote %+v and promote %+v instead", clusterMaster.Key, *destinationKey)
+
+			recoveryAttempted, topologyRecovery, err := logic.ForceExecuteRecovery(clusterName, inst.DeadMaster, &clusterMaster.Key, destinationKey, false)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if !recoveryAttempted {
+				log.Fatalf("Unexpected error: recovery not attempted. This should not happen")
+			}
+			if topologyRecovery == nil {
+				log.Fatalf("Recovery attempted but with no results. This should not happen")
+			}
+			if topologyRecovery.SuccessorKey == nil {
+				log.Fatalf("Recovery attempted yet no slave promoted")
+			}
+			fmt.Println(topologyRecovery.SuccessorKey.DisplayString())
+		}
 	case registerCliCommand("replication-analysis", "Recovery", `Request an analysis of potential crash incidents in all known topologies`):
 		{
 			analysis, err := inst.GetReplicationAnalysis("", false, false)
