@@ -2380,11 +2380,14 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 	}
 	// No Pseudo-GTID; cehck simple binlog file/pos operations:
 	if InstancesAreSiblings(instance, other) {
-		return MoveBelow(&instance.Key, &other.Key)
+		// If comastering, only move below if it's read-only
+		if !other.IsCoMaster || other.ReadOnly {
+			return MoveBelow(&instance.Key, &other.Key)
+		}
 	}
 	// See if we need to MoveUp
 	if instanceMaster.MasterKey.Equals(&other.Key) {
-		// Moving to grandparent
+		// Moving to grandparent--handles co-mastering writable case
 		return MoveUp(&instance.Key)
 	}
 	if instanceMaster.IsBinlogServer() {
