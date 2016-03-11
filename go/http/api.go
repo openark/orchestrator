@@ -1467,7 +1467,7 @@ func (this *HttpAPI) ReloadClusterAlias(params martini.Params, r render.Render, 
 	r.JSON(200, &APIResponse{Code: OK, Message: "Cluster alias cache reloaded"})
 }
 
-// Agents provides complete list of registered agents (See https://github.com/outbrain/orchestrator-agent)
+// Agents provides complete list of registered agents (See https://github.com/github/orchestrator-agent)
 func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
