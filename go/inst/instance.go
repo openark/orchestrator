@@ -376,6 +376,9 @@ func (this *Instance) StatusString() string {
 
 // LagStatusString returns a human readable representation of current lag
 func (this *Instance) LagStatusString() string {
+	if this.IsDetached {
+		return "detached"
+	}
 	if !this.IsLastCheckValid {
 		return "unknown"
 	}
