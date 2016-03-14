@@ -859,9 +859,7 @@ func OpenOrchestrator() (*sql.DB, error) {
 	}
 	db, fromCache, err := sqlutils.GetDB(mysql_uri)
 	if err == nil && !fromCache {
-		if !config.Config.SkipOrchestratorDatabaseUpdate {
-			initOrchestratorDB(db)
-		}
+		initOrchestratorDB(db)
 		db.SetMaxIdleConns(10)
 	}
 	return db, err
