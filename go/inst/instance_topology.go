@@ -1606,6 +1606,11 @@ Cleanup:
 	return instance, err
 }
 
+// sortInstances shuffles given list of instances according to some logic
+func sortInstances(instances [](*Instance)) {
+	sort.Sort(sort.Reverse(InstancesByExecBinlogCoordinates(instances)))
+}
+
 // sortedSlaves returns the list of slaves of a given master, sorted by exec coordinates
 // (most up-to-date slave first)
 func sortedSlaves(masterKey *InstanceKey, shouldStopSlaves bool, includeBinlogServerSubSlaves bool) (slaves [](*Instance), err error) {
@@ -1626,7 +1631,7 @@ func sortedSlaves(masterKey *InstanceKey, shouldStopSlaves bool, includeBinlogSe
 	}
 	slaves = RemoveNilInstances(slaves)
 
-	sort.Sort(sort.Reverse(InstancesByExecBinlogCoordinates(slaves)))
+	sortInstances(slaves)
 	for _, slave := range slaves {
 		log.Debugf("- sorted slave: %+v %+v", slave.Key, slave.ExecBinlogCoordinates)
 	}
