@@ -1611,19 +1611,23 @@ func sortInstances(instances [](*Instance)) {
 	sort.Sort(sort.Reverse(InstancesByExecBinlogCoordinates(instances)))
 }
 
-// sortedSlaves returns the list of slaves of a given master, sorted by exec coordinates
-// (most up-to-date slave first)
-func sortedSlaves(masterKey *InstanceKey, shouldStopSlaves bool, includeBinlogServerSubSlaves bool) (slaves [](*Instance), err error) {
+// getSlavesForSorting returns a list of slaves of a given master potentially for candidate choosing
+func getSlavesForSorting(masterKey *InstanceKey, includeBinlogServerSubSlaves bool) (slaves [](*Instance), err error) {
 	if includeBinlogServerSubSlaves {
 		slaves, err = ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey)
 	} else {
 		slaves, err = ReadSlaveInstances(masterKey)
 	}
-	if err != nil {
-		return slaves, err
-	}
+	return slaves, err
+}
+
+// sortedSlaves returns the list of slaves of some master, sorted by exec coordinates
+// (most up-to-date slave first).
+// This function assumes given `slaves` argument is indeed a list of instances all replicating
+// from the same master (the result of `getSlavesForSorting()` is appropriate)
+func sortedSlaves(slaves [](*Instance), shouldStopSlaves bool) [](*Instance) {
 	if len(slaves) == 0 {
-		return slaves, nil
+		return slaves
 	}
 	if shouldStopSlaves {
 		log.Debugf("sortedSlaves: stopping %d slaves nicely", len(slaves))
@@ -1636,7 +1640,7 @@ func sortedSlaves(masterKey *InstanceKey, shouldStopSlaves bool, includeBinlogSe
 		log.Debugf("- sorted slave: %+v %+v", slave.Key, slave.ExecBinlogCoordinates)
 	}
 
-	return slaves, err
+	return slaves
 }
 
 // MultiMatchBelow will efficiently match multiple slaves below a given instance.
@@ -1977,19 +1981,10 @@ func isBannedFromBeingCandidateSlave(slave *Instance) bool {
 	return false
 }
 
-// GetCandidateSlave chooses the best slave to promote given a (possibly dead) master
-func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instance, [](*Instance), [](*Instance), [](*Instance), error) {
-	var candidateSlave *Instance
-	aheadSlaves := [](*Instance){}
-	equalSlaves := [](*Instance){}
-	laterSlaves := [](*Instance){}
-
-	slaves, err := sortedSlaves(masterKey, forRematchPurposes, false)
-	if err != nil {
-		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err
-	}
+// chooseCandidateSlave
+func chooseCandidateSlave(slaves [](*Instance)) (candidateSlave *Instance, aheadSlaves, equalSlaves, laterSlaves [](*Instance), err error) {
 	if len(slaves) == 0 {
-		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, fmt.Errorf("No slaves found for %+v", *masterKey)
+		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, fmt.Errorf("No slaves found given in chooseCandidateSlave")
 	}
 	for _, slave := range slaves {
 		slave := slave
@@ -2000,8 +1995,8 @@ func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instan
 		}
 	}
 	if candidateSlave == nil {
-		// Unable to find a candidate, so will not regroup.
-		// Pick a (single) slave which is not banned.
+		// Unable to find a candidate that will master others.
+		// Instead, pick a (single) slave which is not banned.
 		for _, slave := range slaves {
 			slave := slave
 			if !isBannedFromBeingCandidateSlave(slave) {
@@ -2013,8 +2008,7 @@ func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instan
 		if candidateSlave != nil {
 			slaves = RemoveInstance(slaves, &candidateSlave.Key)
 		}
-
-		return candidateSlave, slaves, equalSlaves, laterSlaves, fmt.Errorf("GetCandidateSlave: no candidate slaves found %+v", *masterKey)
+		return candidateSlave, slaves, equalSlaves, laterSlaves, fmt.Errorf("chooseCandidateSlave: no candidate slave found")
 	}
 	slaves = RemoveInstance(slaves, &candidateSlave.Key)
 	for _, slave := range slaves {
@@ -2027,16 +2021,42 @@ func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instan
 			aheadSlaves = append(aheadSlaves, slave)
 		}
 	}
-	log.Debugf("sortedSlaves: candidate: %+v, ahead: %d, equal: %d, late: %d", candidateSlave.Key, len(aheadSlaves), len(equalSlaves), len(laterSlaves))
+	return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err
+}
+
+// GetCandidateSlave chooses the best slave to promote given a (possibly dead) master
+func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instance, [](*Instance), [](*Instance), [](*Instance), error) {
+	var candidateSlave *Instance
+	aheadSlaves := [](*Instance){}
+	equalSlaves := [](*Instance){}
+	laterSlaves := [](*Instance){}
+
+	slaves, err := getSlavesForSorting(masterKey, false)
+	if err != nil {
+		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err
+	}
+	slaves = sortedSlaves(slaves, forRematchPurposes)
+	if err != nil {
+		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err
+	}
+	if len(slaves) == 0 {
+		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, fmt.Errorf("No slaves found for %+v", *masterKey)
+	}
+	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err = chooseCandidateSlave(slaves)
+	if err != nil {
+		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err
+	}
+	log.Debugf("GetCandidateSlave: candidate: %+v, ahead: %d, equal: %d, late: %d", candidateSlave.Key, len(aheadSlaves), len(equalSlaves), len(laterSlaves))
 	return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, nil
 }
 
 // GetCandidateSlaveOfBinlogServerTopology chooses the best slave to promote given a (possibly dead) master
 func GetCandidateSlaveOfBinlogServerTopology(masterKey *InstanceKey) (candidateSlave *Instance, err error) {
-	slaves, err := sortedSlaves(masterKey, false, true)
+	slaves, err := getSlavesForSorting(masterKey, true)
 	if err != nil {
 		return candidateSlave, err
 	}
+	slaves = sortedSlaves(slaves, false)
 	if len(slaves) == 0 {
 		return candidateSlave, fmt.Errorf("No slaves found for %+v", *masterKey)
 	}
