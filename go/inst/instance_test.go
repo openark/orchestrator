@@ -30,9 +30,11 @@ func init() {
 
 var key1 = InstanceKey{Hostname: "host1", Port: 3306}
 var key2 = InstanceKey{Hostname: "host2", Port: 3306}
+var key3 = InstanceKey{Hostname: "host3", Port: 3306}
 
 var instance1 = Instance{Key: key1}
 var instance2 = Instance{Key: key2}
+var instance3 = Instance{Key: key3}
 
 func TestInstanceKeyEquals(t *testing.T) {
 	i1 := Instance{
@@ -160,6 +162,20 @@ func TestBinlogFileNumberDistance(t *testing.T) {
 
 	test.S(t).ExpectEquals(fileNum, 17)
 	test.S(t).ExpectEquals(numLen, 5)
+}
+
+func TestIsSmallerBinlogFormat(t *testing.T) {
+	iStatement := &Instance{Key: key1, Binlog_format: "STATEMENT"}
+	iRow := &Instance{Key: key2, Binlog_format: "ROW"}
+	iMixed := &Instance{Key: key3, Binlog_format: "MIXED"}
+	test.S(t).ExpectTrue(iStatement.IsSmallerBinlogFormat(iRow))
+	test.S(t).ExpectFalse(iStatement.IsSmallerBinlogFormat(iStatement))
+	test.S(t).ExpectFalse(iRow.IsSmallerBinlogFormat(iStatement))
+
+	test.S(t).ExpectTrue(iStatement.IsSmallerBinlogFormat(iMixed))
+	test.S(t).ExpectTrue(iMixed.IsSmallerBinlogFormat(iRow))
+	test.S(t).ExpectFalse(iMixed.IsSmallerBinlogFormat(iStatement))
+	test.S(t).ExpectFalse(iRow.IsSmallerBinlogFormat(iMixed))
 }
 
 func TestCanReplicateFrom(t *testing.T) {

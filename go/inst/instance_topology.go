@@ -1981,11 +1981,41 @@ func isBannedFromBeingCandidateSlave(slave *Instance) bool {
 	return false
 }
 
+func getPriorityMajorVersionForCandidate(slaves [](*Instance)) (prorityMajorVersion string, err error) {
+	if len(slaves) == 0 {
+		return "", log.Errorf("empty slaves list in getPriorityMajorVersionForCandidate")
+	}
+	majorVersionsCount := make(map[string]int)
+	for _, slave := range slaves {
+		majorVersionsCount[slave.MajorVersionString()] = majorVersionsCount[slave.MajorVersionString()] + 1
+	}
+	if len(majorVersionsCount) == 1 {
+		// all same version, simple case
+		return slaves[0].MajorVersionString(), nil
+	}
+	log.Debugf("====== majorVersionsCount len: %+v; 5.6 has %+v", len(majorVersionsCount), majorVersionsCount["5.6"])
+	//priorityMajorVersion := ""
+
+	majorVersionMaxCount := 0
+	for majorVersion, count := range majorVersionsCount {
+		if count > majorVersionMaxCount {
+			majorVersionMaxCount = count
+			prorityMajorVersion = majorVersion
+		} else if count == majorVersionMaxCount {
+			majorVersionMaxCount = count
+			prorityMajorVersion = majorVersion
+		}
+	}
+	return prorityMajorVersion, nil
+}
+
 // chooseCandidateSlave
 func chooseCandidateSlave(slaves [](*Instance)) (candidateSlave *Instance, aheadSlaves, equalSlaves, laterSlaves [](*Instance), err error) {
 	if len(slaves) == 0 {
 		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, fmt.Errorf("No slaves found given in chooseCandidateSlave")
 	}
+	getPriorityMajorVersionForCandidate(slaves)
+
 	for _, slave := range slaves {
 		slave := slave
 		if isGenerallyValidAsCandidateSlave(slave) && !isBannedFromBeingCandidateSlave(slave) {

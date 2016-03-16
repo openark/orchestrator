@@ -29,6 +29,10 @@ func generateTestInstances() (instances [](*Instance), instancesMap map[string](
 	i820 := Instance{Key: i820Key, ExecBinlogCoordinates: BinlogCoordinates{LogFile: "mysql.000008", LogPos: 20}}
 	i830 := Instance{Key: i830Key, ExecBinlogCoordinates: BinlogCoordinates{LogFile: "mysql.000008", LogPos: 30}}
 	instances = [](*Instance){&i710, &i720, &i730, &i810, &i820, &i830}
+	for _, instance := range instances {
+		instance.Version = "5.6.7"
+		instance.Binlog_format = "STATEMENT"
+	}
 	instancesMap = make(map[string](*Instance))
 	for _, instance := range instances {
 		instancesMap[instance.Key.StringCode()] = instance
@@ -42,16 +46,38 @@ func TestInitial(t *testing.T) {
 
 func TestSortInstances(t *testing.T) {
 	instances, _ := generateTestInstances()
-	for _, instance := range instances {
-		instance.Version = "5.6.7"
-	}
 	sortInstances(instances)
-	test.S(t).ExpectTrue(instances[0].Key.Equals(&i830Key))
-	test.S(t).ExpectTrue(instances[1].Key.Equals(&i820Key))
-	test.S(t).ExpectTrue(instances[2].Key.Equals(&i810Key))
-	test.S(t).ExpectTrue(instances[3].Key.Equals(&i730Key))
-	test.S(t).ExpectTrue(instances[4].Key.Equals(&i720Key))
-	test.S(t).ExpectTrue(instances[5].Key.Equals(&i710Key))
+	test.S(t).ExpectEquals(instances[0].Key, i830Key)
+	test.S(t).ExpectEquals(instances[1].Key, i820Key)
+	test.S(t).ExpectEquals(instances[2].Key, i810Key)
+	test.S(t).ExpectEquals(instances[3].Key, i730Key)
+	test.S(t).ExpectEquals(instances[4].Key, i720Key)
+	test.S(t).ExpectEquals(instances[5].Key, i710Key)
+}
+
+func TestSortInstancesSameCoordinatesDifferingBinlogFormats(t *testing.T) {
+	instances, instancesMap := generateTestInstances()
+	for _, instance := range instances {
+		instance.ExecBinlogCoordinates = instances[0].ExecBinlogCoordinates
+		instance.Binlog_format = "MIXED"
+	}
+	instancesMap[i810Key.StringCode()].Binlog_format = "STATEMENT"
+	instancesMap[i720Key.StringCode()].Binlog_format = "ROW"
+	sortInstances(instances)
+	test.S(t).ExpectEquals(instances[0].Key, i810Key)
+	test.S(t).ExpectEquals(instances[5].Key, i720Key)
+}
+
+func TestSortInstancesSameCoordinatesDifferingVersions(t *testing.T) {
+	instances, instancesMap := generateTestInstances()
+	for _, instance := range instances {
+		instance.ExecBinlogCoordinates = instances[0].ExecBinlogCoordinates
+	}
+	instancesMap[i810Key.StringCode()].Version = "5.5.1"
+	instancesMap[i720Key.StringCode()].Version = "5.7.8"
+	sortInstances(instances)
+	test.S(t).ExpectEquals(instances[0].Key, i810Key)
+	test.S(t).ExpectEquals(instances[5].Key, i720Key)
 }
 
 func TestIsGenerallyValidAsBinlogSource(t *testing.T) {
@@ -142,4 +168,23 @@ func TestChooseCandidateSlave2(t *testing.T) {
 	test.S(t).ExpectEquals(len(aheadSlaves), 2)
 	test.S(t).ExpectEquals(len(equalSlaves), 0)
 	test.S(t).ExpectEquals(len(laterSlaves), 3)
+}
+
+func TestChooseCandidateSlaveSameCoordinatesDifferentVersions(t *testing.T) {
+	instances, instancesMap := generateTestInstances()
+	for _, instance := range instances {
+		instance.IsLastCheckValid = true
+		instance.LogBinEnabled = true
+		instance.LogSlaveUpdatesEnabled = true
+		instance.ExecBinlogCoordinates = instances[0].ExecBinlogCoordinates
+	}
+	instancesMap[i810Key.StringCode()].Version = "5.5.1"
+	instancesMap[i720Key.StringCode()].Version = "5.7.8"
+	instances = sortedSlaves(instances, false)
+	candidate, aheadSlaves, equalSlaves, laterSlaves, err := chooseCandidateSlave(instances)
+	test.S(t).ExpectNil(err)
+	test.S(t).ExpectEquals(candidate.Key, i810Key)
+	test.S(t).ExpectEquals(len(aheadSlaves), 0)
+	test.S(t).ExpectEquals(len(equalSlaves), 5)
+	test.S(t).ExpectEquals(len(laterSlaves), 0)
 }
