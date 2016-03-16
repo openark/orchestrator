@@ -22,12 +22,12 @@ func init() {
 }
 
 func generateTestInstances() (instances [](*Instance), instancesMap map[string](*Instance)) {
-	i710 := Instance{Key: i710Key, ExecBinlogCoordinates: BinlogCoordinates{LogFile: "mysql.000007", LogPos: 10}}
-	i720 := Instance{Key: i720Key, ExecBinlogCoordinates: BinlogCoordinates{LogFile: "mysql.000007", LogPos: 20}}
-	i730 := Instance{Key: i730Key, ExecBinlogCoordinates: BinlogCoordinates{LogFile: "mysql.000007", LogPos: 30}}
-	i810 := Instance{Key: i810Key, ExecBinlogCoordinates: BinlogCoordinates{LogFile: "mysql.000008", LogPos: 10}}
-	i820 := Instance{Key: i820Key, ExecBinlogCoordinates: BinlogCoordinates{LogFile: "mysql.000008", LogPos: 20}}
-	i830 := Instance{Key: i830Key, ExecBinlogCoordinates: BinlogCoordinates{LogFile: "mysql.000008", LogPos: 30}}
+	i710 := Instance{Key: i710Key, ServerID: 710, ExecBinlogCoordinates: BinlogCoordinates{LogFile: "mysql.000007", LogPos: 10}}
+	i720 := Instance{Key: i720Key, ServerID: 720, ExecBinlogCoordinates: BinlogCoordinates{LogFile: "mysql.000007", LogPos: 20}}
+	i730 := Instance{Key: i730Key, ServerID: 730, ExecBinlogCoordinates: BinlogCoordinates{LogFile: "mysql.000007", LogPos: 30}}
+	i810 := Instance{Key: i810Key, ServerID: 810, ExecBinlogCoordinates: BinlogCoordinates{LogFile: "mysql.000008", LogPos: 10}}
+	i820 := Instance{Key: i820Key, ServerID: 820, ExecBinlogCoordinates: BinlogCoordinates{LogFile: "mysql.000008", LogPos: 20}}
+	i830 := Instance{Key: i830Key, ServerID: 830, ExecBinlogCoordinates: BinlogCoordinates{LogFile: "mysql.000008", LogPos: 30}}
 	instances = [](*Instance){&i710, &i720, &i730, &i810, &i820, &i830}
 	for _, instance := range instances {
 		instance.Version = "5.6.7"
@@ -38,6 +38,14 @@ func generateTestInstances() (instances [](*Instance), instancesMap map[string](
 		instancesMap[instance.Key.StringCode()] = instance
 	}
 	return instances, instancesMap
+}
+
+func applyGeneralGoodToGoReplicationParams(instances [](*Instance)) {
+	for _, instance := range instances {
+		instance.IsLastCheckValid = true
+		instance.LogBinEnabled = true
+		instance.LogSlaveUpdatesEnabled = true
+	}
 }
 
 func TestInitial(t *testing.T) {
@@ -80,16 +88,34 @@ func TestSortInstancesSameCoordinatesDifferingVersions(t *testing.T) {
 	test.S(t).ExpectEquals(instances[5].Key, i720Key)
 }
 
+func TestGetPriorityMajorVersionForCandidate(t *testing.T) {
+	instances, instancesMap := generateTestInstances()
+
+	priorityMajorVersion, err := getPriorityMajorVersionForCandidate(instances)
+	test.S(t).ExpectNil(err)
+	test.S(t).ExpectEquals(priorityMajorVersion, "5.6")
+
+	instancesMap[i810Key.StringCode()].Version = "5.5.1"
+	instancesMap[i720Key.StringCode()].Version = "5.7.8"
+	priorityMajorVersion, err = getPriorityMajorVersionForCandidate(instances)
+	test.S(t).ExpectNil(err)
+	test.S(t).ExpectEquals(priorityMajorVersion, "5.6")
+
+	instancesMap[i710Key.StringCode()].Version = "5.7.8"
+	instancesMap[i720Key.StringCode()].Version = "5.7.8"
+	instancesMap[i730Key.StringCode()].Version = "5.7.8"
+	instancesMap[i830Key.StringCode()].Version = "5.7.8"
+	priorityMajorVersion, err = getPriorityMajorVersionForCandidate(instances)
+	test.S(t).ExpectNil(err)
+	test.S(t).ExpectEquals(priorityMajorVersion, "5.7")
+}
+
 func TestIsGenerallyValidAsBinlogSource(t *testing.T) {
 	instances, _ := generateTestInstances()
 	for _, instance := range instances {
 		test.S(t).ExpectFalse(isGenerallyValidAsBinlogSource(instance))
 	}
-	for _, instance := range instances {
-		instance.IsLastCheckValid = true
-		instance.LogBinEnabled = true
-		instance.LogSlaveUpdatesEnabled = true
-	}
+	applyGeneralGoodToGoReplicationParams(instances)
 	for _, instance := range instances {
 		test.S(t).ExpectTrue(isGenerallyValidAsBinlogSource(instance))
 	}
@@ -108,11 +134,7 @@ func TestIsGenerallyValidAsCandidateSlave(t *testing.T) {
 	for _, instance := range instances {
 		test.S(t).ExpectFalse(isGenerallyValidAsCandidateSlave(instance))
 	}
-	for _, instance := range instances {
-		instance.IsLastCheckValid = true
-		instance.LogBinEnabled = true
-		instance.LogSlaveUpdatesEnabled = true
-	}
+	applyGeneralGoodToGoReplicationParams(instances)
 	for _, instance := range instances {
 		test.S(t).ExpectTrue(isGenerallyValidAsCandidateSlave(instance))
 	}
@@ -132,59 +154,130 @@ func TestChooseCandidateSlaveNoCandidateSlave(t *testing.T) {
 		instance.LogBinEnabled = true
 		instance.LogSlaveUpdatesEnabled = false
 	}
-	_, _, _, _, err := chooseCandidateSlave(instances)
+	_, _, _, _, _, err := chooseCandidateSlave(instances)
 	test.S(t).ExpectNotNil(err)
 }
 
 func TestChooseCandidateSlave(t *testing.T) {
 	instances, _ := generateTestInstances()
-	for _, instance := range instances {
-		instance.IsLastCheckValid = true
-		instance.LogBinEnabled = true
-		instance.LogSlaveUpdatesEnabled = true
-	}
+	applyGeneralGoodToGoReplicationParams(instances)
 	instances = sortedSlaves(instances, false)
-	candidate, aheadSlaves, equalSlaves, laterSlaves, err := chooseCandidateSlave(instances)
+	candidate, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err := chooseCandidateSlave(instances)
 	test.S(t).ExpectNil(err)
 	test.S(t).ExpectEquals(candidate.Key, i830Key)
 	test.S(t).ExpectEquals(len(aheadSlaves), 0)
 	test.S(t).ExpectEquals(len(equalSlaves), 0)
 	test.S(t).ExpectEquals(len(laterSlaves), 5)
+	test.S(t).ExpectEquals(len(cannotReplicateSlaves), 0)
 }
 
 func TestChooseCandidateSlave2(t *testing.T) {
 	instances, instancesMap := generateTestInstances()
-	for _, instance := range instances {
-		instance.IsLastCheckValid = true
-		instance.LogBinEnabled = true
-		instance.LogSlaveUpdatesEnabled = true
-	}
+	applyGeneralGoodToGoReplicationParams(instances)
 	instancesMap[i830Key.StringCode()].LogSlaveUpdatesEnabled = false
 	instancesMap[i820Key.StringCode()].LogBinEnabled = false
 	instances = sortedSlaves(instances, false)
-	candidate, aheadSlaves, equalSlaves, laterSlaves, err := chooseCandidateSlave(instances)
+	candidate, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err := chooseCandidateSlave(instances)
 	test.S(t).ExpectNil(err)
 	test.S(t).ExpectEquals(candidate.Key, i810Key)
 	test.S(t).ExpectEquals(len(aheadSlaves), 2)
 	test.S(t).ExpectEquals(len(equalSlaves), 0)
 	test.S(t).ExpectEquals(len(laterSlaves), 3)
+	test.S(t).ExpectEquals(len(cannotReplicateSlaves), 0)
 }
 
 func TestChooseCandidateSlaveSameCoordinatesDifferentVersions(t *testing.T) {
 	instances, instancesMap := generateTestInstances()
+	applyGeneralGoodToGoReplicationParams(instances)
 	for _, instance := range instances {
-		instance.IsLastCheckValid = true
-		instance.LogBinEnabled = true
-		instance.LogSlaveUpdatesEnabled = true
 		instance.ExecBinlogCoordinates = instances[0].ExecBinlogCoordinates
 	}
 	instancesMap[i810Key.StringCode()].Version = "5.5.1"
 	instancesMap[i720Key.StringCode()].Version = "5.7.8"
 	instances = sortedSlaves(instances, false)
-	candidate, aheadSlaves, equalSlaves, laterSlaves, err := chooseCandidateSlave(instances)
+	candidate, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err := chooseCandidateSlave(instances)
 	test.S(t).ExpectNil(err)
 	test.S(t).ExpectEquals(candidate.Key, i810Key)
 	test.S(t).ExpectEquals(len(aheadSlaves), 0)
 	test.S(t).ExpectEquals(len(equalSlaves), 5)
 	test.S(t).ExpectEquals(len(laterSlaves), 0)
+	test.S(t).ExpectEquals(len(cannotReplicateSlaves), 0)
+}
+
+func TestChooseCandidateSlavePriorityVersionNoLoss(t *testing.T) {
+	instances, instancesMap := generateTestInstances()
+	applyGeneralGoodToGoReplicationParams(instances)
+	instancesMap[i830Key.StringCode()].Version = "5.5.1"
+	instances = sortedSlaves(instances, false)
+	candidate, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err := chooseCandidateSlave(instances)
+	test.S(t).ExpectNil(err)
+	test.S(t).ExpectEquals(candidate.Key, i830Key)
+	test.S(t).ExpectEquals(len(aheadSlaves), 0)
+	test.S(t).ExpectEquals(len(equalSlaves), 0)
+	test.S(t).ExpectEquals(len(laterSlaves), 5)
+	test.S(t).ExpectEquals(len(cannotReplicateSlaves), 0)
+}
+
+func TestChooseCandidateSlavePriorityVersionLosesOne(t *testing.T) {
+	instances, instancesMap := generateTestInstances()
+	applyGeneralGoodToGoReplicationParams(instances)
+	instancesMap[i830Key.StringCode()].Version = "5.7.8"
+	instances = sortedSlaves(instances, false)
+	candidate, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err := chooseCandidateSlave(instances)
+	test.S(t).ExpectNil(err)
+	test.S(t).ExpectEquals(candidate.Key, i820Key)
+	test.S(t).ExpectEquals(len(aheadSlaves), 1)
+	test.S(t).ExpectEquals(len(equalSlaves), 0)
+	test.S(t).ExpectEquals(len(laterSlaves), 4)
+	test.S(t).ExpectEquals(len(cannotReplicateSlaves), 0)
+}
+
+func TestChooseCandidateSlavePriorityVersionLosesTwo(t *testing.T) {
+	instances, instancesMap := generateTestInstances()
+	applyGeneralGoodToGoReplicationParams(instances)
+	instancesMap[i830Key.StringCode()].Version = "5.7.8"
+	instancesMap[i820Key.StringCode()].Version = "5.7.18"
+	instances = sortedSlaves(instances, false)
+	candidate, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err := chooseCandidateSlave(instances)
+	test.S(t).ExpectNil(err)
+	test.S(t).ExpectEquals(candidate.Key, i810Key)
+	test.S(t).ExpectEquals(len(aheadSlaves), 2)
+	test.S(t).ExpectEquals(len(equalSlaves), 0)
+	test.S(t).ExpectEquals(len(laterSlaves), 3)
+	test.S(t).ExpectEquals(len(cannotReplicateSlaves), 0)
+}
+
+func TestChooseCandidateSlavePriorityVersionHigherVersionOverrides(t *testing.T) {
+	instances, instancesMap := generateTestInstances()
+	applyGeneralGoodToGoReplicationParams(instances)
+	instancesMap[i830Key.StringCode()].Version = "5.7.8"
+	instancesMap[i820Key.StringCode()].Version = "5.7.18"
+	instancesMap[i810Key.StringCode()].Version = "5.7.5"
+	instancesMap[i730Key.StringCode()].Version = "5.7.30"
+	instances = sortedSlaves(instances, false)
+	candidate, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err := chooseCandidateSlave(instances)
+	test.S(t).ExpectNil(err)
+	test.S(t).ExpectEquals(candidate.Key, i830Key)
+	test.S(t).ExpectEquals(len(aheadSlaves), 0)
+	test.S(t).ExpectEquals(len(equalSlaves), 0)
+	test.S(t).ExpectEquals(len(laterSlaves), 3)
+	test.S(t).ExpectEquals(len(cannotReplicateSlaves), 2)
+}
+
+func TestChooseCandidateSlaveLosesOneDueToBinlogFormat(t *testing.T) {
+	instances, instancesMap := generateTestInstances()
+	applyGeneralGoodToGoReplicationParams(instances)
+	for _, instance := range instances {
+		instance.Binlog_format = "ROW"
+	}
+	instancesMap[i730Key.StringCode()].Binlog_format = "STATEMENT"
+
+	instances = sortedSlaves(instances, false)
+	candidate, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err := chooseCandidateSlave(instances)
+	test.S(t).ExpectNil(err)
+	test.S(t).ExpectEquals(candidate.Key, i830Key)
+	test.S(t).ExpectEquals(len(aheadSlaves), 0)
+	test.S(t).ExpectEquals(len(equalSlaves), 0)
+	test.S(t).ExpectEquals(len(laterSlaves), 4)
+	test.S(t).ExpectEquals(len(cannotReplicateSlaves), 1)
 }

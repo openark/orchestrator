@@ -117,10 +117,11 @@ func SemicolonTerminated(statement string) string {
 
 // MajorVersion returns a MySQL major version number (e.g. given "5.5.36" it returns "5.5")
 func MajorVersion(version string) []string {
-	if version == "" {
+	tokens := strings.Split(version, ".")
+	if len(tokens) < 2 {
 		return []string{"0", "0"}
 	}
-	return strings.Split(version, ".")[:2]
+	return tokens[:2]
 }
 
 // IsSmallerMajorVersion tests two versions against another and returns true if

@@ -1981,7 +1981,7 @@ func isBannedFromBeingCandidateSlave(slave *Instance) bool {
 	return false
 }
 
-func getPriorityMajorVersionForCandidate(slaves [](*Instance)) (prorityMajorVersion string, err error) {
+func getPriorityMajorVersionForCandidate(slaves [](*Instance)) (priorityMajorVersion string, err error) {
 	if len(slaves) == 0 {
 		return "", log.Errorf("empty slaves list in getPriorityMajorVersionForCandidate")
 	}
@@ -1993,32 +1993,29 @@ func getPriorityMajorVersionForCandidate(slaves [](*Instance)) (prorityMajorVers
 		// all same version, simple case
 		return slaves[0].MajorVersionString(), nil
 	}
-	log.Debugf("====== majorVersionsCount len: %+v; 5.6 has %+v", len(majorVersionsCount), majorVersionsCount["5.6"])
-	//priorityMajorVersion := ""
 
-	majorVersionMaxCount := 0
+	currentMaxMajorVersionCount := 0
 	for majorVersion, count := range majorVersionsCount {
-		if count > majorVersionMaxCount {
-			majorVersionMaxCount = count
-			prorityMajorVersion = majorVersion
-		} else if count == majorVersionMaxCount {
-			majorVersionMaxCount = count
-			prorityMajorVersion = majorVersion
+		if count > currentMaxMajorVersionCount {
+			currentMaxMajorVersionCount = count
+			priorityMajorVersion = majorVersion
 		}
 	}
-	return prorityMajorVersion, nil
+	return priorityMajorVersion, nil
 }
 
 // chooseCandidateSlave
-func chooseCandidateSlave(slaves [](*Instance)) (candidateSlave *Instance, aheadSlaves, equalSlaves, laterSlaves [](*Instance), err error) {
+func chooseCandidateSlave(slaves [](*Instance)) (candidateSlave *Instance, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves [](*Instance), err error) {
 	if len(slaves) == 0 {
-		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, fmt.Errorf("No slaves found given in chooseCandidateSlave")
+		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, fmt.Errorf("No slaves found given in chooseCandidateSlave")
 	}
-	getPriorityMajorVersionForCandidate(slaves)
+	priorityMajorVersion, _ := getPriorityMajorVersionForCandidate(slaves)
 
 	for _, slave := range slaves {
 		slave := slave
-		if isGenerallyValidAsCandidateSlave(slave) && !isBannedFromBeingCandidateSlave(slave) {
+		if isGenerallyValidAsCandidateSlave(slave) &&
+			!isBannedFromBeingCandidateSlave(slave) &&
+			!IsSmallerMajorVersion(priorityMajorVersion, slave.MajorVersionString()) {
 			// this is the one
 			candidateSlave = slave
 			break
@@ -2038,12 +2035,14 @@ func chooseCandidateSlave(slaves [](*Instance)) (candidateSlave *Instance, ahead
 		if candidateSlave != nil {
 			slaves = RemoveInstance(slaves, &candidateSlave.Key)
 		}
-		return candidateSlave, slaves, equalSlaves, laterSlaves, fmt.Errorf("chooseCandidateSlave: no candidate slave found")
+		return candidateSlave, slaves, equalSlaves, laterSlaves, cannotReplicateSlaves, fmt.Errorf("chooseCandidateSlave: no candidate slave found")
 	}
 	slaves = RemoveInstance(slaves, &candidateSlave.Key)
 	for _, slave := range slaves {
 		slave := slave
-		if slave.ExecBinlogCoordinates.SmallerThan(&candidateSlave.ExecBinlogCoordinates) {
+		if canReplicate, _ := slave.CanReplicateFrom(candidateSlave); !canReplicate {
+			cannotReplicateSlaves = append(cannotReplicateSlaves, slave)
+		} else if slave.ExecBinlogCoordinates.SmallerThan(&candidateSlave.ExecBinlogCoordinates) {
 			laterSlaves = append(laterSlaves, slave)
 		} else if slave.ExecBinlogCoordinates.Equals(&candidateSlave.ExecBinlogCoordinates) {
 			equalSlaves = append(equalSlaves, slave)
@@ -2051,33 +2050,34 @@ func chooseCandidateSlave(slaves [](*Instance)) (candidateSlave *Instance, ahead
 			aheadSlaves = append(aheadSlaves, slave)
 		}
 	}
-	return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err
+	return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err
 }
 
 // GetCandidateSlave chooses the best slave to promote given a (possibly dead) master
-func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instance, [](*Instance), [](*Instance), [](*Instance), error) {
+func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instance, [](*Instance), [](*Instance), [](*Instance), [](*Instance), error) {
 	var candidateSlave *Instance
 	aheadSlaves := [](*Instance){}
 	equalSlaves := [](*Instance){}
 	laterSlaves := [](*Instance){}
+	cannotReplicateSlaves := [](*Instance){}
 
 	slaves, err := getSlavesForSorting(masterKey, false)
 	if err != nil {
-		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err
+		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err
 	}
 	slaves = sortedSlaves(slaves, forRematchPurposes)
 	if err != nil {
-		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err
+		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err
 	}
 	if len(slaves) == 0 {
-		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, fmt.Errorf("No slaves found for %+v", *masterKey)
+		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, fmt.Errorf("No slaves found for %+v", *masterKey)
 	}
-	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err = chooseCandidateSlave(slaves)
+	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err = chooseCandidateSlave(slaves)
 	if err != nil {
-		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err
+		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err
 	}
 	log.Debugf("GetCandidateSlave: candidate: %+v, ahead: %d, equal: %d, late: %d", candidateSlave.Key, len(aheadSlaves), len(equalSlaves), len(laterSlaves))
-	return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, nil
+	return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, nil
 }
 
 // GetCandidateSlaveOfBinlogServerTopology chooses the best slave to promote given a (possibly dead) master
@@ -2110,7 +2110,7 @@ func GetCandidateSlaveOfBinlogServerTopology(masterKey *InstanceKey) (candidateS
 
 // RegroupSlavesPseudoGTID will choose a candidate slave of a given instance, and enslave its siblings using pseudo-gtid
 func RegroupSlavesPseudoGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
-	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err := GetCandidateSlave(masterKey, true)
+	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, _, err := GetCandidateSlave(masterKey, true)
 	if err != nil {
 		if !returnSlaveEvenOnFailureToRegroup {
 			candidateSlave = nil
@@ -2207,7 +2207,7 @@ func RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers(masterKey *Instanc
 		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: most up to date binlog server of %+v: %+v", *masterKey, mostUpToDateBinlogServer.Key)
 
 		// Find the most up to date candidate slave:
-		candidateSlave, _, _, _, err := GetCandidateSlave(masterKey, true)
+		candidateSlave, _, _, _, _, err := GetCandidateSlave(masterKey, true)
 		if err != nil {
 			return log.Errore(err)
 		}
@@ -2259,7 +2259,7 @@ func RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers(masterKey *Instanc
 // RegroupSlavesGTID will choose a candidate slave of a given instance, and enslave its siblings using GTID
 func RegroupSlavesGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance)) ([](*Instance), [](*Instance), *Instance, error) {
 	var emptySlaves [](*Instance)
-	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, err := GetCandidateSlave(masterKey, true)
+	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, _, err := GetCandidateSlave(masterKey, true)
 	if err != nil {
 		if !returnSlaveEvenOnFailureToRegroup {
 			candidateSlave = nil
