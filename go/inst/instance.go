@@ -112,51 +112,53 @@ func (this *Instance) Equals(other *Instance) bool {
 
 // MajorVersion returns this instance's major version number (e.g. for 5.5.36 it returns "5.5")
 func (this *Instance) MajorVersion() []string {
-	return strings.Split(this.Version, ".")[:2]
+	return MajorVersion(this.Version)
+}
+
+// MajorVersion returns this instance's major version number (e.g. for 5.5.36 it returns "5.5")
+func (this *Instance) MajorVersionString() string {
+	return strings.Join(this.MajorVersion(), ".")
 }
 
 func (this *Instance) IsMySQL51() bool {
-	return strings.Join(this.MajorVersion(), ".") == "5.1"
+	return this.MajorVersionString() == "5.1"
 }
 
 func (this *Instance) IsMySQL55() bool {
-	return strings.Join(this.MajorVersion(), ".") == "5.5"
+	return this.MajorVersionString() == "5.5"
 }
 
 func (this *Instance) IsMySQL56() bool {
-	return strings.Join(this.MajorVersion(), ".") == "5.6"
+	return this.MajorVersionString() == "5.6"
 }
 
 func (this *Instance) IsMySQL57() bool {
-	return strings.Join(this.MajorVersion(), ".") == "5.7"
+	return this.MajorVersionString() == "5.7"
 }
 
 func (this *Instance) IsMySQL58() bool {
-	return strings.Join(this.MajorVersion(), ".") == "5.8"
+	return this.MajorVersionString() == "5.8"
+}
+
+func (this *Instance) IsMySQL59() bool {
+	return this.MajorVersionString() == "5.9"
+}
+
+// IsSmallerBinlogFormat returns true when this instance's binlgo format is
+// "smaller" than the other's, i.e. binary logs cannot flow from the other instance to this one
+func (this *Instance) IsSmallerBinlogFormat(other *Instance) bool {
+	return IsSmallerBinlogFormat(this.Binlog_format, other.Binlog_format)
 }
 
 // IsSmallerMajorVersion tests this instance against another and returns true if this instance is of a smaller "major" varsion.
 // e.g. 5.5.36 is NOT a smaller major version as comapred to 5.5.36, but IS as compared to 5.6.9
 func (this *Instance) IsSmallerMajorVersion(other *Instance) bool {
-	thisMajorVersion := this.MajorVersion()
-	otherMajorVersion := other.MajorVersion()
-	for i := 0; i < len(thisMajorVersion); i++ {
-		this_token, _ := strconv.Atoi(thisMajorVersion[i])
-		other_token, _ := strconv.Atoi(otherMajorVersion[i])
-		if this_token < other_token {
-			return true
-		}
-		if this_token > other_token {
-			return false
-		}
-	}
-	return false
+	return IsSmallerMajorVersion(this.Version, other.Version)
 }
 
 // IsSmallerMajorVersionByString cehcks if this instance has a smaller major version number than given one
 func (this *Instance) IsSmallerMajorVersionByString(otherVersion string) bool {
-	other := &Instance{Version: otherVersion}
-	return this.IsSmallerMajorVersion(other)
+	return IsSmallerMajorVersion(this.Version, otherVersion)
 }
 
 // IsMariaDB checkes whether this is any version of MariaDB
@@ -284,11 +286,8 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 		return false, fmt.Errorf("instance %+v has version %s, which is lower than %s on %+v ", this.Key, this.Version, other.Version, other.Key)
 	}
 	if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
-		if this.Binlog_format == "STATEMENT" && (other.Binlog_format == "ROW" || other.Binlog_format == "MIXED") {
-			return false, fmt.Errorf("Cannot replicate from ROW/MIXED binlog format on %+v to STATEMENT on %+v", other.Key, this.Key)
-		}
-		if this.Binlog_format == "MIXED" && other.Binlog_format == "ROW" {
-			return false, fmt.Errorf("Cannot replicate from ROW binlog format on %+v to MIXED on %+v", other.Key, this.Key)
+		if this.IsSmallerBinlogFormat(other) {
+			return false, fmt.Errorf("Cannot replicate from %+v binlog format on %+v to %+v on %+v", other.Binlog_format, other.Key, this.Binlog_format, this.Key)
 		}
 	}
 	if config.Config.VerifyReplicationFilters {

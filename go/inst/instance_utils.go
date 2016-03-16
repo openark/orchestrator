@@ -18,6 +18,7 @@ package inst
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -27,6 +28,9 @@ type InstancesByExecBinlogCoordinates [](*Instance)
 func (this InstancesByExecBinlogCoordinates) Len() int      { return len(this) }
 func (this InstancesByExecBinlogCoordinates) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
 func (this InstancesByExecBinlogCoordinates) Less(i, j int) bool {
+	// Returning "true" in this function means [i] is "smaller" than [j],
+	// which will lead to [j] be a better candidate for promotion
+
 	// Sh*t happens. We just might get nil while attempting to discover/recover
 	if this[i] == nil {
 		return false
@@ -37,6 +41,18 @@ func (this InstancesByExecBinlogCoordinates) Less(i, j int) bool {
 	if this[i].ExecBinlogCoordinates.Equals(&this[j].ExecBinlogCoordinates) {
 		// Secondary sorting: "smaller" if not logging slave updates
 		if this[j].LogSlaveUpdatesEnabled && !this[i].LogSlaveUpdatesEnabled {
+			return true
+		}
+		// Next sorting: "smaller" if of higher version (this will be reversed eventually)
+		// Idea is that given 5.6 a& 5.7 both of the exact position, we will want to promote
+		// the 5.6 on top of 5.7, as the other way around is invalid
+		if this[j].IsSmallerMajorVersion(this[i]) {
+			return true
+		}
+		// Next sorting: "smaller" if of larger binlog-format (this will be reversed eventually)
+		// Idea is that given ROW & STATEMENT both of the exact position, we will want to promote
+		// the STATEMENT on top of ROW, as the other way around is invalid
+		if this[j].IsSmallerBinlogFormat(this[i]) {
 			return true
 		}
 	}
@@ -97,4 +113,44 @@ func SemicolonTerminated(statement string) string {
 	statement = strings.TrimRight(statement, ";")
 	statement = statement + ";"
 	return statement
+}
+
+// MajorVersion returns a MySQL major version number (e.g. given "5.5.36" it returns "5.5")
+func MajorVersion(version string) []string {
+	tokens := strings.Split(version, ".")
+	if len(tokens) < 2 {
+		return []string{"0", "0"}
+	}
+	return tokens[:2]
+}
+
+// IsSmallerMajorVersion tests two versions against another and returns true if
+// the former is a smaller "major" varsion than the latter.
+// e.g. 5.5.36 is NOT a smaller major version as comapred to 5.5.40, but IS as compared to 5.6.9
+func IsSmallerMajorVersion(version string, otherVersion string) bool {
+	thisMajorVersion := MajorVersion(version)
+	otherMajorVersion := MajorVersion(otherVersion)
+	for i := 0; i < len(thisMajorVersion); i++ {
+		thisToken, _ := strconv.Atoi(thisMajorVersion[i])
+		otherToken, _ := strconv.Atoi(otherMajorVersion[i])
+		if thisToken < otherToken {
+			return true
+		}
+		if thisToken > otherToken {
+			return false
+		}
+	}
+	return false
+}
+
+// IsSmallerBinlogFormat tests two binlog formats and sees if one is "smaller" than the other.
+// "smaller" binlog format means you can replicate from the smaller to the larger.
+func IsSmallerBinlogFormat(binlogFormat string, otherBinlogFormat string) bool {
+	if binlogFormat == "STATEMENT" {
+		return (otherBinlogFormat == "ROW" || otherBinlogFormat == "MIXED")
+	}
+	if binlogFormat == "MIXED" {
+		return otherBinlogFormat == "ROW"
+	}
+	return false
 }
