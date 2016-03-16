@@ -17,11 +17,8 @@
 package inst
 
 import (
-	"fmt"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
-	"github.com/outbrain/orchestrator/go/inst"
-	"github.com/outbrain/orchestrator/go/logic"
 	. "gopkg.in/check.v1"
 	"math/rand"
 	"testing"
@@ -38,19 +35,19 @@ var _ = Suite(&TestSuite{})
 // This was setup with mysqlsandbox (using MySQL 5.5.32, not that it matters) via:
 // $ make_replication_sandbox --how_many_nodes=3 --replication_directory=55orchestrator /path/to/sandboxes/5.5.32
 // modify below to fit your own environment
-var masterKey = inst.InstanceKey{
+var masterKey = InstanceKey{
 	Hostname: "127.0.0.1",
 	Port:     22987,
 }
-var slave1Key = inst.InstanceKey{
+var slave1Key = InstanceKey{
 	Hostname: "127.0.0.1",
 	Port:     22988,
 }
-var slave2Key = inst.InstanceKey{
+var slave2Key = InstanceKey{
 	Hostname: "127.0.0.1",
 	Port:     22989,
 }
-var slave3Key = inst.InstanceKey{
+var slave3Key = InstanceKey{
 	Hostname: "127.0.0.1",
 	Port:     22990,
 }
@@ -75,9 +72,9 @@ func (s *TestSuite) SetUpSuite(c *C) {
 	_, _ = db.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave2Key.Hostname, slave2Key.Port)
 	_, _ = db.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave3Key.Hostname, slave3Key.Port)
 
-	inst.ExecInstance(&masterKey, "drop database if exists orchestrator_test")
-	inst.ExecInstance(&masterKey, "create database orchestrator_test")
-	inst.ExecInstance(&masterKey, `create table orchestrator_test.test_table(
+	ExecInstance(&masterKey, "drop database if exists orchestrator_test")
+	ExecInstance(&masterKey, "create database orchestrator_test")
+	ExecInstance(&masterKey, `create table orchestrator_test.test_table(
 			name    varchar(128) charset ascii not null primary key,
 			value   varchar(128) charset ascii not null
 		)`)
@@ -86,7 +83,7 @@ func (s *TestSuite) SetUpSuite(c *C) {
 
 func (s *TestSuite) TestReadTopologyMaster(c *C) {
 	key := masterKey
-	i, _ := inst.ReadTopologyInstance(&key)
+	i, _ := ReadTopologyInstance(&key)
 
 	c.Assert(i.Key.Hostname, Equals, key.Hostname)
 	c.Assert(i.IsSlave(), Equals, false)
@@ -96,15 +93,15 @@ func (s *TestSuite) TestReadTopologyMaster(c *C) {
 
 func (s *TestSuite) TestReadTopologySlave(c *C) {
 	key := slave3Key
-	i, _ := inst.ReadTopologyInstance(&key)
+	i, _ := ReadTopologyInstance(&key)
 	c.Assert(i.Key.Hostname, Equals, key.Hostname)
 	c.Assert(i.IsSlave(), Equals, true)
 	c.Assert(len(i.SlaveHosts), Equals, 0)
 }
 
 func (s *TestSuite) TestReadTopologyAndInstanceMaster(c *C) {
-	i, _ := inst.ReadTopologyInstance(&masterKey)
-	iRead, found, _ := inst.ReadInstance(&masterKey)
+	i, _ := ReadTopologyInstance(&masterKey)
+	iRead, found, _ := ReadInstance(&masterKey)
 	c.Assert(found, Equals, true)
 	c.Assert(iRead.Key.Hostname, Equals, i.Key.Hostname)
 	c.Assert(iRead.Version, Equals, i.Version)
@@ -112,59 +109,59 @@ func (s *TestSuite) TestReadTopologyAndInstanceMaster(c *C) {
 }
 
 func (s *TestSuite) TestReadTopologyAndInstanceSlave(c *C) {
-	i, _ := inst.ReadTopologyInstance(&slave1Key)
-	iRead, found, _ := inst.ReadInstance(&slave1Key)
+	i, _ := ReadTopologyInstance(&slave1Key)
+	iRead, found, _ := ReadInstance(&slave1Key)
 	c.Assert(found, Equals, true)
 	c.Assert(iRead.Key.Hostname, Equals, i.Key.Hostname)
 	c.Assert(iRead.Version, Equals, i.Version)
 }
 
 func (s *TestSuite) TestGetMasterOfASlave(c *C) {
-	i, err := inst.ReadTopologyInstance(&slave1Key)
+	i, err := ReadTopologyInstance(&slave1Key)
 	c.Assert(err, IsNil)
-	master, err := inst.GetInstanceMaster(i)
+	master, err := GetInstanceMaster(i)
 	c.Assert(err, IsNil)
 	c.Assert(master.IsSlave(), Equals, false)
 	c.Assert(master.Key.Port, Equals, 22987)
 }
 
 func (s *TestSuite) TestSlavesAreSiblings(c *C) {
-	i0, _ := inst.ReadTopologyInstance(&slave1Key)
-	i1, _ := inst.ReadTopologyInstance(&slave2Key)
-	c.Assert(inst.InstancesAreSiblings(i0, i1), Equals, true)
+	i0, _ := ReadTopologyInstance(&slave1Key)
+	i1, _ := ReadTopologyInstance(&slave2Key)
+	c.Assert(InstancesAreSiblings(i0, i1), Equals, true)
 }
 
 func (s *TestSuite) TestNonSiblings(c *C) {
-	i0, _ := inst.ReadTopologyInstance(&masterKey)
-	i1, _ := inst.ReadTopologyInstance(&slave1Key)
-	c.Assert(inst.InstancesAreSiblings(i0, i1), Not(Equals), true)
+	i0, _ := ReadTopologyInstance(&masterKey)
+	i1, _ := ReadTopologyInstance(&slave1Key)
+	c.Assert(InstancesAreSiblings(i0, i1), Not(Equals), true)
 }
 
 func (s *TestSuite) TestInstanceIsMasterOf(c *C) {
-	i0, _ := inst.ReadTopologyInstance(&masterKey)
-	i1, _ := inst.ReadTopologyInstance(&slave1Key)
-	c.Assert(inst.InstanceIsMasterOf(i0, i1), Equals, true)
+	i0, _ := ReadTopologyInstance(&masterKey)
+	i1, _ := ReadTopologyInstance(&slave1Key)
+	c.Assert(InstanceIsMasterOf(i0, i1), Equals, true)
 }
 
 func (s *TestSuite) TestStopStartSlave(c *C) {
 
-	i, _ := inst.ReadTopologyInstance(&slave1Key)
+	i, _ := ReadTopologyInstance(&slave1Key)
 	c.Assert(i.SlaveRunning(), Equals, true)
-	i, _ = inst.StopSlaveNicely(&i.Key, 0)
+	i, _ = StopSlaveNicely(&i.Key, 0)
 
 	c.Assert(i.SlaveRunning(), Equals, false)
 	c.Assert(i.SQLThreadUpToDate(), Equals, true)
 
-	i, _ = inst.StartSlave(&i.Key)
+	i, _ = StartSlave(&i.Key)
 	c.Assert(i.SlaveRunning(), Equals, true)
 }
 
 func (s *TestSuite) TestReadTopologyUnexisting(c *C) {
-	key := inst.InstanceKey{
+	key := InstanceKey{
 		Hostname: "127.0.0.1",
 		Port:     22999,
 	}
-	_, err := inst.ReadTopologyInstance(&key)
+	_, err := ReadTopologyInstance(&key)
 
 	c.Assert(err, Not(IsNil))
 }
@@ -172,17 +169,17 @@ func (s *TestSuite) TestReadTopologyUnexisting(c *C) {
 func (s *TestSuite) TestMoveBelowAndBack(c *C) {
 	clearTestMaintenance()
 	// become child
-	slave1, err := inst.MoveBelow(&slave1Key, &slave2Key)
+	slave1, err := MoveBelow(&slave1Key, &slave2Key)
 	c.Assert(err, IsNil)
 
 	c.Assert(slave1.MasterKey.Equals(&slave2Key), Equals, true)
 	c.Assert(slave1.SlaveRunning(), Equals, true)
 
 	// And back; keep topology intact
-	slave1, _ = inst.MoveUp(&slave1Key)
-	slave2, _ := inst.ReadTopologyInstance(&slave2Key)
+	slave1, _ = MoveUp(&slave1Key)
+	slave2, _ := ReadTopologyInstance(&slave2Key)
 
-	c.Assert(inst.InstancesAreSiblings(slave1, slave2), Equals, true)
+	c.Assert(InstancesAreSiblings(slave1, slave2), Equals, true)
 	c.Assert(slave1.SlaveRunning(), Equals, true)
 
 }
@@ -191,7 +188,7 @@ func (s *TestSuite) TestMoveBelowAndBackComplex(c *C) {
 	clearTestMaintenance()
 
 	// become child
-	slave1, _ := inst.MoveBelow(&slave1Key, &slave2Key)
+	slave1, _ := MoveBelow(&slave1Key, &slave2Key)
 
 	c.Assert(slave1.MasterKey.Equals(&slave2Key), Equals, true)
 	c.Assert(slave1.SlaveRunning(), Equals, true)
@@ -199,87 +196,87 @@ func (s *TestSuite) TestMoveBelowAndBackComplex(c *C) {
 	// Now let's have fun. Stop slave2 (which is now parent of slave1), execute queries on master,
 	// move s1 back under master, start all, verify queries.
 
-	_, err := inst.StopSlave(&slave2Key)
+	_, err := StopSlave(&slave2Key)
 	c.Assert(err, IsNil)
 
 	randValue := rand.Int()
-	_, err = inst.ExecInstance(&masterKey, `replace into orchestrator_test.test_table (name, value) values ('TestMoveBelowAndBackComplex', ?)`, randValue)
+	_, err = ExecInstance(&masterKey, `replace into orchestrator_test.test_table (name, value) values ('TestMoveBelowAndBackComplex', ?)`, randValue)
 	c.Assert(err, IsNil)
-	master, err := inst.ReadTopologyInstance(&masterKey)
+	master, err := ReadTopologyInstance(&masterKey)
 	c.Assert(err, IsNil)
 
 	// And back; keep topology intact
-	slave1, err = inst.MoveUp(&slave1Key)
+	slave1, err = MoveUp(&slave1Key)
 	c.Assert(err, IsNil)
-	_, err = inst.MasterPosWait(&slave1Key, &master.SelfBinlogCoordinates)
+	_, err = MasterPosWait(&slave1Key, &master.SelfBinlogCoordinates)
 	c.Assert(err, IsNil)
-	slave2, err := inst.ReadTopologyInstance(&slave2Key)
+	slave2, err := ReadTopologyInstance(&slave2Key)
 	c.Assert(err, IsNil)
-	_, err = inst.MasterPosWait(&slave2Key, &master.SelfBinlogCoordinates)
+	_, err = MasterPosWait(&slave2Key, &master.SelfBinlogCoordinates)
 	c.Assert(err, IsNil)
 	// Now check for value!
 	var value1, value2 int
-	inst.ScanInstanceRow(&slave1Key, `select value from orchestrator_test.test_table where name='TestMoveBelowAndBackComplex'`, &value1)
-	inst.ScanInstanceRow(&slave2Key, `select value from orchestrator_test.test_table where name='TestMoveBelowAndBackComplex'`, &value2)
+	ScanInstanceRow(&slave1Key, `select value from orchestrator_test.test_table where name='TestMoveBelowAndBackComplex'`, &value1)
+	ScanInstanceRow(&slave2Key, `select value from orchestrator_test.test_table where name='TestMoveBelowAndBackComplex'`, &value2)
 
-	c.Assert(inst.InstancesAreSiblings(slave1, slave2), Equals, true)
+	c.Assert(InstancesAreSiblings(slave1, slave2), Equals, true)
 	c.Assert(value1, Equals, randValue)
 	c.Assert(value2, Equals, randValue)
 }
 
 func (s *TestSuite) TestFailMoveBelow(c *C) {
 	clearTestMaintenance()
-	_, _ = inst.ExecInstance(&slave2Key, `set global binlog_format:='ROW'`)
-	_, err := inst.MoveBelow(&slave1Key, &slave2Key)
-	_, _ = inst.ExecInstance(&slave2Key, `set global binlog_format:='STATEMENT'`)
+	_, _ = ExecInstance(&slave2Key, `set global binlog_format:='ROW'`)
+	_, err := MoveBelow(&slave1Key, &slave2Key)
+	_, _ = ExecInstance(&slave2Key, `set global binlog_format:='STATEMENT'`)
 	c.Assert(err, Not(IsNil))
 }
 
 func (s *TestSuite) TestMakeCoMasterAndBack(c *C) {
 	clearTestMaintenance()
 
-	slave1, err := inst.MakeCoMaster(&slave1Key)
+	slave1, err := MakeCoMaster(&slave1Key)
 	c.Assert(err, IsNil)
 
 	// Now master & slave1 expected to be co-masters. Check!
-	master, _ := inst.ReadTopologyInstance(&masterKey)
+	master, _ := ReadTopologyInstance(&masterKey)
 	c.Assert(master.IsSlaveOf(slave1), Equals, true)
 	c.Assert(slave1.IsSlaveOf(master), Equals, true)
 
 	// reset - restore to original state
-	master, err = inst.ResetSlaveOperation(&masterKey)
-	slave1, _ = inst.ReadTopologyInstance(&slave1Key)
+	master, err = ResetSlaveOperation(&masterKey)
+	slave1, _ = ReadTopologyInstance(&slave1Key)
 	c.Assert(err, IsNil)
 	c.Assert(master.MasterKey.Hostname, Equals, "_")
 }
 
 func (s *TestSuite) TestFailMakeCoMaster(c *C) {
 	clearTestMaintenance()
-	_, err := inst.MakeCoMaster(&masterKey)
+	_, err := MakeCoMaster(&masterKey)
 	c.Assert(err, Not(IsNil))
 }
 
 func (s *TestSuite) TestMakeCoMasterAndBackAndFailOthersToBecomeCoMasters(c *C) {
 	clearTestMaintenance()
 
-	slave1, err := inst.MakeCoMaster(&slave1Key)
+	slave1, err := MakeCoMaster(&slave1Key)
 	c.Assert(err, IsNil)
 
 	// Now master & slave1 expected to be co-masters. Check!
-	master, _, _ := inst.ReadInstance(&masterKey)
+	master, _, _ := ReadInstance(&masterKey)
 	c.Assert(master.IsSlaveOf(slave1), Equals, true)
 	c.Assert(slave1.IsSlaveOf(master), Equals, true)
 
 	// Verify can't have additional co-masters
-	_, err = inst.MakeCoMaster(&masterKey)
+	_, err = MakeCoMaster(&masterKey)
 	c.Assert(err, Not(IsNil))
-	_, err = inst.MakeCoMaster(&slave1Key)
+	_, err = MakeCoMaster(&slave1Key)
 	c.Assert(err, Not(IsNil))
-	_, err = inst.MakeCoMaster(&slave2Key)
+	_, err = MakeCoMaster(&slave2Key)
 	c.Assert(err, Not(IsNil))
 
 	// reset slave - restore to original state
-	master, err = inst.ResetSlaveOperation(&masterKey)
+	master, err = ResetSlaveOperation(&masterKey)
 	c.Assert(err, IsNil)
 	c.Assert(master.MasterKey.Hostname, Equals, "_")
 }
@@ -290,105 +287,97 @@ func (s *TestSuite) TestDiscover(c *C) {
 	_, err = db.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave1Key.Hostname, slave1Key.Port)
 	_, err = db.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave2Key.Hostname, slave2Key.Port)
 	_, err = db.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave3Key.Hostname, slave3Key.Port)
-	_, found, _ := inst.ReadInstance(&masterKey)
+	_, found, _ := ReadInstance(&masterKey)
 	c.Assert(found, Equals, false)
-	_, _ = inst.ReadTopologyInstance(&slave1Key)
-	logic.StartDiscovery(slave1Key)
-	_, found, err = inst.ReadInstance(&slave1Key)
+	_, _ = ReadTopologyInstance(&slave1Key)
+	_, found, err = ReadInstance(&slave1Key)
 	c.Assert(found, Equals, true)
 	c.Assert(err, IsNil)
 }
 
 func (s *TestSuite) TestForgetMaster(c *C) {
-	_, _ = inst.ReadTopologyInstance(&masterKey)
-	_, found, _ := inst.ReadInstance(&masterKey)
+	_, _ = ReadTopologyInstance(&masterKey)
+	_, found, _ := ReadInstance(&masterKey)
 	c.Assert(found, Equals, true)
-	inst.ForgetInstance(&masterKey)
-	_, found, _ = inst.ReadInstance(&masterKey)
+	ForgetInstance(&masterKey)
+	_, found, _ = ReadInstance(&masterKey)
 	c.Assert(found, Equals, false)
-}
-
-func (s *TestSuite) TestCluster(c *C) {
-	inst.ReadInstance(&masterKey)
-	logic.StartDiscovery(slave1Key)
-	instances, _ := inst.ReadClusterInstances(fmt.Sprintf("%s:%d", masterKey.Hostname, masterKey.Port))
-	c.Assert(len(instances) >= 1, Equals, true)
 }
 
 func (s *TestSuite) TestBeginMaintenance(c *C) {
 	clearTestMaintenance()
-	_, _ = inst.ReadTopologyInstance(&masterKey)
-	_, err := inst.BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance")
+	_, _ = ReadTopologyInstance(&masterKey)
+	_, err := BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance")
 
 	c.Assert(err, IsNil)
 }
 
 func (s *TestSuite) TestBeginEndMaintenance(c *C) {
 	clearTestMaintenance()
-	_, _ = inst.ReadTopologyInstance(&masterKey)
-	k, err := inst.BeginMaintenance(&masterKey, "unittest", "TestBeginEndMaintenance")
+	_, _ = ReadTopologyInstance(&masterKey)
+	k, err := BeginMaintenance(&masterKey, "unittest", "TestBeginEndMaintenance")
 	c.Assert(err, IsNil)
-	err = inst.EndMaintenance(k)
+	err = EndMaintenance(k)
 	c.Assert(err, IsNil)
 }
 
 func (s *TestSuite) TestFailBeginMaintenanceTwice(c *C) {
 	clearTestMaintenance()
-	_, _ = inst.ReadTopologyInstance(&masterKey)
-	_, err := inst.BeginMaintenance(&masterKey, "unittest", "TestFailBeginMaintenanceTwice")
+	_, _ = ReadTopologyInstance(&masterKey)
+	_, err := BeginMaintenance(&masterKey, "unittest", "TestFailBeginMaintenanceTwice")
 	c.Assert(err, IsNil)
-	_, err = inst.BeginMaintenance(&masterKey, "unittest", "TestFailBeginMaintenanceTwice")
+	_, err = BeginMaintenance(&masterKey, "unittest", "TestFailBeginMaintenanceTwice")
 	c.Assert(err, Not(IsNil))
 }
 
 func (s *TestSuite) TestFailEndMaintenanceTwice(c *C) {
 	clearTestMaintenance()
-	_, _ = inst.ReadTopologyInstance(&masterKey)
-	k, err := inst.BeginMaintenance(&masterKey, "unittest", "TestFailEndMaintenanceTwice")
+	_, _ = ReadTopologyInstance(&masterKey)
+	k, err := BeginMaintenance(&masterKey, "unittest", "TestFailEndMaintenanceTwice")
 	c.Assert(err, IsNil)
-	err = inst.EndMaintenance(k)
+	err = EndMaintenance(k)
 	c.Assert(err, IsNil)
-	err = inst.EndMaintenance(k)
+	err = EndMaintenance(k)
 	c.Assert(err, Not(IsNil))
 }
 
 func (s *TestSuite) TestFailMoveBelowUponMaintenance(c *C) {
 	clearTestMaintenance()
-	_, _ = inst.ReadTopologyInstance(&slave1Key)
-	k, err := inst.BeginMaintenance(&slave1Key, "unittest", "TestBeginEndMaintenance")
+	_, _ = ReadTopologyInstance(&slave1Key)
+	k, err := BeginMaintenance(&slave1Key, "unittest", "TestBeginEndMaintenance")
 	c.Assert(err, IsNil)
 
-	_, err = inst.MoveBelow(&slave1Key, &slave2Key)
+	_, err = MoveBelow(&slave1Key, &slave2Key)
 	c.Assert(err, Not(IsNil))
 
-	err = inst.EndMaintenance(k)
+	err = EndMaintenance(k)
 	c.Assert(err, IsNil)
 }
 
 func (s *TestSuite) TestFailMoveBelowUponSlaveStopped(c *C) {
 	clearTestMaintenance()
 
-	slave1, _ := inst.ReadTopologyInstance(&slave1Key)
+	slave1, _ := ReadTopologyInstance(&slave1Key)
 	c.Assert(slave1.SlaveRunning(), Equals, true)
-	slave1, _ = inst.StopSlaveNicely(&slave1.Key, 0)
+	slave1, _ = StopSlaveNicely(&slave1.Key, 0)
 	c.Assert(slave1.SlaveRunning(), Equals, false)
 
-	_, err := inst.MoveBelow(&slave1Key, &slave2Key)
+	_, err := MoveBelow(&slave1Key, &slave2Key)
 	c.Assert(err, Not(IsNil))
 
-	_, _ = inst.StartSlave(&slave1.Key)
+	_, _ = StartSlave(&slave1.Key)
 }
 
 func (s *TestSuite) TestFailMoveBelowUponOtherSlaveStopped(c *C) {
 	clearTestMaintenance()
 
-	slave1, _ := inst.ReadTopologyInstance(&slave1Key)
+	slave1, _ := ReadTopologyInstance(&slave1Key)
 	c.Assert(slave1.SlaveRunning(), Equals, true)
-	slave1, _ = inst.StopSlaveNicely(&slave1.Key, 0)
+	slave1, _ = StopSlaveNicely(&slave1.Key, 0)
 	c.Assert(slave1.SlaveRunning(), Equals, false)
 
-	_, err := inst.MoveBelow(&slave2Key, &slave1Key)
+	_, err := MoveBelow(&slave2Key, &slave1Key)
 	c.Assert(err, Not(IsNil))
 
-	_, _ = inst.StartSlave(&slave1.Key)
+	_, _ = StartSlave(&slave1.Key)
 }

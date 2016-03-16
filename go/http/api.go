@@ -838,8 +838,8 @@ func (this *HttpAPI) RegroupSlaves(params martini.Params, r render.Render, req *
 		return
 	}
 
-	lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlaves(&instanceKey, false, nil, nil)
-
+	lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlaves(&instanceKey, false, nil, nil)
+	lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -862,7 +862,8 @@ func (this *HttpAPI) RegroupSlavesPseudoGTID(params martini.Params, r render.Ren
 		return
 	}
 
-	lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlavesPseudoGTID(&instanceKey, false, nil, nil)
+	lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlavesPseudoGTID(&instanceKey, false, nil, nil)
+	lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
@@ -885,7 +886,8 @@ func (this *HttpAPI) RegroupSlavesGTID(params martini.Params, r render.Render, r
 		return
 	}
 
-	lostSlaves, movedSlaves, promotedSlave, err := inst.RegroupSlavesGTID(&instanceKey, false, nil)
+	lostSlaves, movedSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlavesGTID(&instanceKey, false, nil)
+	lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
@@ -1467,7 +1469,7 @@ func (this *HttpAPI) ReloadClusterAlias(params martini.Params, r render.Render, 
 	r.JSON(200, &APIResponse{Code: OK, Message: "Cluster alias cache reloaded"})
 }
 
-// Agents provides complete list of registered agents (See https://github.com/outbrain/orchestrator-agent)
+// Agents provides complete list of registered agents (See https://github.com/github/orchestrator-agent)
 func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})

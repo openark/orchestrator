@@ -326,8 +326,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		err := sqlutils.QueryRowsMap(db, `show slave hosts`,
 			func(m sqlutils.RowMap) error {
 				slaveKey, err := NewInstanceKeyFromStrings(m.GetString("Host"), m.GetString("Port"))
-				slaveKey.Hostname, resolveErr = ResolveHostname(slaveKey.Hostname)
-				if err == nil {
+				if err == nil && slaveKey.IsValid() {
+					slaveKey.Hostname, resolveErr = ResolveHostname(slaveKey.Hostname)
 					instance.AddSlaveKey(slaveKey)
 					foundByShowSlaveHosts = true
 				}

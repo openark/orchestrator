@@ -61,7 +61,6 @@ type Configuration struct {
 	MySQLOrchestratorUseMutualTLS                bool     // Turn on TLS authentication with the Orchestrator MySQL instance
 	MySQLConnectTimeoutSeconds                   int      // Number of seconds before connection is aborted (driver-side)
 	DefaultInstancePort                          int      // In case port was not specified on command line
-	SkipOrchestratorDatabaseUpdate               bool     // When false, orchestrator will attempt to create & update all tables in backend database; when true, this is skipped. It makes sense to skip on command-line invocations and to enable for http or occasional invocations, or just after upgrades
 	SlaveLagQuery                                string   // custom query to check on slave lg (e.g. heartbeat table)
 	SlaveStartPostWaitMilliseconds               int      // Time to wait after START SLAVE before re-readong instance (give slave chance to connect to master)
 	DiscoverByShowSlaveHosts                     bool     // Attempt SHOW SLAVE HOSTS before PROCESSLIST
@@ -192,7 +191,6 @@ func newConfiguration() *Configuration {
 		MySQLOrchestratorUseMutualTLS:                false,
 		MySQLConnectTimeoutSeconds:                   5,
 		DefaultInstancePort:                          3306,
-		SkipOrchestratorDatabaseUpdate:               false,
 		InstancePollSeconds:                          60,
 		ReadLongRunningQueries:                       true,
 		BinlogFileHistoryDays:                        0,
