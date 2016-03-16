@@ -110,6 +110,28 @@ func TestGetPriorityMajorVersionForCandidate(t *testing.T) {
 	test.S(t).ExpectEquals(priorityMajorVersion, "5.7")
 }
 
+func TestGetPriorityBinlogFormatForCandidate(t *testing.T) {
+	instances, instancesMap := generateTestInstances()
+
+	priorityBinlogFormat, err := getPriorityBinlogFormatForCandidate(instances)
+	test.S(t).ExpectNil(err)
+	test.S(t).ExpectEquals(priorityBinlogFormat, "STATEMENT")
+
+	instancesMap[i810Key.StringCode()].Binlog_format = "MIXED"
+	instancesMap[i720Key.StringCode()].Binlog_format = "ROW"
+	priorityBinlogFormat, err = getPriorityBinlogFormatForCandidate(instances)
+	test.S(t).ExpectNil(err)
+	test.S(t).ExpectEquals(priorityBinlogFormat, "STATEMENT")
+
+	instancesMap[i710Key.StringCode()].Binlog_format = "ROW"
+	instancesMap[i720Key.StringCode()].Binlog_format = "ROW"
+	instancesMap[i730Key.StringCode()].Binlog_format = "ROW"
+	instancesMap[i830Key.StringCode()].Binlog_format = "ROW"
+	priorityBinlogFormat, err = getPriorityBinlogFormatForCandidate(instances)
+	test.S(t).ExpectNil(err)
+	test.S(t).ExpectEquals(priorityBinlogFormat, "ROW")
+}
+
 func TestIsGenerallyValidAsBinlogSource(t *testing.T) {
 	instances, _ := generateTestInstances()
 	for _, instance := range instances {
@@ -280,4 +302,67 @@ func TestChooseCandidateSlaveLosesOneDueToBinlogFormat(t *testing.T) {
 	test.S(t).ExpectEquals(len(equalSlaves), 0)
 	test.S(t).ExpectEquals(len(laterSlaves), 4)
 	test.S(t).ExpectEquals(len(cannotReplicateSlaves), 1)
+}
+
+func TestChooseCandidateSlavePriorityBinlogFormatNoLoss(t *testing.T) {
+	instances, instancesMap := generateTestInstances()
+	applyGeneralGoodToGoReplicationParams(instances)
+	for _, instance := range instances {
+		instance.Binlog_format = "MIXED"
+	}
+	instancesMap[i830Key.StringCode()].Binlog_format = "STATEMENT"
+	instances = sortedSlaves(instances, false)
+	candidate, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err := chooseCandidateSlave(instances)
+	test.S(t).ExpectNil(err)
+	test.S(t).ExpectEquals(candidate.Key, i830Key)
+	test.S(t).ExpectEquals(len(aheadSlaves), 0)
+	test.S(t).ExpectEquals(len(equalSlaves), 0)
+	test.S(t).ExpectEquals(len(laterSlaves), 5)
+	test.S(t).ExpectEquals(len(cannotReplicateSlaves), 0)
+}
+
+func TestChooseCandidateSlavePriorityBinlogFormatLosesOne(t *testing.T) {
+	instances, instancesMap := generateTestInstances()
+	applyGeneralGoodToGoReplicationParams(instances)
+	instancesMap[i830Key.StringCode()].Binlog_format = "ROW"
+	instances = sortedSlaves(instances, false)
+	candidate, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err := chooseCandidateSlave(instances)
+	test.S(t).ExpectNil(err)
+	test.S(t).ExpectEquals(candidate.Key, i820Key)
+	test.S(t).ExpectEquals(len(aheadSlaves), 1)
+	test.S(t).ExpectEquals(len(equalSlaves), 0)
+	test.S(t).ExpectEquals(len(laterSlaves), 4)
+	test.S(t).ExpectEquals(len(cannotReplicateSlaves), 0)
+}
+
+func TestChooseCandidateSlavePriorityBinlogFormatLosesTwo(t *testing.T) {
+	instances, instancesMap := generateTestInstances()
+	applyGeneralGoodToGoReplicationParams(instances)
+	instancesMap[i830Key.StringCode()].Binlog_format = "ROW"
+	instancesMap[i820Key.StringCode()].Binlog_format = "ROW"
+	instances = sortedSlaves(instances, false)
+	candidate, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err := chooseCandidateSlave(instances)
+	test.S(t).ExpectNil(err)
+	test.S(t).ExpectEquals(candidate.Key, i810Key)
+	test.S(t).ExpectEquals(len(aheadSlaves), 2)
+	test.S(t).ExpectEquals(len(equalSlaves), 0)
+	test.S(t).ExpectEquals(len(laterSlaves), 3)
+	test.S(t).ExpectEquals(len(cannotReplicateSlaves), 0)
+}
+
+func TestChooseCandidateSlavePriorityBinlogFormatRowOverrides(t *testing.T) {
+	instances, instancesMap := generateTestInstances()
+	applyGeneralGoodToGoReplicationParams(instances)
+	instancesMap[i830Key.StringCode()].Binlog_format = "ROW"
+	instancesMap[i820Key.StringCode()].Binlog_format = "ROW"
+	instancesMap[i810Key.StringCode()].Binlog_format = "ROW"
+	instancesMap[i730Key.StringCode()].Binlog_format = "ROW"
+	instances = sortedSlaves(instances, false)
+	candidate, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err := chooseCandidateSlave(instances)
+	test.S(t).ExpectNil(err)
+	test.S(t).ExpectEquals(candidate.Key, i830Key)
+	test.S(t).ExpectEquals(len(aheadSlaves), 0)
+	test.S(t).ExpectEquals(len(equalSlaves), 0)
+	test.S(t).ExpectEquals(len(laterSlaves), 3)
+	test.S(t).ExpectEquals(len(cannotReplicateSlaves), 2)
 }

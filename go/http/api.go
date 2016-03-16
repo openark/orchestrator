@@ -838,8 +838,8 @@ func (this *HttpAPI) RegroupSlaves(params martini.Params, r render.Render, req *
 		return
 	}
 
-	lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlaves(&instanceKey, false, nil, nil)
-
+	lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlaves(&instanceKey, false, nil, nil)
+	lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -862,7 +862,8 @@ func (this *HttpAPI) RegroupSlavesPseudoGTID(params martini.Params, r render.Ren
 		return
 	}
 
-	lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlavesPseudoGTID(&instanceKey, false, nil, nil)
+	lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlavesPseudoGTID(&instanceKey, false, nil, nil)
+	lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
@@ -885,7 +886,8 @@ func (this *HttpAPI) RegroupSlavesGTID(params martini.Params, r render.Render, r
 		return
 	}
 
-	lostSlaves, movedSlaves, promotedSlave, err := inst.RegroupSlavesGTID(&instanceKey, false, nil)
+	lostSlaves, movedSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlavesGTID(&instanceKey, false, nil)
+	lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})

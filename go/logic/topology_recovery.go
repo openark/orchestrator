@@ -283,6 +283,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (promotedSlave *inst.Instance, lostSlaves [](*inst.Instance), err error) {
 	analysisEntry := &topologyRecovery.AnalysisEntry
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
+	var cannotReplicateSlaves [](*inst.Instance)
 
 	inst.AuditOperation("recover-dead-master", failedInstanceKey, "problem found; will recover")
 	if !skipProcesses {
@@ -304,11 +305,11 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 	switch masterRecoveryType {
 	case MasterRecoveryGTID:
 		{
-			lostSlaves, _, promotedSlave, err = inst.RegroupSlavesGTID(failedInstanceKey, true, nil)
+			lostSlaves, _, cannotReplicateSlaves, promotedSlave, err = inst.RegroupSlavesGTID(failedInstanceKey, true, nil)
 		}
 	case MasterRecoveryPseudoGTID:
 		{
-			lostSlaves, _, _, promotedSlave, err = inst.RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers(failedInstanceKey, true, nil, &topologyRecovery.PostponedFunctionsContainer)
+			lostSlaves, _, _, cannotReplicateSlaves, promotedSlave, err = inst.RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers(failedInstanceKey, true, nil, &topologyRecovery.PostponedFunctionsContainer)
 		}
 	case MasterRecoveryBinlogServer:
 		{
@@ -316,6 +317,7 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 		}
 	}
 	topologyRecovery.AddError(err)
+	lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 
 	if promotedSlave != nil && len(lostSlaves) > 0 && config.Config.DetachLostSlavesAfterMasterFailover {
 		postponedFunction := func() error {
@@ -641,7 +643,7 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 	if !recoveryResolved {
 		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will next attempt regrouping of slaves")
 		// Plan B: regroup (we wish to reduce cross-DC replication streams)
-		_, _, _, regroupPromotedSlave, err := inst.RegroupSlaves(failedInstanceKey, true, nil, nil)
+		_, _, _, _, regroupPromotedSlave, err := inst.RegroupSlaves(failedInstanceKey, true, nil, nil)
 		if err != nil {
 			topologyRecovery.AddError(err)
 			log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: regroup failed on: %+v", err)
@@ -740,17 +742,19 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 
 	log.Debugf("topology_recovery: RecoverDeadCoMaster: coMasterRecoveryType=%+v", coMasterRecoveryType)
 
+	var cannotReplicateSlaves [](*inst.Instance)
 	switch coMasterRecoveryType {
 	case MasterRecoveryGTID:
 		{
-			lostSlaves, _, promotedSlave, err = inst.RegroupSlavesGTID(failedInstanceKey, true, nil)
+			lostSlaves, _, cannotReplicateSlaves, promotedSlave, err = inst.RegroupSlavesGTID(failedInstanceKey, true, nil)
 		}
 	case MasterRecoveryPseudoGTID:
 		{
-			lostSlaves, _, _, promotedSlave, err = inst.RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers(failedInstanceKey, true, nil, &topologyRecovery.PostponedFunctionsContainer)
+			lostSlaves, _, _, cannotReplicateSlaves, promotedSlave, err = inst.RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers(failedInstanceKey, true, nil, &topologyRecovery.PostponedFunctionsContainer)
 		}
 	}
 	topologyRecovery.AddError(err)
+	lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 
 	mustPromoteOtherCoMaster := config.Config.CoMasterRecoveryMustPromoteOtherCoMaster
 	if !otherCoMaster.ReadOnly {
