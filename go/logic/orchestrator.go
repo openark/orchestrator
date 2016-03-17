@@ -160,12 +160,12 @@ func ContinuousDiscovery() {
 	}
 
 	log.Infof("Starting continuous discovery")
-	recentDiscoveryOperationKeys = cache.New(time.Duration(config.Config.DiscoveryPollSeconds)*time.Second, time.Second)
+	recentDiscoveryOperationKeys = cache.New(time.Duration(config.Config.InstancePollSeconds)*time.Second, time.Second)
 
 	inst.LoadHostnameResolveCache()
 	go handleDiscoveryRequests()
 
-	discoveryTick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
+	discoveryTick := time.Tick(time.Duration(config.Config.GetDiscoveryPollSeconds()) * time.Second)
 	instancePollTick := time.Tick(time.Duration(config.Config.InstancePollSeconds) * time.Second)
 	caretakingTick := time.Tick(time.Minute)
 	recoveryTick := time.Tick(time.Duration(config.Config.RecoveryPollSeconds) * time.Second)
@@ -301,7 +301,7 @@ func ContinuousAgentsPoll() {
 
 	go discoverSeededAgents()
 
-	tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
+	tick := time.Tick(time.Duration(config.Config.GetDiscoveryPollSeconds()) * time.Second)
 	caretakingTick := time.Tick(time.Hour)
 	for range tick {
 		agentsHosts, _ := agent.ReadOutdatedAgentsHosts()
