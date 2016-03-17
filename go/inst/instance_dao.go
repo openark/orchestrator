@@ -47,7 +47,7 @@ func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 }
 
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
-var instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.DiscoveryPollSeconds/2)*time.Second, time.Second)
+var instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
 
 var readTopologyInstanceCounter = metrics.NewCounter()
 var readInstanceCounter = metrics.NewCounter()
@@ -1358,7 +1358,7 @@ func PopulateInstancesAgents(instances [](*Instance)) error {
 }
 
 func GetClusterName(instanceKey *InstanceKey) (clusterName string, err error) {
-	if clusterName, found := instanceKeyInformativeClusterName.Get(instanceKey.DisplayString()); found {
+	if clusterName, found := instanceKeyInformativeClusterName.Get(instanceKey.StringCode()); found {
 		return clusterName.(string), nil
 	}
 	query := `
@@ -1372,7 +1372,7 @@ func GetClusterName(instanceKey *InstanceKey) (clusterName string, err error) {
 			`
 	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port), func(m sqlutils.RowMap) error {
 		clusterName = m.GetString("cluster_name")
-		instanceKeyInformativeClusterName.Set(instanceKey.DisplayString(), clusterName, cache.DefaultExpiration)
+		instanceKeyInformativeClusterName.Set(instanceKey.StringCode(), clusterName, cache.DefaultExpiration)
 		return nil
 	})
 

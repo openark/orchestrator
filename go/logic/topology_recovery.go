@@ -98,7 +98,7 @@ const (
 
 var emptySlavesList [](*inst.Instance)
 
-var emergencyReadTopologyInstanceMap = cache.New(time.Duration(config.Config.DiscoveryPollSeconds)*time.Second, time.Duration(config.Config.DiscoveryPollSeconds)*time.Second)
+var emergencyReadTopologyInstanceMap = cache.New(time.Duration(config.Config.InstancePollSeconds)*time.Second, time.Second)
 
 // InstancesByCountSlaves sorts instances by umber of slaves, descending
 type InstancesByCountSlaves [](*inst.Instance)
@@ -882,10 +882,10 @@ func checkAndRecoverGenericProblem(analysisEntry inst.ReplicationAnalysis, candi
 	return false, nil, nil
 }
 
-// Force a re-read of a topology instance; this is done because we need to substantiate a suspicion that we may have a failover
-// scenario. we want to speed up reading the complete picture.
+// Force a re-read of a topology instance; this is done because we need to substantiate a suspicion
+// that we may have a failover scenario. we want to speed up reading the complete picture.
 func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
-	if existsInCacheError := emergencyReadTopologyInstanceMap.Add(instanceKey.DisplayString(), true, cache.DefaultExpiration); existsInCacheError != nil {
+	if existsInCacheError := emergencyReadTopologyInstanceMap.Add(instanceKey.StringCode(), true, cache.DefaultExpiration); existsInCacheError != nil {
 		// Just recently attempted
 		return
 	}

@@ -69,7 +69,6 @@ type Configuration struct {
 	BinlogFileHistoryDays                        int      // When > 0, amount of days for which orchestrator records per-instance binlog files & sizes
 	UnseenInstanceForgetHours                    uint     // Number of hours after which an unseen instance is forgotten
 	SnapshotTopologiesIntervalHours              uint     // Interval in hour between snapshot-topologies invocation. Default: 0 (disabled)
-	DiscoveryPollSeconds                         uint     // Auto/continuous discovery of instances sleep time between polls
 	InstanceBulkOperationsWaitTimeoutSeconds     uint     // Time to wait on a single instance when doing bulk (many instances) operation
 	ActiveNodeExpireSeconds                      uint     // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
 	HostnameResolveMethod                        string   // Method by which to "normalize" hostname ("none"/"default"/"cname")
@@ -171,6 +170,14 @@ func (this *Configuration) ToJSONString() string {
 	return string(b)
 }
 
+func (this *Configuration) GetDiscoveryPollSeconds() uint {
+	// Turning `DiscoveryPollSeconds` into hard coded value. I see no reason anymore why this would be configurable.
+	// After a couple years working with this I just set it to 1 whereever.
+	// Not making this value configurable solves other problems like inter-dependency between this value
+	// and others, like `InstancePollSeconds`, like cache timeouts etc.
+	return 1
+}
+
 // Config is *the* configuration instance, used globally to get configuration data
 var Config = newConfiguration()
 var readFileNames []string
@@ -198,7 +205,6 @@ func newConfiguration() *Configuration {
 		SnapshotTopologiesIntervalHours:              0,
 		SlaveStartPostWaitMilliseconds:               1000,
 		DiscoverByShowSlaveHosts:                     false,
-		DiscoveryPollSeconds:                         5,
 		InstanceBulkOperationsWaitTimeoutSeconds:     10,
 		ActiveNodeExpireSeconds:                      60,
 		HostnameResolveMethod:                        "cname",
