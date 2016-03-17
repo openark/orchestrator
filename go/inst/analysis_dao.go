@@ -86,7 +86,8 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		        		AND master_instance.last_attempted_check <= master_instance.last_seen + INTERVAL (2 * ?) SECOND
 		        	) IS TRUE AS is_last_check_valid,
 		        MIN(master_instance.master_host IN ('' , '_')
-		            OR master_instance.master_port = 0) AS is_master,
+		            OR master_instance.master_port = 0
+								OR left(master_instance.master_host, 2) = '//') AS is_master,
 		        MIN(master_instance.is_co_master) AS is_co_master,
 		        MIN(CONCAT(master_instance.hostname,
 		                ':',
