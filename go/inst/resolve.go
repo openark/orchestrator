@@ -79,7 +79,9 @@ func ResolveHostname(hostname string) (string, error) {
 		return hostname, fmt.Errorf("Will not resolve multi-hostname: %+v", hostname)
 	}
 	if (&InstanceKey{Hostname: hostname}).IsDetached() {
-		return hostname, fmt.Errorf("Will not resolve detached hostname: %+v", hostname)
+		// quietly abort. Nothign to do. The hostname is detached for a reason: it
+		// will not be resolved, for sure.
+		return hostname, nil
 	}
 
 	// First go to lightweight cache

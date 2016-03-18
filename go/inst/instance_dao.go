@@ -666,12 +666,12 @@ func readInstancesByCondition(condition string, args []interface{}, sort string)
 			ifnull(nullif(candidate_database_instance.promotion_rule, ''), 'neutral') as promotion_rule,
 			ifnull(unresolved_hostname, '') as unresolved_hostname,
 			(
-	    		database_instance_downtime.downtime_active IS NULL
-	    		or database_instance_downtime.end_timestamp < NOW()
-	    	) is false as is_downtimed,
-	    	ifnull(database_instance_downtime.reason, '') as downtime_reason,
-	    	ifnull(database_instance_downtime.owner, '') as downtime_owner,
-	    	ifnull(database_instance_downtime.end_timestamp, '') as downtime_end_timestamp
+    		database_instance_downtime.downtime_active IS NULL
+    		or database_instance_downtime.end_timestamp < NOW()
+    	) is false as is_downtimed,
+    	ifnull(database_instance_downtime.reason, '') as downtime_reason,
+    	ifnull(database_instance_downtime.owner, '') as downtime_owner,
+    	ifnull(database_instance_downtime.end_timestamp, '') as downtime_end_timestamp
 		from
 			database_instance
 			left join candidate_database_instance using (hostname, port)
@@ -745,8 +745,13 @@ func ReadClusterWriteableMaster(clusterName string) ([](*Instance), error) {
 		cluster_name = ?
 		and read_only = 0
 		and (replication_depth = 0 or is_co_master)
+		and (
+				database_instance_downtime.downtime_active = 1
+				and database_instance_downtime.end_timestamp > now()
+				and database_instance_downtime.reason = ?
+			) is not true
 	`
-	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "replication_depth asc")
+	return readInstancesByCondition(condition, sqlutils.Args(clusterName, DowntimeLostInRecoveryMessage), "replication_depth asc")
 }
 
 // ReadWriteableClustersMasters returns writeable masters of all clusters, but only one
@@ -920,6 +925,21 @@ func ReadFuzzyInstance(fuzzyInstanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 	return nil, log.Errorf("Cannot determine fuzzy instance %+v", *fuzzyInstanceKey)
+}
+
+// ReadLostInRecoveryInstances returns all instances (potentially filtered by cluster)
+// which are currently indicated as downtimed due to being lost during a topology recovery.
+// Keep in mind:
+// - instances are only marked as such when config's MasterFailoverLostInstancesDowntimeMinutes > 0
+// - The downtime expires at some point
+func ReadLostInRecoveryInstances(clusterName string) ([](*Instance), error) {
+	condition := `
+		database_instance_downtime.downtime_active = 1
+		and database_instance_downtime.end_timestamp > now()
+		and database_instance_downtime.reason = ?
+		and ? IN ('', cluster_name)
+	`
+	return readInstancesByCondition(condition, sqlutils.Args(DowntimeLostInRecoveryMessage, clusterName), "cluster_name asc, replication_depth asc")
 }
 
 // ReadClusterCandidateInstances reads cluster instances which are also marked as candidates

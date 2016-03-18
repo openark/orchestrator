@@ -995,6 +995,16 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(slave.Key.DisplayString())
 			}
 		}
+	case registerCliCommand("which-lost-in-recovery", "Information", `List instances marked as downtimed for being lost in a recovery process`):
+		{
+			instances, err := inst.ReadLostInRecoveryInstances("")
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, instance := range instances {
+				fmt.Println(instance.Key.DisplayString())
+			}
+		}
 	case registerCliCommand("instance-status", "Information", `Output short status on a given instance`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)

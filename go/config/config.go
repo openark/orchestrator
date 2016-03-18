@@ -156,6 +156,7 @@ type Configuration struct {
 	DetachLostSlavesAfterMasterFailover          bool              // Should slaves that are not to be lost in master recovery (i.e. were more up-to-date than promoted slave) be forcibly detached
 	ApplyMySQLPromotionAfterMasterFailover       bool              // Should orchestrator take upon itself to apply MySQL master promotion: set read_only=0, detach replication, etc.
 	MasterFailoverLostInstancesDowntimeMinutes   uint              // Number of minutes to downtime any server that was lost after a master failover (including failed master & lost slaves). 0 to disable
+	MasterFailoverDetachSlaveMasterHost          bool              // Should orchestrator issue a detach-slave-master-host on newly promoted master (this makes sure the new master will not attempt to replicate old master if that comes back to life). Defaults 'false'. Meaningless if ApplyMySQLPromotionAfterMasterFailover is 'true'.
 	PostponeSlaveRecoveryOnLagMinutes            uint              // On crash recovery, slaves that are lagging more than given minutes are only resurrected late in the recovery process, after master/IM has been elected and processes executed. Value of 0 disables this feature
 	OSCIgnoreHostnameFilters                     []string          // OSC slaves recommendation will ignore slave hostnames matching given patterns
 	GraphiteAddr                                 string            // Optional; address of graphite port. If supplied, metrics will be written here
@@ -289,6 +290,7 @@ func newConfiguration() *Configuration {
 		DetachLostSlavesAfterMasterFailover:          true,
 		ApplyMySQLPromotionAfterMasterFailover:       false,
 		MasterFailoverLostInstancesDowntimeMinutes:   0,
+		MasterFailoverDetachSlaveMasterHost:          false,
 		PostponeSlaveRecoveryOnLagMinutes:            0,
 		OSCIgnoreHostnameFilters:                     []string{},
 		GraphiteAddr:                                 "",
