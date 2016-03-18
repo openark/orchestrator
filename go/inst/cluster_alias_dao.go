@@ -114,7 +114,7 @@ func UpdateClusterAliases() error {
 				      and (
 				        database_instance_downtime.downtime_active IS NULL
 				        or database_instance_downtime.end_timestamp < NOW()
-					  ) is false
+					  	) is false
 				    )
 				  group by
 				    suggested_cluster_alias

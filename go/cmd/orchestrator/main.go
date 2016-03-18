@@ -607,6 +607,19 @@ Cheatsheet:
             orchestrator -c which-cluster-domain -alias some_alias
                 assuming some_alias is a known cluster alias (see ClusterNameToAlias or DetectClusterAliasQuery configuration)
 
+				which-cluster-master
+						Output the name of the active master in a given cluster, indicated by instance or alias.
+						An "active" master is one that is writable and is not marked as downtimed due to a topology recovery.
+						Examples:
+
+            orchestrator -c which-cluster-master -i instance.to.check.com
+
+            orchestrator -c which-cluster-master
+                -i not given, implicitly assumed local hostname
+
+            orchestrator -c which-cluster-master -alias some_alias
+                assuming some_alias is a known cluster alias (see ClusterNameToAlias or DetectClusterAliasQuery configuration)
+
         which-cluster-osc-slaves
             Output a list of slaves in same cluster as given instance, that would server as good candidates as control slaves
             for a pt-online-schema-change operation.
@@ -620,6 +633,17 @@ Cheatsheet:
 
             orchestrator -c which-cluster-osc-slaves -alias some_alias
                 assuming some_alias is a known cluster alias (see ClusterNameToAlias or DetectClusterAliasQuery configuration)
+
+				which-lost-in-recovery
+						List instances marked as downtimed for being lost in a recovery process. This depends on the configuration
+						of MasterFailoverLostInstancesDowntimeMinutes. The output of this command lists heuristically recent
+						"lost" instances that probabaly should be recycled. Note that when the 'downtime' flag expires (or
+						is reset by '-c end-downtime') an instance no longer appears on this list.
+						The topology recovery process injects a magic hint when downtiming lost instances, that is picked up
+						by this command. Examples:
+
+						orchestrator -c which-lost-in-recovery
+								Lists all heuristically-recent known lost instances
 
         which-master
             Output the fully-qualified hostname:port representation of a given instance's master. Examples:
