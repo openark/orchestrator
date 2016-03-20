@@ -85,11 +85,7 @@ func WriteClusterAlias(clusterName string, alias string) error {
 			`,
 			clusterName,
 			alias)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
+		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }
@@ -122,6 +118,21 @@ func UpdateClusterAliases() error {
 		if err == nil {
 			err = ReadClusterAliases()
 		}
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
+// ReplaceAliasClusterName replaces alis mapping of one cluster name onto a new cluster name.
+// Used in topology recovery
+func ReplaceAliasClusterName(oldClusterName string, newClusterName string) error {
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+			update cluster_alias
+				set cluster_name = ?
+				where cluster_name = ?
+			`,
+			newClusterName, oldClusterName)
 		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)

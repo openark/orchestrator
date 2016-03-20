@@ -1117,6 +1117,8 @@ func ReattachSlaveMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		goto Cleanup
 	}
+	// Just in case this instance used to be a master:
+	ReplaceAliasClusterName(instanceKey.StringCode(), reattachedMasterKey.StringCode())
 
 Cleanup:
 	instance, _ = StartSlave(instanceKey)

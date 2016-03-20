@@ -338,6 +338,14 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 		}
 		topologyRecovery.AddPostponedFunction(postponedFunction)
 	}
+	if promotedSlave != nil {
+		postponedFunction := func() error {
+			log.Debugf("topology_recovery: - RecoverDeadMaster: updating cluster_alias")
+			inst.ReplaceAliasClusterName(failedInstanceKey.StringCode(), promotedSlave.Key.StringCode())
+			return nil
+		}
+		topologyRecovery.AddPostponedFunction(postponedFunction)
+	}
 	if config.Config.MasterFailoverLostInstancesDowntimeMinutes > 0 {
 		postponedFunction := func() error {
 			inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
