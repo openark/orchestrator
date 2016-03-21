@@ -455,6 +455,28 @@ func (this *HttpAPI) ReattachSlave(params martini.Params, r render.Render, req *
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave reattached: %+v", instance.Key), Details: instance})
 }
 
+// ReattachSlaveMasterHost reverts a DetachSlaveMasterHost command
+// by resoting the original master hostname in CHANGE MASTER TO
+func (this *HttpAPI) ReattachSlaveMasterHost(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, err := inst.ReattachSlaveMasterHost(&instanceKey)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave reattached: %+v", instance.Key), Details: instance})
+}
+
 // EnableGTID attempts to enable GTID on a slave
 func (this *HttpAPI) EnableGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -1272,7 +1294,7 @@ func (this *HttpAPI) Clusters(params martini.Params, r render.Render, req *http.
 
 // ClustersInfo provides list of known clusters, along with some added metadata per cluster
 func (this *HttpAPI) ClustersInfo(params martini.Params, r render.Render, req *http.Request) {
-	clustersInfo, err := inst.ReadClustersInfo()
+	clustersInfo, err := inst.ReadClustersInfo("")
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -1415,7 +1437,7 @@ func (this *HttpAPI) GetHeuristicClusterPoolInstances(params martini.Params, r r
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	clusterName, err := inst.ReadClusterByAlias(params["clusterName"])
+	clusterName, err := inst.ReadClusterNameByAlias(params["clusterName"])
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -1437,7 +1459,7 @@ func (this *HttpAPI) GetHeuristicClusterPoolInstancesLag(params martini.Params, 
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	clusterName, err := inst.ReadClusterByAlias(params["clusterName"])
+	clusterName, err := inst.ReadClusterNameByAlias(params["clusterName"])
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -1459,14 +1481,8 @@ func (this *HttpAPI) ReloadClusterAlias(params martini.Params, r render.Render, 
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	err := inst.ReadClusterAliases()
 
-	if err != nil {
-		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
-		return
-	}
-
-	r.JSON(200, &APIResponse{Code: OK, Message: "Cluster alias cache reloaded"})
+	r.JSON(200, &APIResponse{Code: ERROR, Message: "This API call has been retired"})
 }
 
 // Agents provides complete list of registered agents (See https://github.com/github/orchestrator-agent)
@@ -2226,6 +2242,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/reset-slave/:host/:port", this.ResetSlave)
 	m.Get("/api/detach-slave/:host/:port", this.DetachSlave)
 	m.Get("/api/reattach-slave/:host/:port", this.ReattachSlave)
+	m.Get("/api/reattach-slave-master-host/:host/:port", this.ReattachSlaveMasterHost)
 
 	// Instance:
 	m.Get("/api/set-read-only/:host/:port", this.SetReadOnly)

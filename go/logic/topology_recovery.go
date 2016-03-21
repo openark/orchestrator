@@ -330,22 +330,6 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 		}
 		topologyRecovery.AddPostponedFunction(postponedFunction)
 	}
-	if promotedSlave != nil && config.Config.MasterFailoverDetachSlaveMasterHost {
-		postponedFunction := func() error {
-			log.Debugf("topology_recovery: - RecoverDeadMaster: detaching master host on promoted master")
-			inst.DetachSlaveMasterHost(&promotedSlave.Key)
-			return nil
-		}
-		topologyRecovery.AddPostponedFunction(postponedFunction)
-	}
-	if promotedSlave != nil {
-		postponedFunction := func() error {
-			log.Debugf("topology_recovery: - RecoverDeadMaster: updating cluster_alias")
-			inst.ReplaceAliasClusterName(failedInstanceKey.StringCode(), promotedSlave.Key.StringCode())
-			return nil
-		}
-		topologyRecovery.AddPostponedFunction(postponedFunction)
-	}
 	if config.Config.MasterFailoverLostInstancesDowntimeMinutes > 0 {
 		postponedFunction := func() error {
 			inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
@@ -502,6 +486,22 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			// Execute post master-failover processes
 			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
 		}
+
+		if config.Config.MasterFailoverDetachSlaveMasterHost {
+			postponedFunction := func() error {
+				log.Debugf("topology_recovery: - RecoverDeadMaster: detaching master host on promoted master")
+				inst.DetachSlaveMasterHost(&promotedSlave.Key)
+				return nil
+			}
+			topologyRecovery.AddPostponedFunction(postponedFunction)
+		}
+		postponedFunction := func() error {
+			log.Debugf("topology_recovery: - RecoverDeadMaster: updating cluster_alias")
+			inst.ReplaceAliasClusterName(analysisEntry.AnalyzedInstanceKey.StringCode(), promotedSlave.Key.StringCode())
+			return nil
+		}
+		topologyRecovery.AddPostponedFunction(postponedFunction)
+
 	} else {
 		recoverDeadMasterFailureCounter.Inc(1)
 	}

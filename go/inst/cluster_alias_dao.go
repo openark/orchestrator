@@ -24,33 +24,8 @@ import (
 	"github.com/outbrain/orchestrator/go/db"
 )
 
-// ReadClusterAliases reads the entrie cluster name aliases mapping
-func ReadClusterAliases() error {
-	updatedMap := make(map[string]string)
-	query := `
-		select
-			cluster_name,
-			alias
-		from
-			cluster_alias
-		`
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
-		updatedMap[m.GetString("cluster_name")] = m.GetString("alias")
-		return nil
-	})
-	if err != nil {
-		log.Errore(err)
-	}
-	clusterAliasMapMutex.Lock()
-	defer clusterAliasMapMutex.Unlock()
-	clusterAliasMap = updatedMap
-	return err
-
-}
-
-// ReadClusterByAlias
-func ReadClusterByAlias(alias string) (string, error) {
-	clusterName := ""
+// ReadClusterNameByAlias
+func ReadClusterNameByAlias(alias string) (clusterName string, err error) {
 	query := `
 		select
 			cluster_name
@@ -60,7 +35,7 @@ func ReadClusterByAlias(alias string) (string, error) {
 			alias = ?
 			or cluster_name = ?
 		`
-	err := db.QueryOrchestrator(query, sqlutils.Args(alias, alias), func(m sqlutils.RowMap) error {
+	err = db.QueryOrchestrator(query, sqlutils.Args(alias, alias), func(m sqlutils.RowMap) error {
 		clusterName = m.GetString("cluster_name")
 		return nil
 	})
@@ -71,7 +46,25 @@ func ReadClusterByAlias(alias string) (string, error) {
 		err = fmt.Errorf("No cluster found for alias %s", alias)
 	}
 	return clusterName, err
+}
 
+// ReadAliasByClusterName returns the cluster alias for the given cluster name,
+// or the cluster name itself if not explicit alias found
+func ReadAliasByClusterName(clusterName string) (alias string, err error) {
+	alias = clusterName // default return value
+	query := `
+		select
+			alias
+		from
+			cluster_alias
+		where
+			cluster_name = ?
+		`
+	err = db.QueryOrchestrator(query, sqlutils.Args(clusterName), func(m sqlutils.RowMap) error {
+		alias = m.GetString("alias")
+		return nil
+	})
+	return clusterName, err
 }
 
 // WriteClusterAlias will write (and override) a single cluster name mapping
@@ -83,14 +76,14 @@ func WriteClusterAlias(clusterName string, alias string) error {
 				values
 					(?, ?)
 			`,
-			clusterName,
-			alias)
+			clusterName, alias)
 		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }
 
-//
+// UpdateClusterAliases writes down the cluster_alias table based on information
+// gained from database_instance
 func UpdateClusterAliases() error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
@@ -105,19 +98,15 @@ func UpdateClusterAliases() error {
 				    left join database_instance_downtime using (hostname, port)
 				  where
 				    suggested_cluster_alias!=''
-				    and not (
-				      (hostname, port) in (select hostname, port from topology_recovery where start_active_period >= now() - interval 11111 day)
-				      and (
-				        database_instance_downtime.downtime_active IS NULL
-				        or database_instance_downtime.end_timestamp < NOW()
-					  	) is false
-				    )
+						/* exclude newly demoted, downtimed masters */
+						and ifnull(
+								database_instance_downtime.downtime_active = 1
+								and database_instance_downtime.end_timestamp > now()
+								and database_instance_downtime.reason = ?
+							, false) is false
 				  group by
 				    suggested_cluster_alias
-			`)
-		if err == nil {
-			err = ReadClusterAliases()
-		}
+			`, DowntimeLostInRecoveryMessage)
 		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
