@@ -255,6 +255,9 @@ function openNodeModal(node) {
   $('#node_modal [data-btn-group=move-equivalent]').appendTo(hiddenZone);
   if (node.MasterKey.Hostname) {
     var td = addNodeModalDataAttribute("Master", node.masterTitle);
+    if (node.IsDetachedMaster) {
+      $('#node_modal button[data-btn=reattach-slave-master-host]').appendTo(td.find("div"))
+    }
     $('#node_modal button[data-btn=reset-slave]').appendTo(td.find("div"))
 
     td = addNodeModalDataAttribute("Replication running", booleanString(node.replicationRunning));
@@ -299,6 +302,7 @@ function openNodeModal(node) {
     }
   } else {
     $('#node_modal button[data-btn=reset-slave]').appendTo(hiddenZone);
+    $('#node_modal button[data-btn=reattach-slave-master-host]').appendTo(hiddenZone);
     $('#node_modal button[data-btn=skip-query]').appendTo(hiddenZone);
     $('#node_modal button[data-btn=detach-slave]').appendTo(hiddenZone)
     $('#node_modal button[data-btn=reattach-slave]').appendTo(hiddenZone)
@@ -375,6 +379,9 @@ function openNodeModal(node) {
   });
   $('#node_modal button[data-btn=reattach-slave]').click(function() {
     apiCommand("/api/reattach-slave/" + node.Key.Hostname + "/" + node.Key.Port);
+  });
+  $('#node_modal button[data-btn=reattach-slave-master-host]').click(function() {
+    apiCommand("/api/reattach-slave-master-host/" + node.Key.Hostname + "/" + node.Key.Port);
   });
   $('#node_modal button[data-btn=reset-slave]').click(function() {
     var message = "<p>Are you sure you wish to reset <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +

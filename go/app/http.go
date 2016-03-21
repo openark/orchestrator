@@ -98,8 +98,6 @@ func standardHttp(discovery bool) {
 		log.Info("Starting Discovery")
 		go logic.ContinuousDiscovery()
 	}
-	inst.ReadClusterAliases()
-
 	log.Info("Registering endpoints")
 	http.API.RegisterRequests(m)
 	http.Web.RegisterRequests(m)

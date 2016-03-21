@@ -256,7 +256,6 @@ func ContinuousDiscovery() {
 					// Take this opportunity to refresh yourself
 					go inst.LoadHostnameResolveCache()
 				}
-				go inst.ReadClusterAliases()
 			}()
 		case <-recoveryTick:
 			go func() {
