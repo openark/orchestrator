@@ -607,6 +607,20 @@ Cheatsheet:
             orchestrator -c which-cluster-domain -alias some_alias
                 assuming some_alias is a known cluster alias (see ClusterNameToAlias or DetectClusterAliasQuery configuration)
 
+				which-heuristic-domain-instance
+						Returns the instance associated as the cluster's writer with a cluster's domain name.
+						Given a cluster, orchestrator looks for the domain name indicated by this cluster, and proceeds to search for
+						a stord key-value attribute for that domain name. This would be the writer host for the given domain.
+						See also set-heuristic-domain-instance, this is meant to be a temporary service mimicking in micro-scale a
+						service discovery functionality.
+						Example:
+
+						orchestrator -c which-heuristic-domain-instance -alias some_alias
+							Detects the domain name for given cluster, reads from key-value store the writer host associated with the domain name.
+
+						orchestrator -c which-heuristic-domain-instance -i instance.of.some.cluster
+							Cluster is inferred by a member instance (the instance is not necessarily the master)
+
 				which-cluster-master
 						Output the name of the active master in a given cluster, indicated by instance or alias.
 						An "active" master is one that is writable and is not marked as downtimed due to a topology recovery.
@@ -880,6 +894,20 @@ Cheatsheet:
             Example:
 
             orchestrator -c deregister-hostname-unresolve -i instance.fqdn.com
+
+				set-heuristic-domain-instance
+						This is a temporary (sync your watches, watch for next ice age) command which registers the cluster domain name of a given cluster
+						with the master/writer host for that cluster. It is a one-time-master-discovery operation.
+						At this time orchestrator may also act as a small & simple key-value store (recall the "temporary" indication).
+						Master failover operations will overwrite the domain instance identity. Orchestrator so turns into a mini master-discovery
+						service (I said "TEMPORARY"). Really there are other tools for the job. See also: which-heuristic-domain-instance
+						Example:
+
+						orchestrator -c set-heuristic-domain-instance --alias some_alias
+								Detects the domain name for given cluster, identifies the writer master of the cluster, associates the two in key-value store
+
+						orchestrator -c set-heuristic-domain-instance -i instance.of.some.cluster
+								Cluster is inferred by a member instance (the instance is not necessarily the master)
 
     Misc commands
 

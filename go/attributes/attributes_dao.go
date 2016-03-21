@@ -142,6 +142,9 @@ func GetHostAttribute(hostname string, attributeName string) (string, error) {
 
 // SetGeneralAttribute sets an attribute not associated with a host. Its a key-value thing
 func SetGeneralAttribute(attributeName string, attributeValue string) error {
+	if attributeName == "" {
+		return nil
+	}
 	return SetHostAttributes("*", attributeName, attributeValue)
 }
 
