@@ -1425,7 +1425,8 @@ func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, err
 	}
 	masterInstance, err := ReadTopologyInstance(&instance.MasterKey)
-	if err != nil {
+	if err == nil {
+		// If the read succeeded, check the master status.
 		if masterInstance.IsSlave() {
 			return instance, fmt.Errorf("MakeMaster: instance's master %+v seems to be replicating", masterInstance.Key)
 		}
@@ -1433,7 +1434,8 @@ func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 			return instance, fmt.Errorf("MakeMaster: instance's master %+v seems to be accessible", masterInstance.Key)
 		}
 	}
-	// If err == nil this is "good": that means the master is inaccessible... So it's OK to do the promotion
+	// Continue anyway if the read failed, because that means the master is
+	// inaccessible... So it's OK to do the promotion.
 	if !instance.SQLThreadUpToDate() {
 		return instance, fmt.Errorf("MakeMaster: instance's SQL thread must be up-to-date with I/O thread for %+v", *instanceKey)
 	}
