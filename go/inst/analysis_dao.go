@@ -471,7 +471,7 @@ func ExpireInstanceAnalysisChangelog() error {
 	return log.Errore(err)
 }
 
-// readRecoveries reads recovery entry/audit entires from topology_recovery
+// ReadReplicationAnalysisChangelog
 func ReadReplicationAnalysisChangelog() ([]ReplicationAnalysisChangelog, error) {
 	res := []ReplicationAnalysisChangelog{}
 	query := `

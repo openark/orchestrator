@@ -236,7 +236,7 @@ func TestInstanceKeyValid(t *testing.T) {
 	test.S(t).ExpectNil(err)
 	test.S(t).ExpectFalse(i.IsValid())
 	i, err = ParseInstanceKey("//myhost:3306")
-	test.S(t).ExpectNotNil(err)
+	test.S(t).ExpectNil(err)
 	test.S(t).ExpectFalse(i.IsValid())
 }
 

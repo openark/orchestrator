@@ -332,10 +332,10 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 	}
 	if config.Config.MasterFailoverLostInstancesDowntimeMinutes > 0 {
 		postponedFunction := func() error {
-			inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), "RecoverDeadMaster indicates this instance is lost", config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
+			inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
 			for _, slave := range lostSlaves {
 				slave := slave
-				inst.BeginDowntime(&slave.Key, inst.GetMaintenanceOwner(), "RecoverDeadMaster indicates this instance is lost", config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
+				inst.BeginDowntime(&slave.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
 			}
 			return nil
 		}
@@ -486,6 +486,22 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			// Execute post master-failover processes
 			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
 		}
+
+		if config.Config.MasterFailoverDetachSlaveMasterHost {
+			postponedFunction := func() error {
+				log.Debugf("topology_recovery: - RecoverDeadMaster: detaching master host on promoted master")
+				inst.DetachSlaveMasterHost(&promotedSlave.Key)
+				return nil
+			}
+			topologyRecovery.AddPostponedFunction(postponedFunction)
+		}
+		postponedFunction := func() error {
+			log.Debugf("topology_recovery: - RecoverDeadMaster: updating cluster_alias")
+			inst.ReplaceAliasClusterName(analysisEntry.AnalyzedInstanceKey.StringCode(), promotedSlave.Key.StringCode())
+			return nil
+		}
+		topologyRecovery.AddPostponedFunction(postponedFunction)
+
 	} else {
 		recoverDeadMasterFailureCounter.Inc(1)
 	}
@@ -822,10 +838,10 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 	}
 	if config.Config.MasterFailoverLostInstancesDowntimeMinutes > 0 {
 		postponedFunction := func() error {
-			inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), "RecoverDeadCoMaster indicates this instance is lost", config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
+			inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
 			for _, slave := range lostSlaves {
 				slave := slave
-				inst.BeginDowntime(&slave.Key, inst.GetMaintenanceOwner(), "RecoverDeadCoMaster indicates this instance is lost", config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
+				inst.BeginDowntime(&slave.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
 			}
 			return nil
 		}
@@ -982,6 +998,7 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 			executeProcesses(config.Config.PostUnsuccessfulFailoverProcesses, "PostUnsuccessfulFailoverProcesses", topologyRecovery, false)
 		} else {
 			// Execute general post failover processes
+			inst.EndDowntime(topologyRecovery.SuccessorKey)
 			executeProcesses(config.Config.PostFailoverProcesses, "PostFailoverProcesses", topologyRecovery, false)
 		}
 	}

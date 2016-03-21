@@ -75,7 +75,7 @@ Usage for most commands:
 func getClusterName(clusterAlias string, instanceKey *inst.InstanceKey) (clusterName string) {
 	var err error
 	if clusterAlias != "" {
-		clusterName, err = inst.ReadClusterByAlias(clusterAlias)
+		clusterName, err = inst.ReadClusterNameByAlias(clusterAlias)
 		if err == nil && clusterName != "" {
 			return clusterName
 		}
@@ -930,11 +930,11 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("which-cluster-domain", "Information", `Output the domain name of the cluster an instance belongs to, or error if unknown to orchestrator`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
-			clusterDomainName, err := inst.ReadClusterDomainName(clusterName)
+			clusterInfo, err := inst.ReadClusterInfo(clusterName)
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(clusterDomainName)
+			fmt.Println(clusterInfo.ClusterDomain)
 		}
 	case registerCliCommand("which-cluster-master", "Information", `Output the name of the master in a given cluster`):
 		{
@@ -993,6 +993,16 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			for _, slave := range slaves {
 				fmt.Println(slave.Key.DisplayString())
+			}
+		}
+	case registerCliCommand("which-lost-in-recovery", "Information", `List instances marked as downtimed for being lost in a recovery process`):
+		{
+			instances, err := inst.ReadLostInRecoveryInstances("")
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, instance := range instances {
+				fmt.Println(instance.Key.DisplayString())
 			}
 		}
 	case registerCliCommand("instance-status", "Information", `Output short status on a given instance`):

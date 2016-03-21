@@ -22,6 +22,10 @@ import (
 	"strings"
 )
 
+var (
+	DowntimeLostInRecoveryMessage = "lost-in-recovery"
+)
+
 // InstancesByExecBinlogCoordinates is a sortabel type for BinlogCoordinates
 type InstancesByExecBinlogCoordinates [](*Instance)
 

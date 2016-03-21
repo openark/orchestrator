@@ -285,6 +285,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 			logReadTopologyInstanceError(instanceKey, fmt.Sprintf("ResolveHostname(%+v)", masterKey.Hostname), resolveErr)
 		}
 		instance.MasterKey = *masterKey
+		instance.IsDetachedMaster = instance.MasterKey.IsDetached()
 		instance.SecondsBehindMaster = m.GetNullInt64("Seconds_Behind_Master")
 		// And until told otherwise:
 		instance.SlaveLagSeconds = instance.SecondsBehindMaster
@@ -596,6 +597,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.LogSlaveUpdatesEnabled = m.GetBool("log_slave_updates")
 	instance.MasterKey.Hostname = m.GetString("master_host")
 	instance.MasterKey.Port = m.GetInt("master_port")
+	instance.IsDetachedMaster = instance.MasterKey.IsDetached()
 	instance.Slave_SQL_Running = m.GetBool("slave_sql_running")
 	instance.Slave_IO_Running = m.GetBool("slave_io_running")
 	instance.HasReplicationFilters = m.GetBool("has_replication_filters")
@@ -666,12 +668,12 @@ func readInstancesByCondition(condition string, args []interface{}, sort string)
 			ifnull(nullif(candidate_database_instance.promotion_rule, ''), 'neutral') as promotion_rule,
 			ifnull(unresolved_hostname, '') as unresolved_hostname,
 			(
-	    		database_instance_downtime.downtime_active IS NULL
-	    		or database_instance_downtime.end_timestamp < NOW()
-	    	) is false as is_downtimed,
-	    	ifnull(database_instance_downtime.reason, '') as downtime_reason,
-	    	ifnull(database_instance_downtime.owner, '') as downtime_owner,
-	    	ifnull(database_instance_downtime.end_timestamp, '') as downtime_end_timestamp
+    		database_instance_downtime.downtime_active IS NULL
+    		or database_instance_downtime.end_timestamp < NOW()
+    	) is false as is_downtimed,
+    	ifnull(database_instance_downtime.reason, '') as downtime_reason,
+    	ifnull(database_instance_downtime.owner, '') as downtime_owner,
+    	ifnull(database_instance_downtime.end_timestamp, '') as downtime_end_timestamp
 		from
 			database_instance
 			left join candidate_database_instance using (hostname, port)
@@ -745,8 +747,13 @@ func ReadClusterWriteableMaster(clusterName string) ([](*Instance), error) {
 		cluster_name = ?
 		and read_only = 0
 		and (replication_depth = 0 or is_co_master)
+		and (
+				database_instance_downtime.downtime_active = 1
+				and database_instance_downtime.end_timestamp > now()
+				and database_instance_downtime.reason = ?
+			) is not true
 	`
-	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "replication_depth asc")
+	return readInstancesByCondition(condition, sqlutils.Args(clusterName, DowntimeLostInRecoveryMessage), "replication_depth asc")
 }
 
 // ReadWriteableClustersMasters returns writeable masters of all clusters, but only one
@@ -920,6 +927,21 @@ func ReadFuzzyInstance(fuzzyInstanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 	return nil, log.Errorf("Cannot determine fuzzy instance %+v", *fuzzyInstanceKey)
+}
+
+// ReadLostInRecoveryInstances returns all instances (potentially filtered by cluster)
+// which are currently indicated as downtimed due to being lost during a topology recovery.
+// Keep in mind:
+// - instances are only marked as such when config's MasterFailoverLostInstancesDowntimeMinutes > 0
+// - The downtime expires at some point
+func ReadLostInRecoveryInstances(clusterName string) ([](*Instance), error) {
+	condition := `
+		database_instance_downtime.downtime_active = 1
+		and database_instance_downtime.end_timestamp > now()
+		and database_instance_downtime.reason = ?
+		and ? IN ('', cluster_name)
+	`
+	return readInstancesByCondition(condition, sqlutils.Args(DowntimeLostInRecoveryMessage, clusterName), "cluster_name asc, replication_depth asc")
 }
 
 // ReadClusterCandidateInstances reads cluster instances which are also marked as candidates
@@ -1380,76 +1402,61 @@ func GetClusterName(instanceKey *InstanceKey) (clusterName string, err error) {
 }
 
 // ReadClusters reads names of all known clusters
-func ReadClusters() ([]string, error) {
-	clusterNames := []string{}
-
-	query := `
-		select
-			cluster_name
-		from
-			database_instance
-		group by
-			cluster_name`
-
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
-		clusterNames = append(clusterNames, m.GetString("cluster_name"))
-		return nil
-	})
-
-	return clusterNames, log.Errore(err)
+func ReadClusters() (clusterNames []string, err error) {
+	clusters, err := ReadClustersInfo("")
+	if err != nil {
+		return clusterNames, err
+	}
+	for _, clusterInfo := range clusters {
+		clusterNames = append(clusterNames, clusterInfo.ClusterName)
+	}
+	return clusterNames, nil
 }
 
 // ReadClusterInfo reads some info about a given cluster
 func ReadClusterInfo(clusterName string) (*ClusterInfo, error) {
-	clusterInfo := &ClusterInfo{}
-
-	query := `
-		select
-			cluster_name,
-			count(*) as count_instances
-		from
-			database_instance
-		where
-			cluster_name=?
-		group by
-			cluster_name`
-
-	err := db.QueryOrchestrator(query, sqlutils.Args(clusterName), func(m sqlutils.RowMap) error {
-		clusterInfo.ClusterName = m.GetString("cluster_name")
-		clusterInfo.CountInstances = m.GetUint("count_instances")
-		ApplyClusterAlias(clusterInfo)
-		ApplyClusterDomain(clusterInfo)
-		clusterInfo.ReadRecoveryInfo()
-		return nil
-	})
+	clusters, err := ReadClustersInfo(clusterName)
 	if err != nil {
-		return clusterInfo, err
+		return &ClusterInfo{}, err
 	}
-	clusterInfo.HeuristicLag, err = GetClusterHeuristicLag(clusterName)
-
-	return clusterInfo, err
+	if len(clusters) != 1 {
+		return &ClusterInfo{}, fmt.Errorf("No cluster info found for %s", clusterName)
+	}
+	return &(clusters[0]), nil
 }
 
 // ReadClustersInfo reads names of all known clusters and some aggregated info
-func ReadClustersInfo() ([]ClusterInfo, error) {
+func ReadClustersInfo(clusterName string) ([]ClusterInfo, error) {
 	clusters := []ClusterInfo{}
 
-	query := `
+	whereClause := ""
+	args := sqlutils.Args()
+	if clusterName != "" {
+		whereClause = `where cluster_name = ?`
+		args = append(args, clusterName)
+	}
+	query := fmt.Sprintf(`
 		select
 			cluster_name,
-			count(*) as count_instances
+			count(*) as count_instances,
+			ifnull(min(alias), cluster_name) as alias,
+			ifnull(min(domain_name), '') as domain_name
 		from
 			database_instance
+			left join cluster_alias using (cluster_name)
+			left join cluster_domain_name using (cluster_name)
+		%s
 		group by
-			cluster_name`
+			cluster_name`, whereClause)
 
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		clusterInfo := ClusterInfo{
 			ClusterName:    m.GetString("cluster_name"),
 			CountInstances: m.GetUint("count_instances"),
+			ClusterAlias:   m.GetString("alias"),
+			ClusterDomain:  m.GetString("domain_name"),
 		}
-		ApplyClusterAlias(&clusterInfo)
-		ApplyClusterDomain(&clusterInfo)
+		clusterInfo.ApplyClusterAlias()
 		clusterInfo.ReadRecoveryInfo()
 
 		clusters = append(clusters, clusterInfo)
