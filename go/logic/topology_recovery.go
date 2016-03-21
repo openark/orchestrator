@@ -19,6 +19,7 @@ package logic
 import (
 	"fmt"
 	"github.com/outbrain/golib/log"
+	"github.com/outbrain/orchestrator/go/attributes"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/inst"
 	"github.com/outbrain/orchestrator/go/os"
@@ -502,6 +503,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		}
 		topologyRecovery.AddPostponedFunction(postponedFunction)
 
+		attributes.SetGeneralAttribute(analysisEntry.ClusterDetails.ClusterDomain, promotedSlave.Key.StringCode())
 	} else {
 		recoverDeadMasterFailureCounter.Inc(1)
 	}

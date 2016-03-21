@@ -26,6 +26,7 @@ import (
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/math"
 	"github.com/outbrain/golib/sqlutils"
+	"github.com/outbrain/orchestrator/go/attributes"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
 	"github.com/pmylund/go-cache"
@@ -747,11 +748,11 @@ func ReadClusterWriteableMaster(clusterName string) ([](*Instance), error) {
 		cluster_name = ?
 		and read_only = 0
 		and (replication_depth = 0 or is_co_master)
-		and (
+		and ifnull(
 				database_instance_downtime.downtime_active = 1
 				and database_instance_downtime.end_timestamp > now()
 				and database_instance_downtime.reason = ?
-			) is not true
+			, false) is not true
 	`
 	return readInstancesByCondition(condition, sqlutils.Args(clusterName, DowntimeLostInRecoveryMessage), "replication_depth asc")
 }
@@ -936,9 +937,10 @@ func ReadFuzzyInstance(fuzzyInstanceKey *InstanceKey) (*Instance, error) {
 // - The downtime expires at some point
 func ReadLostInRecoveryInstances(clusterName string) ([](*Instance), error) {
 	condition := `
-		database_instance_downtime.downtime_active = 1
-		and database_instance_downtime.end_timestamp > now()
-		and database_instance_downtime.reason = ?
+		ifnull(
+			database_instance_downtime.downtime_active = 1
+			and database_instance_downtime.end_timestamp > now()
+			and database_instance_downtime.reason = ?, false)
 		and ? IN ('', cluster_name)
 	`
 	return readInstancesByCondition(condition, sqlutils.Args(DowntimeLostInRecoveryMessage, clusterName), "cluster_name asc, replication_depth asc")
@@ -1464,6 +1466,48 @@ func ReadClustersInfo(clusterName string) ([]ClusterInfo, error) {
 	})
 
 	return clusters, err
+}
+
+// HeuristicallyApplyClusterDomainInstanceAttribute writes down the cluster-domain
+// to master-hostname as a general attribute, by reading current topology and **trusting** it to be correct
+func HeuristicallyApplyClusterDomainInstanceAttribute(clusterName string) (instanceKey *InstanceKey, err error) {
+	clusterInfo, err := ReadClusterInfo(clusterName)
+	if err != nil {
+		return nil, err
+	}
+
+	if clusterInfo.ClusterDomain == "" {
+		return nil, fmt.Errorf("Cannot find domain name for cluster %+v", clusterName)
+	}
+
+	masters, err := ReadClusterWriteableMaster(clusterName)
+	if err != nil {
+		return nil, err
+	}
+	if len(masters) != 1 {
+		return nil, fmt.Errorf("Found %+v potential master for cluster %+v", len(masters), clusterName)
+	}
+	instanceKey = &masters[0].Key
+	return instanceKey, attributes.SetGeneralAttribute(clusterInfo.ClusterDomain, instanceKey.StringCode())
+}
+
+// GetHeuristicClusterDomainInstanceAttribute attempts detecting the cluster domain
+// for the given cluster, and return the instance key associated as writer with that domain
+func GetHeuristicClusterDomainInstanceAttribute(clusterName string) (instanceKey *InstanceKey, err error) {
+	clusterInfo, err := ReadClusterInfo(clusterName)
+	if err != nil {
+		return nil, err
+	}
+
+	if clusterInfo.ClusterDomain == "" {
+		return nil, fmt.Errorf("Cannot find domain name for cluster %+v", clusterName)
+	}
+
+	writerInstanceName, err := attributes.GetGeneralAttribute(clusterInfo.ClusterDomain)
+	if err != nil {
+		return nil, err
+	}
+	return NewRawInstanceKey(writerInstanceName)
 }
 
 // ReadOutdatedInstanceKeys reads and returns keys for all instances that are not up to date (i.e.
