@@ -748,13 +748,8 @@ func ReadClusterWriteableMaster(clusterName string) ([](*Instance), error) {
 		cluster_name = ?
 		and read_only = 0
 		and (replication_depth = 0 or is_co_master)
-		and ifnull(
-				database_instance_downtime.downtime_active = 1
-				and database_instance_downtime.end_timestamp > now()
-				and database_instance_downtime.reason = ?
-			, false) is not true
 	`
-	return readInstancesByCondition(condition, sqlutils.Args(clusterName, DowntimeLostInRecoveryMessage), "replication_depth asc")
+	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "replication_depth asc")
 }
 
 // ReadWriteableClustersMasters returns writeable masters of all clusters, but only one
