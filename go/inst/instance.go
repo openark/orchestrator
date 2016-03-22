@@ -19,10 +19,11 @@ package inst
 import (
 	"database/sql"
 	"fmt"
-	"github.com/outbrain/golib/math"
-	"github.com/outbrain/orchestrator/go/config"
 	"strconv"
 	"strings"
+
+	"github.com/outbrain/golib/math"
+	"github.com/outbrain/orchestrator/go/config"
 )
 
 // CandidatePromotionRule describe the promotion preference/rule for an instance.
@@ -80,6 +81,7 @@ type Instance struct {
 	IsCoMaster                      bool
 	HasReplicationCredentials       bool
 	ReplicationCredentialsAvailable bool
+	SemiSyncEnforced                bool
 
 	LastSeenTimestamp    string
 	IsLastCheckValid     bool
