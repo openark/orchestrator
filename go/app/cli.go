@@ -936,6 +936,15 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(clusterInfo.ClusterDomain)
 		}
+	case registerCliCommand("which-heuristic-domain-instance", "Information", `Returns the instance associated as the cluster's writer with a cluster's domain name.`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			instanceKey, err := inst.GetHeuristicClusterDomainInstanceAttribute(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
 	case registerCliCommand("which-cluster-master", "Information", `Output the name of the master in a given cluster`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
@@ -1233,6 +1242,16 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
+	case registerCliCommand("set-heuristic-domain-instance", "Instance, meta", `Associate domain name of given cluster with what seems to be the writer master for that cluster`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			instanceKey, err := inst.HeuristicallyApplyClusterDomainInstanceAttribute(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
+
 		// meta
 	case registerCliCommand("snapshot-topologies", "Meta", `Take a snapshot of existing topologies.`):
 		{

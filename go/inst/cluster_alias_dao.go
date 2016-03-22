@@ -91,7 +91,12 @@ func UpdateClusterAliases() error {
 					cluster_alias (alias, cluster_name, last_registered)
 				select
 				    suggested_cluster_alias,
-				    substring_index(group_concat(cluster_name order by cluster_name), ',', 1) as cluster_name,
+						substring_index(group_concat(
+							cluster_name order by
+								((last_checked <= last_seen) is true) desc,
+								read_only asc,
+								num_slave_hosts desc
+							), ',', 1) as cluster_name,
 				    NOW()
 				  from
 				    database_instance
