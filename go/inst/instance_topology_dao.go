@@ -19,11 +19,12 @@ package inst
 import (
 	"database/sql"
 	"fmt"
+	"time"
+
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
-	"time"
 )
 
 // Max concurrency for bulk topology operations
@@ -338,7 +339,7 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
-// StartSlave starts replication on a given instance
+// StartSlave starts replication on a given instance.
 func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -347,6 +348,20 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 
 	if !instance.IsSlave() {
 		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
+	}
+
+	// If async fallback is disallowed, we'd better make sure to enable slaves to
+	// send ACKs before START SLAVE. Slave ACKing is off at mysqld startup because
+	// some slaves (those that must never be promoted) should never ACK.
+	// Note: We assume that slaves use 'skip-slave-start' so they won't
+	//       START SLAVE on their own upon restart.
+	if instance.SemiSyncEnforced {
+		// Send ACK only from promotable instances.
+		sendACK := instance.PromotionRule != MustNotPromoteRule
+		// Always disable master setting, in case we're converting a former master.
+		if err := EnableSemiSync(instanceKey, false, sendACK); err != nil {
+			return instance, log.Errore(err)
+		}
 	}
 
 	_, err = ExecInstanceNoPrepare(instanceKey, `start slave`)
@@ -411,6 +426,15 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 
 	log.Infof("Will start slave on %+v until coordinates: %+v", instanceKey, masterCoordinates)
 
+	if instance.SemiSyncEnforced {
+		// Send ACK only from promotable instances.
+		sendACK := instance.PromotionRule != MustNotPromoteRule
+		// Always disable master setting, in case we're converting a former master.
+		if err := EnableSemiSync(instanceKey, false, sendACK); err != nil {
+			return instance, log.Errore(err)
+		}
+	}
+
 	// MariaDB has a bug: a CHANGE MASTER TO statement does not work properly with prepared statement... :P
 	// See https://mariadb.atlassian.net/browse/MDEV-7640
 	// This is the reason for ExecInstanceNoPrepare
@@ -442,6 +466,16 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 	}
 
 	return instance, err
+}
+
+// EnableSemiSync sets the rpl_semi_sync_(master|slave)_enabled variables
+// on a given instance.
+func EnableSemiSync(instanceKey *InstanceKey, master, slave bool) error {
+	log.Infof("instance %+v rpl_semi_sync_master_enabled: %t, rpl_semi_sync_slave_enabled: %t", instanceKey, master, slave)
+	_, err := ExecInstanceNoPrepare(instanceKey,
+		`set global rpl_semi_sync_master_enabled = ?, global rpl_semi_sync_slave_enabled = ?`,
+		master, slave)
+	return err
 }
 
 // ChangeMasterCredentials issues a CHANGE MASTER TO... MASTER_USER=, MASTER_PASSWORD=...
@@ -823,11 +857,31 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 		return instance, fmt.Errorf("noop: aborting set-read-only operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
 
+	// If async fallback is disallowed, we're responsible for flipping the master
+	// semi-sync switch ON before accepting writes. The setting is off by default.
+	if instance.SemiSyncEnforced && !readOnly {
+		// Send ACK only from promotable instances.
+		sendACK := instance.PromotionRule != MustNotPromoteRule
+		if err := EnableSemiSync(instanceKey, true, sendACK); err != nil {
+			return instance, log.Errore(err)
+		}
+	}
+
 	_, err = ExecInstance(instanceKey, fmt.Sprintf("set global read_only = %t", readOnly))
 	if err != nil {
 		return instance, log.Errore(err)
 	}
 	instance, err = ReadTopologyInstance(instanceKey)
+
+	// If we just went read-only, it's safe to flip the master semi-sync switch
+	// OFF, which is the default value so that slaves can make progress.
+	if instance.SemiSyncEnforced && readOnly {
+		// Send ACK only from promotable instances.
+		sendACK := instance.PromotionRule != MustNotPromoteRule
+		if err := EnableSemiSync(instanceKey, false, sendACK); err != nil {
+			return instance, log.Errore(err)
+		}
+	}
 
 	log.Infof("instance %+v read_only: %t", instanceKey, readOnly)
 	AuditOperation("read-only", instanceKey, fmt.Sprintf("set as %t", readOnly))

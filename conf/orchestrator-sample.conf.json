@@ -68,6 +68,7 @@
   "DataCenterPattern": "[.]([^.]+)[.][^.]+[.]mydomain[.]com",
   "PhysicalEnvironmentPattern": "[.]([^.]+[.][^.]+)[.]mydomain[.]com",
   "PromotionIgnoreHostnameFilters": [],
+  "DetectSemiSyncEnforcedQuery": "",
   "ServeAgentsHttp": false,
   "AgentsServerPort": ":3001",
   "AgentsUseSSL": false,

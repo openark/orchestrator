@@ -332,6 +332,8 @@ function openNodeModal(node) {
   $('#node_modal button[data-btn=enable-gtid]').appendTo(td.find("div"))
   $('#node_modal button[data-btn=disable-gtid]').appendTo(td.find("div"))
 
+  addNodeModalDataAttribute("Semi-sync enforced", booleanString(node.SemiSyncEnforced));
+
   addNodeModalDataAttribute("Uptime", node.Uptime);
   addNodeModalDataAttribute("Allow TLS", node.AllowTLS);
   addNodeModalDataAttribute("Cluster",
