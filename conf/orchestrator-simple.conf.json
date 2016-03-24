@@ -1,0 +1,90 @@
+{
+  "#": "-----",
+  "#": "this is a comment. See further comment hints below.",
+  "#": "-----",
+  "Debug": true,
+  "ListenAddress": ":3000",
+  "MySQLTopologyUser": "orc_client_user",
+  "MySQLTopologyPassword": "orc_client_password",
+  "MySQLOrchestratorHost": "127.0.0.1",
+  "MySQLOrchestratorPort": 3306,
+  "MySQLOrchestratorDatabase": "orchestrator",
+  "MySQLOrchestratorUser": "orc_server_user",
+  "MySQLOrchestratorPassword": "orc_server_password",
+  "#": "-----",
+  "#": "The above is all you need for initial setup. Below is more advanced stuff",
+  "#": "-----",
+  "DiscoverByShowSlaveHosts": true,
+  "InstancePollSeconds": 5,
+  "ReadLongRunningQueries": true,
+  "HostnameResolveMethod": "default",
+  "MySQLHostnameResolveMethod": "@@hostname",
+  "ReasonableReplicationLagSeconds": 10,
+  "ProblemIgnoreHostnameFilters": [],
+  "AuditLogFile": "",
+  "AuditToSyslog": false,
+  "RemoveTextFromHostnameDisplay": ".mydomain.com:3306",
+  "SlaveLagQuery": "",
+  "DetectClusterAliasQuery": "SELECT SUBSTRING_INDEX(@@hostname, '.', 1)",
+  "DetectClusterDomainQuery": "",
+  "DataCenterPattern": "[.]([^.]+)[.][^.]+[.]mydomain[.]com",
+  "PhysicalEnvironmentPattern": "[.]([^.]+[.][^.]+)[.]mydomain[.]com",
+  "PromotionIgnoreHostnameFilters": [],
+  "#": "-----",
+  "#": "security, access control:",
+  "#": "-----",
+  "ReadOnly": false,
+  "AuthenticationMethod": "",
+  "HTTPAuthUser": "",
+  "HTTPAuthPassword": "",
+  "AuthUserHeader": "",
+  "PowerAuthUsers": [
+    "*"
+  ],
+  "#": "-----",
+  "#": "Pseudo-GTID config:",
+  "#": "-----",
+  "PseudoGTIDPattern": "",
+  "PseudoGTIDPatternIsFixedSubstring": false,
+  "PseudoGTIDMonotonicHint": "asc:",
+  "DetectPseudoGTIDQuery": "",
+  "PseudoGTIDCoordinatesHistoryHeuristicMinutes": 2,
+  "#": "-----",
+  "#": "Recovery related config:",
+  "#": "-----",
+  "FailureDetectionPeriodBlockMinutes": 60,
+  "RecoveryPollSeconds": 10,
+  "RecoveryPeriodBlockSeconds": 3600,
+  "RecoveryIgnoreHostnameFilters": [],
+  "RecoverMasterClusterFilters": [
+    "_master_pattern_"
+  ],
+  "RecoverIntermediateMasterClusterFilters": [
+    "_intermediate_master_pattern_"
+  ],
+  "OnFailureDetectionProcesses": [
+    "echo 'Detected {failureType} on {failureCluster}. Affected replicas: {countSlaves}' >> /tmp/recovery.log"
+  ],
+  "PreFailoverProcesses": [
+    "echo 'Will recover from {failureType} on {failureCluster}' >> /tmp/recovery.log"
+  ],
+  "PostFailoverProcesses": [
+    "echo '(for all types) Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
+  ],
+  "PostUnsuccessfulFailoverProcesses": [],
+  "PostMasterFailoverProcesses": [
+    "echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Promoted: {successorHost}:{successorPort}' >> /tmp/recovery.log"
+  ],
+  "PostIntermediateMasterFailoverProcesses": [
+    "echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
+  ],
+  "DetachLostSlavesAfterMasterFailover": true,
+  "ApplyMySQLPromotionAfterMasterFailover": false,
+  "MasterFailoverDetachSlaveMasterHost": false,
+  "MasterFailoverLostInstancesDowntimeMinutes": 60,
+  "PostponeSlaveRecoveryOnLagMinutes": 10,
+  "#": "-----",
+  "GraphiteAddr": "",
+  "GraphitePath": "",
+  "GraphiteConvertHostnameDotsToUnderscores": true
+}
