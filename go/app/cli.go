@@ -75,21 +75,22 @@ Usage for most commands:
 func getClusterName(clusterAlias string, instanceKey *inst.InstanceKey) (clusterName string) {
 	var err error
 	if clusterAlias != "" {
-		clusterName, err = inst.ReadClusterNameByAlias(clusterAlias)
-		if err == nil && clusterName != "" {
+		if clusterName, err = inst.ReadClusterNameByAlias(clusterAlias); err == nil && clusterName != "" {
 			return clusterName
 		}
 	}
-	if instanceKey == nil {
-		instanceKey := &inst.InstanceKey{Hostname: clusterAlias, Port: int(config.Config.DefaultInstancePort)}
-		clusterName, err = inst.FindClusterNameByFuzzyInstanceKey(instanceKey)
-		if clusterName == "" {
-			log.Fatalf("Unable to determine cluster name")
+	if clusterAlias != "" {
+		// We're still here? So this wasn't an exact cluster name. Let's cehck if it's fuzzy:
+		fuzzyInstanceKey, err := inst.ParseRawInstanceKeyLoose(clusterAlias)
+		if err != nil {
+			log.Fatale(err)
+		}
+		if clusterName, err = inst.FindClusterNameByFuzzyInstanceKey(fuzzyInstanceKey); clusterName == "" {
+			log.Fatalf("Unable to determine cluster name by alias %+v", clusterAlias)
 		}
 		return clusterName
 	}
-
-	// deduce cluster by instance
+	// So there is no alias. Let's check by instance key
 	instanceKey = inst.ReadFuzzyInstanceKeyIfPossible(instanceKey)
 	if instanceKey == nil {
 		instanceKey = assignThisInstanceKey()
