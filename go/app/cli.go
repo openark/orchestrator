@@ -80,6 +80,14 @@ func getClusterName(clusterAlias string, instanceKey *inst.InstanceKey) (cluster
 			return clusterName
 		}
 	}
+	if instanceKey == nil {
+		instanceKey := &inst.InstanceKey{Hostname: clusterAlias, Port: int(config.Config.DefaultInstancePort)}
+		clusterName, err = inst.FindClusterNameByFuzzyInstanceKey(instanceKey)
+		if clusterName == "" {
+			log.Fatalf("Unable to determine cluster name")
+		}
+		return clusterName
+	}
 
 	// deduce cluster by instance
 	instanceKey = inst.ReadFuzzyInstanceKeyIfPossible(instanceKey)
