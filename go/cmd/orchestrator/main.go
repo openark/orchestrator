@@ -812,14 +812,34 @@ Cheatsheet:
 						- Otherwise orchestrator will do its thing in moving instances around, hopefully promoting your requested
 						  server on top.
 						- Orchestrator will issue all relevant pre-failover and post-failover external processes.
-						- At this time orchestrator will not issue 'SET GLOBAL read_only=1' on the existing master, nor will
-						  it issue a 'FLUSH TABLES WITH READ LOCK'. This is being investigated.
+						- In this command orchestrator will not issue 'SET GLOBAL read_only=1' on the existing master, nor will
+						  it issue a 'FLUSH TABLES WITH READ LOCK'. Please see the 'graceful-master-takeover' command.
 						Examples:
 
 						orchestrator -c force-master-takeover -alias mycluster -d immediate.child.of.master.com
 								Indicate cluster by alias. Orchestrator automatically figures out the master
 
 						orchestrator -c force-master-takeover -i instance.in.relevant.cluster.com -d immediate.child.of.master.com
+								Indicate cluster by an instance. You don't structly need to specify the master, orchestrator
+								will infer the master's identify.
+
+				graceful-master-takeover
+						Gracefully discard master and promote another (direct child) instance instead, even if everything is running well.
+						This allows for planned switchover.
+						NOTE:
+						- Promoted instance must be a direct child of the existing master
+						- Promoted instance must be the *only* direct child of the existing master. It *is* a planned failover thing.
+						- Orchestrator will first issue a "set global read_only=1" on existing master
+						- It will promote candidate master to the binlog positions of the existing master after issuing the above
+						- There _could_ still be statements issued and executed on the existing master by SUPER users, but those are ignored.
+						- Orchestrator then proceeds to handle a DeadMaster failover scenario
+						- Orchestrator will issue all relevant pre-failover and post-failover external processes.
+						Examples:
+
+						orchestrator -c graceful-master-takeover -alias mycluster
+								Indicate cluster by alias. Orchestrator automatically figures out the master and verifies it has a single direct replica
+
+						orchestrator -c force-master-takeover -i instance.in.relevant.cluster.com
 								Indicate cluster by an instance. You don't structly need to specify the master, orchestrator
 								will infer the master's identify.
 

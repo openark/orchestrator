@@ -46,6 +46,15 @@ func NewRawInstanceKey(hostPort string) (*InstanceKey, error) {
 	return instanceKey, nil
 }
 
+// ParseRawInstanceKeyLoose will parse an InstanceKey from a string representation such as 127.0.0.1:3306.
+// The port part is optional; there will be no name resolve
+func ParseRawInstanceKeyLoose(hostPort string) (*InstanceKey, error) {
+	if !strings.Contains(hostPort, ":") {
+		return &InstanceKey{Hostname: hostPort, Port: config.Config.DefaultInstancePort}, nil
+	}
+	return NewRawInstanceKey(hostPort)
+}
+
 // NewInstanceKeyFromStrings creates a new InstanceKey by resolving hostname and port.
 // hostname is normalized via ResolveHostname. port is tested to be valid integer.
 func NewInstanceKeyFromStrings(hostname string, port string) (*InstanceKey, error) {

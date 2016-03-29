@@ -75,13 +75,22 @@ Usage for most commands:
 func getClusterName(clusterAlias string, instanceKey *inst.InstanceKey) (clusterName string) {
 	var err error
 	if clusterAlias != "" {
-		clusterName, err = inst.ReadClusterNameByAlias(clusterAlias)
-		if err == nil && clusterName != "" {
+		if clusterName, err = inst.ReadClusterNameByAlias(clusterAlias); err == nil && clusterName != "" {
 			return clusterName
 		}
 	}
-
-	// deduce cluster by instance
+	if clusterAlias != "" {
+		// We're still here? So this wasn't an exact cluster name. Let's cehck if it's fuzzy:
+		fuzzyInstanceKey, err := inst.ParseRawInstanceKeyLoose(clusterAlias)
+		if err != nil {
+			log.Fatale(err)
+		}
+		if clusterName, err = inst.FindClusterNameByFuzzyInstanceKey(fuzzyInstanceKey); clusterName == "" {
+			log.Fatalf("Unable to determine cluster name by alias %+v", clusterAlias)
+		}
+		return clusterName
+	}
+	// So there is no alias. Let's check by instance key
 	instanceKey = inst.ReadFuzzyInstanceKeyIfPossible(instanceKey)
 	if instanceKey == nil {
 		instanceKey = assignThisInstanceKey()
@@ -1144,40 +1153,26 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("force-master-takeover", "Recovery", `Forcibly discard master and promote another (direct child) instance instead, even if everything is running well`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
-			clusterMasters, err := inst.ReadClusterWriteableMaster(clusterName)
-			if err != nil {
-				log.Fatalf("Cannot deduce cluster master for %+v", clusterName)
-			}
-			var clusterMaster *inst.Instance
-			if len(clusterMasters) == 1 {
-				clusterMaster = clusterMasters[0]
-			} else {
-				log.Fatalf("Cannot deduce cluster master for %+v", clusterName)
-			}
-
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination, the instance to promote in place of the master. Please provide with -d")
 			}
 			destination := validateInstanceIsFound(destinationKey)
-			if !destination.MasterKey.Equals(&clusterMaster.Key) {
-				log.Fatalf("You may only promote a direct child of the master %+v. The master of %+v is %+v.", clusterMaster.Key, destination.Key, destination.MasterKey)
-			}
-			log.Debugf("Will demote %+v and promote %+v instead", clusterMaster.Key, *destinationKey)
-
-			recoveryAttempted, topologyRecovery, err := logic.ForceExecuteRecovery(clusterName, inst.DeadMaster, &clusterMaster.Key, destinationKey, false)
+			topologyRecovery, err := logic.ForceMasterTakeover(clusterName, destination)
 			if err != nil {
 				log.Fatale(err)
 			}
-			if !recoveryAttempted {
-				log.Fatalf("Unexpected error: recovery not attempted. This should not happen")
-			}
-			if topologyRecovery == nil {
-				log.Fatalf("Recovery attempted but with no results. This should not happen")
-			}
-			if topologyRecovery.SuccessorKey == nil {
-				log.Fatalf("Recovery attempted yet no slave promoted")
+			fmt.Println(topologyRecovery.SuccessorKey.DisplayString())
+		}
+	case registerCliCommand("graceful-master-takeover", "Recovery", `Gracefully discard master and promote another (direct child) instance instead, even if everything is running well`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			topologyRecovery, promotedMasterCoordinates, err := logic.GracefulMasterTakeover(clusterName)
+			if err != nil {
+				log.Fatale(err)
 			}
 			fmt.Println(topologyRecovery.SuccessorKey.DisplayString())
+			fmt.Println(*promotedMasterCoordinates)
+			log.Debugf("Promoted %+v as new master. Binlog coordinates at time of promotion: %+v", topologyRecovery.SuccessorKey, *promotedMasterCoordinates)
 		}
 	case registerCliCommand("replication-analysis", "Recovery", `Request an analysis of potential crash incidents in all known topologies`):
 		{

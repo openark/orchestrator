@@ -146,10 +146,10 @@ type Configuration struct {
 	RecoveryIgnoreHostnameFilters                []string          // Recovery analysis will completely ignore hosts matching given patterns
 	RecoverMasterClusterFilters                  []string          // Only do master recovery on clusters matching these regexp patterns (of course the ".*" pattern matches everything)
 	RecoverIntermediateMasterClusterFilters      []string          // Only do IM recovery on clusters matching these regexp patterns (of course the ".*" pattern matches everything)
-	OnFailureDetectionProcesses                  []string          // Processes to execute when detecting a failover scenario (before making a decision whether to failover or not). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}, {slaveHosts}, {isDowntimed}, {autoMasterRecovery}, {autoIntermediateMasterRecovery}
-	PreFailoverProcesses                         []string          // Processes to execute before doing a failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}, {slaveHosts}, {isDowntimed}
-	PostFailoverProcesses                        []string          // Processes to execute after doing a failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}, {slaveHosts}, {isDowntimed}, {isSuccessful}, {lostSlaves}
-	PostUnsuccessfulFailoverProcesses            []string          // Processes to execute after a not-completely-successful failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}, {slaveHosts}, {isDowntimed}, {isSuccessful}, {lostSlaves}
+	OnFailureDetectionProcesses                  []string          // Processes to execute when detecting a failover scenario (before making a decision whether to failover or not). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}, {slaveHosts}, {isDowntimed}, {autoMasterRecovery}, {autoIntermediateMasterRecovery}
+	PreFailoverProcesses                         []string          // Processes to execute before doing a failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}, {slaveHosts}, {isDowntimed}
+	PostFailoverProcesses                        []string          // Processes to execute after doing a failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}, {slaveHosts}, {isDowntimed}, {isSuccessful}, {lostSlaves}
+	PostUnsuccessfulFailoverProcesses            []string          // Processes to execute after a not-completely-successful failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}, {slaveHosts}, {isDowntimed}, {isSuccessful}, {lostSlaves}
 	PostMasterFailoverProcesses                  []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
 	PostIntermediateMasterFailoverProcesses      []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
 	CoMasterRecoveryMustPromoteOtherCoMaster     bool              // When 'false', anything can get promoted (and candidates are prefered over others). When 'true', orchestrator will promote the other co-master or else fail
@@ -197,9 +197,9 @@ func newConfiguration() *Configuration {
 		MySQLTopologyUseMutualTLS:                    false,
 		DatabaselessMode__experimental:               false,
 		MySQLOrchestratorUseMutualTLS:                false,
-		MySQLConnectTimeoutSeconds:                   5,
+		MySQLConnectTimeoutSeconds:                   2,
 		DefaultInstancePort:                          3306,
-		InstancePollSeconds:                          60,
+		InstancePollSeconds:                          5,
 		ReadLongRunningQueries:                       true,
 		BinlogFileHistoryDays:                        0,
 		UnseenInstanceForgetHours:                    240,
@@ -207,8 +207,8 @@ func newConfiguration() *Configuration {
 		SlaveStartPostWaitMilliseconds:               1000,
 		DiscoverByShowSlaveHosts:                     false,
 		InstanceBulkOperationsWaitTimeoutSeconds:     10,
-		ActiveNodeExpireSeconds:                      60,
-		HostnameResolveMethod:                        "cname",
+		ActiveNodeExpireSeconds:                      5,
+		HostnameResolveMethod:                        "default",
 		MySQLHostnameResolveMethod:                   "@@hostname",
 		SkipBinlogServerUnresolveCheck:               true,
 		ExpiryHostnameResolvesMinutes:                60,
@@ -276,7 +276,7 @@ func newConfiguration() *Configuration {
 		FailureDetectionPeriodBlockMinutes:           60,
 		RecoveryPollSeconds:                          10,
 		RecoveryPeriodBlockMinutes:                   60,
-		RecoveryPeriodBlockSeconds:                   0,
+		RecoveryPeriodBlockSeconds:                   3600,
 		RecoveryIgnoreHostnameFilters:                []string{},
 		RecoverMasterClusterFilters:                  []string{},
 		RecoverIntermediateMasterClusterFilters:      []string{},

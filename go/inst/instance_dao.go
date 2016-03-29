@@ -886,6 +886,26 @@ func FindFuzzyInstances(fuzzyInstanceKey *InstanceKey) ([](*Instance), error) {
 	return readInstancesByCondition(condition, sqlutils.Args(fuzzyInstanceKey.Hostname, fuzzyInstanceKey.Port), `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
 }
 
+// FindClusterNameByFuzzyInstanceKey attempts to find a uniquely identifyable cluster name
+// given a fuzze key. It hopes to find instances matching given fuzzy key such that they all
+// belong to same cluster
+func FindClusterNameByFuzzyInstanceKey(fuzzyInstanceKey *InstanceKey) (string, error) {
+	clusterNames := make(map[string]bool)
+	instances, err := FindFuzzyInstances(fuzzyInstanceKey)
+	if err != nil {
+		return "", err
+	}
+	for _, instance := range instances {
+		clusterNames[instance.ClusterName] = true
+	}
+	if len(clusterNames) == 1 {
+		for clusterName := range clusterNames {
+			return clusterName, nil
+		}
+	}
+	return "", log.Errorf("findClusterNameByFuzzyInstanceKey: cannot uniquely identify cluster name by %+v", *fuzzyInstanceKey)
+}
+
 // ReadFuzzyInstanceKey accepts a fuzzy instance key and expects to return a single, fully qualified,
 // known instance key.
 func ReadFuzzyInstanceKey(fuzzyInstanceKey *InstanceKey) *InstanceKey {
