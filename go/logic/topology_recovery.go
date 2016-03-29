@@ -1061,3 +1061,100 @@ func ForceExecuteRecovery(clusterName string, analysisCode inst.AnalysisCode, fa
 	}
 	return executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, true, skipProcesses)
 }
+
+// ForceMasterTakeover *trusts* master of given cluster is dead and fails over to designated instance,
+// which has to be its direct child.
+func ForceMasterTakeover(clusterName string, destination *inst.Instance) (topologyRecovery *TopologyRecovery, err error) {
+	clusterMasters, err := inst.ReadClusterWriteableMaster(clusterName)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot deduce cluster master for %+v", clusterName)
+	}
+	if len(clusterMasters) != 1 {
+		return nil, fmt.Errorf("Cannot deduce cluster master for %+v", clusterName)
+	}
+	clusterMaster := clusterMasters[0]
+
+	if !destination.MasterKey.Equals(&clusterMaster.Key) {
+		return nil, fmt.Errorf("You may only promote a direct child of the master %+v. The master of %+v is %+v.", clusterMaster.Key, destination.Key, destination.MasterKey)
+	}
+	log.Debugf("Will demote %+v and promote %+v instead", clusterMaster.Key, destination.Key)
+
+	recoveryAttempted, topologyRecovery, err := ForceExecuteRecovery(clusterName, inst.DeadMaster, &clusterMaster.Key, &destination.Key, false)
+	if err != nil {
+		return nil, err
+	}
+	if !recoveryAttempted {
+		return nil, fmt.Errorf("Unexpected error: recovery not attempted. This should not happen")
+	}
+	if topologyRecovery == nil {
+		return nil, fmt.Errorf("Recovery attempted but with no results. This should not happen")
+	}
+	if topologyRecovery.SuccessorKey == nil {
+		return nil, fmt.Errorf("Recovery attempted yet no slave promoted")
+	}
+	return topologyRecovery, nil
+}
+
+// GracefulMasterTakeover will demote master of existing topology and promote its
+// direct replica instead.
+// It expects that replica to have no siblings.
+// This function is graceful in that it will first lock down the master, then wait
+// for the designated replica to catch up with last position.
+func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecovery, promotedMasterCoordinates *inst.BinlogCoordinates, err error) {
+	clusterMasters, err := inst.ReadClusterWriteableMaster(clusterName)
+	if err != nil {
+		return nil, nil, fmt.Errorf("Cannot deduce cluster master for %+v", clusterName)
+	}
+	if len(clusterMasters) != 1 {
+		return nil, nil, fmt.Errorf("Cannot deduce cluster master for %+v. Found %+v potential masters", clusterName, len(clusterMasters))
+	}
+	clusterMaster := clusterMasters[0]
+	if len(clusterMaster.SlaveHosts) == 0 {
+		return nil, nil, fmt.Errorf("Master %+v doesn't seem to have replicas", clusterMaster.Key)
+	}
+	if len(clusterMaster.SlaveHosts) > 1 {
+		return nil, nil, fmt.Errorf("GracefulMasterTakeover: master %+v should only have one replica (making the takeover safe and simple), but has %+v. Aborting", clusterMaster.Key, len(clusterMaster.SlaveHosts))
+	}
+
+	designatedInstanceKey := &(clusterMaster.SlaveHosts.GetInstanceKeys()[0])
+	designatedInstance, err := inst.ReadTopologyInstance(designatedInstanceKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !designatedInstance.MasterKey.Equals(&clusterMaster.Key) {
+		return nil, nil, fmt.Errorf("Sanity check failure. It seems like the desginated instance %+v does nto replicate from the master %+v. This error is strange. Panicking", designatedInstance.Key, clusterMaster.Key)
+	}
+	if !designatedInstance.HasReasonableMaintenanceReplicationLag() {
+		return nil, nil, fmt.Errorf("Desginated instance %+v seems to be lagging to much for thie operation. Aborting.", designatedInstance.Key)
+	}
+	log.Debugf("Will demote %+v and promote %+v instead", clusterMaster.Key, designatedInstance.Key)
+
+	if designatedInstance, err = inst.StopSlave(&designatedInstance.Key); err != nil {
+		return nil, nil, err
+	}
+	log.Debugf("Will set %+v as read_only", clusterMaster.Key)
+	if clusterMaster, err = inst.SetReadOnly(&clusterMaster.Key, true); err != nil {
+		return nil, nil, err
+	}
+
+	log.Debugf("Will advance %+v to master coordinates %+v", designatedInstance.Key, clusterMaster.SelfBinlogCoordinates)
+	if designatedInstance, err = inst.StartSlaveUntilMasterCoordinates(&designatedInstance.Key, &clusterMaster.SelfBinlogCoordinates); err != nil {
+		return nil, nil, err
+	}
+	promotedMasterCoordinates = &designatedInstance.SelfBinlogCoordinates
+
+	recoveryAttempted, topologyRecovery, err := ForceExecuteRecovery(clusterName, inst.DeadMaster, &clusterMaster.Key, &designatedInstance.Key, false)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !recoveryAttempted {
+		return nil, nil, fmt.Errorf("Unexpected error: recovery not attempted. This should not happen")
+	}
+	if topologyRecovery == nil {
+		return nil, nil, fmt.Errorf("Recovery attempted but with no results. This should not happen")
+	}
+	if topologyRecovery.SuccessorKey == nil {
+		return nil, nil, fmt.Errorf("Recovery attempted yet no slave promoted")
+	}
+	return topologyRecovery, promotedMasterCoordinates, nil
+}
