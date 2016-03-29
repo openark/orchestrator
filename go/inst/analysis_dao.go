@@ -374,16 +374,16 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		{
 			// Moving on to structure analysis
 			// We also do structural checks. See if there's potential danger in promotions
-			if a.CountStatementBasedLoggingSlaves > 0 && a.CountMixedBasedLoggingSlaves > 0 {
+			if a.IsMaster && a.CountStatementBasedLoggingSlaves > 0 && a.CountMixedBasedLoggingSlaves > 0 {
 				a.StructureAnalysis = append(a.StructureAnalysis, StatementAndMixedLoggingSlavesStructureWarning)
 			}
-			if a.CountStatementBasedLoggingSlaves > 0 && a.CountRowBasedLoggingSlaves > 0 {
+			if a.IsMaster && a.CountStatementBasedLoggingSlaves > 0 && a.CountRowBasedLoggingSlaves > 0 {
 				a.StructureAnalysis = append(a.StructureAnalysis, StatementAndRowLoggingSlavesStructureWarning)
 			}
-			if a.CountMixedBasedLoggingSlaves > 0 && a.CountRowBasedLoggingSlaves > 0 {
+			if a.IsMaster && a.CountMixedBasedLoggingSlaves > 0 && a.CountRowBasedLoggingSlaves > 0 {
 				a.StructureAnalysis = append(a.StructureAnalysis, MixedAndRowLoggingSlavesStructureWarning)
 			}
-			if a.CountDistinctMajorVersionsLoggingSlaves > 1 {
+			if a.IsMaster && a.CountDistinctMajorVersionsLoggingSlaves > 1 {
 				a.StructureAnalysis = append(a.StructureAnalysis, MultipleMajorVersionsLoggingSlaves)
 			}
 		}
