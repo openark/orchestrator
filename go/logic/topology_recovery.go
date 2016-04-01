@@ -973,9 +973,11 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
 	case inst.UnreachableMasterWithStaleSlaves:
 		checkAndRecoverFunction = checkAndRecoverGenericProblem
-	case inst.AllMasterSlavesStale:
-		checkAndRecoverFunction = checkAndRecoverGenericProblem
 	}
+	// Right now this is mostly causing noise with no clear action.
+	// Will revisit this in the future.
+	// case inst.AllMasterSlavesStale:
+	// 	checkAndRecoverFunction = checkAndRecoverGenericProblem
 
 	if checkAndRecoverFunction == nil {
 		// Unhandled problem type
