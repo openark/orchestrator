@@ -65,6 +65,7 @@
   "SlaveLagQuery": "",
   "DetectClusterAliasQuery": "SELECT SUBSTRING_INDEX(@@hostname, '.', 1)",
   "DetectClusterDomainQuery": "",
+  "DetectInstanceAliasQuery": "",
   "DataCenterPattern": "[.]([^.]+)[.][^.]+[.]mydomain[.]com",
   "PhysicalEnvironmentPattern": "[.]([^.]+[.][^.]+)[.]mydomain[.]com",
   "PromotionIgnoreHostnameFilters": [],

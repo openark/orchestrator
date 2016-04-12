@@ -18,6 +18,10 @@ package logic
 
 import (
 	"fmt"
+	"sort"
+	"strings"
+	"time"
+
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/go/attributes"
 	"github.com/outbrain/orchestrator/go/config"
@@ -26,9 +30,6 @@ import (
 	"github.com/outbrain/orchestrator/go/process"
 	"github.com/pmylund/go-cache"
 	"github.com/rcrowley/go-metrics"
-	"sort"
-	"strings"
-	"time"
 )
 
 // BlockedTopologyRecovery represents an entry in the blocked_topology_recovery table
@@ -47,6 +48,7 @@ type TopologyRecovery struct {
 	Id                        int64
 	AnalysisEntry             inst.ReplicationAnalysis
 	SuccessorKey              *inst.InstanceKey
+	SuccessorAlias            string
 	IsActive                  bool
 	IsSuccessful              bool
 	LostSlaves                inst.InstanceKeyMap
@@ -136,7 +138,7 @@ func init() {
 	metrics.Register("recover.dead_co_master.fail", recoverDeadCoMasterFailureCounter)
 }
 
-// replaceCommandPlaceholders replaxces agreed-upon placeholders with analysis data
+// replaceCommandPlaceholders replaces agreed-upon placeholders with analysis data
 func replaceCommandPlaceholders(command string, topologyRecovery *TopologyRecovery) string {
 	analysisEntry := &topologyRecovery.AnalysisEntry
 	command = strings.Replace(command, "{failureType}", string(analysisEntry.Analysis), -1)
@@ -156,6 +158,9 @@ func replaceCommandPlaceholders(command string, topologyRecovery *TopologyRecove
 	if topologyRecovery.SuccessorKey != nil {
 		command = strings.Replace(command, "{successorHost}", topologyRecovery.SuccessorKey.Hostname, -1)
 		command = strings.Replace(command, "{successorPort}", fmt.Sprintf("%d", topologyRecovery.SuccessorKey.Port), -1)
+		// As long as SucesssorKey != nil, we replace {successorAlias}.
+		// If SucessorAlias is "", it's fine. We'll replace {successorAlias} with "".
+		command = strings.Replace(command, "{successorAlias}", topologyRecovery.SuccessorAlias, -1)
 	}
 
 	command = strings.Replace(command, "{lostSlaves}", topologyRecovery.LostSlaves.ToCommaDelimitedList(), -1)
@@ -728,6 +733,7 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 		if !skipProcesses {
 			// Execute post intermediate-master-failover processes
 			topologyRecovery.SuccessorKey = &promotedSlave.Key
+			topologyRecovery.SuccessorAlias = promotedSlave.InstanceAlias
 			executeProcesses(config.Config.PostIntermediateMasterFailoverProcesses, "PostIntermediateMasterFailoverProcesses", topologyRecovery, false)
 		}
 	} else {
@@ -888,6 +894,7 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 		if !skipProcesses {
 			// Execute post intermediate-master-failover processes
 			topologyRecovery.SuccessorKey = &promotedSlave.Key
+			topologyRecovery.SuccessorAlias = promotedSlave.InstanceAlias
 			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
 		}
 	} else {

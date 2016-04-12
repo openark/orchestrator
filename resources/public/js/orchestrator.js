@@ -248,6 +248,9 @@ function openNodeModal(node) {
 
   $('#modalDataAttributesTable').html("");
 
+  if (node.InstanceAlias) {
+    addNodeModalDataAttribute("Instance Alias", node.InstanceAlias);
+  }
   addNodeModalDataAttribute("Last seen", node.LastSeenTimestamp + " (" + node.SecondsSinceLastSeen.Int64 + "s ago)");
   if (node.UnresolvedHostname) {
     addNodeModalDataAttribute("Unresolved hostname", node.UnresolvedHostname);

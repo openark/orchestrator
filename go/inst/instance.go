@@ -42,6 +42,7 @@ const (
 // It presents important replication configuration and detailed replication status.
 type Instance struct {
 	Key                    InstanceKey
+	InstanceAlias          string
 	Uptime                 uint
 	ServerID               uint
 	ServerUUID             string
