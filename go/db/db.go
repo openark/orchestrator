@@ -803,6 +803,11 @@ var generateSQLPatches = []string{
 				database_instance
 				ADD COLUMN allow_tls TINYINT UNSIGNED NOT NULL AFTER sql_delay
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN semi_sync_enforced TINYINT UNSIGNED NOT NULL AFTER physical_environment
+	`,
 }
 
 // Track if a TLS has already been configured for topology

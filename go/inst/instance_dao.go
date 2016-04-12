@@ -441,6 +441,11 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		logReadTopologyInstanceError(instanceKey, "DetectPhysicalEnvironmentQuery", err)
 	}
 
+	if config.Config.DetectSemiSyncEnforcedQuery != "" && !isMaxScale {
+		err := db.QueryRow(config.Config.DetectSemiSyncEnforcedQuery).Scan(&instance.SemiSyncEnforced)
+		logReadTopologyInstanceError(instanceKey, "DetectSemiSyncEnforcedQuery", err)
+	}
+
 	{
 		err = ReadInstanceClusterAttributes(instance)
 		logReadTopologyInstanceError(instanceKey, "ReadInstanceClusterAttributes", err)
@@ -628,6 +633,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.SuggestedClusterAlias = m.GetString("suggested_cluster_alias")
 	instance.DataCenter = m.GetString("data_center")
 	instance.PhysicalEnvironment = m.GetString("physical_environment")
+	instance.SemiSyncEnforced = m.GetBool("semi_sync_enforced")
 	instance.ReplicationDepth = m.GetUint("replication_depth")
 	instance.IsCoMaster = m.GetBool("is_co_master")
 	instance.ReplicationCredentialsAvailable = m.GetBool("replication_credentials_available")
@@ -1615,12 +1621,13 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 					cluster_name=VALUES(cluster_name),
 					suggested_cluster_alias=VALUES(suggested_cluster_alias),
 					data_center=VALUES(data_center),
-					physical_environment=values(physical_environment),
+					physical_environment=VALUES(physical_environment),
 					replication_depth=VALUES(replication_depth),
 					is_co_master=VALUES(is_co_master),
 					replication_credentials_available=VALUES(replication_credentials_available),
 					has_replication_credentials=VALUES(has_replication_credentials),
-					allow_tls=VALUES(allow_tls)
+					allow_tls=VALUES(allow_tls),
+					semi_sync_enforced=VALUES(semi_sync_enforced)
 				`
 		} else {
 			// Scenario: some slave reported a master of his; but the master cannot be contacted.
@@ -1677,8 +1684,9 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				is_co_master,
 				replication_credentials_available,
 				has_replication_credentials,
-				allow_tls
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				allow_tls,
+				semi_sync_enforced
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
@@ -1729,6 +1737,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			instance.ReplicationCredentialsAvailable,
 			instance.HasReplicationCredentials,
 			instance.AllowTLS,
+			instance.SemiSyncEnforced,
 		)
 		if err != nil {
 			return log.Errore(err)
