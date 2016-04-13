@@ -441,6 +441,11 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		logReadTopologyInstanceError(instanceKey, "DetectPhysicalEnvironmentQuery", err)
 	}
 
+	if config.Config.DetectInstanceAliasQuery != "" && !isMaxScale {
+		err := db.QueryRow(config.Config.DetectInstanceAliasQuery).Scan(&instance.InstanceAlias)
+		logReadTopologyInstanceError(instanceKey, "DetectInstanceAliasQuery", err)
+	}
+
 	if config.Config.DetectSemiSyncEnforcedQuery != "" && !isMaxScale {
 		err := db.QueryRow(config.Config.DetectSemiSyncEnforcedQuery).Scan(&instance.SemiSyncEnforced)
 		logReadTopologyInstanceError(instanceKey, "DetectSemiSyncEnforcedQuery", err)
@@ -651,6 +656,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.DowntimeEndTimestamp = m.GetString("downtime_end_timestamp")
 	instance.UnresolvedHostname = m.GetString("unresolved_hostname")
 	instance.AllowTLS = m.GetBool("allow_tls")
+	instance.InstanceAlias = m.GetString("instance_alias")
 
 	instance.SlaveHosts.ReadJson(slaveHostsJSON)
 	return instance
@@ -1627,7 +1633,8 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 					replication_credentials_available=VALUES(replication_credentials_available),
 					has_replication_credentials=VALUES(has_replication_credentials),
 					allow_tls=VALUES(allow_tls),
-					semi_sync_enforced=VALUES(semi_sync_enforced)
+					semi_sync_enforced=VALUES(semi_sync_enforced),
+					instance_alias=VALUES(instance_alias)
 				`
 		} else {
 			// Scenario: some slave reported a master of his; but the master cannot be contacted.
@@ -1685,8 +1692,9 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 				replication_credentials_available,
 				has_replication_credentials,
 				allow_tls,
-				semi_sync_enforced
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				semi_sync_enforced,
+				instance_alias
+			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			%s
 			`, insertIgnore, onDuplicateKeyUpdate)
 
@@ -1738,6 +1746,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 			instance.HasReplicationCredentials,
 			instance.AllowTLS,
 			instance.SemiSyncEnforced,
+			instance.InstanceAlias,
 		)
 		if err != nil {
 			return log.Errore(err)

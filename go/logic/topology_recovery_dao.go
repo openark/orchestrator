@@ -18,13 +18,14 @@ package logic
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
 	"github.com/outbrain/orchestrator/go/inst"
 	"github.com/outbrain/orchestrator/go/process"
-	"strings"
 )
 
 // AttemptFailureDetectionRegistration tries to add a failure-detection entry; if this fails that means the problem has already been detected
@@ -360,8 +361,10 @@ func ResolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst
 
 	isSuccessful := false
 	var successorKeyToWrite inst.InstanceKey
+	var successorAliasToWrite string
 	if successorInstance != nil {
 		topologyRecovery.SuccessorKey = &successorInstance.Key
+		topologyRecovery.SuccessorAlias = successorInstance.InstanceAlias
 		isSuccessful = true
 		successorKeyToWrite = successorInstance.Key
 	}
@@ -370,6 +373,7 @@ func ResolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst
 				is_successful = ?,
 				successor_hostname = ?,
 				successor_port = ?,
+				successor_alias = ?,
 				lost_slaves = ?,
 				participating_instances = ?,
 				all_errors = ?,
@@ -380,7 +384,7 @@ func ResolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst
 				AND processing_node_hostname = ?
 				AND processcing_node_token = ?
 			`, isSuccessful, successorKeyToWrite.Hostname, successorKeyToWrite.Port,
-		topologyRecovery.LostSlaves.ToCommaDelimitedList(),
+		successorAliasToWrite, topologyRecovery.LostSlaves.ToCommaDelimitedList(),
 		topologyRecovery.ParticipatingInstanceKeys.ToCommaDelimitedList(),
 		strings.Join(topologyRecovery.AllErrors, "\n"),
 		topologyRecovery.Id, process.ThisHostname, process.ProcessToken.Hash,
@@ -405,6 +409,7 @@ func readRecoveries(whereCondition string, limit string, args []interface{}) ([]
             processcing_node_token,
             ifnull(successor_hostname, '') as successor_hostname,
             ifnull(successor_port, 0) as successor_port,
+            ifnull(successor_alias, '') as successor_alias,
             analysis,
             cluster_name,
             cluster_alias,
@@ -447,6 +452,7 @@ func readRecoveries(whereCondition string, limit string, args []interface{}) ([]
 		topologyRecovery.SuccessorKey = &inst.InstanceKey{}
 		topologyRecovery.SuccessorKey.Hostname = m.GetString("successor_hostname")
 		topologyRecovery.SuccessorKey.Port = m.GetInt("successor_port")
+		topologyRecovery.SuccessorAlias = m.GetString("successor_alias")
 
 		topologyRecovery.AnalysisEntry.ClusterDetails.ReadRecoveryInfo()
 
