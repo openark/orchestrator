@@ -3,12 +3,15 @@ package ssl
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	nethttp "net/http"
 	"strings"
 
 	"github.com/go-martini/martini"
+	"github.com/howeyc/gopass"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/go/config"
 )
@@ -41,7 +44,7 @@ func HasString(elem string, arr []string) bool {
 func NewTLSConfig(caFile string, mutualTLS bool) (*tls.Config, error) {
 	var c tls.Config
 
-	// TLS 1.0 at a minimum (for mysql)
+	// Set to TLS 1.2 as a minimum.  This is overridden for mysql communication
 	c.MinVersion = tls.VersionTLS12
 	// Remove insecure ciphers from the list
 	c.CipherSuites = cipherSuites
@@ -109,6 +112,84 @@ func AppendKeyPair(tlsConfig *tls.Config, certFile string, keyFile string) error
 	}
 	tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
 	return nil
+}
+
+// Read in a keypair where the key is password protected
+func AppendKeyPairWithPassword(tlsConfig *tls.Config, certFile string, keyFile string, pemPass []byte) error {
+
+	// Certificates aren't usually password protected, but we're kicking the password
+	// along just in case.  It won't be used if the file isn't encrypted
+	certData, err := ReadPEMData(certFile, pemPass)
+	if err != nil {
+		return err
+	}
+	keyData, err := ReadPEMData(keyFile, pemPass)
+	if err != nil {
+		return err
+	}
+	cert, err := tls.X509KeyPair(certData, keyData)
+	if err != nil {
+		return err
+	}
+	tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
+	return nil
+}
+
+// Read a PEM file and ask for a password to decrypt it if needed
+func ReadPEMData(pemFile string, pemPass []byte) ([]byte, error) {
+	pemData, err := ioutil.ReadFile(pemFile)
+	if err != nil {
+		return pemData, err
+	}
+
+	// We should really just get the pem.Block back here, if there's other
+	// junk on the end, warn about it.
+	pemBlock, rest := pem.Decode(pemData)
+	if len(rest) > 0 {
+		log.Warning("Didn't parse all of", pemFile)
+	}
+
+	if x509.IsEncryptedPEMBlock(pemBlock) {
+		// Decrypt and get the ASN.1 DER bytes here
+		pemData, err = x509.DecryptPEMBlock(pemBlock, pemPass)
+		if err != nil {
+			return pemData, err
+		} else {
+			log.Info("Decrypted", pemFile, "successfully")
+		}
+		// Shove the decrypted DER bytes into a new pem Block with blank headers
+		var newBlock pem.Block
+		newBlock.Type = pemBlock.Type
+		newBlock.Bytes = pemData
+		// This is now like reading in an uncrypted key from a file and stuffing it
+		// into a byte stream
+		pemData = pem.EncodeToMemory(&newBlock)
+	}
+	return pemData, nil
+}
+
+// Print a password prompt on the terminal and collect a password
+func GetPEMPassword(pemFile string) []byte {
+	fmt.Printf("Password for %s: ", pemFile)
+	pass, err := gopass.GetPasswd()
+	if err != nil {
+		// We'll error with an incorrect password at DecryptPEMBlock
+		return []byte("")
+	}
+	return pass
+}
+
+// Determine if PEM file is encrypted
+func IsEncryptedPEM(pemFile string) bool {
+	pemData, err := ioutil.ReadFile(pemFile)
+	if err != nil {
+		return false
+	}
+	pemBlock, _ := pem.Decode(pemData)
+	if len(pemBlock.Bytes) == 0 {
+		return false
+	}
+	return x509.IsEncryptedPEMBlock(pemBlock)
 }
 
 // ListenAndServeTLS acts identically to http.ListenAndServeTLS, except that it

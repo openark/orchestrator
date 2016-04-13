@@ -248,6 +248,9 @@ function openNodeModal(node) {
 
   $('#modalDataAttributesTable').html("");
 
+  if (node.InstanceAlias) {
+    addNodeModalDataAttribute("Instance Alias", node.InstanceAlias);
+  }
   addNodeModalDataAttribute("Last seen", node.LastSeenTimestamp + " (" + node.SecondsSinceLastSeen.Int64 + "s ago)");
   if (node.UnresolvedHostname) {
     addNodeModalDataAttribute("Unresolved hostname", node.UnresolvedHostname);
@@ -331,6 +334,8 @@ function openNodeModal(node) {
   var td = addNodeModalDataAttribute("GTID based replication", booleanString(node.usingGTID));
   $('#node_modal button[data-btn=enable-gtid]').appendTo(td.find("div"))
   $('#node_modal button[data-btn=disable-gtid]').appendTo(td.find("div"))
+
+  addNodeModalDataAttribute("Semi-sync enforced", booleanString(node.SemiSyncEnforced));
 
   addNodeModalDataAttribute("Uptime", node.Uptime);
   addNodeModalDataAttribute("Allow TLS", node.AllowTLS);

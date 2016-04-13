@@ -500,6 +500,8 @@ var generateSQLBase = []string{
 	`,
 }
 
+// generateSQLPatches contains DDLs for patching schema to the latest version.
+// Add new statements at the end of the list so they form a changelog.
 var generateSQLPatches = []string{
 	`
 		ALTER TABLE
@@ -799,9 +801,24 @@ var generateSQLPatches = []string{
 			ADD COLUMN has_replication_credentials TINYINT UNSIGNED NOT NULL
 	`,
 	`
-			ALTER TABLE
-				database_instance
-				ADD COLUMN allow_tls TINYINT UNSIGNED NOT NULL AFTER sql_delay
+		ALTER TABLE
+			database_instance
+			ADD COLUMN allow_tls TINYINT UNSIGNED NOT NULL AFTER sql_delay
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN semi_sync_enforced TINYINT UNSIGNED NOT NULL AFTER physical_environment
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN instance_alias varchar(128) CHARACTER SET ascii NOT NULL AFTER physical_environment
+	`,
+	`
+		ALTER TABLE
+			topology_recovery
+			ADD COLUMN successor_alias varchar(128) DEFAULT NULL
 	`,
 }
 
