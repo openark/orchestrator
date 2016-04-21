@@ -1292,6 +1292,7 @@ _Orchestrator_ picks best course of action.
   is the master of the topology.  
 * `/api/clusters`: list names of known topologies.
 * `/api/clusters-info`: list known clusters (topologies) and basic info
+* `/api/cluster-pool-instances/:clusterName`: get pool information
 * `/api/search/:searchString`: list instances matching search string
 * `/api/problems`: list instances who have known problems (e.g. not replicating, lagging etc.)
 * `/api/long-queries`: list of long running queries on all topologies (queries running for over 60 seconds, excluding replication and event-scheduler queries)
