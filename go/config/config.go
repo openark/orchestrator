@@ -108,7 +108,7 @@ type Configuration struct {
 	DetectSemiSyncEnforcedQuery                  string            // Optional query (executed on topology instance) to determine whether semi-sync is fully enforced for master writes (async fallback is not allowed under any circumstance). If provided, must return one row, one column, value 0 or 1.
 	SupportFuzzyPoolHostnames                    bool              // Should "submit-pool-instances" command be able to pass list of fuzzy instances (fuzzy means non-fqdn, but unique enough to recognize). Defaults 'true', implies more queries on backend db
 	PromotionIgnoreHostnameFilters               []string          // Orchestrator will not promote slaves with hostname matching pattern (via -c recovery; for example, avoid promoting dev-dedicated machines)
-	ServeAgentsHttp                              bool              // Spawn another HTTP interface dedicated for orcehstrator-agent
+	ServeAgentsHttp                              bool              // Spawn another HTTP interface dedicated for orchestrator-agent
 	AgentsUseSSL                                 bool              // When "true" orchestrator will listen on agents port with SSL as well as connect to agents via SSL
 	AgentsUseMutualTLS                           bool              // When "true" Use mutual TLS for the server to agent communication
 	AgentSSLSkipVerify                           bool              // When using SSL for the Agent, should we ignore SSL certification error

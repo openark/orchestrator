@@ -24,9 +24,9 @@ $(document).ready(function() {
     }
   };
 
-  $.get("/api/clusters-info", function(clusters) {
-    $.get("/api/replication-analysis", function(replicationAnalysis) {
-      $.get("/api/problems", function(problemInstances) {
+  $.get(appUrl("/api/clusters-info"), function(clusters) {
+    $.get(appUrl("/api/replication-analysis"), function(replicationAnalysis) {
+      $.get(appUrl("/api/problems"), function(problemInstances) {
         if (problemInstances == null) {
           problemInstances = [];
         }
@@ -97,18 +97,18 @@ $(document).ready(function() {
     });
 
     clusters.forEach(function(cluster) {
-      $("#clusters").append('<div xmlns="http://www.w3.org/1999/xhtml" class="popover instance right" data-cluster-name="' + cluster.ClusterName + '"><div class="arrow"></div><h3 class="popover-title"><div class="pull-left"><a href="/web/cluster/' + cluster.ClusterName + '"><span>' + cluster.ClusterName + '</span></a></div><div class="pull-right"></div>&nbsp;<br/>&nbsp;</h3><div class="popover-content"></div></div>');
+      $("#clusters").append('<div xmlns="http://www.w3.org/1999/xhtml" class="popover instance right" data-cluster-name="' + cluster.ClusterName + '"><div class="arrow"></div><h3 class="popover-title"><div class="pull-left"><a href="' + appUrl('/web/cluster/' + cluster.ClusterName) + '"><span>' + cluster.ClusterName + '</span></a></div><div class="pull-right"></div>&nbsp;<br/>&nbsp;</h3><div class="popover-content"></div></div>');
       var popoverElement = $("#clusters [data-cluster-name='" + cluster.ClusterName + "'].popover");
 
       if (typeof removeTextFromHostnameDisplay != "undefined" && removeTextFromHostnameDisplay()) {
         var title = cluster.ClusterName.replace(removeTextFromHostnameDisplay(), '');
         popoverElement.find("h3 .pull-left a span").html(title);
       }
-      var compactClusterUri = '/web/cluster/' + cluster.ClusterName + '?compact=true';
+      var compactClusterUri = appUrl('/web/cluster/' + cluster.ClusterName + '?compact=true');
       if (cluster.ClusterAlias) {
         popoverElement.find("h3 .pull-left a span").addClass("small");
-        popoverElement.find("h3 .pull-left").prepend('<a href="/web/cluster/alias/' + encodeURIComponent(cluster.ClusterAlias) + '"><strong>' + cluster.ClusterAlias + '</strong></a><br/>');
-        compactClusterUri = '/web/cluster/alias/' + encodeURIComponent(cluster.ClusterAlias) + '?compact=true';
+        popoverElement.find("h3 .pull-left").prepend('<a href="' + appUrl('/web/cluster/alias/' + encodeURIComponent(cluster.ClusterAlias)) + '"><strong>' + cluster.ClusterAlias + '</strong></a><br/>');
+        compactClusterUri = appUrl('/web/cluster/alias/' + encodeURIComponent(cluster.ClusterAlias) + '?compact=true');
       }
       if (clustersAnalysisProblems[cluster.ClusterName]) {
         clustersAnalysisProblems[cluster.ClusterName].forEach(function(analysisEntry) {

@@ -1,7 +1,7 @@
 
 $(document).ready(function () {
     showLoader();
-    $.get("/api/long-queries/"+currentFilter(), function (processes) {
+    $.get(appUrl("/api/long-queries/"+currentFilter()), function (processes) {
             displayProcesses(processes);
             if (isAuthorizedForAction()) {
             	// Read-only users don't get auto-refresh. Sorry!
@@ -19,7 +19,7 @@ $(document).ready(function () {
         		$("#long_queries tbody:last").append('<tr><td>'+title+'</td><td><code class="text-primary"><strong>'+value+'</strong></code></td></tr>')
         	}
         	
-        	addInfo('Instance', '<a href="https://orchestrator/web/search?s='+process.InstanceHostname+':'+process.InstancePort+'"><code class="text-primary">'+process.InstanceHostname+":"+process.InstancePort+'</code></a>');
+        	addInfo('Instance', '<a href="' + appUrl('/web/search?s='+process.InstanceHostname+':'+process.InstancePort) + '"><code class="text-primary">'+process.InstanceHostname+":"+process.InstancePort+'</code></a>');
         	addInfo('Process ID <siv class="pull-right"><button class="btn btn-xs btn-danger" data-command="kill_query" data-host="'+process.InstanceHostname+'" data-port="'+process.InstancePort+'" data-process="'+process.Id+'">Kill query</button></div>', process.Id);
         	addInfo('Started at', process.StartedAt);
         	addInfo('Runtime seconds', process.Time);
@@ -28,7 +28,7 @@ $(document).ready(function () {
         	/*
         	var rowDiv = jQuery('<div class="row col-xs-12"/>');
         	var infoDiv = jQuery('<div/>');
-        	infoDiv.html(infoDiv.html() + '<div><a href="https://orchestrator/web/search?s='+process.InstanceHostname+":"+process.InstancePort+'"><code class="text-primary">'+process.InstanceHostname+":"+process.InstancePort+'</code></a></div>');
+        	infoDiv.html(infoDiv.html() + '<div><a href="' + appUrl('/web/search?s='+process.InstanceHostname+":"+process.InstancePort) + '"><code class="text-primary">'+process.InstanceHostname+":"+process.InstancePort+'</code></a></div>');
         	infoDiv.html(infoDiv.html() + '<div>Id: '+process.Id+'</div>');
         	infoDiv.html(infoDiv.html() + '<div>Started: '+process.StartedAt+'</div>');
         	infoDiv.html(infoDiv.html() + '<div>Time: '+process.Time+'</div>');
@@ -47,7 +47,7 @@ $(document).ready(function () {
     	bootbox.confirm(message, function(confirm) {
 			if (confirm) {
 		    	showLoader();
-		        $.get("/api/kill-query/"+host + "/" + port + "/" + processId, function (operationResult) {
+		        $.get(appUrl("/api/kill-query/"+host + "/" + port + "/" + processId), function (operationResult) {
 					hideLoader();
 					if (operationResult.Code == "ERROR") {
 						addAlert(operationResult.Message)

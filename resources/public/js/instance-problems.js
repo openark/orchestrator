@@ -5,11 +5,11 @@ $(document).ready(function() {
   if (typeof currentClusterName != "undefined") {
     problemsURI += "/" + currentClusterName();
   }
-  $.get(problemsURI, function(instances) {
+  $.get(appUrl(problemsURI), function(instances) {
     if (instances == null) {
       instances = [];
     }
-    $.get("/api/maintenance", function(maintenanceList) {
+    $.get(appUrl("/api/maintenance"), function(maintenanceList) {
       normalizeInstances(instances, maintenanceList);
       displayProblemInstances(instances);
     }, "json");

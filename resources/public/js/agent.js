@@ -3,14 +3,14 @@ $(document).ready(function() {
 
   var hasActiveSeeds = false;
 
-  $.get("/api/agent/" + currentAgentHost(), function(agent) {
+  $.get(appUrl("/api/agent/" + currentAgentHost()), function(agent) {
     showLoader();
     agent.AvailableLocalSnapshots || (agent.AvailableLocalSnapshots = [])
     agent.AvailableSnapshots || (agent.AvailableSnapshots = [])
     displayAgent(agent);
   }, "json");
 
-  $.get("/api/agent-active-seeds/" + currentAgentHost(), function(activeSeeds) {
+  $.get(appUrl("/api/agent-active-seeds/" + currentAgentHost()), function(activeSeeds) {
     showLoader();
     activeSeeds.forEach(function(activeSeed) {
       appendSeedDetails(activeSeed, "[data-agent=active_seeds]");
@@ -23,7 +23,7 @@ $(document).ready(function() {
       hasActiveSeeds = true;
       activateRefreshTimer();
 
-      $.get("/api/agent-seed-states/" + activeSeeds[0].SeedId, function(seedStates) {
+      $.get(appUrl("/api/agent-seed-states/" + activeSeeds[0].SeedId), function(seedStates) {
         showLoader();
         seedStates.forEach(function(seedState) {
           appendSeedState(seedState);
@@ -31,7 +31,7 @@ $(document).ready(function() {
       }, "json");
     }
   }, "json");
-  $.get("/api/agent-recent-seeds/" + currentAgentHost(), function(recentSeeds) {
+  $.get(appUrl("/api/agent-recent-seeds/" + currentAgentHost()), function(recentSeeds) {
     showLoader();
     recentSeeds.forEach(function(recentSeed) {
       appendSeedDetails(recentSeed, "[data-agent=recent_seeds]");
@@ -48,7 +48,7 @@ $(document).ready(function() {
     }
     $("[data-agent=hostname]").html(agent.Hostname)
     $("[data-agent=hostname_search]").html(
-      '<a href="/web/search?s=' + agent.Hostname + ':' + agent.MySQLPort + '">' + agent.Hostname + '</a>' + '<div class="pull-right"><button class="btn btn-xs btn-success" data-command="discover" data-hostname="' + agent.Hostname + '" data-mysql-port="' + agent.MySQLPort + '">Discover</button></div>'
+      '<a href="' + appUrl('/web/search?s=' + agent.Hostname + ':' + agent.MySQLPort) + '">' + agent.Hostname + '</a>' + '<div class="pull-right"><button class="btn btn-xs btn-success" data-command="discover" data-hostname="' + agent.Hostname + '" data-mysql-port="' + agent.MySQLPort + '">Discover</button></div>'
     );
     $("[data-agent=port]").html(agent.Port)
     $("[data-agent=last_submitted]").html(agent.LastSubmitted)
@@ -100,7 +100,7 @@ $(document).ready(function() {
         }
         var isLocal = $.inArray(hostname, agent.AvailableLocalSnapshots) >= 0;
         var btnType = (isLocal ? "btn-success" : "btn-warning");
-        return '<td><a href="/web/agent/' + hostname + '">' + hostname + '</a><div class="pull-right"><button class="btn btn-xs ' + btnType + '" data-command="seed" data-seed-source-host="' + hostname + '" data-seed-local="' + isLocal + '" data-mysql-running="' + agent.MySQLRunning + '">Seed</button></div></td>';
+        return '<td><a href="' + appUrl('/web/agent/' + hostname) + '">' + hostname + '</a><div class="pull-right"><button class="btn btn-xs ' + btnType + '" data-command="seed" data-seed-source-host="' + hostname + '" data-seed-local="' + isLocal + '" data-mysql-running="' + agent.MySQLRunning + '">Seed</button></div></td>';
       });
       result = result.map(function(entry) {
         return '<tr>' + entry + '</tr>';
@@ -170,7 +170,7 @@ $(document).ready(function() {
       return;
     }
     showLoader();
-    $.get("/api/agent-umount/" + currentAgentHost(), function(operationResult) {
+    $.get(appUrl("/api/agent-umount/" + currentAgentHost()), function(operationResult) {
       hideLoader();
       if (operationResult.Code == "ERROR") {
         addAlert(operationResult.Message)
@@ -182,7 +182,7 @@ $(document).ready(function() {
   $("body").on("click", "button[data-command=mountlv]", function(event) {
     var lv = $(event.target).attr("data-lv")
     showLoader();
-    $.get("/api/agent-mount/" + currentAgentHost() + "?lv=" + encodeURIComponent(lv), function(operationResult) {
+    $.get(appUrl("/api/agent-mount/" + currentAgentHost() + "?lv=" + encodeURIComponent(lv)), function(operationResult) {
       hideLoader();
       if (operationResult.Code == "ERROR") {
         addAlert(operationResult.Message)
@@ -197,7 +197,7 @@ $(document).ready(function() {
     bootbox.confirm(message, function(confirm) {
       if (confirm) {
         showLoader();
-        $.get("/api/agent-removelv/" + currentAgentHost() + "?lv=" + encodeURIComponent(lv), function(operationResult) {
+        $.get(appUrl("/api/agent-removelv/" + currentAgentHost() + "?lv=" + encodeURIComponent(lv)), function(operationResult) {
           hideLoader();
           if (operationResult.Code == "ERROR") {
             addAlert(operationResult.Message)
@@ -214,7 +214,7 @@ $(document).ready(function() {
     bootbox.confirm(message, function(confirm) {
       if (confirm) {
         showLoader();
-        $.get("/api/agent-create-snapshot/" + currentAgentHost(), function(operationResult) {
+        $.get(appUrl("/api/agent-create-snapshot/" + currentAgentHost()), function(operationResult) {
           hideLoader();
           if (operationResult.Code == "ERROR") {
             addAlert(operationResult.Message)
@@ -231,7 +231,7 @@ $(document).ready(function() {
     bootbox.confirm(message, function(confirm) {
       if (confirm) {
         showLoader();
-        $.get("/api/agent-mysql-stop/" + currentAgentHost(), function(operationResult) {
+        $.get(appUrl("/api/agent-mysql-stop/" + currentAgentHost()), function(operationResult) {
           hideLoader();
           if (operationResult.Code == "ERROR") {
             addAlert(operationResult.Message)
@@ -244,7 +244,7 @@ $(document).ready(function() {
   });
   $("body").on("click", "button[data-command=mysql-start]", function(event) {
     showLoader();
-    $.get("/api/agent-mysql-start/" + currentAgentHost(), function(operationResult) {
+    $.get(appUrl("/api/agent-mysql-start/" + currentAgentHost()), function(operationResult) {
       hideLoader();
       if (operationResult.Code == "ERROR") {
         addAlert(operationResult.Message)
@@ -277,7 +277,7 @@ $(document).ready(function() {
     bootbox.confirm(message, function(confirm) {
       if (confirm) {
         showLoader();
-        $.get("/api/agent-seed/" + currentAgentHost() + "/" + sourceHost, function(operationResult) {
+        $.get(appUrl("/api/agent-seed/" + currentAgentHost() + "/" + sourceHost), function(operationResult) {
           hideLoader();
           if (operationResult.Code == "ERROR") {
             addAlert(operationResult.Message)
