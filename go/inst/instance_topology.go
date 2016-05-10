@@ -2419,24 +2419,27 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 	if InstancesAreSiblings(instance, other) && other.IsBinlogServer() {
 		return MoveBelow(&instance.Key, &other.Key)
 	}
-	instanceMaster, found, err := ReadInstance(&instance.MasterKey)
-	if err != nil || !found {
+	instanceMaster, _, err := ReadInstance(&instance.MasterKey)
+	if err != nil {
 		return instance, err
 	}
-	if instanceMaster.MasterKey.Equals(&other.Key) && instanceMaster.IsBinlogServer() {
+	if instanceMaster != nil && instanceMaster.MasterKey.Equals(&other.Key) && instanceMaster.IsBinlogServer() {
 		// Moving to grandparent via binlog server
 		return Repoint(&instance.Key, &instanceMaster.MasterKey, GTIDHintDeny)
 	}
 	if other.IsBinlogServer() {
-		if instanceMaster.IsBinlogServer() && InstancesAreSiblings(instanceMaster, other) {
+		if instanceMaster != nil && instanceMaster.IsBinlogServer() && InstancesAreSiblings(instanceMaster, other) {
 			// Special case: this is a binlog server family; we move under the uncle, in one single step
 			return Repoint(&instance.Key, &other.Key, GTIDHintDeny)
 		}
 
 		// Relocate to its master, then repoint to the binlog server
 		otherMaster, found, err := ReadInstance(&other.MasterKey)
-		if err != nil || !found {
+		if err != nil {
 			return instance, err
+		}
+		if !found {
+			return instance, log.Errorf("Cannot find master %+v", other.MasterKey)
 		}
 		if !other.IsLastCheckValid {
 			return instance, log.Errorf("Binlog server %+v is not reachable. It would take two steps to relocate %+v below it, and I won't even do the first step.", other.Key, instance.Key)
@@ -2474,11 +2477,11 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 		}
 	}
 	// See if we need to MoveUp
-	if instanceMaster.MasterKey.Equals(&other.Key) {
+	if instanceMaster != nil && instanceMaster.MasterKey.Equals(&other.Key) {
 		// Moving to grandparent--handles co-mastering writable case
 		return MoveUp(&instance.Key)
 	}
-	if instanceMaster.IsBinlogServer() {
+	if instanceMaster != nil && instanceMaster.IsBinlogServer() {
 		// Break operation into two: move (repoint) up, then continue
 		if _, err := MoveUp(&instance.Key); err != nil {
 			return instance, err
