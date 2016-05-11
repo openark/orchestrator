@@ -31,6 +31,7 @@ import (
 	"github.com/outbrain/orchestrator/go/inst"
 	"github.com/outbrain/orchestrator/go/logic"
 	"github.com/outbrain/orchestrator/go/process"
+	"github.com/outbrain/orchestrator/go/recovery"
 )
 
 var thisInstanceKey *inst.InstanceKey
@@ -1340,7 +1341,35 @@ func Cli(command string, strict bool, instance string, destination string, owner
 
 			fmt.Printf("%v\n", output)
 		}
-	// Help
+	case registerCliCommand("disable-global-recoveries", "", `Disallow orchestrator from performing recoveries globally`):
+		{
+			if err := recovery.DisableGlobally(); err != nil {
+				fmt.Printf("ERROR: Failed to disable recoveries globally: %v\n", err)
+				// should change exit code ?
+			} else {
+				fmt.Println("OK: Orchestrator recoveries DISABLED globally")
+			}
+		}
+	case registerCliCommand("enable-global-recoveries", "", `Allow orchestrator to perform recoveries globally`):
+		{
+			if err := recovery.EnableGlobally(); err != nil {
+				fmt.Printf("ERROR: Failed to enable recoveries globally: %v\n", err)
+				// should change exit code ?
+			} else {
+				fmt.Println("OK: Orchestrator recoveries ENABLED globally")
+			}
+		}
+	case registerCliCommand("check-global-recoveries", "", `Show the global recovery configuration`):
+		{
+			isDisabled, err := recovery.IsGloballyDisabled()
+			if err != nil {
+				fmt.Printf("ERROR: Failed to determine if recoveries are disabled globally: %v\n", err)
+				// should change exit code ?
+			} else {
+				fmt.Printf("OK: Global recoveries disabled: %v\n", isDisabled)
+			}
+		}
+		// Help
 	case "help":
 		{
 			fmt.Fprintf(os.Stderr, availableCommandsUsage())

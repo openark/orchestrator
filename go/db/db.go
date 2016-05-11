@@ -498,6 +498,12 @@ var generateSQLBase = []string{
 		  PRIMARY KEY (deployed_version)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE global_recovery_disable (
+		  disable_recovery tinyint unsigned NOT NULL COMMENT 'Insert 1 to disable recovery globally',
+		  PRIMARY KEY (disable_recovery)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii COMMENT='checked with: SELECT COUNT(*) FROM global_recovery_disable WHERE disable_recovery=1'
+	`,
 }
 
 // generateSQLPatches contains DDLs for patching schema to the latest version.
