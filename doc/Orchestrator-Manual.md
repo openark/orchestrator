@@ -1142,7 +1142,7 @@ The following assumes you have [Executed as web/API service](#executing-as-webap
 Open your browser and direct it at `http://your.host:3000`. If all went well, you should see
 the following welcome page:
 
-![Orcehstrator screenshot](images/orchestrator-about.png)
+![Orchestrator screenshot](images/orchestrator-about.png)
 
 If this is your first time using _orchstrator_, then you should begin by teaching it.
 _orchestrator_ needs to know what replication topologies you have. The web interface
@@ -1169,7 +1169,7 @@ time _orchestrator_ will automaticaly find them.
 _Orchestrator_ resolves the `CNAME` of every input it gets, either from the user or from the replication
 topology itself. This is for avoiding ambiguities or implicit duplicates.
 
-![Orcehstrator screenshot](images/orchestrator-discover.png)
+![Orchestrator screenshot](images/orchestrator-discover.png)
 
 Once _orchestrator_ is familiar with a topology, you can view and manipulate it via the `cluster` page.
 Click the `clusters` drop down on navigation bar to see available clusters.
@@ -1182,7 +1182,7 @@ tree infographic, based on a D3 widget. Sub trees are collapsible.
 Each node in the tree presents a single MySQL instance, listing its fully qualified name, its version,
 binary log format and replication lag.
 
-![Orcehstrator screenshot](images/orchestrator-simple.png)
+![Orchestrator screenshot](images/orchestrator-simple.png)
 
 Note that each server has a _settings_ icon to the right. Clicking this icon opens a modal with some
 extra info on that server as well as operations to be performed.
@@ -1191,7 +1191,7 @@ The modal allows you to begin/terminate maintenance mode on an instance; perform
 (by default instances are polled once per minute - this is configurable); stop/start replication; forget
 the instance (may be rediscovered a minute later if still connected to the topology).
 
-![Orcehstrator screenshot](images/orchestrator-instance-modal.png)
+![Orchestrator screenshot](images/orchestrator-instance-modal.png)
 
 The topology can be refactored: slaves can be moved around via _drag and drop_. Start dragging an instance:
 all possible _droppable_ targets are immediately colored green. You may turn your instance to be the slave of
@@ -1208,37 +1208,37 @@ the operation if it finds a deeper block, such as the target not having binary l
 
 Begin dragging: possible targets colored green
 
-![Orcehstrator screenshot](images/orchestrator-simple-drag.png)
+![Orchestrator screenshot](images/orchestrator-simple-drag.png)
 
 Move over your target and drop:
 
-![Orcehstrator screenshot](images/orchestrator-simple-drag-hover.png)
+![Orchestrator screenshot](images/orchestrator-simple-drag-hover.png)
 
 Topology refactored:
 
-![Orcehstrator screenshot](images/orchestrator-simple-dropped.png)
+![Orchestrator screenshot](images/orchestrator-simple-dropped.png)
 
 Dragging a master over its slave makes for a co-masters (master-master) topology:
 
-![Orcehstrator screenshot](images/orchestator-cm-simple-drag-master.png)
+![Orchestrator screenshot](images/orchestator-cm-simple-drag-master.png)
 
 A co-master topology:
 
-![Orcehstrator screenshot](images/orchestator-cm-co-masters.png)
+![Orchestrator screenshot](images/orchestator-cm-co-masters.png)
 
 _Orchestrator_ visually indicates replication & accessibility related problems: slave lag, replication not working,
 instance not accessed for long time, instance access failure, instance under maintenance.
 
-![Orcehstrator screenshot](images/orchestrator-simple-with-problems.png)
+![Orchestrator screenshot](images/orchestrator-simple-with-problems.png)
 
 _Problems_ drop down is available on all pages, and indicates all currently known issues across all topologies:
 
-![Orcehstrator screenshot](images/orchestrator-problems.png)
+![Orchestrator screenshot](images/orchestrator-problems.png)
 
 The `Audit` page presents with all actions taken via _orchestrator_: slave move, detection, maintenance etc.
 (`START SLAVE` and `STOP SLAVE` are currently not audited).
 
-![Orcehstrator screenshot](images/orchestrator-audit-small.png)
+![Orchestrator screenshot](images/orchestrator-audit-small.png)
 
 `Queries` -> `Long queries` page list last met long running queries over the entire topology. these would be
 queries running over `60` seconds, non-replication, non-event-scheduler.
@@ -2169,13 +2169,13 @@ To move slaves via Pseudo-GTID mechanism, click the **Classic mode** green butto
 (depicted by a win-glass icon) is eligible for dragging. At this point such a slave can be dropped on an accessible sibling
 or ancestor (including its very own master/parent).
 
-![Orcehstrator screenshot](images/orchestrator-pseudo-gtid-dead-relay-master.png)
+![Orchestrator screenshot](images/orchestrator-pseudo-gtid-dead-relay-master.png)
 
-![Orcehstrator screenshot](images/orchestrator-pseudo-gtid-dead-relay-master-begin-drag.png)
+![Orchestrator screenshot](images/orchestrator-pseudo-gtid-dead-relay-master-begin-drag.png)
 
-![Orcehstrator screenshot](images/orchestrator-pseudo-gtid-dead-relay-master-drop.png)
+![Orchestrator screenshot](images/orchestrator-pseudo-gtid-dead-relay-master-drop.png)
 
-![Orcehstrator screenshot](images/orchestrator-pseudo-gtid-dead-relay-master-refactored-1.png)
+![Orchestrator screenshot](images/orchestrator-pseudo-gtid-dead-relay-master-refactored-1.png)
 
 
 ## Topology recovery
