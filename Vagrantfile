@@ -7,7 +7,7 @@ BOX = ENV['VAGRANT_BOX'].nil? || ENV['VAGRANT_BOX'].empty? ? 'nrel/CentOS-6.6-x8
 VAGRANTFILE_API_VERSION = "2"
 
 system("
-    if [ #{ARGV[0]} = 'up' ]; then
+    if [[ #{ARGV[0]} = 'up' ]] && [[ ! -e 'vagrant/vagrant-ssh-key' ]]; then
       ssh-keygen -t rsa -b 768 -N '' -q -f vagrant/vagrant-ssh-key
     fi
 ")
@@ -32,7 +32,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       db.vm.network "private_network", ip: "192.168.57.20" + n.to_s
       db.vm.provision "shell", path: "vagrant/base-build.sh"
       if name == "admin"
-        config.vm.network "forwarded_port", guest:3000, host:3000
+        db.vm.network "forwarded_port", guest:3000, host:3000
       end
     end
   end

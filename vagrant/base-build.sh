@@ -25,24 +25,21 @@ if [[ -e /etc/redhat-release ]]; then
 
   # Setup mysql
   /sbin/chkconfig mysql on
+
+  if [[ -e "/orchestrator/vagrant/${HOSTNAME}-my.cnf" ]]; then
+    rm -f /etc/my.cnf
+    cp /orchestrator/vagrant/${HOSTNAME}-my.cnf /etc/my.cnf
+  fi
+
   /sbin/service mysql start
   cat <<-EOF | mysql -u root
-  CREATE DATABASE orchestrator;
+  CREATE DATABASE IF NOT EXISTS orchestrator;
   GRANT ALL PRIVILEGES ON orchestrator.* TO 'orc_client_user'@'%' IDENTIFIED BY 'orc_client_password';
   GRANT SUPER, PROCESS, REPLICATION SLAVE, RELOAD ON *.* TO 'orc_client_user'@'%';
   GRANT ALL PRIVILEGES ON orchestrator.* TO 'orc_client_user'@'localhost' IDENTIFIED BY 'orc_client_password';
   GRANT SUPER, PROCESS, REPLICATION SLAVE, RELOAD ON *.* TO 'orc_client_user'@'localhost';
   GRANT ALL PRIVILEGES ON orchestrator.* TO 'orc_server_user'@'localhost' IDENTIFIED BY 'orc_server_password';
 EOF
-
-  # Install orchestrator
-  rpm -i /tmp/orchestrator-release/orchestrator*.rpm
-  /sbin/chkconfig orchestrator on
-  cp /usr/local/orchestrator/orchestrator-sample.conf.json /etc/orchestrator.conf.json
-  /sbin/service orchestrator start
-
-  # Discover instances
-  /usr/bin/orchestrator -c discover -i localhost
 
 elif [[ -e /etc/debian_version ]]; then
   sudo echo exit 101 > /usr/sbin/policy-rc.d
