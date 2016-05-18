@@ -2,19 +2,45 @@
 
 if [[ -e /etc/redhat-release ]]; then
   # Percona's Yum Repository
-  sudo yum -y install http://www.percona.com/downloads/percona-release/redhat/0.1-3/percona-release-0.1-3.noarch.rpm
+  yum -d 0 -y install http://www.percona.com/downloads/percona-release/redhat/0.1-3/percona-release-0.1-3.noarch.rpm epel-release
 
+  # All the project dependencies to build plus some utilities
   # No reason not to install this stuff in all the places :)
-  sudo yum -y install Percona-Server-server-56 Percona-Server-shared-56 Percona-Server-client-56 Percona-Server-shared-compat
-  sudo yum -y install percona-toolkit percona-xtrabackup
+  yum -d 0 -y install Percona-Server-server-56 Percona-Server-shared-56 Percona-Server-client-56 Percona-Server-shared-compat percona-toolkit percona-xtrabackup ruby-devel gcc rpm-build git vim-enhanced golang
+  # Pin to 1.4 due to 1.5 no longer working on EL6
+  gem install fpm --version 1.4
 
-  # All the project dependencies to build
-  sudo yum -y install ruby-devel gcc rpm-build git
-  gem install fpm
+  # Build orchestrator and orchestrator agent
+  mkdir -p /home/vagrant/go/{bin,pkg,src} /tmp/orchestrator-release
+  mkdir -p /home/vagrant/go/src/github.com/outbrain/orchestrator
+  mount --bind /orchestrator /home/vagrant/go/src/github.com/outbrain/orchestrator
 
-  # Go (via EPEL)
-  sudo yum -y install epel-release
-  sudo yum -y install golang
+  # Build Orchestrator
+  export GOPATH=/home/vagrant/go
+  export GO15VENDOREXPERIMENT=1
+  cd ${GOPATH}/src/github.com/outbrain/orchestrator
+  /usr/bin/go get ./...
+  ${GOPATH}/src/github.com/outbrain/orchestrator/build.sh
+  chown -R vagrant.vagrant /home/vagrant /tmp/orchestrator-release
+
+  # Setup mysql
+  /sbin/chkconfig mysql on
+
+  if [[ -e "/orchestrator/vagrant/${HOSTNAME}-my.cnf" ]]; then
+    rm -f /etc/my.cnf
+    cp /orchestrator/vagrant/${HOSTNAME}-my.cnf /etc/my.cnf
+  fi
+
+  /sbin/service mysql start
+  cat <<-EOF | mysql -u root
+  CREATE DATABASE IF NOT EXISTS orchestrator;
+  GRANT ALL PRIVILEGES ON orchestrator.* TO 'orc_client_user'@'%' IDENTIFIED BY 'orc_client_password';
+  GRANT SUPER, PROCESS, REPLICATION SLAVE, RELOAD ON *.* TO 'orc_client_user'@'%';
+  GRANT ALL PRIVILEGES ON orchestrator.* TO 'orc_client_user'@'localhost' IDENTIFIED BY 'orc_client_password';
+  GRANT SUPER, PROCESS, REPLICATION SLAVE, RELOAD ON *.* TO 'orc_client_user'@'localhost';
+  GRANT ALL PRIVILEGES ON orchestrator.* TO 'orc_server_user'@'localhost' IDENTIFIED BY 'orc_server_password';
+EOF
+
 elif [[ -e /etc/debian_version ]]; then
   sudo echo exit 101 > /usr/sbin/policy-rc.d
   sudo chmod +x /usr/sbin/policy-rc.d
