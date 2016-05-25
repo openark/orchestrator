@@ -26,6 +26,7 @@ import (
 
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/util"
+	"github.com/outbrain/orchestrator/go/agent"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/inst"
 	"github.com/outbrain/orchestrator/go/logic"
@@ -1315,7 +1316,16 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			inst.ReadClusters()
 			fmt.Println("Redeployed internal db")
 		}
-		// Help
+	case registerCliCommand("custom-command", "Agent", "Execute a custom command on the agent as defined in the agent conf"):
+		{
+			output, err := agent.CustomCommand(hostnameFlag, pattern)
+			if err != nil {
+				log.Fatale(err)
+			}
+
+			fmt.Printf("%v\n", output)
+		}
+	// Help
 	case "help":
 		{
 			fmt.Fprintf(os.Stderr, availableCommandsUsage())
