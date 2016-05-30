@@ -101,6 +101,7 @@ type Configuration struct {
 	DetectClusterAliasQuery                      string            // Optional query (executed on topology instance) that returns the alias of a cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all slaves). If provided, must return one row, one column
 	DetectClusterDomainQuery                     string            // Optional query (executed on topology instance) that returns the VIP/CNAME/Alias/whatever domain name for the master of this cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all slaves). If provided, must return one row, one column
 	DetectInstanceAliasQuery                     string            // Optional query (executed on topology instance) that returns the alias of an instance. If provided, must return one row, one column
+	DetectPromotionRuleQuery                     string            // Optional query (executed on topology instance) that returns the promotion rule of an instance. If provided, must return one row, one column.
 	DataCenterPattern                            string            // Regexp pattern with one group, extracting the datacenter name from the hostname
 	PhysicalEnvironmentPattern                   string            // Regexp pattern with one group, extracting physical environment info from hostname (e.g. combination of datacenter & prod/dev env)
 	DetectDataCenterQuery                        string            // Optional query (executed on topology instance) that returns the data center of an instance. If provided, must return one row, one column. Overrides DataCenterPattern and useful for installments where DC cannot be inferred by hostname
@@ -240,6 +241,7 @@ func newConfiguration() *Configuration {
 		DetectClusterAliasQuery:                      "",
 		DetectClusterDomainQuery:                     "",
 		DetectInstanceAliasQuery:                     "",
+		DetectPromotionRuleQuery:                     "",
 		DataCenterPattern:                            "",
 		PhysicalEnvironmentPattern:                   "",
 		DetectDataCenterQuery:                        "",
