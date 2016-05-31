@@ -371,7 +371,7 @@ func (this *Instance) StatusString() string {
 	if this.IsSlave() && !(this.Slave_SQL_Running && this.Slave_IO_Running) {
 		return "nonreplicating"
 	}
-	if this.IsSlave() && this.SecondsBehindMaster.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
+	if this.IsSlave() && !this.HasReasonableMaintenanceReplicationLag() {
 		return "lag"
 	}
 	return "ok"
@@ -425,6 +425,9 @@ func (this *Instance) HumanReadableDescription() string {
 	}
 	if this.UsingPseudoGTID {
 		tokens = append(tokens, "P-GTID")
+	}
+	if this.IsDowntimed {
+		tokens = append(tokens, "downtimed")
 	}
 	description := fmt.Sprintf("[%s]", strings.Join(tokens, ","))
 	return description
