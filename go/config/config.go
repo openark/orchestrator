@@ -107,6 +107,7 @@ type Configuration struct {
 	DetectPhysicalEnvironmentQuery               string            // Optional query (executed on topology instance) that returns the physical environment of an instance. If provided, must return one row, one column. Overrides PhysicalEnvironmentPattern and useful for installments where env cannot be inferred by hostname
 	DetectSemiSyncEnforcedQuery                  string            // Optional query (executed on topology instance) to determine whether semi-sync is fully enforced for master writes (async fallback is not allowed under any circumstance). If provided, must return one row, one column, value 0 or 1.
 	SupportFuzzyPoolHostnames                    bool              // Should "submit-pool-instances" command be able to pass list of fuzzy instances (fuzzy means non-fqdn, but unique enough to recognize). Defaults 'true', implies more queries on backend db
+	InstancePoolExpiryMinutes                    uint              // Time after which entries in database_instance_pool are expired (resubmit via `submit-pool-instances`)
 	PromotionIgnoreHostnameFilters               []string          // Orchestrator will not promote slaves with hostname matching pattern (via -c recovery; for example, avoid promoting dev-dedicated machines)
 	ServeAgentsHttp                              bool              // Spawn another HTTP interface dedicated for orcehstrator-agent
 	AgentsUseSSL                                 bool              // When "true" orchestrator will listen on agents port with SSL as well as connect to agents via SSL
@@ -246,6 +247,7 @@ func newConfiguration() *Configuration {
 		DetectPhysicalEnvironmentQuery:               "",
 		DetectSemiSyncEnforcedQuery:                  "",
 		SupportFuzzyPoolHostnames:                    true,
+		InstancePoolExpiryMinutes:                    60,
 		PromotionIgnoreHostnameFilters:               []string{},
 		ServeAgentsHttp:                              false,
 		AgentsUseSSL:                                 false,
