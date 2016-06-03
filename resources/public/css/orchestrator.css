@@ -8,7 +8,6 @@
 
 body {
     background-color: #eeeeee;
-    background-image: url('/images/tile.png');
     background-repeat: repeat;
     padding-top: 80px;
 }

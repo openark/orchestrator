@@ -18,7 +18,7 @@ function addStatusActionButton(name, uri) {
 
 $(document).ready(function () {
 	var statusObject = $("#orchestratorStatus .panel-body");
-    $.get("/api/health/", function (health) {
+    $.get(appUrl("/api/health/"), function (health) {
     	statusObject.prepend('<h4>'+health.Message+'</h4>')
     	health.Details.AvailableNodes.forEach(function(node) {
     		var hostname = node.split(";")[0];

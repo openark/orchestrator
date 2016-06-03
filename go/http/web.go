@@ -56,6 +56,13 @@ func (this *HttpWeb) AccessToken(params martini.Params, r render.Render, req *ht
 	r.Redirect("/")
 }
 
+func (this *HttpWeb) Index(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	// Redirect index so that all web URLs begin with "/web/".
+	// We also redirect /web/ to /web/clusters so that
+	// the Clusters page has a single canonical URL.
+	r.Redirect("/web/clusters")
+}
+
 func (this *HttpWeb) Clusters(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/clusters", map[string]interface{}{
 		"agentsHttpActive":              config.Config.ServeAgentsHttp,
@@ -364,8 +371,8 @@ func (this *HttpWeb) Status(params martini.Params, r render.Render, req *http.Re
 // RegisterRequests makes for the de-facto list of known Web calls
 func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/web/access-token", this.AccessToken)
-	m.Get("/", this.Clusters)
-	m.Get("/web", this.Clusters)
+	m.Get("/", this.Index)
+	m.Get("/web", this.Index)
 	m.Get("/web/home", this.About)
 	m.Get("/web/about", this.About)
 	m.Get("/web/keep-calm", this.KeepCalm)

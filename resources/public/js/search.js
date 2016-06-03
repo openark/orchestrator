@@ -4,8 +4,8 @@ $(document).ready(function () {
 	
 	
     showLoader();
-    $.get("/api/search/"+currentSearchString(), function (instances) {
-        $.get("/api/maintenance",
+    $.get(appUrl("/api/search/"+currentSearchString()), function (instances) {
+        $.get(appUrl("/api/maintenance"),
             function (maintenanceList) {
         		normalizeInstances(instances, maintenanceList);
                 displaySearchInstances(instances);

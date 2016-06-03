@@ -8,9 +8,9 @@ function appendSeedDetails(seed, selector) {
 		statusMessage = '<span class="text-info">Active</span>';
 	}
 	row += '<td>' + statusMessage + '</td>';
-	row += '<td><a href="/web/seed-details/' + seed.SeedId + '">' + seed.SeedId + '</a></td>';
-	row += '<td><a href="/web/agent/'+seed.TargetHostname+'">'+seed.TargetHostname+'</a></td>';
-	row += '<td><a href="/web/agent/'+seed.SourceHostname+'">'+seed.SourceHostname+'</a></td>';
+	row += '<td><a href="' + appUrl('/web/seed-details/' + seed.SeedId) + '">' + seed.SeedId + '</a></td>';
+	row += '<td><a href="' + appUrl('/web/agent/'+seed.TargetHostname) + '">'+seed.TargetHostname+'</a></td>';
+	row += '<td><a href="' + appUrl('/web/agent/'+seed.SourceHostname) + '">'+seed.SourceHostname+'</a></td>';
 	row += '<td>' + seed.StartTimestamp + '</td>';
 	row += '<td>' + (seed.IsComplete ? seed.EndTimestamp : '<button class="btn btn-xs btn-danger" data-command="abort-seed" data-seed-source-host="'+seed.SourceHostname+'" data-seed-target-host="'+seed.TargetHostname+'" data-seed-id="' + seed.SeedId + '">Abort</button>') + '</td>';
 	row += '</tr>';
@@ -43,7 +43,7 @@ $("body").on("click", "button[data-command=abort-seed]", function(event) {
 	bootbox.confirm(message, function(confirm) {
 		if (confirm) {
 	    	showLoader();
-	        $.get("/api/agent-abort-seed/"+seedId, function (operationResult) {
+	        $.get(appUrl("/api/agent-abort-seed/"+seedId), function (operationResult) {
 				hideLoader();
 				if (operationResult.Code == "ERROR") {
 					addAlert(operationResult.Message)
