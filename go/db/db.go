@@ -820,6 +820,11 @@ var generateSQLPatches = []string{
 			topology_recovery
 			ADD COLUMN successor_alias varchar(128) DEFAULT NULL
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			MODIFY cluster_name varchar(128) NOT NULL
+	`,
 }
 
 // Track if a TLS has already been configured for topology
