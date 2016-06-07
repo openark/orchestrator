@@ -455,10 +455,31 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		err = ReadInstanceClusterAttributes(instance)
 		logReadTopologyInstanceError(instanceKey, "ReadInstanceClusterAttributes", err)
 	}
+
+	// First read the current PromotionRule from candidate_database_instance.
 	{
 		err = ReadInstancePromotionRule(instance)
 		logReadTopologyInstanceError(instanceKey, "ReadInstanceClusterAttributes", err)
 	}
+	// Then check if the instance wants to set a different PromotionRule.
+	// We'll set it here on their behalf so there's no race between the first
+	// time an instance is discovered, and setting a rule like "must_not".
+	if config.Config.DetectPromotionRuleQuery != "" && !isMaxScale {
+		var value string
+		err := db.QueryRow(config.Config.DetectPromotionRuleQuery).Scan(&value)
+		logReadTopologyInstanceError(instanceKey, "DetectPromotionRuleQuery", err)
+		promotionRule, err := ParseCandidatePromotionRule(value)
+		logReadTopologyInstanceError(instanceKey, "ParseCandidatePromotionRule", err)
+		if err == nil {
+			// We need to update candidate_database_instance.
+			// We register the rule even if it hasn't changed,
+			// to bump the last_suggested time.
+			instance.PromotionRule = promotionRule
+			err = RegisterCandidateInstance(instanceKey, promotionRule)
+			logReadTopologyInstanceError(instanceKey, "RegisterCandidateInstance", err)
+		}
+	}
+
 	if instance.ReplicationDepth == 0 && config.Config.DetectClusterAliasQuery != "" && !isMaxScale {
 		// Only need to do on masters
 		clusterAlias := ""
@@ -1937,7 +1958,7 @@ func RegisterCandidateInstance(instanceKey *InstanceKey, promotionRule Candidate
 	return ExecDBWriteFunc(writeFunc)
 }
 
-// RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.
+// ExpireCandidateInstances removes stale master candidate suggestions.
 func ExpireCandidateInstances() error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`

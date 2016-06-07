@@ -1213,7 +1213,11 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("register-candidate", "Instance, meta", `Indicate that a specific instance is a preferred candidate for master promotion`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			err := inst.RegisterCandidateInstance(instanceKey, inst.CandidatePromotionRule(*config.RuntimeCLIFlags.PromotionRule))
+			promotionRule, err := inst.ParseCandidatePromotionRule(*config.RuntimeCLIFlags.PromotionRule)
+			if err != nil {
+				log.Fatale(err)
+			}
+			err = inst.RegisterCandidateInstance(instanceKey, promotionRule)
 			if err != nil {
 				log.Fatale(err)
 			}
