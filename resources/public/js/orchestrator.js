@@ -78,16 +78,29 @@ function hideLoader() {
   $(".ajaxLoader").css('visibility', 'hidden');
 }
 
+function appUrl(url) {
+  // Create an absolute URL that respects URL-rewriting proxies,
+  // such as the Kubernetes apiserver proxy.
+  var here = window.location.pathname;
+  var pos = here.lastIndexOf('/web/');
+  if (pos < 0) {
+    return url;
+  }
+  // This assumes the Orchestrator UI is accessed as ".../web/...".
+  // The part before the "/web/" should be prefixed onto any URLs we write.
+  return here.substr(0, pos) + url;
+}
+
 function visualizeBrand() {
   var img = $("<img>");
 
-  img.attr("src", "/images/octocat-logo-32.png").attr("alt", "GitHub");
+  img.attr("src", appUrl("/images/octocat-logo-32.png")).attr("alt", "GitHub");
 
   if (document.domain && document.domain.indexOf("outbrain.com") >= 0) {
-    img.attr("src", "/images/outbrain-logo-32.png").attr("alt", "Outbrain");
+    img.attr("src", appUrl("/images/outbrain-logo-32.png")).attr("alt", "Outbrain");
   }
   if (document.domain && document.domain.indexOf("booking.com") >= 0) {
-    img.attr("src", "/images/booking-logo-32.png").attr("alt", "Booking.com");
+    img.attr("src", appUrl("/images/booking-logo-32.png")).attr("alt", "Booking.com");
   }
   $(".orchestrator-brand").prepend(img)
 }
@@ -177,7 +190,7 @@ function addInfo(alertText) {
 
 function apiCommand(uri, hint) {
   showLoader();
-  $.get(uri, function(operationResult) {
+  $.get(appUrl(uri), function(operationResult) {
     hideLoader();
     if (operationResult.Code == "ERROR") {
       addAlert(operationResult.Message)
@@ -279,7 +292,7 @@ function openNodeModal(node) {
 
     var masterCoordinatesEl = addNodeModalDataAttribute("Master coordinates", node.ExecBinlogCoordinates.LogFile + ":" + node.ExecBinlogCoordinates.LogPos);
     $('#node_modal [data-btn-group=move-equivalent] ul').empty();
-    $.get("/api/master-equivalent/" + node.MasterKey.Hostname + "/" + node.MasterKey.Port + "/" + node.ExecBinlogCoordinates.LogFile + "/" + node.ExecBinlogCoordinates.LogPos, function(equivalenceResult) {
+    $.get(appUrl("/api/master-equivalent/") + node.MasterKey.Hostname + "/" + node.MasterKey.Port + "/" + node.ExecBinlogCoordinates.LogFile + "/" + node.ExecBinlogCoordinates.LogPos, function(equivalenceResult) {
       if (!equivalenceResult.Details) {
         return false;
       }
@@ -340,13 +353,13 @@ function openNodeModal(node) {
   addNodeModalDataAttribute("Uptime", node.Uptime);
   addNodeModalDataAttribute("Allow TLS", node.AllowTLS);
   addNodeModalDataAttribute("Cluster",
-    '<a href="/web/cluster/' + node.ClusterName + '">' + node.ClusterName + '</a>');
+    '<a href="' + appUrl('/web/cluster/' + node.ClusterName) + '">' + node.ClusterName + '</a>');
   addNodeModalDataAttribute("Audit",
-    '<a href="/web/audit/instance/' + node.Key.Hostname + '/' + node.Key.Port + '">' + node.title + '</a>');
+    '<a href="' + appUrl('/web/audit/instance/' + node.Key.Hostname + '/' + node.Key.Port) + '">' + node.title + '</a>');
   addNodeModalDataAttribute("Agent",
-    '<a href="/web/agent/' + node.Key.Hostname + '">' + node.Key.Hostname + '</a>');
+    '<a href="' + appUrl('/web/agent/' + node.Key.Hostname) + '">' + node.Key.Hostname + '</a>');
   addNodeModalDataAttribute("Long queries",
-    '<a href="/web/long-queries?filter=' + node.Key.Hostname + '">on ' + node.Key.Hostname + '</a>');
+    '<a href="' + appUrl('/web/long-queries?filter=' + node.Key.Hostname) + '">on ' + node.Key.Hostname + '</a>');
 
   $('#node_modal [data-btn]').unbind("click");
 
@@ -842,7 +855,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
       contentHtml += '<p><strong>Master</strong></p>';
     }
     if (renderType == "search") {
-      contentHtml += '<p>' + 'Cluster: <a href="/web/cluster/' + instance.ClusterName + '">' + instance.ClusterName + '</a>' + '</p>';
+      contentHtml += '<p>' + 'Cluster: <a href="' + appUrl('/web/cluster/' + instance.ClusterName) + '">' + instance.ClusterName + '</a>' + '</p>';
     }
     if (renderType == "problems") {
       contentHtml += '<p>' + 'Problem: <strong title="' + instance.problemDescription + '">' + instance.problem.replace(/_/g, ' ') + '</strong>' + '</p>';
@@ -886,14 +899,16 @@ function getParameterByName(name) {
 $(document).ready(function() {
   visualizeBrand();
 
+  $('body').css('background-image', 'url(' + appUrl('/images/tile.png') + ')');
+
   $(".navbar-nav li").removeClass("active");
   $(".navbar-nav li[data-nav-page='" + activePage() + "']").addClass("active");
 
-  $.get("/api/clusters-info", function(clusters) {
+  $.get(appUrl("/api/clusters-info"), function(clusters) {
     clusters.forEach(function(cluster) {
       var title = '<span class="small">' + cluster.ClusterName + '</span>';
       title = ((cluster.ClusterAlias != "") ? '<strong>' + cluster.ClusterAlias + '</strong>, ' + title : title);
-      $("#dropdown-clusters").append('<li><a href="/web/cluster/' + cluster.ClusterName + '">' + title + '</a></li>');
+      $("#dropdown-clusters").append('<li><a href="' + appUrl('/web/cluster/' + cluster.ClusterName) + '">' + title + '</a></li>');
     });
     onClustersListeners.forEach(function(func) {
       func(clusters);

@@ -1653,6 +1653,26 @@ func (this *HttpAPI) AgentMySQLStart(params martini.Params, r render.Render, req
 	r.JSON(200, output)
 }
 
+func (this *HttpAPI) AgentCustomCommand(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	if !config.Config.ServeAgentsHttp {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Agents not served"})
+		return
+	}
+
+	output, err := agent.CustomCommand(params["host"], params["cmd"])
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, output)
+}
+
 // AgentSeed completely seeds a host with another host's snapshots. This is a complex operation
 // governed by orchestrator and executed by the two agents involved.
 func (this *HttpAPI) AgentSeed(params martini.Params, r render.Render, req *http.Request, user auth.User) {
@@ -1948,19 +1968,11 @@ func (this *HttpAPI) RegisterCandidate(params martini.Params, r render.Render, r
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	switch params["promotionRule"] {
-	case "prefer", "neutral", "must_not":
-		{
-			// OK
-		}
-	default:
-		{
-			r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Invalid promotionRule: %+v", params["promotionRule"])})
-			return
-		}
+	promotionRule, err := inst.ParseCandidatePromotionRule(params["promotionRule"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
 	}
-
-	promotionRule := inst.CandidatePromotionRule(params["promotionRule"])
 
 	err = inst.RegisterCandidateInstance(&instanceKey, promotionRule)
 
@@ -2354,6 +2366,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get("/api/agent-seed-details/:seedId", this.AgentSeedDetails)
 	m.Get("/api/agent-seed-states/:seedId", this.AgentSeedStates)
 	m.Get("/api/agent-abort-seed/:seedId", this.AbortSeed)
+	m.Get("/api/agent-custom-command/:host/:command", this.AgentCustomCommand)
 	m.Get("/api/seeds", this.Seeds)
 
 	// Configurable status check endpoint

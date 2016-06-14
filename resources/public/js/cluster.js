@@ -1290,7 +1290,7 @@ function Cluster() {
       var content = 'Heuristic lag: ' + clusterInfo.HeuristicLag + 's';
       addSidebarInfoPopoverContent(content, false);
     } {
-      var content = '<a href="/web/audit-recovery/cluster/' + clusterInfo.ClusterName + '">Recovery history</a>';
+      var content = '<a href="' + appUrl('/web/audit-recovery/cluster/' + clusterInfo.ClusterName) + '">Recovery history</a>';
       addSidebarInfoPopoverContent(content, false);
     } {
       var content = '';
@@ -1551,7 +1551,7 @@ function Cluster() {
         $("#cluster_container").append('<div class="floating_background">' + visualAlias + '</div>');
         $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="' + clusterInfo.ClusterAlias + '">Alias: ' + alias + '</a></li>');
       }
-      $("#dropdown-context").append('<li><a href="/web/cluster-pools/' + currentClusterName() + '">Pools</a></li>');
+      $("#dropdown-context").append('<li><a href="' + appUrl('/web/cluster-pools/' + currentClusterName()) + '">Pools</a></li>');
       if (isCompactDisplay()) {
         $("#dropdown-context").append('<li><a data-command="expand-display" href="' + location.href.split("?")[0].split("#")[0] + '?compact=false"><span class="glyphicon glyphicon-ok small"></span> Compact display</a></li>');
       } else {
@@ -1575,19 +1575,19 @@ function Cluster() {
     getData("/api/active-cluster-recovery/" + currentClusterName(), function(recoveries) {
       // Result is an array: either empty (no active recovery) or with multiple entries
       recoveries.forEach(function(recoveryEntry) {
-        addInfo('<strong><a href="/web/audit-recovery/cluster/' + currentClusterName() + '">' + recoveryEntry.AnalysisEntry.Analysis + ' active recovery in progress</strong></a>. Topology is subject to change in the next moments.');
+        addInfo('<strong><a href="' + appUrl('/web/audit-recovery/cluster/' + currentClusterName()) + '">' + recoveryEntry.AnalysisEntry.Analysis + ' active recovery in progress</strong></a>. Topology is subject to change in the next moments.');
       });
     });
     getData("/api/recently-active-cluster-recovery/" + currentClusterName(), function(recoveries) {
       // Result is an array: either empty (no active recovery) or with multiple entries
       recoveries.forEach(function(recoveryEntry) {
-        addInfo('This cluster just recently (' + recoveryEntry.RecoveryEndTimestamp + ') recovered from <strong><a href="/web/audit-recovery/cluster/' + currentClusterName() + '">' + recoveryEntry.AnalysisEntry.Analysis + '</strong></a>. It may still take some time to rebuild topology graph.');
+        addInfo('This cluster just recently (' + recoveryEntry.RecoveryEndTimestamp + ') recovered from <strong><a href="' + appUrl('/web/audit-recovery/cluster/' + currentClusterName()) + '">' + recoveryEntry.AnalysisEntry.Analysis + '</strong></a>. It may still take some time to rebuild topology graph.');
       });
     });
     getData("/api/blocked-recoveries/cluster/" + currentClusterName(), function(blockedRecoveries) {
       // Result is an array: either empty (no active recovery) or with multiple entries
       blockedRecoveries.forEach(function(blockedRecovery) {
-        addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on ' + getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port) + ' is blocked due to a <a href="/web/audit-recovery/cluster/' + blockedRecovery.ClusterName + '">previous recovery</a>');
+        addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on ' + getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port) + ' is blocked due to a <a href="' + appUrl('/web/audit-recovery/cluster/' + blockedRecovery.ClusterName) + '">previous recovery</a>');
       });
     });
     getData("/api/cluster-osc-slaves/" + currentClusterName(), function(instances) {
@@ -1676,7 +1676,7 @@ function Cluster() {
 
 
   function getData(url, cb) {
-    $.get(url, cb, "json");
+    $.get(appUrl(url), cb, "json");
   }
 
 

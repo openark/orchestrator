@@ -5,11 +5,11 @@ $(document).ready(function () {
     if (auditHostname()) {
     	apiUri = "/api/audit/instance/"+auditHostname()+"/"+auditPort()+"/"+currentPage();
     }
-    $.get(apiUri, function (auditEntries) {
+    $.get(appUrl(apiUri), function (auditEntries) {
             displayAudit(auditEntries);
     	}, "json");
     function displayAudit(auditEntries) {
-    	var baseWebUri = "/web/audit/";
+    	var baseWebUri = appUrl("/web/audit/");
     	if (auditHostname()) {
     		baseWebUri += "instance/"+auditHostname()+"/"+auditPort()+"/";
         }
@@ -19,7 +19,7 @@ $(document).ready(function () {
     		jQuery('<td/>', { text: audit.AuditTimestamp }).appendTo(row);
     		jQuery('<td/>', { text: audit.AuditType }).appendTo(row);
     		if (audit.AuditInstanceKey.Hostname) {
-    			var uri = "/web/audit/instance/"+audit.AuditInstanceKey.Hostname+"/"+audit.AuditInstanceKey.Port;
+    			var uri = appUrl("/web/audit/instance/"+audit.AuditInstanceKey.Hostname+"/"+audit.AuditInstanceKey.Port);
     			$('<a/>',  { text: audit.AuditInstanceKey.Hostname+":"+audit.AuditInstanceKey.Port , href: uri}).wrap($("<td/>")).parent().appendTo(row);
     		} else {
     			jQuery('<td/>', { text: audit.AuditInstanceKey.Hostname+":"+audit.AuditInstanceKey.Port }).appendTo(row);

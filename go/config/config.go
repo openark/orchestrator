@@ -101,6 +101,7 @@ type Configuration struct {
 	DetectClusterAliasQuery                      string            // Optional query (executed on topology instance) that returns the alias of a cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all slaves). If provided, must return one row, one column
 	DetectClusterDomainQuery                     string            // Optional query (executed on topology instance) that returns the VIP/CNAME/Alias/whatever domain name for the master of this cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all slaves). If provided, must return one row, one column
 	DetectInstanceAliasQuery                     string            // Optional query (executed on topology instance) that returns the alias of an instance. If provided, must return one row, one column
+	DetectPromotionRuleQuery                     string            // Optional query (executed on topology instance) that returns the promotion rule of an instance. If provided, must return one row, one column.
 	DataCenterPattern                            string            // Regexp pattern with one group, extracting the datacenter name from the hostname
 	PhysicalEnvironmentPattern                   string            // Regexp pattern with one group, extracting physical environment info from hostname (e.g. combination of datacenter & prod/dev env)
 	DetectDataCenterQuery                        string            // Optional query (executed on topology instance) that returns the data center of an instance. If provided, must return one row, one column. Overrides DataCenterPattern and useful for installments where DC cannot be inferred by hostname
@@ -109,7 +110,7 @@ type Configuration struct {
 	SupportFuzzyPoolHostnames                    bool              // Should "submit-pool-instances" command be able to pass list of fuzzy instances (fuzzy means non-fqdn, but unique enough to recognize). Defaults 'true', implies more queries on backend db
 	InstancePoolExpiryMinutes                    uint              // Time after which entries in database_instance_pool are expired (resubmit via `submit-pool-instances`)
 	PromotionIgnoreHostnameFilters               []string          // Orchestrator will not promote slaves with hostname matching pattern (via -c recovery; for example, avoid promoting dev-dedicated machines)
-	ServeAgentsHttp                              bool              // Spawn another HTTP interface dedicated for orcehstrator-agent
+	ServeAgentsHttp                              bool              // Spawn another HTTP interface dedicated for orchestrator-agent
 	AgentsUseSSL                                 bool              // When "true" orchestrator will listen on agents port with SSL as well as connect to agents via SSL
 	AgentsUseMutualTLS                           bool              // When "true" Use mutual TLS for the server to agent communication
 	AgentSSLSkipVerify                           bool              // When using SSL for the Agent, should we ignore SSL certification error
@@ -241,6 +242,7 @@ func newConfiguration() *Configuration {
 		DetectClusterAliasQuery:                      "",
 		DetectClusterDomainQuery:                     "",
 		DetectInstanceAliasQuery:                     "",
+		DetectPromotionRuleQuery:                     "",
 		DataCenterPattern:                            "",
 		PhysicalEnvironmentPattern:                   "",
 		DetectDataCenterQuery:                        "",

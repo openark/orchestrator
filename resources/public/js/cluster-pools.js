@@ -26,8 +26,8 @@ $(document).ready(function() {
     }
   };
 
-  $.get("/api/cluster-pool-instances/" + currentClusterName(), function(clusterPoolInstances) {
-    $.get("/api/problems", function(problemInstances) {
+  $.get(appUrl("/api/cluster-pool-instances/" + currentClusterName()), function(clusterPoolInstances) {
+    $.get(appUrl("/api/problems"), function(problemInstances) {
       var problemInstancesMap = normalizeInstances(problemInstances, []);
       displayClusterPoolInstances(clusterPoolInstances, problemInstances, problemInstancesMap);
     }, "json");
@@ -137,7 +137,7 @@ $(document).ready(function() {
     activateRefreshTimer();
   }
   $("#dropdown-context").append('<li><a data-command="expand-instances">Expand</a></li>');
-  $("#dropdown-context").append('<li><a href="/web/cluster/' + currentClusterName() + '">Topology</a></li>');
+  $("#dropdown-context").append('<li><a href="' + appUrl('/web/cluster/' + currentClusterName()) + '">Topology</a></li>');
   $("body").on("click", "a[data-command=expand-instances]", function(event) {
     isExpanded = !isExpanded;
     updateExpandedStatus();

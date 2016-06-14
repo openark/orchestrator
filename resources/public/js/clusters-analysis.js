@@ -1,17 +1,17 @@
 $(document).ready(function() {
   showLoader();
 
-  $.get("/api/clusters-info", function(clusters) {
-    $.get("/api/replication-analysis", function(replicationAnalysis) {
-      $.get("/api/blocked-recoveries", function(blockedRecoveries) {
+  $.get(appUrl("/api/clusters-info"), function(clusters) {
+    $.get(appUrl("/api/replication-analysis"), function(replicationAnalysis) {
+      $.get(appUrl("/api/blocked-recoveries"), function(blockedRecoveries) {
         displayClustersAnalysis(clusters, replicationAnalysis, blockedRecoveries);
       }, "json");
     }, "json");
   }, "json");
-  $.get("/api/blocked-recoveries", function(blockedRecoveries) {
+  $.get(appUrl("/api/blocked-recoveries"), function(blockedRecoveries) {
     // Result is an array: either empty (no active recovery) or with multiple entries
     blockedRecoveries.forEach(function(blockedRecovery) {
-      addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on ' + getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port) + ' is blocked due to a <a href="/web/audit-recovery/cluster/' + blockedRecovery.ClusterName + '">previous recovery</a>');
+      addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on ' + getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port) + ' is blocked due to a <a href="' + appUrl('/web/audit-recovery/cluster/' + blockedRecovery.ClusterName) + '">previous recovery</a>');
     });
   });
 
@@ -91,7 +91,7 @@ $(document).ready(function() {
     }
 
     function displayCluster(cluster) {
-      $("#clusters_analysis").append('<div xmlns="http://www.w3.org/1999/xhtml" class="popover instance right" data-cluster-name="' + cluster.ClusterName + '"><div class="arrow"></div><h3 class="popover-title"><div class="pull-left"><a href="/web/cluster/' + cluster.ClusterName + '"><span>' + cluster.ClusterName + '</span></a></div><div class="pull-right"></div>&nbsp;<br/>&nbsp;</h3><div class="popover-content"><div></div></div></div>');
+      $("#clusters_analysis").append('<div xmlns="http://www.w3.org/1999/xhtml" class="popover instance right" data-cluster-name="' + cluster.ClusterName + '"><div class="arrow"></div><h3 class="popover-title"><div class="pull-left"><a href="' + appUrl('/web/cluster/' + cluster.ClusterName) + '"><span>' + cluster.ClusterName + '</span></a></div><div class="pull-right"></div>&nbsp;<br/>&nbsp;</h3><div class="popover-content"><div></div></div></div>');
       var popoverElement = $("#clusters_analysis [data-cluster-name='" + cluster.ClusterName + "'].popover");
 
       if (typeof removeTextFromHostnameDisplay != "undefined" && removeTextFromHostnameDisplay()) {
@@ -100,8 +100,8 @@ $(document).ready(function() {
       }
       if (cluster.ClusterAlias != "") {
         popoverElement.find("h3 .pull-left a span").addClass("small");
-        popoverElement.find("h3 .pull-left").prepend('<a href="/web/cluster/alias/' + encodeURIComponent(cluster.ClusterAlias) + '"><strong>' + cluster.ClusterAlias + '</strong></a><br/>');
-        popoverElement.find("h3 .pull-right").append('<a href="/web/cluster/alias/' + encodeURIComponent(cluster.ClusterAlias) + '?compact=true"><span class="glyphicon glyphicon-compressed" title="Compact display"></span></a>');
+        popoverElement.find("h3 .pull-left").prepend('<a href="' + appUrl('/web/cluster/alias/' + encodeURIComponent(cluster.ClusterAlias)) + '"><strong>' + cluster.ClusterAlias + '</strong></a><br/>');
+        popoverElement.find("h3 .pull-right").append('<a href="' + appUrl('/web/cluster/alias/' + encodeURIComponent(cluster.ClusterAlias) + '?compact=true') + '"><span class="glyphicon glyphicon-compressed" title="Compact display"></span></a>');
       }
       displayInstancesBadge(popoverElement, "Instances", cluster.CountInstances, "label-primary", "Total instances in cluster");
 

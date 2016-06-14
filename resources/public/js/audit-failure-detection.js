@@ -4,8 +4,8 @@ $(document).ready(function() {
   if (detectionId() > 0) {
     uri = "/api/audit-failure-detection/id/" + detectionId();
   }
-  $.get(uri, function(auditEntries) {
-    $.get("/api/replication-analysis-changelog", function(analysisChangelog) {
+  $.get(appUrl(uri), function(auditEntries) {
+    $.get(appUrl("/api/replication-analysis-changelog"), function(analysisChangelog) {
       displayAudit(auditEntries, analysisChangelog);
     }, "json");
   }, "json");
@@ -28,18 +28,18 @@ $(document).ready(function() {
       }).prepend(moreInfoElement).appendTo(row);
       $('<a/>', {
         text: analyzedInstanceDisplay,
-        href: "/web/search/" + analyzedInstanceDisplay
+        href: appUrl("/web/search/" + analyzedInstanceDisplay)
       }).wrap($("<td/>")).parent().appendTo(row);
       $('<td/>', {
         text: audit.AnalysisEntry.CountSlaves
       }).appendTo(row);
       $('<a/>', {
         text: audit.AnalysisEntry.ClusterDetails.ClusterName,
-        href: "/web/cluster/" + audit.AnalysisEntry.ClusterDetails.ClusterName
+        href: appUrl("/web/cluster/" + audit.AnalysisEntry.ClusterDetails.ClusterName)
       }).wrap($("<td/>")).parent().appendTo(row);
       $('<a/>', {
         text: audit.AnalysisEntry.ClusterDetails.ClusterAlias,
-        href: "/web/cluster/alias/" + audit.AnalysisEntry.ClusterDetails.ClusterAlias
+        href: appUrl("/web/cluster/alias/" + audit.AnalysisEntry.ClusterDetails.ClusterAlias)
       }).wrap($("<td/>")).parent().appendTo(row);
       $('<td/>', {
         text: audit.RecoveryStartTimestamp
@@ -70,7 +70,7 @@ $(document).ready(function() {
         });
         moreInfo += "</ul></div>";
       }
-      moreInfo += '<div><a href="/web/audit-recovery/id/' + audit.RelatedRecoveryId + '">Related recovery</a></div>';
+      moreInfo += '<div><a href="' + appUrl('/web/audit-recovery/id/' + audit.RelatedRecoveryId) + '">Related recovery</a></div>';
 
       moreInfo += "<div>Proccessed by <code>" + audit.ProcessingNodeHostname + "</code></div>";
       row.appendTo('#audit tbody');
@@ -91,10 +91,10 @@ $(document).ready(function() {
       $("#audit .pager .next").addClass("disabled");
     }
     $("#audit .pager .previous").not(".disabled").find("a").click(function() {
-      window.location.href = "/web/audit-failure-detection/" + (currentPage() - 1);
+      window.location.href = appUrl("/web/audit-failure-detection/" + (currentPage() - 1));
     });
     $("#audit .pager .next").not(".disabled").find("a").click(function() {
-      window.location.href = "/web/audit-failure-detection/" + (currentPage() + 1);
+      window.location.href = appUrl("/web/audit-failure-detection/" + (currentPage() + 1));
     });
     $("#audit .pager .disabled a").click(function() {
       return false;

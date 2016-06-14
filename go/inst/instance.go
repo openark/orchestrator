@@ -38,6 +38,19 @@ const (
 	MustNotPromoteRule                          = "must_not"
 )
 
+// ParseCandidatePromotionRule returns a CandidatePromotionRule by name.
+// It returns an error if there is no known rule by the given name.
+func ParseCandidatePromotionRule(ruleName string) (CandidatePromotionRule, error) {
+	switch ruleName {
+	case "prefer", "neutral", "must_not":
+		return CandidatePromotionRule(ruleName), nil
+	case "must", "prefer_not":
+		return CandidatePromotionRule(""), fmt.Errorf("CandidatePromotionRule: %v not supported yet", ruleName)
+	default:
+		return CandidatePromotionRule(""), fmt.Errorf("Invalid CandidatePromotionRule: %v", ruleName)
+	}
+}
+
 // Instance represents a database instance, including its current configuration & status.
 // It presents important replication configuration and detailed replication status.
 type Instance struct {
