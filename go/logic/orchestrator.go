@@ -249,6 +249,7 @@ func ContinuousDiscovery() {
 					go inst.ExpireClusterDomainName()
 					go inst.ExpireAudit()
 					go inst.ExpireMasterPositionEquivalence()
+					go inst.ExpirePoolInstances()
 					go inst.FlushNontrivialResolveCacheToDatabase()
 					go process.ExpireNodesHistory()
 					go process.ExpireAccessTokens()

@@ -21,6 +21,7 @@ import (
 
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
+	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
 )
 
@@ -122,4 +123,17 @@ func ReadClusterPoolInstancesMap(clusterName string, pool string) (*PoolInstance
 	}
 
 	return &poolInstancesMap, nil
+}
+
+// ExpirePoolInstances cleans up the database_instance_pool table from expired items
+func ExpirePoolInstances() error {
+	_, err := db.ExecOrchestrator(`
+			delete
+				from database_instance_pool
+			where
+				registered_at < now() - interval ? minute
+			`,
+		config.Config.InstancePoolExpiryMinutes,
+	)
+	return log.Errore(err)
 }

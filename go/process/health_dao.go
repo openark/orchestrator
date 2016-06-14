@@ -19,11 +19,12 @@ package process
 import (
 	"database/sql"
 	"fmt"
+	"time"
+
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
-	"time"
 )
 
 const registrationPollSeconds = 10
