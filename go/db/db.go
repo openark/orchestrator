@@ -825,6 +825,11 @@ var generateSQLPatches = []string{
 			database_instance
 			MODIFY cluster_name varchar(128) NOT NULL
 	`,
+	`
+		ALTER TABLE
+			node_health
+			ADD INDEX last_seen_active_idx (last_seen_active)
+	`,
 }
 
 // Track if a TLS has already been configured for topology
