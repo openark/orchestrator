@@ -71,6 +71,7 @@ type Configuration struct {
 	SnapshotTopologiesIntervalHours              uint     // Interval in hour between snapshot-topologies invocation. Default: 0 (disabled)
 	InstanceBulkOperationsWaitTimeoutSeconds     uint     // Time to wait on a single instance when doing bulk (many instances) operation
 	ActiveNodeExpireSeconds                      uint     // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
+	NodeHealthExpiry                             bool     // Do we expire the node_health table? Usually this is true but it might be disabled on command line tools if an orchestrator daemon is running.
 	HostnameResolveMethod                        string   // Method by which to "normalize" hostname ("none"/"default"/"cname")
 	MySQLHostnameResolveMethod                   string   // Method by which to "normalize" hostname via MySQL server. ("none"/"@@hostname"/"@@report_host"; default "@@hostname")
 	SkipBinlogServerUnresolveCheck               bool     // Skip the double-check that an unresolved hostname resolves back to same hostname for binlog servers
@@ -212,6 +213,7 @@ func newConfiguration() *Configuration {
 		DiscoverByShowSlaveHosts:                     false,
 		InstanceBulkOperationsWaitTimeoutSeconds:     10,
 		ActiveNodeExpireSeconds:                      5,
+		NodeHealthExpiry:                             true,
 		HostnameResolveMethod:                        "default",
 		MySQLHostnameResolveMethod:                   "@@hostname",
 		SkipBinlogServerUnresolveCheck:               true,
