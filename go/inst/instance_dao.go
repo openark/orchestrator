@@ -1126,10 +1126,9 @@ func GetClusterGhostSlaves(clusterName string) (result [](*Instance), err error)
 	condition := `
 			replication_depth > 0
 			and binlog_format = 'ROW'
-			and num_slave_hosts = 0
 			and cluster_name = ?
 		`
-	instances, err := readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
+	instances, err := readInstancesByCondition(condition, sqlutils.Args(clusterName), "num_slave_hosts asc")
 	if err != nil {
 		return result, err
 	}
@@ -1140,6 +1139,12 @@ func GetClusterGhostSlaves(clusterName string) (result [](*Instance), err error)
 			skipThisHost = true
 		}
 		if !instance.IsLastCheckValid {
+			skipThisHost = true
+		}
+		if !instance.LogBinEnabled {
+			skipThisHost = true
+		}
+		if !instance.LogSlaveUpdatesEnabled {
 			skipThisHost = true
 		}
 		if !skipThisHost {
