@@ -978,10 +978,21 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(clusterInstance.Key.DisplayString())
 			}
 		}
-	case registerCliCommand("which-cluster-osc-slaves", "Information", `Output a list of slaves in same cluster as given instance, that could serve as a pt-online-schema-change operation control slaves`):
+	case registerCliCommand("which-cluster-osc-slaves", "Information", `Output a list of slaves in a cluster, that could serve as a pt-online-schema-change operation control slaves`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
 			instances, err := inst.GetClusterOSCSlaves(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, clusterInstance := range instances {
+				fmt.Println(clusterInstance.Key.DisplayString())
+			}
+		}
+	case registerCliCommand("which-cluster-gh-ost-slaves", "Information", `Output a list of slaves in a cluster, that could serve as a gh-ost working server`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			instances, err := inst.GetClusterGhostSlaves(clusterName)
 			if err != nil {
 				log.Fatale(err)
 			}

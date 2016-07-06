@@ -1119,6 +1119,37 @@ func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
 	return result, nil
 }
 
+// GetClusterGhostSlaves returns a list of replicas that can serve as the connected servers
+// for a [gh-ost](https://github.com/github/gh-ost) operation. A gh-ost operation prefers to talk
+// to a RBR replica that has no children.
+func GetClusterGhostSlaves(clusterName string) (result [](*Instance), err error) {
+	condition := `
+			replication_depth > 0
+			and binlog_format = 'ROW'
+			and num_slave_hosts = 0
+			and cluster_name = ?
+		`
+	instances, err := readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
+	if err != nil {
+		return result, err
+	}
+
+	for _, instance := range instances {
+		skipThisHost := false
+		if instance.IsBinlogServer() {
+			skipThisHost = true
+		}
+		if !instance.IsLastCheckValid {
+			skipThisHost = true
+		}
+		if !skipThisHost {
+			result = append(result, instance)
+		}
+	}
+
+	return result, err
+}
+
 // GetInstancesMaxLag returns the maximum lag in a set of instances
 func GetInstancesMaxLag(instances [](*Instance)) (maxLag int64, err error) {
 	if len(instances) == 0 {
