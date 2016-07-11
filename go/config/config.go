@@ -34,9 +34,10 @@ var (
 // Some of the parameteres have reasonable default values, and some (like database credentials) are
 // strictly expected from user.
 type Configuration struct {
-	Debug                                        bool // set debug mode (similar to --debug option)
-	EnableSyslog                                 bool // Should logs be directed (in addition) to syslog daemon?
-	ListenAddress                                string
+	Debug                                        bool   // set debug mode (similar to --debug option)
+	EnableSyslog                                 bool   // Should logs be directed (in addition) to syslog daemon?
+	ListenAddress                                string // Where orchestrator HTTP should listen for TCP
+	ListenSocket                                 string // Where orchestrator HTTP should listen for unix socket (default: empty; when given, TCP is disabled)
 	AgentsServerPort                             string // port orchestrator agents talk back to
 	MySQLTopologyUser                            string
 	MySQLTopologyPassword                        string // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
@@ -193,6 +194,7 @@ func newConfiguration() *Configuration {
 		Debug:                                        false,
 		EnableSyslog:                                 false,
 		ListenAddress:                                ":3000",
+		ListenSocket:                                 "",
 		AgentsServerPort:                             ":3001",
 		StatusEndpoint:                               "/api/status",
 		StatusSimpleHealth:                           true,
