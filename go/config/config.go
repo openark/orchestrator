@@ -34,9 +34,10 @@ var (
 // Some of the parameteres have reasonable default values, and some (like database credentials) are
 // strictly expected from user.
 type Configuration struct {
-	Debug                                        bool // set debug mode (similar to --debug option)
-	EnableSyslog                                 bool // Should logs be directed (in addition) to syslog daemon?
-	ListenAddress                                string
+	Debug                                        bool   // set debug mode (similar to --debug option)
+	EnableSyslog                                 bool   // Should logs be directed (in addition) to syslog daemon?
+	ListenAddress                                string // Where orchestrator HTTP should listen for TCP
+	ListenSocket                                 string // Where orchestrator HTTP should listen for unix socket (default: empty; when given, TCP is disabled)
 	AgentsServerPort                             string // port orchestrator agents talk back to
 	MySQLTopologyUser                            string
 	MySQLTopologyPassword                        string // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
@@ -71,6 +72,7 @@ type Configuration struct {
 	SnapshotTopologiesIntervalHours              uint     // Interval in hour between snapshot-topologies invocation. Default: 0 (disabled)
 	InstanceBulkOperationsWaitTimeoutSeconds     uint     // Time to wait on a single instance when doing bulk (many instances) operation
 	ActiveNodeExpireSeconds                      uint     // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
+	NodeHealthExpiry                             bool     // Do we expire the node_health table? Usually this is true but it might be disabled on command line tools if an orchestrator daemon is running.
 	HostnameResolveMethod                        string   // Method by which to "normalize" hostname ("none"/"default"/"cname")
 	MySQLHostnameResolveMethod                   string   // Method by which to "normalize" hostname via MySQL server. ("none"/"@@hostname"/"@@report_host"; default "@@hostname")
 	SkipBinlogServerUnresolveCheck               bool     // Skip the double-check that an unresolved hostname resolves back to same hostname for binlog servers
@@ -192,6 +194,7 @@ func newConfiguration() *Configuration {
 		Debug:                                        false,
 		EnableSyslog:                                 false,
 		ListenAddress:                                ":3000",
+		ListenSocket:                                 "",
 		AgentsServerPort:                             ":3001",
 		StatusEndpoint:                               "/api/status",
 		StatusSimpleHealth:                           true,
@@ -212,6 +215,7 @@ func newConfiguration() *Configuration {
 		DiscoverByShowSlaveHosts:                     false,
 		InstanceBulkOperationsWaitTimeoutSeconds:     10,
 		ActiveNodeExpireSeconds:                      5,
+		NodeHealthExpiry:                             true,
 		HostnameResolveMethod:                        "default",
 		MySQLHostnameResolveMethod:                   "@@hostname",
 		SkipBinlogServerUnresolveCheck:               true,

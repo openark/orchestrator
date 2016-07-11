@@ -125,9 +125,12 @@ func ContinuousRegistration(extraInfo string, command string) {
 	}()
 }
 
-// expireAvailableNodes is an aggressive puring method to remove node entries who have skipped
+// expireAvailableNodes is an aggressive purging method to remove node entries who have skipped
 // their keepalive for two times
 func expireAvailableNodes() error {
+	if !config.Config.NodeHealthExpiry {
+		return nil
+	}
 	_, err := db.ExecOrchestrator(`
 			delete
 				from node_health

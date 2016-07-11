@@ -18,6 +18,7 @@
 package app
 
 import (
+	"net"
 	nethttp "net/http"
 	"strings"
 
@@ -122,7 +123,17 @@ func standardHttp(discovery bool) {
 	http.Web.RegisterRequests(m)
 
 	// Serve
-	if config.Config.UseSSL {
+	if config.Config.ListenSocket != "" {
+		log.Infof("Starting HTTP listener on unix socket %v", config.Config.ListenSocket)
+		unixListener, err := net.Listen("unix", config.Config.ListenSocket)
+		if err != nil {
+			log.Fatale(err)
+		}
+		defer unixListener.Close()
+		if err := nethttp.Serve(unixListener, m); err != nil {
+			log.Fatale(err)
+		}
+	} else if config.Config.UseSSL {
 		log.Info("Starting HTTPS listener")
 		tlsConfig, err := ssl.NewTLSConfig(config.Config.SSLCAFile, config.Config.UseMutualTLS)
 		if err != nil {
@@ -136,7 +147,7 @@ func standardHttp(discovery bool) {
 			log.Fatale(err)
 		}
 	} else {
-		log.Info("Starting HTTP listener")
+		log.Infof("Starting HTTP listener on %+v", config.Config.ListenAddress)
 		if err := nethttp.ListenAndServe(config.Config.ListenAddress, m); err != nil {
 			log.Fatale(err)
 		}
