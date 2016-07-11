@@ -347,6 +347,10 @@ function openNodeModal(node) {
   var td = addNodeModalDataAttribute("GTID based replication", booleanString(node.usingGTID));
   $('#node_modal button[data-btn=enable-gtid]').appendTo(td.find("div"))
   $('#node_modal button[data-btn=disable-gtid]').appendTo(td.find("div"))
+  if (node.usingGTID) {
+    addNodeModalDataAttribute("Executed GTID set", node.ExecutedGtidSet);
+    addNodeModalDataAttribute("GTID purged", node.GtidPurged);
+  }
 
   addNodeModalDataAttribute("Semi-sync enforced", booleanString(node.SemiSyncEnforced));
 
