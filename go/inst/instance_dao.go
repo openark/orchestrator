@@ -288,8 +288,13 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		instance.MasterKey = *masterKey
 		instance.IsDetachedMaster = instance.MasterKey.IsDetached()
 		instance.SecondsBehindMaster = m.GetNullInt64("Seconds_Behind_Master")
+		if instance.SecondsBehindMaster.Valid && instance.SecondsBehindMaster.Int64 < 0 {
+			log.Warningf("Host: %+v, instance.SecondsBehindMaster < 0 [%+v], correcting to 0", instanceKey, instance.SecondsBehindMaster.Int64)
+			instance.SecondsBehindMaster.Int64 = 0
+		}
 		// And until told otherwise:
 		instance.SlaveLagSeconds = instance.SecondsBehindMaster
+
 		instance.AllowTLS = (m.GetString("Master_SSL_Allowed") == "Yes")
 		// Not breaking the flow even on error
 		slaveStatusFound = true
@@ -424,8 +429,12 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if config.Config.SlaveLagQuery != "" && !isMaxScale {
-		err := db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SlaveLagSeconds)
-		if err != nil {
+		if err := db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SlaveLagSeconds); err == nil {
+			if instance.SlaveLagSeconds.Valid && instance.SlaveLagSeconds.Int64 < 0 {
+				log.Warningf("Host: %+v, instance.SlaveLagSeconds < 0 [%+v], correcting to 0", instanceKey, instance.SlaveLagSeconds.Int64)
+				instance.SlaveLagSeconds.Int64 = 0
+			}
+		} else {
 			instance.SlaveLagSeconds = instance.SecondsBehindMaster
 			logReadTopologyInstanceError(instanceKey, "SlaveLagQuery", err)
 		}
