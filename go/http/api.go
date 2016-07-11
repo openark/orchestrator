@@ -188,7 +188,7 @@ func (this *HttpAPI) BeginMaintenance(params martini.Params, r render.Render, re
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	key, err := inst.BeginMaintenance(&instanceKey, params["owner"], params["reason"])
+	key, err := inst.BeginBoundedMaintenance(&instanceKey, params["owner"], params["reason"], 0, true)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error(), Details: key})
 		return
