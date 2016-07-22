@@ -200,7 +200,7 @@ func newConfiguration() *Configuration {
 		StatusEndpoint:                               "/api/status",
 		StatusSimpleHealth:                           true,
 		StatusOUVerify:                               false,
-		MySQLOrchestratorMaxPoolConnections:          0,    // default no limit to pool size but this should really be set.
+		MySQLOrchestratorMaxPoolConnections:          128,              // limit concurrent conns to backend DB
 		MySQLOrchestratorPort:                        3306,
 		MySQLTopologyMaxPoolConnections:              3,
 		MySQLTopologyUseMutualTLS:                    false,
