@@ -1663,7 +1663,7 @@ func (this *HttpAPI) AgentCustomCommand(params martini.Params, r render.Render, 
 		return
 	}
 
-	output, err := agent.CustomCommand(params["host"], params["cmd"])
+	output, err := agent.CustomCommand(params["host"], params["command"])
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
