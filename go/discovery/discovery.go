@@ -14,7 +14,6 @@
    limitations under the License.
 */
 
-
 /*
 
 package discovery manages a queue of discovery requests: an ordered
@@ -176,11 +175,8 @@ func (q *Queue) cleanup() {
 	log.Infof("Queue.cleanup()")
 	for q.concurrency > 0 && len(q.queue) > 0 {
 		q.maybeDispatch()
-		if key, closed := <-q.done; closed {
-			return
-		} else {
-			q.acknowledgeJob(key)
-		}
+		key := <-q.done
+		q.acknowledgeJob(key)
 	}
 }
 
@@ -208,13 +204,8 @@ func (q *Queue) HandleRequests() {
 				log.Infof("Queue.HandleRequests() q.inputChan is closed. returning")
 				return
 			}
-		case key, ok := <-q.done:
-			if ok {
-				q.acknowledgeJob(key)
-			} else {
-				log.Infof("Queue.HandleRequests() q.done is closed. returning (shouldn't get here)")
-				return // we shouldn't get here as the return above should get triggered first
-			}
+		case key := <-q.done:
+			q.acknowledgeJob(key)
 		}
 	}
 }
