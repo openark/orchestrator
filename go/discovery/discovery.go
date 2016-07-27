@@ -183,12 +183,6 @@ func (q *Queue) cleanup() {
 // Ends when all elements in the queue have been handled.
 // we read from inputChan and call processor up to maxConcurrency times in parallel
 func (q *Queue) HandleRequests() {
-	if q == nil {
-		log.Infof("Queue.HandleRequests() q == nil ??. Should not happen")
-
-		// no queue, nothing to do
-		return
-	}
 	log.Infof("Queue.NewQueue() processing requests")
 	for {
 		select {
