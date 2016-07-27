@@ -33,7 +33,6 @@ being processed then it will be silently ignored.
 package discovery
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/outbrain/golib/log"
@@ -100,23 +99,19 @@ func (q *Queue) push(key inst.InstanceKey) {
 }
 
 // remove the entry and remove it from known keys
-func (q *Queue) pop() (inst.InstanceKey, error) {
+func (q *Queue) pop() inst.InstanceKey {
 	if len(q.queue) == 0 {
-		return inst.InstanceKey{}, errors.New("q.pop() on empty queue")
+		log.Fatal("q.pop() called on empty queue")
 	}
 	key := q.queue[0]
 	q.queue = q.queue[1:]
 	delete(q.knownKeys, key)
-	return key, nil
+	return key
 }
 
 // dispatch a job from the queue (assumes we are in a locked state)
 func (q *Queue) dispatch() {
-	key, err := q.pop() // should never give an error but let's check anyway
-	if err != nil {
-		log.Fatal("Queue.dispatch() q.pop() returns: %+v", err)
-		return
-	}
+	key := q.pop()
 
 	q.concurrency++
 	q.knownKeys[key] = true
