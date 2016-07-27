@@ -138,14 +138,15 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	}
 
 	instance, found, err := inst.ReadInstance(&instanceKey)
-
 	if found && instance.IsUpToDate && instance.IsLastCheckValid {
 		recentDiscoveryOperationKeys.Delete(instanceKey.DisplayString())
 		DiscoverEnd(instanceKey)
 		// we've already discovered this one. Skip!
 		return
 	}
+
 	discoveriesCounter.Inc(1)
+
 	// First we've ever heard of this instance. Continue investigation:
 	instance, err = inst.ReadTopologyInstance(&instanceKey)
 	// panic can occur (IO stuff). Therefore it may happen
@@ -239,6 +240,8 @@ func ContinuousDiscovery() {
 					for _, instanceKey := range instanceKeys {
 						instanceKey := instanceKey
 
+                        // XXX IMO forking a goroutine that is to be
+                        //     blocked on a chan is a misuse of goroutines
 						go func() {
 							if instanceKey.IsValid() {
 								discoveryInstanceKeys <- instanceKey
