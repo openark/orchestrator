@@ -187,17 +187,17 @@ func (q *Queue) HandleRequests() {
 	for {
 		select {
 		case key, ok := <-q.inputChan:
-			if ok {
-				if key != emptyKey {
-					q.queueAndMaybeDispatch(key)
-				} else {
-					log.Warningf("Queue.HandleRequests() q.inputChan received empty key %+v, ignoring (fix the upstream code to prevent this)", key)
-				}
-			} else {
+			if !ok {
 				q.cleanup()
 				log.Infof("Queue.HandleRequests() q.inputChan is closed. returning")
 				return
 			}
+			if key == emptyKey {
+				log.Warningf("Queue.HandleRequests() q.inputChan received empty key %+v,"+
+					"ignoring (fix the upstream code to prevent this)", key)
+				break
+			}
+			q.queueAndMaybeDispatch(key)
 		case key := <-q.done:
 			q.acknowledgeJob(key)
 		}
