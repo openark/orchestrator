@@ -105,18 +105,17 @@ func handleDiscoveryRequestsWithConcurrency(maxConcurrency uint) {
 }
 
 // handleDiscoveryRequests iterates the discoveryInstanceKeys channel
-// and calls upon instance discovery per entry. These requests will
-// be handled by separate go routines so concurrency should be high.
+// and calls upon instance discovery per entry.
 func handleDiscoveryRequestsWithoutConcurrencyLimits() {
 	for instanceKey := range discoveryInstanceKeys {
-		// Possibly this used to be the elected node, but has been demoted, while still
-		// the queue is full.
-		// Just don't process the queue when not elected.
-		if atomic.LoadInt64(&isElectedNode) == 1 {
-			go discoverInstance(instanceKey)
-		} else {
-			log.Debugf("Node apparently demoted. Skipping discovery of %+v. Remaining queue size: %+v", instanceKey, len(discoveryInstanceKeys))
+		// Possibly this used to be the elected node, but has
+		// been demoted, while still the queue is full.
+		if atomic.LoadInt64(&isElectedNode) != 1 {
+			log.Debugf("Node apparently demoted. Skipping discovery of %+v. "+
+				"Remaining queue size: %+v", instanceKey, len(discoveryInstanceKeys))
+			continue
 		}
+		go discoverInstance(instanceKey)
 	}
 }
 
