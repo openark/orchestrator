@@ -71,7 +71,6 @@ type Configuration struct {
 	BinlogFileHistoryDays                        int      // When > 0, amount of days for which orchestrator records per-instance binlog files & sizes
 	UnseenInstanceForgetHours                    uint     // Number of hours after which an unseen instance is forgotten
 	SnapshotTopologiesIntervalHours              uint     // Interval in hour between snapshot-topologies invocation. Default: 0 (disabled)
-	DiscoveryPollSeconds                         uint     // Auto/continuous discovery of instances sleep time between polls
 	DiscoveryMaxConcurrency                      uint     // Maximum concurrency allowed while discovering hosts
 	InstanceBulkOperationsWaitTimeoutSeconds     uint     // Time to wait on a single instance when doing bulk (many instances) operation
 	ActiveNodeExpireSeconds                      uint     // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
@@ -218,7 +217,6 @@ func newConfiguration() *Configuration {
 		SlaveStartPostWaitMilliseconds:               1000,
 		DiscoverByShowSlaveHosts:                     false,
 		DiscoveryMaxConcurrency:                      0, // unlimited by default but this should be set to something
-		DiscoveryPollSeconds:                         5,
 		InstanceBulkOperationsWaitTimeoutSeconds:     10,
 		ActiveNodeExpireSeconds:                      5,
 		NodeHealthExpiry:                             true,
