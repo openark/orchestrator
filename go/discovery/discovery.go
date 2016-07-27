@@ -94,17 +94,14 @@ func (q *Queue) push(key inst.InstanceKey) {
 	if key == emptyKey {
 		log.Fatal("Queue.push(%v) is empty", key)
 	}
-	// log.Debugf("Queue.push(%+v)", key)
 
 	if _, found := q.knownKeys[key]; !found {
-		// log.Debugf("Queue.push() adding %+v to knownKeys", key)
 		// add to the items that are being processed
 		q.knownKeys[key] = true
 		q.queue = append(q.queue, key)
 	} else {
 		// If key already there we just ignore it as the request is in the queue.
 		// the known key also records stuff in the queue, so pending + active jobs.
-		// log.Debugf("Queue.push() ignoring knownKey %+v", key)
 	}
 }
 
@@ -116,7 +113,6 @@ func (q *Queue) pop() (inst.InstanceKey, error) {
 	key := q.queue[0]
 	q.queue = q.queue[1:]
 	delete(q.knownKeys, key)
-	// log.Debugf("Queue.pop() returns %+v", key)
 	return key, nil
 }
 
@@ -134,8 +130,6 @@ func (q *Queue) dispatch() {
 	q.concurrency++
 	q.knownKeys[key] = true
 
-	// log.Debugf("Queue.dispatch() key: %q, concurrency: %d", key, q.concurrency)
-
 	// dispatch a discoverInstance() but tell us when we're done (to limit concurrency)
 	go func() { // discover asynchronously
 		q.processor(key)
@@ -149,14 +143,12 @@ func (q *Queue) acknowledgeJob(key inst.InstanceKey) {
 	q.lock.Lock()
 	delete(q.knownKeys, key)
 	q.concurrency--
-	// log.Debugf("Queue.acknowledgeJob(%+v) q.concurrency: %d", key, q.concurrency)
 	q.lock.Unlock()
 }
 
 // drain queue by dispatching any jobs we have still
 func (q *Queue) maybeDispatch() {
 	q.lock.Lock()
-	// log.Debugf("Queue.maybeDispatch() q.concurrency: %d, q.maxConcurrency: %d, len(q.queue): %d", q.concurrency, q.maxConcurrency, len(q.queue))
 	if q.concurrency < q.maxConcurrency && len(q.queue) > 0 {
 		q.dispatch()
 	}
@@ -170,7 +162,6 @@ func (q *Queue) queueAndMaybeDispatch(key inst.InstanceKey) {
 		log.Fatal("Queue.queueAndMaybeDispatch(%v) is empty", key)
 	}
 	q.lock.Lock()
-	// log.Debugf("Queue.queueAndMaybeDispatch(%+v) concurency: %d", key, q.concurrency)
 	q.push(key)
 	if q.concurrency < q.maxConcurrency && len(q.queue) > 0 {
 		q.dispatch()
