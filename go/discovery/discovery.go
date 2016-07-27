@@ -73,7 +73,6 @@ var emptyKey = inst.InstanceKey{}
 
 // NewQueue creates a new Queue entry.
 func NewQueue(maxConcurrency uint, inputChan chan inst.InstanceKey, processor func(i inst.InstanceKey)) *Queue {
-	log.Infof("Queue.NewQueue()")
 	q := new(Queue)
 
 	q.concurrency = 0                    // explicitly
@@ -90,10 +89,6 @@ func NewQueue(maxConcurrency uint, inputChan chan inst.InstanceKey, processor fu
 // add the key to the slice if it does not exist in known keys
 // - goroutine safe as only called inside the mutex
 func (q *Queue) push(key inst.InstanceKey) {
-	if key == emptyKey {
-		log.Fatal("Queue.push(%v) is empty", key)
-	}
-
 	if _, found := q.knownKeys[key]; !found {
 		// add to the items that are being processed
 		q.knownKeys[key] = true
@@ -121,9 +116,6 @@ func (q *Queue) dispatch() {
 	if err != nil {
 		log.Fatal("Queue.dispatch() q.pop() returns: %+v", err)
 		return
-	}
-	if key == emptyKey {
-		log.Fatal("Queue.dispatch() key is empty")
 	}
 
 	q.concurrency++
@@ -157,9 +149,6 @@ func (q *Queue) maybeDispatch() {
 // add an entry to the queue and dispatch something if concurrency is low enough
 // - we deal with locking inside
 func (q *Queue) queueAndMaybeDispatch(key inst.InstanceKey) {
-	if key == emptyKey {
-		log.Fatal("Queue.queueAndMaybeDispatch(%v) is empty", key)
-	}
 	q.lock.Lock()
 	q.push(key)
 	if q.concurrency < q.maxConcurrency && len(q.queue) > 0 {
@@ -172,7 +161,6 @@ func (q *Queue) queueAndMaybeDispatch(key inst.InstanceKey) {
 // we can not sit in the loop so we have to wait for running go-routines to finish
 // but also to dispatch anything left in the queue until finally everything is done.
 func (q *Queue) cleanup() {
-	log.Infof("Queue.cleanup()")
 	for q.concurrency > 0 && len(q.queue) > 0 {
 		q.maybeDispatch()
 		key := <-q.done
@@ -183,13 +171,11 @@ func (q *Queue) cleanup() {
 // Ends when all elements in the queue have been handled.
 // we read from inputChan and call processor up to maxConcurrency times in parallel
 func (q *Queue) HandleRequests() {
-	log.Infof("Queue.NewQueue() processing requests")
 	for {
 		select {
 		case key, ok := <-q.inputChan:
 			if !ok {
 				q.cleanup()
-				log.Infof("Queue.HandleRequests() q.inputChan is closed. returning")
 				return
 			}
 			if key == emptyKey {
