@@ -13,7 +13,7 @@ export GO15VENDOREXPERIMENT=1
 
 usage() {
   echo
-  echo "Usage: $0 [-t target ] [-a arch ] [ -p prefix ] [-h] [-d]"
+  echo "Usage: $0 [-t target ] [-a arch ] [ -p prefix ] [-h] [-d] [-r]"
   echo "Options:"
   echo "-h Show this screen"
   echo "-t (linux|darwin) Target OS Default:(linux)"
@@ -21,6 +21,7 @@ usage() {
   echo "-d debug output"
   echo "-b build only, do not generate packages"
   echo "-p build prefix Default:(/usr/local)"
+  echo "-r build with race detector"
   echo "-s release subversion"
   echo
 }
@@ -130,7 +131,7 @@ function build() {
   prefix="$4"
   ldflags="-X main.AppVersion=${RELEASE_VERSION}"
   echo "Building via $(go version)"
-  gobuild="go build -ldflags \"$ldflags\" -o $builddir/orchestrator${prefix}/orchestrator/orchestrator go/cmd/orchestrator/main.go"
+  gobuild="go build ${opt_race} -ldflags \"$ldflags\" -o $builddir/orchestrator${prefix}/orchestrator/orchestrator go/cmd/orchestrator/main.go"
 
   case $os in
     'linux')
@@ -162,7 +163,8 @@ function main() {
 }
 
 build_only=0
-while getopts a:t:p:s:dbh flag; do
+opt_race=
+while getopts a:t:p:s:dbhr flag; do
   case $flag in
   a)
     arch="$OPTARG"
@@ -183,6 +185,9 @@ while getopts a:t:p:s:dbh flag; do
     ;;
   p)
     prefix="$OPTARG"
+    ;;
+  r)
+    opt_race="-race"
     ;;
   s)
     RELEASE_VERSION="${RELEASE_VERSION}_${OPTARG}"

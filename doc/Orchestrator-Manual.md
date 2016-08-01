@@ -929,9 +929,9 @@ Cheatsheet:
         instance-status
             Output short status on a given instance (name, replication status, noteable configuration). Example2:
 
-            orchestrator -c replication-status -i instance.to.investigate.com
+            orchestrator -c instance-status -i instance.to.investigate.com
 
-            orchestrator -c replication-status
+            orchestrator -c instance-status
                 -i not given, implicitly assumed local hostname
 
         snapshot-topologies
