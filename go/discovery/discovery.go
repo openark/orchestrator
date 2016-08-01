@@ -19,168 +19,96 @@
 package discovery manages a queue of discovery requests: an ordered
 queue with no duplicates.
 
-The configured processor function is called on an entry that's
-received and this happens in parallel until maxCapacity go-routines
-are running in parallel.
-
-Any new requests get queued and processed as a go routine becomes
-free.  The queue is processed in FIFO order.  If a request is
-received for an instance that is already in the queue or already
-being processed then it will be silently ignored.
+push() operation never blocks while pop() blocks on an empty queue.
 
 */
 
 package discovery
 
 import (
-	"sync"
-
 	"github.com/outbrain/golib/log"
+	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/inst"
+	"sync"
+	"time"
 )
 
-// Queue is a container for processing the orchestrator discovery requests.
+const initialCapacity = 64
+
 type Queue struct {
-	// The number of active go routines processing discovery requests.
-	concurrency uint
-	// Channel used by the active go routines to say they have finished processing.
-	done chan inst.InstanceKey
-	// Input channel we are reading the discovery requests from.
-	inputChan <-chan inst.InstanceKey
-	// This has 2 uses: to indicate if there is a request in the queue
-	// (so not being processed) or to indicate that the request is actively
-	// being dealth with.  That state is not explicitly stored as it is not
-	// really needed.
-	knownKeys map[inst.InstanceKey]bool
-	// lock while making changes
-	lock sync.Mutex
-	// The maximum number of go routines allowed to handle the queue at once.
-	// This is a configuration parameter provided when creating the Queue.
-	maxConcurrency uint
-	// process to run on each received key
-	processor func(i inst.InstanceKey)
-	// This holds the discover requests (the instance name) which need to be
-	// processed. but which are not currently being processed. All requests
-	// are initially added to the end of this queue, and then the top element
-	// will be popped off if the number of active go routines (defined by
-	// concurrency) is less than the maximum specified value at which point
-	// it will be processed by a new go routine.
-	queue []inst.InstanceKey
+	sync.Mutex
+	queue     chan inst.InstanceKey
+	knownKeys map[inst.InstanceKey]time.Time
 }
 
-var emptyKey = inst.InstanceKey{}
-
-// NewQueue creates a new Queue entry.
-func NewQueue(maxConcurrency uint, inputChan chan inst.InstanceKey, processor func(i inst.InstanceKey)) *Queue {
+func NewQueue() *Queue {
 	q := new(Queue)
-
-	q.concurrency = 0                    // explicitly
-	q.done = make(chan inst.InstanceKey) // Do I need this to be larger?
-	q.inputChan = inputChan
-	q.knownKeys = make(map[inst.InstanceKey]bool)
-	q.maxConcurrency = maxConcurrency
-	q.processor = processor
-	q.queue = make([]inst.InstanceKey, 0)
-
+	q.knownKeys = make(map[inst.InstanceKey]time.Time)
+	q.queue = make(chan inst.InstanceKey, initialCapacity)
 	return q
 }
 
-// add the key to the slice if it does not exist in known keys
-// - goroutine safe as only called inside the mutex
-func (q *Queue) push(key inst.InstanceKey) {
-	if _, found := q.knownKeys[key]; !found {
-		// add to the items that are being processed
-		q.knownKeys[key] = true
-		q.queue = append(q.queue, key)
-	} else {
-		// If key already there we just ignore it as the request is in the queue.
-		// the known key also records stuff in the queue, so pending + active jobs.
+func (q *Queue) Len() int {
+	q.Lock()
+	defer q.Unlock()
+	return len(q.queue)
+}
+
+// push the key to the slice if it does not exist in known keys;
+// silently return otherwise.
+func (q *Queue) Push(key inst.InstanceKey) {
+	q.Lock()
+	defer q.Unlock()
+
+	// is it enqueued already?
+	if _, found := q.knownKeys[key]; found {
+		return
 	}
-}
 
-// remove the entry and remove it from known keys
-func (q *Queue) pop() inst.InstanceKey {
-	if len(q.queue) == 0 {
-		log.Fatal("q.pop() called on empty queue")
+	q.knownKeys[key] = time.Now()
+
+	// Instead of blocking on a full queue, allocate a larger
+	// queue if needed. That's not a very ideomatic but
+	// 1) we know the queue is at maximum as large as the number
+	// of hosts 2) we really don't want a discovery planner to
+	// block. Notice: there's a side effect of closing a chan:
+	// zero value will be returned to all waiting goroutines.
+	// We handle this in Pop(). Good enough for now.
+	if len(q.queue) == cap(q.queue) {
+		var newQueue = make(chan inst.InstanceKey, cap(q.queue)*2)
+		close(q.queue)
+		for key := range q.queue {
+			newQueue <- key
+		}
+		q.queue = newQueue
 	}
-	key := q.queue[0]
-	q.queue = q.queue[1:]
-	delete(q.knownKeys, key)
-	return key
+
+	q.queue <- key
 }
 
-// dispatch a job from the queue (assumes we are in a locked state)
-func (q *Queue) dispatch() {
-	key := q.pop()
+var zeroInstanceKey = inst.InstanceKey{}
 
-	q.concurrency++
-	q.knownKeys[key] = true
-
-	// dispatch a discoverInstance() but tell us when we're done (to limit concurrency)
-	go func() { // discover asynchronously
-		q.processor(key)
-		q.done <- key
-	}()
-}
-
-// acknowledge a job has finished
-// - we deal with the locking inside
-func (q *Queue) acknowledgeJob(key inst.InstanceKey) {
-	q.lock.Lock()
-	delete(q.knownKeys, key)
-	q.concurrency--
-	q.lock.Unlock()
-}
-
-// drain queue by dispatching any jobs we have still
-func (q *Queue) maybeDispatch() {
-	q.lock.Lock()
-	if q.concurrency < q.maxConcurrency && len(q.queue) > 0 {
-		q.dispatch()
-	}
-	q.lock.Unlock()
-}
-
-// add an entry to the queue and dispatch something if concurrency is low enough
-// - we deal with locking inside
-func (q *Queue) queueAndMaybeDispatch(key inst.InstanceKey) {
-	q.lock.Lock()
-	q.push(key)
-	if q.concurrency < q.maxConcurrency && len(q.queue) > 0 {
-		q.dispatch()
-	}
-	q.lock.Unlock()
-}
-
-// cleanup is called when the input channel closes.
-// we can not sit in the loop so we have to wait for running go-routines to finish
-// but also to dispatch anything left in the queue until finally everything is done.
-func (q *Queue) cleanup() {
-	for q.concurrency > 0 && len(q.queue) > 0 {
-		q.maybeDispatch()
-		key := <-q.done
-		q.acknowledgeJob(key)
-	}
-}
-
-// Ends when all elements in the queue have been handled.
-// we read from inputChan and call processor up to maxConcurrency times in parallel
-func (q *Queue) HandleRequests() {
+// pop the entry and remove it from known keys;
+// blocks if queue is empty.
+func (q *Queue) Pop() inst.InstanceKey {
+	var key inst.InstanceKey
 	for {
-		select {
-		case key, ok := <-q.inputChan:
-			if !ok {
-				q.cleanup()
-				return
-			}
-			if key == emptyKey {
-				log.Warningf("Queue.HandleRequests() q.inputChan received empty key %+v,"+
-					"ignoring (fix the upstream code to prevent this)", key)
-				break
-			}
-			q.queueAndMaybeDispatch(key)
-		case key := <-q.done:
-			q.acknowledgeJob(key)
+		key = <-q.queue
+		// a zero value key may be returned when a chan is closed (see above)
+		if key != zeroInstanceKey {
+			break
 		}
 	}
+
+	q.Lock()
+	defer q.Unlock()
+
+	// alarm if have been waiting for too long
+	timeOnQueue := time.Since(q.knownKeys[key])
+	if timeOnQueue > time.Duration(config.Config.InstancePollSeconds)*time.Second {
+		log.Warningf("key %v spent %v waiting on a discoveryQueue", key, time.Since(q.knownKeys[key]))
+	}
+
+	delete(q.knownKeys, key)
+	return key
 }

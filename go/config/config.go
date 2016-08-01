@@ -71,7 +71,7 @@ type Configuration struct {
 	BinlogFileHistoryDays                        int      // When > 0, amount of days for which orchestrator records per-instance binlog files & sizes
 	UnseenInstanceForgetHours                    uint     // Number of hours after which an unseen instance is forgotten
 	SnapshotTopologiesIntervalHours              uint     // Interval in hour between snapshot-topologies invocation. Default: 0 (disabled)
-	DiscoveryMaxConcurrency                      uint     // Maximum concurrency allowed while discovering hosts
+	DiscoveryMaxConcurrency                      uint     // Number of goroutines doing hosts discovery
 	InstanceBulkOperationsWaitTimeoutSeconds     uint     // Time to wait on a single instance when doing bulk (many instances) operation
 	ActiveNodeExpireSeconds                      uint     // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
 	NodeHealthExpiry                             bool     // Do we expire the node_health table? Usually this is true but it might be disabled on command line tools if an orchestrator daemon is running.
@@ -216,7 +216,7 @@ func newConfiguration() *Configuration {
 		SnapshotTopologiesIntervalHours:              0,
 		SlaveStartPostWaitMilliseconds:               1000,
 		DiscoverByShowSlaveHosts:                     false,
-		DiscoveryMaxConcurrency:                      0, // unlimited by default but this should be set to something
+		DiscoveryMaxConcurrency:                      300,
 		InstanceBulkOperationsWaitTimeoutSeconds:     10,
 		ActiveNodeExpireSeconds:                      5,
 		NodeHealthExpiry:                             true,

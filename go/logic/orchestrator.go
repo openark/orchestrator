@@ -34,13 +34,10 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
-const (
-	discoveryInstanceChannelCapacity = 5 // size here not critical as channel read by separate go routines.
-)
-
-// discoveryInstanceKeys is a channel of instanceKey-s that were requested for discovery.
-// It can be continuously updated as discovery process progresses.
-var discoveryInstanceKeys = make(chan inst.InstanceKey, discoveryInstanceChannelCapacity)
+// discoveryQueue is a channel of deduplicated instanceKey-s
+// that were requested for discovery.  It can be continuously updated
+// as discovery process progresses.
+var discoveryQueue = discovery.NewQueue()
 
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
@@ -59,7 +56,7 @@ func init() {
 	metrics.Register("discoveries.recent_count", discoveryRecentCountGauge)
 	metrics.Register("elect.is_elected", isElectedGauge)
 
-	ometrics.OnGraphiteTick(func() { discoveryQueueLengthGauge.Update(int64(len(discoveryInstanceKeys))) })
+	ometrics.OnGraphiteTick(func() { discoveryQueueLengthGauge.Update(int64(discoveryQueue.Len())) })
 	ometrics.OnGraphiteTick(func() {
 		if recentDiscoveryOperationKeys == nil {
 			return
@@ -86,42 +83,29 @@ func acceptSignals() {
 	}()
 }
 
-// handleDiscoveryRequests iterates the discoveryInstanceKeys channel
-// and calls upon instance discovery per entry. These requests will
-// be handled by separate go routines so concurrency should be high.
+// handleDiscoveryRequests iterates the discoveryQueue channel and calls upon
+// instance discovery per entry.
 func handleDiscoveryRequests() {
-	log.Infof("handleDiscoveryRequests() DiscoveryMaxConcurrency: %v", config.Config.DiscoveryMaxConcurrency)
-	if config.Config.DiscoveryMaxConcurrency > 0 {
-		handleDiscoveryRequestsWithConcurrency(config.Config.DiscoveryMaxConcurrency)
-	} else {
-		handleDiscoveryRequestsWithoutConcurrencyLimits()
+	// create a pool of discovery workers
+	for i := uint(0); i < config.Config.DiscoveryMaxConcurrency; i++ {
+		go func() {
+			for {
+				instanceKey := discoveryQueue.Pop()
+				// Possibly this used to be the elected node, but has
+				// been demoted, while still the queue is full.
+				if atomic.LoadInt64(&isElectedNode) != 1 {
+					log.Debugf("Node apparently demoted. Skipping discovery of %+v. "+
+						"Remaining queue size: %+v", instanceKey, discoveryQueue.Len())
+					return
+				}
+				discoverInstance(instanceKey)
+			}
+		}()
 	}
 }
 
-// Handle the discovery requests with the maximum given concurrency
-func handleDiscoveryRequestsWithConcurrency(maxConcurrency uint) {
-	q := discovery.NewQueue(maxConcurrency, discoveryInstanceKeys, discoverInstance)
-	q.HandleRequests()
-}
-
-// handleDiscoveryRequests iterates the discoveryInstanceKeys channel
-// and calls upon instance discovery per entry.
-func handleDiscoveryRequestsWithoutConcurrencyLimits() {
-	for instanceKey := range discoveryInstanceKeys {
-		// Possibly this used to be the elected node, but has
-		// been demoted, while still the queue is full.
-		if atomic.LoadInt64(&isElectedNode) != 1 {
-			log.Debugf("Node apparently demoted. Skipping discovery of %+v. "+
-				"Remaining queue size: %+v", instanceKey, len(discoveryInstanceKeys))
-			continue
-		}
-		go discoverInstance(instanceKey)
-	}
-}
-
-// discoverInstance will attempt to discover an instance (unless it is
-// already up to date) and will list down its master and slaves (if any)
-// for further discovery.
+// discoverInstance will attempt discovering an instance (unless it is already up to date) and will
+// list down its master and slaves (if any) for further discovery.
 func discoverInstance(instanceKey inst.InstanceKey) {
 	start := time.Now()
 
@@ -130,17 +114,13 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
-	DiscoverStart(instanceKey)
 	if existsInCacheError := recentDiscoveryOperationKeys.Add(instanceKey.DisplayString(), true, cache.DefaultExpiration); existsInCacheError != nil {
-		DiscoverEnd(instanceKey)
 		// Just recently attempted
 		return
 	}
 
 	instance, found, err := inst.ReadInstance(&instanceKey)
 	if found && instance.IsUpToDate && instance.IsLastCheckValid {
-		recentDiscoveryOperationKeys.Delete(instanceKey.DisplayString())
-		DiscoverEnd(instanceKey)
 		// we've already discovered this one. Skip!
 		return
 	}
@@ -152,15 +132,11 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	// panic can occur (IO stuff). Therefore it may happen
 	// that instance is nil. Check it.
 	if instance == nil {
-		recentDiscoveryOperationKeys.Delete(instanceKey.DisplayString())
-		DiscoverEnd(instanceKey)
 		failedDiscoveriesCounter.Inc(1)
 		log.Warningf("discoverInstance(%+v) instance is nil in %.3fs, error=%+v", instanceKey, time.Since(start).Seconds(), err)
 		return
 	}
 
-	recentDiscoveryOperationKeys.Delete(instanceKey.DisplayString())
-	DiscoverEnd(instanceKey)
 	log.Debugf("Discovered host: %+v, master: %+v, version: %+v in %.3fs", instance.Key, instance.MasterKey, instance.Version, time.Since(start).Seconds())
 
 	if atomic.LoadInt64(&isElectedNode) == 0 {
@@ -169,20 +145,16 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
-	// Investigate master and slaves asynchronously to ensure we
-	// do not block processing other instances while adding these servers
-	// to the queue.
-
 	// Investigate slaves:
 	for _, slaveKey := range instance.SlaveHosts.GetInstanceKeys() {
 		slaveKey := slaveKey
 		if slaveKey.IsValid() {
-			discoveryInstanceKeys <- slaveKey
+			discoveryQueue.Push(slaveKey)
 		}
 	}
 	// Investigate master:
 	if instance.MasterKey.IsValid() {
-		discoveryInstanceKeys <- instance.MasterKey
+		discoveryQueue.Push(instance.MasterKey)
 	}
 }
 
@@ -236,29 +208,20 @@ func ContinuousDiscovery() {
 						log.Errore(err)
 					}
 
-					log.Debugf("outdated keys: %+v", instanceKeys)
+					log.Debugf("Polling %v outdated instances...", len(instanceKeys))
 					for _, instanceKey := range instanceKeys {
 						instanceKey := instanceKey
 
-                        // XXX IMO forking a goroutine that is to be
-                        //     blocked on a chan is a misuse of goroutines
-						go func() {
-							if instanceKey.IsValid() {
-								discoveryInstanceKeys <- instanceKey
-							}
-						}()
+						if instanceKey.IsValid() {
+							discoveryQueue.Push(instanceKey)
+						}
 					}
 					if wasAlreadyElected == 0 {
 						// Just turned to be leader!
 						go process.RegisterNode("", "", false)
 					}
 				} else {
-					hostname, token, _, err := process.ElectedNode()
-					if err == nil {
-						log.Debugf("Inactive node. Active node is: %v[%v]; polling", hostname, token)
-					} else {
-						log.Debugf("Inactive node. Unable to determine active node: %v; polling", err)
-					}
+					log.Debugf("Not elected as active node; polling")
 				}
 			}()
 		case <-instancePollTick:
