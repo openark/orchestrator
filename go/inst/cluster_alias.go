@@ -16,8 +16,6 @@
 
 package inst
 
-import ()
-
 // SetClusterAlias will write (and override) a single cluster name mapping
 func SetClusterAlias(clusterName string, alias string) error {
 	return WriteClusterAlias(clusterName, alias)
