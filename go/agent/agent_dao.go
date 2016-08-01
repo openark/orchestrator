@@ -468,6 +468,16 @@ func AbortSeedCommand(hostname string, seedId int64) (Agent, error) {
 	return executeAgentCommand(hostname, fmt.Sprintf("abort-seed/%d", seedId), nil)
 }
 
+func CustomCommand(hostname string, cmd string) (output string, err error) {
+	onResponse := func(body []byte) {
+		output = string(body)
+		log.Debugf("output: %v", output)
+	}
+
+	_, err = executeAgentCommand(hostname, fmt.Sprintf("custom-commands/%s", cmd), &onResponse)
+	return output, err
+}
+
 // seedCommandCompleted checks an agent to see if it thinks a seed was completed.
 func seedCommandCompleted(hostname string, seedId int64) (Agent, bool, error) {
 	result := false

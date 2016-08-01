@@ -1,17 +1,10 @@
-
 <div>
 	<div id="cluster_sidebar">
 		<div class="navbar" role="navigation">
 			<ul class="nav">
 				<li data-bullet="info">
-					<div
-						data-toggle="popover" 
-						data-placement="bottom"
-						data-html="true" 
-						title="" 
-						data-content=""
-					>
-						<span class="glyphicon glyphicon-info-sign"></span>
+					<div data-toggle="popover" data-placement="bottom" data-html="true" title="" data-content="">
+						<span class="glyphicon"></span>
 					</div>
 				</li>
 				<li data-bullet="colorize-dc">
@@ -43,32 +36,35 @@
 
 <li id="li-move-instance-method" style="display:none">
 	<div id="move-instance-method" class="dropdown">
-	  <button class="btn btn-xs dropdown-toggle" type="button" id="move-instance-method-button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
-	    Move
-	    <span class="caret"></span>
-	  </button>
-	  <ul class="dropdown-menu" aria-labelledby="move-instance-method">
-	    <li><a href="#" data-method="smart" title="Let orchestrator choose slave relocating method">Smart mode</a></li>
-	    <li><a href="#" data-method="classic" title="Move slaves using classic binlog file name and position">Classic mode</a></li>
-	    <li><a href="#" data-method="gtid" title="Move slaves via GTID">GTID mode</a></li>
-	    <li><a href="#" data-method="pseudo-gtid" title="Move slaves via Pseudo-GTID match of binary logs">Pseudo GTID mode</a></li>
-	  </ul>
-</div>
+		<button class="btn btn-xs dropdown-toggle" type="button" id="move-instance-method-button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+			Move
+			<span class="caret"></span>
+		</button>
+		<ul class="dropdown-menu" aria-labelledby="move-instance-method">
+			<li><a href="#" data-method="smart" title="Let orchestrator choose slave relocating method">Smart mode</a></li>
+			<li><a href="#" data-method="classic" title="Move slaves using classic binlog file name and position">Classic mode</a></li>
+			<li><a href="#" data-method="gtid" title="Move slaves via GTID">GTID mode</a></li>
+			<li><a href="#" data-method="pseudo-gtid" title="Move slaves via Pseudo-GTID match of binary logs">Pseudo GTID mode</a></li>
+		</ul>
+	</div>
 </li>
 
 <script>
 	function currentClusterName() {
-	    return "{{.clusterName}}";
+		return "{{.clusterName}}";
 	}
+
 	function isPseudoGTIDModeEnabled() {
-	    return "{{.pseudoGTIDModeEnabled}}" == "true";
+		return "{{.pseudoGTIDModeEnabled}}" == "true";
 	}
+
 	function removeTextFromHostnameDisplay() {
-	    return "{{.removeTextFromHostnameDisplay}}";
+		return "{{.removeTextFromHostnameDisplay}}";
 	}
-    function isCompactDisplay() {
-    	return "{{.compactDisplay}}" == "true";
-    }
+
+	function isCompactDisplay() {
+		return "{{.compactDisplay}}" == "true";
+	}
 </script>
 
 <script src="/js/jquery-ui.min.js"></script>

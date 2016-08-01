@@ -3,7 +3,7 @@ $(document).ready(function () {
     showLoader();
     activateRefreshTimer();
     
-    $.get("/api/agents", function (agents) {
+    $.get(appUrl("/api/agents"), function (agents) {
     	displayAgents(agents);
     }, "json");
     function displayAgents(agents) {
@@ -15,7 +15,7 @@ $(document).ready(function () {
     		//var title = agent.Hostname;
     		//popoverElement.find("h3 a").html(title);
     	    var contentHtml = ''
-    	    	+ '<a href="/web/agent/'+ agent.Hostname +'" class="small">'
+    	    	+ '<a href="' + appUrl('/web/agent/'+ agent.Hostname) +'" class="small">'
     	    	+ agent.Hostname
     	    	+ '</a>'
     			;

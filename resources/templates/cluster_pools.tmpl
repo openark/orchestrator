@@ -1,19 +1,17 @@
+<style type="text/css">
+  #pools .popover.instance {
+    display: inline-block;
+    position: inherit;
+    width: 276px;
+  }
 
-<style type = "text/css">
-    #pools .popover.instance {
-        display: inline-block;
-        position: inherit;
-        width: 276px;
-    }
-    
-    #pools .popover.instance {
-       margin: 8px;
-    }
-    
-    #pools .popover.instance p {
-       margin: 8px 0px;
-    }
-    
+  #pools .popover.instance {
+    margin: 8px;
+  }
+
+  #pools .popover.instance p {
+    margin: 8px 0px;
+  }
 </style>
 
 <div class="container" id="pools">
@@ -21,11 +19,12 @@
 
 
 <script>
-	function currentClusterName() {
-	    return "{{.clusterName}}";
-	}
-	function removeTextFromHostnameDisplay() {
-	    return "{{.removeTextFromHostnameDisplay}}";
-	}
+  function currentClusterName() {
+    return "{{.clusterName}}";
+  }
+
+  function removeTextFromHostnameDisplay() {
+    return "{{.removeTextFromHostnameDisplay}}";
+  }
 </script>
 <script src="/js/cluster-pools.js"></script>

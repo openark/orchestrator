@@ -16,7 +16,12 @@
 
 package inst
 
+import (
+	"strings"
+)
+
 type AnalysisCode string
+type StructureAnalysisCode string
 
 const (
 	NoProblem                                             AnalysisCode = "NoProblem"
@@ -24,11 +29,13 @@ const (
 	DeadMaster                                                         = "DeadMaster"
 	DeadMasterAndSlaves                                                = "DeadMasterAndSlaves"
 	DeadMasterAndSomeSlaves                                            = "DeadMasterAndSomeSlaves"
+	UnreachableMasterWithStaleSlaves                                   = "UnreachableMasterWithStaleSlaves"
 	UnreachableMaster                                                  = "UnreachableMaster"
 	MasterSingleSlaveNotReplicating                                    = "MasterSingleSlaveNotReplicating"
 	MasterSingleSlaveDead                                              = "MasterSingleSlaveDead"
 	AllMasterSlavesNotReplicating                                      = "AllMasterSlavesNotReplicating"
 	AllMasterSlavesNotReplicatingOrDead                                = "AllMasterSlavesNotReplicatingOrDead"
+	AllMasterSlavesStale                                               = "AllMasterSlavesStale"
 	MasterWithoutSlaves                                                = "MasterWithoutSlaves"
 	DeadCoMaster                                                       = "DeadCoMaster"
 	DeadCoMasterAndSomeSlaves                                          = "DeadCoMasterAndSomeSlaves"
@@ -45,31 +52,44 @@ const (
 	BinlogServerFailingToConnectToMaster                               = "BinlogServerFailingToConnectToMaster"
 )
 
+const (
+	StatementAndMixedLoggingSlavesStructureWarning StructureAnalysisCode = "StatementAndMixedLoggingSlavesStructureWarning"
+	StatementAndRowLoggingSlavesStructureWarning                         = "StatementAndRowLoggingSlavesStructureWarning"
+	MixedAndRowLoggingSlavesStructureWarning                             = "MixedAndRowLoggingSlavesStructureWarning"
+	MultipleMajorVersionsLoggingSlaves                                   = "MultipleMajorVersionsLoggingSlaves"
+)
+
 // ReplicationAnalysis notes analysis on replication chain status, per instance
 type ReplicationAnalysis struct {
-	AnalyzedInstanceKey                 InstanceKey
-	AnalyzedInstanceMasterKey           InstanceKey
-	ClusterDetails                      ClusterInfo
-	IsMaster                            bool
-	IsCoMaster                          bool
-	LastCheckValid                      bool
-	CountSlaves                         uint
-	CountValidSlaves                    uint
-	CountValidReplicatingSlaves         uint
-	CountSlavesFailingToConnectToMaster uint
-	ReplicationDepth                    uint
-	SlaveHosts                          InstanceKeyMap
-	IsFailingToConnectToMaster          bool
-	Analysis                            AnalysisCode
-	Description                         string
-	IsDowntimed                         bool
-	DowntimeEndTimestamp                string
-	DowntimeRemainingSeconds            int
-	IsBinlogServer                      bool
-	PseudoGTIDImmediateTopology         bool
-	OracleGTIDImmediateTopology         bool
-	MariaDBGTIDImmediateTopology        bool
-	BinlogServerImmediateTopology       bool
+	AnalyzedInstanceKey                     InstanceKey
+	AnalyzedInstanceMasterKey               InstanceKey
+	ClusterDetails                          ClusterInfo
+	IsMaster                                bool
+	IsCoMaster                              bool
+	LastCheckValid                          bool
+	CountSlaves                             uint
+	CountValidSlaves                        uint
+	CountValidReplicatingSlaves             uint
+	CountSlavesFailingToConnectToMaster     uint
+	CountStaleSlaves                        uint
+	ReplicationDepth                        uint
+	SlaveHosts                              InstanceKeyMap
+	IsFailingToConnectToMaster              bool
+	Analysis                                AnalysisCode
+	Description                             string
+	StructureAnalysis                       []StructureAnalysisCode
+	IsDowntimed                             bool
+	DowntimeEndTimestamp                    string
+	DowntimeRemainingSeconds                int
+	IsBinlogServer                          bool
+	PseudoGTIDImmediateTopology             bool
+	OracleGTIDImmediateTopology             bool
+	MariaDBGTIDImmediateTopology            bool
+	BinlogServerImmediateTopology           bool
+	CountStatementBasedLoggingSlaves        uint
+	CountMixedBasedLoggingSlaves            uint
+	CountRowBasedLoggingSlaves              uint
+	CountDistinctMajorVersionsLoggingSlaves uint
 }
 
 type ReplicationAnalysisChangelog struct {
@@ -81,4 +101,16 @@ type ReplicationAnalysisChangelog struct {
 func (this *ReplicationAnalysis) ReadSlaveHostsFromString(slaveHostsString string) error {
 	this.SlaveHosts = *NewInstanceKeyMap()
 	return this.SlaveHosts.ReadCommaDelimitedList(slaveHostsString)
+}
+
+// AnalysisString returns a human friendly description of all analysis issues
+func (this *ReplicationAnalysis) AnalysisString() string {
+	result := []string{}
+	if this.Analysis != NoProblem {
+		result = append(result, string(this.Analysis))
+	}
+	for _, structureAnalysis := range this.StructureAnalysis {
+		result = append(result, string(structureAnalysis))
+	}
+	return strings.Join(result, ", ")
 }

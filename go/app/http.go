@@ -17,6 +17,7 @@
 package app
 
 import (
+	"net"
 	nethttp "net/http"
 	"strings"
 
@@ -38,9 +39,12 @@ import (
 )
 
 var oauthStateString = process.ProcessToken.Hash
+var sslPEMPassword []byte
+var agentSSLPEMPassword []byte
 
 // Http starts serving
 func Http(discovery bool) {
+	promptForSSLPasswords()
 	process.ContinuousRegistration(process.OrchestratorExecutionHttpMode, "")
 
 	martini.Env = martini.Prod
@@ -48,6 +52,21 @@ func Http(discovery bool) {
 		go agentsHttp()
 	}
 	standardHttp(discovery)
+}
+
+// Iterate over the private keys and get passwords for them
+// Don't prompt for a password a second time if the files are the same
+func promptForSSLPasswords() {
+	if ssl.IsEncryptedPEM(config.Config.SSLPrivateKeyFile) {
+		sslPEMPassword = ssl.GetPEMPassword(config.Config.SSLPrivateKeyFile)
+	}
+	if ssl.IsEncryptedPEM(config.Config.AgentSSLPrivateKeyFile) {
+		if config.Config.AgentSSLPrivateKeyFile == config.Config.SSLPrivateKeyFile {
+			agentSSLPEMPassword = sslPEMPassword
+		} else {
+			agentSSLPEMPassword = ssl.GetPEMPassword(config.Config.AgentSSLPrivateKeyFile)
+		}
+	}
 }
 
 // standardHttp starts serving HTTP or HTTPS (api/web) requests, to be used by normal clients
@@ -116,28 +135,36 @@ func standardHttp(discovery bool) {
 		log.Info("Starting Discovery")
 		go logic.ContinuousDiscovery()
 	}
-	inst.ReadClusterAliases()
-
 	log.Info("Registering endpoints")
 	http.API.RegisterRequests(m)
 	http.Web.RegisterRequests(m)
 
 	// Serve
-	if config.Config.UseSSL {
+	if config.Config.ListenSocket != "" {
+		log.Infof("Starting HTTP listener on unix socket %v", config.Config.ListenSocket)
+		unixListener, err := net.Listen("unix", config.Config.ListenSocket)
+		if err != nil {
+			log.Fatale(err)
+		}
+		defer unixListener.Close()
+		if err := nethttp.Serve(unixListener, m); err != nil {
+			log.Fatale(err)
+		}
+	} else if config.Config.UseSSL {
 		log.Info("Starting HTTPS listener")
 		tlsConfig, err := ssl.NewTLSConfig(config.Config.SSLCAFile, config.Config.UseMutualTLS)
 		if err != nil {
 			log.Fatale(err)
 		}
 		tlsConfig.InsecureSkipVerify = config.Config.SSLSkipVerify
-		if err = ssl.AppendKeyPair(tlsConfig, config.Config.SSLCertFile, config.Config.SSLPrivateKeyFile); err != nil {
+		if err = ssl.AppendKeyPairWithPassword(tlsConfig, config.Config.SSLCertFile, config.Config.SSLPrivateKeyFile, sslPEMPassword); err != nil {
 			log.Fatale(err)
 		}
 		if err = ssl.ListenAndServeTLS(config.Config.ListenAddress, m, tlsConfig); err != nil {
 			log.Fatale(err)
 		}
 	} else {
-		log.Info("Starting HTTP listener")
+		log.Infof("Starting HTTP listener on %+v", config.Config.ListenAddress)
 		if err := nethttp.ListenAndServe(config.Config.ListenAddress, m); err != nil {
 			log.Fatale(err)
 		}
@@ -168,7 +195,7 @@ func agentsHttp() {
 			log.Fatale(err)
 		}
 		tlsConfig.InsecureSkipVerify = config.Config.AgentSSLSkipVerify
-		if err = ssl.AppendKeyPair(tlsConfig, config.Config.AgentSSLCertFile, config.Config.AgentSSLPrivateKeyFile); err != nil {
+		if err = ssl.AppendKeyPairWithPassword(tlsConfig, config.Config.AgentSSLCertFile, config.Config.AgentSSLPrivateKeyFile, agentSSLPEMPassword); err != nil {
 			log.Fatale(err)
 		}
 		if err = ssl.ListenAndServeTLS(config.Config.AgentsServerPort, m, tlsConfig); err != nil {

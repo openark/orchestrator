@@ -26,8 +26,8 @@ import (
 
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/util"
+	"github.com/outbrain/orchestrator/go/agent"
 	"github.com/outbrain/orchestrator/go/config"
-	"github.com/outbrain/orchestrator/go/db"
 	"github.com/outbrain/orchestrator/go/inst"
 	"github.com/outbrain/orchestrator/go/logic"
 	"github.com/outbrain/orchestrator/go/process"
@@ -76,27 +76,30 @@ Usage for most commands:
 func getClusterName(clusterAlias string, instanceKey *inst.InstanceKey) (clusterName string) {
 	var err error
 	if clusterAlias != "" {
-		clusterName, err = inst.ReadClusterByAlias(clusterAlias)
-		if err == nil && clusterName != "" {
+		if clusterName, err = inst.ReadClusterNameByAlias(clusterAlias); err == nil && clusterName != "" {
 			return clusterName
 		}
 	}
-
-	// deduce cluster by instance
-	instanceKey = assignFuzzyInstanceKeyIfPossible(instanceKey)
+	if clusterAlias != "" {
+		// We're still here? So this wasn't an exact cluster name. Let's cehck if it's fuzzy:
+		fuzzyInstanceKey, err := inst.ParseRawInstanceKeyLoose(clusterAlias)
+		if err != nil {
+			log.Fatale(err)
+		}
+		if clusterName, err = inst.FindClusterNameByFuzzyInstanceKey(fuzzyInstanceKey); clusterName == "" {
+			log.Fatalf("Unable to determine cluster name by alias %+v", clusterAlias)
+		}
+		return clusterName
+	}
+	// So there is no alias. Let's check by instance key
+	instanceKey = inst.ReadFuzzyInstanceKeyIfPossible(instanceKey)
 	if instanceKey == nil {
 		instanceKey = assignThisInstanceKey()
 	}
 	if instanceKey == nil {
 		log.Fatalf("Unable to get cluster instances: unresolved instance")
 	}
-	instance, _, err := inst.ReadInstance(instanceKey)
-	if err != nil {
-		log.Fatale(err)
-	}
-	if instance == nil {
-		log.Fatalf("Instance not found: %+v", *instanceKey)
-	}
+	instance := validateInstanceIsFound(instanceKey)
 	clusterName = instance.ClusterName
 
 	if clusterName == "" {
@@ -110,20 +113,10 @@ func assignThisInstanceKey() *inst.InstanceKey {
 	return thisInstanceKey
 }
 
-func assignFuzzyInstanceKeyIfPossible(instanceKey *inst.InstanceKey) *inst.InstanceKey {
-	if instanceKey != nil && instanceKey.Hostname != "" {
-		// Fuzzy instance search
-		if fuzzyInstances, _ := inst.FindFuzzyInstances(instanceKey); len(fuzzyInstances) == 1 {
-			instanceKey = &fuzzyInstances[0].Key
-		}
-	}
-	return instanceKey
-}
-
 // Common code to deduce the instance's instanceKey if not defined.
 func deduceInstanceKeyIfNeeded(instance string, instanceKey *inst.InstanceKey, allowFuzzyMatch bool) *inst.InstanceKey {
 	if allowFuzzyMatch {
-		instanceKey = assignFuzzyInstanceKeyIfPossible(instanceKey)
+		instanceKey = inst.ReadFuzzyInstanceKeyIfPossible(instanceKey)
 	}
 	if instanceKey == nil {
 		instanceKey = assignThisInstanceKey()
@@ -134,11 +127,29 @@ func deduceInstanceKeyIfNeeded(instance string, instanceKey *inst.InstanceKey, a
 	return instanceKey
 }
 
+func validateInstanceIsFound(instanceKey *inst.InstanceKey) (instance *inst.Instance) {
+	instance, _, err := inst.ReadInstance(instanceKey)
+	if err != nil {
+		log.Fatale(err)
+	}
+	if instance == nil {
+		log.Fatalf("Instance not found: %+v", *instanceKey)
+	}
+	return instance
+}
+
 // CliWrapper is called from main and allows for the instance parameter
 // to take multiple instance names separated by a comma or whitespace.
 func CliWrapper(command string, strict bool, instances string, destination string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string, hostnameFlag string) {
 	r := regexp.MustCompile(`[ ,\r\n\t]+`)
 	tokens := r.Split(instances, -1)
+	switch command {
+	case "submit-pool-instances":
+		{
+			// These commands unsplit the tokens (they expect a comma delimited list of instances)
+			tokens = []string{instances}
+		}
+	}
 	for _, instance := range tokens {
 		if instance != "" || len(tokens) == 1 {
 			Cli(command, strict, instance, destination, owner, reason, duration, pattern, clusterAlias, pool, hostnameFlag)
@@ -167,7 +178,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	if err != nil {
 		destinationKey = nil
 	}
-	destinationKey = assignFuzzyInstanceKeyIfPossible(destinationKey)
+	destinationKey = inst.ReadFuzzyInstanceKeyIfPossible(destinationKey)
 
 	if hostname, err := os.Hostname(); err == nil {
 		thisInstanceKey = &inst.InstanceKey{Hostname: hostname, Port: int(config.Config.DefaultInstancePort)}
@@ -186,7 +197,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 
 	skipDatabaseCommands := false
 	switch command {
-	case "reset-internal-db-deployment":
+	case "redeploy-internal-db":
 		skipDatabaseCommands = true
 	case "help":
 		skipDatabaseCommands = true
@@ -236,8 +247,11 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
+			validateInstanceIsFound(instanceKey)
 
-			lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlaves(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
+			lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlaves(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
+			lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
+
 			postponedFunctionsContainer.InvokePostponed()
 			if promotedSlave == nil {
 				log.Fatalf("Could not regroup slaves of %+v; error: %+v", *instanceKey, err)
@@ -367,7 +381,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			instance, _, _, _, err := inst.GetCandidateSlave(instanceKey, false)
+			instance, _, _, _, _, err := inst.GetCandidateSlave(instanceKey, false)
 			if err != nil {
 				log.Fatale(err)
 			} else {
@@ -380,6 +394,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
+			validateInstanceIsFound(instanceKey)
 
 			_, promotedBinlogServer, err := inst.RegroupSlavesBinlogServers(instanceKey, false)
 			if promotedBinlogServer == nil {
@@ -427,8 +442,11 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
+			validateInstanceIsFound(instanceKey)
 
-			lostSlaves, movedSlaves, promotedSlave, err := inst.RegroupSlavesGTID(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) })
+			lostSlaves, movedSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlavesGTID(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) })
+			lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
+
 			if promotedSlave == nil {
 				log.Fatalf("Could not regroup slaves of %+v; error: %+v", *instanceKey, err)
 			}
@@ -519,8 +537,10 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
+			validateInstanceIsFound(instanceKey)
 
-			lostSlaves, equalSlaves, aheadSlaves, promotedSlave, err := inst.RegroupSlavesPseudoGTID(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
+			lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlavesPseudoGTID(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
+			lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 			postponedFunctionsContainer.InvokePostponed()
 			if promotedSlave == nil {
 				log.Fatalf("Could not regroup slaves of %+v; error: %+v", *instanceKey, err)
@@ -684,7 +704,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(statement)
 			}
 		}
-		// Pool
+		// Instance
 	case registerCliCommand("set-read-only", "Instance", `Turn an instance read-only, via SET GLOBAL read_only := 1`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
@@ -835,6 +855,19 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(fmt.Sprintf("%s\t%s\t%s\t%s:%d", clusterPoolInstance.ClusterName, clusterPoolInstance.ClusterAlias, clusterPoolInstance.Pool, clusterPoolInstance.Hostname, clusterPoolInstance.Port))
 			}
 		}
+	case registerCliCommand("which-heuristic-cluster-pool-instances", "Pools", `List instances of a given cluster which are in either any pool or in a specific pool`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+
+			instances, err := inst.GetHeuristicClusterPoolInstances(clusterName, pool)
+			if err != nil {
+				log.Fatale(err)
+			} else {
+				for _, instance := range instances {
+					fmt.Println(instance.Key.DisplayString())
+				}
+			}
+		}
 		// Information
 	case registerCliCommand("find", "Information", `Find instances whose hostname matches given regex pattern`):
 		{
@@ -872,15 +905,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("topology", "Information", `Show an ascii-graph of a replication topology, given a member of that topology`):
 		{
-			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			instance, _, err := inst.ReadInstance(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if instance == nil {
-				log.Fatalf("Instance not found: %+v", *instanceKey)
-			}
-			output, err := inst.ASCIITopology(instanceKey, pattern)
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			output, err := inst.ASCIITopology(clusterName, pattern)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -903,19 +929,31 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatalf("Unable to get master: unresolved instance")
 			}
-			instance, _, err := inst.ReadInstance(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if instance == nil {
-				log.Fatalf("Instance not found: %+v", *instanceKey)
-			}
+			instance := validateInstanceIsFound(instanceKey)
 			fmt.Println(instance.Key.DisplayString())
 		}
 	case registerCliCommand("which-cluster", "Information", `Output the name of the cluster an instance belongs to, or error if unknown to orchestrator`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
 			fmt.Println(clusterName)
+		}
+	case registerCliCommand("which-cluster-domain", "Information", `Output the domain name of the cluster an instance belongs to, or error if unknown to orchestrator`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			clusterInfo, err := inst.ReadClusterInfo(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(clusterInfo.ClusterDomain)
+		}
+	case registerCliCommand("which-heuristic-domain-instance", "Information", `Returns the instance associated as the cluster's writer with a cluster's domain name.`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			instanceKey, err := inst.GetHeuristicClusterDomainInstanceAttribute(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
 		}
 	case registerCliCommand("which-cluster-master", "Information", `Output the name of the master in a given cluster`):
 		{
@@ -940,10 +978,21 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(clusterInstance.Key.DisplayString())
 			}
 		}
-	case registerCliCommand("which-cluster-osc-slaves", "Information", `Output a list of slaves in same cluster as given instance, that could serve as a pt-online-schema-change operation control slaves`):
+	case registerCliCommand("which-cluster-osc-slaves", "Information", `Output a list of slaves in a cluster, that could serve as a pt-online-schema-change operation control slaves`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
 			instances, err := inst.GetClusterOSCSlaves(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, clusterInstance := range instances {
+				fmt.Println(clusterInstance.Key.DisplayString())
+			}
+		}
+	case registerCliCommand("which-cluster-gh-ost-slaves", "Information", `Output a list of slaves in a cluster, that could serve as a gh-ost working server`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			instances, err := inst.GetClusterGhostSlaves(clusterName)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -957,13 +1006,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatalf("Unable to get master: unresolved instance")
 			}
-			instance, _, err := inst.ReadInstance(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if instance == nil {
-				log.Fatalf("Instance not found: %+v", *instanceKey)
-			}
+			instance := validateInstanceIsFound(instanceKey)
 			if instance.MasterKey.IsValid() {
 				fmt.Println(instance.MasterKey.DisplayString())
 			}
@@ -982,19 +1025,23 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(slave.Key.DisplayString())
 			}
 		}
+	case registerCliCommand("which-lost-in-recovery", "Information", `List instances marked as downtimed for being lost in a recovery process`):
+		{
+			instances, err := inst.ReadLostInRecoveryInstances("")
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, instance := range instances {
+				fmt.Println(instance.Key.DisplayString())
+			}
+		}
 	case registerCliCommand("instance-status", "Information", `Output short status on a given instance`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
 			if instanceKey == nil {
 				log.Fatalf("Unable to get status: unresolved instance")
 			}
-			instance, _, err := inst.ReadInstance(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if instance == nil {
-				log.Fatalf("Instance not found: %+v", *instanceKey)
-			}
+			instance := validateInstanceIsFound(instanceKey)
 			fmt.Println(instance.HumanReadableDescription())
 		}
 	case registerCliCommand("get-cluster-heuristic-lag", "Information", `For a given cluster (indicated by an instance or alias), output a heuristic "representative" lag of that cluster`):
@@ -1044,7 +1091,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 					log.Fatalf("Duration value must be non-negative. Given value: %d", durationSeconds)
 				}
 			}
-			maintenanceKey, err := inst.BeginBoundedMaintenance(instanceKey, inst.GetMaintenanceOwner(), reason, uint(durationSeconds))
+			maintenanceKey, err := inst.BeginBoundedMaintenance(instanceKey, inst.GetMaintenanceOwner(), reason, uint(durationSeconds), true)
 			if err == nil {
 				log.Infof("Maintenance key: %+v", maintenanceKey)
 				log.Infof("Maintenance duration: %d seconds", durationSeconds)
@@ -1115,6 +1162,30 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(promotedInstanceKey.DisplayString())
 			}
 		}
+	case registerCliCommand("force-master-takeover", "Recovery", `Forcibly discard master and promote another (direct child) instance instead, even if everything is running well`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce destination, the instance to promote in place of the master. Please provide with -d")
+			}
+			destination := validateInstanceIsFound(destinationKey)
+			topologyRecovery, err := logic.ForceMasterTakeover(clusterName, destination)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(topologyRecovery.SuccessorKey.DisplayString())
+		}
+	case registerCliCommand("graceful-master-takeover", "Recovery", `Gracefully discard master and promote another (direct child) instance instead, even if everything is running well`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			topologyRecovery, promotedMasterCoordinates, err := logic.GracefulMasterTakeover(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(topologyRecovery.SuccessorKey.DisplayString())
+			fmt.Println(*promotedMasterCoordinates)
+			log.Debugf("Promoted %+v as new master. Binlog coordinates at time of promotion: %+v", topologyRecovery.SuccessorKey, *promotedMasterCoordinates)
+		}
 	case registerCliCommand("replication-analysis", "Recovery", `Request an analysis of potential crash incidents in all known topologies`):
 		{
 			analysis, err := inst.GetReplicationAnalysis("", false, false)
@@ -1122,7 +1193,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			for _, entry := range analysis {
-				fmt.Println(fmt.Sprintf("%s (cluster %s): %s", entry.AnalyzedInstanceKey.DisplayString(), entry.ClusterDetails.ClusterName, entry.Analysis))
+				fmt.Println(fmt.Sprintf("%s (cluster %s): %s", entry.AnalyzedInstanceKey.DisplayString(), entry.ClusterDetails.ClusterName, entry.AnalysisString()))
 			}
 		}
 	case registerCliCommand("ack-cluster-recoveries", "Recovery", `Acknowledge recoveries for a given cluster; this unblocks pending future recoveries`):
@@ -1154,7 +1225,11 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("register-candidate", "Instance, meta", `Indicate that a specific instance is a preferred candidate for master promotion`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			err := inst.RegisterCandidateInstance(instanceKey)
+			promotionRule, err := inst.ParseCandidatePromotionRule(*config.RuntimeCLIFlags.PromotionRule)
+			if err != nil {
+				log.Fatale(err)
+			}
+			err = inst.RegisterCandidateInstance(instanceKey, promotionRule)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1178,6 +1253,16 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
+	case registerCliCommand("set-heuristic-domain-instance", "Instance, meta", `Associate domain name of given cluster with what seems to be the writer master for that cluster`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			instanceKey, err := inst.HeuristicallyApplyClusterDomainInstanceAttribute(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
+
 		// meta
 	case registerCliCommand("snapshot-topologies", "Meta", `Take a snapshot of existing topologies.`):
 		{
@@ -1240,13 +1325,22 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			jsonString := config.Config.ToJSONString()
 			fmt.Println(jsonString)
 		}
-	case registerCliCommand("reset-internal-db-deployment", "Meta, internal", `Clear internal db deployment history, use if somehow corrupted internal deployment history`):
+	case registerCliCommand("redeploy-internal-db", "Meta, internal", `Force internal schema migration to current backend structure`):
 		{
-			config.Config.SkipOrchestratorDatabaseUpdate = true
-			db.ResetInternalDeployment()
-			fmt.Println("Internal db deployment history reset. Next orchestrator execution will rebuild internal db structure (no data will be lost)")
+			config.RuntimeCLIFlags.ConfiguredVersion = ""
+			inst.ReadClusters()
+			fmt.Println("Redeployed internal db")
 		}
-		// Help
+	case registerCliCommand("custom-command", "Agent", "Execute a custom command on the agent as defined in the agent conf"):
+		{
+			output, err := agent.CustomCommand(hostnameFlag, pattern)
+			if err != nil {
+				log.Fatale(err)
+			}
+
+			fmt.Printf("%v\n", output)
+		}
+	// Help
 	case "help":
 		{
 			fmt.Fprintf(os.Stderr, availableCommandsUsage())

@@ -7,7 +7,7 @@ BOX = ENV['VAGRANT_BOX'].nil? || ENV['VAGRANT_BOX'].empty? ? 'nrel/CentOS-6.6-x8
 VAGRANTFILE_API_VERSION = "2"
 
 system("
-    if [ #{ARGV[0]} = 'up' ]; then
+    if [[ #{ARGV[0]} = 'up' ]] && [[ ! -e 'vagrant/vagrant-ssh-key' ]]; then
       ssh-keygen -t rsa -b 768 -N '' -q -f vagrant/vagrant-ssh-key
     fi
 ")
@@ -21,7 +21,9 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     vb.customize ['modifyvm', :id, '--nictype2', 'virtio']
   end
 
-  config.vm.synced_folder '.', '/orchestrator', type: 'rsync'
+  config.vm.synced_folder '.', '/orchestrator', type: 'rsync',
+    rsync__auto: true,
+    rsync__exclude: ".git/"
 
   (0..4).each do |n|
     name = (n > 0 ? ("db" + n.to_s) : "admin")
@@ -29,6 +31,9 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
       db.vm.hostname = name
       db.vm.network "private_network", ip: "192.168.57.20" + n.to_s
       db.vm.provision "shell", path: "vagrant/base-build.sh"
+      if name == "admin"
+        db.vm.network "forwarded_port", guest:3000, host:3000
+      end
     end
   end
 end

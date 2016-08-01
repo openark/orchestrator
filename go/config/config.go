@@ -34,9 +34,10 @@ var (
 // Some of the parameteres have reasonable default values, and some (like database credentials) are
 // strictly expected from user.
 type Configuration struct {
-	Debug                                        bool // set debug mode (similar to --debug option)
-	EnableSyslog                                 bool // Should logs be directed (in addition) to syslog daemon?
-	ListenAddress                                string
+	Debug                                        bool   // set debug mode (similar to --debug option)
+	EnableSyslog                                 bool   // Should logs be directed (in addition) to syslog daemon?
+	ListenAddress                                string // Where orchestrator HTTP should listen for TCP
+	ListenSocket                                 string // Where orchestrator HTTP should listen for unix socket (default: empty; when given, TCP is disabled)
 	AgentsServerPort                             string // port orchestrator agents talk back to
 	MySQLTopologyUser                            string
 	MySQLTopologyPassword                        string // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
@@ -61,8 +62,6 @@ type Configuration struct {
 	MySQLOrchestratorUseMutualTLS                bool     // Turn on TLS authentication with the Orchestrator MySQL instance
 	MySQLConnectTimeoutSeconds                   int      // Number of seconds before connection is aborted (driver-side)
 	DefaultInstancePort                          int      // In case port was not specified on command line
-	SkipOrchestratorDatabaseUpdate               bool     // When false, orchestrator will attempt to create & update all tables in backend database; when true, this is skipped. It makes sense to skip on command-line invocations and to enable for http or occasional invocations, or just after upgrades
-	SmartOrchestratorDatabaseUpdate              bool     // When true, orchestrator deploys internal schema based on deployment history, and only applies changes known to be uncommitted
 	SlaveLagQuery                                string   // custom query to check on slave lg (e.g. heartbeat table)
 	SlaveStartPostWaitMilliseconds               int      // Time to wait after START SLAVE before re-readong instance (give slave chance to connect to master)
 	DiscoverByShowSlaveHosts                     bool     // Attempt SHOW SLAVE HOSTS before PROCESSLIST
@@ -71,9 +70,9 @@ type Configuration struct {
 	BinlogFileHistoryDays                        int      // When > 0, amount of days for which orchestrator records per-instance binlog files & sizes
 	UnseenInstanceForgetHours                    uint     // Number of hours after which an unseen instance is forgotten
 	SnapshotTopologiesIntervalHours              uint     // Interval in hour between snapshot-topologies invocation. Default: 0 (disabled)
-	DiscoveryPollSeconds                         uint     // Auto/continuous discovery of instances sleep time between polls
 	InstanceBulkOperationsWaitTimeoutSeconds     uint     // Time to wait on a single instance when doing bulk (many instances) operation
 	ActiveNodeExpireSeconds                      uint     // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
+	NodeHealthExpiry                             bool     // Do we expire the node_health table? Usually this is true but it might be disabled on command line tools if an orchestrator daemon is running.
 	HostnameResolveMethod                        string   // Method by which to "normalize" hostname ("none"/"default"/"cname")
 	MySQLHostnameResolveMethod                   string   // Method by which to "normalize" hostname via MySQL server. ("none"/"@@hostname"/"@@report_host"; default "@@hostname")
 	SkipBinlogServerUnresolveCheck               bool     // Skip the double-check that an unresolved hostname resolves back to same hostname for binlog servers
@@ -106,10 +105,17 @@ type Configuration struct {
 	ClusterNameToAlias                           map[string]string // map between regex matching cluster name to a human friendly alias
 	DetectClusterAliasQuery                      string            // Optional query (executed on topology instance) that returns the alias of a cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all slaves). If provided, must return one row, one column
 	DetectClusterDomainQuery                     string            // Optional query (executed on topology instance) that returns the VIP/CNAME/Alias/whatever domain name for the master of this cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all slaves). If provided, must return one row, one column
+	DetectInstanceAliasQuery                     string            // Optional query (executed on topology instance) that returns the alias of an instance. If provided, must return one row, one column
+	DetectPromotionRuleQuery                     string            // Optional query (executed on topology instance) that returns the promotion rule of an instance. If provided, must return one row, one column.
 	DataCenterPattern                            string            // Regexp pattern with one group, extracting the datacenter name from the hostname
 	PhysicalEnvironmentPattern                   string            // Regexp pattern with one group, extracting physical environment info from hostname (e.g. combination of datacenter & prod/dev env)
+	DetectDataCenterQuery                        string            // Optional query (executed on topology instance) that returns the data center of an instance. If provided, must return one row, one column. Overrides DataCenterPattern and useful for installments where DC cannot be inferred by hostname
+	DetectPhysicalEnvironmentQuery               string            // Optional query (executed on topology instance) that returns the physical environment of an instance. If provided, must return one row, one column. Overrides PhysicalEnvironmentPattern and useful for installments where env cannot be inferred by hostname
+	DetectSemiSyncEnforcedQuery                  string            // Optional query (executed on topology instance) to determine whether semi-sync is fully enforced for master writes (async fallback is not allowed under any circumstance). If provided, must return one row, one column, value 0 or 1.
+	SupportFuzzyPoolHostnames                    bool              // Should "submit-pool-instances" command be able to pass list of fuzzy instances (fuzzy means non-fqdn, but unique enough to recognize). Defaults 'true', implies more queries on backend db
+	InstancePoolExpiryMinutes                    uint              // Time after which entries in database_instance_pool are expired (resubmit via `submit-pool-instances`)
 	PromotionIgnoreHostnameFilters               []string          // Orchestrator will not promote slaves with hostname matching pattern (via -c recovery; for example, avoid promoting dev-dedicated machines)
-	ServeAgentsHttp                              bool              // Spawn another HTTP interface dedicated for orcehstrator-agent
+	ServeAgentsHttp                              bool              // Spawn another HTTP interface dedicated for orchestrator-agent
 	AgentsUseSSL                                 bool              // When "true" orchestrator will listen on agents port with SSL as well as connect to agents via SSL
 	AgentsUseMutualTLS                           bool              // When "true" Use mutual TLS for the server to agent communication
 	AgentSSLSkipVerify                           bool              // When using SSL for the Agent, should we ignore SSL certification error
@@ -134,6 +140,7 @@ type Configuration struct {
 	StaleSeedFailMinutes                         uint              // Number of minutes after which a stale (no progress) seed is considered failed.
 	SeedAcceptableBytesDiff                      int64             // Difference in bytes between seed source & target data size that is still considered as successful copy
 	PseudoGTIDPattern                            string            // Pattern to look for in binary logs that makes for a unique entry (pseudo GTID). When empty, Pseudo-GTID based refactoring is disabled.
+	PseudoGTIDPatternIsFixedSubstring            bool              // If true, then PseudoGTIDPattern is not treated as regular expression but as fixed substring, and can boost search time
 	PseudoGTIDMonotonicHint                      string            // subtring in Pseudo-GTID entry which indicates Pseudo-GTID entries are expected to be monotonically increasing
 	DetectPseudoGTIDQuery                        string            // Optional query which is used to authoritatively decide whether pseudo gtid is enabled on instance
 	PseudoGTIDCoordinatesHistoryHeuristicMinutes int               // Significantly reducing Pseudo-GTID lookup time, this indicates the most recent N minutes binlog position where search for Pseudo-GTID will heuristically begin (there is a fallback on fullscan if unsuccessful)
@@ -148,21 +155,23 @@ type Configuration struct {
 	RecoveryIgnoreHostnameFilters                []string          // Recovery analysis will completely ignore hosts matching given patterns
 	RecoverMasterClusterFilters                  []string          // Only do master recovery on clusters matching these regexp patterns (of course the ".*" pattern matches everything)
 	RecoverIntermediateMasterClusterFilters      []string          // Only do IM recovery on clusters matching these regexp patterns (of course the ".*" pattern matches everything)
-	OnFailureDetectionProcesses                  []string          // Processes to execute when detecting a failover scenario (before making a decision whether to failover or not). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}, {slaveHosts}, {isDowntimed}, {autoMasterRecovery}, {autoIntermediateMasterRecovery}
-	PreFailoverProcesses                         []string          // Processes to execute before doing a failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}, {slaveHosts}, {isDowntimed}
-	PostFailoverProcesses                        []string          // Processes to execute after doing a failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}, {slaveHosts}, {isDowntimed}, {isSuccessful}, {lostSlaves}
-	PostUnsuccessfulFailoverProcesses            []string          // Processes to execute after a not-completely-successful failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failedPort}, {successorHost}, {successorPort}, {countSlaves}, {slaveHosts}, {isDowntimed}, {isSuccessful}, {lostSlaves}
+	OnFailureDetectionProcesses                  []string          // Processes to execute when detecting a failover scenario (before making a decision whether to failover or not). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {successorAlias}, {countSlaves}, {slaveHosts}, {isDowntimed}, {autoMasterRecovery}, {autoIntermediateMasterRecovery}
+	PreFailoverProcesses                         []string          // Processes to execute before doing a failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {successorAlias}, {countSlaves}, {slaveHosts}, {isDowntimed}
+	PostFailoverProcesses                        []string          // Processes to execute after doing a failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {successorAlias}, {countSlaves}, {slaveHosts}, {isDowntimed}, {isSuccessful}, {lostSlaves}
+	PostUnsuccessfulFailoverProcesses            []string          // Processes to execute after a not-completely-successful failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {successorAlias}, {countSlaves}, {slaveHosts}, {isDowntimed}, {isSuccessful}, {lostSlaves}
 	PostMasterFailoverProcesses                  []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
 	PostIntermediateMasterFailoverProcesses      []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
 	CoMasterRecoveryMustPromoteOtherCoMaster     bool              // When 'false', anything can get promoted (and candidates are prefered over others). When 'true', orchestrator will promote the other co-master or else fail
 	DetachLostSlavesAfterMasterFailover          bool              // Should slaves that are not to be lost in master recovery (i.e. were more up-to-date than promoted slave) be forcibly detached
 	ApplyMySQLPromotionAfterMasterFailover       bool              // Should orchestrator take upon itself to apply MySQL master promotion: set read_only=0, detach replication, etc.
 	MasterFailoverLostInstancesDowntimeMinutes   uint              // Number of minutes to downtime any server that was lost after a master failover (including failed master & lost slaves). 0 to disable
+	MasterFailoverDetachSlaveMasterHost          bool              // Should orchestrator issue a detach-slave-master-host on newly promoted master (this makes sure the new master will not attempt to replicate old master if that comes back to life). Defaults 'false'. Meaningless if ApplyMySQLPromotionAfterMasterFailover is 'true'.
 	PostponeSlaveRecoveryOnLagMinutes            uint              // On crash recovery, slaves that are lagging more than given minutes are only resurrected late in the recovery process, after master/IM has been elected and processes executed. Value of 0 disables this feature
 	OSCIgnoreHostnameFilters                     []string          // OSC slaves recommendation will ignore slave hostnames matching given patterns
 	GraphiteAddr                                 string            // Optional; address of graphite port. If supplied, metrics will be written here
 	GraphitePath                                 string            // Prefix for graphite path. May include {hostname} magic placeholder
 	GraphiteConvertHostnameDotsToUnderscores     bool              // If true, then hostname's dots are converted to underscores before being used in graphite path
+	GraphitePollSeconds                          int               // Graphite writes interval. 0 disables.
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -171,14 +180,24 @@ func (this *Configuration) ToJSONString() string {
 	return string(b)
 }
 
-var Config *Configuration = NewConfiguration()
+func (this *Configuration) GetDiscoveryPollSeconds() uint {
+	// Turning `DiscoveryPollSeconds` into hard coded value. I see no reason anymore why this would be configurable.
+	// After a couple years working with this I just set it to 1 whereever.
+	// Not making this value configurable solves other problems like inter-dependency between this value
+	// and others, like `InstancePollSeconds`, like cache timeouts etc.
+	return 1
+}
+
+// Config is *the* configuration instance, used globally to get configuration data
+var Config = newConfiguration()
 var readFileNames []string
 
-func NewConfiguration() *Configuration {
+func newConfiguration() *Configuration {
 	return &Configuration{
 		Debug:                                        false,
 		EnableSyslog:                                 false,
 		ListenAddress:                                ":3000",
+		ListenSocket:                                 "",
 		AgentsServerPort:                             ":3001",
 		StatusEndpoint:                               "/api/status",
 		StatusSimpleHealth:                           true,
@@ -188,21 +207,19 @@ func NewConfiguration() *Configuration {
 		MySQLTopologyUseMutualTLS:                    false,
 		DatabaselessMode__experimental:               false,
 		MySQLOrchestratorUseMutualTLS:                false,
-		MySQLConnectTimeoutSeconds:                   5,
+		MySQLConnectTimeoutSeconds:                   2,
 		DefaultInstancePort:                          3306,
-		SkipOrchestratorDatabaseUpdate:               false,
-		SmartOrchestratorDatabaseUpdate:              false,
-		InstancePollSeconds:                          60,
+		InstancePollSeconds:                          5,
 		ReadLongRunningQueries:                       true,
 		BinlogFileHistoryDays:                        0,
 		UnseenInstanceForgetHours:                    240,
 		SnapshotTopologiesIntervalHours:              0,
 		SlaveStartPostWaitMilliseconds:               1000,
 		DiscoverByShowSlaveHosts:                     false,
-		DiscoveryPollSeconds:                         5,
 		InstanceBulkOperationsWaitTimeoutSeconds:     10,
-		ActiveNodeExpireSeconds:                      60,
-		HostnameResolveMethod:                        "cname",
+		ActiveNodeExpireSeconds:                      5,
+		NodeHealthExpiry:                             true,
+		HostnameResolveMethod:                        "default",
 		MySQLHostnameResolveMethod:                   "@@hostname",
 		SkipBinlogServerUnresolveCheck:               true,
 		ExpiryHostnameResolvesMinutes:                60,
@@ -231,8 +248,15 @@ func NewConfiguration() *Configuration {
 		ClusterNameToAlias:                           make(map[string]string),
 		DetectClusterAliasQuery:                      "",
 		DetectClusterDomainQuery:                     "",
+		DetectInstanceAliasQuery:                     "",
+		DetectPromotionRuleQuery:                     "",
 		DataCenterPattern:                            "",
 		PhysicalEnvironmentPattern:                   "",
+		DetectDataCenterQuery:                        "",
+		DetectPhysicalEnvironmentQuery:               "",
+		DetectSemiSyncEnforcedQuery:                  "",
+		SupportFuzzyPoolHostnames:                    true,
+		InstancePoolExpiryMinutes:                    60,
 		PromotionIgnoreHostnameFilters:               []string{},
 		ServeAgentsHttp:                              false,
 		AgentsUseSSL:                                 false,
@@ -256,6 +280,7 @@ func NewConfiguration() *Configuration {
 		StaleSeedFailMinutes:                         60,
 		SeedAcceptableBytesDiff:                      8192,
 		PseudoGTIDPattern:                            "",
+		PseudoGTIDPatternIsFixedSubstring:            false,
 		PseudoGTIDMonotonicHint:                      "",
 		DetectPseudoGTIDQuery:                        "",
 		PseudoGTIDCoordinatesHistoryHeuristicMinutes: 2,
@@ -266,7 +291,7 @@ func NewConfiguration() *Configuration {
 		FailureDetectionPeriodBlockMinutes:           60,
 		RecoveryPollSeconds:                          10,
 		RecoveryPeriodBlockMinutes:                   60,
-		RecoveryPeriodBlockSeconds:                   0,
+		RecoveryPeriodBlockSeconds:                   3600,
 		RecoveryIgnoreHostnameFilters:                []string{},
 		RecoverMasterClusterFilters:                  []string{},
 		RecoverIntermediateMasterClusterFilters:      []string{},
@@ -280,11 +305,13 @@ func NewConfiguration() *Configuration {
 		DetachLostSlavesAfterMasterFailover:          true,
 		ApplyMySQLPromotionAfterMasterFailover:       false,
 		MasterFailoverLostInstancesDowntimeMinutes:   0,
+		MasterFailoverDetachSlaveMasterHost:          false,
 		PostponeSlaveRecoveryOnLagMinutes:            0,
 		OSCIgnoreHostnameFilters:                     []string{},
 		GraphiteAddr:                                 "",
 		GraphitePath:                                 "",
 		GraphiteConvertHostnameDotsToUnderscores:     true,
+		GraphitePollSeconds:                          60,
 	}
 }
 
@@ -348,15 +375,15 @@ func postReadAdjustments() {
 
 // read reads configuration from given file, or silently skips if the file does not exist.
 // If the file does exist, then it is expected to be in valid JSON format or the function bails out.
-func read(file_name string) (*Configuration, error) {
-	file, err := os.Open(file_name)
+func read(fileName string) (*Configuration, error) {
+	file, err := os.Open(fileName)
 	if err == nil {
 		decoder := json.NewDecoder(file)
 		err := decoder.Decode(Config)
 		if err == nil {
-			log.Infof("Read config: %s", file_name)
+			log.Infof("Read config: %s", fileName)
 		} else {
-			log.Fatal("Cannot read config file:", file_name, err)
+			log.Fatal("Cannot read config file:", fileName, err)
 		}
 		postReadAdjustments()
 	}
@@ -365,27 +392,28 @@ func read(file_name string) (*Configuration, error) {
 
 // Read reads configuration from zero, either, some or all given files, in order of input.
 // A file can override configuration provided in previous file.
-func Read(file_names ...string) *Configuration {
-	for _, file_name := range file_names {
-		read(file_name)
+func Read(fileNames ...string) *Configuration {
+	for _, fileName := range fileNames {
+		read(fileName)
 	}
-	readFileNames = file_names
+	readFileNames = fileNames
 	return Config
 }
 
 // ForceRead reads configuration from given file name or bails out if it fails
-func ForceRead(file_name string) *Configuration {
-	_, err := read(file_name)
+func ForceRead(fileName string) *Configuration {
+	_, err := read(fileName)
 	if err != nil {
-		log.Fatal("Cannot read config file:", file_name, err)
+		log.Fatal("Cannot read config file:", fileName, err)
 	}
-	readFileNames = []string{file_name}
+	readFileNames = []string{fileName}
 	return Config
 }
 
+// Reload re-reads configuration from last used files
 func Reload() *Configuration {
-	for _, file_name := range readFileNames {
-		read(file_name)
+	for _, fileName := range readFileNames {
+		read(fileName)
 	}
 	return Config
 }

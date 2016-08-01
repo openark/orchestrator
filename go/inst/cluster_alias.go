@@ -16,43 +16,11 @@
 
 package inst
 
-import (
-	"fmt"
-	"github.com/outbrain/orchestrator/go/config"
-	"regexp"
-	"sync"
-)
-
-// clusterAlias maps a cluster name to an alias
-var clusterAliasMap = make(map[string]string)
-var clusterAliasMapMutex = &sync.Mutex{}
-
-func ApplyClusterAlias(clusterInfo *ClusterInfo) {
-	// First try out the hard-wired config:
-	for pattern := range config.Config.ClusterNameToAlias {
-		if matched, _ := regexp.MatchString(pattern, clusterInfo.ClusterName); matched {
-			clusterInfo.ClusterAlias = config.Config.ClusterNameToAlias[pattern]
-		}
-	}
-	// Now override by whatever data we have in our database
-	clusterAliasMapMutex.Lock()
-	defer clusterAliasMapMutex.Unlock()
-	if alias, ok := clusterAliasMap[clusterInfo.ClusterName]; ok {
-		clusterInfo.ClusterAlias = alias
-	}
-}
+import ()
 
 // SetClusterAlias will write (and override) a single cluster name mapping
 func SetClusterAlias(clusterName string, alias string) error {
-	err := WriteClusterAlias(clusterName, alias)
-	if err != nil {
-		return err
-	}
-	clusterAliasMapMutex.Lock()
-	defer clusterAliasMapMutex.Unlock()
-	clusterAliasMap[clusterName] = alias
-
-	return nil
+	return WriteClusterAlias(clusterName, alias)
 }
 
 // GetClusterByAlias returns the cluster name associated with given alias.
@@ -60,21 +28,5 @@ func SetClusterAlias(clusterName string, alias string) error {
 // - No cluster is associated with the alias
 // - More than one cluster is associated with the alias
 func GetClusterByAlias(alias string) (string, error) {
-	clusterName := ""
-	clusterAliasMapMutex.Lock()
-	defer clusterAliasMapMutex.Unlock()
-
-	for mappedName, mappedAlias := range clusterAliasMap {
-		if mappedAlias == alias {
-			if clusterName == "" {
-				clusterName = mappedName
-			} else {
-				return clusterName, fmt.Errorf("GetClusterByAlias: multiple clusters for alias %s", alias)
-			}
-		}
-	}
-	if clusterName == "" {
-		return "", fmt.Errorf("GetClusterByAlias: no cluster found for alias %s", alias)
-	}
-	return clusterName, nil
+	return ReadClusterNameByAlias(alias)
 }

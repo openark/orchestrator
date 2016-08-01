@@ -19,11 +19,11 @@ package logic
 import (
 	"os"
 	"os/signal"
+	"sync/atomic"
 	"syscall"
 	"time"
 
 	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/math"
 	"github.com/outbrain/orchestrator/go/agent"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/inst"
@@ -47,13 +47,11 @@ var discoveryQueueLengthGauge = metrics.NewGauge()
 var discoveryRecentCountGauge = metrics.NewGauge()
 var isElectedGauge = metrics.NewGauge()
 
-var isElectedNode = false
+var isElectedNode int64 = 0
 
-var recentDiscoveryOperationKeys = cache.New(time.Duration(config.Config.DiscoveryPollSeconds/2)*time.Second, time.Second)
+var recentDiscoveryOperationKeys *cache.Cache
 
 func init() {
-	isElectedNode = false
-
 	metrics.Register("discoveries.attempt", discoveriesCounter)
 	metrics.Register("discoveries.fail", failedDiscoveriesCounter)
 	metrics.Register("discoveries.queue_length", discoveryQueueLengthGauge)
@@ -61,8 +59,13 @@ func init() {
 	metrics.Register("elect.is_elected", isElectedGauge)
 
 	ometrics.OnGraphiteTick(func() { discoveryQueueLengthGauge.Update(int64(len(discoveryInstanceKeys))) })
-	ometrics.OnGraphiteTick(func() { discoveryRecentCountGauge.Update(int64(recentDiscoveryOperationKeys.ItemCount())) })
-	ometrics.OnGraphiteTick(func() { isElectedGauge.Update(int64(math.TernaryInt(isElectedNode, 1, 0))) })
+	ometrics.OnGraphiteTick(func() {
+		if recentDiscoveryOperationKeys == nil {
+			return
+		}
+		discoveryRecentCountGauge.Update(int64(recentDiscoveryOperationKeys.ItemCount()))
+	})
+	ometrics.OnGraphiteTick(func() { isElectedGauge.Update(int64(atomic.LoadInt64(&isElectedNode))) })
 }
 
 // acceptSignals registers for OS signals
@@ -89,7 +92,7 @@ func handleDiscoveryRequests() {
 		// Possibly this used to be the elected node, but has been demoted, while still
 		// the queue is full.
 		// Just don't process the queue when not elected.
-		if isElectedNode {
+		if atomic.LoadInt64(&isElectedNode) == 1 {
 			go discoverInstance(instanceKey)
 		} else {
 			log.Debugf("Node apparently demoted. Skipping discovery of %+v. Remaining queue size: %+v", instanceKey, len(discoveryInstanceKeys))
@@ -129,7 +132,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 
 	log.Debugf("Discovered host: %+v, master: %+v, version: %+v", instance.Key, instance.MasterKey, instance.Version)
 
-	if !isElectedNode {
+	if atomic.LoadInt64(&isElectedNode) == 0 {
 		// Maybe this node was elected before, but isn't elected anymore.
 		// If not elected, stop drilling up/down the topology
 		return
@@ -138,10 +141,14 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	// Investigate slaves:
 	for _, slaveKey := range instance.SlaveHosts.GetInstanceKeys() {
 		slaveKey := slaveKey
-		discoveryInstanceKeys <- slaveKey
+		if slaveKey.IsValid() {
+			discoveryInstanceKeys <- slaveKey
+		}
 	}
 	// Investigate master:
-	discoveryInstanceKeys <- instance.MasterKey
+	if instance.MasterKey.IsValid() {
+		discoveryInstanceKeys <- instance.MasterKey
+	}
 }
 
 // ContinuousDiscovery starts an asynchronuous infinite discovery process where instances are
@@ -153,10 +160,13 @@ func ContinuousDiscovery() {
 	}
 
 	log.Infof("Starting continuous discovery")
+	recentDiscoveryOperationKeys = cache.New(time.Duration(config.Config.InstancePollSeconds)*time.Second, time.Second)
+
 	inst.LoadHostnameResolveCache()
 	go handleDiscoveryRequests()
 
-	discoveryTick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
+	discoveryTick := time.Tick(time.Duration(config.Config.GetDiscoveryPollSeconds()) * time.Second)
+	instancePollTick := time.Tick(time.Duration(config.Config.InstancePollSeconds) * time.Second)
 	caretakingTick := time.Tick(time.Minute)
 	recoveryTick := time.Tick(time.Duration(config.Config.RecoveryPollSeconds) * time.Second)
 	var snapshotTopologiesTick <-chan time.Time
@@ -174,15 +184,34 @@ func ContinuousDiscovery() {
 		select {
 		case <-discoveryTick:
 			go func() {
-				wasAlreadyElected := isElectedNode
-				if isElectedNode, _ = process.AttemptElection(); isElectedNode {
-					instanceKeys, _ := inst.ReadOutdatedInstanceKeys()
+				wasAlreadyElected := atomic.LoadInt64(&isElectedNode)
+				myIsElectedNode, err := process.AttemptElection()
+				if err != nil {
+					log.Errore(err)
+				}
+				if myIsElectedNode {
+					atomic.StoreInt64(&isElectedNode, 1)
+				} else {
+					atomic.StoreInt64(&isElectedNode, 0)
+				}
+
+				if myIsElectedNode {
+					instanceKeys, err := inst.ReadOutdatedInstanceKeys()
+					if err != nil {
+						log.Errore(err)
+					}
+
 					log.Debugf("outdated keys: %+v", instanceKeys)
 					for _, instanceKey := range instanceKeys {
 						instanceKey := instanceKey
-						go func() { discoveryInstanceKeys <- instanceKey }()
+
+						go func() {
+							if instanceKey.IsValid() {
+								discoveryInstanceKeys <- instanceKey
+							}
+						}()
 					}
-					if !wasAlreadyElected {
+					if wasAlreadyElected == 0 {
 						// Just turned to be leader!
 						go process.RegisterNode("", "", false)
 					}
@@ -190,11 +219,20 @@ func ContinuousDiscovery() {
 					log.Debugf("Not elected as active node; polling")
 				}
 			}()
+		case <-instancePollTick:
+			go func() {
+				// This tick does NOT do instance poll (these are handled by the oversmapling discoveryTick)
+				// But rather should invoke such routinely operations that need to be as (or roughly as) frequent
+				// as instance poll
+				if atomic.LoadInt64(&isElectedNode) == 1 {
+					go inst.UpdateInstanceRecentRelaylogHistory()
+					go inst.RecordInstanceCoordinatesHistory()
+				}
+			}()
 		case <-caretakingTick:
 			// Various periodic internal maintenance tasks
 			go func() {
-				if isElectedNode {
-					go inst.RecordInstanceCoordinatesHistory()
+				if atomic.LoadInt64(&isElectedNode) == 1 {
 					go inst.RecordInstanceBinlogFileHistory()
 					go inst.ForgetLongUnseenInstances()
 					go inst.ForgetUnseenInstancesDifferentlyResolved()
@@ -211,19 +249,18 @@ func ContinuousDiscovery() {
 					go inst.ExpireClusterDomainName()
 					go inst.ExpireAudit()
 					go inst.ExpireMasterPositionEquivalence()
+					go inst.ExpirePoolInstances()
 					go inst.FlushNontrivialResolveCacheToDatabase()
 					go process.ExpireNodesHistory()
 					go process.ExpireAccessTokens()
-				}
-				if !isElectedNode {
+				} else {
 					// Take this opportunity to refresh yourself
 					go inst.LoadHostnameResolveCache()
 				}
-				go inst.ReadClusterAliases()
 			}()
 		case <-recoveryTick:
 			go func() {
-				if isElectedNode {
+				if atomic.LoadInt64(&isElectedNode) == 1 {
 					go ClearActiveFailureDetections()
 					go ClearActiveRecoveries()
 					go ExpireBlockedRecoveries()
@@ -264,7 +301,7 @@ func ContinuousAgentsPoll() {
 
 	go discoverSeededAgents()
 
-	tick := time.Tick(time.Duration(config.Config.DiscoveryPollSeconds) * time.Second)
+	tick := time.Tick(time.Duration(config.Config.GetDiscoveryPollSeconds()) * time.Second)
 	caretakingTick := time.Tick(time.Hour)
 	for range tick {
 		agentsHosts, _ := agent.ReadOutdatedAgentsHosts()

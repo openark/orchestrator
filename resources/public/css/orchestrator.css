@@ -8,7 +8,6 @@
 
 body {
     background-color: #eeeeee;
-    background-image: url('/images/tile.png');
     background-repeat: repeat;
     padding-top: 80px;
 }
@@ -132,6 +131,10 @@ body {
 
 .instance h3.label-warning .glyphicon {
     color: #ffffff;
+}
+
+.glyphicon.text-warning {
+    color: #f0ad4e;
 }
 
 .instance h3.label-danger {
@@ -496,6 +499,11 @@ body {
 #cluster_sidebar li .popover hr {
     margin-top: 8px;
     margin-bottom: 8px;
+}
+
+#cluster_sidebar li div.glyphicon {
+    font-size: 24px;
+    padding-right: 8px;
 }
 
 #cluster_sidebar li .popover pre {

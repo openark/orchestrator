@@ -6,6 +6,7 @@ symbolic-links=0
 server_id=3
 log_bin
 log-slave-updates
+report-host=db3
 
 [mysqld_safe]
 log-error=/var/log/mysqld.log

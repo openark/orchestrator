@@ -2,7 +2,7 @@
 $(document).ready(function () {
     showLoader();
     
-    $.get("/api/seeds", function (seeds) {
+    $.get(appUrl("/api/seeds"), function (seeds) {
 	        showLoader();
 	        var hasActive = false;
 	        seeds.forEach(function (seed) {

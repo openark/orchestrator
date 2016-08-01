@@ -20,7 +20,6 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"fmt"
-	"strings"
 
 	"github.com/go-sql-driver/mysql"
 	"github.com/outbrain/golib/log"
@@ -42,21 +41,6 @@ func (this DummySqlResult) LastInsertId() (int64, error) {
 
 func (this DummySqlResult) RowsAffected() (int64, error) {
 	return 1, nil
-}
-
-var internalDBDeploymentSQL = []string{
-	`
-		CREATE TABLE IF NOT EXISTS _orchestrator_db_deployment (
-		  deployment_id int unsigned NOT NULL AUTO_INCREMENT,
-		  deployment_type enum('base', 'patch'),
-		  deploy_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		  sql_statement TEXT CHARSET ascii NOT NULL,
-		  statement_digest VARCHAR(128) CHARSET ascii NOT NULL,
-		  statement_index INT UNSIGNED NOT NULL,
-		  PRIMARY KEY (deployment_id),
-		  UNIQUE KEY sql_index_uidx (statement_digest, statement_index)
-		) ENGINE=InnoDB DEFAULT CHARSET=ascii
-	`,
 }
 
 // generateSQLBase & generateSQLPatches are lists of SQL statements required to build the orchestrator backend
@@ -485,8 +469,39 @@ var generateSQLBase = []string{
 	    KEY generated_at_idx (generated_at)
 	  ) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS database_instance_recent_relaylog_history (
+		  hostname varchar(128) NOT NULL,
+		  port smallint(5) unsigned NOT NULL,
+			current_relay_log_file varchar(128) NOT NULL,
+		  current_relay_log_pos bigint(20) unsigned NOT NULL,
+			current_seen timestamp NOT NULL DEFAULT '1971-01-01 00:00:00',
+			prev_relay_log_file varchar(128) NOT NULL,
+		  prev_relay_log_pos bigint(20) unsigned NOT NULL,
+			prev_seen timestamp NOT NULL DEFAULT '1971-01-01 00:00:00',
+			PRIMARY KEY (hostname, port),
+		  KEY current_seen_idx (current_seen)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS orchestrator_metadata (
+		  anchor tinyint unsigned NOT NULL,
+		  last_deployed_version varchar(128) CHARACTER SET ascii NOT NULL,
+		  last_deployed_timestamp timestamp NOT NULL,
+		  PRIMARY KEY (anchor)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS orchestrator_db_deployments (
+		  deployed_version varchar(128) CHARACTER SET ascii NOT NULL,
+		  deployed_timestamp timestamp NOT NULL,
+		  PRIMARY KEY (deployed_version)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
+// generateSQLPatches contains DDLs for patching schema to the latest version.
+// Add new statements at the end of the list so they form a changelog.
 var generateSQLPatches = []string{
 	`
 		ALTER TABLE
@@ -770,6 +785,62 @@ var generateSQLPatches = []string{
 			access_token
 			ADD COLUMN acquired_at timestamp NOT NULL DEFAULT '1971-01-01 00:00:00'
 	`,
+	`
+		ALTER TABLE
+			database_instance_pool
+			ADD COLUMN registered_at timestamp NOT NULL DEFAULT '1971-01-01 00:00:00'
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN replication_credentials_available TINYINT UNSIGNED NOT NULL
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN has_replication_credentials TINYINT UNSIGNED NOT NULL
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN allow_tls TINYINT UNSIGNED NOT NULL AFTER sql_delay
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN semi_sync_enforced TINYINT UNSIGNED NOT NULL AFTER physical_environment
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN instance_alias varchar(128) CHARACTER SET ascii NOT NULL AFTER physical_environment
+	`,
+	`
+		ALTER TABLE
+			topology_recovery
+			ADD COLUMN successor_alias varchar(128) DEFAULT NULL
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			MODIFY cluster_name varchar(128) NOT NULL
+	`,
+	`
+		ALTER TABLE
+			node_health
+			ADD INDEX last_seen_active_idx (last_seen_active)
+	`,
+	`
+		ALTER TABLE
+			database_instance_maintenance
+			ADD COLUMN processing_node_hostname varchar(128) CHARACTER SET ascii NOT NULL,
+			ADD COLUMN processing_node_token varchar(128) NOT NULL
+	`,
+	`
+		ALTER TABLE
+			database_instance_maintenance
+			ADD COLUMN explicitly_bounded TINYINT UNSIGNED NOT NULL
+	`,
 }
 
 // Track if a TLS has already been configured for topology
@@ -826,85 +897,42 @@ func OpenOrchestrator() (*sql.DB, error) {
 	}
 	db, fromCache, err := sqlutils.GetDB(mysql_uri)
 	if err == nil && !fromCache {
-		if !config.Config.SkipOrchestratorDatabaseUpdate {
-			initOrchestratorDB(db)
-		}
+		initOrchestratorDB(db)
 		db.SetMaxIdleConns(10)
 	}
 	return db, err
 }
 
-// readInternalDeployments reads orchestrator db deployment statements that are known to have been executed
-func readInternalDeployments() (baseDeployments []string, patchDeployments []string, err error) {
-	if !config.Config.SmartOrchestratorDatabaseUpdate {
-		return baseDeployments, patchDeployments, nil
-	}
-	query := fmt.Sprintf(`
-		select
-			deployment_type,
-			sql_statement
-		from
-			_orchestrator_db_deployment
-		order by
-			deployment_id
-		`)
-	db, err := OpenOrchestrator()
-	if err != nil {
-		log.Fatalf("Cannot initiate orchestrator internal deployment: %+v", err)
-	}
-
-	err = sqlutils.QueryRowsMap(db, query, func(m sqlutils.RowMap) error {
-		deploymentType := m.GetString("deployment_type")
-		sqlStatement := m.GetString("sql_statement")
-
-		if deploymentType == "base" {
-			baseDeployments = append(baseDeployments, sqlStatement)
-		} else if deploymentType == "patch" {
-			patchDeployments = append(patchDeployments, sqlStatement)
-		} else {
-			log.Fatalf("Unknown deployment type (%+v) encountered in _orchestrator_db_deployment", deploymentType)
-		}
-
-		return nil
-	})
-	if err != nil {
-		log.Debugf("Deploying internal orchestrator tables to fix the above; this is a one time operation")
-		// Table does not exist? Create it for first time
-		for _, query := range internalDBDeploymentSQL {
-			if _, err = execInternal(db, query); err != nil {
-				log.Fatalf("Cannot initiate orchestrator internal deployment: %+v", err)
-			}
-		}
-	}
-	return baseDeployments, patchDeployments, nil
-}
-
-// writeInternalDeployment will persist a successful deployment
-func writeInternalDeployment(db *sql.DB, deploymentType string, sqlStatement string, statementIndex int) error {
-	if !config.Config.SmartOrchestratorDatabaseUpdate {
-		return nil
-	}
+// versionIsDeployed checks if given version has already been deployed
+func versionIsDeployed(db *sql.DB) (result bool, err error) {
 	query := `
-        	insert ignore into _orchestrator_db_deployment (
-				deployment_type, sql_statement, statement_digest, statement_index) VALUES (
-				?, ?, CONCAT(SHA1(?), ':', LEFT(REPLACE(REPLACE(REPLACE(?, ' ', ''), '\n', ' '), '\t', ''), 60)), ?)
-				`
-	if _, err := execInternal(db, query, deploymentType, sqlStatement, sqlStatement, sqlStatement, statementIndex); err != nil {
-		log.Fatalf("Unable to write to _orchestrator_db_deployment: %+v", err)
-	}
-	return nil
+		select
+			count(*) as is_deployed
+		from
+			orchestrator_db_deployments
+		where
+			deployed_version = ?
+		`
+	err = db.QueryRow(query, config.RuntimeCLIFlags.ConfiguredVersion).Scan(&result)
+	// err means the table 'orchestrator_db_deployments' does not even exist, in which case we proceed
+	// to deploy.
+	// If there's another error to this, like DB gone bad, then we're about to find out anyway.
+	return result, err
 }
 
-// ResetInternalDeployment will clear existing deployment history (and the effect will be a complete re-deployment
-// the next run). This is made available for possible operational errors, a red button
-func ResetInternalDeployment() error {
-	db, err := OpenOrchestrator()
-	if err != nil {
-		log.Fatalf("Cannot reset orchestrator internal deployment: %+v", err)
+// registerOrchestratorDeployment updates the orchestrator_metadata table upon successful deployment
+func registerOrchestratorDeployment(db *sql.DB) error {
+	query := `
+    	replace into orchestrator_db_deployments (
+				deployed_version, deployed_timestamp
+			) values (
+				?, NOW()
+			)
+				`
+	if _, err := execInternal(db, query, config.RuntimeCLIFlags.ConfiguredVersion); err != nil {
+		log.Fatalf("Unable to write to orchestrator_metadata: %+v", err)
 	}
-	if _, err := execInternal(db, `delete from _orchestrator_db_deployment`); err != nil {
-		log.Fatalf("Unable to clear _orchestrator_db_deployment: %+v", err)
-	}
+	log.Debugf("Migrated database schema to version [%+v]", config.RuntimeCLIFlags.ConfiguredVersion)
 	return nil
 }
 
@@ -931,9 +959,9 @@ func SetupMySQLOrchestratorTLS(uri string) (string, error) {
 	return fmt.Sprintf("%s&tls=orchestrator", uri), nil
 }
 
-// deployIfNotAlreadyDeployed will issue given sql queries that are not already known to be deployed.
+// deployStatements will issue given sql queries that are not already known to be deployed.
 // This iterates both lists (to-run and already-deployed) and also verifies no contraditions.
-func deployIfNotAlreadyDeployed(db *sql.DB, queries []string, deployedQueries []string, deploymentType string, fatalOnError bool) error {
+func deployStatements(db *sql.DB, queries []string, fatalOnError bool) error {
 	tx, err := db.Begin()
 	if err != nil {
 		log.Fatale(err)
@@ -956,22 +984,8 @@ func deployIfNotAlreadyDeployed(db *sql.DB, queries []string, deployedQueries []
 	}
 
 	for i, query := range queries {
-		queryAlreadyExecuted := false
-		// While iterating 'queries', also iterate 'deployedQueries'. Expect identity
-		if len(deployedQueries) > i {
-			if deployedQueries[i] != query {
-				log.Fatalf("initOrchestratorDB() PANIC: non matching %s queries between deployment requests and _orchestrator_db_deployment. Please execute 'orchestrator -c reset-internal-db-deployment'", deploymentType)
-			}
-			queryAlreadyExecuted = true
-		}
-		if queryAlreadyExecuted {
-			continue
-		}
 		if i == 0 {
 			//log.Debugf("sql_mode is: %+v", originalSqlMode)
-		}
-		if config.Config.SmartOrchestratorDatabaseUpdate {
-			log.Debugf("initOrchestratorDB executing: %.80s", strings.TrimSpace(strings.Replace(query, "\n", "", -1)))
 		}
 
 		if fatalOnError {
@@ -982,7 +996,6 @@ func deployIfNotAlreadyDeployed(db *sql.DB, queries []string, deployedQueries []
 			tx.Exec(query)
 			// And ignore any error
 		}
-		writeInternalDeployment(db, deploymentType, query, i)
 	}
 	if _, err := tx.Exec(`set session sql_mode=?`, originalSqlMode); err != nil {
 		log.Fatale(err)
@@ -998,10 +1011,15 @@ func deployIfNotAlreadyDeployed(db *sql.DB, queries []string, deployedQueries []
 func initOrchestratorDB(db *sql.DB) error {
 	log.Debug("Initializing orchestrator")
 
-	baseDeployments, patchDeployments, _ := readInternalDeployments()
-	deployIfNotAlreadyDeployed(db, generateSQLBase, baseDeployments, "base", true)
-	deployIfNotAlreadyDeployed(db, generateSQLPatches, patchDeployments, "patch", false)
-
+	versionAlreadyDeployed, err := versionIsDeployed(db)
+	if versionAlreadyDeployed && config.RuntimeCLIFlags.ConfiguredVersion != "" && err == nil {
+		// Already deployed with this version
+		return nil
+	}
+	log.Debugf("Migrating database schema")
+	deployStatements(db, generateSQLBase, true)
+	deployStatements(db, generateSQLPatches, false)
+	registerOrchestratorDeployment(db)
 	return nil
 }
 

@@ -503,6 +503,25 @@ Cheatsheet:
 
             orchestrator -c cluster-pool-instances
 
+				which-heuristic-cluster-pool-instances
+						List instances belonging to a cluster, which are also in some pool or in a specific given pool.
+						Not all instances are listed: unreachable, downtimed instances ar left out. Only those that should be
+						responsive and healthy are listed. This serves applications in getting information about instances
+						that could be queried (this complements a proxy behavior in providing the *list* of instances).
+						Examples:
+
+						orchestrator -c which-heuristic-cluster-pool-instances --alias mycluster
+								Get the instances of a specific cluster, no specific pool
+
+						orchestrator -c which-heuristic-cluster-pool-instances --alias mycluster --pool some_pool
+								Get the instances of a specific cluster and which belong to a given pool
+
+						orchestrator -c which-heuristic-cluster-pool-instances -i instance.belonging.to.a.cluster
+								Cluster inferred by given instance
+
+						orchestrator -c which-heuristic-cluster-pool-instances
+								Cluster inferred by local hostname
+
     Information commands
         These commands provide/store information about topologies, replication connections, or otherwise orchstrator's
         "inventory".
@@ -576,6 +595,45 @@ Cheatsheet:
             orchestrator -c which-cluster-instances -alias some_alias
                 assuming some_alias is a known cluster alias (see ClusterNameToAlias or DetectClusterAliasQuery configuration)
 
+        which-cluster-domain
+            Output the domain name of given cluster, indicated by instance or alias. This depends on
+						the DetectClusterDomainQuery configuration. Example:
+
+            orchestrator -c which-cluster-domain -i instance.to.check.com
+
+            orchestrator -c which-cluster-domain
+                -i not given, implicitly assumed local hostname
+
+            orchestrator -c which-cluster-domain -alias some_alias
+                assuming some_alias is a known cluster alias (see ClusterNameToAlias or DetectClusterAliasQuery configuration)
+
+				which-heuristic-domain-instance
+						Returns the instance associated as the cluster's writer with a cluster's domain name.
+						Given a cluster, orchestrator looks for the domain name indicated by this cluster, and proceeds to search for
+						a stord key-value attribute for that domain name. This would be the writer host for the given domain.
+						See also set-heuristic-domain-instance, this is meant to be a temporary service mimicking in micro-scale a
+						service discovery functionality.
+						Example:
+
+						orchestrator -c which-heuristic-domain-instance -alias some_alias
+							Detects the domain name for given cluster, reads from key-value store the writer host associated with the domain name.
+
+						orchestrator -c which-heuristic-domain-instance -i instance.of.some.cluster
+							Cluster is inferred by a member instance (the instance is not necessarily the master)
+
+				which-cluster-master
+						Output the name of the active master in a given cluster, indicated by instance or alias.
+						An "active" master is one that is writable and is not marked as downtimed due to a topology recovery.
+						Examples:
+
+            orchestrator -c which-cluster-master -i instance.to.check.com
+
+            orchestrator -c which-cluster-master
+                -i not given, implicitly assumed local hostname
+
+            orchestrator -c which-cluster-master -alias some_alias
+                assuming some_alias is a known cluster alias (see ClusterNameToAlias or DetectClusterAliasQuery configuration)
+
         which-cluster-osc-slaves
             Output a list of slaves in same cluster as given instance, that would server as good candidates as control slaves
             for a pt-online-schema-change operation.
@@ -589,6 +647,17 @@ Cheatsheet:
 
             orchestrator -c which-cluster-osc-slaves -alias some_alias
                 assuming some_alias is a known cluster alias (see ClusterNameToAlias or DetectClusterAliasQuery configuration)
+
+				which-lost-in-recovery
+						List instances marked as downtimed for being lost in a recovery process. This depends on the configuration
+						of MasterFailoverLostInstancesDowntimeMinutes. The output of this command lists heuristically recent
+						"lost" instances that probabaly should be recycled. Note that when the 'downtime' flag expires (or
+						is reset by '-c end-downtime') an instance no longer appears on this list.
+						The topology recovery process injects a magic hint when downtiming lost instances, that is picked up
+						by this command. Examples:
+
+						orchestrator -c which-lost-in-recovery
+								Lists all heuristically-recent known lost instances
 
         which-master
             Output the fully-qualified hostname:port representation of a given instance's master. Examples:
@@ -730,6 +799,50 @@ Cheatsheet:
 
             orchestrator -c recover-lite -i dead.instance.com --debug
 
+				force-master-takeover
+						Forcibly discard master and promote another (direct child) instance instead, even if everything is running well.
+						This allows for planned switchover.
+						NOTE:
+						- You must specify the instance to promote via "-d"
+						- Promoted instance must be a direct child of the existing master
+						- This will not work in a master-master configuration
+						- Orchestrator just treats this command as a DeadMaster failover scenario
+						- It is STRONGLY suggested that you first relocate everything below your chosen instance-to-promote.
+						  It *is* a planned failover thing.
+						- Otherwise orchestrator will do its thing in moving instances around, hopefully promoting your requested
+						  server on top.
+						- Orchestrator will issue all relevant pre-failover and post-failover external processes.
+						- In this command orchestrator will not issue 'SET GLOBAL read_only=1' on the existing master, nor will
+						  it issue a 'FLUSH TABLES WITH READ LOCK'. Please see the 'graceful-master-takeover' command.
+						Examples:
+
+						orchestrator -c force-master-takeover -alias mycluster -d immediate.child.of.master.com
+								Indicate cluster by alias. Orchestrator automatically figures out the master
+
+						orchestrator -c force-master-takeover -i instance.in.relevant.cluster.com -d immediate.child.of.master.com
+								Indicate cluster by an instance. You don't structly need to specify the master, orchestrator
+								will infer the master's identify.
+
+				graceful-master-takeover
+						Gracefully discard master and promote another (direct child) instance instead, even if everything is running well.
+						This allows for planned switchover.
+						NOTE:
+						- Promoted instance must be a direct child of the existing master
+						- Promoted instance must be the *only* direct child of the existing master. It *is* a planned failover thing.
+						- Orchestrator will first issue a "set global read_only=1" on existing master
+						- It will promote candidate master to the binlog positions of the existing master after issuing the above
+						- There _could_ still be statements issued and executed on the existing master by SUPER users, but those are ignored.
+						- Orchestrator then proceeds to handle a DeadMaster failover scenario
+						- Orchestrator will issue all relevant pre-failover and post-failover external processes.
+						Examples:
+
+						orchestrator -c graceful-master-takeover -alias mycluster
+								Indicate cluster by alias. Orchestrator automatically figures out the master and verifies it has a single direct replica
+
+						orchestrator -c force-master-takeover -i instance.in.relevant.cluster.com
+								Indicate cluster by an instance. You don't structly need to specify the master, orchestrator
+								will infer the master's identify.
+
         replication-analysis
             Request an analysis of potential crash incidents in all known topologies.
             Output format is not yet stabilized and may change in the future. Do not trust the output
@@ -802,6 +915,20 @@ Cheatsheet:
 
             orchestrator -c deregister-hostname-unresolve -i instance.fqdn.com
 
+				set-heuristic-domain-instance
+						This is a temporary (sync your watches, watch for next ice age) command which registers the cluster domain name of a given cluster
+						with the master/writer host for that cluster. It is a one-time-master-discovery operation.
+						At this time orchestrator may also act as a small & simple key-value store (recall the "temporary" indication).
+						Master failover operations will overwrite the domain instance identity. Orchestrator so turns into a mini master-discovery
+						service (I said "TEMPORARY"). Really there are other tools for the job. See also: which-heuristic-domain-instance
+						Example:
+
+						orchestrator -c set-heuristic-domain-instance --alias some_alias
+								Detects the domain name for given cluster, identifies the writer master of the cluster, associates the two in key-value store
+
+						orchestrator -c set-heuristic-domain-instance -i instance.of.some.cluster
+								Cluster is inferred by a member instance (the instance is not necessarily the master)
+
     Misc commands
 
         continuous
@@ -839,15 +966,11 @@ Cheatsheet:
 
             orchestrator -c resolve -i cname.to.resolve
 
-        reset-internal-db-deployment
-            Clear internal db deployment history, use if somehow corrupted internal deployment history.
-            When configured with '"SmartOrchestratorDatabaseUpdate": true', Orchestrator does housekeeping for its
-            own database schema, and verifies proposed deployment vs deployment history.
-            In case of contradiction between the two orchestrator bails out. Such a contradiction should not occur, and may
-            signify an inconsistency in the orchestrator code itself.
-            By resetting history orchestrator redeploys its schema (without causing data loss) and accepts the new instructions
-            as the de-factor deployment rule.
-
+        redeploy-internal-db
+						Force internal schema migration to current backend structure. Orchestrator keeps track of the deployed
+						versions and will not reissue a migration for a version already deployed. Normally you should not use
+						this command, and it is provided mostly for building and testing purposes. Nonetheless it is safe to
+						use and at most it wastes some cycles.
     `
 
 // main is the application's entry point. It will either spawn a CLI or HTTP itnerfaces.
@@ -877,11 +1000,22 @@ func main() {
 	config.RuntimeCLIFlags.BinlogFile = flag.String("binlog", "", "Binary log file name")
 	config.RuntimeCLIFlags.Statement = flag.String("statement", "", "Statement/hint")
 	config.RuntimeCLIFlags.GrabElection = flag.Bool("grab-election", false, "Grab leadership (only applies to continuous mode)")
+	config.RuntimeCLIFlags.PromotionRule = flag.String("promotion-rule", "prefer", "Promotion rule for register-andidate (prefer|neutral|must_not)")
 	config.RuntimeCLIFlags.Version = flag.Bool("version", false, "Print version and exit")
 	flag.Parse()
 
 	if *destination != "" && *sibling != "" {
 		log.Fatalf("-s and -d are synonyms, yet both were specified. You're probably doing the wrong thing.")
+	}
+	switch *config.RuntimeCLIFlags.PromotionRule {
+	case "prefer", "neutral", "must_not":
+		{
+			// OK
+		}
+	default:
+		{
+			log.Fatalf("-promotion-rule only supports prefer|neutral|must_not")
+		}
 	}
 	if *destination == "" {
 		*destination = *sibling
@@ -897,7 +1031,7 @@ func main() {
 	if *stack {
 		log.SetPrintStackTrace(*stack)
 	}
-	log.Info("starting")
+	log.Info("starting orchestrator") // FIXME and add the version which is currently in build.sh
 
 	if *config.RuntimeCLIFlags.Version {
 		fmt.Println(AppVersion)
@@ -928,13 +1062,13 @@ func main() {
 	if config.Config.AuditToSyslog {
 		inst.EnableAuditSyslog()
 	}
+	config.RuntimeCLIFlags.ConfiguredVersion = AppVersion
 
 	if len(flag.Args()) == 0 && *command == "" {
 		// No command, no argument: just prompt
 		fmt.Println(prompt)
 		return
 	}
-
 	switch {
 	case len(flag.Args()) == 0 || flag.Arg(0) == "cli":
 		app.CliWrapper(*command, *strict, *instance, *destination, *owner, *reason, *duration, *pattern, *clusterAlias, *pool, *hostnameFlag)

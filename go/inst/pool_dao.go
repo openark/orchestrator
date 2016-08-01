@@ -17,8 +17,11 @@
 package inst
 
 import (
+	"fmt"
+
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
+	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
 )
 
@@ -37,7 +40,7 @@ func writePoolInstances(pool string, instanceKeys [](*InstanceKey)) error {
 			tx.Rollback()
 			return log.Errore(err)
 		}
-		stmt, err = tx.Prepare(`insert into database_instance_pool values (?, ?, ?)`)
+		stmt, err = tx.Prepare(`insert into database_instance_pool (hostname, port, pool, registered_at) values (?, ?, ?, now())`)
 		for _, instanceKey := range instanceKeys {
 			_, err := stmt.Exec(instanceKey.Hostname, instanceKey.Port, pool)
 			if err != nil {
@@ -56,50 +59,30 @@ func writePoolInstances(pool string, instanceKeys [](*InstanceKey)) error {
 	return ExecDBWriteFunc(writeFunc)
 }
 
-func ReadClusterPoolInstances(clusterName string) (*PoolInstancesMap, error) {
-	var poolInstancesMap = make(PoolInstancesMap)
-
-	query := `
-		select 
-			database_instance_pool.*
-		from 
-			database_instance
-			join database_instance_pool using (hostname, port)
-		where
-			database_instance.cluster_name = ?
+// ReadClusterPoolInstances reads cluster-pool-instance associationsfor given cluster and pool
+func ReadClusterPoolInstances(clusterName string, pool string) (result [](*ClusterPoolInstance), err error) {
+	args := sqlutils.Args()
+	whereClause := ``
+	if clusterName != "" {
+		whereClause = `
+			where
+				database_instance.cluster_name = ?
+				and ? in ('', pool)
 		`
-	err := db.QueryOrchestrator(query, sqlutils.Args(clusterName), func(m sqlutils.RowMap) error {
-		pool := m.GetString("pool")
-		hostname := m.GetString("hostname")
-		port := m.GetInt("port")
-		if _, ok := poolInstancesMap[pool]; !ok {
-			poolInstancesMap[pool] = [](*InstanceKey){}
-		}
-		poolInstancesMap[pool] = append(poolInstancesMap[pool], &InstanceKey{Hostname: hostname, Port: port})
-		return nil
-	})
-
-	if err != nil {
-		return nil, err
+		args = append(args, clusterName, pool)
 	}
-
-	return &poolInstancesMap, nil
-
-}
-
-func ReadAllClusterPoolInstances() ([](*ClusterPoolInstance), error) {
-	var result [](*ClusterPoolInstance) = [](*ClusterPoolInstance){}
-	query := `
-		select 
+	query := fmt.Sprintf(`
+		select
 			cluster_name,
 			ifnull(alias, cluster_name) as alias,
 			database_instance_pool.*
-		from 
+		from
 			database_instance
 			join database_instance_pool using (hostname, port)
 			left join cluster_alias using (cluster_name)
-		`
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+		%s
+		`, whereClause)
+	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		clusterPoolInstance := ClusterPoolInstance{
 			ClusterName:  m.GetString("cluster_name"),
 			ClusterAlias: m.GetString("alias"),
@@ -116,5 +99,41 @@ func ReadAllClusterPoolInstances() ([](*ClusterPoolInstance), error) {
 	}
 
 	return result, nil
+}
 
+// ReadAllClusterPoolInstances returns all clusters-pools-insatnces associations
+func ReadAllClusterPoolInstances() ([](*ClusterPoolInstance), error) {
+	return ReadClusterPoolInstances("", "")
+}
+
+// ReadClusterPoolInstancesMap returns association of pools-to-instances for a given cluster
+// and potentially for a given pool.
+func ReadClusterPoolInstancesMap(clusterName string, pool string) (*PoolInstancesMap, error) {
+	var poolInstancesMap = make(PoolInstancesMap)
+
+	clusterPoolInstances, err := ReadClusterPoolInstances(clusterName, pool)
+	if err != nil {
+		return nil, nil
+	}
+	for _, clusterPoolInstance := range clusterPoolInstances {
+		if _, ok := poolInstancesMap[clusterPoolInstance.Pool]; !ok {
+			poolInstancesMap[clusterPoolInstance.Pool] = [](*InstanceKey){}
+		}
+		poolInstancesMap[clusterPoolInstance.Pool] = append(poolInstancesMap[clusterPoolInstance.Pool], &InstanceKey{Hostname: clusterPoolInstance.Hostname, Port: clusterPoolInstance.Port})
+	}
+
+	return &poolInstancesMap, nil
+}
+
+// ExpirePoolInstances cleans up the database_instance_pool table from expired items
+func ExpirePoolInstances() error {
+	_, err := db.ExecOrchestrator(`
+			delete
+				from database_instance_pool
+			where
+				registered_at < now() - interval ? minute
+			`,
+		config.Config.InstancePoolExpiryMinutes,
+	)
+	return log.Errore(err)
 }

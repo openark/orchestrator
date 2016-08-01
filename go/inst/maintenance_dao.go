@@ -18,17 +18,19 @@ package inst
 
 import (
 	"fmt"
+
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
+	"github.com/outbrain/orchestrator/go/process"
 )
 
 // ReadActiveMaintenance returns the list of currently active maintenance entries
 func ReadActiveMaintenance() ([]Maintenance, error) {
 	res := []Maintenance{}
 	query := `
-		select 
+		select
 			database_instance_maintenance_id,
 			hostname,
 			port,
@@ -37,7 +39,7 @@ func ReadActiveMaintenance() ([]Maintenance, error) {
 			maintenance_active,
 			owner,
 			reason
-		from 
+		from
 			database_instance_maintenance
 		where
 			maintenance_active = 1
@@ -67,7 +69,7 @@ func ReadActiveMaintenance() ([]Maintenance, error) {
 }
 
 // BeginBoundedMaintenance will make new maintenance entry for given instanceKey.
-func BeginBoundedMaintenance(instanceKey *InstanceKey, owner string, reason string, durationSeconds uint) (int64, error) {
+func BeginBoundedMaintenance(instanceKey *InstanceKey, owner string, reason string, durationSeconds uint, explicitlyBounded bool) (int64, error) {
 	var maintenanceToken int64 = 0
 	if durationSeconds == 0 {
 		durationSeconds = config.Config.MaintenanceExpireMinutes * 60
@@ -75,9 +77,11 @@ func BeginBoundedMaintenance(instanceKey *InstanceKey, owner string, reason stri
 	res, err := db.ExecOrchestrator(`
 			insert ignore
 				into database_instance_maintenance (
-					hostname, port, maintenance_active, begin_timestamp, end_timestamp, owner, reason
+					hostname, port, maintenance_active, begin_timestamp, end_timestamp, owner, reason,
+					processing_node_hostname, processing_node_token, explicitly_bounded
 				) VALUES (
-					?, ?, 1, NOW(), NOW() + INTERVAL ? SECOND, ?, ?
+					?, ?, 1, NOW(), NOW() + INTERVAL ? SECOND, ?, ?,
+					?, ?, ?
 				)
 			`,
 		instanceKey.Hostname,
@@ -85,6 +89,9 @@ func BeginBoundedMaintenance(instanceKey *InstanceKey, owner string, reason stri
 		durationSeconds,
 		owner,
 		reason,
+		process.ThisHostname,
+		process.ProcessToken.Hash,
+		explicitlyBounded,
 	)
 	if err != nil {
 		return maintenanceToken, log.Errore(err)
@@ -102,7 +109,7 @@ func BeginBoundedMaintenance(instanceKey *InstanceKey, owner string, reason stri
 
 // BeginMaintenance will make new maintenance entry for given instanceKey. Maintenance time is unbounded
 func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) (int64, error) {
-	return BeginBoundedMaintenance(instanceKey, owner, reason, 0)
+	return BeginBoundedMaintenance(instanceKey, owner, reason, 0, false)
 }
 
 // EndMaintenanceByInstanceKey will terminate an active maintenance using given instanceKey as hint
@@ -110,11 +117,11 @@ func EndMaintenanceByInstanceKey(instanceKey *InstanceKey) error {
 	res, err := db.ExecOrchestrator(`
 			update
 				database_instance_maintenance
-			set  
+			set
 				maintenance_active = NULL,
 				end_timestamp = NOW()
 			where
-				hostname = ? 
+				hostname = ?
 				and port = ?
 				and maintenance_active = 1
 			`,
@@ -138,10 +145,10 @@ func EndMaintenanceByInstanceKey(instanceKey *InstanceKey) error {
 func ReadMaintenanceInstanceKey(maintenanceToken int64) (*InstanceKey, error) {
 	var res *InstanceKey
 	query := `
-		select 
-			hostname, port 
-		from 
-			database_instance_maintenance 
+		select
+			hostname, port
+		from
+			database_instance_maintenance
 		where
 			database_instance_maintenance_id = ?
 			`
@@ -167,11 +174,11 @@ func EndMaintenance(maintenanceToken int64) error {
 	res, err := db.ExecOrchestrator(`
 			update
 				database_instance_maintenance
-			set  
+			set
 				maintenance_active = NULL,
 				end_timestamp = NOW()
 			where
-				database_instance_maintenance_id = ? 
+				database_instance_maintenance_id = ?
 			`,
 		maintenanceToken,
 	)
@@ -196,7 +203,7 @@ func ExpireMaintenance() error {
 				database_instance_maintenance
 			where
 				maintenance_active is null
-				and end_timestamp < NOW() - INTERVAL ? DAY 
+				and end_timestamp < NOW() - INTERVAL ? DAY
 			`,
 			config.Config.MaintenancePurgeDays,
 		)
@@ -211,11 +218,11 @@ func ExpireMaintenance() error {
 		res, err := db.ExecOrchestrator(`
 			update
 				database_instance_maintenance
-			set  
-				maintenance_active = NULL				
+			set
+				maintenance_active = NULL
 			where
 				maintenance_active = 1
-				and end_timestamp < NOW() 
+				and end_timestamp < NOW()
 			`,
 		)
 		if err != nil {
@@ -223,6 +230,25 @@ func ExpireMaintenance() error {
 		}
 		if rowsAffected, _ := res.RowsAffected(); rowsAffected > 0 {
 			AuditOperation("expire-maintenance", nil, fmt.Sprintf("Expired bounded: %d", rowsAffected))
+		}
+	}
+	{
+		res, err := db.ExecOrchestrator(`
+			update
+				database_instance_maintenance
+				left join node_health on (processing_node_hostname = node_health.hostname AND processing_node_token = node_health.token)
+			set
+				database_instance_maintenance.maintenance_active = NULL
+			where
+				node_health.last_seen_active IS NULL
+				and explicitly_bounded = 0
+			`,
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
+		if rowsAffected, _ := res.RowsAffected(); rowsAffected > 0 {
+			AuditOperation("expire-maintenance", nil, fmt.Sprintf("Expired dead: %d", rowsAffected))
 		}
 	}
 

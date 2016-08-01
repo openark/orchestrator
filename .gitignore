@@ -1,4 +1,5 @@
 conf/orchestrator.conf.json
+.DS_Store
 .vagrant/
 vagrant/admin-post-install.sh
 vagrant/db-post-install.sh
