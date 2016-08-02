@@ -93,7 +93,10 @@ var zeroInstanceKey = inst.InstanceKey{}
 func (q *Queue) Pop() inst.InstanceKey {
 	var key inst.InstanceKey
 	for {
-		key = <-q.queue
+		q.Lock()
+		queue := q.queue
+		q.Unlock()
+		key = <-queue
 		// a zero value key may be returned when a chan is closed (see above)
 		if key != zeroInstanceKey {
 			break
