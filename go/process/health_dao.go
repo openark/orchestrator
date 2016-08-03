@@ -166,7 +166,7 @@ func ReadAvailableNodes(onlyHttpNodes bool) ([]string, error) {
 	}
 	query := `
 		select
-			concat(hostname, ';', token) as node
+			concat(hostname, ';', token, ';', app_version) as node
 		from
 			node_health
 		where

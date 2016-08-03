@@ -1,7 +1,9 @@
 
-function addStatusTableData(name, content) {
+function addStatusTableData(name, column1, column2) {
 	$("#orchestratorStatusTable").append(
-	        '<tr><td>' + name + '</td><td><code class="text-info"><strong>' + content + '</strong></code></td></tr>'
+	        '<tr><td>' + name + '</td>' +
+                '<td><code class="text-info"><strong>' + column1 + '</strong></code></td>' +
+                '<td><code class="text-info">' + column2 + '</code></td></tr>'
 	);
 }
 function addStatusActionButton(name, uri) {
@@ -21,15 +23,17 @@ $(document).ready(function () {
     $.get(appUrl("/api/health/"), function (health) {
     	statusObject.prepend('<h4>'+health.Message+'</h4>')
     	health.Details.AvailableNodes.forEach(function(node) {
-    		var hostname = node.split(";")[0];
-    		var message = hostname;
+    		var values = node.split(";");
+    		var hostname = values[0];
+    		var app_version = values[2];
+    		var message = hostname
     		if (node == health.Details.ActiveNode) {
     			message += ' <span class="text-success">[Active]</span>';
     		}
     		if (hostname == health.Details.Hostname) {
     			message += ' <span class="text-primary">[This node]</span>';
     		}
-    		addStatusTableData("Available node", message);
+    		addStatusTableData("Available node", message, app_version);
     	})
     	
     	var userId = getUserId();
@@ -37,7 +41,7 @@ $(document).ready(function () {
     		userId = "[unknown]"
     	}
     	var userStatus = (isAuthorizedForAction() ? "admin" : "read only");
-    	addStatusTableData("You", userId + ", " + userStatus);
+    	addStatusTableData("You", userId + ", " + userStatus, "");
 
     	if (isAuthorizedForAction()) {
     		addStatusActionButton("Reload configuration", "reload-configuration");
