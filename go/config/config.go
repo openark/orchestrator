@@ -50,7 +50,7 @@ type Configuration struct {
 	MySQLTopologyMaxPoolConnections              int    // Max concurrent connections on any topology instance
 	DatabaselessMode__experimental               bool   // !!!EXPERIMENTAL!!! Orchestrator will execute without speaking to a backend database; super-standalone mode
 	MySQLOrchestratorHost                        string
-	MySQLOrchestratorMaxPoolConnections          int    // The maximum size of the connection pool to the Orchestrator backend.
+	MySQLOrchestratorMaxPoolConnections          int // The maximum size of the connection pool to the Orchestrator backend.
 	MySQLOrchestratorPort                        uint
 	MySQLOrchestratorDatabase                    string
 	MySQLOrchestratorUser                        string
@@ -200,7 +200,7 @@ func newConfiguration() *Configuration {
 		StatusEndpoint:                               "/api/status",
 		StatusSimpleHealth:                           true,
 		StatusOUVerify:                               false,
-		MySQLOrchestratorMaxPoolConnections:          128,              // limit concurrent conns to backend DB
+		MySQLOrchestratorMaxPoolConnections:          128, // limit concurrent conns to backend DB
 		MySQLOrchestratorPort:                        3306,
 		MySQLTopologyMaxPoolConnections:              3,
 		MySQLTopologyUseMutualTLS:                    false,
