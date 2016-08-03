@@ -841,6 +841,14 @@ var generateSQLPatches = []string{
 			database_instance_maintenance
 			ADD COLUMN explicitly_bounded TINYINT UNSIGNED NOT NULL
 	`,
+	`
+		ALTER TABLE node_health_history
+			ADD COLUMN app_version varchar(30) CHARACTER SET ascii NOT NULL DEFAULT ""
+	`,
+	`
+		ALTER TABLE node_health
+			ADD COLUMN app_version varchar(30) CHARACTER SET ascii NOT NULL DEFAULT ""
+	`,
 }
 
 // Track if a TLS has already been configured for topology
