@@ -51,6 +51,11 @@ function precheck() {
     ok=1
   fi
 
+  if [[ ! -x "$( which govendor )" ]]; then
+    echo "govendor not in PATH (install: go get -u github.com/kardianos/govendor)"
+    ok=1
+  fi
+
   if [[ $(go version | egrep "go1[.][01234]") ]]; then
     echo "go version is too low. Must use 1.5 or above"
     ok=1
@@ -153,6 +158,10 @@ function main() {
   build_only=$4
 
   precheck "$target"
+
+  # fetch dependencies
+  govendor sync
+
   builddir=$( setuptree "$prefix" )
   oinstall "$builddir" "$prefix"
   build "$target" "$arch" "$builddir" "$prefix"
