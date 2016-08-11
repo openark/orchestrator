@@ -1,5 +1,5 @@
 /*
-   Copyright 2016 Simon J Mudd <sjmudd@pobox.com>
+   Copyright 2015 Shlomi Noach, courtesy Booking.com
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -30,10 +30,8 @@ package recovery
 // go to the database each time.
 
 import (
-	"fmt"
-
+	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
-
 	"github.com/outbrain/orchestrator/go/db"
 )
 
@@ -53,11 +51,11 @@ func IsGloballyDisabled() (bool, error) {
 		`
 	err = db.QueryOrchestrator(query, sqlutils.Args(1), func(m sqlutils.RowMap) error {
 		mycount := m.GetInt("mycount")
-		disabled = (mycount == 1)
+		disabled = (mycount > 0)
 		return nil
 	})
 	if err != nil {
-		err = fmt.Errorf("recovery.IsGloballyDisabled(): %v", err)
+		err = log.Errorf("recovery.IsGloballyDisabled(): %v", err)
 	}
 	return disabled, err
 }
@@ -75,7 +73,6 @@ func DisableGlobally() error {
 
 // EnableGlobally ensures recoveries are enabled globally
 func EnableGlobally() error {
-	// Could be TRUNCATE TABLE global_recovery_disable but we only expect to have 0 or 1 rows so not worth it?
 	_, err := db.ExecOrchestrator(`
 		DELETE FROM global_recovery_disable -- deliberately no WHERE clause
 	`,

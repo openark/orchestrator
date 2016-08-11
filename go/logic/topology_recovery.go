@@ -29,7 +29,7 @@ import (
 	"github.com/outbrain/orchestrator/go/os"
 	"github.com/outbrain/orchestrator/go/process"
 	"github.com/outbrain/orchestrator/go/recovery"
-	"github.com/patrickmn/go-cache"
+	"github.com/pmylund/go-cache"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -1055,7 +1055,9 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 				promotedSlaveKey = topologyRecovery.SuccessorKey
 			}
 		} else if recoveryDisabledGlobally {
-			log.Debugf("CheckAndRecover: InstanceKey: %+v, candidateInstanceKey: %+v, skipProcesses: %v: NOT Recovering host (disabled globally)", analysisEntry.AnalyzedInstanceKey, candidateInstanceKey, skipProcesses)
+			log.Infof("CheckAndRecover: InstanceKey: %+v, candidateInstanceKey: %+v, "+
+				"skipProcesses: %v: NOT Recovering host (disabled globally)",
+				analysisEntry.AnalyzedInstanceKey, candidateInstanceKey, skipProcesses)
 		} else {
 			go executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, false, skipProcesses)
 		}
