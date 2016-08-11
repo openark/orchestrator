@@ -71,9 +71,7 @@ func (q *Queue) Push(key inst.InstanceKey) {
 	// queue if needed. That's not a very ideomatic but
 	// 1) we know the queue is at maximum as large as the number
 	// of hosts 2) we really don't want a discovery planner to
-	// block. Notice: there's a side effect of closing a chan:
-	// zero value will be returned to all waiting goroutines.
-	// We handle this in Pop(). Good enough for now.
+	// block.
 	if len(q.queue) == cap(q.queue) {
 		var newQueue = make(chan inst.InstanceKey, cap(q.queue)*2)
 		close(q.queue)
@@ -86,8 +84,6 @@ func (q *Queue) Push(key inst.InstanceKey) {
 	q.queue <- key
 }
 
-var zeroInstanceKey = inst.InstanceKey{}
-
 // pop the entry and remove it from known keys;
 // blocks if queue is empty.
 func (q *Queue) Pop() inst.InstanceKey {
@@ -96,9 +92,10 @@ func (q *Queue) Pop() inst.InstanceKey {
 		q.Lock()
 		queue := q.queue
 		q.Unlock()
-		key = <-queue
-		// a zero value key may be returned when a chan is closed (see above)
-		if key != zeroInstanceKey {
+		k, ok := <-queue
+		// we close channel sometimes (see above)
+		if ok {
+            key = k
 			break
 		}
 	}
