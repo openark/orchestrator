@@ -28,7 +28,6 @@ import (
 	"github.com/outbrain/orchestrator/go/inst"
 	"github.com/outbrain/orchestrator/go/os"
 	"github.com/outbrain/orchestrator/go/process"
-	"github.com/outbrain/orchestrator/go/recovery"
 	"github.com/pmylund/go-cache"
 	"github.com/rcrowley/go-metrics"
 )
@@ -1027,7 +1026,7 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 		return false, nil, log.Errore(err)
 	}
 	// Check for recovery being disabled globally
-	recoveryDisabledGlobally, err := recovery.IsGloballyDisabled()
+	recoveryDisabledGlobally, err := IsRecoveryDisabled()
 	if err != nil {
 		log.Warningf("Unable to determine if recovery is disabled globally: %v", err)
 	}

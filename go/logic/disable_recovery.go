@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package recovery
+package logic
 
 // This file holds wrappers around routines to check if global
 // recovery is disabled or not.
@@ -35,8 +35,8 @@ import (
 	"github.com/outbrain/orchestrator/go/db"
 )
 
-// IsGloballyDisabled returns true if Recoveries are disabled globally
-func IsGloballyDisabled() (bool, error) {
+// IsRecoveryDisabled returns true if Recoveries are disabled globally
+func IsRecoveryDisabled() (bool, error) {
 	var (
 		disabled bool // default is false!
 		err      error
@@ -55,13 +55,13 @@ func IsGloballyDisabled() (bool, error) {
 		return nil
 	})
 	if err != nil {
-		err = log.Errorf("recovery.IsGloballyDisabled(): %v", err)
+		err = log.Errorf("recovery.IsRecoveryDisabled(): %v", err)
 	}
 	return disabled, err
 }
 
-// DisableGlobally ensures recoveries are disabled globally
-func DisableGlobally() error {
+// DisableRecovery ensures recoveries are disabled globally
+func DisableRecovery() error {
 	_, err := db.ExecOrchestrator(`
 		INSERT IGNORE INTO global_recovery_disable
 			(disable_recovery)
@@ -71,8 +71,8 @@ func DisableGlobally() error {
 	return err
 }
 
-// EnableGlobally ensures recoveries are enabled globally
-func EnableGlobally() error {
+// EnableRecovery ensures recoveries are enabled globally
+func EnableRecovery() error {
 	_, err := db.ExecOrchestrator(`
 		DELETE FROM global_recovery_disable -- deliberately no WHERE clause
 	`,
