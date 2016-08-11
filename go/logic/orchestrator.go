@@ -208,7 +208,7 @@ func ContinuousDiscovery() {
 						log.Errore(err)
 					}
 
-					log.Debugf("Polling %v outdated instances...", len(instanceKeys))
+					log.Debugf("outdated keys: %+v", instanceKeys)
 					for _, instanceKey := range instanceKeys {
 						instanceKey := instanceKey
 
