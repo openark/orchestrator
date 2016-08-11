@@ -10,6 +10,3 @@ vagrant/db4-post-install.sh
 vagrant/vagrant-ssh-key
 vagrant/vagrant-ssh-key.pub
 Godeps/_workspace
-
-# packages using `govendor`
-vendor/github.com/go-sql-driver/
