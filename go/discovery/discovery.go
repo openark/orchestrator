@@ -33,7 +33,9 @@ import (
 	"time"
 )
 
-const initialCapacity = 64
+// Size of discovery queue. Should be greater than the total number
+// of machines being discovered.
+const queueCapacity = 100000
 
 type Queue struct {
 	sync.Mutex
@@ -44,7 +46,7 @@ type Queue struct {
 func NewQueue() *Queue {
 	q := new(Queue)
 	q.knownKeys = make(map[inst.InstanceKey]time.Time)
-	q.queue = make(chan inst.InstanceKey, initialCapacity)
+	q.queue = make(chan inst.InstanceKey, queueCapacity)
 	return q
 }
 
@@ -66,39 +68,17 @@ func (q *Queue) Push(key inst.InstanceKey) {
 	}
 
 	q.knownKeys[key] = time.Now()
-
-	// Instead of blocking on a full queue, allocate a larger
-	// queue if needed. That's not a very ideomatic but
-	// 1) we know the queue is at maximum as large as the number
-	// of hosts 2) we really don't want a discovery planner to
-	// block.
-	if len(q.queue) == cap(q.queue) {
-		var newQueue = make(chan inst.InstanceKey, cap(q.queue)*2)
-		close(q.queue)
-		for key := range q.queue {
-			newQueue <- key
-		}
-		q.queue = newQueue
-	}
-
 	q.queue <- key
 }
 
 // pop the entry and remove it from known keys;
 // blocks if queue is empty.
 func (q *Queue) Pop() inst.InstanceKey {
-	var key inst.InstanceKey
-	for {
-		q.Lock()
-		queue := q.queue
-		q.Unlock()
-		k, ok := <-queue
-		// we close channel sometimes (see above)
-		if ok {
-            key = k
-			break
-		}
-	}
+	q.Lock()
+	queue := q.queue
+	q.Unlock()
+
+	key := <-queue
 
 	q.Lock()
 	defer q.Unlock()
@@ -106,7 +86,7 @@ func (q *Queue) Pop() inst.InstanceKey {
 	// alarm if have been waiting for too long
 	timeOnQueue := time.Since(q.knownKeys[key])
 	if timeOnQueue > time.Duration(config.Config.InstancePollSeconds)*time.Second {
-		log.Warningf("key %v spent %v waiting on a discoveryQueue", key, time.Since(q.knownKeys[key]))
+		log.Warningf("key %v spent %.4fs waiting on a discoveryQueue", key, timeOnQueue.Seconds())
 	}
 
 	delete(q.knownKeys, key)
