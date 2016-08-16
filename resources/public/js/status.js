@@ -25,9 +25,10 @@ $(document).ready(function () {
     	health.Details.AvailableNodes.forEach(function(node) {
     		var values = node.split(";");
     		var hostname = values[0];
+    		var token = values[1];
     		var app_version = values[2];
-    		var message = hostname
-    		if (node == health.Details.ActiveNode) {
+    		var message = hostname;
+    		if (hostname + ";" + token == health.Details.ActiveNode) {
     			message += ' <span class="text-success">[Active]</span>';
     		}
     		if (hostname == health.Details.Hostname) {
