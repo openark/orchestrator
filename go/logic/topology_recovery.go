@@ -1131,7 +1131,7 @@ func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecov
 		return nil, nil, err
 	}
 	if !designatedInstance.MasterKey.Equals(&clusterMaster.Key) {
-		return nil, nil, fmt.Errorf("Sanity check failure. It seems like the desginated instance %+v does nto replicate from the master %+v. This error is strange. Panicking", designatedInstance.Key, clusterMaster.Key)
+		return nil, nil, fmt.Errorf("Sanity check failure. It seems like the designated instance %+v does not replicate from the master %+v (designated instance's master key is %+v). This error is strange. Panicking", designatedInstance.Key, clusterMaster.Key, designatedInstance.MasterKey)
 	}
 	if !designatedInstance.HasReasonableMaintenanceReplicationLag() {
 		return nil, nil, fmt.Errorf("Desginated instance %+v seems to be lagging to much for thie operation. Aborting.", designatedInstance.Key)
