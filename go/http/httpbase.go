@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/martini-contrib/auth"
+
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/process"
 )
@@ -76,6 +77,10 @@ func isAuthorizedForAction(req *http.Request, user auth.User) bool {
 			secretToken := strings.Split(cookie.Value, ":")[1]
 			result, _ := process.TokenIsValid(publicToken, secretToken)
 			return result
+		}
+	case "oauth":
+		{
+			return false
 		}
 	default:
 		{
