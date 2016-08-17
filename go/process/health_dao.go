@@ -53,24 +53,27 @@ func RegisterNode(extraInfo string, command string, firstTime bool) (sql.Result,
 	if firstTime {
 		db.ExecOrchestrator(`
 			insert ignore into node_health_history
-				(hostname, token, first_seen_active, extra_info, command)
+				(hostname, token, first_seen_active, extra_info, command, app_version)
 			values
-				(?, ?, NOW(), ?, ?)
+				(?, ?, NOW(), ?, ?, ?)
 			`,
 			ThisHostname, ProcessToken.Hash, extraInfo, command,
+			config.RuntimeCLIFlags.ConfiguredVersion,
 		)
 	}
 	return db.ExecOrchestrator(`
 			insert into node_health
-				(hostname, token, last_seen_active, extra_info, command)
+				(hostname, token, last_seen_active, extra_info, command, app_version)
 			values
-				(?, ?, NOW(), ?, ?)
+				(?, ?, NOW(), ?, ?, ?)
 			on duplicate key update
 				token=values(token),
 				last_seen_active=values(last_seen_active),
-				extra_info=if(values(extra_info) != '', values(extra_info), extra_info)
+				extra_info=if(values(extra_info) != '', values(extra_info), extra_info),
+				app_version=values(app_version)
 			`,
 		ThisHostname, ProcessToken.Hash, extraInfo, command,
+		config.RuntimeCLIFlags.ConfiguredVersion,
 	)
 }
 
@@ -163,7 +166,7 @@ func ReadAvailableNodes(onlyHttpNodes bool) ([]string, error) {
 	}
 	query := `
 		select
-			concat(hostname, ';', token) as node
+			concat(hostname, ';', token, ';', app_version) as node
 		from
 			node_health
 		where
