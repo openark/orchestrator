@@ -186,6 +186,27 @@ func ReadAvailableNodes(onlyHttpNodes bool) ([]string, error) {
 	return res, err
 }
 
+func TokenBelongsToHealthyHttpService(token string) (result bool, err error) {
+	extraInfo := string(OrchestratorExecutionHttpMode)
+
+	query := `
+		select
+			token
+		from
+			node_health
+		where
+			and token = ?
+			and extra_info = ?
+		`
+
+	err = db.QueryOrchestrator(query, sqlutils.Args(token, extraInfo), func(m sqlutils.RowMap) error {
+		// Row exists? We're happy
+		result = true
+		return nil
+	})
+	return result, log.Errore(err)
+}
+
 // Just check to make sure we can connect to the database
 func SimpleHealthTest() (*HealthStatus, error) {
 	health := HealthStatus{Healthy: false, Hostname: ThisHostname, Token: ProcessToken.Hash}

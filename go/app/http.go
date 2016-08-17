@@ -14,7 +14,6 @@
    limitations under the License.
 */
 
-//
 package app
 
 import (
@@ -26,6 +25,7 @@ import (
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/gzip"
 	"github.com/martini-contrib/render"
+	"github.com/martini-contrib/sessions"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/http"
@@ -33,8 +33,12 @@ import (
 	"github.com/outbrain/orchestrator/go/logic"
 	"github.com/outbrain/orchestrator/go/process"
 	"github.com/outbrain/orchestrator/go/ssl"
+
+	martinioauth2 "github.com/martini-contrib/oauth2"
+	golang_oauth2 "golang.org/x/oauth2"
 )
 
+var oauthStateString = process.ProcessToken.Hash
 var sslPEMPassword []byte
 var agentSSLPEMPassword []byte
 
@@ -92,6 +96,19 @@ func standardHttp(discovery bool) {
 				}
 				return auth.SecureCompare(username, config.Config.HTTPAuthUser) && auth.SecureCompare(password, config.Config.HTTPAuthPassword)
 			}))
+		}
+	case "oauth":
+		{
+			oauthConf := &golang_oauth2.Config{
+				ClientID:     config.Config.OAuthClientId,
+				ClientSecret: config.Config.OAuthClientSecret,
+				Scopes:       config.Config.OAuthScopes,
+				RedirectURL:  "http://localhost:3000/oauth2callback",
+			}
+			m.Use(sessions.Sessions("oauth_session", sessions.NewCookieStore([]byte("oauth_secret"))))
+			m.Use(martinioauth2.Github(oauthConf))
+			m.Use(martinioauth2.LoginRequired)
+			m.Map(auth.User(""))
 		}
 	default:
 		{
