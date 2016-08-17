@@ -31,7 +31,6 @@ create table if not exists pseudo_gtid_status (
   pseudo_gtid_hint            varchar(255) charset ascii not null,
   PRIMARY KEY (anchor)
 );
-truncate pseudo_gtid_status;
 
 drop event if exists create_pseudo_gtid_event;
 delimiter $$
