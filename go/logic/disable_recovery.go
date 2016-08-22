@@ -74,7 +74,7 @@ func DisableRecovery() error {
 // EnableRecovery ensures recoveries are enabled globally
 func EnableRecovery() error {
 	_, err := db.ExecOrchestrator(`
-		DELETE FROM global_recovery_disable -- deliberately no WHERE clause
+		DELETE FROM global_recovery_disable
 	`,
 	)
 	return err
