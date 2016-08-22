@@ -33,10 +33,6 @@ import (
 	"time"
 )
 
-// Size of discovery queue. Should be greater than the total number
-// of machines being discovered.
-const queueCapacity = 100000
-
 type Queue struct {
 	sync.Mutex
 	queue     chan inst.InstanceKey
@@ -46,7 +42,7 @@ type Queue struct {
 func NewQueue() *Queue {
 	q := new(Queue)
 	q.knownKeys = make(map[inst.InstanceKey]time.Time)
-	q.queue = make(chan inst.InstanceKey, queueCapacity)
+	q.queue = make(chan inst.InstanceKey, config.Config.DiscoveryQueueCapacity)
 	return q
 }
 
