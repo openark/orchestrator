@@ -283,7 +283,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		}
 		masterKey.Hostname, resolveErr = ResolveHostname(masterKey.Hostname)
 		if resolveErr != nil {
-			logReadTopologyInstanceError(instanceKey, fmt.Sprintf("ResolveHostname(%+v)", masterKey.Hostname), resolveErr)
+			logReadTopologyInstanceError(instanceKey, fmt.Sprintf("ResolveHostname(%q)", masterKey.Hostname), resolveErr)
 		}
 		instance.MasterKey = *masterKey
 		instance.IsDetachedMaster = instance.MasterKey.IsDetached()
@@ -1604,7 +1604,7 @@ func GetHeuristicClusterDomainInstanceAttribute(clusterName string) (instanceKey
 }
 
 // ReadOutdatedInstanceKeys reads and returns keys for all instances that are not up to date (i.e.
-// pre-configured time has passed since they were last cheked)
+// pre-configured time has passed since they were last checked)
 // But we also check for the case where an attempt at instance checking has been made, that hasn't
 // resulted in an actual check! This can happen when TCP/IP connections are hung, in which case the "check"
 // never returns. In such case we multiply interval by a factor, so as not to open too many connections on

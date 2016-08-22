@@ -26,6 +26,7 @@ import (
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/go/agent"
 	"github.com/outbrain/orchestrator/go/config"
+	"github.com/outbrain/orchestrator/go/discovery"
 	"github.com/outbrain/orchestrator/go/inst"
 	ometrics "github.com/outbrain/orchestrator/go/metrics"
 	"github.com/outbrain/orchestrator/go/process"
@@ -33,13 +34,10 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
-const (
-	maxConcurrency = 5
-)
-
-// discoveryInstanceKeys is a channel of instanceKey-s that were requested for discovery.
-// It can be continuously updated as discovery process progresses.
-var discoveryInstanceKeys = make(chan inst.InstanceKey, maxConcurrency)
+// discoveryQueue is a channel of deduplicated instanceKey-s
+// that were requested for discovery.  It can be continuously updated
+// as discovery process progresses.
+var discoveryQueue = discovery.NewQueue()
 
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
@@ -58,7 +56,7 @@ func init() {
 	metrics.Register("discoveries.recent_count", discoveryRecentCountGauge)
 	metrics.Register("elect.is_elected", isElectedGauge)
 
-	ometrics.OnGraphiteTick(func() { discoveryQueueLengthGauge.Update(int64(len(discoveryInstanceKeys))) })
+	ometrics.OnGraphiteTick(func() { discoveryQueueLengthGauge.Update(int64(discoveryQueue.Len())) })
 	ometrics.OnGraphiteTick(func() {
 		if recentDiscoveryOperationKeys == nil {
 			return
@@ -85,24 +83,32 @@ func acceptSignals() {
 	}()
 }
 
-// handleDiscoveryRequests iterates the discoveryInstanceKeys channel and calls upon
+// handleDiscoveryRequests iterates the discoveryQueue channel and calls upon
 // instance discovery per entry.
 func handleDiscoveryRequests() {
-	for instanceKey := range discoveryInstanceKeys {
-		// Possibly this used to be the elected node, but has been demoted, while still
-		// the queue is full.
-		// Just don't process the queue when not elected.
-		if atomic.LoadInt64(&isElectedNode) == 1 {
-			go discoverInstance(instanceKey)
-		} else {
-			log.Debugf("Node apparently demoted. Skipping discovery of %+v. Remaining queue size: %+v", instanceKey, len(discoveryInstanceKeys))
-		}
+	// create a pool of discovery workers
+	for i := uint(0); i < config.Config.DiscoveryMaxConcurrency; i++ {
+		go func() {
+			for {
+				instanceKey := discoveryQueue.Pop()
+				// Possibly this used to be the elected node, but has
+				// been demoted, while still the queue is full.
+				if atomic.LoadInt64(&isElectedNode) != 1 {
+					log.Debugf("Node apparently demoted. Skipping discovery of %+v. "+
+						"Remaining queue size: %+v", instanceKey, discoveryQueue.Len())
+					return
+				}
+				discoverInstance(instanceKey)
+			}
+		}()
 	}
 }
 
 // discoverInstance will attempt discovering an instance (unless it is already up to date) and will
 // list down its master and slaves (if any) for further discovery.
 func discoverInstance(instanceKey inst.InstanceKey) {
+	start := time.Now()
+
 	instanceKey.Formalize()
 	if !instanceKey.IsValid() {
 		return
@@ -114,23 +120,24 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	}
 
 	instance, found, err := inst.ReadInstance(&instanceKey)
-
 	if found && instance.IsUpToDate && instance.IsLastCheckValid {
 		// we've already discovered this one. Skip!
 		return
 	}
+
 	discoveriesCounter.Inc(1)
+
 	// First we've ever heard of this instance. Continue investigation:
 	instance, err = inst.ReadTopologyInstance(&instanceKey)
 	// panic can occur (IO stuff). Therefore it may happen
 	// that instance is nil. Check it.
 	if instance == nil {
 		failedDiscoveriesCounter.Inc(1)
-		log.Warningf("instance is nil in discoverInstance. key=%+v, error=%+v", instanceKey, err)
+		log.Warningf("discoverInstance(%+v) instance is nil in %.3fs, error=%+v", instanceKey, time.Since(start).Seconds(), err)
 		return
 	}
 
-	log.Debugf("Discovered host: %+v, master: %+v, version: %+v", instance.Key, instance.MasterKey, instance.Version)
+	log.Debugf("Discovered host: %+v, master: %+v, version: %+v in %.3fs", instance.Key, instance.MasterKey, instance.Version, time.Since(start).Seconds())
 
 	if atomic.LoadInt64(&isElectedNode) == 0 {
 		// Maybe this node was elected before, but isn't elected anymore.
@@ -142,12 +149,12 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	for _, slaveKey := range instance.SlaveHosts.GetInstanceKeys() {
 		slaveKey := slaveKey
 		if slaveKey.IsValid() {
-			discoveryInstanceKeys <- slaveKey
+			discoveryQueue.Push(slaveKey)
 		}
 	}
 	// Investigate master:
 	if instance.MasterKey.IsValid() {
-		discoveryInstanceKeys <- instance.MasterKey
+		discoveryQueue.Push(instance.MasterKey)
 	}
 }
 
@@ -205,11 +212,9 @@ func ContinuousDiscovery() {
 					for _, instanceKey := range instanceKeys {
 						instanceKey := instanceKey
 
-						go func() {
-							if instanceKey.IsValid() {
-								discoveryInstanceKeys <- instanceKey
-							}
-						}()
+						if instanceKey.IsValid() {
+							discoveryQueue.Push(instanceKey)
+						}
 					}
 					if wasAlreadyElected == 0 {
 						// Just turned to be leader!
