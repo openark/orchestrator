@@ -96,7 +96,7 @@ func handleDiscoveryRequests() {
 				if atomic.LoadInt64(&isElectedNode) != 1 {
 					log.Debugf("Node apparently demoted. Skipping discovery of %+v. "+
 						"Remaining queue size: %+v", instanceKey, discoveryQueue.Len())
-					return
+					continue
 				}
 				discoverInstance(instanceKey)
 			}
