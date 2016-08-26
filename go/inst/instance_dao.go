@@ -1836,7 +1836,6 @@ func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, up
 	if err != nil {
 		log.Fatalf("Failed to build query: %v", err)
 	}
-	log.Infof("will insert (writeMany)", insertQuery)
 
 	_, err = db.ExecOrchestrator(insertQuery, args...)
 	if err != nil {
