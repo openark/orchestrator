@@ -1630,6 +1630,7 @@ The following is a complete list of configuration parameters. "Complete" is alwa
 * `MySQLOrchestratorPassword`   (string), credentials for backend MySQL server
 * `MySQLOrchestratorCredentialsConfigFile`  (string), as an alternative to providing `MySQLOrchestratorUser`, `MySQLOrchestratorPassword`, name of file in `my.cnf`-like format where credentials are stored.
 * `MySQLConnectTimeoutSeconds`  (int), Number of seconds before connection is aborted (driver-side)
+* `MySQLReadTimeoutSeconds`     (int), Number of seconds to wait for a response from the MySQL server before connection is aborted (driver-side)
 * `MySQLHostnameResolveMethod` (string), Method to resolve how to reach the MySQL instance. This is more powerful than `HostnameResolveMethod` and is ideal for complex setups like multiple instances on a host with a VIP per instance. Defaults to `none` but can be set to `@@report_host`
 * `DefaultInstancePort` (int), In case port was not specified on command line (default value for this default is `3306`)
 * `SkipOrchestratorDatabaseUpdate`  (bool), When false, orchestrator will attempt to create & update all tables in backend database; when true, this is skipped. It makes sense to skip on command-line invocations and to enable for http or occasional invocations, or just after upgrades
