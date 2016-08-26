@@ -856,7 +856,7 @@ func OpenTopology(host string, port int) (*sql.DB, error) {
 		config.Config.MySQLTopologyPassword,
 		host, port,
 		config.Config.MySQLConnectTimeoutSeconds,
-		config.Config.MySQLReadTimeoutSeconds,
+		config.Config.MySQLTopologyReadTimeoutSeconds,
 	)
 	if config.Config.MySQLTopologyUseMutualTLS {
 		mysql_uri, _ = SetupMySQLTopologyTLS(mysql_uri)
@@ -903,7 +903,7 @@ func OpenOrchestrator() (*sql.DB, error) {
 		config.Config.MySQLOrchestratorPort,
 		config.Config.MySQLOrchestratorDatabase,
 		config.Config.MySQLConnectTimeoutSeconds,
-		config.Config.MySQLReadTimeoutSeconds,
+		config.Config.MySQLOrchestratorReadTimeoutSeconds,
 	)
 	if config.Config.MySQLOrchestratorUseMutualTLS {
 		mysql_uri, _ = SetupMySQLOrchestratorTLS(mysql_uri)
