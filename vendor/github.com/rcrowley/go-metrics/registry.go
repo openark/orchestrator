@@ -171,7 +171,8 @@ func (r *PrefixedRegistry) Each(fn func(string, interface{})) {
 
 // Get the metric by the given name or nil if none is registered.
 func (r *PrefixedRegistry) Get(name string) interface{} {
-	return r.underlying.Get(name)
+	realName := r.prefix + name
+	return r.underlying.Get(realName)
 }
 
 // Gets an existing metric or registers the given one.
