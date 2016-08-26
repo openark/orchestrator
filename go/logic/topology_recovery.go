@@ -1020,9 +1020,15 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 
 // CheckAndRecover is the main entry point for the recovery mechanism
 func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *inst.InstanceKey, skipProcesses bool) (recoveryAttempted bool, promotedSlaveKey *inst.InstanceKey, err error) {
+	// Allow the analysis to run evern if we don't want to recover
 	replicationAnalysis, err := inst.GetReplicationAnalysis("", true, true)
 	if err != nil {
 		return false, nil, log.Errore(err)
+	}
+	// Check for recovery being disabled globally
+	recoveryDisabledGlobally, err := IsRecoveryDisabled()
+	if err != nil {
+		log.Warningf("Unable to determine if recovery is disabled globally: %v", err)
 	}
 	if *config.RuntimeCLIFlags.Noop {
 		log.Debugf("--noop provided; will not execute processes")
@@ -1047,6 +1053,10 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 			if topologyRecovery != nil {
 				promotedSlaveKey = topologyRecovery.SuccessorKey
 			}
+		} else if recoveryDisabledGlobally {
+			log.Infof("CheckAndRecover: InstanceKey: %+v, candidateInstanceKey: %+v, "+
+				"skipProcesses: %v: NOT Recovering host (disabled globally)",
+				analysisEntry.AnalyzedInstanceKey, candidateInstanceKey, skipProcesses)
 		} else {
 			go executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, false, skipProcesses)
 		}
