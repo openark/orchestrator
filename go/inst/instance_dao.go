@@ -97,11 +97,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	slaveStatusFound := false
 	var resolveErr error
 
-	// Before we even begin anything, declare that we're about to cehck this instance.If anything goes wrong network-wise,
-	// this is our source of truth in terms of instance being inaccessible
-	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
-
 	if !instanceKey.IsValid() {
+		_ = UpdateInstanceLastAttemptedCheck(instanceKey)
 		return instance, fmt.Errorf("ReadTopologyInstance will not act on invalid instance key: %+v", *instanceKey)
 	}
 
@@ -536,10 +533,14 @@ Cleanup:
 		_ = writeInstance(instance, instanceFound, err)
 		WriteLongRunningProcesses(&instance.Key, longRunningProcesses)
 		return instance, nil
-	} else {
-		_ = UpdateInstanceLastChecked(&instance.Key)
-		return nil, fmt.Errorf("Failed ReadTopologyInstance")
 	}
+
+	// Something is wrong, could be network-wise. Record that we
+	// tried to check the instance. last_attempted_check is also
+	// updated on success by writeInstance.
+	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
+	_ = UpdateInstanceLastChecked(&instance.Key)
+	return nil, fmt.Errorf("Failed ReadTopologyInstance")
 }
 
 // ReadInstanceClusterAttributes will return the cluster name for a given instance by looking at its master
