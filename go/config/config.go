@@ -65,6 +65,7 @@ type Configuration struct {
 	MySQLConnectTimeoutSeconds                   int      // Number of seconds before connection is aborted (driver-side)
 	MySQLOrchestratorReadTimeoutSeconds          int      // Number of seconds before backend mysql read operation is aborted (driver-side)
 	MySQLTopologyReadTimeoutSeconds              int      // Number of seconds before topology mysql read operation is aborted (driver-side)
+	MySQLInterpolateParams                       bool     // Do not use sql prepare statement if true
 	DefaultInstancePort                          int      // In case port was not specified on command line
 	SlaveLagQuery                                string   // custom query to check on slave lg (e.g. heartbeat table)
 	SlaveStartPostWaitMilliseconds               int      // Time to wait after START SLAVE before re-readong instance (give slave chance to connect to master)
@@ -219,6 +220,7 @@ func newConfiguration() *Configuration {
 		MySQLConnectTimeoutSeconds:                   2,
 		MySQLOrchestratorReadTimeoutSeconds:          30,
 		MySQLTopologyReadTimeoutSeconds:              10,
+		MySQLInterpolateParams:                       false,
 		DefaultInstancePort:                          3306,
 		InstancePollSeconds:                          5,
 		ReadLongRunningQueries:                       true,
