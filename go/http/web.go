@@ -26,6 +26,8 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/render"
+	"github.com/rcrowley/go-metrics"
+	"github.com/rcrowley/go-metrics/exp"
 
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/inst"
@@ -436,4 +438,7 @@ func (this *HttpWeb) RegisterDebug(m *martini.ClassicMartini) {
 	m.Get("/debug/pprof/heap", pprof.Handler("heap").ServeHTTP)
 	m.Get("/debug/pprof/goroutine", pprof.Handler("goroutine").ServeHTTP)
 	m.Get("/debug/pprof/threadcreate", pprof.Handler("threadcreate").ServeHTTP)
+
+	// go-metrics
+	m.Get("/debug/metrics", exp.ExpHandler(metrics.DefaultRegistry))
 }
