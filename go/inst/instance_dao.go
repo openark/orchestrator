@@ -79,9 +79,14 @@ func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err err
 	return log.Errorf("ReadTopologyInstance(%+v) %+v: %+v", *instanceKey, hint, err)
 }
 
-// ReadTopologyInstance connects to a topology MySQL instance and reads its configuration and
-// replication status. It writes read info into orchestrator's backend.
 func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
+	return ReadTopologyInstanceX(instanceKey, false)
+}
+
+// ReadTopologyInstanceX connects to a topology MySQL instance and reads its configuration and
+// replication status. It writes read info into orchestrator's backend.
+// Writes are optionally buffered.
+func ReadTopologyInstanceX(instanceKey *InstanceKey, bufferWrites bool) (*Instance, error) {
 	defer func() {
 		if err := recover(); err != nil {
 			logReadTopologyInstanceError(instanceKey, "Unexpected, aborting", fmt.Errorf("%+v", err))
@@ -532,7 +537,11 @@ Cleanup:
 		instance.IsLastCheckValid = true
 		instance.IsRecentlyChecked = true
 		instance.IsUpToDate = true
-		enqueueInstanceWrite(instance, instanceFound, err)
+		if bufferWrites {
+			enqueueInstanceWrite(instance, instanceFound, err)
+		} else {
+			writeInstance(instance, instanceFound, err)
+		}
 		WriteLongRunningProcesses(&instance.Key, longRunningProcesses)
 		return instance, nil
 	}
