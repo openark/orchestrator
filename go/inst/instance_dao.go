@@ -29,7 +29,7 @@ import (
 	"github.com/outbrain/orchestrator/go/attributes"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
-	"github.com/pmylund/go-cache"
+	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
 )
 
