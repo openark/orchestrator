@@ -29,7 +29,7 @@ import (
 	"github.com/outbrain/orchestrator/go/attributes"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
-	"github.com/pmylund/go-cache"
+	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -332,9 +332,23 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	if config.Config.DiscoverByShowSlaveHosts || isMaxScale {
 		err := sqlutils.QueryRowsMap(db, `show slave hosts`,
 			func(m sqlutils.RowMap) error {
-				slaveKey, err := NewInstanceKeyFromStrings(m.GetString("Host"), m.GetString("Port"))
+				// MaxScale 1.1 may trigger an error with this command, but
+				// also we may see issues if anything on the MySQL server locks up.
+				// Consequently it's important to validate the values received look
+				// good prior to calling ResolveHostname()
+				host := m.GetString("Host")
+				port := m.GetString("Port")
+				if host == "" || port == "" {
+					if isMaxScale110 && host == "" && port == "0" {
+						// MaxScale 1.1.0 reports a bad response sometimes so ignore it.
+						return nil
+					}
+					// otherwise report the error to the caller
+					return fmt.Errorf("ReadTopologyInstance(%+v) 'show slave hosts' returned row with <host,port>: <%v,%v>", instanceKey, host, port)
+				}
+				// Note: NewInstanceKeyFromStrings calls ResolveHostname() implicitly
+				slaveKey, err := NewInstanceKeyFromStrings(host, port)
 				if err == nil && slaveKey.IsValid() {
-					slaveKey.Hostname, resolveErr = ResolveHostname(slaveKey.Hostname)
 					instance.AddSlaveKey(slaveKey)
 					foundByShowSlaveHosts = true
 				}

@@ -27,7 +27,7 @@ import (
 	"github.com/outbrain/golib/sqlutils"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/db"
-	"github.com/pmylund/go-cache"
+	"github.com/patrickmn/go-cache"
 )
 
 const maxEmptyBinlogFiles int = 10

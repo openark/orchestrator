@@ -30,7 +30,7 @@ import (
 	"github.com/outbrain/orchestrator/go/inst"
 	ometrics "github.com/outbrain/orchestrator/go/metrics"
 	"github.com/outbrain/orchestrator/go/process"
-	"github.com/pmylund/go-cache"
+	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
 )
 
