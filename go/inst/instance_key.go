@@ -95,7 +95,7 @@ func ParseInstanceKeyLoose(hostPort string) (*InstanceKey, error) {
 
 // Formalize this key by getting CNAME for hostname
 func (this *InstanceKey) Formalize() *InstanceKey {
-	if this == nil || this.hostname == "" {
+	if this == nil || this.Hostname == "" {
 		return nil
 	}
 
