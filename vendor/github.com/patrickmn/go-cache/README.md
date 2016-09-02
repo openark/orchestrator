@@ -15,13 +15,14 @@ one) to recover from downtime quickly. (See the docs for `NewFrom()` for caveats
 
 ### Installation
 
-`go get github.com/pmylund/go-cache`
+`go get github.com/patrickmn/go-cache`
 
 ### Usage
 
+```go
 	import (
 		"fmt"
-		"github.com/pmylund/go-cache"
+		"github.com/patrickmn/go-cache"
 		"time"
 	)
 
@@ -99,8 +100,8 @@ one) to recover from downtime quickly. (See the docs for `NewFrom()` for caveats
 		// 2
 
 	}
-
+```
 
 ### Reference
 
-`godoc` or [http://godoc.org/github.com/pmylund/go-cache](http://godoc.org/github.com/pmylund/go-cache)
+`godoc` or [http://godoc.org/github.com/patrickmn/go-cache](http://godoc.org/github.com/patrickmn/go-cache)

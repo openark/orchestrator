@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/go/config"
-	"github.com/pmylund/go-cache"
+	"github.com/patrickmn/go-cache"
 	"net"
 	"regexp"
 	"strings"
@@ -182,7 +182,7 @@ func ResetHostnameResolveCache() error {
 	return err
 }
 
-func HostnameResolveCache() (map[string]*cache.Item, error) {
+func HostnameResolveCache() (map[string]cache.Item, error) {
 	return hostnameResolvesLightweightCache.Items(), nil
 }
 

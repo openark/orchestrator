@@ -28,7 +28,7 @@ import (
 	"github.com/outbrain/orchestrator/go/inst"
 	"github.com/outbrain/orchestrator/go/os"
 	"github.com/outbrain/orchestrator/go/process"
-	"github.com/pmylund/go-cache"
+	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
 )
 
