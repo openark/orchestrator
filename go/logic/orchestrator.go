@@ -221,7 +221,12 @@ func ContinuousDiscovery() {
 						go process.RegisterNode("", "", false)
 					}
 				} else {
-					log.Debugf("Not elected as active node; polling")
+					hostname, _, _, err := process.ElectedNode()
+					if err == nil {
+						log.Debugf("Not elected as active node; active node: %v; polling", hostname)
+					} else {
+						log.Debugf("Not elected as active node; active node: Unable to determine: %v; polling", err)
+					}
 				}
 			}()
 		case <-instancePollTick:
