@@ -1874,6 +1874,13 @@ type instanceUpdateObject struct {
 	lastError                error
 }
 
+// instances sorter by instanceKey
+type byInstanceKey []*Instance
+
+func (a byInstanceKey) Len() int           { return len(a) }
+func (a byInstanceKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byInstanceKey) Less(i, j int) bool { return a[i].Key.SmallerThan(&a[j].Key) }
+
 // Up to instanceWriteBufferSize are flushed in one INSERT ODKU query.
 const instanceWriteBufferSize = 100
 
@@ -1910,6 +1917,9 @@ func flushInstanceWriteBuffer() {
 			log.Debugf("writeInstance: will not update database_instance.last_seen due to error: %+v", upd.lastError)
 		}
 	}
+	// sort instances by instanceKey (table pk) to make locking predictable
+	sort.Sort(byInstanceKey(instances))
+	sort.Sort(byInstanceKey(lastseen))
 
 	writeFunc := func() error {
 		err := writeManyInstances(instances, true, false)
