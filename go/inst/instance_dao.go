@@ -60,6 +60,21 @@ func init() {
 	metrics.Register("instance.read_topology", readTopologyInstanceCounter)
 	metrics.Register("instance.read", readInstanceCounter)
 	metrics.Register("instance.write", writeInstanceCounter)
+
+	// spin off instance write buffer flushing
+	go func() {
+		flushTick := time.Tick(instanceFlushIntervalMilliseconds * time.Millisecond)
+		for {
+			// it is time to flush
+			select {
+			case <-flushTick:
+				flushInstanceWriteBuffer()
+			case <-forceFlushInstanceWriteBuffer:
+				flushInstanceWriteBuffer()
+			}
+		}
+	}()
+
 }
 
 // ExecDBWriteFunc chooses how to execute a write onto the database: whether synchronuously or not
@@ -1859,13 +1874,20 @@ type instanceUpdateObject struct {
 	lastError                error
 }
 
+// Up to instanceWriteBufferSize are flushed in one INSERT ODKU query.
 const instanceWriteBufferSize = 100
 
+// Max interval between buffer flushes
+const instanceFlushIntervalMilliseconds = 100
+
 var instanceWriteBuffer = make(chan instanceUpdateObject, instanceWriteBufferSize)
+var forceFlushInstanceWriteBuffer = make(chan bool)
 
 func enqueueInstanceWrite(instance *Instance, instanceWasActuallyFound bool, lastError error) {
 	if len(instanceWriteBuffer) == instanceWriteBufferSize {
-		flushInstanceWriteBuffer()
+		// Signal the "flushing" gorouting that there's work.
+		// We prefer doing all bulk flushes from one goroutine.
+		forceFlushInstanceWriteBuffer <- true
 	}
 	instanceWriteBuffer <- instanceUpdateObject{instance, instanceWasActuallyFound, lastError}
 }
@@ -1874,6 +1896,10 @@ func enqueueInstanceWrite(instance *Instance, instanceWasActuallyFound bool, las
 func flushInstanceWriteBuffer() {
 	var instances []*Instance
 	var lastseen []*Instance // instances to update with last_seen field
+
+	if len(instanceWriteBuffer) == 0 {
+		return
+	}
 
 	for i := 0; i < len(instanceWriteBuffer); i++ {
 		upd := <-instanceWriteBuffer
