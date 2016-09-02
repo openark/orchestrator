@@ -60,8 +60,12 @@ func ParseRawInstanceKeyLoose(hostPort string) (*InstanceKey, error) {
 func NewInstanceKeyFromStrings(hostname string, port string) (*InstanceKey, error) {
 	instanceKey := &InstanceKey{}
 	var err error
+
+	if hostname == "" || port == "" {
+		return instanceKey, fmt.Errorf("NewInstanceKeyFromString: Empty hostname: %q or port: %q", hostname, port)
+	}
 	if instanceKey.Port, err = strconv.Atoi(port); err != nil {
-		return instanceKey, fmt.Errorf("Invalid port: %s", port)
+		return instanceKey, fmt.Errorf("NewInstanceKeyFromString: Invalid port: %s", port)
 	}
 
 	if instanceKey.Hostname, err = ResolveHostname(hostname); err != nil {
@@ -91,6 +95,10 @@ func ParseInstanceKeyLoose(hostPort string) (*InstanceKey, error) {
 
 // Formalize this key by getting CNAME for hostname
 func (this *InstanceKey) Formalize() *InstanceKey {
+	if this == nil || this.hostname == "" {
+		return nil
+	}
+
 	this.Hostname, _ = ResolveHostname(this.Hostname)
 	return this
 }
