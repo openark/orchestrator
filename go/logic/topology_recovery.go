@@ -125,6 +125,9 @@ var recoverDeadIntermediateMasterFailureCounter = metrics.NewCounter()
 var recoverDeadCoMasterCounter = metrics.NewCounter()
 var recoverDeadCoMasterSuccessCounter = metrics.NewCounter()
 var recoverDeadCoMasterFailureCounter = metrics.NewCounter()
+var recoverUnreachableMasterWithStaleSlavesCounter = metrics.NewCounter()
+var recoverUnreachableMasterWithStaleSlavesSuccessCounter = metrics.NewCounter()
+var recoverUnreachableMasterWithStaleSlavesFailureCounter = metrics.NewCounter()
 
 func init() {
 	metrics.Register("recover.dead_master.start", recoverDeadMasterCounter)
@@ -136,6 +139,9 @@ func init() {
 	metrics.Register("recover.dead_co_master.start", recoverDeadCoMasterCounter)
 	metrics.Register("recover.dead_co_master.success", recoverDeadCoMasterSuccessCounter)
 	metrics.Register("recover.dead_co_master.fail", recoverDeadCoMasterFailureCounter)
+	metrics.Register("recover.unreach_master_stale_slaves.start", recoverUnreachableMasterWithStaleSlavesCounter)
+	metrics.Register("recover.unreach_master_stale_slaves.success", recoverUnreachableMasterWithStaleSlavesSuccessCounter)
+	metrics.Register("recover.unreach_master_stale_slaves.fail", recoverUnreachableMasterWithStaleSlavesFailureCounter)
 }
 
 // replaceCommandPlaceholders replaces agreed-upon placeholders with analysis data
@@ -903,6 +909,26 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 	return true, topologyRecovery, err
 }
 
+// checkAndRecoverUnreachableMasterWithStaleSlaves executes an external process. No other action is taken.
+// Returns false.
+func checkAndRecoverUnreachableMasterWithStaleSlaves(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (bool, *TopologyRecovery, error) {
+	topologyRecovery, err := AttemptRecoveryRegistration(&analysisEntry, !forceInstanceRecovery, !forceInstanceRecovery)
+	if topologyRecovery == nil {
+		log.Debugf("topology_recovery: found an active or recent recovery on %+v. Will not issue another UnreachableMasterWithStaleSlaves.", analysisEntry.AnalyzedInstanceKey)
+	} else {
+		recoverUnreachableMasterWithStaleSlavesCounter.Inc(1)
+		if !skipProcesses {
+			err := executeProcesses(config.Config.UnreachableMasterWithStaleSlavesProcesses, "UnreachableMasterWithStaleSlavesProcesses", topologyRecovery, false)
+			if err != nil {
+				recoverUnreachableMasterWithStaleSlavesFailureCounter.Inc(1)
+			} else {
+				recoverUnreachableMasterWithStaleSlavesSuccessCounter.Inc(1)
+			}
+		}
+	}
+	return false, nil, err
+}
+
 // checkAndRecoverGenericProblem is a general-purpose recovery function
 func checkAndRecoverGenericProblem(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (bool, *TopologyRecovery, error) {
 	return false, nil, nil
@@ -979,7 +1005,7 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	case inst.FirstTierSlaveFailingToConnectToMaster:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
 	case inst.UnreachableMasterWithStaleSlaves:
-		checkAndRecoverFunction = checkAndRecoverGenericProblem
+		checkAndRecoverFunction = checkAndRecoverUnreachableMasterWithStaleSlaves
 	}
 	// Right now this is mostly causing noise with no clear action.
 	// Will revisit this in the future.
