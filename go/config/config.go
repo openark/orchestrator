@@ -166,6 +166,7 @@ type Configuration struct {
 	PostUnsuccessfulFailoverProcesses            []string          // Processes to execute after a not-completely-successful failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {successorAlias}, {countSlaves}, {slaveHosts}, {isDowntimed}, {isSuccessful}, {lostSlaves}
 	PostMasterFailoverProcesses                  []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
 	PostIntermediateMasterFailoverProcesses      []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
+	UnreachableMasterWithStaleSlavesProcesses    []string          // Processes to execute when detecting an UnreachableMasterWithStaleSlaves scenario.
 	CoMasterRecoveryMustPromoteOtherCoMaster     bool              // When 'false', anything can get promoted (and candidates are prefered over others). When 'true', orchestrator will promote the other co-master or else fail
 	DetachLostSlavesAfterMasterFailover          bool              // Should slaves that are not to be lost in master recovery (i.e. were more up-to-date than promoted slave) be forcibly detached
 	ApplyMySQLPromotionAfterMasterFailover       bool              // Should orchestrator take upon itself to apply MySQL master promotion: set read_only=0, detach replication, etc.
@@ -311,6 +312,7 @@ func newConfiguration() *Configuration {
 		PostIntermediateMasterFailoverProcesses:      []string{},
 		PostFailoverProcesses:                        []string{},
 		PostUnsuccessfulFailoverProcesses:            []string{},
+		UnreachableMasterWithStaleSlavesProcesses:    []string{},
 		CoMasterRecoveryMustPromoteOtherCoMaster:     true,
 		DetachLostSlavesAfterMasterFailover:          true,
 		ApplyMySQLPromotionAfterMasterFailover:       false,
