@@ -1190,7 +1190,7 @@ func ResetMasterGTIDOperation(instanceKey *InstanceKey, removeSelfUUID bool, uui
 	if err != nil {
 		return instance, err
 	}
-	if !instance.UsingOracleGTID {
+	if !instance.SupportsOracleGTID {
 		return instance, log.Errorf("reset-master-gtid requested for %+v but it is not using oracle-gtid", *instanceKey)
 	}
 	if len(instance.SlaveHosts) > 0 {
