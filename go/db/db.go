@@ -863,14 +863,25 @@ var topologyTLSConfigured bool = false
 // Track if a TLS has already been configured for Orchestrator
 var orchestratorTLSConfigured bool = false
 
-// OpenTopology returns a DB instance to access a topology instance
+// OpenDiscovery returns a DB instance to access a topology instance.
+// It has lower read timeout than OpenTopology and is intended to
+// be used with low-latency discovery queries.
+func OpenDiscovery(host string, port int) (*sql.DB, error) {
+	return openTopology(host, port, config.Config.MySQLDiscoveryReadTimeoutSeconds)
+}
+
+// OpenTopology returns a DB instance to access a topology instance.
 func OpenTopology(host string, port int) (*sql.DB, error) {
+	return openTopology(host, port, config.Config.MySQLTopologyReadTimeoutSeconds)
+}
+
+func openTopology(host string, port int, readTimeout int) (*sql.DB, error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/?timeout=%ds&readTimeout=%ds",
 		config.Config.MySQLTopologyUser,
 		config.Config.MySQLTopologyPassword,
 		host, port,
 		config.Config.MySQLConnectTimeoutSeconds,
-		config.Config.MySQLTopologyReadTimeoutSeconds,
+		readTimeout,
 	)
 	if config.Config.MySQLTopologyUseMutualTLS {
 		mysql_uri, _ = SetupMySQLTopologyTLS(mysql_uri)

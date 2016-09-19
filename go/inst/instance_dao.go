@@ -105,7 +105,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, fmt.Errorf("ReadTopologyInstance will not act on invalid instance key: %+v", *instanceKey)
 	}
 
-	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	db, err := db.OpenDiscovery(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
 		goto Cleanup
 	}
