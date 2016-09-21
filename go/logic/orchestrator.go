@@ -96,9 +96,15 @@ func handleDiscoveryRequests() {
 				if atomic.LoadInt64(&isElectedNode) != 1 {
 					log.Debugf("Node apparently demoted. Skipping discovery of %+v. "+
 						"Remaining queue size: %+v", instanceKey, discoveryQueue.Len())
+
+					discoveryQueue.Release(instanceKey)
+
 					continue
 				}
+
 				discoverInstance(instanceKey)
+
+				discoveryQueue.Release(instanceKey)
 			}
 		}()
 	}
@@ -113,8 +119,6 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		if discoveryTime > time.Duration(config.Config.InstancePollSeconds)*time.Second {
 			log.Warningf("discoverInstance for key %v took %.4fs", instanceKey, discoveryTime.Seconds())
 		}
-
-		discoveryQueue.Release(instanceKey)
 	}()
 
 	instanceKey.Formalize()
