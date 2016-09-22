@@ -178,6 +178,7 @@ type Configuration struct {
 	GraphitePath                                 string            // Prefix for graphite path. May include {hostname} magic placeholder
 	GraphiteConvertHostnameDotsToUnderscores     bool              // If true, then hostname's dots are converted to underscores before being used in graphite path
 	GraphitePollSeconds                          int               // Graphite writes interval. 0 disables.
+	URLPrefix                                    string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -324,6 +325,7 @@ func newConfiguration() *Configuration {
 		GraphitePath:                                 "",
 		GraphiteConvertHostnameDotsToUnderscores:     true,
 		GraphitePollSeconds:                          60,
+		URLPrefix:                                    "",
 	}
 }
 

@@ -5,7 +5,7 @@
   </p>
   <div id="clustersFound" class="hiddenMessage">
     <p>
-      <i>Orchestrator</i> is familiar with <code id="numClusters"></code> replication cluster(s) at this moment. Click "Clusters" on top navigation bar too see them. If you have more replication clusters you wish to visualize and manage, please let <i>orchestrator</i>      know about them by going to the <a href="/web/discover">discovery page</a>.
+      <i>Orchestrator</i> is familiar with <code id="numClusters"></code> replication cluster(s) at this moment. Click "Clusters" on top navigation bar too see them. If you have more replication clusters you wish to visualize and manage, please let <i>orchestrator</i>      know about them by going to the <a href="{{.prefix}}/web/discover">discovery page</a>.
     </p>
     <p>
       <i>Orchestrator</i> is a multi-tiered application. It executes as a command line tool - you can move slaves around the topology and do most other stuff. It also serves as Web API. In fact, there is little to the web interface you're using right
@@ -31,7 +31,7 @@ GRANT SUPER, PROCESS ON *.* TO 'orchestrator'@'%' IDENTIFIED BY 'secret';
 </pre>
     </p>
     <p>
-      <a href="/web/discover">Start discovery now</a>
+      <a href="{{.prefix}}/web/discover">Start discovery now</a>
     </p>
   </div>
 </div>

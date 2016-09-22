@@ -34,7 +34,9 @@ import (
 )
 
 // HttpWeb is the web requests server, mapping each request to a web page
-type HttpWeb struct{}
+type HttpWeb struct {
+	URLPrefix string
+}
 
 var Web HttpWeb = HttpWeb{}
 
@@ -55,14 +57,14 @@ func (this *HttpWeb) AccessToken(params martini.Params, r render.Render, req *ht
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
-	r.Redirect("/")
+	r.Redirect(this.URLPrefix + "/")
 }
 
 func (this *HttpWeb) Index(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	// Redirect index so that all web URLs begin with "/web/".
 	// We also redirect /web/ to /web/clusters so that
 	// the Clusters page has a single canonical URL.
-	r.Redirect("/web/clusters")
+	r.Redirect(this.URLPrefix + "/web/clusters")
 }
 
 func (this *HttpWeb) Clusters(params martini.Params, r render.Render, req *http.Request, user auth.User) {
@@ -74,6 +76,7 @@ func (this *HttpWeb) Clusters(params martini.Params, r render.Render, req *http.
 		"authorizedForAction":           isAuthorizedForAction(req, user),
 		"userId":                        getUserId(req, user),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
+		"prefix":                        this.URLPrefix,
 	})
 }
 
@@ -86,6 +89,7 @@ func (this *HttpWeb) ClustersAnalysis(params martini.Params, r render.Render, re
 		"authorizedForAction":           isAuthorizedForAction(req, user),
 		"userId":                        getUserId(req, user),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
+		"prefix":                        this.URLPrefix,
 	})
 }
 
@@ -102,6 +106,7 @@ func (this *HttpWeb) Cluster(params martini.Params, r render.Render, req *http.R
 		"userId":                        getUserId(req, user),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
 		"compactDisplay":                req.URL.Query().Get("compact"),
+		"prefix":                        this.URLPrefix,
 	})
 }
 
@@ -152,6 +157,7 @@ func (this *HttpWeb) ClusterPools(params martini.Params, r render.Render, req *h
 		"userId":                        getUserId(req, user),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
 		"compactDisplay":                req.URL.Query().Get("compact"),
+		"prefix":                        this.URLPrefix,
 	})
 }
 
@@ -168,6 +174,7 @@ func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Re
 		"authorizedForAction": isAuthorizedForAction(req, user),
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
+		"prefix":              this.URLPrefix,
 	})
 }
 
@@ -180,6 +187,7 @@ func (this *HttpWeb) Discover(params martini.Params, r render.Render, req *http.
 		"authorizedForAction": isAuthorizedForAction(req, user),
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
+		"prefix":              this.URLPrefix,
 	})
 }
 
@@ -197,6 +205,7 @@ func (this *HttpWeb) LongQueries(params martini.Params, r render.Render, req *ht
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
 		"filter":              filter,
+		"prefix":              this.URLPrefix,
 	})
 }
 
@@ -216,6 +225,7 @@ func (this *HttpWeb) Audit(params martini.Params, r render.Render, req *http.Req
 		"page":                page,
 		"auditHostname":       params["host"],
 		"auditPort":           params["port"],
+		"prefix":              this.URLPrefix,
 	})
 }
 
@@ -239,6 +249,7 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 		"page":                page,
 		"clusterName":         params["clusterName"],
 		"recoveryId":          recoveryId,
+		"prefix":              this.URLPrefix,
 	})
 }
 
@@ -261,6 +272,7 @@ func (this *HttpWeb) AuditFailureDetection(params martini.Params, r render.Rende
 		"autoshow_problems":   false,
 		"page":                page,
 		"detectionId":         detectionId,
+		"prefix":              this.URLPrefix,
 	})
 }
 
@@ -272,6 +284,7 @@ func (this *HttpWeb) Agents(params martini.Params, r render.Render, req *http.Re
 		"authorizedForAction": isAuthorizedForAction(req, user),
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
+		"prefix":              this.URLPrefix,
 	})
 }
 
@@ -284,6 +297,7 @@ func (this *HttpWeb) Agent(params martini.Params, r render.Render, req *http.Req
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
 		"agentHost":           params["host"],
+		"prefix":              this.URLPrefix,
 	})
 }
 
@@ -296,6 +310,7 @@ func (this *HttpWeb) AgentSeedDetails(params martini.Params, r render.Render, re
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
 		"seedId":              params["seedId"],
+		"prefix":              this.URLPrefix,
 	})
 }
 
@@ -307,6 +322,7 @@ func (this *HttpWeb) Seeds(params martini.Params, r render.Render, req *http.Req
 		"authorizedForAction": isAuthorizedForAction(req, user),
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
+		"prefix":              this.URLPrefix,
 	})
 }
 
@@ -319,6 +335,7 @@ func (this *HttpWeb) Home(params martini.Params, r render.Render, req *http.Requ
 		"authorizedForAction": isAuthorizedForAction(req, user),
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
+		"prefix":              this.URLPrefix,
 	})
 }
 
@@ -331,6 +348,7 @@ func (this *HttpWeb) About(params martini.Params, r render.Render, req *http.Req
 		"authorizedForAction": isAuthorizedForAction(req, user),
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
+		"prefix":              this.URLPrefix,
 	})
 }
 
@@ -343,6 +361,7 @@ func (this *HttpWeb) KeepCalm(params martini.Params, r render.Render, req *http.
 		"authorizedForAction": isAuthorizedForAction(req, user),
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
+		"prefix":              this.URLPrefix,
 	})
 }
 
@@ -355,6 +374,7 @@ func (this *HttpWeb) FAQ(params martini.Params, r render.Render, req *http.Reque
 		"authorizedForAction": isAuthorizedForAction(req, user),
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
+		"prefix":              this.URLPrefix,
 	})
 }
 
@@ -367,53 +387,53 @@ func (this *HttpWeb) Status(params martini.Params, r render.Render, req *http.Re
 		"authorizedForAction": isAuthorizedForAction(req, user),
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
+		"prefix":              this.URLPrefix,
 	})
 }
 
 // RegisterRequests makes for the de-facto list of known Web calls
 func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
-	m.Get("/web/access-token", this.AccessToken)
-	m.Get("/", this.Index)
-	m.Get("/web", this.Index)
-	m.Get("/web/home", this.About)
-	m.Get("/web/about", this.About)
-	m.Get("/web/keep-calm", this.KeepCalm)
-	m.Get("/web/faq", this.FAQ)
-	m.Get("/web/status", this.Status)
-	m.Get("/web/clusters", this.Clusters)
-	m.Get("/web/clusters-analysis", this.ClustersAnalysis)
-	m.Get("/web/cluster/:clusterName", this.Cluster)
-	m.Get("/web/cluster/alias/:clusterAlias", this.ClusterByAlias)
-	m.Get("/web/cluster/instance/:host/:port", this.ClusterByInstance)
-	m.Get("/web/cluster-pools/:clusterName", this.ClusterPools)
-	m.Get("/web/search/:searchString", this.Search)
-	m.Get("/web/search", this.Search)
-	m.Get("/web/discover", this.Discover)
-	m.Get("/web/long-queries", this.LongQueries)
-	m.Get("/web/audit", this.Audit)
-	m.Get("/web/audit/:page", this.Audit)
-	m.Get("/web/audit/instance/:host/:port", this.Audit)
-	m.Get("/web/audit/instance/:host/:port/:page", this.Audit)
-	m.Get("/web/audit-recovery", this.AuditRecovery)
-	m.Get("/web/audit-recovery/:page", this.AuditRecovery)
-	m.Get("/web/audit-recovery/id/:id", this.AuditRecovery)
-	m.Get("/web/audit-recovery/cluster/:clusterName", this.AuditRecovery)
-	m.Get("/web/audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
-	m.Get("/web/audit-failure-detection", this.AuditFailureDetection)
-	m.Get("/web/audit-failure-detection/:page", this.AuditFailureDetection)
-	m.Get("/web/audit-failure-detection/id/:id", this.AuditFailureDetection)
-	m.Get("/web/agents", this.Agents)
-	m.Get("/web/agent/:host", this.Agent)
-	m.Get("/web/seed-details/:seedId", this.AgentSeedDetails)
-	m.Get("/web/seeds", this.Seeds)
+	m.Get(this.URLPrefix+"/web/access-token", this.AccessToken)
+	m.Get(this.URLPrefix+"/", this.Index)
+	m.Get(this.URLPrefix+"/web", this.Index)
+	m.Get(this.URLPrefix+"/web/home", this.About)
+	m.Get(this.URLPrefix+"/web/about", this.About)
+	m.Get(this.URLPrefix+"/web/keep-calm", this.KeepCalm)
+	m.Get(this.URLPrefix+"/web/faq", this.FAQ)
+	m.Get(this.URLPrefix+"/web/status", this.Status)
+	m.Get(this.URLPrefix+"/web/clusters", this.Clusters)
+	m.Get(this.URLPrefix+"/web/clusters-analysis", this.ClustersAnalysis)
+	m.Get(this.URLPrefix+"/web/cluster/:clusterName", this.Cluster)
+	m.Get(this.URLPrefix+"/web/cluster/alias/:clusterAlias", this.ClusterByAlias)
+	m.Get(this.URLPrefix+"/web/cluster/instance/:host/:port", this.ClusterByInstance)
+	m.Get(this.URLPrefix+"/web/cluster-pools/:clusterName", this.ClusterPools)
+	m.Get(this.URLPrefix+"/web/search/:searchString", this.Search)
+	m.Get(this.URLPrefix+"/web/search", this.Search)
+	m.Get(this.URLPrefix+"/web/discover", this.Discover)
+	m.Get(this.URLPrefix+"/web/long-queries", this.LongQueries)
+	m.Get(this.URLPrefix+"/web/audit", this.Audit)
+	m.Get(this.URLPrefix+"/web/audit/:page", this.Audit)
+	m.Get(this.URLPrefix+"/web/audit/instance/:host/:port", this.Audit)
+	m.Get(this.URLPrefix+"/web/audit/instance/:host/:port/:page", this.Audit)
+	m.Get(this.URLPrefix+"/web/audit-recovery", this.AuditRecovery)
+	m.Get(this.URLPrefix+"/web/audit-recovery/:page", this.AuditRecovery)
+	m.Get(this.URLPrefix+"/web/audit-recovery/id/:id", this.AuditRecovery)
+	m.Get(this.URLPrefix+"/web/audit-recovery/cluster/:clusterName", this.AuditRecovery)
+	m.Get(this.URLPrefix+"/web/audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
+	m.Get(this.URLPrefix+"/web/audit-failure-detection", this.AuditFailureDetection)
+	m.Get(this.URLPrefix+"/web/audit-failure-detection/:page", this.AuditFailureDetection)
+	m.Get(this.URLPrefix+"/web/audit-failure-detection/id/:id", this.AuditFailureDetection)
+	m.Get(this.URLPrefix+"/web/agents", this.Agents)
+	m.Get(this.URLPrefix+"/web/agent/:host", this.Agent)
+	m.Get(this.URLPrefix+"/web/seed-details/:seedId", this.AgentSeedDetails)
+	m.Get(this.URLPrefix+"/web/seeds", this.Seeds)
 
 	this.RegisterDebug(m)
 }
 
 // RegisterDebug adds handlers for /debug/vars (expvar) and /debug/pprof (net/http/pprof) support
 func (this *HttpWeb) RegisterDebug(m *martini.ClassicMartini) {
-
-	m.Get("/debug/vars", func(w http.ResponseWriter, r *http.Request) {
+	m.Get(this.URLPrefix+"/debug/vars", func(w http.ResponseWriter, r *http.Request) {
 		// from expvar.go, since the expvarHandler isn't exported :(
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		fmt.Fprintf(w, "{\n")
@@ -429,16 +449,16 @@ func (this *HttpWeb) RegisterDebug(m *martini.ClassicMartini) {
 	})
 
 	// list all the /debug/ endpoints we want
-	m.Get("/debug/pprof", pprof.Index)
-	m.Get("/debug/pprof/cmdline", pprof.Cmdline)
-	m.Get("/debug/pprof/profile", pprof.Profile)
-	m.Get("/debug/pprof/symbol", pprof.Symbol)
-	m.Post("/debug/pprof/symbol", pprof.Symbol)
-	m.Get("/debug/pprof/block", pprof.Handler("block").ServeHTTP)
-	m.Get("/debug/pprof/heap", pprof.Handler("heap").ServeHTTP)
-	m.Get("/debug/pprof/goroutine", pprof.Handler("goroutine").ServeHTTP)
-	m.Get("/debug/pprof/threadcreate", pprof.Handler("threadcreate").ServeHTTP)
+	m.Get(this.URLPrefix+"/debug/pprof", pprof.Index)
+	m.Get(this.URLPrefix+"/debug/pprof/cmdline", pprof.Cmdline)
+	m.Get(this.URLPrefix+"/debug/pprof/profile", pprof.Profile)
+	m.Get(this.URLPrefix+"/debug/pprof/symbol", pprof.Symbol)
+	m.Post(this.URLPrefix+"/debug/pprof/symbol", pprof.Symbol)
+	m.Get(this.URLPrefix+"/debug/pprof/block", pprof.Handler("block").ServeHTTP)
+	m.Get(this.URLPrefix+"/debug/pprof/heap", pprof.Handler("heap").ServeHTTP)
+	m.Get(this.URLPrefix+"/debug/pprof/goroutine", pprof.Handler("goroutine").ServeHTTP)
+	m.Get(this.URLPrefix+"/debug/pprof/threadcreate", pprof.Handler("threadcreate").ServeHTTP)
 
 	// go-metrics
-	m.Get("/debug/metrics", exp.ExpHandler(metrics.DefaultRegistry))
+	m.Get(this.URLPrefix+"/debug/metrics", exp.ExpHandler(metrics.DefaultRegistry))
 }
