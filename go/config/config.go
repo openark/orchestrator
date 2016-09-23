@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"os"
 	"regexp"
+	"strings"
 
 	"gopkg.in/gcfg.v1"
 
@@ -384,6 +385,13 @@ func postReadAdjustments() {
 		// The code does not consider RecoveryPeriodBlockMinutes anymore, but RecoveryPeriodBlockMinutes
 		// still supported in config file for backwards compatibility
 		Config.RecoveryPeriodBlockSeconds = Config.RecoveryPeriodBlockMinutes * 60
+	}
+
+	if Config.URLPrefix != "" {
+		// Ensure the prefix starts with "/" and has no trailing one.
+		Config.URLPrefix = strings.TrimLeft(Config.URLPrefix, "/")
+		Config.URLPrefix = strings.TrimRight(Config.URLPrefix, "/")
+		Config.URLPrefix = "/" + Config.URLPrefix
 	}
 }
 
