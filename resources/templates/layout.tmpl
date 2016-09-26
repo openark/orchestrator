@@ -9,14 +9,14 @@
 	<meta name="author" content="">
 	<link rel="shortcut icon" href="../../assets/ico/favicon.ico">
 	<title>Orchestrator - {{.title}}</title>
-	<script type="text/javascript" src="/js/jquery.min.js"></script>
-	<script type="text/javascript" src="/js/jquery.cookie-1.4.1.min.js"></script>
-	<script type="text/javascript" src="/js/corex.js"></script>
-	<script type="text/javascript" src="/js/corex-jquery.js"></script>
-	<script src="/js/common.js"></script>
-	<script src="/js/orchestrator.js"></script>
-	<link href="/bootstrap/css/bootstrap.min.css" rel="stylesheet">
-	<link href="/css/orchestrator.css" rel="stylesheet">
+	<script type="text/javascript" src="{{.prefix}}/js/jquery.min.js"></script>
+	<script type="text/javascript" src="{{.prefix}}/js/jquery.cookie-1.4.1.min.js"></script>
+	<script type="text/javascript" src="{{.prefix}}/js/corex.js"></script>
+	<script type="text/javascript" src="{{.prefix}}/js/corex-jquery.js"></script>
+	<script src="{{.prefix}}/js/common.js"></script>
+	<script src="{{.prefix}}/js/orchestrator.js"></script>
+	<link href="{{.prefix}}/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+	<link href="{{.prefix}}/css/orchestrator.css" rel="stylesheet">
 
 	<style type="text/css">
 		.ajaxLoader {
@@ -48,7 +48,7 @@
 		<div class="collapse navbar-collapse">
 			<ul class="nav navbar-nav">
 				<li>
-					<a href="#" id="mainAjaxLoader" class="ajaxLoader"><img src="/images/ajax-loader.gif" /></a>
+					<a href="#" id="mainAjaxLoader" class="ajaxLoader"><img src="{{.prefix}}/images/ajax-loader.gif" /></a>
 				</li>
 				<li class="dropdown" data-nav-page="home">
 					<a href="#" class="dropdown-toggle" data-toggle="dropdown">
@@ -56,12 +56,12 @@
                             <b class="caret"></b>
                         </a>
 					<ul class="dropdown-menu">
-						<li><a href="/web/about">About</a></li>
+						<li><a href="{{.prefix}}/web/about">About</a></li>
 						<li><a href="https://github.com/github/orchestrator/wiki/Orchestrator-Manual" target="_blank">Manual</a></li>
 						<li><a href="https://github.com/github/orchestrator/wiki/FAQ" target="_blank">FAQ</a></li>
-						<li><a href="/web/keep-calm">Keep calm</a></li>
+						<li><a href="{{.prefix}}/web/keep-calm">Keep calm</a></li>
 						<li role="presentation" class="divider"></li>
-						<li><a href="/web/status">Status</a></li>
+						<li><a href="{{.prefix}}/web/status">Status</a></li>
 					</ul>
 				</li>
 
@@ -71,22 +71,22 @@
                             <b class="caret"></b>
 		                </a>
 					<ul class="dropdown-menu" id="dropdown-clusters">
-						<li><a href="/web/clusters/">Dashboard</a></li>
-						<li><a href="/web/clusters-analysis/">Failure analysis</a></li>
+						<li><a href="{{.prefix}}/web/clusters/">Dashboard</a></li>
+						<li><a href="{{.prefix}}/web/clusters-analysis/">Failure analysis</a></li>
 						<li role="presentation" class="divider"></li>
 					</ul>
 				</li>
 
-				<li data-nav-page="discover"><a href="/web/discover">Discover</a></li>
+				<li data-nav-page="discover"><a href="{{.prefix}}/web/discover">Discover</a></li>
 				<li class="dropdown" data-nav-page="audit">
 					<a href="#" class="dropdown-toggle" data-toggle="dropdown">
                             Audit
                             <b class="caret"></b>
                         </a>
 					<ul class="dropdown-menu">
-						<li><a href="/web/audit">General</a></li>
-						<li><a href="/web/audit-failure-detection">Failure detection</a></li>
-						<li><a href="/web/audit-recovery">Recovery</a></li>
+						<li><a href="{{.prefix}}/web/audit">General</a></li>
+						<li><a href="{{.prefix}}/web/audit-failure-detection">Failure detection</a></li>
+						<li><a href="{{.prefix}}/web/audit-recovery">Recovery</a></li>
 					</ul>
 				</li>
 
@@ -97,15 +97,15 @@
                             <b class="caret"></b>
                         </a>
 					<ul class="dropdown-menu">
-						<li><a href="/web/agents">Agents</a></li>
-						<li><a href="/web/seeds">Seeds</a></li>
+						<li><a href="{{.prefix}}/web/agents">Agents</a></li>
+						<li><a href="{{.prefix}}/web/seeds">Seeds</a></li>
 						<li role="presentation" class="divider"></li>
-						<li><a href="/web/long-queries">Long queries</a></li>
+						<li><a href="{{.prefix}}/web/long-queries">Long queries</a></li>
 					</ul>
 				</li>
 
 				<li data-nav-page="search">
-					<form class="navbar-form navbar-left" role="search" name="searchForm" action="/web/search">
+					<form class="navbar-form navbar-left" role="search" name="searchForm" action="{{.prefix}}/web/search">
 						<div class="form-group">
 							<input type="text" name="s" id="searchInput" class="form-control input-sm" placeholder="Search">
 						</div>
@@ -236,8 +236,8 @@
 
 	</div>
 
-	<script src="/bootstrap/js/bootstrap.min.js"></script>
-	<script type="text/javascript" src="/js/bootbox.min.js"></script>
+	<script src="{{.prefix}}/bootstrap/js/bootstrap.min.js"></script>
+	<script type="text/javascript" src="{{.prefix}}/js/bootbox.min.js"></script>
 	<script>
 		function autoshowProblems() {
 			return "{{.autoshow_problems}}";
@@ -263,7 +263,7 @@
 			return "{{.userId}}";
 		}
 	</script>
-	<script src="/js/instance-problems.js"></script>
+	<script src="{{.prefix}}/js/instance-problems.js"></script>
 </body>
 
 </html>

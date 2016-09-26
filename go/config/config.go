@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"os"
 	"regexp"
+	"strings"
 
 	"gopkg.in/gcfg.v1"
 
@@ -178,6 +179,7 @@ type Configuration struct {
 	GraphitePath                                 string            // Prefix for graphite path. May include {hostname} magic placeholder
 	GraphiteConvertHostnameDotsToUnderscores     bool              // If true, then hostname's dots are converted to underscores before being used in graphite path
 	GraphitePollSeconds                          int               // Graphite writes interval. 0 disables.
+	URLPrefix                                    string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -324,6 +326,7 @@ func newConfiguration() *Configuration {
 		GraphitePath:                                 "",
 		GraphiteConvertHostnameDotsToUnderscores:     true,
 		GraphitePollSeconds:                          60,
+		URLPrefix:                                    "",
 	}
 }
 
@@ -382,6 +385,13 @@ func postReadAdjustments() {
 		// The code does not consider RecoveryPeriodBlockMinutes anymore, but RecoveryPeriodBlockMinutes
 		// still supported in config file for backwards compatibility
 		Config.RecoveryPeriodBlockSeconds = Config.RecoveryPeriodBlockMinutes * 60
+	}
+
+	if Config.URLPrefix != "" {
+		// Ensure the prefix starts with "/" and has no trailing one.
+		Config.URLPrefix = strings.TrimLeft(Config.URLPrefix, "/")
+		Config.URLPrefix = strings.TrimRight(Config.URLPrefix, "/")
+		Config.URLPrefix = "/" + Config.URLPrefix
 	}
 }
 

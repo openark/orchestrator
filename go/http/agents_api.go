@@ -29,7 +29,9 @@ import (
 	"github.com/outbrain/orchestrator/go/attributes"
 )
 
-type HttpAgentsAPI struct{}
+type HttpAgentsAPI struct {
+	URLPrefix string
+}
 
 var AgentsAPI HttpAgentsAPI = HttpAgentsAPI{}
 
@@ -122,10 +124,10 @@ func (this *HttpAgentsAPI) AgentPing(params martini.Params, r render.Render, req
 
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAgentsAPI) RegisterRequests(m *martini.ClassicMartini) {
-	m.Get("/api/submit-agent/:host/:port/:token", this.SubmitAgent)
-	m.Get("/api/host-attribute/:host/:attrVame/:attrValue", this.SetHostAttribute)
-	m.Get("/api/host-attribute/attr/:attr/", this.GetHostAttributeByAttributeName)
-	m.Get("/api/agents-hosts", this.AgentsHosts)
-	m.Get("/api/agents-instances", this.AgentsInstances)
-	m.Get("/api/agent-ping", this.AgentPing)
+	m.Get(this.URLPrefix+"/api/submit-agent/:host/:port/:token", this.SubmitAgent)
+	m.Get(this.URLPrefix+"/api/host-attribute/:host/:attrVame/:attrValue", this.SetHostAttribute)
+	m.Get(this.URLPrefix+"/api/host-attribute/attr/:attr/", this.GetHostAttributeByAttributeName)
+	m.Get(this.URLPrefix+"/api/agents-hosts", this.AgentsHosts)
+	m.Get(this.URLPrefix+"/api/agents-instances", this.AgentsInstances)
+	m.Get(this.URLPrefix+"/api/agent-ping", this.AgentPing)
 }

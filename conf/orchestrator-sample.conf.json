@@ -87,6 +87,7 @@
   "SSLCertFile": "",
   "SSLCAFile": "",
   "SSLValidOUs": [],
+  "URLPrefix": "",
   "StatusEndpoint": "/api/status",
   "StatusSimpleHealth": true,
   "StatusOUVerify": false,

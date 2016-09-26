@@ -106,7 +106,7 @@ func standardHttp(discovery bool) {
 		Layout:          "templates/layout",
 		HTMLContentType: "text/html",
 	}))
-	m.Use(martini.Static("resources/public"))
+	m.Use(martini.Static("resources/public", martini.StaticOptions{Prefix: config.Config.URLPrefix}))
 	if config.Config.UseMutualTLS {
 		m.Use(ssl.VerifyOUs(config.Config.SSLValidOUs))
 	}
@@ -118,6 +118,8 @@ func standardHttp(discovery bool) {
 		go logic.ContinuousDiscovery()
 	}
 	log.Info("Registering endpoints")
+	http.API.URLPrefix = config.Config.URLPrefix
+	http.Web.URLPrefix = config.Config.URLPrefix
 	http.API.RegisterRequests(m)
 	http.Web.RegisterRequests(m)
 
@@ -167,6 +169,7 @@ func agentsHttp() {
 
 	go logic.ContinuousAgentsPoll()
 
+	http.AgentsAPI.URLPrefix = config.Config.URLPrefix
 	http.AgentsAPI.RegisterRequests(m)
 
 	// Serve
