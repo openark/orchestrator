@@ -1698,7 +1698,7 @@ func mkInsertOdku(table string, columns []string, values []string, nrRows int, i
 	var q bytes.Buffer
 	var ignore string = ""
 	if insertIgnore {
-		ignore = "ignore "
+		ignore = "ignore"
 	}
 	var valRow string = fmt.Sprintf("(%s)", strings.Join(values, ", "))
 	var val bytes.Buffer
@@ -1716,7 +1716,7 @@ func mkInsertOdku(table string, columns []string, values []string, nrRows int, i
 		odku.WriteString(fmt.Sprintf("%s=VALUES(%s)", c, c))
 	}
 
-	q.WriteString(fmt.Sprintf(`INSERT %sINTO %s
+	q.WriteString(fmt.Sprintf(`INSERT %s INTO %s
                 (%s)
         VALUES
                 %s
