@@ -1397,6 +1397,44 @@ func (this *HttpAPI) ResetHostnameResolveCache(params martini.Params, r render.R
 	r.JSON(200, &APIResponse{Code: OK, Message: "Hostname cache cleared"})
 }
 
+// DeregisterHostnameUnresolve deregisters the unresolve name used previously
+func (this *HttpAPI) DeregisterHostnameUnresolve(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+
+	var instanceKey *inst.InstanceKey
+	if instKey, err := this.getInstanceKey(params["host"], params["port"]); err == nil {
+		instanceKey = &instKey
+	}
+	if err := inst.DeregisterHostnameUnresolve(instanceKey); err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: "Hostname deregister unresolve completed"})
+}
+
+// RegisterHostnameUnresolve registers the unresolve name to use
+func (this *HttpAPI) RegisterHostnameUnresolve(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+
+	var instanceKey *inst.InstanceKey
+	if instKey, err := this.getInstanceKey(params["host"], params["port"]); err == nil {
+		instanceKey = &instKey
+	}
+	if err := inst.RegisterHostnameUnresolve(instanceKey, params["virtualname"]); err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: "Hostname register unresolve completed"})
+}
+
 // SubmitPoolInstances (re-)applies the list of hostnames for a given pool
 func (this *HttpAPI) SubmitPoolInstances(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -2352,6 +2390,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get(this.URLPrefix+"/api/reload-cluster-alias", this.ReloadClusterAlias)
 	m.Get(this.URLPrefix+"/api/hostname-resolve-cache", this.HostnameResolveCache)
 	m.Get(this.URLPrefix+"/api/reset-hostname-resolve-cache", this.ResetHostnameResolveCache)
+	m.Get(this.URLPrefix+"/api/deregister-hostname-unresolve/:host/:port", this.DeregisterHostnameUnresolve)
+	m.Get(this.URLPrefix+"/api/register-hostname-unresolve/:host/:port/:virtualname", this.RegisterHostnameUnresolve)
 
 	// Agents
 	m.Get(this.URLPrefix+"/api/agents", this.Agents)
