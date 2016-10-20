@@ -407,10 +407,10 @@ func (this *Instance) LagStatusString() string {
 	if this.IsSlave() && !this.SecondsBehindMaster.Valid {
 		return "null"
 	}
-	if this.IsSlave() && this.SecondsBehindMaster.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
-		return fmt.Sprintf("%+vs", this.SecondsBehindMaster.Int64)
+	if this.IsSlave() && this.SlaveLagSeconds.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
+		return fmt.Sprintf("%+vs", this.SlaveLagSeconds.Int64)
 	}
-	return fmt.Sprintf("%+vs", this.SecondsBehindMaster.Int64)
+	return fmt.Sprintf("%+vs", this.SlaveLagSeconds.Int64)
 }
 
 // HumanReadableDescription returns a simple readable string describing the status, version,
