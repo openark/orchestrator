@@ -65,7 +65,9 @@ type APIResponse struct {
 	Details interface{}
 }
 
-type HttpAPI struct{}
+type HttpAPI struct {
+	URLPrefix string
+}
 
 var API HttpAPI = HttpAPI{}
 
@@ -1395,6 +1397,44 @@ func (this *HttpAPI) ResetHostnameResolveCache(params martini.Params, r render.R
 	r.JSON(200, &APIResponse{Code: OK, Message: "Hostname cache cleared"})
 }
 
+// DeregisterHostnameUnresolve deregisters the unresolve name used previously
+func (this *HttpAPI) DeregisterHostnameUnresolve(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+
+	var instanceKey *inst.InstanceKey
+	if instKey, err := this.getInstanceKey(params["host"], params["port"]); err == nil {
+		instanceKey = &instKey
+	}
+	if err := inst.DeregisterHostnameUnresolve(instanceKey); err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: "Hostname deregister unresolve completed"})
+}
+
+// RegisterHostnameUnresolve registers the unresolve name to use
+func (this *HttpAPI) RegisterHostnameUnresolve(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+
+	var instanceKey *inst.InstanceKey
+	if instKey, err := this.getInstanceKey(params["host"], params["port"]); err == nil {
+		instanceKey = &instKey
+	}
+	if err := inst.RegisterHostnameUnresolve(instanceKey, params["virtualname"]); err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, &APIResponse{Code: OK, Message: "Hostname register unresolve completed"})
+}
+
 // SubmitPoolInstances (re-)applies the list of hostnames for a given pool
 func (this *HttpAPI) SubmitPoolInstances(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -2207,167 +2247,169 @@ func (this *HttpAPI) BlockedRecoveries(params martini.Params, r render.Render, r
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	// Smart relocation:
-	m.Get("/api/relocate/:host/:port/:belowHost/:belowPort", this.RelocateBelow)
-	m.Get("/api/relocate-below/:host/:port/:belowHost/:belowPort", this.RelocateBelow)
-	m.Get("/api/relocate-slaves/:host/:port/:belowHost/:belowPort", this.RelocateSlaves)
-	m.Get("/api/regroup-slaves/:host/:port", this.RegroupSlaves)
+	m.Get(this.URLPrefix+"/api/relocate/:host/:port/:belowHost/:belowPort", this.RelocateBelow)
+	m.Get(this.URLPrefix+"/api/relocate-below/:host/:port/:belowHost/:belowPort", this.RelocateBelow)
+	m.Get(this.URLPrefix+"/api/relocate-slaves/:host/:port/:belowHost/:belowPort", this.RelocateSlaves)
+	m.Get(this.URLPrefix+"/api/regroup-slaves/:host/:port", this.RegroupSlaves)
 
 	// Classic file:pos relocation:
-	m.Get("/api/move-up/:host/:port", this.MoveUp)
-	m.Get("/api/move-up-slaves/:host/:port", this.MoveUpSlaves)
-	m.Get("/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow)
-	m.Get("/api/move-equivalent/:host/:port/:belowHost/:belowPort", this.MoveEquivalent)
-	m.Get("/api/repoint-slaves/:host/:port", this.RepointSlaves)
-	m.Get("/api/make-co-master/:host/:port", this.MakeCoMaster)
-	m.Get("/api/enslave-siblings/:host/:port", this.EnslaveSiblings)
-	m.Get("/api/enslave-master/:host/:port", this.EnslaveMaster)
-	m.Get("/api/master-equivalent/:host/:port/:logFile/:logPos", this.MasterEquivalent)
+	m.Get(this.URLPrefix+"/api/move-up/:host/:port", this.MoveUp)
+	m.Get(this.URLPrefix+"/api/move-up-slaves/:host/:port", this.MoveUpSlaves)
+	m.Get(this.URLPrefix+"/api/move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow)
+	m.Get(this.URLPrefix+"/api/move-equivalent/:host/:port/:belowHost/:belowPort", this.MoveEquivalent)
+	m.Get(this.URLPrefix+"/api/repoint-slaves/:host/:port", this.RepointSlaves)
+	m.Get(this.URLPrefix+"/api/make-co-master/:host/:port", this.MakeCoMaster)
+	m.Get(this.URLPrefix+"/api/enslave-siblings/:host/:port", this.EnslaveSiblings)
+	m.Get(this.URLPrefix+"/api/enslave-master/:host/:port", this.EnslaveMaster)
+	m.Get(this.URLPrefix+"/api/master-equivalent/:host/:port/:logFile/:logPos", this.MasterEquivalent)
 
 	// Binlog server relocation:
-	m.Get("/api/regroup-slaves-bls/:host/:port", this.RegroupSlavesBinlogServers)
+	m.Get(this.URLPrefix+"/api/regroup-slaves-bls/:host/:port", this.RegroupSlavesBinlogServers)
 
 	// GTID relocation:
-	m.Get("/api/move-below-gtid/:host/:port/:belowHost/:belowPort", this.MoveBelowGTID)
-	m.Get("/api/move-slaves-gtid/:host/:port/:belowHost/:belowPort", this.MoveSlavesGTID)
-	m.Get("/api/regroup-slaves-gtid/:host/:port", this.RegroupSlavesGTID)
+	m.Get(this.URLPrefix+"/api/move-below-gtid/:host/:port/:belowHost/:belowPort", this.MoveBelowGTID)
+	m.Get(this.URLPrefix+"/api/move-slaves-gtid/:host/:port/:belowHost/:belowPort", this.MoveSlavesGTID)
+	m.Get(this.URLPrefix+"/api/regroup-slaves-gtid/:host/:port", this.RegroupSlavesGTID)
 
 	// Pseudo-GTID relocation:
-	m.Get("/api/match/:host/:port/:belowHost/:belowPort", this.MatchBelow)
-	m.Get("/api/match-below/:host/:port/:belowHost/:belowPort", this.MatchBelow)
-	m.Get("/api/match-up/:host/:port", this.MatchUp)
-	m.Get("/api/match-slaves/:host/:port/:belowHost/:belowPort", this.MultiMatchSlaves)
-	m.Get("/api/multi-match-slaves/:host/:port/:belowHost/:belowPort", this.MultiMatchSlaves)
-	m.Get("/api/match-up-slaves/:host/:port", this.MatchUpSlaves)
-	m.Get("/api/regroup-slaves-pgtid/:host/:port", this.RegroupSlavesPseudoGTID)
+	m.Get(this.URLPrefix+"/api/match/:host/:port/:belowHost/:belowPort", this.MatchBelow)
+	m.Get(this.URLPrefix+"/api/match-below/:host/:port/:belowHost/:belowPort", this.MatchBelow)
+	m.Get(this.URLPrefix+"/api/match-up/:host/:port", this.MatchUp)
+	m.Get(this.URLPrefix+"/api/match-slaves/:host/:port/:belowHost/:belowPort", this.MultiMatchSlaves)
+	m.Get(this.URLPrefix+"/api/multi-match-slaves/:host/:port/:belowHost/:belowPort", this.MultiMatchSlaves)
+	m.Get(this.URLPrefix+"/api/match-up-slaves/:host/:port", this.MatchUpSlaves)
+	m.Get(this.URLPrefix+"/api/regroup-slaves-pgtid/:host/:port", this.RegroupSlavesPseudoGTID)
 	// Legacy, need to revisit:
-	m.Get("/api/make-master/:host/:port", this.MakeMaster)
-	m.Get("/api/make-local-master/:host/:port", this.MakeLocalMaster)
+	m.Get(this.URLPrefix+"/api/make-master/:host/:port", this.MakeMaster)
+	m.Get(this.URLPrefix+"/api/make-local-master/:host/:port", this.MakeLocalMaster)
 
 	// Replication, general:
-	m.Get("/api/enable-gtid/:host/:port", this.EnableGTID)
-	m.Get("/api/disable-gtid/:host/:port", this.DisableGTID)
-	m.Get("/api/skip-query/:host/:port", this.SkipQuery)
-	m.Get("/api/start-slave/:host/:port", this.StartSlave)
-	m.Get("/api/restart-slave/:host/:port", this.RestartSlave)
-	m.Get("/api/stop-slave/:host/:port", this.StopSlave)
-	m.Get("/api/stop-slave-nice/:host/:port", this.StopSlaveNicely)
-	m.Get("/api/reset-slave/:host/:port", this.ResetSlave)
-	m.Get("/api/detach-slave/:host/:port", this.DetachSlave)
-	m.Get("/api/reattach-slave/:host/:port", this.ReattachSlave)
-	m.Get("/api/reattach-slave-master-host/:host/:port", this.ReattachSlaveMasterHost)
+	m.Get(this.URLPrefix+"/api/enable-gtid/:host/:port", this.EnableGTID)
+	m.Get(this.URLPrefix+"/api/disable-gtid/:host/:port", this.DisableGTID)
+	m.Get(this.URLPrefix+"/api/skip-query/:host/:port", this.SkipQuery)
+	m.Get(this.URLPrefix+"/api/start-slave/:host/:port", this.StartSlave)
+	m.Get(this.URLPrefix+"/api/restart-slave/:host/:port", this.RestartSlave)
+	m.Get(this.URLPrefix+"/api/stop-slave/:host/:port", this.StopSlave)
+	m.Get(this.URLPrefix+"/api/stop-slave-nice/:host/:port", this.StopSlaveNicely)
+	m.Get(this.URLPrefix+"/api/reset-slave/:host/:port", this.ResetSlave)
+	m.Get(this.URLPrefix+"/api/detach-slave/:host/:port", this.DetachSlave)
+	m.Get(this.URLPrefix+"/api/reattach-slave/:host/:port", this.ReattachSlave)
+	m.Get(this.URLPrefix+"/api/reattach-slave-master-host/:host/:port", this.ReattachSlaveMasterHost)
 
 	// Instance:
-	m.Get("/api/set-read-only/:host/:port", this.SetReadOnly)
-	m.Get("/api/set-writeable/:host/:port", this.SetWriteable)
-	m.Get("/api/kill-query/:host/:port/:process", this.KillQuery)
+	m.Get(this.URLPrefix+"/api/set-read-only/:host/:port", this.SetReadOnly)
+	m.Get(this.URLPrefix+"/api/set-writeable/:host/:port", this.SetWriteable)
+	m.Get(this.URLPrefix+"/api/kill-query/:host/:port/:process", this.KillQuery)
 
 	// Binary logs:
-	m.Get("/api/last-pseudo-gtid/:host/:port", this.LastPseudoGTID)
+	m.Get(this.URLPrefix+"/api/last-pseudo-gtid/:host/:port", this.LastPseudoGTID)
 
 	// Pools:
-	m.Get("/api/submit-pool-instances/:pool", this.SubmitPoolInstances)
-	m.Get("/api/cluster-pool-instances/:clusterName", this.ReadClusterPoolInstancesMap)
-	m.Get("/api/cluster-pool-instances/:clusterName/:pool", this.ReadClusterPoolInstancesMap)
-	m.Get("/api/heuristic-cluster-pool-instances/:clusterName", this.GetHeuristicClusterPoolInstances)
-	m.Get("/api/heuristic-cluster-pool-instances/:clusterName/:pool", this.GetHeuristicClusterPoolInstances)
-	m.Get("/api/heuristic-cluster-pool-lag/:clusterName", this.GetHeuristicClusterPoolInstancesLag)
-	m.Get("/api/heuristic-cluster-pool-lag/:clusterName/:pool", this.GetHeuristicClusterPoolInstancesLag)
+	m.Get(this.URLPrefix+"/api/submit-pool-instances/:pool", this.SubmitPoolInstances)
+	m.Get(this.URLPrefix+"/api/cluster-pool-instances/:clusterName", this.ReadClusterPoolInstancesMap)
+	m.Get(this.URLPrefix+"/api/cluster-pool-instances/:clusterName/:pool", this.ReadClusterPoolInstancesMap)
+	m.Get(this.URLPrefix+"/api/heuristic-cluster-pool-instances/:clusterName", this.GetHeuristicClusterPoolInstances)
+	m.Get(this.URLPrefix+"/api/heuristic-cluster-pool-instances/:clusterName/:pool", this.GetHeuristicClusterPoolInstances)
+	m.Get(this.URLPrefix+"/api/heuristic-cluster-pool-lag/:clusterName", this.GetHeuristicClusterPoolInstancesLag)
+	m.Get(this.URLPrefix+"/api/heuristic-cluster-pool-lag/:clusterName/:pool", this.GetHeuristicClusterPoolInstancesLag)
 
 	// Information:
-	m.Get("/api/search/:searchString", this.Search)
-	m.Get("/api/search", this.Search)
+	m.Get(this.URLPrefix+"/api/search/:searchString", this.Search)
+	m.Get(this.URLPrefix+"/api/search", this.Search)
 
 	// Cluster
-	m.Get("/api/cluster/:clusterName", this.Cluster)
-	m.Get("/api/cluster/alias/:clusterAlias", this.ClusterByAlias)
-	m.Get("/api/cluster/instance/:host/:port", this.ClusterByInstance)
-	m.Get("/api/cluster-info/:clusterName", this.ClusterInfo)
-	m.Get("/api/cluster-info/alias/:clusterAlias", this.ClusterInfoByAlias)
-	m.Get("/api/cluster-osc-slaves/:clusterName", this.ClusterOSCSlaves)
-	m.Get("/api/set-cluster-alias/:clusterName", this.SetClusterAlias)
-	m.Get("/api/clusters", this.Clusters)
-	m.Get("/api/clusters-info", this.ClustersInfo)
+	m.Get(this.URLPrefix+"/api/cluster/:clusterName", this.Cluster)
+	m.Get(this.URLPrefix+"/api/cluster/alias/:clusterAlias", this.ClusterByAlias)
+	m.Get(this.URLPrefix+"/api/cluster/instance/:host/:port", this.ClusterByInstance)
+	m.Get(this.URLPrefix+"/api/cluster-info/:clusterName", this.ClusterInfo)
+	m.Get(this.URLPrefix+"/api/cluster-info/alias/:clusterAlias", this.ClusterInfoByAlias)
+	m.Get(this.URLPrefix+"/api/cluster-osc-slaves/:clusterName", this.ClusterOSCSlaves)
+	m.Get(this.URLPrefix+"/api/set-cluster-alias/:clusterName", this.SetClusterAlias)
+	m.Get(this.URLPrefix+"/api/clusters", this.Clusters)
+	m.Get(this.URLPrefix+"/api/clusters-info", this.ClustersInfo)
 
 	// Instance management:
-	m.Get("/api/instance/:host/:port", this.Instance)
-	m.Get("/api/discover/:host/:port", this.Discover)
-	m.Get("/api/refresh/:host/:port", this.Refresh)
-	m.Get("/api/forget/:host/:port", this.Forget)
-	m.Get("/api/begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance)
-	m.Get("/api/end-maintenance/:host/:port", this.EndMaintenanceByInstanceKey)
-	m.Get("/api/end-maintenance/:maintenanceKey", this.EndMaintenance)
-	m.Get("/api/begin-downtime/:host/:port/:owner/:reason", this.BeginDowntime)
-	m.Get("/api/begin-downtime/:host/:port/:owner/:reason/:duration", this.BeginDowntime)
-	m.Get("/api/end-downtime/:host/:port", this.EndDowntime)
+	m.Get(this.URLPrefix+"/api/instance/:host/:port", this.Instance)
+	m.Get(this.URLPrefix+"/api/discover/:host/:port", this.Discover)
+	m.Get(this.URLPrefix+"/api/refresh/:host/:port", this.Refresh)
+	m.Get(this.URLPrefix+"/api/forget/:host/:port", this.Forget)
+	m.Get(this.URLPrefix+"/api/begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance)
+	m.Get(this.URLPrefix+"/api/end-maintenance/:host/:port", this.EndMaintenanceByInstanceKey)
+	m.Get(this.URLPrefix+"/api/end-maintenance/:maintenanceKey", this.EndMaintenance)
+	m.Get(this.URLPrefix+"/api/begin-downtime/:host/:port/:owner/:reason", this.BeginDowntime)
+	m.Get(this.URLPrefix+"/api/begin-downtime/:host/:port/:owner/:reason/:duration", this.BeginDowntime)
+	m.Get(this.URLPrefix+"/api/end-downtime/:host/:port", this.EndDowntime)
 
 	// Recovery:
-	m.Get("/api/replication-analysis", this.ReplicationAnalysis)
-	m.Get("/api/replication-analysis/:clusterName", this.ReplicationAnalysis)
-	m.Get("/api/recover/:host/:port", this.Recover)
-	m.Get("/api/recover/:host/:port/:candidateHost/:candidatePort", this.Recover)
-	m.Get("/api/recover-lite/:host/:port", this.RecoverLite)
-	m.Get("/api/recover-lite/:host/:port/:candidateHost/:candidatePort", this.RecoverLite)
-	m.Get("/api/register-candidate/:host/:port/:promotionRule", this.RegisterCandidate)
-	m.Get("/api/automated-recovery-filters", this.AutomatedRecoveryFilters)
-	m.Get("/api/audit-failure-detection", this.AuditFailureDetection)
-	m.Get("/api/audit-failure-detection/:page", this.AuditFailureDetection)
-	m.Get("/api/audit-failure-detection/id/:id", this.AuditFailureDetection)
-	m.Get("/api/replication-analysis-changelog", this.ReadReplicationAnalysisChangelog)
-	m.Get("/api/audit-recovery", this.AuditRecovery)
-	m.Get("/api/audit-recovery/:page", this.AuditRecovery)
-	m.Get("/api/audit-recovery/id/:id", this.AuditRecovery)
-	m.Get("/api/audit-recovery/cluster/:clusterName", this.AuditRecovery)
-	m.Get("/api/audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
-	m.Get("/api/active-cluster-recovery/:clusterName", this.ActiveClusterRecovery)
-	m.Get("/api/recently-active-cluster-recovery/:clusterName", this.RecentlyActiveClusterRecovery)
-	m.Get("/api/recently-active-instance-recovery/:host/:port", this.RecentlyActiveInstanceRecovery)
-	m.Get("/api/ack-recovery/cluster/:clusterName", this.AcknowledgeClusterRecoveries)
-	m.Get("/api/ack-recovery/cluster/alias/:clusterAlias", this.AcknowledgeClusterRecoveries)
-	m.Get("/api/ack-recovery/instance/:host/:port", this.AcknowledgeInstanceRecoveries)
-	m.Get("/api/ack-recovery/:recoveryId", this.AcknowledgeRecovery)
-	m.Get("/api/blocked-recoveries", this.BlockedRecoveries)
-	m.Get("/api/blocked-recoveries/cluster/:clusterName", this.BlockedRecoveries)
+	m.Get(this.URLPrefix+"/api/replication-analysis", this.ReplicationAnalysis)
+	m.Get(this.URLPrefix+"/api/replication-analysis/:clusterName", this.ReplicationAnalysis)
+	m.Get(this.URLPrefix+"/api/recover/:host/:port", this.Recover)
+	m.Get(this.URLPrefix+"/api/recover/:host/:port/:candidateHost/:candidatePort", this.Recover)
+	m.Get(this.URLPrefix+"/api/recover-lite/:host/:port", this.RecoverLite)
+	m.Get(this.URLPrefix+"/api/recover-lite/:host/:port/:candidateHost/:candidatePort", this.RecoverLite)
+	m.Get(this.URLPrefix+"/api/register-candidate/:host/:port/:promotionRule", this.RegisterCandidate)
+	m.Get(this.URLPrefix+"/api/automated-recovery-filters", this.AutomatedRecoveryFilters)
+	m.Get(this.URLPrefix+"/api/audit-failure-detection", this.AuditFailureDetection)
+	m.Get(this.URLPrefix+"/api/audit-failure-detection/:page", this.AuditFailureDetection)
+	m.Get(this.URLPrefix+"/api/audit-failure-detection/id/:id", this.AuditFailureDetection)
+	m.Get(this.URLPrefix+"/api/replication-analysis-changelog", this.ReadReplicationAnalysisChangelog)
+	m.Get(this.URLPrefix+"/api/audit-recovery", this.AuditRecovery)
+	m.Get(this.URLPrefix+"/api/audit-recovery/:page", this.AuditRecovery)
+	m.Get(this.URLPrefix+"/api/audit-recovery/id/:id", this.AuditRecovery)
+	m.Get(this.URLPrefix+"/api/audit-recovery/cluster/:clusterName", this.AuditRecovery)
+	m.Get(this.URLPrefix+"/api/audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
+	m.Get(this.URLPrefix+"/api/active-cluster-recovery/:clusterName", this.ActiveClusterRecovery)
+	m.Get(this.URLPrefix+"/api/recently-active-cluster-recovery/:clusterName", this.RecentlyActiveClusterRecovery)
+	m.Get(this.URLPrefix+"/api/recently-active-instance-recovery/:host/:port", this.RecentlyActiveInstanceRecovery)
+	m.Get(this.URLPrefix+"/api/ack-recovery/cluster/:clusterName", this.AcknowledgeClusterRecoveries)
+	m.Get(this.URLPrefix+"/api/ack-recovery/cluster/alias/:clusterAlias", this.AcknowledgeClusterRecoveries)
+	m.Get(this.URLPrefix+"/api/ack-recovery/instance/:host/:port", this.AcknowledgeInstanceRecoveries)
+	m.Get(this.URLPrefix+"/api/ack-recovery/:recoveryId", this.AcknowledgeRecovery)
+	m.Get(this.URLPrefix+"/api/blocked-recoveries", this.BlockedRecoveries)
+	m.Get(this.URLPrefix+"/api/blocked-recoveries/cluster/:clusterName", this.BlockedRecoveries)
 
 	// General
-	m.Get("/api/problems", this.Problems)
-	m.Get("/api/problems/:clusterName", this.Problems)
-	m.Get("/api/long-queries", this.LongQueries)
-	m.Get("/api/long-queries/:filter", this.LongQueries)
-	m.Get("/api/audit", this.Audit)
-	m.Get("/api/audit/:page", this.Audit)
-	m.Get("/api/audit/instance/:host/:port", this.Audit)
-	m.Get("/api/audit/instance/:host/:port/:page", this.Audit)
-	m.Get("/api/resolve/:host/:port", this.Resolve)
+	m.Get(this.URLPrefix+"/api/problems", this.Problems)
+	m.Get(this.URLPrefix+"/api/problems/:clusterName", this.Problems)
+	m.Get(this.URLPrefix+"/api/long-queries", this.LongQueries)
+	m.Get(this.URLPrefix+"/api/long-queries/:filter", this.LongQueries)
+	m.Get(this.URLPrefix+"/api/audit", this.Audit)
+	m.Get(this.URLPrefix+"/api/audit/:page", this.Audit)
+	m.Get(this.URLPrefix+"/api/audit/instance/:host/:port", this.Audit)
+	m.Get(this.URLPrefix+"/api/audit/instance/:host/:port/:page", this.Audit)
+	m.Get(this.URLPrefix+"/api/resolve/:host/:port", this.Resolve)
 
 	// Meta
-	m.Get("/api/maintenance", this.Maintenance)
-	m.Get("/api/headers", this.Headers)
-	m.Get("/api/health", this.Health)
-	m.Get("/api/lb-check", this.LBCheck)
-	m.Get("/api/grab-election", this.GrabElection)
-	m.Get("/api/reelect", this.Reelect)
-	m.Get("/api/reload-configuration", this.ReloadConfiguration)
-	m.Get("/api/reload-cluster-alias", this.ReloadClusterAlias)
-	m.Get("/api/hostname-resolve-cache", this.HostnameResolveCache)
-	m.Get("/api/reset-hostname-resolve-cache", this.ResetHostnameResolveCache)
+	m.Get(this.URLPrefix+"/api/maintenance", this.Maintenance)
+	m.Get(this.URLPrefix+"/api/headers", this.Headers)
+	m.Get(this.URLPrefix+"/api/health", this.Health)
+	m.Get(this.URLPrefix+"/api/lb-check", this.LBCheck)
+	m.Get(this.URLPrefix+"/api/grab-election", this.GrabElection)
+	m.Get(this.URLPrefix+"/api/reelect", this.Reelect)
+	m.Get(this.URLPrefix+"/api/reload-configuration", this.ReloadConfiguration)
+	m.Get(this.URLPrefix+"/api/reload-cluster-alias", this.ReloadClusterAlias)
+	m.Get(this.URLPrefix+"/api/hostname-resolve-cache", this.HostnameResolveCache)
+	m.Get(this.URLPrefix+"/api/reset-hostname-resolve-cache", this.ResetHostnameResolveCache)
+	m.Get(this.URLPrefix+"/api/deregister-hostname-unresolve/:host/:port", this.DeregisterHostnameUnresolve)
+	m.Get(this.URLPrefix+"/api/register-hostname-unresolve/:host/:port/:virtualname", this.RegisterHostnameUnresolve)
 
 	// Agents
-	m.Get("/api/agents", this.Agents)
-	m.Get("/api/agent/:host", this.Agent)
-	m.Get("/api/agent-umount/:host", this.AgentUnmount)
-	m.Get("/api/agent-mount/:host", this.AgentMountLV)
-	m.Get("/api/agent-create-snapshot/:host", this.AgentCreateSnapshot)
-	m.Get("/api/agent-removelv/:host", this.AgentRemoveLV)
-	m.Get("/api/agent-mysql-stop/:host", this.AgentMySQLStop)
-	m.Get("/api/agent-mysql-start/:host", this.AgentMySQLStart)
-	m.Get("/api/agent-seed/:targetHost/:sourceHost", this.AgentSeed)
-	m.Get("/api/agent-active-seeds/:host", this.AgentActiveSeeds)
-	m.Get("/api/agent-recent-seeds/:host", this.AgentRecentSeeds)
-	m.Get("/api/agent-seed-details/:seedId", this.AgentSeedDetails)
-	m.Get("/api/agent-seed-states/:seedId", this.AgentSeedStates)
-	m.Get("/api/agent-abort-seed/:seedId", this.AbortSeed)
-	m.Get("/api/agent-custom-command/:host/:command", this.AgentCustomCommand)
-	m.Get("/api/seeds", this.Seeds)
+	m.Get(this.URLPrefix+"/api/agents", this.Agents)
+	m.Get(this.URLPrefix+"/api/agent/:host", this.Agent)
+	m.Get(this.URLPrefix+"/api/agent-umount/:host", this.AgentUnmount)
+	m.Get(this.URLPrefix+"/api/agent-mount/:host", this.AgentMountLV)
+	m.Get(this.URLPrefix+"/api/agent-create-snapshot/:host", this.AgentCreateSnapshot)
+	m.Get(this.URLPrefix+"/api/agent-removelv/:host", this.AgentRemoveLV)
+	m.Get(this.URLPrefix+"/api/agent-mysql-stop/:host", this.AgentMySQLStop)
+	m.Get(this.URLPrefix+"/api/agent-mysql-start/:host", this.AgentMySQLStart)
+	m.Get(this.URLPrefix+"/api/agent-seed/:targetHost/:sourceHost", this.AgentSeed)
+	m.Get(this.URLPrefix+"/api/agent-active-seeds/:host", this.AgentActiveSeeds)
+	m.Get(this.URLPrefix+"/api/agent-recent-seeds/:host", this.AgentRecentSeeds)
+	m.Get(this.URLPrefix+"/api/agent-seed-details/:seedId", this.AgentSeedDetails)
+	m.Get(this.URLPrefix+"/api/agent-seed-states/:seedId", this.AgentSeedStates)
+	m.Get(this.URLPrefix+"/api/agent-abort-seed/:seedId", this.AbortSeed)
+	m.Get(this.URLPrefix+"/api/agent-custom-command/:host/:command", this.AgentCustomCommand)
+	m.Get(this.URLPrefix+"/api/seeds", this.Seeds)
 
 	// Configurable status check endpoint
 	m.Get(config.Config.StatusEndpoint, this.StatusCheck)

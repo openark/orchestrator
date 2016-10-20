@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"os"
 	"regexp"
+	"strings"
 
 	"gopkg.in/gcfg.v1"
 
@@ -64,6 +65,7 @@ type Configuration struct {
 	MySQLConnectTimeoutSeconds                   int      // Number of seconds before connection is aborted (driver-side)
 	MySQLOrchestratorReadTimeoutSeconds          int      // Number of seconds before backend mysql read operation is aborted (driver-side)
 	MySQLTopologyReadTimeoutSeconds              int      // Number of seconds before topology mysql read operation is aborted (driver-side)
+	MySQLInterpolateParams                       bool     // Do not use sql prepare statement if true
 	DefaultInstancePort                          int      // In case port was not specified on command line
 	SlaveLagQuery                                string   // custom query to check on slave lg (e.g. heartbeat table)
 	SlaveStartPostWaitMilliseconds               int      // Time to wait after START SLAVE before re-readong instance (give slave chance to connect to master)
@@ -166,6 +168,7 @@ type Configuration struct {
 	PostUnsuccessfulFailoverProcesses            []string          // Processes to execute after a not-completely-successful failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {successorAlias}, {countSlaves}, {slaveHosts}, {isDowntimed}, {isSuccessful}, {lostSlaves}
 	PostMasterFailoverProcesses                  []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
 	PostIntermediateMasterFailoverProcesses      []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
+	UnreachableMasterWithStaleSlavesProcesses    []string          // Processes to execute when detecting an UnreachableMasterWithStaleSlaves scenario.
 	CoMasterRecoveryMustPromoteOtherCoMaster     bool              // When 'false', anything can get promoted (and candidates are prefered over others). When 'true', orchestrator will promote the other co-master or else fail
 	DetachLostSlavesAfterMasterFailover          bool              // Should slaves that are not to be lost in master recovery (i.e. were more up-to-date than promoted slave) be forcibly detached
 	ApplyMySQLPromotionAfterMasterFailover       bool              // Should orchestrator take upon itself to apply MySQL master promotion: set read_only=0, detach replication, etc.
@@ -177,6 +180,7 @@ type Configuration struct {
 	GraphitePath                                 string            // Prefix for graphite path. May include {hostname} magic placeholder
 	GraphiteConvertHostnameDotsToUnderscores     bool              // If true, then hostname's dots are converted to underscores before being used in graphite path
 	GraphitePollSeconds                          int               // Graphite writes interval. 0 disables.
+	URLPrefix                                    string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -216,6 +220,7 @@ func newConfiguration() *Configuration {
 		MySQLConnectTimeoutSeconds:                   2,
 		MySQLOrchestratorReadTimeoutSeconds:          30,
 		MySQLTopologyReadTimeoutSeconds:              10,
+		MySQLInterpolateParams:                       false,
 		DefaultInstancePort:                          3306,
 		InstancePollSeconds:                          5,
 		ReadLongRunningQueries:                       true,
@@ -311,6 +316,7 @@ func newConfiguration() *Configuration {
 		PostIntermediateMasterFailoverProcesses:      []string{},
 		PostFailoverProcesses:                        []string{},
 		PostUnsuccessfulFailoverProcesses:            []string{},
+		UnreachableMasterWithStaleSlavesProcesses:    []string{},
 		CoMasterRecoveryMustPromoteOtherCoMaster:     true,
 		DetachLostSlavesAfterMasterFailover:          true,
 		ApplyMySQLPromotionAfterMasterFailover:       false,
@@ -322,6 +328,7 @@ func newConfiguration() *Configuration {
 		GraphitePath:                                 "",
 		GraphiteConvertHostnameDotsToUnderscores:     true,
 		GraphitePollSeconds:                          60,
+		URLPrefix:                                    "",
 	}
 }
 
@@ -380,6 +387,13 @@ func postReadAdjustments() {
 		// The code does not consider RecoveryPeriodBlockMinutes anymore, but RecoveryPeriodBlockMinutes
 		// still supported in config file for backwards compatibility
 		Config.RecoveryPeriodBlockSeconds = Config.RecoveryPeriodBlockMinutes * 60
+	}
+
+	if Config.URLPrefix != "" {
+		// Ensure the prefix starts with "/" and has no trailing one.
+		Config.URLPrefix = strings.TrimLeft(Config.URLPrefix, "/")
+		Config.URLPrefix = strings.TrimRight(Config.URLPrefix, "/")
+		Config.URLPrefix = "/" + Config.URLPrefix
 	}
 }
 
