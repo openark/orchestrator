@@ -4,7 +4,7 @@
 - [License](license.md)
 - [Download](download.md)
 - [Requirements](requirements.md)
-- [Installation](installation.md)
+- [Installation](install.md)
 - [Execution](execution.md)
 - [Executing via command line](executing-via-command-line.md)
 - [Using the Web interface](using-the-web-interface.md)

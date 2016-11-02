@@ -21,9 +21,9 @@ This guide assumes you have set your Go environment, along with `GOPATH`.
 
 To get started, issue
 
-	go get github.com/outbrain/orchestrator
+	go get github.com/github/orchestrator
 
-Change directory into `$GOPATH:/src/github.com/outbrain/orchestrator`
+Change directory into `$GOPATH:/src/github.com/github/orchestrator`
 
 Issue the following to resolve all dependencies:
 
@@ -130,11 +130,11 @@ You will need:
 
 ### Forking and Pull-Requesting
 
-If you want to submit [pull-requests](https://help.github.com/articles/using-pull-requests/) you should first fork `http://github.com/outbrain/orchestrator`.
+If you want to submit [pull-requests](https://help.github.com/articles/using-pull-requests/) you should first fork `http://github.com/github/orchestrator`.
 
 Setting up the environment is basically the same, except you don't want to
 
-	go get github.com/outbrain/orchestrator
+	go get github.com/github/orchestrator
 
 But instead clone your own repository.
 
@@ -143,7 +143,7 @@ that coupling.
 
 Very briefly, you will either want to:
 
-	go get github.com/outbrain/orchestrator
+	go get github.com/github/orchestrator
 	git remote add awesome-fork https://github.com/you-are-awesome/orchestrator.git
 
 Or you will workaround as follows:
@@ -158,7 +158,7 @@ Or you will workaround as follows:
 
 
 You will have a fork of `orchestrator` to which you can push your changes and from which you can send pull requests.
-It is best that you first consult (use the [project issues](https://github.com/outbrain/orchestrator/issues)) whether some kind of development would indeed be merged.
+It is best that you first consult (use the [project issues](https://github.com/github/orchestrator/issues)) whether some kind of development would indeed be merged.
 
 You will need to license your code in [Apache 2.0 license](http://www.apache.org/licenses/LICENSE-2.0) or compatible.
 
