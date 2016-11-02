@@ -1,4 +1,6 @@
-You have _Orchestrator_ installed and deployed. What can you do with it?
+# First Steps with Orchestrator
+
+You have `Orchestrator` installed and deployed. What can you do with it?
 
 A walk through common commands, mostly on the CLI side
 
@@ -14,10 +16,10 @@ The `:3306` is not required, since the `DefaultInstancePort` configuration is `3
 
 	$ orchestrator -c discover -i some.mysql.instance.com
 
-This discovers a single instance. But: do you also have an _orchestrator_ service running? It will pick up from there and
+This discovers a single instance. But: do you also have an `orchestrator` service running? It will pick up from there and
 will interrogate this instance for its master and slaves, recursively moving on until the entire topology is revealed.
 
-> By the way, you can also run a service-like _orchestrator_ from the command line:
+> By the way, you can also run a service-like `orchestrator` from the command line:
 >
 >	orchestrator -c continuous
 >
@@ -25,7 +27,7 @@ will interrogate this instance for its master and slaves, recursively moving on 
 
 #### Information
 
-We now assume you have topologies known to _orchestrator_ (you have _discovered_ it). Let's say `some.mysql.instance.com`
+We now assume you have topologies known to `orchestrator` (you have _discovered_ it). Let's say `some.mysql.instance.com`
 belongs to one topology. `a.slave.3.instance.com` belongs to another. You may ask the following questions:
 
 	$ orchestrator -c clusters
@@ -156,7 +158,7 @@ Are your clusters healty?
 	  + a.slave.7.instance.com:3306 [OK,5.6.17-log,STATEMENT,>>]
 	+ a.slave.8.instance.com:3306 [OK,5.6.17-log,STATEMENT,>>]
 
-Ask _orchestrator_ to recover the above dead intermediate master:
+Ask `orchestrator` to recover the above dead intermediate master:
 
 	$ orchestrator -c recover -i a.slave.6.instance.com:3306
 	a.slave.8.instance.com:3306
