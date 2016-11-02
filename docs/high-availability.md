@@ -1,4 +1,4 @@
-## Orchestrator High Availability
+# Orchestrator High Availability
 
 `Orchestrator` makes your MySQL topologies available, but what makes `orchestrator` highly available?
 
