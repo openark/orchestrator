@@ -1,6 +1,6 @@
 ## Orchestrator High Availability
 
-_Orchestrator_ makes your MySQL topologies available, but what makes _orchestrator_ highly available?
+`Orchestrator` makes your MySQL topologies available, but what makes `orchestrator` highly available?
 
 Before drilling down into the details, we should first observe that orchestrator is a service that runs with a MySQL backend. Thus, we need to substantiate the HA of both these components, as well as the continued correctness in the failover process of either of the two or of both.
 
@@ -8,7 +8,7 @@ Before drilling down into the details, we should first observe that orchestrator
 
 ### High Availability of the Orchestrator backend database
 
-At this time _Orchestrator_ relies on a MySQL backend. The state of the clusters is persisted to tables and is queried via SQL. It is worth considering the following:
+At this time `Orchestrator` relies on a MySQL backend. The state of the clusters is persisted to tables and is queried via SQL. It is worth considering the following:
 
 - The backend database is very small, and is linear with your number of servers. For most setups it's a matter of a few MB and well below 1GB, depending on history configuration, rate of polling etc. This easily allows for a fully in-memory database even on simplest machines.
 

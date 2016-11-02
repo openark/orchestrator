@@ -4,27 +4,27 @@ DBAs and ops who have more than a mere single-master-single-slave replication to
 
 ### What can orchestrator do for me?
 
-_Orchestrator_ analyzes your replication topologies. It can visualize those topologies, and it allows you to
+`Orchestrator` analyzes your replication topologies. It can visualize those topologies, and it allows you to
 move slaves around the topology easily and safely. It provides full audit to operations making for a
 topology changelog. It can serve as a command line tool or it can provide with JSON API for all operations.
 
 ### Is this yet another monitoring tool?
 
-No. _Orchestrator_ is strictly _not_ a monitoring tool. There is no intention to make it so; no alerts or emails. It does provide with online visualization of your topology status though, and requires some thresholds of its own in order to manage the topology.
+No. `Orchestrator` is strictly _not_ a monitoring tool. There is no intention to make it so; no alerts or emails. It does provide with online visualization of your topology status though, and requires some thresholds of its own in order to manage the topology.
 
 ### What kind of replication does orchestrator support?
 
-_Orchestrator_ supports "plain-old-MySQL-replication", the one that uses binary log files and positions.
+`Orchestrator` supports "plain-old-MySQL-replication", the one that uses binary log files and positions.
 If you don't know what you're using, this is probably the one. It is the only type of replication up to and including MySQL 5.5.
 
 ### Does orchestrator support Row Based Replication?
 
 Yes. Statement Based Replication and Row Based Replication are both supported (and the distinction
-is in fact irrelevant to _orchestrator_)
+is in fact irrelevant to `orchestrator`)
 
 ### Does orchestrator support Semi Sync Replication?
 
-Yes. And _orchestrator_ is in fact ignorant about it.
+Yes. And `orchestrator` is in fact ignorant about it.
 
 ### Does orchestrator support Master-Master (ring) Replication?
 
@@ -35,8 +35,8 @@ And are discouraged. And are an abomination.
 
 ### Does orchestrator support Galera Replication?
 
-Yes and no. _Orchestrator_ is unaware of Galera replication. If you have three Galera masters and different slave topologies under each master,
-then _orchestrator_ sees these as three different topologies.
+Yes and no. `Orchestrator` is unaware of Galera replication. If you have three Galera masters and different slave topologies under each master,
+then `orchestrator` sees these as three different topologies.
 
 ### Does orchestrator support GTID Replication?
 
@@ -69,8 +69,8 @@ No.
 
 ### Is orchestrator open source?
 
-Yes. _Orchestrator_ is released as open source under the Apache 2.0 license and is available at: https://github.com/github/orchestrator
+Yes. `Orchestrator` is released as open source under the Apache 2.0 license and is available at: https://github.com/github/orchestrator
 
 ### Who develops orchestrator and why?
 
-_Orchestrator_ is developed by [Shlomi Noach](https://github.com/shlomi-noach) at [GitHub](http://github.com) (previously at [Booking.com](http://booking.com) and [Outbrain](http://outbrain.com)) to assist in managing multiple large replication topologies; time and human errors saved so far are almost priceless.
+`Orchestrator` is developed by [Shlomi Noach](https://github.com/shlomi-noach) at [GitHub](http://github.com) (previously at [Booking.com](http://booking.com) and [Outbrain](http://outbrain.com)) to assist in managing multiple large replication topologies; time and human errors saved so far are almost priceless.

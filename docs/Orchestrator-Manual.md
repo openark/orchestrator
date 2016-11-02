@@ -2,32 +2,32 @@
 
 ## About
 
-_Orchestrator_ is a MySQL replication topology management and visualization tool, allowing for:
+`Orchestrator` is a MySQL replication topology management and visualization tool, allowing for:
 
 #### Discovery
 
-_orchestrator_ actively crawls through your topologies and maps them. It reads basic MySQL info such as replication status and configuration.
+`orchestrator` actively crawls through your topologies and maps them. It reads basic MySQL info such as replication status and configuration.
 
 It provides with slick visualization of your topologies, including replication problems, even in the face of failures.
 
 #### Refactoring
 
-_orchestrator_ understands replication rules. It knows about binlog file:position, GTID, Pseudo GTID, Binlog Servers.
+`orchestrator` understands replication rules. It knows about binlog file:position, GTID, Pseudo GTID, Binlog Servers.
 
 Refactoring replication topologies can be a matter of drag & drop a replica under another master. Moving slaves around becomes
-safe: _orchestrator_ will reject an illegal refactoring attempt.
+safe: `orchestrator` will reject an illegal refactoring attempt.
 
 Find grained control is achieved by various command line options.
 
 #### Recovery
 
-_Orchestrator_ uses a holistic approach to detect master and intermediate master failures. Based on information gained from
+`Orchestrator` uses a holistic approach to detect master and intermediate master failures. Based on information gained from
 the topology itself, it recognizes a variety of failure scenarios.
 
 Configurable, it may choose to perform automated recovery (or allow the user to choose type of manual recovery). Intermediate master
-recovery achieved internally to _orchestrator_. Master failover supported by pre/post failure hooks.
+recovery achieved internally to `orchestrator`. Master failover supported by pre/post failure hooks.
 
-Recovery process utilizes _orchestrator's_ understanding of the topology and of its ability to perform refactoring. It is based on _state_ as opposed to _configuration_: _orchestrator_ picks the best recovery method by investigating/evaluating the topology at the time of
+Recovery process utilizes _orchestrator's_ understanding of the topology and of its ability to perform refactoring. It is based on _state_ as opposed to _configuration_: `orchestrator` picks the best recovery method by investigating/evaluating the topology at the time of
 recovery itself.
 
 ![Orchestrator screenshot](images/orchestrator-simple.png)
@@ -76,14 +76,14 @@ Additional collaborators & contributors to this Wiki:
 
 
 ## License
-_Orchestrator_ is released as open source under the [Apache 2.0 license](http://www.apache.org/licenses/LICENSE-2.0)
+`Orchestrator` is released as open source under the [Apache 2.0 license](http://www.apache.org/licenses/LICENSE-2.0)
 
 
 ## Download
-_Orchestrator_ is released as open source and is available at [GitHub](https://github.com/outbrain/orchestrator).
+`Orchestrator` is released as open source and is available at [GitHub](https://github.com/outbrain/orchestrator).
 Find official releases in https://github.com/outbrain/orchestrator/releases
 
-For developers: _Orchestrator_ is go-gettable. Issue:
+For developers: `Orchestrator` is go-gettable. Issue:
 
 	go get github.com/outbrain/orchestrator
 
@@ -91,16 +91,16 @@ Read more on [Orchestrator for developers](Orchestrator-for-developers)
 
 
 ## Requirements
-_Orchestrator_ is a standalone Go application. It requires a MySQL backend to store topologies state, maintenance status and audit history.
+`Orchestrator` is a standalone Go application. It requires a MySQL backend to store topologies state, maintenance status and audit history.
 It is built and tested on Linux 64bit, and binaries are availably for this OS type alone. The author has not tested any other operating system.
-However the [build script](https://github.com/outbrain/orchestrator/blob/master/build.sh) is capable of building _orchestrator_ for other OS/architectures.
+However the [build script](https://github.com/outbrain/orchestrator/blob/master/build.sh) is capable of building `orchestrator` for other OS/architectures.
 
 
 ## Installation
 
 For production deployments, see [Orchestrator deployment](Orchestrator-deployment). The following text walks you through the manual way of installation and the necessary configuration to make it work.
 
-The following assumes you will be using the same machine for both the _orchestrator_ binary and the MySQL backend.
+The following assumes you will be using the same machine for both the `orchestrator` binary and the MySQL backend.
 If not, replace `127.0.0.1` with appropriate host name. Replace `orch_backend_password` with your own super secret password.
 
 #### Extract orchestrator binary and files
@@ -108,7 +108,7 @@ If not, replace `127.0.0.1` with appropriate host name. Replace `orch_backend_pa
 - Extract from tarball
 
   Extract the archive you've downloaded from https://github.com/outbrain/orchestrator/releases
-  For example, let's assume you wish to install _orchestrator_ under `/usr/local/orchestrator`:
+  For example, let's assume you wish to install `orchestrator` under `/usr/local/orchestrator`:
 
       sudo mkdir -p /usr/local
       sudo cd /usr/local
@@ -135,7 +135,7 @@ Setup a MySQL server for backend, and invoke the following:
     CREATE DATABASE IF NOT EXISTS orchestrator;
     GRANT ALL PRIVILEGES ON `orchestrator`.* TO 'orchestrator'@'127.0.0.1' IDENTIFIED BY 'orch_backend_password';
 
-_Orchestrator_ uses a configuration file, located in either `/etc/orchestrator.conf.json` or relative path to binary `conf/orchestrator.conf.json` or
+`Orchestrator` uses a configuration file, located in either `/etc/orchestrator.conf.json` or relative path to binary `conf/orchestrator.conf.json` or
 `orchestrator.conf.json`.
 The installed package includes a file called `orchestrator.conf.json.sample` with some basic settings which you can use as baseline for `orchestrator.conf.json`.
 Edit `orchestrator.conf.json` to match the above as follows:
@@ -150,7 +150,7 @@ Edit `orchestrator.conf.json` to match the above as follows:
 
 
 #### Grant access to orchestrator on all your MySQL servers
-For _orchestrator_ to detect your replication topologies, it must also have an account on each and every topology. At this stage this has to be the
+For `orchestrator` to detect your replication topologies, it must also have an account on each and every topology. At this stage this has to be the
 same account (same user, same password) for all topologies. On each of your masters, issue the following:
 
     GRANT SUPER, PROCESS, REPLICATION SLAVE, RELOAD ON *.* TO 'orchestrator'@'orch_host' IDENTIFIED BY 'orch_topology_password';
@@ -170,7 +170,7 @@ Replace `orch_host` with hostname or orchestrator machine (or do your wildcards 
 
 Consider moving `conf/orchestrator.conf.json` to `/etc/orchestrator.conf.json` (both locations are valid)
 
-To execute _orchestrator_ in command line mode or in HTTP API only, all you need is the `orchestrator` binary.
+To execute `orchestrator` in command line mode or in HTTP API only, all you need is the `orchestrator` binary.
 To enjoy the rich web interface, including topology visualizations and drag-and-drop topology changes, you will need
 the `resources` directory and all that is underneath it. If you're unsure, don't touch; things are already in place.
 
@@ -180,11 +180,11 @@ the `resources` directory and all that is underneath it. If you're unsure, don't
 
 #### Executing as web/API service
 
-Assuming you've installed _orchestrator_ under `/usr/local/orchestrator`:
+Assuming you've installed `orchestrator` under `/usr/local/orchestrator`:
 
     cd /usr/local/orchestrator && ./orchestrator http
 
-_Orchestrator_ will start listening on port `3000`. Point your browser to `http://your.host:3000/`
+`Orchestrator` will start listening on port `3000`. Point your browser to `http://your.host:3000/`
 and you're ready to go. You may skip to next sections.
 
 If you like your debug messages, issue:
@@ -201,8 +201,8 @@ You may choose to use a different location for the configuration file, in which 
 
     cd /usr/local/orchestrator && ./orchestrator --debug --config=/path/to/config.file http
 
-Web/API service will, by default, issue a continuous, infinite polling of all known servers. This keeps _orchestrator_'s data up to date.
-You typically want this behavior, but you may disable it, making _orchestrator_ just serve API/Web but never update the instances status:
+Web/API service will, by default, issue a continuous, infinite polling of all known servers. This keeps `orchestrator`'s data up to date.
+You typically want this behavior, but you may disable it, making `orchestrator` just serve API/Web but never update the instances status:
 
     cd /usr/local/orchestrator && ./orchestrator --discovery=false http
 
@@ -232,7 +232,7 @@ You may choose to use a different location for the configuration file, in which 
 
 > `-c` stands for `command`, and is mandatory.
 
-Discover a new instance ("teach" _orchestrator_ about your topology). _Orchestrator_ will automatically recursively drill up the master chain (if any)
+Discover a new instance ("teach" `orchestrator` about your topology). `Orchestrator` will automatically recursively drill up the master chain (if any)
 and down the slaves chain (if any) to detect the entire topology:
 
     orchestrator -c discover -i 127.0.0.1:22987 cli
@@ -275,7 +275,7 @@ Move the slave around the topology:
 
 The above happens to move the slave one level up. However the `relocate` command accepts any valid destination. `relocate`
 figures out the best way to move a slave. If GTID is enabled, use it. If Pseudo-GTID is available, use it. If a binlog server is
-involved, use it. I _orchestrator_ has further insight into the specific coordinates involved, use it. Otherwise just use
+involved, use it. I `orchestrator` has further insight into the specific coordinates involved, use it. Otherwise just use
 plain-old binlog log file:pos math.
 
 Similar to `relocate`, you can move multiple slaves via `relocate-slaves`. This moves slaves-of-an-instance below another server.
@@ -344,7 +344,7 @@ Reset a slave, effectively breaking down the replication (destructive action):
 > The word _classic_ relates to the method of using an up-and-alive topology, where all connections are good and
 > instances can be queried for their replication status.
 
-> However _orchestrator_ also supports topology refactoring in situations where servers are inaccessible.
+> However `orchestrator` also supports topology refactoring in situations where servers are inaccessible.
 > This could made to work via GTID and Pseudo-GTID.
 >
 > It may allow promoting a slave up the topology even as its master is dead, or
@@ -366,7 +366,7 @@ Make an instance read-only or writeable:
     orchestrator -c set-read-only -i 127.0.0.1:22988 cli
     orchestrator -c set-writeable -i 127.0.0.1:22988 cli
 
-Begin maintenance mode on an instance. While in maintenance mode, _orchestrator_ will not allow this instance to
+Begin maintenance mode on an instance. While in maintenance mode, `orchestrator` will not allow this instance to
 be moved or participate in another instance's move:
 
     orchestrator -c begin-maintenance -i 127.0.0.1:22988 --reason="load testing; do not disturb" cli
@@ -1145,38 +1145,38 @@ the following welcome page:
 ![Orchestrator screenshot](images/orchestrator-about.png)
 
 If this is your first time using _orchstrator_, then you should begin by teaching it.
-_orchestrator_ needs to know what replication topologies you have. The web interface
+`orchestrator` needs to know what replication topologies you have. The web interface
 provides this via the `discover` page.
 
 From each replication topology, pick one server (this could be master or slave) and let
-_orchestrator_ know which hostname & port this server listens on. _Orchestrator_ will
+`orchestrator` know which hostname & port this server listens on. `Orchestrator` will
 recursively drill up and down replication to map the entire topology. This may take a couple
-minutes, during which _orchestrator_ connects the servers it encounters into sub-topologies and
+minutes, during which `orchestrator` connects the servers it encounters into sub-topologies and
 eventually into the final topology.
 
 You may manually enter as many servers as you like (inside or outside the topology).
-The first time _orchestrator_ investigates, it can only reach those slaves that are
+The first time `orchestrator` investigates, it can only reach those slaves that are
 _currently replicating_. So if you know you have some slves which are temporarily down, you'll need
 to add them manually, or, if you like to see automation in work, just wait until they're up, at which
-time _orchestrator_ will automaticaly find them.
+time `orchestrator` will automaticaly find them.
 
-> Once _orchestrator_ is familiar with a server, it doesn't care if the server is lagging, not replicating
+> Once `orchestrator` is familiar with a server, it doesn't care if the server is lagging, not replicating
 > or inaccessible. The server is still part of the topology it was last seen in. There is a timeout for
 > that: if a server is not seen by `UnseenInstanceForgetHours` hours, it is automaticaaly forgotten
 > (presumed dead). Again, if it suddenly comes back to life, and connects to a known topology, it is
 > automatically re-discovered.
 
-_Orchestrator_ resolves the `CNAME` of every input it gets, either from the user or from the replication
+`Orchestrator` resolves the `CNAME` of every input it gets, either from the user or from the replication
 topology itself. This is for avoiding ambiguities or implicit duplicates.
 
 ![Orchestrator screenshot](images/orchestrator-discover.png)
 
-Once _orchestrator_ is familiar with a topology, you can view and manipulate it via the `cluster` page.
+Once `orchestrator` is familiar with a topology, you can view and manipulate it via the `cluster` page.
 Click the `clusters` drop down on navigation bar to see available clusters.
 
 > Each topology is associated with a _cluster name_, which is (currently) named after the topology's master.
 
-The `cluster` page is where most fun happens. _Orchestrator_ presents the cluster in an easy to follow
+The `cluster` page is where most fun happens. `Orchestrator` presents the cluster in an easy to follow
 tree infographic, based on a D3 widget. Sub trees are collapsible.
 
 Each node in the tree presents a single MySQL instance, listing its fully qualified name, its version,
@@ -1202,7 +1202,7 @@ Master-master topologies can be created by dragging a _master_ onto one of its s
 Complex refactoring is done by performing multiple such steps. You may need to drag and drop your
 instance three or four times to put it in a "remote" location.
 
-_Orchestrator_ will keep you safe by disallowing dropping your instance when either your instance or its
+`Orchestrator` will keep you safe by disallowing dropping your instance when either your instance or its
 target master have problems (lag too much, do not replicate etc.). It may allow the drop and still abort
 the operation if it finds a deeper block, such as the target not having binary logs.
 
@@ -1226,7 +1226,7 @@ A co-master topology:
 
 ![Orchestrator screenshot](images/orchestator-cm-co-masters.png)
 
-_Orchestrator_ visually indicates replication & accessibility related problems: slave lag, replication not working,
+`Orchestrator` visually indicates replication & accessibility related problems: slave lag, replication not working,
 instance not accessed for long time, instance access failure, instance under maintenance.
 
 ![Orchestrator screenshot](images/orchestrator-simple-with-problems.png)
@@ -1235,7 +1235,7 @@ _Problems_ drop down is available on all pages, and indicates all currently know
 
 ![Orchestrator screenshot](images/orchestrator-problems.png)
 
-The `Audit` page presents with all actions taken via _orchestrator_: slave move, detection, maintenance etc.
+The `Audit` page presents with all actions taken via `orchestrator`: slave move, detection, maintenance etc.
 (`START SLAVE` and `STOP SLAVE` are currently not audited).
 
 ![Orchestrator screenshot](images/orchestrator-audit-small.png)
@@ -1254,20 +1254,20 @@ command line mode.
 > Most users will not be interested in accessing the API. If you're unsure: you don't need it.
 > For creators of frameworks and maintenance tools, it may provide with great powers (and great responsibility).
 
-The following is a brief listing of the web API exposed by _orchestrator_. Documentation tends to fall behind the code; see the
+The following is a brief listing of the web API exposed by `orchestrator`. Documentation tends to fall behind the code; see the
 latest [API source code](https://github.com/outbrain/orchestrator/blob/master/go/http/api.go) for the de-facto lsiting (scroll to end of file).
 
 * `/api/instance/:host/:port`: reads and returns an instance's details (example `/api/instance/mysql10/3306`)
-* `/api/discover/:host/:port`: discover given instance (a running _orchestrator_ service will pick it up from there and
+* `/api/discover/:host/:port`: discover given instance (a running `orchestrator` service will pick it up from there and
 recursively scan the entire topology)
 * `/api/refresh/:host/:port`: synchronously re-read instance status
 * `/api/forget/:host/:port`: remove records of this instance. It may be automatically rediscovered by
   following up on its master or one of its slaves.
 * `/api/resolve/:host/:port`: check if hostname resolves and whether TCP connection can be established (example: `/api/resolve/myhost.mydomain/3306`)  
 * `/api/relocate/:host/:port/:belowHost/:belowPort` (attempt to) move an instance below another instance.
-_Orchestrator_ picks best course of action.
+`Orchestrator` picks best course of action.
 * `/api/relocate-slaves/:host/:port/:belowHost/:belowPort` (attempt to) move slaves of an instance below another instance.
-_Orchestrator_ picks best course of action.
+`Orchestrator` picks best course of action.
 * `/api/move-up/:host/:port` (attempt to) move this instance up the topology (make it child of its grandparent)
 * `/api/move-below/:host/:port/:siblingHost/:siblingPort` (attempt to) move an instance below its sibling.
   the two provided instances must be siblings: slaves of the same master. (example `/api/move-below/mysql10/3306/mysql24/3306`)
@@ -1275,7 +1275,7 @@ _Orchestrator_ picks best course of action.
   circular master-master topology.
 * `/api/reset-slave/:host/:port` reset a slave, breaking replication (destructive operation)
 * `/api/begin-maintenance/:host/:port/:owner/:reason`: declares and begins maintenance mode for an instance.
-  While in maintenance mode, _orchestrator_ will not allow moving this instance.
+  While in maintenance mode, `orchestrator` will not allow moving this instance.
   (example `/api/begin-maintenance/mysql10/3306/gromit/upgrading+mysql+version`)
 * `/api/end-maintenance/:host/:port`: end maintenance on instance
 * `/api/end-maintenance/:maintenanceKey` end maintenance on instance, based on maintenance key given on `begin-maintenance`
@@ -1427,11 +1427,11 @@ This sample is followed by a field breakdown:
 
 ## Security
 
-When operating in HTTP mode (API or Web), access to _orchestrator_ may be restricted via either:
+When operating in HTTP mode (API or Web), access to `orchestrator` may be restricted via either:
 
 *  _basic authentication_
 
-   Add the following to _orchestrator_'s configuration file:
+   Add the following to `orchestrator`'s configuration file:
 
         "AuthenticationMethod": "basic",
         "HTTPAuthUser":         "dba_team",
@@ -1439,12 +1439,12 @@ When operating in HTTP mode (API or Web), access to _orchestrator_ may be restri
 
    With `basic` authentication there's just one single credential, and no roles.
 
-   _Orchestrator_'s configuration file contains credentials to your MySQL servers as well as _basic authentication_
+   `Orchestrator`'s configuration file contains credentials to your MySQL servers as well as _basic authentication_
    credentials as specified above. Keep it safe (e.g. `chmod 600`).
 
 *  _basic authentication, extended_
 
-   Add the following to _orchestrator_'s configuration file:
+   Add the following to `orchestrator`'s configuration file:
 
         "AuthenticationMethod": "multi",
         "HTTPAuthUser":         "dba_team",
@@ -1481,7 +1481,7 @@ When operating in HTTP mode (API or Web), access to _orchestrator_ may be restri
             "wallace", "gromit", "shaun"
             ],
 
-Or, regardless, you may turn the entire _orchestrator_ process to be read only via:
+Or, regardless, you may turn the entire `orchestrator` process to be read only via:
 
 
         "ReadOnly": "true",
@@ -1649,7 +1649,7 @@ The following is a complete list of configuration parameters. "Complete" is alwa
 * `ExpiryHostnameResolvesMinutes`	(int), Number of minute after which a hostname resolve expires (hostname resolve are cached for up to this number of minutes)
 * `RejectHostnameResolvePattern`  (string), Regexp pattern for resolved hostname that will not be accepted (not cached, not written to db). This is done to avoid storing wrong resolves due to network glitches.
 * `ReasonableReplicationLagSeconds` (int), Above this value is considered a problem
-* `VerifyReplicationFilters`  (bool), Include replication filters check before approving topology refactoring (e.g. _orchestrator_ will not allow placing a non-filteres slave under a filtered one)
+* `VerifyReplicationFilters`  (bool), Include replication filters check before approving topology refactoring (e.g. `orchestrator` will not allow placing a non-filteres slave under a filtered one)
 * `MaintenanceOwner`  (string), (Default) name of maintenance owner to use if none provided
 * `ReasonableMaintenanceReplicationLagSeconds` (int), Above this value move-up and move-below are blocked
 * `MaintenanceExpireMinutes`  (int), Minutes after which a maintenance flag is considered stale and is cleared
@@ -1774,7 +1774,7 @@ If your hostnames follow a strict convention, and you are able to detect data ce
   "PhysicalEnvironmentPattern": "[.][^.]+[.]([^.]+)[.]mycompany[.]com",
 ```
 
-_orchestrator_ recognizes a cluster by its master's hostname & port. However you may also assign an alias to a cluster. This makes a couple CLI commadns simpler and some web pages nicer. If the alias can be queried via SQL, configure (and modify):
+`orchestrator` recognizes a cluster by its master's hostname & port. However you may also assign an alias to a cluster. This makes a couple CLI commadns simpler and some web pages nicer. If the alias can be queried via SQL, configure (and modify):
 
 ```
   "DetectClusterAliasQuery": "SELECT SUBSTRING_INDEX(@@hostname, '-', 1)",
@@ -1810,7 +1810,7 @@ While you're at it, make your Pseudo-GTID entries monotonicly increasing, and pr
 
 #### Topology recovery: want to have if you want to own your database
 
-When PseudoGTID is enabled, _orchestrator_ can do automated recovery from dead intermediate master (reconnects orphaned slaves to the topology)
+When PseudoGTID is enabled, `orchestrator` can do automated recovery from dead intermediate master (reconnects orphaned slaves to the topology)
 or from dead masters (auto-promotes best candidate slave).
 
 By default this is disabled. You can specify patterns of clusters for which to enable both. Of course, `.*` matches everything:
@@ -1825,7 +1825,7 @@ By default this is disabled. You can specify patterns of clusters for which to e
 ],
 ```
 
-_orchestrator_ recovers the topology structure, but as a generic tool it does not understand the ouer context of your MySQL topologies
+`orchestrator` recovers the topology structure, but as a generic tool it does not understand the ouer context of your MySQL topologies
 management, such as DNS, proxies etc. It allows for hooks to invoke upon failover detection, before taking action and after taking action.
 You might want to configure the following:
 
@@ -1855,7 +1855,7 @@ You might want to configure the following:
 Pseudo GTID is the method of injecting unique entries into the binary logs, such that they can be used to
 match/sync slaves without direct connection, or slaves whose master is corrupted/dead.
 
-_Orchestrator_ leverages Pseudo GTID, when applicable, and allows for complex re-matching of slaves, including
+`Orchestrator` leverages Pseudo GTID, when applicable, and allows for complex re-matching of slaves, including
 semi-automated fail over onto a slave and the moving of its siblings as its slaves.
 
 To enable Pseudo GTID you need to:
@@ -1872,7 +1872,7 @@ Please consult these blog entries:
 [Refactoring replication topology with Pseudo GTID](http://code.openark.org/blog/mysql/refactoring-replication-topology-with-pseudo-gtid)
 for more detail.
 
-Following are three examples of workeable injection of GTID and the accompanying _orchestrator_ configuration:
+Following are three examples of workeable injection of GTID and the accompanying `orchestrator` configuration:
 
 #### Pseudo GTID via CREATE OR REPLACE VIEW
 
@@ -2047,7 +2047,7 @@ set global event_scheduler := 1;
 }
 ```
 
-Note that we introduce the `DetectPseudoGTIDQuery` config, which allows _orchestrator_ to actually check if Pseudo-GTID was recently injected.
+Note that we introduce the `DetectPseudoGTIDQuery` config, which allows `orchestrator` to actually check if Pseudo-GTID was recently injected.
 
 In the above routine you may notice significant code overhead (`DECLATE CONTINUE HANDLER`, `GET_LOCK`, ...). This code overhead makes for a
 safety mechanism to avoid pileup of the `INSERT` statement in case the server happens to suffer some locking issue. Recall that the event scheduler
@@ -2148,23 +2148,23 @@ set global event_scheduler := 1;
 
 Note that the `@pseudo_gtid_hint` value is composed of UTC timestamp (encoded in hex) followed by other values (connection_id, random). This makes entries increasing in lexical order.
 
-The `PseudoGTIDMonotonicHint` configuration variable tells _orchestrator_ that if it finds the value (`asc:`) in the Pseudo-GTID entry text, then it is to be
+The `PseudoGTIDMonotonicHint` configuration variable tells `orchestrator` that if it finds the value (`asc:`) in the Pseudo-GTID entry text, then it is to be
 trusted that said entry was injected as part of monotonicly increasing Pseudo-GTID entries. This will kick in a search optimization on the master's binary logs.
 
 
-The author of _orchestrator_ uses this last method injection.
+The author of `orchestrator` uses this last method injection.
 
 
 
 #### Using Pseudo GTID
 
-_orchestrator_ will only enable Pseudo-GTID mode if the `PseudoGTIDPattern` configuration variable is non-empty,
+`orchestrator` will only enable Pseudo-GTID mode if the `PseudoGTIDPattern` configuration variable is non-empty,
 but can only validate its correctness during runtime.
 
-If your pattern is incorrect (thus, _orchestrator_ in unable to find pattern in the binary logs), you will not be able
+If your pattern is incorrect (thus, `orchestrator` in unable to find pattern in the binary logs), you will not be able
 to move slaves in the topology via Pseudo-GTID, and you will only find this out upon attempting to.
 
-If you manage more that one topology with _orchestrator_, you will need to use same Pseudo GTID injection method for all, as
+If you manage more that one topology with `orchestrator`, you will need to use same Pseudo GTID injection method for all, as
 there is only a single `PseudoGTIDPattern` value.
 
 To move slaves via Pseudo-GTID mechanism, click the **Classic mode** green button on the navigation bar and turn it into
@@ -2183,7 +2183,7 @@ or ancestor (including its very own master/parent).
 
 ## Topology recovery
 
-_orchestrator_ detects failure scenarios and optionally recovers in such cases.
+`orchestrator` detects failure scenarios and optionally recovers in such cases.
 
 At this time recovery requires either GTID, [Pseudo GTID](#pseudo-gtid) or Binlog Servers.
 
@@ -2208,7 +2208,7 @@ At this time recovery requires either GTID, [Pseudo GTID](#pseudo-gtid) or Binlo
 * UnreachableIntermediateMaster
 * BinlogServerFailingToConnectToMaster
 
-Briefly looking at some examples, here is how _orchestrator_ reaches failure conclusions:
+Briefly looking at some examples, here is how `orchestrator` reaches failure conclusions:
 
 #### `DeadMaster`:
 
@@ -2230,9 +2230,9 @@ This makes for a potential recovery process
 1. Master MySQL access failure
 2. But it has replicating slaves.
 
-This does not make for a recovery process. However, to improve analysis, _orchestrator_ will
+This does not make for a recovery process. However, to improve analysis, `orchestrator` will
 issue an emergent re-read of the slaves, to figure out whether they are really happy with the master
-(in which case maybe _orchestrator_ cannot see it due to a network glitch) or were actually taking
+(in which case maybe `orchestrator` cannot see it due to a network glitch) or were actually taking
 their time to figure out they were failing replication.
 
 #### `DeadIntermediateMaster`:
@@ -2270,7 +2270,7 @@ The exact implementation greatly depends on the topology setup (which instances 
 have replication filters? Which versions of MySQL? etc.). It is very (very) likely your topology will support at least one of the above
 (in particular, matching-up the slaves is a trivial solution, unless replication filters are in place).
 
-A "really-not-simple" recovery case is that of a `DeadMaster`. _orchestrator_ will try to:
+A "really-not-simple" recovery case is that of a `DeadMaster`. `orchestrator` will try to:
 
 - Find the most advanced slave
 - Promote it, enslaving its siblings
@@ -2284,7 +2284,7 @@ are more up-to-date or less up-to-date than others. When all your instances have
 Of course, all other limitations apply (versions, binlog format, replication filters) - and orchestrator will attempt to find a good solution.
 
 The `DeadMaster` case is not simple because your application must be made aware that a master is dead and another takes its place.
-This is strictly outside _orchestrator_'s scope; however _orchestrator_ supports hooks: lists of external processes to invoke
+This is strictly outside `orchestrator`'s scope; however `orchestrator` supports hooks: lists of external processes to invoke
 before/after recovery. These would do whatever changes needed: remove "read-only" flag, change DNS records, etc. It's on you.
 
 Hooks are described in detail further on.
@@ -2294,7 +2294,7 @@ holds the state for recovery operations, if you like to SQL your way for informa
 
 ### Manual recovery
 
-You may choose to ask _orchestrator_ to recover a failure by providing a specific instance that is failed.
+You may choose to ask `orchestrator` to recover a failure by providing a specific instance that is failed.
 This instance must be recognized as having a failure scenario (see above). It is possible to request
 recovery for an instance that is downtimed (as this is manual recovery it overrides automatic assumptions).
 Recover via:
@@ -2333,7 +2333,7 @@ Pending recoveries are unblocked either once `RecoveryPeriodBlockSeconds` has pa
 Acknowledging a recovery is possible either via web API/interface (see audit/recovery page) or via command line interface (see `-c ack-instance-recoveries` or `-c ack-cluster-recoveries`).
 
 > The observant reader may be confused a little as for the reason for two different commands: `ack-instance-recoveries` and `ack-cluster-recoveries`, or for the different discussion on "same instance" vs "same cluster".
-> A recovery can be unacknowledged. While it is unacknowledged and still _recent_, there will be no automated recovery taking place. However if sufficient time has passed, it is perfectly valid that the recovery remains _unacknowledged_ even as _orchestrator_ proceeds to recover a new failure scenario.
+> A recovery can be unacknowledged. While it is unacknowledged and still _recent_, there will be no automated recovery taking place. However if sufficient time has passed, it is perfectly valid that the recovery remains _unacknowledged_ even as `orchestrator` proceeds to recover a new failure scenario.
 > It is therefore possible to have multiple unacknowledged recoveries on same instance or on same cluster.
 > In the future, it may happen that we will change the behavior (based on configuration) such that constraints on recoveries of same cluster are relaxed. We therefore keep separate code and analysis for "same instance" vs. "same cluster">
 
@@ -2351,7 +2351,7 @@ Downtime is explicitly created for this purpose: to allow the DBA a way to suppr
 
 ### Recovery hooks
 
-_orchestrator_ supports hooks -- external scripts invoked through the recovery process. These are arrays of commands invoked through
+`orchestrator` supports hooks -- external scripts invoked through the recovery process. These are arrays of commands invoked through
 shell, in particular `bash`. Hooks are:
 
 - `OnFailureDetectionProcesses`: called when a failure/recovery known scenario is detected. These scripts are called befroe even
@@ -2360,9 +2360,9 @@ shell, in particular `bash`. Hooks are:
   (non-zero exit status) of any process *aborts the recovery operation*. This is your chance to decide whether to go on with
   the recovery or not.
 - `PostIntermediateMasterFailoverProcesses`: specific commands to run after recovery of an intermediate-master failure.
-  Order of execution is sequential. Failures are ignored (the recovery is done in terms of _orchestrator_).
+  Order of execution is sequential. Failures are ignored (the recovery is done in terms of `orchestrator`).
 - `PostMasterFailoverProcesses`: specific commands to run after recovery of a master failure.
-  Order of execution is sequential. Failures are ignored (the recovery is done in terms of _orchestrator_).
+  Order of execution is sequential. Failures are ignored (the recovery is done in terms of `orchestrator`).
 - `PostFailoverProcesses`: commands to run after recovery of any type (and following the specific `PostIntermediateMasterFailoverProcesses`
   or `PostMasterFailoverProcesses` commands). Failures are ignored.
 - `PostUnsuccessfulFailoverProcesses`: commands to run when recovery operation resulted with error, such that there is no known successor instance
@@ -2437,7 +2437,7 @@ needs to be done on obscurring the token on error messages).
 
 ## Supported Topologies and Versions
 
-The following setups are supported by _orchestrator_:
+The following setups are supported by `orchestrator`:
 
 - Plain-old MySQL replication; the _classic_ one, based on log file + position
 - GTID replication. Both Oracle GTID and MariaDB GTID are supported.
@@ -2460,26 +2460,26 @@ Also note:
 
 Master-master (ring) replication is supported for two master nodes. Topologies of three master nodes or more in a ring are unsupported.
 
-Galera/XtraDB Cluster replication is not strictly supported: _orchestrator_ will not recognize that co-masters
-in a Galera topology are related. Each such master would appear to _orchestrator_ to be the head of its own distinct
+Galera/XtraDB Cluster replication is not strictly supported: `orchestrator` will not recognize that co-masters
+in a Galera topology are related. Each such master would appear to `orchestrator` to be the head of its own distinct
 topology.
 
 Replication topologies with multiple MySQL instances on the same host are supported. For example, the testing
-environment for _orchestrator_ is composed of four instances all running on the same machine, courtesy MySQLSandbox.
-However, MySQL's lack of information sharing between slaves and masters make it impossible for _orchestrator_ to
+environment for `orchestrator` is composed of four instances all running on the same machine, courtesy MySQLSandbox.
+However, MySQL's lack of information sharing between slaves and masters make it impossible for `orchestrator` to
 analyze the topology top-to-bottom, since a master does not know which ports its slaves are listening on.
 The default assumption is that slaves are listening on same port as their master. With multiple instances on a single
 machine (and on same network) this is impossible. In such case you must configure your MySQL instances'
 `report_host` and `report_port` ([read more](http://code.openark.org/blog/mysql/the-importance-of-report_host-report_port))
-parameters, and set _orchestrator_'s configuration parameter `DiscoverByShowSlaveHosts` to `true`.
+parameters, and set `orchestrator`'s configuration parameter `DiscoverByShowSlaveHosts` to `true`.
 
 ## Risks
 
-Most of the time _orchestrator_ only reads status from your topologies. Default configuration is to poll each instance once per minute.
-This is very relaxed, and you can go way more intensive than that. But do be aware that _orchestrator_ opens connections to all your servers
+Most of the time `orchestrator` only reads status from your topologies. Default configuration is to poll each instance once per minute.
+This is very relaxed, and you can go way more intensive than that. But do be aware that `orchestrator` opens connections to all your servers
 (and typically reuses them).
 
-Actual risk begins when you modify instances. Namely moving slaves around the topology. _Orchestrator_ does its best to:
+Actual risk begins when you modify instances. Namely moving slaves around the topology. `Orchestrator` does its best to:
 
 1. Make sure you only move an instance to a location where it is valid for it to replicate (e.g. that you don't put a 5.5 server below a 5.6 server)
 2. Make sure you move an instance at the right time (ie the instance and whicever affected servers are not lagging badly, so that operation can compeltely in a timely manner).
@@ -2487,20 +2487,20 @@ Actual risk begins when you modify instances. Namely moving slaves around the to
 
 All the above is tested, and have been put to practice in our production topologies. We have not witnessed a miscalculation or misprotection throughout our production use.
 
-When _orchestrator_ encounters an error throughout the moving process, it does its best to rollback. However extreme cases such as a new master crashing in the middle of the move
+When `orchestrator` encounters an error throughout the moving process, it does its best to rollback. However extreme cases such as a new master crashing in the middle of the move
 may leave the topology unstable (though the same instance could crash before the move and leave whatever topology it was in charge of unstable just as well).
-Or someone manually tampering with replication even while _orchestrator_ is moving the slave around. Point being - weird
+Or someone manually tampering with replication even while `orchestrator` is moving the slave around. Point being - weird
 and evil stuff can happen, and there is a risk in a slave losing its position vs. its master.
 
 Now that you're a bit more scared, it's time to reflect: how much did your hands tremble when you navigated your slaves _by hand_ up and down through the topology?
-We suspect the automation provided by _orchestrator_ makes for a _safer_ management mechanism than we get with our shaking hands.
+We suspect the automation provided by `orchestrator` makes for a _safer_ management mechanism than we get with our shaking hands.
 
 Also, read the [LICENSE](https://github.com/outbrain/orchestrator/blob/master/LICENSE), and especially the "WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND" part.
 
 
 ## Gotchas
 
-* By default, _orchestrator_ only polls a server once a minute (configurable via `InstancePollSeconds`). This means that any
+* By default, `orchestrator` only polls a server once a minute (configurable via `InstancePollSeconds`). This means that any
 status you see is essentially an estimation. Different instances get polled at different times. The status you see on the
 _cluster_ page, for example, does not necessarily reflect a given point in time, but rather a combination of different points
 in time in the last minute (or whatever poll interval you use).
@@ -2515,8 +2515,8 @@ in time in the last minute (or whatever poll interval you use).
 completed. If you choose to click the `Kill query` button, please be advised that you might actually be killing a *different*
 query, executing on same connection following up on the by-now-completed listed long running query.
 
-* It make take a couple minutes for _orchestrator_ to full detect a cluster's topology. The time depends on the depth
-of the topology (if you have slaves-of-slaves the time increases). This is due to the fact _orchestrator_ polls the instances
+* It make take a couple minutes for `orchestrator` to full detect a cluster's topology. The time depends on the depth
+of the topology (if you have slaves-of-slaves the time increases). This is due to the fact `orchestrator` polls the instances
 independently, and and insight on the topology must propagate from master to slave on the next polling occasion.
 
 * Specifically, if you fail over to a new master, you may find that for a couple minutes the topologies seem empty.
@@ -2524,9 +2524,9 @@ This may happen because instances used to identify themselves as belonging to a 
 This is self-healing. Refresh and look at the `Clusters` menu to review the newly created cluster (names after the new master)
 over time.
 
-* Don't restart _orchestrator_ while you're running a seed (only applies to workingwith _orchestrator-agent_)
+* Don't restart `orchestrator` while you're running a seed (only applies to workingwith _orchestrator-agent_)
 
-  Otherwise _orchestrator_ is non-intrusive and self-healing. You can restart it whenever you like.
+  Otherwise `orchestrator` is non-intrusive and self-healing. You can restart it whenever you like.
 
 
 ## Bugs
