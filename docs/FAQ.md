@@ -6,9 +6,7 @@ DBAs and ops who have more than a mere single-master-single-slave replication to
 
 ### What can orchestrator do for me?
 
-`Orchestrator` analyzes your replication topologies. It can visualize those topologies, and it allows you to
-move slaves around the topology easily and safely. It provides full audit to operations making for a
-topology changelog. It can serve as a command line tool or it can provide with JSON API for all operations.
+`Orchestrator` analyzes your replication topologies and provides information and actions: you will be able to visualize & manipulate these topologies (refactoring replication paths). Orchestrator can monitor and recover topology failures, including master death.
 
 ### Is this yet another monitoring tool?
 
@@ -26,7 +24,7 @@ is in fact irrelevant to `orchestrator`)
 
 ### Does orchestrator support Semi Sync Replication?
 
-Yes. And `orchestrator` is in fact ignorant about it.
+Yes.
 
 ### Does orchestrator support Master-Master (ring) Replication?
 
@@ -71,7 +69,7 @@ No.
 
 ### Is orchestrator open source?
 
-Yes. `Orchestrator` is released as open source under the Apache 2.0 license and is available at: https://github.com/github/orchestrator
+Yes. `Orchestrator` is released as open source under the MIT license and is available at: https://github.com/github/orchestrator
 
 ### Who develops orchestrator and why?
 
