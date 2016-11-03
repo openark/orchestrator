@@ -36,18 +36,25 @@ import (
 
 var SeededAgents chan *Agent = make(chan *Agent)
 
-var httpTimeout = time.Duration(time.Duration(config.Config.HttpTimeoutSeconds) * time.Second)
+var httpClient *http.Client
 
-func dialTimeout(network, addr string) (net.Conn, error) {
-	return net.DialTimeout(network, addr, httpTimeout)
-}
+// InitHttpClient gets called once, and initializes httpClient according to config.Config
+func InitHttpClient() {
+	if httpClient != nil {
+		return
+	}
 
-var httpTransport = &http.Transport{
-	TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config.AgentSSLSkipVerify},
-	Dial:            dialTimeout,
-	ResponseHeaderTimeout: httpTimeout,
+	httpTimeout := time.Duration(time.Duration(config.Config.HttpTimeoutSeconds) * time.Second)
+	dialTimeout := func(network, addr string) (net.Conn, error) {
+		return net.DialTimeout(network, addr, httpTimeout)
+	}
+	httpTransport := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config.AgentSSLSkipVerify},
+		Dial:            dialTimeout,
+		ResponseHeaderTimeout: httpTimeout,
+	}
+	httpClient = &http.Client{Transport: httpTransport}
 }
-var httpClient = &http.Client{Transport: httpTransport}
 
 // httpGet is a convenience method for getting http response from URL, optionaly skipping SSL cert verification
 func httpGet(url string) (resp *http.Response, err error) {
@@ -56,7 +63,6 @@ func httpGet(url string) (resp *http.Response, err error) {
 
 // AuditAgentOperation creates and writes a new audit entry by given agent
 func auditAgentOperation(auditType string, agent *Agent, message string) error {
-
 	instanceKey := &inst.InstanceKey{}
 	if agent != nil {
 		instanceKey = &inst.InstanceKey{Hostname: agent.Hostname, Port: int(agent.MySQLPort)}
@@ -86,7 +92,7 @@ func readResponse(res *http.Response, err error) ([]byte, error) {
 // SubmitAgent submits a new agent for listing
 func SubmitAgent(hostname string, port int, token string) (string, error) {
 	_, err := db.ExecOrchestrator(`
-			replace 
+			replace
 				into host_agent (
 					hostname, port, token, last_submitted
 				) VALUES (
@@ -130,9 +136,9 @@ func DiscoverAgentInstance(hostname string, port int) error {
 // ForgetLongUnseenAgents will remove entries of all agents that have long since been last seen.
 func ForgetLongUnseenAgents() error {
 	_, err := db.ExecOrchestrator(`
-			delete 
-				from host_agent 
-			where 
+			delete
+				from host_agent
+			where
 				last_submitted < NOW() - interval ? hour`,
 		config.Config.UnseenAgentForgetHours,
 	)
@@ -143,10 +149,10 @@ func ForgetLongUnseenAgents() error {
 func ReadOutdatedAgentsHosts() ([]string, error) {
 	res := []string{}
 	query := `
-		select 
-			hostname 
-		from 
-			host_agent 
+		select
+			hostname
+		from
+			host_agent
 		where
 			IFNULL(last_checked < now() - interval ? minute, true)
 			`
@@ -166,13 +172,13 @@ func ReadOutdatedAgentsHosts() ([]string, error) {
 func ReadAgents() ([]Agent, error) {
 	res := []Agent{}
 	query := `
-		select 
+		select
 			hostname,
 			port,
 			token,
 			last_submitted,
 			mysql_port
-		from 
+		from
 			host_agent
 		order by
 			hostname
@@ -201,13 +207,13 @@ func readAgentBasicInfo(hostname string) (Agent, string, error) {
 	agent := Agent{}
 	token := ""
 	query := `
-		select 
+		select
 			hostname,
 			port,
 			token,
 			last_submitted,
 			mysql_port
-		from 
+		from
 			host_agent
 		where
 			hostname = ?
@@ -235,11 +241,11 @@ func readAgentBasicInfo(hostname string) (Agent, string, error) {
 // for a given agent
 func UpdateAgentLastChecked(hostname string) error {
 	_, err := db.ExecOrchestrator(`
-        	update 
-        		host_agent 
+        	update
+        		host_agent
         	set
         		last_checked = NOW()
-			where 
+			where
 				hostname = ?`,
 		hostname,
 	)
@@ -253,13 +259,13 @@ func UpdateAgentLastChecked(hostname string) error {
 // UpdateAgentInfo  updates some agent state in backend table
 func UpdateAgentInfo(hostname string, agent Agent) error {
 	_, err := db.ExecOrchestrator(`
-        	update 
-        		host_agent 
+        	update
+        		host_agent
         	set
         		last_seen = NOW(),
         		mysql_port = ?,
         		count_mysql_snapshots = ?
-			where 
+			where
 				hostname = ?`,
 		agent.MySQLPort,
 		len(agent.LogicalVolumes),
@@ -521,7 +527,7 @@ func PostCopy(hostname string) (Agent, error) {
 // SubmitSeedEntry submits a new seed operation entry, returning its unique ID
 func SubmitSeedEntry(targetHostname string, sourceHostname string) (int64, error) {
 	res, err := db.ExecOrchestrator(`
-			insert 
+			insert
 				into agent_seed (
 					target_hostname, source_hostname, start_timestamp
 				) VALUES (
@@ -542,7 +548,7 @@ func SubmitSeedEntry(targetHostname string, sourceHostname string) (int64, error
 // updateSeedComplete updates the seed entry, signing for completion
 func updateSeedComplete(seedId int64, seedError error) error {
 	_, err := db.ExecOrchestrator(`
-			update 
+			update
 				agent_seed
 					set end_timestamp = NOW(),
 					is_complete = 1,
@@ -563,7 +569,7 @@ func updateSeedComplete(seedId int64, seedError error) error {
 // submitSeedStateEntry submits a seed state: a single step in the overall seed process
 func submitSeedStateEntry(seedId int64, action string, errorMessage string) (int64, error) {
 	res, err := db.ExecOrchestrator(`
-			insert 
+			insert
 				into agent_seed_state (
 					agent_seed_id, state_timestamp, state_action, error_message
 				) VALUES (
@@ -585,7 +591,7 @@ func submitSeedStateEntry(seedId int64, action string, errorMessage string) (int
 // updateSeedStateEntry updates seed step state
 func updateSeedStateEntry(seedStateId int64, reason error) error {
 	_, err := db.ExecOrchestrator(`
-			update 
+			update
 				agent_seed_state
 					set error_message = ?
 				where
@@ -604,19 +610,19 @@ func updateSeedStateEntry(seedStateId int64, reason error) error {
 // FailStaleSeeds marks as failed seeds where no progress have been seen recently
 func FailStaleSeeds() error {
 	_, err := db.ExecOrchestrator(`
-				update 
-						agent_seed 
-					set 
-						is_complete=1, 
-						is_successful=0 
-					where 
-						is_complete=0 
+				update
+						agent_seed
+					set
+						is_complete=1,
+						is_successful=0
+					where
+						is_complete=0
 						and (
-							select 
-									max(state_timestamp) as last_state_timestamp 
-								from 
-									agent_seed_state 
-								where 
+							select
+									max(state_timestamp) as last_state_timestamp
+								from
+									agent_seed_state
+								where
 									agent_seed.agent_seed_id = agent_seed_state.agent_seed_id
 						) < now() - interval ? minute`,
 		config.Config.StaleSeedFailMinutes,
@@ -788,7 +794,7 @@ func Seed(targetHostname string, sourceHostname string) (int64, error) {
 func readSeeds(whereCondition string, args []interface{}, limit string) ([]SeedOperation, error) {
 	res := []SeedOperation{}
 	query := fmt.Sprintf(`
-		select 
+		select
 			agent_seed_id,
 			target_hostname,
 			source_hostname,
@@ -796,7 +802,7 @@ func readSeeds(whereCondition string, args []interface{}, limit string) ([]SeedO
 			end_timestamp,
 			is_complete,
 			is_successful
-		from 
+		from
 			agent_seed
 		%s
 		order by
@@ -867,13 +873,13 @@ func ReadRecentSeeds() ([]SeedOperation, error) {
 func ReadSeedStates(seedId int64) ([]SeedOperationState, error) {
 	res := []SeedOperationState{}
 	query := `
-		select 
+		select
 			agent_seed_state_id,
 			agent_seed_id,
 			state_timestamp,
 			state_action,
 			error_message
-		from 
+		from
 			agent_seed_state
 		where
 			agent_seed_id = ?
