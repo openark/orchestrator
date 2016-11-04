@@ -42,9 +42,26 @@ type CliCommand struct {
 	Description string
 }
 
-func registerCliCommand(command string, section string, description string) string {
-	knownCommands = append(knownCommands, CliCommand{Command: command, Section: section, Description: description})
-	return command
+var commandSynonyms = map[string]string{
+	"relocate-slaves":             "relocate-replicas",
+	"regroup-slaves":              "regroup-replicas",
+	"move-up-slaves":              "move-up-replicas",
+	"repoint-slaves":              "repoint-replicas",
+	"get-candidate-slave":         "get-candidate-replica",
+	"move-slaves-gtid":            "move-replicas-gtid",
+	"regroup-slaves-gtid":         "regroup-replicas-gtid",
+	"match-slaves":                "match-replicas",
+	"match-up-slaves":             "match-up-replicas",
+	"regroup-slaves-pgtid":        "regroup-replicas-pgtid",
+	"which-cluster-osc-slaves":    "which-cluster-osc-replicas",
+	"which-cluster-gh-ost-slaves": "which-cluster-gh-ost-replicas",
+	"which-slaves":                "which-replicas",
+}
+
+func registerCliCommand(cliCommand string, section string, description string) string {
+	knownCommands = append(knownCommands, CliCommand{Command: cliCommand, Section: section, Description: description})
+
+	return cliCommand
 }
 
 func commandsListing() string {
@@ -159,13 +176,26 @@ func CliWrapper(command string, strict bool, instances string, destination strin
 
 // Cli initiates a command line interface, executing requested command.
 func Cli(command string, strict bool, instance string, destination string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string, hostnameFlag string) {
+
+	skipDatabaseCommands := false
+	switch command {
+	case "redeploy-internal-db":
+		skipDatabaseCommands = true
+	case "help":
+		skipDatabaseCommands = true
+	case "dump-config":
+		skipDatabaseCommands = true
+	}
+
 	if instance != "" && !strings.Contains(instance, ":") {
 		instance = fmt.Sprintf("%s:%d", instance, config.Config.DefaultInstancePort)
 	}
+
 	instanceKey, err := inst.ParseInstanceKey(instance)
 	if err != nil {
 		instanceKey = nil
 	}
+
 	rawInstanceKey, err := inst.NewRawInstanceKey(instance)
 	if err != nil {
 		rawInstanceKey = nil
@@ -178,8 +208,9 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	if err != nil {
 		destinationKey = nil
 	}
-	destinationKey = inst.ReadFuzzyInstanceKeyIfPossible(destinationKey)
-
+	if !skipDatabaseCommands {
+		destinationKey = inst.ReadFuzzyInstanceKeyIfPossible(destinationKey)
+	}
 	if hostname, err := os.Hostname(); err == nil {
 		thisInstanceKey = &inst.InstanceKey{Hostname: hostname, Port: int(config.Config.DefaultInstancePort)}
 	}
@@ -195,19 +226,11 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	}
 	inst.SetMaintenanceOwner(owner)
 
-	skipDatabaseCommands := false
-	switch command {
-	case "redeploy-internal-db":
-		skipDatabaseCommands = true
-	case "help":
-		skipDatabaseCommands = true
-	case "dump-config":
-		skipDatabaseCommands = true
-	}
-
 	if !skipDatabaseCommands {
+		log.Errorf("========= 1")
 		process.ContinuousRegistration(string(process.OrchestratorExecutionCliMode), command)
 	}
+	log.Errorf("========= 2")
 	// begin commands
 	switch command {
 	// smart mode
