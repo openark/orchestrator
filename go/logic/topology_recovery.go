@@ -942,7 +942,7 @@ func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode 
 		return
 	}
 	go inst.ExecuteOnTopology(func() {
-		inst.ReadTopologyInstance(instanceKey)
+		inst.ReadTopologyInstanceUnbuffered(instanceKey)
 		inst.AuditOperation("emergently-read-topology-instance", instanceKey, string(analysisCode))
 	})
 }
@@ -1162,7 +1162,7 @@ func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecov
 	}
 
 	designatedInstanceKey := &(clusterMaster.SlaveHosts.GetInstanceKeys()[0])
-	designatedInstance, err := inst.ReadTopologyInstance(designatedInstanceKey)
+	designatedInstance, err := inst.ReadTopologyInstanceUnbuffered(designatedInstanceKey)
 	if err != nil {
 		return nil, nil, err
 	}

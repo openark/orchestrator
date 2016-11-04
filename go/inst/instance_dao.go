@@ -95,10 +95,10 @@ func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err err
 	if err == nil {
 		return nil
 	}
-	return log.Errorf("ReadTopologyInstance(%+v) %+v: %+v", *instanceKey, hint, err)
+	return log.Errorf("ReadTopologyInstanceUnbuffered(%+v) %+v: %+v", *instanceKey, hint, err)
 }
 
-func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
+func ReadTopologyInstanceUnbuffered(instanceKey *InstanceKey) (*Instance, error) {
 	return ReadTopologyInstanceX(instanceKey, false)
 }
 
@@ -367,7 +367,7 @@ func ReadTopologyInstanceX(instanceKey *InstanceKey, bufferWrites bool) (*Instan
 						return nil
 					}
 					// otherwise report the error to the caller
-					return fmt.Errorf("ReadTopologyInstance(%+v) 'show slave hosts' returned row with <host,port>: <%v,%v>", instanceKey, host, port)
+					return fmt.Errorf("ReadTopologyInstanceUnbuffered(%+v) 'show slave hosts' returned row with <host,port>: <%v,%v>", instanceKey, host, port)
 				}
 				// Note: NewInstanceKeyFromStrings calls ResolveHostname() implicitly
 				slaveKey, err := NewInstanceKeyFromStrings(host, port)
@@ -796,7 +796,7 @@ func readInstancesByCondition(condition string, args []interface{}, sort string)
 // ReadInstance reads an instance from the orchestrator backend database
 func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 	if config.Config.DatabaselessMode__experimental {
-		instance, err := ReadTopologyInstance(instanceKey)
+		instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 		return instance, (err == nil), err
 	}
 

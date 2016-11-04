@@ -118,7 +118,7 @@ func DiscoverAgentInstance(hostname string, port int) error {
 	}
 
 	instanceKey := agent.GetInstance()
-	instance, err := inst.ReadTopologyInstance(instanceKey)
+	instance, err := inst.ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		log.Errorf("Failed to read topology for %v", instanceKey)
 		return err
