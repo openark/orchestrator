@@ -26,6 +26,7 @@ import (
 	"github.com/martini-contrib/gzip"
 	"github.com/martini-contrib/render"
 	"github.com/outbrain/golib/log"
+	"github.com/outbrain/orchestrator/go/agent"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/http"
 	"github.com/outbrain/orchestrator/go/inst"
@@ -167,6 +168,7 @@ func agentsHttp() {
 
 	log.Info("Starting agents listener")
 
+	agent.InitHttpClient()
 	go logic.ContinuousAgentsPoll()
 
 	http.AgentsAPI.URLPrefix = config.Config.URLPrefix
