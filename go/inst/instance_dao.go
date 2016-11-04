@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -263,8 +264,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 		instance.RelaylogCoordinates.LogFile = m.GetString("Relay_Log_File")
 		instance.RelaylogCoordinates.LogPos = m.GetInt64("Relay_Log_Pos")
 		instance.RelaylogCoordinates.Type = RelayLog
-		instance.LastSQLError = m.GetString("Last_SQL_Error")
-		instance.LastIOError = m.GetString("Last_IO_Error")
+		instance.LastSQLError = strconv.QuoteToASCII(m.GetString("Last_SQL_Error"))
+		instance.LastIOError = strconv.QuoteToASCII(m.GetString("Last_IO_Error"))
 		instance.SQLDelay = m.GetUintD("SQL_Delay", 0)
 		instance.UsingOracleGTID = (m.GetIntD("Auto_Position", 0) == 1)
 		instance.ExecutedGtidSet = m.GetStringD("Executed_Gtid_Set", "")

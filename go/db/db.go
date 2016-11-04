@@ -921,7 +921,7 @@ func OpenOrchestrator() (*sql.DB, error) {
 	if config.Config.DatabaselessMode__experimental {
 		return nil, nil
 	}
-	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds",
+	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&interpolateParams=%t",
 		config.Config.MySQLOrchestratorUser,
 		config.Config.MySQLOrchestratorPassword,
 		config.Config.MySQLOrchestratorHost,
@@ -929,6 +929,7 @@ func OpenOrchestrator() (*sql.DB, error) {
 		config.Config.MySQLOrchestratorDatabase,
 		config.Config.MySQLConnectTimeoutSeconds,
 		config.Config.MySQLOrchestratorReadTimeoutSeconds,
+		config.Config.MySQLInterpolateParams,
 	)
 	if config.Config.MySQLOrchestratorUseMutualTLS {
 		mysql_uri, _ = SetupMySQLOrchestratorTLS(mysql_uri)
@@ -1091,7 +1092,11 @@ func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	res, err := sqlutils.Exec(db, query, args...)
+	dbexec := sqlutils.Exec
+	if config.Config.MySQLInterpolateParams {
+		dbexec = sqlutils.ExecNoPrepare
+	}
+	res, err := dbexec(db, query, args...)
 	return res, err
 }
 

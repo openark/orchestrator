@@ -17,38 +17,84 @@
 package os
 
 import (
-	"github.com/outbrain/golib/log"
+	"bytes"
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"strings"
+	"syscall"
+
+	"github.com/outbrain/golib/log"
+	"github.com/outbrain/orchestrator/go/config"
 )
 
-func execCmd(commandText string, arguments ...string) (*exec.Cmd, string, error) {
+// CommandRun executes some text as a command. This is assumed to be
+// text that will be run by a shell so we need to write out the
+// command to a temporary file and then ask the shell to execute
+// it, after which the temporary file is removed.
+func CommandRun(commandText string, arguments ...string) error {
+	// show the actual command we have been asked to run
+	log.Infof("CommandRun(%v,%+v)", commandText, arguments)
+
+	cmd, shellScript, err := generateShellScript(commandText, arguments...)
+	defer os.Remove(shellScript)
+	if err != nil {
+		return log.Errore(err)
+	}
+
+	cmdOutput := &bytes.Buffer{}
+	cmdError := &bytes.Buffer{}
+	cmd.Stdout = cmdOutput
+	cmd.Stderr = cmdError
+	var waitStatus syscall.WaitStatus
+
+	log.Infof("CommandRun/running: %s", strings.Join(cmd.Args, " "))
+	err = cmd.Run()
+	logOutput("stdout", cmdOutput.Bytes())
+	logOutput("stderr", cmdError.Bytes())
+	if err != nil {
+		// Did the command fail because of an unsuccessful exit code
+		if exitError, ok := err.(*exec.ExitError); ok {
+			waitStatus = exitError.Sys().(syscall.WaitStatus)
+			log.Errorf("CommandRun: failed. exit status %d", waitStatus.ExitStatus())
+		}
+
+		return log.Errore(err)
+	}
+
+	// Command was successful
+	waitStatus = cmd.ProcessState.Sys().(syscall.WaitStatus)
+	log.Infof("CommandRun successful. exit status %d", waitStatus.ExitStatus())
+
+	return nil
+}
+
+// generateShellScript generates a temporary shell script based on
+// the given command to be executed, writes the command to a temporary
+// file and returns the exec.Command which can be executed together
+// with the script name that was created.
+func generateShellScript(commandText string, arguments ...string) (*exec.Cmd, string, error) {
+	shell := config.Config.ProcessesShellCommand
+
 	commandBytes := []byte(commandText)
 	tmpFile, err := ioutil.TempFile("", "orchestrator-process-cmd-")
 	if err != nil {
-		return nil, "", log.Errore(err)
+		return nil, "", log.Errorf("generateShellScript() failed to create TempFile: %v", err.Error())
 	}
-	ioutil.WriteFile(tmpFile.Name(), commandBytes, 0644)
-	log.Debugf("execCmd: %s", commandText)
+	// write commandText to temporary file
+	ioutil.WriteFile(tmpFile.Name(), commandBytes, 0640)
 	shellArguments := append([]string{}, tmpFile.Name())
 	shellArguments = append(shellArguments, arguments...)
-	log.Debugf("%+v", shellArguments)
-	return exec.Command("bash", shellArguments...), tmpFile.Name(), nil
 
-	//return exec.Command(commandText, arguments...) , "", nil
+	cmd := exec.Command(shell, shellArguments...)
+
+	return cmd, tmpFile.Name(), nil
 }
 
-// CommandRun executes a command
-func CommandRun(commandText string, arguments ...string) error {
-	cmd, tmpFileName, err := execCmd(commandText, arguments...)
-	defer os.Remove(tmpFileName)
-	if err != nil {
-		return log.Errore(err)
+// log the output from the command. Provide an indication of what's being logged (e.g. stdout, stderr) as a name
+func logOutput(name string, output []byte) {
+	if len(output) == 0 {
+		return
 	}
-	err = cmd.Run()
-	if err != nil {
-		return log.Errore(err)
-	}
-	return nil
+	log.Infof("CommandRun/%s: %s\n", name, string(output))
 }

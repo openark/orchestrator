@@ -1298,7 +1298,9 @@ _Orchestrator_ picks best course of action.
 * `/api/long-queries`: list of long running queries on all topologies (queries running for over 60 seconds, excluding replication and event-scheduler queries)
 * `/api/long-queries/:filter`: list of long running queries on all topologies, filtered by text match
 * `/api/audit`: show most recent audit entries
-* `/api/audit/:page`: show latest audit entries, paginated (example: `/api/audit/3` for 3rd page)  
+* `/api/audit/:page`: show latest audit entries, paginated (example: `/api/audit/3` for 3rd page)
+* `/api/deregister-hostname-unresolve/:host/:port`:  unregister the given mapping for the given host
+* `/api/register-hostname-unresolve/:host/:port/:virtualname`: register the host which should be used when unresolving the given virtual name
 
 
 #### Instance JSON breakdown
