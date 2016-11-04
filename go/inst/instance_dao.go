@@ -99,13 +99,13 @@ func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err err
 }
 
 func ReadTopologyInstanceUnbuffered(instanceKey *InstanceKey) (*Instance, error) {
-	return ReadTopologyInstanceX(instanceKey, false)
+	return ReadTopologyInstance(instanceKey, false)
 }
 
-// ReadTopologyInstanceX connects to a topology MySQL instance and reads its configuration and
+// ReadTopologyInstance connects to a topology MySQL instance and reads its configuration and
 // replication status. It writes read info into orchestrator's backend.
 // Writes are optionally buffered.
-func ReadTopologyInstanceX(instanceKey *InstanceKey, bufferWrites bool) (*Instance, error) {
+func ReadTopologyInstance(instanceKey *InstanceKey, bufferWrites bool) (*Instance, error) {
 	defer func() {
 		if err := recover(); err != nil {
 			logReadTopologyInstanceError(instanceKey, "Unexpected, aborting", fmt.Errorf("%+v", err))
@@ -367,7 +367,7 @@ func ReadTopologyInstanceX(instanceKey *InstanceKey, bufferWrites bool) (*Instan
 						return nil
 					}
 					// otherwise report the error to the caller
-					return fmt.Errorf("ReadTopologyInstanceUnbuffered(%+v) 'show slave hosts' returned row with <host,port>: <%v,%v>", instanceKey, host, port)
+					return fmt.Errorf("ReadTopologyInstance(%+v) 'show slave hosts' returned row with <host,port>: <%v,%v>", instanceKey, host, port)
 				}
 				// Note: NewInstanceKeyFromStrings calls ResolveHostname() implicitly
 				slaveKey, err := NewInstanceKeyFromStrings(host, port)
