@@ -50,7 +50,7 @@ func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 }
 
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
-var instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
+var instanceKeyInformativeClusterName *cache.Cache
 
 var readTopologyInstanceCounter = metrics.NewCounter()
 var readInstanceCounter = metrics.NewCounter()
@@ -60,10 +60,15 @@ func init() {
 	metrics.Register("instance.read_topology", readTopologyInstanceCounter)
 	metrics.Register("instance.read", readInstanceCounter)
 	metrics.Register("instance.write", writeInstanceCounter)
+}
+
+func InitializeInstanceDao() {
+	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
+	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
 
 	// spin off instance write buffer flushing
 	go func() {
-		flushTick := time.Tick(instanceFlushIntervalMilliseconds * time.Millisecond)
+		flushTick := time.Tick(time.Duration(config.Config.InstanceFlushIntervalMilliseconds) * time.Millisecond)
 		for {
 			// it is time to flush
 			select {
@@ -74,7 +79,6 @@ func init() {
 			}
 		}
 	}()
-
 }
 
 // ExecDBWriteFunc chooses how to execute a write onto the database: whether synchronuously or not
@@ -1881,17 +1885,11 @@ func (a byInstanceKey) Len() int           { return len(a) }
 func (a byInstanceKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byInstanceKey) Less(i, j int) bool { return a[i].Key.SmallerThan(&a[j].Key) }
 
-// Up to instanceWriteBufferSize are flushed in one INSERT ODKU query.
-const instanceWriteBufferSize = 100
-
-// Max interval between buffer flushes
-const instanceFlushIntervalMilliseconds = 100
-
-var instanceWriteBuffer = make(chan instanceUpdateObject, instanceWriteBufferSize)
+var instanceWriteBuffer chan instanceUpdateObject
 var forceFlushInstanceWriteBuffer = make(chan bool)
 
 func enqueueInstanceWrite(instance *Instance, instanceWasActuallyFound bool, lastError error) {
-	if len(instanceWriteBuffer) == instanceWriteBufferSize {
+	if len(instanceWriteBuffer) == config.Config.InstanceWriteBufferSize {
 		// Signal the "flushing" gorouting that there's work.
 		// We prefer doing all bulk flushes from one goroutine.
 		forceFlushInstanceWriteBuffer <- true

@@ -37,7 +37,7 @@ import (
 // discoveryQueue is a channel of deduplicated instanceKey-s
 // that were requested for discovery.  It can be continuously updated
 // as discovery process progresses.
-var discoveryQueue = discovery.NewQueue()
+var discoveryQueue *discovery.Queue
 
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
@@ -86,6 +86,8 @@ func acceptSignals() {
 // handleDiscoveryRequests iterates the discoveryQueue channel and calls upon
 // instance discovery per entry.
 func handleDiscoveryRequests() {
+	discoveryQueue = discovery.NewQueue()
+
 	// create a pool of discovery workers
 	for i := uint(0); i < config.Config.DiscoveryMaxConcurrency; i++ {
 		go func() {
