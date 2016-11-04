@@ -1,4 +1,4 @@
-Welcome to the _orchestrator_ wiki!
+Welcome to the `orchestrator` wiki!
 
 * [Manual](Orchestrator-Manual)
 * [Manual, Table of Contents](Orchestrator-Manual#toc)
