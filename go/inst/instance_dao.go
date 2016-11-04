@@ -1708,7 +1708,7 @@ func mkInsertOdku(table string, columns []string, values []string, nrRows int, i
 	var val bytes.Buffer
 	val.WriteString(valRow)
 	for i := 1; i < nrRows; i++ {
-		val.WriteString(", ")
+		val.WriteString(",\n                ") // indent VALUES, see below
 		val.WriteString(valRow)
 	}
 
@@ -1732,11 +1732,11 @@ func mkInsertOdku(table string, columns []string, values []string, nrRows int, i
 	return q.String(), nil
 }
 
-// writeManyInstances stores instances in the orchestrator backend
-func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, updateLastSeen bool) error {
+func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bool, updateLastSeen bool) (string, []interface{}) {
 	if len(instances) == 0 {
-		return nil // nothing to write
+		return "", nil
 	}
+
 	insertIgnore := false
 	if !instanceWasActuallyFound {
 		insertIgnore = true
@@ -1860,13 +1860,23 @@ func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, up
 		args = append(args, instance.InstanceAlias)
 	}
 
-	insertQuery, err := mkInsertOdku("database_instance", columns, values, len(instances), insertIgnore)
+	sql, err := mkInsertOdku("database_instance", columns, values, len(instances), insertIgnore)
 	if err != nil {
 		log.Fatalf("Failed to build query: %v", err)
 	}
 
-	_, err = db.ExecOrchestrator(insertQuery, args...)
-	if err != nil {
+	return sql, args
+}
+
+// writeManyInstances stores instances in the orchestrator backend
+func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, updateLastSeen bool) error {
+	if len(instances) == 0 {
+		return nil // nothing to write
+	}
+
+	sql, args := mkInsertOdkuForInstances(instances, instanceWasActuallyFound, updateLastSeen)
+
+	if _, err := db.ExecOrchestrator(sql, args...); err != nil {
 		return err
 	}
 	return nil
