@@ -162,6 +162,7 @@ type Configuration struct {
 	RecoveryIgnoreHostnameFilters                []string          // Recovery analysis will completely ignore hosts matching given patterns
 	RecoverMasterClusterFilters                  []string          // Only do master recovery on clusters matching these regexp patterns (of course the ".*" pattern matches everything)
 	RecoverIntermediateMasterClusterFilters      []string          // Only do IM recovery on clusters matching these regexp patterns (of course the ".*" pattern matches everything)
+	ProcessesShellCommand                        string            // Shell that executes command scripts
 	OnFailureDetectionProcesses                  []string          // Processes to execute when detecting a failover scenario (before making a decision whether to failover or not). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {successorAlias}, {countSlaves}, {slaveHosts}, {isDowntimed}, {autoMasterRecovery}, {autoIntermediateMasterRecovery}
 	PreFailoverProcesses                         []string          // Processes to execute before doing a failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {successorAlias}, {countSlaves}, {slaveHosts}, {isDowntimed}
 	PostFailoverProcesses                        []string          // Processes to execute after doing a failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {successorAlias}, {countSlaves}, {slaveHosts}, {isDowntimed}, {isSuccessful}, {lostSlaves}
@@ -310,6 +311,7 @@ func newConfiguration() *Configuration {
 		RecoveryIgnoreHostnameFilters:                []string{},
 		RecoverMasterClusterFilters:                  []string{},
 		RecoverIntermediateMasterClusterFilters:      []string{},
+		ProcessesShellCommand:                        "bash",
 		OnFailureDetectionProcesses:                  []string{},
 		PreFailoverProcesses:                         []string{},
 		PostMasterFailoverProcesses:                  []string{},
