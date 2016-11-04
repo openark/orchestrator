@@ -153,12 +153,8 @@ func (this *Instance) IsMySQL57() bool {
 	return this.MajorVersionString() == "5.7"
 }
 
-func (this *Instance) IsMySQL58() bool {
-	return this.MajorVersionString() == "5.8"
-}
-
-func (this *Instance) IsMySQL59() bool {
-	return this.MajorVersionString() == "5.9"
+func (this *Instance) IsMySQL80() bool {
+	return this.MajorVersionString() == "8.0"
 }
 
 // IsSmallerBinlogFormat returns true when this instance's binlgo format is
@@ -208,6 +204,24 @@ func (this *Instance) IsOracleMySQL() bool {
 		return false
 	}
 	return true
+}
+
+// NameAndMarjorVersionString returns something like MariaDB-10.1 MaxScale-1.4 MySQL-5.7
+func (instance *Instance) NameAndMajorVersionString() string {
+	var name string
+	if instance == nil {
+		return name // empty string
+	} else if instance.IsOracleMySQL() {
+		name = "MySQL"
+	} else if instance.IsMariaDB() {
+		name = "MariaDB"
+	} else if instance.isMaxScale() {
+		name = "MaxScale"
+	} else {
+		name = "unknown"
+	}
+
+	return name + "-" + instance.MajorVersionString()
 }
 
 // IsSlave makes simple heuristics to decide whether this insatnce is a slave of another instance

@@ -26,50 +26,66 @@ push() operation never blocks while pop() blocks on an empty queue.
 package discovery
 
 import (
+	"sync"
+	"time"
+
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/orchestrator/go/config"
 	"github.com/outbrain/orchestrator/go/inst"
-	"sync"
-	"time"
 )
 
 type Queue struct {
 	sync.Mutex
-	queue     chan inst.InstanceKey
-	knownKeys map[inst.InstanceKey]time.Time
+
+	queue chan inst.InstanceKey
+
+	queuedKeys map[inst.InstanceKey]time.Time
+
+	consumedKeys map[inst.InstanceKey]time.Time
 }
 
 func NewQueue() *Queue {
 	q := new(Queue)
-	q.knownKeys = make(map[inst.InstanceKey]time.Time)
+
+	q.queuedKeys = make(map[inst.InstanceKey]time.Time)
+
+	q.consumedKeys = make(map[inst.InstanceKey]time.Time)
+
 	q.queue = make(chan inst.InstanceKey, config.Config.DiscoveryQueueCapacity)
+
 	return q
 }
 
 func (q *Queue) Len() int {
 	q.Lock()
 	defer q.Unlock()
+
 	return len(q.queue)
 }
 
-// push the key to the slice if it does not exist in known keys;
-// silently return otherwise.
+// Push enqueues a key if it is not on a queue and is not being
+// processed; silently returns otherwise.
 func (q *Queue) Push(key inst.InstanceKey) {
 	q.Lock()
 	defer q.Unlock()
 
 	// is it enqueued already?
-	if _, found := q.knownKeys[key]; found {
+	if _, found := q.queuedKeys[key]; found {
 		return
 	}
 
-	q.knownKeys[key] = time.Now()
+	// is it being processed now?
+	if _, found := q.consumedKeys[key]; found {
+		return
+	}
+
+	q.queuedKeys[key] = time.Now()
 	q.queue <- key
 }
 
-// pop the entry and remove it from known keys;
-// blocks if queue is empty.
-func (q *Queue) Pop() inst.InstanceKey {
+// Consume fetches a key to process; blocks if queue is empty.
+// Release must be called once after Consume.
+func (q *Queue) Consume() inst.InstanceKey {
 	q.Lock()
 	queue := q.queue
 	q.Unlock()
@@ -80,11 +96,23 @@ func (q *Queue) Pop() inst.InstanceKey {
 	defer q.Unlock()
 
 	// alarm if have been waiting for too long
-	timeOnQueue := time.Since(q.knownKeys[key])
+	timeOnQueue := time.Since(q.queuedKeys[key])
 	if timeOnQueue > time.Duration(config.Config.InstancePollSeconds)*time.Second {
 		log.Warningf("key %v spent %.4fs waiting on a discoveryQueue", key, timeOnQueue.Seconds())
 	}
 
-	delete(q.knownKeys, key)
+	q.consumedKeys[key] = q.queuedKeys[key]
+
+	delete(q.queuedKeys, key)
+
 	return key
+}
+
+// Release removes a key from a list of being processed keys
+// which allows that key to be pushed into the queue again.
+func (q *Queue) Release(key inst.InstanceKey) {
+	q.Lock()
+	defer q.Unlock()
+
+	delete(q.consumedKeys, key)
 }

@@ -90,15 +90,21 @@ func handleDiscoveryRequests() {
 	for i := uint(0); i < config.Config.DiscoveryMaxConcurrency; i++ {
 		go func() {
 			for {
-				instanceKey := discoveryQueue.Pop()
+				instanceKey := discoveryQueue.Consume()
 				// Possibly this used to be the elected node, but has
 				// been demoted, while still the queue is full.
 				if atomic.LoadInt64(&isElectedNode) != 1 {
 					log.Debugf("Node apparently demoted. Skipping discovery of %+v. "+
 						"Remaining queue size: %+v", instanceKey, discoveryQueue.Len())
+
+					discoveryQueue.Release(instanceKey)
+
 					continue
 				}
+
 				discoverInstance(instanceKey)
+
+				discoveryQueue.Release(instanceKey)
 			}
 		}()
 	}
@@ -108,6 +114,12 @@ func handleDiscoveryRequests() {
 // list down its master and slaves (if any) for further discovery.
 func discoverInstance(instanceKey inst.InstanceKey) {
 	start := time.Now()
+	defer func() {
+		discoveryTime := time.Since(start)
+		if discoveryTime > time.Duration(config.Config.InstancePollSeconds)*time.Second {
+			log.Warningf("discoverInstance for key %v took %.4fs", instanceKey, discoveryTime.Seconds())
+		}
+	}()
 
 	instanceKey.Formalize()
 	if !instanceKey.IsValid() {
