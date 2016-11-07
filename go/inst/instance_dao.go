@@ -95,7 +95,7 @@ func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err err
 	if err == nil {
 		return nil
 	}
-	return log.Errorf("ReadTopologyInstanceUnbuffered(%+v) %+v: %+v", *instanceKey, hint, err)
+	return log.Errorf("ReadTopologyInstance(%+v) %+v: %+v", *instanceKey, hint, err)
 }
 
 func ReadTopologyInstanceUnbuffered(instanceKey *InstanceKey) (*Instance, error) {
