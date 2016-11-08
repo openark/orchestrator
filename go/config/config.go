@@ -18,6 +18,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"regexp"
 	"strings"
@@ -68,8 +69,9 @@ type Configuration struct {
 	MySQLTopologyReadTimeoutSeconds              int      // Number of seconds before topology mysql read operation is aborted (driver-side). Used for all but discovery queries.
 	MySQLInterpolateParams                       bool     // Do not use sql prepare statement if true
 	DefaultInstancePort                          int      // In case port was not specified on command line
-	SlaveLagQuery                                string   // custom query to check on slave lg (e.g. heartbeat table)
-	SlaveStartPostWaitMilliseconds               int      // Time to wait after START SLAVE before re-readong instance (give slave chance to connect to master)
+	SlaveLagQuery                                string   // Synonym to ReplicationLagQuery
+	ReplicationLagQuery                          string   // custom query to check on replica lg (e.g. heartbeat table)
+	SlaveStartPostWaitMilliseconds               int      // Time to wait after START SLAVE before re-readong instance (give replica chance to connect to master)
 	DiscoverByShowSlaveHosts                     bool     // Attempt SHOW SLAVE HOSTS before PROCESSLIST
 	InstancePollSeconds                          uint     // Number of seconds between instance reads
 	ReadLongRunningQueries                       bool     // Whether orchestrator should read and record current long running executing queries.
@@ -93,7 +95,7 @@ type Configuration struct {
 	ReasonableMaintenanceReplicationLagSeconds   int      // Above this value move-up and move-below are blocked
 	MaintenanceExpireMinutes                     uint     // Minutes after which a maintenance flag is considered stale and is cleared
 	MaintenancePurgeDays                         uint     // Days after which maintenance entries are purged from the database
-	CandidateInstanceExpireMinutes               uint     // Minutes after which a suggestion to use an instance as a candidate slave (to be preferably promoted on master failover) is expired.
+	CandidateInstanceExpireMinutes               uint     // Minutes after which a suggestion to use an instance as a candidate replica (to be preferably promoted on master failover) is expired.
 	AuditLogFile                                 string   // Name of log file for audit operations. Disabled when empty.
 	AuditToSyslog                                bool     // If true, audit messages are written to syslog
 	AuditPageSize                                int
@@ -111,8 +113,8 @@ type Configuration struct {
 	AccessTokenUseExpirySeconds                  uint              // Time by which an issued token must be used
 	AccessTokenExpiryMinutes                     uint              // Time after which HTTP access token expires
 	ClusterNameToAlias                           map[string]string // map between regex matching cluster name to a human friendly alias
-	DetectClusterAliasQuery                      string            // Optional query (executed on topology instance) that returns the alias of a cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all slaves). If provided, must return one row, one column
-	DetectClusterDomainQuery                     string            // Optional query (executed on topology instance) that returns the VIP/CNAME/Alias/whatever domain name for the master of this cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all slaves). If provided, must return one row, one column
+	DetectClusterAliasQuery                      string            // Optional query (executed on topology instance) that returns the alias of a cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all replicas). If provided, must return one row, one column
+	DetectClusterDomainQuery                     string            // Optional query (executed on topology instance) that returns the VIP/CNAME/Alias/whatever domain name for the master of this cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all replicas). If provided, must return one row, one column
 	DetectInstanceAliasQuery                     string            // Optional query (executed on topology instance) that returns the alias of an instance. If provided, must return one row, one column
 	DetectPromotionRuleQuery                     string            // Optional query (executed on topology instance) that returns the promotion rule of an instance. If provided, must return one row, one column.
 	DataCenterPattern                            string            // Regexp pattern with one group, extracting the datacenter name from the hostname
@@ -122,7 +124,7 @@ type Configuration struct {
 	DetectSemiSyncEnforcedQuery                  string            // Optional query (executed on topology instance) to determine whether semi-sync is fully enforced for master writes (async fallback is not allowed under any circumstance). If provided, must return one row, one column, value 0 or 1.
 	SupportFuzzyPoolHostnames                    bool              // Should "submit-pool-instances" command be able to pass list of fuzzy instances (fuzzy means non-fqdn, but unique enough to recognize). Defaults 'true', implies more queries on backend db
 	InstancePoolExpiryMinutes                    uint              // Time after which entries in database_instance_pool are expired (resubmit via `submit-pool-instances`)
-	PromotionIgnoreHostnameFilters               []string          // Orchestrator will not promote slaves with hostname matching pattern (via -c recovery; for example, avoid promoting dev-dedicated machines)
+	PromotionIgnoreHostnameFilters               []string          // Orchestrator will not promote replicas with hostname matching pattern (via -c recovery; for example, avoid promoting dev-dedicated machines)
 	ServeAgentsHttp                              bool              // Spawn another HTTP interface dedicated for orchestrator-agent
 	AgentsUseSSL                                 bool              // When "true" orchestrator will listen on agents port with SSL as well as connect to agents via SSL
 	AgentsUseMutualTLS                           bool              // When "true" Use mutual TLS for the server to agent communication
@@ -172,12 +174,15 @@ type Configuration struct {
 	PostIntermediateMasterFailoverProcesses      []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
 	UnreachableMasterWithStaleSlavesProcesses    []string          // Processes to execute when detecting an UnreachableMasterWithStaleSlaves scenario.
 	CoMasterRecoveryMustPromoteOtherCoMaster     bool              // When 'false', anything can get promoted (and candidates are prefered over others). When 'true', orchestrator will promote the other co-master or else fail
-	DetachLostSlavesAfterMasterFailover          bool              // Should slaves that are not to be lost in master recovery (i.e. were more up-to-date than promoted slave) be forcibly detached
+	DetachLostSlavesAfterMasterFailover          bool              // synonym to DetachLostReplicasAfterMasterFailover
+	DetachLostReplicasAfterMasterFailover        bool              // Should replicas that are not to be lost in master recovery (i.e. were more up-to-date than promoted replica) be forcibly detached
 	ApplyMySQLPromotionAfterMasterFailover       bool              // Should orchestrator take upon itself to apply MySQL master promotion: set read_only=0, detach replication, etc.
-	MasterFailoverLostInstancesDowntimeMinutes   uint              // Number of minutes to downtime any server that was lost after a master failover (including failed master & lost slaves). 0 to disable
-	MasterFailoverDetachSlaveMasterHost          bool              // Should orchestrator issue a detach-slave-master-host on newly promoted master (this makes sure the new master will not attempt to replicate old master if that comes back to life). Defaults 'false'. Meaningless if ApplyMySQLPromotionAfterMasterFailover is 'true'.
-	PostponeSlaveRecoveryOnLagMinutes            uint              // On crash recovery, slaves that are lagging more than given minutes are only resurrected late in the recovery process, after master/IM has been elected and processes executed. Value of 0 disables this feature
-	OSCIgnoreHostnameFilters                     []string          // OSC slaves recommendation will ignore slave hostnames matching given patterns
+	MasterFailoverLostInstancesDowntimeMinutes   uint              // Number of minutes to downtime any server that was lost after a master failover (including failed master & lost replicas). 0 to disable
+	MasterFailoverDetachSlaveMasterHost          bool              // synonym to MasterFailoverDetachReplicaMasterHost
+	MasterFailoverDetachReplicaMasterHost        bool              // Should orchestrator issue a detach-replica-master-host on newly promoted master (this makes sure the new master will not attempt to replicate old master if that comes back to life). Defaults 'false'. Meaningless if ApplyMySQLPromotionAfterMasterFailover is 'true'.
+	PostponeSlaveRecoveryOnLagMinutes            uint              // Synonym to PostponeReplicaRecoveryOnLagMinutes
+	PostponeReplicaRecoveryOnLagMinutes          uint              // On crash recovery, replicas that are lagging more than given minutes are only resurrected late in the recovery process, after master/IM has been elected and processes executed. Value of 0 disables this feature
+	OSCIgnoreHostnameFilters                     []string          // OSC replicas recommendation will ignore replica hostnames matching given patterns
 	GraphiteAddr                                 string            // Optional; address of graphite port. If supplied, metrics will be written here
 	GraphitePath                                 string            // Prefix for graphite path. May include {hostname} magic placeholder
 	GraphiteConvertHostnameDotsToUnderscores     bool              // If true, then hostname's dots are converted to underscores before being used in graphite path
@@ -336,69 +341,101 @@ func newConfiguration() *Configuration {
 	}
 }
 
-func postReadAdjustments() {
-	if Config.MySQLOrchestratorCredentialsConfigFile != "" {
+func (this *Configuration) postReadAdjustments() error {
+	if this.MySQLOrchestratorCredentialsConfigFile != "" {
 		mySQLConfig := struct {
 			Client struct {
 				User     string
 				Password string
 			}
 		}{}
-		err := gcfg.ReadFileInto(&mySQLConfig, Config.MySQLOrchestratorCredentialsConfigFile)
+		err := gcfg.ReadFileInto(&mySQLConfig, this.MySQLOrchestratorCredentialsConfigFile)
 		if err != nil {
 			log.Fatalf("Failed to parse gcfg data from file: %+v", err)
 		} else {
-			log.Debugf("Parsed orchestrator credentials from %s", Config.MySQLOrchestratorCredentialsConfigFile)
-			Config.MySQLOrchestratorUser = mySQLConfig.Client.User
-			Config.MySQLOrchestratorPassword = mySQLConfig.Client.Password
+			log.Debugf("Parsed orchestrator credentials from %s", this.MySQLOrchestratorCredentialsConfigFile)
+			this.MySQLOrchestratorUser = mySQLConfig.Client.User
+			this.MySQLOrchestratorPassword = mySQLConfig.Client.Password
 		}
 	}
 	{
 		// We accept password in the form "${SOME_ENV_VARIABLE}" in which case we pull
 		// the given variable from os env
-		submatch := envVariableRegexp.FindStringSubmatch(Config.MySQLOrchestratorPassword)
+		submatch := envVariableRegexp.FindStringSubmatch(this.MySQLOrchestratorPassword)
 		if len(submatch) > 1 {
-			Config.MySQLOrchestratorPassword = os.Getenv(submatch[1])
+			this.MySQLOrchestratorPassword = os.Getenv(submatch[1])
 		}
 	}
-	if Config.MySQLTopologyCredentialsConfigFile != "" {
+	if this.MySQLTopologyCredentialsConfigFile != "" {
 		mySQLConfig := struct {
 			Client struct {
 				User     string
 				Password string
 			}
 		}{}
-		err := gcfg.ReadFileInto(&mySQLConfig, Config.MySQLTopologyCredentialsConfigFile)
+		err := gcfg.ReadFileInto(&mySQLConfig, this.MySQLTopologyCredentialsConfigFile)
 		if err != nil {
 			log.Fatalf("Failed to parse gcfg data from file: %+v", err)
 		} else {
-			log.Debugf("Parsed topology credentials from %s", Config.MySQLTopologyCredentialsConfigFile)
-			Config.MySQLTopologyUser = mySQLConfig.Client.User
-			Config.MySQLTopologyPassword = mySQLConfig.Client.Password
+			log.Debugf("Parsed topology credentials from %s", this.MySQLTopologyCredentialsConfigFile)
+			this.MySQLTopologyUser = mySQLConfig.Client.User
+			this.MySQLTopologyPassword = mySQLConfig.Client.Password
 		}
 	}
 	{
 		// We accept password in the form "${SOME_ENV_VARIABLE}" in which case we pull
 		// the given variable from os env
-		submatch := envVariableRegexp.FindStringSubmatch(Config.MySQLTopologyPassword)
+		submatch := envVariableRegexp.FindStringSubmatch(this.MySQLTopologyPassword)
 		if len(submatch) > 1 {
-			Config.MySQLTopologyPassword = os.Getenv(submatch[1])
+			this.MySQLTopologyPassword = os.Getenv(submatch[1])
 		}
 	}
 
-	if Config.RecoveryPeriodBlockSeconds == 0 && Config.RecoveryPeriodBlockMinutes > 0 {
+	if this.RecoveryPeriodBlockSeconds == 0 && this.RecoveryPeriodBlockMinutes > 0 {
 		// RecoveryPeriodBlockSeconds is a newer addition that overrides RecoveryPeriodBlockMinutes
 		// The code does not consider RecoveryPeriodBlockMinutes anymore, but RecoveryPeriodBlockMinutes
 		// still supported in config file for backwards compatibility
-		Config.RecoveryPeriodBlockSeconds = Config.RecoveryPeriodBlockMinutes * 60
+		this.RecoveryPeriodBlockSeconds = this.RecoveryPeriodBlockMinutes * 60
 	}
 
-	if Config.URLPrefix != "" {
-		// Ensure the prefix starts with "/" and has no trailing one.
-		Config.URLPrefix = strings.TrimLeft(Config.URLPrefix, "/")
-		Config.URLPrefix = strings.TrimRight(Config.URLPrefix, "/")
-		Config.URLPrefix = "/" + Config.URLPrefix
+	{
+		if this.ReplicationLagQuery != "" && this.SlaveLagQuery != "" && this.ReplicationLagQuery != this.SlaveLagQuery {
+			return fmt.Errorf("config's ReplicationLagQuery and SlaveLagQuery are synonyms and cannot both be defined")
+		}
+		if this.SlaveLagQuery != "" {
+			this.ReplicationLagQuery = this.SlaveLagQuery
+		}
 	}
+
+	{
+		if this.DetachLostSlavesAfterMasterFailover {
+			this.DetachLostReplicasAfterMasterFailover = true
+		}
+	}
+
+	{
+		if this.MasterFailoverDetachSlaveMasterHost {
+			this.MasterFailoverDetachReplicaMasterHost = true
+		}
+	}
+
+	{
+		if this.PostponeReplicaRecoveryOnLagMinutes != 0 && this.PostponeSlaveRecoveryOnLagMinutes != 0 &&
+			this.PostponeReplicaRecoveryOnLagMinutes != this.PostponeSlaveRecoveryOnLagMinutes {
+			return fmt.Errorf("config's PostponeReplicaRecoveryOnLagMinutes and PostponeSlaveRecoveryOnLagMinutes are synonyms and cannot both be defined")
+		}
+		if this.PostponeSlaveRecoveryOnLagMinutes != 0 {
+			this.PostponeReplicaRecoveryOnLagMinutes = this.PostponeSlaveRecoveryOnLagMinutes
+		}
+	}
+
+	if this.URLPrefix != "" {
+		// Ensure the prefix starts with "/" and has no trailing one.
+		this.URLPrefix = strings.TrimLeft(this.URLPrefix, "/")
+		this.URLPrefix = strings.TrimRight(this.URLPrefix, "/")
+		this.URLPrefix = "/" + this.URLPrefix
+	}
+	return nil
 }
 
 // read reads configuration from given file, or silently skips if the file does not exist.
@@ -413,7 +450,9 @@ func read(fileName string) (*Configuration, error) {
 		} else {
 			log.Fatal("Cannot read config file:", fileName, err)
 		}
-		postReadAdjustments()
+		if err := Config.postReadAdjustments(); err != nil {
+			log.Fatale(err)
+		}
 	}
 	return Config, err
 }
