@@ -642,7 +642,7 @@ function Cluster() {
 
   // moveChildren checks whether an children of an instance (node) can be dropped on another (droppableNode).
   // The function consults with the current moveInstanceMethod; the type of action taken is based on that.
-  // For example, actions can be repoint-replicas, match-replicas, relocate-replicas, move-up-slaves etc.
+  // For example, actions can be repoint-replicas, match-replicas, relocate-replicas, move-up-replicas etc.
   // When shouldApply is false nothing gets executed, and the function merely serves as a predictive
   // to the possibility of the drop.
   function moveChildren(node, droppableNode, shouldApply) {
@@ -858,12 +858,12 @@ function Cluster() {
   }
 
   function moveUpSlaves(node, masterNode) {
-    var message = "<h4>move-up-slaves</h4>Are you sure you wish to move up slaves of <code><strong>" +
+    var message = "<h4>move-up-replicas</h4>Are you sure you wish to move up replicas of <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code> below <code><strong>" +
       masterNode.Key.Hostname + ":" + masterNode.Key.Port +
       "</strong></code>?";
-    var apiUrl = "/api/move-up-slaves/" + node.Key.Hostname + "/" + node.Key.Port;
+    var apiUrl = "/api/move-up-replicas/" + node.Key.Hostname + "/" + node.Key.Port;
     return executeMoveOperation(message, apiUrl);
   }
 
@@ -930,7 +930,7 @@ function Cluster() {
   function moveBelowGTID(node, otherNode) {
     var message = "<h4>GTID MODE, move-below</h4>Are you sure you wish to turn <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
-      "</strong></code> into a slave of <code><strong>" +
+      "</strong></code> into a replica of <code><strong>" +
       otherNode.Key.Hostname + ":" + otherNode.Key.Port +
       "</strong></code>?";
     var apiUrl = "/api/move-below-gtid/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
@@ -938,12 +938,12 @@ function Cluster() {
   }
 
   function moveSlavesGTID(node, otherNode) {
-    var message = "<h4>GTID MODE, move-slaves</h4>Are you sure you wish to move slaves of <code><strong>" +
+    var message = "<h4>GTID MODE, move-replicas</h4>Are you sure you wish to move replicas of <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code> below <code><strong>" +
       otherNode.Key.Hostname + ":" + otherNode.Key.Port +
       "</strong></code>?";
-    var apiUrl = "/api/move-slaves-gtid/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
+    var apiUrl = "/api/move-replicas-gtid/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
     return executeMoveOperation(message, apiUrl);
   }
 
@@ -1224,14 +1224,14 @@ function Cluster() {
   }
 
   function showOSCSlaves() {
-    getData("/api/cluster-osc-slaves/" + currentClusterName(), function(instances) {
+    getData("/api/cluster-osc-replicas/" + currentClusterName(), function(instances) {
       var instancesMap = normalizeInstances(instances, Array());
       var instancesTitles = Array();
       instances.forEach(function(instance) {
         instancesTitles.push(instance.title);
       });
       var instancesTitlesConcatenates = instancesTitles.join(" ");
-      bootbox.alert("Heuristic list of OSC controller slaves: <pre>" + instancesTitlesConcatenates + "</pre>");
+      bootbox.alert("Heuristic list of OSC controller replicas: <pre>" + instancesTitlesConcatenates + "</pre>");
     });
   }
 
@@ -1590,14 +1590,14 @@ function Cluster() {
         addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on ' + getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port) + ' is blocked due to a <a href="' + appUrl('/web/audit-recovery/cluster/' + blockedRecovery.ClusterName) + '">previous recovery</a>');
       });
     });
-    getData("/api/cluster-osc-slaves/" + currentClusterName(), function(instances) {
+    getData("/api/cluster-osc-replicas/" + currentClusterName(), function(instances) {
       var instancesMap = normalizeInstances(instances, Array());
       var instancesTitles = Array();
       instances.forEach(function(instance) {
         instancesTitles.push(instance.title);
       });
       var instancesTitlesConcatenates = instancesTitles.join(" ");
-      var content = "Heuristic list of OSC controller slaves: <pre>" + instancesTitlesConcatenates + "</pre>";;
+      var content = "Heuristic list of OSC controller replicas: <pre>" + instancesTitlesConcatenates + "</pre>";;
       addSidebarInfoPopoverContent(content);
     });
 
@@ -1615,7 +1615,7 @@ function Cluster() {
     $("body").on("click", "a[data-command=change-cluster-alias]", function(event) {
       promptForAlias($(event.target).attr("data-alias"));
     });
-    $("body").on("click", "a[data-command=cluster-osc-slaves]", function(event) {
+    $("body").on("click", "a[data-command=cluster-osc-replicas]", function(event) {
       showOSCSlaves();
     });
     $("body").on("click", "a[data-command=pool-indicator]", function(event) {
