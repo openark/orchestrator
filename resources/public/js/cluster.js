@@ -23,8 +23,8 @@ function Cluster() {
       apiCommand("/api/recover-lite/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
       return true;
     },
-    "match-up-slaves": function(e) {
-      apiCommand("/api/match-up-slaves/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
+    "match-up-replicas": function(e) {
+      apiCommand("/api/match-up-replicas/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
       return true;
     },
     "regroup-replicas": function(e) {
@@ -37,10 +37,10 @@ function Cluster() {
       apiCommand("/api/recover/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port + "/" + suggestedSuccessorHost + "/" + suggestedSuccessorPort);
       return true;
     },
-    "multi-match-slaves": function(e) {
+    "match-replicas": function(e) {
       var belowHost = $(e.target).attr("data-below-host");
       var belowPort = $(e.target).attr("data-below-port");
-      apiCommand("/api/multi-match-slaves/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port + "/" + belowHost + "/" + belowPort);
+      apiCommand("/api/match-replicas/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port + "/" + belowHost + "/" + belowPort);
       return true;
     },
     "make-master": function(e) {
@@ -642,7 +642,7 @@ function Cluster() {
 
   // moveChildren checks whether an children of an instance (node) can be dropped on another (droppableNode).
   // The function consults with the current moveInstanceMethod; the type of action taken is based on that.
-  // For example, actions can be repoint-slaves, multi-match-slaves, relocate-slaves, move-up-slaves etc.
+  // For example, actions can be repoint-slaves, match-replicas, relocate-slaves, move-up-slaves etc.
   // When shouldApply is false nothing gets executed, and the function merely serves as a predictive
   // to the possibility of the drop.
   function moveChildren(node, droppableNode, shouldApply) {
@@ -868,12 +868,12 @@ function Cluster() {
   }
 
   function matchSlaves(node, otherNode) {
-    var message = "<h4>multi-match-slaves</h4>Are you sure you wish to match slaves of <code><strong>" +
+    var message = "<h4>match-replicas</h4>Are you sure you wish to match replicas of <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code> below <code><strong>" +
       otherNode.Key.Hostname + ":" + otherNode.Key.Port +
       "</strong></code>?";
-    var apiUrl = "/api/multi-match-slaves/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
+    var apiUrl = "/api/match-replicas/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
     return executeMoveOperation(message, apiUrl);
   }
 
@@ -1380,7 +1380,7 @@ function Cluster() {
     recoveryListing.append('<li role="separator" class="divider"></li>');
 
     if (!instance.isMaster) {
-      recoveryListing.append('<li><a href="#" data-btn="match-up-slaves" data-command="match-up-slaves">Match up slaves to <code>' + instance.masterTitle + '</code></a></li>');
+      recoveryListing.append('<li><a href="#" data-btn="match-up-replicas" data-command="match-up-replicas">Match up replicas to <code>' + instance.masterTitle + '</code></a></li>');
     }
     if (instance.children && instance.children.length > 1) {
       recoveryListing.append('<li><a href="#" data-btn="regroup-replicas" data-command="regroup-replicas">Regroup replicas (auto pick best replica, only heals topology, no external processes)</a></li>');
@@ -1426,7 +1426,7 @@ function Cluster() {
           return
         }
         recoveryListing.append(
-          '<li><a href="#" data-btn="multi-match-slaves" data-command="multi-match-slaves" data-below-host="' + sibling.Key.Hostname + '" data-below-port="' + sibling.Key.Port + '">Match all slaves below <code>' + sibling.title + '</code></a></li>');
+          '<li><a href="#" data-btn="match-replicas" data-command="match-replicas" data-below-host="' + sibling.Key.Hostname + '" data-below-port="' + sibling.Key.Port + '">Match all replicas below <code>' + sibling.title + '</code></a></li>');
       });
     }
   }
