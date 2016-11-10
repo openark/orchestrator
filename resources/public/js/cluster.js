@@ -229,18 +229,18 @@ function Cluster() {
 
     renderInstanceElement(instanceEl, node, "cluster");
     if (node.children) {
-      var trailerEl = $('<div class="instance-trailer" data-nodeid="' + node.id + '"><div><span class="glyphicon glyphicon-chevron-left" title="Drag and drop slaves of this instance"></span></div></div>').appendTo(instanceEl);
+      var trailerEl = $('<div class="instance-trailer" data-nodeid="' + node.id + '"><div><span class="glyphicon glyphicon-chevron-left" title="Drag and drop replicas of this instance"></span></div></div>').appendTo(instanceEl);
       instanceEl.data("instance-trailer", trailerEl);
-      var numSlaves = 0;
+      var numReplicas = 0;
       node.children.forEach(function(slave) {
         if (slave.isAggregate) {
-          numSlaves += slave.aggregatedInstances.length;
+          numReplicas += slave.aggregatedInstances.length;
         } else {
-          numSlaves += 1;
+          numReplicas += 1;
         }
       });
-      var numSlavesMessage = ((numSlaves == 1) ? "1 slave" : "" + numSlaves + " slaves");
-      trailerEl.getAppend(".instance-trailer-title").text(numSlavesMessage);
+      var numReplicasMessage = ((numReplicas == 1) ? "1 slave" : "" + numReplicas + " slaves");
+      trailerEl.getAppend(".instance-trailer-title").text(numReplicasMessage);
       trailerEl.getAppend(".instance-trailer-content").text("Drag to move slaves");
     }
     if ($.cookie("colorize-dc") == "true") {
@@ -406,7 +406,7 @@ function Cluster() {
       }
       if (node.isAggregate) {
         if (shouldApply) {
-          relocateSlaves(node.masterNode, droppableNode, node.aggregatedInstancesPattern);
+          relocateReplicas(node.masterNode, droppableNode, node.aggregatedInstancesPattern);
         }
         return {
           accept: "warning",
@@ -674,7 +674,7 @@ function Cluster() {
 
       if (node.id == droppableNode.id) {
         if (shouldApply) {
-          relocateSlaves(node, droppableNode);
+          relocateReplicas(node, droppableNode);
         }
         return {
           accept: "ok",
@@ -690,7 +690,7 @@ function Cluster() {
       }
       // the general case
       if (shouldApply) {
-        relocateSlaves(node, droppableNode);
+        relocateReplicas(node, droppableNode);
       }
       return {
         accept: "warning",
@@ -767,20 +767,20 @@ function Cluster() {
       // Not pseudo-GTID mode, non GTID mode
       if (node.id == droppableNode.id) {
         if (shouldApply) {
-          repointSlaves(node);
+          repointReplicas(node);
         }
         return {
           accept: "ok",
-          type: "repointSlaves < " + droppableTitle
+          type: "repointReplicas < " + droppableTitle
         };
       }
       if (instanceIsChild(node, droppableNode)) {
         if (shouldApply) {
-          moveUpSlaves(node, droppableNode);
+          moveUpReplicas(node, droppableNode);
         }
         return {
           accept: "ok",
-          type: "moveUpSlaves < " + droppableTitle
+          type: "moveUpReplicas < " + droppableTitle
         };
       }
       return {
@@ -835,7 +835,7 @@ function Cluster() {
     return executeMoveOperation(message, apiUrl);
   }
 
-  function relocateSlaves(node, siblingNode, pattern) {
+  function relocateReplicas(node, siblingNode, pattern) {
     pattern = pattern || "";
     var message = "<h4>relocate-replicas</h4>Are you sure you wish to relocate replicas of <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
@@ -849,7 +849,7 @@ function Cluster() {
     return executeMoveOperation(message, apiUrl);
   }
 
-  function repointSlaves(node, siblingNode) {
+  function repointReplicas(node, siblingNode) {
     var message = "<h4>repoint-replicas</h4>Are you sure you wish to repoint replicas of <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code>?";
@@ -857,7 +857,7 @@ function Cluster() {
     return executeMoveOperation(message, apiUrl);
   }
 
-  function moveUpSlaves(node, masterNode) {
+  function moveUpReplicas(node, masterNode) {
     var message = "<h4>move-up-replicas</h4>Are you sure you wish to move up replicas of <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code> below <code><strong>" +
@@ -867,7 +867,7 @@ function Cluster() {
     return executeMoveOperation(message, apiUrl);
   }
 
-  function matchSlaves(node, otherNode) {
+  function matchReplicas(node, otherNode) {
     var message = "<h4>match-replicas</h4>Are you sure you wish to match replicas of <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code> below <code><strong>" +
@@ -1223,7 +1223,7 @@ function Cluster() {
     });
   }
 
-  function showOSCSlaves() {
+  function showOSCReplicas() {
     getData("/api/cluster-osc-replicas/" + currentClusterName(), function(instances) {
       var instancesMap = normalizeInstances(instances, Array());
       var instancesTitles = Array();
@@ -1616,7 +1616,7 @@ function Cluster() {
       promptForAlias($(event.target).attr("data-alias"));
     });
     $("body").on("click", "a[data-command=cluster-osc-replicas]", function(event) {
-      showOSCSlaves();
+      showOSCReplicas();
     });
     $("body").on("click", "a[data-command=pool-indicator]", function(event) {
       if ($.cookie("pool-indicator") == "true") {
