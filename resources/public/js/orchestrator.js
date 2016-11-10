@@ -272,7 +272,9 @@ function openNodeModal(node) {
   if (node.MasterKey.Hostname) {
     var td = addNodeModalDataAttribute("Master", node.masterTitle);
     if (node.IsDetachedMaster) {
-      $('#node_modal button[data-btn=reattach-slave-master-host]').appendTo(td.find("div"))
+      $('#node_modal button[data-btn=reattach-replica-master-host]').appendTo(td.find("div"));
+    } else {
+      $('#node_modal button[data-btn=reattach-replica-master-host]').appendTo(hiddenZone);
     }
     $('#node_modal button[data-btn=reset-slave]').appendTo(td.find("div"))
 
@@ -310,18 +312,18 @@ function openNodeModal(node) {
       }
     }, "json");
     if (node.IsDetached) {
-      $('#node_modal button[data-btn=detach-slave]').appendTo(hiddenZone)
-      $('#node_modal button[data-btn=reattach-slave]').appendTo(masterCoordinatesEl.find("div"))
+      $('#node_modal button[data-btn=detach-replica]').appendTo(hiddenZone)
+      $('#node_modal button[data-btn=reattach-replica]').appendTo(masterCoordinatesEl.find("div"))
     } else {
-      $('#node_modal button[data-btn=detach-slave]').appendTo(masterCoordinatesEl.find("div"))
-      $('#node_modal button[data-btn=reattach-slave]').appendTo(hiddenZone)
+      $('#node_modal button[data-btn=detach-replica]').appendTo(masterCoordinatesEl.find("div"))
+      $('#node_modal button[data-btn=reattach-replica]').appendTo(hiddenZone)
     }
   } else {
     $('#node_modal button[data-btn=reset-slave]').appendTo(hiddenZone);
-    $('#node_modal button[data-btn=reattach-slave-master-host]').appendTo(hiddenZone);
+    $('#node_modal button[data-btn=reattach-replica-master-host]').appendTo(hiddenZone);
     $('#node_modal button[data-btn=skip-query]').appendTo(hiddenZone);
-    $('#node_modal button[data-btn=detach-slave]').appendTo(hiddenZone)
-    $('#node_modal button[data-btn=reattach-slave]').appendTo(hiddenZone)
+    $('#node_modal button[data-btn=detach-replica]').appendTo(hiddenZone)
+    $('#node_modal button[data-btn=reattach-replica]').appendTo(hiddenZone)
   }
   if (node.LogBinEnabled) {
     addNodeModalDataAttribute("Self coordinates", node.SelfBinlogCoordinates.LogFile + ":" + node.SelfBinlogCoordinates.LogPos);
@@ -396,14 +398,14 @@ function openNodeModal(node) {
   $('#node_modal [data-btn=stop-slave-nice]').click(function() {
     apiCommand("/api/stop-slave-nice/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-  $('#node_modal button[data-btn=detach-slave]').click(function() {
-    apiCommand("/api/detach-slave/" + node.Key.Hostname + "/" + node.Key.Port);
+  $('#node_modal button[data-btn=detach-replica]').click(function() {
+    apiCommand("/api/detach-replica/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-  $('#node_modal button[data-btn=reattach-slave]').click(function() {
-    apiCommand("/api/reattach-slave/" + node.Key.Hostname + "/" + node.Key.Port);
+  $('#node_modal button[data-btn=reattach-replica]').click(function() {
+    apiCommand("/api/reattach-replica/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-  $('#node_modal button[data-btn=reattach-slave-master-host]').click(function() {
-    apiCommand("/api/reattach-slave-master-host/" + node.Key.Hostname + "/" + node.Key.Port);
+  $('#node_modal button[data-btn=reattach-replica-master-host]').click(function() {
+    apiCommand("/api/reattach-replica-master-host/" + node.Key.Hostname + "/" + node.Key.Port);
   });
   $('#node_modal button[data-btn=reset-slave]').click(function() {
     var message = "<p>Are you sure you wish to reset <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
