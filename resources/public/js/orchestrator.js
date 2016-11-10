@@ -327,7 +327,7 @@ function openNodeModal(node) {
     addNodeModalDataAttribute("Self coordinates", node.SelfBinlogCoordinates.LogFile + ":" + node.SelfBinlogCoordinates.LogPos);
   }
   var td = addNodeModalDataAttribute("Num slaves", node.SlaveHosts.length);
-  $('#node_modal button[data-btn=regroup-slaves]').appendTo(td.find("div"))
+  $('#node_modal button[data-btn=regroup-replicas]').appendTo(td.find("div"))
   addNodeModalDataAttribute("Server ID", node.ServerID);
   if (node.ServerUUID) {
     addNodeModalDataAttribute("Server UUID", node.ServerUUID);
@@ -508,17 +508,17 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=enable-gtid]').show();
   }
 
-  $('#node_modal button[data-btn=regroup-slaves]').hide();
+  $('#node_modal button[data-btn=regroup-replicas]').hide();
   if (node.SlaveHosts.length > 1) {
-    $('#node_modal button[data-btn=regroup-slaves]').show();
+    $('#node_modal button[data-btn=regroup-replicas]').show();
   }
-  $('#node_modal button[data-btn=regroup-slaves]').click(function() {
-    var message = "<p>Are you sure you wish to regroup slaves of <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+  $('#node_modal button[data-btn=regroup-replicas]').click(function() {
+    var message = "<p>Are you sure you wish to regroup replicas of <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code>?" +
       "<p>This will attempt to promote one slave over its siblings";
     bootbox.confirm(message, function(confirm) {
       if (confirm) {
-        apiCommand("/api/regroup-slaves/" + node.Key.Hostname + "/" + node.Key.Port);
+        apiCommand("/api/regroup-replicas/" + node.Key.Hostname + "/" + node.Key.Port);
       }
     });
   });

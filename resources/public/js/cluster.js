@@ -27,8 +27,8 @@ function Cluster() {
       apiCommand("/api/match-up-slaves/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
       return true;
     },
-    "regroup-slaves": function(e) {
-      apiCommand("/api/regroup-slaves/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
+    "regroup-replicas": function(e) {
+      apiCommand("/api/regroup-replicas/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
       return true;
     },
     "recover-suggested-successor": function(e) {
@@ -1383,7 +1383,7 @@ function Cluster() {
       recoveryListing.append('<li><a href="#" data-btn="match-up-slaves" data-command="match-up-slaves">Match up slaves to <code>' + instance.masterTitle + '</code></a></li>');
     }
     if (instance.children && instance.children.length > 1) {
-      recoveryListing.append('<li><a href="#" data-btn="regroup-slaves" data-command="regroup-slaves">Regroup slaves (auto pick best slave, only heals topology, no external processes)</a></li>');
+      recoveryListing.append('<li><a href="#" data-btn="regroup-replicas" data-command="regroup-replicas">Regroup replicas (auto pick best replica, only heals topology, no external processes)</a></li>');
     }
     if (instance.isMaster) {
       // Suggest successor
@@ -1404,7 +1404,7 @@ function Cluster() {
           return
         }
         recoveryListing.append(
-          '<li><a href="#" data-btn="recover-suggested-successor" data-command="recover-suggested-successor" data-suggested-successor-host="' + slave.Key.Hostname + '" data-suggested-successor-port="' + slave.Key.Port + '">Regroup slaves, try to promote <code>' + slave.title + '</code></a></li>');
+          '<li><a href="#" data-btn="recover-suggested-successor" data-command="recover-suggested-successor" data-suggested-successor-host="' + slave.Key.Hostname + '" data-suggested-successor-port="' + slave.Key.Port + '">Regroup replicas, try to promote <code>' + slave.title + '</code></a></li>');
       });
     }
     if (instance.masterNode) {
