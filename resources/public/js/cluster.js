@@ -642,7 +642,7 @@ function Cluster() {
 
   // moveChildren checks whether an children of an instance (node) can be dropped on another (droppableNode).
   // The function consults with the current moveInstanceMethod; the type of action taken is based on that.
-  // For example, actions can be repoint-slaves, match-replicas, relocate-slaves, move-up-slaves etc.
+  // For example, actions can be repoint-replicas, match-replicas, relocate-slaves, move-up-slaves etc.
   // When shouldApply is false nothing gets executed, and the function merely serves as a predictive
   // to the possibility of the drop.
   function moveChildren(node, droppableNode, shouldApply) {
@@ -850,10 +850,10 @@ function Cluster() {
   }
 
   function repointSlaves(node, siblingNode) {
-    var message = "<h4>repoint-slaves</h4>Are you sure you wish to repoint slaves of <code><strong>" +
+    var message = "<h4>repoint-replicas</h4>Are you sure you wish to repoint replicas of <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code>?";
-    var apiUrl = "/api/repoint-slaves/" + node.Key.Hostname + "/" + node.Key.Port;
+    var apiUrl = "/api/repoint-replicas/" + node.Key.Hostname + "/" + node.Key.Port;
     return executeMoveOperation(message, apiUrl);
   }
 
