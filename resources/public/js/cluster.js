@@ -642,7 +642,7 @@ function Cluster() {
 
   // moveChildren checks whether an children of an instance (node) can be dropped on another (droppableNode).
   // The function consults with the current moveInstanceMethod; the type of action taken is based on that.
-  // For example, actions can be repoint-replicas, match-replicas, relocate-slaves, move-up-slaves etc.
+  // For example, actions can be repoint-replicas, match-replicas, relocate-replicas, move-up-slaves etc.
   // When shouldApply is false nothing gets executed, and the function merely serves as a predictive
   // to the possibility of the drop.
   function moveChildren(node, droppableNode, shouldApply) {
@@ -837,7 +837,7 @@ function Cluster() {
 
   function relocateSlaves(node, siblingNode, pattern) {
     pattern = pattern || "";
-    var message = "<h4>relocate-slaves</h4>Are you sure you wish to relocate slaves of <code><strong>" +
+    var message = "<h4>relocate-replicas</h4>Are you sure you wish to relocate replicas of <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code> below <code><strong>" +
       siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
@@ -845,7 +845,7 @@ function Cluster() {
       "<h4>Note</h4><p>Orchestrator will try and figure out the best relocation path. This may involve multiple steps. " +
       "<p>In case multiple steps are involved, failure of one may leave some instances hanging in a different location than you expected, " +
       "but they would still be in a <i>valid</i> state.";
-    var apiUrl = "/api/relocate-slaves/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port + "?pattern=" + encodeURIComponent(pattern);
+    var apiUrl = "/api/relocate-replicas/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port + "?pattern=" + encodeURIComponent(pattern);
     return executeMoveOperation(message, apiUrl);
   }
 
