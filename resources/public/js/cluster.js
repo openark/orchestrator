@@ -349,7 +349,7 @@ function Cluster() {
 
   // moveInstance checks whether an instance (node) can be dropped on another (droppableNode).
   // The function consults with the current moveInstanceMethod; the type of action taken is based on that.
-  // For example, actions can be repoint, match-below, relocate, move-up, enslave-master etc.
+  // For example, actions can be repoint, match-below, relocate, move-up, take-master etc.
   // When shouldApply is false nothing gets executed, and the function merely serves as a predictive
   // to the possibility of the drop.
   function moveInstance(node, droppableNode, shouldApply) {
@@ -599,11 +599,11 @@ function Cluster() {
           }
         }
         if (shouldApply) {
-          enslaveMaster(node, droppableNode);
+          takeMaster(node, droppableNode);
         }
         return {
           accept: "ok",
-          type: "enslaveMaster " + droppableTitle
+          type: "takeMaster " + droppableTitle
         };
       }
       if (instanceIsChild(droppableNode, node) && node.isMaster && !node.isCoMaster) {
@@ -897,13 +897,13 @@ function Cluster() {
     return executeMoveOperation(message, apiUrl);
   }
 
-  function enslaveMaster(node, masterNode) {
-    var message = "<h4>enslave-master</h4>Are you sure you wish to make <code><strong>" +
+  function takeMaster(node, masterNode) {
+    var message = "<h4>take-master</h4>Are you sure you wish to make <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code> master of <code><strong>" +
       masterNode.Key.Hostname + ":" + masterNode.Key.Port +
       "</strong></code>?";
-    var apiUrl = "/api/enslave-master/" + node.Key.Hostname + "/" + node.Key.Port;
+    var apiUrl = "/api/take-master/" + node.Key.Hostname + "/" + node.Key.Port;
     return executeMoveOperation(message, apiUrl);
   }
 

@@ -343,7 +343,7 @@ function openNodeModal(node) {
   if (node.LogBinEnabled) {
     addNodeModalDataAttribute("Binlog format", node.Binlog_format);
     var td = addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
-    $('#node_modal button[data-btn=enslave-siblings]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=take-siblings]').appendTo(td.find("div"))
   }
 
   var td = addNodeModalDataAttribute("GTID based replication", booleanString(node.usingGTID));
@@ -525,17 +525,17 @@ function openNodeModal(node) {
     });
   });
 
-  $('#node_modal button[data-btn=enslave-siblings]').hide();
+  $('#node_modal button[data-btn=take-siblings]').hide();
   if (node.LogBinEnabled && node.LogSlaveUpdatesEnabled) {
-    $('#node_modal button[data-btn=enslave-siblings]').show();
+    $('#node_modal button[data-btn=take-siblings]').show();
   }
-  $('#node_modal button[data-btn=enslave-siblings]').click(function() {
+  $('#node_modal button[data-btn=take-siblings]').click(function() {
     var message = "<p>Are you sure you want <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
-      "</strong></code> to enslave its siblings?" +
+      "</strong></code> to take its siblings?" +
       "<p>This will stop replication on this slave and on its siblings throughout the operation";
     bootbox.confirm(message, function(confirm) {
       if (confirm) {
-        apiCommand("/api/enslave-siblings/" + node.Key.Hostname + "/" + node.Key.Port);
+        apiCommand("/api/take-siblings/" + node.Key.Hostname + "/" + node.Key.Port);
       }
     });
   });
