@@ -2321,7 +2321,6 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "match-below/:host/:port/:belowHost/:belowPort", this.MatchBelow)
 	this.registerRequest(m, "match-up/:host/:port", this.MatchUp)
 	this.registerRequest(m, "match-slaves/:host/:port/:belowHost/:belowPort", this.MultiMatchSlaves)
-	this.registerRequest(m, "multi-match-slaves/:host/:port/:belowHost/:belowPort", this.MultiMatchSlaves)
 	this.registerRequest(m, "match-up-slaves/:host/:port", this.MatchUpSlaves)
 	this.registerRequest(m, "regroup-slaves-pgtid/:host/:port", this.RegroupSlavesPseudoGTID)
 	// Legacy, need to revisit:

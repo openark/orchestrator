@@ -82,7 +82,7 @@ $(document).ready(function() {
         moreInfo += '<div><strong>Unacknowledged</strong></div>';
       }
       if (audit.LostSlaves.length > 0) {
-        moreInfo += "<div>Lost slaves:<ul>";
+        moreInfo += "<div>Lost replicas:<ul>";
         audit.LostSlaves.forEach(function(instanceKey) {
           moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
         });
@@ -96,7 +96,7 @@ $(document).ready(function() {
         moreInfo += "</ul></div>";
       }
       if (audit.AnalysisEntry.SlaveHosts.length > 0) {
-        moreInfo += '<div>' + audit.AnalysisEntry.CountSlaves + ' slave hosts :<ul>';
+        moreInfo += '<div>' + audit.AnalysisEntry.CountSlaves + ' replicting hosts :<ul>';
         audit.AnalysisEntry.SlaveHosts.forEach(function(instanceKey) {
           moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
         });

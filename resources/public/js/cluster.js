@@ -23,12 +23,12 @@ function Cluster() {
       apiCommand("/api/recover-lite/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
       return true;
     },
-    "match-up-slaves": function(e) {
-      apiCommand("/api/match-up-slaves/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
+    "match-up-replicas": function(e) {
+      apiCommand("/api/match-up-replicas/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
       return true;
     },
-    "regroup-slaves": function(e) {
-      apiCommand("/api/regroup-slaves/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
+    "regroup-replicas": function(e) {
+      apiCommand("/api/regroup-replicas/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
       return true;
     },
     "recover-suggested-successor": function(e) {
@@ -37,10 +37,10 @@ function Cluster() {
       apiCommand("/api/recover/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port + "/" + suggestedSuccessorHost + "/" + suggestedSuccessorPort);
       return true;
     },
-    "multi-match-slaves": function(e) {
+    "match-replicas": function(e) {
       var belowHost = $(e.target).attr("data-below-host");
       var belowPort = $(e.target).attr("data-below-port");
-      apiCommand("/api/multi-match-slaves/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port + "/" + belowHost + "/" + belowPort);
+      apiCommand("/api/match-replicas/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port + "/" + belowHost + "/" + belowPort);
       return true;
     },
     "make-master": function(e) {
@@ -229,19 +229,19 @@ function Cluster() {
 
     renderInstanceElement(instanceEl, node, "cluster");
     if (node.children) {
-      var trailerEl = $('<div class="instance-trailer" data-nodeid="' + node.id + '"><div><span class="glyphicon glyphicon-chevron-left" title="Drag and drop slaves of this instance"></span></div></div>').appendTo(instanceEl);
+      var trailerEl = $('<div class="instance-trailer" data-nodeid="' + node.id + '"><div><span class="glyphicon glyphicon-chevron-left" title="Drag and drop replicas of this instance"></span></div></div>').appendTo(instanceEl);
       instanceEl.data("instance-trailer", trailerEl);
-      var numSlaves = 0;
-      node.children.forEach(function(slave) {
-        if (slave.isAggregate) {
-          numSlaves += slave.aggregatedInstances.length;
+      var numReplicas = 0;
+      node.children.forEach(function(replica) {
+        if (replica.isAggregate) {
+          numReplicas += replica.aggregatedInstances.length;
         } else {
-          numSlaves += 1;
+          numReplicas += 1;
         }
       });
-      var numSlavesMessage = ((numSlaves == 1) ? "1 slave" : "" + numSlaves + " slaves");
-      trailerEl.getAppend(".instance-trailer-title").text(numSlavesMessage);
-      trailerEl.getAppend(".instance-trailer-content").text("Drag to move slaves");
+      var numReplicasMessage = ((numReplicas == 1) ? "1 replica" : "" + numReplicas + " replicas");
+      trailerEl.getAppend(".instance-trailer-title").text(numReplicasMessage);
+      trailerEl.getAppend(".instance-trailer-content").text("Drag to move replicas");
     }
     if ($.cookie("colorize-dc") == "true") {
       var dcColor = dcColorsMap[node.DataCenter];
@@ -349,7 +349,7 @@ function Cluster() {
 
   // moveInstance checks whether an instance (node) can be dropped on another (droppableNode).
   // The function consults with the current moveInstanceMethod; the type of action taken is based on that.
-  // For example, actions can be repoint, match-below, relocate, move-up, enslave-master etc.
+  // For example, actions can be repoint, match-below, relocate, move-up, take-master etc.
   // When shouldApply is false nothing gets executed, and the function merely serves as a predictive
   // to the possibility of the drop.
   function moveInstance(node, droppableNode, shouldApply) {
@@ -406,7 +406,7 @@ function Cluster() {
       }
       if (node.isAggregate) {
         if (shouldApply) {
-          relocateSlaves(node.masterNode, droppableNode, node.aggregatedInstancesPattern);
+          relocateReplicas(node.masterNode, droppableNode, node.aggregatedInstancesPattern);
         }
         return {
           accept: "warning",
@@ -571,7 +571,7 @@ function Cluster() {
           // Typically, when a node has a problem we do not allow moving it up.
           // But there's a special situation when allowing is desired: when the parent has personal issues,
           // (say disk issue or otherwise something heavyweight running which slows down replication)
-          // and you want to move up the slave which is only delayed by its master.
+          // and you want to move up the replica which is only delayed by its master.
           // So to help out, if the instance is identically at its master's trail, it is allowed to move up.
           if (!node.isSQLThreadCaughtUpWithIOThread) {
             return {
@@ -591,7 +591,7 @@ function Cluster() {
         if (node.hasProblem) {
           // Typically, when a node has a problem we do not allow moving it up.
           // But there's a special situation when allowing is desired: when
-          // this slave is completely caught up;
+          // this replica is completely caught up;
           if (!node.isSQLThreadCaughtUpWithIOThread) {
             return {
               accept: false
@@ -599,11 +599,11 @@ function Cluster() {
           }
         }
         if (shouldApply) {
-          enslaveMaster(node, droppableNode);
+          takeMaster(node, droppableNode);
         }
         return {
           accept: "ok",
-          type: "enslaveMaster " + droppableTitle
+          type: "takeMaster " + droppableTitle
         };
       }
       if (instanceIsChild(droppableNode, node) && node.isMaster && !node.isCoMaster) {
@@ -642,7 +642,7 @@ function Cluster() {
 
   // moveChildren checks whether an children of an instance (node) can be dropped on another (droppableNode).
   // The function consults with the current moveInstanceMethod; the type of action taken is based on that.
-  // For example, actions can be repoint-slaves, multi-match-slaves, relocate-slaves, move-up-slaves etc.
+  // For example, actions can be repoint-replicas, match-replicas, relocate-replicas, move-up-replicas etc.
   // When shouldApply is false nothing gets executed, and the function merely serves as a predictive
   // to the possibility of the drop.
   function moveChildren(node, droppableNode, shouldApply) {
@@ -674,7 +674,7 @@ function Cluster() {
 
       if (node.id == droppableNode.id) {
         if (shouldApply) {
-          relocateSlaves(node, droppableNode);
+          relocateReplicas(node, droppableNode);
         }
         return {
           accept: "ok",
@@ -682,15 +682,15 @@ function Cluster() {
         };
       }
       if (instanceIsDescendant(droppableNode, node) && node.children.length <= 1) {
-        // Can generally move slaves onto one of them, but there needs to be at least two slaves...
-        // Otherwise we;re trying to mvoe a slave under itself which is clearly an error.
+        // Can generally move replicas onto one of them, but there needs to be at least two replicas...
+        // Otherwise we;re trying to mvoe a replica under itself which is clearly an error.
         return {
           accept: false
         };
       }
       // the general case
       if (shouldApply) {
-        relocateSlaves(node, droppableNode);
+        relocateReplicas(node, droppableNode);
       }
       return {
         accept: "warning",
@@ -701,11 +701,11 @@ function Cluster() {
     var gtidBelowFunc = null;
     var gtidOperationName = "";
     if (moveInstanceMethod == "pseudo-gtid") {
-      gtidBelowFunc = matchSlaves;
+      gtidBelowFunc = matchReplicas;
       gtidOperationName = "match";
     }
     if (moveInstanceMethod == "gtid") {
-      gtidBelowFunc = moveSlavesGTID;
+      gtidBelowFunc = moveReplicasGTID;
       gtidOperationName = "move:gtid";
     }
     if (gtidBelowFunc != null) {
@@ -736,8 +736,8 @@ function Cluster() {
         };
       }
       if (instanceIsDescendant(droppableNode, node) && node.children.length <= 1) {
-        // Can generally move slaves onto one of them, but there needs to be at least two slaves...
-        // Otherwise we;re trying to mvoe a slave under itself which is clearly an error.
+        // Can generally move replicas onto one of them, but there needs to be at least two replicas...
+        // Otherwise we;re trying to mvoe a replica under itself which is clearly an error.
         // Wrong direction!
         return {
           accept: false
@@ -767,20 +767,20 @@ function Cluster() {
       // Not pseudo-GTID mode, non GTID mode
       if (node.id == droppableNode.id) {
         if (shouldApply) {
-          repointSlaves(node);
+          repointReplicas(node);
         }
         return {
           accept: "ok",
-          type: "repointSlaves < " + droppableTitle
+          type: "repointReplicas < " + droppableTitle
         };
       }
       if (instanceIsChild(node, droppableNode)) {
         if (shouldApply) {
-          moveUpSlaves(node, droppableNode);
+          moveUpReplicas(node, droppableNode);
         }
         return {
           accept: "ok",
-          type: "moveUpSlaves < " + droppableTitle
+          type: "moveUpReplicas < " + droppableTitle
         };
       }
       return {
@@ -789,12 +789,12 @@ function Cluster() {
     }
     if (shouldApply) {
       addAlert(
-        "Cannot move slaves of <code><strong>" +
+        "Cannot move replicas of <code><strong>" +
         node.Key.Hostname + ":" + node.Key.Port +
         "</strong></code> under <code><strong>" +
         droppableNode.Key.Hostname + ":" + droppableNode.Key.Port +
         "</strong></code>. " +
-        "You may only repoint or move up the slaves of an instance. Otherwise try Smart Mode."
+        "You may only repoint or move up the replicas of an instance. Otherwise try Smart Mode."
       );
     }
     return {
@@ -825,7 +825,7 @@ function Cluster() {
   function relocate(node, siblingNode) {
     var message = "<h4>relocate</h4>Are you sure you wish to turn <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
-      "</strong></code> into a slave of <code><strong>" +
+      "</strong></code> into a replica of <code><strong>" +
       siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
       "</strong></code>?" +
       "<h4>Note</h4><p>Orchestrator will try and figure out the best relocation path. This may involve multiple steps. " +
@@ -835,9 +835,9 @@ function Cluster() {
     return executeMoveOperation(message, apiUrl);
   }
 
-  function relocateSlaves(node, siblingNode, pattern) {
+  function relocateReplicas(node, siblingNode, pattern) {
     pattern = pattern || "";
-    var message = "<h4>relocate-slaves</h4>Are you sure you wish to relocate slaves of <code><strong>" +
+    var message = "<h4>relocate-replicas</h4>Are you sure you wish to relocate replicas of <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code> below <code><strong>" +
       siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
@@ -845,42 +845,42 @@ function Cluster() {
       "<h4>Note</h4><p>Orchestrator will try and figure out the best relocation path. This may involve multiple steps. " +
       "<p>In case multiple steps are involved, failure of one may leave some instances hanging in a different location than you expected, " +
       "but they would still be in a <i>valid</i> state.";
-    var apiUrl = "/api/relocate-slaves/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port + "?pattern=" + encodeURIComponent(pattern);
+    var apiUrl = "/api/relocate-replicas/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port + "?pattern=" + encodeURIComponent(pattern);
     return executeMoveOperation(message, apiUrl);
   }
 
-  function repointSlaves(node, siblingNode) {
-    var message = "<h4>repoint-slaves</h4>Are you sure you wish to repoint slaves of <code><strong>" +
+  function repointReplicas(node, siblingNode) {
+    var message = "<h4>repoint-replicas</h4>Are you sure you wish to repoint replicas of <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code>?";
-    var apiUrl = "/api/repoint-slaves/" + node.Key.Hostname + "/" + node.Key.Port;
+    var apiUrl = "/api/repoint-replicas/" + node.Key.Hostname + "/" + node.Key.Port;
     return executeMoveOperation(message, apiUrl);
   }
 
-  function moveUpSlaves(node, masterNode) {
-    var message = "<h4>move-up-slaves</h4>Are you sure you wish to move up slaves of <code><strong>" +
+  function moveUpReplicas(node, masterNode) {
+    var message = "<h4>move-up-replicas</h4>Are you sure you wish to move up replicas of <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code> below <code><strong>" +
       masterNode.Key.Hostname + ":" + masterNode.Key.Port +
       "</strong></code>?";
-    var apiUrl = "/api/move-up-slaves/" + node.Key.Hostname + "/" + node.Key.Port;
+    var apiUrl = "/api/move-up-replicas/" + node.Key.Hostname + "/" + node.Key.Port;
     return executeMoveOperation(message, apiUrl);
   }
 
-  function matchSlaves(node, otherNode) {
-    var message = "<h4>multi-match-slaves</h4>Are you sure you wish to match slaves of <code><strong>" +
+  function matchReplicas(node, otherNode) {
+    var message = "<h4>match-replicas</h4>Are you sure you wish to match replicas of <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code> below <code><strong>" +
       otherNode.Key.Hostname + ":" + otherNode.Key.Port +
       "</strong></code>?";
-    var apiUrl = "/api/multi-match-slaves/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
+    var apiUrl = "/api/match-replicas/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
     return executeMoveOperation(message, apiUrl);
   }
 
   function moveBelow(node, siblingNode) {
     var message = "<h4>move-below</h4>Are you sure you wish to turn <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
-      "</strong></code> into a slave of <code><strong>" +
+      "</strong></code> into a replica of <code><strong>" +
       siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
       "</strong></code>?";
     var apiUrl = "/api/move-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port;
@@ -890,20 +890,20 @@ function Cluster() {
   function moveUp(node, grandparentNode) {
     var message = "<h4>move-up</h4>Are you sure you wish to turn <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
-      "</strong></code> into a slave of <code><strong>" +
+      "</strong></code> into a replica of <code><strong>" +
       grandparentNode.Key.Hostname + ":" + grandparentNode.Key.Port +
       "</strong></code>?";
     var apiUrl = "/api/move-up/" + node.Key.Hostname + "/" + node.Key.Port;
     return executeMoveOperation(message, apiUrl);
   }
 
-  function enslaveMaster(node, masterNode) {
-    var message = "<h4>enslave-master</h4>Are you sure you wish to make <code><strong>" +
+  function takeMaster(node, masterNode) {
+    var message = "<h4>take-master</h4>Are you sure you wish to make <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code> master of <code><strong>" +
       masterNode.Key.Hostname + ":" + masterNode.Key.Port +
       "</strong></code>?";
-    var apiUrl = "/api/enslave-master/" + node.Key.Hostname + "/" + node.Key.Port;
+    var apiUrl = "/api/take-master/" + node.Key.Hostname + "/" + node.Key.Port;
     return executeMoveOperation(message, apiUrl);
   }
 
@@ -920,7 +920,7 @@ function Cluster() {
   function matchBelow(node, otherNode) {
     var message = "<h4>PSEUDO-GTID MODE, match-below</h4>Are you sure you wish to turn <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
-      "</strong></code> into a slave of <code><strong>" +
+      "</strong></code> into a replica of <code><strong>" +
       otherNode.Key.Hostname + ":" + otherNode.Key.Port +
       "</strong></code>?";
     var apiUrl = "/api/match-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
@@ -930,20 +930,20 @@ function Cluster() {
   function moveBelowGTID(node, otherNode) {
     var message = "<h4>GTID MODE, move-below</h4>Are you sure you wish to turn <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
-      "</strong></code> into a slave of <code><strong>" +
+      "</strong></code> into a replica of <code><strong>" +
       otherNode.Key.Hostname + ":" + otherNode.Key.Port +
       "</strong></code>?";
     var apiUrl = "/api/move-below-gtid/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
     return executeMoveOperation(message, apiUrl);
   }
 
-  function moveSlavesGTID(node, otherNode) {
-    var message = "<h4>GTID MODE, move-slaves</h4>Are you sure you wish to move slaves of <code><strong>" +
+  function moveReplicasGTID(node, otherNode) {
+    var message = "<h4>GTID MODE, move-replicas</h4>Are you sure you wish to move replicas of <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code> below <code><strong>" +
       otherNode.Key.Hostname + ":" + otherNode.Key.Port +
       "</strong></code>?";
-    var apiUrl = "/api/move-slaves-gtid/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
+    var apiUrl = "/api/move-replicas-gtid/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
     return executeMoveOperation(message, apiUrl);
   }
 
@@ -1130,7 +1130,7 @@ function Cluster() {
     instances.forEach(function(instance) {
       if (!instance.hasConnectivityProblem)
         return;
-      // The instance has a connectivity problem! Do a client-side recommendation of most advanced slave:
+      // The instance has a connectivity problem! Do a client-side recommendation of most advanced replica:
       // a direct child of the master, with largest exec binlog coordinates.
       var sortedChildren = instance.children.slice();
       sortedChildren.sort(compareInstancesExecBinlogCoordinates)
@@ -1141,7 +1141,7 @@ function Cluster() {
             child.isMostAdvancedOfSiblings = true;
             if (instance.isMaster && !instance.isCoMaster) {
               // Moreover, the instance is the (only) master!
-              // Therefore its most advanced slaves are candidate masters
+              // Therefore its most advanced replicas are candidate masters
               child.isCandidateMaster = true;
             }
           }
@@ -1223,15 +1223,15 @@ function Cluster() {
     });
   }
 
-  function showOSCSlaves() {
-    getData("/api/cluster-osc-slaves/" + currentClusterName(), function(instances) {
+  function showOSCReplicas() {
+    getData("/api/cluster-osc-replicas/" + currentClusterName(), function(instances) {
       var instancesMap = normalizeInstances(instances, Array());
       var instancesTitles = Array();
       instances.forEach(function(instance) {
         instancesTitles.push(instance.title);
       });
       var instancesTitlesConcatenates = instancesTitles.join(" ");
-      bootbox.alert("Heuristic list of OSC controller slaves: <pre>" + instancesTitlesConcatenates + "</pre>");
+      bootbox.alert("Heuristic list of OSC controller replicas: <pre>" + instancesTitlesConcatenates + "</pre>");
     });
   }
 
@@ -1380,31 +1380,31 @@ function Cluster() {
     recoveryListing.append('<li role="separator" class="divider"></li>');
 
     if (!instance.isMaster) {
-      recoveryListing.append('<li><a href="#" data-btn="match-up-slaves" data-command="match-up-slaves">Match up slaves to <code>' + instance.masterTitle + '</code></a></li>');
+      recoveryListing.append('<li><a href="#" data-btn="match-up-replicas" data-command="match-up-replicas">Match up replicas to <code>' + instance.masterTitle + '</code></a></li>');
     }
     if (instance.children && instance.children.length > 1) {
-      recoveryListing.append('<li><a href="#" data-btn="regroup-slaves" data-command="regroup-slaves">Regroup slaves (auto pick best slave, only heals topology, no external processes)</a></li>');
+      recoveryListing.append('<li><a href="#" data-btn="regroup-replicas" data-command="regroup-replicas">Regroup replicas (auto pick best replica, only heals topology, no external processes)</a></li>');
     }
     if (instance.isMaster) {
       // Suggest successor
-      instance.children.forEach(function(slave) {
-        if (!slave.LogBinEnabled) {
+      instance.children.forEach(function(replica) {
+        if (!replica.LogBinEnabled) {
           return
         }
-        if (slave.SQLDelay > 0) {
+        if (replica.SQLDelay > 0) {
           return
         }
-        if (!slave.LogSlaveUpdatesEnabled) {
+        if (!replica.LogSlaveUpdatesEnabled) {
           return
         }
-        if (slave.lastCheckInvalidProblem()) {
+        if (replica.lastCheckInvalidProblem()) {
           return
         }
-        if (slave.notRecentlyCheckedProblem()) {
+        if (replica.notRecentlyCheckedProblem()) {
           return
         }
         recoveryListing.append(
-          '<li><a href="#" data-btn="recover-suggested-successor" data-command="recover-suggested-successor" data-suggested-successor-host="' + slave.Key.Hostname + '" data-suggested-successor-port="' + slave.Key.Port + '">Regroup slaves, try to promote <code>' + slave.title + '</code></a></li>');
+          '<li><a href="#" data-btn="recover-suggested-successor" data-command="recover-suggested-successor" data-suggested-successor-host="' + replica.Key.Hostname + '" data-suggested-successor-port="' + replica.Key.Port + '">Regroup replicas, try to promote <code>' + replica.title + '</code></a></li>');
       });
     }
     if (instance.masterNode) {
@@ -1426,7 +1426,7 @@ function Cluster() {
           return
         }
         recoveryListing.append(
-          '<li><a href="#" data-btn="multi-match-slaves" data-command="multi-match-slaves" data-below-host="' + sibling.Key.Hostname + '" data-below-port="' + sibling.Key.Port + '">Match all slaves below <code>' + sibling.title + '</code></a></li>');
+          '<li><a href="#" data-btn="match-replicas" data-command="match-replicas" data-below-host="' + sibling.Key.Hostname + '" data-below-port="' + sibling.Key.Port + '">Match all replicas below <code>' + sibling.title + '</code></a></li>');
       });
     }
   }
@@ -1590,14 +1590,14 @@ function Cluster() {
         addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on ' + getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port) + ' is blocked due to a <a href="' + appUrl('/web/audit-recovery/cluster/' + blockedRecovery.ClusterName) + '">previous recovery</a>');
       });
     });
-    getData("/api/cluster-osc-slaves/" + currentClusterName(), function(instances) {
+    getData("/api/cluster-osc-replicas/" + currentClusterName(), function(instances) {
       var instancesMap = normalizeInstances(instances, Array());
       var instancesTitles = Array();
       instances.forEach(function(instance) {
         instancesTitles.push(instance.title);
       });
       var instancesTitlesConcatenates = instancesTitles.join(" ");
-      var content = "Heuristic list of OSC controller slaves: <pre>" + instancesTitlesConcatenates + "</pre>";;
+      var content = "Heuristic list of OSC controller replicas: <pre>" + instancesTitlesConcatenates + "</pre>";;
       addSidebarInfoPopoverContent(content);
     });
 
@@ -1615,8 +1615,8 @@ function Cluster() {
     $("body").on("click", "a[data-command=change-cluster-alias]", function(event) {
       promptForAlias($(event.target).attr("data-alias"));
     });
-    $("body").on("click", "a[data-command=cluster-osc-slaves]", function(event) {
-      showOSCSlaves();
+    $("body").on("click", "a[data-command=cluster-osc-replicas]", function(event) {
+      showOSCReplicas();
     });
     $("body").on("click", "a[data-command=pool-indicator]", function(event) {
       if ($.cookie("pool-indicator") == "true") {

@@ -272,7 +272,9 @@ function openNodeModal(node) {
   if (node.MasterKey.Hostname) {
     var td = addNodeModalDataAttribute("Master", node.masterTitle);
     if (node.IsDetachedMaster) {
-      $('#node_modal button[data-btn=reattach-slave-master-host]').appendTo(td.find("div"))
+      $('#node_modal button[data-btn=reattach-replica-master-host]').appendTo(td.find("div"));
+    } else {
+      $('#node_modal button[data-btn=reattach-replica-master-host]').appendTo(hiddenZone);
     }
     $('#node_modal button[data-btn=reset-slave]').appendTo(td.find("div"))
 
@@ -310,24 +312,24 @@ function openNodeModal(node) {
       }
     }, "json");
     if (node.IsDetached) {
-      $('#node_modal button[data-btn=detach-slave]').appendTo(hiddenZone)
-      $('#node_modal button[data-btn=reattach-slave]').appendTo(masterCoordinatesEl.find("div"))
+      $('#node_modal button[data-btn=detach-replica]').appendTo(hiddenZone)
+      $('#node_modal button[data-btn=reattach-replica]').appendTo(masterCoordinatesEl.find("div"))
     } else {
-      $('#node_modal button[data-btn=detach-slave]').appendTo(masterCoordinatesEl.find("div"))
-      $('#node_modal button[data-btn=reattach-slave]').appendTo(hiddenZone)
+      $('#node_modal button[data-btn=detach-replica]').appendTo(masterCoordinatesEl.find("div"))
+      $('#node_modal button[data-btn=reattach-replica]').appendTo(hiddenZone)
     }
   } else {
     $('#node_modal button[data-btn=reset-slave]').appendTo(hiddenZone);
-    $('#node_modal button[data-btn=reattach-slave-master-host]').appendTo(hiddenZone);
+    $('#node_modal button[data-btn=reattach-replica-master-host]').appendTo(hiddenZone);
     $('#node_modal button[data-btn=skip-query]').appendTo(hiddenZone);
-    $('#node_modal button[data-btn=detach-slave]').appendTo(hiddenZone)
-    $('#node_modal button[data-btn=reattach-slave]').appendTo(hiddenZone)
+    $('#node_modal button[data-btn=detach-replica]').appendTo(hiddenZone)
+    $('#node_modal button[data-btn=reattach-replica]').appendTo(hiddenZone)
   }
   if (node.LogBinEnabled) {
     addNodeModalDataAttribute("Self coordinates", node.SelfBinlogCoordinates.LogFile + ":" + node.SelfBinlogCoordinates.LogPos);
   }
-  var td = addNodeModalDataAttribute("Num slaves", node.SlaveHosts.length);
-  $('#node_modal button[data-btn=regroup-slaves]').appendTo(td.find("div"))
+  var td = addNodeModalDataAttribute("Num replicas", node.SlaveHosts.length);
+  $('#node_modal button[data-btn=regroup-replicas]').appendTo(td.find("div"))
   addNodeModalDataAttribute("Server ID", node.ServerID);
   if (node.ServerUUID) {
     addNodeModalDataAttribute("Server UUID", node.ServerUUID);
@@ -341,7 +343,7 @@ function openNodeModal(node) {
   if (node.LogBinEnabled) {
     addNodeModalDataAttribute("Binlog format", node.Binlog_format);
     var td = addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
-    $('#node_modal button[data-btn=enslave-siblings]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=take-siblings]').appendTo(td.find("div"))
   }
 
   var td = addNodeModalDataAttribute("GTID based replication", booleanString(node.usingGTID));
@@ -396,14 +398,14 @@ function openNodeModal(node) {
   $('#node_modal [data-btn=stop-slave-nice]').click(function() {
     apiCommand("/api/stop-slave-nice/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-  $('#node_modal button[data-btn=detach-slave]').click(function() {
-    apiCommand("/api/detach-slave/" + node.Key.Hostname + "/" + node.Key.Port);
+  $('#node_modal button[data-btn=detach-replica]').click(function() {
+    apiCommand("/api/detach-replica/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-  $('#node_modal button[data-btn=reattach-slave]').click(function() {
-    apiCommand("/api/reattach-slave/" + node.Key.Hostname + "/" + node.Key.Port);
+  $('#node_modal button[data-btn=reattach-replica]').click(function() {
+    apiCommand("/api/reattach-replica/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-  $('#node_modal button[data-btn=reattach-slave-master-host]').click(function() {
-    apiCommand("/api/reattach-slave-master-host/" + node.Key.Hostname + "/" + node.Key.Port);
+  $('#node_modal button[data-btn=reattach-replica-master-host]').click(function() {
+    apiCommand("/api/reattach-replica-master-host/" + node.Key.Hostname + "/" + node.Key.Port);
   });
   $('#node_modal button[data-btn=reset-slave]').click(function() {
     var message = "<p>Are you sure you wish to reset <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
@@ -508,32 +510,32 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=enable-gtid]').show();
   }
 
-  $('#node_modal button[data-btn=regroup-slaves]').hide();
+  $('#node_modal button[data-btn=regroup-replicas]').hide();
   if (node.SlaveHosts.length > 1) {
-    $('#node_modal button[data-btn=regroup-slaves]').show();
+    $('#node_modal button[data-btn=regroup-replicas]').show();
   }
-  $('#node_modal button[data-btn=regroup-slaves]').click(function() {
-    var message = "<p>Are you sure you wish to regroup slaves of <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+  $('#node_modal button[data-btn=regroup-replicas]').click(function() {
+    var message = "<p>Are you sure you wish to regroup replicas of <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code>?" +
-      "<p>This will attempt to promote one slave over its siblings";
+      "<p>This will attempt to promote one replica over its siblings";
     bootbox.confirm(message, function(confirm) {
       if (confirm) {
-        apiCommand("/api/regroup-slaves/" + node.Key.Hostname + "/" + node.Key.Port);
+        apiCommand("/api/regroup-replicas/" + node.Key.Hostname + "/" + node.Key.Port);
       }
     });
   });
 
-  $('#node_modal button[data-btn=enslave-siblings]').hide();
+  $('#node_modal button[data-btn=take-siblings]').hide();
   if (node.LogBinEnabled && node.LogSlaveUpdatesEnabled) {
-    $('#node_modal button[data-btn=enslave-siblings]').show();
+    $('#node_modal button[data-btn=take-siblings]').show();
   }
-  $('#node_modal button[data-btn=enslave-siblings]').click(function() {
+  $('#node_modal button[data-btn=take-siblings]').click(function() {
     var message = "<p>Are you sure you want <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
-      "</strong></code> to enslave its siblings?" +
-      "<p>This will stop replication on this slave and on its siblings throughout the operation";
+      "</strong></code> to take its siblings?" +
+      "<p>This will stop replication on this replica and on its siblings throughout the operation";
     bootbox.confirm(message, function(confirm) {
       if (confirm) {
-        apiCommand("/api/enslave-siblings/" + node.Key.Hostname + "/" + node.Key.Port);
+        apiCommand("/api/take-siblings/" + node.Key.Hostname + "/" + node.Key.Port);
       }
     });
   });
@@ -636,13 +638,13 @@ function normalizeInstanceProblem(instance) {
     instance.problemDescription = "Orchestrator has not made an attempt to reach this instance for a while now.\nThis should generally not happen; consider refreshing or re-discovering this instance";
     instance.problemOrder = 3;
   } else if (instance.notReplicatingProblem()) {
-    // check slaves only; where not replicating
+    // check replicas only; where not replicating
     instance.problem = "not_replicating";
     instance.problemDescription = "Replication is not running.\nEither stopped manually or is failing on I/O or SQL error.";
     instance.problemOrder = 4;
   } else if (instance.replicationLagProblem()) {
     instance.problem = "replication_lag";
-    instance.problemDescription = "Slave is lagging in replication.\nThis diagnostic is based on either Seconds_behind_master or configured SlaveLagQuery";
+    instance.problemDescription = "Replica is lagging.\nThis diagnostic is based on either Seconds_behind_master or configured ReplicationLagQuery";
     instance.problemOrder = 5;
   }
   instance.hasProblem = (instance.problem != null);
@@ -803,7 +805,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-pencil" title="Writeable"></span> ');
     }
     if (instance.isMostAdvancedOfSiblings) {
-      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-star" title="Most advanced slave"></span> ');
+      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-star" title="Most advanced replica"></span> ');
     }
     if (instance.CountMySQLSnapshots > 0) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-camera" title="' + instance.CountMySQLSnapshots + ' snapshots"></span> ');
@@ -835,7 +837,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
       instance.renderHint = "stale";
       indicateLastSeenInStatus = true;
     } else if (instance.notReplicatingProblem()) {
-      // check slaves only; check master only if it's co-master where not
+      // check replicas only; check master only if it's co-master where not
       // replicating
       instance.renderHint = "danger";
     } else if (instance.replicationLagProblem()) {
