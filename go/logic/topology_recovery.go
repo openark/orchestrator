@@ -210,7 +210,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 	if err != nil {
 		return promotedSlave, log.Errore(err)
 	}
-	// Find candidate slave
+	// Find candidate replica
 	promotedSlave, err = inst.GetCandidateSlaveOfBinlogServerTopology(&promotedBinlogServer.Key)
 	if err != nil {
 		return promotedSlave, log.Errore(err)
@@ -392,7 +392,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 	}
 	// We didn't pick the ideal candidate; let's see if we can replace with a candidate from same DC and ENV
 	if candidateInstanceKey == nil {
-		// Try a candidate slave that is in same DC & env as the dead instance
+		// Try a candidate replica that is in same DC & env as the dead instance
 		if deadInstance, _, err := inst.ReadInstance(deadInstanceKey); err == nil && deadInstance != nil {
 			for _, candidateSlave := range candidateSlaves {
 				if candidateSlave.DataCenter == deadInstance.DataCenter &&
@@ -409,7 +409,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 		// We cannot find a candidate in same DC and ENV as dead master
 		for _, candidateSlave := range candidateSlaves {
 			if promotedSlave.Key.Equals(&candidateSlave.Key) {
-				// Seems like we promoted a candidate slave (though not in same DC and ENV as dead master). Good enough.
+				// Seems like we promoted a candidate replica (though not in same DC and ENV as dead master). Good enough.
 				// No further action required.
 				log.Infof("topology_recovery: promoted slave %+v is a good candidate", promotedSlave.Key)
 				return promotedSlave, nil
@@ -418,7 +418,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 	}
 	// Still nothing?
 	if candidateInstanceKey == nil {
-		// Try a candidate slave that is in same DC & env as the promoted slave (our promoted slave is not an "is_candidate")
+		// Try a candidate replica that is in same DC & env as the promoted slave (our promoted slave is not an "is_candidate")
 		for _, candidateSlave := range candidateSlaves {
 			if promotedSlave.DataCenter == candidateSlave.DataCenter &&
 				promotedSlave.PhysicalEnvironment == candidateSlave.PhysicalEnvironment &&
@@ -688,7 +688,7 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 		}
 	}
 	if !recoveryResolved {
-		// Do we still have leftovers? Some slaves couldn't move? Couldn't regroup? Only left with regroup's resulting leader?
+		// Do we still have leftovers? some replicas couldn't move? Couldn't regroup? Only left with regroup's resulting leader?
 		// nothing moved?
 		// We don't care much if regroup made it or not. We prefer that it made it, in whcih case we only need to relocate up
 		// one slave, but the operation is still valid if regroup partially/completely failed. We just promote anything

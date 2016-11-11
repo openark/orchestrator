@@ -351,7 +351,7 @@ func (this *HttpAPI) MoveUp(params martini.Params, r render.Render, req *http.Re
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v moved up", instanceKey), Details: instance})
 }
 
-// MoveUpSlaves attempts to move up all slaves of an instance
+// MoveUpSlaves attempts to move up all replicas of an instance
 func (this *HttpAPI) MoveUpSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -372,7 +372,7 @@ func (this *HttpAPI) MoveUpSlaves(params martini.Params, r render.Render, req *h
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Moved up %d slaves of %+v below %+v; %d errors: %+v", len(slaves), instanceKey, newMaster.Key, len(errs), errs), Details: newMaster.Key})
 }
 
-// MoveUpSlaves attempts to move up all slaves of an instance
+// MoveUpSlaves attempts to move up all replicas of an instance
 func (this *HttpAPI) RepointSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -824,7 +824,7 @@ func (this *HttpAPI) MatchUp(params martini.Params, r render.Render, req *http.R
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v matched up at %+v", instanceKey, *matchedCoordinates), Details: instance})
 }
 
-// MultiMatchSlaves attempts to match all slaves of a given instance below another, efficiently
+// MultiMatchSlaves attempts to match all replicas of a given instance below another, efficiently
 func (this *HttpAPI) MultiMatchSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -850,7 +850,7 @@ func (this *HttpAPI) MultiMatchSlaves(params martini.Params, r render.Render, re
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Matched %d slaves of %+v below %+v; %d errors: %+v", len(slaves), instanceKey, newMaster.Key, len(errs), errs), Details: newMaster.Key})
 }
 
-// MatchUpSlaves attempts to match up all slaves of an instance
+// MatchUpSlaves attempts to match up all replicas of an instance
 func (this *HttpAPI) MatchUpSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})

@@ -352,7 +352,7 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 
 	// If async fallback is disallowed, we'd better make sure to enable slaves to
 	// send ACKs before START SLAVE. Slave ACKing is off at mysqld startup because
-	// some slaves (those that must never be promoted) should never ACK.
+	// some replicas (those that must never be promoted) should never ACK.
 	// Note: We assume that slaves use 'skip-slave-start' so they won't
 	//       START SLAVE on their own upon restart.
 	if instance.SemiSyncEnforced {

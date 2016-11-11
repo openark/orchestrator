@@ -293,8 +293,8 @@ Cleanup:
 	return instance, err
 }
 
-// MoveUpSlaves will attempt moving up all slaves of a given instance, at the same time.
-// Clock-time, this is fater than moving one at a time. However this means all slaves of the given instance, and the instance itself,
+// MoveUpSlaves will attempt moving up all replicas of a given instance, at the same time.
+// Clock-time, this is fater than moving one at a time. However this means all replicas of the given instance, and the instance itself,
 // will all stop replicating together.
 func MoveUpSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), *Instance, error, []error) {
 	res := [](*Instance){}
@@ -633,7 +633,7 @@ func moveSlavesViaGTID(slaves [](*Instance), other *Instance) (movedSlaves [](*I
 	return movedSlaves, unmovedSlaves, err, errs
 }
 
-// MoveSlavesGTID will (attempt to) move all slaves of given master below given instance.
+// MoveSlavesGTID will (attempt to) move all replicas of given master below given instance.
 func MoveSlavesGTID(masterKey *InstanceKey, belowKey *InstanceKey, pattern string) (movedSlaves [](*Instance), unmovedSlaves [](*Instance), err error, errs []error) {
 	belowInstance, err := ReadTopologyInstance(belowKey)
 	if err != nil {
@@ -806,14 +806,14 @@ func RepointSlavesTo(instanceKey *InstanceKey, pattern string, belowKey *Instanc
 		return res, nil, errs
 	}
 	if belowKey == nil {
-		// Default to existing master. All slaves are of the same master, hence just pick one.
+		// Default to existing master. All replicas are of the same master, hence just pick one.
 		belowKey = &slaves[0].MasterKey
 	}
 	log.Infof("Will repoint slaves of %+v to %+v", *instanceKey, *belowKey)
 	return RepointTo(slaves, belowKey)
 }
 
-// RepointSlaves repoints all slaves of a given instance onto its existing master.
+// RepointSlaves repoints all replicas of a given instance onto its existing master.
 func RepointSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), error, []error) {
 	return RepointSlavesTo(instanceKey, pattern, nil)
 }
@@ -1832,7 +1832,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 	return res, belowInstance, err, errs
 }
 
-// MultiMatchSlaves will match (via pseudo-gtid) all slaves of given master below given instance.
+// MultiMatchSlaves will match (via pseudo-gtid) all replicas of given master below given instance.
 func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey, pattern string) ([](*Instance), *Instance, error, []error) {
 	res := [](*Instance){}
 	errs := []error{}
@@ -1908,7 +1908,7 @@ func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instan
 	return MatchBelow(instanceKey, &master.MasterKey, requireInstanceMaintenance)
 }
 
-// MatchUpSlaves will move all slaves of given master up the replication chain,
+// MatchUpSlaves will move all replicas of given master up the replication chain,
 // so that they become siblings of their master.
 // This should be called when the local master dies, and all its slaves are to be resurrected via Pseudo-GTID
 func MatchUpSlaves(masterKey *InstanceKey, pattern string) ([](*Instance), *Instance, error, []error) {
@@ -2068,7 +2068,7 @@ func chooseCandidateSlave(slaves [](*Instance)) (candidateSlave *Instance, ahead
 		if candidateSlave != nil {
 			slaves = RemoveInstance(slaves, &candidateSlave.Key)
 		}
-		return candidateSlave, slaves, equalSlaves, laterSlaves, cannotReplicateSlaves, fmt.Errorf("chooseCandidateSlave: no candidate slave found")
+		return candidateSlave, slaves, equalSlaves, laterSlaves, cannotReplicateSlaves, fmt.Errorf("chooseCandidateSlave: no candidate replica found")
 	}
 	slaves = RemoveInstance(slaves, &candidateSlave.Key)
 	for _, slave := range slaves {
@@ -2134,14 +2134,14 @@ func GetCandidateSlaveOfBinlogServerTopology(masterKey *InstanceKey) (candidateS
 		}
 	}
 	if candidateSlave != nil {
-		log.Debugf("GetCandidateSlaveOfBinlogServerTopology: returning %+v as candidate slave for %+v", candidateSlave.Key, *masterKey)
+		log.Debugf("GetCandidateSlaveOfBinlogServerTopology: returning %+v as candidate replica for %+v", candidateSlave.Key, *masterKey)
 	} else {
-		log.Debugf("GetCandidateSlaveOfBinlogServerTopology: no candidate slave found for %+v", *masterKey)
+		log.Debugf("GetCandidateSlaveOfBinlogServerTopology: no candidate replica found for %+v", *masterKey)
 	}
 	return candidateSlave, err
 }
 
-// RegroupSlavesPseudoGTID will choose a candidate slave of a given instance, and enslave its siblings using pseudo-gtid
+// RegroupSlavesPseudoGTID will choose a candidate replica of a given instance, and enslave its siblings using pseudo-gtid
 func RegroupSlavesPseudoGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), [](*Instance), *Instance, error) {
 	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err := GetCandidateSlave(masterKey, true)
 	if err != nil {
@@ -2163,8 +2163,8 @@ func RegroupSlavesPseudoGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToR
 	barrier := make(chan *InstanceKey)
 	for _, slave := range equalSlaves {
 		slave := slave
-		// This replica has the exact same executing coordinates as the candidate slave. This replica
-		// is *extremely* easy to attach below the candidate slave!
+		// This replica has the exact same executing coordinates as the candidate replica. This replica
+		// is *extremely* easy to attach below the candidate replica!
 		go func() {
 			defer func() { barrier <- &candidateSlave.Key }()
 			ExecuteOnTopology(func() {
@@ -2239,41 +2239,41 @@ func RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers(masterKey *Instanc
 		}
 		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: most up to date binlog server of %+v: %+v", *masterKey, mostUpToDateBinlogServer.Key)
 
-		// Find the most up to date candidate slave:
+		// Find the most up to date candidate replica:
 		candidateSlave, _, _, _, _, err := GetCandidateSlave(masterKey, true)
 		if err != nil {
 			return log.Errore(err)
 		}
 		if candidateSlave == nil {
-			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: no candidate slave for %+v", *masterKey)
+			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: no candidate replica for %+v", *masterKey)
 			// Let the followup code handle that
 			return nil
 		}
-		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: candidate slave of %+v: %+v", *masterKey, candidateSlave.Key)
+		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: candidate replica of %+v: %+v", *masterKey, candidateSlave.Key)
 
 		if candidateSlave.ExecBinlogCoordinates.SmallerThan(&mostUpToDateBinlogServer.ExecBinlogCoordinates) {
-			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: candidate slave %+v coordinates smaller than binlog server %+v", candidateSlave.Key, mostUpToDateBinlogServer.Key)
+			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: candidate replica %+v coordinates smaller than binlog server %+v", candidateSlave.Key, mostUpToDateBinlogServer.Key)
 			// Need to align under binlog server...
 			candidateSlave, err = Repoint(&candidateSlave.Key, &mostUpToDateBinlogServer.Key, GTIDHintDeny)
 			if err != nil {
 				return log.Errore(err)
 			}
-			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: repointed candidate slave %+v under binlog server %+v", candidateSlave.Key, mostUpToDateBinlogServer.Key)
+			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: repointed candidate replica %+v under binlog server %+v", candidateSlave.Key, mostUpToDateBinlogServer.Key)
 			candidateSlave, err = StartSlaveUntilMasterCoordinates(&candidateSlave.Key, &mostUpToDateBinlogServer.ExecBinlogCoordinates)
 			if err != nil {
 				return log.Errore(err)
 			}
-			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: aligned candidate slave %+v under binlog server %+v", candidateSlave.Key, mostUpToDateBinlogServer.Key)
+			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: aligned candidate replica %+v under binlog server %+v", candidateSlave.Key, mostUpToDateBinlogServer.Key)
 			// and move back
 			candidateSlave, err = Repoint(&candidateSlave.Key, masterKey, GTIDHintDeny)
 			if err != nil {
 				return log.Errore(err)
 			}
-			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: repointed candidate slave %+v under master %+v", candidateSlave.Key, *masterKey)
+			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: repointed candidate replica %+v under master %+v", candidateSlave.Key, *masterKey)
 			return nil
 		}
 		// Either because it _was_ like that, or we _made_ it so,
-		// candidate slave is as/more up to date than all binlog servers
+		// candidate replica is as/more up to date than all binlog servers
 		for _, binlogServer := range binlogServerSlaves {
 			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: matching slaves of binlog server %+v below %+v", binlogServer.Key, candidateSlave.Key)
 			// Right now sequentially.
@@ -2289,7 +2289,7 @@ func RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers(masterKey *Instanc
 	return RegroupSlavesPseudoGTID(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen, postponedFunctionsContainer)
 }
 
-// RegroupSlavesGTID will choose a candidate slave of a given instance, and enslave its siblings using GTID
+// RegroupSlavesGTID will choose a candidate replica of a given instance, and enslave its siblings using GTID
 func RegroupSlavesGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance)) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
 	var emptySlaves [](*Instance)
 	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err := GetCandidateSlave(masterKey, true)
