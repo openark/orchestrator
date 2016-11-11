@@ -644,7 +644,7 @@ function normalizeInstanceProblem(instance) {
     instance.problemOrder = 4;
   } else if (instance.replicationLagProblem()) {
     instance.problem = "replication_lag";
-    instance.problemDescription = "Slave is lagging in replication.\nThis diagnostic is based on either Seconds_behind_master or configured SlaveLagQuery";
+    instance.problemDescription = "Replica is lagging.\nThis diagnostic is based on either Seconds_behind_master or configured ReplicationLagQuery";
     instance.problemOrder = 5;
   }
   instance.hasProblem = (instance.problem != null);
