@@ -232,16 +232,16 @@ function Cluster() {
       var trailerEl = $('<div class="instance-trailer" data-nodeid="' + node.id + '"><div><span class="glyphicon glyphicon-chevron-left" title="Drag and drop replicas of this instance"></span></div></div>').appendTo(instanceEl);
       instanceEl.data("instance-trailer", trailerEl);
       var numReplicas = 0;
-      node.children.forEach(function(slave) {
-        if (slave.isAggregate) {
-          numReplicas += slave.aggregatedInstances.length;
+      node.children.forEach(function(replica) {
+        if (replica.isAggregate) {
+          numReplicas += replica.aggregatedInstances.length;
         } else {
           numReplicas += 1;
         }
       });
-      var numReplicasMessage = ((numReplicas == 1) ? "1 slave" : "" + numReplicas + " slaves");
+      var numReplicasMessage = ((numReplicas == 1) ? "1 replica" : "" + numReplicas + " replicas");
       trailerEl.getAppend(".instance-trailer-title").text(numReplicasMessage);
-      trailerEl.getAppend(".instance-trailer-content").text("Drag to move slaves");
+      trailerEl.getAppend(".instance-trailer-content").text("Drag to move replicas");
     }
     if ($.cookie("colorize-dc") == "true") {
       var dcColor = dcColorsMap[node.DataCenter];
@@ -571,7 +571,7 @@ function Cluster() {
           // Typically, when a node has a problem we do not allow moving it up.
           // But there's a special situation when allowing is desired: when the parent has personal issues,
           // (say disk issue or otherwise something heavyweight running which slows down replication)
-          // and you want to move up the slave which is only delayed by its master.
+          // and you want to move up the replica which is only delayed by its master.
           // So to help out, if the instance is identically at its master's trail, it is allowed to move up.
           if (!node.isSQLThreadCaughtUpWithIOThread) {
             return {
@@ -591,7 +591,7 @@ function Cluster() {
         if (node.hasProblem) {
           // Typically, when a node has a problem we do not allow moving it up.
           // But there's a special situation when allowing is desired: when
-          // this slave is completely caught up;
+          // this replica is completely caught up;
           if (!node.isSQLThreadCaughtUpWithIOThread) {
             return {
               accept: false
@@ -682,8 +682,8 @@ function Cluster() {
         };
       }
       if (instanceIsDescendant(droppableNode, node) && node.children.length <= 1) {
-        // Can generally move slaves onto one of them, but there needs to be at least two slaves...
-        // Otherwise we;re trying to mvoe a slave under itself which is clearly an error.
+        // Can generally move replicas onto one of them, but there needs to be at least two replicas...
+        // Otherwise we;re trying to mvoe a replica under itself which is clearly an error.
         return {
           accept: false
         };
@@ -701,11 +701,11 @@ function Cluster() {
     var gtidBelowFunc = null;
     var gtidOperationName = "";
     if (moveInstanceMethod == "pseudo-gtid") {
-      gtidBelowFunc = matchSlaves;
+      gtidBelowFunc = matchReplicas;
       gtidOperationName = "match";
     }
     if (moveInstanceMethod == "gtid") {
-      gtidBelowFunc = moveSlavesGTID;
+      gtidBelowFunc = moveReplicasGTID;
       gtidOperationName = "move:gtid";
     }
     if (gtidBelowFunc != null) {
@@ -736,8 +736,8 @@ function Cluster() {
         };
       }
       if (instanceIsDescendant(droppableNode, node) && node.children.length <= 1) {
-        // Can generally move slaves onto one of them, but there needs to be at least two slaves...
-        // Otherwise we;re trying to mvoe a slave under itself which is clearly an error.
+        // Can generally move replicas onto one of them, but there needs to be at least two replicas...
+        // Otherwise we;re trying to mvoe a replica under itself which is clearly an error.
         // Wrong direction!
         return {
           accept: false
@@ -789,12 +789,12 @@ function Cluster() {
     }
     if (shouldApply) {
       addAlert(
-        "Cannot move slaves of <code><strong>" +
+        "Cannot move replicas of <code><strong>" +
         node.Key.Hostname + ":" + node.Key.Port +
         "</strong></code> under <code><strong>" +
         droppableNode.Key.Hostname + ":" + droppableNode.Key.Port +
         "</strong></code>. " +
-        "You may only repoint or move up the slaves of an instance. Otherwise try Smart Mode."
+        "You may only repoint or move up the replicas of an instance. Otherwise try Smart Mode."
       );
     }
     return {
@@ -825,7 +825,7 @@ function Cluster() {
   function relocate(node, siblingNode) {
     var message = "<h4>relocate</h4>Are you sure you wish to turn <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
-      "</strong></code> into a slave of <code><strong>" +
+      "</strong></code> into a replica of <code><strong>" +
       siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
       "</strong></code>?" +
       "<h4>Note</h4><p>Orchestrator will try and figure out the best relocation path. This may involve multiple steps. " +
@@ -880,7 +880,7 @@ function Cluster() {
   function moveBelow(node, siblingNode) {
     var message = "<h4>move-below</h4>Are you sure you wish to turn <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
-      "</strong></code> into a slave of <code><strong>" +
+      "</strong></code> into a replica of <code><strong>" +
       siblingNode.Key.Hostname + ":" + siblingNode.Key.Port +
       "</strong></code>?";
     var apiUrl = "/api/move-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + siblingNode.Key.Hostname + "/" + siblingNode.Key.Port;
@@ -890,7 +890,7 @@ function Cluster() {
   function moveUp(node, grandparentNode) {
     var message = "<h4>move-up</h4>Are you sure you wish to turn <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
-      "</strong></code> into a slave of <code><strong>" +
+      "</strong></code> into a replica of <code><strong>" +
       grandparentNode.Key.Hostname + ":" + grandparentNode.Key.Port +
       "</strong></code>?";
     var apiUrl = "/api/move-up/" + node.Key.Hostname + "/" + node.Key.Port;
@@ -920,7 +920,7 @@ function Cluster() {
   function matchBelow(node, otherNode) {
     var message = "<h4>PSEUDO-GTID MODE, match-below</h4>Are you sure you wish to turn <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
-      "</strong></code> into a slave of <code><strong>" +
+      "</strong></code> into a replica of <code><strong>" +
       otherNode.Key.Hostname + ":" + otherNode.Key.Port +
       "</strong></code>?";
     var apiUrl = "/api/match-below/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
@@ -937,7 +937,7 @@ function Cluster() {
     return executeMoveOperation(message, apiUrl);
   }
 
-  function moveSlavesGTID(node, otherNode) {
+  function moveReplicasGTID(node, otherNode) {
     var message = "<h4>GTID MODE, move-replicas</h4>Are you sure you wish to move replicas of <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code> below <code><strong>" +
@@ -1130,7 +1130,7 @@ function Cluster() {
     instances.forEach(function(instance) {
       if (!instance.hasConnectivityProblem)
         return;
-      // The instance has a connectivity problem! Do a client-side recommendation of most advanced slave:
+      // The instance has a connectivity problem! Do a client-side recommendation of most advanced replica:
       // a direct child of the master, with largest exec binlog coordinates.
       var sortedChildren = instance.children.slice();
       sortedChildren.sort(compareInstancesExecBinlogCoordinates)
@@ -1141,7 +1141,7 @@ function Cluster() {
             child.isMostAdvancedOfSiblings = true;
             if (instance.isMaster && !instance.isCoMaster) {
               // Moreover, the instance is the (only) master!
-              // Therefore its most advanced slaves are candidate masters
+              // Therefore its most advanced replicas are candidate masters
               child.isCandidateMaster = true;
             }
           }
@@ -1387,24 +1387,24 @@ function Cluster() {
     }
     if (instance.isMaster) {
       // Suggest successor
-      instance.children.forEach(function(slave) {
-        if (!slave.LogBinEnabled) {
+      instance.children.forEach(function(replica) {
+        if (!replica.LogBinEnabled) {
           return
         }
-        if (slave.SQLDelay > 0) {
+        if (replica.SQLDelay > 0) {
           return
         }
-        if (!slave.LogSlaveUpdatesEnabled) {
+        if (!replica.LogSlaveUpdatesEnabled) {
           return
         }
-        if (slave.lastCheckInvalidProblem()) {
+        if (replica.lastCheckInvalidProblem()) {
           return
         }
-        if (slave.notRecentlyCheckedProblem()) {
+        if (replica.notRecentlyCheckedProblem()) {
           return
         }
         recoveryListing.append(
-          '<li><a href="#" data-btn="recover-suggested-successor" data-command="recover-suggested-successor" data-suggested-successor-host="' + slave.Key.Hostname + '" data-suggested-successor-port="' + slave.Key.Port + '">Regroup replicas, try to promote <code>' + slave.title + '</code></a></li>');
+          '<li><a href="#" data-btn="recover-suggested-successor" data-command="recover-suggested-successor" data-suggested-successor-host="' + replica.Key.Hostname + '" data-suggested-successor-port="' + replica.Key.Port + '">Regroup replicas, try to promote <code>' + replica.title + '</code></a></li>');
       });
     }
     if (instance.masterNode) {

@@ -328,7 +328,7 @@ function openNodeModal(node) {
   if (node.LogBinEnabled) {
     addNodeModalDataAttribute("Self coordinates", node.SelfBinlogCoordinates.LogFile + ":" + node.SelfBinlogCoordinates.LogPos);
   }
-  var td = addNodeModalDataAttribute("Num slaves", node.SlaveHosts.length);
+  var td = addNodeModalDataAttribute("Num replicas", node.SlaveHosts.length);
   $('#node_modal button[data-btn=regroup-replicas]').appendTo(td.find("div"))
   addNodeModalDataAttribute("Server ID", node.ServerID);
   if (node.ServerUUID) {
@@ -517,7 +517,7 @@ function openNodeModal(node) {
   $('#node_modal button[data-btn=regroup-replicas]').click(function() {
     var message = "<p>Are you sure you wish to regroup replicas of <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code>?" +
-      "<p>This will attempt to promote one slave over its siblings";
+      "<p>This will attempt to promote one replica over its siblings";
     bootbox.confirm(message, function(confirm) {
       if (confirm) {
         apiCommand("/api/regroup-replicas/" + node.Key.Hostname + "/" + node.Key.Port);
@@ -532,7 +532,7 @@ function openNodeModal(node) {
   $('#node_modal button[data-btn=take-siblings]').click(function() {
     var message = "<p>Are you sure you want <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
       "</strong></code> to take its siblings?" +
-      "<p>This will stop replication on this slave and on its siblings throughout the operation";
+      "<p>This will stop replication on this replica and on its siblings throughout the operation";
     bootbox.confirm(message, function(confirm) {
       if (confirm) {
         apiCommand("/api/take-siblings/" + node.Key.Hostname + "/" + node.Key.Port);
@@ -638,7 +638,7 @@ function normalizeInstanceProblem(instance) {
     instance.problemDescription = "Orchestrator has not made an attempt to reach this instance for a while now.\nThis should generally not happen; consider refreshing or re-discovering this instance";
     instance.problemOrder = 3;
   } else if (instance.notReplicatingProblem()) {
-    // check slaves only; where not replicating
+    // check replicas only; where not replicating
     instance.problem = "not_replicating";
     instance.problemDescription = "Replication is not running.\nEither stopped manually or is failing on I/O or SQL error.";
     instance.problemOrder = 4;
@@ -805,7 +805,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-pencil" title="Writeable"></span> ');
     }
     if (instance.isMostAdvancedOfSiblings) {
-      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-star" title="Most advanced slave"></span> ');
+      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-star" title="Most advanced replica"></span> ');
     }
     if (instance.CountMySQLSnapshots > 0) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-camera" title="' + instance.CountMySQLSnapshots + ' snapshots"></span> ');
@@ -837,7 +837,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
       instance.renderHint = "stale";
       indicateLastSeenInStatus = true;
     } else if (instance.notReplicatingProblem()) {
-      // check slaves only; check master only if it's co-master where not
+      // check replicas only; check master only if it's co-master where not
       // replicating
       instance.renderHint = "danger";
     } else if (instance.replicationLagProblem()) {

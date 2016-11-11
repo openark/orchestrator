@@ -1274,7 +1274,7 @@ func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordin
 	}
 	if err != nil || instancePseudoGtidCoordinates == nil {
 		// Unable to find pseudo GTID in binary logs.
-		// Then MAYBE we are lucky enough (chances are we are, if this slave did not crash) that we can
+		// Then MAYBE we are lucky enough (chances are we are, if this replica did not crash) that we can
 		// extract the Pseudo GTID entry from the last (current) relay log file.
 		instancePseudoGtidCoordinates, instancePseudoGtidText, err = getLastPseudoGTIDEntryInRelayLogs(instance, minRelaylogCoordinates, recordedInstanceRelayLogCoordinates, exhaustiveSearch)
 	}
@@ -1736,8 +1736,8 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 						config.Config.PostponeSlaveRecoveryOnLagMinutes > 0 &&
 						slave.SQLDelay > config.Config.PostponeSlaveRecoveryOnLagMinutes*60 &&
 						len(bucketSlaves) == 1 {
-						// This slave is the only one in the bucket, AND it's lagging very much, AND
-						// we're configured to postpone operation on this slave so as not to delay everyone else.
+						// This replica is the only one in the bucket, AND it's lagging very much, AND
+						// we're configured to postpone operation on this replica so as not to delay everyone else.
 						(*postponedFunctionsContainer).AddPostponedFunction(matchFunc)
 						return
 						// We bail out and trust our invoker to later call upon this postponed function
@@ -1789,7 +1789,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 
 						var err error
 						if _, found := matchedSlaves[slave.Key]; found {
-							// Already matched this slave
+							// Already matched this replica
 							return
 						}
 						log.Debugf("MultiMatchBelow: Will match up %+v to previously matched master coordinates %+v", slave.Key, *bucketMatchedCoordinates)
@@ -1925,7 +1925,7 @@ func MatchUpSlaves(masterKey *InstanceKey, pattern string) ([](*Instance), *Inst
 
 func isGenerallyValidAsBinlogSource(slave *Instance) bool {
 	if !slave.IsLastCheckValid {
-		// something wrong with this slave right now. We shouldn't hope to be able to promote it
+		// something wrong with this replica right now. We shouldn't hope to be able to promote it
 		return false
 	}
 	if !slave.LogBinEnabled {
@@ -1955,7 +1955,7 @@ func isGenerallyValidAsCandidateSlave(slave *Instance) bool {
 // valid to promote to be master.
 func isValidAsCandidateMasterInBinlogServerTopology(slave *Instance) bool {
 	if !slave.IsLastCheckValid {
-		// something wrong with this slave right now. We shouldn't hope to be able to promote it
+		// something wrong with this replica right now. We shouldn't hope to be able to promote it
 		return false
 	}
 	if !slave.LogBinEnabled {
@@ -2163,7 +2163,7 @@ func RegroupSlavesPseudoGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToR
 	barrier := make(chan *InstanceKey)
 	for _, slave := range equalSlaves {
 		slave := slave
-		// This slave has the exact same executing coordinates as the candidate slave. This slave
+		// This replica has the exact same executing coordinates as the candidate slave. This replica
 		// is *extremely* easy to attach below the candidate slave!
 		go func() {
 			defer func() { barrier <- &candidateSlave.Key }()
