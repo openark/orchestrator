@@ -332,7 +332,7 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	return true, nil
 }
 
-// HasReasonableMaintenanceReplicationLag returns true when the slave lag is reasonable, and maintenance operations should have a green light to go.
+// HasReasonableMaintenanceReplicationLag returns true when the replica lag is reasonable, and maintenance operations should have a green light to go.
 func (this *Instance) HasReasonableMaintenanceReplicationLag() bool {
 	// replicas with SQLDelay are a special case
 	if this.SQLDelay > 0 {

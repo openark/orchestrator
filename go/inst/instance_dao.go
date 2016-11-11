@@ -1095,7 +1095,7 @@ func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
 
 		}
 		if len(intermediateMasters) == 2 {
-			// Pick one slave from each IM (should be possible)
+			// Pick one replica from each IM (should be possible)
 			for _, im := range intermediateMasters {
 				slaves, err := ReadSlaveInstances(&im.Key)
 				if err != nil {
@@ -1718,7 +1718,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 					instance_alias=VALUES(instance_alias)
 				`
 		} else {
-			// Scenario: some slave reported a master of his; but the master cannot be contacted.
+			// Scenario: some replica reported a master of his; but the master cannot be contacted.
 			// We might still want to have that master written down
 			// Use with caution
 			insertIgnore = `ignore`

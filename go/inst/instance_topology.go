@@ -177,13 +177,13 @@ func MoveEquivalent(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	if binlogCoordinates == nil {
 		return instance, fmt.Errorf("No equivalent coordinates found for %+v replicating from %+v at %+v", instance.Key, instance.MasterKey, instance.ExecBinlogCoordinates)
 	}
-	// For performance reasons, we did all the above before even checking the slave is stopped or stopping it at all.
+	// For performance reasons, we did all the above before even checking the replica is stopped or stopping it at all.
 	// This allows us to quickly skip the entire operation should there NOT be coordinates.
-	// To elaborate: if the slave is actually running AND making progress, it is unlikely/impossible for it to have
+	// To elaborate: if the replica is actually running AND making progress, it is unlikely/impossible for it to have
 	// equivalent coordinates, as the current coordinates are like to have never been seen.
 	// This excludes the case, for example, that the master is itself not replicating.
 	// Now if we DO get to happen on equivalent coordinates, we need to double check. For CHANGE MASTER to happen we must
-	// stop the slave anyhow. But then let's verify the position hasn't changed.
+	// stop the replica anyhow. But then let's verify the position hasn't changed.
 	knownExecBinlogCoordinates := instance.ExecBinlogCoordinates
 	instance, err = StopSlave(instanceKey)
 	if err != nil {
@@ -1268,7 +1268,7 @@ func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordin
 		// The approach is not to take chances. If log-slave-updates is disabled, fail and go for relay-logs.
 		// If log-slave-updates was just enabled then possibly no pseudo-gtid is found, and so again we will go
 		// for relay logs.
-		// Also, if master has STATEMENT binlog format, and the slave has ROW binlog format, then comparing binlog entries would urely fail if based on the slave's binary logs.
+		// Also, if master has STATEMENT binlog format, and the replica has ROW binlog format, then comparing binlog entries would urely fail if based on the slave's binary logs.
 		// Instead, we revert to the relay logs.
 		instancePseudoGtidCoordinates, instancePseudoGtidText, err = getLastPseudoGTIDEntryInInstance(instance, minBinlogCoordinates, maxBinlogCoordinates, exhaustiveSearch)
 	}
@@ -1558,7 +1558,7 @@ Cleanup:
 	return instance, err
 }
 
-// MakeLocalMaster promotes a replica above its master, making it slave of its grandparent, while also enslaving its siblings.
+// MakeLocalMaster promotes a replica above its master, making it replica of its grandparent, while also enslaving its siblings.
 // This serves as a convenience method to recover replication when a local master fails; the instance promoted is one of its slaves,
 // which is most advanced among its siblings.
 // This method utilizes Pseudo GTID
@@ -1626,7 +1626,7 @@ func getSlavesForSorting(masterKey *InstanceKey, includeBinlogServerSubSlaves bo
 }
 
 // sortedSlaves returns the list of replicas of some master, sorted by exec coordinates
-// (most up-to-date slave first).
+// (most up-to-date replica first).
 // This function assumes given `slaves` argument is indeed a list of instances all replicating
 // from the same master (the result of `getSlavesForSorting()` is appropriate)
 func sortedSlaves(slaves [](*Instance), shouldStopSlaves bool) [](*Instance) {
@@ -1696,7 +1696,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 
 	// Optimizations:
 	// replicas which broke on the same Exec-coordinates can be handled in the exact same way:
-	// we only need to figure out one slave of each group/bucket of exec-coordinates; then apply the CHANGE MASTER TO
+	// we only need to figure out one replica of each group/bucket of exec-coordinates; then apply the CHANGE MASTER TO
 	// on all its fellow members using same coordinates.
 	slaveBuckets := make(map[BinlogCoordinates][](*Instance))
 	for _, slave := range slaves {
@@ -1709,8 +1709,8 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 	}
 	matchedSlaves := make(map[InstanceKey]bool)
 	bucketsBarrier := make(chan *BinlogCoordinates)
-	// Now go over the buckets, and try a single slave from each bucket
-	// (though if one results with an error, synchronuously-for-that-bucket continue to the next slave in bucket)
+	// Now go over the buckets, and try a single replica from each bucket
+	// (though if one results with an error, synchronuously-for-that-bucket continue to the next replica in bucket)
 
 	for execCoordinates, bucketSlaves := range slaveBuckets {
 		execCoordinates := execCoordinates
@@ -1951,7 +1951,7 @@ func isGenerallyValidAsCandidateSlave(slave *Instance) bool {
 	return true
 }
 
-// isValidAsCandidateMasterInBinlogServerTopology let's us know whether a given slave is generally
+// isValidAsCandidateMasterInBinlogServerTopology let's us know whether a given replica is generally
 // valid to promote to be master.
 func isValidAsCandidateMasterInBinlogServerTopology(slave *Instance) bool {
 	if !slave.IsLastCheckValid {
@@ -2056,7 +2056,7 @@ func chooseCandidateSlave(slaves [](*Instance)) (candidateSlave *Instance, ahead
 	}
 	if candidateSlave == nil {
 		// Unable to find a candidate that will master others.
-		// Instead, pick a (single) slave which is not banned.
+		// Instead, pick a (single) replica which is not banned.
 		for _, slave := range slaves {
 			slave := slave
 			if !isBannedFromBeingCandidateSlave(slave) {
@@ -2086,7 +2086,7 @@ func chooseCandidateSlave(slaves [](*Instance)) (candidateSlave *Instance, ahead
 	return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err
 }
 
-// GetCandidateSlave chooses the best slave to promote given a (possibly dead) master
+// GetCandidateSlave chooses the best replica to promote given a (possibly dead) master
 func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instance, [](*Instance), [](*Instance), [](*Instance), [](*Instance), error) {
 	var candidateSlave *Instance
 	aheadSlaves := [](*Instance){}
@@ -2113,7 +2113,7 @@ func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instan
 	return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, nil
 }
 
-// GetCandidateSlaveOfBinlogServerTopology chooses the best slave to promote given a (possibly dead) master
+// GetCandidateSlaveOfBinlogServerTopology chooses the best replica to promote given a (possibly dead) master
 func GetCandidateSlaveOfBinlogServerTopology(masterKey *InstanceKey) (candidateSlave *Instance, err error) {
 	slaves, err := getSlavesForSorting(masterKey, true)
 	if err != nil {
@@ -2345,7 +2345,7 @@ func RegroupSlavesBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailure
 	return repointedBinlogServers, promotedBinlogServer, nil
 }
 
-// RegroupSlaves is a "smart" method of promoting one slave over the others ("promoting" it on top of its siblings)
+// RegroupSlaves is a "smart" method of promoting one replica over the others ("promoting" it on top of its siblings)
 // This method decides which strategy to use: GTID, Pseudo-GTID, Binlog Servers.
 func RegroupSlaves(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool,
 	onCandidateSlaveChosen func(*Instance),

@@ -411,7 +411,7 @@ func getNextBinlogEventsChunk(instance *Instance, startingCoordinates BinlogCoor
 	return events, err
 }
 
-// GetNextBinlogCoordinatesToMatch is given a twin-coordinates couple for a would-be slave (instanceKey) and another
+// GetNextBinlogCoordinatesToMatch is given a twin-coordinates couple for a would-be replica (instanceKey) and another
 // instance (otherKey).
 // This is part of the match-below process, and is the heart of the operation: matching the binlog events starting
 // the twin-coordinates (where both share the same Pseudo-GTID) until "instance" runs out of entries, hopefully

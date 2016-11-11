@@ -145,10 +145,10 @@ func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
 }
 
 // GetSlaveRestartPreserveStatements returns a sequence of statements that make sure a replica is stopped
-// and then returned to the same state. For example, if the slave was fully running, this will issue
+// and then returned to the same state. For example, if the replica was fully running, this will issue
 // a STOP on both io_thread and sql_thread, followed by START on both. If one of them is not running
 // at the time this function is called, said thread will be neither stopped nor started.
-// The caller may provide an injected statememt, to be executed while the slave is stopped.
+// The caller may provide an injected statememt, to be executed while the replica is stopped.
 // This is useful for CHANGE MASTER TO commands, that unfortunately must take place while the slave
 // is completely stopped.
 func GetSlaveRestartPreserveStatements(instanceKey *InstanceKey, injectedStatement string) (statements []string, err error) {
@@ -235,7 +235,7 @@ func PurgeBinaryLogsToCurrent(instanceKey *InstanceKey) (*Instance, error) {
 
 // StopSlaveNicely stops a replica such that SQL_thread and IO_thread are aligned (i.e.
 // SQL_thread consumes all relay log entries)
-// It will actually START the sql_thread even if the slave is completely stopped.
+// It will actually START the sql_thread even if the replica is completely stopped.
 func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -271,7 +271,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	}
 	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave`)
 	if err != nil {
-		// Patch; current MaxScale behavior for STOP SLAVE is to throw an error if slave already stopped.
+		// Patch; current MaxScale behavior for STOP SLAVE is to throw an error if replica already stopped.
 		if instance.isMaxScale() && err.Error() == "Error 1199: Slave connection is not running" {
 			err = nil
 		}
@@ -324,7 +324,7 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave`)
 	if err != nil {
-		// Patch; current MaxScale behavior for STOP SLAVE is to throw an error if slave already stopped.
+		// Patch; current MaxScale behavior for STOP SLAVE is to throw an error if replica already stopped.
 		if instance.isMaxScale() && err.Error() == "Error 1199: Slave connection is not running" {
 			err = nil
 		}
@@ -778,7 +778,7 @@ func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
-// ReattachSlave restores a detached slave back into replication
+// ReattachSlave restores a detached replica back into replication
 func ReattachSlave(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {

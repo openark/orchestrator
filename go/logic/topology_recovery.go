@@ -245,7 +245,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 	if err != nil {
 		return promotedSlave, log.Errore(err)
 	}
-	// Reconnect binlog servers to promoted slave (now master):
+	// Reconnect binlog servers to promoted replica (now master):
 	promotedBinlogServer, err = inst.SkipToNextBinaryLog(&promotedBinlogServer.Key)
 	if err != nil {
 		return promotedSlave, log.Errore(err)
@@ -364,7 +364,7 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 }
 
 // replacePromotedSlaveWithCandidate is called after an intermediate master has died and been replaced by some promotedSlave.
-// But, is there an even better slave to promote?
+// But, is there an even better replica to promote?
 // if candidateInstanceKey is given, then it is forced to be promoted over the promotedSlave
 // Otherwise, search for the best to promote!
 func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promotedSlave *inst.Instance, candidateInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
@@ -373,8 +373,8 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 	// However, can we improve on our choice? Are there any replicas marked with "is_candidate"?
 	// Maybe we actually promoted such a replica. Does that mean we should keep it?
 	// The current logic is:
-	// - 1. we prefer to promote a "is_candidate" which is in the same DC & env as the dead intermediate master (or do nothing if the promtoed slave is such one)
-	// - 2. we prefer to promote a "is_candidate" which is in the same DC & env as the promoted slave (or do nothing if the promtoed slave is such one)
+	// - 1. we prefer to promote a "is_candidate" which is in the same DC & env as the dead intermediate master (or do nothing if the promtoed replica is such one)
+	// - 2. we prefer to promote a "is_candidate" which is in the same DC & env as the promoted replica (or do nothing if the promtoed slave is such one)
 	// - 3. keep to current choice
 	log.Infof("topology_recovery: checking if should replace promoted slave with a better candidate")
 	if candidateInstanceKey == nil {
@@ -418,7 +418,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 	}
 	// Still nothing?
 	if candidateInstanceKey == nil {
-		// Try a candidate replica that is in same DC & env as the promoted slave (our promoted slave is not an "is_candidate")
+		// Try a candidate replica that is in same DC & env as the promoted replica (our promoted slave is not an "is_candidate")
 		for _, candidateSlave := range candidateSlaves {
 			if promotedSlave.DataCenter == candidateSlave.DataCenter &&
 				promotedSlave.PhysicalEnvironment == candidateSlave.PhysicalEnvironment &&
@@ -554,7 +554,7 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 	}
 	if sibling.IsBinlogServer() != intermediateMasterInstance.IsBinlogServer() {
 		// When both are binlog servers, failover is trivial.
-		// When failed IM is binlog server, its sibling is still valid, but we catually prefer to just repoint the slave up -- simplest!
+		// When failed IM is binlog server, its sibling is still valid, but we catually prefer to just repoint the replica up -- simplest!
 		return false
 	}
 	if sibling.ExecBinlogCoordinates.SmallerThan(&intermediateMasterInstance.ExecBinlogCoordinates) {
