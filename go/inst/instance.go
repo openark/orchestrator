@@ -229,7 +229,7 @@ func (this *Instance) IsSlave() bool {
 	return this.MasterKey.Hostname != "" && this.MasterKey.Hostname != "_" && this.MasterKey.Port != 0 && (this.ReadBinlogCoordinates.LogFile != "" || this.UsingGTID())
 }
 
-// SlaveRunning returns true when this instance's status is of a replicating slave.
+// SlaveRunning returns true when this instance's status is of a replicating replica.
 func (this *Instance) SlaveRunning() bool {
 	return this.IsSlave() && this.Slave_SQL_Running && this.Slave_IO_Running
 }
@@ -292,7 +292,7 @@ func (this *Instance) IsSlaveOf(master *Instance) bool {
 	return this.MasterKey.Equals(&master.Key)
 }
 
-// IsSlaveOf returns true if this i supposed master of given slave
+// IsSlaveOf returns true if this i supposed master of given replica
 func (this *Instance) IsMasterOf(slave *Instance) bool {
 	return slave.IsSlaveOf(this)
 }

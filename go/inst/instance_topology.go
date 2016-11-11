@@ -662,7 +662,7 @@ func MoveSlavesGTID(masterKey *InstanceKey, belowKey *InstanceKey, pattern strin
 // Repoint connects a replica to a master using its exact same executing coordinates.
 // The given masterKey can be null, in which case the existing master is used.
 // Two use cases:
-// - masterKey is nil: use case is corrupted relay logs on slave
+// - masterKey is nil: use case is corrupted relay logs on replica
 // - masterKey is not nil: using Binlog servers (coordinates remain the same)
 func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gtidHint OperationGTIDHint) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -677,7 +677,7 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gtidHint Operatio
 		masterKey = &instance.MasterKey
 	}
 	// With repoint we *prefer* the master to be alive, but we don't strictly require it.
-	// The use case for the master being alive is with hostname-resolve or hostname-unresolve: asking the slave
+	// The use case for the master being alive is with hostname-resolve or hostname-unresolve: asking the replica
 	// to reconnect to its same master while changing the MASTER_HOST in CHANGE MASTER TO due to DNS changes etc.
 	master, err := ReadTopologyInstance(masterKey)
 	masterIsAccessible := (err == nil)
@@ -890,7 +890,7 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 	if instance.ReplicationCredentialsAvailable && !master.HasReplicationCredentials {
-		// Yay! We can get credentials from the slave!
+		// Yay! We can get credentials from the replica!
 		replicationUser, replicationPassword, err := ReadReplicationCredentials(&instance.Key)
 		if err != nil {
 			goto Cleanup
@@ -1268,7 +1268,7 @@ func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordin
 		// The approach is not to take chances. If log-slave-updates is disabled, fail and go for relay-logs.
 		// If log-slave-updates was just enabled then possibly no pseudo-gtid is found, and so again we will go
 		// for relay logs.
-		// Also, if master has STATEMENT binlog format, and the replica has ROW binlog format, then comparing binlog entries would urely fail if based on the slave's binary logs.
+		// Also, if master has STATEMENT binlog format, and the replica has ROW binlog format, then comparing binlog entries would urely fail if based on the replica's binary logs.
 		// Instead, we revert to the relay logs.
 		instancePseudoGtidCoordinates, instancePseudoGtidText, err = getLastPseudoGTIDEntryInInstance(instance, minBinlogCoordinates, maxBinlogCoordinates, exhaustiveSearch)
 	}
@@ -1498,7 +1498,7 @@ func EnslaveSiblings(instanceKey *InstanceKey) (*Instance, int, error) {
 	return instance, enslavedSiblings, err
 }
 
-// EnslaveMaster will move an instance up the chain and cause its master to become its slave.
+// EnslaveMaster will move an instance up the chain and cause its master to become its replica.
 // It's almost a role change, just that other replicas of either 'instance' or its master are currently unaffected
 // (they continue replicate without change)
 // Note that the master must itself be a replica; however the grandparent does not necessarily have to be reachable
@@ -1766,7 +1766,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 						errs = append(errs, slaveErr)
 					}()
 					log.Errore(slaveErr)
-					// Failure: some unknown problem with bucket slave. Let's try the next one (continue loop)
+					// Failure: some unknown problem with bucket replica. Let's try the next one (continue loop)
 				}
 			}()
 			if bucketMatchedCoordinates == nil {
@@ -1774,7 +1774,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 				return
 			}
 			log.Debugf("MultiMatchBelow: bucket %+v coordinates are: %+v. Proceeding to match all bucket slaves", execCoordinates, *bucketMatchedCoordinates)
-			// At this point our bucket has a known salvaged slave.
+			// At this point our bucket has a known salvaged replica.
 			// We don't wait for the other buckets -- we immediately work out all the other replicas in this bucket.
 			// (perhaps another bucket is busy matching a 24h delayed-replica; we definitely don't want to hold on that)
 			func() {
@@ -2199,7 +2199,7 @@ func RegroupSlavesPseudoGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToR
 
 	log.Debugf("RegroupSlaves: done")
 	AuditOperation("regroup-slaves", masterKey, fmt.Sprintf("regrouped %+v slaves below %+v", len(operatedSlaves), *masterKey))
-	// aheadSlaves are lost (they were ahead in replication as compared to promoted slave)
+	// aheadSlaves are lost (they were ahead in replication as compared to promoted replica)
 	return aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, instance, err
 }
 

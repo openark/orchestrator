@@ -119,7 +119,7 @@ func RefreshTopologyInstances(instances [](*Instance)) {
 	for _, instance := range instances {
 		instance := instance
 		go func() {
-			// Signal completed slave
+			// Signal completed replica
 			defer func() { barrier <- instance.Key }()
 			// Wait your turn to read a replica
 			ExecuteOnTopology(func() {
@@ -149,7 +149,7 @@ func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
 // a STOP on both io_thread and sql_thread, followed by START on both. If one of them is not running
 // at the time this function is called, said thread will be neither stopped nor started.
 // The caller may provide an injected statememt, to be executed while the replica is stopped.
-// This is useful for CHANGE MASTER TO commands, that unfortunately must take place while the slave
+// This is useful for CHANGE MASTER TO commands, that unfortunately must take place while the replica
 // is completely stopped.
 func GetSlaveRestartPreserveStatements(instanceKey *InstanceKey, injectedStatement string) (statements []string, err error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -296,7 +296,7 @@ func StopSlavesNicely(slaves [](*Instance), timeout time.Duration) [](*Instance)
 		slave := slave
 		go func() {
 			updatedSlave := &slave
-			// Signal completed slave
+			// Signal completed replica
 			defer func() { barrier <- *updatedSlave }()
 			// Wait your turn to read a replica
 			ExecuteOnTopology(func() {
@@ -399,7 +399,7 @@ func StartSlaves(slaves [](*Instance)) {
 	for _, instance := range slaves {
 		instance := instance
 		go func() {
-			// Signal compelted slave
+			// Signal compelted replica
 			defer func() { barrier <- instance.Key }()
 			// Wait your turn to read a replica
 			ExecuteOnTopology(func() { StartSlave(&instance.Key) })
@@ -686,7 +686,7 @@ func skipQueryClassic(instance *Instance) error {
 	return err
 }
 
-// skipQueryOracleGtid skips a single query in an Oracle GTID replicating slave, by injecting an empty transaction
+// skipQueryOracleGtid skips a single query in an Oracle GTID replicating replica, by injecting an empty transaction
 func skipQueryOracleGtid(instance *Instance) error {
 	nextGtid, err := instance.NextGTID()
 	if err != nil {

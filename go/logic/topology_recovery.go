@@ -432,7 +432,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 
 	// So do we have a candidate?
 	if candidateInstanceKey == nil {
-		// Found nothing. Stick with promoted slave
+		// Found nothing. Stick with promoted replica
 		return promotedSlave, nil
 	}
 	if promotedSlave.Key.Equals(candidateInstanceKey) {
@@ -691,7 +691,7 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 		// Do we still have leftovers? some replicas couldn't move? Couldn't regroup? Only left with regroup's resulting leader?
 		// nothing moved?
 		// We don't care much if regroup made it or not. We prefer that it made it, in whcih case we only need to relocate up
-		// one slave, but the operation is still valid if regroup partially/completely failed. We just promote anything
+		// one replica, but the operation is still valid if regroup partially/completely failed. We just promote anything
 		// not regrouped.
 		// So, match up all that's left, plan D
 		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will next attempt to relocate up from %+v", *failedInstanceKey)
@@ -821,7 +821,7 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 		topologyRecovery.ParticipatingInstanceKeys.AddKey(promotedSlave.Key)
 	}
 
-	// OK, we may have someone promoted. Either this was the other co-master or another slave.
+	// OK, we may have someone promoted. Either this was the other co-master or another replica.
 	// Noting down that we DO NOT attempt to set a new co-master topology. We are good with remaining with a single master.
 	// I tried solving the "let's promote a replica and create a new co-master setup" but this turns so complex due to various factors.
 	// I see this as risky and not worth the questionable benefit.
