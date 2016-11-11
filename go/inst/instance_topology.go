@@ -581,7 +581,7 @@ func MoveBelowGTID(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	return moveInstanceBelowViaGTID(instance, other)
 }
 
-// moveSlavesViaGTID moves a list of slaves under another instance via GTID, returning those slaves
+// moveSlavesViaGTID moves a list of replicas under another instance via GTID, returning those slaves
 // that could not be moved (do not use GTID)
 func moveSlavesViaGTID(slaves [](*Instance), other *Instance) (movedSlaves [](*Instance), unmovedSlaves [](*Instance), err error, errs []error) {
 	slaves = RemoveInstance(slaves, &other.Key)
@@ -637,11 +637,11 @@ func moveSlavesViaGTID(slaves [](*Instance), other *Instance) (movedSlaves [](*I
 func MoveSlavesGTID(masterKey *InstanceKey, belowKey *InstanceKey, pattern string) (movedSlaves [](*Instance), unmovedSlaves [](*Instance), err error, errs []error) {
 	belowInstance, err := ReadTopologyInstance(belowKey)
 	if err != nil {
-		// Can't access "below" ==> can't move slaves beneath it
+		// Can't access "below" ==> can't move replicas beneath it
 		return movedSlaves, unmovedSlaves, err, errs
 	}
 
-	// slaves involved
+	// replicas involved
 	slaves, err := ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey)
 	if err != nil {
 		return movedSlaves, unmovedSlaves, err, errs
@@ -736,7 +736,7 @@ Cleanup:
 
 }
 
-// RepointTo repoints list of slaves onto another master.
+// RepointTo repoints list of replicas onto another master.
 // Binlog Server is the major use case
 func RepointTo(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance), error, []error) {
 	res := [](*Instance){}
@@ -789,7 +789,7 @@ func RepointTo(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance), erro
 	return res, nil, errs
 }
 
-// RepointSlavesTo repoints slaves of a given instance (possibly filtered) onto another master.
+// RepointSlavesTo repoints replicas of a given instance (possibly filtered) onto another master.
 // Binlog Server is the major use case
 func RepointSlavesTo(instanceKey *InstanceKey, pattern string, belowKey *InstanceKey) ([](*Instance), error, []error) {
 	res := [](*Instance){}
@@ -1183,7 +1183,7 @@ func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
 
 // ResetMasterGTIDOperation will issue a safe RESET MASTER on a replica that replicates via GTID:
 // It will make sure the gtid_purged set matches the executed set value as read just before the RESET.
-// this will enable new slaves to be attached to given instance without complaints about missing/purged entries.
+// this will enable new replicas to be attached to given instance without complaints about missing/purged entries.
 // This function requires that the instance does not have slaves.
 func ResetMasterGTIDOperation(instanceKey *InstanceKey, removeSelfUUID bool, uuidToRemove string) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -1417,7 +1417,7 @@ func RematchSlave(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*I
 	return MatchBelow(instanceKey, &masterInstance.Key, requireInstanceMaintenance)
 }
 
-// MakeMaster will take an instance, make all its siblings its slaves (via pseudo-GTID) and make it master
+// MakeMaster will take an instance, make all its siblings its replicas (via pseudo-GTID) and make it master
 // (stop its replicaiton, make writeable).
 func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -1499,7 +1499,7 @@ func EnslaveSiblings(instanceKey *InstanceKey) (*Instance, int, error) {
 }
 
 // EnslaveMaster will move an instance up the chain and cause its master to become its slave.
-// It's almost a role change, just that other slaves of either 'instance' or its master are currently unaffected
+// It's almost a role change, just that other replicas of either 'instance' or its master are currently unaffected
 // (they continue replicate without change)
 // Note that the master must itself be a replica; however the grandparent does not necessarily have to be reachable
 // and can in fact be dead.
@@ -1615,7 +1615,7 @@ func sortInstances(instances [](*Instance)) {
 	sort.Sort(sort.Reverse(InstancesByExecBinlogCoordinates(instances)))
 }
 
-// getSlavesForSorting returns a list of slaves of a given master potentially for candidate choosing
+// getSlavesForSorting returns a list of replicas of a given master potentially for candidate choosing
 func getSlavesForSorting(masterKey *InstanceKey, includeBinlogServerSubSlaves bool) (slaves [](*Instance), err error) {
 	if includeBinlogServerSubSlaves {
 		slaves, err = ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey)
@@ -1625,7 +1625,7 @@ func getSlavesForSorting(masterKey *InstanceKey, includeBinlogServerSubSlaves bo
 	return slaves, err
 }
 
-// sortedSlaves returns the list of slaves of some master, sorted by exec coordinates
+// sortedSlaves returns the list of replicas of some master, sorted by exec coordinates
 // (most up-to-date slave first).
 // This function assumes given `slaves` argument is indeed a list of instances all replicating
 // from the same master (the result of `getSlavesForSorting()` is appropriate)
@@ -1647,8 +1647,8 @@ func sortedSlaves(slaves [](*Instance), shouldStopSlaves bool) [](*Instance) {
 	return slaves
 }
 
-// MultiMatchBelow will efficiently match multiple slaves below a given instance.
-// It is assumed that all given slaves are siblings
+// MultiMatchBelow will efficiently match multiple replicas below a given instance.
+// It is assumed that all given replicas are siblings
 func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyStopped bool, postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), *Instance, error, []error) {
 	res := [](*Instance){}
 	errs := []error{}
@@ -1681,13 +1681,13 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 		return res, belowInstance, err, errs
 	}
 
-	// slaves involved
+	// replicas involved
 	if len(slaves) == 0 {
 		return res, belowInstance, nil, errs
 	}
 	if !slavesAlreadyStopped {
 		log.Debugf("MultiMatchBelow: stopping %d slaves nicely", len(slaves))
-		// We want the slaves to have SQL thread up to date with IO thread.
+		// We want the replicas to have SQL thread up to date with IO thread.
 		// We will wait for them (up to a timeout) to do so.
 		slaves = StopSlavesNicely(slaves, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
 	}
@@ -1695,7 +1695,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 	sort.Sort(sort.Reverse(InstancesByExecBinlogCoordinates(slaves)))
 
 	// Optimizations:
-	// Slaves which broke on the same Exec-coordinates can be handled in the exact same way:
+	// replicas which broke on the same Exec-coordinates can be handled in the exact same way:
 	// we only need to figure out one slave of each group/bucket of exec-coordinates; then apply the CHANGE MASTER TO
 	// on all its fellow members using same coordinates.
 	slaveBuckets := make(map[BinlogCoordinates][](*Instance))
@@ -1775,11 +1775,11 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 			}
 			log.Debugf("MultiMatchBelow: bucket %+v coordinates are: %+v. Proceeding to match all bucket slaves", execCoordinates, *bucketMatchedCoordinates)
 			// At this point our bucket has a known salvaged slave.
-			// We don't wait for the other buckets -- we immediately work out all the other slaves in this bucket.
+			// We don't wait for the other buckets -- we immediately work out all the other replicas in this bucket.
 			// (perhaps another bucket is busy matching a 24h delayed-replica; we definitely don't want to hold on that)
 			func() {
 				barrier := make(chan *InstanceKey)
-				// We point all this bucket's slaves into the same coordinates, concurrently
+				// We point all this bucket's replicas into the same coordinates, concurrently
 				// We are already doing concurrent buckets; but for each bucket we also want to do concurrent slaves,
 				// otherwise one large bucket would make for a sequential work...
 				for _, slave := range bucketSlaves {
@@ -1839,7 +1839,7 @@ func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey, pattern str
 
 	belowInstance, err := ReadTopologyInstance(belowKey)
 	if err != nil {
-		// Can't access "below" ==> can't match slaves beneath it
+		// Can't access "below" ==> can't match replicas beneath it
 		return res, nil, err, errs
 	}
 
@@ -1871,7 +1871,7 @@ func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey, pattern str
 
 	// Not binlog server
 
-	// slaves involved
+	// replicas involved
 	slaves, err := ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey)
 	if err != nil {
 		return res, belowInstance, err, errs
@@ -1910,7 +1910,7 @@ func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instan
 
 // MatchUpSlaves will move all replicas of given master up the replication chain,
 // so that they become siblings of their master.
-// This should be called when the local master dies, and all its slaves are to be resurrected via Pseudo-GTID
+// This should be called when the local master dies, and all its replicas are to be resurrected via Pseudo-GTID
 func MatchUpSlaves(masterKey *InstanceKey, pattern string) ([](*Instance), *Instance, error, []error) {
 	res := [](*Instance){}
 	errs := []error{}
@@ -2221,7 +2221,7 @@ func getMostUpToDateActiveBinlogServer(masterKey *InstanceKey) (mostAdvancedBinl
 }
 
 // RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers uses Pseugo-GTID to regroup slaves
-// of given instance. The function also drill in to slaves of binlog servers that are replicating from given instance,
+// of given instance. The function also drill in to replicas of binlog servers that are replicating from given instance,
 // and other recursive binlog servers, as long as they're in the same binlog-server-family.
 func RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), [](*Instance), *Instance, error) {
 	// First, handle binlog server issues:
@@ -2512,7 +2512,7 @@ func RelocateBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 }
 
 // relocateSlavesInternal is a protentially recursive function which chooses how to relocate
-// slaves of an instance below another.
+// replicas of an instance below another.
 // It may choose to use Pseudo-GTID, or normal binlog positions, or take advantage of binlog servers,
 // or it may combine any of the above in a multi-step operation.
 func relocateSlavesInternal(slaves [](*Instance), instance, other *Instance) ([](*Instance), error, []error) {
@@ -2565,7 +2565,7 @@ func relocateSlavesInternal(slaves [](*Instance), instance, other *Instance) ([]
 
 	// Pseudo GTID
 	if other.UsingPseudoGTID {
-		// Which slaves are using Pseudo GTID?
+		// Which replicas are using Pseudo GTID?
 		var pseudoGTIDSlaves [](*Instance)
 		for _, slave := range slaves {
 			if slave.UsingPseudoGTID {
@@ -2585,7 +2585,7 @@ func relocateSlavesInternal(slaves [](*Instance), instance, other *Instance) ([]
 	return nil, log.Errorf("Relocating %+v slaves of %+v below %+v turns to be too complex; please do it manually", len(slaves), instance.Key, other.Key), errs
 }
 
-// RelocateSlaves will attempt moving slaves of an instance indicated by instanceKey below another instance.
+// RelocateSlaves will attempt moving replicas of an instance indicated by instanceKey below another instance.
 // Orchestrator will try and figure out the best way to relocate the servers. This could span normal
 // binlog-position, pseudo-gtid, repointing, binlog servers...
 func RelocateSlaves(instanceKey, otherKey *InstanceKey, pattern string) (slaves [](*Instance), other *Instance, err error, errs []error) {

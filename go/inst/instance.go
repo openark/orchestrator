@@ -334,7 +334,7 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 
 // HasReasonableMaintenanceReplicationLag returns true when the slave lag is reasonable, and maintenance operations should have a green light to go.
 func (this *Instance) HasReasonableMaintenanceReplicationLag() bool {
-	// Slaves with SQLDelay are a special case
+	// replicas with SQLDelay are a special case
 	if this.SQLDelay > 0 {
 		return math.AbsInt64(this.SecondsBehindMaster.Int64-int64(this.SQLDelay)) <= int64(config.Config.ReasonableMaintenanceReplicationLagSeconds)
 	}

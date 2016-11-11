@@ -256,7 +256,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 	}
 
 	func() {
-		// Move binlog server slaves up to replicate from master.
+		// Move binlog server replicas up to replicate from master.
 		// This can only be done once a BLS has skipped to the next binlog
 		// We postpone this operation. The master is already promoted and we're happy.
 		binlogServerSlaves, err := inst.ReadBinlogServerSlaveInstances(&promotedBinlogServer.Key)
@@ -370,7 +370,7 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promotedSlave *inst.Instance, candidateInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
 	candidateSlaves, _ := inst.ReadClusterCandidateInstances(promotedSlave.ClusterName)
 	// So we've already promoted a replica.
-	// However, can we improve on our choice? Are there any slaves marked with "is_candidate"?
+	// However, can we improve on our choice? Are there any replicas marked with "is_candidate"?
 	// Maybe we actually promoted such a replica. Does that mean we should keep it?
 	// The current logic is:
 	// - 1. we prefer to promote a "is_candidate" which is in the same DC & env as the dead intermediate master (or do nothing if the promtoed slave is such one)
@@ -564,7 +564,7 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 }
 
 // GetCandidateSiblingOfIntermediateMaster chooses the best sibling of a dead intermediate master
-// to whom the IM's slaves can be moved.
+// to whom the IM's replicas can be moved.
 func GetCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *inst.Instance) (*inst.Instance, error) {
 
 	siblings, err := inst.ReadSlaveInstances(&intermediateMasterInstance.MasterKey)
@@ -947,7 +947,7 @@ func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode 
 	})
 }
 
-// Force reading of slaves of given instance. This is because we suspect the instance is dead, and want to speed up
+// Force reading of replicas of given instance. This is because we suspect the instance is dead, and want to speed up
 // detection of replication failure from its slaves.
 func emergentlyReadTopologyInstanceSlaves(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
 	slaves, err := inst.ReadSlaveInstancesIncludingBinlogServerSubSlaves(instanceKey)

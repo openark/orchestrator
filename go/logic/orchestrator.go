@@ -111,7 +111,7 @@ func handleDiscoveryRequests() {
 }
 
 // discoverInstance will attempt discovering an instance (unless it is already up to date) and will
-// list down its master and slaves (if any) for further discovery.
+// list down its master and replicas (if any) for further discovery.
 func discoverInstance(instanceKey inst.InstanceKey) {
 	start := time.Now()
 	defer func() {

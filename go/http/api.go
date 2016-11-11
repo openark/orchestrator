@@ -690,7 +690,7 @@ func (this *HttpAPI) RelocateBelow(params martini.Params, r render.Render, req *
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v relocated below %+v", instanceKey, belowKey), Details: instance})
 }
 
-// RelocateSlaves attempts to smartly relocate slaves of a given instance below another
+// RelocateSlaves attempts to smartly relocate replicas of a given instance below another
 func (this *HttpAPI) RelocateSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})

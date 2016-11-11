@@ -285,7 +285,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	return instance, err
 }
 
-// StopSlavesNicely will attemt to stop all given slaves nicely, up to timeout
+// StopSlavesNicely will attemt to stop all given replicas nicely, up to timeout
 func StopSlavesNicely(slaves [](*Instance), timeout time.Duration) [](*Instance) {
 	refreshedSlaves := [](*Instance){}
 
@@ -350,10 +350,10 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 
-	// If async fallback is disallowed, we'd better make sure to enable slaves to
+	// If async fallback is disallowed, we'd better make sure to enable replicas to
 	// send ACKs before START SLAVE. Slave ACKing is off at mysqld startup because
 	// some replicas (those that must never be promoted) should never ACK.
-	// Note: We assume that slaves use 'skip-slave-start' so they won't
+	// Note: We assume that replicas use 'skip-slave-start' so they won't
 	//       START SLAVE on their own upon restart.
 	if instance.SemiSyncEnforced {
 		// Send ACK only from promotable instances.
@@ -874,7 +874,7 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 	instance, err = ReadTopologyInstance(instanceKey)
 
 	// If we just went read-only, it's safe to flip the master semi-sync switch
-	// OFF, which is the default value so that slaves can make progress.
+	// OFF, which is the default value so that replicas can make progress.
 	if instance.SemiSyncEnforced && readOnly {
 		// Send ACK only from promotable instances.
 		sendACK := instance.PromotionRule != MustNotPromoteRule
