@@ -134,7 +134,7 @@ func RefreshTopologyInstances(instances [](*Instance)) {
 }
 
 // RefreshInstanceSlaveHosts is a workaround for a bug in MySQL where
-// SHOW SLAVE HOSTS continues to present old, long disconnected slaves.
+// SHOW SLAVE HOSTS continues to present old, long disconnected replicas.
 // It turns out issuing a couple FLUSH commands mitigates the problem.
 func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
 	_, _ = ExecInstance(instanceKey, `flush error logs`)

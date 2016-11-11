@@ -274,7 +274,7 @@ func (this *Instance) NextGTID() (string, error) {
 	return nextGTID, nil
 }
 
-// AddSlaveKey adds a replica to the list of this instance's slaves.
+// AddSlaveKey adds a replica to the list of this instance's replicas.
 func (this *Instance) AddSlaveKey(slaveKey *InstanceKey) {
 	this.SlaveHosts.AddKey(*slaveKey)
 }

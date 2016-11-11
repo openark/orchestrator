@@ -78,7 +78,7 @@ func ASCIITopology(clusterName string, historyTimestampPattern string) (result s
 
 	replicationMap := make(map[*Instance]([]*Instance))
 	var masterInstance *Instance
-	// Investigate slaves:
+	// Investigate replicas:
 	for _, instance := range instances {
 		master, ok := instancesMap[instance.MasterKey]
 		if ok {
@@ -581,7 +581,7 @@ func MoveBelowGTID(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	return moveInstanceBelowViaGTID(instance, other)
 }
 
-// moveSlavesViaGTID moves a list of replicas under another instance via GTID, returning those slaves
+// moveSlavesViaGTID moves a list of replicas under another instance via GTID, returning those replicas
 // that could not be moved (do not use GTID)
 func moveSlavesViaGTID(slaves [](*Instance), other *Instance) (movedSlaves [](*Instance), unmovedSlaves [](*Instance), err error, errs []error) {
 	slaves = RemoveInstance(slaves, &other.Key)
@@ -1184,7 +1184,7 @@ func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
 // ResetMasterGTIDOperation will issue a safe RESET MASTER on a replica that replicates via GTID:
 // It will make sure the gtid_purged set matches the executed set value as read just before the RESET.
 // this will enable new replicas to be attached to given instance without complaints about missing/purged entries.
-// This function requires that the instance does not have slaves.
+// This function requires that the instance does not have replicas.
 func ResetMasterGTIDOperation(instanceKey *InstanceKey, removeSelfUUID bool, uuidToRemove string) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -1559,7 +1559,7 @@ Cleanup:
 }
 
 // MakeLocalMaster promotes a replica above its master, making it replica of its grandparent, while also enslaving its siblings.
-// This serves as a convenience method to recover replication when a local master fails; the instance promoted is one of its slaves,
+// This serves as a convenience method to recover replication when a local master fails; the instance promoted is one of its replicas,
 // which is most advanced among its siblings.
 // This method utilizes Pseudo GTID
 func MakeLocalMaster(instanceKey *InstanceKey) (*Instance, error) {
@@ -1672,7 +1672,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 
 	belowInstance, err := ReadTopologyInstance(belowKey)
 	if err != nil {
-		// Can't access the server below which we need to match ==> can't move slaves
+		// Can't access the server below which we need to match ==> can't move replicas
 		return res, belowInstance, err, errs
 	}
 	if belowInstance.IsBinlogServer() {
@@ -1780,7 +1780,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 			func() {
 				barrier := make(chan *InstanceKey)
 				// We point all this bucket's replicas into the same coordinates, concurrently
-				// We are already doing concurrent buckets; but for each bucket we also want to do concurrent slaves,
+				// We are already doing concurrent buckets; but for each bucket we also want to do concurrent replicas,
 				// otherwise one large bucket would make for a sequential work...
 				for _, slave := range bucketSlaves {
 					slave := slave
@@ -2220,7 +2220,7 @@ func getMostUpToDateActiveBinlogServer(masterKey *InstanceKey) (mostAdvancedBinl
 	return mostAdvancedBinlogServer, binlogServerSlaves, err
 }
 
-// RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers uses Pseugo-GTID to regroup slaves
+// RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers uses Pseugo-GTID to regroup replicas
 // of given instance. The function also drill in to replicas of binlog servers that are replicating from given instance,
 // and other recursive binlog servers, as long as they're in the same binlog-server-family.
 func RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), [](*Instance), *Instance, error) {

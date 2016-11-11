@@ -157,7 +157,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
-	// Investigate slaves:
+	// Investigate replicas:
 	for _, slaveKey := range instance.SlaveHosts.GetInstanceKeys() {
 		slaveKey := slaveKey
 		if slaveKey.IsValid() {

@@ -328,7 +328,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	// No `goto Cleanup` after this point.
 	// -------------------------------------------------------------------------
 
-	// Get slaves, either by SHOW SLAVE HOSTS or via PROCESSLIST
+	// Get replicas, either by SHOW SLAVE HOSTS or via PROCESSLIST
 	// MaxScale does not support PROCESSLIST, so SHOW SLAVE HOSTS is the only option
 	if config.Config.DiscoverByShowSlaveHosts || isMaxScale {
 		err := sqlutils.QueryRowsMap(db, `show slave hosts`,
@@ -839,7 +839,7 @@ func ReadSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
 	return readInstancesByCondition(condition, sqlutils.Args(masterKey.Hostname, masterKey.Port), "")
 }
 
-// ReadSlaveInstancesIncludingBinlogServerSubSlaves returns a list of direct slves including any slaves
+// ReadSlaveInstancesIncludingBinlogServerSubSlaves returns a list of direct slves including any replicas
 // of a binlog server replica
 func ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey *InstanceKey) ([](*Instance), error) {
 	slaves, err := ReadSlaveInstances(masterKey)
@@ -1055,7 +1055,7 @@ func filterOSCInstances(instances [](*Instance)) [](*Instance) {
 	return result
 }
 
-// GetClusterOSCSlaves returns a heuristic list of replicas which are fit as controll slaves for an OSC operation.
+// GetClusterOSCSlaves returns a heuristic list of replicas which are fit as controll replicas for an OSC operation.
 // These would be intermediate masters
 func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
 	intermediateMasters := [](*Instance){}
@@ -1110,7 +1110,7 @@ func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
 		}
 	}
 	{
-		// Get 2 3rd tier slaves, if possible
+		// Get 2 3rd tier replicas, if possible
 		condition := `
 			replication_depth = 3
 			and cluster_name = ?
@@ -1125,7 +1125,7 @@ func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
 		result = append(result, slaves...)
 	}
 	{
-		// Get 2 1st tier leaf slaves, if possible
+		// Get 2 1st tier leaf replicas, if possible
 		condition := `
 			replication_depth = 1
 			and num_slave_hosts = 0
@@ -1192,7 +1192,7 @@ func GetInstancesMaxLag(instances [](*Instance)) (maxLag int64, err error) {
 	return maxLag, nil
 }
 
-// GetClusterHeuristicLag returns a heuristic lag for a cluster, based on its OSC slaves
+// GetClusterHeuristicLag returns a heuristic lag for a cluster, based on its OSC replicas
 func GetClusterHeuristicLag(clusterName string) (int64, error) {
 	instances, err := GetClusterOSCSlaves(clusterName)
 	if err != nil {
@@ -1298,7 +1298,7 @@ func ReviewUnseenInstances() error {
 	return err
 }
 
-// readUnseenMasterKeys will read list of masters that have never been seen, and yet whose slaves
+// readUnseenMasterKeys will read list of masters that have never been seen, and yet whose replicas
 // seem to be replicating.
 func readUnseenMasterKeys() ([]InstanceKey, error) {
 	res := []InstanceKey{}

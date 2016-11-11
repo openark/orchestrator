@@ -967,7 +967,7 @@ func (this *HttpAPI) RegroupSlavesBinlogServers(params martini.Params, r render.
 		promotedBinlogServer.Key.DisplayString()), Details: promotedBinlogServer.Key})
 }
 
-// MakeMaster attempts to make the given instance a master, and match its siblings to be its slaves
+// MakeMaster attempts to make the given instance a master, and match its siblings to be its replicas
 func (this *HttpAPI) MakeMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -1275,7 +1275,7 @@ func (this *HttpAPI) ClusterInfoByAlias(params martini.Params, r render.Render, 
 	this.ClusterInfo(params, r, req)
 }
 
-// ClusterOSCSlaves returns heuristic list of OSC slaves
+// ClusterOSCSlaves returns heuristic list of OSC replicas
 func (this *HttpAPI) ClusterOSCSlaves(params martini.Params, r render.Render, req *http.Request) {
 	instances, err := inst.GetClusterOSCSlaves(params["clusterName"])
 

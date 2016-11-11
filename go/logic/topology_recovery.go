@@ -103,14 +103,14 @@ var emptySlavesList [](*inst.Instance)
 
 var emergencyReadTopologyInstanceMap = cache.New(time.Duration(config.Config.InstancePollSeconds)*time.Second, time.Second)
 
-// InstancesByCountSlaves sorts instances by umber of slaves, descending
+// InstancesByCountSlaves sorts instances by umber of replicas, descending
 type InstancesByCountSlaves [](*inst.Instance)
 
 func (this InstancesByCountSlaves) Len() int      { return len(this) }
 func (this InstancesByCountSlaves) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
 func (this InstancesByCountSlaves) Less(i, j int) bool {
 	if len(this[i].SlaveHosts) == len(this[j].SlaveHosts) {
-		// Secondary sorting: prefer more advanced slaves
+		// Secondary sorting: prefer more advanced replicas
 		return !this[i].ExecBinlogCoordinates.SmallerThan(&this[j].ExecBinlogCoordinates)
 	}
 	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
@@ -374,7 +374,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 	// Maybe we actually promoted such a replica. Does that mean we should keep it?
 	// The current logic is:
 	// - 1. we prefer to promote a "is_candidate" which is in the same DC & env as the dead intermediate master (or do nothing if the promtoed replica is such one)
-	// - 2. we prefer to promote a "is_candidate" which is in the same DC & env as the promoted replica (or do nothing if the promtoed slave is such one)
+	// - 2. we prefer to promote a "is_candidate" which is in the same DC & env as the promoted replica (or do nothing if the promtoed replica is such one)
 	// - 3. keep to current choice
 	log.Infof("topology_recovery: checking if should replace promoted slave with a better candidate")
 	if candidateInstanceKey == nil {
@@ -418,7 +418,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 	}
 	// Still nothing?
 	if candidateInstanceKey == nil {
-		// Try a candidate replica that is in same DC & env as the promoted replica (our promoted slave is not an "is_candidate")
+		// Try a candidate replica that is in same DC & env as the promoted replica (our promoted replica is not an "is_candidate")
 		for _, candidateSlave := range candidateSlaves {
 			if promotedSlave.DataCenter == candidateSlave.DataCenter &&
 				promotedSlave.PhysicalEnvironment == candidateSlave.PhysicalEnvironment &&
@@ -540,7 +540,7 @@ func isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instanc
 	return true
 }
 
-// isValidAsCandidateSiblingOfIntermediateMaster checks to see that the given sibling is capable to take over instance's slaves
+// isValidAsCandidateSiblingOfIntermediateMaster checks to see that the given sibling is capable to take over instance's replicas
 func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *inst.Instance, sibling *inst.Instance) bool {
 	if sibling.Key.Equals(&intermediateMasterInstance.Key) {
 		// same instance
@@ -948,7 +948,7 @@ func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode 
 }
 
 // Force reading of replicas of given instance. This is because we suspect the instance is dead, and want to speed up
-// detection of replication failure from its slaves.
+// detection of replication failure from its replicas.
 func emergentlyReadTopologyInstanceSlaves(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
 	slaves, err := inst.ReadSlaveInstancesIncludingBinlogServerSubSlaves(instanceKey)
 	if err != nil {
