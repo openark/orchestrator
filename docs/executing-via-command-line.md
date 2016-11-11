@@ -63,7 +63,7 @@ Move the slave around the topology:
 >     + 127.0.0.1:22990
 
 The above happens to move the slave one level up. However the `relocate` command accepts any valid destination. `relocate`
-figures out the best way to move a slave. If GTID is enabled, use it. If Pseudo-GTID is available, use it. If a binlog server is
+figures out the best way to move a replica. If GTID is enabled, use it. If Pseudo-GTID is available, use it. If a binlog server is
 involved, use it. I `orchestrator` has further insight into the specific coordinates involved, use it. Otherwise just use
 plain-old binlog log file:pos math.
 
@@ -94,13 +94,13 @@ Similar to `relocate`, you can move multiple slaves via `relocate-slaves`. This 
 Other command sgive you a more fine grained control on how your servers are relocated. Consider the _classic_ binary log file:pos
 way of repointing slaves:
 
-Move a slave up the topology (make it sbling of its master, or direct slave of its "grandparent"):
+Move a replica up the topology (make it sbling of its master, or direct slave of its "grandparent"):
 
     orchestrator -c move-up -i 127.0.0.1:22988 cli
 
 > The above command will only succeed if the instance _has_ a grandparent, and does not have _problems_ such as slave lag etc.
 
-Move a slave below its sibling:
+Move a replica below its sibling:
 
     orchestrator -c move-below -i 127.0.0.1:22988 -d 127.0.0.1:22990 --debug cli
 
@@ -109,14 +109,14 @@ Move a slave below its sibling:
 > The above command will only succeed if `127.0.0.1:22988` and `127.0.0.1:22990` are siblings (slaves of same master), none of them has _problems_ (e.g. slave lag),
 > and the sibling _can_ be master of instance (i.e. has binary logs, has `log_slave_updates`, no version collision etc.)
 
-Promote a slave to be co-master with its master, making for a circular Master-Master topology:
+Promote a replica to be co-master with its master, making for a circular Master-Master topology:
 
     orchestrator -c make-co-master -i 127.0.0.1:22988 cli
 
-> The above command will only succeed if `127.0.0.1:22988`'s master is root of topology (is not itself a slave)
+> The above command will only succeed if `127.0.0.1:22988`'s master is root of topology (is not itself a replica)
 > and is not associated in another co-master ring.
 
-Reset a slave, effectively breaking down the replication (destructive action):
+Reset a replica, effectively breaking down the replication (destructive action):
 
     orchestrator -c reset-slave -i 127.0.0.1:22988 cli
 
@@ -136,13 +136,13 @@ Reset a slave, effectively breaking down the replication (destructive action):
 > However `orchestrator` also supports topology refactoring in situations where servers are inaccessible.
 > This could made to work via GTID and Pseudo-GTID.
 >
-> It may allow promoting a slave up the topology even as its master is dead, or
+> It may allow promoting a replica up the topology even as its master is dead, or
 > matching and synching the slaves of a failed master even though they all stopped replicating in different
 > positions.
 
 The following are Pseudo-GTID specific commands:
 
-Match a slave below another instance (we expect the other instance to be as advanced or more advanced than the moved slave)
+Match a replica below another instance (we expect the other instance to be as advanced or more advanced than the moved slave)
 
     orchestrator -c match-below -i 127.0.0.1:22988 -d 127.0.0.1:22990 --debug cli
 

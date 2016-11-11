@@ -15,7 +15,7 @@ All the above is tested, and have been put to practice in our production topolog
 When `orchestrator` encounters an error throughout the moving process, it does its best to rollback. However extreme cases such as a new master crashing in the middle of the move
 may leave the topology unstable (though the same instance could crash before the move and leave whatever topology it was in charge of unstable just as well).
 Or someone manually tampering with replication even while `orchestrator` is moving the slave around. Point being - weird
-and evil stuff can happen, and there is a risk in a slave losing its position vs. its master.
+and evil stuff can happen, and there is a risk in a replica losing its position vs. its master.
 
 Now that you're a bit more scared, it's time to reflect: how much did your hands tremble when you navigated your slaves _by hand_ up and down through the topology?
 We suspect the automation provided by `orchestrator` makes for a _safer_ management mechanism than we get with our shaking hands.

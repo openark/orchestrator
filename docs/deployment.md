@@ -17,7 +17,7 @@ The following hints should clear up some questions:
 
 - `Orchestrator` uses a MySQL backend.
 - The backend database has the _state_ of your topologies. `Orchestrator` is almost stateless.
-  - `Orchestrator` only has state for pending operations (e.g. while a slave is being moved)
+  - `Orchestrator` only has state for pending operations (e.g. while a replica is being moved)
 - The backend databse will have the state of your multiple topologies.  
 - You _can_ and _should_ have more than one `orchestrator` running with the same MySQL backend.
 - You should _not_ have more than one MySQL backend.

@@ -4,7 +4,7 @@ Pseudo GTID is the method of injecting unique entries into the binary logs, such
 match/sync slaves without direct connection, or slaves whose master is corrupted/dead.
 
 `Orchestrator` leverages Pseudo GTID, when applicable, and allows for complex re-matching of slaves, including
-semi-automated fail over onto a slave and the moving of its siblings as its slaves.
+semi-automated fail over onto a replica and the moving of its siblings as its slaves.
 
 To enable Pseudo GTID you need to:
 
@@ -316,8 +316,8 @@ If you manage more that one topology with `orchestrator`, you will need to use s
 there is only a single `PseudoGTIDPattern` value.
 
 To move slaves via Pseudo-GTID mechanism, click the **Classic mode** green button on the navigation bar and turn it into
-**Pseudo GTID mode**. The rules for dragging a slave change: any slave whose SQL thread is up-to-date with the IO-thread
-(depicted by a win-glass icon) is eligible for dragging. At this point such a slave can be dropped on an accessible sibling
+**Pseudo GTID mode**. The rules for dragging a replica change: any slave whose SQL thread is up-to-date with the IO-thread
+(depicted by a win-glass icon) is eligible for dragging. At this point such a replica can be dropped on an accessible sibling
 or ancestor (including its very own master/parent).
 
 ![Orchestrator screenshot](images/orchestrator-pseudo-gtid-dead-relay-master.png)
