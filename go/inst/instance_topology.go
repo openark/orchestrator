@@ -216,7 +216,7 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, err
 	}
 	if !instance.IsSlave() {
-		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
+		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 	rinstance, _, _ := ReadInstance(&instance.Key)
 	if canMove, merr := rinstance.CanMove(); !canMove {
@@ -228,7 +228,7 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if !master.IsSlave() {
-		return instance, fmt.Errorf("master is not a slave itself: %+v", master.Key)
+		return instance, fmt.Errorf("master is not a replica itself: %+v", master.Key)
 	}
 
 	if canReplicate, err := instance.CanReplicateFrom(master); canReplicate == false {
@@ -307,7 +307,7 @@ func MoveUpSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), *Ins
 		return res, nil, err, errs
 	}
 	if !instance.IsSlave() {
-		return res, instance, fmt.Errorf("instance is not a slave: %+v", instanceKey), errs
+		return res, instance, fmt.Errorf("instance is not a replica: %+v", instanceKey), errs
 	}
 	_, err = GetInstanceMaster(instance)
 	if err != nil {
@@ -659,7 +659,7 @@ func MoveSlavesGTID(masterKey *InstanceKey, belowKey *InstanceKey, pattern strin
 	return movedSlaves, unmovedSlaves, err, errs
 }
 
-// Repoint connects a slave to a master using its exact same executing coordinates.
+// Repoint connects a replica to a master using its exact same executing coordinates.
 // The given masterKey can be null, in which case the existing master is used.
 // Two use cases:
 // - masterKey is nil: use case is corrupted relay logs on slave
@@ -670,7 +670,7 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gtidHint Operatio
 		return instance, err
 	}
 	if !instance.IsSlave() {
-		return instance, fmt.Errorf("instance is not a slave: %+v", *instanceKey)
+		return instance, fmt.Errorf("instance is not a replica: %+v", *instanceKey)
 	}
 
 	if masterKey == nil {
@@ -818,7 +818,7 @@ func RepointSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), err
 	return RepointSlavesTo(instanceKey, pattern, nil)
 }
 
-// MakeCoMaster will attempt to make an instance co-master with its master, by making its master a slave of its own.
+// MakeCoMaster will attempt to make an instance co-master with its master, by making its master a replica of its own.
 // This only works out if the master is not replicating; the master does not have a known master (it may have an unknown master).
 func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -879,7 +879,7 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	// the coMaster used to be merely a slave. Just point master into *some* position
+	// the coMaster used to be merely a replica. Just point master into *some* position
 	// within coMaster...
 	if master.IsSlave() {
 		// this is the case of a co-master. For masters, the StopSlave operation throws an error, and
@@ -917,7 +917,7 @@ Cleanup:
 	return instance, err
 }
 
-// ResetSlaveOperation will reset a slave
+// ResetSlaveOperation will reset a replica
 func ResetSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -958,7 +958,7 @@ Cleanup:
 	return instance, err
 }
 
-// DetachSlaveOperation will detach a slave from its master by forcibly corrupting its replication coordinates
+// DetachSlaveOperation will detach a replica from its master by forcibly corrupting its replication coordinates
 func DetachSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -999,7 +999,7 @@ Cleanup:
 	return instance, err
 }
 
-// ReattachSlaveOperation will detach a slave from its master by forcibly corrupting its replication coordinates
+// ReattachSlaveOperation will detach a replica from its master by forcibly corrupting its replication coordinates
 func ReattachSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -1040,14 +1040,14 @@ Cleanup:
 	return instance, err
 }
 
-// DetachSlaveMasterHost detaches a slave from its master by corrupting the Master_Host (in such way that is reversible)
+// DetachSlaveMasterHost detaches a replica from its master by corrupting the Master_Host (in such way that is reversible)
 func DetachSlaveMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
 	}
 	if !instance.IsSlave() {
-		return instance, fmt.Errorf("instance is not a slave: %+v", *instanceKey)
+		return instance, fmt.Errorf("instance is not a replica: %+v", *instanceKey)
 	}
 	if instance.MasterKey.IsDetached() {
 		return instance, fmt.Errorf("instance already detached: %+v", *instanceKey)
@@ -1084,14 +1084,14 @@ Cleanup:
 	return instance, err
 }
 
-// ReattachSlaveMasterHost reattaches a slave back onto its master by undoing a DetachSlaveMasterHost operation
+// ReattachSlaveMasterHost reattaches a replica back onto its master by undoing a DetachSlaveMasterHost operation
 func ReattachSlaveMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
 	}
 	if !instance.IsSlave() {
-		return instance, fmt.Errorf("instance is not a slave: %+v", *instanceKey)
+		return instance, fmt.Errorf("instance is not a replica: %+v", *instanceKey)
 	}
 	if !instance.MasterKey.IsDetached() {
 		return instance, fmt.Errorf("instance does not seem to be detached: %+v", *instanceKey)
@@ -1181,7 +1181,7 @@ func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
-// ResetMasterGTIDOperation will issue a safe RESET MASTER on a slave that replicates via GTID:
+// ResetMasterGTIDOperation will issue a safe RESET MASTER on a replica that replicates via GTID:
 // It will make sure the gtid_purged set matches the executed set value as read just before the RESET.
 // this will enable new slaves to be attached to given instance without complaints about missing/purged entries.
 // This function requires that the instance does not have slaves.
@@ -1404,7 +1404,7 @@ Cleanup:
 	return instance, nextBinlogCoordinatesToMatch, err
 }
 
-// RematchSlave will re-match a slave to its master, using pseudo-gtid
+// RematchSlave will re-match a replica to its master, using pseudo-gtid
 func RematchSlave(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instance, *BinlogCoordinates, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -1473,7 +1473,7 @@ Cleanup:
 	return instance, err
 }
 
-// EnslaveSiblings is a convenience method for turning sublings of a slave to be its subordinates.
+// EnslaveSiblings is a convenience method for turning sublings of a replica to be its subordinates.
 // This uses normal connected replication (does not utilize Pseudo-GTID)
 func EnslaveSiblings(instanceKey *InstanceKey) (*Instance, int, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -1501,7 +1501,7 @@ func EnslaveSiblings(instanceKey *InstanceKey) (*Instance, int, error) {
 // EnslaveMaster will move an instance up the chain and cause its master to become its slave.
 // It's almost a role change, just that other slaves of either 'instance' or its master are currently unaffected
 // (they continue replicate without change)
-// Note that the master must itself be a slave; however the grandparent does not necessarily have to be reachable
+// Note that the master must itself be a replica; however the grandparent does not necessarily have to be reachable
 // and can in fact be dead.
 func EnslaveMaster(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -1558,7 +1558,7 @@ Cleanup:
 	return instance, err
 }
 
-// MakeLocalMaster promotes a slave above its master, making it slave of its grandparent, while also enslaving its siblings.
+// MakeLocalMaster promotes a replica above its master, making it slave of its grandparent, while also enslaving its siblings.
 // This serves as a convenience method to recover replication when a local master fails; the instance promoted is one of its slaves,
 // which is most advanced among its siblings.
 // This method utilizes Pseudo GTID
@@ -1718,7 +1718,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 		var bucketMatchedCoordinates *BinlogCoordinates
 		// Buckets concurrent
 		go func() {
-			// find coordinates for a single bucket based on a slave in said bucket
+			// find coordinates for a single bucket based on a replica in said bucket
 			defer func() { bucketsBarrier <- &execCoordinates }()
 			func() {
 				for _, slave := range bucketSlaves {
@@ -1746,7 +1746,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 					log.Debugf("MultiMatchBelow: match result: %+v, %+v", matchedCoordinates, slaveErr)
 
 					if slaveErr == nil {
-						// Success! We matched a slave of this bucket
+						// Success! We matched a replica of this bucket
 						func() {
 							// Instantaneous mutex.
 							slaveMutex <- true
@@ -1887,14 +1887,14 @@ func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey, pattern str
 	return matchedSlaves, belowInstance, err, errs
 }
 
-// MatchUp will move a slave up the replication chain, so that it becomes sibling of its master, via Pseudo-GTID
+// MatchUp will move a replica up the replication chain, so that it becomes sibling of its master, via Pseudo-GTID
 func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instance, *BinlogCoordinates, error) {
 	instance, found, err := ReadInstance(instanceKey)
 	if err != nil || !found {
 		return nil, nil, err
 	}
 	if !instance.IsSlave() {
-		return instance, nil, fmt.Errorf("instance is not a slave: %+v", instanceKey)
+		return instance, nil, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 	master, found, err := ReadInstance(&instance.MasterKey)
 	if err != nil || !found {
@@ -1902,7 +1902,7 @@ func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instan
 	}
 
 	if !master.IsSlave() {
-		return instance, nil, fmt.Errorf("master is not a slave itself: %+v", master.Key)
+		return instance, nil, fmt.Errorf("master is not a replica itself: %+v", master.Key)
 	}
 
 	return MatchBelow(instanceKey, &master.MasterKey, requireInstanceMaintenance)

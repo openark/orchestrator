@@ -303,7 +303,7 @@ func SearchEntryInInstanceBinlogs(instance *Instance, entryText string, monotoni
 	for {
 		log.Debugf("Searching for given pseudo gtid entry in binlog %+v of %+v", currentBinlog.LogFile, instance.Key)
 		// loop iteration per binary log. This might turn to be a heavyweight operation. We wish to throttle the operation such that
-		// the instance does not suffer. If it is a slave, we will only act as long as it's not lagging too much.
+		// the instance does not suffer. If it is a replica, we will only act as long as it's not lagging too much.
 		if instance.SlaveRunning() {
 			for {
 				log.Debugf("%+v is a replicating slave. Verifying lag", instance.Key)
@@ -417,7 +417,7 @@ func getNextBinlogEventsChunk(instance *Instance, startingCoordinates BinlogCoor
 // the twin-coordinates (where both share the same Pseudo-GTID) until "instance" runs out of entries, hopefully
 // before "other" runs out.
 // If "other" runs out that means "instance" is more advanced in replication than "other", in which case we can't
-// turn it into a slave of "other".
+// turn it into a replica of "other".
 // Otherwise "instance" will point to the *next* binlog entry in "other"
 func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates BinlogCoordinates, recordedInstanceRelayLogCoordinates BinlogCoordinates, maxBinlogCoordinates *BinlogCoordinates,
 	other *Instance, otherCoordinates BinlogCoordinates) (*BinlogCoordinates, int, error) {
@@ -526,7 +526,7 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 			if event == nil {
 				// end of binary logs for otherInstance: this is unexpected and means instance is more advanced
 				// than otherInstance
-				return nil, 0, log.Errorf("Unexpected end of binary logs for assumed master (%+v). This means the instance which attempted to be a slave (%+v) was more advanced. Try the other way round", other.Key, instance.Key)
+				return nil, 0, log.Errorf("Unexpected end of binary logs for assumed master (%+v). This means the instance which attempted to be a replica (%+v) was more advanced. Try the other way round", other.Key, instance.Key)
 			}
 			otherEventInfo = event.Info
 			otherEventCoordinates = event.Coordinates

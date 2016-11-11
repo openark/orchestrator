@@ -170,7 +170,7 @@ func (this *BinlogEventCursor) nextRealEvent(recursionLevel int) (*BinlogEvent, 
 // NextCoordinates return the binlog coordinates of the next entry as yet unprocessed by the cursor.
 // Moreover, when the cursor terminates (consumes last entry), these coordinates indicate what will be the futuristic
 // coordinates of the next binlog entry.
-// The value of this function is used by match-below to move a slave behind another, after exhausting the shared binlog
+// The value of this function is used by match-below to move a replica behind another, after exhausting the shared binlog
 // entries of both.
 func (this *BinlogEventCursor) getNextCoordinates() (BinlogCoordinates, error) {
 	if this.nextCoordinates.LogPos == 0 {

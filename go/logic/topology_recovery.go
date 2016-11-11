@@ -369,9 +369,9 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 // Otherwise, search for the best to promote!
 func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promotedSlave *inst.Instance, candidateInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
 	candidateSlaves, _ := inst.ReadClusterCandidateInstances(promotedSlave.ClusterName)
-	// So we've already promoted a slave.
+	// So we've already promoted a replica.
 	// However, can we improve on our choice? Are there any slaves marked with "is_candidate"?
-	// Maybe we actually promoted such a slave. Does that mean we should keep it?
+	// Maybe we actually promoted such a replica. Does that mean we should keep it?
 	// The current logic is:
 	// - 1. we prefer to promote a "is_candidate" which is in the same DC & env as the dead intermediate master (or do nothing if the promtoed slave is such one)
 	// - 2. we prefer to promote a "is_candidate" which is in the same DC & env as the promoted slave (or do nothing if the promtoed slave is such one)
@@ -823,7 +823,7 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 
 	// OK, we may have someone promoted. Either this was the other co-master or another slave.
 	// Noting down that we DO NOT attempt to set a new co-master topology. We are good with remaining with a single master.
-	// I tried solving the "let's promote a slave and create a new co-master setup" but this turns so complex due to various factors.
+	// I tried solving the "let's promote a replica and create a new co-master setup" but this turns so complex due to various factors.
 	// I see this as risky and not worth the questionable benefit.
 	// Maybe future me is a smarter person and finds a simple solution. Unlikely. I'm getting dumber.
 	//

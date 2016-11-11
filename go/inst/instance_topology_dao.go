@@ -121,7 +121,7 @@ func RefreshTopologyInstances(instances [](*Instance)) {
 		go func() {
 			// Signal completed slave
 			defer func() { barrier <- instance.Key }()
-			// Wait your turn to read a slave
+			// Wait your turn to read a replica
 			ExecuteOnTopology(func() {
 				log.Debugf("... reading instance: %+v", instance.Key)
 				ReadTopologyInstance(&instance.Key)
@@ -144,7 +144,7 @@ func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
-// GetSlaveRestartPreserveStatements returns a sequence of statements that make sure a slave is stopped
+// GetSlaveRestartPreserveStatements returns a sequence of statements that make sure a replica is stopped
 // and then returned to the same state. For example, if the slave was fully running, this will issue
 // a STOP on both io_thread and sql_thread, followed by START on both. If one of them is not running
 // at the time this function is called, said thread will be neither stopped nor started.
@@ -233,7 +233,7 @@ func PurgeBinaryLogsToCurrent(instanceKey *InstanceKey) (*Instance, error) {
 	return PurgeBinaryLogsTo(instanceKey, instance.SelfBinlogCoordinates.LogFile)
 }
 
-// StopSlaveNicely stops a slave such that SQL_thread and IO_thread are aligned (i.e.
+// StopSlaveNicely stops a replica such that SQL_thread and IO_thread are aligned (i.e.
 // SQL_thread consumes all relay log entries)
 // It will actually START the sql_thread even if the slave is completely stopped.
 func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance, error) {
@@ -243,7 +243,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	}
 
 	if !instance.IsSlave() {
-		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
+		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 
 	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave io_thread`)
@@ -298,7 +298,7 @@ func StopSlavesNicely(slaves [](*Instance), timeout time.Duration) [](*Instance)
 			updatedSlave := &slave
 			// Signal completed slave
 			defer func() { barrier <- *updatedSlave }()
-			// Wait your turn to read a slave
+			// Wait your turn to read a replica
 			ExecuteOnTopology(func() {
 				StopSlaveNicely(&slave.Key, timeout)
 				slave, _ = StopSlave(&slave.Key)
@@ -320,7 +320,7 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if !instance.IsSlave() {
-		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
+		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave`)
 	if err != nil {
@@ -347,7 +347,7 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if !instance.IsSlave() {
-		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
+		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 
 	// If async fallback is disallowed, we'd better make sure to enable slaves to
@@ -401,7 +401,7 @@ func StartSlaves(slaves [](*Instance)) {
 		go func() {
 			// Signal compelted slave
 			defer func() { barrier <- instance.Key }()
-			// Wait your turn to read a slave
+			// Wait your turn to read a replica
 			ExecuteOnTopology(func() { StartSlave(&instance.Key) })
 		}()
 	}
@@ -418,7 +418,7 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 	}
 
 	if !instance.IsSlave() {
-		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
+		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 	if instance.SlaveRunning() {
 		return instance, fmt.Errorf("slave already running: %+v", instanceKey)
@@ -612,7 +612,7 @@ func SkipToNextBinaryLog(instanceKey *InstanceKey) (*Instance, error) {
 	return StartSlave(instanceKey)
 }
 
-// ResetSlave resets a slave, breaking the replication
+// ResetSlave resets a replica, breaking the replication
 func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -715,7 +715,7 @@ func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if !instance.IsSlave() {
-		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
+		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 	if instance.Slave_SQL_Running {
 		return instance, fmt.Errorf("Slave SQL thread is running on %+v", instanceKey)
@@ -743,7 +743,7 @@ func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
 	return StartSlave(instanceKey)
 }
 
-// DetachSlave detaches a slave from replication; forcibly corrupting the binlog coordinates (though in such way
+// DetachSlave detaches a replica from replication; forcibly corrupting the binlog coordinates (though in such way
 // that is reversible)
 func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)

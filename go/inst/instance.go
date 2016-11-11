@@ -224,7 +224,7 @@ func (instance *Instance) NameAndMajorVersionString() string {
 	return name + "-" + instance.MajorVersionString()
 }
 
-// IsSlave makes simple heuristics to decide whether this insatnce is a slave of another instance
+// IsSlave makes simple heuristics to decide whether this insatnce is a replica of another instance
 func (this *Instance) IsSlave() bool {
 	return this.MasterKey.Hostname != "" && this.MasterKey.Hostname != "_" && this.MasterKey.Port != 0 && (this.ReadBinlogCoordinates.LogFile != "" || this.UsingGTID())
 }
@@ -274,7 +274,7 @@ func (this *Instance) NextGTID() (string, error) {
 	return nextGTID, nil
 }
 
-// AddSlaveKey adds a slave to the list of this instance's slaves.
+// AddSlaveKey adds a replica to the list of this instance's slaves.
 func (this *Instance) AddSlaveKey(slaveKey *InstanceKey) {
 	this.SlaveHosts.AddKey(*slaveKey)
 }
@@ -311,7 +311,7 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 			return false, fmt.Errorf("instance does not have log_slave_updates enabled: %+v", other.Key)
 		}
 		// OK for a master to not have log_slave_updates
-		// Not OK for a slave, for it has to relay the logs.
+		// Not OK for a replica, for it has to relay the logs.
 	}
 	if this.IsSmallerMajorVersion(other) && !this.IsBinlogServer() {
 		return false, fmt.Errorf("instance %+v has version %s, which is lower than %s on %+v ", this.Key, this.Version, other.Version, other.Key)
