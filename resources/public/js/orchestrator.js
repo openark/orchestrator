@@ -233,6 +233,9 @@ function addNodeModalDataAttribute(name, value) {
   if (value == "false" || value === false) {
     codeClass = "text-danger";
   }
+  if (name == "Maintenance") {
+    codeClass = "text-danger";
+  }
   $('#modalDataAttributesTable').append(
     '<tr><td>' + name + '</td><td><code class="' + codeClass + '"><strong>' + value + '</strong></code><div class="pull-right attributes-buttons"></div></td></tr>');
   return $('#modalDataAttributesTable tr:last td:last');
@@ -260,6 +263,12 @@ function openNodeModal(node) {
   $('#node_modal .modal-title').html('<code class="text-primary">' + node.title + "</code>");
 
   $('#modalDataAttributesTable').html("");
+
+  $('#node_modal button[data-btn=end-maintenance]').hide();
+  if (node.inMaintenance) {
+    td = addNodeModalDataAttribute("Maintenance", node.maintenanceReason);
+    $('#node_modal button[data-btn=end-maintenance]').appendTo(td.find("div")).show();
+  }
 
   if (node.InstanceAlias) {
     addNodeModalDataAttribute("Instance Alias", node.InstanceAlias);
@@ -549,14 +558,9 @@ function openNodeModal(node) {
   $('#node_modal button[data-btn=recover]').click(function() {
     apiCommand("/api/recover/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-  $('#node_modal button[data-btn=end-maintenance]').hide();
-  if (node.inMaintenance) {
-    $('#node_modal button[data-btn=end-maintenance]').show();
-  }
   $('#node_modal button[data-btn=end-maintenance]').click(function() {
     apiCommand("/api/end-maintenance/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-
 
   if (!isAuthorizedForAction()) {
     $('#node_modal button[data-btn]').hide();
@@ -592,6 +596,7 @@ function normalizeInstance(instance) {
   instance.hasMaster = true;
   instance.masterNode = null;
   instance.inMaintenance = false;
+  instance.maintenanceReason = "";
   instance.maintenanceEntry = null;
   instance.isFirstChildInDisplay = false
 
@@ -699,6 +704,7 @@ function normalizeInstances(instances, maintenanceList) {
     var instanceId = getInstanceId(maintenanceEntry.Key.Hostname, maintenanceEntry.Key.Port)
     if (instanceId in instancesMap) {
       instancesMap[instanceId].inMaintenance = true;
+      instancesMap[instanceId].maintenanceReason = maintenanceEntry.Reason;
       instancesMap[instanceId].maintenanceEntry = maintenanceEntry;
     }
   });
