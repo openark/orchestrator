@@ -1325,14 +1325,12 @@ function Cluster() {
       }
     } {
       // Compact display
-      var anchor = $("#cluster_sidebar [data-bullet=compact] a");
+      var anchor = $("#cluster_sidebar [data-bullet=compact-display] a");
       var glyph = $(anchor).find(".glyphicon")
       if (isCompactDisplay()) {
-        anchor.attr("href", location.href.split("?")[0].split("#")[0] + '?compact=false')
         glyph.addClass("text-info");
         glyph.attr("title", "Disable compact display");
       } else {
-        anchor.attr("href", location.href.split("?")[0].split("#")[0] + '?compact=true')
         glyph.addClass("text-muted");
         glyph.attr("title", "Enable compact display");
       }
@@ -1660,6 +1658,21 @@ function Cluster() {
         });
       } else {
         $.cookie("colorize-dc", "true", {
+          path: '/',
+          expires: 1
+        });
+      }
+      location.reload();
+      return
+    });
+    $("body").on("click", "a[data-command=compact-display]", function(event) {
+      if ($.cookie("compact-display") == "true") {
+        $.cookie("compact-display", "false", {
+          path: '/',
+          expires: 1
+        });
+      } else {
+        $.cookie("compact-display", "true", {
           path: '/',
           expires: 1
         });

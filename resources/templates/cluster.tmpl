@@ -12,9 +12,9 @@
 						<a data-command="colorize-dc"><span class="glyphicon glyphicon-adjust"></span></a>
 					</div>
 				</li>
-				<li data-bullet="compact">
+				<li data-bullet="compact-display">
 					<div>
-						<a href=""><span class="glyphicon glyphicon-compressed"></span></a>
+						<a data-command="compact-display"><span class="glyphicon glyphicon-compressed"></span></a>
 					</div>
 				</li>
 				<li data-bullet="pool-indicator">
@@ -63,7 +63,7 @@
 	}
 
 	function isCompactDisplay() {
-		return "{{.compactDisplay}}" == "true";
+		return ($.cookie("compact-display") == "true");
 	}
 </script>
 
