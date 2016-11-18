@@ -1060,19 +1060,23 @@ function Cluster() {
       }
       var instanceFullNames = [];
       instances.forEach(function(instance) {
-        incrementProblems("", instance.title + " " + instance.Version)
+        var instanceDescription = instance.title + " " + instance.Version;
+        if ($.cookie("anonymize") == "true") {
+          instanceDescription = anonymizeInstanceId(instance.id);
+        }
+        incrementProblems("", instanceDescription)
         instanceFullNames.push(getInstanceTitle(instance.Key.Hostname, instance.Key.Port));
         if (instance.inMaintenanceProblem()) {
-          incrementProblems("inMaintenanceProblem", instance.title + " " + instance.Version)
+          incrementProblems("inMaintenanceProblem", instanceDescription)
         }
         if (instance.lastCheckInvalidProblem()) {
-          incrementProblems("lastCheckInvalidProblem", instance.title + " " + instance.Version)
+          incrementProblems("lastCheckInvalidProblem", instanceDescription)
         } else if (instance.notRecentlyCheckedProblem()) {
-          incrementProblems("notRecentlyCheckedProblem", instance.title + " " + instance.Version)
+          incrementProblems("notRecentlyCheckedProblem", instanceDescription)
         } else if (instance.notReplicatingProblem()) {
-          incrementProblems("notReplicatingProblem", instance.title + " " + instance.Version)
+          incrementProblems("notReplicatingProblem", instanceDescription)
         } else if (instance.replicationLagProblem()) {
-          incrementProblems("replicationLagProblem", instance.title + " " + instance.Version)
+          incrementProblems("replicationLagProblem", instanceDescription)
         }
       });
       var aggergateInstance = instances[0];
