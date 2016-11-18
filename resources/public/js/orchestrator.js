@@ -233,6 +233,9 @@ function addNodeModalDataAttribute(name, value) {
   if (value == "false" || value === false) {
     codeClass = "text-danger";
   }
+  if (name == "Maintenance") {
+    codeClass = "text-danger";
+  }
   $('#modalDataAttributesTable').append(
     '<tr><td>' + name + '</td><td><code class="' + codeClass + '"><strong>' + value + '</strong></code><div class="pull-right attributes-buttons"></div></td></tr>');
   return $('#modalDataAttributesTable tr:last td:last');
@@ -261,6 +264,12 @@ function openNodeModal(node) {
 
   $('#modalDataAttributesTable').html("");
 
+  $('#node_modal button[data-btn=end-maintenance]').hide();
+  if (node.inMaintenance) {
+    td = addNodeModalDataAttribute("Maintenance", node.maintenanceReason);
+    $('#node_modal button[data-btn=end-maintenance]').appendTo(td.find("div")).show();
+  }
+
   if (node.InstanceAlias) {
     addNodeModalDataAttribute("Instance Alias", node.InstanceAlias);
   }
@@ -284,9 +293,13 @@ function openNodeModal(node) {
     $('#node_modal [data-btn-group=stop-slave]').appendTo(td.find("div"))
 
     if (!node.replicationRunning) {
-      td = addNodeModalDataAttribute("Last SQL error", node.LastSQLError);
-      $('#node_modal button[data-btn=skip-query]').appendTo(td.find("div"))
-      addNodeModalDataAttribute("Last IO error", node.LastIOError);
+      if (node.LastSQLError) {
+        td = addNodeModalDataAttribute("Last SQL error", node.LastSQLError);
+        $('#node_modal button[data-btn=skip-query]').appendTo(td.find("div"))
+      }
+      if (node.LastIOError) {
+        addNodeModalDataAttribute("Last IO error", node.LastIOError);
+      }
     }
     addNodeModalDataAttribute("Seconds behind master", node.SecondsBehindMaster.Valid ? node.SecondsBehindMaster.Int64 : "null");
     addNodeModalDataAttribute("Replication lag", node.SlaveLagSeconds.Valid ? node.SlaveLagSeconds.Int64 : "null");
@@ -549,14 +562,9 @@ function openNodeModal(node) {
   $('#node_modal button[data-btn=recover]').click(function() {
     apiCommand("/api/recover/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-  $('#node_modal button[data-btn=end-maintenance]').hide();
-  if (node.inMaintenance) {
-    $('#node_modal button[data-btn=end-maintenance]').show();
-  }
   $('#node_modal button[data-btn=end-maintenance]').click(function() {
     apiCommand("/api/end-maintenance/" + node.Key.Hostname + "/" + node.Key.Port);
   });
-
 
   if (!isAuthorizedForAction()) {
     $('#node_modal button[data-btn]').hide();
@@ -592,6 +600,7 @@ function normalizeInstance(instance) {
   instance.hasMaster = true;
   instance.masterNode = null;
   instance.inMaintenance = false;
+  instance.maintenanceReason = "";
   instance.maintenanceEntry = null;
   instance.isFirstChildInDisplay = false
 
@@ -604,6 +613,13 @@ function normalizeInstance(instance) {
   instance.isAggregate = false;
 
   instance.renderHint = "";
+
+  if (instance.LastSQLError == '""') {
+    instance.LastSQLError = '';
+  }
+  if (instance.LastIOError == '""') {
+    instance.LastIOError = '';
+  }
 }
 
 function normalizeInstanceProblem(instance) {
@@ -699,6 +715,7 @@ function normalizeInstances(instances, maintenanceList) {
     var instanceId = getInstanceId(maintenanceEntry.Key.Hostname, maintenanceEntry.Key.Port)
     if (instanceId in instancesMap) {
       instancesMap[instanceId].inMaintenance = true;
+      instancesMap[instanceId].maintenanceReason = maintenanceEntry.Reason;
       instancesMap[instanceId].maintenanceEntry = maintenanceEntry;
     }
   });
