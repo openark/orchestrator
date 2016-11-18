@@ -28,7 +28,7 @@ recursively scan the entire topology)
   the two provided instances must be siblings: slaves of the same master. (example `/api/move-below/mysql10/3306/mysql24/3306`)
 * `/api/make-co-master/:host/:port` (attempt to) make this instance co-master with its own master, creating a
   circular master-master topology.
-* `/api/reset-slave/:host/:port` reset a slave, breaking replication (destructive operation)
+* `/api/reset-slave/:host/:port` reset a replica, breaking replication (destructive operation)
 * `/api/begin-maintenance/:host/:port/:owner/:reason`: declares and begins maintenance mode for an instance.
   While in maintenance mode, `orchestrator` will not allow moving this instance.
   (example `/api/begin-maintenance/mysql10/3306/gromit/upgrading+mysql+version`)
@@ -36,7 +36,7 @@ recursively scan the entire topology)
 * `/api/end-maintenance/:maintenanceKey` end maintenance on instance, based on maintenance key given on `begin-maintenance`
 * `/api/start-slave/:host/:port`: issue a `START SLAVE` on an instance
 * `/api/stop-slave/:host/:port`: issue a `STOP SLAVE` on an instance
-* `/api/stop-slave-nice/:host/:port`: stop a slave such that the SQL thread is aligned with IO thread
+* `/api/stop-slave-nice/:host/:port`: stop a replica such that the SQL thread is aligned with IO thread
 * `/api/set-read-only/:host/:port`: issue a `SET GLOBAL read_only := 1` on an instance
 * `/api/set-writeable/:host/:port`: issue a `SET GLOBAL read_only := 0` on an instance
 * `/api/kill-query/:host/:port/:process`: kill a query (denoted by process id) on given instance. Synchronous call.

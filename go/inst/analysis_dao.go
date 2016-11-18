@@ -328,10 +328,10 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			//
 		} else if !a.IsMaster && a.LastCheckValid && a.CountSlaves > 1 && a.CountValidReplicatingSlaves == 0 &&
 			a.CountSlavesFailingToConnectToMaster > 0 && a.CountSlavesFailingToConnectToMaster == a.CountValidSlaves {
-			// All slaves are either failing to connect to master (and at least one of these have to exist)
+			// All replicas are either failing to connect to master (and at least one of these have to exist)
 			// or completely dead.
-			// Must have at least two slaves to reach such conclusion -- do note that the intermediate master is still
-			// reachable to orchestrator, so we base our conclusion on slaves only at this point.
+			// Must have at least two replicas to reach such conclusion -- do note that the intermediate master is still
+			// reachable to orchestrator, so we base our conclusion on replicas only at this point.
 			a.Analysis = AllIntermediateMasterSlavesFailingToConnectOrDead
 			a.Description = "Intermediate master is reachable but all of its slaves are failing to connect"
 			//

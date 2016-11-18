@@ -104,7 +104,7 @@ You may move servers around using various commands. The generic "figure things o
 	  + a.slave.7.instance.com:3306 [OK,5.6.17-log,STATEMENT,>>]
 	+ a.slave.8.instance.com:3306 [OK,5.6.17-log,STATEMENT,>>]
 
-`relocate` and `relocate-slaves` automatically figure out hwo to repoint a slave. Perhaps via GTID; perhaps normal binlog file:pos.
+`relocate` and `relocate-slaves` automatically figure out how to repoint a replica. Perhaps via GTID; perhaps normal binlog file:pos.
 Or maybe there's Pseudo GTID, or is there a binlog server involved? Other variations also supported.
 
 If you want to have greater control:
@@ -122,7 +122,7 @@ You are easily able to see what the following do:
 	$ orchestrator -c set-read-only -i a.slave.8.instance.com
 	$ orchestrator -c set-writeable -i a.slave.8.instance.com
 
-Break replication by messing with a slave's binlog coordinates:
+Break replication by messing with a replica's binlog coordinates:
 
 	$ orchestrator -c detach-slave -i a.slave.8.instance.com
 

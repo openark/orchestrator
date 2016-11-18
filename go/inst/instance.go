@@ -224,12 +224,12 @@ func (instance *Instance) NameAndMajorVersionString() string {
 	return name + "-" + instance.MajorVersionString()
 }
 
-// IsSlave makes simple heuristics to decide whether this insatnce is a slave of another instance
+// IsSlave makes simple heuristics to decide whether this insatnce is a replica of another instance
 func (this *Instance) IsSlave() bool {
 	return this.MasterKey.Hostname != "" && this.MasterKey.Hostname != "_" && this.MasterKey.Port != 0 && (this.ReadBinlogCoordinates.LogFile != "" || this.UsingGTID())
 }
 
-// SlaveRunning returns true when this instance's status is of a replicating slave.
+// SlaveRunning returns true when this instance's status is of a replicating replica.
 func (this *Instance) SlaveRunning() bool {
 	return this.IsSlave() && this.Slave_SQL_Running && this.Slave_IO_Running
 }
@@ -274,7 +274,7 @@ func (this *Instance) NextGTID() (string, error) {
 	return nextGTID, nil
 }
 
-// AddSlaveKey adds a slave to the list of this instance's slaves.
+// AddSlaveKey adds a replica to the list of this instance's replicas.
 func (this *Instance) AddSlaveKey(slaveKey *InstanceKey) {
 	this.SlaveHosts.AddKey(*slaveKey)
 }
@@ -292,7 +292,7 @@ func (this *Instance) IsSlaveOf(master *Instance) bool {
 	return this.MasterKey.Equals(&master.Key)
 }
 
-// IsSlaveOf returns true if this i supposed master of given slave
+// IsSlaveOf returns true if this i supposed master of given replica
 func (this *Instance) IsMasterOf(slave *Instance) bool {
 	return slave.IsSlaveOf(this)
 }
@@ -311,7 +311,7 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 			return false, fmt.Errorf("instance does not have log_slave_updates enabled: %+v", other.Key)
 		}
 		// OK for a master to not have log_slave_updates
-		// Not OK for a slave, for it has to relay the logs.
+		// Not OK for a replica, for it has to relay the logs.
 	}
 	if this.IsSmallerMajorVersion(other) && !this.IsBinlogServer() {
 		return false, fmt.Errorf("instance %+v has version %s, which is lower than %s on %+v ", this.Key, this.Version, other.Version, other.Key)
@@ -332,9 +332,9 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	return true, nil
 }
 
-// HasReasonableMaintenanceReplicationLag returns true when the slave lag is reasonable, and maintenance operations should have a green light to go.
+// HasReasonableMaintenanceReplicationLag returns true when the replica lag is reasonable, and maintenance operations should have a green light to go.
 func (this *Instance) HasReasonableMaintenanceReplicationLag() bool {
-	// Slaves with SQLDelay are a special case
+	// replicas with SQLDelay are a special case
 	if this.SQLDelay > 0 {
 		return math.AbsInt64(this.SecondsBehindMaster.Int64-int64(this.SQLDelay)) <= int64(config.Config.ReasonableMaintenanceReplicationLagSeconds)
 	}

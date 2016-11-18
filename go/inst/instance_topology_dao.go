@@ -119,9 +119,9 @@ func RefreshTopologyInstances(instances [](*Instance)) {
 	for _, instance := range instances {
 		instance := instance
 		go func() {
-			// Signal completed slave
+			// Signal completed replica
 			defer func() { barrier <- instance.Key }()
-			// Wait your turn to read a slave
+			// Wait your turn to read a replica
 			ExecuteOnTopology(func() {
 				log.Debugf("... reading instance: %+v", instance.Key)
 				ReadTopologyInstance(&instance.Key)
@@ -134,7 +134,7 @@ func RefreshTopologyInstances(instances [](*Instance)) {
 }
 
 // RefreshInstanceSlaveHosts is a workaround for a bug in MySQL where
-// SHOW SLAVE HOSTS continues to present old, long disconnected slaves.
+// SHOW SLAVE HOSTS continues to present old, long disconnected replicas.
 // It turns out issuing a couple FLUSH commands mitigates the problem.
 func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
 	_, _ = ExecInstance(instanceKey, `flush error logs`)
@@ -144,12 +144,12 @@ func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
-// GetSlaveRestartPreserveStatements returns a sequence of statements that make sure a slave is stopped
-// and then returned to the same state. For example, if the slave was fully running, this will issue
+// GetSlaveRestartPreserveStatements returns a sequence of statements that make sure a replica is stopped
+// and then returned to the same state. For example, if the replica was fully running, this will issue
 // a STOP on both io_thread and sql_thread, followed by START on both. If one of them is not running
 // at the time this function is called, said thread will be neither stopped nor started.
-// The caller may provide an injected statememt, to be executed while the slave is stopped.
-// This is useful for CHANGE MASTER TO commands, that unfortunately must take place while the slave
+// The caller may provide an injected statememt, to be executed while the replica is stopped.
+// This is useful for CHANGE MASTER TO commands, that unfortunately must take place while the replica
 // is completely stopped.
 func GetSlaveRestartPreserveStatements(instanceKey *InstanceKey, injectedStatement string) (statements []string, err error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -233,9 +233,9 @@ func PurgeBinaryLogsToCurrent(instanceKey *InstanceKey) (*Instance, error) {
 	return PurgeBinaryLogsTo(instanceKey, instance.SelfBinlogCoordinates.LogFile)
 }
 
-// StopSlaveNicely stops a slave such that SQL_thread and IO_thread are aligned (i.e.
+// StopSlaveNicely stops a replica such that SQL_thread and IO_thread are aligned (i.e.
 // SQL_thread consumes all relay log entries)
-// It will actually START the sql_thread even if the slave is completely stopped.
+// It will actually START the sql_thread even if the replica is completely stopped.
 func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -243,7 +243,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	}
 
 	if !instance.IsSlave() {
-		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
+		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 
 	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave io_thread`)
@@ -271,7 +271,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	}
 	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave`)
 	if err != nil {
-		// Patch; current MaxScale behavior for STOP SLAVE is to throw an error if slave already stopped.
+		// Patch; current MaxScale behavior for STOP SLAVE is to throw an error if replica already stopped.
 		if instance.isMaxScale() && err.Error() == "Error 1199: Slave connection is not running" {
 			err = nil
 		}
@@ -285,7 +285,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	return instance, err
 }
 
-// StopSlavesNicely will attemt to stop all given slaves nicely, up to timeout
+// StopSlavesNicely will attemt to stop all given replicas nicely, up to timeout
 func StopSlavesNicely(slaves [](*Instance), timeout time.Duration) [](*Instance) {
 	refreshedSlaves := [](*Instance){}
 
@@ -296,9 +296,9 @@ func StopSlavesNicely(slaves [](*Instance), timeout time.Duration) [](*Instance)
 		slave := slave
 		go func() {
 			updatedSlave := &slave
-			// Signal completed slave
+			// Signal completed replica
 			defer func() { barrier <- *updatedSlave }()
-			// Wait your turn to read a slave
+			// Wait your turn to read a replica
 			ExecuteOnTopology(func() {
 				StopSlaveNicely(&slave.Key, timeout)
 				slave, _ = StopSlave(&slave.Key)
@@ -320,11 +320,11 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if !instance.IsSlave() {
-		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
+		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave`)
 	if err != nil {
-		// Patch; current MaxScale behavior for STOP SLAVE is to throw an error if slave already stopped.
+		// Patch; current MaxScale behavior for STOP SLAVE is to throw an error if replica already stopped.
 		if instance.isMaxScale() && err.Error() == "Error 1199: Slave connection is not running" {
 			err = nil
 		}
@@ -347,13 +347,13 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if !instance.IsSlave() {
-		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
+		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 
-	// If async fallback is disallowed, we'd better make sure to enable slaves to
-	// send ACKs before START SLAVE. Slave ACKing is off at mysqld startup because
-	// some slaves (those that must never be promoted) should never ACK.
-	// Note: We assume that slaves use 'skip-slave-start' so they won't
+	// If async fallback is disallowed, we'd better make sure to enable replicas to
+	// send ACKs before START SLAVE. Replica ACKing is off at mysqld startup because
+	// some replicas (those that must never be promoted) should never ACK.
+	// Note: We assume that replicas use 'skip-slave-start' so they won't
 	//       START SLAVE on their own upon restart.
 	if instance.SemiSyncEnforced {
 		// Send ACK only from promotable instances.
@@ -399,9 +399,9 @@ func StartSlaves(slaves [](*Instance)) {
 	for _, instance := range slaves {
 		instance := instance
 		go func() {
-			// Signal compelted slave
+			// Signal compelted replica
 			defer func() { barrier <- instance.Key }()
-			// Wait your turn to read a slave
+			// Wait your turn to read a replica
 			ExecuteOnTopology(func() { StartSlave(&instance.Key) })
 		}()
 	}
@@ -418,7 +418,7 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 	}
 
 	if !instance.IsSlave() {
-		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
+		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 	if instance.SlaveRunning() {
 		return instance, fmt.Errorf("slave already running: %+v", instanceKey)
@@ -612,7 +612,7 @@ func SkipToNextBinaryLog(instanceKey *InstanceKey) (*Instance, error) {
 	return StartSlave(instanceKey)
 }
 
-// ResetSlave resets a slave, breaking the replication
+// ResetSlave resets a replica, breaking the replication
 func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -686,7 +686,7 @@ func skipQueryClassic(instance *Instance) error {
 	return err
 }
 
-// skipQueryOracleGtid skips a single query in an Oracle GTID replicating slave, by injecting an empty transaction
+// skipQueryOracleGtid skips a single query in an Oracle GTID replicating replica, by injecting an empty transaction
 func skipQueryOracleGtid(instance *Instance) error {
 	nextGtid, err := instance.NextGTID()
 	if err != nil {
@@ -715,7 +715,7 @@ func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if !instance.IsSlave() {
-		return instance, fmt.Errorf("instance is not a slave: %+v", instanceKey)
+		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 	if instance.Slave_SQL_Running {
 		return instance, fmt.Errorf("Slave SQL thread is running on %+v", instanceKey)
@@ -743,7 +743,7 @@ func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
 	return StartSlave(instanceKey)
 }
 
-// DetachSlave detaches a slave from replication; forcibly corrupting the binlog coordinates (though in such way
+// DetachSlave detaches a replica from replication; forcibly corrupting the binlog coordinates (though in such way
 // that is reversible)
 func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -778,7 +778,7 @@ func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
-// ReattachSlave restores a detached slave back into replication
+// ReattachSlave restores a detached replica back into replication
 func ReattachSlave(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -874,7 +874,7 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 	instance, err = ReadTopologyInstance(instanceKey)
 
 	// If we just went read-only, it's safe to flip the master semi-sync switch
-	// OFF, which is the default value so that slaves can make progress.
+	// OFF, which is the default value so that replicas can make progress.
 	if instance.SemiSyncEnforced && readOnly {
 		// Send ACK only from promotable instances.
 		sendACK := instance.PromotionRule != MustNotPromoteRule

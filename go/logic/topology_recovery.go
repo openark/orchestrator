@@ -103,14 +103,14 @@ var emptySlavesList [](*inst.Instance)
 
 var emergencyReadTopologyInstanceMap = cache.New(time.Duration(config.Config.InstancePollSeconds)*time.Second, time.Second)
 
-// InstancesByCountSlaves sorts instances by umber of slaves, descending
+// InstancesByCountSlaves sorts instances by umber of replicas, descending
 type InstancesByCountSlaves [](*inst.Instance)
 
 func (this InstancesByCountSlaves) Len() int      { return len(this) }
 func (this InstancesByCountSlaves) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
 func (this InstancesByCountSlaves) Less(i, j int) bool {
 	if len(this[i].SlaveHosts) == len(this[j].SlaveHosts) {
-		// Secondary sorting: prefer more advanced slaves
+		// Secondary sorting: prefer more advanced replicas
 		return !this[i].ExecBinlogCoordinates.SmallerThan(&this[j].ExecBinlogCoordinates)
 	}
 	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
@@ -210,7 +210,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 	if err != nil {
 		return promotedSlave, log.Errore(err)
 	}
-	// Find candidate slave
+	// Find candidate replica
 	promotedSlave, err = inst.GetCandidateSlaveOfBinlogServerTopology(&promotedBinlogServer.Key)
 	if err != nil {
 		return promotedSlave, log.Errore(err)
@@ -245,7 +245,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 	if err != nil {
 		return promotedSlave, log.Errore(err)
 	}
-	// Reconnect binlog servers to promoted slave (now master):
+	// Reconnect binlog servers to promoted replica (now master):
 	promotedBinlogServer, err = inst.SkipToNextBinaryLog(&promotedBinlogServer.Key)
 	if err != nil {
 		return promotedSlave, log.Errore(err)
@@ -256,7 +256,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 	}
 
 	func() {
-		// Move binlog server slaves up to replicate from master.
+		// Move binlog server replicas up to replicate from master.
 		// This can only be done once a BLS has skipped to the next binlog
 		// We postpone this operation. The master is already promoted and we're happy.
 		binlogServerSlaves, err := inst.ReadBinlogServerSlaveInstances(&promotedBinlogServer.Key)
@@ -364,17 +364,17 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 }
 
 // replacePromotedSlaveWithCandidate is called after an intermediate master has died and been replaced by some promotedSlave.
-// But, is there an even better slave to promote?
+// But, is there an even better replica to promote?
 // if candidateInstanceKey is given, then it is forced to be promoted over the promotedSlave
 // Otherwise, search for the best to promote!
 func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promotedSlave *inst.Instance, candidateInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
 	candidateSlaves, _ := inst.ReadClusterCandidateInstances(promotedSlave.ClusterName)
-	// So we've already promoted a slave.
-	// However, can we improve on our choice? Are there any slaves marked with "is_candidate"?
-	// Maybe we actually promoted such a slave. Does that mean we should keep it?
+	// So we've already promoted a replica.
+	// However, can we improve on our choice? Are there any replicas marked with "is_candidate"?
+	// Maybe we actually promoted such a replica. Does that mean we should keep it?
 	// The current logic is:
-	// - 1. we prefer to promote a "is_candidate" which is in the same DC & env as the dead intermediate master (or do nothing if the promtoed slave is such one)
-	// - 2. we prefer to promote a "is_candidate" which is in the same DC & env as the promoted slave (or do nothing if the promtoed slave is such one)
+	// - 1. we prefer to promote a "is_candidate" which is in the same DC & env as the dead intermediate master (or do nothing if the promtoed replica is such one)
+	// - 2. we prefer to promote a "is_candidate" which is in the same DC & env as the promoted replica (or do nothing if the promtoed replica is such one)
 	// - 3. keep to current choice
 	log.Infof("topology_recovery: checking if should replace promoted slave with a better candidate")
 	if candidateInstanceKey == nil {
@@ -392,7 +392,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 	}
 	// We didn't pick the ideal candidate; let's see if we can replace with a candidate from same DC and ENV
 	if candidateInstanceKey == nil {
-		// Try a candidate slave that is in same DC & env as the dead instance
+		// Try a candidate replica that is in same DC & env as the dead instance
 		if deadInstance, _, err := inst.ReadInstance(deadInstanceKey); err == nil && deadInstance != nil {
 			for _, candidateSlave := range candidateSlaves {
 				if candidateSlave.DataCenter == deadInstance.DataCenter &&
@@ -409,7 +409,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 		// We cannot find a candidate in same DC and ENV as dead master
 		for _, candidateSlave := range candidateSlaves {
 			if promotedSlave.Key.Equals(&candidateSlave.Key) {
-				// Seems like we promoted a candidate slave (though not in same DC and ENV as dead master). Good enough.
+				// Seems like we promoted a candidate replica (though not in same DC and ENV as dead master). Good enough.
 				// No further action required.
 				log.Infof("topology_recovery: promoted slave %+v is a good candidate", promotedSlave.Key)
 				return promotedSlave, nil
@@ -418,7 +418,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 	}
 	// Still nothing?
 	if candidateInstanceKey == nil {
-		// Try a candidate slave that is in same DC & env as the promoted slave (our promoted slave is not an "is_candidate")
+		// Try a candidate replica that is in same DC & env as the promoted replica (our promoted replica is not an "is_candidate")
 		for _, candidateSlave := range candidateSlaves {
 			if promotedSlave.DataCenter == candidateSlave.DataCenter &&
 				promotedSlave.PhysicalEnvironment == candidateSlave.PhysicalEnvironment &&
@@ -432,7 +432,7 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 
 	// So do we have a candidate?
 	if candidateInstanceKey == nil {
-		// Found nothing. Stick with promoted slave
+		// Found nothing. Stick with promoted replica
 		return promotedSlave, nil
 	}
 	if promotedSlave.Key.Equals(candidateInstanceKey) {
@@ -540,7 +540,7 @@ func isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instanc
 	return true
 }
 
-// isValidAsCandidateSiblingOfIntermediateMaster checks to see that the given sibling is capable to take over instance's slaves
+// isValidAsCandidateSiblingOfIntermediateMaster checks to see that the given sibling is capable to take over instance's replicas
 func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *inst.Instance, sibling *inst.Instance) bool {
 	if sibling.Key.Equals(&intermediateMasterInstance.Key) {
 		// same instance
@@ -554,7 +554,7 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 	}
 	if sibling.IsBinlogServer() != intermediateMasterInstance.IsBinlogServer() {
 		// When both are binlog servers, failover is trivial.
-		// When failed IM is binlog server, its sibling is still valid, but we catually prefer to just repoint the slave up -- simplest!
+		// When failed IM is binlog server, its sibling is still valid, but we catually prefer to just repoint the replica up -- simplest!
 		return false
 	}
 	if sibling.ExecBinlogCoordinates.SmallerThan(&intermediateMasterInstance.ExecBinlogCoordinates) {
@@ -564,7 +564,7 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 }
 
 // GetCandidateSiblingOfIntermediateMaster chooses the best sibling of a dead intermediate master
-// to whom the IM's slaves can be moved.
+// to whom the IM's replicas can be moved.
 func GetCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *inst.Instance) (*inst.Instance, error) {
 
 	siblings, err := inst.ReadSlaveInstances(&intermediateMasterInstance.MasterKey)
@@ -688,10 +688,10 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 		}
 	}
 	if !recoveryResolved {
-		// Do we still have leftovers? Some slaves couldn't move? Couldn't regroup? Only left with regroup's resulting leader?
+		// Do we still have leftovers? some replicas couldn't move? Couldn't regroup? Only left with regroup's resulting leader?
 		// nothing moved?
 		// We don't care much if regroup made it or not. We prefer that it made it, in whcih case we only need to relocate up
-		// one slave, but the operation is still valid if regroup partially/completely failed. We just promote anything
+		// one replica, but the operation is still valid if regroup partially/completely failed. We just promote anything
 		// not regrouped.
 		// So, match up all that's left, plan D
 		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will next attempt to relocate up from %+v", *failedInstanceKey)
@@ -821,9 +821,9 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 		topologyRecovery.ParticipatingInstanceKeys.AddKey(promotedSlave.Key)
 	}
 
-	// OK, we may have someone promoted. Either this was the other co-master or another slave.
+	// OK, we may have someone promoted. Either this was the other co-master or another replica.
 	// Noting down that we DO NOT attempt to set a new co-master topology. We are good with remaining with a single master.
-	// I tried solving the "let's promote a slave and create a new co-master setup" but this turns so complex due to various factors.
+	// I tried solving the "let's promote a replica and create a new co-master setup" but this turns so complex due to various factors.
 	// I see this as risky and not worth the questionable benefit.
 	// Maybe future me is a smarter person and finds a simple solution. Unlikely. I'm getting dumber.
 	//
@@ -947,8 +947,8 @@ func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode 
 	})
 }
 
-// Force reading of slaves of given instance. This is because we suspect the instance is dead, and want to speed up
-// detection of replication failure from its slaves.
+// Force reading of replicas of given instance. This is because we suspect the instance is dead, and want to speed up
+// detection of replication failure from its replicas.
 func emergentlyReadTopologyInstanceSlaves(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
 	slaves, err := inst.ReadSlaveInstancesIncludingBinlogServerSubSlaves(instanceKey)
 	if err != nil {

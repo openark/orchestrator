@@ -40,7 +40,7 @@ The following is a complete list of configuration parameters. "Complete" is alwa
 * `AuditLogFile`  (string), Name of log file for audit operations. Disabled when empty.
 * `AuditPageSize`       (int), Number of entries in an audit page
 * `RemoveTextFromHostnameDisplay` (string), Text to strip off the hostname on cluster/clusters pages. Save pixels (e.g. `mycompany.com`)
-* `ReadOnly`				(bool) When `"true"`, no write operations (e.g. stopping a slave, repointing slaves, discovering) are allowed
+* `ReadOnly`				(bool) When `"true"`, no write operations (e.g. stopping a replica, repointing slaves, discovering) are allowed
 * `AuthenticationMethod`    (string), type of authentication. Either empty (no authentication, default), `"basic"`, `"multi"` or `"proxy"`. See [Security](#security) section.
 * `AuthUserHeader`          (string), name of HTTP header which contains authenticated user when `AuthenticationMethod` is `"proxy"`
 * `PowerAuthUsers`          (string list), users considered as *power users* (allowed to manipulate the topology); applies on `"proxy"` `AuthenticationMethod`.

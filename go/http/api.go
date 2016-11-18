@@ -351,7 +351,7 @@ func (this *HttpAPI) MoveUp(params martini.Params, r render.Render, req *http.Re
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v moved up", instanceKey), Details: instance})
 }
 
-// MoveUpSlaves attempts to move up all slaves of an instance
+// MoveUpSlaves attempts to move up all replicas of an instance
 func (this *HttpAPI) MoveUpSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -372,7 +372,7 @@ func (this *HttpAPI) MoveUpSlaves(params martini.Params, r render.Render, req *h
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Moved up %d slaves of %+v below %+v; %d errors: %+v", len(slaves), instanceKey, newMaster.Key, len(errs), errs), Details: newMaster.Key})
 }
 
-// MoveUpSlaves attempts to move up all slaves of an instance
+// MoveUpSlaves attempts to move up all replicas of an instance
 func (this *HttpAPI) RepointSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -414,7 +414,7 @@ func (this *HttpAPI) MakeCoMaster(params martini.Params, r render.Render, req *h
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance made co-master: %+v", instance.Key), Details: instance})
 }
 
-// ResetSlave makes a slave forget about its master, effectively breaking the replication
+// ResetSlave makes a replica forget about its master, effectively breaking the replication
 func (this *HttpAPI) ResetSlave(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -435,7 +435,7 @@ func (this *HttpAPI) ResetSlave(params martini.Params, r render.Render, req *htt
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave reset on %+v", instance.Key), Details: instance})
 }
 
-// DetachSlave corrupts a slave's binlog corrdinates (though encodes it in such way
+// DetachSlave corrupts a replica's binlog corrdinates (though encodes it in such way
 // that is reversible), effectively breaking replication
 func (this *HttpAPI) DetachSlave(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -501,7 +501,7 @@ func (this *HttpAPI) ReattachSlaveMasterHost(params martini.Params, r render.Ren
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave reattached: %+v", instance.Key), Details: instance})
 }
 
-// EnableGTID attempts to enable GTID on a slave
+// EnableGTID attempts to enable GTID on a replica
 func (this *HttpAPI) EnableGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -522,7 +522,7 @@ func (this *HttpAPI) EnableGTID(params martini.Params, r render.Render, req *htt
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Enabled GTID on %+v", instance.Key), Details: instance})
 }
 
-// DisableGTID attempts to disable GTID on a slave, and revert to binlog file:pos
+// DisableGTID attempts to disable GTID on a replica, and revert to binlog file:pos
 func (this *HttpAPI) DisableGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -690,7 +690,7 @@ func (this *HttpAPI) RelocateBelow(params martini.Params, r render.Render, req *
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v relocated below %+v", instanceKey, belowKey), Details: instance})
 }
 
-// RelocateSlaves attempts to smartly relocate slaves of a given instance below another
+// RelocateSlaves attempts to smartly relocate replicas of a given instance below another
 func (this *HttpAPI) RelocateSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -824,7 +824,7 @@ func (this *HttpAPI) MatchUp(params martini.Params, r render.Render, req *http.R
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v matched up at %+v", instanceKey, *matchedCoordinates), Details: instance})
 }
 
-// MultiMatchSlaves attempts to match all slaves of a given instance below another, efficiently
+// MultiMatchSlaves attempts to match all replicas of a given instance below another, efficiently
 func (this *HttpAPI) MultiMatchSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -850,7 +850,7 @@ func (this *HttpAPI) MultiMatchSlaves(params martini.Params, r render.Render, re
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Matched %d slaves of %+v below %+v; %d errors: %+v", len(slaves), instanceKey, newMaster.Key, len(errs), errs), Details: newMaster.Key})
 }
 
-// MatchUpSlaves attempts to match up all slaves of an instance
+// MatchUpSlaves attempts to match up all replicas of an instance
 func (this *HttpAPI) MatchUpSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -871,7 +871,7 @@ func (this *HttpAPI) MatchUpSlaves(params martini.Params, r render.Render, req *
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Matched up %d slaves of %+v below %+v; %d errors: %+v", len(slaves), instanceKey, newMaster.Key, len(errs), errs), Details: newMaster.Key})
 }
 
-// RegroupSlaves attempts to pick a slave of a given instance and make it enslave its siblings, using any
+// RegroupSlaves attempts to pick a replica of a given instance and make it enslave its siblings, using any
 // method possible (GTID, Pseudo-GTID, binlog servers)
 func (this *HttpAPI) RegroupSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -895,7 +895,7 @@ func (this *HttpAPI) RegroupSlaves(params martini.Params, r render.Render, req *
 		promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalSlaves), len(aheadSlaves)), Details: promotedSlave.Key})
 }
 
-// RegroupSlaves attempts to pick a slave of a given instance and make it enslave its siblings, efficiently,
+// RegroupSlaves attempts to pick a replica of a given instance and make it enslave its siblings, efficiently,
 // using pseudo-gtid if necessary
 func (this *HttpAPI) RegroupSlavesPseudoGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -920,7 +920,7 @@ func (this *HttpAPI) RegroupSlavesPseudoGTID(params martini.Params, r render.Ren
 		promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalSlaves), len(aheadSlaves)), Details: promotedSlave.Key})
 }
 
-// RegroupSlavesGTID attempts to pick a slave of a given instance and make it enslave its siblings, efficiently, using GTID
+// RegroupSlavesGTID attempts to pick a replica of a given instance and make it enslave its siblings, efficiently, using GTID
 func (this *HttpAPI) RegroupSlavesGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -944,7 +944,7 @@ func (this *HttpAPI) RegroupSlavesGTID(params martini.Params, r render.Render, r
 		promotedSlave.Key.DisplayString(), len(lostSlaves), len(movedSlaves)), Details: promotedSlave.Key})
 }
 
-// RegroupSlavesBinlogServers attempts to pick a slave of a given instance and make it enslave its siblings, efficiently, using GTID
+// RegroupSlavesBinlogServers attempts to pick a replica of a given instance and make it enslave its siblings, efficiently, using GTID
 func (this *HttpAPI) RegroupSlavesBinlogServers(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -967,7 +967,7 @@ func (this *HttpAPI) RegroupSlavesBinlogServers(params martini.Params, r render.
 		promotedBinlogServer.Key.DisplayString()), Details: promotedBinlogServer.Key})
 }
 
-// MakeMaster attempts to make the given instance a master, and match its siblings to be its slaves
+// MakeMaster attempts to make the given instance a master, and match its siblings to be its replicas
 func (this *HttpAPI) MakeMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -1275,7 +1275,7 @@ func (this *HttpAPI) ClusterInfoByAlias(params martini.Params, r render.Render, 
 	this.ClusterInfo(params, r, req)
 }
 
-// ClusterOSCSlaves returns heuristic list of OSC slaves
+// ClusterOSCSlaves returns heuristic list of OSC replicas
 func (this *HttpAPI) ClusterOSCSlaves(params martini.Params, r render.Render, req *http.Request) {
 	instances, err := inst.GetClusterOSCSlaves(params["clusterName"])
 

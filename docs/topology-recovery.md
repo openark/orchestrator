@@ -78,7 +78,7 @@ A "simple" recovery case is that of a `DeadIntermediateMaster`. Its slaves are o
 using GTID or Pseudo-GTID they can still be re-connected to the topology. We might choose to:
 
 - Find a sibling of the dead intermediate master, and move orphaned slaves below said sibling
-- Promote a slave from among the orphaned slaves, make it intermediate master of its siblings, then
+- Promote a replica from among the orphaned slaves, make it intermediate master of its siblings, then
   connect promoted slave up the topology
 - relocate all orphaned slaves
 - Combine parts of the above

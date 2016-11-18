@@ -31,7 +31,7 @@ type TestSuite struct{}
 
 var _ = Suite(&TestSuite{})
 
-// This test suite assumes one master and three direct slaves, as follows;
+// This test suite assumes one master and three direct replicas, as follows;
 // This was setup with mysqlsandbox (using MySQL 5.5.32, not that it matters) via:
 // $ make_replication_sandbox --how_many_nodes=3 --replication_directory=55orchestrator /path/to/sandboxes/5.5.32
 // modify below to fit your own environment
@@ -193,7 +193,7 @@ func (s *TestSuite) TestMoveBelowAndBackComplex(c *C) {
 	c.Assert(slave1.MasterKey.Equals(&slave2Key), Equals, true)
 	c.Assert(slave1.SlaveRunning(), Equals, true)
 
-	// Now let's have fun. Stop slave2 (which is now parent of slave1), execute queries on master,
+	// Now let's have fun. Stop replica2 (which is now parent of replica1), execute queries on master,
 	// move s1 back under master, start all, verify queries.
 
 	_, err := StopSlave(&slave2Key)
@@ -238,7 +238,7 @@ func (s *TestSuite) TestMakeCoMasterAndBack(c *C) {
 	slave1, err := MakeCoMaster(&slave1Key)
 	c.Assert(err, IsNil)
 
-	// Now master & slave1 expected to be co-masters. Check!
+	// Now master & replica1 expected to be co-masters. Check!
 	master, _ := ReadTopologyInstance(&masterKey)
 	c.Assert(master.IsSlaveOf(slave1), Equals, true)
 	c.Assert(slave1.IsSlaveOf(master), Equals, true)
@@ -262,7 +262,7 @@ func (s *TestSuite) TestMakeCoMasterAndBackAndFailOthersToBecomeCoMasters(c *C) 
 	slave1, err := MakeCoMaster(&slave1Key)
 	c.Assert(err, IsNil)
 
-	// Now master & slave1 expected to be co-masters. Check!
+	// Now master & replica1 expected to be co-masters. Check!
 	master, _, _ := ReadInstance(&masterKey)
 	c.Assert(master.IsSlaveOf(slave1), Equals, true)
 	c.Assert(slave1.IsSlaveOf(master), Equals, true)
@@ -275,7 +275,7 @@ func (s *TestSuite) TestMakeCoMasterAndBackAndFailOthersToBecomeCoMasters(c *C) 
 	_, err = MakeCoMaster(&slave2Key)
 	c.Assert(err, Not(IsNil))
 
-	// reset slave - restore to original state
+	// reset replica - restore to original state
 	master, err = ResetSlaveOperation(&masterKey)
 	c.Assert(err, IsNil)
 	c.Assert(master.MasterKey.Hostname, Equals, "_")

@@ -328,7 +328,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	// No `goto Cleanup` after this point.
 	// -------------------------------------------------------------------------
 
-	// Get slaves, either by SHOW SLAVE HOSTS or via PROCESSLIST
+	// Get replicas, either by SHOW SLAVE HOSTS or via PROCESSLIST
 	// MaxScale does not support PROCESSLIST, so SHOW SLAVE HOSTS is the only option
 	if config.Config.DiscoverByShowSlaveHosts || isMaxScale {
 		err := sqlutils.QueryRowsMap(db, `show slave hosts`,
@@ -830,7 +830,7 @@ func ReadWriteableClustersMasters() (instances [](*Instance), err error) {
 	return instances, err
 }
 
-// ReadSlaveInstances reads slaves of a given master
+// ReadSlaveInstances reads replicas of a given master
 func ReadSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
 	condition := `
 			master_host = ?
@@ -839,7 +839,7 @@ func ReadSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
 	return readInstancesByCondition(condition, sqlutils.Args(masterKey.Hostname, masterKey.Port), "")
 }
 
-// ReadSlaveInstancesIncludingBinlogServerSubSlaves returns a list of direct slves including any slaves
+// ReadSlaveInstancesIncludingBinlogServerSubSlaves returns a list of direct slves including any replicas
 // of a binlog server replica
 func ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey *InstanceKey) ([](*Instance), error) {
 	slaves, err := ReadSlaveInstances(masterKey)
@@ -859,7 +859,7 @@ func ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey *InstanceKey) ([
 	return slaves, err
 }
 
-// ReadBinlogServerSlaveInstances reads direct slaves of a given master that are binlog servers
+// ReadBinlogServerSlaveInstances reads direct replicas of a given master that are binlog servers
 func ReadBinlogServerSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
 	condition := `
 			master_host = ?
@@ -1031,7 +1031,7 @@ func ReadClusterCandidateInstances(clusterName string) ([](*Instance), error) {
 	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
 }
 
-// filterOSCInstances will filter the given list such that only slaves fit for OSC control remain.
+// filterOSCInstances will filter the given list such that only replicas fit for OSC control remain.
 func filterOSCInstances(instances [](*Instance)) [](*Instance) {
 	result := [](*Instance){}
 	for _, instance := range instances {
@@ -1055,7 +1055,7 @@ func filterOSCInstances(instances [](*Instance)) [](*Instance) {
 	return result
 }
 
-// GetClusterOSCSlaves returns a heuristic list of slaves which are fit as controll slaves for an OSC operation.
+// GetClusterOSCSlaves returns a heuristic list of replicas which are fit as controll replicas for an OSC operation.
 // These would be intermediate masters
 func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
 	intermediateMasters := [](*Instance){}
@@ -1081,9 +1081,9 @@ func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
 		result = append(result, intermediateMasters...)
 	}
 	{
-		// Get 2 slaves of found IMs, if possible
+		// Get 2 replicas of found IMs, if possible
 		if len(intermediateMasters) == 1 {
-			// Pick 2 slaves for this IM
+			// Pick 2 replicas for this IM
 			slaves, err := ReadSlaveInstances(&(intermediateMasters[0].Key))
 			if err != nil {
 				return result, err
@@ -1095,7 +1095,7 @@ func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
 
 		}
 		if len(intermediateMasters) == 2 {
-			// Pick one slave from each IM (should be possible)
+			// Pick one replica from each IM (should be possible)
 			for _, im := range intermediateMasters {
 				slaves, err := ReadSlaveInstances(&im.Key)
 				if err != nil {
@@ -1110,7 +1110,7 @@ func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
 		}
 	}
 	{
-		// Get 2 3rd tier slaves, if possible
+		// Get 2 3rd tier replicas, if possible
 		condition := `
 			replication_depth = 3
 			and cluster_name = ?
@@ -1125,7 +1125,7 @@ func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
 		result = append(result, slaves...)
 	}
 	{
-		// Get 2 1st tier leaf slaves, if possible
+		// Get 2 1st tier leaf replicas, if possible
 		condition := `
 			replication_depth = 1
 			and num_slave_hosts = 0
@@ -1192,7 +1192,7 @@ func GetInstancesMaxLag(instances [](*Instance)) (maxLag int64, err error) {
 	return maxLag, nil
 }
 
-// GetClusterHeuristicLag returns a heuristic lag for a cluster, based on its OSC slaves
+// GetClusterHeuristicLag returns a heuristic lag for a cluster, based on its OSC replicas
 func GetClusterHeuristicLag(clusterName string) (int64, error) {
 	instances, err := GetClusterOSCSlaves(clusterName)
 	if err != nil {
@@ -1298,7 +1298,7 @@ func ReviewUnseenInstances() error {
 	return err
 }
 
-// readUnseenMasterKeys will read list of masters that have never been seen, and yet whose slaves
+// readUnseenMasterKeys will read list of masters that have never been seen, and yet whose replicas
 // seem to be replicating.
 func readUnseenMasterKeys() ([]InstanceKey, error) {
 	res := []InstanceKey{}
@@ -1336,7 +1336,7 @@ func readUnseenMasterKeys() ([]InstanceKey, error) {
 }
 
 // InjectUnseenMasters will review masters of instances that are known to be replicating, yet which are not listed
-// in database_instance. Since their slaves are listed as replicating, we can assume that such masters actually do
+// in database_instance. Since their replicas are listed as replicating, we can assume that such masters actually do
 // exist: we shall therefore inject them with minimal details into the database_instance table.
 func InjectUnseenMasters() error {
 
@@ -1418,7 +1418,7 @@ func readUnknownMasterHostnameResolves() (map[string]string, error) {
 }
 
 // ResolveUnknownMasterHostnameResolves fixes missing hostname resolves based on hostname_resolve_history
-// The use case is slaves replicating from some unknown-hostname which cannot be otherwise found. This could
+// The use case is replicas replicating from some unknown-hostname which cannot be otherwise found. This could
 // happen due to an expire unresolve together with clearing up of hostname cache.
 func ResolveUnknownMasterHostnameResolves() error {
 
@@ -1718,7 +1718,7 @@ func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 					instance_alias=VALUES(instance_alias)
 				`
 		} else {
-			// Scenario: some slave reported a master of his; but the master cannot be contacted.
+			// Scenario: some replica reported a master of his; but the master cannot be contacted.
 			// We might still want to have that master written down
 			// Use with caution
 			insertIgnore = `ignore`
@@ -2137,7 +2137,7 @@ func RecordInstanceBinlogFileHistory() error {
 // UpdateInstanceRecentRelaylogHistory updates the database_instance_recent_relaylog_history
 // table listing the current relaylog coordinates and the one-before.
 // This information can be used to diagnoze a stale-replication scenario (for example, master is locked down
-// and although slaves are connected, they're not making progress)
+// and although replicas are connected, they're not making progress)
 func UpdateInstanceRecentRelaylogHistory() error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
