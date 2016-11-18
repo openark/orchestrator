@@ -293,9 +293,13 @@ function openNodeModal(node) {
     $('#node_modal [data-btn-group=stop-slave]').appendTo(td.find("div"))
 
     if (!node.replicationRunning) {
-      td = addNodeModalDataAttribute("Last SQL error", node.LastSQLError);
-      $('#node_modal button[data-btn=skip-query]').appendTo(td.find("div"))
-      addNodeModalDataAttribute("Last IO error", node.LastIOError);
+      if (node.LastSQLError) {
+        td = addNodeModalDataAttribute("Last SQL error", node.LastSQLError);
+        $('#node_modal button[data-btn=skip-query]').appendTo(td.find("div"))
+      }
+      if (node.LastIOError) {
+        addNodeModalDataAttribute("Last IO error", node.LastIOError);
+      }
     }
     addNodeModalDataAttribute("Seconds behind master", node.SecondsBehindMaster.Valid ? node.SecondsBehindMaster.Int64 : "null");
     addNodeModalDataAttribute("Replication lag", node.SlaveLagSeconds.Valid ? node.SlaveLagSeconds.Int64 : "null");
@@ -609,6 +613,13 @@ function normalizeInstance(instance) {
   instance.isAggregate = false;
 
   instance.renderHint = "";
+
+  if (instance.LastSQLError == '""') {
+    instance.LastSQLError = '';
+  }
+  if (instance.LastIOError == '""') {
+    instance.LastIOError = '';
+  }
 }
 
 function normalizeInstanceProblem(instance) {
