@@ -981,7 +981,7 @@ func DetachReplicaOperation(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 
-	instance, err = DetachSlave(instanceKey)
+	instance, err = DetachReplica(instanceKey)
 	if err != nil {
 		goto Cleanup
 	}
@@ -1041,7 +1041,7 @@ Cleanup:
 }
 
 // DetachSlaveMasterHost detaches a replica from its master by corrupting the Master_Host (in such way that is reversible)
-func DetachSlaveMasterHost(instanceKey *InstanceKey) (*Instance, error) {
+func DetachReplicaMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err

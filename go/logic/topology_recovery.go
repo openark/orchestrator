@@ -503,7 +503,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		if config.Config.MasterFailoverDetachSlaveMasterHost {
 			postponedFunction := func() error {
 				log.Debugf("topology_recovery: - RecoverDeadMaster: detaching master host on promoted master")
-				inst.DetachSlaveMasterHost(&promotedSlave.Key)
+				inst.DetachReplicaMasterHost(&promotedSlave.Key)
 				return nil
 			}
 			topologyRecovery.AddPostponedFunction(postponedFunction)
@@ -836,7 +836,7 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 	// but we want to make sure the circle is broken no matter what.
 	// So in the case we promoted not-the-other-co-master, we issue a detach-slave-master-host, which is a reversible operation
 	if promotedSlave != nil && !promotedSlave.Key.Equals(otherCoMasterKey) {
-		_, err = inst.DetachSlaveMasterHost(&promotedSlave.Key)
+		_, err = inst.DetachReplicaMasterHost(&promotedSlave.Key)
 		topologyRecovery.AddError(log.Errore(err))
 	}
 

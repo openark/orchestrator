@@ -437,7 +437,7 @@ func (this *HttpAPI) ResetSlave(params martini.Params, r render.Render, req *htt
 
 // DetachSlave corrupts a replica's binlog corrdinates (though encodes it in such way
 // that is reversible), effectively breaking replication
-func (this *HttpAPI) DetachSlave(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpAPI) DetachReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -2336,7 +2336,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "stop-slave/:host/:port", this.StopSlave)
 	this.registerRequest(m, "stop-slave-nice/:host/:port", this.StopSlaveNicely)
 	this.registerRequest(m, "reset-slave/:host/:port", this.ResetSlave)
-	this.registerRequest(m, "detach-slave/:host/:port", this.DetachSlave)
+	this.registerRequest(m, "detach-slave/:host/:port", this.DetachReplica)
 	this.registerRequest(m, "reattach-slave/:host/:port", this.ReattachReplica)
 	this.registerRequest(m, "reattach-slave-master-host/:host/:port", this.ReattachReplicaMasterHost)
 

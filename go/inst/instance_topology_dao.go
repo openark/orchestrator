@@ -745,7 +745,7 @@ func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
 
 // DetachSlave detaches a replica from replication; forcibly corrupting the binlog coordinates (though in such way
 // that is reversible)
-func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
+func DetachReplica(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
