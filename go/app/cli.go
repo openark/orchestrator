@@ -429,7 +429,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			_, promotedBinlogServer, err := inst.RegroupSlavesBinlogServers(instanceKey, false)
+			_, promotedBinlogServer, err := inst.RegroupReplicasBinlogServers(instanceKey, false)
 			if promotedBinlogServer == nil {
 				log.Fatalf("Could not regroup binlog server replicas of %+v; error: %+v", *instanceKey, err)
 			}
@@ -477,7 +477,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			lostSlaves, movedSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlavesGTID(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) })
+			lostSlaves, movedSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupReplicasGTID(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) })
 			lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 
 			if promotedSlave == nil {
@@ -570,7 +570,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlavesPseudoGTID(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
+			lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupReplicasPseudoGTID(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
 			lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 			postponedFunctionsContainer.InvokePostponed()
 			if promotedSlave == nil {

@@ -2141,8 +2141,8 @@ func GetCandidateSlaveOfBinlogServerTopology(masterKey *InstanceKey) (candidateS
 	return candidateSlave, err
 }
 
-// RegroupSlavesPseudoGTID will choose a candidate replica of a given instance, and enslave its siblings using pseudo-gtid
-func RegroupSlavesPseudoGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), [](*Instance), *Instance, error) {
+// RegroupReplicasPseudoGTID will choose a candidate replica of a given instance, and enslave its siblings using pseudo-gtid
+func RegroupReplicasPseudoGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), [](*Instance), *Instance, error) {
 	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err := GetCandidateSlave(masterKey, true)
 	if err != nil {
 		if !returnSlaveEvenOnFailureToRegroup {
@@ -2159,7 +2159,7 @@ func RegroupSlavesPseudoGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToR
 		onCandidateSlaveChosen(candidateSlave)
 	}
 
-	log.Debugf("RegroupSlaves: working on %d equals slaves", len(equalSlaves))
+	log.Debugf("RegroupReplicas: working on %d equals slaves", len(equalSlaves))
 	barrier := make(chan *InstanceKey)
 	for _, slave := range equalSlaves {
 		slave := slave
@@ -2176,13 +2176,13 @@ func RegroupSlavesPseudoGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToR
 		<-barrier
 	}
 
-	log.Debugf("RegroupSlaves: multi matching %d later slaves", len(laterSlaves))
+	log.Debugf("RegroupReplicas: multi matching %d later slaves", len(laterSlaves))
 	// As for the laterSlaves, we'll have to apply pseudo GTID
 	laterSlaves, instance, err, _ := MultiMatchBelow(laterSlaves, &candidateSlave.Key, true, postponedFunctionsContainer)
 
 	operatedSlaves := append(equalSlaves, candidateSlave)
 	operatedSlaves = append(operatedSlaves, laterSlaves...)
-	log.Debugf("RegroupSlaves: starting %d slaves", len(operatedSlaves))
+	log.Debugf("RegroupReplicas: starting %d slaves", len(operatedSlaves))
 	barrier = make(chan *InstanceKey)
 	for _, slave := range operatedSlaves {
 		slave := slave
@@ -2197,7 +2197,7 @@ func RegroupSlavesPseudoGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToR
 		<-barrier
 	}
 
-	log.Debugf("RegroupSlaves: done")
+	log.Debugf("RegroupReplicas: done")
 	AuditOperation("regroup-slaves", masterKey, fmt.Sprintf("regrouped %+v slaves below %+v", len(operatedSlaves), *masterKey))
 	// aheadSlaves are lost (they were ahead in replication as compared to promoted replica)
 	return aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, instance, err
@@ -2220,24 +2220,24 @@ func getMostUpToDateActiveBinlogServer(masterKey *InstanceKey) (mostAdvancedBinl
 	return mostAdvancedBinlogServer, binlogServerSlaves, err
 }
 
-// RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers uses Pseugo-GTID to regroup replicas
+// RegroupReplicasPseudoGTIDIncludingSubSlavesOfBinlogServers uses Pseugo-GTID to regroup replicas
 // of given instance. The function also drill in to replicas of binlog servers that are replicating from given instance,
 // and other recursive binlog servers, as long as they're in the same binlog-server-family.
-func RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), [](*Instance), *Instance, error) {
+func RegroupReplicasPseudoGTIDIncludingSubSlavesOfBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), [](*Instance), *Instance, error) {
 	// First, handle binlog server issues:
 	func() error {
-		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: starting on slaves of %+v", *masterKey)
+		log.Debugf("RegroupReplicasIncludingSubSlavesOfBinlogServers: starting on slaves of %+v", *masterKey)
 		// Find the most up to date binlog server:
 		mostUpToDateBinlogServer, binlogServerSlaves, err := getMostUpToDateActiveBinlogServer(masterKey)
 		if err != nil {
 			return log.Errore(err)
 		}
 		if mostUpToDateBinlogServer == nil {
-			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: no binlog server replicates from %+v", *masterKey)
+			log.Debugf("RegroupReplicasIncludingSubSlavesOfBinlogServers: no binlog server replicates from %+v", *masterKey)
 			// No binlog server; proceed as normal
 			return nil
 		}
-		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: most up to date binlog server of %+v: %+v", *masterKey, mostUpToDateBinlogServer.Key)
+		log.Debugf("RegroupReplicasIncludingSubSlavesOfBinlogServers: most up to date binlog server of %+v: %+v", *masterKey, mostUpToDateBinlogServer.Key)
 
 		// Find the most up to date candidate replica:
 		candidateSlave, _, _, _, _, err := GetCandidateSlave(masterKey, true)
@@ -2245,52 +2245,52 @@ func RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers(masterKey *Instanc
 			return log.Errore(err)
 		}
 		if candidateSlave == nil {
-			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: no candidate replica for %+v", *masterKey)
+			log.Debugf("RegroupReplicasIncludingSubSlavesOfBinlogServers: no candidate replica for %+v", *masterKey)
 			// Let the followup code handle that
 			return nil
 		}
-		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: candidate replica of %+v: %+v", *masterKey, candidateSlave.Key)
+		log.Debugf("RegroupReplicasIncludingSubSlavesOfBinlogServers: candidate replica of %+v: %+v", *masterKey, candidateSlave.Key)
 
 		if candidateSlave.ExecBinlogCoordinates.SmallerThan(&mostUpToDateBinlogServer.ExecBinlogCoordinates) {
-			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: candidate replica %+v coordinates smaller than binlog server %+v", candidateSlave.Key, mostUpToDateBinlogServer.Key)
+			log.Debugf("RegroupReplicasIncludingSubSlavesOfBinlogServers: candidate replica %+v coordinates smaller than binlog server %+v", candidateSlave.Key, mostUpToDateBinlogServer.Key)
 			// Need to align under binlog server...
 			candidateSlave, err = Repoint(&candidateSlave.Key, &mostUpToDateBinlogServer.Key, GTIDHintDeny)
 			if err != nil {
 				return log.Errore(err)
 			}
-			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: repointed candidate replica %+v under binlog server %+v", candidateSlave.Key, mostUpToDateBinlogServer.Key)
+			log.Debugf("RegroupReplicasIncludingSubSlavesOfBinlogServers: repointed candidate replica %+v under binlog server %+v", candidateSlave.Key, mostUpToDateBinlogServer.Key)
 			candidateSlave, err = StartSlaveUntilMasterCoordinates(&candidateSlave.Key, &mostUpToDateBinlogServer.ExecBinlogCoordinates)
 			if err != nil {
 				return log.Errore(err)
 			}
-			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: aligned candidate replica %+v under binlog server %+v", candidateSlave.Key, mostUpToDateBinlogServer.Key)
+			log.Debugf("RegroupReplicasIncludingSubSlavesOfBinlogServers: aligned candidate replica %+v under binlog server %+v", candidateSlave.Key, mostUpToDateBinlogServer.Key)
 			// and move back
 			candidateSlave, err = Repoint(&candidateSlave.Key, masterKey, GTIDHintDeny)
 			if err != nil {
 				return log.Errore(err)
 			}
-			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: repointed candidate replica %+v under master %+v", candidateSlave.Key, *masterKey)
+			log.Debugf("RegroupReplicasIncludingSubSlavesOfBinlogServers: repointed candidate replica %+v under master %+v", candidateSlave.Key, *masterKey)
 			return nil
 		}
 		// Either because it _was_ like that, or we _made_ it so,
 		// candidate replica is as/more up to date than all binlog servers
 		for _, binlogServer := range binlogServerSlaves {
-			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: matching slaves of binlog server %+v below %+v", binlogServer.Key, candidateSlave.Key)
+			log.Debugf("RegroupReplicasIncludingSubSlavesOfBinlogServers: matching slaves of binlog server %+v below %+v", binlogServer.Key, candidateSlave.Key)
 			// Right now sequentially.
 			// At this point just do what you can, don't return an error
 			MultiMatchReplicas(&binlogServer.Key, &candidateSlave.Key, "")
-			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: done matching slaves of binlog server %+v below %+v", binlogServer.Key, candidateSlave.Key)
+			log.Debugf("RegroupReplicasIncludingSubSlavesOfBinlogServers: done matching slaves of binlog server %+v below %+v", binlogServer.Key, candidateSlave.Key)
 		}
-		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: done handling binlog regrouping for %+v; will proceed with normal RegroupSlaves", *masterKey)
+		log.Debugf("RegroupReplicasIncludingSubSlavesOfBinlogServers: done handling binlog regrouping for %+v; will proceed with normal RegroupReplicas", *masterKey)
 		AuditOperation("regroup-slaves-including-bls", masterKey, fmt.Sprintf("matched slaves of binlog server slaves of %+v under %+v", *masterKey, candidateSlave.Key))
 		return nil
 	}()
 	// Proceed to normal regroup:
-	return RegroupSlavesPseudoGTID(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen, postponedFunctionsContainer)
+	return RegroupReplicasPseudoGTID(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen, postponedFunctionsContainer)
 }
 
-// RegroupSlavesGTID will choose a candidate replica of a given instance, and enslave its siblings using GTID
-func RegroupSlavesGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance)) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
+// RegroupReplicasGTID will choose a candidate replica of a given instance, and enslave its siblings using GTID
+func RegroupReplicasGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool, onCandidateSlaveChosen func(*Instance)) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
 	var emptySlaves [](*Instance)
 	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err := GetCandidateSlave(masterKey, true)
 	if err != nil {
@@ -2305,7 +2305,7 @@ func RegroupSlavesGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup
 	}
 
 	slavesToMove := append(equalSlaves, laterSlaves...)
-	log.Debugf("RegroupSlavesGTID: working on %d slaves", len(slavesToMove))
+	log.Debugf("RegroupReplicasGTID: working on %d slaves", len(slavesToMove))
 
 	movedSlaves, unmovedSlaves, err, _ := moveSlavesViaGTID(slavesToMove, candidateSlave)
 	if err != nil {
@@ -2314,14 +2314,14 @@ func RegroupSlavesGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup
 	unmovedSlaves = append(unmovedSlaves, aheadSlaves...)
 	StartSlave(&candidateSlave.Key)
 
-	log.Debugf("RegroupSlavesGTID: done")
+	log.Debugf("RegroupReplicasGTID: done")
 	AuditOperation("regroup-slaves-gtid", masterKey, fmt.Sprintf("regrouped slaves of %+v via GTID; promoted %+v", *masterKey, candidateSlave.Key))
 	return unmovedSlaves, movedSlaves, cannotReplicateSlaves, candidateSlave, err
 }
 
-// RegroupSlavesBinlogServers works on a binlog-servers topology. It picks the most up-to-date BLS and repoints all other
+// RegroupReplicasBinlogServers works on a binlog-servers topology. It picks the most up-to-date BLS and repoints all other
 // BLS below it
-func RegroupSlavesBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool) (repointedBinlogServers [](*Instance), promotedBinlogServer *Instance, err error) {
+func RegroupReplicasBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool) (repointedBinlogServers [](*Instance), promotedBinlogServer *Instance, err error) {
 	var binlogServerSlaves [](*Instance)
 	promotedBinlogServer, binlogServerSlaves, err = getMostUpToDateActiveBinlogServer(masterKey)
 
@@ -2345,7 +2345,7 @@ func RegroupSlavesBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailure
 	return repointedBinlogServers, promotedBinlogServer, nil
 }
 
-// RegroupSlaves is a "smart" method of promoting one replica over the others ("promoting" it on top of its siblings)
+// RegroupReplicas is a "smart" method of promoting one replica over the others ("promoting" it on top of its siblings)
 // This method decides which strategy to use: GTID, Pseudo-GTID, Binlog Servers.
 func RegroupReplicas(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool,
 	onCandidateSlaveChosen func(*Instance),
@@ -2379,22 +2379,22 @@ func RegroupReplicas(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup b
 		}
 	}
 	if allGTID {
-		log.Debugf("RegroupSlaves: using GTID to regroup slaves of %+v", *masterKey)
-		unmovedSlaves, movedSlaves, cannotReplicateSlaves, candidateSlave, err := RegroupSlavesGTID(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen)
+		log.Debugf("RegroupReplicas: using GTID to regroup slaves of %+v", *masterKey)
+		unmovedSlaves, movedSlaves, cannotReplicateSlaves, candidateSlave, err := RegroupReplicasGTID(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen)
 		return unmovedSlaves, emptySlaves, movedSlaves, cannotReplicateSlaves, candidateSlave, err
 	}
 	if allBinlogServers {
-		log.Debugf("RegroupSlaves: using binlog servers to regroup slaves of %+v", *masterKey)
-		movedSlaves, candidateSlave, err := RegroupSlavesBinlogServers(masterKey, returnSlaveEvenOnFailureToRegroup)
+		log.Debugf("RegroupReplicas: using binlog servers to regroup slaves of %+v", *masterKey)
+		movedSlaves, candidateSlave, err := RegroupReplicasBinlogServers(masterKey, returnSlaveEvenOnFailureToRegroup)
 		return emptySlaves, emptySlaves, movedSlaves, cannotReplicateSlaves, candidateSlave, err
 	}
 	if allPseudoGTID {
-		log.Debugf("RegroupSlaves: using Pseudo-GTID to regroup slaves of %+v", *masterKey)
-		return RegroupSlavesPseudoGTID(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen, postponedFunctionsContainer)
+		log.Debugf("RegroupReplicas: using Pseudo-GTID to regroup slaves of %+v", *masterKey)
+		return RegroupReplicasPseudoGTID(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen, postponedFunctionsContainer)
 	}
 	// And, as last resort, we do PseudoGTID & binlog servers
-	log.Warningf("RegroupSlaves: unsure what method to invoke for %+v; trying Pseudo-GTID+Binlog Servers", *masterKey)
-	return RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen, postponedFunctionsContainer)
+	log.Warningf("RegroupReplicas: unsure what method to invoke for %+v; trying Pseudo-GTID+Binlog Servers", *masterKey)
+	return RegroupReplicasPseudoGTIDIncludingSubSlavesOfBinlogServers(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen, postponedFunctionsContainer)
 }
 
 // relocateBelowInternal is a protentially recursive function which chooses how to relocate an instance below another.

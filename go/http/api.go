@@ -871,7 +871,7 @@ func (this *HttpAPI) MatchUpReplicas(params martini.Params, r render.Render, req
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Matched up %d slaves of %+v below %+v; %d errors: %+v", len(slaves), instanceKey, newMaster.Key, len(errs), errs), Details: newMaster.Key})
 }
 
-// RegroupSlaves attempts to pick a replica of a given instance and make it enslave its siblings, using any
+// RegroupReplicas attempts to pick a replica of a given instance and make it enslave its siblings, using any
 // method possible (GTID, Pseudo-GTID, binlog servers)
 func (this *HttpAPI) RegroupReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -895,9 +895,9 @@ func (this *HttpAPI) RegroupReplicas(params martini.Params, r render.Render, req
 		promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalSlaves), len(aheadSlaves)), Details: promotedSlave.Key})
 }
 
-// RegroupSlaves attempts to pick a replica of a given instance and make it enslave its siblings, efficiently,
+// RegroupReplicas attempts to pick a replica of a given instance and make it enslave its siblings, efficiently,
 // using pseudo-gtid if necessary
-func (this *HttpAPI) RegroupSlavesPseudoGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpAPI) RegroupReplicasPseudoGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -908,7 +908,7 @@ func (this *HttpAPI) RegroupSlavesPseudoGTID(params martini.Params, r render.Ren
 		return
 	}
 
-	lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlavesPseudoGTID(&instanceKey, false, nil, nil)
+	lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupReplicasPseudoGTID(&instanceKey, false, nil, nil)
 	lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 
 	if err != nil {
@@ -920,8 +920,8 @@ func (this *HttpAPI) RegroupSlavesPseudoGTID(params martini.Params, r render.Ren
 		promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalSlaves), len(aheadSlaves)), Details: promotedSlave.Key})
 }
 
-// RegroupSlavesGTID attempts to pick a replica of a given instance and make it enslave its siblings, efficiently, using GTID
-func (this *HttpAPI) RegroupSlavesGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+// RegroupReplicasGTID attempts to pick a replica of a given instance and make it enslave its siblings, efficiently, using GTID
+func (this *HttpAPI) RegroupReplicasGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -932,7 +932,7 @@ func (this *HttpAPI) RegroupSlavesGTID(params martini.Params, r render.Render, r
 		return
 	}
 
-	lostSlaves, movedSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlavesGTID(&instanceKey, false, nil)
+	lostSlaves, movedSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupReplicasGTID(&instanceKey, false, nil)
 	lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 
 	if err != nil {
@@ -944,8 +944,8 @@ func (this *HttpAPI) RegroupSlavesGTID(params martini.Params, r render.Render, r
 		promotedSlave.Key.DisplayString(), len(lostSlaves), len(movedSlaves)), Details: promotedSlave.Key})
 }
 
-// RegroupSlavesBinlogServers attempts to pick a replica of a given instance and make it enslave its siblings, efficiently, using GTID
-func (this *HttpAPI) RegroupSlavesBinlogServers(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+// RegroupReplicasBinlogServers attempts to pick a replica of a given instance and make it enslave its siblings, efficiently, using GTID
+func (this *HttpAPI) RegroupReplicasBinlogServers(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -956,7 +956,7 @@ func (this *HttpAPI) RegroupSlavesBinlogServers(params martini.Params, r render.
 		return
 	}
 
-	_, promotedBinlogServer, err := inst.RegroupSlavesBinlogServers(&instanceKey, false)
+	_, promotedBinlogServer, err := inst.RegroupReplicasBinlogServers(&instanceKey, false)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
@@ -2309,12 +2309,12 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "master-equivalent/:host/:port/:logFile/:logPos", this.MasterEquivalent)
 
 	// Binlog server relocation:
-	this.registerRequest(m, "regroup-slaves-bls/:host/:port", this.RegroupSlavesBinlogServers)
+	this.registerRequest(m, "regroup-slaves-bls/:host/:port", this.RegroupReplicasBinlogServers)
 
 	// GTID relocation:
 	this.registerRequest(m, "move-below-gtid/:host/:port/:belowHost/:belowPort", this.MoveBelowGTID)
 	this.registerRequest(m, "move-slaves-gtid/:host/:port/:belowHost/:belowPort", this.MoveSlavesGTID)
-	this.registerRequest(m, "regroup-slaves-gtid/:host/:port", this.RegroupSlavesGTID)
+	this.registerRequest(m, "regroup-slaves-gtid/:host/:port", this.RegroupReplicasGTID)
 
 	// Pseudo-GTID relocation:
 	this.registerRequest(m, "match/:host/:port/:belowHost/:belowPort", this.MatchBelow)
@@ -2322,7 +2322,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "match-up/:host/:port", this.MatchUp)
 	this.registerRequest(m, "match-slaves/:host/:port/:belowHost/:belowPort", this.MultiMatchReplicas)
 	this.registerRequest(m, "match-up-slaves/:host/:port", this.MatchUpReplicas)
-	this.registerRequest(m, "regroup-slaves-pgtid/:host/:port", this.RegroupSlavesPseudoGTID)
+	this.registerRequest(m, "regroup-slaves-pgtid/:host/:port", this.RegroupReplicasPseudoGTID)
 	// Legacy, need to revisit:
 	this.registerRequest(m, "make-master/:host/:port", this.MakeMaster)
 	this.registerRequest(m, "make-local-master/:host/:port", this.MakeLocalMaster)
