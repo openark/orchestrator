@@ -230,7 +230,7 @@ func (this *Instance) IsSlave() bool {
 }
 
 // SlaveRunning returns true when this instance's status is of a replicating replica.
-func (this *Instance) SlaveRunning() bool {
+func (this *Instance) ReplicaRunning() bool {
 	return this.IsSlave() && this.Slave_SQL_Running && this.Slave_IO_Running
 }
 

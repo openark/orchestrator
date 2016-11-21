@@ -420,7 +420,7 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 	if !instance.IsSlave() {
 		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
-	if instance.SlaveRunning() {
+	if instance.ReplicaRunning() {
 		return instance, fmt.Errorf("slave already running: %+v", instanceKey)
 	}
 
@@ -488,7 +488,7 @@ func ChangeMasterCredentials(instanceKey *InstanceKey, masterUser string, master
 		return instance, log.Errorf("Empty user in ChangeMasterCredentials() for %+v", *instanceKey)
 	}
 
-	if instance.SlaveRunning() {
+	if instance.ReplicaRunning() {
 		return instance, fmt.Errorf("ChangeMasterTo: Cannot change master on: %+v because slave is running", *instanceKey)
 	}
 	log.Debugf("ChangeMasterTo: will attempt changing master credentials on %+v", *instanceKey)
@@ -516,7 +516,7 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 		return instance, log.Errore(err)
 	}
 
-	if instance.SlaveRunning() {
+	if instance.ReplicaRunning() {
 		return instance, fmt.Errorf("ChangeMasterTo: Cannot change master on: %+v because slave is running", *instanceKey)
 	}
 	log.Debugf("ChangeMasterTo: will attempt changing master on %+v to %+v, %+v", *instanceKey, *masterKey, *masterBinlogCoordinates)
@@ -619,7 +619,7 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 
-	if instance.SlaveRunning() {
+	if instance.ReplicaRunning() {
 		return instance, fmt.Errorf("Cannot reset slave on: %+v because slave is running", instanceKey)
 	}
 
@@ -652,7 +652,7 @@ func ResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 
-	if instance.SlaveRunning() {
+	if instance.ReplicaRunning() {
 		return instance, fmt.Errorf("Cannot reset master on: %+v because slave is running", instanceKey)
 	}
 
@@ -751,7 +751,7 @@ func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 
-	if instance.SlaveRunning() {
+	if instance.ReplicaRunning() {
 		return instance, fmt.Errorf("Cannot detach slave on: %+v because slave is running", instanceKey)
 	}
 
@@ -785,7 +785,7 @@ func ReattachSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 
-	if instance.SlaveRunning() {
+	if instance.ReplicaRunning() {
 		return instance, fmt.Errorf("Cannot (need not) reattach slave on: %+v because slave is running", instanceKey)
 	}
 

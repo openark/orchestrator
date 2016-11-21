@@ -531,7 +531,7 @@ func isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instanc
 	if !sibling.LogSlaveUpdatesEnabled {
 		return false
 	}
-	if !sibling.SlaveRunning() {
+	if !sibling.ReplicaRunning() {
 		return false
 	}
 	if !sibling.IsLastCheckValid {
