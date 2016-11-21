@@ -287,14 +287,14 @@ func (this *Instance) GetNextBinaryLog(binlogCoordinates BinlogCoordinates) (Bin
 	return binlogCoordinates.NextFileCoordinates()
 }
 
-// IsSlaveOf returns true if this instance claims to replicate from given master
-func (this *Instance) IsSlaveOf(master *Instance) bool {
+// IsReplicaOf returns true if this instance claims to replicate from given master
+func (this *Instance) IsReplicaOf(master *Instance) bool {
 	return this.MasterKey.Equals(&master.Key)
 }
 
-// IsSlaveOf returns true if this i supposed master of given replica
+// IsReplicaOf returns true if this i supposed master of given replica
 func (this *Instance) IsMasterOf(slave *Instance) bool {
-	return slave.IsSlaveOf(this)
+	return slave.IsReplicaOf(this)
 }
 
 // CanReplicateFrom uses heursitics to decide whether this instacne can practically replicate from other instance.

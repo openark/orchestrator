@@ -240,8 +240,8 @@ func (s *TestSuite) TestMakeCoMasterAndBack(c *C) {
 
 	// Now master & replica1 expected to be co-masters. Check!
 	master, _ := ReadTopologyInstance(&masterKey)
-	c.Assert(master.IsSlaveOf(slave1), Equals, true)
-	c.Assert(slave1.IsSlaveOf(master), Equals, true)
+	c.Assert(master.IsReplicaOf(slave1), Equals, true)
+	c.Assert(slave1.IsReplicaOf(master), Equals, true)
 
 	// reset - restore to original state
 	master, err = ResetSlaveOperation(&masterKey)
@@ -264,8 +264,8 @@ func (s *TestSuite) TestMakeCoMasterAndBackAndFailOthersToBecomeCoMasters(c *C) 
 
 	// Now master & replica1 expected to be co-masters. Check!
 	master, _, _ := ReadInstance(&masterKey)
-	c.Assert(master.IsSlaveOf(slave1), Equals, true)
-	c.Assert(slave1.IsSlaveOf(master), Equals, true)
+	c.Assert(master.IsReplicaOf(slave1), Equals, true)
+	c.Assert(slave1.IsReplicaOf(master), Equals, true)
 
 	// Verify can't have additional co-masters
 	_, err = MakeCoMaster(&masterKey)
