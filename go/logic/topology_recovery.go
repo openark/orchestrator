@@ -322,7 +322,7 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 		}
 	case MasterRecoveryPseudoGTID:
 		{
-			lostSlaves, _, _, cannotReplicateSlaves, promotedSlave, err = inst.RegroupReplicasPseudoGTIDIncludingSubSlavesOfBinlogServers(failedInstanceKey, true, nil, &topologyRecovery.PostponedFunctionsContainer)
+			lostSlaves, _, _, cannotReplicateSlaves, promotedSlave, err = inst.RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(failedInstanceKey, true, nil, &topologyRecovery.PostponedFunctionsContainer)
 		}
 	case MasterRecoveryBinlogServer:
 		{
@@ -781,7 +781,7 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 		}
 	case MasterRecoveryPseudoGTID:
 		{
-			lostSlaves, _, _, cannotReplicateSlaves, promotedSlave, err = inst.RegroupReplicasPseudoGTIDIncludingSubSlavesOfBinlogServers(failedInstanceKey, true, nil, &topologyRecovery.PostponedFunctionsContainer)
+			lostSlaves, _, _, cannotReplicateSlaves, promotedSlave, err = inst.RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(failedInstanceKey, true, nil, &topologyRecovery.PostponedFunctionsContainer)
 		}
 	}
 	topologyRecovery.AddError(err)
