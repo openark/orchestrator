@@ -1143,10 +1143,10 @@ func GetClusterOSCReplicas(clusterName string) ([](*Instance), error) {
 	return result, nil
 }
 
-// GetClusterGhostSlaves returns a list of replicas that can serve as the connected servers
+// GetClusterGhostReplicas returns a list of replicas that can serve as the connected servers
 // for a [gh-ost](https://github.com/github/gh-ost) operation. A gh-ost operation prefers to talk
 // to a RBR replica that has no children.
-func GetClusterGhostSlaves(clusterName string) (result [](*Instance), err error) {
+func GetClusterGhostReplicas(clusterName string) (result [](*Instance), err error) {
 	condition := `
 			replication_depth > 0
 			and binlog_format = 'ROW'
