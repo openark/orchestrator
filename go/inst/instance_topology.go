@@ -642,7 +642,7 @@ func MoveSlavesGTID(masterKey *InstanceKey, belowKey *InstanceKey, pattern strin
 	}
 
 	// replicas involved
-	slaves, err := ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey)
+	slaves, err := ReadSlaveInstancesIncludingBinlogServerSubReplicas(masterKey)
 	if err != nil {
 		return movedSlaves, unmovedSlaves, err, errs
 	}
@@ -1618,7 +1618,7 @@ func sortInstances(instances [](*Instance)) {
 // getSlavesForSorting returns a list of replicas of a given master potentially for candidate choosing
 func getSlavesForSorting(masterKey *InstanceKey, includeBinlogServerSubSlaves bool) (slaves [](*Instance), err error) {
 	if includeBinlogServerSubSlaves {
-		slaves, err = ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey)
+		slaves, err = ReadSlaveInstancesIncludingBinlogServerSubReplicas(masterKey)
 	} else {
 		slaves, err = ReadSlaveInstances(masterKey)
 	}
@@ -1872,7 +1872,7 @@ func MultiMatchReplicas(masterKey *InstanceKey, belowKey *InstanceKey, pattern s
 	// Not binlog server
 
 	// replicas involved
-	slaves, err := ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey)
+	slaves, err := ReadSlaveInstancesIncludingBinlogServerSubReplicas(masterKey)
 	if err != nil {
 		return res, belowInstance, err, errs
 	}
@@ -2347,7 +2347,7 @@ func RegroupSlavesBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailure
 
 // RegroupSlaves is a "smart" method of promoting one replica over the others ("promoting" it on top of its siblings)
 // This method decides which strategy to use: GTID, Pseudo-GTID, Binlog Servers.
-func RegroupSlaves(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool,
+func RegroupReplicas(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool,
 	onCandidateSlaveChosen func(*Instance),
 	postponedFunctionsContainer *PostponedFunctionsContainer) (
 	aheadSlaves [](*Instance), equalSlaves [](*Instance), laterSlaves [](*Instance), cannotReplicateSlaves [](*Instance), instance *Instance, err error) {

@@ -873,7 +873,7 @@ func (this *HttpAPI) MatchUpReplicas(params martini.Params, r render.Render, req
 
 // RegroupSlaves attempts to pick a replica of a given instance and make it enslave its siblings, using any
 // method possible (GTID, Pseudo-GTID, binlog servers)
-func (this *HttpAPI) RegroupSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpAPI) RegroupReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -884,7 +884,7 @@ func (this *HttpAPI) RegroupSlaves(params martini.Params, r render.Render, req *
 		return
 	}
 
-	lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlaves(&instanceKey, false, nil, nil)
+	lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupReplicas(&instanceKey, false, nil, nil)
 	lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
@@ -2295,7 +2295,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "relocate/:host/:port/:belowHost/:belowPort", this.RelocateBelow)
 	this.registerRequest(m, "relocate-below/:host/:port/:belowHost/:belowPort", this.RelocateBelow)
 	this.registerRequest(m, "relocate-slaves/:host/:port/:belowHost/:belowPort", this.RelocateReplicas)
-	this.registerRequest(m, "regroup-slaves/:host/:port", this.RegroupSlaves)
+	this.registerRequest(m, "regroup-slaves/:host/:port", this.RegroupReplicas)
 
 	// Classic file:pos relocation:
 	this.registerRequest(m, "move-up/:host/:port", this.MoveUp)

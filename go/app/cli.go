@@ -282,7 +282,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlaves(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
+			lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupReplicas(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
 			lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 
 			postponedFunctionsContainer.InvokePostponed()

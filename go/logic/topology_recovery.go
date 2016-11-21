@@ -673,7 +673,7 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 	if !recoveryResolved {
 		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will next attempt regrouping of slaves")
 		// Plan B: regroup (we wish to reduce cross-DC replication streams)
-		_, _, _, _, regroupPromotedSlave, err := inst.RegroupSlaves(failedInstanceKey, true, nil, nil)
+		_, _, _, _, regroupPromotedSlave, err := inst.RegroupReplicas(failedInstanceKey, true, nil, nil)
 		if err != nil {
 			topologyRecovery.AddError(err)
 			log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: regroup failed on: %+v", err)
@@ -950,7 +950,7 @@ func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode 
 // Force reading of replicas of given instance. This is because we suspect the instance is dead, and want to speed up
 // detection of replication failure from its replicas.
 func emergentlyReadTopologyInstanceSlaves(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
-	slaves, err := inst.ReadSlaveInstancesIncludingBinlogServerSubSlaves(instanceKey)
+	slaves, err := inst.ReadSlaveInstancesIncludingBinlogServerSubReplicas(instanceKey)
 	if err != nil {
 		return
 	}

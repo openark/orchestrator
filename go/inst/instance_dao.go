@@ -839,9 +839,9 @@ func ReadSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
 	return readInstancesByCondition(condition, sqlutils.Args(masterKey.Hostname, masterKey.Port), "")
 }
 
-// ReadSlaveInstancesIncludingBinlogServerSubSlaves returns a list of direct slves including any replicas
+// ReadSlaveInstancesIncludingBinlogServerSubReplicas returns a list of direct slves including any replicas
 // of a binlog server replica
-func ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey *InstanceKey) ([](*Instance), error) {
+func ReadSlaveInstancesIncludingBinlogServerSubReplicas(masterKey *InstanceKey) ([](*Instance), error) {
 	slaves, err := ReadSlaveInstances(masterKey)
 	if err != nil {
 		return slaves, err
@@ -849,7 +849,7 @@ func ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey *InstanceKey) ([
 	for _, slave := range slaves {
 		slave := slave
 		if slave.IsBinlogServer() {
-			binlogServerSlaves, err := ReadSlaveInstancesIncludingBinlogServerSubSlaves(&slave.Key)
+			binlogServerSlaves, err := ReadSlaveInstancesIncludingBinlogServerSubReplicas(&slave.Key)
 			if err != nil {
 				return slaves, err
 			}
