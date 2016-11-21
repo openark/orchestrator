@@ -1022,7 +1022,7 @@ func ReattachSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 
-	instance, err = ReattachSlave(instanceKey)
+	instance, err = ReattachReplica(instanceKey)
 	if err != nil {
 		goto Cleanup
 	}

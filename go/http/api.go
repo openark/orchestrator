@@ -459,7 +459,7 @@ func (this *HttpAPI) DetachSlave(params martini.Params, r render.Render, req *ht
 
 // ReattachSlave reverts a DetachSlave commands by reassigning the correct
 // binlog coordinates to an instance
-func (this *HttpAPI) ReattachSlave(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpAPI) ReattachReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -2337,7 +2337,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "stop-slave-nice/:host/:port", this.StopSlaveNicely)
 	this.registerRequest(m, "reset-slave/:host/:port", this.ResetSlave)
 	this.registerRequest(m, "detach-slave/:host/:port", this.DetachSlave)
-	this.registerRequest(m, "reattach-slave/:host/:port", this.ReattachSlave)
+	this.registerRequest(m, "reattach-slave/:host/:port", this.ReattachReplica)
 	this.registerRequest(m, "reattach-slave-master-host/:host/:port", this.ReattachReplicaMasterHost)
 
 	// Instance:

@@ -779,7 +779,7 @@ func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
 }
 
 // ReattachSlave restores a detached replica back into replication
-func ReattachSlave(instanceKey *InstanceKey) (*Instance, error) {
+func ReattachReplica(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
