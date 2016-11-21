@@ -142,7 +142,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	discoveriesCounter.Inc(1)
 
 	// First we've ever heard of this instance. Continue investigation:
-	instance, err = inst.ReadTopologyInstance(&instanceKey, config.Config.BufferInstanceWrites)
+	instance, err = inst.ReadTopologyInstanceBufferable(&instanceKey, config.Config.BufferInstanceWrites)
 	// panic can occur (IO stuff). Therefore it may happen
 	// that instance is nil. Check it.
 	if instance == nil {
@@ -346,6 +346,6 @@ func ContinuousAgentsPoll() {
 func discoverSeededAgents() {
 	for seededAgent := range agent.SeededAgents {
 		instanceKey := &inst.InstanceKey{Hostname: seededAgent.Hostname, Port: int(seededAgent.MySQLPort)}
-		go inst.ReadTopologyInstanceUnbuffered(instanceKey)
+		go inst.ReadTopologyInstance(instanceKey)
 	}
 }

@@ -136,7 +136,7 @@ func (this *HttpAPI) Discover(params martini.Params, r render.Render, req *http.
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	instance, err := inst.ReadTopologyInstanceUnbuffered(&instanceKey)
+	instance, err := inst.ReadTopologyInstance(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -754,7 +754,7 @@ func (this *HttpAPI) LastPseudoGTID(params martini.Params, r render.Render, req 
 		return
 	}
 
-	instance, err := inst.ReadTopologyInstanceUnbuffered(&instanceKey)
+	instance, err := inst.ReadTopologyInstance(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return

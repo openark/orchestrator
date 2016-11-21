@@ -99,14 +99,14 @@ func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err err
 	return log.Errorf("ReadTopologyInstance(%+v) %+v: %+v", *instanceKey, hint, err)
 }
 
-func ReadTopologyInstanceUnbuffered(instanceKey *InstanceKey) (*Instance, error) {
-	return ReadTopologyInstance(instanceKey, false)
+func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
+	return ReadTopologyInstanceBufferable(instanceKey, false)
 }
 
 // ReadTopologyInstance connects to a topology MySQL instance and reads its configuration and
 // replication status. It writes read info into orchestrator's backend.
 // Writes are optionally buffered.
-func ReadTopologyInstance(instanceKey *InstanceKey, bufferWrites bool) (*Instance, error) {
+func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool) (*Instance, error) {
 	defer func() {
 		if err := recover(); err != nil {
 			logReadTopologyInstanceError(instanceKey, "Unexpected, aborting", fmt.Errorf("%+v", err))
@@ -797,7 +797,7 @@ func readInstancesByCondition(condition string, args []interface{}, sort string)
 // ReadInstance reads an instance from the orchestrator backend database
 func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
 	if config.Config.DatabaselessMode__experimental {
-		instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
+		instance, err := ReadTopologyInstance(instanceKey)
 		return instance, (err == nil), err
 	}
 

@@ -201,7 +201,7 @@ func UnresolveHostname(instanceKey *InstanceKey) (InstanceKey, bool, error) {
 	// We unresovled to a different hostname. We will now re-resolve to double-check!
 	unresolvedKey := &InstanceKey{Hostname: unresolvedHostname, Port: instanceKey.Port}
 
-	instance, err := ReadTopologyInstanceUnbuffered(unresolvedKey)
+	instance, err := ReadTopologyInstance(unresolvedKey)
 	if err != nil {
 		return *instanceKey, false, log.Errore(err)
 	}
