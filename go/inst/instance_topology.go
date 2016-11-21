@@ -126,7 +126,7 @@ func ASCIITopology(clusterName string, historyTimestampPattern string) (result s
 // GetInstanceMaster synchronously reaches into the replication topology
 // and retrieves master's data
 func GetInstanceMaster(instance *Instance) (*Instance, error) {
-	master, err := ReadTopologyInstance(&instance.MasterKey)
+	master, err := ReadTopologyInstanceUnbuffered(&instance.MasterKey)
 	return master, err
 }
 
@@ -211,7 +211,7 @@ Cleanup:
 // It will perform all safety and sanity checks and will tamper with this instance's replication
 // as well as its master.
 func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, err
 	}
@@ -302,7 +302,7 @@ func MoveUpSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), *Ins
 	slaveMutex := make(chan bool, 1)
 	var barrier chan *InstanceKey
 
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return res, nil, err, errs
 	}
@@ -426,11 +426,11 @@ Cleanup:
 // It will perform all safety and sanity checks and will tamper with this instance's replication
 // as well as its sibling.
 func MoveBelow(instanceKey, siblingKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, err
 	}
-	sibling, err := ReadTopologyInstance(siblingKey)
+	sibling, err := ReadTopologyInstanceUnbuffered(siblingKey)
 	if err != nil {
 		return instance, err
 	}
@@ -570,11 +570,11 @@ Cleanup:
 
 // MoveBelowGTID will attempt moving instance indicated by instanceKey below another instance using either Oracle GTID or MariaDB GTID.
 func MoveBelowGTID(instanceKey, otherKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, err
 	}
-	other, err := ReadTopologyInstance(otherKey)
+	other, err := ReadTopologyInstanceUnbuffered(otherKey)
 	if err != nil {
 		return instance, err
 	}
@@ -635,7 +635,7 @@ func moveSlavesViaGTID(slaves [](*Instance), other *Instance) (movedSlaves [](*I
 
 // MoveSlavesGTID will (attempt to) move all replicas of given master below given instance.
 func MoveSlavesGTID(masterKey *InstanceKey, belowKey *InstanceKey, pattern string) (movedSlaves [](*Instance), unmovedSlaves [](*Instance), err error, errs []error) {
-	belowInstance, err := ReadTopologyInstance(belowKey)
+	belowInstance, err := ReadTopologyInstanceUnbuffered(belowKey)
 	if err != nil {
 		// Can't access "below" ==> can't move replicas beneath it
 		return movedSlaves, unmovedSlaves, err, errs
@@ -665,7 +665,7 @@ func MoveSlavesGTID(masterKey *InstanceKey, belowKey *InstanceKey, pattern strin
 // - masterKey is nil: use case is corrupted relay logs on replica
 // - masterKey is not nil: using Binlog servers (coordinates remain the same)
 func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gtidHint OperationGTIDHint) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, err
 	}
@@ -679,7 +679,7 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gtidHint Operatio
 	// With repoint we *prefer* the master to be alive, but we don't strictly require it.
 	// The use case for the master being alive is with hostname-resolve or hostname-unresolve: asking the replica
 	// to reconnect to its same master while changing the MASTER_HOST in CHANGE MASTER TO due to DNS changes etc.
-	master, err := ReadTopologyInstance(masterKey)
+	master, err := ReadTopologyInstanceUnbuffered(masterKey)
 	masterIsAccessible := (err == nil)
 	if !masterIsAccessible {
 		master, _, err = ReadInstance(masterKey)
@@ -821,7 +821,7 @@ func RepointSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), err
 // MakeCoMaster will attempt to make an instance co-master with its master, by making its master a replica of its own.
 // This only works out if the master is not replicating; the master does not have a known master (it may have an unknown master).
 func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, err
 	}
@@ -919,7 +919,7 @@ Cleanup:
 
 // ResetSlaveOperation will reset a replica
 func ResetSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, err
 	}
@@ -960,7 +960,7 @@ Cleanup:
 
 // DetachSlaveOperation will detach a replica from its master by forcibly corrupting its replication coordinates
 func DetachSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, err
 	}
@@ -1001,7 +1001,7 @@ Cleanup:
 
 // ReattachSlaveOperation will detach a replica from its master by forcibly corrupting its replication coordinates
 func ReattachSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, err
 	}
@@ -1042,7 +1042,7 @@ Cleanup:
 
 // DetachSlaveMasterHost detaches a replica from its master by corrupting the Master_Host (in such way that is reversible)
 func DetachSlaveMasterHost(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, err
 	}
@@ -1086,7 +1086,7 @@ Cleanup:
 
 // ReattachSlaveMasterHost reattaches a replica back onto its master by undoing a DetachSlaveMasterHost operation
 func ReattachSlaveMasterHost(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, err
 	}
@@ -1133,7 +1133,7 @@ Cleanup:
 
 // EnableGTID will attempt to enable GTID-mode (either Oracle or MariaDB)
 func EnableGTID(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, err
 	}
@@ -1158,7 +1158,7 @@ func EnableGTID(instanceKey *InstanceKey) (*Instance, error) {
 
 // DisableGTID will attempt to disable GTID-mode (either Oracle or MariaDB) and revert to binlog file:pos replication
 func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, err
 	}
@@ -1186,7 +1186,7 @@ func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
 // this will enable new replicas to be attached to given instance without complaints about missing/purged entries.
 // This function requires that the instance does not have replicas.
 func ResetMasterGTIDOperation(instanceKey *InstanceKey, removeSelfUUID bool, uuidToRemove string) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, err
 	}
@@ -1330,7 +1330,7 @@ func CorrelateBinlogCoordinates(instance *Instance, binlogCoordinates *BinlogCoo
 // a cousin of some sort (though unlikely). The only important thing is that the "other instance" is more
 // advanced in replication than given instance.
 func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance bool) (*Instance, *BinlogCoordinates, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, nil, err
 	}
@@ -1340,7 +1340,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	if instanceKey.Equals(otherKey) {
 		return instance, nil, fmt.Errorf("MatchBelow: attempt to match an instance below itself %+v", *instanceKey)
 	}
-	otherInstance, err := ReadTopologyInstance(otherKey)
+	otherInstance, err := ReadTopologyInstanceUnbuffered(otherKey)
 	if err != nil {
 		return instance, nil, err
 	}
@@ -1406,7 +1406,7 @@ Cleanup:
 
 // RematchSlave will re-match a replica to its master, using pseudo-gtid
 func RematchSlave(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instance, *BinlogCoordinates, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, nil, err
 	}
@@ -1420,11 +1420,11 @@ func RematchSlave(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*I
 // MakeMaster will take an instance, make all its siblings its replicas (via pseudo-GTID) and make it master
 // (stop its replicaiton, make writeable).
 func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, err
 	}
-	masterInstance, err := ReadTopologyInstance(&instance.MasterKey)
+	masterInstance, err := ReadTopologyInstanceUnbuffered(&instance.MasterKey)
 	if err == nil {
 		// If the read succeeded, check the master status.
 		if masterInstance.IsSlave() {
@@ -1476,7 +1476,7 @@ Cleanup:
 // EnslaveSiblings is a convenience method for turning sublings of a replica to be its subordinates.
 // This uses normal connected replication (does not utilize Pseudo-GTID)
 func EnslaveSiblings(instanceKey *InstanceKey) (*Instance, int, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, 0, err
 	}
@@ -1504,7 +1504,7 @@ func EnslaveSiblings(instanceKey *InstanceKey) (*Instance, int, error) {
 // Note that the master must itself be a replica; however the grandparent does not necessarily have to be reachable
 // and can in fact be dead.
 func EnslaveMaster(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, err
 	}
@@ -1563,7 +1563,7 @@ Cleanup:
 // which is most advanced among its siblings.
 // This method utilizes Pseudo GTID
 func MakeLocalMaster(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, err
 	}
@@ -1571,7 +1571,7 @@ func MakeLocalMaster(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil || !found {
 		return instance, err
 	}
-	grandparentInstance, err := ReadTopologyInstance(&masterInstance.MasterKey)
+	grandparentInstance, err := ReadTopologyInstanceUnbuffered(&masterInstance.MasterKey)
 	if err != nil {
 		return instance, err
 	}
@@ -1670,7 +1670,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 		}
 	}
 
-	belowInstance, err := ReadTopologyInstance(belowKey)
+	belowInstance, err := ReadTopologyInstanceUnbuffered(belowKey)
 	if err != nil {
 		// Can't access the server below which we need to match ==> can't move replicas
 		return res, belowInstance, err, errs
@@ -1837,7 +1837,7 @@ func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey, pattern str
 	res := [](*Instance){}
 	errs := []error{}
 
-	belowInstance, err := ReadTopologyInstance(belowKey)
+	belowInstance, err := ReadTopologyInstanceUnbuffered(belowKey)
 	if err != nil {
 		// Can't access "below" ==> can't match replicas beneath it
 		return res, nil, err, errs

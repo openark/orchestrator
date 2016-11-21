@@ -83,7 +83,7 @@ func (s *TestSuite) SetUpSuite(c *C) {
 
 func (s *TestSuite) TestReadTopologyMaster(c *C) {
 	key := masterKey
-	i, _ := ReadTopologyInstance(&key)
+	i, _ := ReadTopologyInstanceUnbuffered(&key)
 
 	c.Assert(i.Key.Hostname, Equals, key.Hostname)
 	c.Assert(i.IsSlave(), Equals, false)
@@ -93,14 +93,14 @@ func (s *TestSuite) TestReadTopologyMaster(c *C) {
 
 func (s *TestSuite) TestReadTopologySlave(c *C) {
 	key := slave3Key
-	i, _ := ReadTopologyInstance(&key)
+	i, _ := ReadTopologyInstanceUnbuffered(&key)
 	c.Assert(i.Key.Hostname, Equals, key.Hostname)
 	c.Assert(i.IsSlave(), Equals, true)
 	c.Assert(len(i.SlaveHosts), Equals, 0)
 }
 
 func (s *TestSuite) TestReadTopologyAndInstanceMaster(c *C) {
-	i, _ := ReadTopologyInstance(&masterKey)
+	i, _ := ReadTopologyInstanceUnbuffered(&masterKey)
 	iRead, found, _ := ReadInstance(&masterKey)
 	c.Assert(found, Equals, true)
 	c.Assert(iRead.Key.Hostname, Equals, i.Key.Hostname)
@@ -109,7 +109,7 @@ func (s *TestSuite) TestReadTopologyAndInstanceMaster(c *C) {
 }
 
 func (s *TestSuite) TestReadTopologyAndInstanceSlave(c *C) {
-	i, _ := ReadTopologyInstance(&slave1Key)
+	i, _ := ReadTopologyInstanceUnbuffered(&slave1Key)
 	iRead, found, _ := ReadInstance(&slave1Key)
 	c.Assert(found, Equals, true)
 	c.Assert(iRead.Key.Hostname, Equals, i.Key.Hostname)
@@ -117,7 +117,7 @@ func (s *TestSuite) TestReadTopologyAndInstanceSlave(c *C) {
 }
 
 func (s *TestSuite) TestGetMasterOfASlave(c *C) {
-	i, err := ReadTopologyInstance(&slave1Key)
+	i, err := ReadTopologyInstanceUnbuffered(&slave1Key)
 	c.Assert(err, IsNil)
 	master, err := GetInstanceMaster(i)
 	c.Assert(err, IsNil)
@@ -126,26 +126,26 @@ func (s *TestSuite) TestGetMasterOfASlave(c *C) {
 }
 
 func (s *TestSuite) TestSlavesAreSiblings(c *C) {
-	i0, _ := ReadTopologyInstance(&slave1Key)
-	i1, _ := ReadTopologyInstance(&slave2Key)
+	i0, _ := ReadTopologyInstanceUnbuffered(&slave1Key)
+	i1, _ := ReadTopologyInstanceUnbuffered(&slave2Key)
 	c.Assert(InstancesAreSiblings(i0, i1), Equals, true)
 }
 
 func (s *TestSuite) TestNonSiblings(c *C) {
-	i0, _ := ReadTopologyInstance(&masterKey)
-	i1, _ := ReadTopologyInstance(&slave1Key)
+	i0, _ := ReadTopologyInstanceUnbuffered(&masterKey)
+	i1, _ := ReadTopologyInstanceUnbuffered(&slave1Key)
 	c.Assert(InstancesAreSiblings(i0, i1), Not(Equals), true)
 }
 
 func (s *TestSuite) TestInstanceIsMasterOf(c *C) {
-	i0, _ := ReadTopologyInstance(&masterKey)
-	i1, _ := ReadTopologyInstance(&slave1Key)
+	i0, _ := ReadTopologyInstanceUnbuffered(&masterKey)
+	i1, _ := ReadTopologyInstanceUnbuffered(&slave1Key)
 	c.Assert(InstanceIsMasterOf(i0, i1), Equals, true)
 }
 
 func (s *TestSuite) TestStopStartSlave(c *C) {
 
-	i, _ := ReadTopologyInstance(&slave1Key)
+	i, _ := ReadTopologyInstanceUnbuffered(&slave1Key)
 	c.Assert(i.SlaveRunning(), Equals, true)
 	i, _ = StopSlaveNicely(&i.Key, 0)
 
@@ -161,7 +161,7 @@ func (s *TestSuite) TestReadTopologyUnexisting(c *C) {
 		Hostname: "127.0.0.1",
 		Port:     22999,
 	}
-	_, err := ReadTopologyInstance(&key)
+	_, err := ReadTopologyInstanceUnbuffered(&key)
 
 	c.Assert(err, Not(IsNil))
 }
@@ -177,7 +177,7 @@ func (s *TestSuite) TestMoveBelowAndBack(c *C) {
 
 	// And back; keep topology intact
 	slave1, _ = MoveUp(&slave1Key)
-	slave2, _ := ReadTopologyInstance(&slave2Key)
+	slave2, _ := ReadTopologyInstanceUnbuffered(&slave2Key)
 
 	c.Assert(InstancesAreSiblings(slave1, slave2), Equals, true)
 	c.Assert(slave1.SlaveRunning(), Equals, true)
@@ -202,7 +202,7 @@ func (s *TestSuite) TestMoveBelowAndBackComplex(c *C) {
 	randValue := rand.Int()
 	_, err = ExecInstance(&masterKey, `replace into orchestrator_test.test_table (name, value) values ('TestMoveBelowAndBackComplex', ?)`, randValue)
 	c.Assert(err, IsNil)
-	master, err := ReadTopologyInstance(&masterKey)
+	master, err := ReadTopologyInstanceUnbuffered(&masterKey)
 	c.Assert(err, IsNil)
 
 	// And back; keep topology intact
@@ -210,7 +210,7 @@ func (s *TestSuite) TestMoveBelowAndBackComplex(c *C) {
 	c.Assert(err, IsNil)
 	_, err = MasterPosWait(&slave1Key, &master.SelfBinlogCoordinates)
 	c.Assert(err, IsNil)
-	slave2, err := ReadTopologyInstance(&slave2Key)
+	slave2, err := ReadTopologyInstanceUnbuffered(&slave2Key)
 	c.Assert(err, IsNil)
 	_, err = MasterPosWait(&slave2Key, &master.SelfBinlogCoordinates)
 	c.Assert(err, IsNil)
@@ -239,13 +239,13 @@ func (s *TestSuite) TestMakeCoMasterAndBack(c *C) {
 	c.Assert(err, IsNil)
 
 	// Now master & replica1 expected to be co-masters. Check!
-	master, _ := ReadTopologyInstance(&masterKey)
+	master, _ := ReadTopologyInstanceUnbuffered(&masterKey)
 	c.Assert(master.IsSlaveOf(slave1), Equals, true)
 	c.Assert(slave1.IsSlaveOf(master), Equals, true)
 
 	// reset - restore to original state
 	master, err = ResetSlaveOperation(&masterKey)
-	slave1, _ = ReadTopologyInstance(&slave1Key)
+	slave1, _ = ReadTopologyInstanceUnbuffered(&slave1Key)
 	c.Assert(err, IsNil)
 	c.Assert(master.MasterKey.Hostname, Equals, "_")
 }
@@ -289,14 +289,14 @@ func (s *TestSuite) TestDiscover(c *C) {
 	_, err = db.ExecOrchestrator("delete from database_instance where hostname = ? and port = ?", slave3Key.Hostname, slave3Key.Port)
 	_, found, _ := ReadInstance(&masterKey)
 	c.Assert(found, Equals, false)
-	_, _ = ReadTopologyInstance(&slave1Key)
+	_, _ = ReadTopologyInstanceUnbuffered(&slave1Key)
 	_, found, err = ReadInstance(&slave1Key)
 	c.Assert(found, Equals, true)
 	c.Assert(err, IsNil)
 }
 
 func (s *TestSuite) TestForgetMaster(c *C) {
-	_, _ = ReadTopologyInstance(&masterKey)
+	_, _ = ReadTopologyInstanceUnbuffered(&masterKey)
 	_, found, _ := ReadInstance(&masterKey)
 	c.Assert(found, Equals, true)
 	ForgetInstance(&masterKey)
@@ -306,7 +306,7 @@ func (s *TestSuite) TestForgetMaster(c *C) {
 
 func (s *TestSuite) TestBeginMaintenance(c *C) {
 	clearTestMaintenance()
-	_, _ = ReadTopologyInstance(&masterKey)
+	_, _ = ReadTopologyInstanceUnbuffered(&masterKey)
 	_, err := BeginMaintenance(&masterKey, "unittest", "TestBeginMaintenance")
 
 	c.Assert(err, IsNil)
@@ -314,7 +314,7 @@ func (s *TestSuite) TestBeginMaintenance(c *C) {
 
 func (s *TestSuite) TestBeginEndMaintenance(c *C) {
 	clearTestMaintenance()
-	_, _ = ReadTopologyInstance(&masterKey)
+	_, _ = ReadTopologyInstanceUnbuffered(&masterKey)
 	k, err := BeginMaintenance(&masterKey, "unittest", "TestBeginEndMaintenance")
 	c.Assert(err, IsNil)
 	err = EndMaintenance(k)
@@ -323,7 +323,7 @@ func (s *TestSuite) TestBeginEndMaintenance(c *C) {
 
 func (s *TestSuite) TestFailBeginMaintenanceTwice(c *C) {
 	clearTestMaintenance()
-	_, _ = ReadTopologyInstance(&masterKey)
+	_, _ = ReadTopologyInstanceUnbuffered(&masterKey)
 	_, err := BeginMaintenance(&masterKey, "unittest", "TestFailBeginMaintenanceTwice")
 	c.Assert(err, IsNil)
 	_, err = BeginMaintenance(&masterKey, "unittest", "TestFailBeginMaintenanceTwice")
@@ -332,7 +332,7 @@ func (s *TestSuite) TestFailBeginMaintenanceTwice(c *C) {
 
 func (s *TestSuite) TestFailEndMaintenanceTwice(c *C) {
 	clearTestMaintenance()
-	_, _ = ReadTopologyInstance(&masterKey)
+	_, _ = ReadTopologyInstanceUnbuffered(&masterKey)
 	k, err := BeginMaintenance(&masterKey, "unittest", "TestFailEndMaintenanceTwice")
 	c.Assert(err, IsNil)
 	err = EndMaintenance(k)
@@ -343,7 +343,7 @@ func (s *TestSuite) TestFailEndMaintenanceTwice(c *C) {
 
 func (s *TestSuite) TestFailMoveBelowUponMaintenance(c *C) {
 	clearTestMaintenance()
-	_, _ = ReadTopologyInstance(&slave1Key)
+	_, _ = ReadTopologyInstanceUnbuffered(&slave1Key)
 	k, err := BeginMaintenance(&slave1Key, "unittest", "TestBeginEndMaintenance")
 	c.Assert(err, IsNil)
 
@@ -357,7 +357,7 @@ func (s *TestSuite) TestFailMoveBelowUponMaintenance(c *C) {
 func (s *TestSuite) TestFailMoveBelowUponSlaveStopped(c *C) {
 	clearTestMaintenance()
 
-	slave1, _ := ReadTopologyInstance(&slave1Key)
+	slave1, _ := ReadTopologyInstanceUnbuffered(&slave1Key)
 	c.Assert(slave1.SlaveRunning(), Equals, true)
 	slave1, _ = StopSlaveNicely(&slave1.Key, 0)
 	c.Assert(slave1.SlaveRunning(), Equals, false)
@@ -371,7 +371,7 @@ func (s *TestSuite) TestFailMoveBelowUponSlaveStopped(c *C) {
 func (s *TestSuite) TestFailMoveBelowUponOtherSlaveStopped(c *C) {
 	clearTestMaintenance()
 
-	slave1, _ := ReadTopologyInstance(&slave1Key)
+	slave1, _ := ReadTopologyInstanceUnbuffered(&slave1Key)
 	c.Assert(slave1.SlaveRunning(), Equals, true)
 	slave1, _ = StopSlaveNicely(&slave1.Key, 0)
 	c.Assert(slave1.SlaveRunning(), Equals, false)

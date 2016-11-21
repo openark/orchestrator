@@ -99,7 +99,7 @@ func EmptyCommitInstance(instanceKey *InstanceKey) error {
 
 // RefreshTopologyInstance will synchronuously re-read topology instance
 func RefreshTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
-	_, err := ReadTopologyInstance(instanceKey)
+	_, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +124,7 @@ func RefreshTopologyInstances(instances [](*Instance)) {
 			// Wait your turn to read a replica
 			ExecuteOnTopology(func() {
 				log.Debugf("... reading instance: %+v", instance.Key)
-				ReadTopologyInstance(&instance.Key)
+				ReadTopologyInstanceUnbuffered(&instance.Key)
 			})
 		}()
 	}
@@ -140,7 +140,7 @@ func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
 	_, _ = ExecInstance(instanceKey, `flush error logs`)
 	_, _ = ExecInstance(instanceKey, `flush error logs`)
 
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	return instance, err
 }
 
@@ -152,7 +152,7 @@ func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
 // This is useful for CHANGE MASTER TO commands, that unfortunately must take place while the replica
 // is completely stopped.
 func GetSlaveRestartPreserveStatements(instanceKey *InstanceKey, injectedStatement string) (statements []string, err error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return statements, err
 	}
@@ -190,12 +190,12 @@ func FlushBinaryLogs(instanceKey *InstanceKey, count int) (*Instance, error) {
 	log.Infof("flush-binary-logs count=%+v on %+v", count, *instanceKey)
 	AuditOperation("flush-binary-logs", instanceKey, "success")
 
-	return ReadTopologyInstance(instanceKey)
+	return ReadTopologyInstanceUnbuffered(instanceKey)
 }
 
 // FlushBinaryLogsTo attempts to 'FLUSH BINARY LOGS' until given binary log is reached
 func FlushBinaryLogsTo(instanceKey *InstanceKey, logFile string) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -221,12 +221,12 @@ func PurgeBinaryLogsTo(instanceKey *InstanceKey, logFile string) (*Instance, err
 	log.Infof("purge-binary-logs to=%+v on %+v", logFile, *instanceKey)
 	AuditOperation("purge-binary-logs", instanceKey, "success")
 
-	return ReadTopologyInstance(instanceKey)
+	return ReadTopologyInstanceUnbuffered(instanceKey)
 }
 
 // FlushBinaryLogsTo attempts to 'PURGE BINARY LOGS' until given binary log is reached
 func PurgeBinaryLogsToCurrent(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -237,7 +237,7 @@ func PurgeBinaryLogsToCurrent(instanceKey *InstanceKey) (*Instance, error) {
 // SQL_thread consumes all relay log entries)
 // It will actually START the sql_thread even if the replica is completely stopped.
 func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -257,7 +257,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 				// timeout
 				return nil, log.Errorf("StopSlaveNicely timeout on %+v", *instanceKey)
 			}
-			instance, err = ReadTopologyInstance(instanceKey)
+			instance, err = ReadTopologyInstanceUnbuffered(instanceKey)
 			if err != nil {
 				return instance, log.Errore(err)
 			}
@@ -280,7 +280,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 		return instance, log.Errore(err)
 	}
 
-	instance, err = ReadTopologyInstance(instanceKey)
+	instance, err = ReadTopologyInstanceUnbuffered(instanceKey)
 	log.Infof("Stopped slave nicely on %+v, Self:%+v, Exec:%+v", *instanceKey, instance.SelfBinlogCoordinates, instance.ExecBinlogCoordinates)
 	return instance, err
 }
@@ -314,7 +314,7 @@ func StopSlavesNicely(slaves [](*Instance), timeout time.Duration) [](*Instance)
 
 // StopSlave stops replication on a given instance
 func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -333,7 +333,7 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 
 		return instance, log.Errore(err)
 	}
-	instance, err = ReadTopologyInstance(instanceKey)
+	instance, err = ReadTopologyInstanceUnbuffered(instanceKey)
 
 	log.Infof("Stopped slave on %+v, Self:%+v, Exec:%+v", *instanceKey, instance.SelfBinlogCoordinates, instance.ExecBinlogCoordinates)
 	return instance, err
@@ -341,7 +341,7 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 
 // StartSlave starts replication on a given instance.
 func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -373,7 +373,7 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 		time.Sleep(time.Duration(config.Config.SlaveStartPostWaitMilliseconds) * time.Millisecond)
 	}
 
-	instance, err = ReadTopologyInstance(instanceKey)
+	instance, err = ReadTopologyInstanceUnbuffered(instanceKey)
 	return instance, err
 }
 
@@ -412,7 +412,7 @@ func StartSlaves(slaves [](*Instance)) {
 
 // StartSlaveUntilMasterCoordinates issuesa START SLAVE UNTIL... statement on given instance
 func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinates *BinlogCoordinates) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -445,7 +445,7 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 	}
 
 	for upToDate := false; !upToDate; {
-		instance, err = ReadTopologyInstance(instanceKey)
+		instance, err = ReadTopologyInstanceUnbuffered(instanceKey)
 		if err != nil {
 			return instance, log.Errore(err)
 		}
@@ -480,7 +480,7 @@ func EnableSemiSync(instanceKey *InstanceKey, master, slave bool) error {
 
 // ChangeMasterCredentials issues a CHANGE MASTER TO... MASTER_USER=, MASTER_PASSWORD=...
 func ChangeMasterCredentials(instanceKey *InstanceKey, masterUser string, masterPassword string) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -505,13 +505,13 @@ func ChangeMasterCredentials(instanceKey *InstanceKey, masterUser string, master
 
 	log.Infof("ChangeMasterTo: Changed master credentials on %+v", *instanceKey)
 
-	instance, err = ReadTopologyInstance(instanceKey)
+	instance, err = ReadTopologyInstanceUnbuffered(instanceKey)
 	return instance, err
 }
 
 // ChangeMasterTo changes the given instance's master according to given input.
 func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinlogCoordinates *BinlogCoordinates, skipUnresolve bool, gtidHint OperationGTIDHint) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -584,7 +584,7 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 
 	log.Infof("ChangeMasterTo: Changed master on %+v to: %+v, %+v. GTID: %+v", *instanceKey, masterKey, masterBinlogCoordinates, changedViaGTID)
 
-	instance, err = ReadTopologyInstance(instanceKey)
+	instance, err = ReadTopologyInstanceUnbuffered(instanceKey)
 	return instance, err
 }
 
@@ -592,7 +592,7 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 // USE WITH CARE!
 // Use case is binlog servers where the master was gone & replaced by another.
 func SkipToNextBinaryLog(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -614,7 +614,7 @@ func SkipToNextBinaryLog(instanceKey *InstanceKey) (*Instance, error) {
 
 // ResetSlave resets a replica, breaking the replication
 func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -641,13 +641,13 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	log.Infof("Reset slave %+v", instanceKey)
 
-	instance, err = ReadTopologyInstance(instanceKey)
+	instance, err = ReadTopologyInstanceUnbuffered(instanceKey)
 	return instance, err
 }
 
 // ResetMaster issues a RESET MASTER statement on given instance. Use with extreme care!
 func ResetMaster(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -666,7 +666,7 @@ func ResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	log.Infof("Reset master %+v", instanceKey)
 
-	instance, err = ReadTopologyInstance(instanceKey)
+	instance, err = ReadTopologyInstanceUnbuffered(instanceKey)
 	return instance, err
 }
 
@@ -709,7 +709,7 @@ func skipQueryOracleGtid(instance *Instance) error {
 
 // SkipQuery skip a single query in a failed replication instance
 func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -746,7 +746,7 @@ func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
 // DetachSlave detaches a replica from replication; forcibly corrupting the binlog coordinates (though in such way
 // that is reversible)
 func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -774,13 +774,13 @@ func DetachSlave(instanceKey *InstanceKey) (*Instance, error) {
 
 	log.Infof("Detach slave %+v", instanceKey)
 
-	instance, err = ReadTopologyInstance(instanceKey)
+	instance, err = ReadTopologyInstanceUnbuffered(instanceKey)
 	return instance, err
 }
 
 // ReattachSlave restores a detached replica back into replication
 func ReattachSlave(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -806,13 +806,13 @@ func ReattachSlave(instanceKey *InstanceKey) (*Instance, error) {
 
 	log.Infof("Reattach slave %+v", instanceKey)
 
-	instance, err = ReadTopologyInstance(instanceKey)
+	instance, err = ReadTopologyInstanceUnbuffered(instanceKey)
 	return instance, err
 }
 
 // MasterPosWait issues a MASTER_POS_WAIT() an given instance according to given coordinates.
 func MasterPosWait(instanceKey *InstanceKey, binlogCoordinates *BinlogCoordinates) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -823,7 +823,7 @@ func MasterPosWait(instanceKey *InstanceKey, binlogCoordinates *BinlogCoordinate
 	}
 	log.Infof("Instance %+v has reached coordinates: %+v", instanceKey, binlogCoordinates)
 
-	instance, err = ReadTopologyInstance(instanceKey)
+	instance, err = ReadTopologyInstanceUnbuffered(instanceKey)
 	return instance, err
 }
 
@@ -848,7 +848,7 @@ func ReadReplicationCredentials(instanceKey *InstanceKey) (replicationUser strin
 
 // SetReadOnly sets or clears the instance's global read_only variable
 func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -871,7 +871,7 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 	if err != nil {
 		return instance, log.Errore(err)
 	}
-	instance, err = ReadTopologyInstance(instanceKey)
+	instance, err = ReadTopologyInstanceUnbuffered(instanceKey)
 
 	// If we just went read-only, it's safe to flip the master semi-sync switch
 	// OFF, which is the default value so that replicas can make progress.
@@ -891,7 +891,7 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 
 // KillQuery stops replication on a given instance
 func KillQuery(instanceKey *InstanceKey, process int64) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+	instance, err := ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -905,7 +905,7 @@ func KillQuery(instanceKey *InstanceKey, process int64) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 
-	instance, err = ReadTopologyInstance(instanceKey)
+	instance, err = ReadTopologyInstanceUnbuffered(instanceKey)
 	if err != nil {
 		return instance, log.Errore(err)
 	}

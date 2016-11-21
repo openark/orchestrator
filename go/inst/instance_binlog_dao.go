@@ -307,7 +307,7 @@ func SearchEntryInInstanceBinlogs(instance *Instance, entryText string, monotoni
 		if instance.SlaveRunning() {
 			for {
 				log.Debugf("%+v is a replicating slave. Verifying lag", instance.Key)
-				instance, err = ReadTopologyInstance(&instance.Key)
+				instance, err = ReadTopologyInstanceUnbuffered(&instance.Key)
 				if err != nil {
 					break
 				}

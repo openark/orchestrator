@@ -703,7 +703,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatalf("Unresolved instance")
 			}
-			instance, err := inst.ReadTopologyInstance(instanceKey)
+			instance, err := inst.ReadTopologyInstanceUnbuffered(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -789,7 +789,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatalf("Unresolved instance")
 			}
-			instance, err := inst.ReadTopologyInstance(instanceKey)
+			instance, err := inst.ReadTopologyInstanceUnbuffered(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -811,7 +811,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatalf("Unresolved instance")
 			}
-			instance, err := inst.ReadTopologyInstance(instanceKey)
+			instance, err := inst.ReadTopologyInstanceUnbuffered(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -830,7 +830,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatalf("Unresolved instance")
 			}
-			instance, err := inst.ReadTopologyInstance(instanceKey)
+			instance, err := inst.ReadTopologyInstanceUnbuffered(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -843,7 +843,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce target instance:", destination)
 			}
-			otherInstance, err := inst.ReadTopologyInstance(destinationKey)
+			otherInstance, err := inst.ReadTopologyInstanceUnbuffered(destinationKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1088,7 +1088,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("discover", "Instance management", `Lookup an instance, investigate it`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, false)
-			instance, err := inst.ReadTopologyInstance(instanceKey)
+			instance, err := inst.ReadTopologyInstanceUnbuffered(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}

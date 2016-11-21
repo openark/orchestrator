@@ -74,6 +74,8 @@ type Configuration struct {
 	SlaveStartPostWaitMilliseconds               int      // Time to wait after START SLAVE before re-readong instance (give replica chance to connect to master)
 	DiscoverByShowSlaveHosts                     bool     // Attempt SHOW SLAVE HOSTS before PROCESSLIST
 	InstancePollSeconds                          uint     // Number of seconds between instance reads
+	InstanceWriteBufferSize                      int      // Instance write buffer size (max number of instances to flush in one INSERT ODKU)
+	InstanceFlushIntervalMilliseconds            int      // Max interval between instance write buffer flushes
 	ReadLongRunningQueries                       bool     // Whether orchestrator should read and record current long running executing queries.
 	BinlogFileHistoryDays                        int      // When > 0, amount of days for which orchestrator records per-instance binlog files & sizes
 	UnseenInstanceForgetHours                    uint     // Number of hours after which an unseen instance is forgotten
@@ -231,6 +233,8 @@ func newConfiguration() *Configuration {
 		MySQLInterpolateParams:                       false,
 		DefaultInstancePort:                          3306,
 		InstancePollSeconds:                          5,
+		InstanceWriteBufferSize:                      100,
+		InstanceFlushIntervalMilliseconds:            100,
 		ReadLongRunningQueries:                       true,
 		BinlogFileHistoryDays:                        0,
 		UnseenInstanceForgetHours:                    240,
