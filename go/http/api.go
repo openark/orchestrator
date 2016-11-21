@@ -1275,8 +1275,8 @@ func (this *HttpAPI) ClusterInfoByAlias(params martini.Params, r render.Render, 
 	this.ClusterInfo(params, r, req)
 }
 
-// ClusterOSCSlaves returns heuristic list of OSC replicas
-func (this *HttpAPI) ClusterOSCSlaves(params martini.Params, r render.Render, req *http.Request) {
+// ClusterOSCReplicas returns heuristic list of OSC replicas
+func (this *HttpAPI) ClusterOSCReplicas(params martini.Params, r render.Render, req *http.Request) {
 	instances, err := inst.GetClusterOSCReplicas(params["clusterName"])
 
 	if err != nil {
@@ -2367,7 +2367,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "cluster/instance/:host/:port", this.ClusterByInstance)
 	this.registerRequest(m, "cluster-info/:clusterName", this.ClusterInfo)
 	this.registerRequest(m, "cluster-info/alias/:clusterAlias", this.ClusterInfoByAlias)
-	this.registerRequest(m, "cluster-osc-slaves/:clusterName", this.ClusterOSCSlaves)
+	this.registerRequest(m, "cluster-osc-slaves/:clusterName", this.ClusterOSCReplicas)
 	this.registerRequest(m, "set-cluster-alias/:clusterName", this.SetClusterAlias)
 	this.registerRequest(m, "clusters", this.Clusters)
 	this.registerRequest(m, "clusters-info", this.ClustersInfo)

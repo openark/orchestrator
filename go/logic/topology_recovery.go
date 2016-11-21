@@ -103,12 +103,12 @@ var emptySlavesList [](*inst.Instance)
 
 var emergencyReadTopologyInstanceMap = cache.New(time.Duration(config.Config.InstancePollSeconds)*time.Second, time.Second)
 
-// InstancesByCountSlaves sorts instances by umber of replicas, descending
-type InstancesByCountSlaves [](*inst.Instance)
+// InstancesByCountReplicas sorts instances by umber of replicas, descending
+type InstancesByCountReplicas [](*inst.Instance)
 
-func (this InstancesByCountSlaves) Len() int      { return len(this) }
-func (this InstancesByCountSlaves) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
-func (this InstancesByCountSlaves) Less(i, j int) bool {
+func (this InstancesByCountReplicas) Len() int      { return len(this) }
+func (this InstancesByCountReplicas) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
+func (this InstancesByCountReplicas) Less(i, j int) bool {
 	if len(this[i].SlaveHosts) == len(this[j].SlaveHosts) {
 		// Secondary sorting: prefer more advanced replicas
 		return !this[i].ExecBinlogCoordinates.SmallerThan(&this[j].ExecBinlogCoordinates)
@@ -575,7 +575,7 @@ func GetCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *inst.In
 		return nil, log.Errorf("topology_recovery: no siblings found for %+v", intermediateMasterInstance.Key)
 	}
 
-	sort.Sort(sort.Reverse(InstancesByCountSlaves(siblings)))
+	sort.Sort(sort.Reverse(InstancesByCountReplicas(siblings)))
 
 	// In the next series of steps we attempt to return a good replacement.
 	// None of the below attempts is sure to pick a winning server. Perhaps picked server is not enough up-todate -- but
