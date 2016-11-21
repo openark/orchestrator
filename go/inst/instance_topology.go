@@ -999,8 +999,8 @@ Cleanup:
 	return instance, err
 }
 
-// ReattachSlaveOperation will detach a replica from its master by forcibly corrupting its replication coordinates
-func ReattachSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
+// ReattachReplicaOperation will detach a replica from its master by forcibly corrupting its replication coordinates
+func ReattachReplicaOperation(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err

@@ -457,7 +457,7 @@ func (this *HttpAPI) DetachSlave(params martini.Params, r render.Render, req *ht
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave detached: %+v", instance.Key), Details: instance})
 }
 
-// ReattachSlave reverts a DetachSlave commands by reassigning the correct
+// ReattachReplica reverts a DetachSlave commands by reassigning the correct
 // binlog coordinates to an instance
 func (this *HttpAPI) ReattachReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -470,7 +470,7 @@ func (this *HttpAPI) ReattachReplica(params martini.Params, r render.Render, req
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	instance, err := inst.ReattachSlaveOperation(&instanceKey)
+	instance, err := inst.ReattachReplicaOperation(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return

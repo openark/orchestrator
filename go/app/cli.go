@@ -667,7 +667,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("reattach-replica", "Replication, general", `Undo a detach-replica operation`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			_, err := inst.ReattachSlaveOperation(instanceKey)
+			_, err := inst.ReattachReplicaOperation(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
