@@ -132,7 +132,7 @@ applies for master recovery and for intermediate-master recovery. Detailed break
 The analysis mechanism runs at all times, and checks periodically for failure/recovery scenarios. It will make an
 automated recovery for:
 
-- An actioanable type of scenario (duh)
+- An actionable type of scenario (duh)
 - For an instance that is not downtimed
 - For an instance belonging to a cluster for which recovery is explicitly enabled via configuration
 - For an instance in a cluster that has not recently been recovered, unless such recent recoveries were acknowledged
@@ -183,6 +183,60 @@ shell, in particular `bash`. Hooks are:
 - `PostFailoverProcesses`: commands to run after recovery of any type (and following the specific `PostIntermediateMasterFailoverProcesses`
   or `PostMasterFailoverProcesses` commands). Failures are ignored.
 - `PostUnsuccessfulFailoverProcesses`: commands to run when recovery operation resulted with error, such that there is no known successor instance
+
+#### Hooks arguments and environment
+
+`orchestrator` provides all hooks with failure/recovery related information, such as the identity of the failed instance, identity of promoted instance, affecetd replicas, type of failure, name of cluster, etc.
+
+This information is passed independently in two ways, and you may choose to use one or both:
+
+1. Environment variables: `orchestrator` will set the following, which can be retrieved by your hooks:
+
+- `ORC_FAILURE_TYPE`
+- `ORC_FAILURE_DESCRIPTION`
+- `ORC_FAILED_HOST`
+- `ORC_FAILED_PORT`
+- `ORC_FAILURE_CLUSTER`
+- `ORC_FAILURE_CLUSTER_ALIAS`
+- `ORC_FAILURE_CLUSTER_DOMAIN`
+- `ORC_COUNT_REPLICAS`
+- `ORC_IS_DOWNTIMED`
+- `ORC_AUTO_MASTER_RECOVERY`
+- `ORC_AUTO_INTERMEDIATE_MASTER_RECOVERY`
+- `ORC_ORCHESTRATOR_HOST`
+- `ORC_IS_SUCCESSFUL`
+- `ORC_LOST_REPLICAS`
+- `ORC_REPLICA_HOSTS`
+
+And, in the event a recovery was successful:
+
+- `ORC_SUCCESSOR_HOST`
+- `ORC_SUCCESSOR_PORT`
+- `ORC_SUCCESSOR_ALIAS`
+
+2. Command line text replacement. `orchestrator` replaces the following magic tokens in your `*Proccesses` commands:
+
+- `{failureType}`
+- `{failureDescription}`
+- `{failedHost}`
+- `{failedPort}`
+- `{failureCluster}`
+- `{failureClusterAlias}`
+- `{failureClusterDomain}`
+- `{countSlaves}`
+- `{isDowntimed}`
+- `{autoMasterRecovery}`
+- `{autoIntermediateMasterRecovery}`
+- `{orchestratorHost}`
+- `{lostSlaves}`
+- `{slaveHosts}`
+- `{isSuccessful}`
+
+And, in the event a recovery was successful:
+
+- `{successorHost}`
+- `{successorPort}`
+- `{successorAlias}`
 
 
 ### Recovery configuration
