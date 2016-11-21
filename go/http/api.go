@@ -351,8 +351,8 @@ func (this *HttpAPI) MoveUp(params martini.Params, r render.Render, req *http.Re
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v moved up", instanceKey), Details: instance})
 }
 
-// MoveUpSlaves attempts to move up all replicas of an instance
-func (this *HttpAPI) MoveUpSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+// MoveUpReplicas attempts to move up all replicas of an instance
+func (this *HttpAPI) MoveUpReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -363,7 +363,7 @@ func (this *HttpAPI) MoveUpSlaves(params martini.Params, r render.Render, req *h
 		return
 	}
 
-	slaves, newMaster, err, errs := inst.MoveUpSlaves(&instanceKey, req.URL.Query().Get("pattern"))
+	slaves, newMaster, err, errs := inst.MoveUpReplicas(&instanceKey, req.URL.Query().Get("pattern"))
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -372,8 +372,8 @@ func (this *HttpAPI) MoveUpSlaves(params martini.Params, r render.Render, req *h
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Moved up %d slaves of %+v below %+v; %d errors: %+v", len(slaves), instanceKey, newMaster.Key, len(errs), errs), Details: newMaster.Key})
 }
 
-// MoveUpSlaves attempts to move up all replicas of an instance
-func (this *HttpAPI) RepointSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+// MoveUpReplicas attempts to move up all replicas of an instance
+func (this *HttpAPI) RepointReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -384,7 +384,7 @@ func (this *HttpAPI) RepointSlaves(params martini.Params, r render.Render, req *
 		return
 	}
 
-	slaves, err, _ := inst.RepointSlaves(&instanceKey, req.URL.Query().Get("pattern"))
+	slaves, err, _ := inst.RepointReplicas(&instanceKey, req.URL.Query().Get("pattern"))
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -691,7 +691,7 @@ func (this *HttpAPI) RelocateBelow(params martini.Params, r render.Render, req *
 }
 
 // RelocateSlaves attempts to smartly relocate replicas of a given instance below another
-func (this *HttpAPI) RelocateSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpAPI) RelocateReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -707,7 +707,7 @@ func (this *HttpAPI) RelocateSlaves(params martini.Params, r render.Render, req 
 		return
 	}
 
-	slaves, _, err, errs := inst.RelocateSlaves(&instanceKey, &belowKey, req.URL.Query().Get("pattern"))
+	slaves, _, err, errs := inst.RelocateReplicas(&instanceKey, &belowKey, req.URL.Query().Get("pattern"))
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -2294,15 +2294,15 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	// Smart relocation:
 	this.registerRequest(m, "relocate/:host/:port/:belowHost/:belowPort", this.RelocateBelow)
 	this.registerRequest(m, "relocate-below/:host/:port/:belowHost/:belowPort", this.RelocateBelow)
-	this.registerRequest(m, "relocate-slaves/:host/:port/:belowHost/:belowPort", this.RelocateSlaves)
+	this.registerRequest(m, "relocate-slaves/:host/:port/:belowHost/:belowPort", this.RelocateReplicas)
 	this.registerRequest(m, "regroup-slaves/:host/:port", this.RegroupSlaves)
 
 	// Classic file:pos relocation:
 	this.registerRequest(m, "move-up/:host/:port", this.MoveUp)
-	this.registerRequest(m, "move-up-slaves/:host/:port", this.MoveUpSlaves)
+	this.registerRequest(m, "move-up-slaves/:host/:port", this.MoveUpReplicas)
 	this.registerRequest(m, "move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow)
 	this.registerRequest(m, "move-equivalent/:host/:port/:belowHost/:belowPort", this.MoveEquivalent)
-	this.registerRequest(m, "repoint-slaves/:host/:port", this.RepointSlaves)
+	this.registerRequest(m, "repoint-slaves/:host/:port", this.RepointReplicas)
 	this.registerRequest(m, "make-co-master/:host/:port", this.MakeCoMaster)
 	this.registerRequest(m, "enslave-siblings/:host/:port", this.EnslaveSiblings)
 	this.registerRequest(m, "enslave-master/:host/:port", this.EnslaveMaster)

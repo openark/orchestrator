@@ -293,10 +293,10 @@ Cleanup:
 	return instance, err
 }
 
-// MoveUpSlaves will attempt moving up all replicas of a given instance, at the same time.
+// MoveUpReplicas will attempt moving up all replicas of a given instance, at the same time.
 // Clock-time, this is fater than moving one at a time. However this means all replicas of the given instance, and the instance itself,
 // will all stop replicating together.
-func MoveUpSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), *Instance, error, []error) {
+func MoveUpReplicas(instanceKey *InstanceKey, pattern string) ([](*Instance), *Instance, error, []error) {
 	res := [](*Instance){}
 	errs := []error{}
 	slaveMutex := make(chan bool, 1)
@@ -315,7 +315,7 @@ func MoveUpSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), *Ins
 	}
 
 	if instance.IsBinlogServer() {
-		slaves, err, errors := RepointSlavesTo(instanceKey, pattern, &instance.MasterKey)
+		slaves, err, errors := RepointReplicasTo(instanceKey, pattern, &instance.MasterKey)
 		// Bail out!
 		return slaves, instance, err, errors
 	}
@@ -789,9 +789,9 @@ func RepointTo(slaves [](*Instance), belowKey *InstanceKey) ([](*Instance), erro
 	return res, nil, errs
 }
 
-// RepointSlavesTo repoints replicas of a given instance (possibly filtered) onto another master.
+// RepointReplicasTo repoints replicas of a given instance (possibly filtered) onto another master.
 // Binlog Server is the major use case
-func RepointSlavesTo(instanceKey *InstanceKey, pattern string, belowKey *InstanceKey) ([](*Instance), error, []error) {
+func RepointReplicasTo(instanceKey *InstanceKey, pattern string, belowKey *InstanceKey) ([](*Instance), error, []error) {
 	res := [](*Instance){}
 	errs := []error{}
 
@@ -813,9 +813,9 @@ func RepointSlavesTo(instanceKey *InstanceKey, pattern string, belowKey *Instanc
 	return RepointTo(slaves, belowKey)
 }
 
-// RepointSlaves repoints all replicas of a given instance onto its existing master.
-func RepointSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), error, []error) {
-	return RepointSlavesTo(instanceKey, pattern, nil)
+// RepointReplicas repoints all replicas of a given instance onto its existing master.
+func RepointReplicas(instanceKey *InstanceKey, pattern string) ([](*Instance), error, []error) {
+	return RepointReplicasTo(instanceKey, pattern, nil)
 }
 
 // MakeCoMaster will attempt to make an instance co-master with its master, by making its master a replica of its own.
@@ -1864,7 +1864,7 @@ func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey, pattern str
 		binlogCase = true
 	}
 	if binlogCase {
-		slaves, err, errors := RepointSlavesTo(masterKey, pattern, belowKey)
+		slaves, err, errors := RepointReplicasTo(masterKey, pattern, belowKey)
 		// Bail out!
 		return slaves, masterInstance, err, errors
 	}
@@ -2578,7 +2578,7 @@ func relocateSlavesInternal(slaves [](*Instance), instance, other *Instance) ([]
 
 	// Normal binlog file:pos
 	if InstanceIsMasterOf(other, instance) {
-		// moveUpSlaves -- but not supporting "slaves" argument at this time.
+		// MoveUpReplicas -- but not supporting "slaves" argument at this time.
 	}
 
 	// Too complex
@@ -2588,7 +2588,7 @@ func relocateSlavesInternal(slaves [](*Instance), instance, other *Instance) ([]
 // RelocateSlaves will attempt moving replicas of an instance indicated by instanceKey below another instance.
 // Orchestrator will try and figure out the best way to relocate the servers. This could span normal
 // binlog-position, pseudo-gtid, repointing, binlog servers...
-func RelocateSlaves(instanceKey, otherKey *InstanceKey, pattern string) (slaves [](*Instance), other *Instance, err error, errs []error) {
+func RelocateReplicas(instanceKey, otherKey *InstanceKey, pattern string) (slaves [](*Instance), other *Instance, err error, errs []error) {
 
 	instance, found, err := ReadInstance(instanceKey)
 	if err != nil || !found {

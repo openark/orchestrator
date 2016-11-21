@@ -262,7 +262,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
-			slaves, _, err, errs := inst.RelocateSlaves(instanceKey, destinationKey, pattern)
+			slaves, _, err, errs := inst.RelocateReplicas(instanceKey, destinationKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {
@@ -313,7 +313,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			movedSlaves, _, err, errs := inst.MoveUpSlaves(instanceKey, pattern)
+			movedSlaves, _, err, errs := inst.MoveUpReplicas(instanceKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {
@@ -362,7 +362,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("repoint-replicas", "Classic file:pos relocation", `Repoint all replicas of given instance to replicate back from the instance. Use with care`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			repointedSlaves, err, errs := inst.RepointSlavesTo(instanceKey, pattern, destinationKey)
+			repointedSlaves, err, errs := inst.RepointReplicasTo(instanceKey, pattern, destinationKey)
 			if err != nil {
 				log.Fatale(err)
 			} else {
