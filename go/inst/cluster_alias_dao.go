@@ -114,7 +114,29 @@ func UpdateClusterAliases() error {
 			`, DowntimeLostInRecoveryMessage)
 		return log.Errore(err)
 	}
-	return ExecDBWriteFunc(writeFunc)
+	if err := ExecDBWriteFunc(writeFunc); err != nil {
+		return err
+	}
+	writeFunc = func() error {
+		// Handling the case where no cluster alias exists: we write a dummy alias in the form of the real cluster name.
+		_, err := db.ExecOrchestrator(`
+			replace into
+					cluster_alias (alias, cluster_name, last_registered)
+				select
+						cluster_name, cluster_name, now()
+				  from
+				    database_instance
+				  group by
+				    cluster_name
+					having
+						sum(suggested_cluster_alias = '') = count(*)
+			`)
+		return log.Errore(err)
+	}
+	if err := ExecDBWriteFunc(writeFunc); err != nil {
+		return err
+	}
+	return nil
 }
 
 // ReplaceAliasClusterName replaces alis mapping of one cluster name onto a new cluster name.
