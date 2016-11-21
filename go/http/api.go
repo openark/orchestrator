@@ -479,9 +479,9 @@ func (this *HttpAPI) ReattachSlave(params martini.Params, r render.Render, req *
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave reattached: %+v", instance.Key), Details: instance})
 }
 
-// ReattachSlaveMasterHost reverts a DetachSlaveMasterHost command
+// ReattachReplicaMasterHost reverts a DetachSlaveMasterHost command
 // by resoting the original master hostname in CHANGE MASTER TO
-func (this *HttpAPI) ReattachSlaveMasterHost(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpAPI) ReattachReplicaMasterHost(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -492,7 +492,7 @@ func (this *HttpAPI) ReattachSlaveMasterHost(params martini.Params, r render.Ren
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	instance, err := inst.ReattachSlaveMasterHost(&instanceKey)
+	instance, err := inst.ReattachReplicaMasterHost(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -2338,7 +2338,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "reset-slave/:host/:port", this.ResetSlave)
 	this.registerRequest(m, "detach-slave/:host/:port", this.DetachSlave)
 	this.registerRequest(m, "reattach-slave/:host/:port", this.ReattachSlave)
-	this.registerRequest(m, "reattach-slave-master-host/:host/:port", this.ReattachSlaveMasterHost)
+	this.registerRequest(m, "reattach-slave-master-host/:host/:port", this.ReattachReplicaMasterHost)
 
 	// Instance:
 	this.registerRequest(m, "set-read-only/:host/:port", this.SetReadOnly)

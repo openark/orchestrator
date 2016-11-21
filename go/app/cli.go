@@ -691,7 +691,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			_, err := inst.ReattachSlaveMasterHost(instanceKey)
+			_, err := inst.ReattachReplicaMasterHost(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}

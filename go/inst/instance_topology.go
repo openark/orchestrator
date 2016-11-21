@@ -1084,8 +1084,8 @@ Cleanup:
 	return instance, err
 }
 
-// ReattachSlaveMasterHost reattaches a replica back onto its master by undoing a DetachSlaveMasterHost operation
-func ReattachSlaveMasterHost(instanceKey *InstanceKey) (*Instance, error) {
+// ReattachReplicaMasterHost reattaches a replica back onto its master by undoing a DetachSlaveMasterHost operation
+func ReattachReplicaMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
