@@ -825,7 +825,7 @@ func (this *HttpAPI) MatchUp(params martini.Params, r render.Render, req *http.R
 }
 
 // MultiMatchSlaves attempts to match all replicas of a given instance below another, efficiently
-func (this *HttpAPI) MultiMatchSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpAPI) MultiMatchReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -841,7 +841,7 @@ func (this *HttpAPI) MultiMatchSlaves(params martini.Params, r render.Render, re
 		return
 	}
 
-	slaves, newMaster, err, errs := inst.MultiMatchSlaves(&instanceKey, &belowKey, req.URL.Query().Get("pattern"))
+	slaves, newMaster, err, errs := inst.MultiMatchReplicas(&instanceKey, &belowKey, req.URL.Query().Get("pattern"))
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -851,7 +851,7 @@ func (this *HttpAPI) MultiMatchSlaves(params martini.Params, r render.Render, re
 }
 
 // MatchUpSlaves attempts to match up all replicas of an instance
-func (this *HttpAPI) MatchUpSlaves(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpAPI) MatchUpReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -862,7 +862,7 @@ func (this *HttpAPI) MatchUpSlaves(params martini.Params, r render.Render, req *
 		return
 	}
 
-	slaves, newMaster, err, errs := inst.MatchUpSlaves(&instanceKey, req.URL.Query().Get("pattern"))
+	slaves, newMaster, err, errs := inst.MatchUpReplicas(&instanceKey, req.URL.Query().Get("pattern"))
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -2320,8 +2320,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "match/:host/:port/:belowHost/:belowPort", this.MatchBelow)
 	this.registerRequest(m, "match-below/:host/:port/:belowHost/:belowPort", this.MatchBelow)
 	this.registerRequest(m, "match-up/:host/:port", this.MatchUp)
-	this.registerRequest(m, "match-slaves/:host/:port/:belowHost/:belowPort", this.MultiMatchSlaves)
-	this.registerRequest(m, "match-up-slaves/:host/:port", this.MatchUpSlaves)
+	this.registerRequest(m, "match-slaves/:host/:port/:belowHost/:belowPort", this.MultiMatchReplicas)
+	this.registerRequest(m, "match-up-slaves/:host/:port", this.MatchUpReplicas)
 	this.registerRequest(m, "regroup-slaves-pgtid/:host/:port", this.RegroupSlavesPseudoGTID)
 	// Legacy, need to revisit:
 	this.registerRequest(m, "make-master/:host/:port", this.MakeMaster)

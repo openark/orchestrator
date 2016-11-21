@@ -531,7 +531,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce destination:", destination)
 			}
 
-			matchedSlaves, _, err, errs := inst.MultiMatchSlaves(instanceKey, destinationKey, pattern)
+			matchedSlaves, _, err, errs := inst.MultiMatchReplicas(instanceKey, destinationKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {
@@ -550,7 +550,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			matchedSlaves, _, err, errs := inst.MatchUpSlaves(instanceKey, pattern)
+			matchedSlaves, _, err, errs := inst.MatchUpReplicas(instanceKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {

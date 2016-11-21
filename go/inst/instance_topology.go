@@ -1833,7 +1833,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 }
 
 // MultiMatchSlaves will match (via pseudo-gtid) all replicas of given master below given instance.
-func MultiMatchSlaves(masterKey *InstanceKey, belowKey *InstanceKey, pattern string) ([](*Instance), *Instance, error, []error) {
+func MultiMatchReplicas(masterKey *InstanceKey, belowKey *InstanceKey, pattern string) ([](*Instance), *Instance, error, []error) {
 	res := [](*Instance){}
 	errs := []error{}
 
@@ -1911,7 +1911,7 @@ func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instan
 // MatchUpSlaves will move all replicas of given master up the replication chain,
 // so that they become siblings of their master.
 // This should be called when the local master dies, and all its replicas are to be resurrected via Pseudo-GTID
-func MatchUpSlaves(masterKey *InstanceKey, pattern string) ([](*Instance), *Instance, error, []error) {
+func MatchUpReplicas(masterKey *InstanceKey, pattern string) ([](*Instance), *Instance, error, []error) {
 	res := [](*Instance){}
 	errs := []error{}
 
@@ -1920,7 +1920,7 @@ func MatchUpSlaves(masterKey *InstanceKey, pattern string) ([](*Instance), *Inst
 		return res, nil, err, errs
 	}
 
-	return MultiMatchSlaves(masterKey, &masterInstance.MasterKey, pattern)
+	return MultiMatchReplicas(masterKey, &masterInstance.MasterKey, pattern)
 }
 
 func isGenerallyValidAsBinlogSource(slave *Instance) bool {
@@ -2278,7 +2278,7 @@ func RegroupSlavesPseudoGTIDIncludingSubSlavesOfBinlogServers(masterKey *Instanc
 			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: matching slaves of binlog server %+v below %+v", binlogServer.Key, candidateSlave.Key)
 			// Right now sequentially.
 			// At this point just do what you can, don't return an error
-			MultiMatchSlaves(&binlogServer.Key, &candidateSlave.Key, "")
+			MultiMatchReplicas(&binlogServer.Key, &candidateSlave.Key, "")
 			log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: done matching slaves of binlog server %+v below %+v", binlogServer.Key, candidateSlave.Key)
 		}
 		log.Debugf("RegroupSlavesIncludingSubSlavesOfBinlogServers: done handling binlog regrouping for %+v; will proceed with normal RegroupSlaves", *masterKey)
