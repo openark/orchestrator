@@ -417,7 +417,7 @@ Cleanup:
 		// All returned with error
 		return res, instance, log.Error("Error on all operations"), errs
 	}
-	AuditOperation("move-up-slaves", instanceKey, fmt.Sprintf("moved up %d/%d slaves of %+v. New master: %+v", len(res), len(slaves), *instanceKey, instance.MasterKey))
+	AuditOperation("move-up-replicas", instanceKey, fmt.Sprintf("moved up %d/%d slaves of %+v. New master: %+v", len(res), len(slaves), *instanceKey, instance.MasterKey))
 
 	return res, instance, err, errs
 }
@@ -1882,7 +1882,7 @@ func MultiMatchReplicas(masterKey *InstanceKey, belowKey *InstanceKey, pattern s
 	if len(matchedSlaves) != len(slaves) {
 		err = fmt.Errorf("MultiMatchReplicas: only matched %d out of %d slaves of %+v; error is: %+v", len(matchedSlaves), len(slaves), *masterKey, err)
 	}
-	AuditOperation("multi-match-slaves", masterKey, fmt.Sprintf("matched %d slaves under %+v", len(matchedSlaves), *belowKey))
+	AuditOperation("multi-match-replicas", masterKey, fmt.Sprintf("matched %d slaves under %+v", len(matchedSlaves), *belowKey))
 
 	return matchedSlaves, belowInstance, err, errs
 }
@@ -2198,7 +2198,7 @@ func RegroupReplicasPseudoGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureT
 	}
 
 	log.Debugf("RegroupReplicas: done")
-	AuditOperation("regroup-slaves", masterKey, fmt.Sprintf("regrouped %+v slaves below %+v", len(operatedSlaves), *masterKey))
+	AuditOperation("regroup-replicas", masterKey, fmt.Sprintf("regrouped %+v slaves below %+v", len(operatedSlaves), *masterKey))
 	// aheadSlaves are lost (they were ahead in replication as compared to promoted replica)
 	return aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, instance, err
 }
@@ -2612,7 +2612,7 @@ func RelocateReplicas(instanceKey, otherKey *InstanceKey, pattern string) (slave
 	slaves, err, errs = relocateSlavesInternal(slaves, instance, other)
 
 	if err == nil {
-		AuditOperation("relocate-slaves", instanceKey, fmt.Sprintf("relocated %+v slaves of %+v below %+v", len(slaves), *instanceKey, *otherKey))
+		AuditOperation("relocate-replicas", instanceKey, fmt.Sprintf("relocated %+v slaves of %+v below %+v", len(slaves), *instanceKey, *otherKey))
 	}
 	return slaves, other, err, errs
 }
