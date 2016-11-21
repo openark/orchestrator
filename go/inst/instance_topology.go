@@ -2035,10 +2035,10 @@ func getPriorityBinlogFormatForCandidate(slaves [](*Instance)) (priorityBinlogFo
 	return priorityBinlogFormat, nil
 }
 
-// chooseCandidateSlave
-func chooseCandidateSlave(slaves [](*Instance)) (candidateSlave *Instance, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves [](*Instance), err error) {
+// chooseCandidateReplica
+func chooseCandidateReplica(slaves [](*Instance)) (candidateSlave *Instance, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves [](*Instance), err error) {
 	if len(slaves) == 0 {
-		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, fmt.Errorf("No slaves found given in chooseCandidateSlave")
+		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, fmt.Errorf("No slaves found given in chooseCandidateReplica")
 	}
 	priorityMajorVersion, _ := getPriorityMajorVersionForCandidate(slaves)
 	priorityBinlogFormat, _ := getPriorityBinlogFormatForCandidate(slaves)
@@ -2068,7 +2068,7 @@ func chooseCandidateSlave(slaves [](*Instance)) (candidateSlave *Instance, ahead
 		if candidateSlave != nil {
 			slaves = RemoveInstance(slaves, &candidateSlave.Key)
 		}
-		return candidateSlave, slaves, equalSlaves, laterSlaves, cannotReplicateSlaves, fmt.Errorf("chooseCandidateSlave: no candidate replica found")
+		return candidateSlave, slaves, equalSlaves, laterSlaves, cannotReplicateSlaves, fmt.Errorf("chooseCandidateReplica: no candidate replica found")
 	}
 	slaves = RemoveInstance(slaves, &candidateSlave.Key)
 	for _, slave := range slaves {
@@ -2105,7 +2105,7 @@ func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instan
 	if len(slaves) == 0 {
 		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, fmt.Errorf("No slaves found for %+v", *masterKey)
 	}
-	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err = chooseCandidateSlave(slaves)
+	candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err = chooseCandidateReplica(slaves)
 	if err != nil {
 		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err
 	}
