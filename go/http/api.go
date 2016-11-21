@@ -595,8 +595,8 @@ func (this *HttpAPI) MoveBelowGTID(params martini.Params, r render.Render, req *
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v moved below %+v via GTID", instanceKey, belowKey), Details: instance})
 }
 
-// MoveSlavesGTID attempts to move an instance below another, via GTID
-func (this *HttpAPI) MoveSlavesGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+// MoveReplicasGTID attempts to move an instance below another, via GTID
+func (this *HttpAPI) MoveReplicasGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -612,7 +612,7 @@ func (this *HttpAPI) MoveSlavesGTID(params martini.Params, r render.Render, req 
 		return
 	}
 
-	movedSlaves, _, err, errs := inst.MoveSlavesGTID(&instanceKey, &belowKey, req.URL.Query().Get("pattern"))
+	movedSlaves, _, err, errs := inst.MoveReplicasGTID(&instanceKey, &belowKey, req.URL.Query().Get("pattern"))
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -2313,7 +2313,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 
 	// GTID relocation:
 	this.registerRequest(m, "move-below-gtid/:host/:port/:belowHost/:belowPort", this.MoveBelowGTID)
-	this.registerRequest(m, "move-slaves-gtid/:host/:port/:belowHost/:belowPort", this.MoveSlavesGTID)
+	this.registerRequest(m, "move-slaves-gtid/:host/:port/:belowHost/:belowPort", this.MoveReplicasGTID)
 	this.registerRequest(m, "regroup-slaves-gtid/:host/:port", this.RegroupReplicasGTID)
 
 	// Pseudo-GTID relocation:

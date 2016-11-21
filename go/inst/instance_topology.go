@@ -581,9 +581,9 @@ func MoveBelowGTID(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	return moveInstanceBelowViaGTID(instance, other)
 }
 
-// moveSlavesViaGTID moves a list of replicas under another instance via GTID, returning those replicas
+// MoveReplicasViaGTID moves a list of replicas under another instance via GTID, returning those replicas
 // that could not be moved (do not use GTID)
-func moveSlavesViaGTID(slaves [](*Instance), other *Instance) (movedSlaves [](*Instance), unmovedSlaves [](*Instance), err error, errs []error) {
+func MoveReplicasViaGTID(slaves [](*Instance), other *Instance) (movedSlaves [](*Instance), unmovedSlaves [](*Instance), err error, errs []error) {
 	slaves = RemoveInstance(slaves, &other.Key)
 	if len(slaves) == 0 {
 		// Nothing to do
@@ -626,15 +626,15 @@ func moveSlavesViaGTID(slaves [](*Instance), other *Instance) (movedSlaves [](*I
 	}
 	if len(errs) == len(slaves) {
 		// All returned with error
-		return movedSlaves, unmovedSlaves, fmt.Errorf("moveSlavesViaGTID: Error on all %+v operations", len(errs)), errs
+		return movedSlaves, unmovedSlaves, fmt.Errorf("MoveReplicasViaGTID: Error on all %+v operations", len(errs)), errs
 	}
 	AuditOperation("move-slaves-gtid", &other.Key, fmt.Sprintf("moved %d/%d slaves below %+v via GTID", len(movedSlaves), len(slaves), other.Key))
 
 	return movedSlaves, unmovedSlaves, err, errs
 }
 
-// MoveSlavesGTID will (attempt to) move all replicas of given master below given instance.
-func MoveSlavesGTID(masterKey *InstanceKey, belowKey *InstanceKey, pattern string) (movedSlaves [](*Instance), unmovedSlaves [](*Instance), err error, errs []error) {
+// MoveReplicasGTID will (attempt to) move all replicas of given master below given instance.
+func MoveReplicasGTID(masterKey *InstanceKey, belowKey *InstanceKey, pattern string) (movedSlaves [](*Instance), unmovedSlaves [](*Instance), err error, errs []error) {
 	belowInstance, err := ReadTopologyInstance(belowKey)
 	if err != nil {
 		// Can't access "below" ==> can't move replicas beneath it
@@ -647,13 +647,13 @@ func MoveSlavesGTID(masterKey *InstanceKey, belowKey *InstanceKey, pattern strin
 		return movedSlaves, unmovedSlaves, err, errs
 	}
 	slaves = filterInstancesByPattern(slaves, pattern)
-	movedSlaves, unmovedSlaves, err, errs = moveSlavesViaGTID(slaves, belowInstance)
+	movedSlaves, unmovedSlaves, err, errs = MoveReplicasViaGTID(slaves, belowInstance)
 	if err != nil {
 		log.Errore(err)
 	}
 
 	if len(unmovedSlaves) > 0 {
-		err = fmt.Errorf("MoveSlavesGTID: only moved %d out of %d slaves of %+v; error is: %+v", len(movedSlaves), len(slaves), *masterKey, err)
+		err = fmt.Errorf("MoveReplicasGTID: only moved %d out of %d slaves of %+v; error is: %+v", len(movedSlaves), len(slaves), *masterKey, err)
 	}
 
 	return movedSlaves, unmovedSlaves, err, errs
@@ -2307,7 +2307,7 @@ func RegroupReplicasGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegro
 	slavesToMove := append(equalSlaves, laterSlaves...)
 	log.Debugf("RegroupReplicasGTID: working on %d slaves", len(slavesToMove))
 
-	movedSlaves, unmovedSlaves, err, _ := moveSlavesViaGTID(slavesToMove, candidateSlave)
+	movedSlaves, unmovedSlaves, err, _ := MoveReplicasViaGTID(slavesToMove, candidateSlave)
 	if err != nil {
 		log.Errore(err)
 	}
@@ -2551,7 +2551,7 @@ func relocateSlavesInternal(slaves [](*Instance), instance, other *Instance) ([]
 	}
 	// GTID
 	{
-		movedSlaves, unmovedSlaves, err, errs := moveSlavesViaGTID(slaves, other)
+		movedSlaves, unmovedSlaves, err, errs := MoveReplicasViaGTID(slaves, other)
 
 		if len(movedSlaves) == len(slaves) {
 			// Moved (or tried moving) everything via GTID
