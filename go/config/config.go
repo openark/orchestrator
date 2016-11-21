@@ -75,6 +75,7 @@ type Configuration struct {
 	DiscoverByShowSlaveHosts                     bool     // Attempt SHOW SLAVE HOSTS before PROCESSLIST
 	InstancePollSeconds                          uint     // Number of seconds between instance reads
 	InstanceWriteBufferSize                      int      // Instance write buffer size (max number of instances to flush in one INSERT ODKU)
+	BufferInstanceWrites                         bool     // Set to 'true' for write-optimization on backend table (compromise: writes can be stale and overwrite non stale data)
 	InstanceFlushIntervalMilliseconds            int      // Max interval between instance write buffer flushes
 	ReadLongRunningQueries                       bool     // Whether orchestrator should read and record current long running executing queries.
 	BinlogFileHistoryDays                        int      // When > 0, amount of days for which orchestrator records per-instance binlog files & sizes
@@ -234,6 +235,7 @@ func newConfiguration() *Configuration {
 		DefaultInstancePort:                          3306,
 		InstancePollSeconds:                          5,
 		InstanceWriteBufferSize:                      100,
+		BufferInstanceWrites:                         false,
 		InstanceFlushIntervalMilliseconds:            100,
 		ReadLongRunningQueries:                       true,
 		BinlogFileHistoryDays:                        0,

@@ -142,7 +142,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	discoveriesCounter.Inc(1)
 
 	// First we've ever heard of this instance. Continue investigation:
-	instance, err = inst.ReadTopologyInstance(&instanceKey, true)
+	instance, err = inst.ReadTopologyInstance(&instanceKey, config.Config.BufferInstanceWrites)
 	// panic can occur (IO stuff). Therefore it may happen
 	// that instance is nil. Check it.
 	if instance == nil {
