@@ -1832,7 +1832,7 @@ func MultiMatchBelow(slaves [](*Instance), belowKey *InstanceKey, slavesAlreadyS
 	return res, belowInstance, err, errs
 }
 
-// MultiMatchSlaves will match (via pseudo-gtid) all replicas of given master below given instance.
+// MultiMatchReplicas will match (via pseudo-gtid) all replicas of given master below given instance.
 func MultiMatchReplicas(masterKey *InstanceKey, belowKey *InstanceKey, pattern string) ([](*Instance), *Instance, error, []error) {
 	res := [](*Instance){}
 	errs := []error{}
@@ -1852,15 +1852,15 @@ func MultiMatchReplicas(masterKey *InstanceKey, belowKey *InstanceKey, pattern s
 	binlogCase := false
 	if masterInstance.IsBinlogServer() && masterInstance.MasterKey.Equals(belowKey) {
 		// repoint-up
-		log.Debugf("MultiMatchSlaves: pointing slaves up from binlog server")
+		log.Debugf("MultiMatchReplicas: pointing slaves up from binlog server")
 		binlogCase = true
 	} else if belowInstance.IsBinlogServer() && belowInstance.MasterKey.Equals(masterKey) {
 		// repoint-down
-		log.Debugf("MultiMatchSlaves: pointing slaves down to binlog server")
+		log.Debugf("MultiMatchReplicas: pointing slaves down to binlog server")
 		binlogCase = true
 	} else if masterInstance.IsBinlogServer() && belowInstance.IsBinlogServer() && masterInstance.MasterKey.Equals(&belowInstance.MasterKey) {
 		// Both BLS, siblings
-		log.Debugf("MultiMatchSlaves: pointing slaves to binlong sibling")
+		log.Debugf("MultiMatchReplicas: pointing slaves to binlong sibling")
 		binlogCase = true
 	}
 	if binlogCase {
@@ -1880,7 +1880,7 @@ func MultiMatchReplicas(masterKey *InstanceKey, belowKey *InstanceKey, pattern s
 	matchedSlaves, belowInstance, err, errs := MultiMatchBelow(slaves, &belowInstance.Key, false, nil)
 
 	if len(matchedSlaves) != len(slaves) {
-		err = fmt.Errorf("MultiMatchSlaves: only matched %d out of %d slaves of %+v; error is: %+v", len(matchedSlaves), len(slaves), *masterKey, err)
+		err = fmt.Errorf("MultiMatchReplicas: only matched %d out of %d slaves of %+v; error is: %+v", len(matchedSlaves), len(slaves), *masterKey, err)
 	}
 	AuditOperation("multi-match-slaves", masterKey, fmt.Sprintf("matched %d slaves under %+v", len(matchedSlaves), *belowKey))
 

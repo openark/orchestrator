@@ -824,7 +824,7 @@ func (this *HttpAPI) MatchUp(params martini.Params, r render.Render, req *http.R
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v matched up at %+v", instanceKey, *matchedCoordinates), Details: instance})
 }
 
-// MultiMatchSlaves attempts to match all replicas of a given instance below another, efficiently
+// MultiMatchReplicas attempts to match all replicas of a given instance below another, efficiently
 func (this *HttpAPI) MultiMatchReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
