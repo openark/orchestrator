@@ -107,7 +107,7 @@ func getClusterName(clusterAlias string, instanceKey *inst.InstanceKey) (cluster
 		}
 	}
 	if clusterAlias != "" {
-		// We're still here? So this wasn't an exact cluster name. Let's cehck if it's fuzzy:
+		// We're still here? So this wasn't an exact cluster name. Let's check if it's fuzzy:
 		fuzzyInstanceKey, err := inst.ParseRawInstanceKeyLoose(clusterAlias)
 		if err != nil {
 			log.Fatale(err)
