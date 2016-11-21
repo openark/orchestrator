@@ -448,7 +448,7 @@ func (this *HttpAPI) DetachSlave(params martini.Params, r render.Render, req *ht
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	instance, err := inst.DetachSlaveOperation(&instanceKey)
+	instance, err := inst.DetachReplicaOperation(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return

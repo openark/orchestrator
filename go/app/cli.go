@@ -658,7 +658,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("detach-replica", "Replication, general", `Stops replication and modifies binlog position into an impossible, yet reversible, value.`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			_, err := inst.DetachSlaveOperation(instanceKey)
+			_, err := inst.DetachReplicaOperation(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}

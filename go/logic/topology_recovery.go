@@ -337,7 +337,7 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 			log.Debugf("topology_recovery: - RecoverDeadMaster: lost %+v slaves during recovery process; detaching them", len(lostSlaves))
 			for _, slave := range lostSlaves {
 				slave := slave
-				inst.DetachSlaveOperation(&slave.Key)
+				inst.DetachReplicaOperation(&slave.Key)
 			}
 			return nil
 		}
@@ -845,7 +845,7 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 			log.Debugf("topology_recovery: - RecoverDeadCoMaster: lost %+v slaves during recovery process; detaching them", len(lostSlaves))
 			for _, slave := range lostSlaves {
 				slave := slave
-				inst.DetachSlaveOperation(&slave.Key)
+				inst.DetachReplicaOperation(&slave.Key)
 			}
 			return nil
 		}
