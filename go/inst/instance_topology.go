@@ -1629,7 +1629,7 @@ func getSlavesForSorting(masterKey *InstanceKey, includeBinlogServerSubSlaves bo
 // (most up-to-date replica first).
 // This function assumes given `slaves` argument is indeed a list of instances all replicating
 // from the same master (the result of `getSlavesForSorting()` is appropriate)
-func sortedSlaves(slaves [](*Instance), shouldStopSlaves bool) [](*Instance) {
+func sortedReplicas(slaves [](*Instance), shouldStopSlaves bool) [](*Instance) {
 	if len(slaves) == 0 {
 		return slaves
 	}
@@ -2098,7 +2098,7 @@ func GetCandidateSlave(masterKey *InstanceKey, forRematchPurposes bool) (*Instan
 	if err != nil {
 		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err
 	}
-	slaves = sortedSlaves(slaves, forRematchPurposes)
+	slaves = sortedReplicas(slaves, forRematchPurposes)
 	if err != nil {
 		return candidateSlave, aheadSlaves, equalSlaves, laterSlaves, cannotReplicateSlaves, err
 	}
@@ -2119,7 +2119,7 @@ func GetCandidateSlaveOfBinlogServerTopology(masterKey *InstanceKey) (candidateS
 	if err != nil {
 		return candidateSlave, err
 	}
-	slaves = sortedSlaves(slaves, false)
+	slaves = sortedReplicas(slaves, false)
 	if len(slaves) == 0 {
 		return candidateSlave, fmt.Errorf("No slaves found for %+v", *masterKey)
 	}
