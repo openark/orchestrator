@@ -1796,7 +1796,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 	}
 
 	var values []string = make([]string, len(columns), len(columns))
-	for i, _ := range columns {
+	for i := range columns {
 		values[i] = "?"
 	}
 	values[2] = "NOW()" // last_checked
