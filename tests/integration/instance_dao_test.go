@@ -86,7 +86,7 @@ func (s *TestSuite) TestReadTopologyMaster(c *C) {
 	i, _ := ReadTopologyInstance(&key)
 
 	c.Assert(i.Key.Hostname, Equals, key.Hostname)
-	c.Assert(i.IsSlave(), Equals, false)
+	c.Assert(i.IsReplica(), Equals, false)
 	c.Assert(len(i.SlaveHosts), Equals, 3)
 	c.Assert(len(i.SlaveHosts.GetInstanceKeys()), Equals, len(i.SlaveHosts))
 }
@@ -95,7 +95,7 @@ func (s *TestSuite) TestReadTopologySlave(c *C) {
 	key := slave3Key
 	i, _ := ReadTopologyInstance(&key)
 	c.Assert(i.Key.Hostname, Equals, key.Hostname)
-	c.Assert(i.IsSlave(), Equals, true)
+	c.Assert(i.IsReplica(), Equals, true)
 	c.Assert(len(i.SlaveHosts), Equals, 0)
 }
 
@@ -121,7 +121,7 @@ func (s *TestSuite) TestGetMasterOfASlave(c *C) {
 	c.Assert(err, IsNil)
 	master, err := GetInstanceMaster(i)
 	c.Assert(err, IsNil)
-	c.Assert(master.IsSlave(), Equals, false)
+	c.Assert(master.IsReplica(), Equals, false)
 	c.Assert(master.Key.Port, Equals, 22987)
 }
 

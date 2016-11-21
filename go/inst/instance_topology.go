@@ -132,10 +132,10 @@ func GetInstanceMaster(instance *Instance) (*Instance, error) {
 
 // InstancesAreSiblings checks whether both instances are replicating from same master
 func InstancesAreSiblings(instance0, instance1 *Instance) bool {
-	if !instance0.IsSlave() {
+	if !instance0.IsReplica() {
 		return false
 	}
-	if !instance1.IsSlave() {
+	if !instance1.IsReplica() {
 		return false
 	}
 	if instance0.Key.Equals(&instance1.Key) {
@@ -147,7 +147,7 @@ func InstancesAreSiblings(instance0, instance1 *Instance) bool {
 
 // InstanceIsMasterOf checks whether an instance is the master of another
 func InstanceIsMasterOf(allegedMaster, allegedSlave *Instance) bool {
-	if !allegedSlave.IsSlave() {
+	if !allegedSlave.IsReplica() {
 		return false
 	}
 	if allegedMaster.Key.Equals(&allegedSlave.Key) {
@@ -215,7 +215,7 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		return instance, err
 	}
-	if !instance.IsSlave() {
+	if !instance.IsReplica() {
 		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 	rinstance, _, _ := ReadInstance(&instance.Key)
@@ -227,7 +227,7 @@ func MoveUp(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errorf("Cannot GetInstanceMaster() for %+v. error=%+v", instance.Key, err)
 	}
 
-	if !master.IsSlave() {
+	if !master.IsReplica() {
 		return instance, fmt.Errorf("master is not a replica itself: %+v", master.Key)
 	}
 
@@ -306,7 +306,7 @@ func MoveUpSlaves(instanceKey *InstanceKey, pattern string) ([](*Instance), *Ins
 	if err != nil {
 		return res, nil, err, errs
 	}
-	if !instance.IsSlave() {
+	if !instance.IsReplica() {
 		return res, instance, fmt.Errorf("instance is not a replica: %+v", instanceKey), errs
 	}
 	_, err = GetInstanceMaster(instance)
@@ -669,7 +669,7 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gtidHint Operatio
 	if err != nil {
 		return instance, err
 	}
-	if !instance.IsSlave() {
+	if !instance.IsReplica() {
 		return instance, fmt.Errorf("instance is not a replica: %+v", *instanceKey)
 	}
 
@@ -881,7 +881,7 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 
 	// the coMaster used to be merely a replica. Just point master into *some* position
 	// within coMaster...
-	if master.IsSlave() {
+	if master.IsReplica() {
 		// this is the case of a co-master. For masters, the StopSlave operation throws an error, and
 		// there's really no point in doing it.
 		master, err = StopSlave(&master.Key)
@@ -933,7 +933,7 @@ func ResetSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	if instance.IsSlave() {
+	if instance.IsReplica() {
 		instance, err = StopSlave(instanceKey)
 		if err != nil {
 			goto Cleanup
@@ -974,7 +974,7 @@ func DetachSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	if instance.IsSlave() {
+	if instance.IsReplica() {
 		instance, err = StopSlave(instanceKey)
 		if err != nil {
 			goto Cleanup
@@ -1015,7 +1015,7 @@ func ReattachSlaveOperation(instanceKey *InstanceKey) (*Instance, error) {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	if instance.IsSlave() {
+	if instance.IsReplica() {
 		instance, err = StopSlave(instanceKey)
 		if err != nil {
 			goto Cleanup
@@ -1046,7 +1046,7 @@ func DetachSlaveMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		return instance, err
 	}
-	if !instance.IsSlave() {
+	if !instance.IsReplica() {
 		return instance, fmt.Errorf("instance is not a replica: %+v", *instanceKey)
 	}
 	if instance.MasterKey.IsDetached() {
@@ -1090,7 +1090,7 @@ func ReattachSlaveMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		return instance, err
 	}
-	if !instance.IsSlave() {
+	if !instance.IsReplica() {
 		return instance, fmt.Errorf("instance is not a replica: %+v", *instanceKey)
 	}
 	if !instance.MasterKey.IsDetached() {
@@ -1207,7 +1207,7 @@ func ResetMasterGTIDOperation(instanceKey *InstanceKey, removeSelfUUID bool, uui
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	if instance.IsSlave() {
+	if instance.IsReplica() {
 		instance, err = StopSlave(instanceKey)
 		if err != nil {
 			goto Cleanup
@@ -1427,7 +1427,7 @@ func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 	masterInstance, err := ReadTopologyInstance(&instance.MasterKey)
 	if err == nil {
 		// If the read succeeded, check the master status.
-		if masterInstance.IsSlave() {
+		if masterInstance.IsReplica() {
 			return instance, fmt.Errorf("MakeMaster: instance's master %+v seems to be replicating", masterInstance.Key)
 		}
 		if masterInstance.IsLastCheckValid {
@@ -1893,7 +1893,7 @@ func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instan
 	if err != nil || !found {
 		return nil, nil, err
 	}
-	if !instance.IsSlave() {
+	if !instance.IsReplica() {
 		return instance, nil, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 	master, found, err := ReadInstance(&instance.MasterKey)
@@ -1901,7 +1901,7 @@ func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instan
 		return instance, nil, log.Errorf("Cannot get master for %+v. error=%+v", instance.Key, err)
 	}
 
-	if !master.IsSlave() {
+	if !master.IsReplica() {
 		return instance, nil, fmt.Errorf("master is not a replica itself: %+v", master.Key)
 	}
 
