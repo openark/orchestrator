@@ -2511,11 +2511,11 @@ func RelocateBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
-// relocateSlavesInternal is a protentially recursive function which chooses how to relocate
+// relocateReplicasInternal is a protentially recursive function which chooses how to relocate
 // replicas of an instance below another.
 // It may choose to use Pseudo-GTID, or normal binlog positions, or take advantage of binlog servers,
 // or it may combine any of the above in a multi-step operation.
-func relocateSlavesInternal(slaves [](*Instance), instance, other *Instance) ([](*Instance), error, []error) {
+func relocateReplicasInternal(slaves [](*Instance), instance, other *Instance) ([](*Instance), error, []error) {
 	errs := []error{}
 	var err error
 	// simplest:
@@ -2542,7 +2542,7 @@ func relocateSlavesInternal(slaves [](*Instance), instance, other *Instance) ([]
 		if err != nil || !found {
 			return nil, err, errs
 		}
-		slaves, err, errs = relocateSlavesInternal(slaves, instance, otherMaster)
+		slaves, err, errs = relocateReplicasInternal(slaves, instance, otherMaster)
 		if err != nil {
 			return slaves, err, errs
 		}
@@ -2558,7 +2558,7 @@ func relocateSlavesInternal(slaves [](*Instance), instance, other *Instance) ([]
 			return movedSlaves, err, errs
 		} else if len(movedSlaves) > 0 {
 			// something was moved via GTID; let's try further on
-			return relocateSlavesInternal(unmovedSlaves, instance, other)
+			return relocateReplicasInternal(unmovedSlaves, instance, other)
 		}
 		// Otherwise nothing was moved via GTID. Maybe we don't have any GTIDs, we continue.
 	}
@@ -2609,7 +2609,7 @@ func RelocateReplicas(instanceKey, otherKey *InstanceKey, pattern string) (slave
 		// Nothing to do
 		return slaves, other, nil, errs
 	}
-	slaves, err, errs = relocateSlavesInternal(slaves, instance, other)
+	slaves, err, errs = relocateReplicasInternal(slaves, instance, other)
 
 	if err == nil {
 		AuditOperation("relocate-replicas", instanceKey, fmt.Sprintf("relocated %+v slaves of %+v below %+v", len(slaves), *instanceKey, *otherKey))
