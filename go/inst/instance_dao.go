@@ -350,7 +350,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 				// Note: NewInstanceKeyFromStrings calls ResolveHostname() implicitly
 				slaveKey, err := NewInstanceKeyFromStrings(host, port)
 				if err == nil && slaveKey.IsValid() {
-					instance.AddSlaveKey(slaveKey)
+					instance.AddReplicaKey(slaveKey)
 					foundByShowSlaveHosts = true
 				}
 				return err
@@ -376,7 +376,7 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 					logReadTopologyInstanceError(instanceKey, "ResolveHostname: processlist", resolveErr)
 				}
 				slaveKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
-				instance.AddSlaveKey(&slaveKey)
+				instance.AddReplicaKey(&slaveKey)
 				return err
 			})
 
