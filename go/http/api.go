@@ -1277,7 +1277,7 @@ func (this *HttpAPI) ClusterInfoByAlias(params martini.Params, r render.Render, 
 
 // ClusterOSCSlaves returns heuristic list of OSC replicas
 func (this *HttpAPI) ClusterOSCSlaves(params martini.Params, r render.Render, req *http.Request) {
-	instances, err := inst.GetClusterOSCSlaves(params["clusterName"])
+	instances, err := inst.GetClusterOSCReplicas(params["clusterName"])
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})

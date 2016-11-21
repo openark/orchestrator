@@ -1055,9 +1055,9 @@ func filterOSCInstances(instances [](*Instance)) [](*Instance) {
 	return result
 }
 
-// GetClusterOSCSlaves returns a heuristic list of replicas which are fit as controll replicas for an OSC operation.
+// GetClusterOSCReplicas returns a heuristic list of replicas which are fit as controll replicas for an OSC operation.
 // These would be intermediate masters
-func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
+func GetClusterOSCReplicas(clusterName string) ([](*Instance), error) {
 	intermediateMasters := [](*Instance){}
 	result := [](*Instance){}
 	var err error
@@ -1194,7 +1194,7 @@ func GetInstancesMaxLag(instances [](*Instance)) (maxLag int64, err error) {
 
 // GetClusterHeuristicLag returns a heuristic lag for a cluster, based on its OSC replicas
 func GetClusterHeuristicLag(clusterName string) (int64, error) {
-	instances, err := GetClusterOSCSlaves(clusterName)
+	instances, err := GetClusterOSCReplicas(clusterName)
 	if err != nil {
 		return 0, err
 	}

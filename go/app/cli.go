@@ -1012,7 +1012,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("which-cluster-osc-replicas", "Information", `Output a list of replicas in a cluster, that could serve as a pt-online-schema-change operation control replicas`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
-			instances, err := inst.GetClusterOSCSlaves(clusterName)
+			instances, err := inst.GetClusterOSCReplicas(clusterName)
 			if err != nil {
 				log.Fatale(err)
 			}
