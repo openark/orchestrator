@@ -304,7 +304,7 @@ func SearchEntryInInstanceBinlogs(instance *Instance, entryText string, monotoni
 		log.Debugf("Searching for given pseudo gtid entry in binlog %+v of %+v", currentBinlog.LogFile, instance.Key)
 		// loop iteration per binary log. This might turn to be a heavyweight operation. We wish to throttle the operation such that
 		// the instance does not suffer. If it is a replica, we will only act as long as it's not lagging too much.
-		if instance.SlaveRunning() {
+		if instance.ReplicaRunning() {
 			for {
 				log.Debugf("%+v is a replicating slave. Verifying lag", instance.Key)
 				instance, err = ReadTopologyInstance(&instance.Key)
