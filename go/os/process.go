@@ -32,11 +32,11 @@ import (
 // text that will be run by a shell so we need to write out the
 // command to a temporary file and then ask the shell to execute
 // it, after which the temporary file is removed.
-func CommandRun(commandText string, arguments ...string) error {
+func CommandRun(commandText string, env []string, arguments ...string) error {
 	// show the actual command we have been asked to run
 	log.Infof("CommandRun(%v,%+v)", commandText, arguments)
 
-	cmd, shellScript, err := generateShellScript(commandText, arguments...)
+	cmd, shellScript, err := generateShellScript(commandText, env, arguments...)
 	defer os.Remove(shellScript)
 	if err != nil {
 		return log.Errore(err)
@@ -73,7 +73,7 @@ func CommandRun(commandText string, arguments ...string) error {
 // the given command to be executed, writes the command to a temporary
 // file and returns the exec.Command which can be executed together
 // with the script name that was created.
-func generateShellScript(commandText string, arguments ...string) (*exec.Cmd, string, error) {
+func generateShellScript(commandText string, env []string, arguments ...string) (*exec.Cmd, string, error) {
 	shell := config.Config.ProcessesShellCommand
 
 	commandBytes := []byte(commandText)
@@ -87,6 +87,7 @@ func generateShellScript(commandText string, arguments ...string) (*exec.Cmd, st
 	shellArguments = append(shellArguments, arguments...)
 
 	cmd := exec.Command(shell, shellArguments...)
+	cmd.Env = env
 
 	return cmd, tmpFile.Name(), nil
 }
