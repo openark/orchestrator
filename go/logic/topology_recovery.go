@@ -399,11 +399,11 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 	return promotedReplica, lostReplicas, err
 }
 
-// replacePromotedSlaveWithCandidate is called after an intermediate master has died and been replaced by some promotedReplica.
+// replacePromotedReplicaWithCandidate is called after an intermediate master has died and been replaced by some promotedReplica.
 // But, is there an even better replica to promote?
 // if candidateInstanceKey is given, then it is forced to be promoted over the promotedReplica
 // Otherwise, search for the best to promote!
-func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promotedReplica *inst.Instance, candidateInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
+func replacePromotedReplicaWithCandidate(deadInstanceKey *inst.InstanceKey, promotedReplica *inst.Instance, candidateInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
 	candidateReplicas, _ := inst.ReadClusterCandidateInstances(promotedReplica.ClusterName)
 	// So we've already promoted a replica.
 	// However, can we improve on our choice? Are there any replicas marked with "is_candidate"?
@@ -517,7 +517,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 	topologyRecovery.LostSlaves.AddInstances(lostReplicas)
 
 	if promotedReplica != nil {
-		promotedReplica, err = replacePromotedSlaveWithCandidate(&analysisEntry.AnalyzedInstanceKey, promotedReplica, candidateInstanceKey)
+		promotedReplica, err = replacePromotedReplicaWithCandidate(&analysisEntry.AnalyzedInstanceKey, promotedReplica, candidateInstanceKey)
 		topologyRecovery.AddError(err)
 	}
 	// And this is the end; whether successful or not, we're done.
@@ -683,11 +683,11 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 		}
 		// We have a candidate
 		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will attempt a candidate intermediate master: %+v", candidateSiblingOfIntermediateMaster.Key)
-		relocatedSlaves, candidateSibling, err, errs := inst.RelocateReplicas(failedInstanceKey, &candidateSiblingOfIntermediateMaster.Key, "")
+		relocatedReplicas, candidateSibling, err, errs := inst.RelocateReplicas(failedInstanceKey, &candidateSiblingOfIntermediateMaster.Key, "")
 		topologyRecovery.AddErrors(errs)
 		topologyRecovery.ParticipatingInstanceKeys.AddKey(candidateSiblingOfIntermediateMaster.Key)
 
-		if len(relocatedSlaves) == 0 {
+		if len(relocatedReplicas) == 0 {
 			log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: failed to move any slave to candidate intermediate master (%+v)", candidateSibling.Key)
 			return
 		}
@@ -699,7 +699,7 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 			recoveryResolved = true
 			successorInstance = candidateSibling
 
-			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Relocated %d replicas under candidate sibling: %+v; %d errors: %+v", len(relocatedSlaves), candidateSibling.Key, len(errs), errs))
+			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Relocated %d replicas under candidate sibling: %+v; %d errors: %+v", len(relocatedReplicas), candidateSibling.Key, len(errs), errs))
 		}
 	}
 	// Plan A: find a replacement intermediate master in same Data Center
@@ -709,13 +709,13 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 	if !recoveryResolved {
 		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will next attempt regrouping of replicas")
 		// Plan B: regroup (we wish to reduce cross-DC replication streams)
-		_, _, _, _, regroupPromotedSlave, err := inst.RegroupReplicas(failedInstanceKey, true, nil, nil)
+		_, _, _, _, regroupPromotedReplica, err := inst.RegroupReplicas(failedInstanceKey, true, nil, nil)
 		if err != nil {
 			topologyRecovery.AddError(err)
 			log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: regroup failed on: %+v", err)
 		}
-		if regroupPromotedSlave != nil {
-			topologyRecovery.ParticipatingInstanceKeys.AddKey(regroupPromotedSlave.Key)
+		if regroupPromotedReplica != nil {
+			topologyRecovery.ParticipatingInstanceKeys.AddKey(regroupPromotedReplica.Key)
 		}
 		// Plan C: try replacement intermediate master in other DC...
 		if candidateSiblingOfIntermediateMaster != nil && candidateSiblingOfIntermediateMaster.DataCenter != intermediateMasterInstance.DataCenter {
@@ -733,12 +733,12 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will next attempt to relocate up from %+v", *failedInstanceKey)
 
 		var errs []error
-		var relocatedSlaves [](*inst.Instance)
-		relocatedSlaves, successorInstance, err, errs = inst.RelocateReplicas(failedInstanceKey, &analysisEntry.AnalyzedInstanceMasterKey, "")
+		var relocatedReplicas [](*inst.Instance)
+		relocatedReplicas, successorInstance, err, errs = inst.RelocateReplicas(failedInstanceKey, &analysisEntry.AnalyzedInstanceMasterKey, "")
 		topologyRecovery.AddErrors(errs)
 		topologyRecovery.ParticipatingInstanceKeys.AddKey(analysisEntry.AnalyzedInstanceMasterKey)
 
-		if len(relocatedSlaves) > 0 {
+		if len(relocatedReplicas) > 0 {
 			recoveryResolved = true
 			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Relocated replicas under: %+v %d errors: %+v", successorInstance.Key, len(errs), errs))
 		} else {
@@ -834,15 +834,15 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 		topologyRecovery.ParticipatingInstanceKeys.AddKey(promotedReplica.Key)
 		if mustPromoteOtherCoMaster {
 			log.Debugf("topology_recovery: mustPromoteOtherCoMaster. Verifying that %+v is/can be promoted", *otherCoMasterKey)
-			promotedReplica, err = replacePromotedSlaveWithCandidate(failedInstanceKey, promotedReplica, otherCoMasterKey)
+			promotedReplica, err = replacePromotedReplicaWithCandidate(failedInstanceKey, promotedReplica, otherCoMasterKey)
 		} else {
 			// We are allowed to promote any server
-			promotedReplica, err = replacePromotedSlaveWithCandidate(failedInstanceKey, promotedReplica, nil)
+			promotedReplica, err = replacePromotedReplicaWithCandidate(failedInstanceKey, promotedReplica, nil)
 
 			if promotedReplica.DataCenter == otherCoMaster.DataCenter &&
 				promotedReplica.PhysicalEnvironment == otherCoMaster.PhysicalEnvironment && false {
 				// and _still_ we prefer to promote the co-master! They're in same env & DC so no worries about geo issues!
-				promotedReplica, err = replacePromotedSlaveWithCandidate(failedInstanceKey, promotedReplica, otherCoMasterKey)
+				promotedReplica, err = replacePromotedReplicaWithCandidate(failedInstanceKey, promotedReplica, otherCoMasterKey)
 			}
 		}
 		topologyRecovery.AddError(err)
