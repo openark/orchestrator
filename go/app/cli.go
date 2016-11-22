@@ -282,15 +282,15 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			lostSlaves, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedSlave, err := inst.RegroupReplicas(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
-			lostSlaves = append(lostSlaves, cannotReplicateReplicas...)
+			lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicas(instanceKey, false, func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.DisplayString()) }, postponedFunctionsContainer)
+			lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 
 			postponedFunctionsContainer.InvokePostponed()
-			if promotedSlave == nil {
+			if promotedReplica == nil {
 				log.Fatalf("Could not regroup replicas of %+v; error: %+v", *instanceKey, err)
 			}
 			fmt.Println(fmt.Sprintf("%s lost: %d, trivial: %d, pseudo-gtid: %d",
-				promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalReplicas), len(aheadReplicas)))
+				promotedReplica.Key.DisplayString(), len(lostReplicas), len(equalReplicas), len(aheadReplicas)))
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -477,14 +477,14 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			lostSlaves, movedSlaves, cannotReplicateReplicas, promotedSlave, err := inst.RegroupReplicasGTID(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) })
-			lostSlaves = append(lostSlaves, cannotReplicateReplicas...)
+			lostReplicas, movedSlaves, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasGTID(instanceKey, false, func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.DisplayString()) })
+			lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 
-			if promotedSlave == nil {
+			if promotedReplica == nil {
 				log.Fatalf("Could not regroup replicas of %+v; error: %+v", *instanceKey, err)
 			}
 			fmt.Println(fmt.Sprintf("%s lost: %d, moved: %d",
-				promotedSlave.Key.DisplayString(), len(lostSlaves), len(movedSlaves)))
+				promotedReplica.Key.DisplayString(), len(lostReplicas), len(movedSlaves)))
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -570,14 +570,14 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			lostSlaves, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedSlave, err := inst.RegroupReplicasPseudoGTID(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
-			lostSlaves = append(lostSlaves, cannotReplicateReplicas...)
+			lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasPseudoGTID(instanceKey, false, func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.DisplayString()) }, postponedFunctionsContainer)
+			lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 			postponedFunctionsContainer.InvokePostponed()
-			if promotedSlave == nil {
+			if promotedReplica == nil {
 				log.Fatalf("Could not regroup replicas of %+v; error: %+v", *instanceKey, err)
 			}
 			fmt.Println(fmt.Sprintf("%s lost: %d, trivial: %d, pseudo-gtid: %d",
-				promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalReplicas), len(aheadReplicas)))
+				promotedReplica.Key.DisplayString(), len(lostReplicas), len(equalReplicas), len(aheadReplicas)))
 			if err != nil {
 				log.Fatale(err)
 			}
