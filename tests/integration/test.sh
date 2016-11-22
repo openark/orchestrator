@@ -43,7 +43,9 @@ test_single() {
   mysql --default-character-set=utf8mb4 test < $tests_path/create-per-test.sql
 
   echo_dot
-  mysql --default-character-set=utf8mb4 test < $tests_path/$test_name/create.sql
+  if [ -f $tests_path/$test_name/create.sql ] ; then
+    mysql --default-character-set=utf8mb4 test < $tests_path/$test_name/create.sql
+  fi
 
   extra_args=""
   if [ -f $tests_path/$test_name/extra_args ] ; then
