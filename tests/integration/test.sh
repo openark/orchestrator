@@ -115,7 +115,7 @@ build_binary() {
 
 test_all() {
   build_binary
-  find $tests_path ! -path . -type d -mindepth 1 -maxdepth 1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
+  find $tests_path ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
     test_single "$test_name"
     if [ $? -ne 0 ] ; then
       echo "+ FAIL"
