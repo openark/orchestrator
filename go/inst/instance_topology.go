@@ -1615,8 +1615,8 @@ func sortInstances(instances [](*Instance)) {
 	sort.Sort(sort.Reverse(InstancesByExecBinlogCoordinates(instances)))
 }
 
-// getSlavesForSorting returns a list of replicas of a given master potentially for candidate choosing
-func getSlavesForSorting(masterKey *InstanceKey, includeBinlogServerSubSlaves bool) (slaves [](*Instance), err error) {
+// getReplicasForSorting returns a list of replicas of a given master potentially for candidate choosing
+func getReplicasForSorting(masterKey *InstanceKey, includeBinlogServerSubSlaves bool) (slaves [](*Instance), err error) {
 	if includeBinlogServerSubSlaves {
 		slaves, err = ReadSlaveInstancesIncludingBinlogServerSubReplicas(masterKey)
 	} else {
@@ -1628,7 +1628,7 @@ func getSlavesForSorting(masterKey *InstanceKey, includeBinlogServerSubSlaves bo
 // sortedReplicas returns the list of replicas of some master, sorted by exec coordinates
 // (most up-to-date replica first).
 // This function assumes given `slaves` argument is indeed a list of instances all replicating
-// from the same master (the result of `getSlavesForSorting()` is appropriate)
+// from the same master (the result of `getReplicasForSorting()` is appropriate)
 func sortedReplicas(slaves [](*Instance), shouldStopSlaves bool) [](*Instance) {
 	if len(slaves) == 0 {
 		return slaves
@@ -2096,7 +2096,7 @@ func GetCandidateReplica(masterKey *InstanceKey, forRematchPurposes bool) (*Inst
 	laterReplicas := [](*Instance){}
 	cannotReplicateReplicas := [](*Instance){}
 
-	slaves, err := getSlavesForSorting(masterKey, false)
+	slaves, err := getReplicasForSorting(masterKey, false)
 	if err != nil {
 		return candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err
 	}
@@ -2117,7 +2117,7 @@ func GetCandidateReplica(masterKey *InstanceKey, forRematchPurposes bool) (*Inst
 
 // GetCandidateReplicaOfBinlogServerTopology chooses the best replica to promote given a (possibly dead) master
 func GetCandidateReplicaOfBinlogServerTopology(masterKey *InstanceKey) (candidateReplica *Instance, err error) {
-	slaves, err := getSlavesForSorting(masterKey, true)
+	slaves, err := getReplicasForSorting(masterKey, true)
 	if err != nil {
 		return candidateReplica, err
 	}
@@ -2381,17 +2381,17 @@ func RegroupReplicas(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup b
 		}
 	}
 	if allGTID {
-		log.Debugf("RegroupReplicas: using GTID to regroup slaves of %+v", *masterKey)
+		log.Debugf("RegroupReplicas: using GTID to regroup replicas of %+v", *masterKey)
 		unmovedSlaves, movedSlaves, cannotReplicateReplicas, candidateReplica, err := RegroupReplicasGTID(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen)
 		return unmovedSlaves, emptySlaves, movedSlaves, cannotReplicateReplicas, candidateReplica, err
 	}
 	if allBinlogServers {
-		log.Debugf("RegroupReplicas: using binlog servers to regroup slaves of %+v", *masterKey)
+		log.Debugf("RegroupReplicas: using binlog servers to regroup replicas of %+v", *masterKey)
 		movedSlaves, candidateReplica, err := RegroupReplicasBinlogServers(masterKey, returnSlaveEvenOnFailureToRegroup)
 		return emptySlaves, emptySlaves, movedSlaves, cannotReplicateReplicas, candidateReplica, err
 	}
 	if allPseudoGTID {
-		log.Debugf("RegroupReplicas: using Pseudo-GTID to regroup slaves of %+v", *masterKey)
+		log.Debugf("RegroupReplicas: using Pseudo-GTID to regroup replicas of %+v", *masterKey)
 		return RegroupReplicasPseudoGTID(masterKey, returnSlaveEvenOnFailureToRegroup, onCandidateSlaveChosen, postponedFunctionsContainer)
 	}
 	// And, as last resort, we do PseudoGTID & binlog servers
