@@ -19,4 +19,6 @@ go test ./go/...
 echo "Running integration tests"
 ./tests/integration/test.sh
 
+mysql test -e "show grants for current_user()"
+
 echo "Done"
