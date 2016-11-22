@@ -52,7 +52,7 @@ type TopologyRecovery struct {
 	SuccessorAlias            string
 	IsActive                  bool
 	IsSuccessful              bool
-	LostSlaves                inst.InstanceKeyMap
+	LostReplicas              inst.InstanceKeyMap
 	ParticipatingInstanceKeys inst.InstanceKeyMap
 	AllErrors                 []string
 	RecoveryStartTimestamp    string
@@ -72,7 +72,7 @@ func NewTopologyRecovery(replicationAnalysis inst.ReplicationAnalysis) *Topology
 	topologyRecovery := &TopologyRecovery{}
 	topologyRecovery.AnalysisEntry = replicationAnalysis
 	topologyRecovery.SuccessorKey = nil
-	topologyRecovery.LostSlaves = *inst.NewInstanceKeyMap()
+	topologyRecovery.LostReplicas = *inst.NewInstanceKeyMap()
 	topologyRecovery.ParticipatingInstanceKeys = *inst.NewInstanceKeyMap()
 	topologyRecovery.AllErrors = []string{}
 	topologyRecovery.PostponedFunctions = [](func() error){}
@@ -100,7 +100,7 @@ const (
 	MasterRecoveryBinlogServer                    = "MasterRecoveryBinlogServer"
 )
 
-var emptyReplicasList [](*inst.Instance)
+var emptySlavesList [](*inst.Instance)
 
 var emergencyReadTopologyInstanceMap = cache.New(time.Duration(config.Config.InstancePollSeconds)*time.Second, time.Second)
 
@@ -171,8 +171,8 @@ func replaceCommandPlaceholders(command string, topologyRecovery *TopologyRecove
 		command = strings.Replace(command, "{successorAlias}", topologyRecovery.SuccessorAlias, -1)
 	}
 
-	command = strings.Replace(command, "{lostSlaves}", topologyRecovery.LostSlaves.ToCommaDelimitedList(), -1)
-	command = strings.Replace(command, "{lostReplicas}", topologyRecovery.LostSlaves.ToCommaDelimitedList(), -1)
+	command = strings.Replace(command, "{lostSlaves}", topologyRecovery.LostReplicas.ToCommaDelimitedList(), -1)
+	command = strings.Replace(command, "{lostReplicas}", topologyRecovery.LostReplicas.ToCommaDelimitedList(), -1)
 	command = strings.Replace(command, "{slaveHosts}", analysisEntry.SlaveHosts.ToCommaDelimitedList(), -1)
 	command = strings.Replace(command, "{replicaHosts}", analysisEntry.SlaveHosts.ToCommaDelimitedList(), -1)
 
@@ -196,7 +196,7 @@ func applyEnvironmentVariables(topologyRecovery *TopologyRecovery) []string {
 	env = append(env, fmt.Sprintf("ORC_AUTO_INTERMEDIATE_MASTER_RECOVERY=%s", analysisEntry.ClusterDetails.HasAutomatedIntermediateMasterRecovery))
 	env = append(env, fmt.Sprintf("ORC_ORCHESTRATOR_HOST=%s", process.ThisHostname))
 	env = append(env, fmt.Sprintf("ORC_IS_SUCCESSFUL=%s", (topologyRecovery.SuccessorKey != nil)))
-	env = append(env, fmt.Sprintf("ORC_LOST_REPLICAS=%s", topologyRecovery.LostSlaves.ToCommaDelimitedList()))
+	env = append(env, fmt.Sprintf("ORC_LOST_REPLICAS=%s", topologyRecovery.LostReplicas.ToCommaDelimitedList()))
 	env = append(env, fmt.Sprintf("ORC_REPLICA_HOSTS=%s", analysisEntry.SlaveHosts.ToCommaDelimitedList()))
 
 	if topologyRecovery.SuccessorKey != nil {
@@ -368,7 +368,7 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 	topologyRecovery.AddError(err)
 	lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 
-	if promotedReplica != nil && len(lostReplicas) > 0 && config.Config.DetachLostSlavesAfterMasterFailover {
+	if promotedReplica != nil && len(lostReplicas) > 0 && config.Config.DetachLostReplicasAfterMasterFailover {
 		postponedFunction := func() error {
 			log.Debugf("topology_recovery: - RecoverDeadMaster: lost %+v replicas during recovery process; detaching them", len(lostReplicas))
 			for _, slave := range lostReplicas {
@@ -514,7 +514,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 	log.Debugf("topology_recovery: will handle DeadMaster event on %+v", analysisEntry.ClusterDetails.ClusterName)
 	recoverDeadMasterCounter.Inc(1)
 	promotedReplica, lostReplicas, err := RecoverDeadMaster(topologyRecovery, skipProcesses)
-	topologyRecovery.LostSlaves.AddInstances(lostReplicas)
+	topologyRecovery.LostReplicas.AddInstances(lostReplicas)
 
 	if promotedReplica != nil {
 		promotedReplica, err = replacePromotedReplicaWithCandidate(&analysisEntry.AnalyzedInstanceKey, promotedReplica, candidateInstanceKey)
@@ -876,7 +876,7 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 		topologyRecovery.AddError(log.Errore(err))
 	}
 
-	if promotedReplica != nil && len(lostReplicas) > 0 && config.Config.DetachLostSlavesAfterMasterFailover {
+	if promotedReplica != nil && len(lostReplicas) > 0 && config.Config.DetachLostReplicasAfterMasterFailover {
 		postponedFunction := func() error {
 			log.Debugf("topology_recovery: - RecoverDeadCoMaster: lost %+v replicas during recovery process; detaching them", len(lostReplicas))
 			for _, slave := range lostReplicas {
@@ -924,7 +924,7 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 	} else {
 		inst.AuditOperation("recover-dead-co-master", failedInstanceKey, fmt.Sprintf("promoted: %+v", promotedReplica.Key))
 	}
-	topologyRecovery.LostSlaves.AddInstances(lostReplicas)
+	topologyRecovery.LostReplicas.AddInstances(lostReplicas)
 	if promotedReplica != nil {
 		// success
 		recoverDeadCoMasterSuccessCounter.Inc(1)

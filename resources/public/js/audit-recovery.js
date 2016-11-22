@@ -81,9 +81,9 @@ $(document).ready(function() {
       } else {
         moreInfo += '<div><strong>Unacknowledged</strong></div>';
       }
-      if (audit.LostSlaves.length > 0) {
+      if (audit.LostReplicas.length > 0) {
         moreInfo += "<div>Lost replicas:<ul>";
-        audit.LostSlaves.forEach(function(instanceKey) {
+        audit.LostReplicas.forEach(function(instanceKey) {
           moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
         });
         moreInfo += "</ul></div>";

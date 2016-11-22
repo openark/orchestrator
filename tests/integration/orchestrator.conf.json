@@ -144,7 +144,7 @@
     "echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
   ],
   "CoMasterRecoveryMustPromoteOtherCoMaster": true,
-  "DetachLostSlavesAfterMasterFailover": true,
+  "DetachLostReplicasAfterMasterFailover": true,
   "ApplyMySQLPromotionAfterMasterFailover": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 10,
   "MasterFailoverDetachSlaveMasterHost": true,

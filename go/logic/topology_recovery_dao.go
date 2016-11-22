@@ -384,7 +384,7 @@ func ResolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst
 				AND processing_node_hostname = ?
 				AND processcing_node_token = ?
 			`, isSuccessful, successorKeyToWrite.Hostname, successorKeyToWrite.Port,
-		successorAliasToWrite, topologyRecovery.LostSlaves.ToCommaDelimitedList(),
+		successorAliasToWrite, topologyRecovery.LostReplicas.ToCommaDelimitedList(),
 		topologyRecovery.ParticipatingInstanceKeys.ToCommaDelimitedList(),
 		strings.Join(topologyRecovery.AllErrors, "\n"),
 		topologyRecovery.Id, process.ThisHostname, process.ProcessToken.Hash,
@@ -457,7 +457,7 @@ func readRecoveries(whereCondition string, limit string, args []interface{}) ([]
 		topologyRecovery.AnalysisEntry.ClusterDetails.ReadRecoveryInfo()
 
 		topologyRecovery.AllErrors = strings.Split(m.GetString("all_errors"), "\n")
-		topologyRecovery.LostSlaves.ReadCommaDelimitedList(m.GetString("lost_slaves"))
+		topologyRecovery.LostReplicas.ReadCommaDelimitedList(m.GetString("lost_slaves"))
 		topologyRecovery.ParticipatingInstanceKeys.ReadCommaDelimitedList(m.GetString("participating_instances"))
 
 		topologyRecovery.Acknowledged = m.GetBool("acknowledged")
