@@ -16,11 +16,7 @@ cd .gopath/src/github.com/outbrain/orchestrator
 echo "Running unit tests"
 go test ./go/...
 
-echo "checking mysql 1"
-mysql -e "select @@hostname"
-echo "checking mysql 2"
-sudo -i mysql -e "show grants for current_user"
-echo "checking mysql 3"
-mysql -e "show databases"
-echo "checking mysql 4"
-mysql -e "no such query"
+echo "Running integration tests"
+./tests/integration/test.sh
+
+echo "Done"
