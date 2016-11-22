@@ -830,8 +830,8 @@ func ReadWriteableClustersMasters() (instances [](*Instance), err error) {
 	return instances, err
 }
 
-// ReadSlaveInstances reads replicas of a given master
-func ReadSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
+// ReadReplicaInstances reads replicas of a given master
+func ReadReplicaInstances(masterKey *InstanceKey) ([](*Instance), error) {
 	condition := `
 			master_host = ?
 			and master_port = ?
@@ -839,21 +839,21 @@ func ReadSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
 	return readInstancesByCondition(condition, sqlutils.Args(masterKey.Hostname, masterKey.Port), "")
 }
 
-// ReadSlaveInstancesIncludingBinlogServerSubReplicas returns a list of direct slves including any replicas
+// ReadReplicaInstancesIncludingBinlogServerSubReplicas returns a list of direct slves including any replicas
 // of a binlog server replica
-func ReadSlaveInstancesIncludingBinlogServerSubReplicas(masterKey *InstanceKey) ([](*Instance), error) {
-	replicas, err := ReadSlaveInstances(masterKey)
+func ReadReplicaInstancesIncludingBinlogServerSubReplicas(masterKey *InstanceKey) ([](*Instance), error) {
+	replicas, err := ReadReplicaInstances(masterKey)
 	if err != nil {
 		return replicas, err
 	}
 	for _, slave := range replicas {
 		slave := slave
 		if slave.IsBinlogServer() {
-			binlogServerSlaves, err := ReadSlaveInstancesIncludingBinlogServerSubReplicas(&slave.Key)
+			binlogServerReplicas, err := ReadReplicaInstancesIncludingBinlogServerSubReplicas(&slave.Key)
 			if err != nil {
 				return replicas, err
 			}
-			replicas = append(replicas, binlogServerSlaves...)
+			replicas = append(replicas, binlogServerReplicas...)
 		}
 	}
 	return replicas, err
@@ -1084,7 +1084,7 @@ func GetClusterOSCReplicas(clusterName string) ([](*Instance), error) {
 		// Get 2 replicas of found IMs, if possible
 		if len(intermediateMasters) == 1 {
 			// Pick 2 replicas for this IM
-			replicas, err := ReadSlaveInstances(&(intermediateMasters[0].Key))
+			replicas, err := ReadReplicaInstances(&(intermediateMasters[0].Key))
 			if err != nil {
 				return result, err
 			}
@@ -1097,7 +1097,7 @@ func GetClusterOSCReplicas(clusterName string) ([](*Instance), error) {
 		if len(intermediateMasters) == 2 {
 			// Pick one replica from each IM (should be possible)
 			for _, im := range intermediateMasters {
-				replicas, err := ReadSlaveInstances(&im.Key)
+				replicas, err := ReadReplicaInstances(&im.Key)
 				if err != nil {
 					return result, err
 				}

@@ -295,30 +295,30 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 		// Move binlog server replicas up to replicate from master.
 		// This can only be done once a BLS has skipped to the next binlog
 		// We postpone this operation. The master is already promoted and we're happy.
-		binlogServerSlaves, err := inst.ReadBinlogServerSlaveInstances(&promotedBinlogServer.Key)
+		binlogServerReplicas, err := inst.ReadBinlogServerSlaveInstances(&promotedBinlogServer.Key)
 		if err != nil {
 			return
 		}
 		maxBinlogServersToPromote := 3
-		for i, binlogServerSlave := range binlogServerSlaves {
-			binlogServerSlave := binlogServerSlave
+		for i, binlogServerReplica := range binlogServerReplicas {
+			binlogServerReplica := binlogServerReplica
 			if i >= maxBinlogServersToPromote {
 				return
 			}
 			postponedFunction := func() error {
-				binlogServerSlave, err := inst.StopSlave(&binlogServerSlave.Key)
+				binlogServerReplica, err := inst.StopSlave(&binlogServerReplica.Key)
 				if err != nil {
 					return err
 				}
 				// Make sure the BLS has the "next binlog" -- the one the master flushed & purged to. Otherwise the BLS
 				// will request a binlog the master does not have
-				if binlogServerSlave.ExecBinlogCoordinates.SmallerThan(&promotedBinlogServer.ExecBinlogCoordinates) {
-					binlogServerSlave, err = inst.StartSlaveUntilMasterCoordinates(&binlogServerSlave.Key, &promotedBinlogServer.ExecBinlogCoordinates)
+				if binlogServerReplica.ExecBinlogCoordinates.SmallerThan(&promotedBinlogServer.ExecBinlogCoordinates) {
+					binlogServerReplica, err = inst.StartSlaveUntilMasterCoordinates(&binlogServerReplica.Key, &promotedBinlogServer.ExecBinlogCoordinates)
 					if err != nil {
 						return err
 					}
 				}
-				_, err = inst.Repoint(&binlogServerSlave.Key, &promotedReplica.Key, inst.GTIDHintDeny)
+				_, err = inst.Repoint(&binlogServerReplica.Key, &promotedReplica.Key, inst.GTIDHintDeny)
 				return err
 			}
 			topologyRecovery.AddPostponedFunction(postponedFunction)
@@ -603,7 +603,7 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 // to whom the IM's replicas can be moved.
 func GetCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *inst.Instance) (*inst.Instance, error) {
 
-	siblings, err := inst.ReadSlaveInstances(&intermediateMasterInstance.MasterKey)
+	siblings, err := inst.ReadReplicaInstances(&intermediateMasterInstance.MasterKey)
 	if err != nil {
 		return nil, err
 	}
@@ -986,7 +986,7 @@ func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode 
 // Force reading of replicas of given instance. This is because we suspect the instance is dead, and want to speed up
 // detection of replication failure from its replicas.
 func emergentlyReadTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
-	replicas, err := inst.ReadSlaveInstancesIncludingBinlogServerSubReplicas(instanceKey)
+	replicas, err := inst.ReadReplicaInstancesIncludingBinlogServerSubReplicas(instanceKey)
 	if err != nil {
 		return
 	}

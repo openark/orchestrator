@@ -1048,7 +1048,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatalf("Unable to get replicas: unresolved instance")
 			}
-			slaves, err := inst.ReadSlaveInstances(instanceKey)
+			slaves, err := inst.ReadReplicaInstances(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}

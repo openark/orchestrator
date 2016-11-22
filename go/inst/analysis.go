@@ -97,8 +97,8 @@ type ReplicationAnalysisChangelog struct {
 	Changelog           string
 }
 
-// ReadSlaveHostsFromString parses and reads replica keys from comma delimited string
-func (this *ReplicationAnalysis) ReadSlaveHostsFromString(slaveHostsString string) error {
+// ReadReplicaHostsFromString parses and reads replica keys from comma delimited string
+func (this *ReplicationAnalysis) ReadReplicaHostsFromString(slaveHostsString string) error {
 	this.SlaveHosts = *NewInstanceKeyMap()
 	return this.SlaveHosts.ReadCommaDelimitedList(slaveHostsString)
 }

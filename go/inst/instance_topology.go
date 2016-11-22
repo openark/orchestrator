@@ -320,7 +320,7 @@ func MoveUpReplicas(instanceKey *InstanceKey, pattern string) ([](*Instance), *I
 		return replicas, instance, err, errors
 	}
 
-	replicas, err := ReadSlaveInstances(instanceKey)
+	replicas, err := ReadReplicaInstances(instanceKey)
 	if err != nil {
 		return res, instance, err, errs
 	}
@@ -642,7 +642,7 @@ func MoveReplicasGTID(masterKey *InstanceKey, belowKey *InstanceKey, pattern str
 	}
 
 	// replicas involved
-	replicas, err := ReadSlaveInstancesIncludingBinlogServerSubReplicas(masterKey)
+	replicas, err := ReadReplicaInstancesIncludingBinlogServerSubReplicas(masterKey)
 	if err != nil {
 		return movedSlaves, unmovedSlaves, err, errs
 	}
@@ -795,7 +795,7 @@ func RepointReplicasTo(instanceKey *InstanceKey, pattern string, belowKey *Insta
 	res := [](*Instance){}
 	errs := []error{}
 
-	replicas, err := ReadSlaveInstances(instanceKey)
+	replicas, err := ReadReplicaInstances(instanceKey)
 	if err != nil {
 		return res, err, errs
 	}
@@ -1439,7 +1439,7 @@ func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 	if !instance.SQLThreadUpToDate() {
 		return instance, fmt.Errorf("MakeMaster: instance's SQL thread must be up-to-date with I/O thread for %+v", *instanceKey)
 	}
-	siblings, err := ReadSlaveInstances(&masterInstance.Key)
+	siblings, err := ReadReplicaInstances(&masterInstance.Key)
 	if err != nil {
 		return instance, err
 	}
@@ -1484,7 +1484,7 @@ func EnslaveSiblings(instanceKey *InstanceKey) (*Instance, int, error) {
 	if err != nil || !found {
 		return instance, 0, err
 	}
-	siblings, err := ReadSlaveInstances(&masterInstance.Key)
+	siblings, err := ReadReplicaInstances(&masterInstance.Key)
 	if err != nil {
 		return instance, 0, err
 	}
@@ -1575,7 +1575,7 @@ func MakeLocalMaster(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		return instance, err
 	}
-	siblings, err := ReadSlaveInstances(&masterInstance.Key)
+	siblings, err := ReadReplicaInstances(&masterInstance.Key)
 	if err != nil {
 		return instance, err
 	}
@@ -1618,9 +1618,9 @@ func sortInstances(instances [](*Instance)) {
 // getReplicasForSorting returns a list of replicas of a given master potentially for candidate choosing
 func getReplicasForSorting(masterKey *InstanceKey, includeBinlogServerSubSlaves bool) (replicas [](*Instance), err error) {
 	if includeBinlogServerSubSlaves {
-		replicas, err = ReadSlaveInstancesIncludingBinlogServerSubReplicas(masterKey)
+		replicas, err = ReadReplicaInstancesIncludingBinlogServerSubReplicas(masterKey)
 	} else {
-		replicas, err = ReadSlaveInstances(masterKey)
+		replicas, err = ReadReplicaInstances(masterKey)
 	}
 	return replicas, err
 }
@@ -1872,7 +1872,7 @@ func MultiMatchReplicas(masterKey *InstanceKey, belowKey *InstanceKey, pattern s
 	// Not binlog server
 
 	// replicas involved
-	replicas, err := ReadSlaveInstancesIncludingBinlogServerSubReplicas(masterKey)
+	replicas, err := ReadReplicaInstancesIncludingBinlogServerSubReplicas(masterKey)
 	if err != nil {
 		return res, belowInstance, err, errs
 	}
@@ -2211,10 +2211,10 @@ func RegroupReplicasPseudoGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureT
 	return aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, instance, err
 }
 
-func getMostUpToDateActiveBinlogServer(masterKey *InstanceKey) (mostAdvancedBinlogServer *Instance, binlogServerSlaves [](*Instance), err error) {
-	if binlogServerSlaves, err = ReadBinlogServerSlaveInstances(masterKey); err == nil && len(binlogServerSlaves) > 0 {
+func getMostUpToDateActiveBinlogServer(masterKey *InstanceKey) (mostAdvancedBinlogServer *Instance, binlogServerReplicas [](*Instance), err error) {
+	if binlogServerReplicas, err = ReadBinlogServerSlaveInstances(masterKey); err == nil && len(binlogServerReplicas) > 0 {
 		// Pick the most advanced binlog sever that is good to go
-		for _, binlogServer := range binlogServerSlaves {
+		for _, binlogServer := range binlogServerReplicas {
 			if binlogServer.IsLastCheckValid {
 				if mostAdvancedBinlogServer == nil {
 					mostAdvancedBinlogServer = binlogServer
@@ -2225,7 +2225,7 @@ func getMostUpToDateActiveBinlogServer(masterKey *InstanceKey) (mostAdvancedBinl
 			}
 		}
 	}
-	return mostAdvancedBinlogServer, binlogServerSlaves, err
+	return mostAdvancedBinlogServer, binlogServerReplicas, err
 }
 
 // RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers uses Pseugo-GTID to regroup replicas
@@ -2236,7 +2236,7 @@ func RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(masterKey *Ins
 	func() error {
 		log.Debugf("RegroupReplicasIncludingSubReplicasOfBinlogServers: starting on replicas of %+v", *masterKey)
 		// Find the most up to date binlog server:
-		mostUpToDateBinlogServer, binlogServerSlaves, err := getMostUpToDateActiveBinlogServer(masterKey)
+		mostUpToDateBinlogServer, binlogServerReplicas, err := getMostUpToDateActiveBinlogServer(masterKey)
 		if err != nil {
 			return log.Errore(err)
 		}
@@ -2282,7 +2282,7 @@ func RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(masterKey *Ins
 		}
 		// Either because it _was_ like that, or we _made_ it so,
 		// candidate replica is as/more up to date than all binlog servers
-		for _, binlogServer := range binlogServerSlaves {
+		for _, binlogServer := range binlogServerReplicas {
 			log.Debugf("RegroupReplicasIncludingSubReplicasOfBinlogServers: matching replicas of binlog server %+v below %+v", binlogServer.Key, candidateReplica.Key)
 			// Right now sequentially.
 			// At this point just do what you can, don't return an error
@@ -2330,8 +2330,8 @@ func RegroupReplicasGTID(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegro
 // RegroupReplicasBinlogServers works on a binlog-servers topology. It picks the most up-to-date BLS and repoints all other
 // BLS below it
 func RegroupReplicasBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup bool) (repointedBinlogServers [](*Instance), promotedBinlogServer *Instance, err error) {
-	var binlogServerSlaves [](*Instance)
-	promotedBinlogServer, binlogServerSlaves, err = getMostUpToDateActiveBinlogServer(masterKey)
+	var binlogServerReplicas [](*Instance)
+	promotedBinlogServer, binlogServerReplicas, err = getMostUpToDateActiveBinlogServer(masterKey)
 
 	resultOnError := func(err error) ([](*Instance), *Instance, error) {
 		if !returnSlaveEvenOnFailureToRegroup {
@@ -2344,7 +2344,7 @@ func RegroupReplicasBinlogServers(masterKey *InstanceKey, returnSlaveEvenOnFailu
 		return resultOnError(err)
 	}
 
-	repointedBinlogServers, err, _ = RepointTo(binlogServerSlaves, &promotedBinlogServer.Key)
+	repointedBinlogServers, err, _ = RepointTo(binlogServerReplicas, &promotedBinlogServer.Key)
 
 	if err != nil {
 		return resultOnError(err)
@@ -2362,7 +2362,7 @@ func RegroupReplicas(masterKey *InstanceKey, returnSlaveEvenOnFailureToRegroup b
 	//
 	var emptySlaves [](*Instance)
 
-	replicas, err := ReadSlaveInstances(masterKey)
+	replicas, err := ReadReplicaInstances(masterKey)
 	if err != nil {
 		return emptySlaves, emptySlaves, emptySlaves, emptySlaves, instance, err
 	}
@@ -2607,7 +2607,7 @@ func RelocateReplicas(instanceKey, otherKey *InstanceKey, pattern string) (repli
 		return replicas, other, log.Errorf("Error reading %+v", *otherKey), errs
 	}
 
-	replicas, err = ReadSlaveInstances(instanceKey)
+	replicas, err = ReadReplicaInstances(instanceKey)
 	if err != nil {
 		return replicas, other, err, errs
 	}
