@@ -884,15 +884,15 @@ func (this *HttpAPI) RegroupReplicas(params martini.Params, r render.Render, req
 		return
 	}
 
-	lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupReplicas(&instanceKey, false, nil, nil)
-	lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
+	lostSlaves, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedSlave, err := inst.RegroupReplicas(&instanceKey, false, nil, nil)
+	lostSlaves = append(lostSlaves, cannotReplicateReplicas...)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("promoted slave: %s, lost: %d, trivial: %d, pseudo-gtid: %d",
-		promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalSlaves), len(aheadSlaves)), Details: promotedSlave.Key})
+		promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalReplicas), len(aheadReplicas)), Details: promotedSlave.Key})
 }
 
 // RegroupReplicas attempts to pick a replica of a given instance and make it enslave its siblings, efficiently,
@@ -908,8 +908,8 @@ func (this *HttpAPI) RegroupReplicasPseudoGTID(params martini.Params, r render.R
 		return
 	}
 
-	lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupReplicasPseudoGTID(&instanceKey, false, nil, nil)
-	lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
+	lostSlaves, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedSlave, err := inst.RegroupReplicasPseudoGTID(&instanceKey, false, nil, nil)
+	lostSlaves = append(lostSlaves, cannotReplicateReplicas...)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
@@ -917,7 +917,7 @@ func (this *HttpAPI) RegroupReplicasPseudoGTID(params martini.Params, r render.R
 	}
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("promoted slave: %s, lost: %d, trivial: %d, pseudo-gtid: %d",
-		promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalSlaves), len(aheadSlaves)), Details: promotedSlave.Key})
+		promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalReplicas), len(aheadReplicas)), Details: promotedSlave.Key})
 }
 
 // RegroupReplicasGTID attempts to pick a replica of a given instance and make it enslave its siblings, efficiently, using GTID
@@ -932,8 +932,8 @@ func (this *HttpAPI) RegroupReplicasGTID(params martini.Params, r render.Render,
 		return
 	}
 
-	lostSlaves, movedSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupReplicasGTID(&instanceKey, false, nil)
-	lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
+	lostSlaves, movedSlaves, cannotReplicateReplicas, promotedSlave, err := inst.RegroupReplicasGTID(&instanceKey, false, nil)
+	lostSlaves = append(lostSlaves, cannotReplicateReplicas...)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
