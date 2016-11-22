@@ -612,13 +612,13 @@ func (this *HttpAPI) MoveReplicasGTID(params martini.Params, r render.Render, re
 		return
 	}
 
-	movedSlaves, _, err, errs := inst.MoveReplicasGTID(&instanceKey, &belowKey, req.URL.Query().Get("pattern"))
+	movedReplicas, _, err, errs := inst.MoveReplicasGTID(&instanceKey, &belowKey, req.URL.Query().Get("pattern"))
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Moved %d slaves of %+v below %+v via GTID; %d errors: %+v", len(movedSlaves), instanceKey, belowKey, len(errs), errs), Details: belowKey})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Moved %d slaves of %+v below %+v via GTID; %d errors: %+v", len(movedReplicas), instanceKey, belowKey, len(errs), errs), Details: belowKey})
 }
 
 // EnslaveSiblings
@@ -932,7 +932,7 @@ func (this *HttpAPI) RegroupReplicasGTID(params martini.Params, r render.Render,
 		return
 	}
 
-	lostReplicas, movedSlaves, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasGTID(&instanceKey, false, nil)
+	lostReplicas, movedReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasGTID(&instanceKey, false, nil)
 	lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 
 	if err != nil {
@@ -941,7 +941,7 @@ func (this *HttpAPI) RegroupReplicasGTID(params martini.Params, r render.Render,
 	}
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("promoted slave: %s, lost: %d, moved: %d",
-		promotedReplica.Key.DisplayString(), len(lostReplicas), len(movedSlaves)), Details: promotedReplica.Key})
+		promotedReplica.Key.DisplayString(), len(lostReplicas), len(movedReplicas)), Details: promotedReplica.Key})
 }
 
 // RegroupReplicasBinlogServers attempts to pick a replica of a given instance and make it enslave its siblings, efficiently, using GTID

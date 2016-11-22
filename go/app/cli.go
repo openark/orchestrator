@@ -313,14 +313,14 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			movedSlaves, _, err, errs := inst.MoveUpReplicas(instanceKey, pattern)
+			movedReplicas, _, err, errs := inst.MoveUpReplicas(instanceKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {
 				for _, e := range errs {
 					log.Errore(e)
 				}
-				for _, slave := range movedSlaves {
+				for _, slave := range movedReplicas {
 					fmt.Println(slave.Key.DisplayString())
 				}
 			}
@@ -457,14 +457,14 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
-			movedSlaves, _, err, errs := inst.MoveReplicasGTID(instanceKey, destinationKey, pattern)
+			movedReplicas, _, err, errs := inst.MoveReplicasGTID(instanceKey, destinationKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {
 				for _, e := range errs {
 					log.Errore(e)
 				}
-				for _, slave := range movedSlaves {
+				for _, slave := range movedReplicas {
 					fmt.Println(slave.Key.DisplayString())
 				}
 			}
@@ -477,14 +477,14 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			lostReplicas, movedSlaves, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasGTID(instanceKey, false, func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.DisplayString()) })
+			lostReplicas, movedReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasGTID(instanceKey, false, func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.DisplayString()) })
 			lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 
 			if promotedReplica == nil {
 				log.Fatalf("Could not regroup replicas of %+v; error: %+v", *instanceKey, err)
 			}
 			fmt.Println(fmt.Sprintf("%s lost: %d, moved: %d",
-				promotedReplica.Key.DisplayString(), len(lostReplicas), len(movedSlaves)))
+				promotedReplica.Key.DisplayString(), len(lostReplicas), len(movedReplicas)))
 			if err != nil {
 				log.Fatale(err)
 			}

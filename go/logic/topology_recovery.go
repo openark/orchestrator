@@ -100,7 +100,7 @@ const (
 	MasterRecoveryBinlogServer                    = "MasterRecoveryBinlogServer"
 )
 
-var emptySlavesList [](*inst.Instance)
+var emptyReplicasList [](*inst.Instance)
 
 var emergencyReadTopologyInstanceMap = cache.New(time.Duration(config.Config.InstancePollSeconds)*time.Second, time.Second)
 
