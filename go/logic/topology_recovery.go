@@ -404,7 +404,7 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 // if candidateInstanceKey is given, then it is forced to be promoted over the promotedReplica
 // Otherwise, search for the best to promote!
 func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promotedReplica *inst.Instance, candidateInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
-	candidateSlaves, _ := inst.ReadClusterCandidateInstances(promotedReplica.ClusterName)
+	candidateReplicas, _ := inst.ReadClusterCandidateInstances(promotedReplica.ClusterName)
 	// So we've already promoted a replica.
 	// However, can we improve on our choice? Are there any replicas marked with "is_candidate"?
 	// Maybe we actually promoted such a replica. Does that mean we should keep it?
@@ -415,8 +415,8 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 	log.Infof("topology_recovery: checking if should replace promoted slave with a better candidate")
 	if candidateInstanceKey == nil {
 		if deadInstance, _, err := inst.ReadInstance(deadInstanceKey); err == nil && deadInstance != nil {
-			for _, candidateSlave := range candidateSlaves {
-				if promotedReplica.Key.Equals(&candidateSlave.Key) &&
+			for _, candidateReplica := range candidateReplicas {
+				if promotedReplica.Key.Equals(&candidateReplica.Key) &&
 					promotedReplica.DataCenter == deadInstance.DataCenter &&
 					promotedReplica.PhysicalEnvironment == deadInstance.PhysicalEnvironment {
 					// Seems like we promoted a candidate in the same DC & ENV as dead IM! Ideal! We're happy!
@@ -430,21 +430,21 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 	if candidateInstanceKey == nil {
 		// Try a candidate replica that is in same DC & env as the dead instance
 		if deadInstance, _, err := inst.ReadInstance(deadInstanceKey); err == nil && deadInstance != nil {
-			for _, candidateSlave := range candidateSlaves {
-				if candidateSlave.DataCenter == deadInstance.DataCenter &&
-					candidateSlave.PhysicalEnvironment == deadInstance.PhysicalEnvironment &&
-					candidateSlave.MasterKey.Equals(&promotedReplica.Key) {
+			for _, candidateReplica := range candidateReplicas {
+				if candidateReplica.DataCenter == deadInstance.DataCenter &&
+					candidateReplica.PhysicalEnvironment == deadInstance.PhysicalEnvironment &&
+					candidateReplica.MasterKey.Equals(&promotedReplica.Key) {
 					// This would make a great candidate
-					candidateInstanceKey = &candidateSlave.Key
-					log.Debugf("topology_recovery: no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as failed instance", promotedReplica.Key, candidateSlave.Key)
+					candidateInstanceKey = &candidateReplica.Key
+					log.Debugf("topology_recovery: no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as failed instance", promotedReplica.Key, candidateReplica.Key)
 				}
 			}
 		}
 	}
 	if candidateInstanceKey == nil {
 		// We cannot find a candidate in same DC and ENV as dead master
-		for _, candidateSlave := range candidateSlaves {
-			if promotedReplica.Key.Equals(&candidateSlave.Key) {
+		for _, candidateReplica := range candidateReplicas {
+			if promotedReplica.Key.Equals(&candidateReplica.Key) {
 				// Seems like we promoted a candidate replica (though not in same DC and ENV as dead master). Good enough.
 				// No further action required.
 				log.Infof("topology_recovery: promoted slave %+v is a good candidate", promotedReplica.Key)
@@ -455,13 +455,13 @@ func replacePromotedSlaveWithCandidate(deadInstanceKey *inst.InstanceKey, promot
 	// Still nothing?
 	if candidateInstanceKey == nil {
 		// Try a candidate replica that is in same DC & env as the promoted replica (our promoted replica is not an "is_candidate")
-		for _, candidateSlave := range candidateSlaves {
-			if promotedReplica.DataCenter == candidateSlave.DataCenter &&
-				promotedReplica.PhysicalEnvironment == candidateSlave.PhysicalEnvironment &&
-				candidateSlave.MasterKey.Equals(&promotedReplica.Key) {
+		for _, candidateReplica := range candidateReplicas {
+			if promotedReplica.DataCenter == candidateReplica.DataCenter &&
+				promotedReplica.PhysicalEnvironment == candidateReplica.PhysicalEnvironment &&
+				candidateReplica.MasterKey.Equals(&promotedReplica.Key) {
 				// OK, better than nothing
-				candidateInstanceKey = &candidateSlave.Key
-				log.Debugf("topology_recovery: no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as promoted instance", promotedReplica.Key, candidateSlave.Key)
+				candidateInstanceKey = &candidateReplica.Key
+				log.Debugf("topology_recovery: no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as promoted instance", promotedReplica.Key, candidateReplica.Key)
 			}
 		}
 	}
