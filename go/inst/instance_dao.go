@@ -373,7 +373,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 				// Note: NewInstanceKeyFromStrings calls ResolveHostname() implicitly
 				slaveKey, err := NewInstanceKeyFromStrings(host, port)
 				if err == nil && slaveKey.IsValid() {
-					instance.AddSlaveKey(slaveKey)
+					instance.AddReplicaKey(slaveKey)
 					foundByShowSlaveHosts = true
 				}
 				return err
@@ -399,7 +399,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 					logReadTopologyInstanceError(instanceKey, "ResolveHostname: processlist", resolveErr)
 				}
 				slaveKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
-				instance.AddSlaveKey(&slaveKey)
+				instance.AddReplicaKey(&slaveKey)
 				return err
 			})
 
@@ -870,9 +870,9 @@ func ReadSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
 	return readInstancesByCondition(condition, sqlutils.Args(masterKey.Hostname, masterKey.Port), "")
 }
 
-// ReadSlaveInstancesIncludingBinlogServerSubSlaves returns a list of direct slves including any replicas
+// ReadSlaveInstancesIncludingBinlogServerSubReplicas returns a list of direct slves including any replicas
 // of a binlog server replica
-func ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey *InstanceKey) ([](*Instance), error) {
+func ReadSlaveInstancesIncludingBinlogServerSubReplicas(masterKey *InstanceKey) ([](*Instance), error) {
 	slaves, err := ReadSlaveInstances(masterKey)
 	if err != nil {
 		return slaves, err
@@ -880,7 +880,7 @@ func ReadSlaveInstancesIncludingBinlogServerSubSlaves(masterKey *InstanceKey) ([
 	for _, slave := range slaves {
 		slave := slave
 		if slave.IsBinlogServer() {
-			binlogServerSlaves, err := ReadSlaveInstancesIncludingBinlogServerSubSlaves(&slave.Key)
+			binlogServerSlaves, err := ReadSlaveInstancesIncludingBinlogServerSubReplicas(&slave.Key)
 			if err != nil {
 				return slaves, err
 			}
@@ -1086,9 +1086,9 @@ func filterOSCInstances(instances [](*Instance)) [](*Instance) {
 	return result
 }
 
-// GetClusterOSCSlaves returns a heuristic list of replicas which are fit as controll replicas for an OSC operation.
+// GetClusterOSCReplicas returns a heuristic list of replicas which are fit as controll replicas for an OSC operation.
 // These would be intermediate masters
-func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
+func GetClusterOSCReplicas(clusterName string) ([](*Instance), error) {
 	intermediateMasters := [](*Instance){}
 	result := [](*Instance){}
 	var err error
@@ -1174,10 +1174,10 @@ func GetClusterOSCSlaves(clusterName string) ([](*Instance), error) {
 	return result, nil
 }
 
-// GetClusterGhostSlaves returns a list of replicas that can serve as the connected servers
+// GetClusterGhostReplicas returns a list of replicas that can serve as the connected servers
 // for a [gh-ost](https://github.com/github/gh-ost) operation. A gh-ost operation prefers to talk
 // to a RBR replica that has no children.
-func GetClusterGhostSlaves(clusterName string) (result [](*Instance), err error) {
+func GetClusterGhostReplicas(clusterName string) (result [](*Instance), err error) {
 	condition := `
 			replication_depth > 0
 			and binlog_format = 'ROW'
@@ -1225,7 +1225,7 @@ func GetInstancesMaxLag(instances [](*Instance)) (maxLag int64, err error) {
 
 // GetClusterHeuristicLag returns a heuristic lag for a cluster, based on its OSC replicas
 func GetClusterHeuristicLag(clusterName string) (int64, error) {
-	instances, err := GetClusterOSCSlaves(clusterName)
+	instances, err := GetClusterOSCReplicas(clusterName)
 	if err != nil {
 		return 0, err
 	}
