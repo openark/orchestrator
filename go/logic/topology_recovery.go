@@ -18,6 +18,7 @@ package logic
 
 import (
 	"fmt"
+	goos "os"
 	"sort"
 	"strings"
 	"time"
@@ -175,13 +176,45 @@ func replaceCommandPlaceholders(command string, topologyRecovery *TopologyRecove
 	return command
 }
 
+// replaceCommandPlaceholders replaces agreed-upon placeholders with analysis data
+func applyEnvironmentVariables(topologyRecovery *TopologyRecovery) []string {
+	analysisEntry := &topologyRecovery.AnalysisEntry
+	env := goos.Environ()
+	env = append(env, fmt.Sprintf("ORC_FAILURE_TYPE=%s", string(analysisEntry.Analysis)))
+	env = append(env, fmt.Sprintf("ORC_FAILURE_DESCRIPTION=%s", analysisEntry.Description))
+	env = append(env, fmt.Sprintf("ORC_FAILED_HOST=%s", analysisEntry.AnalyzedInstanceKey.Hostname))
+	env = append(env, fmt.Sprintf("ORC_FAILED_PORT=%d", analysisEntry.AnalyzedInstanceKey.Port))
+	env = append(env, fmt.Sprintf("ORC_FAILURE_CLUSTER=%s", analysisEntry.ClusterDetails.ClusterName))
+	env = append(env, fmt.Sprintf("ORC_FAILURE_CLUSTER_ALIAS=%s", analysisEntry.ClusterDetails.ClusterAlias))
+	env = append(env, fmt.Sprintf("ORC_FAILURE_CLUSTER_DOMAIN=%s", analysisEntry.ClusterDetails.ClusterDomain))
+	env = append(env, fmt.Sprintf("ORC_COUNT_REPLICAS=%s", analysisEntry.CountSlaves))
+	env = append(env, fmt.Sprintf("ORC_IS_DOWNTIMED=%s", analysisEntry.IsDowntimed))
+	env = append(env, fmt.Sprintf("ORC_AUTO_MASTER_RECOVERY=%s", analysisEntry.ClusterDetails.HasAutomatedMasterRecovery))
+	env = append(env, fmt.Sprintf("ORC_AUTO_INTERMEDIATE_MASTER_RECOVERY=%s", analysisEntry.ClusterDetails.HasAutomatedIntermediateMasterRecovery))
+	env = append(env, fmt.Sprintf("ORC_ORCHESTRATOR_HOST=%s", process.ThisHostname))
+	env = append(env, fmt.Sprintf("ORC_IS_SUCCESSFUL=%s", (topologyRecovery.SuccessorKey != nil)))
+	env = append(env, fmt.Sprintf("ORC_LOST_REPLICAS=%s", topologyRecovery.LostSlaves.ToCommaDelimitedList()))
+	env = append(env, fmt.Sprintf("ORC_REPLICA_HOSTS=%s", analysisEntry.SlaveHosts.ToCommaDelimitedList()))
+
+	if topologyRecovery.SuccessorKey != nil {
+		env = append(env, fmt.Sprintf("ORC_SUCCESSOR_HOST=%s", topologyRecovery.SuccessorKey.Hostname))
+		env = append(env, fmt.Sprintf("ORC_SUCCESSOR_PORT=%d", topologyRecovery.SuccessorKey.Port))
+		// As long as SucesssorKey != nil, we replace {successorAlias}.
+		// If SucessorAlias is "", it's fine. We'll replace {successorAlias} with "".
+		env = append(env, fmt.Sprintf("ORC_SUCCESSOR_ALIAS=%s", topologyRecovery.SuccessorAlias))
+	}
+
+	return env
+}
+
 // executeProcesses executes a list of processes
 func executeProcesses(processes []string, description string, topologyRecovery *TopologyRecovery, failOnError bool) error {
 	var err error
 	for _, command := range processes {
 		command := replaceCommandPlaceholders(command, topologyRecovery)
+		env := applyEnvironmentVariables(topologyRecovery)
 
-		if cmdErr := os.CommandRun(command); cmdErr == nil {
+		if cmdErr := os.CommandRun(command, env); cmdErr == nil {
 			log.Infof("Executed %s command: %s", description, command)
 		} else {
 			if err == nil {
