@@ -1,1 +1,1 @@
--c which-cluster-instances -i testhost:22294
+-c which-replicas -i testhost:22293
