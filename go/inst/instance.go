@@ -225,13 +225,13 @@ func (instance *Instance) NameAndMajorVersionString() string {
 }
 
 // IsSlave makes simple heuristics to decide whether this insatnce is a replica of another instance
-func (this *Instance) IsSlave() bool {
+func (this *Instance) IsReplica() bool {
 	return this.MasterKey.Hostname != "" && this.MasterKey.Hostname != "_" && this.MasterKey.Port != 0 && (this.ReadBinlogCoordinates.LogFile != "" || this.UsingGTID())
 }
 
 // SlaveRunning returns true when this instance's status is of a replicating replica.
-func (this *Instance) SlaveRunning() bool {
-	return this.IsSlave() && this.Slave_SQL_Running && this.Slave_IO_Running
+func (this *Instance) ReplicaRunning() bool {
+	return this.IsReplica() && this.Slave_SQL_Running && this.Slave_IO_Running
 }
 
 // SQLThreadUpToDate returns true when the instance had consumed all relay logs.
@@ -274,8 +274,8 @@ func (this *Instance) NextGTID() (string, error) {
 	return nextGTID, nil
 }
 
-// AddSlaveKey adds a replica to the list of this instance's replicas.
-func (this *Instance) AddSlaveKey(slaveKey *InstanceKey) {
+// AddReplicaKey adds a replica to the list of this instance's replicas.
+func (this *Instance) AddReplicaKey(slaveKey *InstanceKey) {
 	this.SlaveHosts.AddKey(*slaveKey)
 }
 
@@ -287,14 +287,14 @@ func (this *Instance) GetNextBinaryLog(binlogCoordinates BinlogCoordinates) (Bin
 	return binlogCoordinates.NextFileCoordinates()
 }
 
-// IsSlaveOf returns true if this instance claims to replicate from given master
-func (this *Instance) IsSlaveOf(master *Instance) bool {
+// IsReplicaOf returns true if this instance claims to replicate from given master
+func (this *Instance) IsReplicaOf(master *Instance) bool {
 	return this.MasterKey.Equals(&master.Key)
 }
 
-// IsSlaveOf returns true if this i supposed master of given replica
+// IsReplicaOf returns true if this i supposed master of given replica
 func (this *Instance) IsMasterOf(slave *Instance) bool {
-	return slave.IsSlaveOf(this)
+	return slave.IsReplicaOf(this)
 }
 
 // CanReplicateFrom uses heursitics to decide whether this instacne can practically replicate from other instance.
@@ -306,7 +306,7 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	if !other.LogBinEnabled {
 		return false, fmt.Errorf("instance does not have binary logs enabled: %+v", other.Key)
 	}
-	if other.IsSlave() {
+	if other.IsReplica() {
 		if !other.LogSlaveUpdatesEnabled {
 			return false, fmt.Errorf("instance does not have log_slave_updates enabled: %+v", other.Key)
 		}
@@ -395,10 +395,10 @@ func (this *Instance) StatusString() string {
 	if !this.IsRecentlyChecked {
 		return "unchecked"
 	}
-	if this.IsSlave() && !(this.Slave_SQL_Running && this.Slave_IO_Running) {
+	if this.IsReplica() && !(this.Slave_SQL_Running && this.Slave_IO_Running) {
 		return "nonreplicating"
 	}
-	if this.IsSlave() && !this.HasReasonableMaintenanceReplicationLag() {
+	if this.IsReplica() && !this.HasReasonableMaintenanceReplicationLag() {
 		return "lag"
 	}
 	return "ok"
@@ -415,13 +415,13 @@ func (this *Instance) LagStatusString() string {
 	if !this.IsRecentlyChecked {
 		return "unknown"
 	}
-	if this.IsSlave() && !(this.Slave_SQL_Running && this.Slave_IO_Running) {
+	if this.IsReplica() && !(this.Slave_SQL_Running && this.Slave_IO_Running) {
 		return "null"
 	}
-	if this.IsSlave() && !this.SecondsBehindMaster.Valid {
+	if this.IsReplica() && !this.SecondsBehindMaster.Valid {
 		return "null"
 	}
-	if this.IsSlave() && this.SlaveLagSeconds.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
+	if this.IsReplica() && this.SlaveLagSeconds.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
 		return fmt.Sprintf("%+vs", this.SlaveLagSeconds.Int64)
 	}
 	return fmt.Sprintf("%+vs", this.SlaveLagSeconds.Int64)
