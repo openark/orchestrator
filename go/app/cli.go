@@ -262,7 +262,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
-			slaves, _, err, errs := inst.RelocateSlaves(instanceKey, destinationKey, pattern)
+			slaves, _, err, errs := inst.RelocateReplicas(instanceKey, destinationKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {
@@ -282,7 +282,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlaves(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
+			lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupReplicas(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
 			lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 
 			postponedFunctionsContainer.InvokePostponed()
@@ -313,7 +313,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			movedSlaves, _, err, errs := inst.MoveUpSlaves(instanceKey, pattern)
+			movedSlaves, _, err, errs := inst.MoveUpReplicas(instanceKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {
@@ -362,7 +362,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("repoint-replicas", "Classic file:pos relocation", `Repoint all replicas of given instance to replicate back from the instance. Use with care`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			repointedSlaves, err, errs := inst.RepointSlavesTo(instanceKey, pattern, destinationKey)
+			repointedSlaves, err, errs := inst.RepointReplicasTo(instanceKey, pattern, destinationKey)
 			if err != nil {
 				log.Fatale(err)
 			} else {
@@ -429,7 +429,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			_, promotedBinlogServer, err := inst.RegroupSlavesBinlogServers(instanceKey, false)
+			_, promotedBinlogServer, err := inst.RegroupReplicasBinlogServers(instanceKey, false)
 			if promotedBinlogServer == nil {
 				log.Fatalf("Could not regroup binlog server replicas of %+v; error: %+v", *instanceKey, err)
 			}
@@ -457,7 +457,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
-			movedSlaves, _, err, errs := inst.MoveSlavesGTID(instanceKey, destinationKey, pattern)
+			movedSlaves, _, err, errs := inst.MoveReplicasGTID(instanceKey, destinationKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {
@@ -477,7 +477,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			lostSlaves, movedSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlavesGTID(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) })
+			lostSlaves, movedSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupReplicasGTID(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) })
 			lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 
 			if promotedSlave == nil {
@@ -531,7 +531,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce destination:", destination)
 			}
 
-			matchedSlaves, _, err, errs := inst.MultiMatchSlaves(instanceKey, destinationKey, pattern)
+			matchedSlaves, _, err, errs := inst.MultiMatchReplicas(instanceKey, destinationKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {
@@ -550,7 +550,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			matchedSlaves, _, err, errs := inst.MatchUpSlaves(instanceKey, pattern)
+			matchedSlaves, _, err, errs := inst.MatchUpReplicas(instanceKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {
@@ -570,7 +570,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupSlavesPseudoGTID(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
+			lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupReplicasPseudoGTID(instanceKey, false, func(candidateSlave *inst.Instance) { fmt.Println(candidateSlave.Key.DisplayString()) }, postponedFunctionsContainer)
 			lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
 			postponedFunctionsContainer.InvokePostponed()
 			if promotedSlave == nil {
@@ -658,7 +658,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("detach-replica", "Replication, general", `Stops replication and modifies binlog position into an impossible, yet reversible, value.`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			_, err := inst.DetachSlaveOperation(instanceKey)
+			_, err := inst.DetachReplicaOperation(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -667,7 +667,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("reattach-replica", "Replication, general", `Undo a detach-replica operation`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			_, err := inst.ReattachSlaveOperation(instanceKey)
+			_, err := inst.ReattachReplicaOperation(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -679,7 +679,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			_, err := inst.DetachSlaveMasterHost(instanceKey)
+			_, err := inst.DetachReplicaMasterHost(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -691,7 +691,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			_, err := inst.ReattachSlaveMasterHost(instanceKey)
+			_, err := inst.ReattachReplicaMasterHost(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1012,7 +1012,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("which-cluster-osc-replicas", "Information", `Output a list of replicas in a cluster, that could serve as a pt-online-schema-change operation control replicas`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
-			instances, err := inst.GetClusterOSCSlaves(clusterName)
+			instances, err := inst.GetClusterOSCReplicas(clusterName)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1023,7 +1023,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("which-cluster-gh-ost-replicas", "Information", `Output a list of replicas in a cluster, that could serve as a gh-ost working server`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
-			instances, err := inst.GetClusterGhostSlaves(clusterName)
+			instances, err := inst.GetClusterGhostReplicas(clusterName)
 			if err != nil {
 				log.Fatale(err)
 			}

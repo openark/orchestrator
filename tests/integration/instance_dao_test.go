@@ -86,7 +86,7 @@ func (s *TestSuite) TestReadTopologyMaster(c *C) {
 	i, _ := ReadTopologyInstance(&key)
 
 	c.Assert(i.Key.Hostname, Equals, key.Hostname)
-	c.Assert(i.IsSlave(), Equals, false)
+	c.Assert(i.IsReplica(), Equals, false)
 	c.Assert(len(i.SlaveHosts), Equals, 3)
 	c.Assert(len(i.SlaveHosts.GetInstanceKeys()), Equals, len(i.SlaveHosts))
 }
@@ -95,7 +95,7 @@ func (s *TestSuite) TestReadTopologySlave(c *C) {
 	key := slave3Key
 	i, _ := ReadTopologyInstance(&key)
 	c.Assert(i.Key.Hostname, Equals, key.Hostname)
-	c.Assert(i.IsSlave(), Equals, true)
+	c.Assert(i.IsReplica(), Equals, true)
 	c.Assert(len(i.SlaveHosts), Equals, 0)
 }
 
@@ -121,7 +121,7 @@ func (s *TestSuite) TestGetMasterOfASlave(c *C) {
 	c.Assert(err, IsNil)
 	master, err := GetInstanceMaster(i)
 	c.Assert(err, IsNil)
-	c.Assert(master.IsSlave(), Equals, false)
+	c.Assert(master.IsReplica(), Equals, false)
 	c.Assert(master.Key.Port, Equals, 22987)
 }
 
@@ -146,14 +146,14 @@ func (s *TestSuite) TestInstanceIsMasterOf(c *C) {
 func (s *TestSuite) TestStopStartSlave(c *C) {
 
 	i, _ := ReadTopologyInstance(&slave1Key)
-	c.Assert(i.SlaveRunning(), Equals, true)
+	c.Assert(i.ReplicaRunning(), Equals, true)
 	i, _ = StopSlaveNicely(&i.Key, 0)
 
-	c.Assert(i.SlaveRunning(), Equals, false)
+	c.Assert(i.ReplicaRunning(), Equals, false)
 	c.Assert(i.SQLThreadUpToDate(), Equals, true)
 
 	i, _ = StartSlave(&i.Key)
-	c.Assert(i.SlaveRunning(), Equals, true)
+	c.Assert(i.ReplicaRunning(), Equals, true)
 }
 
 func (s *TestSuite) TestReadTopologyUnexisting(c *C) {
@@ -173,14 +173,14 @@ func (s *TestSuite) TestMoveBelowAndBack(c *C) {
 	c.Assert(err, IsNil)
 
 	c.Assert(slave1.MasterKey.Equals(&slave2Key), Equals, true)
-	c.Assert(slave1.SlaveRunning(), Equals, true)
+	c.Assert(slave1.ReplicaRunning(), Equals, true)
 
 	// And back; keep topology intact
 	slave1, _ = MoveUp(&slave1Key)
 	slave2, _ := ReadTopologyInstance(&slave2Key)
 
 	c.Assert(InstancesAreSiblings(slave1, slave2), Equals, true)
-	c.Assert(slave1.SlaveRunning(), Equals, true)
+	c.Assert(slave1.ReplicaRunning(), Equals, true)
 
 }
 
@@ -191,7 +191,7 @@ func (s *TestSuite) TestMoveBelowAndBackComplex(c *C) {
 	slave1, _ := MoveBelow(&slave1Key, &slave2Key)
 
 	c.Assert(slave1.MasterKey.Equals(&slave2Key), Equals, true)
-	c.Assert(slave1.SlaveRunning(), Equals, true)
+	c.Assert(slave1.ReplicaRunning(), Equals, true)
 
 	// Now let's have fun. Stop replica2 (which is now parent of replica1), execute queries on master,
 	// move s1 back under master, start all, verify queries.
@@ -240,8 +240,8 @@ func (s *TestSuite) TestMakeCoMasterAndBack(c *C) {
 
 	// Now master & replica1 expected to be co-masters. Check!
 	master, _ := ReadTopologyInstance(&masterKey)
-	c.Assert(master.IsSlaveOf(slave1), Equals, true)
-	c.Assert(slave1.IsSlaveOf(master), Equals, true)
+	c.Assert(master.IsReplicaOf(slave1), Equals, true)
+	c.Assert(slave1.IsReplicaOf(master), Equals, true)
 
 	// reset - restore to original state
 	master, err = ResetSlaveOperation(&masterKey)
@@ -264,8 +264,8 @@ func (s *TestSuite) TestMakeCoMasterAndBackAndFailOthersToBecomeCoMasters(c *C) 
 
 	// Now master & replica1 expected to be co-masters. Check!
 	master, _, _ := ReadInstance(&masterKey)
-	c.Assert(master.IsSlaveOf(slave1), Equals, true)
-	c.Assert(slave1.IsSlaveOf(master), Equals, true)
+	c.Assert(master.IsReplicaOf(slave1), Equals, true)
+	c.Assert(slave1.IsReplicaOf(master), Equals, true)
 
 	// Verify can't have additional co-masters
 	_, err = MakeCoMaster(&masterKey)
@@ -358,9 +358,9 @@ func (s *TestSuite) TestFailMoveBelowUponSlaveStopped(c *C) {
 	clearTestMaintenance()
 
 	slave1, _ := ReadTopologyInstance(&slave1Key)
-	c.Assert(slave1.SlaveRunning(), Equals, true)
+	c.Assert(slave1.ReplicaRunning(), Equals, true)
 	slave1, _ = StopSlaveNicely(&slave1.Key, 0)
-	c.Assert(slave1.SlaveRunning(), Equals, false)
+	c.Assert(slave1.ReplicaRunning(), Equals, false)
 
 	_, err := MoveBelow(&slave1Key, &slave2Key)
 	c.Assert(err, Not(IsNil))
@@ -372,9 +372,9 @@ func (s *TestSuite) TestFailMoveBelowUponOtherSlaveStopped(c *C) {
 	clearTestMaintenance()
 
 	slave1, _ := ReadTopologyInstance(&slave1Key)
-	c.Assert(slave1.SlaveRunning(), Equals, true)
+	c.Assert(slave1.ReplicaRunning(), Equals, true)
 	slave1, _ = StopSlaveNicely(&slave1.Key, 0)
-	c.Assert(slave1.SlaveRunning(), Equals, false)
+	c.Assert(slave1.ReplicaRunning(), Equals, false)
 
 	_, err := MoveBelow(&slave2Key, &slave1Key)
 	c.Assert(err, Not(IsNil))
