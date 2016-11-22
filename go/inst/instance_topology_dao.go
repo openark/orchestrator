@@ -287,7 +287,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 
 // StopSlavesNicely will attemt to stop all given replicas nicely, up to timeout
 func StopSlavesNicely(replicas [](*Instance), timeout time.Duration) [](*Instance) {
-	refreshedSlaves := [](*Instance){}
+	refreshedReplicas := [](*Instance){}
 
 	log.Debugf("Stopping %d replicas nicely", len(replicas))
 	// use concurrency but wait for all to complete
@@ -295,21 +295,21 @@ func StopSlavesNicely(replicas [](*Instance), timeout time.Duration) [](*Instanc
 	for _, slave := range replicas {
 		slave := slave
 		go func() {
-			updatedSlave := &slave
+			updatedReplica := &slave
 			// Signal completed replica
-			defer func() { barrier <- *updatedSlave }()
+			defer func() { barrier <- *updatedReplica }()
 			// Wait your turn to read a replica
 			ExecuteOnTopology(func() {
 				StopSlaveNicely(&slave.Key, timeout)
 				slave, _ = StopSlave(&slave.Key)
-				updatedSlave = &slave
+				updatedReplica = &slave
 			})
 		}()
 	}
 	for range replicas {
-		refreshedSlaves = append(refreshedSlaves, <-barrier)
+		refreshedReplicas = append(refreshedReplicas, <-barrier)
 	}
-	return refreshedSlaves
+	return refreshedReplicas
 }
 
 // StopSlave stops replication on a given instance
@@ -743,7 +743,7 @@ func SkipQuery(instanceKey *InstanceKey) (*Instance, error) {
 	return StartSlave(instanceKey)
 }
 
-// DetachSlave detaches a replica from replication; forcibly corrupting the binlog coordinates (though in such way
+// DetachReplica detaches a replica from replication; forcibly corrupting the binlog coordinates (though in such way
 // that is reversible)
 func DetachReplica(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)

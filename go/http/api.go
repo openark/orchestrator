@@ -479,7 +479,7 @@ func (this *HttpAPI) ReattachReplica(params martini.Params, r render.Render, req
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave reattached: %+v", instance.Key), Details: instance})
 }
 
-// ReattachReplicaMasterHost reverts a DetachSlaveMasterHost command
+// ReattachReplicaMasterHost reverts a achReplicaMasterHost command
 // by resoting the original master hostname in CHANGE MASTER TO
 func (this *HttpAPI) ReattachReplicaMasterHost(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -621,8 +621,8 @@ func (this *HttpAPI) MoveReplicasGTID(params martini.Params, r render.Render, re
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Moved %d slaves of %+v below %+v via GTID; %d errors: %+v", len(movedReplicas), instanceKey, belowKey, len(errs), errs), Details: belowKey})
 }
 
-// EnslaveSiblings
-func (this *HttpAPI) EnslaveSiblings(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+// TakeSiblings
+func (this *HttpAPI) TakeSiblings(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -633,7 +633,7 @@ func (this *HttpAPI) EnslaveSiblings(params martini.Params, r render.Render, req
 		return
 	}
 
-	instance, count, err := inst.EnslaveSiblings(&instanceKey)
+	instance, count, err := inst.TakeSiblings(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -2304,7 +2304,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "move-equivalent/:host/:port/:belowHost/:belowPort", this.MoveEquivalent)
 	this.registerRequest(m, "repoint-slaves/:host/:port", this.RepointReplicas)
 	this.registerRequest(m, "make-co-master/:host/:port", this.MakeCoMaster)
-	this.registerRequest(m, "enslave-siblings/:host/:port", this.EnslaveSiblings)
+	this.registerRequest(m, "enslave-siblings/:host/:port", this.TakeSiblings)
 	this.registerRequest(m, "enslave-master/:host/:port", this.EnslaveMaster)
 	this.registerRequest(m, "master-equivalent/:host/:port/:logFile/:logPos", this.MasterEquivalent)
 

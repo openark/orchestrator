@@ -859,8 +859,8 @@ func ReadReplicaInstancesIncludingBinlogServerSubReplicas(masterKey *InstanceKey
 	return replicas, err
 }
 
-// ReadBinlogServerSlaveInstances reads direct replicas of a given master that are binlog servers
-func ReadBinlogServerSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
+// ReadBinlogServerReplicaInstances reads direct replicas of a given master that are binlog servers
+func ReadBinlogServerReplicaInstances(masterKey *InstanceKey) ([](*Instance), error) {
 	condition := `
 			master_host = ?
 			and master_port = ?

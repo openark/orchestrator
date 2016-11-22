@@ -67,11 +67,11 @@ type ReplicationAnalysis struct {
 	IsMaster                                bool
 	IsCoMaster                              bool
 	LastCheckValid                          bool
-	CountSlaves                             uint
-	CountValidSlaves                        uint
-	CountValidReplicatingSlaves             uint
-	CountSlavesFailingToConnectToMaster     uint
-	CountStaleSlaves                        uint
+	CountReplicas                           uint
+	CountValidReplicas                      uint
+	CountValidReplicatingReplicas           uint
+	CountReplicasFailingToConnectToMaster   uint
+	CountStaleReplicas                      uint
 	ReplicationDepth                        uint
 	SlaveHosts                              InstanceKeyMap
 	IsFailingToConnectToMaster              bool

@@ -1040,7 +1040,7 @@ Cleanup:
 	return instance, err
 }
 
-// DetachSlaveMasterHost detaches a replica from its master by corrupting the Master_Host (in such way that is reversible)
+// DetachReplicaMasterHost detaches a replica from its master by corrupting the Master_Host (in such way that is reversible)
 func DetachReplicaMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -1084,7 +1084,7 @@ Cleanup:
 	return instance, err
 }
 
-// ReattachReplicaMasterHost reattaches a replica back onto its master by undoing a DetachSlaveMasterHost operation
+// ReattachReplicaMasterHost reattaches a replica back onto its master by undoing a DetachReplicaMasterHost operation
 func ReattachReplicaMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -1404,8 +1404,8 @@ Cleanup:
 	return instance, nextBinlogCoordinatesToMatch, err
 }
 
-// RematchSlave will re-match a replica to its master, using pseudo-gtid
-func RematchSlave(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instance, *BinlogCoordinates, error) {
+// RematchReplica will re-match a replica to its master, using pseudo-gtid
+func RematchReplica(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instance, *BinlogCoordinates, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, nil, err
@@ -1473,9 +1473,9 @@ Cleanup:
 	return instance, err
 }
 
-// EnslaveSiblings is a convenience method for turning sublings of a replica to be its subordinates.
+// TakeSiblings is a convenience method for turning sublings of a replica to be its subordinates.
 // This uses normal connected replication (does not utilize Pseudo-GTID)
-func EnslaveSiblings(instanceKey *InstanceKey) (*Instance, int, error) {
+func TakeSiblings(instanceKey *InstanceKey) (*Instance, int, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, 0, err
@@ -1616,8 +1616,8 @@ func sortInstances(instances [](*Instance)) {
 }
 
 // getReplicasForSorting returns a list of replicas of a given master potentially for candidate choosing
-func getReplicasForSorting(masterKey *InstanceKey, includeBinlogServerSubSlaves bool) (replicas [](*Instance), err error) {
-	if includeBinlogServerSubSlaves {
+func getReplicasForSorting(masterKey *InstanceKey, includeBinlogServerSubReplicas bool) (replicas [](*Instance), err error) {
+	if includeBinlogServerSubReplicas {
 		replicas, err = ReadReplicaInstancesIncludingBinlogServerSubReplicas(masterKey)
 	} else {
 		replicas, err = ReadReplicaInstances(masterKey)
@@ -1704,24 +1704,24 @@ func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlre
 		slaveBuckets[slave.ExecBinlogCoordinates] = append(slaveBuckets[slave.ExecBinlogCoordinates], slave)
 	}
 	log.Debugf("MultiMatchBelow: %d replicas merged into %d buckets", len(replicas), len(slaveBuckets))
-	for bucket, bucketSlaves := range slaveBuckets {
-		log.Debugf("+- bucket: %+v, %d replicas", bucket, len(bucketSlaves))
+	for bucket, bucketReplicas := range slaveBuckets {
+		log.Debugf("+- bucket: %+v, %d replicas", bucket, len(bucketReplicas))
 	}
-	matchedSlaves := make(map[InstanceKey]bool)
+	matchedReplicas := make(map[InstanceKey]bool)
 	bucketsBarrier := make(chan *BinlogCoordinates)
 	// Now go over the buckets, and try a single replica from each bucket
 	// (though if one results with an error, synchronuously-for-that-bucket continue to the next replica in bucket)
 
-	for execCoordinates, bucketSlaves := range slaveBuckets {
+	for execCoordinates, bucketReplicas := range slaveBuckets {
 		execCoordinates := execCoordinates
-		bucketSlaves := bucketSlaves
+		bucketReplicas := bucketReplicas
 		var bucketMatchedCoordinates *BinlogCoordinates
 		// Buckets concurrent
 		go func() {
 			// find coordinates for a single bucket based on a replica in said bucket
 			defer func() { bucketsBarrier <- &execCoordinates }()
 			func() {
-				for _, slave := range bucketSlaves {
+				for _, slave := range bucketReplicas {
 					slave := slave
 					var slaveErr error
 					var matchedCoordinates *BinlogCoordinates
@@ -1733,9 +1733,9 @@ func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlre
 						return nil
 					}
 					if postponedFunctionsContainer != nil &&
-						config.Config.PostponeSlaveRecoveryOnLagMinutes > 0 &&
-						slave.SQLDelay > config.Config.PostponeSlaveRecoveryOnLagMinutes*60 &&
-						len(bucketSlaves) == 1 {
+						config.Config.PostponeReplicaRecoveryOnLagMinutes > 0 &&
+						slave.SQLDelay > config.Config.PostponeReplicaRecoveryOnLagMinutes*60 &&
+						len(bucketReplicas) == 1 {
 						// This replica is the only one in the bucket, AND it's lagging very much, AND
 						// we're configured to postpone operation on this replica so as not to delay everyone else.
 						(*postponedFunctionsContainer).AddPostponedFunction(matchFunc)
@@ -1752,7 +1752,7 @@ func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlre
 							slaveMutex <- true
 							defer func() { <-slaveMutex }()
 							bucketMatchedCoordinates = matchedCoordinates
-							matchedSlaves[slave.Key] = true
+							matchedReplicas[slave.Key] = true
 						}()
 						log.Debugf("MultiMatchBelow: matched slave %+v in bucket %+v", slave.Key, execCoordinates)
 						return
@@ -1770,7 +1770,7 @@ func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlre
 				}
 			}()
 			if bucketMatchedCoordinates == nil {
-				log.Errorf("MultiMatchBelow: Cannot match up %d replicas since their bucket %+v is failed", len(bucketSlaves), execCoordinates)
+				log.Errorf("MultiMatchBelow: Cannot match up %d replicas since their bucket %+v is failed", len(bucketReplicas), execCoordinates)
 				return
 			}
 			log.Debugf("MultiMatchBelow: bucket %+v coordinates are: %+v. Proceeding to match all bucket replicas", execCoordinates, *bucketMatchedCoordinates)
@@ -1782,13 +1782,13 @@ func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlre
 				// We point all this bucket's replicas into the same coordinates, concurrently
 				// We are already doing concurrent buckets; but for each bucket we also want to do concurrent replicas,
 				// otherwise one large bucket would make for a sequential work...
-				for _, slave := range bucketSlaves {
+				for _, slave := range bucketReplicas {
 					slave := slave
 					go func() {
 						defer func() { barrier <- &slave.Key }()
 
 						var err error
-						if _, found := matchedSlaves[slave.Key]; found {
+						if _, found := matchedReplicas[slave.Key]; found {
 							// Already matched this replica
 							return
 						}
@@ -1805,7 +1805,7 @@ func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlre
 							slaveMutex <- true
 							defer func() { <-slaveMutex }()
 							if slaveMatchSuccess {
-								matchedSlaves[slave.Key] = true
+								matchedReplicas[slave.Key] = true
 							} else {
 								errs = append(errs, err)
 								log.Errorf("MultiMatchBelow: Cannot match up %+v: error is %+v", slave.Key, err)
@@ -1813,7 +1813,7 @@ func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlre
 						}()
 					}()
 				}
-				for range bucketSlaves {
+				for range bucketReplicas {
 					<-barrier
 				}
 			}()
@@ -1825,7 +1825,7 @@ func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlre
 
 	for _, slave := range replicas {
 		slave := slave
-		if _, found := matchedSlaves[slave.Key]; found {
+		if _, found := matchedReplicas[slave.Key]; found {
 			res = append(res, slave)
 		}
 	}
@@ -1877,14 +1877,14 @@ func MultiMatchReplicas(masterKey *InstanceKey, belowKey *InstanceKey, pattern s
 		return res, belowInstance, err, errs
 	}
 	replicas = filterInstancesByPattern(replicas, pattern)
-	matchedSlaves, belowInstance, err, errs := MultiMatchBelow(replicas, &belowInstance.Key, false, nil)
+	matchedReplicas, belowInstance, err, errs := MultiMatchBelow(replicas, &belowInstance.Key, false, nil)
 
-	if len(matchedSlaves) != len(replicas) {
-		err = fmt.Errorf("MultiMatchReplicas: only matched %d out of %d replicas of %+v; error is: %+v", len(matchedSlaves), len(replicas), *masterKey, err)
+	if len(matchedReplicas) != len(replicas) {
+		err = fmt.Errorf("MultiMatchReplicas: only matched %d out of %d replicas of %+v; error is: %+v", len(matchedReplicas), len(replicas), *masterKey, err)
 	}
-	AuditOperation("multi-match-replicas", masterKey, fmt.Sprintf("matched %d replicas under %+v", len(matchedSlaves), *belowKey))
+	AuditOperation("multi-match-replicas", masterKey, fmt.Sprintf("matched %d replicas under %+v", len(matchedReplicas), *belowKey))
 
-	return matchedSlaves, belowInstance, err, errs
+	return matchedReplicas, belowInstance, err, errs
 }
 
 // MatchUp will move a replica up the replication chain, so that it becomes sibling of its master, via Pseudo-GTID
@@ -1908,7 +1908,7 @@ func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instan
 	return MatchBelow(instanceKey, &master.MasterKey, requireInstanceMaintenance)
 }
 
-// MatchUpSlaves will move all replicas of given master up the replication chain,
+// MatchUpReplicas will move all replicas of given master up the replication chain,
 // so that they become siblings of their master.
 // This should be called when the local master dies, and all its replicas are to be resurrected via Pseudo-GTID
 func MatchUpReplicas(masterKey *InstanceKey, pattern string) ([](*Instance), *Instance, error, []error) {
@@ -1938,7 +1938,7 @@ func isGenerallyValidAsBinlogSource(slave *Instance) bool {
 	return true
 }
 
-func isGenerallyValidAsCandidateSlave(slave *Instance) bool {
+func isGenerallyValidAsCandidateReplica(slave *Instance) bool {
 	if !isGenerallyValidAsBinlogSource(slave) {
 		// does not have binary logs
 		return false
@@ -1972,7 +1972,7 @@ func isValidAsCandidateMasterInBinlogServerTopology(slave *Instance) bool {
 	return true
 }
 
-func isBannedFromBeingCandidateSlave(slave *Instance) bool {
+func isBannedFromBeingCandidateReplica(slave *Instance) bool {
 	if slave.PromotionRule == MustNotPromoteRule {
 		log.Debugf("instance %+v is banned because of promotion rule", slave.Key)
 		return true
@@ -2045,8 +2045,8 @@ func chooseCandidateReplica(replicas [](*Instance)) (candidateReplica *Instance,
 
 	for _, replica := range replicas {
 		replica := replica
-		if isGenerallyValidAsCandidateSlave(replica) &&
-			!isBannedFromBeingCandidateSlave(replica) &&
+		if isGenerallyValidAsCandidateReplica(replica) &&
+			!isBannedFromBeingCandidateReplica(replica) &&
 			!IsSmallerMajorVersion(priorityMajorVersion, replica.MajorVersionString()) &&
 			!IsSmallerBinlogFormat(priorityBinlogFormat, replica.Binlog_format) {
 			// this is the one
@@ -2059,7 +2059,7 @@ func chooseCandidateReplica(replicas [](*Instance)) (candidateReplica *Instance,
 		// Instead, pick a (single) replica which is not banned.
 		for _, replica := range replicas {
 			replica := replica
-			if !isBannedFromBeingCandidateSlave(replica) {
+			if !isBannedFromBeingCandidateReplica(replica) {
 				// this is the one
 				candidateReplica = replica
 				break
@@ -2136,7 +2136,7 @@ func GetCandidateReplicaOfBinlogServerTopology(masterKey *InstanceKey) (candidat
 		if candidateReplica != nil {
 			break
 		}
-		if isValidAsCandidateMasterInBinlogServerTopology(slave) && !isBannedFromBeingCandidateSlave(slave) {
+		if isValidAsCandidateMasterInBinlogServerTopology(slave) && !isBannedFromBeingCandidateReplica(slave) {
 			// this is the one
 			candidateReplica = slave
 		}
@@ -2188,11 +2188,11 @@ func RegroupReplicasPseudoGTID(masterKey *InstanceKey, returnReplicaEvenOnFailur
 	// As for the laterReplicas, we'll have to apply pseudo GTID
 	laterReplicas, instance, err, _ := MultiMatchBelow(laterReplicas, &candidateReplica.Key, true, postponedFunctionsContainer)
 
-	operatedSlaves := append(equalReplicas, candidateReplica)
-	operatedSlaves = append(operatedSlaves, laterReplicas...)
-	log.Debugf("RegroupReplicas: starting %d replicas", len(operatedSlaves))
+	operatedReplicas := append(equalReplicas, candidateReplica)
+	operatedReplicas = append(operatedReplicas, laterReplicas...)
+	log.Debugf("RegroupReplicas: starting %d replicas", len(operatedReplicas))
 	barrier = make(chan *InstanceKey)
-	for _, slave := range operatedSlaves {
+	for _, slave := range operatedReplicas {
 		slave := slave
 		go func() {
 			defer func() { barrier <- &candidateReplica.Key }()
@@ -2201,18 +2201,18 @@ func RegroupReplicasPseudoGTID(masterKey *InstanceKey, returnReplicaEvenOnFailur
 			})
 		}()
 	}
-	for range operatedSlaves {
+	for range operatedReplicas {
 		<-barrier
 	}
 
 	log.Debugf("RegroupReplicas: done")
-	AuditOperation("regroup-replicas", masterKey, fmt.Sprintf("regrouped %+v replicas below %+v", len(operatedSlaves), *masterKey))
+	AuditOperation("regroup-replicas", masterKey, fmt.Sprintf("regrouped %+v replicas below %+v", len(operatedReplicas), *masterKey))
 	// aheadReplicas are lost (they were ahead in replication as compared to promoted replica)
 	return aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, instance, err
 }
 
 func getMostUpToDateActiveBinlogServer(masterKey *InstanceKey) (mostAdvancedBinlogServer *Instance, binlogServerReplicas [](*Instance), err error) {
-	if binlogServerReplicas, err = ReadBinlogServerSlaveInstances(masterKey); err == nil && len(binlogServerReplicas) > 0 {
+	if binlogServerReplicas, err = ReadBinlogServerReplicaInstances(masterKey); err == nil && len(binlogServerReplicas) > 0 {
 		// Pick the most advanced binlog sever that is good to go
 		for _, binlogServer := range binlogServerReplicas {
 			if binlogServer.IsLastCheckValid {
@@ -2574,14 +2574,14 @@ func relocateReplicasInternal(replicas [](*Instance), instance, other *Instance)
 	// Pseudo GTID
 	if other.UsingPseudoGTID {
 		// Which replicas are using Pseudo GTID?
-		var pseudoGTIDSlaves [](*Instance)
+		var pseudoGTIDReplicas [](*Instance)
 		for _, slave := range replicas {
 			if slave.UsingPseudoGTID {
-				pseudoGTIDSlaves = append(pseudoGTIDSlaves, slave)
+				pseudoGTIDReplicas = append(pseudoGTIDReplicas, slave)
 			}
 		}
-		pseudoGTIDSlaves, _, err, errs = MultiMatchBelow(pseudoGTIDSlaves, &other.Key, false, nil)
-		return pseudoGTIDSlaves, err, errs
+		pseudoGTIDReplicas, _, err, errs = MultiMatchBelow(pseudoGTIDReplicas, &other.Key, false, nil)
+		return pseudoGTIDReplicas, err, errs
 	}
 
 	// Normal binlog file:pos
@@ -2593,7 +2593,7 @@ func relocateReplicasInternal(replicas [](*Instance), instance, other *Instance)
 	return nil, log.Errorf("Relocating %+v replicas of %+v below %+v turns to be too complex; please do it manually", len(replicas), instance.Key, other.Key), errs
 }
 
-// RelocateSlaves will attempt moving replicas of an instance indicated by instanceKey below another instance.
+// RelocateReplicas will attempt moving replicas of an instance indicated by instanceKey below another instance.
 // Orchestrator will try and figure out the best way to relocate the servers. This could span normal
 // binlog-position, pseudo-gtid, repointing, binlog servers...
 func RelocateReplicas(instanceKey, otherKey *InstanceKey, pattern string) (replicas [](*Instance), other *Instance, err error, errs []error) {

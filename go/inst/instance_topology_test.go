@@ -143,10 +143,10 @@ func TestIsGenerallyValidAsBinlogSource(t *testing.T) {
 	}
 }
 
-func TestIsGenerallyValidAsCandidateSlave(t *testing.T) {
+func TestIsGenerallyValidAsCandidateReplica(t *testing.T) {
 	instances, _ := generateTestInstances()
 	for _, instance := range instances {
-		test.S(t).ExpectFalse(isGenerallyValidAsCandidateSlave(instance))
+		test.S(t).ExpectFalse(isGenerallyValidAsCandidateReplica(instance))
 	}
 	for _, instance := range instances {
 		instance.IsLastCheckValid = true
@@ -154,22 +154,22 @@ func TestIsGenerallyValidAsCandidateSlave(t *testing.T) {
 		instance.LogSlaveUpdatesEnabled = false
 	}
 	for _, instance := range instances {
-		test.S(t).ExpectFalse(isGenerallyValidAsCandidateSlave(instance))
+		test.S(t).ExpectFalse(isGenerallyValidAsCandidateReplica(instance))
 	}
 	applyGeneralGoodToGoReplicationParams(instances)
 	for _, instance := range instances {
-		test.S(t).ExpectTrue(isGenerallyValidAsCandidateSlave(instance))
+		test.S(t).ExpectTrue(isGenerallyValidAsCandidateReplica(instance))
 	}
 }
 
-func TestIsBannedFromBeingCandidateSlave(t *testing.T) {
+func TestIsBannedFromBeingCandidateReplica(t *testing.T) {
 	instances, _ := generateTestInstances()
 	for _, instance := range instances {
-		test.S(t).ExpectFalse(isBannedFromBeingCandidateSlave(instance))
+		test.S(t).ExpectFalse(isBannedFromBeingCandidateReplica(instance))
 	}
 }
 
-func TestChooseCandidateReplicaNoCandidateSlave(t *testing.T) {
+func TestChooseCandidateReplicaNoCandidateReplica(t *testing.T) {
 	instances, _ := generateTestInstances()
 	for _, instance := range instances {
 		instance.IsLastCheckValid = true

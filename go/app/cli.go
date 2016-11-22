@@ -362,14 +362,14 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("repoint-replicas", "Classic file:pos relocation", `Repoint all replicas of given instance to replicate back from the instance. Use with care`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			repointedSlaves, err, errs := inst.RepointReplicasTo(instanceKey, pattern, destinationKey)
+			repointedReplicas, err, errs := inst.RepointReplicasTo(instanceKey, pattern, destinationKey)
 			if err != nil {
 				log.Fatale(err)
 			} else {
 				for _, e := range errs {
 					log.Errore(e)
 				}
-				for _, slave := range repointedSlaves {
+				for _, slave := range repointedReplicas {
 					fmt.Println(fmt.Sprintf("%s<%s", slave.Key.DisplayString(), instanceKey.DisplayString()))
 				}
 			}
@@ -380,7 +380,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			_, _, err := inst.EnslaveSiblings(instanceKey)
+			_, _, err := inst.TakeSiblings(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -514,7 +514,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("rematch", "Pseudo-GTID relocation", `Reconnect a replica onto its master, via PSeudo-GTID.`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			instance, _, err := inst.RematchSlave(instanceKey, true)
+			instance, _, err := inst.RematchReplica(instanceKey, true)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -531,14 +531,14 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce destination:", destination)
 			}
 
-			matchedSlaves, _, err, errs := inst.MultiMatchReplicas(instanceKey, destinationKey, pattern)
+			matchedReplicas, _, err, errs := inst.MultiMatchReplicas(instanceKey, destinationKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {
 				for _, e := range errs {
 					log.Errore(e)
 				}
-				for _, slave := range matchedSlaves {
+				for _, slave := range matchedReplicas {
 					fmt.Println(slave.Key.DisplayString())
 				}
 			}
@@ -550,14 +550,14 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce instance:", instance)
 			}
 
-			matchedSlaves, _, err, errs := inst.MatchUpReplicas(instanceKey, pattern)
+			matchedReplicas, _, err, errs := inst.MatchUpReplicas(instanceKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {
 				for _, e := range errs {
 					log.Errore(e)
 				}
-				for _, slave := range matchedSlaves {
+				for _, slave := range matchedReplicas {
 					fmt.Println(slave.Key.DisplayString())
 				}
 			}

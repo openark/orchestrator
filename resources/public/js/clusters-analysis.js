@@ -84,9 +84,9 @@ $(document).ready(function() {
       }
       popoverElement.find(".popover-content>div").append('<div class="divider"></div><div>' + displayText + '</div> ');
       if (analysisEntry.IsStructureAnalysis) {
-        displayInstancesBadge(popoverElement, "Participating replicas", analysisEntry.CountSlaves, "label-warning", "Replicas having structural issue");
+        displayInstancesBadge(popoverElement, "Participating replicas", analysisEntry.CountReplicas, "label-warning", "Replicas having structural issue");
       } else {
-        displayInstancesBadge(popoverElement, "Affected replicas", analysisEntry.CountSlaves, "label-danger", "Direct replicas of failing instance");
+        displayInstancesBadge(popoverElement, "Affected replicas", analysisEntry.CountReplicas, "label-danger", "Direct replicas of failing instance");
       }
     }
 

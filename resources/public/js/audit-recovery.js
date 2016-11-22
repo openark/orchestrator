@@ -43,7 +43,7 @@ $(document).ready(function() {
         href: appUrl("/web/search/" + analyzedInstanceDisplay)
       }).wrap($("<td/>")).parent().appendTo(row);
       $('<td/>', {
-        text: audit.AnalysisEntry.CountSlaves
+        text: audit.AnalysisEntry.CountReplicas
       }).appendTo(row);
       $('<a/>', {
         text: audit.AnalysisEntry.ClusterDetails.ClusterName,
@@ -96,7 +96,7 @@ $(document).ready(function() {
         moreInfo += "</ul></div>";
       }
       if (audit.AnalysisEntry.SlaveHosts.length > 0) {
-        moreInfo += '<div>' + audit.AnalysisEntry.CountSlaves + ' replicting hosts :<ul>';
+        moreInfo += '<div>' + audit.AnalysisEntry.CountReplicas + ' replicting hosts :<ul>';
         audit.AnalysisEntry.SlaveHosts.forEach(function(instanceKey) {
           moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
         });

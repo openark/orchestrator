@@ -224,12 +224,12 @@ func (instance *Instance) NameAndMajorVersionString() string {
 	return name + "-" + instance.MajorVersionString()
 }
 
-// IsSlave makes simple heuristics to decide whether this insatnce is a replica of another instance
+// IsReplica makes simple heuristics to decide whether this insatnce is a replica of another instance
 func (this *Instance) IsReplica() bool {
 	return this.MasterKey.Hostname != "" && this.MasterKey.Hostname != "_" && this.MasterKey.Port != 0 && (this.ReadBinlogCoordinates.LogFile != "" || this.UsingGTID())
 }
 
-// SlaveRunning returns true when this instance's status is of a replicating replica.
+// ReplicaRunning returns true when this instance's status is of a replicating replica.
 func (this *Instance) ReplicaRunning() bool {
 	return this.IsReplica() && this.Slave_SQL_Running && this.Slave_IO_Running
 }
