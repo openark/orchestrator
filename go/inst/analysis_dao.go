@@ -241,10 +241,10 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		a.BinlogServerImmediateTopology = countValidBinlogServerSlaves == a.CountValidReplicas && a.CountValidReplicas > 0
 		a.PseudoGTIDImmediateTopology = m.GetBool("is_pseudo_gtid")
 
-		a.CountStatementBasedLoggingSlaves = m.GetUint("count_statement_based_loggin_slaves")
-		a.CountMixedBasedLoggingSlaves = m.GetUint("count_mixed_based_loggin_slaves")
-		a.CountRowBasedLoggingSlaves = m.GetUint("count_row_based_loggin_slaves")
-		a.CountDistinctMajorVersionsLoggingSlaves = m.GetUint("count_distinct_logging_major_versions")
+		a.CountStatementBasedLoggingReplicas = m.GetUint("count_statement_based_loggin_slaves")
+		a.CountMixedBasedLoggingReplicas = m.GetUint("count_mixed_based_loggin_slaves")
+		a.CountRowBasedLoggingReplicas = m.GetUint("count_row_based_loggin_slaves")
+		a.CountDistinctMajorVersionsLoggingReplicas = m.GetUint("count_distinct_logging_major_versions")
 
 		if a.IsMaster && !a.LastCheckValid && a.CountReplicas == 0 {
 			a.Analysis = DeadMasterWithoutSlaves
@@ -374,16 +374,16 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		{
 			// Moving on to structure analysis
 			// We also do structural checks. See if there's potential danger in promotions
-			if a.IsMaster && a.CountStatementBasedLoggingSlaves > 0 && a.CountMixedBasedLoggingSlaves > 0 {
+			if a.IsMaster && a.CountStatementBasedLoggingReplicas > 0 && a.CountMixedBasedLoggingReplicas > 0 {
 				a.StructureAnalysis = append(a.StructureAnalysis, StatementAndMixedLoggingSlavesStructureWarning)
 			}
-			if a.IsMaster && a.CountStatementBasedLoggingSlaves > 0 && a.CountRowBasedLoggingSlaves > 0 {
+			if a.IsMaster && a.CountStatementBasedLoggingReplicas > 0 && a.CountRowBasedLoggingReplicas > 0 {
 				a.StructureAnalysis = append(a.StructureAnalysis, StatementAndRowLoggingSlavesStructureWarning)
 			}
-			if a.IsMaster && a.CountMixedBasedLoggingSlaves > 0 && a.CountRowBasedLoggingSlaves > 0 {
+			if a.IsMaster && a.CountMixedBasedLoggingReplicas > 0 && a.CountRowBasedLoggingReplicas > 0 {
 				a.StructureAnalysis = append(a.StructureAnalysis, MixedAndRowLoggingSlavesStructureWarning)
 			}
-			if a.IsMaster && a.CountDistinctMajorVersionsLoggingSlaves > 1 {
+			if a.IsMaster && a.CountDistinctMajorVersionsLoggingReplicas > 1 {
 				a.StructureAnalysis = append(a.StructureAnalysis, MultipleMajorVersionsLoggingSlaves)
 			}
 		}

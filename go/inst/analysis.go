@@ -61,35 +61,35 @@ const (
 
 // ReplicationAnalysis notes analysis on replication chain status, per instance
 type ReplicationAnalysis struct {
-	AnalyzedInstanceKey                     InstanceKey
-	AnalyzedInstanceMasterKey               InstanceKey
-	ClusterDetails                          ClusterInfo
-	IsMaster                                bool
-	IsCoMaster                              bool
-	LastCheckValid                          bool
-	CountReplicas                           uint
-	CountValidReplicas                      uint
-	CountValidReplicatingReplicas           uint
-	CountReplicasFailingToConnectToMaster   uint
-	CountStaleReplicas                      uint
-	ReplicationDepth                        uint
-	SlaveHosts                              InstanceKeyMap
-	IsFailingToConnectToMaster              bool
-	Analysis                                AnalysisCode
-	Description                             string
-	StructureAnalysis                       []StructureAnalysisCode
-	IsDowntimed                             bool
-	DowntimeEndTimestamp                    string
-	DowntimeRemainingSeconds                int
-	IsBinlogServer                          bool
-	PseudoGTIDImmediateTopology             bool
-	OracleGTIDImmediateTopology             bool
-	MariaDBGTIDImmediateTopology            bool
-	BinlogServerImmediateTopology           bool
-	CountStatementBasedLoggingSlaves        uint
-	CountMixedBasedLoggingSlaves            uint
-	CountRowBasedLoggingSlaves              uint
-	CountDistinctMajorVersionsLoggingSlaves uint
+	AnalyzedInstanceKey                       InstanceKey
+	AnalyzedInstanceMasterKey                 InstanceKey
+	ClusterDetails                            ClusterInfo
+	IsMaster                                  bool
+	IsCoMaster                                bool
+	LastCheckValid                            bool
+	CountReplicas                             uint
+	CountValidReplicas                        uint
+	CountValidReplicatingReplicas             uint
+	CountReplicasFailingToConnectToMaster     uint
+	CountStaleReplicas                        uint
+	ReplicationDepth                          uint
+	SlaveHosts                                InstanceKeyMap
+	IsFailingToConnectToMaster                bool
+	Analysis                                  AnalysisCode
+	Description                               string
+	StructureAnalysis                         []StructureAnalysisCode
+	IsDowntimed                               bool
+	DowntimeEndTimestamp                      string
+	DowntimeRemainingSeconds                  int
+	IsBinlogServer                            bool
+	PseudoGTIDImmediateTopology               bool
+	OracleGTIDImmediateTopology               bool
+	MariaDBGTIDImmediateTopology              bool
+	BinlogServerImmediateTopology             bool
+	CountStatementBasedLoggingReplicas        uint
+	CountMixedBasedLoggingReplicas            uint
+	CountRowBasedLoggingReplicas              uint
+	CountDistinctMajorVersionsLoggingReplicas uint
 }
 
 type ReplicationAnalysisChangelog struct {
@@ -98,9 +98,9 @@ type ReplicationAnalysisChangelog struct {
 }
 
 // ReadReplicaHostsFromString parses and reads replica keys from comma delimited string
-func (this *ReplicationAnalysis) ReadReplicaHostsFromString(slaveHostsString string) error {
+func (this *ReplicationAnalysis) ReadReplicaHostsFromString(replicaHostsString string) error {
 	this.SlaveHosts = *NewInstanceKeyMap()
-	return this.SlaveHosts.ReadCommaDelimitedList(slaveHostsString)
+	return this.SlaveHosts.ReadCommaDelimitedList(replicaHostsString)
 }
 
 // AnalysisString returns a human friendly description of all analysis issues
