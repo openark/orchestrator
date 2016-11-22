@@ -252,23 +252,23 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadMaster
-			a.Description = "Master cannot be reached by orchestrator and none of its slaves is replicating"
+			a.Description = "Master cannot be reached by orchestrator and none of its replicas is replicating"
 			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountSlaves > 0 && a.CountValidSlaves == 0 && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadMasterAndSlaves
-			a.Description = "Master cannot be reached by orchestrator and none of its slaves is replicating"
+			a.Description = "Master cannot be reached by orchestrator and none of its replicas is replicating"
 			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountValidSlaves < a.CountSlaves && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadMasterAndSomeSlaves
-			a.Description = "Master cannot be reached by orchestrator; some of its slaves are unreachable and none of its reachable slaves is replicating"
+			a.Description = "Master cannot be reached by orchestrator; some of its replicas are unreachable and none of its reachable replicas is replicating"
 			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountStaleSlaves == a.CountSlaves && a.CountValidReplicatingSlaves > 0 {
 			a.Analysis = UnreachableMasterWithStaleSlaves
-			a.Description = "Master cannot be reached by orchestrator and has running yet stale slaves"
+			a.Description = "Master cannot be reached by orchestrator and has running yet stale replicas"
 			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves > 0 {
 			a.Analysis = UnreachableMaster
-			a.Description = "Master cannot be reached by orchestrator but it has replicating slaves; possibly a network/host issue"
+			a.Description = "Master cannot be reached by orchestrator but it has replicating replicas; possibly a network/host issue"
 			//
 		} else if a.IsMaster && a.LastCheckValid && a.CountSlaves == 1 && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = MasterSingleSlaveNotReplicating
@@ -280,31 +280,31 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			//
 		} else if a.IsMaster && a.LastCheckValid && a.CountSlaves > 1 && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = AllMasterSlavesNotReplicating
-			a.Description = "Master is reachable but none of its slaves is replicating"
+			a.Description = "Master is reachable but none of its replicas is replicating"
 			//
 		} else if a.IsMaster && a.LastCheckValid && a.CountSlaves > 1 && a.CountValidSlaves < a.CountSlaves && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = AllMasterSlavesNotReplicatingOrDead
-			a.Description = "Master is reachable but none of its slaves is replicating"
+			a.Description = "Master is reachable but none of its replicas is replicating"
 			//
 		} else if a.IsMaster && a.LastCheckValid && a.CountSlaves > 1 && a.CountStaleSlaves == a.CountSlaves && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves > 0 {
 			a.Analysis = AllMasterSlavesStale
-			a.Description = "Master is reachable but all of its slaves are stale, although attempting to replicate"
+			a.Description = "Master is reachable but all of its replicas are stale, although attempting to replicate"
 			//
 		} else /* co-master */ if a.IsCoMaster && !a.LastCheckValid && a.CountSlaves > 0 && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadCoMaster
-			a.Description = "Co-master cannot be reached by orchestrator and none of its slaves is replicating"
+			a.Description = "Co-master cannot be reached by orchestrator and none of its replicas is replicating"
 			//
 		} else if a.IsCoMaster && !a.LastCheckValid && a.CountSlaves > 0 && a.CountValidSlaves < a.CountSlaves && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadCoMasterAndSomeSlaves
-			a.Description = "Co-master cannot be reached by orchestrator; some of its slaves are unreachable and none of its reachable slaves is replicating"
+			a.Description = "Co-master cannot be reached by orchestrator; some of its replicas are unreachable and none of its reachable replicas is replicating"
 			//
 		} else if a.IsCoMaster && !a.LastCheckValid && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves > 0 {
 			a.Analysis = UnreachableCoMaster
-			a.Description = "Co-master cannot be reached by orchestrator but it has replicating slaves; possibly a network/host issue"
+			a.Description = "Co-master cannot be reached by orchestrator but it has replicating replicas; possibly a network/host issue"
 			//
 		} else if a.IsCoMaster && a.LastCheckValid && a.CountSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = AllCoMasterSlavesNotReplicating
-			a.Description = "Co-master is reachable but none of its slaves is replicating"
+			a.Description = "Co-master is reachable but none of its replicas is replicating"
 			//
 		} else /* intermediate-master */ if !a.IsMaster && !a.LastCheckValid && a.CountSlaves == 1 && a.CountValidSlaves == a.CountSlaves && a.CountSlavesFailingToConnectToMaster == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadIntermediateMasterWithSingleSlaveFailingToConnect
@@ -316,15 +316,15 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			//
 		} else /* intermediate-master */ if !a.IsMaster && !a.LastCheckValid && a.CountSlaves > 1 && a.CountValidSlaves == a.CountSlaves && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadIntermediateMaster
-			a.Description = "Intermediate master cannot be reached by orchestrator and none of its slaves is replicating"
+			a.Description = "Intermediate master cannot be reached by orchestrator and none of its replicas is replicating"
 			//
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountValidSlaves < a.CountSlaves && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = DeadIntermediateMasterAndSomeSlaves
-			a.Description = "Intermediate master cannot be reached by orchestrator; some of its slaves are unreachable and none of its reachable slaves is replicating"
+			a.Description = "Intermediate master cannot be reached by orchestrator; some of its replicas are unreachable and none of its reachable replicas is replicating"
 			//
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountValidSlaves > 0 && a.CountValidReplicatingSlaves > 0 {
 			a.Analysis = UnreachableIntermediateMaster
-			a.Description = "Intermediate master cannot be reached by orchestrator but it has replicating slaves; possibly a network/host issue"
+			a.Description = "Intermediate master cannot be reached by orchestrator but it has replicating replicas; possibly a network/host issue"
 			//
 		} else if !a.IsMaster && a.LastCheckValid && a.CountSlaves > 1 && a.CountValidReplicatingSlaves == 0 &&
 			a.CountSlavesFailingToConnectToMaster > 0 && a.CountSlavesFailingToConnectToMaster == a.CountValidSlaves {
@@ -333,11 +333,11 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			// Must have at least two replicas to reach such conclusion -- do note that the intermediate master is still
 			// reachable to orchestrator, so we base our conclusion on replicas only at this point.
 			a.Analysis = AllIntermediateMasterSlavesFailingToConnectOrDead
-			a.Description = "Intermediate master is reachable but all of its slaves are failing to connect"
+			a.Description = "Intermediate master is reachable but all of its replicas are failing to connect"
 			//
 		} else if !a.IsMaster && a.LastCheckValid && a.CountSlaves > 0 && a.CountValidReplicatingSlaves == 0 {
 			a.Analysis = AllIntermediateMasterSlavesNotReplicating
-			a.Description = "Intermediate master is reachable but none of its slaves is replicating"
+			a.Description = "Intermediate master is reachable but none of its replicas is replicating"
 			//
 		} else if a.IsBinlogServer && a.IsFailingToConnectToMaster {
 			a.Analysis = BinlogServerFailingToConnectToMaster
@@ -350,7 +350,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		}
 		//		 else if a.IsMaster && a.CountSlaves == 0 {
 		//			a.Analysis = MasterWithoutSlaves
-		//			a.Description = "Master has no slaves"
+		//			a.Description = "Master has no replicas"
 		//		}
 
 		appendAnalysis := func(analysis *ReplicationAnalysis) {

@@ -286,13 +286,13 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 }
 
 // StopSlavesNicely will attemt to stop all given replicas nicely, up to timeout
-func StopSlavesNicely(slaves [](*Instance), timeout time.Duration) [](*Instance) {
+func StopSlavesNicely(replicas [](*Instance), timeout time.Duration) [](*Instance) {
 	refreshedSlaves := [](*Instance){}
 
-	log.Debugf("Stopping %d slaves nicely", len(slaves))
+	log.Debugf("Stopping %d replicas nicely", len(replicas))
 	// use concurrency but wait for all to complete
 	barrier := make(chan *Instance)
-	for _, slave := range slaves {
+	for _, slave := range replicas {
 		slave := slave
 		go func() {
 			updatedSlave := &slave
@@ -306,7 +306,7 @@ func StopSlavesNicely(slaves [](*Instance), timeout time.Duration) [](*Instance)
 			})
 		}()
 	}
-	for range slaves {
+	for range replicas {
 		refreshedSlaves = append(refreshedSlaves, <-barrier)
 	}
 	return refreshedSlaves
@@ -392,11 +392,11 @@ func RestartSlave(instanceKey *InstanceKey) (instance *Instance, err error) {
 }
 
 // StartSlaves will do concurrent start-slave
-func StartSlaves(slaves [](*Instance)) {
+func StartSlaves(replicas [](*Instance)) {
 	// use concurrency but wait for all to complete
-	log.Debugf("Starting %d slaves", len(slaves))
+	log.Debugf("Starting %d replicas", len(replicas))
 	barrier := make(chan InstanceKey)
-	for _, instance := range slaves {
+	for _, instance := range replicas {
 		instance := instance
 		go func() {
 			// Signal compelted replica
@@ -405,7 +405,7 @@ func StartSlaves(slaves [](*Instance)) {
 			ExecuteOnTopology(func() { StartSlave(&instance.Key) })
 		}()
 	}
-	for range slaves {
+	for range replicas {
 		<-barrier
 	}
 }

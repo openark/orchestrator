@@ -842,21 +842,21 @@ func ReadSlaveInstances(masterKey *InstanceKey) ([](*Instance), error) {
 // ReadSlaveInstancesIncludingBinlogServerSubReplicas returns a list of direct slves including any replicas
 // of a binlog server replica
 func ReadSlaveInstancesIncludingBinlogServerSubReplicas(masterKey *InstanceKey) ([](*Instance), error) {
-	slaves, err := ReadSlaveInstances(masterKey)
+	replicas, err := ReadSlaveInstances(masterKey)
 	if err != nil {
-		return slaves, err
+		return replicas, err
 	}
-	for _, slave := range slaves {
+	for _, slave := range replicas {
 		slave := slave
 		if slave.IsBinlogServer() {
 			binlogServerSlaves, err := ReadSlaveInstancesIncludingBinlogServerSubReplicas(&slave.Key)
 			if err != nil {
-				return slaves, err
+				return replicas, err
 			}
-			slaves = append(slaves, binlogServerSlaves...)
+			replicas = append(replicas, binlogServerSlaves...)
 		}
 	}
-	return slaves, err
+	return replicas, err
 }
 
 // ReadBinlogServerSlaveInstances reads direct replicas of a given master that are binlog servers
@@ -1084,27 +1084,27 @@ func GetClusterOSCReplicas(clusterName string) ([](*Instance), error) {
 		// Get 2 replicas of found IMs, if possible
 		if len(intermediateMasters) == 1 {
 			// Pick 2 replicas for this IM
-			slaves, err := ReadSlaveInstances(&(intermediateMasters[0].Key))
+			replicas, err := ReadSlaveInstances(&(intermediateMasters[0].Key))
 			if err != nil {
 				return result, err
 			}
-			sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(slaves)))
-			slaves = filterOSCInstances(slaves)
-			slaves = slaves[0:math.MinInt(2, len(slaves))]
-			result = append(result, slaves...)
+			sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(replicas)))
+			replicas = filterOSCInstances(replicas)
+			replicas = replicas[0:math.MinInt(2, len(replicas))]
+			result = append(result, replicas...)
 
 		}
 		if len(intermediateMasters) == 2 {
 			// Pick one replica from each IM (should be possible)
 			for _, im := range intermediateMasters {
-				slaves, err := ReadSlaveInstances(&im.Key)
+				replicas, err := ReadSlaveInstances(&im.Key)
 				if err != nil {
 					return result, err
 				}
-				sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(slaves)))
-				slaves = filterOSCInstances(slaves)
-				if len(slaves) > 0 {
-					result = append(result, slaves[0])
+				sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(replicas)))
+				replicas = filterOSCInstances(replicas)
+				if len(replicas) > 0 {
+					result = append(result, replicas[0])
 				}
 			}
 		}
@@ -1115,14 +1115,14 @@ func GetClusterOSCReplicas(clusterName string) ([](*Instance), error) {
 			replication_depth = 3
 			and cluster_name = ?
 		`
-		slaves, err := readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
+		replicas, err := readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
 		if err != nil {
 			return result, err
 		}
-		sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(slaves)))
-		slaves = filterOSCInstances(slaves)
-		slaves = slaves[0:math.MinInt(2, len(slaves))]
-		result = append(result, slaves...)
+		sort.Sort(sort.Reverse(InstancesByCountSlaveHosts(replicas)))
+		replicas = filterOSCInstances(replicas)
+		replicas = replicas[0:math.MinInt(2, len(replicas))]
+		result = append(result, replicas...)
 	}
 	{
 		// Get 2 1st tier leaf replicas, if possible
@@ -1131,13 +1131,13 @@ func GetClusterOSCReplicas(clusterName string) ([](*Instance), error) {
 			and num_slave_hosts = 0
 			and cluster_name = ?
 		`
-		slaves, err := readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
+		replicas, err := readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
 		if err != nil {
 			return result, err
 		}
-		slaves = filterOSCInstances(slaves)
-		slaves = slaves[0:math.MinInt(2, len(slaves))]
-		result = append(result, slaves...)
+		replicas = filterOSCInstances(replicas)
+		replicas = replicas[0:math.MinInt(2, len(replicas))]
+		result = append(result, replicas...)
 	}
 
 	return result, nil
