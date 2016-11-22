@@ -292,17 +292,17 @@ func StopSlavesNicely(replicas [](*Instance), timeout time.Duration) [](*Instanc
 	log.Debugf("Stopping %d replicas nicely", len(replicas))
 	// use concurrency but wait for all to complete
 	barrier := make(chan *Instance)
-	for _, slave := range replicas {
-		slave := slave
+	for _, replica := range replicas {
+		replica := replica
 		go func() {
-			updatedReplica := &slave
+			updatedReplica := &replica
 			// Signal completed replica
 			defer func() { barrier <- *updatedReplica }()
 			// Wait your turn to read a replica
 			ExecuteOnTopology(func() {
-				StopSlaveNicely(&slave.Key, timeout)
-				slave, _ = StopSlave(&slave.Key)
-				updatedReplica = &slave
+				StopSlaveNicely(&replica.Key, timeout)
+				replica, _ = StopSlave(&replica.Key)
+				updatedReplica = &replica
 			})
 		}()
 	}

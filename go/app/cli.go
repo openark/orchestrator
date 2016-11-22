@@ -262,15 +262,15 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
-			slaves, _, err, errs := inst.RelocateReplicas(instanceKey, destinationKey, pattern)
+			replicas, _, err, errs := inst.RelocateReplicas(instanceKey, destinationKey, pattern)
 			if err != nil {
 				log.Fatale(err)
 			} else {
 				for _, e := range errs {
 					log.Errore(e)
 				}
-				for _, slave := range slaves {
-					fmt.Println(slave.Key.DisplayString())
+				for _, replica := range replicas {
+					fmt.Println(replica.Key.DisplayString())
 				}
 			}
 		}
@@ -320,8 +320,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				for _, e := range errs {
 					log.Errore(e)
 				}
-				for _, slave := range movedReplicas {
-					fmt.Println(slave.Key.DisplayString())
+				for _, replica := range movedReplicas {
+					fmt.Println(replica.Key.DisplayString())
 				}
 			}
 		}
@@ -369,8 +369,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				for _, e := range errs {
 					log.Errore(e)
 				}
-				for _, slave := range repointedReplicas {
-					fmt.Println(fmt.Sprintf("%s<%s", slave.Key.DisplayString(), instanceKey.DisplayString()))
+				for _, replica := range repointedReplicas {
+					fmt.Println(fmt.Sprintf("%s<%s", replica.Key.DisplayString(), instanceKey.DisplayString()))
 				}
 			}
 		}
@@ -464,8 +464,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				for _, e := range errs {
 					log.Errore(e)
 				}
-				for _, slave := range movedReplicas {
-					fmt.Println(slave.Key.DisplayString())
+				for _, replica := range movedReplicas {
+					fmt.Println(replica.Key.DisplayString())
 				}
 			}
 		}
@@ -538,8 +538,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				for _, e := range errs {
 					log.Errore(e)
 				}
-				for _, slave := range matchedReplicas {
-					fmt.Println(slave.Key.DisplayString())
+				for _, replica := range matchedReplicas {
+					fmt.Println(replica.Key.DisplayString())
 				}
 			}
 		}
@@ -557,8 +557,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				for _, e := range errs {
 					log.Errore(e)
 				}
-				for _, slave := range matchedReplicas {
-					fmt.Println(slave.Key.DisplayString())
+				for _, replica := range matchedReplicas {
+					fmt.Println(replica.Key.DisplayString())
 				}
 			}
 		}
@@ -1048,12 +1048,12 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatalf("Unable to get replicas: unresolved instance")
 			}
-			slaves, err := inst.ReadReplicaInstances(instanceKey)
+			replicas, err := inst.ReadReplicaInstances(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
-			for _, slave := range slaves {
-				fmt.Println(slave.Key.DisplayString())
+			for _, replica := range replicas {
+				fmt.Println(replica.Key.DisplayString())
 			}
 		}
 	case registerCliCommand("which-lost-in-recovery", "Information", `List instances marked as downtimed for being lost in a recovery process`):

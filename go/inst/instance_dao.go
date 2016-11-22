@@ -846,10 +846,10 @@ func ReadReplicaInstancesIncludingBinlogServerSubReplicas(masterKey *InstanceKey
 	if err != nil {
 		return replicas, err
 	}
-	for _, slave := range replicas {
-		slave := slave
-		if slave.IsBinlogServer() {
-			binlogServerReplicas, err := ReadReplicaInstancesIncludingBinlogServerSubReplicas(&slave.Key)
+	for _, replica := range replicas {
+		replica := replica
+		if replica.IsBinlogServer() {
+			binlogServerReplicas, err := ReadReplicaInstancesIncludingBinlogServerSubReplicas(&replica.Key)
 			if err != nil {
 				return replicas, err
 			}
