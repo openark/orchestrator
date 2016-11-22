@@ -19,7 +19,7 @@ go test ./go/...
 echo "checking mysql 1"
 mysql -e "select @@hostname"
 echo "checking mysql 2"
-mysql -e "show grants for current_user"
+sudo mysql -e "show grants for current_user"
 echo "checking mysql 3"
 mysql -e "show databases"
 echo "checking mysql 4"
