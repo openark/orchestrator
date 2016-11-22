@@ -348,9 +348,9 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 					return fmt.Errorf("ReadTopologyInstance(%+v) 'show slave hosts' returned row with <host,port>: <%v,%v>", instanceKey, host, port)
 				}
 				// Note: NewInstanceKeyFromStrings calls ResolveHostname() implicitly
-				slaveKey, err := NewInstanceKeyFromStrings(host, port)
-				if err == nil && slaveKey.IsValid() {
-					instance.AddReplicaKey(slaveKey)
+				replicaKey, err := NewInstanceKeyFromStrings(host, port)
+				if err == nil && replicaKey.IsValid() {
+					instance.AddReplicaKey(replicaKey)
 					foundByShowSlaveHosts = true
 				}
 				return err
@@ -375,8 +375,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 				if resolveErr != nil {
 					logReadTopologyInstanceError(instanceKey, "ResolveHostname: processlist", resolveErr)
 				}
-				slaveKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
-				instance.AddReplicaKey(&slaveKey)
+				replicaKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
+				instance.AddReplicaKey(&replicaKey)
 				return err
 			})
 

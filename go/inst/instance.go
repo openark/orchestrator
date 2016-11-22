@@ -275,8 +275,8 @@ func (this *Instance) NextGTID() (string, error) {
 }
 
 // AddReplicaKey adds a replica to the list of this instance's replicas.
-func (this *Instance) AddReplicaKey(slaveKey *InstanceKey) {
-	this.SlaveHosts.AddKey(*slaveKey)
+func (this *Instance) AddReplicaKey(replicaKey *InstanceKey) {
+	this.SlaveHosts.AddKey(*replicaKey)
 }
 
 // GetNextBinaryLog returns the successive, if any, binary log file to the one given
@@ -293,8 +293,8 @@ func (this *Instance) IsReplicaOf(master *Instance) bool {
 }
 
 // IsReplicaOf returns true if this i supposed master of given replica
-func (this *Instance) IsMasterOf(slave *Instance) bool {
-	return slave.IsReplicaOf(this)
+func (this *Instance) IsMasterOf(replica *Instance) bool {
+	return replica.IsReplicaOf(this)
 }
 
 // CanReplicateFrom uses heursitics to decide whether this instacne can practically replicate from other instance.
