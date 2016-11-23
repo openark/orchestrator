@@ -100,6 +100,12 @@ function Cluster() {
 
   main();
 
+  function isColorizeDC() {
+    if ($.cookie("colorize-dc") == "false") {
+      return false
+    }
+    return true
+  }
 
   function getInstanceDiv(instanceId) {
     var popoverDiv = $("#cluster_container > .instance[data-nodeid='" + instanceId + "']");
@@ -243,7 +249,7 @@ function Cluster() {
       trailerEl.getAppend(".instance-trailer-title").text(numReplicasMessage);
       trailerEl.getAppend(".instance-trailer-content").text("Drag to move replicas");
     }
-    if ($.cookie("colorize-dc") == "true") {
+    if (isColorizeDC()) {
       var dcColor = dcColorsMap[node.DataCenter];
       $(instanceEl).css("border-color", dcColor);
       $(instanceEl).css("border-width", 2);
@@ -1316,7 +1322,7 @@ function Cluster() {
     // Colorize-dc
     {
       var glyph = $("#cluster_sidebar [data-bullet=colorize-dc] .glyphicon");
-      if ($.cookie("colorize-dc") == "true") {
+      if (isColorizeDC()) {
         glyph.addClass("text-info");
         glyph.attr("title", "Disable colors");
       } else {
@@ -1568,7 +1574,7 @@ function Cluster() {
       if ($.cookie("anonymize") == "true") {
         $("#dropdown-context a[data-command=anonymize]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
       }
-      if ($.cookie("colorize-dc") == "true") {
+      if (isColorizeDC()) {
         $("#dropdown-context a[data-command=colorize-dc]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
       }
       populateSidebar(clusterInfo);
@@ -1651,7 +1657,7 @@ function Cluster() {
       location.reload();
     });
     $("body").on("click", "a[data-command=colorize-dc]", function(event) {
-      if ($.cookie("colorize-dc") == "true") {
+      if (isColorizeDC()) {
         $.cookie("colorize-dc", "false", {
           path: '/',
           expires: 1
