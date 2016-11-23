@@ -160,10 +160,10 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	}
 
 	// Investigate replicas:
-	for _, slaveKey := range instance.SlaveHosts.GetInstanceKeys() {
-		slaveKey := slaveKey
-		if slaveKey.IsValid() {
-			discoveryQueue.Push(slaveKey)
+	for _, replicaKey := range instance.SlaveHosts.GetInstanceKeys() {
+		replicaKey := replicaKey
+		if replicaKey.IsValid() {
+			discoveryQueue.Push(replicaKey)
 		}
 	}
 	// Investigate master:

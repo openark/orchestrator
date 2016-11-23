@@ -125,6 +125,12 @@ func getLastPseudoGTIDEntryInBinlog(pseudoGTIDRegexp *regexp.Regexp, instanceKey
 	return &binlogCoordinates, entryText, err
 }
 
+// getLastPseudoGTIDEntryInInstance will search for the last pseudo GTID entry in an instance's binary logs. Arguments:
+// - instance
+// - minBinlogCoordinates: a hint, suggested coordinates to start with. The search will _attempt_ to begin search from
+//   these coordinates, but if search is empty, then we failback to full search, ignoring this hint
+// - maxBinlogCoordinates: a hard limit on the maximum position we're allowed to investigate.
+// - exhaustiveSearch: when 'true', continue iterating binary logs. When 'false', only investigate most recent binary log.
 func getLastPseudoGTIDEntryInInstance(instance *Instance, minBinlogCoordinates *BinlogCoordinates, maxBinlogCoordinates *BinlogCoordinates, exhaustiveSearch bool) (*BinlogCoordinates, string, error) {
 	pseudoGTIDRegexp, err := compilePseudoGTIDPattern()
 	if err != nil {
@@ -149,8 +155,8 @@ func getLastPseudoGTIDEntryInInstance(instance *Instance, minBinlogCoordinates *
 			break
 		}
 		if minBinlogCoordinates != nil && minBinlogCoordinates.LogFile == currentBinlog.LogFile {
-			// We tried and failed with the minBinlogCoordinates hint. We no longer require it,
-			// and continue with exhaustive search.
+			// We tried and failed with the minBinlogCoordinates heuristic/hint. We no longer require it,
+			// and continue with exhaustive search, on same binlog.
 			minBinlogCoordinates = nil
 			log.Debugf("Heuristic binlog search failed; continuing exhaustive search")
 			// And we do NOT iterate the log file: we scan same log faile again, with no heuristic
@@ -167,7 +173,7 @@ func getLastPseudoGTIDEntryInInstance(instance *Instance, minBinlogCoordinates *
 
 func getLastPseudoGTIDEntryInRelayLogs(instance *Instance, minBinlogCoordinates *BinlogCoordinates, recordedInstanceRelayLogCoordinates BinlogCoordinates, exhaustiveSearch bool) (*BinlogCoordinates, string, error) {
 	// Look for last GTID in relay logs:
-	// Since MySQL does not provide with a SHOW RELAY LOGS command, we heuristically srtart from current
+	// Since MySQL does not provide with a SHOW RELAY LOGS command, we heuristically start from current
 	// relay log (indiciated by Relay_log_file) and walk backwards.
 	// Eventually we will hit a relay log name which does not exist.
 	pseudoGTIDRegexp, err := compilePseudoGTIDPattern()
@@ -193,7 +199,7 @@ func getLastPseudoGTIDEntryInRelayLogs(instance *Instance, minBinlogCoordinates 
 			// and continue with exhaustive search.
 			minBinlogCoordinates = nil
 			log.Debugf("Heuristic relaylog search failed; continuing exhaustive search")
-			// And we do NOT iterate the log file: we scan same log faile again, with no heuristic
+			// And we do NOT iterate to previous log file: we scan same log faile again, with no heuristic
 		} else {
 			currentRelayLog, err = currentRelayLog.PreviousFileCoordinates()
 		}
@@ -222,7 +228,6 @@ func SearchEntryInBinlog(pseudoGTIDRegexp *regexp.Regexp, instanceKey *InstanceK
 		nextPos = minBinlogCoordinates.LogPos
 	}
 
-	//	commandToken := math.TernaryString(binlogCoordinates.Type == BinaryLog, "binlog", "relaylog")
 	for moreRowsExpected {
 		query := fmt.Sprintf("show binlog events in '%s' FROM %d LIMIT %d", binlog, nextPos, config.Config.BinlogEventsChunkSize)
 
@@ -306,7 +311,7 @@ func SearchEntryInInstanceBinlogs(instance *Instance, entryText string, monotoni
 		// the instance does not suffer. If it is a replica, we will only act as long as it's not lagging too much.
 		if instance.ReplicaRunning() {
 			for {
-				log.Debugf("%+v is a replicating slave. Verifying lag", instance.Key)
+				log.Debugf("%+v is a replicating replica. Verifying lag", instance.Key)
 				instance, err = ReadTopologyInstance(&instance.Key)
 				if err != nil {
 					break
