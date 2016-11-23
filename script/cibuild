@@ -4,13 +4,6 @@ set -e
 
 . script/bootstrap
 
-echo "whoami: $(whoami)"
-uptime
-pwd
-find ../ | grep -v orchestrator-build-deploy-tarball
-df -h
-echo ""
-
 echo "Verifying code is formatted via 'gofmt -s -w  go/'"
 gofmt -s -w  go/
 git diff --exit-code --quiet
