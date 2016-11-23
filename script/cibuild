@@ -7,7 +7,7 @@ set -e
 echo "whoami: $(whoami)"
 uptime
 pwd
-find .
+find ../ | grep -v orchestrator-build-deploy-tarball
 df -h
 echo ""
 
