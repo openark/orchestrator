@@ -4,6 +4,11 @@ set -e
 
 . script/bootstrap
 
+echo "whoami: $(whoami)"
+uptime
+df -h
+echo ""
+
 echo "Verifying code is formatted via 'gofmt -s -w  go/'"
 gofmt -s -w  go/
 git diff --exit-code --quiet
@@ -18,7 +23,5 @@ go test ./go/...
 
 echo "Running integration tests"
 ./tests/integration/test.sh
-
-mysql test -uroot -e "show grants for current_user()"
 
 echo "Done"
