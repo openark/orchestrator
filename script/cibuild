@@ -15,3 +15,8 @@ cd .gopath/src/github.com/outbrain/orchestrator
 
 echo "Running unit tests"
 go test ./go/...
+
+echo "Running integration tests"
+./tests/integration/test.sh
+
+echo "Done"
