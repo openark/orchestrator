@@ -223,13 +223,13 @@ And, in the event a recovery was successful:
 - `{failureCluster}`
 - `{failureClusterAlias}`
 - `{failureClusterDomain}`
-- `{countSlaves}`
+- `{countReplicas}` aka `{countSlaves}`
 - `{isDowntimed}`
 - `{autoMasterRecovery}`
 - `{autoIntermediateMasterRecovery}`
 - `{orchestratorHost}`
-- `{lostSlaves}`
-- `{slaveHosts}`
+- `{lostReplicas}` aka `{lostSlaves}`
+- `{replicaHosts}` aka `{slaveHosts}`
 - `{isSuccessful}`
 
 And, in the event a recovery was successful:
@@ -263,7 +263,7 @@ Elaborating on recovery-related configuration:
 
 - `RecoveryPollSeconds`: poll interval at which orchestrator re-checks for crash scenarios (default: 10s)
 
-- `DetachLostSlavesAfterMasterFailover`: in the case of master promotion and assuming that some slaves could not make it into
+- `DetachLostReplicasAfterMasterFailover`: in the case of master promotion and assuming that some slaves could not make it into
 the refactored topology, should orchestrator forcibly issue a detach-slave command to make sure they don't accidentally resume
 replication in the future.
 

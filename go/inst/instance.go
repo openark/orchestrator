@@ -224,12 +224,12 @@ func (instance *Instance) NameAndMajorVersionString() string {
 	return name + "-" + instance.MajorVersionString()
 }
 
-// IsSlave makes simple heuristics to decide whether this insatnce is a replica of another instance
+// IsReplica makes simple heuristics to decide whether this insatnce is a replica of another instance
 func (this *Instance) IsReplica() bool {
 	return this.MasterKey.Hostname != "" && this.MasterKey.Hostname != "_" && this.MasterKey.Port != 0 && (this.ReadBinlogCoordinates.LogFile != "" || this.UsingGTID())
 }
 
-// SlaveRunning returns true when this instance's status is of a replicating replica.
+// ReplicaRunning returns true when this instance's status is of a replicating replica.
 func (this *Instance) ReplicaRunning() bool {
 	return this.IsReplica() && this.Slave_SQL_Running && this.Slave_IO_Running
 }
@@ -275,8 +275,8 @@ func (this *Instance) NextGTID() (string, error) {
 }
 
 // AddReplicaKey adds a replica to the list of this instance's replicas.
-func (this *Instance) AddReplicaKey(slaveKey *InstanceKey) {
-	this.SlaveHosts.AddKey(*slaveKey)
+func (this *Instance) AddReplicaKey(replicaKey *InstanceKey) {
+	this.SlaveHosts.AddKey(*replicaKey)
 }
 
 // GetNextBinaryLog returns the successive, if any, binary log file to the one given
@@ -293,8 +293,8 @@ func (this *Instance) IsReplicaOf(master *Instance) bool {
 }
 
 // IsReplicaOf returns true if this i supposed master of given replica
-func (this *Instance) IsMasterOf(slave *Instance) bool {
-	return slave.IsReplicaOf(this)
+func (this *Instance) IsMasterOf(replica *Instance) bool {
+	return replica.IsReplicaOf(this)
 }
 
 // CanReplicateFrom uses heursitics to decide whether this instacne can practically replicate from other instance.
