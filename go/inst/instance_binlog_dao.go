@@ -311,7 +311,7 @@ func SearchEntryInInstanceBinlogs(instance *Instance, entryText string, monotoni
 		// the instance does not suffer. If it is a replica, we will only act as long as it's not lagging too much.
 		if instance.ReplicaRunning() {
 			for {
-				log.Debugf("%+v is a replicating slave. Verifying lag", instance.Key)
+				log.Debugf("%+v is a replicating replica. Verifying lag", instance.Key)
 				instance, err = ReadTopologyInstance(&instance.Key)
 				if err != nil {
 					break

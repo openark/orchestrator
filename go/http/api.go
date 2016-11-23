@@ -432,10 +432,10 @@ func (this *HttpAPI) ResetSlave(params martini.Params, r render.Render, req *htt
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave reset on %+v", instance.Key), Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica reset on %+v", instance.Key), Details: instance})
 }
 
-// DetachSlave corrupts a replica's binlog corrdinates (though encodes it in such way
+// DetachReplica corrupts a replica's binlog corrdinates (though encodes it in such way
 // that is reversible), effectively breaking replication
 func (this *HttpAPI) DetachReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -454,10 +454,10 @@ func (this *HttpAPI) DetachReplica(params martini.Params, r render.Render, req *
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave detached: %+v", instance.Key), Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica detached: %+v", instance.Key), Details: instance})
 }
 
-// ReattachReplica reverts a DetachSlave commands by reassigning the correct
+// ReattachReplica reverts a DetachReplica commands by reassigning the correct
 // binlog coordinates to an instance
 func (this *HttpAPI) ReattachReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -476,10 +476,10 @@ func (this *HttpAPI) ReattachReplica(params martini.Params, r render.Render, req
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave reattached: %+v", instance.Key), Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica reattached: %+v", instance.Key), Details: instance})
 }
 
-// ReattachReplicaMasterHost reverts a DetachSlaveMasterHost command
+// ReattachReplicaMasterHost reverts a achReplicaMasterHost command
 // by resoting the original master hostname in CHANGE MASTER TO
 func (this *HttpAPI) ReattachReplicaMasterHost(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -498,7 +498,7 @@ func (this *HttpAPI) ReattachReplicaMasterHost(params martini.Params, r render.R
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave reattached: %+v", instance.Key), Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica reattached: %+v", instance.Key), Details: instance})
 }
 
 // EnableGTID attempts to enable GTID on a replica
@@ -612,17 +612,17 @@ func (this *HttpAPI) MoveReplicasGTID(params martini.Params, r render.Render, re
 		return
 	}
 
-	movedSlaves, _, err, errs := inst.MoveReplicasGTID(&instanceKey, &belowKey, req.URL.Query().Get("pattern"))
+	movedReplicas, _, err, errs := inst.MoveReplicasGTID(&instanceKey, &belowKey, req.URL.Query().Get("pattern"))
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Moved %d slaves of %+v below %+v via GTID; %d errors: %+v", len(movedSlaves), instanceKey, belowKey, len(errs), errs), Details: belowKey})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Moved %d slaves of %+v below %+v via GTID; %d errors: %+v", len(movedReplicas), instanceKey, belowKey, len(errs), errs), Details: belowKey})
 }
 
-// EnslaveSiblings
-func (this *HttpAPI) EnslaveSiblings(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+// TakeSiblings
+func (this *HttpAPI) TakeSiblings(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -633,7 +633,7 @@ func (this *HttpAPI) EnslaveSiblings(params martini.Params, r render.Render, req
 		return
 	}
 
-	instance, count, err := inst.EnslaveSiblings(&instanceKey)
+	instance, count, err := inst.TakeSiblings(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -690,7 +690,7 @@ func (this *HttpAPI) RelocateBelow(params martini.Params, r render.Render, req *
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v relocated below %+v", instanceKey, belowKey), Details: instance})
 }
 
-// RelocateSlaves attempts to smartly relocate replicas of a given instance below another
+// Relocates attempts to smartly relocate replicas of a given instance below another
 func (this *HttpAPI) RelocateReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -850,7 +850,7 @@ func (this *HttpAPI) MultiMatchReplicas(params martini.Params, r render.Render, 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Matched %d slaves of %+v below %+v; %d errors: %+v", len(slaves), instanceKey, newMaster.Key, len(errs), errs), Details: newMaster.Key})
 }
 
-// MatchUpSlaves attempts to match up all replicas of an instance
+// MatchUpReplicas attempts to match up all replicas of an instance
 func (this *HttpAPI) MatchUpReplicas(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -884,15 +884,15 @@ func (this *HttpAPI) RegroupReplicas(params martini.Params, r render.Render, req
 		return
 	}
 
-	lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupReplicas(&instanceKey, false, nil, nil)
-	lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
+	lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicas(&instanceKey, false, nil, nil)
+	lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("promoted slave: %s, lost: %d, trivial: %d, pseudo-gtid: %d",
-		promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalSlaves), len(aheadSlaves)), Details: promotedSlave.Key})
+		promotedReplica.Key.DisplayString(), len(lostReplicas), len(equalReplicas), len(aheadReplicas)), Details: promotedReplica.Key})
 }
 
 // RegroupReplicas attempts to pick a replica of a given instance and make it enslave its siblings, efficiently,
@@ -908,8 +908,8 @@ func (this *HttpAPI) RegroupReplicasPseudoGTID(params martini.Params, r render.R
 		return
 	}
 
-	lostSlaves, equalSlaves, aheadSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupReplicasPseudoGTID(&instanceKey, false, nil, nil)
-	lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
+	lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasPseudoGTID(&instanceKey, false, nil, nil)
+	lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
@@ -917,7 +917,7 @@ func (this *HttpAPI) RegroupReplicasPseudoGTID(params martini.Params, r render.R
 	}
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("promoted slave: %s, lost: %d, trivial: %d, pseudo-gtid: %d",
-		promotedSlave.Key.DisplayString(), len(lostSlaves), len(equalSlaves), len(aheadSlaves)), Details: promotedSlave.Key})
+		promotedReplica.Key.DisplayString(), len(lostReplicas), len(equalReplicas), len(aheadReplicas)), Details: promotedReplica.Key})
 }
 
 // RegroupReplicasGTID attempts to pick a replica of a given instance and make it enslave its siblings, efficiently, using GTID
@@ -932,8 +932,8 @@ func (this *HttpAPI) RegroupReplicasGTID(params martini.Params, r render.Render,
 		return
 	}
 
-	lostSlaves, movedSlaves, cannotReplicateSlaves, promotedSlave, err := inst.RegroupReplicasGTID(&instanceKey, false, nil)
-	lostSlaves = append(lostSlaves, cannotReplicateSlaves...)
+	lostReplicas, movedReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasGTID(&instanceKey, false, nil)
+	lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
@@ -941,7 +941,7 @@ func (this *HttpAPI) RegroupReplicasGTID(params martini.Params, r render.Render,
 	}
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("promoted slave: %s, lost: %d, moved: %d",
-		promotedSlave.Key.DisplayString(), len(lostSlaves), len(movedSlaves)), Details: promotedSlave.Key})
+		promotedReplica.Key.DisplayString(), len(lostReplicas), len(movedReplicas)), Details: promotedReplica.Key})
 }
 
 // RegroupReplicasBinlogServers attempts to pick a replica of a given instance and make it enslave its siblings, efficiently, using GTID
@@ -1049,7 +1049,7 @@ func (this *HttpAPI) StartSlave(params martini.Params, r render.Render, req *htt
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave started: %+v", instance.Key), Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica started: %+v", instance.Key), Details: instance})
 }
 
 // RestartSlave stops & starts replication on given instance
@@ -1070,7 +1070,7 @@ func (this *HttpAPI) RestartSlave(params martini.Params, r render.Render, req *h
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave restarted: %+v", instance.Key), Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica restarted: %+v", instance.Key), Details: instance})
 }
 
 // StopSlave stops replication on given instance
@@ -1091,7 +1091,7 @@ func (this *HttpAPI) StopSlave(params martini.Params, r render.Render, req *http
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave stopped: %+v", instance.Key), Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica stopped: %+v", instance.Key), Details: instance})
 }
 
 // StopSlaveNicely stops replication on given instance, such that sql thead is aligned with IO thread
@@ -1112,7 +1112,7 @@ func (this *HttpAPI) StopSlaveNicely(params martini.Params, r render.Render, req
 		return
 	}
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Slave stopped nicely: %+v", instance.Key), Details: instance})
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica stopped nicely: %+v", instance.Key), Details: instance})
 }
 
 // MasterEquivalent provides (possibly empty) list of master coordinates equivalent to the given ones
@@ -2304,7 +2304,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "move-equivalent/:host/:port/:belowHost/:belowPort", this.MoveEquivalent)
 	this.registerRequest(m, "repoint-slaves/:host/:port", this.RepointReplicas)
 	this.registerRequest(m, "make-co-master/:host/:port", this.MakeCoMaster)
-	this.registerRequest(m, "enslave-siblings/:host/:port", this.EnslaveSiblings)
+	this.registerRequest(m, "enslave-siblings/:host/:port", this.TakeSiblings)
 	this.registerRequest(m, "enslave-master/:host/:port", this.EnslaveMaster)
 	this.registerRequest(m, "master-equivalent/:host/:port/:logFile/:logPos", this.MasterEquivalent)
 
