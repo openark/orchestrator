@@ -7,7 +7,7 @@ set -e
 echo "whoami: $(whoami)"
 uptime
 pwd
-(cd ~/ ; pwd)
+find.
 df -h
 echo ""
 
