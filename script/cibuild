@@ -6,6 +6,7 @@ set -e
 
 echo "whoami: $(whoami)"
 uptime
+pwd
 df -h
 echo ""
 
