@@ -60,7 +60,7 @@ same account (same user, same password) for all topologies. On each of your mast
 
 > `REPLICATION SLAVE` is required for `SHOW SLAVE HOSTS`, and for scanning binary logs in favor of [Pseudo GTID](#pseudo-gtid)
 > `RELOAD` required for `RESET SLAVE` operation
-> `PROCESS` required to see slave processes in `SHOW PROCESSLIST`
+> `PROCESS` required to see replica processes in `SHOW PROCESSLIST`
 > On MySQL 5.6 and above, and if using `master_info_repository = 'TABLE'`, let orchestrator have access
 > to the `mysql.slave_master_info` table. This will allow orchestrator to grab replication credentials if need be.
 

@@ -30,32 +30,32 @@ Briefly looking at some examples, here is how `orchestrator` reaches failure con
 #### `DeadMaster`:
 
 1. Master MySQL access failure
-2. All of master's slaves are failing replication
+2. All of master's replicas are failing replication
 
 This makes for a potential recovery process
 
 #### `DeadMasterAndSomeSlaves`:
 
 1. Master MySQL access failure
-2. Some of its slaves are also unreachable
-3. Rest of the slaves are failing replication
+2. Some of its replicas are also unreachable
+3. Rest of the replicas are failing replication
 
 This makes for a potential recovery process
 
 #### `UnreachableMaster`:
 
 1. Master MySQL access failure
-2. But it has replicating slaves.
+2. But it has replicating replicas.
 
 This does not make for a recovery process. However, to improve analysis, `orchestrator` will
-issue an emergent re-read of the slaves, to figure out whether they are really happy with the master
+issue an emergent re-read of the replicas, to figure out whether they are really happy with the master
 (in which case maybe `orchestrator` cannot see it due to a network glitch) or were actually taking
 their time to figure out they were failing replication.
 
 #### `DeadIntermediateMaster`:
 
-1. An intermediate master (slave with slaves) cannot be reached
-2. All of its slaves are failing replication
+1. An intermediate master (replica with replicas) cannot be reached
+2. All of its replicas are failing replication
 
 This makes for a potential recovery process
 
@@ -69,34 +69,34 @@ You may see up to date analysis via:
 - Web: `/web/clusters-analysis/` page (`Clusters`->`Failure analysis`).
   This presents an incomplete list of problems, only highlighting actionable ones.
 
-Note that recovery is not concerned with the death of a single slave machine, as it implies
+Note that recovery is not concerned with the death of a single replica machine, as it implies
 no required changes to topology.
 
 ### What's in a recovery?
 
-A "simple" recovery case is that of a `DeadIntermediateMaster`. Its slaves are orphaned, but when
+A "simple" recovery case is that of a `DeadIntermediateMaster`. Its replicas are orphaned, but when
 using GTID or Pseudo-GTID they can still be re-connected to the topology. We might choose to:
 
-- Find a sibling of the dead intermediate master, and move orphaned slaves below said sibling
-- Promote a replica from among the orphaned slaves, make it intermediate master of its siblings, then
-  connect promoted slave up the topology
-- relocate all orphaned slaves
+- Find a sibling of the dead intermediate master, and move orphaned replicas below said sibling
+- Promote a replica from among the orphaned replicas, make it intermediate master of its siblings, then
+  connect promoted replica up the topology
+- relocate all orphaned replicas
 - Combine parts of the above
 
 The exact implementation greatly depends on the topology setup (which instances have `log-slave-updates`? Are instances lagging? Do they
 have replication filters? Which versions of MySQL? etc.). It is very (very) likely your topology will support at least one of the above
-(in particular, matching-up the slaves is a trivial solution, unless replication filters are in place).
+(in particular, matching-up the replicas is a trivial solution, unless replication filters are in place).
 
 A "really-not-simple" recovery case is that of a `DeadMaster`. `orchestrator` will try to:
 
-- Find the most advanced slave
+- Find the most advanced replica
 - Promote it, enslaving its siblings
 - Bring siblings up to date
-- Check if there was a pre-defined "candidate slave"
-- Promote that over the previously chosen slave
+- Check if there was a pre-defined "candidate replica"
+- Promote that over the previously chosen replica
 - And... call upon hooks (read further)
 
-Success of the above depends on how many slaves have `log-slave-updates`, and whether those that are not configured as such
+Success of the above depends on how many replicas have `log-slave-updates`, and whether those that are not configured as such
 are more up-to-date or less up-to-date than others. When all your instances have `log-slave-updates` the problem is greatly simplified.
 Of course, all other limitations apply (versions, binlog format, replication filters) - and orchestrator will attempt to find a good solution.
 
@@ -263,14 +263,14 @@ Elaborating on recovery-related configuration:
 
 - `RecoveryPollSeconds`: poll interval at which orchestrator re-checks for crash scenarios (default: 10s)
 
-- `DetachLostReplicasAfterMasterFailover`: in the case of master promotion and assuming that some slaves could not make it into
-the refactored topology, should orchestrator forcibly issue a detach-slave command to make sure they don't accidentally resume
+- `DetachLostReplicasAfterMasterFailover`: in the case of master promotion and assuming that some replicas could not make it into
+the refactored topology, should orchestrator forcibly issue a `detach-replica` command to make sure they don't accidentally resume
 replication in the future.
 
 - `MasterFailoverLostInstancesDowntimeMinutes`: when non-zero, and after master promotion, orchestrator will downtime lost
-slaves and dead master for given number of minutes.
+replicas and dead master for given number of minutes.
 
 - `PostponeSlaveRecoveryOnLagMinutes`: some recovery operations can be pushed to be the very last steps; so that more urgent
-operations (e.g. change DNS entries) could be applied faster. Fixing slaves that are lagging at time of recovery (either because of `MASTER_DELAY` configuration or just because they were busy) could take a substantial time due to binary log exhaustive search (GTID & Pseudo-GTID). This variable defines the threshold above which a lagging slave's rewiring is pushed till the last moment.
+operations (e.g. change DNS entries) could be applied faster. Fixing replicas that are lagging at time of recovery (either because of `MASTER_DELAY` configuration or just because they were busy) could take a substantial time due to binary log exhaustive search (GTID & Pseudo-GTID). This variable defines the threshold above which a lagging replica's rewiring is pushed till the last moment.
 
 - `ApplyMySQLPromotionAfterMasterFailover`: after master promotion, should orchestrator take it upon itself to clear the `read_only` flag & forcibly detach replication? (default: `false`)

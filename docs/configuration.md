@@ -4,8 +4,8 @@ The following is a complete list of configuration parameters. "Complete" is alwa
 
 * `Debug`                   (bool), set debug mode (similar to --debug option)
 * `ListenAddress`           (string), host & port to listen on (default `":3000"`). You can limit connections to local machine via `"127.0.0.1:3000"`
-* `MySQLTopologyUser`       (string), credentials for replication topology servers (masters & slaves)
-* `MySQLTopologyPassword`   (string), credentials for replication topology servers (masters & slaves)
+* `MySQLTopologyUser`       (string), credentials for replication topology servers (masters & replicas)
+* `MySQLTopologyPassword`   (string), credentials for replication topology servers (masters & replicas)
 * `MySQLTopologyCredentialsConfigFile` (string), as an alternative to providing `MySQLTopologyUser`, `MySQLTopologyPassword`, name of file in `my.cnf`-like format where credentials are stored.
 * `MySQLTopologyMaxPoolConnections` (int), Max concurrent connections on any topology instance
 * `MySQLOrchestratorHost`   (string), hostname for backend MySQL server
@@ -19,9 +19,9 @@ The following is a complete list of configuration parameters. "Complete" is alwa
 * `MySQLHostnameResolveMethod` (string), Method to resolve how to reach the MySQL instance. This is more powerful than `HostnameResolveMethod` and is ideal for complex setups like multiple instances on a host with a VIP per instance. Defaults to `none` but can be set to `@@report_host`
 * `DefaultInstancePort` (int), In case port was not specified on command line (default value for this default is `3306`)
 * `SkipOrchestratorDatabaseUpdate`  (bool), When false, orchestrator will attempt to create & update all tables in backend database; when true, this is skipped. It makes sense to skip on command-line invocations and to enable for http or occasional invocations, or just after upgrades
-* `SlaveLagQuery`               (string), custom query to check on slave lg (e.g. heartbeat table). If unprovided,
-  slave's `Seconds_Behind_Master` is used.
-* `SlaveStartPostWaitMilliseconds`  (int), Time to wait after `START SLAVE` before re-reading instance (give slave chance to connect to master)
+* `SlaveLagQuery`               (string), custom query to check on replica lg (e.g. heartbeat table). If unprovided,
+  replica's `Seconds_Behind_Master` is used.
+* `SlaveStartPostWaitMilliseconds`  (int), Time to wait after `START SLAVE` before re-reading instance (give replica chance to connect to master)
 * `DiscoverByShowSlaveHosts`    (bool), Attempt `SHOW SLAVE HOSTS` before `SHOW PROCESSLIST`
 * `InstancePollSeconds`         (uint), Number of seconds between instance reads
 * `UnseenInstanceForgetHours`   (uint), Number of hours after which an unseen instance is forgotten
@@ -32,7 +32,7 @@ The following is a complete list of configuration parameters. "Complete" is alwa
 * `ExpiryHostnameResolvesMinutes`	(int), Number of minute after which a hostname resolve expires (hostname resolve are cached for up to this number of minutes)
 * `RejectHostnameResolvePattern`  (string), Regexp pattern for resolved hostname that will not be accepted (not cached, not written to db). This is done to avoid storing wrong resolves due to network glitches.
 * `ReasonableReplicationLagSeconds` (int), Above this value is considered a problem
-* `VerifyReplicationFilters`  (bool), Include replication filters check before approving topology refactoring (e.g. `orchestrator` will not allow placing a non-filteres slave under a filtered one)
+* `VerifyReplicationFilters`  (bool), Include replication filters check before approving topology refactoring (e.g. `orchestrator` will not allow placing a non-filteres replica under a filtered one)
 * `MaintenanceOwner`  (string), (Default) name of maintenance owner to use if none provided
 * `ReasonableMaintenanceReplicationLagSeconds` (int), Above this value move-up and move-below are blocked
 * `MaintenanceExpireMinutes`  (int), Minutes after which a maintenance flag is considered stale and is cleared
@@ -40,7 +40,7 @@ The following is a complete list of configuration parameters. "Complete" is alwa
 * `AuditLogFile`  (string), Name of log file for audit operations. Disabled when empty.
 * `AuditPageSize`       (int), Number of entries in an audit page
 * `RemoveTextFromHostnameDisplay` (string), Text to strip off the hostname on cluster/clusters pages. Save pixels (e.g. `mycompany.com`)
-* `ReadOnly`				(bool) When `"true"`, no write operations (e.g. stopping a replica, repointing slaves, discovering) are allowed
+* `ReadOnly`				(bool) When `"true"`, no write operations (e.g. stopping a replica, repointing replicas, discovering) are allowed
 * `AuthenticationMethod`    (string), type of authentication. Either empty (no authentication, default), `"basic"`, `"multi"` or `"proxy"`. See [Security](#security) section.
 * `AuthUserHeader`          (string), name of HTTP header which contains authenticated user when `AuthenticationMethod` is `"proxy"`
 * `PowerAuthUsers`          (string list), users considered as *power users* (allowed to manipulate the topology); applies on `"proxy"` `AuthenticationMethod`.
@@ -48,7 +48,7 @@ The following is a complete list of configuration parameters. "Complete" is alwa
 * `HTTPAuthPassword`    (string), Password for HTTP Basic authentication
 * `ClusterNameToAlias`  (string-to-string map), Map between regex matching cluster name to a human friendly alias.
   The human friendly alias is then presented on the `Clusters` menu and in the `Clusters Dashboard` page.
-* `DetectClusterAliasQuery` (string), Optional query (executed on topology instance) that returns the alias of a cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all slaves). If provided, must return one row, one column. This overrides `ClusterNameToAlias`.
+* `DetectClusterAliasQuery` (string), Optional query (executed on topology instance) that returns the alias of a cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all replicas). If provided, must return one row, one column. This overrides `ClusterNameToAlias`.
 * `DataCenterPattern` (string), Regexp pattern with one group, extracting the datacenter name from the hostname
 * `PhysicalEnvironmentPattern`  (string), Regexp pattern with one group, extracting physical environment info from hostname (e.g. combination of datacenter & prod/dev env)
 * `DenyAutoPromotionHostnamePattern`  (string), Orchestrator will not auto-promote hosts with name matching patterb (via -c recovery; for example, avoid promoting dev-dedicated machines)
@@ -193,8 +193,8 @@ While you're at it, make your Pseudo-GTID entries monotonicly increasing, and pr
 
 #### Topology recovery: want to have if you want to own your database
 
-When PseudoGTID is enabled, `orchestrator` can do automated recovery from dead intermediate master (reconnects orphaned slaves to the topology)
-or from dead masters (auto-promotes best candidate slave).
+When PseudoGTID is enabled, `orchestrator` can do automated recovery from dead intermediate master (reconnects orphaned replicas to the topology)
+or from dead masters (auto-promotes best candidate replica).
 
 By default this is disabled. You can specify patterns of clusters for which to enable both. Of course, `.*` matches everything:
 
@@ -214,7 +214,7 @@ You might want to configure the following:
 
 ```
 "OnFailureDetectionProcesses": [
-  "echo 'Detected {failureType} on {failureCluster}. Affected slaves: {countSlaves}'
+  "echo 'Detected {failureType} on {failureCluster}. Affected replicas: {countSlaves}'
 ],
 "PreFailoverProcesses": [
   "echo 'Will recover from {failureType} on {failureCluster}'
