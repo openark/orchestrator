@@ -25,7 +25,7 @@ When operating in HTTP mode (API or Web), access to `orchestrator` may be restri
 
    The `multi` authentication works like `basic`, but also accepts the user `readonly` with any password. The `readonly` user
    is allowed to view all content but unable to perform write operations through the API (such as stopping a replica,
-   repointing slaves, discovering new instances etc.)
+   repointing replicas, discovering new instances etc.)
 
 *  _Headers authentication_
 

@@ -10,17 +10,17 @@ If this is your first time using _orchstrator_, then you should begin by teachin
 `orchestrator` needs to know what replication topologies you have. The web interface
 provides this via the `discover` page.
 
-From each replication topology, pick one server (this could be master or slave) and let
+From each replication topology, pick one server (this could be master or replica) and let
 `orchestrator` know which hostname & port this server listens on. `Orchestrator` will
 recursively drill up and down replication to map the entire topology. This may take a couple
 minutes, during which `orchestrator` connects the servers it encounters into sub-topologies and
 eventually into the final topology.
 
 You may manually enter as many servers as you like (inside or outside the topology).
-The first time `orchestrator` investigates, it can only reach those slaves that are
-_currently replicating_. So if you know you have some slves which are temporarily down, you'll need
+The first time `orchestrator` investigates, it can only reach those replicas that are
+_currently replicating_. So if you know you have some replicas which are temporarily down, you'll need
 to add them manually, or, if you like to see automation in work, just wait until they're up, at which
-time `orchestrator` will automaticaly find them.
+time `orchestrator` will automatically find them.
 
 > Once `orchestrator` is familiar with a server, it doesn't care if the server is lagging, not replicating
 > or inaccessible. The server is still part of the topology it was last seen in. There is a timeout for
@@ -55,11 +55,11 @@ the instance (may be rediscovered a minute later if still connected to the topol
 
 ![Orchestrator screenshot](images/orchestrator-instance-modal.png)
 
-The topology can be refactored: slaves can be moved around via _drag and drop_. Start dragging an instance:
-all possible _droppable_ targets are immediately colored green. You may turn your instance to be the slave of
+The topology can be refactored: replicas can be moved around via _drag and drop_. Start dragging an instance:
+all possible _droppable_ targets are immediately colored green. You may turn your instance to be the replica of
 all _droppable_ targets.
 
-Master-master topologies can be created by dragging a _master_ onto one of its slaves, making both co-masters.
+Master-master topologies can be created by dragging a _master_ onto one of its replicas, making both co-masters.
 
 Complex refactoring is done by performing multiple such steps. You may need to drag and drop your
 instance three or four times to put it in a "remote" location.
@@ -80,7 +80,7 @@ Topology refactored:
 
 ![Orchestrator screenshot](images/orchestrator-simple-dropped.png)
 
-Dragging a master over its slave makes for a co-masters (master-master) topology:
+Dragging a master over its replica makes for a co-masters (master-master) topology:
 
 ![Orchestrator screenshot](images/orchestator-cm-simple-drag-master.png)
 
@@ -88,7 +88,7 @@ A co-master topology:
 
 ![Orchestrator screenshot](images/orchestator-cm-co-masters.png)
 
-`Orchestrator` visually indicates replication & accessibility related problems: slave lag, replication not working,
+`Orchestrator` visually indicates replication & accessibility related problems: replica lag, replication not working,
 instance not accessed for long time, instance access failure, instance under maintenance.
 
 ![Orchestrator screenshot](images/orchestrator-simple-with-problems.png)
@@ -97,7 +97,7 @@ _Problems_ drop down is available on all pages, and indicates all currently know
 
 ![Orchestrator screenshot](images/orchestrator-problems.png)
 
-The `Audit` page presents with all actions taken via `orchestrator`: slave move, detection, maintenance etc.
+The `Audit` page presents with all actions taken via `orchestrator`: replica move, detection, maintenance etc.
 (`START SLAVE` and `STOP SLAVE` are currently not audited).
 
 ![Orchestrator screenshot](images/orchestrator-audit-small.png)

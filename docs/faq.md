@@ -2,7 +2,7 @@
 
 ### Who should use orchestrator?
 
-DBAs and ops who have more than a mere single-master-single-slave replication topology.
+DBAs and ops who have more than a mere single-master-single-replica replication topology.
 
 ### What can orchestrator do for me?
 
@@ -35,7 +35,7 @@ And are discouraged. And are an abomination.
 
 ### Does orchestrator support Galera Replication?
 
-Yes and no. `Orchestrator` is unaware of Galera replication. If you have three Galera masters and different slave topologies under each master,
+Yes and no. `Orchestrator` is unaware of Galera replication. If you have three Galera masters and different replica topologies under each master,
 then `orchestrator` sees these as three different topologies.
 
 ### Does orchestrator support GTID Replication?
