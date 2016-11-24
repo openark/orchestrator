@@ -1,0 +1,22 @@
+#
+class orchestrator::pseudo_gtid(
+  $file_ensure = present,
+  $service_ensure = stopped,
+) {
+
+  file { '/etc/init.d/pseudo-gtid':
+    ensure => $file_ensure,
+    mode   => '0555',
+    source => 'puppet:///modules/orchestrator/etc/init.d/pseudo-gtid',
+  }
+
+  service { 'pseudo-gtid':
+    ensure    => $service_ensure,
+    subscribe => [
+      File['/etc/init.d/pseudo-gtid'],
+    ],
+    hasstatus => false,
+    pattern   => 'pseudo-gtid',
+    enable    => true
+  }
+}
