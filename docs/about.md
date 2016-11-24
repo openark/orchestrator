@@ -12,7 +12,7 @@ It provides with slick visualization of your topologies, including replication p
 
 `orchestrator` understands replication rules. It knows about binlog file:position, GTID, Pseudo GTID, Binlog Servers.
 
-Refactoring replication topologies can be a matter of drag & drop a replica under another master. Moving slaves around becomes
+Refactoring replication topologies can be a matter of drag & drop a replica under another master. Moving replicas around becomes
 safe: `orchestrator` will reject an illegal refactoring attempt.
 
 Find grained control is achieved by various command line options.

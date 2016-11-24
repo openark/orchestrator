@@ -21,11 +21,11 @@ recursively scan the entire topology)
 * `/api/resolve/:host/:port`: check if hostname resolves and whether TCP connection can be established (example: `/api/resolve/myhost.mydomain/3306`)  
 * `/api/relocate/:host/:port/:belowHost/:belowPort` (attempt to) move an instance below another instance.
 `Orchestrator` picks best course of action.
-* `/api/relocate-slaves/:host/:port/:belowHost/:belowPort` (attempt to) move slaves of an instance below another instance.
+* `/api/relocate-slaves/:host/:port/:belowHost/:belowPort` (attempt to) move replicas of an instance below another instance.
 `Orchestrator` picks best course of action.
 * `/api/move-up/:host/:port` (attempt to) move this instance up the topology (make it child of its grandparent)
 * `/api/move-below/:host/:port/:siblingHost/:siblingPort` (attempt to) move an instance below its sibling.
-  the two provided instances must be siblings: slaves of the same master. (example `/api/move-below/mysql10/3306/mysql24/3306`)
+  the two provided instances must be siblings: replicas of the same master. (example `/api/move-below/mysql10/3306/mysql24/3306`)
 * `/api/make-co-master/:host/:port` (attempt to) make this instance co-master with its own master, creating a
   circular master-master topology.
 * `/api/reset-slave/:host/:port` reset a replica, breaking replication (destructive operation)
@@ -165,7 +165,7 @@ This sample is followed by a field breakdown:
 * `SQLDelay`: the configured `MASTER_DELAY`
 * `ExecutedGtidSet`: if using Oracle GTID, the executed GTID set
 * `SlaveLagSeconds`: when `SlaveLagQuery` provided, the computed slave lag; otherwise same as `SecondsBehindMaster`
-* `SlaveHosts`: list of MySQL slaves _hostname & port_)
+* `SlaveHosts`: list of MySQL replicas _hostname & port_)
 * `ClusterName`: name of cluster this instance is associated with; uniquely identifies cluster
 * `DataCenter`: (metadata) name of data center, infered by `DataCenterPattern` config variable
 * `PhysicalEnvironment`: (metadata) name of environment, infered by `PhysicalEnvironmentPattern` config variable

@@ -22,7 +22,7 @@ The following hints should clear up some questions:
 - You _can_ and _should_ have more than one `orchestrator` running with the same MySQL backend.
 - You should _not_ have more than one MySQL backend.
 
-The MySQL backend is a master server, for which you may have slaves for redundancy or otherwise build your favorite HA solution.
+The MySQL backend is a master server, for which you may have replicas for redundancy or otherwise build your favorite HA solution.
 
 The author of `orchestrator` has deployed it in large environments of thousands of servers, with a single backend database managing them all.
 
@@ -56,7 +56,7 @@ To the right: the many topologies polled by `orchestrator`. The leader polls eac
 
 On top left: the `orchestrator` MySQL backend: a master & three slaves. All 4 services use the same backend database.
 
-Not shown in this picture (for clarity purposes), but the `orchestrator` backend database and its slaves are themselves one of those topologies
+Not shown in this picture (for clarity purposes), but the `orchestrator` backend database and its replicas are themselves one of those topologies
 polled by `orchestrator` It eats its own dogfood.
 
 On left, bottom: `orchestrator` CLI is installed on any and all MySQL servers. All these CLI deployments use the very same

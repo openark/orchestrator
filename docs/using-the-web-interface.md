@@ -17,7 +17,7 @@ minutes, during which `orchestrator` connects the servers it encounters into sub
 eventually into the final topology.
 
 You may manually enter as many servers as you like (inside or outside the topology).
-The first time `orchestrator` investigates, it can only reach those slaves that are
+The first time `orchestrator` investigates, it can only reach those replicas that are
 _currently replicating_. So if you know you have some slves which are temporarily down, you'll need
 to add them manually, or, if you like to see automation in work, just wait until they're up, at which
 time `orchestrator` will automaticaly find them.
@@ -55,7 +55,7 @@ the instance (may be rediscovered a minute later if still connected to the topol
 
 ![Orchestrator screenshot](images/orchestrator-instance-modal.png)
 
-The topology can be refactored: slaves can be moved around via _drag and drop_. Start dragging an instance:
+The topology can be refactored: replicas can be moved around via _drag and drop_. Start dragging an instance:
 all possible _droppable_ targets are immediately colored green. You may turn your instance to be the slave of
 all _droppable_ targets.
 

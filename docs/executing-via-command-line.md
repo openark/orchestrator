@@ -22,7 +22,7 @@ You may choose to use a different location for the configuration file, in which 
 > `-c` stands for `command`, and is mandatory.
 
 Discover a new instance ("teach" `orchestrator` about your topology). `Orchestrator` will automatically recursively drill up the master chain (if any)
-and down the slaves chain (if any) to detect the entire topology:
+and down the replicas chain (if any) to detect the entire topology:
 
     orchestrator -c discover -i 127.0.0.1:22987 cli
 
@@ -67,7 +67,7 @@ figures out the best way to move a replica. If GTID is enabled, use it. If Pseud
 involved, use it. I `orchestrator` has further insight into the specific coordinates involved, use it. Otherwise just use
 plain-old binlog log file:pos math.
 
-Similar to `relocate`, you can move multiple slaves via `relocate-slaves`. This moves slaves-of-an-instance below another server.
+Similar to `relocate`, you can move multiple replicas via `relocate-slaves`. This moves slaves-of-an-instance below another server.
 
 > Assume this:
 >
@@ -89,7 +89,7 @@ Similar to `relocate`, you can move multiple slaves via `relocate-slaves`. This 
 >       + 10.0.0.4:3306
 >       + 10.0.0.5:3306
 
-> You may use `--pattern` to filter those slaves affected.
+> You may use `--pattern` to filter those replicas affected.
 
 Other command sgive you a more fine grained control on how your servers are relocated. Consider the _classic_ binary log file:pos
 way of repointing slaves:
@@ -124,7 +124,7 @@ Reset a replica, effectively breaking down the replication (destructive action):
 >
 > `move-up`, `move-below`, `make-co-master` and `reset-slave` are the building blocks of _classic_ topology refactoring.
 > With the first two actions one can make any change to the topology, with the exception of moving the master.
-> The last two allow replacing a master by promoting one of its slaves to be a co-master (MySQL master-master
+> The last two allow replacing a master by promoting one of its replicas to be a co-master (MySQL master-master
 > replication), then resetting the newly promoted co-master, effectively making it the master of all topology.
 
 > These actions are also as atomic as possible, by only affecting two replication servers per action (e.g. `move-up` affects
@@ -137,7 +137,7 @@ Reset a replica, effectively breaking down the replication (destructive action):
 > This could made to work via GTID and Pseudo-GTID.
 >
 > It may allow promoting a replica up the topology even as its master is dead, or
-> matching and synching the slaves of a failed master even though they all stopped replicating in different
+> matching and synching the replicas of a failed master even though they all stopped replicating in different
 > positions.
 
 The following are Pseudo-GTID specific commands:

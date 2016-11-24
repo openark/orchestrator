@@ -4,7 +4,7 @@ Most of the time `orchestrator` only reads status from your topologies. Default 
 This is very relaxed, and you can go way more intensive than that. But do be aware that `orchestrator` opens connections to all your servers
 (and typically reuses them).
 
-Actual risk begins when you modify instances. Namely moving slaves around the topology. `Orchestrator` does its best to:
+Actual risk begins when you modify instances. Namely moving replicas around the topology. `Orchestrator` does its best to:
 
 1. Make sure you only move an instance to a location where it is valid for it to replicate (e.g. that you don't put a 5.5 server below a 5.6 server)
 2. Make sure you move an instance at the right time (ie the instance and whicever affected servers are not lagging badly, so that operation can compeltely in a timely manner).
@@ -17,7 +17,7 @@ may leave the topology unstable (though the same instance could crash before the
 Or someone manually tampering with replication even while `orchestrator` is moving the slave around. Point being - weird
 and evil stuff can happen, and there is a risk in a replica losing its position vs. its master.
 
-Now that you're a bit more scared, it's time to reflect: how much did your hands tremble when you navigated your slaves _by hand_ up and down through the topology?
+Now that you're a bit more scared, it's time to reflect: how much did your hands tremble when you navigated your replicas _by hand_ up and down through the topology?
 We suspect the automation provided by `orchestrator` makes for a _safer_ management mechanism than we get with our shaking hands.
 
 Also, read the [LICENSE](https://github.com/github/orchestrator/blob/master/LICENSE), and especially the "WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND" part.

@@ -193,7 +193,7 @@ While you're at it, make your Pseudo-GTID entries monotonicly increasing, and pr
 
 #### Topology recovery: want to have if you want to own your database
 
-When PseudoGTID is enabled, `orchestrator` can do automated recovery from dead intermediate master (reconnects orphaned slaves to the topology)
+When PseudoGTID is enabled, `orchestrator` can do automated recovery from dead intermediate master (reconnects orphaned replicas to the topology)
 or from dead masters (auto-promotes best candidate slave).
 
 By default this is disabled. You can specify patterns of clusters for which to enable both. Of course, `.*` matches everything:
