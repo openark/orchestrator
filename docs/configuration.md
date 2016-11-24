@@ -4,8 +4,8 @@ The following is a complete list of configuration parameters. "Complete" is alwa
 
 * `Debug`                   (bool), set debug mode (similar to --debug option)
 * `ListenAddress`           (string), host & port to listen on (default `":3000"`). You can limit connections to local machine via `"127.0.0.1:3000"`
-* `MySQLTopologyUser`       (string), credentials for replication topology servers (masters & slaves)
-* `MySQLTopologyPassword`   (string), credentials for replication topology servers (masters & slaves)
+* `MySQLTopologyUser`       (string), credentials for replication topology servers (masters & replicas)
+* `MySQLTopologyPassword`   (string), credentials for replication topology servers (masters & replicas)
 * `MySQLTopologyCredentialsConfigFile` (string), as an alternative to providing `MySQLTopologyUser`, `MySQLTopologyPassword`, name of file in `my.cnf`-like format where credentials are stored.
 * `MySQLTopologyMaxPoolConnections` (int), Max concurrent connections on any topology instance
 * `MySQLOrchestratorHost`   (string), hostname for backend MySQL server
@@ -40,7 +40,7 @@ The following is a complete list of configuration parameters. "Complete" is alwa
 * `AuditLogFile`  (string), Name of log file for audit operations. Disabled when empty.
 * `AuditPageSize`       (int), Number of entries in an audit page
 * `RemoveTextFromHostnameDisplay` (string), Text to strip off the hostname on cluster/clusters pages. Save pixels (e.g. `mycompany.com`)
-* `ReadOnly`				(bool) When `"true"`, no write operations (e.g. stopping a replica, repointing slaves, discovering) are allowed
+* `ReadOnly`				(bool) When `"true"`, no write operations (e.g. stopping a replica, repointing replicas, discovering) are allowed
 * `AuthenticationMethod`    (string), type of authentication. Either empty (no authentication, default), `"basic"`, `"multi"` or `"proxy"`. See [Security](#security) section.
 * `AuthUserHeader`          (string), name of HTTP header which contains authenticated user when `AuthenticationMethod` is `"proxy"`
 * `PowerAuthUsers`          (string list), users considered as *power users* (allowed to manipulate the topology); applies on `"proxy"` `AuthenticationMethod`.
@@ -48,7 +48,7 @@ The following is a complete list of configuration parameters. "Complete" is alwa
 * `HTTPAuthPassword`    (string), Password for HTTP Basic authentication
 * `ClusterNameToAlias`  (string-to-string map), Map between regex matching cluster name to a human friendly alias.
   The human friendly alias is then presented on the `Clusters` menu and in the `Clusters Dashboard` page.
-* `DetectClusterAliasQuery` (string), Optional query (executed on topology instance) that returns the alias of a cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all slaves). If provided, must return one row, one column. This overrides `ClusterNameToAlias`.
+* `DetectClusterAliasQuery` (string), Optional query (executed on topology instance) that returns the alias of a cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all replicas). If provided, must return one row, one column. This overrides `ClusterNameToAlias`.
 * `DataCenterPattern` (string), Regexp pattern with one group, extracting the datacenter name from the hostname
 * `PhysicalEnvironmentPattern`  (string), Regexp pattern with one group, extracting physical environment info from hostname (e.g. combination of datacenter & prod/dev env)
 * `DenyAutoPromotionHostnamePattern`  (string), Orchestrator will not auto-promote hosts with name matching patterb (via -c recovery; for example, avoid promoting dev-dedicated machines)
@@ -214,7 +214,7 @@ You might want to configure the following:
 
 ```
 "OnFailureDetectionProcesses": [
-  "echo 'Detected {failureType} on {failureCluster}. Affected slaves: {countSlaves}'
+  "echo 'Detected {failureType} on {failureCluster}. Affected replicas: {countSlaves}'
 ],
 "PreFailoverProcesses": [
   "echo 'Will recover from {failureType} on {failureCluster}'

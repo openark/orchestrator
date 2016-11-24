@@ -13,7 +13,7 @@ completed. If you choose to click the `Kill query` button, please be advised tha
 query, executing on same connection following up on the by-now-completed listed long running query.
 
 * It make take a couple minutes for `orchestrator` to full detect a cluster's topology. The time depends on the depth
-of the topology (if you have slaves-of-slaves the time increases). This is due to the fact `orchestrator` polls the instances
+of the topology (if you have replicas-of-replicas the time increases). This is due to the fact `orchestrator` polls the instances
 independently, and and insight on the topology must propagate from master to replica on the next polling occasion.
 
 * Specifically, if you fail over to a new master, you may find that for a couple minutes the topologies seem empty.

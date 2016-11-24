@@ -54,7 +54,7 @@ In the above four `orchestrator` services are behind an HTTP load balancer. Only
 
 To the right: the many topologies polled by `orchestrator`. The leader polls each an every server in those topologies.
 
-On top left: the `orchestrator` MySQL backend: a master & three slaves. All 4 services use the same backend database.
+On top left: the `orchestrator` MySQL backend: a master & three replicas. All 4 services use the same backend database.
 
 Not shown in this picture (for clarity purposes), but the `orchestrator` backend database and its replicas are themselves one of those topologies
 polled by `orchestrator` It eats its own dogfood.

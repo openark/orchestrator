@@ -17,11 +17,11 @@ latest [API source code](https://github.com/github/orchestrator/blob/master/go/h
 recursively scan the entire topology)
 * `/api/refresh/:host/:port`: synchronously re-read instance status
 * `/api/forget/:host/:port`: remove records of this instance. It may be automatically rediscovered by
-  following up on its master or one of its slaves.
+  following up on its master or one of its replicas.
 * `/api/resolve/:host/:port`: check if hostname resolves and whether TCP connection can be established (example: `/api/resolve/myhost.mydomain/3306`)  
 * `/api/relocate/:host/:port/:belowHost/:belowPort` (attempt to) move an instance below another instance.
 `Orchestrator` picks best course of action.
-* `/api/relocate-slaves/:host/:port/:belowHost/:belowPort` (attempt to) move replicas of an instance below another instance.
+* `/api/relocate-replicas/:host/:port/:belowHost/:belowPort` (attempt to) move replicas of an instance below another instance.
 `Orchestrator` picks best course of action.
 * `/api/move-up/:host/:port` (attempt to) move this instance up the topology (make it child of its grandparent)
 * `/api/move-below/:host/:port/:siblingHost/:siblingPort` (attempt to) move an instance below its sibling.

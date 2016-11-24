@@ -45,16 +45,16 @@ This makes for a potential recovery process
 #### `UnreachableMaster`:
 
 1. Master MySQL access failure
-2. But it has replicating slaves.
+2. But it has replicating replicas.
 
 This does not make for a recovery process. However, to improve analysis, `orchestrator` will
-issue an emergent re-read of the slaves, to figure out whether they are really happy with the master
+issue an emergent re-read of the replicas, to figure out whether they are really happy with the master
 (in which case maybe `orchestrator` cannot see it due to a network glitch) or were actually taking
 their time to figure out they were failing replication.
 
 #### `DeadIntermediateMaster`:
 
-1. An intermediate master (slave with slaves) cannot be reached
+1. An intermediate master (slave with replicas) cannot be reached
 2. All of its replicas are failing replication
 
 This makes for a potential recovery process
@@ -78,9 +78,9 @@ A "simple" recovery case is that of a `DeadIntermediateMaster`. Its replicas are
 using GTID or Pseudo-GTID they can still be re-connected to the topology. We might choose to:
 
 - Find a sibling of the dead intermediate master, and move orphaned replicas below said sibling
-- Promote a replica from among the orphaned slaves, make it intermediate master of its siblings, then
+- Promote a replica from among the orphaned replicas, make it intermediate master of its siblings, then
   connect promoted replica up the topology
-- relocate all orphaned slaves
+- relocate all orphaned replicas
 - Combine parts of the above
 
 The exact implementation greatly depends on the topology setup (which instances have `log-slave-updates`? Are instances lagging? Do they
@@ -268,7 +268,7 @@ the refactored topology, should orchestrator forcibly issue a detach-slave comma
 replication in the future.
 
 - `MasterFailoverLostInstancesDowntimeMinutes`: when non-zero, and after master promotion, orchestrator will downtime lost
-slaves and dead master for given number of minutes.
+replicas and dead master for given number of minutes.
 
 - `PostponeSlaveRecoveryOnLagMinutes`: some recovery operations can be pushed to be the very last steps; so that more urgent
 operations (e.g. change DNS entries) could be applied faster. Fixing replicas that are lagging at time of recovery (either because of `MASTER_DELAY` configuration or just because they were busy) could take a substantial time due to binary log exhaustive search (GTID & Pseudo-GTID). This variable defines the threshold above which a lagging slave's rewiring is pushed till the last moment.

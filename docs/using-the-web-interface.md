@@ -59,7 +59,7 @@ The topology can be refactored: replicas can be moved around via _drag and drop_
 all possible _droppable_ targets are immediately colored green. You may turn your instance to be the replica of
 all _droppable_ targets.
 
-Master-master topologies can be created by dragging a _master_ onto one of its slaves, making both co-masters.
+Master-master topologies can be created by dragging a _master_ onto one of its replicas, making both co-masters.
 
 Complex refactoring is done by performing multiple such steps. You may need to drag and drop your
 instance three or four times to put it in a "remote" location.
