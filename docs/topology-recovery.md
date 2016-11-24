@@ -69,7 +69,7 @@ You may see up to date analysis via:
 - Web: `/web/clusters-analysis/` page (`Clusters`->`Failure analysis`).
   This presents an incomplete list of problems, only highlighting actionable ones.
 
-Note that recovery is not concerned with the death of a single slave machine, as it implies
+Note that recovery is not concerned with the death of a single replica machine, as it implies
 no required changes to topology.
 
 ### What's in a recovery?
@@ -79,7 +79,7 @@ using GTID or Pseudo-GTID they can still be re-connected to the topology. We mig
 
 - Find a sibling of the dead intermediate master, and move orphaned replicas below said sibling
 - Promote a replica from among the orphaned slaves, make it intermediate master of its siblings, then
-  connect promoted slave up the topology
+  connect promoted replica up the topology
 - relocate all orphaned slaves
 - Combine parts of the above
 

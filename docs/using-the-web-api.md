@@ -152,9 +152,9 @@ This sample is followed by a field breakdown:
 * `Slave_IO_Running`: direct mapping from `SHOW SLAVE STATUS`'s `Slave_IO_Running`
 * `HasReplicationFilters`: true if there's any replication filter
 * `SupportsOracleGTID`: true if cnfigured with `gtid_mode` (Oracle MySQL >= 5.6)
-* `UsingOracleGTID`: true if slave replicates via Oracle GTID
-* `UsingMariaDBGTID`:  true if slave replicates via MariaDB GTID
-* `UsingPseudoGTID`: true if slave known to have Pseudo-GTID coordinates (see related `DetectPseudoGTIDQuery` config)
+* `UsingOracleGTID`: true if replica replicates via Oracle GTID
+* `UsingMariaDBGTID`:  true if replica replicates via MariaDB GTID
+* `UsingPseudoGTID`: true if replica known to have Pseudo-GTID coordinates (see related `DetectPseudoGTIDQuery` config)
 * `ReadBinlogCoordinates`: (when replicating) the coordinates being read from the master (what `IO_THREAD` polls)
 * `ExecBinlogCoordinates`: (when replicating) the master's coordinates that are being executed right now (what `SQL_THREAD` executed)
 * `RelaylogCoordinates`: (when replicating) the relay log's coordinates that are being executed right now
@@ -164,12 +164,12 @@ This sample is followed by a field breakdown:
     `"Valid": false` indicates a `NULL`
 * `SQLDelay`: the configured `MASTER_DELAY`
 * `ExecutedGtidSet`: if using Oracle GTID, the executed GTID set
-* `SlaveLagSeconds`: when `SlaveLagQuery` provided, the computed slave lag; otherwise same as `SecondsBehindMaster`
+* `SlaveLagSeconds`: when `SlaveLagQuery` provided, the computed replica lag; otherwise same as `SecondsBehindMaster`
 * `SlaveHosts`: list of MySQL replicas _hostname & port_)
 * `ClusterName`: name of cluster this instance is associated with; uniquely identifies cluster
 * `DataCenter`: (metadata) name of data center, infered by `DataCenterPattern` config variable
 * `PhysicalEnvironment`: (metadata) name of environment, infered by `PhysicalEnvironmentPattern` config variable
-* `ReplicationDepth`: distance from the master (master is `0`, direct slave is `1` and so on)
+* `ReplicationDepth`: distance from the master (master is `0`, direct replica is `1` and so on)
 * `IsCoMaster`: true when this instanceis part of a master-master pair
 * `IsLastCheckValid`: whether last attempt at reading this instane succeeeded
 * `IsUpToDate`: whether this data is up to date

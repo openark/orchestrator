@@ -56,7 +56,7 @@ the instance (may be rediscovered a minute later if still connected to the topol
 ![Orchestrator screenshot](images/orchestrator-instance-modal.png)
 
 The topology can be refactored: replicas can be moved around via _drag and drop_. Start dragging an instance:
-all possible _droppable_ targets are immediately colored green. You may turn your instance to be the slave of
+all possible _droppable_ targets are immediately colored green. You may turn your instance to be the replica of
 all _droppable_ targets.
 
 Master-master topologies can be created by dragging a _master_ onto one of its slaves, making both co-masters.
@@ -80,7 +80,7 @@ Topology refactored:
 
 ![Orchestrator screenshot](images/orchestrator-simple-dropped.png)
 
-Dragging a master over its slave makes for a co-masters (master-master) topology:
+Dragging a master over its replica makes for a co-masters (master-master) topology:
 
 ![Orchestrator screenshot](images/orchestator-cm-simple-drag-master.png)
 
@@ -88,7 +88,7 @@ A co-master topology:
 
 ![Orchestrator screenshot](images/orchestator-cm-co-masters.png)
 
-`Orchestrator` visually indicates replication & accessibility related problems: slave lag, replication not working,
+`Orchestrator` visually indicates replication & accessibility related problems: replica lag, replication not working,
 instance not accessed for long time, instance access failure, instance under maintenance.
 
 ![Orchestrator screenshot](images/orchestrator-simple-with-problems.png)
@@ -97,7 +97,7 @@ _Problems_ drop down is available on all pages, and indicates all currently know
 
 ![Orchestrator screenshot](images/orchestrator-problems.png)
 
-The `Audit` page presents with all actions taken via `orchestrator`: slave move, detection, maintenance etc.
+The `Audit` page presents with all actions taken via `orchestrator`: replica move, detection, maintenance etc.
 (`START SLAVE` and `STOP SLAVE` are currently not audited).
 
 ![Orchestrator screenshot](images/orchestrator-audit-small.png)

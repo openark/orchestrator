@@ -109,7 +109,7 @@ Or maybe there's Pseudo GTID, or is there a binlog server involved? Other variat
 
 If you want to have greater control:
  - Normal file:pos operations are done via `move-up`, `move-below`
- - Pseudo-GTID specific slave relocation, use `match`, `match-slaves`, `regroup-slaves`.
+ - Pseudo-GTID specific replica relocation, use `match`, `match-slaves`, `regroup-slaves`.
  - Binlog server operations are typically done with `repoint`, `repoint-slaves`
 
 #### Replication control

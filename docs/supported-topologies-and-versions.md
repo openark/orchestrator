@@ -15,7 +15,7 @@ The following setups are _unsupported_:
 
 - Master-master...-master (circular) replication with 3 or more nodes in ring.
 - 5.6 Parallel (thread per schema) replication
-- Multi master replication (one slave replicating from multiple masters)
+- Multi master replication (one replica replicating from multiple masters)
 - Tungsten replicator
 
 
