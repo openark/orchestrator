@@ -124,11 +124,11 @@ You are easily able to see what the following do:
 
 Break replication by messing with a replica's binlog coordinates:
 
-	$ orchestrator -c detach-slave -i a.replica.8.instance.com
+	$ orchestrator -c detach-replica -i a.replica.8.instance.com
 
 Don't worry, this is reversible:
 
-	$ orchestrator -c reattach-slave -i a.replica.8.instance.com
+	$ orchestrator -c reattach-replica -i a.replica.8.instance.com
 
 This works for normal file:pos as well as GTID setups:
 

@@ -142,7 +142,7 @@ Reset a replica, effectively breaking down the replication (destructive action):
 
 The following are Pseudo-GTID specific commands:
 
-Match a replica below another instance (we expect the other instance to be as advanced or more advanced than the moved slave)
+Match a replica below another instance (we expect the other instance to be as advanced or more advanced than the moved replica)
 
     orchestrator -c match-below -i 127.0.0.1:22988 -d 127.0.0.1:22990 --debug cli
 

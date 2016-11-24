@@ -10,7 +10,7 @@ If this is your first time using _orchstrator_, then you should begin by teachin
 `orchestrator` needs to know what replication topologies you have. The web interface
 provides this via the `discover` page.
 
-From each replication topology, pick one server (this could be master or slave) and let
+From each replication topology, pick one server (this could be master or replica) and let
 `orchestrator` know which hostname & port this server listens on. `Orchestrator` will
 recursively drill up and down replication to map the entire topology. This may take a couple
 minutes, during which `orchestrator` connects the servers it encounters into sub-topologies and
@@ -18,9 +18,9 @@ eventually into the final topology.
 
 You may manually enter as many servers as you like (inside or outside the topology).
 The first time `orchestrator` investigates, it can only reach those replicas that are
-_currently replicating_. So if you know you have some slves which are temporarily down, you'll need
+_currently replicating_. So if you know you have some replicas which are temporarily down, you'll need
 to add them manually, or, if you like to see automation in work, just wait until they're up, at which
-time `orchestrator` will automaticaly find them.
+time `orchestrator` will automatically find them.
 
 > Once `orchestrator` is familiar with a server, it doesn't care if the server is lagging, not replicating
 > or inaccessible. The server is still part of the topology it was last seen in. There is a timeout for

@@ -2,7 +2,7 @@
 
 ### Who should use orchestrator?
 
-DBAs and ops who have more than a mere single-master-single-slave replication topology.
+DBAs and ops who have more than a mere single-master-single-replica replication topology.
 
 ### What can orchestrator do for me?
 

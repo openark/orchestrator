@@ -54,7 +54,7 @@ their time to figure out they were failing replication.
 
 #### `DeadIntermediateMaster`:
 
-1. An intermediate master (slave with replicas) cannot be reached
+1. An intermediate master (replica with replicas) cannot be reached
 2. All of its replicas are failing replication
 
 This makes for a potential recovery process
@@ -89,11 +89,11 @@ have replication filters? Which versions of MySQL? etc.). It is very (very) like
 
 A "really-not-simple" recovery case is that of a `DeadMaster`. `orchestrator` will try to:
 
-- Find the most advanced slave
+- Find the most advanced replica
 - Promote it, enslaving its siblings
 - Bring siblings up to date
-- Check if there was a pre-defined "candidate slave"
-- Promote that over the previously chosen slave
+- Check if there was a pre-defined "candidate replica"
+- Promote that over the previously chosen replica
 - And... call upon hooks (read further)
 
 Success of the above depends on how many replicas have `log-slave-updates`, and whether those that are not configured as such
@@ -264,13 +264,13 @@ Elaborating on recovery-related configuration:
 - `RecoveryPollSeconds`: poll interval at which orchestrator re-checks for crash scenarios (default: 10s)
 
 - `DetachLostReplicasAfterMasterFailover`: in the case of master promotion and assuming that some replicas could not make it into
-the refactored topology, should orchestrator forcibly issue a detach-slave command to make sure they don't accidentally resume
+the refactored topology, should orchestrator forcibly issue a `detach-replica` command to make sure they don't accidentally resume
 replication in the future.
 
 - `MasterFailoverLostInstancesDowntimeMinutes`: when non-zero, and after master promotion, orchestrator will downtime lost
 replicas and dead master for given number of minutes.
 
 - `PostponeSlaveRecoveryOnLagMinutes`: some recovery operations can be pushed to be the very last steps; so that more urgent
-operations (e.g. change DNS entries) could be applied faster. Fixing replicas that are lagging at time of recovery (either because of `MASTER_DELAY` configuration or just because they were busy) could take a substantial time due to binary log exhaustive search (GTID & Pseudo-GTID). This variable defines the threshold above which a lagging slave's rewiring is pushed till the last moment.
+operations (e.g. change DNS entries) could be applied faster. Fixing replicas that are lagging at time of recovery (either because of `MASTER_DELAY` configuration or just because they were busy) could take a substantial time due to binary log exhaustive search (GTID & Pseudo-GTID). This variable defines the threshold above which a lagging replica's rewiring is pushed till the last moment.
 
 - `ApplyMySQLPromotionAfterMasterFailover`: after master promotion, should orchestrator take it upon itself to clear the `read_only` flag & forcibly detach replication? (default: `false`)

@@ -20,7 +20,7 @@ The following is a complete list of configuration parameters. "Complete" is alwa
 * `DefaultInstancePort` (int), In case port was not specified on command line (default value for this default is `3306`)
 * `SkipOrchestratorDatabaseUpdate`  (bool), When false, orchestrator will attempt to create & update all tables in backend database; when true, this is skipped. It makes sense to skip on command-line invocations and to enable for http or occasional invocations, or just after upgrades
 * `SlaveLagQuery`               (string), custom query to check on replica lg (e.g. heartbeat table). If unprovided,
-  slave's `Seconds_Behind_Master` is used.
+  replica's `Seconds_Behind_Master` is used.
 * `SlaveStartPostWaitMilliseconds`  (int), Time to wait after `START SLAVE` before re-reading instance (give replica chance to connect to master)
 * `DiscoverByShowSlaveHosts`    (bool), Attempt `SHOW SLAVE HOSTS` before `SHOW PROCESSLIST`
 * `InstancePollSeconds`         (uint), Number of seconds between instance reads
@@ -194,7 +194,7 @@ While you're at it, make your Pseudo-GTID entries monotonicly increasing, and pr
 #### Topology recovery: want to have if you want to own your database
 
 When PseudoGTID is enabled, `orchestrator` can do automated recovery from dead intermediate master (reconnects orphaned replicas to the topology)
-or from dead masters (auto-promotes best candidate slave).
+or from dead masters (auto-promotes best candidate replica).
 
 By default this is disabled. You can specify patterns of clusters for which to enable both. Of course, `.*` matches everything:
 
