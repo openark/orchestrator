@@ -1488,22 +1488,22 @@ func TakeSiblings(instanceKey *InstanceKey) (*Instance, int, error) {
 	if err != nil {
 		return instance, 0, err
 	}
-	enslavedSiblings := 0
+	takenSiblings := 0
 	for _, sibling := range siblings {
 		if _, err := MoveBelow(&sibling.Key, &instance.Key); err == nil {
-			enslavedSiblings++
+			takenSiblings++
 		}
 	}
 
-	return instance, enslavedSiblings, err
+	return instance, takenSiblings, err
 }
 
-// EnslaveMaster will move an instance up the chain and cause its master to become its replica.
+// TakeMaster will move an instance up the chain and cause its master to become its replica.
 // It's almost a role change, just that other replicas of either 'instance' or its master are currently unaffected
 // (they continue replicate without change)
 // Note that the master must itself be a replica; however the grandparent does not necessarily have to be reachable
 // and can in fact be dead.
-func EnslaveMaster(instanceKey *InstanceKey) (*Instance, error) {
+func TakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
@@ -1512,7 +1512,7 @@ func EnslaveMaster(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil || !found {
 		return instance, err
 	}
-	log.Debugf("EnslaveMaster: will attempt making %+v enslave its master %+v, now resolved as %+v", *instanceKey, instance.MasterKey, masterInstance.Key)
+	log.Debugf("TakeMaster: will attempt making %+v take its master %+v, now resolved as %+v", *instanceKey, instance.MasterKey, masterInstance.Key)
 
 	if canReplicate, err := masterInstance.CanReplicateFrom(instance); canReplicate == false {
 		return instance, err
@@ -1553,7 +1553,7 @@ Cleanup:
 	if err != nil {
 		return instance, err
 	}
-	AuditOperation("enslave-master", instanceKey, fmt.Sprintf("enslaved master: %+v", masterInstance.Key))
+	AuditOperation("take-master", instanceKey, fmt.Sprintf("took master: %+v", masterInstance.Key))
 
 	return instance, err
 }
@@ -2149,7 +2149,7 @@ func GetCandidateReplicaOfBinlogServerTopology(masterKey *InstanceKey) (candidat
 	return candidateReplica, err
 }
 
-// RegroupReplicasPseudoGTID will choose a candidate replica of a given instance, and enslave its siblings using pseudo-gtid
+// RegroupReplicasPseudoGTID will choose a candidate replica of a given instance, and take its siblings using pseudo-gtid
 func RegroupReplicasPseudoGTID(masterKey *InstanceKey, returnReplicaEvenOnFailureToRegroup bool, onCandidateReplicaChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), [](*Instance), *Instance, error) {
 	candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err := GetCandidateReplica(masterKey, true)
 	if err != nil {
@@ -2297,7 +2297,7 @@ func RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(masterKey *Ins
 	return RegroupReplicasPseudoGTID(masterKey, returnReplicaEvenOnFailureToRegroup, onCandidateReplicaChosen, postponedFunctionsContainer)
 }
 
-// RegroupReplicasGTID will choose a candidate replica of a given instance, and enslave its siblings using GTID
+// RegroupReplicasGTID will choose a candidate replica of a given instance, and take its siblings using GTID
 func RegroupReplicasGTID(masterKey *InstanceKey, returnReplicaEvenOnFailureToRegroup bool, onCandidateReplicaChosen func(*Instance)) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
 	var emptyReplicas [](*Instance)
 	candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err := GetCandidateReplica(masterKey, true)

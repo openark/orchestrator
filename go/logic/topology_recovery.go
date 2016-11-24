@@ -483,8 +483,8 @@ func replacePromotedReplicaWithCandidate(deadInstanceKey *inst.InstanceKey, prom
 	}
 
 	if candidateInstance.MasterKey.Equals(&promotedReplica.Key) {
-		log.Debugf("topology_recovery: suggested candidate %+v is replica of promoted instance %+v. Will try and enslave its master", *candidateInstanceKey, promotedReplica.Key)
-		candidateInstance, err = inst.EnslaveMaster(&candidateInstance.Key)
+		log.Debugf("topology_recovery: suggested candidate %+v is replica of promoted instance %+v. Will try and take its master", *candidateInstanceKey, promotedReplica.Key)
+		candidateInstance, err = inst.TakeMaster(&candidateInstance.Key)
 		if err != nil {
 			return promotedReplica, log.Errore(err)
 		}
