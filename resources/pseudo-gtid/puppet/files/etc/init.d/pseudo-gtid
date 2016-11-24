@@ -1,0 +1,54 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Provides:          pseudo-gtid
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: pseudo-gtid
+# Description:       pseudo-gtid
+### END INIT INFO
+
+# Start/stop the pseudo-gtid daemon.
+#
+# The pseudo-gtid daemon will continuously write pseudo-gtid entries into the local MySQL host (presumably it is the master)
+#
+
+PSEUDO_GTID_INJECT_PATH=/path/to
+
+do_start() {
+    start-stop-daemon --start --oknodo --quiet --pidfile /var/run/pseudo-gtid.pid --make-pidfile --name pseudo-gtid --startas ${PSEUDO_GTID_INJECT_PATH}/pseudo-gtid --background || return 2
+}
+
+do_stop() {
+  start-stop-daemon --stop --quiet --retry=TERM/1/KILL/5 --pidfile /var/run/pseudo-gtid.pid --startas ${PSEUDO_GTID_INJECT_PATH}/pseudo-gtid \
+    || return 1
+}
+
+do_status() {
+  test -f /var/run/pseudo-gtid.pid && ps $(cat /var/run/pseudo-gtid.pid) > /dev/null
+}
+
+case "$1" in
+start)  log_daemon_msg "Starting pseudo-gtid" "pseudo-gtid"
+  do_start
+        log_end_msg $?
+  ;;
+stop) log_daemon_msg "Stopping pseudo-gtid" "pseudo-gtid"
+  do_stop
+        log_end_msg $?
+        ;;
+restart) log_daemon_msg "Restarting pseudo-gtid" "pseudo-gtid"
+  do_stop
+  do_start
+        log_end_msg $?
+        ;;
+status)
+  do_status
+        log_end_msg $?
+        ;;
+*)  log_action_msg "Usage: /etc/init.d/pseudo-gtid {start|stop|restart}"
+        exit 2
+        ;;
+esac
+exit 0

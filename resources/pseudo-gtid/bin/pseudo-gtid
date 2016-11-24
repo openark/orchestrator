@@ -1,0 +1,45 @@
+#!/bin/bash
+
+#
+# Continuously inject pseudo-gtid entries
+#
+
+read -r -d '' QUERIES <<'EOF'
+set @connection_id := connection_id();
+set @now := now();
+set @rand := floor(rand()*(1 << 32));
+set @pseudo_gtid_hint := concat_ws(':', lpad(hex(unix_timestamp(@now)), 8, '0'), lpad(hex(@connection_id), 16, '0'), lpad(hex(@rand), 8, '0'));
+set @_create_statement := concat('drop ', 'view if exists `meta`.`_pseudo_gtid_', 'hint__asc:', @pseudo_gtid_hint, '`');
+PREPARE st FROM @_create_statement;
+EXECUTE st;
+DEALLOCATE PREPARE st;
+
+SET innodb_lock_wait_timeout = 1;
+set @serverid := @@server_id;
+set @hostname := @@hostname;
+set @port := @@port;
+set @pseudo_gtid := concat('pseudo-gtid://', @hostname, ':', @port, '/', @serverid, '/', date(@now), '/', time(@now), '/', @rand);
+insert into pseudo_gtid_status (
+     anchor,
+     originating_mysql_host,
+     originating_mysql_port,
+     originating_server_id,
+     time_generated,
+     pseudo_gtid_uri,
+     pseudo_gtid_hint
+  )
+  values (1, @hostname, @port, @serverid, @now, @pseudo_gtid, @pseudo_gtid_hint)
+  on duplicate key update
+    originating_mysql_host = values(originating_mysql_host),
+    originating_mysql_port = values(originating_mysql_port),
+    originating_server_id = values(originating_server_id),
+    time_generated = values(time_generated),
+    pseudo_gtid_uri = values(pseudo_gtid_uri),
+    pseudo_gtid_hint = values(pseudo_gtid_hint)
+;
+EOF
+
+while [ 1 ] ; do
+  mysql -uroot meta -e "$QUERIES"
+  sleep 5
+done
