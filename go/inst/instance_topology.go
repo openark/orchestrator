@@ -1324,6 +1324,23 @@ func CorrelateBinlogCoordinates(instance *Instance, binlogCoordinates *BinlogCoo
 	return nextBinlogCoordinatesToMatch, countMatchedEvents, nil
 }
 
+func CorrelateRelaylogCoordinates(instance *Instance, relaylogCoordinates *BinlogCoordinates, otherInstance *Instance) (correlatedCoordinates, nextCoordinates *BinlogCoordinates, found bool, err error) {
+	var binlogEvent *BinlogEvent
+	if relaylogCoordinates == nil {
+		if binlogEvent, err = GetLastExecutedEntryInRelayLogs(instance, nil, instance.RelaylogCoordinates); err != nil {
+			return correlatedCoordinates, nextCoordinates, found, err
+		}
+	} else {
+		relaylogCoordinates.Type = RelayLog
+		if binlogEvent, err = ReadBinlogEventAtRelayLogCoordinates(&instance.Key, relaylogCoordinates); err != nil {
+			return correlatedCoordinates, nextCoordinates, found, err
+		}
+	}
+
+	correlatedCoordinates, nextCoordinates, found, err = SearchEventInRelayLogs(binlogEvent, otherInstance, nil, otherInstance.RelaylogCoordinates)
+	return correlatedCoordinates, nextCoordinates, found, err
+}
+
 // MatchBelow will attempt moving instance indicated by instanceKey below its the one indicated by otherKey.
 // The refactoring is based on matching binlog entries, not on "classic" positions comparisons.
 // The "other instance" could be the sibling of the moving instance any of its ancestors. It may actually be
