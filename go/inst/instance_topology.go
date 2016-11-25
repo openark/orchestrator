@@ -1325,6 +1325,10 @@ func CorrelateBinlogCoordinates(instance *Instance, binlogCoordinates *BinlogCoo
 }
 
 func CorrelateRelaylogCoordinates(instance *Instance, relaylogCoordinates *BinlogCoordinates, otherInstance *Instance) (correlatedCoordinates, nextCoordinates *BinlogCoordinates, found bool, err error) {
+	// The two servers are expected to have the same master, or this doesn't work
+	if !instance.MasterKey.Equals(&otherInstance.MasterKey) {
+		return correlatedCoordinates, nextCoordinates, found, log.Errorf("CorrelateRelaylogCoordinates requires sibling instances, however %+v has master %+v, and %+v has master %+v", instance.Key, instance.MasterKey, otherInstance.Key, otherInstance.MasterKey)
+	}
 	var binlogEvent *BinlogEvent
 	if relaylogCoordinates == nil {
 		if binlogEvent, err = GetLastExecutedEntryInRelayLogs(instance, nil, instance.RelaylogCoordinates); err != nil {
