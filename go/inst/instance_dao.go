@@ -17,6 +17,8 @@
 package inst
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -49,7 +51,7 @@ func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 }
 
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
-var instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
+var instanceKeyInformativeClusterName *cache.Cache
 
 var readTopologyInstanceCounter = metrics.NewCounter()
 var readInstanceCounter = metrics.NewCounter()
@@ -59,6 +61,25 @@ func init() {
 	metrics.Register("instance.read_topology", readTopologyInstanceCounter)
 	metrics.Register("instance.read", readInstanceCounter)
 	metrics.Register("instance.write", writeInstanceCounter)
+}
+
+func InitializeInstanceDao() {
+	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
+	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
+
+	// spin off instance write buffer flushing
+	go func() {
+		flushTick := time.Tick(time.Duration(config.Config.InstanceFlushIntervalMilliseconds) * time.Millisecond)
+		for {
+			// it is time to flush
+			select {
+			case <-flushTick:
+				flushInstanceWriteBuffer()
+			case <-forceFlushInstanceWriteBuffer:
+				flushInstanceWriteBuffer()
+			}
+		}
+	}()
 }
 
 // ExecDBWriteFunc chooses how to execute a write onto the database: whether synchronuously or not
@@ -78,9 +99,14 @@ func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err err
 	return log.Errorf("ReadTopologyInstance(%+v) %+v: %+v", *instanceKey, hint, err)
 }
 
+func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
+	return ReadTopologyInstanceBufferable(instanceKey, false)
+}
+
 // ReadTopologyInstance connects to a topology MySQL instance and reads its configuration and
 // replication status. It writes read info into orchestrator's backend.
-func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
+// Writes are optionally buffered.
+func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool) (*Instance, error) {
 	defer func() {
 		if err := recover(); err != nil {
 			logReadTopologyInstanceError(instanceKey, "Unexpected, aborting", fmt.Errorf("%+v", err))
@@ -98,11 +124,8 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	slaveStatusFound := false
 	var resolveErr error
 
-	// Before we even begin anything, declare that we're about to cehck this instance.If anything goes wrong network-wise,
-	// this is our source of truth in terms of instance being inaccessible
-	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
-
 	if !instanceKey.IsValid() {
+		_ = UpdateInstanceLastAttemptedCheck(instanceKey)
 		return instance, fmt.Errorf("ReadTopologyInstance will not act on invalid instance key: %+v", *instanceKey)
 	}
 
@@ -534,13 +557,21 @@ Cleanup:
 		instance.IsLastCheckValid = true
 		instance.IsRecentlyChecked = true
 		instance.IsUpToDate = true
-		_ = writeInstance(instance, instanceFound, err)
+		if bufferWrites {
+			enqueueInstanceWrite(instance, instanceFound, err)
+		} else {
+			writeInstance(instance, instanceFound, err)
+		}
 		WriteLongRunningProcesses(&instance.Key, longRunningProcesses)
 		return instance, nil
-	} else {
-		_ = UpdateInstanceLastChecked(&instance.Key)
-		return nil, fmt.Errorf("Failed ReadTopologyInstance")
 	}
+
+	// Something is wrong, could be network-wise. Record that we
+	// tried to check the instance. last_attempted_check is also
+	// updated on success by writeInstance.
+	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
+	_ = UpdateInstanceLastChecked(&instance.Key)
+	return nil, fmt.Errorf("Failed ReadTopologyInstance")
 }
 
 // ReadInstanceClusterAttributes will return the cluster name for a given instance by looking at its master
@@ -1658,193 +1689,273 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 
 }
 
-// writeInstance stores an instance in the orchestrator backend
-func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError error) error {
+func mkInsertOdku(table string, columns []string, values []string, nrRows int, insertIgnore bool) (string, error) {
+	if len(columns) == 0 {
+		return "", errors.New("Column list cannot be empty")
+	}
+	if nrRows < 1 {
+		return "", errors.New("nrRows must be a positive number")
+	}
+	if len(columns) != len(values) {
+		return "", errors.New("number of values must be equal to number of columns")
+	}
+
+	var q bytes.Buffer
+	var ignore string = ""
+	if insertIgnore {
+		ignore = "ignore"
+	}
+	var valRow string = fmt.Sprintf("(%s)", strings.Join(values, ", "))
+	var val bytes.Buffer
+	val.WriteString(valRow)
+	for i := 1; i < nrRows; i++ {
+		val.WriteString(",\n                ") // indent VALUES, see below
+		val.WriteString(valRow)
+	}
+
+	var col string = strings.Join(columns, ", ")
+	var odku bytes.Buffer
+	odku.WriteString(fmt.Sprintf("%s=VALUES(%s)", columns[0], columns[0]))
+	for _, c := range columns[1:] {
+		odku.WriteString(", ")
+		odku.WriteString(fmt.Sprintf("%s=VALUES(%s)", c, c))
+	}
+
+	q.WriteString(fmt.Sprintf(`INSERT %s INTO %s
+                (%s)
+        VALUES
+                %s
+        ON DUPLICATE KEY UPDATE
+                %s
+        `,
+		ignore, table, col, val.String(), odku.String()))
+
+	return q.String(), nil
+}
+
+func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bool, updateLastSeen bool) (string, []interface{}) {
+	if len(instances) == 0 {
+		return "", nil
+	}
+
+	insertIgnore := false
+	if !instanceWasActuallyFound {
+		insertIgnore = true
+	}
+	var columns = []string{
+		"hostname",
+		"port",
+		"last_checked",
+		"last_attempted_check",
+		"uptime",
+		"server_id",
+		"server_uuid",
+		"version",
+		"binlog_server",
+		"read_only",
+		"binlog_format",
+		"log_bin",
+		"log_slave_updates",
+		"binary_log_file",
+		"binary_log_pos",
+		"master_host",
+		"master_port",
+		"slave_sql_running",
+		"slave_io_running",
+		"has_replication_filters",
+		"supports_oracle_gtid",
+		"oracle_gtid",
+		"executed_gtid_set",
+		"gtid_purged",
+		"mariadb_gtid",
+		"pseudo_gtid",
+		"master_log_file",
+		"read_master_log_pos",
+		"relay_master_log_file",
+		"exec_master_log_pos",
+		"relay_log_file",
+		"relay_log_pos",
+		"last_sql_error",
+		"last_io_error",
+		"seconds_behind_master",
+		"slave_lag_seconds",
+		"sql_delay",
+		"num_slave_hosts",
+		"slave_hosts",
+		"cluster_name",
+		"suggested_cluster_alias",
+		"data_center",
+		"physical_environment",
+		"replication_depth",
+		"is_co_master",
+		"replication_credentials_available",
+		"has_replication_credentials",
+		"allow_tls",
+		"semi_sync_enforced",
+		"instance_alias",
+	}
+
+	var values []string = make([]string, len(columns), len(columns))
+	for i := range columns {
+		values[i] = "?"
+	}
+	values[2] = "NOW()" // last_checked
+	values[3] = "NOW()" // last_attempted_check
+
+	if updateLastSeen {
+		columns = append(columns, "last_seen")
+		values = append(values, "NOW()")
+	}
+
+	var args []interface{}
+	for _, instance := range instances {
+		// number of columns minus 2 as last_checked and last_attempted_check
+		// updated with NOW()
+		args = append(args, instance.Key.Hostname)
+		args = append(args, instance.Key.Port)
+		args = append(args, instance.Uptime)
+		args = append(args, instance.ServerID)
+		args = append(args, instance.ServerUUID)
+		args = append(args, instance.Version)
+		args = append(args, instance.IsBinlogServer())
+		args = append(args, instance.ReadOnly)
+		args = append(args, instance.Binlog_format)
+		args = append(args, instance.LogBinEnabled)
+		args = append(args, instance.LogSlaveUpdatesEnabled)
+		args = append(args, instance.SelfBinlogCoordinates.LogFile)
+		args = append(args, instance.SelfBinlogCoordinates.LogPos)
+		args = append(args, instance.MasterKey.Hostname)
+		args = append(args, instance.MasterKey.Port)
+		args = append(args, instance.Slave_SQL_Running)
+		args = append(args, instance.Slave_IO_Running)
+		args = append(args, instance.HasReplicationFilters)
+		args = append(args, instance.SupportsOracleGTID)
+		args = append(args, instance.UsingOracleGTID)
+		args = append(args, instance.ExecutedGtidSet)
+		args = append(args, instance.GtidPurged)
+		args = append(args, instance.UsingMariaDBGTID)
+		args = append(args, instance.UsingPseudoGTID)
+		args = append(args, instance.ReadBinlogCoordinates.LogFile)
+		args = append(args, instance.ReadBinlogCoordinates.LogPos)
+		args = append(args, instance.ExecBinlogCoordinates.LogFile)
+		args = append(args, instance.ExecBinlogCoordinates.LogPos)
+		args = append(args, instance.RelaylogCoordinates.LogFile)
+		args = append(args, instance.RelaylogCoordinates.LogPos)
+		args = append(args, instance.LastSQLError)
+		args = append(args, instance.LastIOError)
+		args = append(args, instance.SecondsBehindMaster)
+		args = append(args, instance.SlaveLagSeconds)
+		args = append(args, instance.SQLDelay)
+		args = append(args, len(instance.SlaveHosts))
+		args = append(args, instance.SlaveHosts.ToJSONString())
+		args = append(args, instance.ClusterName)
+		args = append(args, instance.SuggestedClusterAlias)
+		args = append(args, instance.DataCenter)
+		args = append(args, instance.PhysicalEnvironment)
+		args = append(args, instance.ReplicationDepth)
+		args = append(args, instance.IsCoMaster)
+		args = append(args, instance.ReplicationCredentialsAvailable)
+		args = append(args, instance.HasReplicationCredentials)
+		args = append(args, instance.AllowTLS)
+		args = append(args, instance.SemiSyncEnforced)
+		args = append(args, instance.InstanceAlias)
+	}
+
+	sql, err := mkInsertOdku("database_instance", columns, values, len(instances), insertIgnore)
+	if err != nil {
+		log.Fatalf("Failed to build query: %v", err)
+	}
+
+	return sql, args
+}
+
+// writeManyInstances stores instances in the orchestrator backend
+func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, updateLastSeen bool) error {
+	if len(instances) == 0 {
+		return nil // nothing to write
+	}
+
+	sql, args := mkInsertOdkuForInstances(instances, instanceWasActuallyFound, updateLastSeen)
+
+	if _, err := db.ExecOrchestrator(sql, args...); err != nil {
+		return err
+	}
+	return nil
+}
+
+type instanceUpdateObject struct {
+	instance                 *Instance
+	instanceWasActuallyFound bool
+	lastError                error
+}
+
+// instances sorter by instanceKey
+type byInstanceKey []*Instance
+
+func (a byInstanceKey) Len() int           { return len(a) }
+func (a byInstanceKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byInstanceKey) Less(i, j int) bool { return a[i].Key.SmallerThan(&a[j].Key) }
+
+var instanceWriteBuffer chan instanceUpdateObject
+var forceFlushInstanceWriteBuffer = make(chan bool)
+
+func enqueueInstanceWrite(instance *Instance, instanceWasActuallyFound bool, lastError error) {
+	if len(instanceWriteBuffer) == config.Config.InstanceWriteBufferSize {
+		// Signal the "flushing" gorouting that there's work.
+		// We prefer doing all bulk flushes from one goroutine.
+		forceFlushInstanceWriteBuffer <- true
+	}
+	instanceWriteBuffer <- instanceUpdateObject{instance, instanceWasActuallyFound, lastError}
+}
+
+// flushInstanceWriteBuffer saves enqueued instances to Orchestrator Db
+func flushInstanceWriteBuffer() {
+	var instances []*Instance
+	var lastseen []*Instance // instances to update with last_seen field
+
+	if len(instanceWriteBuffer) == 0 {
+		return
+	}
+
+	for i := 0; i < len(instanceWriteBuffer); i++ {
+		upd := <-instanceWriteBuffer
+		if upd.instanceWasActuallyFound && upd.lastError == nil {
+			lastseen = append(lastseen, upd.instance)
+		} else {
+			instances = append(instances, upd.instance)
+			log.Debugf("writeInstance: will not update database_instance.last_seen due to error: %+v", upd.lastError)
+		}
+	}
+	// sort instances by instanceKey (table pk) to make locking predictable
+	sort.Sort(byInstanceKey(instances))
+	sort.Sort(byInstanceKey(lastseen))
 
 	writeFunc := func() error {
-		insertIgnore := ""
-		onDuplicateKeyUpdate := ""
-		if instanceWasActuallyFound {
-			// Data is real
-			onDuplicateKeyUpdate = `
-				on duplicate key update
-      		last_checked=VALUES(last_checked),
-      		last_attempted_check=VALUES(last_attempted_check),
-      		uptime=VALUES(uptime),
-      		server_id=VALUES(server_id),
-      		server_uuid=VALUES(server_uuid),
-					version=VALUES(version),
-					binlog_server=VALUES(binlog_server),
-					read_only=VALUES(read_only),
-					binlog_format=VALUES(binlog_format),
-					log_bin=VALUES(log_bin),
-					log_slave_updates=VALUES(log_slave_updates),
-					binary_log_file=VALUES(binary_log_file),
-					binary_log_pos=VALUES(binary_log_pos),
-					master_host=VALUES(master_host),
-					master_port=VALUES(master_port),
-					slave_sql_running=VALUES(slave_sql_running),
-					slave_io_running=VALUES(slave_io_running),
-					has_replication_filters=VALUES(has_replication_filters),
-					supports_oracle_gtid=VALUES(supports_oracle_gtid),
-					oracle_gtid=VALUES(oracle_gtid),
-					executed_gtid_set=VALUES(executed_gtid_set),
-					gtid_purged=VALUES(gtid_purged),
-					mariadb_gtid=VALUES(mariadb_gtid),
-					pseudo_gtid=values(pseudo_gtid),
-					master_log_file=VALUES(master_log_file),
-					read_master_log_pos=VALUES(read_master_log_pos),
-					relay_master_log_file=VALUES(relay_master_log_file),
-					exec_master_log_pos=VALUES(exec_master_log_pos),
-					relay_log_file=VALUES(relay_log_file),
-					relay_log_pos=VALUES(relay_log_pos),
-					last_sql_error=VALUES(last_sql_error),
-					last_io_error=VALUES(last_io_error),
-					seconds_behind_master=VALUES(seconds_behind_master),
-					slave_lag_seconds=VALUES(slave_lag_seconds),
-					sql_delay=VALUES(sql_delay),
-					num_slave_hosts=VALUES(num_slave_hosts),
-					slave_hosts=VALUES(slave_hosts),
-					cluster_name=VALUES(cluster_name),
-					suggested_cluster_alias=VALUES(suggested_cluster_alias),
-					data_center=VALUES(data_center),
-					physical_environment=VALUES(physical_environment),
-					replication_depth=VALUES(replication_depth),
-					is_co_master=VALUES(is_co_master),
-					replication_credentials_available=VALUES(replication_credentials_available),
-					has_replication_credentials=VALUES(has_replication_credentials),
-					allow_tls=VALUES(allow_tls),
-					semi_sync_enforced=VALUES(semi_sync_enforced),
-					instance_alias=VALUES(instance_alias)
-				`
-		} else {
-			// Scenario: some replica reported a master of his; but the master cannot be contacted.
-			// We might still want to have that master written down
-			// Use with caution
-			insertIgnore = `ignore`
-		}
-		insertQuery := fmt.Sprintf(`
-    	insert %s into database_instance (
-    		hostname,
-    		port,
-    		last_checked,
-    		last_attempted_check,
-    		uptime,
-    		server_id,
-    		server_uuid,
-				version,
-				binlog_server,
-				read_only,
-				binlog_format,
-				log_bin,
-				log_slave_updates,
-				binary_log_file,
-				binary_log_pos,
-				master_host,
-				master_port,
-				slave_sql_running,
-				slave_io_running,
-				has_replication_filters,
-				supports_oracle_gtid,
-				oracle_gtid,
-				executed_gtid_set,
-				gtid_purged,
-				mariadb_gtid,
-				pseudo_gtid,
-				master_log_file,
-				read_master_log_pos,
-				relay_master_log_file,
-				exec_master_log_pos,
-				relay_log_file,
-				relay_log_pos,
-				last_sql_error,
-				last_io_error,
-				seconds_behind_master,
-				slave_lag_seconds,
-				sql_delay,
-				num_slave_hosts,
-				slave_hosts,
-				cluster_name,
-				suggested_cluster_alias,
-				data_center,
-				physical_environment,
-				replication_depth,
-				is_co_master,
-				replication_credentials_available,
-				has_replication_credentials,
-				allow_tls,
-				semi_sync_enforced,
-				instance_alias
-			) values (?, ?, NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-			%s
-			`, insertIgnore, onDuplicateKeyUpdate)
-
-		_, err := db.ExecOrchestrator(insertQuery,
-			instance.Key.Hostname,
-			instance.Key.Port,
-			instance.Uptime,
-			instance.ServerID,
-			instance.ServerUUID,
-			instance.Version,
-			instance.IsBinlogServer(),
-			instance.ReadOnly,
-			instance.Binlog_format,
-			instance.LogBinEnabled,
-			instance.LogSlaveUpdatesEnabled,
-			instance.SelfBinlogCoordinates.LogFile,
-			instance.SelfBinlogCoordinates.LogPos,
-			instance.MasterKey.Hostname,
-			instance.MasterKey.Port,
-			instance.Slave_SQL_Running,
-			instance.Slave_IO_Running,
-			instance.HasReplicationFilters,
-			instance.SupportsOracleGTID,
-			instance.UsingOracleGTID,
-			instance.ExecutedGtidSet,
-			instance.GtidPurged,
-			instance.UsingMariaDBGTID,
-			instance.UsingPseudoGTID,
-			instance.ReadBinlogCoordinates.LogFile,
-			instance.ReadBinlogCoordinates.LogPos,
-			instance.ExecBinlogCoordinates.LogFile,
-			instance.ExecBinlogCoordinates.LogPos,
-			instance.RelaylogCoordinates.LogFile,
-			instance.RelaylogCoordinates.LogPos,
-			instance.LastSQLError,
-			instance.LastIOError,
-			instance.SecondsBehindMaster,
-			instance.SlaveLagSeconds,
-			instance.SQLDelay,
-			len(instance.SlaveHosts),
-			instance.SlaveHosts.ToJSONString(),
-			instance.ClusterName,
-			instance.SuggestedClusterAlias,
-			instance.DataCenter,
-			instance.PhysicalEnvironment,
-			instance.ReplicationDepth,
-			instance.IsCoMaster,
-			instance.ReplicationCredentialsAvailable,
-			instance.HasReplicationCredentials,
-			instance.AllowTLS,
-			instance.SemiSyncEnforced,
-			instance.InstanceAlias,
-		)
+		err := writeManyInstances(instances, true, false)
 		if err != nil {
-			return log.Errore(err)
+			return log.Errorf("flushInstanceWriteBuffer writemany: %v", err)
+		}
+		err = writeManyInstances(lastseen, true, true)
+		if err != nil {
+			return log.Errorf("flushInstanceWriteBuffer last_seen: %v", err)
 		}
 
-		if instanceWasActuallyFound && lastError == nil {
-			db.ExecOrchestrator(`
-        		update database_instance set last_seen = NOW() where hostname=? and port=?
-        	`, instance.Key.Hostname, instance.Key.Port,
-			)
-		} else {
-			log.Debugf("writeInstance: will not update database_instance due to error: %+v", lastError)
-		}
-		writeInstanceCounter.Inc(1)
+		writeInstanceCounter.Inc(int64(len(instances)))
 		return nil
 	}
-	return ExecDBWriteFunc(writeFunc)
+	err := ExecDBWriteFunc(writeFunc)
+	if err != nil {
+		log.Errorf("flushInstanceWriteBuffer: %v", err)
+	}
+}
+
+// writeInstance stores an instance in the orchestrator backend
+func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError error) error {
+	if lastError != nil {
+		log.Debugf("writeInstance: will not update database_instance due to error: %+v", lastError)
+		return nil
+	}
+	return writeManyInstances([]*Instance{instance}, instanceWasActuallyFound, true)
 }
 
 // UpdateInstanceLastChecked updates the last_check timestamp in the orchestrator backed database
