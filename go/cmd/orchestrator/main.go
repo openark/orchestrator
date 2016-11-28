@@ -122,6 +122,8 @@ func main() {
 	}
 	config.RuntimeCLIFlags.ConfiguredVersion = AppVersion
 
+	inst.InitializeInstanceDao()
+
 	if len(flag.Args()) == 0 && *command == "" {
 		// No command, no argument: just prompt
 		fmt.Println(app.AppPrompt)
