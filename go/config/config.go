@@ -51,6 +51,7 @@ type Configuration struct {
 	MySQLTopologyUseMutualTLS                    bool   // Turn on TLS authentication with the Topology MySQL instances
 	MySQLTopologyMaxPoolConnections              int    // Max concurrent connections on any topology instance
 	DatabaselessMode__experimental               bool   // !!!EXPERIMENTAL!!! Orchestrator will execute without speaking to a backend database; super-standalone mode
+	BackendDB                                    string
 	MySQLOrchestratorHost                        string
 	MySQLOrchestratorMaxPoolConnections          int // The maximum size of the connection pool to the Orchestrator backend.
 	MySQLOrchestratorPort                        uint
@@ -226,6 +227,7 @@ func newConfiguration() *Configuration {
 		MySQLTopologyMaxPoolConnections:              3,
 		MySQLTopologyUseMutualTLS:                    false,
 		DatabaselessMode__experimental:               false,
+		BackendDB:                                    "rqlite",
 		MySQLOrchestratorUseMutualTLS:                false,
 		MySQLConnectTimeoutSeconds:                   2,
 		MySQLOrchestratorReadTimeoutSeconds:          30,
