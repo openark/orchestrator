@@ -1547,6 +1547,38 @@ func (this *HttpAPI) ReloadClusterAlias(params martini.Params, r render.Render, 
 	r.JSON(200, &APIResponse{Code: ERROR, Message: "This API call has been retired"})
 }
 
+// BulkPromotionRules returns a list of the known promotion rules for each instance
+func (this *HttpAPI) BulkPromotionRules(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+
+	promotionRules, err := inst.BulkReadCandidateDatabaseInstance()
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, promotionRules)
+}
+
+// BulkInstances returns a list of all known instances
+func (this *HttpAPI) BulkInstances(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+
+	instances, err := inst.BulkReadInstance()
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, instances)
+}
+
 // Agents provides complete list of registered agents (See https://github.com/github/orchestrator-agent)
 func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -2436,6 +2468,9 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "reset-hostname-resolve-cache", this.ResetHostnameResolveCache)
 	this.registerRequest(m, "deregister-hostname-unresolve/:host/:port", this.DeregisterHostnameUnresolve)
 	this.registerRequest(m, "register-hostname-unresolve/:host/:port/:virtualname", this.RegisterHostnameUnresolve)
+	// Bulk access to information
+	this.registerRequest(m, "/api/bulk-instances", this.BulkInstances)
+	this.registerRequest(m, "/api/bulk-promotion-rules", this.BulkPromotionRules)
 
 	// Agents
 	this.registerRequest(m, "agents", this.Agents)
