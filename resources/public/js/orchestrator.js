@@ -137,39 +137,6 @@ function getInstanceTitle(host, port) {
 
 
 
-function commonSuffixLength(strings) {
-  if (strings.length == 0) {
-    return 0;
-  }
-  if (strings.length == 1) {
-    return 0;
-  }
-  var longestSuffixLength = 0;
-  var maxLength = 0;
-  strings.forEach(function(s) {
-    maxLength = ((maxLength == 0) ? s.length : Math
-      .min(maxLength, s.length));
-  });
-  var suffixLength = 0;
-  while (suffixLength < maxLength) {
-    suffixLength++
-    var suffixes = strings.map(function(s) {
-      return s.substring(s.length - suffixLength)
-    });
-    var uniqueSuffixes = suffixes.filter(function(elem, pos) {
-      return suffixes.indexOf(elem) == pos;
-    })
-    if (uniqueSuffixes.length > 1) {
-      // lost it. keep last longestSuffixLength value
-      break;
-    }
-    // we're still good
-    longestSuffixLength = suffixLength;
-  }
-  return longestSuffixLength;
-}
-
-
 function addAlert(alertText, alertClass) {
   if ($.cookie("anonymize") == "true") {
     return false;
@@ -699,12 +666,8 @@ function normalizeInstances(instances, maintenanceList) {
   var hostNames = instances.map(function(instance) {
     return instance.title
   });
-  var suffixLength = commonSuffixLength(hostNames);
   instances.forEach(function(instance) {
     instance.canonicalTitle = canonizeInstanceTitle(instance.title)
-    if (instance.canonicalTitle == instance.title) {
-      instance.canonicalTitle = instance.title.substring(0, instance.title.length - suffixLength);
-    }
   });
   var instancesMap = {};
   instances.forEach(function(instance) {
