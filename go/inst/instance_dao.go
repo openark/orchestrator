@@ -645,6 +645,36 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 	return nil
 }
 
+// BulkReadInstance returns a list of all instances from the database
+// - hostname:port is good enough
+func BulkReadInstance() ([](*InstanceKey), error) {
+	var instances [](*InstanceKey)
+
+	// table scan - I know.
+	query := `
+SELECT	hostname, port
+FROM	database_instance
+`
+
+	err := db.QueryOrchestrator(query, nil, func(m sqlutils.RowMap) error {
+		instanceKey := &InstanceKey{
+			Hostname: m.GetString("hostname"),
+			Port:     m.GetInt("port"),
+		}
+		instances = append(instances, instanceKey)
+
+		log.Debugf("BulkReadInstance: %+v", instanceKey)
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return instances, nil
+}
+
 func ReadInstancePromotionRule(instance *Instance) (err error) {
 	if config.Config.DatabaselessMode__experimental {
 		return nil
