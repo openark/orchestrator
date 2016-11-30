@@ -57,6 +57,10 @@ recursively scan the entire topology)
 * `/api/deregister-hostname-unresolve/:host/:port`:  unregister the given mapping for the given host
 * `/api/register-hostname-unresolve/:host/:port/:virtualname`: register the host which should be used when unresolving the given virtual name
 
+The following bulk retrieval rules are intended for allowing the information inside orchestrator to be used by external systems.
+* `/api/bulk-instance`: provide a json list of instances in the form of Hostname Port
+* `/api/bulk-promotion-rules`: provide a json list of instance promotion rules in the form of Hostname Port PromotionRule
+
 
 #### Instance JSON breakdown
 

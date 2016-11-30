@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/user"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/outbrain/golib/log"
@@ -41,6 +42,12 @@ type CliCommand struct {
 	Section     string
 	Description string
 }
+
+type stringSlice []string
+
+func (a stringSlice) Len() int           { return len(a) }
+func (a stringSlice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a stringSlice) Less(i, j int) bool { return a[i] < a[j] }
 
 var commandSynonyms = map[string]string{
 	"relocate-slaves":             "relocate-replicas",
@@ -1447,6 +1454,34 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatalf("ERROR: Failed to determine if recoveries are disabled globally: %v\n", err)
 			}
 			fmt.Printf("OK: Global recoveries disabled: %v\n", isDisabled)
+		}
+	case registerCliCommand("bulk-instances", "", `Return a list of sorted instance names known to orchestrator`):
+		{
+			instances, err := inst.BulkReadInstance()
+			if err != nil {
+				log.Fatalf("Error: Failed to retrieve instances: %v\n", err)
+				return
+			}
+			var asciiInstances stringSlice
+			for _, v := range instances {
+				asciiInstances = append(asciiInstances, v.String())
+			}
+			sort.Sort(asciiInstances)
+			fmt.Printf("%s\n", strings.Join(asciiInstances, "\n"))
+		}
+	case registerCliCommand("bulk-promotion-rules", "", `Return a list of promotion rules known to orchestrator`):
+		{
+			promotionRules, err := inst.BulkReadCandidateDatabaseInstance()
+			if err != nil {
+				log.Fatalf("Error: Failed to retrieve promotion rules: %v\n", err)
+			}
+			var asciiPromotionRules stringSlice
+			for _, v := range promotionRules {
+				asciiPromotionRules = append(asciiPromotionRules, v.String())
+			}
+			sort.Sort(asciiPromotionRules)
+
+			fmt.Printf("%s\n", strings.Join(asciiPromotionRules, "\n"))
 		}
 		// Help
 	case "help":
