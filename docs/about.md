@@ -1,6 +1,6 @@
 # About Orchestrator
 
-`Orchestrator` is a MySQL replication topology management and visualization tool, allowing for:
+`Orchestrator` is a MySQL replication topology HA, management and visualization tool, allowing for:
 
 #### Discovery
 
@@ -34,7 +34,7 @@ recovery itself.
 
 Authored by [Shlomi Noach](https://github.com/shlomi-noach)
 
-This project was originally initiated at [Outbrain](http://outbrain.com), who were kind enough to release it as open source in its very first days. Outbrain were also kind enough to permit the change of license from Apache 2.0 to MIT, the latter being even more permissible than the former.
+This project was originally initiated at [Outbrain](http://outbrain.com), who were kind enough to release it as open source from its very beginning. We wish to recognize Outbrain for their support of open source software and for their further willingness to collaborate to this particular project's success.
 
 The project was later developed at [Booking.com](http://booking.com) and the company was gracious enough to release further changes into the open source.
 

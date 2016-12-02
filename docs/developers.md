@@ -150,8 +150,8 @@ Or you will workaround as follows:
 
 	cd $GOPATH
 	mkdir -p {src,bin,pkg}
-	mkdir -p src/github.com/outbrain/
-	cd src/github.com/outbrain/
+	mkdir -p src/github.com/github/
+	cd src/github.com/github/
 	git clone git@github.com:you-are-awesome/orchestrator.git # OR: git clone https://github.com/you-are-awesome/orchestrator.git
 	cd orchestrator/
 	go get ./...
