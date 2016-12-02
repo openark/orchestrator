@@ -25,13 +25,13 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/util"
 	"github.com/github/orchestrator/go/agent"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/process"
+	"github.com/outbrain/golib/log"
+	"github.com/outbrain/golib/util"
 )
 
 var thisInstanceKey *inst.InstanceKey

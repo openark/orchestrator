@@ -22,8 +22,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/outbrain/golib/math"
 	"github.com/github/orchestrator/go/config"
+	"github.com/outbrain/golib/math"
 )
 
 // CandidatePromotionRule describe the promotion preference/rule for an instance.

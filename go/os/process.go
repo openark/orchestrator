@@ -24,8 +24,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/outbrain/golib/log"
 	"github.com/github/orchestrator/go/config"
+	"github.com/outbrain/golib/log"
 )
 
 // CommandRun executes some text as a command. This is assumed to be

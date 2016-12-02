@@ -21,11 +21,11 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/ssl"
 	"github.com/go-sql-driver/mysql"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/ssl"
 )
 
 var (

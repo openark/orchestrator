@@ -29,9 +29,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/outbrain/golib/log"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/inst"
+	"github.com/outbrain/golib/log"
 )
 
 type Queue struct {

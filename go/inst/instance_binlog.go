@@ -21,8 +21,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/outbrain/golib/log"
 	"github.com/github/orchestrator/go/config"
+	"github.com/outbrain/golib/log"
 )
 
 // Event entries may contains table IDs (can be different for same tables on different servers)

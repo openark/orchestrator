@@ -18,11 +18,11 @@ package logic
 
 import (
 	"fmt"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/inst"
+	"github.com/outbrain/golib/log"
+	"github.com/outbrain/golib/sqlutils"
 )
 
 // WriteAsyncRequest

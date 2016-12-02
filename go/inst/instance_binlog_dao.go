@@ -22,11 +22,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/db"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/math"
 	"github.com/outbrain/golib/sqlutils"
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/db"
 	"github.com/patrickmn/go-cache"
 )
 

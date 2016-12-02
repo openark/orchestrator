@@ -27,11 +27,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/inst"
+	"github.com/outbrain/golib/log"
+	"github.com/outbrain/golib/sqlutils"
 )
 
 var SeededAgents chan *Agent = make(chan *Agent)

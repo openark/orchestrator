@@ -19,10 +19,10 @@ package inst
 import (
 	"fmt"
 
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
+	"github.com/outbrain/golib/log"
+	"github.com/outbrain/golib/sqlutils"
 )
 
 // writePoolInstances will write (and override) a single cluster name mapping

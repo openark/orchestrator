@@ -17,9 +17,9 @@
 package inst
 
 import (
+	"github.com/github/orchestrator/go/config"
 	"github.com/outbrain/golib/log"
 	test "github.com/outbrain/golib/tests"
-	"github.com/github/orchestrator/go/config"
 	"testing"
 )
 

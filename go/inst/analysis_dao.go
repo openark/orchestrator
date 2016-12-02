@@ -18,10 +18,10 @@ package inst
 
 import (
 	"fmt"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
+	"github.com/outbrain/golib/log"
+	"github.com/outbrain/golib/sqlutils"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
 	"regexp"

@@ -23,12 +23,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/outbrain/golib/log"
 	"github.com/github/orchestrator/go/attributes"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/os"
 	"github.com/github/orchestrator/go/process"
+	"github.com/outbrain/golib/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
 )

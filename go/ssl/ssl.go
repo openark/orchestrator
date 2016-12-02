@@ -10,10 +10,10 @@ import (
 	nethttp "net/http"
 	"strings"
 
+	"github.com/github/orchestrator/go/config"
 	"github.com/go-martini/martini"
 	"github.com/howeyc/gopass"
 	"github.com/outbrain/golib/log"
-	"github.com/github/orchestrator/go/config"
 )
 
 var cipherSuites = []uint16{

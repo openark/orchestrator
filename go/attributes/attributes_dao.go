@@ -23,9 +23,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/github/orchestrator/go/db"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
-	"github.com/github/orchestrator/go/db"
 )
 
 func readResponse(res *http.Response, err error) ([]byte, error) {
