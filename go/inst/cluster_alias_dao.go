@@ -21,7 +21,7 @@ import (
 
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
-	"github.com/outbrain/orchestrator/go/db"
+	"github.com/github/orchestrator/go/db"
 )
 
 // ReadClusterNameByAlias

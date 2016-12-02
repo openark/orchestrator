@@ -24,12 +24,12 @@ import (
 	"time"
 
 	"github.com/outbrain/golib/log"
-	"github.com/outbrain/orchestrator/go/agent"
-	"github.com/outbrain/orchestrator/go/config"
-	"github.com/outbrain/orchestrator/go/discovery"
-	"github.com/outbrain/orchestrator/go/inst"
-	ometrics "github.com/outbrain/orchestrator/go/metrics"
-	"github.com/outbrain/orchestrator/go/process"
+	"github.com/github/orchestrator/go/agent"
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/discovery"
+	"github.com/github/orchestrator/go/inst"
+	ometrics "github.com/github/orchestrator/go/metrics"
+	"github.com/github/orchestrator/go/process"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
 )

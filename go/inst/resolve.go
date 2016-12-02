@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/outbrain/golib/log"
-	"github.com/outbrain/orchestrator/go/config"
+	"github.com/github/orchestrator/go/config"
 	"github.com/patrickmn/go-cache"
 	"net"
 	"regexp"

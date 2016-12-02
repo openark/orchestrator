@@ -17,8 +17,8 @@
 package inst
 
 import (
-	"github.com/outbrain/orchestrator/go/config"
-	"github.com/outbrain/orchestrator/go/db"
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/db"
 	. "gopkg.in/check.v1"
 	"math/rand"
 	"testing"

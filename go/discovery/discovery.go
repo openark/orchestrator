@@ -30,8 +30,8 @@ import (
 	"time"
 
 	"github.com/outbrain/golib/log"
-	"github.com/outbrain/orchestrator/go/config"
-	"github.com/outbrain/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/inst"
 )
 
 type Queue struct {

@@ -21,8 +21,8 @@ import (
 
 	"github.com/outbrain/golib/sqlutils"
 
-	"github.com/outbrain/orchestrator/go/config"
-	"github.com/outbrain/orchestrator/go/db"
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/db"
 )
 
 // CandidateDatabaseInstance contains information about explicit promotion rules for an instance

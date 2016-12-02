@@ -19,7 +19,7 @@ package inst
 import (
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
-	"github.com/outbrain/orchestrator/go/db"
+	"github.com/github/orchestrator/go/db"
 )
 
 // WriteLongRunningProcesses rewrites current state of long running processes for given instance

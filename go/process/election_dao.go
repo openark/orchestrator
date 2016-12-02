@@ -19,8 +19,8 @@ package process
 import (
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
-	"github.com/outbrain/orchestrator/go/config"
-	"github.com/outbrain/orchestrator/go/db"
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/db"
 )
 
 // AttemptElection tries to grab leadership (become active node)

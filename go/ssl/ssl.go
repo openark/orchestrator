@@ -13,7 +13,7 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/howeyc/gopass"
 	"github.com/outbrain/golib/log"
-	"github.com/outbrain/orchestrator/go/config"
+	"github.com/github/orchestrator/go/config"
 )
 
 var cipherSuites = []uint16{

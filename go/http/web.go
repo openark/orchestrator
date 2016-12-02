@@ -29,8 +29,8 @@ import (
 	"github.com/rcrowley/go-metrics"
 	"github.com/rcrowley/go-metrics/exp"
 
-	"github.com/outbrain/orchestrator/go/config"
-	"github.com/outbrain/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/inst"
 )
 
 // HttpWeb is the web requests server, mapping each request to a web page

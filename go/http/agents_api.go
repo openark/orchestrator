@@ -25,8 +25,8 @@ import (
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/render"
 
-	"github.com/outbrain/orchestrator/go/agent"
-	"github.com/outbrain/orchestrator/go/attributes"
+	"github.com/github/orchestrator/go/agent"
+	"github.com/github/orchestrator/go/attributes"
 )
 
 type HttpAgentsAPI struct {

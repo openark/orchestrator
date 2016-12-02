@@ -3,7 +3,7 @@ package inst
 import (
 	"github.com/outbrain/golib/log"
 	test "github.com/outbrain/golib/tests"
-	"github.com/outbrain/orchestrator/go/config"
+	"github.com/github/orchestrator/go/config"
 	"testing"
 )
 
