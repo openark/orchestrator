@@ -30,11 +30,11 @@ import (
 
 	"github.com/outbrain/golib/util"
 
-	"github.com/outbrain/orchestrator/go/agent"
-	"github.com/outbrain/orchestrator/go/config"
-	"github.com/outbrain/orchestrator/go/inst"
-	"github.com/outbrain/orchestrator/go/logic"
-	"github.com/outbrain/orchestrator/go/process"
+	"github.com/github/orchestrator/go/agent"
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/logic"
+	"github.com/github/orchestrator/go/process"
 )
 
 // APIResponseCode is an OK/ERROR response code

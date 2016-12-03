@@ -19,7 +19,7 @@ package inst
 import (
 	"strings"
 
-	"github.com/outbrain/orchestrator/go/config"
+	"github.com/github/orchestrator/go/config"
 
 	"github.com/outbrain/golib/log"
 )

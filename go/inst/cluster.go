@@ -17,7 +17,7 @@
 package inst
 
 import (
-	"github.com/outbrain/orchestrator/go/config"
+	"github.com/github/orchestrator/go/config"
 	"regexp"
 	"strings"
 )

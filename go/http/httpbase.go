@@ -23,8 +23,8 @@ import (
 
 	"github.com/martini-contrib/auth"
 
-	"github.com/outbrain/orchestrator/go/config"
-	"github.com/outbrain/orchestrator/go/process"
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/process"
 )
 
 func getProxyAuthUser(req *http.Request) string {
