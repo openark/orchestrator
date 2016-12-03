@@ -171,7 +171,7 @@ function main() {
 
 build_only=0
 opt_race=
-while getopts a:t:p:s:dbhr flag; do
+while getopts a:t:p:s:v:dbhr flag; do
   case $flag in
   a)
     arch="${OPTARG}"
