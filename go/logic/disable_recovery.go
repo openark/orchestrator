@@ -30,9 +30,9 @@ package logic
 // go to the database each time.
 
 import (
+	"github.com/github/orchestrator/go/db"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
-	"github.com/outbrain/orchestrator/go/db"
 )
 
 // IsRecoveryDisabled returns true if Recoveries are disabled globally

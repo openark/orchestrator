@@ -17,7 +17,7 @@
 package logic
 
 import (
-	"github.com/outbrain/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/inst"
 )
 
 // AsyncRequest represents an entry in the async_request table

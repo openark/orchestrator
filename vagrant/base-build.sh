@@ -12,15 +12,15 @@ if [[ -e /etc/redhat-release ]]; then
 
   # Build orchestrator and orchestrator agent
   mkdir -p /home/vagrant/go/{bin,pkg,src} /tmp/orchestrator-release
-  mkdir -p /home/vagrant/go/src/github.com/outbrain/orchestrator
-  mount --bind /orchestrator /home/vagrant/go/src/github.com/outbrain/orchestrator
+  mkdir -p /home/vagrant/go/src/github.com/github/orchestrator
+  mount --bind /orchestrator /home/vagrant/go/src/github.com/github/orchestrator
 
   # Build Orchestrator
   export GOPATH=/home/vagrant/go
   export GO15VENDOREXPERIMENT=1
-  cd ${GOPATH}/src/github.com/outbrain/orchestrator
+  cd ${GOPATH}/src/github.com/github/orchestrator
   /usr/bin/go get ./...
-  ${GOPATH}/src/github.com/outbrain/orchestrator/build.sh
+  ${GOPATH}/src/github.com/github/orchestrator/build.sh
   chown -R vagrant.vagrant /home/vagrant /tmp/orchestrator-release
 
   # Setup mysql

@@ -18,9 +18,9 @@ package inst
 
 import (
 	"fmt"
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/db"
 	"github.com/outbrain/golib/log"
-	"github.com/outbrain/orchestrator/go/config"
-	"github.com/outbrain/orchestrator/go/db"
 )
 
 // BeginDowntime will make mark an instance as downtimed (or override existing downtime period)
