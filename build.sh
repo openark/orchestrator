@@ -6,7 +6,8 @@
 #
 set -e
 
-RELEASE_VERSION=$(cat RELEASE_VERSION)
+RELEASE_VERSION=
+RELEASE_SUBVERSION=
 TOPDIR=/tmp/orchestrator-release
 export RELEASE_VERSION TOPDIR
 export GO15VENDOREXPERIMENT=1
@@ -22,7 +23,8 @@ usage() {
   echo "-b build only, do not generate packages"
   echo "-p build prefix Default:(/usr/local)"
   echo "-r build with race detector"
-  echo "-s release subversion"
+  echo "-v release version (optional; default: content of RELEASE_VERSION file)"
+  echo "-s release subversion (optional; default: empty)"
   echo
 }
 
@@ -152,6 +154,11 @@ function main() {
   prefix="$3"
   build_only=$4
 
+  if [ -z "${RELEASE_VERSION}" ] ; then
+    RELEASE_VERSION=$(cat RELEASE_VERSION)
+  fi
+  RELEASE_VERSION="${RELEASE_VERSION}${RELEASE_SUBVERSION}"
+
   precheck "$target"
   builddir=$( setuptree "$prefix" )
   oinstall "$builddir" "$prefix"
@@ -167,10 +174,10 @@ opt_race=
 while getopts a:t:p:s:dbhr flag; do
   case $flag in
   a)
-    arch="$OPTARG"
+    arch="${OPTARG}"
     ;;
   t)
-    target="$OPTARG"
+    target="${OPTARG}"
     ;;
   h)
     usage
@@ -184,13 +191,16 @@ while getopts a:t:p:s:dbhr flag; do
     build_only=1
     ;;
   p)
-    prefix="$OPTARG"
+    prefix="${OPTARG}"
     ;;
   r)
     opt_race="-race"
     ;;
+  v)
+    RELEASE_VERSION="${OPTARG}"
+    ;;
   s)
-    RELEASE_VERSION="${RELEASE_VERSION}_${OPTARG}"
+    RELEASE_SUBVERSION="_${OPTARG}"
     ;;
   ?)
     usage
