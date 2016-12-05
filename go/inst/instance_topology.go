@@ -23,9 +23,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/github/orchestrator/go/config"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/math"
-	"github.com/outbrain/orchestrator/go/config"
 )
 
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively

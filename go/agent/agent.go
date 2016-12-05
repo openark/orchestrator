@@ -16,7 +16,7 @@
 
 package agent
 
-import "github.com/outbrain/orchestrator/go/inst"
+import "github.com/github/orchestrator/go/inst"
 
 // LogicalVolume describes an LVM volume
 type LogicalVolume struct {

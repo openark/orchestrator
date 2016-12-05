@@ -1,4 +1,4 @@
-orchestrator [[Manual]](https://github.com/outbrain/orchestrator/wiki/Orchestrator-Manual)
+orchestrator [[Documentation]](https://github.com/github/orchestrator/tree/master/docs)
 ============
 
 `orchestrator` is a MySQL replication topology management and visualization tool, allowing for:
@@ -13,22 +13,18 @@ It provides with slick visualization of your topologies, including replication p
 
 `orchestrator` understands replication rules. It knows about binlog file:position, GTID, Pseudo GTID, Binlog Servers.
 
-Refactoring replication topologies can be a matter of drag & drop a replica under another master. Moving slaves around becomes
-safe: `orchestrator` will reject an illegal refactoring attempt.
+Refactoring replication topologies can be a matter of drag & drop a replica under another master. Moving replicas around is safe: `orchestrator` will reject an illegal refactoring attempt.
 
 Find grained control is achieved by various command line options.
 
 #### Recovery
 
-`orchestrator` uses a holistic approach to detect master and intermediate master failures. Based on information gained from
-the topology itself, it recognizes a variety of failure scenarios.
+`orchestrator` uses a holistic approach to detect master and intermediate master failures. Based on information gained from the topology itself, it recognizes a variety of failure scenarios.
 
-Configurable, it may choose to perform automated recovery (or allow the user to choose type of manual recovery). Intermediate master
-recovery achieved internally to `orchestrator`. Master failover supported by pre/post failure hooks.
+Configurable, it may choose to perform automated recovery (or allow the user to choose type of manual recovery). Intermediate master recovery achieved internally to `orchestrator`. Master failover supported by pre/post failure hooks.
 
 Recovery process utilizes _orchestrator's_ understanding of the topology and of its ability to perform refactoring. It is based on _state_ as opposed to _configuration_: `orchestrator` picks the best recovery method by investigating/evaluating the topology at the time of
 recovery itself.
-
 
 #### The interface
 
@@ -38,7 +34,7 @@ recovery itself.
 - Web API (HTTP GET access)
 - Web interface, a _slick_ one.
 
-![Orcehstrator screenshot](https://raw.githubusercontent.com/wiki/outbrain/orchestrator/images/orchestrator-simple.png)
+![Orcehstrator screenshot](https://github.com/github/orchestrator/raw/master/docs/images/orchestrator-simple-topology.png)
 
 #### More
 
@@ -49,10 +45,10 @@ recovery itself.
 - MySQL-Pool association
 - Run as a service; orchestrator multi-service HA
 - HTTP security/authentication methods
-- When working with [orchestrator-agent](https://github.com/outbrain/orchestrator-agent), seed new/corrupt instances
+- Coupled with [orchestrator-agent](https://github.com/github/orchestrator-agent), seed new/corrupt instances
 - More...
 
-Read the [Orchestrator Manual](https://github.com/outbrain/orchestrator/wiki/Orchestrator-Manual) for comprehensive documentation.
+Read the [Orchestrator documentation](https://github.com/github/orchestrator/tree/master/docs)
 
 Authored by [Shlomi Noach](https://github.com/shlomi-noach) at [GitHub](http://github.com). Previously at [Booking.com](http://booking.com) and [Outbrain](http://outbrain.com)
 

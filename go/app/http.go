@@ -21,18 +21,18 @@ import (
 	nethttp "net/http"
 	"strings"
 
+	"github.com/github/orchestrator/go/agent"
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/http"
+	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/logic"
+	"github.com/github/orchestrator/go/process"
+	"github.com/github/orchestrator/go/ssl"
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/gzip"
 	"github.com/martini-contrib/render"
 	"github.com/outbrain/golib/log"
-	"github.com/outbrain/orchestrator/go/agent"
-	"github.com/outbrain/orchestrator/go/config"
-	"github.com/outbrain/orchestrator/go/http"
-	"github.com/outbrain/orchestrator/go/inst"
-	"github.com/outbrain/orchestrator/go/logic"
-	"github.com/outbrain/orchestrator/go/process"
-	"github.com/outbrain/orchestrator/go/ssl"
 )
 
 var sslPEMPassword []byte

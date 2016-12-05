@@ -10,7 +10,7 @@ set -e
 # up so it points back to us and go is none the wiser
 
 set -x
-#rm -rf .gopath
-mkdir -p .gopath/src/github.com/outbrain
-ln -s "$PWD" .gopath/src/github.com/outbrain/orchestrator
+rm -rf .gopath
+mkdir -p .gopath/src/github.com/github
+ln -s "$PWD" .gopath/src/github.com/github/orchestrator
 export GOPATH=$PWD/.gopath:$GOPATH

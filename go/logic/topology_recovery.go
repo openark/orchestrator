@@ -23,12 +23,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/github/orchestrator/go/attributes"
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/os"
+	"github.com/github/orchestrator/go/process"
 	"github.com/outbrain/golib/log"
-	"github.com/outbrain/orchestrator/go/attributes"
-	"github.com/outbrain/orchestrator/go/config"
-	"github.com/outbrain/orchestrator/go/inst"
-	"github.com/outbrain/orchestrator/go/os"
-	"github.com/outbrain/orchestrator/go/process"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
 )
