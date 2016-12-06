@@ -893,10 +893,10 @@ $(document).ready(function() {
   $.get(appUrl("/api/clusters-info"), function(clusters) {
     clusters.forEach(function(cluster) {
       var url = appUrl('/web/cluster/' + cluster.ClusterName)
-      var title = '<span class="small">' + cluster.ClusterName + '</span>';
+      var title = cluster.ClusterName;
       if ((cluster.ClusterAlias != "") && (cluster.ClusterAlias != cluster.ClusterName)) {
         url = appUrl('/web/cluster/alias/' + encodeURIComponent(cluster.ClusterAlias));
-        title = '<strong>' + cluster.ClusterAlias + '</strong>, ' + title;
+        title = '<strong>' + cluster.ClusterAlias + '</strong>, <span class="small">' + title + '</span>';;
       }
       $("#dropdown-clusters").append('<li><a href="' + url + '">' + title + '</a></li>');
     });
