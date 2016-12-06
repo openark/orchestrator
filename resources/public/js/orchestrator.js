@@ -894,7 +894,7 @@ $(document).ready(function() {
     clusters.forEach(function(cluster) {
       var url = appUrl('/web/cluster/' + cluster.ClusterName)
       var title = '<span class="small">' + cluster.ClusterName + '</span>';
-      if ((cluster.ClusterAlias != "") && (cluster.ClusterName != "")) {
+      if ((cluster.ClusterAlias != "") && (cluster.ClusterAlias != cluster.ClusterName)) {
         url = appUrl('/web/cluster/alias/' + encodeURIComponent(cluster.ClusterAlias));
         title = '<strong>' + cluster.ClusterAlias + '</strong>, ' + title;
       }
