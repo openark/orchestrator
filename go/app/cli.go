@@ -1363,6 +1363,26 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			jsonString := config.Config.ToJSONString()
 			fmt.Println(jsonString)
 		}
+	case registerCliCommand("show-resolve-hosts", "Meta", `Show the content of the hostname_resolve table. Generally used for debugging`):
+		{
+			resolves, err := inst.ReadAllHostnameResolves()
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, r := range resolves {
+				fmt.Println(r)
+			}
+		}
+	case registerCliCommand("show-unresolve-hosts", "Meta", `Show the content of the hostname_unresolve table. Generally used for debugging`):
+		{
+			unresolves, err := inst.ReadAllHostnameUnresolves()
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, r := range unresolves {
+				fmt.Println(r)
+			}
+		}
 	case registerCliCommand("redeploy-internal-db", "Meta, internal", `Force internal schema migration to current backend structure`):
 		{
 			config.RuntimeCLIFlags.ConfiguredVersion = ""
