@@ -33,7 +33,7 @@ type HostnameResolve struct {
 	resolvedHostname string
 }
 
-func (this *HostnameResolve) String() string {
+func (this HostnameResolve) String() string {
 	return fmt.Sprintf("%s %s", this.hostname, this.resolvedHostname)
 }
 
@@ -42,7 +42,7 @@ type HostnameUnresolve struct {
 	unresolvedHostname string
 }
 
-func (this *HostnameUnresolve) String() string {
+func (this HostnameUnresolve) String() string {
 	return fmt.Sprintf("%s %s", this.hostname, this.unresolvedHostname)
 }
 
