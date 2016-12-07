@@ -1,6 +1,6 @@
 # Configuration
 
-The following is a complete list of configuration parameters. "Complete" is always behind the latest code; you may also want to look at [config.go](https://github.com/github/orchestrator/blob/master/src/github.com/github/orchestrator/config/config.go)
+The following is an incomplete list of configuration parameters. "Complete" is always behind the latest code; you may also want to look at [config.go](https://github.com/github/orchestrator/blob/master/go/config/config.go)
 
 * `Debug`                   (bool), set debug mode (similar to --debug option)
 * `ListenAddress`           (string), host & port to listen on (default `":3000"`). You can limit connections to local machine via `"127.0.0.1:3000"`
@@ -19,7 +19,7 @@ The following is a complete list of configuration parameters. "Complete" is alwa
 * `MySQLHostnameResolveMethod` (string), Method to resolve how to reach the MySQL instance. This is more powerful than `HostnameResolveMethod` and is ideal for complex setups like multiple instances on a host with a VIP per instance. Defaults to `none` but can be set to `@@report_host`
 * `DefaultInstancePort` (int), In case port was not specified on command line (default value for this default is `3306`)
 * `SkipOrchestratorDatabaseUpdate`  (bool), When false, orchestrator will attempt to create & update all tables in backend database; when true, this is skipped. It makes sense to skip on command-line invocations and to enable for http or occasional invocations, or just after upgrades
-* `SlaveLagQuery`               (string), custom query to check on replica lg (e.g. heartbeat table). If unprovided,
+* `ReplicaLagQuery`               (string), custom query to check on replica lg (e.g. heartbeat table). If unprovided,
   replica's `Seconds_Behind_Master` is used.
 * `SlaveStartPostWaitMilliseconds`  (int), Time to wait after `START SLAVE` before re-reading instance (give replica chance to connect to master)
 * `DiscoverByShowSlaveHosts`    (bool), Attempt `SHOW SLAVE HOSTS` before `SHOW PROCESSLIST`
@@ -84,7 +84,7 @@ The following is a complete list of configuration parameters. "Complete" is alwa
 * `RecoverMasterClusterFilters` ([]string), Only do master recovery on clusters matching these regexp patterns (of course the ``.*`` pattern matches everything)
 * `RecoverIntermediateMasterClusterFilters` ([]string), Only do intermediate-master recovery on clusters matching these regexp patterns (of course the ``.*`` pattern matches everything)
 
-See [sample config file](https://github.com/github/orchestrator/blob/master/conf/orchestrator.conf.json) in master branch.
+See [sample config file](https://github.com/github/orchestrator/blob/master/conf/orchestrator-simple.conf.json) in master branch.
 
 #### Minimal config to work with
 
@@ -136,7 +136,7 @@ See [security](#security) section.
 
 Use a heartbeat mechanism (as with [pt-heartbeat](http://www.percona.com/doc/percona-toolkit/2.1/pt-heartbeat.html)), and configure:
 ```
-  "SlaveLagQuery": "select slave_lag_seconds from heartbeat_table",
+  "ReplicationLagQuery": "select replication_lag_seconds from heartbeat_table",
 ```
 
 If you have multiple instances on same host, you must configure your MySQL servers with `report_host` and `report_port` and add:

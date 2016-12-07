@@ -7,17 +7,17 @@ If not, please refer to the [installation section](Orchestrator-Manual#installat
 
 The following hints should clear up some questions:
 
-- `Orchestrator` can run as a linux service
+- `orchestrator` can run as a linux service
   - When running as a service, it assumes the role of continuous discovery: a never ending polling of your MySQL topologies
   - When running as a service, it also provides HTTP API/Web interface
-- `Orchestrator` can run in command line mode
+- `orchestrator` can run in command line mode
   - Useful for us CLI geeks who want to have greater control and capture all the lovely debug messages
 
 ###### In terms of deployment
 
-- `Orchestrator` uses a MySQL backend.
-- The backend database has the _state_ of your topologies. `Orchestrator` is almost stateless.
-  - `Orchestrator` only has state for pending operations (e.g. while a replica is being moved)
+- `orchestrator` uses a MySQL backend.
+- The backend database has the _state_ of your topologies. `orchestrator` is almost stateless.
+  - `orchestrator` only has state for pending operations (e.g. while a replica is being moved)
 - The backend databse will have the state of your multiple topologies.  
 - You _can_ and _should_ have more than one `orchestrator` running with the same MySQL backend.
 - You should _not_ have more than one MySQL backend.
@@ -40,7 +40,7 @@ The author of `orchestrator` has deployed it in large environments of thousands 
   with the _same backend MySQL_
 - You _may_ concurrently issue commands from multiple CLIs, as well as working with the Web UI at the same time.
 - The (single) MySQL backend has the necessary state for managing concurrent operations.
-- `Orchestrator` has "maintenance locks" which prevent destructive concurrent operations on the same instance. At worst an
+- `orchestrator` has "maintenance locks" which prevent destructive concurrent operations on the same instance. At worst an
   operation will be rejected due to not being able to acquire maintenance lock.
 
 The author of `orchestrator` has it deployed on multiple machines as a service, behind a F5 load balancer. On the same setup,

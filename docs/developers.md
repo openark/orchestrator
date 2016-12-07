@@ -1,19 +1,19 @@
 # Orchestrator for Developers
 
-`Orchestrator` is open source and accepts pull requests.
+`orchestrator` is open source and accepts pull requests.
 
 If you would like to build `orchestrator` on your own machine, or eventually submit PRs, follow this guide.
 
 #### Requirements
 
-`Orchestrator` is built on Linux. OS/X should generally follow same guidelines. I have no hint about MS Windows, and the
+`orchestrator` is built on Linux. OS/X should generally follow same guidelines. I have no hint about MS Windows, and the
 build is incompatible with Windows.
 
 #### Go setup
 
-You will need to have a *Go 1.5* environment. *1.5* is required as of Dec 2015 due to [vendor directories](https://golang.org/cmd/go/#hdr-Vendor_Directories) - Go's package dependencies solution.
+You will need to have a *Go 1.5* or higher environment. *1.5* is required as of Dec 2015 due to [vendor directories](https://golang.org/cmd/go/#hdr-Vendor_Directories) - Go's package dependencies solution.
 
-You will need to
+With `1.5` you will need to
 
 	export GO15VENDOREXPERIMENT=1
 
@@ -21,13 +21,9 @@ This guide assumes you have set your Go environment, along with `GOPATH`.
 
 To get started, issue
 
-	go get github.com/github/orchestrator
+	go get github.com/github/orchestrator/...
 
 Change directory into `$GOPATH:/src/github.com/github/orchestrator`
-
-Issue the following to resolve all dependencies:
-
-	go get ./...
 
 Test that your code builds via
 
@@ -35,7 +31,7 @@ Test that your code builds via
 
 #### DB setup
 
-`Orchestrator` requires a MySQL backend to run. This could be installed anywhere. I usually use [mysqlsandbox](http://mysqlsandbox.net/) for local installations. You may choose to just install mysql-server on your dev machine.
+`orchestrator` requires a MySQL backend to run. This could be installed anywhere. I usually use [mysqlsandbox](http://mysqlsandbox.net/) for local installations. You may choose to just install mysql-server on your dev machine.
 
 Once your backend MySQL setup is complete, issue:
 
@@ -43,7 +39,7 @@ Once your backend MySQL setup is complete, issue:
     GRANT ALL PRIVILEGES ON `orchestrator`.* TO 'orchestrator'@'127.0.0.1'
     IDENTIFIED BY 'orch_backend_password';
 
-`Orchestrator` uses a configuration file whose search path is either `/etc/orchestrator.conf.json`,  `conf/orchestrator.conf.json` or `orchestrator.conf.json`.
+`orchestrator` uses a configuration file whose search path is either `/etc/orchestrator.conf.json`,  `conf/orchestrator.conf.json` or `orchestrator.conf.json`.
 The repository includes a file called `conf/orchestrator.conf.json.sample` with some basic settings. Issue:
 
 	cp conf/orchestrator.conf.json.sample conf/orchestrator.conf.json
@@ -101,7 +97,7 @@ If you've made it this far, you've done 90% of the work. You may consider config
 
 #### Building
 
-To build an `Orchestrator` package, use the `build.sh` script:
+To build an `orchestrator` package, use the `build.sh` script:
 
 	bash build.sh
 
@@ -134,7 +130,7 @@ If you want to submit [pull-requests](https://help.github.com/articles/using-pul
 
 Setting up the environment is basically the same, except you don't want to
 
-	go get github.com/github/orchestrator
+	go get github.com/github/orchestrator/...
 
 But instead clone your own repository.
 
@@ -143,7 +139,7 @@ that coupling.
 
 Very briefly, you will either want to:
 
-	go get github.com/github/orchestrator
+	go get github.com/github/orchestrator/...
 	git remote add awesome-fork https://github.com/you-are-awesome/orchestrator.git
 
 Or you will workaround as follows:
@@ -154,7 +150,6 @@ Or you will workaround as follows:
 	cd src/github.com/github/
 	git clone git@github.com:you-are-awesome/orchestrator.git # OR: git clone https://github.com/you-are-awesome/orchestrator.git
 	cd orchestrator/
-	go get ./...
 
 
 You will have a fork of `orchestrator` to which you can push your changes and from which you can send pull requests.
