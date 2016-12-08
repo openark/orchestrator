@@ -3,6 +3,8 @@ orchestrator [[Documentation]](https://github.com/github/orchestrator/tree/maste
 
 `orchestrator` is a MySQL replication topology management and visualization tool, allowing for:
 
+![Orcehstrator logo](https://github.com/github/orchestrator/raw/readme-logo/docs/images/orchestrator-logo-wide.png)
+
 #### Discovery
 
 `orchestrator` actively crawls through your topologies and maps them. It reads basic MySQL info such as replication status and configuration.
