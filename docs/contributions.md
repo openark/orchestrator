@@ -1,4 +1,4 @@
 # Contributions
 
 Yes, please. All contributions must be licensed under the
-[MIT license](license.md) or compatible.
+[Apache License 2.0](license.md) or compatible.
