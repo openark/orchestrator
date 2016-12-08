@@ -1,9 +1,9 @@
 orchestrator [[Documentation]](https://github.com/github/orchestrator/tree/master/docs)
 ============
 
-`orchestrator` is a MySQL replication topology management and visualization tool, allowing for:
-
 ![Orcehstrator logo](https://github.com/github/orchestrator/raw/readme-logo/docs/images/orchestrator-logo-wide.png)
+
+`orchestrator` is a MySQL replication topology management and visualization tool, allowing for:
 
 #### Discovery
 
