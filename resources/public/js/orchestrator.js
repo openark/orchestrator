@@ -830,11 +830,12 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (indicateLastSeenInStatus) {
       statusMessage = 'seen ' + instance.SecondsSinceLastSeen.Int64 + ' seconds ago';
     }
-    var contentHtml = '' + instance.Version;
+    var identityHtml = '' + instance.Version;
     if (instance.LogBinEnabled) {
-      contentHtml += " " + instance.Binlog_format;
+      identityHtml += " " + instance.Binlog_format;
     }
-    contentHtml = '' + '<div class="pull-right">' + statusMessage + ' </div>' + '<p class="instance-basic-info">' + contentHtml + '</p>';
+    identityHtml += ', ' + instance.FlavorName;
+    var contentHtml = '' + '<div class="pull-right">' + statusMessage + ' </div>' + '<p class="instance-basic-info">' + identityHtml + '</p>';
     if (instance.isCoMaster) {
       contentHtml += '<p><strong>Co master</strong></p>';
     } else if (instance.isMaster) {
