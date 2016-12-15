@@ -921,6 +921,20 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				}
 			}
 		}
+	case registerCliCommand("search", "Information", `Search instances by name, version, version comment, port`):
+		{
+			if pattern == "" {
+				log.Fatal("No pattern given")
+			}
+			instances, err := inst.SearchInstances(pattern)
+			if err != nil {
+				log.Fatale(err)
+			} else {
+				for _, instance := range instances {
+					fmt.Println(instance.Key.DisplayString())
+				}
+			}
+		}
 	case registerCliCommand("clusters", "Information", `List all clusters known to orchestrator`):
 		{
 			clusters, err := inst.ReadClusters()
