@@ -159,7 +159,7 @@ func getLastPseudoGTIDEntryInInstance(instance *Instance, minBinlogCoordinates *
 			// and continue with exhaustive search, on same binlog.
 			minBinlogCoordinates = nil
 			log.Debugf("Heuristic binlog search failed; continuing exhaustive search")
-			// And we do NOT iterate the log file: we scan same log faile again, with no heuristic
+			// And we do NOT iterate the log file: we scan same log file again, with no heuristic
 			//return nil, "", log.Errorf("past minBinlogCoordinates (%+v); skipping iteration over rest of binary logs", *minBinlogCoordinates)
 		} else {
 			currentBinlog, err = currentBinlog.PreviousFileCoordinates()
@@ -199,7 +199,7 @@ func getLastPseudoGTIDEntryInRelayLogs(instance *Instance, minBinlogCoordinates 
 			// and continue with exhaustive search.
 			minBinlogCoordinates = nil
 			log.Debugf("Heuristic relaylog search failed; continuing exhaustive search")
-			// And we do NOT iterate to previous log file: we scan same log faile again, with no heuristic
+			// And we do NOT iterate to previous log file: we scan same log file again, with no heuristic
 		} else {
 			currentRelayLog, err = currentRelayLog.PreviousFileCoordinates()
 		}
@@ -416,68 +416,158 @@ func getNextBinlogEventsChunk(instance *Instance, startingCoordinates BinlogCoor
 	return events, err
 }
 
-// GetNextBinlogCoordinatesToMatch is given a twin-coordinates couple for a would-be replica (instanceKey) and another
-// instance (otherKey).
+// rpad formats the binlog coordinates to a given size. If the size
+// increases this value is modified so it can be reused later. This
+// is to ensure consistent formatting in debug output.
+func rpad(coordinates BinlogCoordinates, length *int) string {
+	s := fmt.Sprintf("%+v", coordinates)
+	if len(s) > *length {
+		*length = len(s)
+	}
+
+	if len(s) >= *length {
+		return s
+	}
+	return fmt.Sprintf("%s%s", s, strings.Repeat(" ", *length-len(s)))
+}
+
+// used by GetNextBinlogCoordinatesToMatch to format debug information appropriately
+// format the event information in debug output
+func formatEventCleanly(event BinlogEvent, length *int) string {
+	return fmt.Sprintf("%+v %+v; %+v", rpad(event.Coordinates, length), event.EventType, strings.Split(strings.TrimSpace(event.Info), "\n")[0])
+}
+
+// Only do special filtering if instance is MySQL-5.7 and other
+// is MySQL-5.6 and in pseudo-gtid mode.
+func special56To57filterProcessing(instance *Instance, other *Instance) (bool, bool, error) {
+	// be paranoid
+	if instance == nil || other == nil {
+		return false, false, fmt.Errorf("special56To57filterProcessing: instance or other is nil. Should not happen")
+	}
+
+	filterInstance := instance.FlavorNameAndMajorVersion() == "MySQL-5.7" && // 5.7 replica
+		other.FlavorNameAndMajorVersion() == "MySQL-5.6" // replicating under 5.6 master
+
+	// The logic for other is a bit weird and may require us
+	// to check the instance's master.  To avoid this do some
+	// preliminary checks first to avoid the "master" access
+	// unless absolutely needed.
+
+	if instance.LogBinEnabled || // instance writes binlogs (not relay logs)
+		instance.FlavorNameAndMajorVersion() != "MySQL-5.7" || // instance NOT 5.7 replica
+		other.FlavorNameAndMajorVersion() != "MySQL-5.7" { // new master is NOT  5.7
+		return filterInstance, false /* good exit status avoiding checking master */, nil
+	}
+
+	// We need to check if the master is 5.6
+	master, err := GetInstanceMaster(instance)
+	if err != nil {
+		return false, false, log.Errorf("special56To57filterProcessing: can not GetInstanceMaster() for %+v. error=%+v", instance.Key, err)
+	}
+
+	filterOther := master.FlavorNameAndMajorVersion() == "MySQL-5.6" // master(instance) == 5.6
+
+	return filterInstance, filterOther, nil
+}
+
+// The event type to filter out
+const anonymousGTIDNextEvent = "SET @@SESSION.GTID_NEXT= 'ANONYMOUS'"
+
+// check if the event is one we want to skip.
+func specialEventToSkip(event *BinlogEvent) bool {
+	if event != nil && strings.Index(event.Info, anonymousGTIDNextEvent) >= 0 {
+		return true
+	}
+	return false
+}
+
+// GetNextBinlogCoordinatesToMatch is given a twin-coordinates couple for a would-be replica (instance) and another
+// instance (other).
 // This is part of the match-below process, and is the heart of the operation: matching the binlog events starting
 // the twin-coordinates (where both share the same Pseudo-GTID) until "instance" runs out of entries, hopefully
 // before "other" runs out.
 // If "other" runs out that means "instance" is more advanced in replication than "other", in which case we can't
 // turn it into a replica of "other".
-// Otherwise "instance" will point to the *next* binlog entry in "other"
-func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates BinlogCoordinates, recordedInstanceRelayLogCoordinates BinlogCoordinates, maxBinlogCoordinates *BinlogCoordinates,
-	other *Instance, otherCoordinates BinlogCoordinates) (*BinlogCoordinates, int, error) {
+func GetNextBinlogCoordinatesToMatch(
+	instance *Instance,
+	instanceCoordinates BinlogCoordinates,
+	recordedInstanceRelayLogCoordinates BinlogCoordinates,
+	maxBinlogCoordinates *BinlogCoordinates,
+	other *Instance,
+	otherCoordinates BinlogCoordinates) (*BinlogCoordinates, int, error) {
 
+	const noMatchedEvents int = 0 // to make return statements' intent clearer
+
+	// create instanceCursor for scanning instance binlog events
 	fetchNextEvents := func(binlogCoordinates BinlogCoordinates) ([]BinlogEvent, error) {
 		return getNextBinlogEventsChunk(instance, binlogCoordinates, 0)
 	}
 	instanceCursor := NewBinlogEventCursor(instanceCoordinates, fetchNextEvents)
 
+	// create otherCursor for scanning other binlog events
 	fetchOtherNextEvents := func(binlogCoordinates BinlogCoordinates) ([]BinlogEvent, error) {
 		return getNextBinlogEventsChunk(other, binlogCoordinates, 0)
 	}
 	otherCursor := NewBinlogEventCursor(otherCoordinates, fetchOtherNextEvents)
 
-	var beautifyCoordinatesLength int = 0
-	rpad := func(s string, length int) string {
-		if len(s) >= length {
-			return s
-		}
-		return fmt.Sprintf("%s%s", s, strings.Repeat(" ", length-len(s)))
+	// for 5.6 to 5.7 replication special processing may be needed.
+	applyInstanceSpecialFiltering, applyOtherSpecialFiltering, err := special56To57filterProcessing(instance, other)
+	if err != nil {
+		return nil, noMatchedEvents, log.Errore(err)
 	}
 
-	var lastConsumedEventCoordinates BinlogCoordinates
-	var countMatchedEvents int = 0
+	var (
+		beautifyCoordinatesLength    int = 0
+		countMatchedEvents           int = 0
+		lastConsumedEventCoordinates BinlogCoordinates
+	)
+
 	for {
 		// Exhaust binlogs/relaylogs on instance. While iterating them, also iterate the otherInstance binlogs.
 		// We expect entries on both to match, sequentially, until instance's binlogs/relaylogs are exhausted.
-		var instanceEventInfo string
-		var otherEventInfo string
-		var eventCoordinates BinlogCoordinates
-		var otherEventCoordinates BinlogCoordinates
+		var (
+			// the whole event to make things simpler
+			instanceEvent BinlogEvent
+			otherEvent    BinlogEvent
+		)
+
 		{
-			// Extract next binlog/relaylog entry from instance:
-			event, err := instanceCursor.nextRealEvent(0)
-			if err != nil {
-				return nil, 0, log.Errore(err)
-			}
-			if event != nil {
-				lastConsumedEventCoordinates = event.Coordinates
+			// we may need to skip Anonymous GTID Next Events so loop here over any we find
+			var event *BinlogEvent
+			var err error
+			for done := false; !done; {
+				// Extract next binlog/relaylog entry from instance:
+				event, err = instanceCursor.nextRealEvent(0)
+				if err != nil {
+					return nil, noMatchedEvents, log.Errore(err)
+				}
+				if event != nil {
+					lastConsumedEventCoordinates = event.Coordinates
+				}
+				if event == nil || !applyInstanceSpecialFiltering || !specialEventToSkip(event) {
+					done = true
+				}
 			}
 
 			switch instanceCoordinates.Type {
 			case BinaryLog:
 				if event == nil {
 					// end of binary logs for instance:
-					targetMatchCoordinates, err := otherCursor.getNextCoordinates()
+					otherNextCoordinates, err := otherCursor.getNextCoordinates()
 					if err != nil {
-						return nil, 0, log.Errore(err)
+						return nil, noMatchedEvents, log.Errore(err)
 					}
-					nextCoordinates, _ := instanceCursor.getNextCoordinates()
-					if nextCoordinates.SmallerThan(&instance.SelfBinlogCoordinates) {
-						return nil, 0, log.Errorf("Unexpected problem: instance binlog iteration ended before self coordinates. Ended with: %+v, self coordinates: %+v", nextCoordinates, instance.SelfBinlogCoordinates)
+					instanceNextCoordinates, err := instanceCursor.getNextCoordinates()
+					if err != nil {
+						return nil, noMatchedEvents, log.Errore(err)
 					}
-					log.Debugf("Reached end of binary logs for instance, at %+v. Other coordinates: %+v", nextCoordinates, targetMatchCoordinates)
-					return &targetMatchCoordinates, countMatchedEvents, nil
+					// sanity check
+					if instanceNextCoordinates.SmallerThan(&instance.SelfBinlogCoordinates) {
+						return nil, noMatchedEvents, log.Errorf("Unexpected problem: instance binlog iteration ended before self coordinates. Ended with: %+v, self coordinates: %+v", instanceNextCoordinates, instance.SelfBinlogCoordinates)
+					}
+					// Possible good exit point.
+					log.Debugf("Reached end of binary logs for instance, at %+v. Other coordinates: %+v", instanceNextCoordinates, otherNextCoordinates)
+					return &otherNextCoordinates, countMatchedEvents, nil
 				}
 			case RelayLog:
 				// Argghhhh! SHOW RELAY LOG EVENTS IN '...' statement returns CRAPPY values for End_log_pos:
@@ -497,63 +587,67 @@ func GetNextBinlogCoordinatesToMatch(instance *Instance, instanceCoordinates Bin
 				} else if recordedInstanceRelayLogCoordinates.Equals(&event.Coordinates) {
 					// We've passed the maxScanInstanceCoordinates (applies for relay logs)
 					endOfScan = true
-					log.Debugf("Reached slave relay log coordinates at %+v", recordedInstanceRelayLogCoordinates)
+					log.Debugf("Reached replica relay log coordinates at %+v", recordedInstanceRelayLogCoordinates)
 				} else if recordedInstanceRelayLogCoordinates.SmallerThan(&event.Coordinates) {
-					return nil, 0, log.Errorf("Unexpected problem: relay log scan passed relay log position without hitting it. Ended with: %+v, relay log position: %+v", event.Coordinates, recordedInstanceRelayLogCoordinates)
+					return nil, noMatchedEvents, log.Errorf("Unexpected problem: relay log scan passed relay log position without hitting it. Ended with: %+v, relay log position: %+v", event.Coordinates, recordedInstanceRelayLogCoordinates)
 				}
 				if endOfScan {
 					// end of binary logs for instance:
-					targetMatchCoordinates, err := otherCursor.getNextCoordinates()
+					otherNextCoordinates, err := otherCursor.getNextCoordinates()
 					if err != nil {
-						log.Debugf("Cannot otherCursor.getNextCoordinates(). otherCoordinates=%+v, cached events in cursor: %d; index=%d", otherCoordinates, len(otherCursor.cachedEvents), otherCursor.currentEventIndex)
-						return nil, 0, log.Errore(err)
+						log.Debugf("otherCursor.getNextCoordinates() failed. otherCoordinates=%+v, cached events in cursor: %d; index=%d", otherCoordinates, len(otherCursor.cachedEvents), otherCursor.currentEventIndex)
+						return nil, noMatchedEvents, log.Errore(err)
 					}
+					// Possible good exit point.
 					// No further sanity checks (read the above lengthy explanation)
-					log.Debugf("Reached limit of relay logs for instance, just after %+v. Other coordinates: %+v", lastConsumedEventCoordinates, targetMatchCoordinates)
-					return &targetMatchCoordinates, countMatchedEvents, nil
+					log.Debugf("Reached limit of relay logs for instance, just after %+v. Other coordinates: %+v", lastConsumedEventCoordinates, otherNextCoordinates)
+					return &otherNextCoordinates, countMatchedEvents, nil
 				}
 			}
 
-			instanceEventInfo = event.Info
-			eventCoordinates = event.Coordinates
-			coordinatesStr := fmt.Sprintf("%+v", event.Coordinates)
-			if len(coordinatesStr) > beautifyCoordinatesLength {
-				beautifyCoordinatesLength = len(coordinatesStr)
-			}
-			log.Debugf("> %+v %+v; %+v", rpad(coordinatesStr, beautifyCoordinatesLength), event.EventType, strings.Split(strings.TrimSpace(instanceEventInfo), "\n")[0])
+			instanceEvent = *event // make a physical copy
+			log.Debugf("> %s", formatEventCleanly(instanceEvent, &beautifyCoordinatesLength))
 		}
 		{
-			// Extract next binlog/relaylog entry from otherInstance (intended master):
-			event, err := otherCursor.nextRealEvent(0)
-			if err != nil {
-				return nil, 0, log.Errore(err)
+			// Extract next binlog/relaylog entry from other (intended master):
+			// - this must have binlogs. We may need to filter anonymous events if we were processing
+			//   a relay log on instance and the instance's master runs 5.6
+			var event *BinlogEvent
+			var err error
+			for done := false; !done; {
+				// Extract next binlog entry from other:
+				event, err = otherCursor.nextRealEvent(0)
+				if err != nil {
+					return nil, noMatchedEvents, log.Errore(err)
+				}
+				if event == nil || !applyOtherSpecialFiltering || !specialEventToSkip(event) {
+					done = true
+				}
 			}
+
 			if event == nil {
 				// end of binary logs for otherInstance: this is unexpected and means instance is more advanced
 				// than otherInstance
-				return nil, 0, log.Errorf("Unexpected end of binary logs for assumed master (%+v). This means the instance which attempted to be a replica (%+v) was more advanced. Try the other way round", other.Key, instance.Key)
+				return nil, noMatchedEvents, log.Errorf("Unexpected end of binary logs for assumed master (%+v). This means the instance which attempted to be a replica (%+v) was more advanced. Try the other way round", other.Key, instance.Key)
 			}
-			otherEventInfo = event.Info
-			otherEventCoordinates = event.Coordinates
-			coordinatesStr := fmt.Sprintf("%+v", event.Coordinates)
-			if len(coordinatesStr) > beautifyCoordinatesLength {
-				beautifyCoordinatesLength = len(coordinatesStr)
-			}
-			log.Debugf("< %+v %+v; %+v", rpad(coordinatesStr, beautifyCoordinatesLength), event.EventType, strings.Split(strings.TrimSpace(otherEventInfo), "\n")[0])
+
+			otherEvent = *event // make a physical copy
+			log.Debugf("< %s", formatEventCleanly(otherEvent, &beautifyCoordinatesLength))
 		}
 		// Verify things are sane (the two extracted entries are identical):
 		// (not strictly required by the algorithm but adds such a lovely self-sanity-testing essence)
-		if instanceEventInfo != otherEventInfo {
-			return nil, 0, log.Errorf("Mismatching entries, aborting: %+v <-> %+v", instanceEventInfo, otherEventInfo)
+		if instanceEvent.Info != otherEvent.Info {
+			return nil, noMatchedEvents, log.Errorf("Mismatching entries, aborting: %+v <-> %+v", instanceEvent.Info, otherEvent.Info)
 		}
 		countMatchedEvents++
 		if maxBinlogCoordinates != nil {
+			// Possible good exit point.
 			// Not searching till end of binary logs/relay log exec pos. Instead, we're stopping at an instructed position.
-			if eventCoordinates.Equals(maxBinlogCoordinates) {
+			if instanceEvent.Coordinates.Equals(maxBinlogCoordinates) {
 				log.Debugf("maxBinlogCoordinates specified as %+v and reached. Stopping", *maxBinlogCoordinates)
-				return &otherEventCoordinates, countMatchedEvents, nil
-			} else if maxBinlogCoordinates.SmallerThan(&eventCoordinates) {
-				return nil, 0, log.Errorf("maxBinlogCoordinates (%+v) exceeded but not met", *maxBinlogCoordinates)
+				return &otherEvent.Coordinates, countMatchedEvents, nil
+			} else if maxBinlogCoordinates.SmallerThan(&instanceEvent.Coordinates) {
+				return nil, noMatchedEvents, log.Errorf("maxBinlogCoordinates (%+v) exceeded but not met", *maxBinlogCoordinates)
 			}
 		}
 	}

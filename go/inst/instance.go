@@ -234,6 +234,16 @@ func (this *Instance) applyFlavorName() {
 	}
 }
 
+// FlavorNameAndMajorVersion returns a string of the combined
+// flavor and major version which is useful in some checks.
+func (this *Instance) FlavorNameAndMajorVersion() string {
+	if this.FlavorName == "" {
+		this.applyFlavorName()
+	}
+
+	return this.FlavorName + "-" + this.MajorVersionString()
+}
+
 // IsReplica makes simple heuristics to decide whether this insatnce is a replica of another instance
 func (this *Instance) IsReplica() bool {
 	return this.MasterKey.Hostname != "" && this.MasterKey.Hostname != "_" && this.MasterKey.Port != 0 && (this.ReadBinlogCoordinates.LogFile != "" || this.UsingGTID())
