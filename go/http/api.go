@@ -1579,6 +1579,16 @@ func (this *HttpAPI) BulkInstances(params martini.Params, r render.Render, req *
 	r.JSON(200, instances)
 }
 
+// DiscoveryMetricsRaw will return the last X seconds worth of discovery information in time based order as a JSON array
+func (this *HttpAPI) DiscoveryMetricsRaw(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	r.JSON(200, &APIResponse{Code: ERROR, Message: "NOT IMPLEMENTED"})
+}
+
+// DiscoveryMetricsAggregated will return the aggregated metrics from the last X seconds worth of raw discovery information
+func (this *HttpAPI) DiscoveryMetricsAggregated(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	r.JSON(200, &APIResponse{Code: ERROR, Message: "NOT IMPLEMENTED"})
+}
+
 // Agents provides complete list of registered agents (See https://github.com/github/orchestrator-agent)
 func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -2471,6 +2481,10 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	// Bulk access to information
 	this.registerRequest(m, "/api/bulk-instances", this.BulkInstances)
 	this.registerRequest(m, "/api/bulk-promotion-rules", this.BulkPromotionRules)
+
+	// Monitoring
+	this.registerRequest(m, "/api/discovery-metrics-raw/:seconds", this.DiscoveryMetricsRaw)
+	this.registerRequest(m, "/api/discovery-metrics-aggregated/:seconds", this.DiscoveryMetricsAggregated)
 
 	// Agents
 	this.registerRequest(m, "agents", this.Agents)
