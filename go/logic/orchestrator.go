@@ -32,12 +32,17 @@ import (
 	"github.com/outbrain/golib/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
+	"github.com/sjmudd/stopwatch"
 )
 
 // discoveryQueue is a channel of deduplicated instanceKey-s
 // that were requested for discovery.  It can be continuously updated
 // as discovery process progresses.
 var discoveryQueue *discovery.Queue
+
+// discoveryMetricsContainer contains the last N discovery metrics
+// which can then be accessed via an API call for monitoring
+var discoveryMetricsContainer = *discovery.MetricsCollection
 
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
@@ -123,6 +128,12 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		}
 	}()
 
+	discoverLatency := stopwatch.NewNamedStopwatch()
+	discoverLatency.Add("totalLatency")
+	discoverLatency.Add("instanceLatency")
+	discoverLatency.Add("backendLatency")
+	discoverLatency.Start("totalLatency")
+
 	instanceKey.Formalize()
 	if !instanceKey.IsValid() {
 		return
@@ -133,7 +144,9 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
+	discoverLatency.Start("backendLatency")
 	instance, found, err := inst.ReadInstance(&instanceKey)
+	discoverLatency.Stop("backendLatency")
 	if found && instance.IsUpToDate && instance.IsLastCheckValid {
 		// we've already discovered this one. Skip!
 		return
@@ -147,11 +160,38 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	// that instance is nil. Check it.
 	if instance == nil {
 		failedDiscoveriesCounter.Inc(1)
-		log.Warningf("discoverInstance(%+v) instance is nil in %.3fs, error=%+v", instanceKey, time.Since(start).Seconds(), err)
+		mc.Append(&discover.Metric{
+			Timestamp:       time.Now(),
+			InstanceKey:     instanceKey,
+			TotalLatency:    discoverLatency.Elapsed("totalLatency"),
+			BackendLatency:  discoveryLatency.Elapsed("backendLatency"),
+			InstanceLatency: discoveryLatency.Elapsed("instanceLatency"),
+			Err:             err,
+		})
+		log.Warningf("discoverInstance(%+v) instance is nil in %.3fs (Backend: %.3fs, Instance: %.3fs), error=%+v",
+			instanceKey,
+			discoverLatency.ElapsedSeconds("totalLatency"),
+			discoverLatency.ElapsedSeconds("backendLatency"),
+			discoverLatency.ElapsedSeconds("instanceLatency"),
+			err)
 		return
 	}
 
-	log.Debugf("Discovered host: %+v, master: %+v, version: %+v in %.3fs", instance.Key, instance.MasterKey, instance.Version, time.Since(start).Seconds())
+	mc.Append(&discover.Metric{
+		Timestamp:       time.Now(),
+		InstanceKey:     instanceKey,
+		TotalLatency:    discoverLatency.Elapsed("totalLatency"),
+		BackendLatency:  discoveryLatency.Elapsed("backendLatency"),
+		InstanceLatency: discoveryLatency.Elapsed("instanceLatency"),
+		Err:             nil,
+	})
+	log.Debugf("Discovered host: %+v, master: %+v, version: %+v in %.3fs (Backend: %.3fs, Instance: %.3fs)",
+		instance.Key,
+		instance.MasterKey,
+		instance.Version,
+		discoverLatency.ElapsedSeconds("totalLatency"),
+		discoverLatency.ElapsedSeconds("backendLatency"),
+		discoverLatency.ElapsedSeconds("instanceLatency"))
 
 	if atomic.LoadInt64(&isElectedNode) == 0 {
 		// Maybe this node was elected before, but isn't elected anymore.
@@ -194,6 +234,11 @@ func ContinuousDiscovery() {
 	if config.Config.SnapshotTopologiesIntervalHours > 0 {
 		snapshotTopologiesTick = time.Tick(time.Duration(config.Config.SnapshotTopologiesIntervalHours) * time.Hour)
 	}
+
+	// record discovery Metrics for the time shown, after which they get thrown away.
+	// metrics are available via an API call.
+	period := time.Second * 120 // FIX ME and add a config value
+	discoveryMetricsContainer = discovery.NewMetricsCollection(period)
 
 	go ometrics.InitGraphiteMetrics()
 	go acceptSignals()

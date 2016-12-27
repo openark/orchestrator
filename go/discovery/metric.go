@@ -53,11 +53,22 @@ type MetricCollection struct {
 	collection [](*Metric) // may need impoving if the size of the collection grows too much
 }
 
+// Expire removes old values periodically given the period
+// - FIX ME and add a way to stop this cleanly when we shut down.
+func (mc *MetricCollection) Expire(period time.Duration) {
+	log.Infof("MetricCollection: Expiring values every second and keeping values for last %+v", time.Duration.String())
+	for t := range time.NewTicker(time.Second) {
+		mc.RemoveBefore(time.Now().Add(-period))
+	}
+}
+
 // NewMetricCollection returns the pointer to a new MetricCollection
-func NewMetricCollection() *MetricCollection {
+func NewMetricCollection(period time.Duration) *MetricCollection {
 	mc := &MetricCollection{
 		collection: nil,
 	}
+	go mc.Expire(period)
+
 	return mc
 }
 
