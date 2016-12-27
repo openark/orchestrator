@@ -863,6 +863,11 @@ var generateSQLPatches = []string{
 		ALTER TABLE node_health
 			MODIFY app_version varchar(64) CHARACTER SET ascii NOT NULL DEFAULT ""
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN version_comment varchar(128) NOT NULL DEFAULT ''
+	`,
 }
 
 // Track if a TLS has already been configured for topology

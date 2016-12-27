@@ -73,7 +73,7 @@ No.
 
 ### Is orchestrator open source?
 
-Yes. `Orchestrator` is released as open source under the MIT license and is available at: https://github.com/github/orchestrator
+Yes. `Orchestrator` is released as open source under the Apache License 2.0 and is available at: https://github.com/github/orchestrator
 
 ### Who develops orchestrator and why?
 
