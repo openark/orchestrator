@@ -18,7 +18,7 @@ The following hints should clear up some questions:
 - `orchestrator` uses a MySQL backend.
 - The backend database has the _state_ of your topologies. `orchestrator` is almost stateless.
   - `orchestrator` only has state for pending operations (e.g. while a replica is being moved)
-- The backend databse will have the state of your multiple topologies.  
+- The backend database will have the state of your multiple topologies.
 - You _can_ and _should_ have more than one `orchestrator` running with the same MySQL backend.
 - You should _not_ have more than one MySQL backend.
 
@@ -43,8 +43,9 @@ The author of `orchestrator` has deployed it in large environments of thousands 
 - `orchestrator` has "maintenance locks" which prevent destructive concurrent operations on the same instance. At worst an
   operation will be rejected due to not being able to acquire maintenance lock.
 
-The author of `orchestrator` has it deployed on multiple machines as a service, behind a F5 load balancer. On the same setup,
-CLI is deployed and can be executed from thousands of machines.
+The author of `orchestrator` has it deployed on multiple machines
+as a service, behind a load balancer. On the same setup, CLI is
+deployed and can be executed from thousands of machines.
 
 ##### A visualized example
 
