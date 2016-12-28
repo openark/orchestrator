@@ -192,6 +192,7 @@ type Configuration struct {
 	GraphiteConvertHostnameDotsToUnderscores     bool              // If true, then hostname's dots are converted to underscores before being used in graphite path
 	GraphitePollSeconds                          int               // Graphite writes interval. 0 disables.
 	URLPrefix                                    string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
+	MaxOutdatedKeysToShow                        int               // Maximum number of keys to show in ContinousDiscovery. If the number of polled hosts grows too far then showing the complete list is not ideal.
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -346,6 +347,7 @@ func newConfiguration() *Configuration {
 		GraphiteConvertHostnameDotsToUnderscores:     true,
 		GraphitePollSeconds:                          60,
 		URLPrefix:                                    "",
+		MaxOutdatedKeysToShow:                        100,
 	}
 }
 

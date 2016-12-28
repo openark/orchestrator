@@ -269,7 +269,12 @@ func ContinuousDiscovery() {
 						log.Errore(err)
 					}
 
-					log.Debugf("outdated keys: %+v", instanceKeys)
+					if len(instanceKeys) > config.Config.MaxOutdatedKeysToShow {
+						log.Debugf("polling %d outdated keys")
+					} else {
+						log.Debugf("outdated keys: %+v", instanceKeys)
+					}
+
 					for _, instanceKey := range instanceKeys {
 						instanceKey := instanceKey
 
