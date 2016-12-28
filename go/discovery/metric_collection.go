@@ -12,20 +12,25 @@ import (
 	"github.com/github/orchestrator/go/config"
 )
 
+// MC contains the last N discovery metrics which can then be accessed via an API call for monitoring.
+// Currently this is accessed by ContinuousDiscovery() but also from http api calls.
+// I may need to protect this better?
+var MC *MetricCollection
+
 // MetricCollection contains a collection of Metrics
 type MetricCollection struct {
 	sync.Mutex                 // for locking the structure
 	collection   [](*Metric)   // may need impoving if the size of the collection grows too much
 	done         chan struct{} // to indicate that we are finishing expiry
 	ticker       *time.Ticker  // expiry ticker
-        expirePeriod time.Duration // time to keep the collection information for
+	expirePeriod time.Duration // time to keep the collection information for
 }
 
 // NewMetricCollection returns the pointer to a new MetricCollection
 func NewMetricCollection(period time.Duration) *MetricCollection {
 	mc := &MetricCollection{
-		collection: nil,
-		done: make(chan struct{}),
+		collection:   nil,
+		done:         make(chan struct{}),
 		expirePeriod: period,
 	}
 	go mc.Expire()
@@ -38,7 +43,6 @@ func (mc *MetricCollection) Expire() {
 	if mc == nil {
 		return
 	}
-	log.Infof("MetricCollection: Expiring values every second and keeping values for last %+v", mc.expirePeriod.String())
 	mc.ticker = time.NewTicker(time.Second) // hard-coded at every second
 
 	for {

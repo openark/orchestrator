@@ -40,10 +40,6 @@ import (
 // as discovery process progresses.
 var discoveryQueue *discovery.Queue
 
-// discoveryMetricCollection contains the last N discovery metrics
-// which can then be accessed via an API call for monitoring
-var discoveryMetricCollection *discovery.MetricCollection
-
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
 var discoveryQueueLengthGauge = metrics.NewGauge()
@@ -83,11 +79,11 @@ func acceptSignals() {
 			case syscall.SIGHUP:
 				log.Debugf("Received SIGHUP. Reloading configuration")
 				config.Reload()
-				discoveryMetricCollection.Reload()
+				discovery.MC.Reload()
 				inst.AuditOperation("reload-configuration", nil, "Triggered via SIGHUP")
 			case syscall.SIGTERM:
 				log.Debugf("Received SIGTERM. Shutting down orchestrator")
-				discoveryMetricCollection.Shutdown()
+				discovery.MC.Shutdown()
 				// probably should poke other go routines to stop cleanly here ...
 				inst.AuditOperation("shutdown", nil, "Triggered via SIGTERM")
 			}
@@ -167,7 +163,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	// that instance is nil. Check it.
 	if instance == nil {
 		failedDiscoveriesCounter.Inc(1)
-		discoveryMetricCollection.Append(&discovery.Metric{
+		discovery.MC.Append(&discovery.Metric{
 			Timestamp:       time.Now(),
 			InstanceKey:     instanceKey,
 			TotalLatency:    discoverLatency.Elapsed("totalLatency"),
@@ -184,7 +180,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
-	discoveryMetricCollection.Append(&discovery.Metric{
+	discovery.MC.Append(&discovery.Metric{
 		Timestamp:       time.Now(),
 		InstanceKey:     instanceKey,
 		TotalLatency:    discoverLatency.Elapsed("totalLatency"),
@@ -244,7 +240,7 @@ func ContinuousDiscovery() {
 
 	// record discovery Metrics for the time shown, after which they get thrown away.
 	// metrics are available via an API call.
-	discoveryMetricCollection = discovery.NewMetricCollection(time.Duration(config.Config.DiscoveryCollectionRetentionSeconds) * time.Second)
+	discovery.MC = discovery.NewMetricCollection(time.Duration(config.Config.DiscoveryCollectionRetentionSeconds) * time.Second)
 
 	go ometrics.InitGraphiteMetrics()
 	go acceptSignals()
