@@ -347,7 +347,7 @@ func newConfiguration() *Configuration {
 		GraphiteConvertHostnameDotsToUnderscores:     true,
 		GraphitePollSeconds:                          60,
 		URLPrefix:                                    "",
-		MaxOutdatedKeysToShow:                        100,
+		MaxOutdatedKeysToShow:                        10,
 	}
 }
 
