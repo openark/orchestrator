@@ -62,7 +62,7 @@ func TestAppend(t *testing.T) {
 				}
 			}
 			// check we get back the values we expect
-			if !MetricsEqual(since, dm[i:len(dm)]) {
+			if !MetricsEqual(since, dm[i:]) {
 				t.Errorf("TestAppend: since[%d] != dm[%d:%d]", i, i, len(dm))
 				for j := range since {
 					t.Logf("TestAppend: j: %d, Got %+v, expected: %+v", *since[j], dm[i+j])
