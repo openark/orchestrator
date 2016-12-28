@@ -108,8 +108,10 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 }
 
 // ReadTopologyInstanceBufferable connects to a topology MySQL instance
-// and reads its configuration and replication status. It writes read
-// info into orchestrator's backend.  Writes are optionally buffered.
+// and collects information on the server and its replication state.
+// It writes the information retrieved into orchestrator's backend.
+// - writes are optionally buffered.
+// - timing information can be collected for the stages performed.
 func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool, latency *stopwatch.NamedStopwatch) (*Instance, error) {
 	defer func() {
 		if err := recover(); err != nil {
