@@ -86,6 +86,7 @@ func acceptSignals() {
 				discovery.MC.Shutdown()
 				// probably should poke other go routines to stop cleanly here ...
 				inst.AuditOperation("shutdown", nil, "Triggered via SIGTERM")
+				os.Exit(0)
 			}
 		}
 	}()
