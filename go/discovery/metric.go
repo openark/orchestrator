@@ -3,8 +3,6 @@ package discovery
 // Collect discovery metrics and manage their storage and retrieval for monitoring purposes.
 
 import (
-	"errors"
-	"sync"
 	"time"
 
 	"github.com/github/orchestrator/go/inst"
@@ -16,6 +14,7 @@ type Metric struct {
 	InstanceKey     inst.InstanceKey // instance being monitored
 	BackendLatency  time.Duration    // time taken talking to the backend
 	InstanceLatency time.Duration    // time taken talking to the instance
+	TotalLatency    time.Duration    // total time taken doing the discovery
 	Err             error            // error (if applicable) doing the discovery process
 }
 
@@ -31,6 +30,7 @@ func (m *Metric) Equal(m2 *Metric) bool {
 		m.InstanceKey == m2.InstanceKey &&
 		m.BackendLatency == m2.BackendLatency &&
 		m.InstanceLatency == m2.InstanceLatency &&
+		m.TotalLatency == m2.TotalLatency &&
 		m.Err == m2.Err
 }
 
@@ -45,121 +45,4 @@ func MetricsEqual(m1, m2 [](*Metric)) bool {
 		}
 	}
 	return true
-}
-
-// MetricCollection contains a collection of Metrics
-type MetricCollection struct {
-	sync.Mutex             // for locking the structure
-	collection [](*Metric) // may need impoving if the size of the collection grows too much
-}
-
-// Expire removes old values periodically given the period
-// - FIX ME and add a way to stop this cleanly when we shut down.
-func (mc *MetricCollection) Expire(period time.Duration) {
-	log.Infof("MetricCollection: Expiring values every second and keeping values for last %+v", time.Duration.String())
-	for t := range time.NewTicker(time.Second) {
-		mc.RemoveBefore(time.Now().Add(-period))
-	}
-}
-
-// NewMetricCollection returns the pointer to a new MetricCollection
-func NewMetricCollection(period time.Duration) *MetricCollection {
-	mc := &MetricCollection{
-		collection: nil,
-	}
-	go mc.Expire(period)
-
-	return mc
-}
-
-// Append a new Metric to the existing collection
-func (mc *MetricCollection) Append(m *Metric) error {
-	if mc == nil {
-		return errors.New("MetricsCollection.Append: mc == nil")
-	}
-	mc.Lock()
-	defer mc.Unlock()
-	// we don't want to add nil metrics
-	if m == nil {
-		return errors.New("MetricsCollection.Append: m == nil")
-	}
-	// if no timestamp provided add one
-	if m.Timestamp.IsZero() {
-		m.Timestamp = time.Now()
-	}
-	mc.collection = append(mc.collection, m)
-
-	return nil
-}
-
-// Since returns the Metrics on or after the given time. We assume
-// the metrics are stored in ascending time.
-// Iterate backwards until we reach the first value before the given time
-// or the end of the array.
-func (mc *MetricCollection) Since(t time.Time) ([](*Metric), error) {
-	if mc == nil {
-		return nil, errors.New("MetricsCollection.Since: mc == nil")
-	}
-	mc.Lock()
-	defer mc.Unlock()
-	if mc.collection == nil || len(mc.collection) == 0 {
-		return nil, nil // nothing to return
-	}
-	last := len(mc.collection)
-	first := last - 1
-
-	done := false
-	for !done {
-		if mc.collection[first].Timestamp.After(t) || mc.collection[first].Timestamp.Equal(t) {
-			if first == 0 {
-				break // as can't go lower
-			}
-			first--
-		} else {
-			if first != last {
-				first++ // go back one (except if we're already at the end)
-			}
-			break
-		}
-	}
-
-	return mc.collection[first:last], nil
-}
-
-// RemoveBefore collection values from mc before the given time.
-func (mc *MetricCollection) RemoveBefore(t time.Time) error {
-	if mc == nil {
-		return errors.New("MetricsCollection.RemoveBefore: mc == nil")
-	}
-	mc.Lock()
-	defer mc.Unlock()
-	if mc.collection == nil {
-		return nil // no data so nothing to do
-	}
-	cLen := len(mc.collection)
-	if cLen == 0 {
-		return nil // we have a collection but no data
-	}
-	// remove old data here.
-	first := 0
-	done := false
-	for !done {
-		if mc.collection[first].Timestamp.Before(t) {
-			first++
-			if first == cLen {
-				break
-			}
-		} else {
-			first--
-			break
-		}
-	}
-
-	// get the interval we need.
-	if first == len(mc.collection) {
-		mc.collection = nil // remove all entries
-	} else if first != -1 {
-		mc.collection = mc.collection[first:]
-	}
-	return nil // no errors
 }
