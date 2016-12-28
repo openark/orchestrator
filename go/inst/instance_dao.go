@@ -100,16 +100,23 @@ func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err err
 	return log.Errorf("ReadTopologyInstance(%+v) %+v: %+v", *instanceKey, hint, err)
 }
 
-// ReadTopologyInstance will poll a MySQL instance but writes to the orchestrator
-// backend are NOT buffered.
-func ReadTopologyInstance(instanceKey *InstanceKey, discoverLatency *stopwatch.NamedStopwatch) (*Instance, error) {
-	return ReadTopologyInstanceBufferable(instanceKey, false, discoverLatency)
+// ReadTopologyInstanceTimed collects and returns timing information
+// when polling a MySQL server.
+// - writes to the orchestrator backend may be buffered.
+func ReadTopologyInstance(instanceKey *InstanceKey, bufferWrites bool) (*Instance, error) {
+	return ReadTopologyInstanceBufferable(instanceKey, false, false)
+}
+// ReadTopologyInstance will poll a MySQL instance to find out its stated.
+// - writes to the orchestrator backend where this is recorded are
+//   NOT buffered.
+func ReadTopologyInstance(instanceKey *InstanceKey, latency *stopwatch.NamedStopwatch) (*Instance, error) {
+	return ReadTopologyInstanceBufferable(instanceKey, false, latency)
 }
 
 // ReadTopologyInstanceBufferable connects to a topology MySQL instance
 // and reads its configuration and replication status. It writes read
 // info into orchestrator's backend.  Writes are optionally buffered.
-func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool, discoverLatency *stopwatch.NamedStopwatch) (*Instance, error) {
+func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool, latency *stopwatch.NamedStopwatch) (*Instance, error) {
 	defer func() {
 		if err := recover(); err != nil {
 			logReadTopologyInstanceError(instanceKey, "Unexpected, aborting", fmt.Errorf("%+v", err))
@@ -132,7 +139,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		return instance, fmt.Errorf("ReadTopologyInstance will not act on invalid instance key: %+v", *instanceKey)
 	}
 
-	discoverLatency.Start("instanceLatency")
+	latency.Start("instance")
 
 	db, err := db.OpenDiscovery(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
@@ -554,7 +561,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			logReadTopologyInstanceError(instanceKey, "WriteClusterDomainName", err)
 		}
 	}
-	discoverLatency.Stop("instanceLatency")
+	latency.Stop("instance")
 
 Cleanup:
 	readTopologyInstanceCounter.Inc(1)
@@ -563,24 +570,24 @@ Cleanup:
 		instance.IsLastCheckValid = true
 		instance.IsRecentlyChecked = true
 		instance.IsUpToDate = true
-		discoverLatency.Start("backendLatency")
+		latency.Start("backend")
 		if bufferWrites {
 			enqueueInstanceWrite(instance, instanceFound, err)
 		} else {
 			writeInstance(instance, instanceFound, err)
 		}
 		WriteLongRunningProcesses(&instance.Key, longRunningProcesses)
-		discoverLatency.Stop("backendLatency")
+		latency.Stop("backend")
 		return instance, nil
 	}
 
 	// Something is wrong, could be network-wise. Record that we
 	// tried to check the instance. last_attempted_check is also
 	// updated on success by writeInstance.
-	discoverLatency.Start("backendLatency")
+	latency.Start("backend")
 	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
 	_ = UpdateInstanceLastChecked(&instance.Key)
-	discoverLatency.Stop("backendLatency")
+	latency.Stop("backend")
 	return nil, fmt.Errorf("Failed ReadTopologyInstance")
 }
 
