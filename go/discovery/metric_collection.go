@@ -33,8 +33,7 @@ func NewMetricCollection(period time.Duration) *MetricCollection {
 	return mc
 }
 
-// Expire removes old values periodically given the period
-// - FIX ME and add a way to stop this cleanly when we shut down.
+// Expire removes old values periodically given mc.expirePeriod
 func (mc *MetricCollection) Expire() {
 	if mc == nil {
 		return
@@ -46,11 +45,9 @@ func (mc *MetricCollection) Expire() {
 		select {
 		case <-mc.ticker.C: // do the periodic expiry
 			mc.RemoveBefore(time.Now().Add(-mc.expirePeriod))
-		case <-mc.done: {
-				// stop the ticker and return
-				mc.ticker.Stop()
-				return	
-			}
+		case <-mc.done: // stop the ticker and return
+			mc.ticker.Stop()
+			return
 		}
 	}
 }
