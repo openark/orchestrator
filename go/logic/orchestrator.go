@@ -133,11 +133,11 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		}
 	}()
 
-	discoverLatency := stopwatch.NewNamedStopwatch()
-	discoverLatency.Add("totalLatency")
-	discoverLatency.Add("instanceLatency")
-	discoverLatency.Add("backendLatency")
-	discoverLatency.Start("totalLatency")
+	latency := stopwatch.NewNamedStopwatch()
+	latency.Add("total")
+	latency.Add("instance")
+	latency.Add("backend")
+	latency.Start("total")
 
 	instanceKey.Formalize()
 	if !instanceKey.IsValid() {
@@ -149,9 +149,9 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
-	discoverLatency.Start("backendLatency")
+	latency.Start("backend")
 	instance, found, err := inst.ReadInstance(&instanceKey)
-	discoverLatency.Stop("backendLatency")
+	latency.Stop("backend")
 	if found && instance.IsUpToDate && instance.IsLastCheckValid {
 		// we've already discovered this one. Skip!
 		return
@@ -160,7 +160,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	discoveriesCounter.Inc(1)
 
 	// First we've ever heard of this instance. Continue investigation:
-	instance, err = inst.ReadTopologyInstanceBufferable(&instanceKey, config.Config.BufferInstanceWrites, discoverLatency)
+	instance, err = inst.ReadTopologyInstanceBufferable(&instanceKey, config.Config.BufferInstanceWrites, latency)
 	// panic can occur (IO stuff). Therefore it may happen
 	// that instance is nil. Check it.
 	if instance == nil {
@@ -168,16 +168,16 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		discovery.MC.Append(&discovery.Metric{
 			Timestamp:       time.Now(),
 			InstanceKey:     instanceKey,
-			TotalLatency:    discoverLatency.Elapsed("totalLatency"),
-			BackendLatency:  discoverLatency.Elapsed("backendLatency"),
-			InstanceLatency: discoverLatency.Elapsed("instanceLatency"),
+			TotalLatency:    latency.Elapsed("total"),
+			BackendLatency:  latency.Elapsed("backend"),
+			InstanceLatency: latency.Elapsed("instance"),
 			Err:             err,
 		})
 		log.Warningf("discoverInstance(%+v) instance is nil in %.3fs (Backend: %.3fs, Instance: %.3fs), error=%+v",
 			instanceKey,
-			discoverLatency.ElapsedSeconds("totalLatency"),
-			discoverLatency.ElapsedSeconds("backendLatency"),
-			discoverLatency.ElapsedSeconds("instanceLatency"),
+			latency.ElapsedSeconds("total"),
+			latency.ElapsedSeconds("backend"),
+			latency.ElapsedSeconds("instance"),
 			err)
 		return
 	}
@@ -185,18 +185,18 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	discovery.MC.Append(&discovery.Metric{
 		Timestamp:       time.Now(),
 		InstanceKey:     instanceKey,
-		TotalLatency:    discoverLatency.Elapsed("totalLatency"),
-		BackendLatency:  discoverLatency.Elapsed("backendLatency"),
-		InstanceLatency: discoverLatency.Elapsed("instanceLatency"),
+		TotalLatency:    latency.Elapsed("total"),
+		BackendLatency:  latency.Elapsed("backend"),
+		InstanceLatency: latency.Elapsed("instance"),
 		Err:             nil,
 	})
 	log.Debugf("Discovered host: %+v, master: %+v, version: %+v in %.3fs (Backend: %.3fs, Instance: %.3fs)",
 		instance.Key,
 		instance.MasterKey,
 		instance.Version,
-		discoverLatency.ElapsedSeconds("totalLatency"),
-		discoverLatency.ElapsedSeconds("backendLatency"),
-		discoverLatency.ElapsedSeconds("instanceLatency"))
+		latency.ElapsedSeconds("total"),
+		latency.ElapsedSeconds("backend"),
+		latency.ElapsedSeconds("instance"))
 
 	if atomic.LoadInt64(&isElectedNode) == 0 {
 		// Maybe this node was elected before, but isn't elected anymore.
