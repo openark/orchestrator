@@ -83,6 +83,7 @@ type Configuration struct {
 	SnapshotTopologiesIntervalHours              uint     // Interval in hour between snapshot-topologies invocation. Default: 0 (disabled)
 	DiscoveryMaxConcurrency                      uint     // Number of goroutines doing hosts discovery
 	DiscoveryQueueCapacity                       uint     // Buffer size of the discovery queue. Should be greater than the number of DB instances being discovered
+	DiscoveryCollectionRetentionSeconds          uint     // Number of seconds to retain the discovery collection information
 	InstanceBulkOperationsWaitTimeoutSeconds     uint     // Time to wait on a single instance when doing bulk (many instances) operation
 	ActiveNodeExpireSeconds                      uint     // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
 	NodeHealthExpiry                             bool     // Do we expire the node_health table? Usually this is true but it might be disabled on command line tools if an orchestrator daemon is running.
@@ -245,6 +246,7 @@ func newConfiguration() *Configuration {
 		DiscoverByShowSlaveHosts:                     false,
 		DiscoveryMaxConcurrency:                      300,
 		DiscoveryQueueCapacity:                       100000,
+		DiscoveryCollectionRetentionSeconds:          120,
 		InstanceBulkOperationsWaitTimeoutSeconds:     10,
 		ActiveNodeExpireSeconds:                      5,
 		NodeHealthExpiry:                             true,

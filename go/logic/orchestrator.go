@@ -40,9 +40,9 @@ import (
 // as discovery process progresses.
 var discoveryQueue *discovery.Queue
 
-// discoveryMetricsContainer contains the last N discovery metrics
+// discoveryMetricCollection contains the last N discovery metrics
 // which can then be accessed via an API call for monitoring
-var discoveryMetricsContainer = *discovery.MetricsCollection
+var discoveryMetricCollection *discovery.MetricCollection
 
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
@@ -82,6 +82,7 @@ func acceptSignals() {
 			case syscall.SIGHUP:
 				log.Debugf("Received SIGHUP. Reloading configuration")
 				config.Reload()
+				discoveryMetricCollection.Reload()
 				inst.AuditOperation("reload-configuration", nil, "Triggered via SIGHUP")
 			}
 		}
@@ -160,12 +161,12 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	// that instance is nil. Check it.
 	if instance == nil {
 		failedDiscoveriesCounter.Inc(1)
-		mc.Append(&discover.Metric{
+		discoveryMetricCollection.Append(&discovery.Metric{
 			Timestamp:       time.Now(),
 			InstanceKey:     instanceKey,
 			TotalLatency:    discoverLatency.Elapsed("totalLatency"),
-			BackendLatency:  discoveryLatency.Elapsed("backendLatency"),
-			InstanceLatency: discoveryLatency.Elapsed("instanceLatency"),
+			BackendLatency:  discoverLatency.Elapsed("backendLatency"),
+			InstanceLatency: discoverLatency.Elapsed("instanceLatency"),
 			Err:             err,
 		})
 		log.Warningf("discoverInstance(%+v) instance is nil in %.3fs (Backend: %.3fs, Instance: %.3fs), error=%+v",
@@ -177,12 +178,12 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
-	mc.Append(&discover.Metric{
+	discoveryMetricCollection.Append(&discovery.Metric{
 		Timestamp:       time.Now(),
 		InstanceKey:     instanceKey,
 		TotalLatency:    discoverLatency.Elapsed("totalLatency"),
-		BackendLatency:  discoveryLatency.Elapsed("backendLatency"),
-		InstanceLatency: discoveryLatency.Elapsed("instanceLatency"),
+		BackendLatency:  discoverLatency.Elapsed("backendLatency"),
+		InstanceLatency: discoverLatency.Elapsed("instanceLatency"),
 		Err:             nil,
 	})
 	log.Debugf("Discovered host: %+v, master: %+v, version: %+v in %.3fs (Backend: %.3fs, Instance: %.3fs)",
@@ -237,8 +238,7 @@ func ContinuousDiscovery() {
 
 	// record discovery Metrics for the time shown, after which they get thrown away.
 	// metrics are available via an API call.
-	period := time.Second * 120 // FIX ME and add a config value
-	discoveryMetricsContainer = discovery.NewMetricsCollection(period)
+	discoveryMetricCollection = discovery.NewMetricCollection(time.Duration(config.Config.DiscoveryCollectionRetentionSeconds) * time.Second)
 
 	go ometrics.InitGraphiteMetrics()
 	go acceptSignals()
