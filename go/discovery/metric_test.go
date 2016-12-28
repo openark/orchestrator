@@ -37,7 +37,7 @@ func TestAppend(t *testing.T) {
 		BackendLatency:  time.Second * 5,
 		InstanceLatency: time.Second * 6,
 	})
-	dmc = NewMetricCollection()
+	dmc = NewMetricCollection(time.Second)
 
 	dmc.Append(dm[0])
 	dmc.Append(dm[1])
