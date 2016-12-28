@@ -100,17 +100,11 @@ func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err err
 	return log.Errorf("ReadTopologyInstance(%+v) %+v: %+v", *instanceKey, hint, err)
 }
 
-// ReadTopologyInstanceTimed collects and returns timing information
-// when polling a MySQL server.
-// - writes to the orchestrator backend may be buffered.
-func ReadTopologyInstance(instanceKey *InstanceKey, bufferWrites bool) (*Instance, error) {
-	return ReadTopologyInstanceBufferable(instanceKey, false, false)
-}
-// ReadTopologyInstance will poll a MySQL instance to find out its stated.
-// - writes to the orchestrator backend where this is recorded are
-//   NOT buffered.
-func ReadTopologyInstance(instanceKey *InstanceKey, latency *stopwatch.NamedStopwatch) (*Instance, error) {
-	return ReadTopologyInstanceBufferable(instanceKey, false, latency)
+// ReadTopologyInstance collects information on the state of a MySQL
+// server and writes the result synchronously to the orchestrator
+// backend.
+func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
+	return ReadTopologyInstanceBufferable(instanceKey, false, nil)
 }
 
 // ReadTopologyInstanceBufferable connects to a topology MySQL instance
