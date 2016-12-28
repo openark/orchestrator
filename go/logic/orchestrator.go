@@ -76,6 +76,7 @@ func acceptSignals() {
 	c := make(chan os.Signal, 1)
 
 	signal.Notify(c, syscall.SIGHUP)
+	signal.Notify(c, syscall.SIGTERM)
 	go func() {
 		for sig := range c {
 			switch sig {
@@ -84,6 +85,11 @@ func acceptSignals() {
 				config.Reload()
 				discoveryMetricCollection.Reload()
 				inst.AuditOperation("reload-configuration", nil, "Triggered via SIGHUP")
+			case syscall.SIGTERM:
+				log.Debugf("Received SIGTERM. Shutting down orchestrator")
+				discoveryMetricCollection.Shutdown()
+				// probably should poke other go routines to stop cleanly here ...
+				inst.AuditOperation("shutdown", nil, "Triggered via SIGTERM")
 			}
 		}
 	}()
