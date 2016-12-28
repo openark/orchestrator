@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/auth"
@@ -32,6 +33,7 @@ import (
 
 	"github.com/github/orchestrator/go/agent"
 	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/discovery"
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/process"
@@ -1581,12 +1583,26 @@ func (this *HttpAPI) BulkInstances(params martini.Params, r render.Render, req *
 
 // DiscoveryMetricsRaw will return the last X seconds worth of discovery information in time based order as a JSON array
 func (this *HttpAPI) DiscoveryMetricsRaw(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	r.JSON(200, &APIResponse{Code: ERROR, Message: "NOT IMPLEMENTED"})
+	seconds, err := strconv.Atoi(params["seconds"])
+	if err != nil || seconds <= 0 {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Invalid value provided for seconds"})
+		return
+	}
+
+	mc, err := discovery.MC.Since(time.Now().Add(-time.Duration(seconds) * time.Second))
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to determine start time. Perhaps seconds value is wrong?"})
+		return
+	}
+
+	// build up JSON response for each row -maybe this requires no special munging?
+
+	r.JSON(200, mc)
 }
 
 // DiscoveryMetricsAggregated will return the aggregated metrics from the last X seconds worth of raw discovery information
 func (this *HttpAPI) DiscoveryMetricsAggregated(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	r.JSON(200, &APIResponse{Code: ERROR, Message: "NOT IMPLEMENTED"})
+	r.JSON(200, &APIResponse{Code: ERROR, Message: "NOT IMPLEMENTED - try using /api/discovery-metrics-raw/:seconds instead"})
 }
 
 // Agents provides complete list of registered agents (See https://github.com/github/orchestrator-agent)
