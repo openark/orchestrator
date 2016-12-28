@@ -121,8 +121,9 @@ func handleDiscoveryRequests() {
 	}
 }
 
-// discoverInstance will attempt discovering an instance (unless it is already up to date) and will
-// list down its master and replicas (if any) for further discovery.
+// discoverInstance will attempt to discover (poll) an instance (unless
+// it is already up to date) and will also ensure that its master and
+// replicas (if any) are also checked.
 func discoverInstance(instanceKey inst.InstanceKey) {
 	start := time.Now()
 	defer func() {
@@ -159,7 +160,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	discoveriesCounter.Inc(1)
 
 	// First we've ever heard of this instance. Continue investigation:
-	instance, err = inst.ReadTopologyInstanceBufferable(&instanceKey, config.Config.BufferInstanceWrites)
+	instance, err = inst.ReadTopologyInstanceBufferable(&instanceKey, config.Config.BufferInstanceWrites, discoverLatency)
 	// panic can occur (IO stuff). Therefore it may happen
 	// that instance is nil. Check it.
 	if instance == nil {
