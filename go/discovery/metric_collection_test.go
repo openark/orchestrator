@@ -74,23 +74,23 @@ func TestAppend(t *testing.T) {
 
 // Add some values and then check that as we remove them we get back what we expect.
 // This test is expected to run AFTER TestAppend
-func TestRemoveBefore(t *testing.T) {
+func TestremoveBefore(t *testing.T) {
 	if len(dm) != 3 {
-		t.Errorf("TestRemoveBefore: dm is not the expected length. Got: %d, Expected: %d", len(dm), 3)
+		t.Errorf("TestremoveBefore: dm is not the expected length. Got: %d, Expected: %d", len(dm), 3)
 	}
 
 	// we expect to have the 3 value in the array so remove them one by one.
 	// the first iteration should remove nothing.
 	for i := -1; i <= 3; i++ {
 		refTime := ts.Add(time.Duration(i) * time.Second)
-		// t.Logf("TestRemoveBefore: i: %d, refTime: %+v", i, refTime)
+		// t.Logf("TestremoveBefore: i: %d, refTime: %+v", i, refTime)
 
-		if err := dmc.RemoveBefore(refTime); err != nil {
-			t.Errorf("TestRemoveBefore: failed. i: %d, refTime: %+v, err: %+v", i, refTime, err)
+		if err := dmc.removeBefore(refTime); err != nil {
+			t.Errorf("TestremoveBefore: failed. i: %d, refTime: %+v, err: %+v", i, refTime, err)
 		}
 		since, err := dmc.Since(refTime)
 		if err != nil {
-			t.Errorf("TestRemoveBefore: Got Error trying to retrieve data since %+v: %+v", refTime, err)
+			t.Errorf("TestremoveBefore: Got Error trying to retrieve data since %+v: %+v", refTime, err)
 		} else {
 			// check expected size we get back
 			var expecting int
@@ -102,7 +102,7 @@ func TestRemoveBefore(t *testing.T) {
 				expecting = 3 - i
 			}
 			if len(since) != expecting {
-				t.Errorf("TestRemoveBefore(c): i: %d. len(since) wrong. Got: %d, Expecting: %d", i, len(since), expecting)
+				t.Errorf("TestremoveBefore(c): i: %d. len(since) wrong. Got: %d, Expecting: %d", i, len(since), expecting)
 			}
 		}
 	}

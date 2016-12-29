@@ -44,12 +44,12 @@ func (mc *MetricCollection) autoExpire() {
 	if mc == nil {
 		return
 	}
-	ticker := time.NewTicker(time.Second * 5) // hard-coded at every second   FIXME and but back to one second!
+	ticker := time.NewTicker(time.Second) // hard-coded at every second
 
 	for {
 		select {
 		case <-ticker.C: // do the periodic expiry
-			mc.RemoveBefore(time.Now().Add(-mc.expirePeriod))
+			mc.removeBefore(time.Now().Add(-mc.expirePeriod))
 		case <-mc.done: // stop the ticker and return
 			ticker.Stop()
 			return
@@ -82,7 +82,6 @@ func (mc *MetricCollection) Shutdown() {
 
 // Append a new Metric to the existing collection
 func (mc *MetricCollection) Append(m *Metric) error {
-	log.Infof("MetricCollection.Append(%+v) mc=%v", m, mc)
 	if mc == nil {
 		return errors.New("MetricsCollection.Append: mc == nil")
 	}
@@ -97,7 +96,6 @@ func (mc *MetricCollection) Append(m *Metric) error {
 		m.Timestamp = time.Now()
 	}
 	mc.collection = append(mc.collection, m)
-	log.Infof("MetricCollection.Append(%+v) mc=%v, len(mc.collection)=%d", m, mc, len(mc.collection))
 
 	return nil
 }
@@ -107,7 +105,6 @@ func (mc *MetricCollection) Append(m *Metric) error {
 // Iterate backwards until we reach the first value before the given time
 // or the end of the array.
 func (mc *MetricCollection) Since(t time.Time) ([](*Metric), error) {
-	log.Debugf("MetricCollection.Since(%+v) mc=%v", t, mc)
 	if mc == nil {
 		return nil, errors.New("MetricsCollection.Since: mc == nil")
 	}
@@ -137,16 +134,16 @@ func (mc *MetricCollection) Since(t time.Time) ([](*Metric), error) {
 	return mc.collection[first:last], nil
 }
 
-// RemoveBefore collection values from mc before the given time.
-func (mc *MetricCollection) RemoveBefore(t time.Time) error {
+// removeBefore is called by autoExpire and removes collection values
+// from mc before the given time.
+func (mc *MetricCollection) removeBefore(t time.Time) error {
 	if mc == nil {
-		return errors.New("MetricsCollection.RemoveBefore: mc == nil")
+		return errors.New("MetricsCollection.removeBefore: mc == nil")
 	}
 	mc.Lock()
 	defer mc.Unlock()
 
 	cLen := len(mc.collection)
-	log.Debugf("MetricCollection.RemoveBefore(%+v) mc=%v, have %d collection entries", t, mc, cLen)
 	if cLen == 0 {
 		return nil // we have a collection but no data
 	}
@@ -167,10 +164,8 @@ func (mc *MetricCollection) RemoveBefore(t time.Time) error {
 
 	// get the interval we need.
 	if first == len(mc.collection) {
-		log.Debugf("MetricCollection.RemoveBefore(%+v) mc=%v,  removing all entries", t, mc)
 		mc.collection = nil // remove all entries
 	} else if first != -1 {
-		log.Debugf("MetricCollection.RemoveBefore(%+v) mc=%v, keeping entries from position %d", t, mc, first)
 		mc.collection = mc.collection[first:]
 	}
 	return nil // no errors
