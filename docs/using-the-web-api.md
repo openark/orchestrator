@@ -61,6 +61,8 @@ The following bulk retrieval rules are intended for allowing the information ins
 * `/api/bulk-instance`: provide a json list of instances in the form of Hostname Port
 * `/api/bulk-promotion-rules`: provide a json list of instance promotion rules in the form of Hostname Port PromotionRule
 
+The following urls allow access to the discovery metrics
+* `/api/discovery-metrics-raw/:seconds`: list the raw discovery metrics for the last specified number of seconds. Raw discovery metric data is kept for DiscoveryCollectionRetentionSeconds seconds (default: 120)
 
 #### Instance JSON breakdown
 
