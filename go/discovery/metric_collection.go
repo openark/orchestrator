@@ -22,7 +22,6 @@ type MetricCollection struct {
 	sync.Mutex                 // for locking the structure
 	collection   [](*Metric)   // may need impoving if the size of the collection grows too much
 	done         chan struct{} // to indicate that we are finishing expiry
-	ticker       *time.Ticker  // expiry ticker
 	expirePeriod time.Duration // time to keep the collection information for
 }
 
@@ -33,24 +32,26 @@ func NewMetricCollection(period time.Duration) *MetricCollection {
 		done:         make(chan struct{}),
 		expirePeriod: period,
 	}
-	go mc.Expire()
+	go mc.autoExpire()
 
 	return mc
 }
 
-// Expire removes old values periodically given mc.expirePeriod
-func (mc *MetricCollection) Expire() {
+// autoExpire is a private method which auto expires information
+// periodically in the collection according to mc.expirePeriod.
+// It will stop if it receives a message on channel mc.done.
+func (mc *MetricCollection) autoExpire() {
 	if mc == nil {
 		return
 	}
-	mc.ticker = time.NewTicker(time.Second) // hard-coded at every second
+	ticker := time.NewTicker(time.Second * 5) // hard-coded at every second   FIXME and but back to one second!
 
 	for {
 		select {
-		case <-mc.ticker.C: // do the periodic expiry
+		case <-ticker.C: // do the periodic expiry
 			mc.RemoveBefore(time.Now().Add(-mc.expirePeriod))
 		case <-mc.done: // stop the ticker and return
-			mc.ticker.Stop()
+			ticker.Stop()
 			return
 		}
 	}
@@ -72,6 +73,7 @@ func (mc *MetricCollection) Reload() {
 
 // Shutdown prepares to stop by terminating the expiry process
 func (mc *MetricCollection) Shutdown() {
+	log.Infof("MetricCollection.Shutdown: signalling mc.autoExpire() to stop")
 	if mc == nil {
 		return
 	}
@@ -80,7 +82,7 @@ func (mc *MetricCollection) Shutdown() {
 
 // Append a new Metric to the existing collection
 func (mc *MetricCollection) Append(m *Metric) error {
-	log.Infof("MetricCollection.Append(%+v)", m)
+	log.Infof("MetricCollection.Append(%+v) mc=%v", m, mc)
 	if mc == nil {
 		return errors.New("MetricsCollection.Append: mc == nil")
 	}
@@ -95,7 +97,7 @@ func (mc *MetricCollection) Append(m *Metric) error {
 		m.Timestamp = time.Now()
 	}
 	mc.collection = append(mc.collection, m)
-	log.Infof("MetricCollection.Append(%+v) len(mc.collection)=%d", m, len(mc.collection))
+	log.Infof("MetricCollection.Append(%+v) mc=%v, len(mc.collection)=%d", m, mc, len(mc.collection))
 
 	return nil
 }
@@ -105,12 +107,13 @@ func (mc *MetricCollection) Append(m *Metric) error {
 // Iterate backwards until we reach the first value before the given time
 // or the end of the array.
 func (mc *MetricCollection) Since(t time.Time) ([](*Metric), error) {
+	log.Debugf("MetricCollection.Since(%+v) mc=%v", t, mc)
 	if mc == nil {
 		return nil, errors.New("MetricsCollection.Since: mc == nil")
 	}
 	mc.Lock()
 	defer mc.Unlock()
-	if mc.collection == nil || len(mc.collection) == 0 {
+	if len(mc.collection) == 0 {
 		return nil, nil // nothing to return
 	}
 	last := len(mc.collection)
@@ -136,17 +139,14 @@ func (mc *MetricCollection) Since(t time.Time) ([](*Metric), error) {
 
 // RemoveBefore collection values from mc before the given time.
 func (mc *MetricCollection) RemoveBefore(t time.Time) error {
-	log.Debugf("MetricCollection.RemoveBefore(%+v)", t)
 	if mc == nil {
 		return errors.New("MetricsCollection.RemoveBefore: mc == nil")
 	}
 	mc.Lock()
 	defer mc.Unlock()
-	log.Debugf("MetricCollection.RemoveBefore(%+v) have %d collection entries", t, len(mc.collection))
-	if mc.collection == nil {
-		return nil // no data so nothing to do
-	}
+
 	cLen := len(mc.collection)
+	log.Debugf("MetricCollection.RemoveBefore(%+v) mc=%v, have %d collection entries", t, mc, cLen)
 	if cLen == 0 {
 		return nil // we have a collection but no data
 	}
@@ -167,10 +167,10 @@ func (mc *MetricCollection) RemoveBefore(t time.Time) error {
 
 	// get the interval we need.
 	if first == len(mc.collection) {
-		log.Debugf("MetricCollection.RemoveBefore(%+v) removing all entries", t)
+		log.Debugf("MetricCollection.RemoveBefore(%+v) mc=%v,  removing all entries", t, mc)
 		mc.collection = nil // remove all entries
 	} else if first != -1 {
-		log.Debugf("MetricCollection.RemoveBefore(%+v) keeping entries from position %d", t, first)
+		log.Debugf("MetricCollection.RemoveBefore(%+v) mc=%v, keeping entries from position %d", t, mc, first)
 		mc.collection = mc.collection[first:]
 	}
 	return nil // no errors
