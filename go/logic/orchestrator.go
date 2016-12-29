@@ -240,10 +240,6 @@ func ContinuousDiscovery() {
 		snapshotTopologiesTick = time.Tick(time.Duration(config.Config.SnapshotTopologiesIntervalHours) * time.Hour)
 	}
 
-	// record discovery Metrics for the time shown, after which they get thrown away.
-	// metrics are available via an API call.
-	discovery.MC = discovery.NewMetricCollection(time.Duration(config.Config.DiscoveryCollectionRetentionSeconds) * time.Second)
-
 	go ometrics.InitGraphiteMetrics()
 	go acceptSignals()
 
