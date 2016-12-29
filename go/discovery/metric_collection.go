@@ -4,6 +4,7 @@ package discovery
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -169,4 +170,54 @@ func (mc *MetricCollection) removeBefore(t time.Time) error {
 		mc.collection = mc.collection[first:]
 	}
 	return nil // no errors
+}
+
+// timestamp uses a nore normal timestamp format.
+func timestamp(t time.Time) string {
+	return fmt.Sprintf("%q", t.Format("2016-12-31 23:58:58.000"))
+}
+
+// myfloat is to force the JSON output to show 3 decimal places
+type myfloat float64
+
+func (m myfloat) String() string {
+	return fmt.Sprintf(".3f", m)
+}
+
+type MetricJSON struct {
+	Timestamp       string
+	Hostname        string
+	Port            int
+	BackendLatency  myfloat
+	InstanceLatency myfloat
+	TotalLatency    myfloat
+	Err             error
+}
+
+// to make the API response we need this in a printable JSON format, so adjust this
+// here using a temporary structure
+func (mc *MetricCollection) JSONSince(t time.Time) ([](MetricJSON), error) {
+	if mc == nil {
+		return nil, errors.New("MetricCollection.JSONSince: mc == nil")
+	}
+	raw, err := mc.Since(t)
+	if err != nil {
+		return nil, err
+	}
+
+	// build up JSON response for each Metric we received
+	var s []MetricJSON
+	for i := range raw {
+		mj := MetricJSON{
+			Timestamp:       timestamp(raw[i].Timestamp),
+			Hostname:        raw[i].InstanceKey.Hostname,
+			Port:            raw[i].InstanceKey.Port,
+			BackendLatency:  myfloat(raw[i].BackendLatency.Seconds()),
+			InstanceLatency: myfloat(raw[i].InstanceLatency.Seconds()),
+			TotalLatency:    myfloat(raw[i].TotalLatency.Seconds()),
+			Err:             raw[i].Err,
+		}
+		s = append(s, mj)
+	}
+	return s, nil
 }

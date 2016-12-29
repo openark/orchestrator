@@ -1594,16 +1594,14 @@ func (this *HttpAPI) DiscoveryMetricsRaw(params martini.Params, r render.Render,
 
 	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
 	log.Debugf("DiscoveryMetricsRaw: refTime: %+v", refTime)
-	mc, err := discovery.MC.Since(refTime)
+	json, err := discovery.MC.JSONSince(refTime)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to determine start time. Perhaps seconds value is wrong?"})
 		return
 	}
-	log.Debugf("DiscoveryMetricsRaw: retrieved %d entries from discovery.MC", len(mc))
+	log.Debugf("DiscoveryMetricsRaw: retrieved %d entries from discovery.MC", len(json))
 
-	// build up JSON response for each row -maybe this requires no special munging?
-
-	r.JSON(200, mc)
+	r.JSON(200, json)
 }
 
 // Agents provides complete list of registered agents (See https://github.com/github/orchestrator-agent)
