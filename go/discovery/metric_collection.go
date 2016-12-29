@@ -80,6 +80,7 @@ func (mc *MetricCollection) Shutdown() {
 
 // Append a new Metric to the existing collection
 func (mc *MetricCollection) Append(m *Metric) error {
+	log.Infof("MetricCollection.Append(%+v)", m)
 	if mc == nil {
 		return errors.New("MetricsCollection.Append: mc == nil")
 	}
@@ -94,6 +95,7 @@ func (mc *MetricCollection) Append(m *Metric) error {
 		m.Timestamp = time.Now()
 	}
 	mc.collection = append(mc.collection, m)
+	log.Infof("MetricCollection.Append(%+v) len(mc.collection)=%d", m, len(mc.collection))
 
 	return nil
 }
@@ -134,11 +136,13 @@ func (mc *MetricCollection) Since(t time.Time) ([](*Metric), error) {
 
 // RemoveBefore collection values from mc before the given time.
 func (mc *MetricCollection) RemoveBefore(t time.Time) error {
+	log.Debugf("MetricCollection.RemoveBefore(%+v)", t)
 	if mc == nil {
 		return errors.New("MetricsCollection.RemoveBefore: mc == nil")
 	}
 	mc.Lock()
 	defer mc.Unlock()
+	log.Debugf("MetricCollection.RemoveBefore(%+v) have %d collection entries", t, len(mc.collection))
 	if mc.collection == nil {
 		return nil // no data so nothing to do
 	}
@@ -163,8 +167,10 @@ func (mc *MetricCollection) RemoveBefore(t time.Time) error {
 
 	// get the interval we need.
 	if first == len(mc.collection) {
+		log.Debugf("MetricCollection.RemoveBefore(%+v) removing all entries", t)
 		mc.collection = nil // remove all entries
 	} else if first != -1 {
+		log.Debugf("MetricCollection.RemoveBefore(%+v) keeping entries from position %d", t, first)
 		mc.collection = mc.collection[first:]
 	}
 	return nil // no errors
