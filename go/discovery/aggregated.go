@@ -28,56 +28,46 @@ import (
 type AggregatedDiscoveryMetrics struct {
 	FirstSeen                       time.Time // timestamp of the first data seen
 	LastSeen                        time.Time // timestamp of the last data seen
-	DistinctInstanceKeys            int       // number of distinct Instances seen
-	DistinctFailedInstanceKeys      int       // number of distinct Instances which failed
+	CountDistinctInstanceKeys       int       // number of distinct Instances seen
+	CountDistinctFailedInstanceKeys int       // number of distinct Instances which failed
 	FailedDiscoveries               uint64    // number of failed discoveries
 	SuccessfulDiscoveries           uint64    // number of successful discoveries
-	PollAvgTotalSeconds             float64   // Average Total Poll Time
-	PollAvgBackendSeconds           float64
-	PollAvgInstanceSeconds          float64
-	PollFailedAvgTotalSeconds       float64 // Average Total Poll Time for failed discoveries
-	PollFailedAvgBackendSeconds     float64
-	PollFailedAvgInstanceSeconds    float64
-	PollMaxTotalSeconds             float64
-	PollMaxBackendSeconds           float64
-	PollMaxInstanceSeconds          float64
-	PollFailedMaxTotalSeconds       float64
-	PollFailedMaxBackendSeconds     float64
-	PollFailedMaxInstanceSeconds    float64
-	PollMedianTotalSeconds          float64
-	PollMedianBackendSeconds        float64
-	PollMedianInstanceSeconds       float64
-	PollFailedMedianTotalSeconds    float64
-	PollFailedMedianBackendSeconds  float64
-	PollFailedMedianInstanceSeconds float64
-	PollQ95TotalSeconds             float64
-	PollQ95BackendSeconds           float64
-	PollQ95InstanceSeconds          float64
-	PollFailedQ95TotalSeconds       float64
-	PollFailedQ95BackendSeconds     float64
-	PollFailedQ95InstanceSeconds    float64
+	MeanTotalSeconds                float64
+	MeanBackendSeconds              float64
+	MeanInstanceSeconds             float64
+	FailedMeanTotalSeconds          float64
+	FailedMeanBackendSeconds        float64
+	FailedMeanInstanceSeconds       float64
+	MaxTotalSeconds                 float64
+	MaxBackendSeconds               float64
+	MaxInstanceSeconds              float64
+	FailedMaxTotalSeconds           float64
+	FailedMaxBackendSeconds         float64
+	FailedMaxInstanceSeconds        float64
+	MedianTotalSeconds              float64
+	MedianBackendSeconds            float64
+	MedianInstanceSeconds           float64
+	FailedMedianTotalSeconds        float64
+	FailedMedianBackendSeconds      float64
+	FailedMedianInstanceSeconds     float64
+	Q95TotalSeconds                 float64
+	Q95BackendSeconds               float64
+	Q95InstanceSeconds              float64
+	FailedQ95TotalSeconds           float64
+	FailedQ95BackendSeconds         float64
+	FailedQ95InstanceSeconds        float64
 }
 
-func sum(values stats.Float64Data) float64 {
-	var sum float64
-
-	for _, v := range values {
-		sum += v
-	}
-	return sum
-}
-
-func avg(values stats.Float64Data) float64 {
-	length := len(values)
-
-	if length == 0 {
+// internal routine to return the average value or 0
+func mean(values stats.Float64Data) float64 {
+	s, err := stats.Mean(values)
+	if err != nil {
 		return 0
 	}
-
-	return sum(values) / float64(length)
+	return s
 }
 
-// return the requested percentile value given.
+// internal routine to return the requested percentile valeu or 0
 func percentile(values stats.Float64Data, percent float64) float64 {
 	s, err := stats.Percentile(values, percent)
 	if err != nil {
@@ -106,13 +96,13 @@ func median(values stats.Float64Data) float64 {
 
 // AggregatedSince returns a large number of aggregated metrics
 // based on the raw metrics collected since the given time.
-func (mc *MetricCollection) AggregatedSince(t time.Time) AggregatedDiscoveryMetrics {
+func (mc *MetricCollection) AggregatedSince(t time.Time) (AggregatedDiscoveryMetrics, error) {
 	results, err := mc.Since(t)
 	if err != nil {
-		return AggregatedDiscoveryMetrics{}
+		return AggregatedDiscoveryMetrics{}, err
 	}
 
-	return aggregate(results)
+	return aggregate(results), nil
 }
 
 func aggregate(results [](*Metric)) AggregatedDiscoveryMetrics {
@@ -181,33 +171,33 @@ func aggregate(results [](*Metric)) AggregatedDiscoveryMetrics {
 	return AggregatedDiscoveryMetrics{
 		FirstSeen:                       first,
 		LastSeen:                        last,
-		DistinctInstanceKeys:            len(names["InstanceKeys"]),
-		DistinctFailedInstanceKeys:      len(names["FailedInstanceKeys"]),
+		CountDistinctInstanceKeys:       len(names["InstanceKeys"]),
+		CountDistinctFailedInstanceKeys: len(names["FailedInstanceKeys"]),
 		FailedDiscoveries:               counters["FailedDiscoveries"],
 		SuccessfulDiscoveries:           counters["Discoveries"],
-		PollAvgTotalSeconds:             avg(timings["TotalSeconds"]),
-		PollAvgBackendSeconds:           avg(timings["BackendSeconds"]),
-		PollAvgInstanceSeconds:          avg(timings["InstanceSeconds"]),
-		PollFailedAvgTotalSeconds:       avg(timings["FailedTotalSeconds"]),
-		PollFailedAvgBackendSeconds:     avg(timings["FailedBackendSeconds"]),
-		PollFailedAvgInstanceSeconds:    avg(timings["FailedInstanceSeconds"]),
-		PollMaxTotalSeconds:             max(timings["TotalSeconds"]),
-		PollMaxBackendSeconds:           max(timings["BackendSeconds"]),
-		PollMaxInstanceSeconds:          max(timings["InstanceSeconds"]),
-		PollFailedMaxTotalSeconds:       max(timings["FailedTotalSeconds"]),
-		PollFailedMaxBackendSeconds:     max(timings["FailedBackendSeconds"]),
-		PollFailedMaxInstanceSeconds:    max(timings["FailedInstanceSeconds"]),
-		PollMedianTotalSeconds:          median(timings["TotalSeconds"]),
-		PollMedianBackendSeconds:        median(timings["BackendSeconds"]),
-		PollMedianInstanceSeconds:       median(timings["InstanceSeconds"]),
-		PollFailedMedianTotalSeconds:    median(timings["FailedTotalSeconds"]),
-		PollFailedMedianBackendSeconds:  median(timings["FailedBackendSeconds"]),
-		PollFailedMedianInstanceSeconds: median(timings["FailedInstanceSeconds"]),
-		PollQ95TotalSeconds:             percentile(timings["TotalSeconds"], 95),
-		PollQ95BackendSeconds:           percentile(timings["BackendSeconds"], 95),
-		PollQ95InstanceSeconds:          percentile(timings["InstanceSeconds"], 95),
-		PollFailedQ95TotalSeconds:       percentile(timings["FailedTotalSeconds"], 95),
-		PollFailedQ95BackendSeconds:     percentile(timings["FailedBackendSeconds"], 95),
-		PollFailedQ95InstanceSeconds:    percentile(timings["FailedInstanceSeconds"], 95),
+		MeanTotalSeconds:                mean(timings["TotalSeconds"]),
+		MeanBackendSeconds:              mean(timings["BackendSeconds"]),
+		MeanInstanceSeconds:             mean(timings["InstanceSeconds"]),
+		FailedMeanTotalSeconds:          mean(timings["FailedTotalSeconds"]),
+		FailedMeanBackendSeconds:        mean(timings["FailedBackendSeconds"]),
+		FailedMeanInstanceSeconds:       mean(timings["FailedInstanceSeconds"]),
+		MaxTotalSeconds:                 max(timings["TotalSeconds"]),
+		MaxBackendSeconds:               max(timings["BackendSeconds"]),
+		MaxInstanceSeconds:              max(timings["InstanceSeconds"]),
+		FailedMaxTotalSeconds:           max(timings["FailedTotalSeconds"]),
+		FailedMaxBackendSeconds:         max(timings["FailedBackendSeconds"]),
+		FailedMaxInstanceSeconds:        max(timings["FailedInstanceSeconds"]),
+		MedianTotalSeconds:              median(timings["TotalSeconds"]),
+		MedianBackendSeconds:            median(timings["BackendSeconds"]),
+		MedianInstanceSeconds:           median(timings["InstanceSeconds"]),
+		FailedMedianTotalSeconds:        median(timings["FailedTotalSeconds"]),
+		FailedMedianBackendSeconds:      median(timings["FailedBackendSeconds"]),
+		FailedMedianInstanceSeconds:     median(timings["FailedInstanceSeconds"]),
+		Q95TotalSeconds:                 percentile(timings["TotalSeconds"], 95),
+		Q95BackendSeconds:               percentile(timings["BackendSeconds"], 95),
+		Q95InstanceSeconds:              percentile(timings["InstanceSeconds"], 95),
+		FailedQ95TotalSeconds:           percentile(timings["FailedTotalSeconds"], 95),
+		FailedQ95BackendSeconds:         percentile(timings["FailedBackendSeconds"], 95),
+		FailedQ95InstanceSeconds:        percentile(timings["FailedInstanceSeconds"], 95),
 	}
 }

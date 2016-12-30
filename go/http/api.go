@@ -1607,7 +1607,7 @@ func (this *HttpAPI) DiscoveryMetricsAggregated(params martini.Params, r render.
 	seconds, err := strconv.Atoi(params["seconds"])
 
 	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
-	aggregated, err := discovery.AggregatedSince(refTime)
+	aggregated, err := discovery.MC.AggregatedSince(refTime)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to genereate aggregated discovery metrics"})
 		return
