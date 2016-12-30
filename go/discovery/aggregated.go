@@ -142,7 +142,7 @@ func aggregate(results [](*Metric)) AggregatedDiscoveryMetrics {
 	}
 
 	// iterate over results storing required values
-	for _, v := range rawResults {
+	for _, v := range results {
 		// first and last
 		if first.IsZero() || first.After(v.Timestamp) {
 			first = v.Timestamp
