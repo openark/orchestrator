@@ -1584,8 +1584,6 @@ func (this *HttpAPI) BulkInstances(params martini.Params, r render.Render, req *
 
 // DiscoveryMetricsRaw will return the last X seconds worth of discovery information in time based order as a JSON array
 func (this *HttpAPI) DiscoveryMetricsRaw(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	log.Debugf("DiscoveryMetricsRaw: seconds(raw): %q", params["seconds"])
-
 	seconds, err := strconv.Atoi(params["seconds"])
 	if err != nil || seconds <= 0 {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Invalid value provided for seconds"})
@@ -1593,7 +1591,6 @@ func (this *HttpAPI) DiscoveryMetricsRaw(params martini.Params, r render.Render,
 	}
 
 	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
-	log.Debugf("DiscoveryMetricsRaw: refTime: %+v", refTime)
 	json, err := discovery.MC.JSONSince(refTime)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to determine start time. Perhaps seconds value is wrong?"})
@@ -1602,6 +1599,20 @@ func (this *HttpAPI) DiscoveryMetricsRaw(params martini.Params, r render.Render,
 	log.Debugf("DiscoveryMetricsRaw: retrieved %d entries from discovery.MC", len(json))
 
 	r.JSON(200, json)
+}
+
+// DiscoveryMetricsAggregated will return a single set of aggregated metrics for raw values collected since the
+// specified time.
+func (this *HttpAPI) DiscoveryMetricsAggregated(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+
+	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
+	aggregated, err := discovery.AggregatedSince(refTime)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to genereate aggregated discovery metrics"})
+		return
+	}
+	r.JSON(200, aggregated)
 }
 
 // Agents provides complete list of registered agents (See https://github.com/github/orchestrator-agent)
@@ -2499,6 +2510,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 
 	// Monitoring
 	this.registerRequest(m, "discovery-metrics-raw/:seconds", this.DiscoveryMetricsRaw)
+	this.registerRequest(m, "discovery-metrics-aggregated/:seconds", this.DiscoveryMetricsAggregated)
 
 	// Agents
 	this.registerRequest(m, "agents", this.Agents)
