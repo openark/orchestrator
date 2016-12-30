@@ -6,6 +6,7 @@
 #
 set -e
 
+mydir=$(dirname $0)
 RELEASE_VERSION=
 RELEASE_SUBVERSION=
 TOPDIR=/tmp/orchestrator-release
@@ -80,7 +81,7 @@ function oinstall() {
   builddir="$1"
   prefix="$2"
 
-  cd  $(dirname $0)
+  cd  $mydir
   gofmt -s -w  go/
   rsync -qa ./resources $builddir/orchestrator${prefix}/orchestrator/
   rsync -qa ./conf/orchestrator-sample.* $builddir/orchestrator${prefix}/orchestrator/
@@ -155,7 +156,7 @@ function main() {
   build_only=$4
 
   if [ -z "${RELEASE_VERSION}" ] ; then
-    RELEASE_VERSION=$(cat RELEASE_VERSION)
+    RELEASE_VERSION=$(cat $mydir/RELEASE_VERSION)
   fi
   RELEASE_VERSION="${RELEASE_VERSION}${RELEASE_SUBVERSION}"
 
