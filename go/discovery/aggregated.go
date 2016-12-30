@@ -141,32 +141,35 @@ func aggregate(results [](*Metric)) AggregatedDiscoveryMetrics {
 		if last.Before(v.Timestamp) {
 			last = v.Timestamp
 		}
-		// failed / successful names
-		if v.Err == nil {
-			x := names["InstanceKeys"]
-			x[v.InstanceKey.String()] = 1 // Value doesn't matter
-			names["InstanceKeys"] = x
-		} else {
+
+		// successful names
+		x := names["InstanceKeys"]
+		x[v.InstanceKey.String()] = 1 // Value doesn't matter
+		names["InstanceKeys"] = x
+		// failed names
+		if v.Err != nil {
 			x := names["FailedInstanceKeys"]
 			x[v.InstanceKey.String()] = 1 // Value doesn't matter
 			names["FailedInstanceKeys"] = x
 		}
 
+		// discoveries
 		counters["Discoveries"]++
-		if v.Err == nil {
+		if v.Err != nil {
 			counters["FailedDiscoveries"]++
 		}
 
+		// All timings
 		timings["TotalSeconds"] = append(timings["TotalSeconds"], v.TotalLatency.Seconds())
 		timings["BackendSeconds"] = append(timings["BackendSeconds"], v.BackendLatency.Seconds())
 		timings["InstanceSeconds"] = append(timings["InstanceSeconds"], v.InstanceLatency.Seconds())
 
+		// Failed timings
 		if v.Err != nil {
 			timings["FailedTotalSeconds"] = append(timings["FailedTotalSeconds"], v.TotalLatency.Seconds())
 			timings["FailedBackendSeconds"] = append(timings["FailedBackendSeconds"], v.BackendLatency.Seconds())
 			timings["FailedInstanceSeconds"] = append(timings["FailedInstanceSeconds"], v.InstanceLatency.Seconds())
 		}
-
 	}
 
 	return AggregatedDiscoveryMetrics{
