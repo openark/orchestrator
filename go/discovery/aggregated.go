@@ -50,12 +50,12 @@ type AggregatedDiscoveryMetrics struct {
 	FailedMedianTotalSeconds        float64
 	FailedMedianBackendSeconds      float64
 	FailedMedianInstanceSeconds     float64
-	Q95TotalSeconds                 float64
-	Q95BackendSeconds               float64
-	Q95InstanceSeconds              float64
-	FailedQ95TotalSeconds           float64
-	FailedQ95BackendSeconds         float64
-	FailedQ95InstanceSeconds        float64
+	P95TotalSeconds                 float64
+	P95BackendSeconds               float64
+	P95InstanceSeconds              float64
+	FailedP95TotalSeconds           float64
+	FailedP95BackendSeconds         float64
+	FailedP95InstanceSeconds        float64
 }
 
 // internal routine to return the average value or 0
@@ -111,12 +111,13 @@ func aggregate(results [](*Metric)) AggregatedDiscoveryMetrics {
 	}
 
 	var (
-		first    time.Time
-		last     time.Time
-		counters map[string]uint64              // map of string based counters
-		names    map[string](map[string]int)    // map of string based names (using a map)
-		timings  map[string](stats.Float64Data) // map of string based float64 values
+		first time.Time
+		last  time.Time
 	)
+
+	counters := make(map[string]uint64)             // map of string based counters
+	names := make(map[string](map[string]int))      // map of string based names (using a map)
+	timings := make(map[string](stats.Float64Data)) // map of string based float64 values
 
 	// initialise counters
 	for _, v := range []string{"FailedDiscoveries", "Discoveries"} {
@@ -193,11 +194,11 @@ func aggregate(results [](*Metric)) AggregatedDiscoveryMetrics {
 		FailedMedianTotalSeconds:        median(timings["FailedTotalSeconds"]),
 		FailedMedianBackendSeconds:      median(timings["FailedBackendSeconds"]),
 		FailedMedianInstanceSeconds:     median(timings["FailedInstanceSeconds"]),
-		Q95TotalSeconds:                 percentile(timings["TotalSeconds"], 95),
-		Q95BackendSeconds:               percentile(timings["BackendSeconds"], 95),
-		Q95InstanceSeconds:              percentile(timings["InstanceSeconds"], 95),
-		FailedQ95TotalSeconds:           percentile(timings["FailedTotalSeconds"], 95),
-		FailedQ95BackendSeconds:         percentile(timings["FailedBackendSeconds"], 95),
-		FailedQ95InstanceSeconds:        percentile(timings["FailedInstanceSeconds"], 95),
+		P95TotalSeconds:                 percentile(timings["TotalSeconds"], 95),
+		P95BackendSeconds:               percentile(timings["BackendSeconds"], 95),
+		P95InstanceSeconds:              percentile(timings["InstanceSeconds"], 95),
+		FailedP95TotalSeconds:           percentile(timings["FailedTotalSeconds"], 95),
+		FailedP95BackendSeconds:         percentile(timings["FailedBackendSeconds"], 95),
+		FailedP95InstanceSeconds:        percentile(timings["FailedInstanceSeconds"], 95),
 	}
 }
