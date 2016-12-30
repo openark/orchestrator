@@ -1612,7 +1612,7 @@ func (this *HttpAPI) DiscoveryMetricsAggregated(params martini.Params, r render.
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to genereate aggregated discovery metrics"})
 		return
 	}
-	log.Printf("Aggregated data: %+v", aggregated)
+	// log.Debugf("Aggregated data: %+v", aggregated)
 	r.JSON(200, aggregated)
 }
 
