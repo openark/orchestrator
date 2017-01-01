@@ -22,8 +22,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/github/orchestrator/go/config"
 	"github.com/outbrain/golib/math"
-	"github.com/outbrain/orchestrator/go/config"
 )
 
 // CandidatePromotionRule describe the promotion preference/rule for an instance.
@@ -60,6 +60,8 @@ type Instance struct {
 	ServerID               uint
 	ServerUUID             string
 	Version                string
+	VersionComment         string
+	FlavorName             string
 	ReadOnly               bool
 	Binlog_format          string
 	LogBinEnabled          bool
@@ -179,6 +181,11 @@ func (this *Instance) IsMariaDB() bool {
 	return strings.Contains(this.Version, "MariaDB")
 }
 
+// IsPercona checkes whether this is any version of Percona Server
+func (this *Instance) IsPercona() bool {
+	return strings.Contains(this.VersionComment, "Percona")
+}
+
 // isMaxScale checkes whether this is any version of MaxScale
 func (this *Instance) isMaxScale() bool {
 	return strings.Contains(this.Version, "maxscale")
@@ -197,6 +204,9 @@ func (this *Instance) IsOracleMySQL() bool {
 	if this.IsMariaDB() {
 		return false
 	}
+	if this.IsPercona() {
+		return false
+	}
 	if this.isMaxScale() {
 		return false
 	}
@@ -206,22 +216,22 @@ func (this *Instance) IsOracleMySQL() bool {
 	return true
 }
 
-// NameAndMarjorVersionString returns something like MariaDB-10.1 MaxScale-1.4 MySQL-5.7
-func (instance *Instance) NameAndMajorVersionString() string {
-	var name string
-	if instance == nil {
-		return name // empty string
-	} else if instance.IsOracleMySQL() {
-		name = "MySQL"
-	} else if instance.IsMariaDB() {
-		name = "MariaDB"
-	} else if instance.isMaxScale() {
-		name = "MaxScale"
-	} else {
-		name = "unknown"
+// applyFlavorName
+func (this *Instance) applyFlavorName() {
+	if this == nil {
+		return
 	}
-
-	return name + "-" + instance.MajorVersionString()
+	if this.IsOracleMySQL() {
+		this.FlavorName = "MySQL"
+	} else if this.IsMariaDB() {
+		this.FlavorName = "MariaDB"
+	} else if this.IsPercona() {
+		this.FlavorName = "Percona"
+	} else if this.isMaxScale() {
+		this.FlavorName = "MaxScale"
+	} else {
+		this.FlavorName = "unknown"
+	}
 }
 
 // IsReplica makes simple heuristics to decide whether this insatnce is a replica of another instance

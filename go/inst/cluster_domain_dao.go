@@ -17,9 +17,9 @@
 package inst
 
 import (
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/db"
 	"github.com/outbrain/golib/log"
-	"github.com/outbrain/orchestrator/go/config"
-	"github.com/outbrain/orchestrator/go/db"
 )
 
 // WriteClusterDomainName will write (and override) the domain name of a cluster

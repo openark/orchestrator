@@ -6,7 +6,10 @@
 #
 set -e
 
-RELEASE_VERSION=$(cat RELEASE_VERSION)
+mydir=$(dirname $0)
+GIT_COMMIT=$(git rev-parse HEAD)
+RELEASE_VERSION=
+RELEASE_SUBVERSION=
 TOPDIR=/tmp/orchestrator-release
 export RELEASE_VERSION TOPDIR
 export GO15VENDOREXPERIMENT=1
@@ -22,7 +25,8 @@ usage() {
   echo "-b build only, do not generate packages"
   echo "-p build prefix Default:(/usr/local)"
   echo "-r build with race detector"
-  echo "-s release subversion"
+  echo "-v release version (optional; default: content of RELEASE_VERSION file)"
+  echo "-s release subversion (optional; default: empty)"
   echo
 }
 
@@ -78,7 +82,7 @@ function oinstall() {
   builddir="$1"
   prefix="$2"
 
-  cd  $(dirname $0)
+  cd  $mydir
   gofmt -s -w  go/
   rsync -qa ./resources $builddir/orchestrator${prefix}/orchestrator/
   rsync -qa ./conf/orchestrator-sample.* $builddir/orchestrator${prefix}/orchestrator/
@@ -94,7 +98,7 @@ function package() {
 
   cd $TOPDIR
 
-  echo "Release version is ${RELEASE_VERSION}"
+  echo "Release version is ${RELEASE_VERSION} ( ${GIT_COMMIT} )"
 
   case $target in
     'linux')
@@ -102,14 +106,14 @@ function package() {
       tar -C $builddir/orchestrator -czf $TOPDIR/orchestrator-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
 
       echo "Creating Distro full packages"
-      fpm -v "${RELEASE_VERSION}" --epoch 1 -f -s dir -t rpm -n orchestrator -C $builddir/orchestrator --prefix=/ .
-      fpm -v "${RELEASE_VERSION}" --epoch 1 -f -s dir -t deb -n orchestrator -C $builddir/orchestrator --prefix=/ --deb-no-default-config-files .
+      fpm -v "${RELEASE_VERSION}" --epoch 1 -f -s dir -n orchestrator -m shlomi-noach --description "MySQL replication topology management and HA" --url "https://github.com/github/orchestrator" --vendor "GitHub" --license "Apache 2.0" -C $builddir/orchestrator --prefix=/ -t rpm .
+      fpm -v "${RELEASE_VERSION}" --epoch 1 -f -s dir -n orchestrator -m shlomi-noach --description "MySQL replication topology management and HA" --url "https://github.com/github/orchestrator" --vendor "GitHub" --license "Apache 2.0" -C $builddir/orchestrator --prefix=/ -t deb --deb-no-default-config-files .
 
       cd $TOPDIR
-      # rpm packaging -- executable only
+      # orchestrator-cli packaging -- executable only
       echo "Creating Distro cli packages"
-      fpm -v "${RELEASE_VERSION}" --epoch 1  -f -s dir -t rpm -n orchestrator-cli -C $builddir/orchestrator-cli --prefix=/ .
-      fpm -v "${RELEASE_VERSION}" --epoch 1  -f -s dir -t deb -n orchestrator-cli -C $builddir/orchestrator-cli --prefix=/ --deb-no-default-config-files .
+      fpm -v "${RELEASE_VERSION}" --epoch 1  -f -s dir -n orchestrator-cli -m shlomi-noach --description "MySQL replication topology management and HA" --url "https://github.com/github/orchestrator" --vendor "GitHub" --license "Apache 2.0" -C $builddir/orchestrator-cli --prefix=/ -t rpm .
+      fpm -v "${RELEASE_VERSION}" --epoch 1  -f -s dir -n orchestrator-cli -m shlomi-noach --description "MySQL replication topology management and HA" --url "https://github.com/github/orchestrator" --vendor "GitHub" --license "Apache 2.0" -C $builddir/orchestrator-cli --prefix=/ -t deb --deb-no-default-config-files .
       ;;
     'darwin')
       echo "Creating Darwin full Package"
@@ -129,7 +133,7 @@ function build() {
   arch="$2"
   builddir="$3"
   prefix="$4"
-  ldflags="-X main.AppVersion=${RELEASE_VERSION}"
+  ldflags="-X main.AppVersion=${RELEASE_VERSION} -X main.GitCommit=${GIT_COMMIT}"
   echo "Building via $(go version)"
   gobuild="go build ${opt_race} -ldflags \"$ldflags\" -o $builddir/orchestrator${prefix}/orchestrator/orchestrator go/cmd/orchestrator/main.go"
 
@@ -152,6 +156,11 @@ function main() {
   prefix="$3"
   build_only=$4
 
+  if [ -z "${RELEASE_VERSION}" ] ; then
+    RELEASE_VERSION=$(cat $mydir/RELEASE_VERSION)
+  fi
+  RELEASE_VERSION="${RELEASE_VERSION}${RELEASE_SUBVERSION}"
+
   precheck "$target"
   builddir=$( setuptree "$prefix" )
   oinstall "$builddir" "$prefix"
@@ -164,13 +173,13 @@ function main() {
 
 build_only=0
 opt_race=
-while getopts a:t:p:s:dbhr flag; do
+while getopts a:t:p:s:v:dbhr flag; do
   case $flag in
   a)
-    arch="$OPTARG"
+    arch="${OPTARG}"
     ;;
   t)
-    target="$OPTARG"
+    target="${OPTARG}"
     ;;
   h)
     usage
@@ -184,13 +193,16 @@ while getopts a:t:p:s:dbhr flag; do
     build_only=1
     ;;
   p)
-    prefix="$OPTARG"
+    prefix="${OPTARG}"
     ;;
   r)
     opt_race="-race"
     ;;
+  v)
+    RELEASE_VERSION="${OPTARG}"
+    ;;
   s)
-    RELEASE_VERSION="${RELEASE_VERSION}_${OPTARG}"
+    RELEASE_SUBVERSION="_${OPTARG}"
     ;;
   ?)
     usage

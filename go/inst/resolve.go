@@ -19,8 +19,8 @@ package inst
 import (
 	"errors"
 	"fmt"
+	"github.com/github/orchestrator/go/config"
 	"github.com/outbrain/golib/log"
-	"github.com/outbrain/orchestrator/go/config"
 	"github.com/patrickmn/go-cache"
 	"net"
 	"regexp"
@@ -31,6 +31,19 @@ import (
 type HostnameResolve struct {
 	hostname         string
 	resolvedHostname string
+}
+
+func (this HostnameResolve) String() string {
+	return fmt.Sprintf("%s %s", this.hostname, this.resolvedHostname)
+}
+
+type HostnameUnresolve struct {
+	hostname           string
+	unresolvedHostname string
+}
+
+func (this HostnameUnresolve) String() string {
+	return fmt.Sprintf("%s %s", this.hostname, this.unresolvedHostname)
 }
 
 func init() {
@@ -150,7 +163,7 @@ func LoadHostnameResolveCache() error {
 }
 
 func loadHostnameResolveCacheFromDatabase() error {
-	allHostnamesResolves, err := readAllHostnameResolves()
+	allHostnamesResolves, err := ReadAllHostnameResolves()
 	if err != nil {
 		return err
 	}

@@ -21,11 +21,11 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/ssl"
 	"github.com/go-sql-driver/mysql"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/sqlutils"
-	"github.com/outbrain/orchestrator/go/config"
-	"github.com/outbrain/orchestrator/go/ssl"
 )
 
 var (
@@ -862,6 +862,11 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE node_health
 			MODIFY app_version varchar(64) CHARACTER SET ascii NOT NULL DEFAULT ""
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN version_comment varchar(128) NOT NULL DEFAULT ''
 	`,
 }
 

@@ -830,11 +830,12 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (indicateLastSeenInStatus) {
       statusMessage = 'seen ' + instance.SecondsSinceLastSeen.Int64 + ' seconds ago';
     }
-    var contentHtml = '' + instance.Version;
+    var identityHtml = '' + instance.Version;
     if (instance.LogBinEnabled) {
-      contentHtml += " " + instance.Binlog_format;
+      identityHtml += " " + instance.Binlog_format;
     }
-    contentHtml = '' + '<div class="pull-right">' + statusMessage + ' </div>' + '<p class="instance-basic-info">' + contentHtml + '</p>';
+    identityHtml += ', ' + instance.FlavorName;
+    var contentHtml = '' + '<div class="pull-right">' + statusMessage + ' </div>' + '<p class="instance-basic-info">' + identityHtml + '</p>';
     if (instance.isCoMaster) {
       contentHtml += '<p><strong>Co master</strong></p>';
     } else if (instance.isMaster) {
@@ -892,9 +893,13 @@ $(document).ready(function() {
 
   $.get(appUrl("/api/clusters-info"), function(clusters) {
     clusters.forEach(function(cluster) {
-      var title = '<span class="small">' + cluster.ClusterName + '</span>';
-      title = ((cluster.ClusterAlias != "") ? '<strong>' + cluster.ClusterAlias + '</strong>, ' + title : title);
-      $("#dropdown-clusters").append('<li><a href="' + appUrl('/web/cluster/' + cluster.ClusterName) + '">' + title + '</a></li>');
+      var url = appUrl('/web/cluster/' + cluster.ClusterName)
+      var title = cluster.ClusterName;
+      if ((cluster.ClusterAlias != "") && (cluster.ClusterAlias != cluster.ClusterName)) {
+        url = appUrl('/web/cluster/alias/' + encodeURIComponent(cluster.ClusterAlias));
+        title = '<strong>' + cluster.ClusterAlias + '</strong>, <span class="small">' + title + '</span>';;
+      }
+      $("#dropdown-clusters").append('<li><a href="' + url + '">' + title + '</a></li>');
     });
     onClustersListeners.forEach(function(func) {
       func(clusters);

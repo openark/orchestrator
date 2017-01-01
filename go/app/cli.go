@@ -25,13 +25,13 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/github/orchestrator/go/agent"
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/logic"
+	"github.com/github/orchestrator/go/process"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/util"
-	"github.com/outbrain/orchestrator/go/agent"
-	"github.com/outbrain/orchestrator/go/config"
-	"github.com/outbrain/orchestrator/go/inst"
-	"github.com/outbrain/orchestrator/go/logic"
-	"github.com/outbrain/orchestrator/go/process"
 )
 
 var thisInstanceKey *inst.InstanceKey
@@ -976,13 +976,36 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				}
 			}
 		}
+	case registerCliCommand("search", "Information", `Search instances by name, version, version comment, port`):
+		{
+			if pattern == "" {
+				log.Fatal("No pattern given")
+			}
+			instances, err := inst.SearchInstances(pattern)
+			if err != nil {
+				log.Fatale(err)
+			} else {
+				for _, instance := range instances {
+					fmt.Println(instance.Key.DisplayString())
+				}
+			}
+		}
 	case registerCliCommand("clusters", "Information", `List all clusters known to orchestrator`):
 		{
 			clusters, err := inst.ReadClusters()
 			if err != nil {
 				log.Fatale(err)
-			} else {
-				fmt.Println(strings.Join(clusters, "\n"))
+			}
+			fmt.Println(strings.Join(clusters, "\n"))
+		}
+	case registerCliCommand("clusters-alias", "Information", `List all clusters known to orchestrator`):
+		{
+			clusters, err := inst.ReadClustersInfo("")
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, cluster := range clusters {
+				fmt.Println(fmt.Sprintf("%s\t%s", cluster.ClusterName, cluster.ClusterAlias))
 			}
 		}
 	case registerCliCommand("all-clusters-masters", "Information", `List of writeable masters, one per cluster`):
@@ -1417,6 +1440,26 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		{
 			jsonString := config.Config.ToJSONString()
 			fmt.Println(jsonString)
+		}
+	case registerCliCommand("show-resolve-hosts", "Meta", `Show the content of the hostname_resolve table. Generally used for debugging`):
+		{
+			resolves, err := inst.ReadAllHostnameResolves()
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, r := range resolves {
+				fmt.Println(r)
+			}
+		}
+	case registerCliCommand("show-unresolve-hosts", "Meta", `Show the content of the hostname_unresolve table. Generally used for debugging`):
+		{
+			unresolves, err := inst.ReadAllHostnameUnresolves()
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, r := range unresolves {
+				fmt.Println(r)
+			}
 		}
 	case registerCliCommand("redeploy-internal-db", "Meta, internal", `Force internal schema migration to current backend structure`):
 		{
