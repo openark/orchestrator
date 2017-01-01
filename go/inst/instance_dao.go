@@ -506,7 +506,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 	// First read the current PromotionRule from candidate_database_instance.
 	{
 		err = ReadInstancePromotionRule(instance)
-		logReadTopologyInstanceError(instanceKey, "ReadInstanceClusterAttributes", err)
+		logReadTopologyInstanceError(instanceKey, "ReadInstancePromotionRule", err)
 	}
 	// Then check if the instance wants to set a different PromotionRule.
 	// We'll set it here on their behalf so there's no race between the first
@@ -527,7 +527,8 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 		}
 	}
 
-	if instance.ReplicationDepth == 0 && config.Config.DetectClusterAliasQuery != "" && !isMaxScale {
+	ReadClusterAliasOverride(instance)
+	if instance.SuggestedClusterAlias == "" && instance.ReplicationDepth == 0 && config.Config.DetectClusterAliasQuery != "" && !isMaxScale {
 		// Only need to do on masters
 		clusterAlias := ""
 		err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
@@ -572,6 +573,28 @@ Cleanup:
 	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
 	_ = UpdateInstanceLastChecked(&instance.Key)
 	return nil, fmt.Errorf("Failed ReadTopologyInstance")
+}
+
+// ReadClusterAliasOverride reads and applies SuggestedClusterAlias based on cluster_alias_override
+func ReadClusterAliasOverride(instance *Instance) (err error) {
+	aliasOverride := ""
+	query := `
+		select
+			alias
+		from
+			cluster_alias_override
+		where
+			cluster_name = ?
+			`
+	err = db.QueryOrchestrator(query, sqlutils.Args(instance.ClusterName), func(m sqlutils.RowMap) error {
+		aliasOverride = m.GetString("alias")
+
+		return nil
+	})
+	if aliasOverride != "" {
+		instance.SuggestedClusterAlias = aliasOverride
+	}
+	return err
 }
 
 // ReadInstanceClusterAttributes will return the cluster name for a given instance by looking at its master
