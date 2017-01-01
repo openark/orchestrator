@@ -95,7 +95,7 @@ test_single() {
   fi
 
   if [ -f $tests_path/$test_name/expect_output ] ; then
-    diff $tests_path/$test_name/expect_output $test_outfile > $test_diff_file
+    diff -b $tests_path/$test_name/expect_output $test_outfile > $test_diff_file
     diff_result=$?
     if [ $diff_result -ne 0 ] ; then
       echo

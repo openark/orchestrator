@@ -940,8 +940,17 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			clusters, err := inst.ReadClusters()
 			if err != nil {
 				log.Fatale(err)
-			} else {
-				fmt.Println(strings.Join(clusters, "\n"))
+			}
+			fmt.Println(strings.Join(clusters, "\n"))
+		}
+	case registerCliCommand("clusters-alias", "Information", `List all clusters known to orchestrator`):
+		{
+			clusters, err := inst.ReadClustersInfo("")
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, cluster := range clusters {
+				fmt.Println(fmt.Sprintf("%s\t%s", cluster.ClusterName, cluster.ClusterAlias))
 			}
 		}
 	case registerCliCommand("all-clusters-masters", "Information", `List of writeable masters, one per cluster`):
