@@ -13,7 +13,7 @@ To enable Pseudo GTID you need to:
 3. Optionally hint to orchestrator that such entries are in ascending order
 
 Injecting an entry in the binary log is a matter of issuing a statement. Depending on whether you're using
-statement based replication or row based replication, such a statement could be an `ISNERT`, `CREATE` or other.
+statement based replication or row based replication, such a statement could be an `INSERT`, `CREATE` or other.
 Please consult these blog entries:
 [Pseudo GTID](http://code.openark.org/blog/mysql/pseudo-gtid),
 [Pseudo GTID, Row Based Replication](http://code.openark.org/blog/mysql/pseudo-gtid-row-based-replication),
