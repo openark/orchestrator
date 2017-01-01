@@ -7,6 +7,7 @@
 set -e
 
 mydir=$(dirname $0)
+GIT_COMMIT=$(git rev-parse HEAD)
 RELEASE_VERSION=
 RELEASE_SUBVERSION=
 TOPDIR=/tmp/orchestrator-release
@@ -97,7 +98,7 @@ function package() {
 
   cd $TOPDIR
 
-  echo "Release version is ${RELEASE_VERSION}"
+  echo "Release version is ${RELEASE_VERSION} ( ${GIT_COMMIT} )"
 
   case $target in
     'linux')
@@ -132,7 +133,7 @@ function build() {
   arch="$2"
   builddir="$3"
   prefix="$4"
-  ldflags="-X main.AppVersion=${RELEASE_VERSION}"
+  ldflags="-X main.AppVersion=${RELEASE_VERSION} -X main.GitCommit=${GIT_COMMIT}"
   echo "Building via $(go version)"
   gobuild="go build ${opt_race} -ldflags \"$ldflags\" -o $builddir/orchestrator${prefix}/orchestrator/orchestrator go/cmd/orchestrator/main.go"
 

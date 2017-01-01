@@ -29,7 +29,7 @@ import (
 	"github.com/outbrain/golib/math"
 )
 
-var AppVersion string
+var AppVersion, GitCommit string
 
 // main is the application's entry point. It will either spawn a CLI or HTTP itnerfaces.
 func main() {
@@ -89,12 +89,20 @@ func main() {
 	if *stack {
 		log.SetPrintStackTrace(*stack)
 	}
-	log.Info("starting orchestrator") // FIXME and add the version which is currently in build.sh
-
 	if *config.RuntimeCLIFlags.Version {
 		fmt.Println(AppVersion)
+		fmt.Println(GitCommit)
 		return
 	}
+
+	startText := "starting orchestrator"
+	if AppVersion != "" {
+		startText += ", version: " + AppVersion
+	}
+	if GitCommit != "" {
+		startText += ", git commit: " + GitCommit
+	}
+	log.Info(startText)
 
 	runtime.GOMAXPROCS(math.MinInt(4, runtime.NumCPU()))
 
