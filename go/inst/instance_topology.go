@@ -1254,14 +1254,14 @@ Cleanup:
 
 // FindLastPseudoGTIDEntry will search an instance's binary logs or relay logs for the last pseudo-GTID entry,
 // and return found coordinates as well as entry text
-func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordinates BinlogCoordinates, maxBinlogCoordinates *BinlogCoordinates, exhaustiveSearch bool, expectedBinlogFormat *string) (instancePseudoGtidCoordinates *BinlogCoordinates, instancePseudoGtidText string, err error) {
+func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordinates BinlogCoordinates, maxBinlogCoordinates *BinlogCoordinates, exhaustiveSearch bool, expectedBinlogFormat *string, onlyRelayLogSearch bool) (instancePseudoGtidCoordinates *BinlogCoordinates, instancePseudoGtidText string, err error) {
 
 	if config.Config.PseudoGTIDPattern == "" {
 		return instancePseudoGtidCoordinates, instancePseudoGtidText, fmt.Errorf("PseudoGTIDPattern not configured; cannot use Pseudo-GTID")
 	}
 
 	minBinlogCoordinates, minRelaylogCoordinates, err := GetHeuristiclyRecentCoordinatesForInstance(&instance.Key)
-	if instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled && (expectedBinlogFormat == nil || instance.Binlog_format == *expectedBinlogFormat) {
+	if instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled && !onlyRelayLogSearch && (expectedBinlogFormat == nil || instance.Binlog_format == *expectedBinlogFormat) {
 		// Well no need to search this instance's binary logs if it doesn't have any...
 		// With regard log-slave-updates, some edge cases are possible, like having this instance's log-slave-updates
 		// enabled/disabled (of course having restarted it)
@@ -1288,7 +1288,7 @@ func CorrelateBinlogCoordinates(instance *Instance, binlogCoordinates *BinlogCoo
 	// a FLUSH LOGS/FLUSH RELAY LOGS (or a START SLAVE, though that's an altogether different problem) etc.
 	// We want to be on the safe side; we don't utterly trust that we are the only ones playing with the instance.
 	recordedInstanceRelayLogCoordinates := instance.RelaylogCoordinates
-	instancePseudoGtidCoordinates, instancePseudoGtidText, err := FindLastPseudoGTIDEntry(instance, recordedInstanceRelayLogCoordinates, binlogCoordinates, true, &otherInstance.Binlog_format)
+	instancePseudoGtidCoordinates, instancePseudoGtidText, err := FindLastPseudoGTIDEntry(instance, recordedInstanceRelayLogCoordinates, binlogCoordinates, true, &otherInstance.Binlog_format, false)
 
 	if err != nil {
 		return nil, 0, err
