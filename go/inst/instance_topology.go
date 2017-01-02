@@ -1261,7 +1261,7 @@ func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordin
 	}
 
 	minBinlogCoordinates, minRelaylogCoordinates, err := GetHeuristiclyRecentCoordinatesForInstance(&instance.Key)
-	if instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled && !onlyRelayLogSearch && (expectedBinlogFormat == nil || instance.Binlog_format == *expectedBinlogFormat) {
+	if instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled && !*config.RuntimeCLIFlags.SkipBinlogSearch && (expectedBinlogFormat == nil || instance.Binlog_format == *expectedBinlogFormat) {
 		// Well no need to search this instance's binary logs if it doesn't have any...
 		// With regard log-slave-updates, some edge cases are possible, like having this instance's log-slave-updates
 		// enabled/disabled (of course having restarted it)
