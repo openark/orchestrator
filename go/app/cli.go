@@ -614,11 +614,11 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatalf("Instance not found: %+v", *destinationKey)
 			}
 
-			instanceCoordinates, correlatedCoordinates, nextCoordinates, _, err := inst.CorrelateRelaylogCoordinates(instance, nil, otherInstance)
+			err := inst.AlignViaRelaylogCorrelation(instance, otherInstance)
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%+v;%+v;%+v", *instanceCoordinates, *correlatedCoordinates, *nextCoordinates))
+			fmt.Println(instance.Key.DisplayString())
 		}
 		// General replication commands
 	case registerCliCommand("enable-gtid", "Replication, general", `If possible, turn on GTID replication`):

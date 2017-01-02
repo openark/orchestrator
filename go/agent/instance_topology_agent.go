@@ -1,0 +1,71 @@
+/*
+   Copyright 2014 Outbrain Inc.
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+package agent
+
+import (
+	"fmt"
+
+	"github.com/github/orchestrator/go/inst"
+	"github.com/outbrain/golib/log"
+)
+
+func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.Instance, error) {
+	var err error
+	var found bool
+	var nextCoordinates *inst.BinlogCoordinates
+	var content string
+	onResponse := func(contentBytes []byte) {
+		content = string(contentBytes)
+	}
+	log.Debugf("AlignViaRelaylogCorrelation: stopping replication")
+
+	if instance.ReplicaRunning() {
+		return instance, log.Errorf("AlignViaRelaylogCorrelation: replication on %+v must not run", instance.Key)
+	}
+	if otherInstance.ReplicaRunning() {
+		return instance, log.Errorf("AlignViaRelaylogCorrelation: replication on %+v must not run", otherInstance.Key)
+	}
+
+	log.Debugf("AlignViaRelaylogCorrelation: correlating coordinates of %+v on %+v", instance.Key, otherInstance.Key)
+	_, _, nextCoordinates, found, err = inst.CorrelateRelaylogCoordinates(instance, nil, otherInstance)
+	if err != nil {
+		goto Cleanup
+	}
+	if !found {
+		goto Cleanup
+	}
+	log.Debugf("AlignViaRelaylogCorrelation: correlated next-coordinates are %+v", *nextCoordinates)
+
+	if _, err := RelaylogContentsTail(otherInstance.Key.Hostname, nextCoordinates, &onResponse); err != nil {
+		goto Cleanup
+	}
+	log.Debugf("AlignViaRelaylogCorrelation: got content (%d bytes)", len(content))
+
+	if _, err := ApplyRelaylogContents(instance.Key.Hostname, content); err != nil {
+		goto Cleanup
+	}
+	log.Debugf("AlignViaRelaylogCorrelation: applied content (%d bytes)", len(content))
+
+Cleanup:
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	// and we're done (pending deferred functions)
+	inst.AuditOperation("align-via-relaylogs", &instance.Key, fmt.Sprintf("aligned %+v by relaylogs from %+v", instance.Key, otherInstance.Key))
+
+	return instance, err
+}

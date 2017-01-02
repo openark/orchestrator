@@ -34,6 +34,8 @@ import (
 	"github.com/outbrain/golib/sqlutils"
 )
 
+type httpMethodFunc func(uri string) (resp *http.Response, err error)
+
 var SeededAgents chan *Agent = make(chan *Agent)
 
 var httpClient *http.Client
@@ -59,6 +61,11 @@ func InitHttpClient() {
 // httpGet is a convenience method for getting http response from URL, optionaly skipping SSL cert verification
 func httpGet(url string) (resp *http.Response, err error) {
 	return httpClient.Get(url)
+}
+
+// httpPost is a convenience method for posting text data
+func httpPost(url string, bodyType string, content string) (resp *http.Response, err error) {
+	return httpClient.Post(url, bodyType, strings.NewReader(content))
 }
 
 // AuditAgentOperation creates and writes a new audit entry by given agent
@@ -393,8 +400,9 @@ func GetAgent(hostname string) (Agent, error) {
 	return agent, err
 }
 
-// executeAgentCommand requests an agent to execute a command via HTTP api
-func executeAgentCommand(hostname string, command string, onResponse *func([]byte)) (Agent, error) {
+// executeAgentCommandWithMethodFunc requests an agent to execute a command via HTTP api, either GET or POST,
+// with specific http method implementation by the caller
+func executeAgentCommandWithMethodFunc(hostname string, command string, methodFunc httpMethodFunc, onResponse *func([]byte)) (Agent, error) {
 	agent, token, err := readAgentBasicInfo(hostname)
 	if err != nil {
 		return agent, err
@@ -412,7 +420,7 @@ func executeAgentCommand(hostname string, command string, onResponse *func([]byt
 	log.Debugf("orchestrator-agent command: %s", fullCommand)
 	agentCommandUri := fmt.Sprintf("%s/%s", uri, fullCommand)
 
-	body, err := readResponse(httpGet(agentCommandUri))
+	body, err := readResponse(methodFunc(agentCommandUri))
 	if err != nil {
 		return agent, log.Errore(err)
 	}
@@ -422,6 +430,22 @@ func executeAgentCommand(hostname string, command string, onResponse *func([]byt
 	auditAgentOperation("agent-command", &agent, command)
 
 	return agent, err
+}
+
+// executeAgentCommand requests an agent to execute a command via HTTP api
+func executeAgentCommand(hostname string, command string, onResponse *func([]byte)) (Agent, error) {
+	httpFunc := func(uri string) (resp *http.Response, err error) {
+		return httpGet(uri)
+	}
+	return executeAgentCommandWithMethodFunc(hostname, command, httpFunc, onResponse)
+}
+
+// executeAgentPostCommand requests an agent to execute a command via HTTP POST
+func executeAgentPostCommand(hostname string, command string, content string, onResponse *func([]byte)) (Agent, error) {
+	httpFunc := func(uri string) (resp *http.Response, err error) {
+		return httpPost(uri, "text/plain", content)
+	}
+	return executeAgentCommandWithMethodFunc(hostname, command, httpFunc, onResponse)
 }
 
 // Unmount unmounts the designated snapshot mount point
@@ -902,4 +926,12 @@ func ReadSeedStates(seedId int64) ([]SeedOperationState, error) {
 		log.Errore(err)
 	}
 	return res, err
+}
+
+func RelaylogContentsTail(hostname string, startCoordinates *inst.BinlogCoordinates, onResponse *func([]byte)) (Agent, error) {
+	return executeAgentCommand(hostname, fmt.Sprintf("mysql-relaylog-contents-tail/%s/%d", startCoordinates.LogFile, startCoordinates.LogPos), onResponse)
+}
+
+func ApplyRelaylogContents(hostname string, content string) (Agent, error) {
+	return executeAgentPostCommand(hostname, "apply-relaylog-contents", content, nil)
 }
