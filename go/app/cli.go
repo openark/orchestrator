@@ -614,11 +614,11 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatalf("Instance not found: %+v", *destinationKey)
 			}
 
-			coordinates, otherRelaylogCoordinates, _, err := inst.CorrelateRelaylogCoordinates(instance, nil, otherInstance)
+			instanceCoordinates, coordinates, otherRelaylogCoordinates, _, err := inst.CorrelateRelaylogCoordinates(instance, nil, otherInstance)
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%+v;%+v", *coordinates, *otherRelaylogCoordinates))
+			fmt.Println(fmt.Sprintf("%+v;%+v;%+v", *instanceCoordinates, *coordinates, *otherRelaylogCoordinates))
 		}
 		// General replication commands
 	case registerCliCommand("enable-gtid", "Replication, general", `If possible, turn on GTID replication`):
@@ -893,11 +893,11 @@ func Cli(command string, strict bool, instance string, destination string, owner
 					log.Fatalf("Expecing --binlog argument as file:pos")
 				}
 			}
-			coordinates, nextCoordinates, _, err := inst.CorrelateRelaylogCoordinates(instance, relaylogCoordinates, otherInstance)
+			instanceCoordinates, correlatedCoordinates, nextCoordinates, _, err := inst.CorrelateRelaylogCoordinates(instance, relaylogCoordinates, otherInstance)
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%+v;%+v", *coordinates, *nextCoordinates))
+			fmt.Println(fmt.Sprintf("%+v;%+v;%+v", *instanceCoordinates, *correlatedCoordinates, *nextCoordinates))
 		}
 	case registerCliCommand("find-binlog-entry", "Binary logs", `Get binlog file:pos of entry given by --pattern (exact full match, not a regular expression) in a given instance`):
 		{
