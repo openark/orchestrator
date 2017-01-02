@@ -2241,6 +2241,29 @@ func GetHeuristiclyRecentCoordinatesForInstance(instanceKey *InstanceKey) (selfC
 	return selfCoordinates, relayLogCoordinates, err
 }
 
+// GetHeuristiclyRecentCoordinatesForInstance returns valid and reasonably recent coordinates for given instance.
+func GetLastKnownCoordinatesForInstance(instanceKey *InstanceKey) (selfCoordinates *BinlogCoordinates, relayLogCoordinates *BinlogCoordinates, err error) {
+	query := `
+		select
+			binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
+		from
+			database_instance_coordinates_history
+		where
+			hostname = ?
+			and port = ?
+		order by
+			recorded_timestamp desc
+			limit 1
+			`
+	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port, config.Config.PseudoGTIDCoordinatesHistoryHeuristicMinutes), func(m sqlutils.RowMap) error {
+		selfCoordinates = &BinlogCoordinates{LogFile: m.GetString("binary_log_file"), LogPos: m.GetInt64("binary_log_pos")}
+		relayLogCoordinates = &BinlogCoordinates{LogFile: m.GetString("relay_log_file"), LogPos: m.GetInt64("relay_log_pos")}
+
+		return nil
+	})
+	return selfCoordinates, relayLogCoordinates, err
+}
+
 // RecordInstanceBinlogFileHistory snapshots the binlog coordinates of instances
 func RecordInstanceBinlogFileHistory() error {
 	{

@@ -589,6 +589,37 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 		}
+		// relay-log based synchronization
+	case registerCliCommand("align-via-relay-logs", "Remote relay log relocation", `Align instance's data by comparing and applying another instance's relay logs`):
+		{
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance, err := inst.ReadTopologyInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce target instance:", destination)
+			}
+			otherInstance, err := inst.ReadTopologyInstance(destinationKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if otherInstance == nil {
+				log.Fatalf("Instance not found: %+v", *destinationKey)
+			}
+
+			coordinates, otherRelaylogCoordinates, _, err := inst.CorrelateRelaylogCoordinates(instance, nil, otherInstance)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(fmt.Sprintf("%+v;%+v", *coordinates, *otherRelaylogCoordinates))
+		}
 		// General replication commands
 	case registerCliCommand("enable-gtid", "Replication, general", `If possible, turn on GTID replication`):
 		{
@@ -822,7 +853,11 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instance == nil {
 				log.Fatalf("Instance not found: %+v", *instanceKey)
 			}
-			binlogEvent, err := inst.GetLastExecutedEntryInRelayLogs(instance, nil, instance.RelaylogCoordinates)
+			_, minCoordinates, err := inst.GetLastKnownCoordinatesForInstance(&instance.Key)
+			if err != nil {
+				log.Fatalf("Error reading last known coordinates for %+v: %+v", instance.Key, err)
+			}
+			binlogEvent, err := inst.GetLastExecutedEntryInRelayLogs(instance, minCoordinates, instance.RelaylogCoordinates)
 			if err != nil {
 				log.Fatale(err)
 			}

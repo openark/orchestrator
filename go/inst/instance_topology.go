@@ -1331,7 +1331,10 @@ func CorrelateRelaylogCoordinates(instance *Instance, relaylogCoordinates *Binlo
 	}
 	var binlogEvent *BinlogEvent
 	if relaylogCoordinates == nil {
-		if binlogEvent, err = GetLastExecutedEntryInRelayLogs(instance, nil, instance.RelaylogCoordinates); err != nil {
+
+		if _, minCoordinates, err := GetLastKnownCoordinatesForInstance(&instance.Key); err != nil {
+			return correlatedCoordinates, nextCoordinates, found, err
+		} else if binlogEvent, err = GetLastExecutedEntryInRelayLogs(instance, minCoordinates, instance.RelaylogCoordinates); err != nil {
 			return correlatedCoordinates, nextCoordinates, found, err
 		}
 	} else {
