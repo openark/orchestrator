@@ -614,7 +614,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatalf("Instance not found: %+v", *destinationKey)
 			}
 
-			err := inst.AlignViaRelaylogCorrelation(instance, otherInstance)
+			_, err = agent.AlignViaRelaylogCorrelation(instance, otherInstance)
 			if err != nil {
 				log.Fatale(err)
 			}
