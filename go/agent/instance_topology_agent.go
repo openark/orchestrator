@@ -50,6 +50,7 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 	}
 	log.Debugf("AlignViaRelaylogCorrelation: correlated next-coordinates are %+v", *nextCoordinates)
 
+	InitHttpClient()
 	if _, err := RelaylogContentsTail(otherInstance.Key.Hostname, nextCoordinates, &onResponse); err != nil {
 		goto Cleanup
 	}

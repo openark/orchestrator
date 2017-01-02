@@ -25,6 +25,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
@@ -39,6 +40,7 @@ type httpMethodFunc func(uri string) (resp *http.Response, err error)
 var SeededAgents chan *Agent = make(chan *Agent)
 
 var httpClient *http.Client
+var httpClientMutex = &sync.Mutex{}
 
 // InitHttpClient gets called once, and initializes httpClient according to config.Config
 func InitHttpClient() {
