@@ -853,7 +853,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instance == nil {
 				log.Fatalf("Instance not found: %+v", *instanceKey)
 			}
-			_, minCoordinates, err := inst.GetLastKnownCoordinatesForInstance(&instance.Key)
+			minCoordinates, err := inst.GetPreviousKnownRelayLogCoordinatesForInstance(instance)
 			if err != nil {
 				log.Fatalf("Error reading last known coordinates for %+v: %+v", instance.Key, err)
 			}

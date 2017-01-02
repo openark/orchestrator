@@ -2241,7 +2241,7 @@ func GetHeuristiclyRecentCoordinatesForInstance(instanceKey *InstanceKey) (selfC
 	return selfCoordinates, relayLogCoordinates, err
 }
 
-// GetHeuristiclyRecentCoordinatesForInstance returns valid and reasonably recent coordinates for given instance.
+// GetLastKnownCoordinatesForInstance returns the very last known coordinates for an instance
 func GetLastKnownCoordinatesForInstance(instanceKey *InstanceKey) (selfCoordinates *BinlogCoordinates, relayLogCoordinates *BinlogCoordinates, err error) {
 	query := `
 		select
@@ -2255,13 +2255,42 @@ func GetLastKnownCoordinatesForInstance(instanceKey *InstanceKey) (selfCoordinat
 			recorded_timestamp desc
 			limit 1
 			`
-	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port, config.Config.PseudoGTIDCoordinatesHistoryHeuristicMinutes), func(m sqlutils.RowMap) error {
+	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port), func(m sqlutils.RowMap) error {
 		selfCoordinates = &BinlogCoordinates{LogFile: m.GetString("binary_log_file"), LogPos: m.GetInt64("binary_log_pos")}
 		relayLogCoordinates = &BinlogCoordinates{LogFile: m.GetString("relay_log_file"), LogPos: m.GetInt64("relay_log_pos")}
 
 		return nil
 	})
 	return selfCoordinates, relayLogCoordinates, err
+}
+
+// GetPreviousKnownRelayLogCoordinatesForInstance returns known relay log coordinates, that are not the
+// exact current coordinates
+func GetPreviousKnownRelayLogCoordinatesForInstance(instance *Instance) (relayLogCoordinates *BinlogCoordinates, err error) {
+	query := `
+		select
+			relay_log_file, relay_log_pos
+		from
+			database_instance_coordinates_history
+		where
+			hostname = ?
+			and port = ?
+			and (relay_log_file, relay_log_pos) < (?, ?)
+		order by
+			recorded_timestamp desc
+			limit 1
+			`
+	err = db.QueryOrchestrator(query, sqlutils.Args(
+		instance.Key.Hostname,
+		instance.Key.Port,
+		instance.RelaylogCoordinates.LogFile,
+		instance.RelaylogCoordinates.LogPos,
+	), func(m sqlutils.RowMap) error {
+		relayLogCoordinates = &BinlogCoordinates{LogFile: m.GetString("relay_log_file"), LogPos: m.GetInt64("relay_log_pos")}
+
+		return nil
+	})
+	return relayLogCoordinates, err
 }
 
 // RecordInstanceBinlogFileHistory snapshots the binlog coordinates of instances
