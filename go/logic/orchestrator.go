@@ -222,16 +222,18 @@ func ContinuousDiscovery() {
 						log.Errore(err)
 					}
 
-					if len(instanceKeys) > config.Config.MaxOutdatedKeysToShow {
-						log.Debugf("polling %d outdated keys", len(instanceKeys))
-					} else {
-						log.Debugf("outdated keys: %+v", instanceKeys)
-					}
-					for _, instanceKey := range instanceKeys {
-						instanceKey := instanceKey
+					if len(instanceKeys) > 0 {
+						if len(instanceKeys) > config.Config.MaxOutdatedKeysToShow {
+							log.Debugf("polling %d outdated keys", len(instanceKeys))
+						} else {
+							log.Debugf("outdated keys: %+v", instanceKeys)
+						}
+						for _, instanceKey := range instanceKeys {
+							instanceKey := instanceKey
 
-						if instanceKey.IsValid() {
-							discoveryQueue.Push(instanceKey)
+							if instanceKey.IsValid() {
+								discoveryQueue.Push(instanceKey)
+							}
 						}
 					}
 					if wasAlreadyElected == 0 {
