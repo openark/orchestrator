@@ -17,6 +17,7 @@
 package agent
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/github/orchestrator/go/inst"
@@ -29,7 +30,7 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 	var nextCoordinates *inst.BinlogCoordinates
 	var content string
 	onResponse := func(contentBytes []byte) {
-		content = string(contentBytes)
+		json.Unmarshal(contentBytes, &content)
 	}
 	log.Debugf("AlignViaRelaylogCorrelation: stopping replication")
 
