@@ -62,6 +62,11 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 	}
 	log.Debugf("AlignViaRelaylogCorrelation: applied content (%d bytes)", len(content))
 
+	instance, err = inst.ChangeMasterTo(&instance.Key, &otherInstance.MasterKey, &otherInstance.ExecBinlogCoordinates, false, inst.GTIDHintNeutral)
+	if err != nil {
+		goto Cleanup
+	}
+
 Cleanup:
 	if err != nil {
 		return instance, log.Errore(err)

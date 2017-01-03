@@ -44,6 +44,9 @@ var httpClientMutex = &sync.Mutex{}
 
 // InitHttpClient gets called once, and initializes httpClient according to config.Config
 func InitHttpClient() {
+	httpClientMutex.Lock()
+	defer httpClientMutex.Unlock()
+
 	if httpClient != nil {
 		return
 	}
