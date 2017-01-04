@@ -9,6 +9,7 @@ RUN set -ex \
     && apk add --no-cache --virtual .build-deps \
         bash \
         rsync \
+        git \
     && bash build.sh -b \
     && rsync -av $(find /tmp/orchestrator-release -type d -name orchestrator -maxdepth 2)/ / \
     && rsync -av $(find /tmp/orchestrator-release -type d -name orchestrator-cli -maxdepth 2)/ / \
