@@ -809,6 +809,61 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(fmt.Sprintf("%+v:%s", *coordinates, text))
 		}
+	case registerCliCommand("last-executed-relay-entry", "Binary logs", `Find coordinates of last executed relay log entry`):
+		{
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance, err := inst.ReadTopologyInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			binlogEvent, err := inst.GetLastExecutedEntryInRelayLogs(instance, nil, instance.RelaylogCoordinates)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(fmt.Sprintf("%+v:%d", *binlogEvent, binlogEvent.NextEventPos))
+		}
+	case registerCliCommand("correlate-relaylog-pos", "Binary logs", `Given an instance (-i) and relaylog coordinates (--binlog=file:pos), find the correlated coordinates in another instance's relay logs (-d)`):
+		{
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance, err := inst.ReadTopologyInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce target instance:", destination)
+			}
+			otherInstance, err := inst.ReadTopologyInstance(destinationKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if otherInstance == nil {
+				log.Fatalf("Instance not found: %+v", *destinationKey)
+			}
+
+			var relaylogCoordinates *inst.BinlogCoordinates
+			if *config.RuntimeCLIFlags.BinlogFile != "" {
+				if relaylogCoordinates, err = inst.ParseBinlogCoordinates(*config.RuntimeCLIFlags.BinlogFile); err != nil {
+					log.Fatalf("Expecing --binlog argument as file:pos")
+				}
+			}
+			coordinates, nextCoordinates, _, err := inst.CorrelateRelaylogCoordinates(instance, relaylogCoordinates, otherInstance)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(fmt.Sprintf("%+v;%+v", *coordinates, *nextCoordinates))
+		}
 	case registerCliCommand("find-binlog-entry", "Binary logs", `Get binlog file:pos of entry given by --pattern (exact full match, not a regular expression) in a given instance`):
 		{
 			if pattern == "" {
