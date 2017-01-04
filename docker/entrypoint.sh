@@ -3,7 +3,7 @@ if [ ! -e /etc/orchestrator.conf.json ] ; then
 cat <<EOF > /etc/orchestrator.conf.json
 {
   "Debug": true,
-  "ListenAddress": "${ORC_ADDRESS:-:3000}",
+  "ListenAddress": ":3000",
   "MySQLTopologyUser": "${ORC_TOPOLOGY_USER:-:orchestrator}",
   "MySQLTopologyPassword": "${ORC_TOPOLOGY_PASSOWRD:-:orchestrator}",
   "MySQLOrchestratorHost": "${ORC_DB_HOST:-db}",
