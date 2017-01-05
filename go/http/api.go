@@ -1288,7 +1288,7 @@ func (this *HttpAPI) ClusterOSCReplicas(params martini.Params, r render.Render, 
 }
 
 // SetClusterAlias will change an alias for a given clustername
-func (this *HttpAPI) SetClusterAlias(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpAPI) SetClusterAliasManualOverride(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -1296,7 +1296,7 @@ func (this *HttpAPI) SetClusterAlias(params martini.Params, r render.Render, req
 	clusterName := params["clusterName"]
 	alias := req.URL.Query().Get("alias")
 
-	err := inst.SetClusterAlias(clusterName, alias)
+	err := inst.SetClusterAliasManualOverride(clusterName, alias)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -2400,7 +2400,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "cluster-info/:clusterName", this.ClusterInfo)
 	this.registerRequest(m, "cluster-info/alias/:clusterAlias", this.ClusterInfoByAlias)
 	this.registerRequest(m, "cluster-osc-slaves/:clusterName", this.ClusterOSCReplicas)
-	this.registerRequest(m, "set-cluster-alias/:clusterName", this.SetClusterAlias)
+	this.registerRequest(m, "set-cluster-alias/:clusterName", this.SetClusterAliasManualOverride)
 	this.registerRequest(m, "clusters", this.Clusters)
 	this.registerRequest(m, "clusters-info", this.ClustersInfo)
 
