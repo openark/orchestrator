@@ -2276,6 +2276,8 @@ func GetPreviousKnownRelayLogCoordinatesForInstance(instance *Instance) (relayLo
 			hostname = ?
 			and port = ?
 			and (relay_log_file, relay_log_pos) < (?, ?)
+			and relay_log_file != ''
+			and relay_log_pos != 0
 		order by
 			recorded_timestamp desc
 			limit 1
@@ -2291,6 +2293,23 @@ func GetPreviousKnownRelayLogCoordinatesForInstance(instance *Instance) (relayLo
 		return nil
 	})
 	return relayLogCoordinates, err
+}
+
+// ResetInstanceRelaylogCoordinatesHistory forgets about the history of an instance. This action is desirable
+// when relay logs become obsolete or irrelevant. Such is the case on `CHANGE MASTER TO`: servers gets compeltely
+// new relay logs.
+func ResetInstanceRelaylogCoordinatesHistory(instanceKey *InstanceKey) error {
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+			update database_instance_coordinates_history
+				set relay_log_file='', relay_log_pos=0
+			where
+				hostname=? and port=?
+				`, instanceKey.Hostname, instanceKey.Port,
+		)
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
 }
 
 // RecordInstanceBinlogFileHistory snapshots the binlog coordinates of instances
