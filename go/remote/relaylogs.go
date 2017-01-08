@@ -73,12 +73,12 @@ relaylog_tail() {
   contents_file=$(mktemp)
 
   [ "$start_position" == "0" ] && start_position=""
-  counter=0
+  is_first_relaylog=1
   relaylogs_starting_at $starting_relay_log
   for relay_log in $relay_logs ; do
     binlog_header_size $relay_log
     # header_size variable is now populated
-    if ((counter==0)) ; then
+    if [ $is_first_relaylog -eq 1 ] ; then
       # First relaylog file. We only get the header from the first file.
       # Then, we also filter by --start-position
       cat $relay_log | head -c$header_size >> $contents_file
@@ -92,7 +92,7 @@ relaylog_tail() {
       ((header_size++))
       cat $relay_log | tail -c+$header_size >> $contents_file
     fi
-    ((counter++))
+    is_first_relaylog=0
   done
 
   cat $contents_file | gzip | base64
