@@ -117,13 +117,16 @@ var ApplyRelayLogContentsScript = `#!/bin/bash
 
 mysql_command="$MAGIC_MYSQL_COMMAND"
 mysql_command="${mysql_command:-mysql}"
+contents_file="$MAGIC_CONTENTS_FILE"
+contents_file="${contents_file:-"-"}"
+
 
 set -e
 
 apply_relaylog() {
   binlog_file=$(mktemp)
 
-  cat - | base64 --decode | gunzip > $binlog_file
+  cat "$contents_file" | base64 --decode | gunzip > $binlog_file
   mysqlbinlog $binlog_file | $mysql_command
 }
 

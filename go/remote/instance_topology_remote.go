@@ -67,17 +67,6 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 	if err != nil {
 		return instance, err
 	}
-	applyRelayLogContentsScriptFile, err := ioutil.TempFile("", "orchestrator-remote-apply-relaylogs-content-")
-	if err != nil {
-		return instance, err
-	} else {
-		script := ApplyRelayLogContentsScript
-		script = strings.Replace(script, "$MAGIC_MYSQL_COMMAND", "", -1)
-		if err := ioutil.WriteFile(applyRelayLogContentsScriptFile.Name(), []byte(script), 0640); err != nil {
-			return instance, err
-		}
-	}
-	log.Debugf("applyRelayLogContentsScriptFile: %+v", applyRelayLogContentsScriptFile.Name())
 
 	{
 		command := config.Config.RemoteSSHCommand
@@ -91,7 +80,30 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 	{
 		command := config.Config.RemoteSSHCommand
 		command = strings.Replace(command, "{hostname}", instance.Key.Hostname, -1)
-		command = fmt.Sprintf("cat %s | %s", localRelayLogContentsFile.Name(), command)
+		command = fmt.Sprintf("cat %s | %s cat - > %s", localRelayLogContentsFile.Name(), command, localRelayLogContentsFile.Name())
+		if err := os.CommandRun(command, os.EmptyEnv); err != nil {
+			return instance, err
+		}
+	}
+	log.Debugf("Have copied contents file to %s, output file is %s", instance.Key.Hostname, localRelayLogContentsFile.Name())
+
+	applyRelayLogContentsScriptFile, err := ioutil.TempFile("", "orchestrator-remote-apply-relaylogs-content-")
+	if err != nil {
+		return instance, err
+	} else {
+		script := ApplyRelayLogContentsScript
+		script = strings.Replace(script, "$MAGIC_MYSQL_COMMAND", "", -1)
+		script = strings.Replace(script, "$MAGIC_CONTENTS_FILE", localRelayLogContentsFile.Name(), -1)
+
+		if err := ioutil.WriteFile(applyRelayLogContentsScriptFile.Name(), []byte(script), 0640); err != nil {
+			return instance, err
+		}
+	}
+	log.Debugf("applyRelayLogContentsScriptFile: %+v", applyRelayLogContentsScriptFile.Name())
+	{
+		command := config.Config.RemoteSSHCommand
+		command = strings.Replace(command, "{hostname}", instance.Key.Hostname, -1)
+		command = fmt.Sprintf("cat %s | %s", applyRelayLogContentsScriptFile.Name(), command)
 		if err := os.CommandRun(command, os.EmptyEnv); err != nil {
 			return instance, err
 		}
