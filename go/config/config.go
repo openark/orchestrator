@@ -185,7 +185,8 @@ type Configuration struct {
 	MasterFailoverDetachReplicaMasterHost        bool              // Should orchestrator issue a detach-replica-master-host on newly promoted master (this makes sure the new master will not attempt to replicate old master if that comes back to life). Defaults 'false'. Meaningless if ApplyMySQLPromotionAfterMasterFailover is 'true'.
 	PostponeSlaveRecoveryOnLagMinutes            uint              // Synonym to PostponeReplicaRecoveryOnLagMinutes
 	PostponeReplicaRecoveryOnLagMinutes          uint              // On crash recovery, replicas that are lagging more than given minutes are only resurrected late in the recovery process, after master/IM has been elected and processes executed. Value of 0 disables this feature
-	RemoteSSHCommand                             string            // A `ssh` command to be used by recovery process to read/apply relaylogs. If provided, this variable must contain the text "{hostname}". The remote SSH login must have the privileges to read/write relay logs. Example: "setuidgid remoteuser ssh {hostname} 'sudo -i'"
+	RemoteSSHCommand                             string            // A `ssh` command to be used by recovery process to read/apply relaylogs. If provided, this variable must contain the text "{hostname}". The remote SSH login must have the privileges to read/write relay logs. Example: "setuidgid remoteuser ssh {hostname}"
+	RemoteSSHCommandUseSudo                      bool              // Should orchestrator apply 'sudo' on the remote host upon SSH command
 	OSCIgnoreHostnameFilters                     []string          // OSC replicas recommendation will ignore replica hostnames matching given patterns
 	GraphiteAddr                                 string            // Optional; address of graphite port. If supplied, metrics will be written here
 	GraphitePath                                 string            // Prefix for graphite path. May include {hostname} magic placeholder
@@ -341,6 +342,7 @@ func newConfiguration() *Configuration {
 		MasterFailoverDetachSlaveMasterHost:          false,
 		PostponeSlaveRecoveryOnLagMinutes:            0,
 		RemoteSSHCommand:                             "",
+		RemoteSSHCommandUseSudo:                      true,
 		OSCIgnoreHostnameFilters:                     []string{},
 		GraphiteAddr:                                 "",
 		GraphitePath:                                 "",

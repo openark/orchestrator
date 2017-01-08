@@ -51,6 +51,11 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 	}
 	log.Debugf("AlignViaRelaylogCorrelation: correlated next-coordinates are %+v", *nextCoordinates)
 
+	sudoCommand := ""
+	if config.Config.RemoteSSHCommandUseSudo {
+		sudoCommand = "sudo -i"
+	}
+
 	getRelayLogContentsScriptFile, err := ioutil.TempFile("", "orchestrator-remote-get-relaylogs-content-")
 	if err != nil {
 		return instance, err
@@ -72,7 +77,7 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 	{
 		command := config.Config.RemoteSSHCommand
 		command = strings.Replace(command, "{hostname}", otherInstance.Key.Hostname, -1)
-		command = fmt.Sprintf("cat %s | %s > %s", getRelayLogContentsScriptFile.Name(), command, localRelayLogContentsFile.Name())
+		command = fmt.Sprintf("cat %s | %s '%s' > %s", getRelayLogContentsScriptFile.Name(), command, sudoCommand, localRelayLogContentsFile.Name())
 		if err := os.CommandRun(command, os.EmptyEnv); err != nil {
 			return instance, err
 		}
@@ -81,7 +86,7 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 	{
 		command := config.Config.RemoteSSHCommand
 		command = strings.Replace(command, "{hostname}", instance.Key.Hostname, -1)
-		command = fmt.Sprintf("cat %s | %s cat - > %s", localRelayLogContentsFile.Name(), command, localRelayLogContentsCopyFileName)
+		command = fmt.Sprintf("cat %s | %s '%s cat - > %s'", localRelayLogContentsFile.Name(), command, sudoCommand, localRelayLogContentsCopyFileName)
 		if err := os.CommandRun(command, os.EmptyEnv); err != nil {
 			return instance, err
 		}
@@ -104,7 +109,7 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 	{
 		command := config.Config.RemoteSSHCommand
 		command = strings.Replace(command, "{hostname}", instance.Key.Hostname, -1)
-		command = fmt.Sprintf("cat %s | %s", applyRelayLogContentsScriptFile.Name(), command)
+		command = fmt.Sprintf("cat %s | %s '%s'", applyRelayLogContentsScriptFile.Name(), command, sudoCommand)
 		if err := os.CommandRun(command, os.EmptyEnv); err != nil {
 			return instance, err
 		}
