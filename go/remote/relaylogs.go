@@ -115,11 +115,12 @@ var ApplyRelayLogContentsScript = `#!/bin/bash
 #   for example: "mysql --default-file=/root/.my.cnf"
 #   Notice this should be quoted as one argument to the program
 
+mysql_command="$MAGIC_MYSQL_COMMAND"
+mysql_command="${mysql_command:-mysql}"
+
 set -e
 
 apply_relaylog() {
-  mysql_command="${1:-mysql}"
-
   binlog_file=$(mktemp)
 
   cat - | base64 --decode | gunzip > $binlog_file
@@ -127,8 +128,8 @@ apply_relaylog() {
 }
 
 main() {
-  apply_relaylog "$@"
+  apply_relaylog
 }
 
-main "$@"
+main
 `

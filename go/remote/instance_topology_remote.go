@@ -72,6 +72,7 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 		return instance, err
 	} else {
 		script := ApplyRelayLogContentsScript
+		script = strings.Replace(script, "$MAGIC_MYSQL_COMMAND", "", -1)
 		if err := ioutil.WriteFile(applyRelayLogContentsScriptFile.Name(), []byte(script), 0640); err != nil {
 			return instance, err
 		}
@@ -87,15 +88,15 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 		}
 	}
 	log.Debugf("Have executed on %s, output file is %s", otherInstance.Key.Hostname, localRelayLogContentsFile.Name())
-	return instance, fmt.Errorf("That;s it for now, I'm just testing, not applying")
 	{
 		command := config.Config.RemoteSSHCommand
 		command = strings.Replace(command, "{hostname}", instance.Key.Hostname, -1)
-		command = fmt.Sprintf("cat %s | %s > %s", getRelayLogContentsScriptFile.Name(), command, localRelayLogContentsFile.Name())
+		command = fmt.Sprintf("cat %s | %s", localRelayLogContentsFile.Name(), command)
 		if err := os.CommandRun(command, os.EmptyEnv); err != nil {
 			return instance, err
 		}
 	}
+	log.Debugf("Have applied on %s. Whoa", instance.Key.Hostname)
 
 	instance, err = inst.ChangeMasterTo(&instance.Key, &otherInstance.MasterKey, &otherInstance.ExecBinlogCoordinates, false, inst.GTIDHintNeutral)
 	if err != nil {
