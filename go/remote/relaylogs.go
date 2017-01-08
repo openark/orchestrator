@@ -18,9 +18,9 @@ package remote
 
 var GetRelayLogContentsScript = `#!/bin/bash
 #
-# Expected system variables:
-# FIRST_RELAYLOG_FILE
-# START_POSITION
+# We will magically set these variables:
+FIRST_RELAYLOG_FILE=$MAGIC_FIRST_RELAYLOG_FILE
+START_POSITION=$MAGIC_START_POSITION
 
 set -e
 
