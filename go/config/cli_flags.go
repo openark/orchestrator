@@ -28,6 +28,7 @@ type CLIFlags struct {
 	Statement          *string
 	PromotionRule      *string
 	ConfiguredVersion  string
+	SkipBinlogSearch   *bool
 }
 
 var RuntimeCLIFlags CLIFlags
