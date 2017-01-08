@@ -19,8 +19,8 @@ package remote
 var GetRelayLogContentsScript = `#!/bin/bash
 #
 # We will magically set these variables:
-FIRST_RELAYLOG_FILE=$MAGIC_FIRST_RELAYLOG_FILE
-START_POSITION=$MAGIC_START_POSITION
+FIRST_RELAYLOG_FILE="$MAGIC_FIRST_RELAYLOG_FILE"
+START_POSITION="$MAGIC_START_POSITION"
 
 set -e
 
@@ -68,8 +68,8 @@ binlog_header_size() {
 
 
 relaylog_tail() {
-  starting_relay_log=$(basename "$1")
-  start_position="$2"
+  starting_relay_log=$(basename "$FIRST_RELAYLOG_FILE")
+  start_position="$START_POSITION"
   contents_file=$(mktemp)
 
   [ "$start_position" == "0" ] && start_position=""
@@ -100,10 +100,10 @@ relaylog_tail() {
 
 main() {
   bootstrap
-  relaylog_tail "$@"
+  relaylog_tail
 }
 
-main "$@"
+main
 `
 
 var ApplyRelayLogContentsScript = `#!/bin/bash
