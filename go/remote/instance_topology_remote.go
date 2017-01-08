@@ -19,11 +19,12 @@ package remote
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strings"
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/inst"
-	"github.com/github/orchestrator/go/os"
+	orcos "github.com/github/orchestrator/go/os"
 	"github.com/outbrain/golib/log"
 )
 
@@ -51,15 +52,19 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 	}
 	log.Debugf("AlignViaRelaylogCorrelation: correlated next-coordinates are %+v", *nextCoordinates)
 
+	// We now have the correlation info needed to proceed with remote calls
 	sudoCommand := ""
 	if config.Config.RemoteSSHCommandUseSudo {
 		sudoCommand = "sudo -i"
 	}
 
+	// Write get-relaylogs script locally
 	getRelayLogContentsScriptFile, err := ioutil.TempFile("", "orchestrator-remote-get-relaylogs-content-")
 	if err != nil {
 		return instance, err
-	} else {
+	}
+	{
+		defer os.Remove(getRelayLogContentsScriptFile.Name())
 		script := GetRelayLogContentsScript
 		script = strings.Replace(script, "$MAGIC_FIRST_RELAYLOG_FILE", nextCoordinates.LogFile, -1)
 		script = strings.Replace(script, "$MAGIC_START_POSITION", fmt.Sprintf("%d", nextCoordinates.LogPos), -1)
@@ -68,35 +73,41 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 		}
 	}
 	log.Debugf("getRelayLogContentsScriptFile: %+v", getRelayLogContentsScriptFile.Name())
+
+	// Get relay log contents, save locally
 	localRelayLogContentsFile, err := ioutil.TempFile("", "orchestrator-remote-relaylogs-content-")
 	if err != nil {
 		return instance, err
 	}
+	defer os.Remove(localRelayLogContentsFile.Name())
 	localRelayLogContentsCopyFileName := fmt.Sprintf("%s.copy", localRelayLogContentsFile.Name())
-
 	{
 		command := config.Config.RemoteSSHCommand
 		command = strings.Replace(command, "{hostname}", otherInstance.Key.Hostname, -1)
 		command = fmt.Sprintf("cat %s | %s '%s' > %s", getRelayLogContentsScriptFile.Name(), command, sudoCommand, localRelayLogContentsFile.Name())
-		if err := os.CommandRun(command, os.EmptyEnv); err != nil {
+		if err := orcos.CommandRun(command, orcos.EmptyEnv); err != nil {
 			return instance, err
 		}
 	}
 	log.Debugf("Have executed on %s, output file is %s", otherInstance.Key.Hostname, localRelayLogContentsFile.Name())
+	// Copy local relay log contents to target host:
 	{
 		command := config.Config.RemoteSSHCommand
 		command = strings.Replace(command, "{hostname}", instance.Key.Hostname, -1)
 		command = fmt.Sprintf("cat %s | %s '%s cat - > %s'", localRelayLogContentsFile.Name(), command, sudoCommand, localRelayLogContentsCopyFileName)
-		if err := os.CommandRun(command, os.EmptyEnv); err != nil {
+		if err := orcos.CommandRun(command, orcos.EmptyEnv); err != nil {
 			return instance, err
 		}
 	}
 	log.Debugf("Have copied contents file to %s, output file is %s", instance.Key.Hostname, localRelayLogContentsFile.Name())
 
+	// Generate the apply-relaylogs script, locally
 	applyRelayLogContentsScriptFile, err := ioutil.TempFile("", "orchestrator-remote-apply-relaylogs-content-")
 	if err != nil {
 		return instance, err
-	} else {
+	}
+	{
+		defer os.Remove(applyRelayLogContentsScriptFile.Name())
 		script := ApplyRelayLogContentsScript
 		script = strings.Replace(script, "$MAGIC_MYSQL_COMMAND", "", -1)
 		script = strings.Replace(script, "$MAGIC_CONTENTS_FILE", localRelayLogContentsCopyFileName, -1)
@@ -106,11 +117,12 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 		}
 	}
 	log.Debugf("applyRelayLogContentsScriptFile: %+v", applyRelayLogContentsScriptFile.Name())
+	// apply relaylog contents on target host:
 	{
 		command := config.Config.RemoteSSHCommand
 		command = strings.Replace(command, "{hostname}", instance.Key.Hostname, -1)
 		command = fmt.Sprintf("cat %s | %s '%s'", applyRelayLogContentsScriptFile.Name(), command, sudoCommand)
-		if err := os.CommandRun(command, os.EmptyEnv); err != nil {
+		if err := orcos.CommandRun(command, orcos.EmptyEnv); err != nil {
 			return instance, err
 		}
 	}
