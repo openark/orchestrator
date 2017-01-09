@@ -668,34 +668,44 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 	return nil
 }
 
+type byNamePort [](*InstanceKey)
+
+func (this byNamePort) Len() int      { return len(this) }
+func (this byNamePort) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
+func (this byNamePort) Less(i, j int) bool {
+	return (this[i].Hostname < this[j].Hostname) ||
+		(this[i].Hostname == this[j].Hostname && this[i].Port < this[j].Port)
+}
+
 // BulkReadInstance returns a list of all instances from the database
-// - hostname:port is good enough
+// - I only need the Hostname and Port fields.
+// - I must use readInstancesByCondition to ensure all column
+//   settings are correct.
 func BulkReadInstance() ([](*InstanceKey), error) {
-	var instances [](*InstanceKey)
+	var instanceKeys [](*InstanceKey)
 
-	// table scan - I know.
-	query := `
-SELECT	hostname, port
-FROM	database_instance
-`
-
-	err := db.QueryOrchestrator(query, nil, func(m sqlutils.RowMap) error {
-		instanceKey := &InstanceKey{
-			Hostname: m.GetString("hostname"),
-			Port:     m.GetInt("port"),
-		}
-		instances = append(instances, instanceKey)
-
-		log.Debugf("BulkReadInstance: %+v", instanceKey)
-
-		return nil
-	})
-
+	// no condition (I want all rows) and no sorting (but this is done by Hostname, Port anyway)
+	instances, err := readInstancesByCondition("", nil, "")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("BulkReadInstance: %+v", err)
 	}
 
-	return instances, nil
+	// update counters if we picked anything up
+	if len(instances) > 0 {
+		readInstanceCounter.Inc(int64(len(instances)))
+
+		for i := range instances {
+			instanceKeys = append(instanceKeys,
+				&InstanceKey{
+					Hostname: instances[i].Key.Hostname,
+					Port:     instances[i].Key.Port,
+				})
+		}
+		// sort on orchestrator and not the backend (should be redundant)
+		sort.Sort(byNamePort(instanceKeys))
+	}
+
+	return instanceKeys, nil
 }
 
 func ReadInstancePromotionRule(instance *Instance) (err error) {
