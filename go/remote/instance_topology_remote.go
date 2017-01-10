@@ -60,7 +60,7 @@ func TestRemoteCommandOnInstance(instanceKey *inst.InstanceKey) error {
 }
 
 // AlignViaRelaylogCorrelation will align siblings by applying relaylogs from one to the other, via remote SSH
-func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.Instance, error) {
+func AlignViaRelaylogCorrelation(instance, fromInstance *inst.Instance) (*inst.Instance, error) {
 	if config.Config.RemoteSSHCommand == "" {
 		return instance, fmt.Errorf("RemoteSSHCommand not configured")
 	}
@@ -68,8 +68,8 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 	if err := TestRemoteCommandOnInstance(&instance.Key); err != nil {
 		return instance, err
 	}
-	log.Debugf("Testing SSH on %+v", otherInstance.Key)
-	if err := TestRemoteCommandOnInstance(&otherInstance.Key); err != nil {
+	log.Debugf("Testing SSH on %+v", fromInstance.Key)
+	if err := TestRemoteCommandOnInstance(&fromInstance.Key); err != nil {
 		return instance, err
 	}
 
@@ -77,12 +77,12 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 	if instance.ReplicaRunning() {
 		return instance, log.Errorf("AlignViaRelaylogCorrelation: replication on %+v must not run", instance.Key)
 	}
-	if otherInstance.ReplicaRunning() {
-		return instance, log.Errorf("AlignViaRelaylogCorrelation: replication on %+v must not run", otherInstance.Key)
+	if fromInstance.ReplicaRunning() {
+		return instance, log.Errorf("AlignViaRelaylogCorrelation: replication on %+v must not run", fromInstance.Key)
 	}
 
-	log.Debugf("AlignViaRelaylogCorrelation: correlating coordinates of %+v on %+v", instance.Key, otherInstance.Key)
-	_, _, nextCoordinates, found, err := inst.CorrelateRelaylogCoordinates(instance, nil, otherInstance)
+	log.Debugf("AlignViaRelaylogCorrelation: correlating coordinates of %+v on %+v", instance.Key, fromInstance.Key)
+	_, _, nextCoordinates, found, err := inst.CorrelateRelaylogCoordinates(instance, nil, fromInstance)
 	if err != nil {
 		return instance, err
 	}
@@ -122,13 +122,13 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 	localRelayLogContentsCopyFileName := fmt.Sprintf("%s.copy", localRelayLogContentsFile.Name())
 	{
 		command := config.Config.RemoteSSHCommand
-		command = strings.Replace(command, "{hostname}", otherInstance.Key.Hostname, -1)
+		command = strings.Replace(command, "{hostname}", fromInstance.Key.Hostname, -1)
 		command = fmt.Sprintf("cat %s | %s '%s' > %s", getRelayLogContentsScriptFile.Name(), command, sudoCommand, localRelayLogContentsFile.Name())
 		if err := orcos.CommandRun(command, orcos.EmptyEnv); err != nil {
 			return instance, err
 		}
 	}
-	log.Debugf("Have executed on %s, output file is %s", otherInstance.Key.Hostname, localRelayLogContentsFile.Name())
+	log.Debugf("Have fetched relay logs from %s, output file is %s", fromInstance.Key.Hostname, localRelayLogContentsFile.Name())
 	// Copy local relay log contents to target host:
 	{
 		command := config.Config.RemoteSSHCommand
@@ -167,10 +167,10 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 	}
 	log.Debugf("Have successfully applied relay logs on %s", instance.Key.Hostname)
 
-	instance, err = inst.ChangeMasterTo(&instance.Key, &otherInstance.MasterKey, &otherInstance.ExecBinlogCoordinates, false, inst.GTIDHintNeutral)
+	instance, err = inst.ChangeMasterTo(&instance.Key, &fromInstance.MasterKey, &fromInstance.ExecBinlogCoordinates, false, inst.GTIDHintNeutral)
 	if err != nil {
 		return instance, err
 	}
-	inst.AuditOperation("align-via-relaylogs-remote", &instance.Key, fmt.Sprintf("aligned %+v by relaylogs from %+v", instance.Key, otherInstance.Key))
+	inst.AuditOperation("align-via-relaylogs-remote", &instance.Key, fmt.Sprintf("aligned %+v by relaylogs from %+v", instance.Key, fromInstance.Key))
 	return instance, err
 }
