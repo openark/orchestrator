@@ -156,6 +156,11 @@ func AlignViaRelaylogCorrelation(instance, fromInstance *inst.Instance) (*inst.I
 		}
 	}
 	log.Debugf("applyRelayLogContentsScriptFile: %+v", applyRelayLogContentsScriptFile.Name())
+
+	if *config.RuntimeCLIFlags.Noop {
+		return instance, fmt.Errorf("noop: Not really applying scripts onto %+v; signalling error but nothing went wrong", instance.Key)
+	}
+
 	// apply relaylog contents on target host:
 	{
 		command := config.Config.RemoteSSHCommand
