@@ -25,13 +25,52 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/inst"
 	orcos "github.com/github/orchestrator/go/os"
+	"github.com/github/orchestrator/go/process"
 	"github.com/outbrain/golib/log"
 )
+
+func TestRemoteCommandOnInstance(instanceKey *inst.InstanceKey) error {
+	sudoCommand := ""
+	if config.Config.RemoteSSHCommandUseSudo {
+		sudoCommand = "sudo -i"
+	}
+
+	tempFile, err := ioutil.TempFile("", "orchestrator-remote-test-")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tempFile.Name())
+
+	randomToken := process.NewToken()
+
+	command := config.Config.RemoteSSHCommand
+	command = strings.Replace(command, "{hostname}", instanceKey.Hostname, -1)
+	command = fmt.Sprintf("%s '%s echo %s' > %s", command, sudoCommand, randomToken.Hash, tempFile.Name())
+	if err := orcos.CommandRun(command, orcos.EmptyEnv); err != nil {
+		return err
+	}
+	bytes, err := ioutil.ReadFile(tempFile.Name())
+	if err != nil {
+		return err
+	}
+	if content := strings.TrimSpace(string(bytes)); content != randomToken.Hash {
+		return fmt.Errorf("TestRemoteCommandOnInstance: expected %s, got %s", randomToken.Hash, content)
+	}
+	return nil
+}
 
 // AlignViaRelaylogCorrelation will align siblings by applying relaylogs from one to the other, via remote SSH
 func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.Instance, error) {
 	if config.Config.RemoteSSHCommand == "" {
 		return instance, fmt.Errorf("RemoteSSHCommand not configured")
+	}
+	log.Debugf("Testing SSH on %+v", instance.Key)
+	if err := TestRemoteCommandOnInstance(&instance.Key); err != nil {
+		return instance, err
+	}
+	log.Debugf("Testing SSH on %+v", otherInstance.Key)
+	if err := TestRemoteCommandOnInstance(&otherInstance.Key); err != nil {
+		return instance, err
 	}
 
 	log.Debugf("AlignViaRelaylogCorrelation: stopping replication")
