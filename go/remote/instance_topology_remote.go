@@ -165,7 +165,7 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 			return instance, err
 		}
 	}
-	log.Debugf("Have applied on %s. Whoa", instance.Key.Hostname)
+	log.Debugf("Have successfully applied relay logs on %s", instance.Key.Hostname)
 
 	instance, err = inst.ChangeMasterTo(&instance.Key, &otherInstance.MasterKey, &otherInstance.ExecBinlogCoordinates, false, inst.GTIDHintNeutral)
 	if err != nil {
