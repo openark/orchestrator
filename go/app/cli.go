@@ -661,7 +661,9 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			syncedReplicas, failedReplicas, err := remote.SyncReplicasRelayLogs(instanceKey)
+			syncedReplicas, failedReplicas, err := remote.SyncReplicasRelayLogs(instanceKey, postponedFunctionsContainer)
+			postponedFunctionsContainer.InvokePostponed()
+
 			fmt.Println(fmt.Sprintf("synced: %d, failed: %d", len(syncedReplicas), len(failedReplicas)))
 			if err != nil {
 				log.Fatale(err)

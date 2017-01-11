@@ -176,45 +176,62 @@ func AlignViaRelaylogCorrelation(instance, fromInstance *inst.Instance) (*inst.I
 	return instance, err
 }
 
-func SyncReplicasRelayLogs(masterKey *inst.InstanceKey) (syncedReplicas, failedReplicas [](*inst.Instance), err error) {
+func SyncReplicasRelayLogs(masterKey *inst.InstanceKey, postponedFunctionsContainer *inst.PostponedFunctionsContainer) (
+	syncedReplicas, failedReplicas, postponedReplicas [](*inst.Instance), err error,
+) {
 	var replicas [](*inst.Instance)
 	if replicas, err = inst.GetSortedReplicas(masterKey, true); err != nil {
-		return syncedReplicas, replicas, err
+		return syncedReplicas, replicas, postponedReplicas, err
 	}
 	if len(replicas) <= 1 {
 		// Nothing to be done
-		return syncedReplicas, replicas, err
+		return syncedReplicas, replicas, postponedReplicas, err
 	}
 	applyFromReplica := replicas[0]
 	applyToReplicas := replicas[1:]
 
 	log.Debugf("Testing SSH on %+v", applyFromReplica.Key)
 	if err := TestRemoteCommandOnInstance(&applyFromReplica.Key); err != nil {
-		return syncedReplicas, replicas, err
+		return syncedReplicas, replicas, postponedReplicas, err
 	}
 
 	defer inst.StartSlave(&applyFromReplica.Key)
 
-	barrier := make(chan *inst.InstanceKey)
+	barrier := make(chan *inst.InstanceKey, len(applyToReplicas))
 	allErrors := make(chan error, len(applyToReplicas))
 	synchedReplicasChan := make(chan *inst.Instance, len(applyToReplicas))
 	failedReplicasChan := make(chan *inst.Instance, len(applyToReplicas))
+
+	applyToReplicaFunc := func(applyToReplica *inst.Instance) error {
+		defer func() {
+			barrier <- &applyToReplica.Key
+			inst.StartSlave(&applyToReplica.Key)
+		}()
+
+		if _, err := AlignViaRelaylogCorrelation(applyToReplica, applyFromReplica); err == nil {
+			synchedReplicasChan <- applyToReplica
+		} else {
+			failedReplicasChan <- applyToReplica
+			allErrors <- err
+		}
+		return err
+	}
+
+	countImmediateApply := 0
 	for _, applyToReplica := range applyToReplicas {
 		applyToReplica := applyToReplica
-		go func() {
-			defer func() {
-				defer func() { barrier <- &applyToReplica.Key }()
-				inst.StartSlave(&applyToReplica.Key)
-			}()
-			if _, err := AlignViaRelaylogCorrelation(applyToReplica, applyFromReplica); err == nil {
-				synchedReplicasChan <- applyToReplica
-			} else {
-				failedReplicasChan <- applyToReplica
-				allErrors <- err
-			}
-		}()
+
+		if postponedFunctionsContainer != nil &&
+			config.Config.PostponeReplicaRecoveryOnLagMinutes > 0 &&
+			applyToReplica.SQLDelay > config.Config.PostponeReplicaRecoveryOnLagMinutes*60 {
+			postponedReplicas = append(postponedReplicas, applyToReplica)
+			(*postponedFunctionsContainer).AddPostponedFunction(func() error { return applyToReplicaFunc(applyToReplica) })
+		} else {
+			countImmediateApply++
+			go applyToReplicaFunc(applyToReplica)
+		}
 	}
-	for range applyToReplicas {
+	for i := 0; i < countImmediateApply; i++ {
 		<-barrier
 	}
 	syncedReplicas = append(syncedReplicas, applyFromReplica)
@@ -229,5 +246,5 @@ func SyncReplicasRelayLogs(masterKey *inst.InstanceKey) (syncedReplicas, failedR
 		log.Errore(<-allErrors)
 	}
 	inst.AuditOperation("sync-replicas-relaylogs", masterKey, fmt.Sprintf("aligned %+v replicas by relaylogs from %+v, got %+v errors", len(applyToReplicas), applyFromReplica.Key, countErrors))
-	return syncedReplicas, failedReplicas, err
+	return syncedReplicas, failedReplicas, postponedReplicas, err
 }
