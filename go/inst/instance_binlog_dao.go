@@ -385,6 +385,9 @@ func SearchEventInRelayLogs(searchEvent *BinlogEvent, instance *Instance, minBin
 	// Since MySQL does not provide with a SHOW RELAY LOGS command, we heuristically start from current
 	// relay log (indiciated by Relay_log_file) and walk backwards.
 	log.Debugf("will search for event %+v", *searchEvent)
+	if minBinlogCoordinates != nil {
+		log.Debugf("Starting with coordinates: %+v", *minBinlogCoordinates)
+	}
 	currentRelayLog := recordedInstanceRelayLogCoordinates
 	for err == nil {
 		log.Debugf("Searching for event in relaylog %+v of %+v, up to pos %+v", currentRelayLog.LogFile, instance.Key, recordedInstanceRelayLogCoordinates)
