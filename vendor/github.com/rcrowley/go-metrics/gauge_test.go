@@ -1,6 +1,9 @@
 package metrics
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func BenchmarkGuage(b *testing.B) {
 	g := NewGauge()
@@ -34,4 +37,32 @@ func TestGetOrRegisterGauge(t *testing.T) {
 	if g := GetOrRegisterGauge("foo", r); 47 != g.Value() {
 		t.Fatal(g)
 	}
+}
+
+func TestFunctionalGauge(t *testing.T) {
+	var counter int64
+	fg := NewFunctionalGauge(func() int64 {
+		counter++
+		return counter
+	})
+	fg.Value()
+	fg.Value()
+	if counter != 2 {
+		t.Error("counter != 2")
+	}
+}
+
+func TestGetOrRegisterFunctionalGauge(t *testing.T) {
+	r := NewRegistry()
+	NewRegisteredFunctionalGauge("foo", r, func() int64 { return 47 })
+	if g := GetOrRegisterGauge("foo", r); 47 != g.Value() {
+		t.Fatal(g)
+	}
+}
+
+func ExampleGetOrRegisterGauge() {
+	m := "server.bytes_sent"
+	g := GetOrRegisterGauge(m, nil)
+	g.Update(47)
+	fmt.Println(g.Value()) // Output: 47
 }

@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -78,4 +79,11 @@ func TestTimerZero(t *testing.T) {
 	if rateMean := tm.RateMean(); 0.0 != rateMean {
 		t.Errorf("tm.RateMean(): 0.0 != %v\n", rateMean)
 	}
+}
+
+func ExampleGetOrRegisterTimer() {
+	m := "account.create.latency"
+	t := GetOrRegisterTimer(m, nil)
+	t.Update(47)
+	fmt.Println(t.Max()) // Output: 47
 }
