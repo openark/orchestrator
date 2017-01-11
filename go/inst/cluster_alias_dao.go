@@ -82,6 +82,21 @@ func WriteClusterAlias(clusterName string, alias string) error {
 	return ExecDBWriteFunc(writeFunc)
 }
 
+// WriteClusterAliasManualOverride will write (and override) a single cluster name mapping
+func WriteClusterAliasManualOverride(clusterName string, alias string) error {
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+			replace into
+					cluster_alias_override (cluster_name, alias)
+				values
+					(?, ?)
+			`,
+			clusterName, alias)
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
 // UpdateClusterAliases writes down the cluster_alias table based on information
 // gained from database_instance
 func UpdateClusterAliases() error {
@@ -140,16 +155,33 @@ func UpdateClusterAliases() error {
 }
 
 // ReplaceAliasClusterName replaces alis mapping of one cluster name onto a new cluster name.
-// Used in topology recovery
-func ReplaceAliasClusterName(oldClusterName string, newClusterName string) error {
-	writeFunc := func() error {
-		_, err := db.ExecOrchestrator(`
+// Used in topology failover/recovery
+func ReplaceAliasClusterName(oldClusterName string, newClusterName string) (err error) {
+	{
+		writeFunc := func() error {
+			_, err := db.ExecOrchestrator(`
 			update cluster_alias
 				set cluster_name = ?
 				where cluster_name = ?
 			`,
-			newClusterName, oldClusterName)
-		return log.Errore(err)
+				newClusterName, oldClusterName)
+			return log.Errore(err)
+		}
+		err = ExecDBWriteFunc(writeFunc)
 	}
-	return ExecDBWriteFunc(writeFunc)
+	{
+		writeFunc := func() error {
+			_, err := db.ExecOrchestrator(`
+			update cluster_alias_override
+				set cluster_name = ?
+				where cluster_name = ?
+			`,
+				newClusterName, oldClusterName)
+			return log.Errore(err)
+		}
+		if ferr := ExecDBWriteFunc(writeFunc); ferr != nil {
+			err = ferr
+		}
+	}
+	return err
 }
