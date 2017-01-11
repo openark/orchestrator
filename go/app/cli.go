@@ -652,6 +652,22 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(instance.Key.DisplayString())
 		}
+		// relay-log based synchronization
+	case registerCliCommand("sync-replicas-relaylogs", "Remote relay log relocation", `Given master, sync all of its replicas by remotely copying and applying relaylogs`):
+		{
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			validateInstanceIsFound(instanceKey)
+
+			syncedReplicas, failedReplicas, err := remote.SyncReplicasRelayLogs(instanceKey)
+			fmt.Println(fmt.Sprintf("synced: %d, failed: %d", len(syncedReplicas), len(failedReplicas)))
+			if err != nil {
+				log.Fatale(err)
+			}
+		}
+
 		// General replication commands
 	case registerCliCommand("enable-gtid", "Replication, general", `If possible, turn on GTID replication`):
 		{

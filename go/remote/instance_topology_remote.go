@@ -68,10 +68,6 @@ func AlignViaRelaylogCorrelation(instance, fromInstance *inst.Instance) (*inst.I
 	if err := TestRemoteCommandOnInstance(&instance.Key); err != nil {
 		return instance, err
 	}
-	log.Debugf("Testing SSH on %+v", fromInstance.Key)
-	if err := TestRemoteCommandOnInstance(&fromInstance.Key); err != nil {
-		return instance, err
-	}
 
 	log.Debugf("AlignViaRelaylogCorrelation: stopping replication")
 	if instance.ReplicaRunning() {
@@ -178,4 +174,58 @@ func AlignViaRelaylogCorrelation(instance, fromInstance *inst.Instance) (*inst.I
 	}
 	inst.AuditOperation("align-via-relaylogs-remote", &instance.Key, fmt.Sprintf("aligned %+v by relaylogs from %+v", instance.Key, fromInstance.Key))
 	return instance, err
+}
+
+func SyncReplicasRelayLogs(masterKey *inst.InstanceKey) (syncedReplicas, failedReplicas [](*inst.Instance), err error) {
+	var replicas [](*inst.Instance)
+	if replicas, err = inst.GetSortedReplicas(masterKey, true); err != nil {
+		return syncedReplicas, replicas, err
+	}
+	if len(replicas) <= 1 {
+		// Nothing to be done
+		return syncedReplicas, replicas, err
+	}
+	applyFromReplica := replicas[0]
+	applyToReplicas := replicas[1:]
+
+	log.Debugf("Testing SSH on %+v", applyFromReplica.Key)
+	if err := TestRemoteCommandOnInstance(&applyFromReplica.Key); err != nil {
+		return syncedReplicas, replicas, err
+	}
+
+	barrier := make(chan *inst.InstanceKey)
+	allErrors := make(chan error, len(applyToReplicas))
+	synchedReplicasChan := make(chan *inst.Instance, len(applyToReplicas))
+	failedReplicasChan := make(chan *inst.Instance, len(applyToReplicas))
+	for _, applyToReplica := range applyToReplicas {
+		applyToReplica := applyToReplica
+		go func() {
+			defer func() {
+				defer func() { barrier <- &applyToReplica.Key }()
+				inst.StartSlave(&applyToReplica.Key)
+			}()
+			if _, err := AlignViaRelaylogCorrelation(applyToReplica, applyFromReplica); err == nil {
+				synchedReplicasChan <- applyToReplica
+			} else {
+				failedReplicasChan <- applyToReplica
+				allErrors <- err
+			}
+		}()
+	}
+	for range applyToReplicas {
+		<-barrier
+	}
+	syncedReplicas = append(syncedReplicas, applyFromReplica)
+	for len(synchedReplicasChan) > 0 {
+		syncedReplicas = append(syncedReplicas, <-synchedReplicasChan)
+	}
+	for len(synchedReplicasChan) > 0 {
+		failedReplicas = append(failedReplicas, <-failedReplicasChan)
+	}
+	countErrors := len(allErrors)
+	for len(allErrors) > 0 {
+		log.Errore(<-allErrors)
+	}
+	inst.AuditOperation("sync-replicas-relaylogs", masterKey, fmt.Sprintf("aligned %+v replicas by relaylogs from %+v, got %+v errors", len(applyToReplicas), applyFromReplica.Key, countErrors))
+	return syncedReplicas, failedReplicas, err
 }

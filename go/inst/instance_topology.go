@@ -1677,6 +1677,19 @@ func sortedReplicas(replicas [](*Instance), shouldStopSlaves bool) [](*Instance)
 	return replicas
 }
 
+// GetSortedReplicas reads list of replicas of a given master, and returns them sorted by exec coordinates
+// (most up-to-date replica first).
+func GetSortedReplicas(masterKey *InstanceKey, stopReplication bool) (replicas [](*Instance), err error) {
+	if replicas, err = getReplicasForSorting(masterKey, false); err != nil {
+		return replicas, err
+	}
+	replicas = sortedReplicas(replicas, stopReplication)
+	if len(replicas) == 0 {
+		return replicas, fmt.Errorf("No replicas found for %+v", *masterKey)
+	}
+	return replicas, err
+}
+
 // MultiMatchBelow will efficiently match multiple replicas below a given instance.
 // It is assumed that all given replicas are siblings
 func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlreadyStopped bool, postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), *Instance, error, []error) {
