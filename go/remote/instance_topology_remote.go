@@ -193,6 +193,8 @@ func SyncReplicasRelayLogs(masterKey *inst.InstanceKey) (syncedReplicas, failedR
 		return syncedReplicas, replicas, err
 	}
 
+	defer inst.StartSlave(&applyFromReplica.Key)
+
 	barrier := make(chan *inst.InstanceKey)
 	allErrors := make(chan error, len(applyToReplicas))
 	synchedReplicasChan := make(chan *inst.Instance, len(applyToReplicas))
