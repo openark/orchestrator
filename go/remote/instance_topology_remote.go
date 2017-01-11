@@ -221,7 +221,7 @@ func SyncReplicasRelayLogs(masterKey *inst.InstanceKey) (syncedReplicas, failedR
 	for len(synchedReplicasChan) > 0 {
 		syncedReplicas = append(syncedReplicas, <-synchedReplicasChan)
 	}
-	for len(synchedReplicasChan) > 0 {
+	for len(failedReplicasChan) > 0 {
 		failedReplicas = append(failedReplicas, <-failedReplicasChan)
 	}
 	countErrors := len(allErrors)
