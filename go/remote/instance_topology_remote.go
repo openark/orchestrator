@@ -69,7 +69,6 @@ func AlignViaRelaylogCorrelation(instance, fromInstance *inst.Instance) (*inst.I
 		return instance, err
 	}
 
-	log.Debugf("AlignViaRelaylogCorrelation: stopping replication")
 	if instance.ReplicaRunning() {
 		return instance, log.Errorf("AlignViaRelaylogCorrelation: replication on %+v must not run", instance.Key)
 	}
@@ -217,6 +216,7 @@ func SyncReplicasRelayLogs(masterKey *inst.InstanceKey, postponedFunctionsContai
 		return err
 	}
 
+	log.Debugf("Applying relay logs on %+v replicas", len(applyToReplicas))
 	countImmediateApply := 0
 	for _, applyToReplica := range applyToReplicas {
 		applyToReplica := applyToReplica

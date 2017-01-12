@@ -664,7 +664,10 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instanceKey, postponedFunctionsContainer)
 			postponedFunctionsContainer.InvokePostponed()
 
-			fmt.Println(fmt.Sprintf("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas)))
+			log.Infof("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
+			for _, replica := range syncedReplicas {
+				fmt.Println(replica.Key.DisplayString())
+			}
 			if err != nil {
 				log.Fatale(err)
 			}
