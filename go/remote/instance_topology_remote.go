@@ -102,6 +102,7 @@ func AlignViaRelaylogCorrelation(instance, fromInstance *inst.Instance) (*inst.I
 		script := GetRelayLogContentsScript
 		script = strings.Replace(script, "$MAGIC_FIRST_RELAYLOG_FILE", nextCoordinates.LogFile, -1)
 		script = strings.Replace(script, "$MAGIC_START_POSITION", fmt.Sprintf("%d", nextCoordinates.LogPos), -1)
+		script = strings.Replace(script, "$MAGIC_STOP_POSITION", fmt.Sprintf("%d", fromInstance.ReadBinlogCoordinates.LogPos), -1)
 		if err := ioutil.WriteFile(getRelayLogContentsScriptFile.Name(), []byte(script), 0640); err != nil {
 			return instance, err
 		}
@@ -194,18 +195,13 @@ func SyncReplicasRelayLogs(masterKey *inst.InstanceKey, postponedFunctionsContai
 		return syncedReplicas, replicas, postponedReplicas, err
 	}
 
-	defer inst.StartSlave(&applyFromReplica.Key)
-
 	barrier := make(chan *inst.InstanceKey, len(applyToReplicas))
 	allErrors := make(chan error, len(applyToReplicas))
 	synchedReplicasChan := make(chan *inst.Instance, len(applyToReplicas))
 	failedReplicasChan := make(chan *inst.Instance, len(applyToReplicas))
 
 	applyToReplicaFunc := func(applyToReplica *inst.Instance) error {
-		defer func() {
-			barrier <- &applyToReplica.Key
-			inst.StartSlave(&applyToReplica.Key)
-		}()
+		defer func() { barrier <- &applyToReplica.Key }()
 
 		if _, err := AlignViaRelaylogCorrelation(applyToReplica, applyFromReplica); err == nil {
 			synchedReplicasChan <- applyToReplica
