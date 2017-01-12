@@ -98,12 +98,11 @@ func AlignViaRelaylogCorrelation(instance, fromInstance *inst.Instance) (*inst.I
 		return instance, err
 	}
 	{
-		//	defer os.Remove(getRelayLogContentsScriptFile.Name())
+		defer os.Remove(getRelayLogContentsScriptFile.Name())
 		script := GetRelayLogContentsScript
 		script = strings.Replace(script, "$MAGIC_FIRST_RELAYLOG_FILE", nextCoordinates.LogFile, -1)
 		script = strings.Replace(script, "$MAGIC_START_POSITION", fmt.Sprintf("%d", nextCoordinates.LogPos), -1)
 		script = strings.Replace(script, "$MAGIC_STOP_POSITION", fmt.Sprintf("%d", fromInstance.ReadBinlogCoordinates.LogPos), -1)
-		log.Debugf("------ MAGIC_START_POSITION=%+v, MAGIC_STOP_POSITION=%+v", fmt.Sprintf("%d", nextCoordinates.LogPos), fmt.Sprintf("%d", fromInstance.ReadBinlogCoordinates.LogPos))
 		if err := ioutil.WriteFile(getRelayLogContentsScriptFile.Name(), []byte(script), 0640); err != nil {
 			return instance, err
 		}
