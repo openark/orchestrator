@@ -504,6 +504,13 @@ var generateSQLBase = []string{
 		  PRIMARY KEY (disable_recovery)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS cluster_alias_override (
+		  cluster_name varchar(128) CHARACTER SET ascii NOT NULL,
+		  alias varchar(128) NOT NULL,
+		  PRIMARY KEY (cluster_name)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 // generateSQLPatches contains DDLs for patching schema to the latest version.
