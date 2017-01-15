@@ -101,6 +101,7 @@ func AlignViaRelaylogCorrelation(instance, fromInstance *inst.Instance) (*inst.I
 		defer os.Remove(getRelayLogContentsScriptFile.Name())
 		script := GetRelayLogContentsScript
 		script = strings.Replace(script, "$MAGIC_FIRST_RELAYLOG_FILE", nextCoordinates.LogFile, -1)
+		script = strings.Replace(script, "$MAGIC_LAST_RELAYLOG_FILE", fromInstance.RelaylogCoordinates.LogFile, -1)
 		script = strings.Replace(script, "$MAGIC_START_POSITION", fmt.Sprintf("%d", nextCoordinates.LogPos), -1)
 		log.Debugf("fromInstance.RelaylogCoordinates = %+v", fromInstance.RelaylogCoordinates)
 		script = strings.Replace(script, "$MAGIC_STOP_POSITION", fmt.Sprintf("%d", fromInstance.RelaylogCoordinates.LogPos), -1)

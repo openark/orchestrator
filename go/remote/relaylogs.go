@@ -20,6 +20,7 @@ var GetRelayLogContentsScript = `#!/bin/bash
 #
 # We will magically set these variables:
 FIRST_RELAYLOG_FILE="$MAGIC_FIRST_RELAYLOG_FILE"
+LAST_RELAYLOG_FILE="$MAGIC_LAST_RELAYLOG_FILE"
 START_POSITION="$MAGIC_START_POSITION"
 STOP_POSITION="$MAGIC_STOP_POSITION"
 [ "$STOP_POSITION" == "0" ] && STOP_POSITION=""
@@ -48,10 +49,11 @@ bootstrap() {
 
 relaylogs_starting_at() {
   starting_relay_log=$(basename "$1")
+  ending_relay_log=$(basename "$2")
 
   relay_logs_file=$(mktemp)
   basedir=$(dirname $relaylog_index_file)
-  cat $relaylog_index_file | awk "/$starting_relay_log/,0" | while read f ; do
+  cat $relaylog_index_file | sed -n "/$starting_relay_log/,/$ending_relay_log/p" | while read f ; do
     echo "${basedir}/${f}" >> $relay_logs_file
   done
   relay_logs=$(cat $relay_logs_file)
@@ -71,6 +73,7 @@ binlog_header_size() {
 
 relaylog_tail() {
   starting_relay_log=$(basename "$FIRST_RELAYLOG_FILE")
+  ending_relay_log=$(basename "$LAST_RELAYLOG_FILE")
   start_position="$START_POSITION"
   contents_file=$(mktemp)
   contents_file_log=/tmp/c.log
@@ -79,7 +82,7 @@ relaylog_tail() {
 
   [ "$start_position" == "0" ] && start_position=""
 
-  relaylogs_starting_at $starting_relay_log
+  relaylogs_starting_at $starting_relay_log $ending_relay_log
 
   is_first_relaylog=1
   last_relaylog=$(echo "$relay_logs" | tail -1)
