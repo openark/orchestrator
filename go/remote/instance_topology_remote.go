@@ -98,7 +98,7 @@ func AlignViaRelaylogCorrelation(instance, fromInstance *inst.Instance) (*inst.I
 		return instance, err
 	}
 	{
-		//defer os.Remove(getRelayLogContentsScriptFile.Name())
+		defer os.Remove(getRelayLogContentsScriptFile.Name())
 		script := GetRelayLogContentsScript
 		script = strings.Replace(script, "$MAGIC_FIRST_RELAYLOG_FILE", nextCoordinates.LogFile, -1)
 		script = strings.Replace(script, "$MAGIC_START_POSITION", fmt.Sprintf("%d", nextCoordinates.LogPos), -1)
@@ -114,7 +114,7 @@ func AlignViaRelaylogCorrelation(instance, fromInstance *inst.Instance) (*inst.I
 	if err != nil {
 		return instance, err
 	}
-	//defer os.Remove(localRelayLogContentsFile.Name())
+	defer os.Remove(localRelayLogContentsFile.Name())
 	localRelayLogContentsCopyFileName := fmt.Sprintf("%s.copy", localRelayLogContentsFile.Name())
 	{
 		command := config.Config.RemoteSSHCommand

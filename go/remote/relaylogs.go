@@ -118,7 +118,7 @@ relaylog_tail() {
     is_first_relaylog=0
   done
 
-  echo "cat $contents_file | gzip | base64"
+  cat $contents_file | gzip | base64
 }
 
 main() {
