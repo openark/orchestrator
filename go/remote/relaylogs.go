@@ -57,7 +57,6 @@ get_relaylogs_names() {
     echo "${basedir}/${f}" >> $relay_logs_file
   done
   relay_logs=$(cat $relay_logs_file)
-  cat $relay_logs_file >> $contents_file_log
 }
 
 binlog_header_size() {
@@ -77,11 +76,6 @@ relaylog_tail() {
   ending_relay_log=$(basename "$LAST_RELAYLOG_FILE")
   start_position="$START_POSITION"
   contents_file=$(mktemp)
-  contents_file_log=/tmp/c.log
-  echo >> $contents_file_log
-  date >> $contents_file_log
-  echo "starting_relay_log = $starting_relay_log" >> $contents_file_log
-  echo "ending_relay_log = $ending_relay_log" >> $contents_file_log
 
   [ "$start_position" == "0" ] && start_position=""
 
@@ -91,34 +85,26 @@ relaylog_tail() {
   last_relaylog=$(echo "$relay_logs" | tail -1)
 
   for relay_log in $relay_logs ; do
-    echo "+++ relay_log: $relay_log" >> $contents_file_log
     binlog_header_size $relay_log
     stop_position=$(wc -c $relay_log)
-    echo "stop position is $stop_position" >> $contents_file_log
     if [ "$relay_log" == "$last_relaylog" ] ; then
       if [ ! -z "$STOP_POSITION" ] ; then
         stop_position="$STOP_POSITION"
-        echo "this is the last relay log. stop position is $stop_position" >> $contents_file_log
       fi
     fi
     # header_size variable is now populated
     if [ $is_first_relaylog -eq 1 ] ; then
       # First relaylog file. We only get the header from the first file.
       # Then, we also filter by --start-position
-      echo "this is the first relay log" >> $contents_file_log
-      echo "cat $relay_log | head -c$header_size" >> $contents_file_log
       cat $relay_log | head -c$header_size >> $contents_file
       [ -z "$start_position" ] && start_position="$header_size"
       # _tail_ command is unfortunately 1-based, which is why we ++
       ((start_position++))
-      echo "start_position is $start_position" >> $contents_file_log
-      echo "cat $relay_log | head -c $stop_position | tail -c+$start_position" >> $contents_file_log
       cat $relay_log | head -c $stop_position | tail -c+$start_position >> $contents_file
     else
       # Skip header
       # _tail_ command is unfortunately 1-based, which is why we ++
       ((header_size++))
-      echo "cat $relay_log | head -c $stop_position | tail -c+$header_size" >> $contents_file_log
       cat $relay_log | head -c $stop_position | tail -c+$header_size >> $contents_file
     fi
     is_first_relaylog=0
