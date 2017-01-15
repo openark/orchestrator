@@ -211,6 +211,7 @@ func SyncReplicasRelayLogs(masterKey *inst.InstanceKey, postponedFunctionsContai
 		if _, err := AlignViaRelaylogCorrelation(applyToReplica, applyFromReplica); err == nil {
 			synchedReplicasChan <- applyToReplica
 		} else {
+			err = fmt.Errorf("%+v: %+v", applyToReplica.Key, err.Error())
 			failedReplicasChan <- applyToReplica
 			allErrors <- err
 		}
