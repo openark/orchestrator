@@ -75,6 +75,9 @@ func AlignViaRelaylogCorrelation(instance, fromInstance *inst.Instance) (*inst.I
 	if fromInstance.ReplicaRunning() {
 		return instance, log.Errorf("AlignViaRelaylogCorrelation: replication on %+v must not run", fromInstance.Key)
 	}
+	if fromInstance.ExecBinlogCoordinates.SmallerThan(&instance.ExecBinlogCoordinates) {
+		return instance, log.Errorf("AlignViaRelaylogCorrelation: %+v is more up to date than %+v. Will not apply relaylogs from %+v", instance.Key, fromInstance.Key, fromInstance.Key)
+	}
 
 	log.Debugf("AlignViaRelaylogCorrelation: correlating coordinates of %+v on %+v", instance.Key, fromInstance.Key)
 	_, _, nextCoordinates, found, err := inst.CorrelateRelaylogCoordinates(instance, nil, fromInstance)

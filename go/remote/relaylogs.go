@@ -47,7 +47,7 @@ bootstrap() {
   fi
 }
 
-relaylogs_starting_at() {
+get_relaylogs_names() {
   starting_relay_log=$(basename "$1")
   ending_relay_log=$(basename "$2")
 
@@ -85,7 +85,7 @@ relaylog_tail() {
 
   [ "$start_position" == "0" ] && start_position=""
 
-  relaylogs_starting_at $starting_relay_log $ending_relay_log
+  get_relaylogs_names $starting_relay_log $ending_relay_log
 
   is_first_relaylog=1
   last_relaylog=$(echo "$relay_logs" | tail -1)
