@@ -53,7 +53,7 @@ relaylogs_starting_at() {
 
   relay_logs_file=$(mktemp)
   basedir=$(dirname $relaylog_index_file)
-  cat $relaylog_index_file | sed -n "/$starting_relay_log/,/$ending_relay_log/p" | while read f ; do
+  cat $relaylog_index_file | sed -n "/$starting_relay_log/,/$ending_relay_log/p;/$ending_relay_log/q" | while read f ; do
     echo "${basedir}/${f}" >> $relay_logs_file
   done
   relay_logs=$(cat $relay_logs_file)
