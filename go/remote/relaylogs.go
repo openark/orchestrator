@@ -57,6 +57,7 @@ relaylogs_starting_at() {
     echo "${basedir}/${f}" >> $relay_logs_file
   done
   relay_logs=$(cat $relay_logs_file)
+  cat $relay_logs_file >> $contents_file_log
 }
 
 binlog_header_size() {
@@ -79,6 +80,8 @@ relaylog_tail() {
   contents_file_log=/tmp/c.log
   echo >> $contents_file_log
   date >> $contents_file_log
+  echo "starting_relay_log = $starting_relay_log" >> $contents_file_log
+  echo "ending_relay_log = $ending_relay_log" >> $contents_file_log
 
   [ "$start_position" == "0" ] && start_position=""
 
