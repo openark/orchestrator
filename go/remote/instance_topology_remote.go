@@ -91,7 +91,7 @@ func AlignViaRelaylogCorrelation(instance, fromInstance *inst.Instance) (*inst.I
 	if !found {
 		return instance, err
 	}
-	log.Debugf("AlignViaRelaylogCorrelation: correlated next-coordinates are %+v", *nextCoordinates)
+	log.Debugf("AlignViaRelaylogCorrelation: correlated next-coordinates on %+v are %+v", fromInstance.Key, *nextCoordinates)
 
 	// We now have the correlation info needed to proceed with remote calls
 	sudoCommand := ""
