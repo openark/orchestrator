@@ -82,32 +82,37 @@ relaylog_tail() {
   last_relaylog=$(echo "$relay_logs" | tail -1)
 
   for relay_log in $relay_logs ; do
+    echo "+++ relay_log: $relay_log" >> $contents_file
     binlog_header_size $relay_log
     stop_position=$(wc -c $relay_log)
+    echo "stop position is $stop_position" >> $contents_file
     if [ "$relay_log" == "$last_relaylog" ] ; then
       if [ ! -z "$STOP_POSITION" ] ; then
         stop_position="$STOP_POSITION"
+        echo "this is the last relay log. stop position is $stop_position" >> $contents_file
       fi
     fi
     # header_size variable is now populated
     if [ $is_first_relaylog -eq 1 ] ; then
       # First relaylog file. We only get the header from the first file.
       # Then, we also filter by --start-position
-      cat $relay_log | head -c$header_size >> $contents_file
+      echo "this is the first relay log" >> $contents_file
+      echo "cat $relay_log | head -c$header_size" >> $contents_file
       [ -z "$start_position" ] && start_position="$header_size"
       # _tail_ command is unfortunately 1-based, which is why we ++
       ((start_position++))
-      cat $relay_log | head -c $stop_position | tail -c+$start_position >> $contents_file
+      echo "start_position is $start_position" >> $contents_file
+      echo "cat $relay_log | head -c $stop_position | tail -c+$start_position" >> $contents_file
     else
       # Skip header
       # _tail_ command is unfortunately 1-based, which is why we ++
       ((header_size++))
-      cat $relay_log | head -c $stop_position | tail -c+$header_size >> $contents_file
+      echo "cat $relay_log | head -c $stop_position | tail -c+$header_size" >> $contents_file
     fi
     is_first_relaylog=0
   done
 
-  cat $contents_file | gzip | base64
+  echo "cat $contents_file | gzip | base64"
 }
 
 main() {
