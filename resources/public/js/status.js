@@ -36,7 +36,7 @@ $(document).ready(function () {
 
 				message += '<code class="text-info">';
 				if (node.Hostname == health.Details.ActiveNode.Hostname && node.Token == health.Details.ActiveNode.Token) {
-					message += '<span class="text-success">[Active since '+health.Details.ActiveNode.FirstSeenActive+']</span>';
+					message += '<span class="text-success">[Elected at '+health.Details.ActiveNode.FirstSeenActive+']</span>';
 				}
 				if (node.Hostname == health.Details.Hostname) {
     			message += ' <span class="text-primary">[This node]</span>';
