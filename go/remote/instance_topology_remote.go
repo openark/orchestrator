@@ -189,7 +189,7 @@ func SyncReplicasRelayLogs(masterKey *inst.InstanceKey, postponedFunctionsContai
 	syncedReplicas, failedReplicas, postponedReplicas [](*inst.Instance), err error,
 ) {
 	var replicas [](*inst.Instance)
-	if replicas, err = inst.GetSortedReplicas(masterKey, true); err != nil {
+	if replicas, err = inst.GetSortedReplicas(masterKey, inst.StopReplicationNormal); err != nil {
 		return syncedReplicas, replicas, postponedReplicas, err
 	}
 	if len(replicas) <= 1 {

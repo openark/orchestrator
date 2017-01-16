@@ -28,6 +28,14 @@ import (
 	"github.com/outbrain/golib/math"
 )
 
+type StopReplicationMethod string
+
+const (
+	NoStopReplication     StopReplicationMethod = "NoStopReplication"
+	StopReplicationNormal                       = "StopReplicationNormal"
+	StopReplicationNicely                       = "StopReplicationNicely"
+)
+
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
 func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance), extendedOutput bool) []string {
@@ -1659,14 +1667,11 @@ func getReplicasForSorting(masterKey *InstanceKey, includeBinlogServerSubReplica
 // (most up-to-date replica first).
 // This function assumes given `replicas` argument is indeed a list of instances all replicating
 // from the same master (the result of `getReplicasForSorting()` is appropriate)
-func sortedReplicas(replicas [](*Instance), shouldStopSlaves bool) [](*Instance) {
+func sortedReplicas(replicas [](*Instance), stopReplicationMethod StopReplicationMethod) [](*Instance) {
 	if len(replicas) == 0 {
 		return replicas
 	}
-	if shouldStopSlaves {
-		log.Debugf("sortedReplicas: stopping %d replicas nicely", len(replicas))
-		replicas = StopSlavesNicely(replicas, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
-	}
+	replicas = StopSlaves(replicas, stopReplicationMethod, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
 	replicas = RemoveNilInstances(replicas)
 
 	sortInstances(replicas)
@@ -1679,11 +1684,11 @@ func sortedReplicas(replicas [](*Instance), shouldStopSlaves bool) [](*Instance)
 
 // GetSortedReplicas reads list of replicas of a given master, and returns them sorted by exec coordinates
 // (most up-to-date replica first).
-func GetSortedReplicas(masterKey *InstanceKey, stopReplication bool) (replicas [](*Instance), err error) {
+func GetSortedReplicas(masterKey *InstanceKey, stopReplicationMethod StopReplicationMethod) (replicas [](*Instance), err error) {
 	if replicas, err = getReplicasForSorting(masterKey, false); err != nil {
 		return replicas, err
 	}
-	replicas = sortedReplicas(replicas, stopReplication)
+	replicas = sortedReplicas(replicas, stopReplicationMethod)
 	if len(replicas) == 0 {
 		return replicas, fmt.Errorf("No replicas found for %+v", *masterKey)
 	}
@@ -2143,7 +2148,11 @@ func GetCandidateReplica(masterKey *InstanceKey, forRematchPurposes bool) (*Inst
 	if err != nil {
 		return candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err
 	}
-	replicas = sortedReplicas(replicas, forRematchPurposes)
+	stopReplicationMethod := NoStopReplication
+	if forRematchPurposes {
+		stopReplicationMethod = StopReplicationNicely
+	}
+	replicas = sortedReplicas(replicas, stopReplicationMethod)
 	if err != nil {
 		return candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err
 	}
@@ -2170,7 +2179,7 @@ func GetCandidateReplicaOfBinlogServerTopology(masterKey *InstanceKey) (candidat
 	if err != nil {
 		return candidateReplica, err
 	}
-	replicas = sortedReplicas(replicas, false)
+	replicas = sortedReplicas(replicas, NoStopReplication)
 	if len(replicas) == 0 {
 		return candidateReplica, fmt.Errorf("No replicas found for %+v", *masterKey)
 	}
