@@ -21,6 +21,7 @@ import (
 	goos "os"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/github/orchestrator/go/attributes"
@@ -331,7 +332,27 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 func recoverDeadMasterViaRelaylogSync(topologyRecovery *TopologyRecovery) (promotedReplica *inst.Instance, syncedReplicas, failedReplicas, postponedReplicas [](*inst.Instance), err error) {
 	failedMasterKey := &topologyRecovery.AnalysisEntry.AnalyzedInstanceKey
 
-	_, syncedReplicas, failedReplicas, postponedReplicas, err = remote.SyncReplicasRelayLogs(failedMasterKey, remote.SyncRelaylogsChangeMasterToSharedMasterFunc, &topologyRecovery.PostponedFunctionsContainer)
+	failedMaster, _, err := inst.ReadInstance(failedMasterKey)
+	if err != nil {
+		return promotedReplica, syncedReplicas, failedReplicas, postponedReplicas, err
+	}
+
+	var once sync.Once
+	var replacement *inst.Instance
+	var syncRelaylogsChangeMasterToFunc remote.SyncRelaylogsChangeMasterIdentityFunc = func(sourceReplica *inst.Instance, replicas ...*inst.Instance) (masterKey *inst.InstanceKey, coordinates *inst.BinlogCoordinates, err error) {
+		var replacementErr error
+		once.Do(func() {
+			replacement, replacementErr = GetBestMasterReplacementFromAmongItsReplicas(failedMaster, replicas)
+			log.Debugf("recoverDeadMasterViaRelaylogSync: master replacement is %+v", replacement.Key)
+		})
+		if replacementErr != nil {
+			return nil, nil, replacementErr
+		}
+		return &replacement.Key, &replacement.SelfBinlogCoordinates, nil
+	}
+
+	syncFromReplica, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(failedMasterKey, syncRelaylogsChangeMasterToFunc, &topologyRecovery.PostponedFunctionsContainer)
+	log.Debugf("recoverDeadMasterViaRelaylogSync: syncFromReplica: %+v, synced: %d, failed: %d, postponed: %d", syncFromReplica.Key, len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
 
 	return promotedReplica, syncedReplicas, failedReplicas, postponedReplicas, err
 }
