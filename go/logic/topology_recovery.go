@@ -613,6 +613,73 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 	return true
 }
 
+func isGenerallyValidAsWouldBeMaster(replica *inst.Instance) bool {
+	if !replica.IsLastCheckValid {
+		// something wrong with this replica right now. We shouldn't hope to be able to promote it
+		return false
+	}
+	if !replica.LogBinEnabled {
+		return false
+	}
+
+	return true
+}
+
+func GetBestMasterReplacementFromAmongItsReplicas(master *inst.Instance, replicas [](*inst.Instance)) (replacement *inst.Instance, err error) {
+	// Sanity:
+	for _, replica := range replicas {
+		if !replica.MasterKey.Equals(&master.Key) {
+			return nil, log.Errorf("GetBestMasterReplacementFromAmongItsReplicas: %+v is not a replica of %+v", replica.Key, master.Key)
+		}
+	}
+	validReplicas := [](*inst.Instance){}
+	for _, replica := range replicas {
+		if isGenerallyValidAsWouldBeMaster(replica) {
+			validReplicas = append(validReplicas, replica)
+		}
+	}
+
+	for _, replica := range validReplicas {
+		if replica.IsCandidate &&
+			replica.DataCenter == master.DataCenter &&
+			replica.PhysicalEnvironment == master.PhysicalEnvironment {
+			log.Infof("GetBestMasterReplacementFromAmongItsReplicas: found %+v as the ideal candidate", replica.Key)
+			return replica, nil
+		}
+	}
+	for _, replica := range validReplicas {
+		if replica.IsCandidate &&
+			replica.DataCenter == master.DataCenter {
+			log.Infof("GetBestMasterReplacementFromAmongItsReplicas: found %+v as candidate in same dc", replica.Key)
+			return replica, nil
+		}
+	}
+	for _, replica := range validReplicas {
+		if replica.DataCenter == master.DataCenter &&
+			replica.PhysicalEnvironment == master.PhysicalEnvironment {
+			log.Infof("GetBestMasterReplacementFromAmongItsReplicas: found %+v as valid replacement in same dc & environment", replica.Key)
+			return replica, nil
+		}
+	}
+	for _, replica := range validReplicas {
+		if replica.DataCenter == master.DataCenter {
+			log.Infof("GetBestMasterReplacementFromAmongItsReplicas: found %+v as valid replacement in same dc", replica.Key)
+			return replica, nil
+		}
+	}
+	for _, replica := range validReplicas {
+		if replica.IsCandidate {
+			log.Infof("GetBestMasterReplacementFromAmongItsReplicas: found %+v as candidate in different dc", replica.Key)
+			return replica, nil
+		}
+	}
+	for _, replica := range validReplicas {
+		log.Infof("GetBestMasterReplacementFromAmongItsReplicas: found %+v as valid replacement in different dc", replica.Key)
+		return replica, nil
+	}
+	return nil, fmt.Errorf("GetBestMasterReplacementFromAmongItsReplicas: cannot find replacement")
+}
+
 // GetCandidateSiblingOfIntermediateMaster chooses the best sibling of a dead intermediate master
 // to whom the IM's replicas can be moved.
 func GetCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *inst.Instance) (*inst.Instance, error) {

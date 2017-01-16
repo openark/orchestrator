@@ -1425,6 +1425,29 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(fmt.Sprintf("%d recoveries acknowldged", countRecoveries))
 		}
+	case registerCliCommand("get-best-master-replacement", "Recovery", `Information command suggesting the best would-be replacement to master of given cluster`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			masters, err := inst.ReadClusterWriteableMaster(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if len(masters) == 0 {
+				log.Fatalf("No writeable masters found for cluster %+v", clusterName)
+			}
+			clusterMaster := masters[0]
+
+			replicas, err := inst.ReadReplicaInstances(&clusterMaster.Key)
+			if err != nil {
+				log.Fatale(err)
+			}
+
+			replacement, err := logic.GetBestMasterReplacementFromAmongItsReplicas(clusterMaster, replicas)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(replacement.Key.DisplayString())
+		}
 	// Instance meta
 	case registerCliCommand("register-candidate", "Instance, meta", `Indicate that a specific instance is a preferred candidate for master promotion`):
 		{
