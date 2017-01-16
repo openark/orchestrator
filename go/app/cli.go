@@ -652,7 +652,25 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(instance.Key.DisplayString())
 		}
-		// relay-log based synchronization
+	case registerCliCommand("regroup-replicas-ssh", "Remote relay log relocation", `Regroup replicas of a given instance by syncing their relay logs over SSH`):
+		{
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			validateInstanceIsFound(instanceKey)
+
+			_, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instanceKey, remote.SyncRelaylogsChangeMasterToSourceReplicaFunc, postponedFunctionsContainer)
+			postponedFunctionsContainer.InvokePostponed()
+
+			log.Infof("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
+			for _, replica := range syncedReplicas {
+				fmt.Println(replica.Key.DisplayString())
+			}
+			if err != nil {
+				log.Fatale(err)
+			}
+		}
 	case registerCliCommand("sync-replicas-relaylogs", "Remote relay log relocation", `Given master, sync all of its replicas by remotely copying and applying relaylogs`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
