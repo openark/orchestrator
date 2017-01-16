@@ -2,7 +2,7 @@
 function addStatusTableData(name, column1, column2) {
 	$("#orchestratorStatusTable").append(
 	        '<tr><td>' + name + '</td>' +
-                '<td><code class="text-info"><strong>' + column1 + '</strong></code></td>' +
+                '<td>' + column1 + '</td>' +
                 '<td><code class="text-info">' + column2 + '</code></td></tr>'
 	);
 }
@@ -27,14 +27,21 @@ $(document).ready(function () {
 				if (app_version == "") {
 					app_version = "unknown version";
 				}
-				var message = node.Hostname;
+				var message = '';
+				message += '<code class="text-info"><strong>';
+				message += node.Hostname;
+				message += ' <span class="text-info">[Running since '+node.FirstSeenActive+']</span>';
+				message += '</strong></code>';
+				message += '</br>';
+
+				message += '<code class="text-info">';
 				if (node.Hostname == health.Details.ActiveNode.Hostname && node.Token == health.Details.ActiveNode.Token) {
-					message += ' <span class="text-success">[Active since '+health.Details.ActiveNode.FirstSeenActive+']</span>';
+					message += '<span class="text-success">[Active since '+health.Details.ActiveNode.FirstSeenActive+']</span>';
 				}
 				if (node.Hostname == health.Details.Hostname) {
     			message += ' <span class="text-primary">[This node]</span>';
     		}
-				message += ' <span class="text-info">[Running since '+node.FirstSeenActive+']</span>';
+				message += '</code>';
 
     		addStatusTableData("Available node", message, app_version);
     	})
