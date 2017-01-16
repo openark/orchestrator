@@ -23,20 +23,22 @@ $(document).ready(function () {
     $.get(appUrl("/api/health/"), function (health) {
     	statusObject.prepend('<h4>'+health.Message+'</h4>')
     	health.Details.AvailableNodes.forEach(function(node) {
-    		var values = node.split(";");
-    		var hostname = values[0];
-    		var token = values[1];
-    		var app_version = values[2];
-    		var message = hostname;
-    		if (hostname + ";" + token == health.Details.ActiveNode) {
-    			message += ' <span class="text-success">[Active]</span>';
-    		}
-    		if (hostname == health.Details.Hostname) {
+				var app_version = node.AppVersion;
+				if (app_version == "") {
+					app_version = "unknown version";
+				}
+				var message = node.Hostname;
+				if (node.Hostname == health.Details.ActiveNode.Hostname && node.Token == health.Details.ActiveNode.Token) {
+					message += ' <span class="text-success">[Active since '+health.Details.ActiveNode.FirstSeenActive+']</span>';
+				}
+				if (node.Hostname == health.Details.Hostname) {
     			message += ' <span class="text-primary">[This node]</span>';
     		}
+				message += ' <span class="text-info">[Running since '+node.FirstSeenActive+']</span>';
+
     		addStatusTableData("Available node", message, app_version);
     	})
-    	
+
     	var userId = getUserId();
     	if (userId == "") {
     		userId = "[unknown]"
@@ -49,6 +51,6 @@ $(document).ready(function () {
     		addStatusActionButton("Reset hostname resolve cache", "reset-hostname-resolve-cache");
     		addStatusActionButton("Reelect", "reelect");
     	}
-    
-    }, "json");   
+
+    }, "json");
 });
