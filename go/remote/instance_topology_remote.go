@@ -79,7 +79,7 @@ func TestRemoteCommandOnInstance(instanceKey *inst.InstanceKey) error {
 }
 
 // SyncReplicaRelayLogs will align siblings by applying relaylogs from one to the other, via remote SSH
-func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsChangeMasterIdentityFunc SyncRelaylogsChangeMasterIdentityFunc) (*inst.Instance, error) {
+func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsChangeMasterIdentityFunc SyncRelaylogsChangeMasterIdentityFunc, startReplication bool) (*inst.Instance, error) {
 	if config.Config.RemoteSSHCommand == "" {
 		return instance, fmt.Errorf("RemoteSSHCommand not configured")
 	}
@@ -208,6 +208,12 @@ func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsCh
 			}
 		}
 	}
+	if startReplication {
+		instance, err = inst.StartSlave(&instance.Key)
+		if err != nil {
+			return instance, err
+		}
+	}
 
 	inst.AuditOperation("align-via-relaylogs-remote", &instance.Key, fmt.Sprintf("aligned %+v by relaylogs from %+v", instance.Key, fromInstance.Key))
 	return instance, err
@@ -216,6 +222,7 @@ func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsCh
 func SyncReplicasRelayLogs(
 	masterKey *inst.InstanceKey,
 	syncRelaylogsChangeMasterIdentityFunc SyncRelaylogsChangeMasterIdentityFunc,
+	startReplication bool,
 	postponedFunctionsContainer *inst.PostponedFunctionsContainer,
 ) (
 	synchedFromReplica *inst.Instance,
@@ -251,7 +258,7 @@ func SyncReplicasRelayLogs(
 	applyToReplicaFunc := func(applyToReplica *inst.Instance) error {
 		defer func() { barrier <- &applyToReplica.Key }()
 
-		if _, err := SyncReplicaRelayLogs(applyToReplica, synchedFromReplica, syncRelaylogsChangeMasterIdentityFunc); err == nil {
+		if _, err := SyncReplicaRelayLogs(applyToReplica, synchedFromReplica, syncRelaylogsChangeMasterIdentityFunc, startReplication); err == nil {
 			synchedReplicasChan <- applyToReplica
 		} else {
 			err = fmt.Errorf("%+v: %+v", applyToReplica.Key, err.Error())

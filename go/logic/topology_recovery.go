@@ -352,7 +352,7 @@ func recoverDeadMasterViaRelaylogSync(topologyRecovery *TopologyRecovery) (promo
 		return &replacement.Key, &replacement.SelfBinlogCoordinates, nil
 	}
 
-	syncFromReplica, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(failedMasterKey, syncRelaylogsChangeMasterToFunc, &topologyRecovery.PostponedFunctionsContainer)
+	syncFromReplica, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(failedMasterKey, syncRelaylogsChangeMasterToFunc, true, &topologyRecovery.PostponedFunctionsContainer)
 	log.Debugf("recoverDeadMasterViaRelaylogSync: syncFromReplica: %+v, synced: %d, failed: %d, postponed: %d", syncFromReplica.Key, len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
 
 	return promotedReplica, syncedReplicas, failedReplicas, postponedReplicas, err
