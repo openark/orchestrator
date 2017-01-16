@@ -331,7 +331,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 func recoverDeadMasterViaRelaylogSync(topologyRecovery *TopologyRecovery) (promotedReplica *inst.Instance, syncedReplicas, failedReplicas, postponedReplicas [](*inst.Instance), err error) {
 	failedMasterKey := &topologyRecovery.AnalysisEntry.AnalyzedInstanceKey
 
-	_, syncedReplicas, failedReplicas, postponedReplicas, err = remote.SyncReplicasRelayLogs(failedMasterKey, remote.SyncRelaylogsChangeMasterToSharedMaster, &topologyRecovery.PostponedFunctionsContainer)
+	_, syncedReplicas, failedReplicas, postponedReplicas, err = remote.SyncReplicasRelayLogs(failedMasterKey, remote.SyncRelaylogsChangeMasterToSharedMasterFunc, &topologyRecovery.PostponedFunctionsContainer)
 
 	return promotedReplica, syncedReplicas, failedReplicas, postponedReplicas, err
 }

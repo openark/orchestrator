@@ -29,13 +29,17 @@ import (
 	"github.com/outbrain/golib/log"
 )
 
-type SyncRelaylogsChangeMasterMethod string
+type SyncRelaylogsChangeMasterIdentityFunc func(sourceReplica *inst.Instance, replicas ...*inst.Instance) (masterKey *inst.InstanceKey, coordinates *inst.BinlogCoordinates, err error)
 
-const (
-	SyncRelaylogsNoChangeMaster              SyncRelaylogsChangeMasterMethod = "SyncRelaylogsNoChangeMaster"
-	SyncRelaylogsChangeMasterToSharedMaster                                  = "SyncRelaylogsChangeMasterToSharedMaster"
-	SyncRelaylogsChangeMasterToSourceReplica                                 = "SyncRelaylogsChangeMasterToSourceReplica"
-)
+var SyncRelaylogsChangeMasterToSharedMasterFunc SyncRelaylogsChangeMasterIdentityFunc = func(sourceReplica *inst.Instance, replicas ...*inst.Instance) (masterKey *inst.InstanceKey, coordinates *inst.BinlogCoordinates, err error) {
+	return &sourceReplica.MasterKey, &sourceReplica.ExecBinlogCoordinates, nil
+}
+var SyncRelaylogsChangeMasterToSourceReplicaFunc SyncRelaylogsChangeMasterIdentityFunc = func(sourceReplica *inst.Instance, replicas ...*inst.Instance) (masterKey *inst.InstanceKey, coordinates *inst.BinlogCoordinates, err error) {
+	if !sourceReplica.LogBinEnabled {
+		return nil, nil, fmt.Errorf("Cannot change master onto source replica %+v since it has no binary logs", sourceReplica.Key)
+	}
+	return &sourceReplica.Key, &sourceReplica.SelfBinlogCoordinates, nil
+}
 
 func TestRemoteCommandOnInstance(instanceKey *inst.InstanceKey) error {
 	sudoCommand := ""
@@ -68,7 +72,7 @@ func TestRemoteCommandOnInstance(instanceKey *inst.InstanceKey) error {
 }
 
 // SyncReplicaRelayLogs will align siblings by applying relaylogs from one to the other, via remote SSH
-func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsChangeMasterMethod SyncRelaylogsChangeMasterMethod) (*inst.Instance, error) {
+func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsChangeMasterIdentityFunc SyncRelaylogsChangeMasterIdentityFunc) (*inst.Instance, error) {
 	if config.Config.RemoteSSHCommand == "" {
 		return instance, fmt.Errorf("RemoteSSHCommand not configured")
 	}
@@ -77,9 +81,6 @@ func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsCh
 		return instance, err
 	}
 
-	if syncRelaylogsChangeMasterMethod == SyncRelaylogsChangeMasterToSourceReplica && !fromInstance.LogBinEnabled {
-		return instance, log.Errorf("SyncReplicaRelayLogs: cannot change master to source replica %+v since it has no binary logs", fromInstance.Key)
-	}
 	if instance.ReplicaRunning() {
 		return instance, log.Errorf("SyncReplicaRelayLogs: replication on %+v must not run", instance.Key)
 	}
@@ -188,39 +189,47 @@ func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsCh
 	}
 	log.Debugf("Have successfully applied relay logs on %s", instance.Key.Hostname)
 
-	switch syncRelaylogsChangeMasterMethod {
-	case SyncRelaylogsChangeMasterToSharedMaster:
-		{
-			instance, err = inst.ChangeMasterTo(&instance.Key, &fromInstance.MasterKey, &fromInstance.ExecBinlogCoordinates, false, inst.GTIDHintNeutral)
-			if err != nil {
-				return instance, err
-			}
+	if syncRelaylogsChangeMasterIdentityFunc != nil {
+		changeToKey, changeToCoordinates, err := syncRelaylogsChangeMasterIdentityFunc(fromInstance, instance)
+		if err != nil {
+			return instance, err
 		}
-	case SyncRelaylogsChangeMasterToSourceReplica:
-		{
-			instance, err = inst.ChangeMasterTo(&instance.Key, &fromInstance.Key, &fromInstance.SelfBinlogCoordinates, false, inst.GTIDHintNeutral)
+		if changeToKey != nil && changeToCoordinates != nil {
+			instance, err = inst.ChangeMasterTo(&instance.Key, changeToKey, changeToCoordinates, false, inst.GTIDHintNeutral)
 			if err != nil {
 				return instance, err
 			}
 		}
 	}
+
 	inst.AuditOperation("align-via-relaylogs-remote", &instance.Key, fmt.Sprintf("aligned %+v by relaylogs from %+v", instance.Key, fromInstance.Key))
 	return instance, err
 }
 
-func SyncReplicasRelayLogs(masterKey *inst.InstanceKey, syncRelaylogsChangeMasterMethod SyncRelaylogsChangeMasterMethod, postponedFunctionsContainer *inst.PostponedFunctionsContainer) (
-	synchedFromReplica *inst.Instance, syncedReplicas, failedReplicas, postponedReplicas [](*inst.Instance), err error,
+func SyncReplicasRelayLogs(
+	masterKey *inst.InstanceKey,
+	syncRelaylogsChangeMasterIdentityFunc SyncRelaylogsChangeMasterIdentityFunc,
+	postponedFunctionsContainer *inst.PostponedFunctionsContainer,
+) (
+	synchedFromReplica *inst.Instance,
+	syncedReplicas, failedReplicas, postponedReplicas [](*inst.Instance),
+	err error,
 ) {
 	var replicas [](*inst.Instance)
 	if replicas, err = inst.GetSortedReplicas(masterKey, inst.StopReplicationNormal); err != nil {
 		return synchedFromReplica, syncedReplicas, replicas, postponedReplicas, err
 	}
+
 	synchedFromReplica = replicas[0]
 	if len(replicas) <= 1 {
 		// Nothing to be done
 		return synchedFromReplica, syncedReplicas, replicas, postponedReplicas, err
 	}
 	applyToReplicas := replicas[1:]
+
+	if err != nil {
+		return synchedFromReplica, syncedReplicas, replicas, postponedReplicas, err
+	}
 
 	log.Debugf("Testing SSH on %+v", synchedFromReplica.Key)
 	if err := TestRemoteCommandOnInstance(&synchedFromReplica.Key); err != nil {
@@ -235,7 +244,7 @@ func SyncReplicasRelayLogs(masterKey *inst.InstanceKey, syncRelaylogsChangeMaste
 	applyToReplicaFunc := func(applyToReplica *inst.Instance) error {
 		defer func() { barrier <- &applyToReplica.Key }()
 
-		if _, err := SyncReplicaRelayLogs(applyToReplica, synchedFromReplica, syncRelaylogsChangeMasterMethod); err == nil {
+		if _, err := SyncReplicaRelayLogs(applyToReplica, synchedFromReplica, syncRelaylogsChangeMasterIdentityFunc); err == nil {
 			synchedReplicasChan <- applyToReplica
 		} else {
 			err = fmt.Errorf("%+v: %+v", applyToReplica.Key, err.Error())
@@ -274,6 +283,7 @@ func SyncReplicasRelayLogs(masterKey *inst.InstanceKey, syncRelaylogsChangeMaste
 	for len(allErrors) > 0 {
 		log.Errore(<-allErrors)
 	}
+
 	inst.AuditOperation("sync-replicas-relaylogs", masterKey, fmt.Sprintf("aligned %+v replicas by relaylogs from %+v, got %+v errors", len(applyToReplicas), synchedFromReplica.Key, countErrors))
 	return synchedFromReplica, syncedReplicas, failedReplicas, postponedReplicas, err
 }
