@@ -29,11 +29,18 @@ import (
 	"github.com/outbrain/golib/log"
 )
 
+// SyncRelaylogsChangeMasterIdentityFunc returns the identity and coorindates into which a replica would CHANGE MASTER TO
+// having been applied with someone else's relaylogs.
+// As examples, in testing we would point such replica back to the master (but with updated coordinates)
+// In real master failover we would point to a candidate replica's self coordinates
 type SyncRelaylogsChangeMasterIdentityFunc func(sourceReplica *inst.Instance, replicas ...*inst.Instance) (masterKey *inst.InstanceKey, coordinates *inst.BinlogCoordinates, err error)
 
+// SyncRelaylogsChangeMasterToSharedMasterFunc points applied-to replica to the applied-from replica's master coordinates
 var SyncRelaylogsChangeMasterToSharedMasterFunc SyncRelaylogsChangeMasterIdentityFunc = func(sourceReplica *inst.Instance, replicas ...*inst.Instance) (masterKey *inst.InstanceKey, coordinates *inst.BinlogCoordinates, err error) {
 	return &sourceReplica.MasterKey, &sourceReplica.ExecBinlogCoordinates, nil
 }
+
+// SyncRelaylogsChangeMasterToSharedMasterFunc points applied-to replica to the applied-from replica
 var SyncRelaylogsChangeMasterToSourceReplicaFunc SyncRelaylogsChangeMasterIdentityFunc = func(sourceReplica *inst.Instance, replicas ...*inst.Instance) (masterKey *inst.InstanceKey, coordinates *inst.BinlogCoordinates, err error) {
 	if !sourceReplica.LogBinEnabled {
 		return nil, nil, fmt.Errorf("Cannot change master onto source replica %+v since it has no binary logs", sourceReplica.Key)
