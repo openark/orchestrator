@@ -29,6 +29,14 @@ import (
 	"github.com/outbrain/golib/log"
 )
 
+type SyncRelaylogsChangeMasterMethod string
+
+const (
+	SyncRelaylogsNoChangeMaster              SyncRelaylogsChangeMasterMethod = "SyncRelaylogsNoChangeMaster"
+	SyncRelaylogsChangeMasterToSharedMaster                                  = "SyncRelaylogsChangeMasterToSharedMaster"
+	SyncRelaylogsChangeMasterToSourceReplica                                 = "SyncRelaylogsChangeMasterToSourceReplica"
+)
+
 func TestRemoteCommandOnInstance(instanceKey *inst.InstanceKey) error {
 	sudoCommand := ""
 	if config.Config.RemoteSSHCommandUseSudo {
@@ -59,8 +67,8 @@ func TestRemoteCommandOnInstance(instanceKey *inst.InstanceKey) error {
 	return nil
 }
 
-// AlignViaRelaylogCorrelation will align siblings by applying relaylogs from one to the other, via remote SSH
-func AlignViaRelaylogCorrelation(instance, fromInstance *inst.Instance) (*inst.Instance, error) {
+// SyncReplicaRelayLogs will align siblings by applying relaylogs from one to the other, via remote SSH
+func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsChangeMasterMethod SyncRelaylogsChangeMasterMethod) (*inst.Instance, error) {
 	if config.Config.RemoteSSHCommand == "" {
 		return instance, fmt.Errorf("RemoteSSHCommand not configured")
 	}
@@ -69,21 +77,24 @@ func AlignViaRelaylogCorrelation(instance, fromInstance *inst.Instance) (*inst.I
 		return instance, err
 	}
 
+	if syncRelaylogsChangeMasterMethod == SyncRelaylogsChangeMasterToSourceReplica && !fromInstance.LogBinEnabled {
+		return instance, log.Errorf("SyncReplicaRelayLogs: cannot change master to source replica %+v since it has no binary logs", fromInstance.Key)
+	}
 	if instance.ReplicaRunning() {
-		return instance, log.Errorf("AlignViaRelaylogCorrelation: replication on %+v must not run", instance.Key)
+		return instance, log.Errorf("SyncReplicaRelayLogs: replication on %+v must not run", instance.Key)
 	}
 	if fromInstance.ReplicaRunning() {
-		return instance, log.Errorf("AlignViaRelaylogCorrelation: replication on %+v must not run", fromInstance.Key)
+		return instance, log.Errorf("SyncReplicaRelayLogs: replication on %+v must not run", fromInstance.Key)
 	}
 	if fromInstance.ExecBinlogCoordinates.Equals(&instance.ExecBinlogCoordinates) {
-		log.Debugf("AlignViaRelaylogCorrelation: %+v and %+v are at same coordinates. Nothing to apply.", instance.Key, fromInstance.Key)
+		log.Debugf("SyncReplicaRelayLogs: %+v and %+v are at same coordinates. Nothing to apply.", instance.Key, fromInstance.Key)
 		return instance, nil
 	}
 	if fromInstance.ExecBinlogCoordinates.SmallerThan(&instance.ExecBinlogCoordinates) {
-		return instance, log.Errorf("AlignViaRelaylogCorrelation: %+v is more up to date than %+v. Will not apply relaylogs from %+v", instance.Key, fromInstance.Key, fromInstance.Key)
+		return instance, log.Errorf("SyncReplicaRelayLogs: %+v is more up to date than %+v. Will not apply relaylogs from %+v", instance.Key, fromInstance.Key, fromInstance.Key)
 	}
 
-	log.Debugf("AlignViaRelaylogCorrelation: correlating coordinates of %+v on %+v", instance.Key, fromInstance.Key)
+	log.Debugf("SyncReplicaRelayLogs: correlating coordinates of %+v on %+v", instance.Key, fromInstance.Key)
 	_, _, nextCoordinates, found, err := inst.CorrelateRelaylogCoordinates(instance, nil, fromInstance)
 	if err != nil {
 		return instance, err
@@ -91,7 +102,7 @@ func AlignViaRelaylogCorrelation(instance, fromInstance *inst.Instance) (*inst.I
 	if !found {
 		return instance, err
 	}
-	log.Debugf("AlignViaRelaylogCorrelation: correlated next-coordinates on %+v are %+v", fromInstance.Key, *nextCoordinates)
+	log.Debugf("SyncReplicaRelayLogs: correlated next-coordinates on %+v are %+v", fromInstance.Key, *nextCoordinates)
 
 	// We now have the correlation info needed to proceed with remote calls
 	sudoCommand := ""
@@ -177,31 +188,43 @@ func AlignViaRelaylogCorrelation(instance, fromInstance *inst.Instance) (*inst.I
 	}
 	log.Debugf("Have successfully applied relay logs on %s", instance.Key.Hostname)
 
-	instance, err = inst.ChangeMasterTo(&instance.Key, &fromInstance.MasterKey, &fromInstance.ExecBinlogCoordinates, false, inst.GTIDHintNeutral)
-	if err != nil {
-		return instance, err
+	switch syncRelaylogsChangeMasterMethod {
+	case SyncRelaylogsChangeMasterToSharedMaster:
+		{
+			instance, err = inst.ChangeMasterTo(&instance.Key, &fromInstance.MasterKey, &fromInstance.ExecBinlogCoordinates, false, inst.GTIDHintNeutral)
+			if err != nil {
+				return instance, err
+			}
+		}
+	case SyncRelaylogsChangeMasterToSourceReplica:
+		{
+			instance, err = inst.ChangeMasterTo(&instance.Key, &fromInstance.Key, &fromInstance.SelfBinlogCoordinates, false, inst.GTIDHintNeutral)
+			if err != nil {
+				return instance, err
+			}
+		}
 	}
 	inst.AuditOperation("align-via-relaylogs-remote", &instance.Key, fmt.Sprintf("aligned %+v by relaylogs from %+v", instance.Key, fromInstance.Key))
 	return instance, err
 }
 
-func SyncReplicasRelayLogs(masterKey *inst.InstanceKey, postponedFunctionsContainer *inst.PostponedFunctionsContainer) (
-	syncedReplicas, failedReplicas, postponedReplicas [](*inst.Instance), err error,
+func SyncReplicasRelayLogs(masterKey *inst.InstanceKey, syncRelaylogsChangeMasterMethod SyncRelaylogsChangeMasterMethod, postponedFunctionsContainer *inst.PostponedFunctionsContainer) (
+	synchedFromReplica *inst.Instance, syncedReplicas, failedReplicas, postponedReplicas [](*inst.Instance), err error,
 ) {
 	var replicas [](*inst.Instance)
 	if replicas, err = inst.GetSortedReplicas(masterKey, inst.StopReplicationNormal); err != nil {
-		return syncedReplicas, replicas, postponedReplicas, err
+		return synchedFromReplica, syncedReplicas, replicas, postponedReplicas, err
 	}
+	synchedFromReplica = replicas[0]
 	if len(replicas) <= 1 {
 		// Nothing to be done
-		return syncedReplicas, replicas, postponedReplicas, err
+		return synchedFromReplica, syncedReplicas, replicas, postponedReplicas, err
 	}
-	applyFromReplica := replicas[0]
 	applyToReplicas := replicas[1:]
 
-	log.Debugf("Testing SSH on %+v", applyFromReplica.Key)
-	if err := TestRemoteCommandOnInstance(&applyFromReplica.Key); err != nil {
-		return syncedReplicas, replicas, postponedReplicas, err
+	log.Debugf("Testing SSH on %+v", synchedFromReplica.Key)
+	if err := TestRemoteCommandOnInstance(&synchedFromReplica.Key); err != nil {
+		return synchedFromReplica, syncedReplicas, replicas, postponedReplicas, err
 	}
 
 	barrier := make(chan *inst.InstanceKey, len(applyToReplicas))
@@ -212,7 +235,7 @@ func SyncReplicasRelayLogs(masterKey *inst.InstanceKey, postponedFunctionsContai
 	applyToReplicaFunc := func(applyToReplica *inst.Instance) error {
 		defer func() { barrier <- &applyToReplica.Key }()
 
-		if _, err := AlignViaRelaylogCorrelation(applyToReplica, applyFromReplica); err == nil {
+		if _, err := SyncReplicaRelayLogs(applyToReplica, synchedFromReplica, syncRelaylogsChangeMasterMethod); err == nil {
 			synchedReplicasChan <- applyToReplica
 		} else {
 			err = fmt.Errorf("%+v: %+v", applyToReplica.Key, err.Error())
@@ -240,7 +263,7 @@ func SyncReplicasRelayLogs(masterKey *inst.InstanceKey, postponedFunctionsContai
 	for i := 0; i < countImmediateApply; i++ {
 		<-barrier
 	}
-	syncedReplicas = append(syncedReplicas, applyFromReplica)
+	syncedReplicas = append(syncedReplicas, synchedFromReplica)
 	for len(synchedReplicasChan) > 0 {
 		syncedReplicas = append(syncedReplicas, <-synchedReplicasChan)
 	}
@@ -251,6 +274,6 @@ func SyncReplicasRelayLogs(masterKey *inst.InstanceKey, postponedFunctionsContai
 	for len(allErrors) > 0 {
 		log.Errore(<-allErrors)
 	}
-	inst.AuditOperation("sync-replicas-relaylogs", masterKey, fmt.Sprintf("aligned %+v replicas by relaylogs from %+v, got %+v errors", len(applyToReplicas), applyFromReplica.Key, countErrors))
-	return syncedReplicas, failedReplicas, postponedReplicas, err
+	inst.AuditOperation("sync-replicas-relaylogs", masterKey, fmt.Sprintf("aligned %+v replicas by relaylogs from %+v, got %+v errors", len(applyToReplicas), synchedFromReplica.Key, countErrors))
+	return synchedFromReplica, syncedReplicas, failedReplicas, postponedReplicas, err
 }

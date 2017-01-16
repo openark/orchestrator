@@ -615,7 +615,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatalf("Instance not found: %+v", *destinationKey)
 			}
 
-			_, err = agent.AlignViaRelaylogCorrelation(instance, otherInstance)
+			_, err = agent.SyncReplicaRelayLogs(instance, otherInstance)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -646,7 +646,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatalf("Instance not found: %+v", *destinationKey)
 			}
 
-			_, err = remote.AlignViaRelaylogCorrelation(instance, otherInstance)
+			_, err = remote.SyncReplicaRelayLogs(instance, otherInstance, remote.SyncRelaylogsChangeMasterToSharedMaster)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -661,7 +661,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instanceKey, postponedFunctionsContainer)
+			_, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instanceKey, remote.SyncRelaylogsChangeMasterToSharedMaster, postponedFunctionsContainer)
 			postponedFunctionsContainer.InvokePostponed()
 
 			log.Infof("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas))

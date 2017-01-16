@@ -28,6 +28,7 @@ import (
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/os"
 	"github.com/github/orchestrator/go/process"
+	"github.com/github/orchestrator/go/remote"
 	"github.com/outbrain/golib/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
@@ -98,6 +99,7 @@ const (
 	MasterRecoveryGTID         MasterRecoveryType = "MasterRecoveryGTID"
 	MasterRecoveryPseudoGTID                      = "MasterRecoveryPseudoGTID"
 	MasterRecoveryBinlogServer                    = "MasterRecoveryBinlogServer"
+	MasterRecoveryRemoteSSH                       = "MasterRecoveryRemoteSSH"
 )
 
 var emergencyReadTopologyInstanceMap = cache.New(time.Duration(config.Config.InstancePollSeconds)*time.Second, time.Second)
@@ -326,6 +328,14 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 	return promotedReplica, err
 }
 
+func recoverDeadMasterViaRelaylogSync(topologyRecovery *TopologyRecovery) (promotedReplica *inst.Instance, syncedReplicas, failedReplicas, postponedReplicas [](*inst.Instance), err error) {
+	failedMasterKey := &topologyRecovery.AnalysisEntry.AnalyzedInstanceKey
+
+	_, syncedReplicas, failedReplicas, postponedReplicas, err = remote.SyncReplicasRelayLogs(failedMasterKey, remote.SyncRelaylogsChangeMasterToSharedMaster, &topologyRecovery.PostponedFunctionsContainer)
+
+	return promotedReplica, syncedReplicas, failedReplicas, postponedReplicas, err
+}
+
 // RecoverDeadMaster recovers a dead master, complete logic inside
 func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (promotedReplica *inst.Instance, lostReplicas [](*inst.Instance), err error) {
 	analysisEntry := &topologyRecovery.AnalysisEntry
@@ -346,6 +356,8 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 		masterRecoveryType = MasterRecoveryGTID
 	} else if analysisEntry.BinlogServerImmediateTopology {
 		masterRecoveryType = MasterRecoveryBinlogServer
+	} else if config.Config.RemoteSSHForMasterFailover {
+		masterRecoveryType = MasterRecoveryRemoteSSH
 	}
 	log.Debugf("topology_recovery: RecoverDeadMaster: masterRecoveryType=%+v", masterRecoveryType)
 
@@ -361,6 +373,10 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 	case MasterRecoveryBinlogServer:
 		{
 			promotedReplica, err = recoverDeadMasterInBinlogServerTopology(topologyRecovery)
+		}
+	case MasterRecoveryRemoteSSH:
+		{
+			promotedReplica, _, lostReplicas, _, err = recoverDeadMasterViaRelaylogSync(topologyRecovery)
 		}
 	}
 	topologyRecovery.AddError(err)
