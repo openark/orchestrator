@@ -297,6 +297,10 @@ func SyncReplicasRelayLogs(
 	for len(allErrors) > 0 {
 		log.Errore(<-allErrors)
 	}
+	if startReplication {
+		synchedFromReplica, err = inst.StartSlave(&synchedFromReplica.Key)
+		log.Errore(err)
+	}
 
 	inst.AuditOperation("sync-replicas-relaylogs", masterKey, fmt.Sprintf("aligned %+v replicas by relaylogs from %+v, got %+v errors", len(applyToReplicas), synchedFromReplica.Key, countErrors))
 	return synchedFromReplica, syncedReplicas, failedReplicas, postponedReplicas, err
