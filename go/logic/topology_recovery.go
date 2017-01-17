@@ -358,7 +358,9 @@ func recoverDeadMasterViaRelaylogSync(topologyRecovery *TopologyRecovery) (promo
 		if replacementErr != nil {
 			return nil, nil, replacementErr
 		}
-		log.Debugf("recoverDeadMasterViaRelaylogSync: ++ got nil? %+v", (replacement == nil))
+		if replacement == nil {
+			return nil, nil, fmt.Errorf("recoverDeadMasterViaRelaylogSync: cannot find replacement")
+		}
 		return &replacement.Key, &replacement.SelfBinlogCoordinates, nil
 	}
 
