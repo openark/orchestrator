@@ -343,7 +343,9 @@ func recoverDeadMasterViaRelaylogSync(topologyRecovery *TopologyRecovery) (promo
 	var syncRelaylogsChangeMasterToFunc remote.SyncRelaylogsChangeMasterIdentityFunc = func(sourceReplica *inst.Instance, replicas ...*inst.Instance) (masterKey *inst.InstanceKey, coordinates *inst.BinlogCoordinates, err error) {
 		var replacementErr error
 		once.Do(func() {
+			log.Debugf("recoverDeadMasterViaRelaylogSync: getting best replacement for %+v from among its %+v replicas", failedMaster.Key, len(replicas))
 			replacement, replacementErr = GetBestMasterReplacementFromAmongItsReplicas(failedMaster, replicas)
+			log.Debugf("recoverDeadMasterViaRelaylogSync: + got nil? %+v ; error: %+v", (replacement == nil), replacementErr)
 			if replacementErr != nil {
 				return
 			}
@@ -356,6 +358,7 @@ func recoverDeadMasterViaRelaylogSync(topologyRecovery *TopologyRecovery) (promo
 		if replacementErr != nil {
 			return nil, nil, replacementErr
 		}
+		log.Debugf("recoverDeadMasterViaRelaylogSync: ++ got nil? %+v", (replacement == nil))
 		return &replacement.Key, &replacement.SelfBinlogCoordinates, nil
 	}
 
