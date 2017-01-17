@@ -78,6 +78,30 @@ func TestRemoteCommandOnInstance(instanceKey *inst.InstanceKey) error {
 	return nil
 }
 
+func applySyncRelaylogsChangeMasterIdentityFunc(syncRelaylogsChangeMasterIdentityFunc SyncRelaylogsChangeMasterIdentityFunc, fromInstance, instance *inst.Instance) (updatedInstance *inst.Instance, err error) {
+	if syncRelaylogsChangeMasterIdentityFunc == nil {
+		return instance, nil
+	}
+	changeToKey, changeToCoordinates, err := syncRelaylogsChangeMasterIdentityFunc(fromInstance, instance)
+	if err != nil {
+		return instance, err
+	}
+	if changeToKey == nil {
+		return instance, nil
+	}
+	if changeToCoordinates == nil {
+		return instance, nil
+	}
+	if instance.Key.Equals(changeToKey) {
+		return instance, nil
+	}
+	// We exempt the very instance from pointing onto itself
+
+	instance, err = inst.ChangeMasterTo(&instance.Key, changeToKey, changeToCoordinates, false, inst.GTIDHintNeutral)
+
+	return instance, nil
+}
+
 // SyncReplicaRelayLogs will align siblings by applying relaylogs from one to the other, via remote SSH
 func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsChangeMasterIdentityFunc SyncRelaylogsChangeMasterIdentityFunc, startReplication bool) (*inst.Instance, error) {
 	if config.Config.RemoteSSHCommand == "" {
@@ -199,23 +223,12 @@ func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsCh
 		log.Debugf("Have successfully applied relay logs on %s", instance.Key.Hostname)
 	}
 
-	if syncRelaylogsChangeMasterIdentityFunc != nil {
-		changeToKey, changeToCoordinates, err := syncRelaylogsChangeMasterIdentityFunc(fromInstance, instance)
-		if err != nil {
-			return instance, err
-		}
-		if changeToKey != nil && changeToCoordinates != nil && !instance.Key.Equals(changeToKey) {
-			// We exempt the very instance from pointing onto itself
-			instance, err = inst.ChangeMasterTo(&instance.Key, changeToKey, changeToCoordinates, false, inst.GTIDHintNeutral)
-			if err != nil {
-				return instance, err
-			}
-		}
+	var err error
+	if instance, err = applySyncRelaylogsChangeMasterIdentityFunc(syncRelaylogsChangeMasterIdentityFunc, fromInstance, instance); err != nil {
+		return instance, err
 	}
 	if startReplication {
-		var err error
-		instance, err = inst.StartSlave(&instance.Key)
-		if err != nil {
+		if instance, err = inst.StartSlave(&instance.Key); err != nil {
 			return instance, err
 		}
 	}
@@ -301,6 +314,9 @@ func SyncReplicasRelayLogs(
 	countErrors := len(allErrors)
 	for len(allErrors) > 0 {
 		log.Errore(<-allErrors)
+	}
+	if synchedFromReplica, err = applySyncRelaylogsChangeMasterIdentityFunc(syncRelaylogsChangeMasterIdentityFunc, synchedFromReplica, synchedFromReplica); err != nil {
+		return synchedFromReplica, syncedReplicas, failedReplicas, postponedReplicas, err
 	}
 	if startReplication {
 		synchedFromReplica, err = inst.StartSlave(&synchedFromReplica.Key)
