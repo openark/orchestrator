@@ -369,7 +369,7 @@ func recoverDeadMasterViaRelaylogSync(topologyRecovery *TopologyRecovery) (promo
 	} else {
 		log.Debugf("recoverDeadMasterViaRelaylogSync: no replacement found")
 	}
-
+	promotedReplica = replacement
 	return promotedReplica, syncedReplicas, failedReplicas, postponedReplicas, err
 }
 
