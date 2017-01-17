@@ -945,24 +945,29 @@ func SetupMySQLTopologyTLS(uri string) (string, error) {
 }
 
 // OpenTopology returns the DB instance for the orchestrator backed database
-func OpenOrchestrator() (*sql.DB, error) {
+func OpenOrchestrator() (db *sql.DB, err error) {
 	if config.Config.DatabaselessMode__experimental {
 		return nil, nil
 	}
-	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&interpolateParams=%t",
-		config.Config.MySQLOrchestratorUser,
-		config.Config.MySQLOrchestratorPassword,
-		config.Config.MySQLOrchestratorHost,
-		config.Config.MySQLOrchestratorPort,
-		config.Config.MySQLOrchestratorDatabase,
-		config.Config.MySQLConnectTimeoutSeconds,
-		config.Config.MySQLOrchestratorReadTimeoutSeconds,
-		config.Config.MySQLInterpolateParams,
-	)
-	if config.Config.MySQLOrchestratorUseMutualTLS {
-		mysql_uri, _ = SetupMySQLOrchestratorTLS(mysql_uri)
+	var fromCache bool
+	if config.Config.IsSQLite3() {
+		db, fromCache, err = sqlutils.GetSQLiteDB(config.Config.SQLite3DataFile)
+	} else {
+		mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&interpolateParams=%t",
+			config.Config.MySQLOrchestratorUser,
+			config.Config.MySQLOrchestratorPassword,
+			config.Config.MySQLOrchestratorHost,
+			config.Config.MySQLOrchestratorPort,
+			config.Config.MySQLOrchestratorDatabase,
+			config.Config.MySQLConnectTimeoutSeconds,
+			config.Config.MySQLOrchestratorReadTimeoutSeconds,
+			config.Config.MySQLInterpolateParams,
+		)
+		if config.Config.MySQLOrchestratorUseMutualTLS {
+			mysql_uri, _ = SetupMySQLOrchestratorTLS(mysql_uri)
+		}
+		db, fromCache, err = sqlutils.GetDB(mysql_uri)
 	}
-	db, fromCache, err := sqlutils.GetDB(mysql_uri)
 	if err == nil && !fromCache {
 		initOrchestratorDB(db)
 
@@ -1051,14 +1056,15 @@ func deployStatements(db *sql.DB, queries []string, fatalOnError bool) error {
 	// along with the "invalid" definition, and then go ahead and fix those definitions via following ALTER statements.
 	// My bad.
 	originalSqlMode := ""
-	err = tx.QueryRow(`select @@session.sql_mode`).Scan(&originalSqlMode)
-	if _, err := tx.Exec(`set @@session.sql_mode=REPLACE(@@session.sql_mode, 'NO_ZERO_DATE', '')`); err != nil {
-		log.Fatale(err)
+	if config.Config.IsMySQL() {
+		err = tx.QueryRow(`select @@session.sql_mode`).Scan(&originalSqlMode)
+		if _, err := tx.Exec(`set @@session.sql_mode=REPLACE(@@session.sql_mode, 'NO_ZERO_DATE', '')`); err != nil {
+			log.Fatale(err)
+		}
+		if _, err := tx.Exec(`set @@session.sql_mode=REPLACE(@@session.sql_mode, 'NO_ZERO_IN_DATE', '')`); err != nil {
+			log.Fatale(err)
+		}
 	}
-	if _, err := tx.Exec(`set @@session.sql_mode=REPLACE(@@session.sql_mode, 'NO_ZERO_IN_DATE', '')`); err != nil {
-		log.Fatale(err)
-	}
-
 	for i, query := range queries {
 		if i == 0 {
 			//log.Debugf("sql_mode is: %+v", originalSqlMode)
@@ -1073,8 +1079,10 @@ func deployStatements(db *sql.DB, queries []string, fatalOnError bool) error {
 			// And ignore any error
 		}
 	}
-	if _, err := tx.Exec(`set session sql_mode=?`, originalSqlMode); err != nil {
-		log.Fatale(err)
+	if config.Config.IsMySQL() {
+		if _, err := tx.Exec(`set session sql_mode=?`, originalSqlMode); err != nil {
+			log.Fatale(err)
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		log.Fatale(err)

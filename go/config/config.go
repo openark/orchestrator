@@ -51,6 +51,8 @@ type Configuration struct {
 	MySQLTopologyUseMutualTLS                    bool   // Turn on TLS authentication with the Topology MySQL instances
 	MySQLTopologyMaxPoolConnections              int    // Max concurrent connections on any topology instance
 	DatabaselessMode__experimental               bool   // !!!EXPERIMENTAL!!! Orchestrator will execute without speaking to a backend database; super-standalone mode
+	BackendDB                                    string // EXPERIMENTAL: type of backend db; either "mysql" or "sqlite3"
+	SQLite3DataFile                              string // when BackendDB == "sqlite3", full path to sqlite3 datafile
 	MySQLOrchestratorHost                        string
 	MySQLOrchestratorMaxPoolConnections          int // The maximum size of the connection pool to the Orchestrator backend.
 	MySQLOrchestratorPort                        uint
@@ -224,6 +226,8 @@ func newConfiguration() *Configuration {
 		StatusEndpoint:                               "/api/status",
 		StatusSimpleHealth:                           true,
 		StatusOUVerify:                               false,
+		BackendDB:                                    "mysql",
+		SQLite3DataFile:                              "",
 		MySQLOrchestratorMaxPoolConnections:          128, // limit concurrent conns to backend DB
 		MySQLOrchestratorPort:                        3306,
 		MySQLTopologyMaxPoolConnections:              3,
@@ -453,7 +457,19 @@ func (this *Configuration) postReadAdjustments() error {
 			return fmt.Errorf("config's RemoteSSHCommand must either be empty, or contain a '{hostname}' placeholder")
 		}
 	}
+
+	if this.IsSQLite3() && this.SQLite3DataFile == "" {
+		return fmt.Errorf("SQLite3DataFile must be set when BackendDB is sqlite3")
+	}
 	return nil
+}
+
+func (this *Configuration) IsSQLite3() bool {
+	return this.BackendDB == "sqlite3"
+}
+
+func (this *Configuration) IsMySQL() bool {
+	return this.BackendDB == "mysql" || this.BackendDB == ""
 }
 
 // read reads configuration from given file, or silently skips if the file does not exist.
