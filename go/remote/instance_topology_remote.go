@@ -204,7 +204,8 @@ func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsCh
 		if err != nil {
 			return instance, err
 		}
-		if changeToKey != nil && changeToCoordinates != nil {
+		if changeToKey != nil && changeToCoordinates != nil && !instance.Key.Equals(changeToKey) {
+			// We exempt the very instance from pointing onto itself
 			instance, err = inst.ChangeMasterTo(&instance.Key, changeToKey, changeToCoordinates, false, inst.GTIDHintNeutral)
 			if err != nil {
 				return instance, err

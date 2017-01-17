@@ -165,7 +165,7 @@ func TestIsGenerallyValidAsCandidateReplica(t *testing.T) {
 func TestIsBannedFromBeingCandidateReplica(t *testing.T) {
 	instances, _ := generateTestInstances()
 	for _, instance := range instances {
-		test.S(t).ExpectFalse(isBannedFromBeingCandidateReplica(instance))
+		test.S(t).ExpectFalse(IsBannedFromBeingCandidateReplica(instance))
 	}
 }
 

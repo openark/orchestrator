@@ -344,6 +344,13 @@ func recoverDeadMasterViaRelaylogSync(topologyRecovery *TopologyRecovery) (promo
 		var replacementErr error
 		once.Do(func() {
 			replacement, replacementErr = GetBestMasterReplacementFromAmongItsReplicas(failedMaster, replicas)
+			if replacementErr != nil {
+				return
+			}
+			replacement, replacementErr = inst.ReadTopologyInstance(&replacement.Key) // To get up-to-date SelfBinlogCoordinates
+			if replacementErr != nil {
+				return
+			}
 			log.Debugf("recoverDeadMasterViaRelaylogSync: master replacement is %+v", replacement.Key)
 		})
 		if replacementErr != nil {
@@ -354,6 +361,11 @@ func recoverDeadMasterViaRelaylogSync(topologyRecovery *TopologyRecovery) (promo
 
 	syncFromReplica, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(failedMasterKey, syncRelaylogsChangeMasterToFunc, true, &topologyRecovery.PostponedFunctionsContainer)
 	log.Debugf("recoverDeadMasterViaRelaylogSync: syncFromReplica: %+v, synced: %d, failed: %d, postponed: %d", syncFromReplica.Key, len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
+	if replacement != nil {
+		log.Debugf("recoverDeadMasterViaRelaylogSync: replacement: %+v", replacement.Key)
+	} else {
+		log.Debugf("recoverDeadMasterViaRelaylogSync: no replacement found")
+	}
 
 	return promotedReplica, syncedReplicas, failedReplicas, postponedReplicas, err
 }
@@ -641,6 +653,9 @@ func isGenerallyValidAsWouldBeMaster(replica *inst.Instance) bool {
 		return false
 	}
 	if !replica.LogBinEnabled {
+		return false
+	}
+	if inst.IsBannedFromBeingCandidateReplica(replica) {
 		return false
 	}
 
