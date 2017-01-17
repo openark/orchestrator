@@ -222,7 +222,11 @@ func ContinuousDiscovery() {
 						log.Errore(err)
 					}
 
-					log.Debugf("outdated keys: %+v", instanceKeys)
+					if len(instanceKeys) > config.Config.MaxOutdatedKeysToShow {
+						log.Debugf("polling %d outdated keys", len(instanceKeys))
+					} else {
+						log.Debugf("outdated keys: %+v", instanceKeys)
+					}
 					for _, instanceKey := range instanceKeys {
 						instanceKey := instanceKey
 
@@ -235,9 +239,8 @@ func ContinuousDiscovery() {
 						go process.RegisterNode("", "", false)
 					}
 				} else {
-					hostname, _, _, err := process.ElectedNode()
-					if err == nil {
-						log.Debugf("Not elected as active node; active node: %v; polling", hostname)
+					if electedNode, _, err := process.ElectedNode(); err == nil {
+						log.Debugf("Not elected as active node; active node: %v; polling", electedNode.Hostname)
 					} else {
 						log.Debugf("Not elected as active node; active node: Unable to determine: %v; polling", err)
 					}
