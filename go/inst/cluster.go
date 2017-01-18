@@ -42,6 +42,12 @@ func (this *ClusterInfo) ReadRecoveryInfo() {
 // filtersMatchCluster will see whether the given filters match the given cluster details
 func (this *ClusterInfo) filtersMatchCluster(filters []string) bool {
 	for _, filter := range filters {
+		if filter == this.ClusterName {
+			return true
+		}
+		if filter == this.ClusterAlias {
+			return true
+		}
 		if strings.HasPrefix(filter, "alias=") {
 			// Match by exact cluster alias name
 			alias := strings.SplitN(filter, "=", 2)[1]
