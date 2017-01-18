@@ -61,6 +61,9 @@ The following bulk retrieval rules are intended for allowing the information ins
 * `/api/bulk-instance`: provide a json list of instances in the form of Hostname Port
 * `/api/bulk-promotion-rules`: provide a json list of instance promotion rules in the form of Hostname Port PromotionRule
 
+The following monitoring URLs provide more timing information for discovery processes
+* `/api/discovery-queue-metrics-raw/:seconds`: return a list of active and queued number discovery keys over the requested number of seconds
+* `/api/discovery-queue-metrics-aggregated/:seconds`: return aggregated data based on the raw data mentioned above
 
 #### Instance JSON breakdown
 

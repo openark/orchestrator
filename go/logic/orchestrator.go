@@ -56,7 +56,7 @@ func init() {
 	metrics.Register("discoveries.recent_count", discoveryRecentCountGauge)
 	metrics.Register("elect.is_elected", isElectedGauge)
 
-	ometrics.OnGraphiteTick(func() { discoveryQueueLengthGauge.Update(int64(discoveryQueue.Len())) })
+	ometrics.OnGraphiteTick(func() { discoveryQueueLengthGauge.Update(int64(discoveryQueue.QueueLen())) })
 	ometrics.OnGraphiteTick(func() {
 		if recentDiscoveryOperationKeys == nil {
 			return
@@ -86,7 +86,7 @@ func acceptSignals() {
 // handleDiscoveryRequests iterates the discoveryQueue channel and calls upon
 // instance discovery per entry.
 func handleDiscoveryRequests() {
-	discoveryQueue = discovery.NewQueue()
+	discoveryQueue = discovery.CreateOrReturnQueue("DEFAULT")
 
 	// create a pool of discovery workers
 	for i := uint(0); i < config.Config.DiscoveryMaxConcurrency; i++ {
@@ -97,7 +97,7 @@ func handleDiscoveryRequests() {
 				// been demoted, while still the queue is full.
 				if atomic.LoadInt64(&isElectedNode) != 1 {
 					log.Debugf("Node apparently demoted. Skipping discovery of %+v. "+
-						"Remaining queue size: %+v", instanceKey, discoveryQueue.Len())
+						"Remaining queue size: %+v", instanceKey, discoveryQueue.QueueLen())
 
 					discoveryQueue.Release(instanceKey)
 
