@@ -239,9 +239,8 @@ func ContinuousDiscovery() {
 						go process.RegisterNode("", "", false)
 					}
 				} else {
-					hostname, _, _, err := process.ElectedNode()
-					if err == nil {
-						log.Debugf("Not elected as active node; active node: %v; polling", hostname)
+					if electedNode, _, err := process.ElectedNode(); err == nil {
+						log.Debugf("Not elected as active node; active node: %v; polling", electedNode.Hostname)
 					} else {
 						log.Debugf("Not elected as active node; active node: Unable to determine: %v; polling", err)
 					}

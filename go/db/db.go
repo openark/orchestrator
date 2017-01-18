@@ -875,6 +875,14 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN version_comment varchar(128) NOT NULL DEFAULT ''
 	`,
+	`
+		ALTER TABLE active_node
+			ADD COLUMN first_seen_active timestamp NOT NULL DEFAULT '1971-01-01 00:00:00'
+	`,
+	`
+		ALTER TABLE node_health
+			ADD COLUMN first_seen_active timestamp NOT NULL DEFAULT '1971-01-01 00:00:00'
+	`,
 }
 
 // Track if a TLS has already been configured for topology

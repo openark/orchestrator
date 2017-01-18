@@ -1179,6 +1179,7 @@ func ForceMasterTakeover(clusterName string, destination *inst.Instance) (topolo
 // It expects that replica to have no siblings.
 // This function is graceful in that it will first lock down the master, then wait
 // for the designated replica to catch up with last position.
+// It will point old master at the newly promoted master at the correct coordinates, but will not start replication.
 func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecovery, promotedMasterCoordinates *inst.BinlogCoordinates, err error) {
 	clusterMasters, err := inst.ReadClusterWriteableMaster(clusterName)
 	if err != nil {
@@ -1239,5 +1240,8 @@ func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecov
 	if topologyRecovery.SuccessorKey == nil {
 		return nil, nil, fmt.Errorf("Recovery attempted yet no replica promoted")
 	}
-	return topologyRecovery, promotedMasterCoordinates, nil
+
+	clusterMaster, err = inst.ChangeMasterTo(&clusterMaster.Key, &designatedInstance.Key, promotedMasterCoordinates, false, inst.GTIDHintNeutral)
+
+	return topologyRecovery, promotedMasterCoordinates, err
 }

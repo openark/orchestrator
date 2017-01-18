@@ -18,6 +18,11 @@ $(document).ready(function() {
   function displayProblemInstances(instances) {
     hideLoader();
 
+    if (isAnonymized()) {
+      $("#instance_problems").remove();
+      return;
+    }
+
     function SortByProblemOrder(instance0, instance1) {
       var orderDiff = instance0.problemOrder - instance1.problemOrder;
       if (orderDiff != 0) return orderDiff;
@@ -40,7 +45,6 @@ $(document).ready(function() {
         var instanceEl = Instance.createElement(instance).addClass("instance-problem").appendTo(li);
         $("#instance_problems ul").append(li);
 
-        //var popoverElement = $("#instance_problems [data-nodeid='" + instance.id + "'].popover");
         renderInstanceElement(instanceEl, instance, "problems"); //popoverElement
         instanceEl.click(function() {
           openNodeModal(instance);
