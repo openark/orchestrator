@@ -103,7 +103,7 @@ func applySyncRelaylogsChangeMasterIdentityFunc(syncRelaylogsChangeMasterIdentit
 }
 
 // SyncReplicaRelayLogs will align siblings by applying relaylogs from one to the other, via remote SSH
-func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsChangeMasterIdentityFunc SyncRelaylogsChangeMasterIdentityFunc, startReplication bool) (*inst.Instance, error) {
+func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, capturedRelayLogCoordinates *inst.BinlogCoordinates, syncRelaylogsChangeMasterIdentityFunc SyncRelaylogsChangeMasterIdentityFunc, startReplication bool) (*inst.Instance, error) {
 	if config.Config.RemoteSSHCommand == "" {
 		return instance, fmt.Errorf("RemoteSSHCommand not configured")
 	}
@@ -119,7 +119,7 @@ func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsCh
 	if needToSync && instance.ReplicaRunning() {
 		return instance, log.Errorf("SyncReplicaRelayLogs: replication on %+v must not run", instance.Key)
 	}
-	if needToSync && fromInstance.ReplicaRunning() {
+	if needToSync && fromInstance.ReplicaRunning() && (capturedRelayLogCoordinates == nil) {
 		return instance, log.Errorf("SyncReplicaRelayLogs: replication on %+v must not run", fromInstance.Key)
 	}
 	if needToSync && fromInstance.ExecBinlogCoordinates.SmallerThan(&instance.ExecBinlogCoordinates) {
@@ -132,7 +132,7 @@ func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsCh
 
 	if needToSync {
 		log.Debugf("SyncReplicaRelayLogs: correlating coordinates of %+v on %+v", instance.Key, fromInstance.Key)
-		_, _, nextCoordinates, found, err := inst.CorrelateRelaylogCoordinates(instance, nil, fromInstance)
+		_, _, nextCoordinates, found, err := inst.CorrelateRelaylogCoordinates(instance, capturedRelayLogCoordinates, fromInstance)
 		if err != nil {
 			return instance, err
 		}
@@ -277,10 +277,11 @@ func SyncReplicasRelayLogs(
 	synchedReplicasChan := make(chan *inst.Instance, len(applyToReplicas))
 	failedReplicasChan := make(chan *inst.Instance, len(applyToReplicas))
 
+	capturedRelayLogCoordinates := &synchedFromReplica.RelaylogCoordinates
 	applyToReplicaFunc := func(applyToReplica *inst.Instance) error {
 		defer func() { barrier <- &applyToReplica.Key }()
 
-		if _, err := SyncReplicaRelayLogs(applyToReplica, synchedFromReplica, syncRelaylogsChangeMasterIdentityFunc, startReplication); err == nil {
+		if _, err := SyncReplicaRelayLogs(applyToReplica, synchedFromReplica, capturedRelayLogCoordinates, syncRelaylogsChangeMasterIdentityFunc, startReplication); err == nil {
 			synchedReplicasChan <- applyToReplica
 		} else {
 			err = fmt.Errorf("%+v: %+v", applyToReplica.Key, err.Error())
