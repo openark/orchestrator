@@ -646,7 +646,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatalf("Instance not found: %+v", *destinationKey)
 			}
 
-			_, err = remote.SyncReplicaRelayLogs(instance, otherInstance, nil, remote.SyncRelaylogsChangeMasterToSharedMasterFunc, false)
+			_, err = remote.SyncReplicaRelayLogs(instance, otherInstance, remote.SyncRelaylogsChangeMasterToSharedMasterFunc, false)
 			if err != nil {
 				log.Fatale(err)
 			}
