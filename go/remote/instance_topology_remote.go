@@ -238,8 +238,9 @@ func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsCh
 }
 
 func SyncReplicasRelayLogs(
-	masterKey *inst.InstanceKey,
+	master *inst.Instance,
 	syncRelaylogsChangeMasterIdentityFunc SyncRelaylogsChangeMasterIdentityFunc,
+	avoidPostponingInstance *inst.Instance,
 	startReplication bool,
 	postponedFunctionsContainer *inst.PostponedFunctionsContainer,
 ) (
@@ -248,7 +249,7 @@ func SyncReplicasRelayLogs(
 	err error,
 ) {
 	var replicas [](*inst.Instance)
-	if replicas, err = inst.GetSortedReplicas(masterKey, inst.StopReplicationNormal); err != nil {
+	if replicas, err = inst.GetSortedReplicas(&master.Key, inst.StopReplicationNormal); err != nil {
 		return synchedFromReplica, syncedReplicas, replicas, postponedReplicas, err
 	}
 
@@ -291,9 +292,22 @@ func SyncReplicasRelayLogs(
 	for _, applyToReplica := range applyToReplicas {
 		applyToReplica := applyToReplica
 
-		if postponedFunctionsContainer != nil &&
-			config.Config.PostponeReplicaRecoveryOnLagMinutes > 0 &&
-			applyToReplica.SQLDelay > config.Config.PostponeReplicaRecoveryOnLagMinutes*60 {
+		toBePostponed := false
+		if postponedFunctionsContainer != nil {
+			if config.Config.PostponeReplicaRecoveryOnLagMinutes > 0 &&
+				applyToReplica.SQLDelay > config.Config.PostponeReplicaRecoveryOnLagMinutes*60 {
+				toBePostponed = true
+			}
+			if applyToReplica.DataCenter != master.DataCenter {
+				toBePostponed = true
+			}
+		}
+		if avoidPostponingInstance != nil {
+			if avoidPostponingInstance.Key.Equals(&applyToReplica.Key) {
+				toBePostponed = false
+			}
+		}
+		if toBePostponed {
 			postponedReplicas = append(postponedReplicas, applyToReplica)
 			(*postponedFunctionsContainer).AddPostponedFunction(func() error { return applyToReplicaFunc(applyToReplica) })
 		} else {
@@ -323,6 +337,6 @@ func SyncReplicasRelayLogs(
 		log.Errore(err)
 	}
 
-	inst.AuditOperation("sync-replicas-relaylogs", masterKey, fmt.Sprintf("aligned %+v replicas by relaylogs from %+v, got %+v errors", len(applyToReplicas), synchedFromReplica.Key, countErrors))
+	inst.AuditOperation("sync-replicas-relaylogs", &master.Key, fmt.Sprintf("aligned %+v replicas by relaylogs from %+v, got %+v errors", len(applyToReplicas), synchedFromReplica.Key, countErrors))
 	return synchedFromReplica, syncedReplicas, failedReplicas, postponedReplicas, err
 }
