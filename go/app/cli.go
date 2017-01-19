@@ -658,9 +658,9 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			validateInstanceIsFound(instanceKey)
+			instance := validateInstanceIsFound(instanceKey)
 
-			_, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instanceKey, remote.SyncRelaylogsChangeMasterToSourceReplicaFunc, true, postponedFunctionsContainer)
+			_, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instance, remote.SyncRelaylogsChangeMasterToSourceReplicaFunc, nil, true, postponedFunctionsContainer)
 			postponedFunctionsContainer.InvokePostponed()
 
 			log.Infof("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
@@ -677,9 +677,9 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			validateInstanceIsFound(instanceKey)
+			instance := validateInstanceIsFound(instanceKey)
 
-			_, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instanceKey, remote.SyncRelaylogsChangeMasterToSharedMasterFunc, false, postponedFunctionsContainer)
+			_, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instance, remote.SyncRelaylogsChangeMasterToSharedMasterFunc, nil, false, postponedFunctionsContainer)
 			postponedFunctionsContainer.InvokePostponed()
 
 			log.Infof("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
