@@ -111,18 +111,21 @@ func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsCh
 	if err := TestRemoteCommandOnInstance(&instance.Key); err != nil {
 		return instance, err
 	}
-
-	if instance.ReplicaRunning() {
+	needToSync := true
+	if instance.Key.Equals(&fromInstance.Key) {
+		log.Debugf("SyncReplicaRelayLogs: will not pply from %+v onto itself.", instance.Key)
+		needToSync = false
+	}
+	if needToSync && instance.ReplicaRunning() {
 		return instance, log.Errorf("SyncReplicaRelayLogs: replication on %+v must not run", instance.Key)
 	}
-	if fromInstance.ReplicaRunning() {
+	if needToSync && fromInstance.ReplicaRunning() {
 		return instance, log.Errorf("SyncReplicaRelayLogs: replication on %+v must not run", fromInstance.Key)
 	}
-	if fromInstance.ExecBinlogCoordinates.SmallerThan(&instance.ExecBinlogCoordinates) {
+	if needToSync && fromInstance.ExecBinlogCoordinates.SmallerThan(&instance.ExecBinlogCoordinates) {
 		return instance, log.Errorf("SyncReplicaRelayLogs: %+v is more up to date than %+v. Will not apply relaylogs from %+v", instance.Key, fromInstance.Key, fromInstance.Key)
 	}
-	needToSync := true
-	if fromInstance.ExecBinlogCoordinates.Equals(&instance.ExecBinlogCoordinates) {
+	if needToSync && fromInstance.ExecBinlogCoordinates.Equals(&instance.ExecBinlogCoordinates) {
 		log.Debugf("SyncReplicaRelayLogs: %+v and %+v are at same coordinates. Not actually applying relay logs.", instance.Key, fromInstance.Key)
 		needToSync = false
 	}
