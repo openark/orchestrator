@@ -264,7 +264,7 @@ func SyncReplicasRelayLogs(
 		return synchedFromReplica, syncedReplicas, replicas, postponedReplicas, err
 	}
 
-	log.Debugf("Testing SSH on %+v", synchedFromReplica.Key)
+	log.Debugf("SyncReplicasRelayLogs: Testing SSH on %+v", synchedFromReplica.Key)
 	if err := TestRemoteCommandOnInstance(&synchedFromReplica.Key); err != nil {
 		return synchedFromReplica, syncedReplicas, replicas, postponedReplicas, err
 	}
@@ -287,7 +287,7 @@ func SyncReplicasRelayLogs(
 		return err
 	}
 
-	log.Debugf("Applying relay logs on %+v replicas", len(applyToReplicas))
+	log.Debugf("SyncReplicasRelayLogs: Applying relay logs on %+v replicas", len(applyToReplicas))
 	countImmediateApply := 0
 	for _, applyToReplica := range applyToReplicas {
 		applyToReplica := applyToReplica
@@ -308,9 +308,11 @@ func SyncReplicasRelayLogs(
 			}
 		}
 		if toBePostponed {
+			log.Debugf("SyncReplicasRelayLogs: postponing relaylog sync on %+v", applyToReplica.Key)
 			postponedReplicas = append(postponedReplicas, applyToReplica)
 			(*postponedFunctionsContainer).AddPostponedFunction(func() error { return applyToReplicaFunc(applyToReplica) })
 		} else {
+			log.Debugf("SyncReplicasRelayLogs: applying relaylog sync on %+v", applyToReplica.Key)
 			countImmediateApply++
 			go applyToReplicaFunc(applyToReplica)
 		}
