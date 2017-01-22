@@ -40,12 +40,24 @@ var SyncRelaylogsChangeMasterToSharedMasterFunc SyncRelaylogsChangeMasterIdentit
 	return &sourceReplica.MasterKey, &sourceReplica.ExecBinlogCoordinates, nil
 }
 
-// SyncRelaylogsChangeMasterToSharedMasterFunc points applied-to replica to the applied-from replica
+// SyncRelaylogsChangeMasterToSourceReplicaFunc points applied-to replica to the applied-from replica
 var SyncRelaylogsChangeMasterToSourceReplicaFunc SyncRelaylogsChangeMasterIdentityFunc = func(sourceReplica *inst.Instance, replicas ...*inst.Instance) (masterKey *inst.InstanceKey, coordinates *inst.BinlogCoordinates, err error) {
 	if !sourceReplica.LogBinEnabled {
 		return nil, nil, fmt.Errorf("Cannot change master onto source replica %+v since it has no binary logs", sourceReplica.Key)
 	}
 	return &sourceReplica.Key, &sourceReplica.SelfBinlogCoordinates, nil
+}
+
+// SyncRelaylogsChangeMasterToTargetReplicaFunc points replica to the first target replica in given list
+var SyncRelaylogsChangeMasterToTargetReplicaFunc SyncRelaylogsChangeMasterIdentityFunc = func(sourceReplica *inst.Instance, replicas ...*inst.Instance) (masterKey *inst.InstanceKey, coordinates *inst.BinlogCoordinates, err error) {
+	if len(replicas) == 0 {
+		return nil, nil, fmt.Errorf("No replicas given to SyncRelaylogsChangeMasterToTargetReplicaFunc")
+	}
+	replica := replicas[0]
+	if !replica.LogBinEnabled {
+		return nil, nil, fmt.Errorf("Cannot change master onto replica %+v since it has no binary logs", replica.Key)
+	}
+	return &replica.Key, &replica.SelfBinlogCoordinates, nil
 }
 
 func TestRemoteCommandOnInstance(instanceKey *inst.InstanceKey) error {
@@ -341,4 +353,48 @@ func SyncReplicasRelayLogs(
 
 	inst.AuditOperation("sync-replicas-relaylogs", &master.Key, fmt.Sprintf("aligned %+v replicas by relaylogs from %+v, got %+v errors", len(applyToReplicas), synchedFromReplica.Key, countErrors))
 	return synchedFromReplica, syncedReplicas, failedReplicas, postponedReplicas, err
+}
+
+func SyncRelayLogsToSingleReplica(
+	master *inst.Instance,
+	syncRelaylogsChangeMasterIdentityFunc SyncRelaylogsChangeMasterIdentityFunc,
+	startReplication bool,
+) (synchedFromReplica, synchedToReplica *inst.Instance, err error) {
+	var replicas [](*inst.Instance)
+	if replicas, err = inst.GetSortedReplicas(&master.Key, inst.StopReplicationNormal); err != nil {
+		return synchedFromReplica, synchedToReplica, err
+	}
+
+	synchedFromReplica = replicas[0]
+	if len(replicas) <= 1 {
+		// Nothing to be done
+		return synchedFromReplica, synchedToReplica, err
+	}
+	applyToReplicas := replicas[1:]
+
+	log.Debugf("SyncReplicasRelayLogs: Testing SSH on %+v", synchedFromReplica.Key)
+	if err := TestRemoteCommandOnInstance(&synchedFromReplica.Key); err != nil {
+		return synchedFromReplica, synchedToReplica, err
+	}
+
+	log.Debugf("SyncReplicasRelayLogs: searching for replica to apply relay logs to", len(applyToReplicas))
+	for _, applyToReplica := range applyToReplicas {
+		applyToReplica := applyToReplica
+
+		if applyToReplica, err := SyncReplicaRelayLogs(applyToReplica, synchedFromReplica, syncRelaylogsChangeMasterIdentityFunc, startReplication); err == nil {
+			log.Debugf("SyncReplicasRelayLogs: picked %+v", applyToReplica.Key)
+			synchedToReplica = applyToReplica
+			break
+		}
+	}
+	if synchedFromReplica, err = applySyncRelaylogsChangeMasterIdentityFunc(syncRelaylogsChangeMasterIdentityFunc, synchedFromReplica, synchedFromReplica); err != nil {
+		return synchedFromReplica, synchedToReplica, err
+	}
+	if startReplication {
+		synchedFromReplica, err = inst.StartSlave(&synchedFromReplica.Key)
+		log.Errore(err)
+	}
+
+	inst.AuditOperation("sync-replicas-relaylogs-to-single", &master.Key, fmt.Sprintf("applied relaylogs from %+v to %+v", synchedFromReplica.Key, synchedToReplica.Key))
+	return synchedFromReplica, synchedToReplica, nil
 }

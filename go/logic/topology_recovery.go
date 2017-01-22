@@ -344,7 +344,7 @@ func recoverDeadMasterViaRelaylogSync(topologyRecovery *TopologyRecovery) (promo
 		var replacementErr error
 		once.Do(func() {
 			log.Debugf("recoverDeadMasterViaRelaylogSync: getting best replacement for %+v from among its %+v replicas", failedMaster.Key, len(replicas))
-			replacement, replacementErr = GetBestMasterReplacementFromAmongItsReplicas(failedMaster, replicas)
+			replacement, replacementErr = GetBestMasterReplacementFromAmongItsReplicas(failedMaster, replicas, false)
 			log.Debugf("recoverDeadMasterViaRelaylogSync: + got nil? %+v ; error: %+v", (replacement == nil), replacementErr)
 			if replacementErr != nil {
 				return
@@ -373,6 +373,28 @@ func recoverDeadMasterViaRelaylogSync(topologyRecovery *TopologyRecovery) (promo
 	}
 	promotedReplica = replacement
 	return promotedReplica, syncedReplicas, failedReplicas, postponedReplicas, err
+}
+
+func recoverDeadMasterViaRelaylogSyncCombined(topologyRecovery *TopologyRecovery) (promotedReplica *inst.Instance, syncedReplicas, failedReplicas, postponedReplicas [](*inst.Instance), err error) {
+	log.Debugf("recoverDeadMasterViaRelaylogSync")
+	failedMasterKey := &topologyRecovery.AnalysisEntry.AnalyzedInstanceKey
+
+	failedMaster, _, err := inst.ReadInstance(failedMasterKey)
+	if err != nil {
+		return promotedReplica, syncedReplicas, failedReplicas, postponedReplicas, err
+	}
+
+	log.Debugf("recoverDeadMasterViaRelaylogSync: checking who to promote to and copy relay logs to")
+	if _, promotedReplica, err = remote.SyncRelayLogsToSingleReplica(failedMaster, remote.SyncRelaylogsChangeMasterToTargetReplicaFunc, true); err != nil {
+		return promotedReplica, syncedReplicas, failedReplicas, postponedReplicas, err
+	}
+	if promotedReplica == nil {
+		return promotedReplica, syncedReplicas, failedReplicas, postponedReplicas, fmt.Errorf("recoverDeadMasterViaRelaylogSyncCombined: promotedReplica is nil")
+	}
+	log.Debugf("recoverDeadMasterViaRelaylogSync: relocating all replicas of %+v under %+v", failedMaster.Key, promotedReplica.Key)
+	relocatedReplicas, _, err, _ := inst.RelocateReplicas(&failedMaster.Key, &promotedReplica.Key, "")
+
+	return promotedReplica, relocatedReplicas, failedReplicas, postponedReplicas, err
 }
 
 // RecoverDeadMaster recovers a dead master, complete logic inside
@@ -415,7 +437,8 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 		}
 	case MasterRecoveryRemoteSSH:
 		{
-			promotedReplica, _, lostReplicas, _, err = recoverDeadMasterViaRelaylogSync(topologyRecovery)
+			//		promotedReplica, _, lostReplicas, _, err = recoverDeadMasterViaRelaylogSync(topologyRecovery)
+			promotedReplica, _, lostReplicas, _, err = recoverDeadMasterViaRelaylogSyncCombined(topologyRecovery)
 		}
 	}
 	topologyRecovery.AddError(err)
@@ -652,12 +675,18 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 	return true
 }
 
-func isGenerallyValidAsWouldBeMaster(replica *inst.Instance) bool {
+func isGenerallyValidAsWouldBeMaster(replica *inst.Instance, requireLogSlaveUpdates bool) bool {
 	if !replica.IsLastCheckValid {
 		// something wrong with this replica right now. We shouldn't hope to be able to promote it
 		return false
 	}
 	if !replica.LogBinEnabled {
+		return false
+	}
+	if requireLogSlaveUpdates && !replica.LogSlaveUpdatesEnabled {
+		return false
+	}
+	if replica.IsBinlogServer() {
 		return false
 	}
 	if inst.IsBannedFromBeingCandidateReplica(replica) {
@@ -667,7 +696,7 @@ func isGenerallyValidAsWouldBeMaster(replica *inst.Instance) bool {
 	return true
 }
 
-func GetBestMasterReplacementFromAmongItsReplicas(master *inst.Instance, replicas [](*inst.Instance)) (replacement *inst.Instance, err error) {
+func GetBestMasterReplacementFromAmongItsReplicas(master *inst.Instance, replicas [](*inst.Instance), requireLogSlaveUpdates bool) (replacement *inst.Instance, err error) {
 	// Sanity:
 	for _, replica := range replicas {
 		if !replica.MasterKey.Equals(&master.Key) {
@@ -676,7 +705,7 @@ func GetBestMasterReplacementFromAmongItsReplicas(master *inst.Instance, replica
 	}
 	validReplicas := [](*inst.Instance){}
 	for _, replica := range replicas {
-		if isGenerallyValidAsWouldBeMaster(replica) {
+		if isGenerallyValidAsWouldBeMaster(replica, requireLogSlaveUpdates) {
 			validReplicas = append(validReplicas, replica)
 		}
 	}

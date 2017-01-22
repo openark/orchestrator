@@ -1460,7 +1460,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 
-			replacement, err := logic.GetBestMasterReplacementFromAmongItsReplicas(clusterMaster, replicas)
+			replacement, err := logic.GetBestMasterReplacementFromAmongItsReplicas(clusterMaster, replicas, false)
 			if err != nil {
 				log.Fatale(err)
 			}
