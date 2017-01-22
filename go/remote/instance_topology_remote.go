@@ -377,7 +377,7 @@ func SyncRelayLogsToSingleReplica(
 		return synchedFromReplica, synchedToReplica, err
 	}
 
-	log.Debugf("SyncReplicasRelayLogs: searching for replica to apply relay logs to", len(applyToReplicas))
+	log.Debugf("SyncReplicasRelayLogs: searching for replica to apply relay logs to")
 	for _, applyToReplica := range applyToReplicas {
 		applyToReplica := applyToReplica
 

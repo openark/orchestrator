@@ -364,7 +364,7 @@ func recoverDeadMasterViaRelaylogSync(topologyRecovery *TopologyRecovery) (promo
 		return &replacement.Key, &replacement.SelfBinlogCoordinates, nil
 	}
 
-	syncFromReplica, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(failedMaster, syncRelaylogsChangeMasterToFunc, replacement, true, &topologyRecovery.PostponedFunctionsContainer)
+	syncFromReplica, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(failedMaster, syncRelaylogsChangeMasterToFunc, replacement, true, nil)
 	log.Debugf("recoverDeadMasterViaRelaylogSync: syncFromReplica: %+v, synced: %d, failed: %d, postponed: %d", syncFromReplica.Key, len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
 	if replacement != nil {
 		log.Debugf("recoverDeadMasterViaRelaylogSync: replacement: %+v", replacement.Key)
@@ -437,8 +437,8 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 		}
 	case MasterRecoveryRemoteSSH:
 		{
-			//		promotedReplica, _, lostReplicas, _, err = recoverDeadMasterViaRelaylogSync(topologyRecovery)
-			promotedReplica, _, lostReplicas, _, err = recoverDeadMasterViaRelaylogSyncCombined(topologyRecovery)
+			promotedReplica, _, lostReplicas, _, err = recoverDeadMasterViaRelaylogSync(topologyRecovery)
+			//promotedReplica, _, lostReplicas, _, err = recoverDeadMasterViaRelaylogSyncCombined(topologyRecovery)
 		}
 	}
 	topologyRecovery.AddError(err)
