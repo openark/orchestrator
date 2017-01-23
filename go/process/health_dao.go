@@ -18,7 +18,6 @@ package process
 
 import (
 	"database/sql"
-	"fmt"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
@@ -29,14 +28,22 @@ import (
 
 const registrationPollSeconds = 10
 
+type NodeHealth struct {
+	Hostname        string
+	Token           string
+	AppVersion      string
+	FirstSeenActive string
+	LastSeenActive  string
+}
+
 type HealthStatus struct {
 	Healthy        bool
 	Hostname       string
 	Token          string
 	IsActiveNode   bool
-	ActiveNode     string
+	ActiveNode     NodeHealth
 	Error          error
-	AvailableNodes []string
+	AvailableNodes [](*NodeHealth)
 }
 
 type OrchestratorExecutionMode string
@@ -63,9 +70,9 @@ func RegisterNode(extraInfo string, command string, firstTime bool) (sql.Result,
 	}
 	return db.ExecOrchestrator(`
 			insert into node_health
-				(hostname, token, last_seen_active, extra_info, command, app_version)
+				(hostname, token, first_seen_active, last_seen_active, extra_info, command, app_version)
 			values
-				(?, ?, NOW(), ?, ?, ?)
+				(?, ?, now(), now(), ?, ?, ?)
 			on duplicate key update
 				token=values(token),
 				last_seen_active=values(last_seen_active),
@@ -92,13 +99,11 @@ func HealthTest() (*HealthStatus, error) {
 		return &health, log.Errore(err)
 	}
 	health.Healthy = (rows > 0)
-	activeHostname, activeToken, isActive, err := ElectedNode()
+	health.ActiveNode, health.IsActiveNode, err = ElectedNode()
 	if err != nil {
 		health.Error = err
 		return &health, log.Errore(err)
 	}
-	health.ActiveNode = fmt.Sprintf("%s;%s", activeHostname, activeToken)
-	health.IsActiveNode = isActive
 
 	health.AvailableNodes, err = ReadAvailableNodes(true)
 
@@ -158,15 +163,14 @@ func ExpireNodesHistory() error {
 	return log.Errore(err)
 }
 
-func ReadAvailableNodes(onlyHttpNodes bool) ([]string, error) {
-	res := []string{}
+func ReadAvailableNodes(onlyHttpNodes bool) (nodes [](*NodeHealth), err error) {
 	extraInfo := ""
 	if onlyHttpNodes {
 		extraInfo = string(OrchestratorExecutionHttpMode)
 	}
 	query := `
 		select
-			concat(hostname, ';', token, ';', app_version) as node
+			hostname, token, app_version, first_seen_active, last_seen_active
 		from
 			node_health
 		where
@@ -176,14 +180,18 @@ func ReadAvailableNodes(onlyHttpNodes bool) ([]string, error) {
 			hostname
 		`
 
-	err := db.QueryOrchestrator(query, sqlutils.Args(registrationPollSeconds*2, extraInfo), func(m sqlutils.RowMap) error {
-		res = append(res, m.GetString("node"))
+	err = db.QueryOrchestrator(query, sqlutils.Args(registrationPollSeconds*2, extraInfo), func(m sqlutils.RowMap) error {
+		nodeHealth := &NodeHealth{
+			Hostname:        m.GetString("hostname"),
+			Token:           m.GetString("token"),
+			AppVersion:      m.GetString("app_version"),
+			FirstSeenActive: m.GetString("first_seen_active"),
+			LastSeenActive:  m.GetString("last_seen_active"),
+		}
+		nodes = append(nodes, nodeHealth)
 		return nil
 	})
-	if err != nil {
-		log.Errore(err)
-	}
-	return res, err
+	return nodes, log.Errore(err)
 }
 
 func TokenBelongsToHealthyHttpService(token string) (result bool, err error) {
