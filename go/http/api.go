@@ -2506,8 +2506,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "deregister-hostname-unresolve/:host/:port", this.DeregisterHostnameUnresolve)
 	this.registerRequest(m, "register-hostname-unresolve/:host/:port/:virtualname", this.RegisterHostnameUnresolve)
 	// Bulk access to information
-	this.registerRequest(m, "/api/bulk-instances", this.BulkInstances)
-	this.registerRequest(m, "/api/bulk-promotion-rules", this.BulkPromotionRules)
+	this.registerRequest(m, "bulk-instances", this.BulkInstances)
+	this.registerRequest(m, "bulk-promotion-rules", this.BulkPromotionRules)
 
 	// Monitoring
 	this.registerRequest(m, "discovery-queue-metrics-raw/:seconds", this.DiscoveryQueueMetricsRaw)
