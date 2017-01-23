@@ -1,0 +1,13 @@
+
+Example outputs:
+================
+
+Below are some sample outputs from the discovery queue api:
+
+(1) https://orchestrator.mycompany.com/api/discovery-queue-metrics-raw/60 returns
+
+[{"Active":4,"Queued":0},{"Active":37,"Queued":0},{"Active":5,"Queued":0},{"Active":4,"Queued":0},{"Active":4,"Queued":0},{"Active":4,"Queued":0},{"Active":4,"Queued":0},{"Active":4,"Queued":0},{"Active":29,"Queued":0},{"Active":4,"Queued":0},{"Active":5,"Queued":0},{"Active":3,"Queued":0},{"Active":4,"Queued":0},{"Active":138,"Queued":0},{"Active":23,"Queued":0},{"Active":3,"Queued":0},{"Active":4,"Queued":0},{"Active":5,"Queued":0},{"Active":4,"Queued":0},{"Active":6,"Queued":0},{"Active":4,"Queued":0},{"Active":4,"Queued":0},{"Active":4,"Queued":0},{"Active":18,"Queued":0},{"Active":4,"Queued":0},{"Active":4,"Queued":0},{"Active":4,"Queued":0},{"Active":5,"Queued":0},{"Active":94,"Queued":0},{"Active":5,"Queued":0},{"Active":6,"Queued":0},{"Active":4,"Queued":0},{"Active":4,"Queued":0},{"Active":5,"Queued":0},{"Active":13,"Queued":0},{"Active":4,"Queued":0},{"Active":5,"Queued":0},{"Active":4,"Queued":0},{"Active":4,"Queued":0},{"Active":4,"Queued":0},{"Active":22,"Queued":0},{"Active":41,"Queued":0},{"Active":4,"Queued":0},{"Active":170,"Queued":0},{"Active":52,"Queued":0},{"Active":23,"Queued":0},{"Active":5,"Queued":0},{"Active":6,"Queued":0},{"Active":5,"Queued":0},{"Active":6,"Queued":0},{"Active":11,"Queued":0},{"Active":5,"Queued":0},{"Active":5,"Queued":0},{"Active":7,"Queued":0},{"Active":6,"Queued":0},{"Active":6,"Queued":0},{"Active":6,"Queued":0},{"Active":5,"Queued":0},{"Active":153,"Queued":0},{"Active":11,"Queued":0}]
+
+(2) https://orchestrator.mycompany.com/api/discovery-queue-metrics-aggregated/60 returns
+
+{"ActiveMinEntries":2,"ActiveMeanEntries":13.5,"ActiveMedianEntries":5,"ActiveP95Entries":66,"ActiveMaxEntries":167,"QueuedMinEntries":0,"QueuedMeanEntries":0,"QueuedMedianEntries":0,"QueuedP95Entries":0,"QueuedMaxEntries":0}
