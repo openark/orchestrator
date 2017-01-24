@@ -196,8 +196,8 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 
 	if !isMaxScale {
 		var mysqlHostname, mysqlReportHost string
-		err = db.QueryRow("select @@global.hostname, ifnull(@@global.report_host, ''), @@global.server_id, @@global.version, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
-			&mysqlHostname, &mysqlReportHost, &instance.ServerID, &instance.Version, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
+		err = db.QueryRow("select @@global.hostname, ifnull(@@global.report_host, ''), @@global.server_id, @@global.version, @@global.version_comment, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
+			&mysqlHostname, &mysqlReportHost, &instance.ServerID, &instance.Version, &instance.VersionComment, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
 		if err != nil {
 			goto Cleanup
 		}
@@ -506,7 +506,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 	// First read the current PromotionRule from candidate_database_instance.
 	{
 		err = ReadInstancePromotionRule(instance)
-		logReadTopologyInstanceError(instanceKey, "ReadInstanceClusterAttributes", err)
+		logReadTopologyInstanceError(instanceKey, "ReadInstancePromotionRule", err)
 	}
 	// Then check if the instance wants to set a different PromotionRule.
 	// We'll set it here on their behalf so there's no race between the first
@@ -527,7 +527,8 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 		}
 	}
 
-	if instance.ReplicationDepth == 0 && config.Config.DetectClusterAliasQuery != "" && !isMaxScale {
+	ReadClusterAliasOverride(instance)
+	if instance.SuggestedClusterAlias == "" && instance.ReplicationDepth == 0 && config.Config.DetectClusterAliasQuery != "" && !isMaxScale {
 		// Only need to do on masters
 		clusterAlias := ""
 		err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
@@ -572,6 +573,28 @@ Cleanup:
 	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
 	_ = UpdateInstanceLastChecked(&instance.Key)
 	return nil, fmt.Errorf("Failed ReadTopologyInstance")
+}
+
+// ReadClusterAliasOverride reads and applies SuggestedClusterAlias based on cluster_alias_override
+func ReadClusterAliasOverride(instance *Instance) (err error) {
+	aliasOverride := ""
+	query := `
+		select
+			alias
+		from
+			cluster_alias_override
+		where
+			cluster_name = ?
+			`
+	err = db.QueryOrchestrator(query, sqlutils.Args(instance.ClusterName), func(m sqlutils.RowMap) error {
+		aliasOverride = m.GetString("alias")
+
+		return nil
+	})
+	if aliasOverride != "" {
+		instance.SuggestedClusterAlias = aliasOverride
+	}
+	return err
 }
 
 // ReadInstanceClusterAttributes will return the cluster name for a given instance by looking at its master
@@ -708,6 +731,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.ServerID = m.GetUint("server_id")
 	instance.ServerUUID = m.GetString("server_uuid")
 	instance.Version = m.GetString("version")
+	instance.VersionComment = m.GetString("version_comment")
 	instance.ReadOnly = m.GetBool("read_only")
 	instance.Binlog_format = m.GetString("binlog_format")
 	instance.LogBinEnabled = m.GetBool("log_bin")
@@ -765,6 +789,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.InstanceAlias = m.GetString("instance_alias")
 
 	instance.SlaveHosts.ReadJson(slaveHostsJSON)
+	instance.applyFlavorName()
 	return instance
 }
 
@@ -980,11 +1005,12 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 			locate(?, hostname) > 0
 			or locate(?, cluster_name) > 0
 			or locate(?, version) > 0
+			or locate(?, version_comment) > 0
 			or locate(?, concat(hostname, ':', port)) > 0
 			or concat(server_id, '') = ?
 			or concat(port, '') = ?
 		`
-	args := sqlutils.Args(searchString, searchString, searchString, searchString, searchString, searchString)
+	args := sqlutils.Args(searchString, searchString, searchString, searchString, searchString, searchString, searchString)
 	return readInstancesByCondition(condition, args, `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
 }
 
@@ -1781,6 +1807,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"server_id",
 		"server_uuid",
 		"version",
+		"version_comment",
 		"binlog_server",
 		"read_only",
 		"binlog_format",
@@ -1847,6 +1874,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.ServerID)
 		args = append(args, instance.ServerUUID)
 		args = append(args, instance.Version)
+		args = append(args, instance.VersionComment)
 		args = append(args, instance.IsBinlogServer())
 		args = append(args, instance.ReadOnly)
 		args = append(args, instance.Binlog_format)
@@ -2192,13 +2220,13 @@ func RecordInstanceCoordinatesHistory() error {
 	}
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	insert into
-        		database_instance_coordinates_history (
+    	insert into
+    		database_instance_coordinates_history (
 					hostname, port,	last_seen, recorded_timestamp,
 					binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
 				)
-        	select
-        		hostname, port, last_seen, NOW(),
+    	select
+    		hostname, port, last_seen, NOW(),
 				binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
 			from
 				database_instance
@@ -2234,6 +2262,77 @@ func GetHeuristiclyRecentCoordinatesForInstance(instanceKey *InstanceKey) (selfC
 		return nil
 	})
 	return selfCoordinates, relayLogCoordinates, err
+}
+
+// GetLastKnownCoordinatesForInstance returns the very last known coordinates for an instance
+func GetLastKnownCoordinatesForInstance(instanceKey *InstanceKey) (selfCoordinates *BinlogCoordinates, relayLogCoordinates *BinlogCoordinates, err error) {
+	query := `
+		select
+			binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
+		from
+			database_instance_coordinates_history
+		where
+			hostname = ?
+			and port = ?
+		order by
+			recorded_timestamp desc
+			limit 1
+			`
+	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port), func(m sqlutils.RowMap) error {
+		selfCoordinates = &BinlogCoordinates{LogFile: m.GetString("binary_log_file"), LogPos: m.GetInt64("binary_log_pos")}
+		relayLogCoordinates = &BinlogCoordinates{LogFile: m.GetString("relay_log_file"), LogPos: m.GetInt64("relay_log_pos")}
+
+		return nil
+	})
+	return selfCoordinates, relayLogCoordinates, err
+}
+
+// GetPreviousKnownRelayLogCoordinatesForInstance returns known relay log coordinates, that are not the
+// exact current coordinates
+func GetPreviousKnownRelayLogCoordinatesForInstance(instance *Instance) (relayLogCoordinates *BinlogCoordinates, err error) {
+	query := `
+		select
+			relay_log_file, relay_log_pos
+		from
+			database_instance_coordinates_history
+		where
+			hostname = ?
+			and port = ?
+			and (relay_log_file, relay_log_pos) < (?, ?)
+			and relay_log_file != ''
+			and relay_log_pos != 0
+		order by
+			recorded_timestamp desc
+			limit 1
+			`
+	err = db.QueryOrchestrator(query, sqlutils.Args(
+		instance.Key.Hostname,
+		instance.Key.Port,
+		instance.RelaylogCoordinates.LogFile,
+		instance.RelaylogCoordinates.LogPos,
+	), func(m sqlutils.RowMap) error {
+		relayLogCoordinates = &BinlogCoordinates{LogFile: m.GetString("relay_log_file"), LogPos: m.GetInt64("relay_log_pos")}
+
+		return nil
+	})
+	return relayLogCoordinates, err
+}
+
+// ResetInstanceRelaylogCoordinatesHistory forgets about the history of an instance. This action is desirable
+// when relay logs become obsolete or irrelevant. Such is the case on `CHANGE MASTER TO`: servers gets compeltely
+// new relay logs.
+func ResetInstanceRelaylogCoordinatesHistory(instanceKey *InstanceKey) error {
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+			update database_instance_coordinates_history
+				set relay_log_file='', relay_log_pos=0
+			where
+				hostname=? and port=?
+				`, instanceKey.Hostname, instanceKey.Port,
+		)
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
 }
 
 // RecordInstanceBinlogFileHistory snapshots the binlog coordinates of instances

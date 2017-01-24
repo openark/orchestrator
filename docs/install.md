@@ -29,6 +29,10 @@ If not, replace `127.0.0.1` with appropriate host name. Replace `orch_backend_pa
 
       sudo dpkg -i orchestrator_1.0_amd64.deb
 
+- Install from repository
+
+  `orchestrator` packages can be found in https://packagecloud.io/github/orchestrator
+
 
 #### Setup backend MySQL server
 

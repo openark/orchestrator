@@ -172,6 +172,54 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	}
 }
 
+func onDiscoveryTick() {
+	wasAlreadyElected := atomic.LoadInt64(&isElectedNode)
+	myIsElectedNode, err := process.AttemptElection()
+	if err != nil {
+		log.Errore(err)
+	}
+	if myIsElectedNode {
+		atomic.StoreInt64(&isElectedNode, 1)
+	} else {
+		atomic.StoreInt64(&isElectedNode, 0)
+	}
+
+	if !myIsElectedNode {
+		if electedNode, _, err := process.ElectedNode(); err == nil {
+			log.Debugf("Not elected as active node; active node: %v; polling", electedNode.Hostname)
+		} else {
+			log.Debugf("Not elected as active node; active node: Unable to determine: %v; polling", err)
+		}
+		return
+	}
+
+	// I'm elected!
+	instanceKeys, err := inst.ReadOutdatedInstanceKeys()
+	if err != nil {
+		log.Errore(err)
+	}
+
+	if wasAlreadyElected == 0 {
+		// Just turned to be leader!
+		go process.RegisterNode("", "", false)
+	}
+
+	if len(instanceKeys) > 0 {
+		if len(instanceKeys) > config.Config.MaxOutdatedKeysToShow {
+			log.Debugf("polling %d outdated keys", len(instanceKeys))
+		} else {
+			log.Debugf("outdated keys: %+v", instanceKeys)
+		}
+		for _, instanceKey := range instanceKeys {
+			instanceKey := instanceKey
+
+			if instanceKey.IsValid() {
+				discoveryQueue.Push(instanceKey)
+			}
+		}
+	}
+}
+
 // ContinuousDiscovery starts an asynchronuous infinite discovery process where instances are
 // periodically investigated and their status captured, and long since unseen instances are
 // purged and forgotten.
@@ -205,43 +253,7 @@ func ContinuousDiscovery() {
 		select {
 		case <-discoveryTick:
 			go func() {
-				wasAlreadyElected := atomic.LoadInt64(&isElectedNode)
-				myIsElectedNode, err := process.AttemptElection()
-				if err != nil {
-					log.Errore(err)
-				}
-				if myIsElectedNode {
-					atomic.StoreInt64(&isElectedNode, 1)
-				} else {
-					atomic.StoreInt64(&isElectedNode, 0)
-				}
-
-				if myIsElectedNode {
-					instanceKeys, err := inst.ReadOutdatedInstanceKeys()
-					if err != nil {
-						log.Errore(err)
-					}
-
-					log.Debugf("outdated keys: %+v", instanceKeys)
-					for _, instanceKey := range instanceKeys {
-						instanceKey := instanceKey
-
-						if instanceKey.IsValid() {
-							discoveryQueue.Push(instanceKey)
-						}
-					}
-					if wasAlreadyElected == 0 {
-						// Just turned to be leader!
-						go process.RegisterNode("", "", false)
-					}
-				} else {
-					hostname, _, _, err := process.ElectedNode()
-					if err == nil {
-						log.Debugf("Not elected as active node; active node: %v; polling", hostname)
-					} else {
-						log.Debugf("Not elected as active node; active node: Unable to determine: %v; polling", err)
-					}
-				}
+				onDiscoveryTick()
 			}()
 		case <-instancePollTick:
 			go func() {

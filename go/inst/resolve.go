@@ -33,6 +33,19 @@ type HostnameResolve struct {
 	resolvedHostname string
 }
 
+func (this HostnameResolve) String() string {
+	return fmt.Sprintf("%s %s", this.hostname, this.resolvedHostname)
+}
+
+type HostnameUnresolve struct {
+	hostname           string
+	unresolvedHostname string
+}
+
+func (this HostnameUnresolve) String() string {
+	return fmt.Sprintf("%s %s", this.hostname, this.unresolvedHostname)
+}
+
 func init() {
 	if config.Config.ExpiryHostnameResolvesMinutes < 1 {
 		config.Config.ExpiryHostnameResolvesMinutes = 1
@@ -150,7 +163,7 @@ func LoadHostnameResolveCache() error {
 }
 
 func loadHostnameResolveCacheFromDatabase() error {
-	allHostnamesResolves, err := readAllHostnameResolves()
+	allHostnamesResolves, err := ReadAllHostnameResolves()
 	if err != nil {
 		return err
 	}
