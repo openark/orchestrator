@@ -20,7 +20,10 @@ var GetRelayLogContentsScript = `#!/bin/bash
 #
 # We will magically set these variables:
 FIRST_RELAYLOG_FILE="$MAGIC_FIRST_RELAYLOG_FILE"
+LAST_RELAYLOG_FILE="$MAGIC_LAST_RELAYLOG_FILE"
 START_POSITION="$MAGIC_START_POSITION"
+STOP_POSITION="$MAGIC_STOP_POSITION"
+[ "$STOP_POSITION" == "0" ] && STOP_POSITION=""
 
 set -e
 
@@ -44,12 +47,13 @@ bootstrap() {
   fi
 }
 
-relaylogs_starting_at() {
+get_relaylogs_names() {
   starting_relay_log=$(basename "$1")
+  ending_relay_log=$(basename "$2")
 
   relay_logs_file=$(mktemp)
   basedir=$(dirname $relaylog_index_file)
-  cat $relaylog_index_file | awk "/$starting_relay_log/,0" | while read f ; do
+  cat $relaylog_index_file | sed -n "/$starting_relay_log/,/$ending_relay_log/p;/$ending_relay_log/q" | while read f ; do
     echo "${basedir}/${f}" >> $relay_logs_file
   done
   relay_logs=$(cat $relay_logs_file)
@@ -69,14 +73,25 @@ binlog_header_size() {
 
 relaylog_tail() {
   starting_relay_log=$(basename "$FIRST_RELAYLOG_FILE")
+  ending_relay_log=$(basename "$LAST_RELAYLOG_FILE")
   start_position="$START_POSITION"
   contents_file=$(mktemp)
 
   [ "$start_position" == "0" ] && start_position=""
+
+  get_relaylogs_names $starting_relay_log $ending_relay_log
+
   is_first_relaylog=1
-  relaylogs_starting_at $starting_relay_log
+  last_relaylog=$(echo "$relay_logs" | tail -1)
+
   for relay_log in $relay_logs ; do
     binlog_header_size $relay_log
+    stop_position=$(wc -c $relay_log)
+    if [ "$relay_log" == "$last_relaylog" ] ; then
+      if [ ! -z "$STOP_POSITION" ] ; then
+        stop_position="$STOP_POSITION"
+      fi
+    fi
     # header_size variable is now populated
     if [ $is_first_relaylog -eq 1 ] ; then
       # First relaylog file. We only get the header from the first file.
@@ -85,12 +100,12 @@ relaylog_tail() {
       [ -z "$start_position" ] && start_position="$header_size"
       # _tail_ command is unfortunately 1-based, which is why we ++
       ((start_position++))
-      cat $relay_log | tail -c+$start_position >> $contents_file
+      cat $relay_log | head -c $stop_position | tail -c+$start_position >> $contents_file
     else
       # Skip header
       # _tail_ command is unfortunately 1-based, which is why we ++
       ((header_size++))
-      cat $relay_log | tail -c+$header_size >> $contents_file
+      cat $relay_log | head -c $stop_position | tail -c+$header_size >> $contents_file
     fi
     is_first_relaylog=0
   done
