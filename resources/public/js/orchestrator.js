@@ -103,7 +103,7 @@ function appUrl(url) {
 function visualizeBrand() {
   var img = $("<img>");
 
-  img.attr("src", appUrl("/images/octocat-logo-32.png")).attr("alt", "GitHub");
+  img.attr("src", appUrl("/images/orchestrator-logo-32.png")).attr("alt", "GitHub");
 
   if (document.domain && document.domain.indexOf("outbrain.com") >= 0) {
     img.attr("src", appUrl("/images/outbrain-logo-32.png")).attr("alt", "Outbrain");
