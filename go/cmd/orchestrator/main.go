@@ -27,6 +27,8 @@ import (
 	"github.com/github/orchestrator/go/inst"
 	"github.com/outbrain/golib/log"
 	"github.com/outbrain/golib/math"
+
+	"github.com/rqlite/rqlite/app/rqlited"
 )
 
 var AppVersion, GitCommit string
@@ -142,6 +144,13 @@ func main() {
 	case len(flag.Args()) == 0 || flag.Arg(0) == "cli":
 		app.CliWrapper(*command, *strict, *instance, *destination, *owner, *reason, *duration, *pattern, *clusterAlias, *pool, *hostnameFlag)
 	case flag.Arg(0) == "http":
+		if config.Config.BackendDB == "rqlite" {
+			log.Infof("spawning rqlite")
+			go func() {
+				//
+				rqlited.Rqlited("/Users/shlomi-noach/node.1/")
+			}()
+		}
 		app.Http(*discovery)
 	default:
 		fmt.Fprintln(os.Stderr, `Usage:
