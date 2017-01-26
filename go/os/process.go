@@ -25,7 +25,7 @@ import (
 	"syscall"
 
 	"github.com/github/orchestrator/go/config"
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 )
 
 var EmptyEnv = []string{}

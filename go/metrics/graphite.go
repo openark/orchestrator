@@ -20,7 +20,7 @@ import (
 	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/process"
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 	"github.com/rcrowley/go-metrics"
 	"net"
 	"strings"
