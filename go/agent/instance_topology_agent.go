@@ -21,10 +21,10 @@ import (
 	"fmt"
 
 	"github.com/github/orchestrator/go/inst"
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 )
 
-func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.Instance, error) {
+func SyncReplicaRelayLogs(instance, otherInstance *inst.Instance) (*inst.Instance, error) {
 	var err error
 	var found bool
 	var nextCoordinates *inst.BinlogCoordinates
@@ -32,16 +32,16 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 	onResponse := func(contentBytes []byte) {
 		json.Unmarshal(contentBytes, &content)
 	}
-	log.Debugf("AlignViaRelaylogCorrelation: stopping replication")
+	log.Debugf("SyncReplicaRelayLogs: stopping replication")
 
 	if instance.ReplicaRunning() {
-		return instance, log.Errorf("AlignViaRelaylogCorrelation: replication on %+v must not run", instance.Key)
+		return instance, log.Errorf("SyncReplicaRelayLogs: replication on %+v must not run", instance.Key)
 	}
 	if otherInstance.ReplicaRunning() {
-		return instance, log.Errorf("AlignViaRelaylogCorrelation: replication on %+v must not run", otherInstance.Key)
+		return instance, log.Errorf("SyncReplicaRelayLogs: replication on %+v must not run", otherInstance.Key)
 	}
 
-	log.Debugf("AlignViaRelaylogCorrelation: correlating coordinates of %+v on %+v", instance.Key, otherInstance.Key)
+	log.Debugf("SyncReplicaRelayLogs: correlating coordinates of %+v on %+v", instance.Key, otherInstance.Key)
 	_, _, nextCoordinates, found, err = inst.CorrelateRelaylogCoordinates(instance, nil, otherInstance)
 	if err != nil {
 		goto Cleanup
@@ -49,18 +49,18 @@ func AlignViaRelaylogCorrelation(instance, otherInstance *inst.Instance) (*inst.
 	if !found {
 		goto Cleanup
 	}
-	log.Debugf("AlignViaRelaylogCorrelation: correlated next-coordinates are %+v", *nextCoordinates)
+	log.Debugf("SyncReplicaRelayLogs: correlated next-coordinates are %+v", *nextCoordinates)
 
 	InitHttpClient()
 	if _, err := RelaylogContentsTail(otherInstance.Key.Hostname, nextCoordinates, &onResponse); err != nil {
 		goto Cleanup
 	}
-	log.Debugf("AlignViaRelaylogCorrelation: got content (%d bytes)", len(content))
+	log.Debugf("SyncReplicaRelayLogs: got content (%d bytes)", len(content))
 
 	if _, err := ApplyRelaylogContents(instance.Key.Hostname, content); err != nil {
 		goto Cleanup
 	}
-	log.Debugf("AlignViaRelaylogCorrelation: applied content (%d bytes)", len(content))
+	log.Debugf("SyncReplicaRelayLogs: applied content (%d bytes)", len(content))
 
 	instance, err = inst.ChangeMasterTo(&instance.Key, &otherInstance.MasterKey, &otherInstance.ExecBinlogCoordinates, false, inst.GTIDHintNeutral)
 	if err != nil {

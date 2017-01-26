@@ -24,8 +24,8 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/ssl"
 	"github.com/go-sql-driver/mysql"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 )
 
 var (

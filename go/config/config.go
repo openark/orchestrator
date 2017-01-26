@@ -25,7 +25,7 @@ import (
 
 	"gopkg.in/gcfg.v1"
 
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 )
 
 var (
@@ -187,6 +187,7 @@ type Configuration struct {
 	MasterFailoverDetachReplicaMasterHost        bool              // Should orchestrator issue a detach-replica-master-host on newly promoted master (this makes sure the new master will not attempt to replicate old master if that comes back to life). Defaults 'false'. Meaningless if ApplyMySQLPromotionAfterMasterFailover is 'true'.
 	PostponeSlaveRecoveryOnLagMinutes            uint              // Synonym to PostponeReplicaRecoveryOnLagMinutes
 	PostponeReplicaRecoveryOnLagMinutes          uint              // On crash recovery, replicas that are lagging more than given minutes are only resurrected late in the recovery process, after master/IM has been elected and processes executed. Value of 0 disables this feature
+	RemoteSSHForMasterFailover                   bool              // Should orchestrator attempt a remote-ssh relaylog-synching upon master failover? Requires RemoteSSHCommand
 	RemoteSSHCommand                             string            // A `ssh` command to be used by recovery process to read/apply relaylogs. If provided, this variable must contain the text "{hostname}". The remote SSH login must have the privileges to read/write relay logs. Example: "setuidgid remoteuser ssh {hostname}"
 	RemoteSSHCommandUseSudo                      bool              // Should orchestrator apply 'sudo' on the remote host upon SSH command
 	OSCIgnoreHostnameFilters                     []string          // OSC replicas recommendation will ignore replica hostnames matching given patterns
@@ -345,6 +346,7 @@ func newConfiguration() *Configuration {
 		MasterFailoverLostInstancesDowntimeMinutes:   0,
 		MasterFailoverDetachSlaveMasterHost:          false,
 		PostponeSlaveRecoveryOnLagMinutes:            0,
+		RemoteSSHForMasterFailover:                   false,
 		RemoteSSHCommand:                             "",
 		RemoteSSHCommandUseSudo:                      true,
 		OSCIgnoreHostnameFilters:                     []string{},
@@ -460,6 +462,9 @@ func (this *Configuration) postReadAdjustments() error {
 
 	if this.IsSQLite3() && this.SQLite3DataFile == "" {
 		return fmt.Errorf("SQLite3DataFile must be set when BackendDB is sqlite3")
+	}
+	if this.RemoteSSHForMasterFailover && this.RemoteSSHCommand == "" {
+		return fmt.Errorf("RemoteSSHCommand is required when RemoteSSHForMasterFailover is set")
 	}
 	return nil
 }

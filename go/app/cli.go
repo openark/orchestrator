@@ -31,8 +31,8 @@ import (
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/remote"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/util"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/util"
 )
 
 var thisInstanceKey *inst.InstanceKey
@@ -615,7 +615,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatalf("Instance not found: %+v", *destinationKey)
 			}
 
-			_, err = agent.AlignViaRelaylogCorrelation(instance, otherInstance)
+			_, err = agent.SyncReplicaRelayLogs(instance, otherInstance)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -646,12 +646,51 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatalf("Instance not found: %+v", *destinationKey)
 			}
 
-			_, err = remote.AlignViaRelaylogCorrelation(instance, otherInstance)
+			_, err = remote.SyncReplicaRelayLogs(instance, otherInstance, remote.SyncRelaylogsChangeMasterToSharedMasterFunc, false)
 			if err != nil {
 				log.Fatale(err)
 			}
 			fmt.Println(instance.Key.DisplayString())
 		}
+	case registerCliCommand("regroup-replicas-ssh", "Remote relay log relocation", `Regroup replicas of a given instance by syncing their relay logs over SSH`):
+		{
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			instance := validateInstanceIsFound(instanceKey)
+
+			_, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instance, remote.SyncRelaylogsChangeMasterToSourceReplicaFunc, nil, true, postponedFunctionsContainer)
+			postponedFunctionsContainer.InvokePostponed()
+
+			log.Infof("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
+			for _, replica := range syncedReplicas {
+				fmt.Println(replica.Key.DisplayString())
+			}
+			if err != nil {
+				log.Fatale(err)
+			}
+		}
+	case registerCliCommand("sync-replicas-relaylogs", "Remote relay log relocation", `Given master, sync all of its replicas by remotely copying and applying relaylogs`):
+		{
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			instance := validateInstanceIsFound(instanceKey)
+
+			_, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instance, remote.SyncRelaylogsChangeMasterToSharedMasterFunc, nil, false, postponedFunctionsContainer)
+			postponedFunctionsContainer.InvokePostponed()
+
+			log.Infof("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
+			for _, replica := range syncedReplicas {
+				fmt.Println(replica.Key.DisplayString())
+			}
+			if err != nil {
+				log.Fatale(err)
+			}
+		}
+
 		// General replication commands
 	case registerCliCommand("enable-gtid", "Replication, general", `If possible, turn on GTID replication`):
 		{
@@ -1403,6 +1442,29 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			fmt.Println(fmt.Sprintf("%d recoveries acknowldged", countRecoveries))
+		}
+	case registerCliCommand("get-best-master-replacement", "Recovery", `Information command suggesting the best would-be replacement to master of given cluster`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			masters, err := inst.ReadClusterWriteableMaster(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if len(masters) == 0 {
+				log.Fatalf("No writeable masters found for cluster %+v", clusterName)
+			}
+			clusterMaster := masters[0]
+
+			replicas, err := inst.ReadReplicaInstances(&clusterMaster.Key)
+			if err != nil {
+				log.Fatale(err)
+			}
+
+			replacement, err := logic.GetBestMasterReplacementFromAmongItsReplicas(clusterMaster, replicas, false)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(replacement.Key.DisplayString())
 		}
 	// Instance meta
 	case registerCliCommand("register-candidate", "Instance, meta", `Indicate that a specific instance is a preferred candidate for master promotion`):

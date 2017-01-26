@@ -23,8 +23,8 @@ import (
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 )
 
 // Max concurrency for bulk topology operations
@@ -285,11 +285,15 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	return instance, err
 }
 
-// StopSlavesNicely will attemt to stop all given replicas nicely, up to timeout
-func StopSlavesNicely(replicas [](*Instance), timeout time.Duration) [](*Instance) {
+// StopSlaves will stop replication concurrently on given set of replicas.
+// It will potentially do nothing, or attempt to stop _nicely_ or just stop normally, all according to stopReplicationMethod
+func StopSlaves(replicas [](*Instance), stopReplicationMethod StopReplicationMethod, timeout time.Duration) [](*Instance) {
+	if stopReplicationMethod == NoStopReplication {
+		return replicas
+	}
 	refreshedReplicas := [](*Instance){}
 
-	log.Debugf("Stopping %d replicas nicely", len(replicas))
+	log.Debugf("Stopping %d replicas via %s", len(replicas), string(stopReplicationMethod))
 	// use concurrency but wait for all to complete
 	barrier := make(chan *Instance)
 	for _, replica := range replicas {
@@ -300,7 +304,9 @@ func StopSlavesNicely(replicas [](*Instance), timeout time.Duration) [](*Instanc
 			defer func() { barrier <- *updatedReplica }()
 			// Wait your turn to read a replica
 			ExecuteOnTopology(func() {
-				StopSlaveNicely(&replica.Key, timeout)
+				if stopReplicationMethod == StopReplicationNicely {
+					StopSlaveNicely(&replica.Key, timeout)
+				}
 				replica, _ = StopSlave(&replica.Key)
 				updatedReplica = &replica
 			})
@@ -310,6 +316,11 @@ func StopSlavesNicely(replicas [](*Instance), timeout time.Duration) [](*Instanc
 		refreshedReplicas = append(refreshedReplicas, <-barrier)
 	}
 	return refreshedReplicas
+}
+
+// StopSlavesNicely will attemt to stop all given replicas nicely, up to timeout
+func StopSlavesNicely(replicas [](*Instance), timeout time.Duration) [](*Instance) {
+	return StopSlaves(replicas, StopReplicationNicely, timeout)
 }
 
 // StopSlave stops replication on a given instance

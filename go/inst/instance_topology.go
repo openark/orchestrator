@@ -24,8 +24,16 @@ import (
 	"time"
 
 	"github.com/github/orchestrator/go/config"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/math"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/math"
+)
+
+type StopReplicationMethod string
+
+const (
+	NoStopReplication     StopReplicationMethod = "NoStopReplication"
+	StopReplicationNormal                       = "StopReplicationNormal"
+	StopReplicationNicely                       = "StopReplicationNicely"
 )
 
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
@@ -1659,14 +1667,11 @@ func getReplicasForSorting(masterKey *InstanceKey, includeBinlogServerSubReplica
 // (most up-to-date replica first).
 // This function assumes given `replicas` argument is indeed a list of instances all replicating
 // from the same master (the result of `getReplicasForSorting()` is appropriate)
-func sortedReplicas(replicas [](*Instance), shouldStopSlaves bool) [](*Instance) {
+func sortedReplicas(replicas [](*Instance), stopReplicationMethod StopReplicationMethod) [](*Instance) {
 	if len(replicas) == 0 {
 		return replicas
 	}
-	if shouldStopSlaves {
-		log.Debugf("sortedReplicas: stopping %d replicas nicely", len(replicas))
-		replicas = StopSlavesNicely(replicas, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
-	}
+	replicas = StopSlaves(replicas, stopReplicationMethod, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
 	replicas = RemoveNilInstances(replicas)
 
 	sortInstances(replicas)
@@ -1675,6 +1680,19 @@ func sortedReplicas(replicas [](*Instance), shouldStopSlaves bool) [](*Instance)
 	}
 
 	return replicas
+}
+
+// GetSortedReplicas reads list of replicas of a given master, and returns them sorted by exec coordinates
+// (most up-to-date replica first).
+func GetSortedReplicas(masterKey *InstanceKey, stopReplicationMethod StopReplicationMethod) (replicas [](*Instance), err error) {
+	if replicas, err = getReplicasForSorting(masterKey, false); err != nil {
+		return replicas, err
+	}
+	replicas = sortedReplicas(replicas, stopReplicationMethod)
+	if len(replicas) == 0 {
+		return replicas, fmt.Errorf("No replicas found for %+v", *masterKey)
+	}
+	return replicas, err
 }
 
 // MultiMatchBelow will efficiently match multiple replicas below a given instance.
@@ -2002,7 +2020,7 @@ func isValidAsCandidateMasterInBinlogServerTopology(replica *Instance) bool {
 	return true
 }
 
-func isBannedFromBeingCandidateReplica(replica *Instance) bool {
+func IsBannedFromBeingCandidateReplica(replica *Instance) bool {
 	if replica.PromotionRule == MustNotPromoteRule {
 		log.Debugf("instance %+v is banned because of promotion rule", replica.Key)
 		return true
@@ -2076,7 +2094,7 @@ func chooseCandidateReplica(replicas [](*Instance)) (candidateReplica *Instance,
 	for _, replica := range replicas {
 		replica := replica
 		if isGenerallyValidAsCandidateReplica(replica) &&
-			!isBannedFromBeingCandidateReplica(replica) &&
+			!IsBannedFromBeingCandidateReplica(replica) &&
 			!IsSmallerMajorVersion(priorityMajorVersion, replica.MajorVersionString()) &&
 			!IsSmallerBinlogFormat(priorityBinlogFormat, replica.Binlog_format) {
 			// this is the one
@@ -2089,7 +2107,7 @@ func chooseCandidateReplica(replicas [](*Instance)) (candidateReplica *Instance,
 		// Instead, pick a (single) replica which is not banned.
 		for _, replica := range replicas {
 			replica := replica
-			if !isBannedFromBeingCandidateReplica(replica) {
+			if !IsBannedFromBeingCandidateReplica(replica) {
 				// this is the one
 				candidateReplica = replica
 				break
@@ -2130,7 +2148,11 @@ func GetCandidateReplica(masterKey *InstanceKey, forRematchPurposes bool) (*Inst
 	if err != nil {
 		return candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err
 	}
-	replicas = sortedReplicas(replicas, forRematchPurposes)
+	stopReplicationMethod := NoStopReplication
+	if forRematchPurposes {
+		stopReplicationMethod = StopReplicationNicely
+	}
+	replicas = sortedReplicas(replicas, stopReplicationMethod)
 	if err != nil {
 		return candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err
 	}
@@ -2157,7 +2179,7 @@ func GetCandidateReplicaOfBinlogServerTopology(masterKey *InstanceKey) (candidat
 	if err != nil {
 		return candidateReplica, err
 	}
-	replicas = sortedReplicas(replicas, false)
+	replicas = sortedReplicas(replicas, NoStopReplication)
 	if len(replicas) == 0 {
 		return candidateReplica, fmt.Errorf("No replicas found for %+v", *masterKey)
 	}
@@ -2166,7 +2188,7 @@ func GetCandidateReplicaOfBinlogServerTopology(masterKey *InstanceKey) (candidat
 		if candidateReplica != nil {
 			break
 		}
-		if isValidAsCandidateMasterInBinlogServerTopology(replica) && !isBannedFromBeingCandidateReplica(replica) {
+		if isValidAsCandidateMasterInBinlogServerTopology(replica) && !IsBannedFromBeingCandidateReplica(replica) {
 			// this is the one
 			candidateReplica = replica
 		}
