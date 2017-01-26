@@ -30,17 +30,18 @@ func (this *regexpMap) process(text string) (result string) {
 	return this.r.ReplaceAllString(text, this.replacement)
 }
 
-var (
-	createTableCharset           = rmap(`(?i) (character set|charset) [\S]+`, ``)
-	createTableUnsigned          = rmap(`(?i)int unsigned`, `int`)
-	createTableUnsignedPrecision = rmap(`(?i)int[\s]*[(][\s]*([0-9]+)[\s]*[)] unsigned`, `int`)
-	createTableEngine            = rmap(`(?i)engine[\s]*=[\s]*(innodb|myisam|ndb|memory|tokudb)`, ``)
-	createTableDefaultCharset    = rmap(`(?i)DEFAULT CHARSET[\s]*=[\s]*[\S]+`, ``)
-	createTableAutoIncrement     = rmap(`(?i)int( not null|) auto_increment`, `integer`)
-)
+var createTableConversions = []regexpMap{
+	rmap(`(?i) (character set|charset) [\S]+`, ``),
+	rmap(`(?i)int unsigned`, `int`),
+	rmap(`(?i)int[\s]*[(][\s]*([0-9]+)[\s]*[)] unsigned`, `int`),
+	rmap(`(?i)engine[\s]*=[\s]*(innodb|myisam|ndb|memory|tokudb)`, ``),
+	rmap(`(?i)DEFAULT CHARSET[\s]*=[\s]*[\S]+`, ``),
+	rmap(`(?i)int( not null|) auto_increment`, `integer`),
+}
 
 var (
-	identifyCreateStatement = regexp.MustCompile(regexpSpaces(`(?i)^[\s]*create table`))
+	identifyCreateTableStatement = regexp.MustCompile(regexpSpaces(`(?i)^[\s]*create table`))
+	identifyAlterTableStatement  = regexp.MustCompile(regexpSpaces(`(?i)^[\s]*alter table`))
 )
 
 func rmap(regexpExpression string, replacement string) regexpMap {
@@ -55,16 +56,17 @@ func regexpSpaces(statement string) string {
 }
 
 func isCreateTable(statement string) bool {
-	return identifyCreateStatement.MatchString(statement)
+	return identifyCreateTableStatement.MatchString(statement)
+}
+
+func isAlterTable(statement string) bool {
+	return identifyAlterTableStatement.MatchString(statement)
 }
 
 func ToSqlite3CreateTable(statement string) (string, error) {
-	statement = createTableCharset.process(statement)
-	statement = createTableUnsigned.process(statement)
-	statement = createTableUnsignedPrecision.process(statement)
-	statement = createTableEngine.process(statement)
-	statement = createTableDefaultCharset.process(statement)
-	statement = createTableAutoIncrement.process(statement)
+	for _, rmap := range createTableConversions {
+		statement = rmap.process(statement)
+	}
 
 	return statement, nil
 }
