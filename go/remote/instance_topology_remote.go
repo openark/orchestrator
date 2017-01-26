@@ -26,7 +26,7 @@ import (
 	"github.com/github/orchestrator/go/inst"
 	orcos "github.com/github/orchestrator/go/os"
 	"github.com/github/orchestrator/go/process"
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 )
 
 // SyncRelaylogsChangeMasterIdentityFunc returns the identity and coorindates into which a replica would CHANGE MASTER TO

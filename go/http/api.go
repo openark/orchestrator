@@ -28,7 +28,7 @@ import (
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/render"
 
-	"github.com/outbrain/golib/util"
+	"github.com/openark/golib/util"
 
 	"github.com/github/orchestrator/go/agent"
 	"github.com/github/orchestrator/go/config"

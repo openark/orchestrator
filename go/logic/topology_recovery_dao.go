@@ -24,8 +24,8 @@ import (
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/process"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 )
 
 // AttemptFailureDetectionRegistration tries to add a failure-detection entry; if this fails that means the problem has already been detected

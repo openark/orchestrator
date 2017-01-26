@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/github/orchestrator/go/config"
-	"github.com/outbrain/golib/math"
+	"github.com/openark/golib/math"
 )
 
 // CandidatePromotionRule describe the promotion preference/rule for an instance.
