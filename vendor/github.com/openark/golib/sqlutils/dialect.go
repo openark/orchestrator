@@ -31,7 +31,12 @@ func (this *regexpMap) process(text string) (result string) {
 }
 
 var (
-	createTableCharset = rmap(`(?i)varchar[\s]*[(][\s]*([0-9]+)[\s]*[)] (character set|charset) [\S]+`, `varchar(${1})`)
+	createTableCharset           = rmap(`(?i) (character set|charset) [\S]+`, ``)
+	createTableUnsigned          = rmap(`(?i)int unsigned`, `int`)
+	createTableUnsignedPrecision = rmap(`(?i)int[\s]*[(][\s]*([0-9]+)[\s]*[)] unsigned`, `int`)
+	createTableEngine            = rmap(`(?i)engine[\s]*=[\s]*(innodb|myisam|ndb|memory|tokudb)`, ``)
+	createTableDefaultCharset    = rmap(`(?i)DEFAULT CHARSET[\s]*=[\s]*[\S]+`, ``)
+	createTableAutoIncrement     = rmap(`(?i)int( not null|) auto_increment`, `integer`)
 )
 
 var (
@@ -55,9 +60,18 @@ func isCreateTable(statement string) bool {
 
 func ToSqlite3CreateTable(statement string) (string, error) {
 	statement = createTableCharset.process(statement)
+	statement = createTableUnsigned.process(statement)
+	statement = createTableUnsignedPrecision.process(statement)
+	statement = createTableEngine.process(statement)
+	statement = createTableDefaultCharset.process(statement)
+	statement = createTableAutoIncrement.process(statement)
+
 	return statement, nil
 }
 
 func ToSqlite3Dialect(statement string) (translated string, err error) {
+	if isCreateTable(statement) {
+		return ToSqlite3CreateTable(statement)
+	}
 	return statement, err
 }

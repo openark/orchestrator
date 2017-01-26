@@ -53,6 +53,24 @@ func TestToSqlite3CreateTable(t *testing.T) {
 		statement := "create table t(id int, v varchar ( 123 ) CHARACTER SET ascii NOT NULL default '')"
 		result, err := ToSqlite3CreateTable(statement)
 		test.S(t).ExpectNil(err)
-		test.S(t).ExpectEquals(result, "create table t(id int, v varchar(123) NOT NULL default '')")
+		test.S(t).ExpectEquals(result, "create table t(id int, v varchar ( 123 ) NOT NULL default '')")
+	}
+	{
+		statement := "create table t(i smallint unsigned)"
+		result, err := ToSqlite3CreateTable(statement)
+		test.S(t).ExpectNil(err)
+		test.S(t).ExpectEquals(result, "create table t(i smallint)")
+	}
+	{
+		statement := "create table t(i smallint(5) unsigned)"
+		result, err := ToSqlite3CreateTable(statement)
+		test.S(t).ExpectNil(err)
+		test.S(t).ExpectEquals(result, "create table t(i smallint)")
+	}
+	{
+		statement := "create table t(i smallint ( 5 ) unsigned)"
+		result, err := ToSqlite3CreateTable(statement)
+		test.S(t).ExpectNil(err)
+		test.S(t).ExpectEquals(result, "create table t(i smallint)")
 	}
 }

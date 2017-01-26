@@ -71,12 +71,17 @@ var generateSQLBase = []string{
           num_slave_hosts int(10) unsigned NOT NULL,
           slave_hosts text CHARACTER SET ascii NOT NULL,
           cluster_name tinytext CHARACTER SET ascii NOT NULL,
-          PRIMARY KEY (hostname,port),
-          KEY cluster_name_idx (cluster_name(128)),
-          KEY last_checked_idx (last_checked),
-          KEY last_seen_idx (last_seen)
+          PRIMARY KEY (hostname,port)
         ) ENGINE=InnoDB DEFAULT CHARSET=ascii
-
+	`,
+	`
+				CREATE INDEX cluster_name_idx ON database_instance(cluster_name)
+	`,
+	`
+				CREATE INDEX last_checked_idx ON database_instance(last_checked)
+	`,
+	`
+				CREATE INDEX last_seen_idx ON database_instance(last_seen)
 	`,
 	`
         CREATE TABLE IF NOT EXISTS database_instance_maintenance (
@@ -88,9 +93,11 @@ var generateSQLBase = []string{
           end_timestamp timestamp NULL DEFAULT NULL,
           owner varchar(128) CHARACTER SET utf8 NOT NULL,
           reason text CHARACTER SET utf8 NOT NULL,
-          PRIMARY KEY (database_instance_maintenance_id),
-          UNIQUE KEY maintenance_uidx (maintenance_active, hostname, port)
+          PRIMARY KEY (database_instance_maintenance_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+				CREATE UNIQUE INDEX maintenance_uidx ON database_instance_maintenance (maintenance_active, hostname, port)
 	`,
 	`
         CREATE TABLE IF NOT EXISTS database_instance_long_running_queries (
@@ -984,6 +991,14 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 	return db, err
 }
 
+func translateStatement(statement string) (string, error) {
+	var err error
+	if config.Config.IsSQLite3() {
+		statement, err = sqlutils.ToSqlite3Dialect(statement)
+	}
+	return statement, err
+}
+
 // versionIsDeployed checks if given version has already been deployed
 func versionIsDeployed(db *sql.DB) (result bool, err error) {
 	query := `
@@ -1070,9 +1085,13 @@ func deployStatements(db *sql.DB, queries []string, fatalOnError bool) error {
 			//log.Debugf("sql_mode is: %+v", originalSqlMode)
 		}
 
+		query, err := translateStatement(query)
+		if err != nil {
+			return log.Fatalf("Cannot initiate orchestrator: %+v; query=%+v", err, query)
+		}
 		if fatalOnError {
 			if _, err := tx.Exec(query); err != nil {
-				return log.Fatalf("Cannot initiate orchestrator: %+v", err)
+				return log.Fatalf("Cannot initiate orchestrator: %+v; query=%+v", err, query)
 			}
 		} else {
 			tx.Exec(query)
