@@ -37,11 +37,26 @@ var createTableConversions = []regexpMap{
 	rmap(`(?i)engine[\s]*=[\s]*(innodb|myisam|ndb|memory|tokudb)`, ``),
 	rmap(`(?i)DEFAULT CHARSET[\s]*=[\s]*[\S]+`, ``),
 	rmap(`(?i)int( not null|) auto_increment`, `integer`),
+	rmap(`(?i)comment '[^']*'`, ``),
+	rmap(`(?i)after [\S]+`, ``),
+	rmap(`(?i)alter table ([\S]+) add (index|key) ([\S]+) (.+)`, `create index $3_$1 on $1 $4`),
+	rmap(`(?i)alter table ([\S]+) add unique (index|key) ([\S]+) (.+)`, `create unique index $3_$1 on $1 $4`),
+	rmap(`(?i)([\S]+) enum[\s]*([(].*?[)])`, `$1 text check($1 in $2)`),
+	rmap(`(?i)([\s\S]+[/][*] sqlite3-skip [*][/][\s\S]+)`, ``),
+
+	/* sqlite3-skip */
+}
+
+var insertConversions = []regexpMap{
+	rmap(`(?i)insert ignore`, `insert or ignore`),
+	rmap(`(?i)now[(][)]`, `datetime('now')`),
 }
 
 var (
 	identifyCreateTableStatement = regexp.MustCompile(regexpSpaces(`(?i)^[\s]*create table`))
+	identifyCreateIndexStatement = regexp.MustCompile(regexpSpaces(`(?i)^[\s]*create( unique|) index`))
 	identifyAlterTableStatement  = regexp.MustCompile(regexpSpaces(`(?i)^[\s]*alter table`))
+	identifyInsertStatement      = regexp.MustCompile(regexpSpaces(`(?i)^[\s]*(insert|replace)`))
 )
 
 func rmap(regexpExpression string, replacement string) regexpMap {
@@ -52,14 +67,22 @@ func rmap(regexpExpression string, replacement string) regexpMap {
 }
 
 func regexpSpaces(statement string) string {
-	return strings.Replace(statement, " ", `[ ]+`, -1)
+	return strings.Replace(statement, " ", `[\s]+`, -1)
 }
 
-func isCreateTable(statement string) bool {
+func IsInsert(statement string) bool {
+	return identifyInsertStatement.MatchString(statement)
+}
+
+func IsCreateTable(statement string) bool {
 	return identifyCreateTableStatement.MatchString(statement)
 }
 
-func isAlterTable(statement string) bool {
+func IsCreateIndex(statement string) bool {
+	return identifyCreateIndexStatement.MatchString(statement)
+}
+
+func IsAlterTable(statement string) bool {
 	return identifyAlterTableStatement.MatchString(statement)
 }
 
@@ -71,9 +94,23 @@ func ToSqlite3CreateTable(statement string) (string, error) {
 	return statement, nil
 }
 
+func ToSqlite3Insert(statement string) (string, error) {
+	for _, rmap := range insertConversions {
+		statement = rmap.process(statement)
+	}
+
+	return statement, nil
+}
+
 func ToSqlite3Dialect(statement string) (translated string, err error) {
-	if isCreateTable(statement) {
+	if IsCreateTable(statement) {
 		return ToSqlite3CreateTable(statement)
+	}
+	if IsAlterTable(statement) {
+		return ToSqlite3CreateTable(statement)
+	}
+	if IsInsert(statement) {
+		return ToSqlite3Insert(statement)
 	}
 	return statement, err
 }

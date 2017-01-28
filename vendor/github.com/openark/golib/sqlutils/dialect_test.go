@@ -26,14 +26,14 @@ func init() {
 }
 
 func TestIsCreateTable(t *testing.T) {
-	test.S(t).ExpectTrue(isCreateTable("create table t(id int)"))
-	test.S(t).ExpectTrue(isCreateTable(" create table t(id int)"))
-	test.S(t).ExpectTrue(isCreateTable("CREATE  TABLE t(id int)"))
-	test.S(t).ExpectTrue(isCreateTable(`
+	test.S(t).ExpectTrue(IsCreateTable("create table t(id int)"))
+	test.S(t).ExpectTrue(IsCreateTable(" create table t(id int)"))
+	test.S(t).ExpectTrue(IsCreateTable("CREATE  TABLE t(id int)"))
+	test.S(t).ExpectTrue(IsCreateTable(`
 		create table t(id int)
 		`))
-	test.S(t).ExpectFalse(isCreateTable("where create table t(id int)"))
-	test.S(t).ExpectFalse(isCreateTable("insert"))
+	test.S(t).ExpectFalse(IsCreateTable("where create table t(id int)"))
+	test.S(t).ExpectFalse(IsCreateTable("insert"))
 }
 
 func TestToSqlite3CreateTable(t *testing.T) {
@@ -73,4 +73,14 @@ func TestToSqlite3CreateTable(t *testing.T) {
 		test.S(t).ExpectNil(err)
 		test.S(t).ExpectEquals(result, "create table t(i smallint)")
 	}
+}
+
+func TestIsInsert(t *testing.T) {
+	test.S(t).ExpectTrue(IsInsert("insert into t"))
+	test.S(t).ExpectTrue(IsInsert("insert ignore into t"))
+	test.S(t).ExpectTrue(IsInsert(`
+		  insert ignore into t
+			`))
+	test.S(t).ExpectFalse(IsInsert("where create table t(id int)"))
+	test.S(t).ExpectFalse(IsInsert("create table t(id int)"))
 }

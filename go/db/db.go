@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/ssl"
@@ -70,18 +71,18 @@ var generateSQLBase = []string{
           slave_lag_seconds bigint(20) unsigned DEFAULT NULL,
           num_slave_hosts int(10) unsigned NOT NULL,
           slave_hosts text CHARACTER SET ascii NOT NULL,
-          cluster_name tinytext CHARACTER SET ascii NOT NULL,
+          cluster_name varchar(128) CHARACTER SET ascii NOT NULL,
           PRIMARY KEY (hostname,port)
         ) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
-				CREATE INDEX cluster_name_idx ON database_instance(cluster_name)
+				CREATE INDEX cluster_name_idx_database_instance ON database_instance(cluster_name)
 	`,
 	`
-				CREATE INDEX last_checked_idx ON database_instance(last_checked)
+				CREATE INDEX last_checked_idx_database_instance ON database_instance(last_checked)
 	`,
 	`
-				CREATE INDEX last_seen_idx ON database_instance(last_seen)
+				CREATE INDEX last_seen_idx_database_instance ON database_instance(last_seen)
 	`,
 	`
         CREATE TABLE IF NOT EXISTS database_instance_maintenance (
@@ -97,14 +98,14 @@ var generateSQLBase = []string{
         ) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
-				CREATE UNIQUE INDEX maintenance_uidx ON database_instance_maintenance (maintenance_active, hostname, port)
+				CREATE UNIQUE INDEX maintenance_uidx_database_instance_maintenance ON database_instance_maintenance (maintenance_active, hostname, port)
 	`,
 	`
         CREATE TABLE IF NOT EXISTS database_instance_long_running_queries (
           hostname varchar(128) NOT NULL,
           port smallint(5) unsigned NOT NULL,
           process_id bigint(20) NOT NULL,
-          process_started_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          process_started_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
           process_user varchar(16) CHARACTER SET utf8 NOT NULL,
           process_host varchar(128) CHARACTER SET utf8 NOT NULL,
           process_db varchar(128) CHARACTER SET utf8 NOT NULL,
@@ -112,9 +113,11 @@ var generateSQLBase = []string{
           process_time_seconds int(11) NOT NULL,
           process_state varchar(128) CHARACTER SET utf8 NOT NULL,
           process_info varchar(1024) CHARACTER SET utf8 NOT NULL,
-          PRIMARY KEY (hostname,port,process_id),
-          KEY process_started_at_idx (process_started_at)
+          PRIMARY KEY (hostname,port,process_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+				CREATE INDEX process_started_at_idx_database_instance_long_running_queries ON database_instance_long_running_queries (process_started_at)
 	`,
 	`
         CREATE TABLE IF NOT EXISTS audit (
@@ -124,10 +127,14 @@ var generateSQLBase = []string{
           hostname varchar(128) CHARACTER SET ascii NOT NULL DEFAULT '',
           port smallint(5) unsigned NOT NULL,
           message text CHARACTER SET utf8 NOT NULL,
-          PRIMARY KEY (audit_id),
-          KEY audit_timestamp_idx (audit_timestamp),
-          KEY host_port_idx (hostname, port, audit_timestamp)
+          PRIMARY KEY (audit_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=latin1
+	`,
+	`
+				CREATE INDEX audit_timestamp_idx_audit ON audit (audit_timestamp)
+	`,
+	`
+				CREATE INDEX host_port_idx_audit ON audit (hostname, port, audit_timestamp)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS host_agent (
@@ -139,12 +146,20 @@ var generateSQLBase = []string{
 		  last_seen timestamp NULL DEFAULT NULL,
 		  mysql_port smallint(5) unsigned DEFAULT NULL,
 		  count_mysql_snapshots smallint(5) unsigned NOT NULL,
-		  PRIMARY KEY (hostname),
-		  KEY token_idx (token(32)),
-		  KEY last_submitted_idx (last_submitted),
-		  KEY last_checked_idx (last_checked),
-		  KEY last_seen_idx (last_seen)
+		  PRIMARY KEY (hostname)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+				CREATE INDEX token_idx_host_agent ON host_agent (token)
+	`,
+	`
+				CREATE INDEX last_submitted_idx_host_agent ON host_agent (last_submitted)
+	`,
+	`
+				CREATE INDEX last_checked_idx_host_agent ON host_agent (last_checked)
+	`,
+	`
+				CREATE INDEX last_seen_idx_host_agent ON host_agent (last_seen)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS agent_seed (
@@ -152,16 +167,26 @@ var generateSQLBase = []string{
 		  target_hostname varchar(128) NOT NULL,
 		  source_hostname varchar(128) NOT NULL,
 		  start_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		  end_timestamp timestamp NOT NULL,
+		  end_timestamp timestamp NOT NULL DEFAULT '1971-01-01 00:00:00',
 		  is_complete tinyint(3) unsigned NOT NULL DEFAULT '0',
 		  is_successful tinyint(3) unsigned NOT NULL DEFAULT '0',
-		  PRIMARY KEY (agent_seed_id),
-		  KEY target_hostname_idx (target_hostname,is_complete),
-		  KEY source_hostname_idx (source_hostname,is_complete),
-		  KEY start_timestamp_idx (start_timestamp),
-		  KEY is_complete_idx (is_complete,start_timestamp),
-		  KEY is_successful_idx (is_successful, start_timestamp)
+		  PRIMARY KEY (agent_seed_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+				CREATE INDEX target_hostname_idx_agent_seed ON agent_seed (target_hostname,is_complete)
+	`,
+	`
+				CREATE INDEX source_hostname_idx_agent_seed ON agent_seed (source_hostname,is_complete)
+	`,
+	`
+				CREATE INDEX start_timestamp_idx_agent_seed ON agent_seed (start_timestamp)
+	`,
+	`
+				CREATE INDEX is_complete_idx_agent_seed ON agent_seed (is_complete,start_timestamp)
+	`,
+	`
+				CREATE INDEX is_successful_idx_agent_seed ON agent_seed (is_successful, start_timestamp)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS agent_seed_state (
@@ -170,9 +195,11 @@ var generateSQLBase = []string{
 		  state_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		  state_action varchar(127) NOT NULL,
 		  error_message varchar(255) NOT NULL,
-		  PRIMARY KEY (agent_seed_state_id),
-		  KEY agent_seed_idx (agent_seed_id, state_timestamp)
+		  PRIMARY KEY (agent_seed_state_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+				CREATE INDEX agent_seed_idx_agent_seed_state ON agent_seed_state (agent_seed_id, state_timestamp)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS host_attributes (
@@ -181,21 +208,31 @@ var generateSQLBase = []string{
 		  attribute_value varchar(128) NOT NULL,
 		  submit_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		  expire_timestamp timestamp NULL DEFAULT NULL,
-		  PRIMARY KEY (hostname,attribute_name),
-		  KEY attribute_name_idx (attribute_name),
-		  KEY attribute_value_idx (attribute_value),
-		  KEY submit_timestamp_idx (submit_timestamp),
-		  KEY expire_timestamp_idx (expire_timestamp)
+		  PRIMARY KEY (hostname,attribute_name)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX attribute_name_idx_host_attributes ON host_attributes (attribute_name)
+	`,
+	`
+		CREATE INDEX attribute_value_idx_host_attributes ON host_attributes (attribute_value)
+	`,
+	`
+		CREATE INDEX submit_timestamp_idx_host_attributes ON host_attributes (submit_timestamp)
+	`,
+	`
+		CREATE INDEX expire_timestamp_idx_host_attributes ON host_attributes (expire_timestamp)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS hostname_resolve (
 		  hostname varchar(128) NOT NULL,
 		  resolved_hostname varchar(128) NOT NULL,
 		  resolved_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		  PRIMARY KEY (hostname),
-		  KEY resolved_timestamp_idx (resolved_timestamp)
+		  PRIMARY KEY (hostname)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX resolved_timestamp_idx_hostname_resolve ON hostname_resolve (resolved_timestamp)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS cluster_alias (
@@ -209,7 +246,7 @@ var generateSQLBase = []string{
 		  anchor tinyint unsigned NOT NULL,
 		  hostname varchar(128) CHARACTER SET ascii NOT NULL,
 		  token varchar(128) NOT NULL,
-		  last_seen_active timestamp NOT NULL,
+		  last_seen_active timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		  PRIMARY KEY (anchor)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
@@ -221,8 +258,8 @@ var generateSQLBase = []string{
 		CREATE TABLE IF NOT EXISTS node_health (
 		  hostname varchar(128) CHARACTER SET ascii NOT NULL,
 		  token varchar(128) NOT NULL,
-		  last_seen_active timestamp NOT NULL,
-		  PRIMARY KEY (hostname)
+		  last_seen_active timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  PRIMARY KEY (hostname, token)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
@@ -236,170 +273,208 @@ var generateSQLBase = []string{
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS topology_recovery (
-          recovery_id bigint unsigned not null auto_increment,
-		  hostname varchar(128) NOT NULL,
-		  port smallint unsigned NOT NULL,
-          in_active_period tinyint unsigned NOT NULL DEFAULT 0,
-          start_active_period timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          end_active_period_unixtime int unsigned,
-          end_recovery timestamp NULL,
-		  processing_node_hostname varchar(128) CHARACTER SET ascii NOT NULL,
-		  processcing_node_token varchar(128) NOT NULL,
-		  successor_hostname varchar(128) DEFAULT NULL,
-		  successor_port smallint unsigned DEFAULT NULL,
-		  PRIMARY KEY (recovery_id),
-          UNIQUE KEY hostname_port_active_period_uidx(hostname, port, in_active_period, end_active_period_unixtime),
-		  KEY in_active_start_period_idx (in_active_period, start_active_period),
-		  KEY start_active_period_idx (start_active_period)
+			recovery_id bigint unsigned not null auto_increment,
+			hostname varchar(128) NOT NULL,
+			port smallint unsigned NOT NULL,
+			in_active_period tinyint unsigned NOT NULL DEFAULT 0,
+			start_active_period timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			end_active_period_unixtime int unsigned,
+			end_recovery timestamp NULL,
+			processing_node_hostname varchar(128) CHARACTER SET ascii NOT NULL,
+			processcing_node_token varchar(128) NOT NULL,
+			successor_hostname varchar(128) DEFAULT NULL,
+			successor_port smallint unsigned DEFAULT NULL,
+			PRIMARY KEY (recovery_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX in_active_start_period_idx_topology_recovery ON topology_recovery (in_active_period, start_active_period)
+	`,
+	`
+		CREATE INDEX start_active_period_idx_topology_recovery ON topology_recovery (start_active_period)
+	`,
+	`
+		CREATE UNIQUE INDEX hostname_port_active_period_uidx_topology_recovery ON topology_recovery (hostname, port, in_active_period, end_active_period_unixtime)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS hostname_unresolve (
 		  hostname varchar(128) NOT NULL,
 		  unresolved_hostname varchar(128) NOT NULL,
-		  PRIMARY KEY (hostname),
-		  KEY unresolved_hostname_idx (unresolved_hostname)
+		  PRIMARY KEY (hostname)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX unresolved_hostname_idx_hostname_unresolve ON hostname_unresolve (unresolved_hostname)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS database_instance_pool (
-          hostname varchar(128) CHARACTER SET ascii NOT NULL,
-          port smallint(5) unsigned NOT NULL,
-		  pool varchar(128) NOT NULL,
-		  PRIMARY KEY (hostname, port, pool),
-		  KEY pool_idx (pool)
+			hostname varchar(128) CHARACTER SET ascii NOT NULL,
+			port smallint(5) unsigned NOT NULL,
+			pool varchar(128) NOT NULL,
+			PRIMARY KEY (hostname, port, pool)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
-        CREATE TABLE IF NOT EXISTS database_instance_topology_history (
-          snapshot_unix_timestamp INT UNSIGNED NOT NULL,
-          hostname varchar(128) CHARACTER SET ascii NOT NULL,
-          port smallint(5) unsigned NOT NULL,
-          master_host varchar(128) CHARACTER SET ascii NOT NULL,
-          master_port smallint(5) unsigned NOT NULL,
-          cluster_name tinytext CHARACTER SET ascii NOT NULL,
-          PRIMARY KEY (snapshot_unix_timestamp, hostname, port),
-          KEY cluster_name_idx (snapshot_unix_timestamp, cluster_name(128))
-        ) ENGINE=InnoDB DEFAULT CHARSET=ascii
-
+		CREATE INDEX pool_idx_database_instance_pool ON database_instance_pool (pool)
 	`,
 	`
-        CREATE TABLE IF NOT EXISTS candidate_database_instance (
-          hostname varchar(128) CHARACTER SET ascii NOT NULL,
-          port smallint(5) unsigned NOT NULL,
-          last_suggested TIMESTAMP NOT NULL,
-          PRIMARY KEY (hostname, port),
-          KEY last_suggested_idx (last_suggested)
-        ) ENGINE=InnoDB DEFAULT CHARSET=ascii
-
+		CREATE TABLE IF NOT EXISTS database_instance_topology_history (
+			snapshot_unix_timestamp INT UNSIGNED NOT NULL,
+			hostname varchar(128) CHARACTER SET ascii NOT NULL,
+			port smallint(5) unsigned NOT NULL,
+			master_host varchar(128) CHARACTER SET ascii NOT NULL,
+			master_port smallint(5) unsigned NOT NULL,
+			cluster_name tinytext CHARACTER SET ascii NOT NULL,
+			PRIMARY KEY (snapshot_unix_timestamp, hostname, port)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
-        CREATE TABLE IF NOT EXISTS database_instance_downtime (
-          hostname varchar(128) NOT NULL,
-          port smallint(5) unsigned NOT NULL,
-          downtime_active tinyint(4) DEFAULT NULL,
-          begin_timestamp timestamp DEFAULT CURRENT_TIMESTAMP,
-          end_timestamp timestamp,
-          owner varchar(128) CHARACTER SET utf8 NOT NULL,
-          reason text CHARACTER SET utf8 NOT NULL,
-          PRIMARY KEY (hostname, port)
-        ) ENGINE=InnoDB DEFAULT CHARSET=ascii
+		CREATE INDEX cluster_name_idx_database_instance_topology_history ON database_instance_topology_history (snapshot_unix_timestamp, cluster_name)
 	`,
 	`
-        CREATE TABLE IF NOT EXISTS topology_failure_detection (
-          detection_id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-          hostname varchar(128) NOT NULL,
-          port smallint unsigned NOT NULL,
-          in_active_period tinyint unsigned NOT NULL DEFAULT '0',
-          start_active_period timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          end_active_period_unixtime int unsigned NOT NULL,
-          processing_node_hostname varchar(128) NOT NULL,
-          processcing_node_token varchar(128) NOT NULL,
-          analysis varchar(128) NOT NULL,
-          cluster_name varchar(128) NOT NULL,
-          cluster_alias varchar(128) NOT NULL,
-          count_affected_slaves int unsigned NOT NULL,
-          slave_hosts text NOT NULL,
-          PRIMARY KEY (detection_id),
-          UNIQUE KEY hostname_port_active_period_uidx (hostname, port, in_active_period, end_active_period_unixtime),
-          KEY in_active_start_period_idx (in_active_period, start_active_period)
-        ) ENGINE=InnoDB DEFAULT CHARSET=ascii
+		CREATE TABLE IF NOT EXISTS candidate_database_instance (
+			hostname varchar(128) CHARACTER SET ascii NOT NULL,
+			port smallint(5) unsigned NOT NULL,
+			last_suggested TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (hostname, port)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX last_suggested_idx_candidate_database_instance ON candidate_database_instance (last_suggested)
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS database_instance_downtime (
+			hostname varchar(128) NOT NULL,
+			port smallint(5) unsigned NOT NULL,
+			downtime_active tinyint(4) DEFAULT NULL,
+			begin_timestamp timestamp DEFAULT CURRENT_TIMESTAMP,
+			end_timestamp timestamp,
+			owner varchar(128) CHARACTER SET utf8 NOT NULL,
+			reason text CHARACTER SET utf8 NOT NULL,
+			PRIMARY KEY (hostname, port)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS topology_failure_detection (
+			detection_id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			hostname varchar(128) NOT NULL,
+			port smallint unsigned NOT NULL,
+			in_active_period tinyint unsigned NOT NULL DEFAULT '0',
+			start_active_period timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			end_active_period_unixtime int unsigned NOT NULL,
+			processing_node_hostname varchar(128) NOT NULL,
+			processcing_node_token varchar(128) NOT NULL,
+			analysis varchar(128) NOT NULL,
+			cluster_name varchar(128) NOT NULL,
+			cluster_alias varchar(128) NOT NULL,
+			count_affected_slaves int unsigned NOT NULL,
+			slave_hosts text NOT NULL,
+			PRIMARY KEY (detection_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE UNIQUE INDEX hostname_port_active_period_uidx_topology_failure_detection ON topology_failure_detection (hostname, port, in_active_period, end_active_period_unixtime)
+	`,
+	`
+		CREATE INDEX in_active_start_period_idx_topology_failure_detection ON topology_failure_detection (in_active_period, start_active_period)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS hostname_resolve_history (
-		  resolved_hostname varchar(128) NOT NULL,
-		  hostname varchar(128) NOT NULL,
-		  resolved_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		  PRIMARY KEY (resolved_hostname),
-		  KEY (hostname),
-		  KEY resolved_timestamp_idx (resolved_timestamp)
+			resolved_hostname varchar(128) NOT NULL,
+			hostname varchar(128) NOT NULL,
+			resolved_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (resolved_hostname)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX hostname_idx_hostname_resolve_history ON hostname_resolve_history (hostname)
+	`,
+	`
+		CREATE INDEX resolved_timestamp_idx_hostname_resolve_history ON hostname_resolve_history (resolved_timestamp)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS hostname_unresolve_history (
-		  unresolved_hostname varchar(128) NOT NULL,
-		  hostname varchar(128) NOT NULL,
-		  last_registered TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		  PRIMARY KEY (unresolved_hostname),
-		  KEY (hostname),
-		  KEY last_registered_idx (last_registered)
+			unresolved_hostname varchar(128) NOT NULL,
+			hostname varchar(128) NOT NULL,
+			last_registered TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (unresolved_hostname)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX hostname_idx_hostname_unresolve_history ON hostname_unresolve_history (hostname)
+	`,
+	`
+		CREATE INDEX last_registered_idx_hostname_unresolve_history ON hostname_unresolve_history (last_registered)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS cluster_domain_name (
-		  cluster_name varchar(128) CHARACTER SET ascii NOT NULL,
-		  domain_name varchar(128) NOT NULL,
-		  PRIMARY KEY (cluster_name),
-		  KEY domain_name_idx(domain_name(32))
+			cluster_name varchar(128) CHARACTER SET ascii NOT NULL,
+			domain_name varchar(128) NOT NULL,
+			PRIMARY KEY (cluster_name)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
-        CREATE TABLE IF NOT EXISTS master_position_equivalence (
-          equivalence_id bigint unsigned not null auto_increment,
-          master1_hostname varchar(128) CHARACTER SET ascii NOT NULL,
-          master1_port smallint(5) unsigned NOT NULL,
-          master1_binary_log_file varchar(128) CHARACTER SET ascii NOT NULL,
-          master1_binary_log_pos bigint(20) unsigned NOT NULL,
-          master2_hostname varchar(128) CHARACTER SET ascii NOT NULL,
-          master2_port smallint(5) unsigned NOT NULL,
-          master2_binary_log_file varchar(128) CHARACTER SET ascii NOT NULL,
-          master2_binary_log_pos bigint(20) unsigned NOT NULL,
-          last_suggested TIMESTAMP NOT NULL,
-          PRIMARY KEY (equivalence_id),
-          UNIQUE KEY equivalence_uidx (master1_hostname, master1_port, master1_binary_log_file, master1_binary_log_pos, master2_hostname, master2_port),
-          KEY master2_idx (master2_hostname, master2_port, master2_binary_log_file, master2_binary_log_pos),
-          KEY last_suggested_idx(last_suggested)
-        ) ENGINE=InnoDB DEFAULT CHARSET=ascii
+		CREATE INDEX domain_name_idx_cluster_domain_name ON cluster_domain_name (domain_name)
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS master_position_equivalence (
+			equivalence_id bigint unsigned not null auto_increment,
+			master1_hostname varchar(128) CHARACTER SET ascii NOT NULL,
+			master1_port smallint(5) unsigned NOT NULL,
+			master1_binary_log_file varchar(128) CHARACTER SET ascii NOT NULL,
+			master1_binary_log_pos bigint(20) unsigned NOT NULL,
+			master2_hostname varchar(128) CHARACTER SET ascii NOT NULL,
+			master2_port smallint(5) unsigned NOT NULL,
+			master2_binary_log_file varchar(128) CHARACTER SET ascii NOT NULL,
+			master2_binary_log_pos bigint(20) unsigned NOT NULL,
+			last_suggested TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (equivalence_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE UNIQUE INDEX equivalence_uidx_master_position_equivalence ON master_position_equivalence (master1_hostname, master1_port, master1_binary_log_file, master1_binary_log_pos, master2_hostname, master2_port)
+	`,
+	`
+		CREATE INDEX master2_idx_master_position_equivalence ON master_position_equivalence (master2_hostname, master2_port, master2_binary_log_file, master2_binary_log_pos)
+	`,
+	`
+		CREATE INDEX last_suggested_idx_master_position_equivalence ON master_position_equivalence (last_suggested)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS async_request (
-		  request_id bigint unsigned NOT NULL AUTO_INCREMENT,
-		  command varchar(128) charset ascii not null,
-		  hostname varchar(128) NOT NULL,
-		  port smallint(5) unsigned NOT NULL,
-		  destination_hostname varchar(128) NOT NULL,
-		  destination_port smallint(5) unsigned NOT NULL,
-		  pattern text CHARACTER SET utf8 NOT NULL,
-		  gtid_hint varchar(32) charset ascii not null,
-		  begin_timestamp timestamp NULL DEFAULT NULL,
-		  end_timestamp timestamp NULL DEFAULT NULL,
-		  story text CHARACTER SET utf8 NOT NULL,
-		  PRIMARY KEY (request_id),
-		  KEY begin_timestamp_idx (begin_timestamp),
-		  KEY end_timestamp_idx (end_timestamp)
+			request_id bigint unsigned NOT NULL AUTO_INCREMENT,
+			command varchar(128) charset ascii not null,
+			hostname varchar(128) NOT NULL,
+			port smallint(5) unsigned NOT NULL,
+			destination_hostname varchar(128) NOT NULL,
+			destination_port smallint(5) unsigned NOT NULL,
+			pattern text CHARACTER SET utf8 NOT NULL,
+			gtid_hint varchar(32) charset ascii not null,
+			begin_timestamp timestamp NULL DEFAULT NULL,
+			end_timestamp timestamp NULL DEFAULT NULL,
+			story text CHARACTER SET utf8 NOT NULL,
+			PRIMARY KEY (request_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+		CREATE INDEX begin_timestamp_idx_async_request ON async_request (begin_timestamp)
+	`,
+	`
+		CREATE INDEX end_timestamp_idx_async_request ON async_request (end_timestamp)
+	`,
+	`
 		CREATE TABLE IF NOT EXISTS blocked_topology_recovery (
-		  hostname varchar(128) NOT NULL,
-		  port smallint(5) unsigned NOT NULL,
-		  cluster_name varchar(128) NOT NULL,
-		  analysis varchar(128) NOT NULL,
-		  last_blocked_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		  blocking_recovery_id bigint unsigned,
-		  PRIMARY KEY (hostname, port),
-		  KEY cluster_blocked_idx (cluster_name, last_blocked_timestamp)
-		) ENGINE=InnoDB CHARSET=ascii
+			hostname varchar(128) NOT NULL,
+			port smallint(5) unsigned NOT NULL,
+			cluster_name varchar(128) NOT NULL,
+			analysis varchar(128) NOT NULL,
+			last_blocked_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			blocking_recovery_id bigint unsigned,
+			PRIMARY KEY (hostname, port)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX cluster_blocked_idx_blocked_topology_recovery ON blocked_topology_recovery (cluster_name, last_blocked_timestamp)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS database_instance_last_analysis (
@@ -407,115 +482,137 @@ var generateSQLBase = []string{
 		  port smallint(5) unsigned NOT NULL,
 		  analysis_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		  analysis varchar(128) NOT NULL,
-		  PRIMARY KEY (hostname, port),
-		  KEY analysis_timestamp_idx(analysis_timestamp)
+		  PRIMARY KEY (hostname, port)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX analysis_timestamp_idx_database_instance_last_analysis ON database_instance_last_analysis (analysis_timestamp)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS database_instance_analysis_changelog (
-          changelog_id bigint unsigned not null auto_increment,
-		  hostname varchar(128) NOT NULL,
-		  port smallint(5) unsigned NOT NULL,
-		  analysis_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		  analysis varchar(128) NOT NULL,
-		  PRIMARY KEY (changelog_id),
-		  KEY analysis_timestamp_idx(analysis_timestamp)
+			changelog_id bigint unsigned not null auto_increment,
+			hostname varchar(128) NOT NULL,
+			port smallint(5) unsigned NOT NULL,
+			analysis_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			analysis varchar(128) NOT NULL,
+			PRIMARY KEY (changelog_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX analysis_timestamp_idx_database_instance_analysis_changelog ON database_instance_analysis_changelog (analysis_timestamp)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS node_health_history (
-		  history_id bigint unsigned not null auto_increment,
-		  hostname varchar(128) CHARACTER SET ascii NOT NULL,
-		  token varchar(128) NOT NULL,
-		  first_seen_active timestamp NOT NULL,
-		  extra_info varchar(128) CHARACTER SET utf8 NOT NULL,
-		  PRIMARY KEY (history_id),
-		  UNIQUE KEY hostname_token_idx(hostname, token),
-		  KEY first_seen_active_idx(first_seen_active)
+			history_id bigint unsigned not null auto_increment,
+			hostname varchar(128) CHARACTER SET ascii NOT NULL,
+			token varchar(128) NOT NULL,
+			first_seen_active timestamp NOT NULL,
+			extra_info varchar(128) CHARACTER SET utf8 NOT NULL,
+			PRIMARY KEY (history_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX first_seen_active_idx_node_health_history ON node_health_history (first_seen_active)
+	`,
+	`
+		CREATE UNIQUE INDEX hostname_token_idx_node_health_history ON node_health_history (hostname, token)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS database_instance_coordinates_history (
-          history_id bigint unsigned not null auto_increment,
-		  hostname varchar(128) NOT NULL,
-		  port smallint(5) unsigned NOT NULL,
-		  recorded_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		  binary_log_file varchar(128) NOT NULL,
-		  binary_log_pos bigint(20) unsigned NOT NULL,
-		  relay_log_file varchar(128) NOT NULL,
-		  relay_log_pos bigint(20) unsigned NOT NULL,
-		  PRIMARY KEY (history_id),
-		  KEY hostname_port_recorded_timestmp_idx (hostname, port, recorded_timestamp),
-		  KEY recorded_timestmp_idx (recorded_timestamp)
+			history_id bigint unsigned not null auto_increment,
+			hostname varchar(128) NOT NULL,
+			port smallint(5) unsigned NOT NULL,
+			recorded_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			binary_log_file varchar(128) NOT NULL,
+			binary_log_pos bigint(20) unsigned NOT NULL,
+			relay_log_file varchar(128) NOT NULL,
+			relay_log_pos bigint(20) unsigned NOT NULL,
+			PRIMARY KEY (history_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX hostname_port_recorded_timestmp_idx_database_instance_coordinates_history ON database_instance_coordinates_history (hostname, port, recorded_timestamp)
+	`,
+	`
+		CREATE INDEX recorded_timestmp_idx_database_instance_coordinates_history ON database_instance_coordinates_history (recorded_timestamp)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS database_instance_binlog_files_history (
-          history_id bigint unsigned not null auto_increment,
-		  hostname varchar(128) NOT NULL,
-		  port smallint(5) unsigned NOT NULL,
-		  binary_log_file varchar(128) NOT NULL,
-		  binary_log_pos bigint(20) unsigned NOT NULL,
-		  first_seen timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		  last_seen timestamp NOT NULL DEFAULT '1971-01-01 00:00:00',
-		  PRIMARY KEY (history_id),
-		  UNIQUE KEY hostname_port_file_idx (hostname, port, binary_log_file),
-		  KEY last_seen_idx (last_seen)
+			history_id bigint unsigned not null auto_increment,
+			hostname varchar(128) NOT NULL,
+			port smallint(5) unsigned NOT NULL,
+			binary_log_file varchar(128) NOT NULL,
+			binary_log_pos bigint(20) unsigned NOT NULL,
+			first_seen timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			last_seen timestamp NOT NULL DEFAULT '1971-01-01 00:00:00',
+			PRIMARY KEY (history_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
-	  CREATE TABLE IF NOT EXISTS access_token (
-	    access_token_id bigint unsigned not null auto_increment,
-	    public_token varchar(128) NOT NULL,
-	    secret_token varchar(128) NOT NULL,
-	    generated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	    generated_by varchar(128) CHARACTER SET utf8 NOT NULL,
+		CREATE UNIQUE INDEX hostname_port_file_idx_database_instance_binlog_files_history ON database_instance_binlog_files_history (hostname, port, binary_log_file)
+	`,
+	`
+		CREATE INDEX last_seen_idx_database_instance_binlog_files_history ON database_instance_binlog_files_history (last_seen)
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS access_token (
+			access_token_id bigint unsigned not null auto_increment,
+			public_token varchar(128) NOT NULL,
+			secret_token varchar(128) NOT NULL,
+			generated_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			generated_by varchar(128) CHARACTER SET utf8 NOT NULL,
 			is_acquired tinyint unsigned NOT NULL DEFAULT '0',
-	    PRIMARY KEY (access_token_id),
-	    UNIQUE KEY public_token_idx (public_token),
-	    KEY generated_at_idx (generated_at)
-	  ) ENGINE=InnoDB DEFAULT CHARSET=ascii
+			PRIMARY KEY (access_token_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE UNIQUE INDEX public_token_uidx_access_token ON access_token (public_token)
+	`,
+	`
+		CREATE INDEX generated_at_idx_access_token ON access_token (generated_at)
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS database_instance_recent_relaylog_history (
-		  hostname varchar(128) NOT NULL,
-		  port smallint(5) unsigned NOT NULL,
+			hostname varchar(128) NOT NULL,
+			port smallint(5) unsigned NOT NULL,
 			current_relay_log_file varchar(128) NOT NULL,
-		  current_relay_log_pos bigint(20) unsigned NOT NULL,
+			current_relay_log_pos bigint(20) unsigned NOT NULL,
 			current_seen timestamp NOT NULL DEFAULT '1971-01-01 00:00:00',
 			prev_relay_log_file varchar(128) NOT NULL,
-		  prev_relay_log_pos bigint(20) unsigned NOT NULL,
+			prev_relay_log_pos bigint(20) unsigned NOT NULL,
 			prev_seen timestamp NOT NULL DEFAULT '1971-01-01 00:00:00',
-			PRIMARY KEY (hostname, port),
-		  KEY current_seen_idx (current_seen)
+			PRIMARY KEY (hostname, port)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+		CREATE INDEX current_seen_idx_database_instance_recent_relaylog_history ON database_instance_recent_relaylog_history (current_seen)
+	`,
+	`
 		CREATE TABLE IF NOT EXISTS orchestrator_metadata (
-		  anchor tinyint unsigned NOT NULL,
-		  last_deployed_version varchar(128) CHARACTER SET ascii NOT NULL,
-		  last_deployed_timestamp timestamp NOT NULL,
-		  PRIMARY KEY (anchor)
+			anchor tinyint unsigned NOT NULL,
+			last_deployed_version varchar(128) CHARACTER SET ascii NOT NULL,
+			last_deployed_timestamp timestamp NOT NULL,
+			PRIMARY KEY (anchor)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS orchestrator_db_deployments (
-		  deployed_version varchar(128) CHARACTER SET ascii NOT NULL,
-		  deployed_timestamp timestamp NOT NULL,
-		  PRIMARY KEY (deployed_version)
+			deployed_version varchar(128) CHARACTER SET ascii NOT NULL,
+			deployed_timestamp timestamp NOT NULL,
+			PRIMARY KEY (deployed_version)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS global_recovery_disable (
-		  disable_recovery tinyint unsigned NOT NULL COMMENT 'Insert 1 to disable recovery globally',
-		  PRIMARY KEY (disable_recovery)
+			disable_recovery tinyint unsigned NOT NULL COMMENT 'Insert 1 to disable recovery globally',
+			PRIMARY KEY (disable_recovery)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS cluster_alias_override (
-		  cluster_name varchar(128) CHARACTER SET ascii NOT NULL,
-		  alias varchar(128) NOT NULL,
-		  PRIMARY KEY (cluster_name)
+			cluster_name varchar(128) CHARACTER SET ascii NOT NULL,
+			alias varchar(128) NOT NULL,
+			PRIMARY KEY (cluster_name)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 }
@@ -541,7 +638,7 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE
 			database_instance
-			ADD COLUMN last_attempted_check TIMESTAMP AFTER last_checked
+			ADD COLUMN last_attempted_check TIMESTAMP DEFAULT '1971-01-01 00:00:00' AFTER last_checked
 	`,
 	`
 		ALTER TABLE
@@ -626,15 +723,34 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE
 			topology_recovery
-			ADD COLUMN analysis              varchar(128) CHARACTER SET ascii NOT NULL,
-			ADD COLUMN cluster_name          varchar(128) CHARACTER SET ascii NOT NULL,
-			ADD COLUMN cluster_alias         varchar(128) CHARACTER SET ascii NOT NULL,
-			ADD COLUMN count_affected_slaves int unsigned NOT NULL,
+			ADD COLUMN analysis              varchar(128) CHARACTER SET ascii NOT NULL
+	`,
+	`
+		ALTER TABLE
+			topology_recovery
+			ADD COLUMN cluster_name          varchar(128) CHARACTER SET ascii NOT NULL
+	`,
+	`
+		ALTER TABLE
+			topology_recovery
+			ADD COLUMN cluster_alias         varchar(128) CHARACTER SET ascii NOT NULL
+	`,
+	`
+		ALTER TABLE
+			topology_recovery
+			ADD COLUMN count_affected_slaves int unsigned NOT NULL
+	`,
+	`
+		ALTER TABLE
+			topology_recovery
 			ADD COLUMN slave_hosts text CHARACTER SET ascii NOT NULL
 	`,
 	`
 		ALTER TABLE hostname_unresolve
-			ADD COLUMN last_registered TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			ADD COLUMN last_registered TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	`,
+	`
+		ALTER TABLE hostname_unresolve
 			ADD KEY last_registered_idx (last_registered)
 	`,
 	`
@@ -652,7 +768,10 @@ var generateSQLPatches = []string{
 	`,
 	`
 		ALTER TABLE cluster_domain_name
-			ADD COLUMN last_registered TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			ADD COLUMN last_registered TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	`,
+	`
+		ALTER TABLE cluster_domain_name
 			ADD KEY last_registered_idx (last_registered)
 	`,
 	`
@@ -677,7 +796,10 @@ var generateSQLPatches = []string{
 	`,
 	`
 		ALTER TABLE cluster_alias
-			ADD COLUMN last_registered TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			ADD COLUMN last_registered TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	`,
+	`
+		ALTER TABLE cluster_alias
 			ADD KEY last_registered_idx (last_registered)
 	`,
 	`
@@ -688,15 +810,31 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE
 			topology_recovery
-			ADD COLUMN acknowledged TINYINT UNSIGNED NOT NULL DEFAULT 0,
-			ADD COLUMN acknowledged_by varchar(128) CHARACTER SET utf8 NOT NULL,
+			ADD COLUMN acknowledged TINYINT UNSIGNED NOT NULL DEFAULT 0
+	`,
+	`
+		ALTER TABLE
+			topology_recovery
+			ADD COLUMN acknowledged_by varchar(128) CHARACTER SET utf8 NOT NULL
+	`,
+	`
+		ALTER TABLE
+			topology_recovery
 			ADD COLUMN acknowledge_comment text CHARACTER SET utf8 NOT NULL
 	`,
 	`
 		ALTER TABLE
 			topology_recovery
-			ADD COLUMN participating_instances text CHARACTER SET ascii NOT NULL after slave_hosts,
-			ADD COLUMN lost_slaves text CHARACTER SET ascii NOT NULL after participating_instances,
+			ADD COLUMN participating_instances text CHARACTER SET ascii NOT NULL after slave_hosts
+	`,
+	`
+		ALTER TABLE
+			topology_recovery
+			ADD COLUMN lost_slaves text CHARACTER SET ascii NOT NULL after participating_instances
+	`,
+	`
+		ALTER TABLE
+			topology_recovery
 			ADD COLUMN all_errors text CHARACTER SET ascii NOT NULL after lost_slaves
 	`,
 	`
@@ -710,7 +848,11 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE
 			topology_recovery
-			ADD COLUMN acknowledged_at TIMESTAMP NULL after acknowledged,
+			ADD COLUMN acknowledged_at TIMESTAMP NULL after acknowledged
+	`,
+	`
+		ALTER TABLE
+			topology_recovery
 			ADD KEY acknowledged_idx (acknowledged, acknowledged_at)
 	`,
 	`
@@ -723,7 +865,7 @@ var generateSQLPatches = []string{
 			ADD COLUMN promotion_rule enum('must', 'prefer', 'neutral', 'prefer_not', 'must_not') NOT NULL DEFAULT 'neutral'
 	`,
 	`
-		ALTER TABLE node_health
+		ALTER TABLE node_health /* sqlite3-skip */
 			DROP PRIMARY KEY,
 			ADD PRIMARY KEY (hostname, token)
 	`,
@@ -732,24 +874,24 @@ var generateSQLPatches = []string{
 			ADD COLUMN extra_info varchar(128) CHARACTER SET utf8 NOT NULL
 	`,
 	`
-		ALTER TABLE agent_seed
+		ALTER TABLE agent_seed /* sqlite3-skip */
 			MODIFY end_timestamp timestamp NOT NULL DEFAULT '1971-01-01 00:00:00'
 	`,
 	`
-		ALTER TABLE active_node
+		ALTER TABLE active_node /* sqlite3-skip */
 			MODIFY last_seen_active timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 	`,
 
 	`
-		ALTER TABLE node_health
+		ALTER TABLE node_health /* sqlite3-skip */
 			MODIFY last_seen_active timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 	`,
 	`
-		ALTER TABLE candidate_database_instance
+		ALTER TABLE candidate_database_instance /* sqlite3-skip */
 			MODIFY last_suggested timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 	`,
 	`
-		ALTER TABLE master_position_equivalence
+		ALTER TABLE master_position_equivalence /* sqlite3-skip */
 			MODIFY last_suggested timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 	`,
 	`
@@ -759,7 +901,7 @@ var generateSQLPatches = []string{
 	`,
 	`
 		ALTER TABLE
-			database_instance
+			database_instance /* sqlite3-skip */
 			MODIFY last_attempted_check TIMESTAMP NOT NULL DEFAULT '1971-01-01 00:00:00'
 	`,
 	`
@@ -770,7 +912,11 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE
 			topology_recovery
-			ADD COLUMN last_detection_id bigint unsigned NOT NULL,
+			ADD COLUMN last_detection_id bigint unsigned NOT NULL
+	`,
+	`
+		ALTER TABLE
+			topology_recovery
 			ADD KEY last_detection_idx (last_detection_id)
 	`,
 	`
@@ -842,7 +988,7 @@ var generateSQLPatches = []string{
 	`,
 	`
 		ALTER TABLE
-			database_instance
+			database_instance /* sqlite3-skip */
 			MODIFY cluster_name varchar(128) NOT NULL
 	`,
 	`
@@ -853,7 +999,11 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE
 			database_instance_maintenance
-			ADD COLUMN processing_node_hostname varchar(128) CHARACTER SET ascii NOT NULL,
+			ADD COLUMN processing_node_hostname varchar(128) CHARACTER SET ascii NOT NULL
+	`,
+	`
+		ALTER TABLE
+			database_instance_maintenance
 			ADD COLUMN processing_node_token varchar(128) NOT NULL
 	`,
 	`
@@ -863,18 +1013,18 @@ var generateSQLPatches = []string{
 	`,
 	`
 		ALTER TABLE node_health_history
-			ADD COLUMN app_version varchar(30) CHARACTER SET ascii NOT NULL DEFAULT ""
+			ADD COLUMN app_version varchar(64) CHARACTER SET ascii NOT NULL DEFAULT ""
 	`,
 	`
 		ALTER TABLE node_health
-			ADD COLUMN app_version varchar(30) CHARACTER SET ascii NOT NULL DEFAULT ""
+			ADD COLUMN app_version varchar(64) CHARACTER SET ascii NOT NULL DEFAULT ""
 	`,
 	`
-		ALTER TABLE node_health_history
+		ALTER TABLE node_health_history /* sqlite3-skip */
 			MODIFY app_version varchar(64) CHARACTER SET ascii NOT NULL DEFAULT ""
 	`,
 	`
-		ALTER TABLE node_health
+		ALTER TABLE node_health /* sqlite3-skip */
 			MODIFY app_version varchar(64) CHARACTER SET ascii NOT NULL DEFAULT ""
 	`,
 	`
@@ -1057,7 +1207,7 @@ func SetupMySQLOrchestratorTLS(uri string) (string, error) {
 
 // deployStatements will issue given sql queries that are not already known to be deployed.
 // This iterates both lists (to-run and already-deployed) and also verifies no contraditions.
-func deployStatements(db *sql.DB, queries []string, fatalOnError bool) error {
+func deployStatements(db *sql.DB, queries []string) error {
 	tx, err := db.Begin()
 	if err != nil {
 		log.Fatale(err)
@@ -1089,13 +1239,13 @@ func deployStatements(db *sql.DB, queries []string, fatalOnError bool) error {
 		if err != nil {
 			return log.Fatalf("Cannot initiate orchestrator: %+v; query=%+v", err, query)
 		}
-		if fatalOnError {
-			if _, err := tx.Exec(query); err != nil {
+		if _, err := tx.Exec(query); err != nil {
+			if strings.Contains(err.Error(), "syntax error") {
 				return log.Fatalf("Cannot initiate orchestrator: %+v; query=%+v", err, query)
 			}
-		} else {
-			tx.Exec(query)
-			// And ignore any error
+			if !sqlutils.IsAlterTable(query) && !sqlutils.IsCreateIndex(query) {
+				return log.Fatalf("Cannot initiate orchestrator: %+v; query=%+v", err, query)
+			}
 		}
 	}
 	if config.Config.IsMySQL() {
@@ -1120,20 +1270,30 @@ func initOrchestratorDB(db *sql.DB) error {
 		return nil
 	}
 	log.Debugf("Migrating database schema")
-	deployStatements(db, generateSQLBase, true)
-	deployStatements(db, generateSQLPatches, false)
+	deployStatements(db, generateSQLBase)
+	deployStatements(db, generateSQLPatches)
 	registerOrchestratorDeployment(db)
 	return nil
 }
 
 // execInternalSilently
 func execInternalSilently(db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
+	var err error
+	query, err = translateStatement(query)
+	if err != nil {
+		return nil, err
+	}
 	res, err := sqlutils.ExecSilently(db, query, args...)
 	return res, err
 }
 
 // execInternal
 func execInternal(db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
+	var err error
+	query, err = translateStatement(query)
+	if err != nil {
+		return nil, err
+	}
 	res, err := sqlutils.ExecSilently(db, query, args...)
 	return res, err
 }
