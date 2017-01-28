@@ -1303,6 +1303,11 @@ func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
 	if config.Config.DatabaselessMode__experimental {
 		return DummySqlResult{}, nil
 	}
+	var err error
+	query, err = translateStatement(query)
+	if err != nil {
+		return nil, err
+	}
 	db, err := OpenOrchestrator()
 	if err != nil {
 		return nil, err
