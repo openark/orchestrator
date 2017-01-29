@@ -88,11 +88,11 @@ func TestToSqlite3GeneralConversions(t *testing.T) {
 	{
 		statement := "select now() - interval ? second"
 		result := ToSqlite3Dialect(statement)
-		test.S(t).ExpectEquals(result, "select datetime('now', printf('-%d second', ?))")
+		test.S(t).ExpectEquals(result, "select datetime('now', printf('-%%d second', ?))")
 	}
 	{
 		statement := "select now() + interval ? minute"
 		result := ToSqlite3Dialect(statement)
-		test.S(t).ExpectEquals(result, "select datetime('now', printf('+%d minute', ?))")
+		test.S(t).ExpectEquals(result, "select datetime('now', printf('+%%d minute', ?))")
 	}
 }

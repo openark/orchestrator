@@ -53,8 +53,12 @@ var insertConversions = []regexpMap{
 }
 
 var generalConversions = []regexpMap{
-	rmap(`(?i)now[(][)][\s]*-[\s]*interval [?] ([\S]+)`, `datetime('now', printf('-%d $1', ?))`),
-	rmap(`(?i)now[(][)][\s]*[+][\s]*interval [?] ([\S]+)`, `datetime('now', printf('+%d $1', ?))`),
+	rmap(`(?i)now[(][)][\s]*-[\s]*interval [?] ([\w]+)`, `datetime('now', printf('-%%d $1', ?))`),
+	rmap(`(?i)now[(][)][\s]*[+][\s]*interval [?] ([\w]+)`, `datetime('now', printf('+%%d $1', ?))`),
+	//	rmap(`(?i)timestampdiff[(][\s]*(second)[\s]*,([^,]+),[)]`, `datetime('now')`),
+	//rmap(`(?i)unix_timestamp[(]()[)]`, `datetime('now')`),
+
+	//timestampdiff(second, last_checked, now())
 	rmap(`(?i)now[(][)]`, `datetime('now')`),
 }
 
