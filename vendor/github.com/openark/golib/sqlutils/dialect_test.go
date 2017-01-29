@@ -39,38 +39,32 @@ func TestIsCreateTable(t *testing.T) {
 func TestToSqlite3CreateTable(t *testing.T) {
 	{
 		statement := "create table t(id int)"
-		result, err := ToSqlite3CreateTable(statement)
-		test.S(t).ExpectNil(err)
+		result := ToSqlite3CreateTable(statement)
 		test.S(t).ExpectEquals(result, statement)
 	}
 	{
 		statement := "create table t(id int, v varchar(123) CHARACTER SET ascii NOT NULL default '')"
-		result, err := ToSqlite3CreateTable(statement)
-		test.S(t).ExpectNil(err)
+		result := ToSqlite3CreateTable(statement)
 		test.S(t).ExpectEquals(result, "create table t(id int, v varchar(123) NOT NULL default '')")
 	}
 	{
 		statement := "create table t(id int, v varchar ( 123 ) CHARACTER SET ascii NOT NULL default '')"
-		result, err := ToSqlite3CreateTable(statement)
-		test.S(t).ExpectNil(err)
+		result := ToSqlite3CreateTable(statement)
 		test.S(t).ExpectEquals(result, "create table t(id int, v varchar ( 123 ) NOT NULL default '')")
 	}
 	{
 		statement := "create table t(i smallint unsigned)"
-		result, err := ToSqlite3CreateTable(statement)
-		test.S(t).ExpectNil(err)
+		result := ToSqlite3CreateTable(statement)
 		test.S(t).ExpectEquals(result, "create table t(i smallint)")
 	}
 	{
 		statement := "create table t(i smallint(5) unsigned)"
-		result, err := ToSqlite3CreateTable(statement)
-		test.S(t).ExpectNil(err)
+		result := ToSqlite3CreateTable(statement)
 		test.S(t).ExpectEquals(result, "create table t(i smallint)")
 	}
 	{
 		statement := "create table t(i smallint ( 5 ) unsigned)"
-		result, err := ToSqlite3CreateTable(statement)
-		test.S(t).ExpectNil(err)
+		result := ToSqlite3CreateTable(statement)
 		test.S(t).ExpectEquals(result, "create table t(i smallint)")
 	}
 }
@@ -83,4 +77,22 @@ func TestIsInsert(t *testing.T) {
 			`))
 	test.S(t).ExpectFalse(IsInsert("where create table t(id int)"))
 	test.S(t).ExpectFalse(IsInsert("create table t(id int)"))
+}
+
+func TestToSqlite3GeneralConversions(t *testing.T) {
+	{
+		statement := "select now()"
+		result := ToSqlite3Dialect(statement)
+		test.S(t).ExpectEquals(result, "select datetime('now')")
+	}
+	{
+		statement := "select now() - interval ? second"
+		result := ToSqlite3Dialect(statement)
+		test.S(t).ExpectEquals(result, "select datetime('now', printf('-%d second', ?))")
+	}
+	{
+		statement := "select now() + interval ? minute"
+		result := ToSqlite3Dialect(statement)
+		test.S(t).ExpectEquals(result, "select datetime('now', printf('+%d minute', ?))")
+	}
 }

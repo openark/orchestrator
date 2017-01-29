@@ -1142,11 +1142,10 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 }
 
 func translateStatement(statement string) (string, error) {
-	var err error
 	if config.Config.IsSQLite3() {
-		statement, err = sqlutils.ToSqlite3Dialect(statement)
+		statement = sqlutils.ToSqlite3Dialect(statement)
 	}
-	return statement, err
+	return statement, nil
 }
 
 // versionIsDeployed checks if given version has already been deployed

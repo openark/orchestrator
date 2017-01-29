@@ -52,6 +52,12 @@ var insertConversions = []regexpMap{
 	rmap(`(?i)now[(][)]`, `datetime('now')`),
 }
 
+var generalConversions = []regexpMap{
+	rmap(`(?i)now[(][)][\s]*-[\s]*interval [?] ([\S]+)`, `datetime('now', printf('-%d $1', ?))`),
+	rmap(`(?i)now[(][)][\s]*[+][\s]*interval [?] ([\S]+)`, `datetime('now', printf('+%d $1', ?))`),
+	rmap(`(?i)now[(][)]`, `datetime('now')`),
+}
+
 var (
 	identifyCreateTableStatement = regexp.MustCompile(regexpSpaces(`(?i)^[\s]*create table`))
 	identifyCreateIndexStatement = regexp.MustCompile(regexpSpaces(`(?i)^[\s]*create( unique|) index`))
@@ -86,31 +92,31 @@ func IsAlterTable(statement string) bool {
 	return identifyAlterTableStatement.MatchString(statement)
 }
 
-func ToSqlite3CreateTable(statement string) (string, error) {
-	for _, rmap := range createTableConversions {
+func applyConversions(statement string, conversions []regexpMap) string {
+	for _, rmap := range conversions {
 		statement = rmap.process(statement)
 	}
-
-	return statement, nil
+	return statement
 }
 
-func ToSqlite3Insert(statement string) (string, error) {
-	for _, rmap := range insertConversions {
-		statement = rmap.process(statement)
-	}
-
-	return statement, nil
+func ToSqlite3CreateTable(statement string) string {
+	return applyConversions(statement, createTableConversions)
 }
 
-func ToSqlite3Dialect(statement string) (translated string, err error) {
+func ToSqlite3Insert(statement string) string {
+	return applyConversions(statement, insertConversions)
+}
+
+func ToSqlite3Dialect(statement string) (translated string) {
 	if IsCreateTable(statement) {
 		return ToSqlite3CreateTable(statement)
 	}
 	if IsAlterTable(statement) {
 		return ToSqlite3CreateTable(statement)
 	}
+	statement = applyConversions(statement, generalConversions)
 	if IsInsert(statement) {
 		return ToSqlite3Insert(statement)
 	}
-	return statement, err
+	return statement
 }
