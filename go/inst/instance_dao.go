@@ -804,17 +804,14 @@ func readInstancesByCondition(condition string, args []interface{}, sort string)
 		query := fmt.Sprintf(`
 		select
 			*,
-			timestampdiff(second, last_checked, now()) as seconds_since_last_checked,
-			(last_checked <= last_seen) is true as is_last_check_valid,
-			timestampdiff(second, last_seen, now()) as seconds_since_last_seen,
+			unix_timestamp() - unix_timestamp(last_checked) as seconds_since_last_checked,
+			ifnull(last_checked <= last_seen, 0) as is_last_check_valid,
+			unix_timestamp() - unix_timestamp(last_seen) as seconds_since_last_seen,
 			candidate_database_instance.last_suggested is not null
 				 and candidate_database_instance.promotion_rule in ('must', 'prefer') as is_candidate,
 			ifnull(nullif(candidate_database_instance.promotion_rule, ''), 'neutral') as promotion_rule,
 			ifnull(unresolved_hostname, '') as unresolved_hostname,
-			(
-    		database_instance_downtime.downtime_active IS NULL
-    		or database_instance_downtime.end_timestamp < NOW()
-    	) is false as is_downtimed,
+			(database_instance_downtime.downtime_active is not null and ifnull(database_instance_downtime.end_timestamp, now()) > now()) as is_downtimed,
     	ifnull(database_instance_downtime.reason, '') as downtime_reason,
     	ifnull(database_instance_downtime.owner, '') as downtime_owner,
     	ifnull(database_instance_downtime.end_timestamp, '') as downtime_end_timestamp
@@ -964,10 +961,10 @@ func ReadUnseenInstances() ([](*Instance), error) {
 // ReadProblemInstances reads all instances with problems
 func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 	condition := `
-			cluster_name LIKE IF(? = '', '%', ?)
+			cluster_name LIKE (CASE WHEN ? = '' THEN '%' ELSE ? END)
 			and (
 				(last_seen < last_checked)
-				or (not ifnull(timestampdiff(second, last_checked, now()) <= ?, false))
+				or (unix_timestamp() - unix_timestamp(last_checked) > ?)
 				or (not slave_sql_running)
 				or (not slave_io_running)
 				or (abs(cast(seconds_behind_master as signed) - cast(sql_delay as signed)) > ?)
@@ -1722,10 +1719,10 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 			if (
 				last_attempted_check <= last_checked,
 				last_checked < now() - interval ? second,
-				last_checked < now() - interval (? * 2) second
+				last_checked < now() - interval ? second
 			)
 			`
-	args := sqlutils.Args(config.Config.InstancePollSeconds, config.Config.InstancePollSeconds)
+	args := sqlutils.Args(config.Config.InstancePollSeconds, 2*config.Config.InstancePollSeconds)
 
 	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))

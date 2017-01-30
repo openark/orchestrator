@@ -72,9 +72,9 @@ func WriteClusterAlias(clusterName string, alias string) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
 			replace into
-					cluster_alias (cluster_name, alias)
+					cluster_alias (cluster_name, alias, last_registered)
 				values
-					(?, ?)
+					(?, ?, now())
 			`,
 			clusterName, alias)
 		return log.Errore(err)

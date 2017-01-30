@@ -42,14 +42,14 @@ var recentInstantAnalysis = cache.New(time.Duration(config.Config.RecoveryPollSe
 func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnalysis bool) ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
-	args := sqlutils.Args(config.Config.InstancePollSeconds, clusterName)
+	args := sqlutils.Args(2*config.Config.InstancePollSeconds, clusterName)
 	analysisQueryReductionClause := ``
 	if config.Config.ReduceReplicationAnalysisCount {
 		analysisQueryReductionClause = `
 			HAVING
 				(MIN(
 		        		master_instance.last_checked <= master_instance.last_seen
-		        		AND master_instance.last_attempted_check <= master_instance.last_seen + INTERVAL (2 * ?) SECOND
+		        		AND master_instance.last_attempted_check <= master_instance.last_seen + INTERVAL ? SECOND
 		        	) IS TRUE /* AS is_last_check_valid */) = 0
 				OR (IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
 		                    AND slave_instance.slave_io_running = 0
@@ -69,7 +69,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		          ) /* AS is_failing_to_connect_to_master */)
 				OR (COUNT(slave_instance.server_id) /* AS count_slaves */ > 0)
 			`
-		args = append(args, config.Config.InstancePollSeconds)
+		args = append(args, 2*config.Config.InstancePollSeconds)
 	}
 	// "OR count_slaves > 0" above is a recent addition, which, granted, makes some previous conditions redundant.
 	// It gives more output, and more "NoProblem" messages that I am now interested in for purpose of auditing in database_instance_analysis_changelog
@@ -83,7 +83,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
 		        MIN(
 		        		master_instance.last_checked <= master_instance.last_seen
-		        		AND master_instance.last_attempted_check <= master_instance.last_seen + INTERVAL (2 * ?) SECOND
+		        		AND master_instance.last_attempted_check <= master_instance.last_seen + INTERVAL ? SECOND
 		        	) IS TRUE AS is_last_check_valid,
 		        MIN(master_instance.master_host IN ('' , '_')
 		            OR master_instance.master_port = 0
@@ -124,7 +124,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 				    		IFNULL(database_instance_downtime.end_timestamp, '')
 				    	) AS downtime_end_timestamp,
 			    	MIN(
-				    		IFNULL(TIMESTAMPDIFF(SECOND, NOW(), database_instance_downtime.end_timestamp), 0)
+				    		IFNULL(unix_timestamp() - unix_timestamp(database_instance_downtime.end_timestamp), 0)
 				    	) AS downtime_remaining_seconds,
 			    	MIN(
 				    		master_instance.binlog_server

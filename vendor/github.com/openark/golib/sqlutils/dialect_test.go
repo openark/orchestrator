@@ -17,12 +17,22 @@
 package sqlutils
 
 import (
+	"regexp"
+	"strings"
 	"testing"
 
 	test "github.com/openark/golib/tests"
 )
 
+var spacesRegexp = regexp.MustCompile(`[\s]+`)
+
 func init() {
+}
+
+func stripSpaces(statement string) string {
+	statement = strings.TrimSpace(statement)
+	statement = spacesRegexp.ReplaceAllString(statement, " ")
+	return statement
 }
 
 func TestIsCreateTable(t *testing.T) {
@@ -66,6 +76,35 @@ func TestToSqlite3CreateTable(t *testing.T) {
 		statement := "create table t(i smallint ( 5 ) unsigned)"
 		result := ToSqlite3CreateTable(statement)
 		test.S(t).ExpectEquals(result, "create table t(i smallint)")
+	}
+}
+
+func TestToSqlite3AlterTable(t *testing.T) {
+	{
+		statement := `
+			ALTER TABLE
+				database_instance
+				ADD COLUMN sql_delay INT UNSIGNED NOT NULL AFTER slave_lag_seconds
+		`
+		result := stripSpaces(ToSqlite3Dialect(statement))
+		test.S(t).ExpectEquals(result, stripSpaces(`
+			ALTER TABLE
+				database_instance
+				add column sql_delay int not null default 0
+			`))
+	}
+	{
+		statement := `
+			ALTER TABLE
+				database_instance
+				ADD INDEX master_host_port_idx (master_host, master_port)
+		`
+		result := stripSpaces(ToSqlite3Dialect(statement))
+		test.S(t).ExpectEquals(result, stripSpaces(`
+			create index
+				master_host_port_idx_database_instance
+				on database_instance (master_host, master_port)
+			`))
 	}
 }
 

@@ -35,7 +35,7 @@ func ReadActiveMaintenance() ([]Maintenance, error) {
 			hostname,
 			port,
 			begin_timestamp,
-			timestampdiff(second, begin_timestamp, now()) as seconds_elapsed,
+			unix_timestamp() - unix_timestamp(begin_timestamp) as seconds_elapsed,
 			maintenance_active,
 			owner,
 			reason

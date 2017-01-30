@@ -638,11 +638,6 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE
 			database_instance
-			ADD COLUMN last_attempted_check TIMESTAMP DEFAULT '1971-01-01 00:00:00' AFTER last_checked
-	`,
-	`
-		ALTER TABLE
-			database_instance
 			ADD COLUMN oracle_gtid TINYINT UNSIGNED NOT NULL AFTER slave_io_running
 	`,
 	`
@@ -1246,6 +1241,7 @@ func deployStatements(db *sql.DB, queries []string) error {
 			if !sqlutils.IsAlterTable(query) && !sqlutils.IsCreateIndex(query) {
 				return log.Fatalf("Cannot initiate orchestrator: %+v; query=%+v", err, query)
 			}
+			log.Errorf("Error initiating orchestrator: %+v; query=%+v", err, query)
 		}
 	}
 	if config.Config.IsMySQL() {
@@ -1325,6 +1321,10 @@ func QueryOrchestratorRowsMap(query string, on_row func(sqlutils.RowMap) error) 
 	if config.Config.DatabaselessMode__experimental {
 		return nil
 	}
+	query, err := translateStatement(query)
+	if err != nil {
+		return log.Fatalf("Cannot query orchestrator: %+v; query=%+v", err, query)
+	}
 	db, err := OpenOrchestrator()
 	if err != nil {
 		return err
@@ -1337,6 +1337,10 @@ func QueryOrchestratorRowsMap(query string, on_row func(sqlutils.RowMap) error) 
 func QueryOrchestrator(query string, argsArray []interface{}, on_row func(sqlutils.RowMap) error) error {
 	if config.Config.DatabaselessMode__experimental {
 		return nil
+	}
+	query, err := translateStatement(query)
+	if err != nil {
+		return log.Fatalf("Cannot query orchestrator: %+v; query=%+v", err, query)
 	}
 	db, err := OpenOrchestrator()
 	if err != nil {
@@ -1351,6 +1355,10 @@ func QueryOrchestratorRowsMapBuffered(query string, on_row func(sqlutils.RowMap)
 	if config.Config.DatabaselessMode__experimental {
 		return nil
 	}
+	query, err := translateStatement(query)
+	if err != nil {
+		return log.Fatalf("Cannot query orchestrator: %+v; query=%+v", err, query)
+	}
 	db, err := OpenOrchestrator()
 	if err != nil {
 		return err
@@ -1363,6 +1371,10 @@ func QueryOrchestratorRowsMapBuffered(query string, on_row func(sqlutils.RowMap)
 func QueryOrchestratorBuffered(query string, argsArray []interface{}, on_row func(sqlutils.RowMap) error) error {
 	if config.Config.DatabaselessMode__experimental {
 		return nil
+	}
+	query, err := translateStatement(query)
+	if err != nil {
+		return log.Fatalf("Cannot query orchestrator: %+v; query=%+v", err, query)
 	}
 	db, err := OpenOrchestrator()
 	if err != nil {

@@ -39,10 +39,16 @@ var createTableConversions = []regexpMap{
 	rmap(`(?i)int( not null|) auto_increment`, `integer`),
 	rmap(`(?i)comment '[^']*'`, ``),
 	rmap(`(?i)after [\S]+`, ``),
-	rmap(`(?i)alter table ([\S]+) add (index|key) ([\S]+) (.+)`, `create index $3_$1 on $1 $4`),
-	rmap(`(?i)alter table ([\S]+) add unique (index|key) ([\S]+) (.+)`, `create unique index $3_$1 on $1 $4`),
+	rmap(`(?i)alter table ([\S]+) add (index|key) ([\S]+) (.+)`, `create index ${3}_${1} on $1 $4`),
+	rmap(`(?i)alter table ([\S]+) add unique (index|key) ([\S]+) (.+)`, `create unique index ${3}_${1} on $1 $4`),
 	rmap(`(?i)([\S]+) enum[\s]*([(].*?[)])`, `$1 text check($1 in $2)`),
 	rmap(`(?i)([\s\S]+[/][*] sqlite3-skip [*][/][\s\S]+)`, ``),
+	rmap(`(?i)timestamp default current_timestamp`, `timestamp default ('')`),
+	rmap(`(?i)timestamp not null default current_timestamp`, `timestamp not null default ('')`),
+
+	rmap(`(?i)add column (.*int) not null[\s]*$`, `add column $1 not null default 0`),
+	rmap(`(?i)add column (.* text) not null[\s]*$`, `add column $1 not null default ''`),
+	rmap(`(?i)add column (.* varchar.*) not null[\s]*$`, `add column $1 not null default ''`),
 
 	/* sqlite3-skip */
 }
@@ -55,11 +61,10 @@ var insertConversions = []regexpMap{
 var generalConversions = []regexpMap{
 	rmap(`(?i)now[(][)][\s]*-[\s]*interval [?] ([\w]+)`, `datetime('now', printf('-%%d $1', ?))`),
 	rmap(`(?i)now[(][)][\s]*[+][\s]*interval [?] ([\w]+)`, `datetime('now', printf('+%%d $1', ?))`),
-	//	rmap(`(?i)timestampdiff[(][\s]*(second)[\s]*,([^,]+),[)]`, `datetime('now')`),
-	//rmap(`(?i)unix_timestamp[(]()[)]`, `datetime('now')`),
-
-	//timestampdiff(second, last_checked, now())
+	rmap(`(?i)unix_timestamp[(][)]`, `strftime('%%s', 'now')`),
+	rmap(`(?i)unix_timestamp[(]([^)]+)[)]`, `strftime('%%s', $1)`),
 	rmap(`(?i)now[(][)]`, `datetime('now')`),
+	rmap(`(?i)cast[(][\s]*([\S]+) as signed[\s]*[)]`, `cast($1 as integer)`),
 }
 
 var (
