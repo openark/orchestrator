@@ -116,6 +116,36 @@ func TestIsInsert(t *testing.T) {
 			`))
 	test.S(t).ExpectFalse(IsInsert("where create table t(id int)"))
 	test.S(t).ExpectFalse(IsInsert("create table t(id int)"))
+	test.S(t).ExpectTrue(IsInsert(`
+		insert into
+				cluster_domain_name (cluster_name, domain_name, last_registered)
+			values
+				(?, ?, datetime('now'))
+			on duplicate key update
+				domain_name=values(domain_name),
+				last_registered=values(last_registered)
+	`))
+}
+
+func TestToSqlite3Insert(t *testing.T) {
+	{
+		statement := `
+			insert into
+					cluster_domain_name (cluster_name, domain_name, last_registered)
+				values
+					(?, ?, datetime('now'))
+				on duplicate key update
+					domain_name=values(domain_name),
+					last_registered=values(last_registered)
+		`
+		result := stripSpaces(ToSqlite3Dialect(statement))
+		test.S(t).ExpectEquals(result, stripSpaces(`
+			replace into
+					cluster_domain_name (cluster_name, domain_name, last_registered)
+				values
+					(?, ?, datetime('now'))
+			`))
+	}
 }
 
 func TestToSqlite3GeneralConversions(t *testing.T) {

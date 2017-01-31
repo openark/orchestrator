@@ -419,7 +419,7 @@ func auditInstanceAnalysisInChangelog(instanceKey *InstanceKey, analysisCode Ana
 	// and has no familiarity of the former's cache)
 	analysisChangeWriteAttemptCounter.Inc(1)
 	sqlResult, err := db.ExecOrchestrator(`
-			insert ignore into database_instance_last_analysis (
+			insert into database_instance_last_analysis (
 					hostname, port, analysis_timestamp, analysis
 				) values (
 					?, ?, now(), ?

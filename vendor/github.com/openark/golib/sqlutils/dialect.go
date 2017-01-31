@@ -56,6 +56,7 @@ var createTableConversions = []regexpMap{
 var insertConversions = []regexpMap{
 	rmap(`(?i)insert ignore`, `insert or ignore`),
 	rmap(`(?i)now[(][)]`, `datetime('now')`),
+	rmap(`(?i)insert into ([\s\S]+) on duplicate key update [\s\S]+`, `replace into $1`),
 }
 
 var generalConversions = []regexpMap{
