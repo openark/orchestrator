@@ -179,5 +179,4 @@ func TestToSqlite3GeneralConversions(t *testing.T) {
 		result := ToSqlite3Dialect(statement)
 		test.S(t).ExpectEquals(result, "AND master_instance.last_attempted_check <= datetime(master_instance.last_seen, printf('+%d minute', ?))")
 	}
-
 }

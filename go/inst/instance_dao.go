@@ -417,7 +417,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 				    command,
 				    time,
 				    state,
-				    left(processlist.info, 1024) as info,
+				    substr(processlist.info, 1, 1024) as info,
 				    now() - interval time second as started_at
 				  from
 				    information_schema.processlist

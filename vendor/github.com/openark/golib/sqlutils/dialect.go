@@ -68,10 +68,12 @@ var generalConversions = []regexpMap{
 	rmap(`(?i)[=<>\s]([\S]+[.][\S]+)[\s]*[-][\s]*interval [?] ([\w]+)`, ` datetime($1, printf('-%d $2', ?))`),
 	rmap(`(?i)[=<>\s]([\S]+[.][\S]+)[\s]*[+][\s]*interval [?] ([\w]+)`, ` datetime($1, printf('+%d $2', ?))`),
 
-	rmap(`(?i)unix_timestamp[(][)]`, `strftime('%%s', 'now')`),
-	rmap(`(?i)unix_timestamp[(]([^)]+)[)]`, `strftime('%%s', $1)`),
+	rmap(`(?i)unix_timestamp[(][)]`, `strftime('%s', 'now')`),
+	rmap(`(?i)unix_timestamp[(]([^)]+)[)]`, `strftime('%s', $1)`),
 	rmap(`(?i)now[(][)]`, `datetime('now')`),
 	rmap(`(?i)cast[(][\s]*([\S]+) as signed[\s]*[)]`, `cast($1 as integer)`),
+
+	rmap(`(?i) rlike `, ` like `),
 }
 
 var (
