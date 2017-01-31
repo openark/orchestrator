@@ -1716,11 +1716,11 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 		from
 			database_instance
 		where
-			if (
-				last_attempted_check <= last_checked,
-				last_checked < now() - interval ? second,
-				last_checked < now() - interval ? second
-			)
+			case
+				when last_attempted_check <= last_checked
+				then last_checked < now() - interval ? second
+				else last_checked < now() - interval ? second
+			end
 			`
 	args := sqlutils.Args(config.Config.InstancePollSeconds, 2*config.Config.InstancePollSeconds)
 
@@ -2208,8 +2208,8 @@ func RecordInstanceCoordinatesHistory() error {
 			_, err := db.ExecOrchestrator(`
         	delete from database_instance_coordinates_history
 			where
-				recorded_timestamp < NOW() - INTERVAL (? + 5) MINUTE
-				`, config.Config.PseudoGTIDCoordinatesHistoryHeuristicMinutes,
+				recorded_timestamp < NOW() - INTERVAL ? MINUTE
+				`, (config.Config.PseudoGTIDCoordinatesHistoryHeuristicMinutes + 5),
 			)
 			return log.Errore(err)
 		}

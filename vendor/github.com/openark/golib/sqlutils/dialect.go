@@ -60,8 +60,14 @@ var insertConversions = []regexpMap{
 }
 
 var generalConversions = []regexpMap{
-	rmap(`(?i)now[(][)][\s]*-[\s]*interval [?] ([\w]+)`, `datetime('now', printf('-%d $1', ?))`),
+	rmap(`(?i)now[(][)][\s]*[-][\s]*interval [?] ([\w]+)`, `datetime('now', printf('-%d $1', ?))`),
 	rmap(`(?i)now[(][)][\s]*[+][\s]*interval [?] ([\w]+)`, `datetime('now', printf('+%d $1', ?))`),
+	rmap(`(?i)now[(][)][\s]*[-][\s]*interval ([0-9.]+) ([\w]+)`, `datetime('now', '-${1} $2')`),
+	rmap(`(?i)now[(][)][\s]*[+][\s]*interval ([0-9.]+) ([\w]+)`, `datetime('now', '+${1} $2')`),
+
+	rmap(`(?i)[=<>\s]([\S]+[.][\S]+)[\s]*[-][\s]*interval [?] ([\w]+)`, ` datetime($1, printf('-%d $2', ?))`),
+	rmap(`(?i)[=<>\s]([\S]+[.][\S]+)[\s]*[+][\s]*interval [?] ([\w]+)`, ` datetime($1, printf('+%d $2', ?))`),
+
 	rmap(`(?i)unix_timestamp[(][)]`, `strftime('%%s', 'now')`),
 	rmap(`(?i)unix_timestamp[(]([^)]+)[)]`, `strftime('%%s', $1)`),
 	rmap(`(?i)now[(][)]`, `datetime('now')`),
