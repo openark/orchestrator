@@ -104,11 +104,6 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		                    AND slave_instance.last_io_error RLIKE 'error (connecting|reconnecting) to master'
 		                    AND slave_instance.slave_sql_running = 1),
 		                0) AS count_slaves_failing_to_connect_to_master,
-						IFNULL(SUM(
-									current_relay_log_file=prev_relay_log_file
-									and current_relay_log_pos=prev_relay_log_pos
-									and current_seen != prev_seen),
-								0) AS count_stale_slaves,
 		        MIN(master_instance.replication_depth) AS replication_depth,
 		        GROUP_CONCAT(slave_instance.Hostname, ':', slave_instance.Port) as slave_hosts,
 		        MIN(
@@ -221,7 +216,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		a.CountValidReplicas = m.GetUint("count_valid_slaves")
 		a.CountValidReplicatingReplicas = m.GetUint("count_valid_replicating_slaves")
 		a.CountReplicasFailingToConnectToMaster = m.GetUint("count_slaves_failing_to_connect_to_master")
-		a.CountStaleReplicas = m.GetUint("count_stale_slaves")
+		a.CountStaleReplicas = 0
 		a.ReplicationDepth = m.GetUint("replication_depth")
 		a.IsFailingToConnectToMaster = m.GetBool("is_failing_to_connect_to_master")
 		a.IsDowntimed = m.GetBool("is_downtimed")

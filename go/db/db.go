@@ -1139,7 +1139,7 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 func translateStatement(statement string) (string, error) {
 	if config.Config.IsSQLite3() {
 		statement = sqlutils.ToSqlite3Dialect(statement)
-		log.Infof(statement)
+		fmt.Println(statement)
 	}
 	return statement, nil
 }

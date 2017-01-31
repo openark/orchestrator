@@ -63,7 +63,7 @@ func WriteResolvedHostname(hostname string, resolvedHostname string) error {
 				values
 					(?, ?, NOW())
 				on duplicate key update
-					hostname=if(values(hostname) != resolved_hostname, values(hostname), hostname),
+					hostname=values(hostname),
 					resolved_timestamp=values(resolved_timestamp)
 			`,
 				hostname,

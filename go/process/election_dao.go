@@ -48,6 +48,7 @@ func AttemptElection() (bool, error) {
 		}
 	}
 	{
+		// takeover from a node that has been inactive
 		sqlResult, err := db.ExecOrchestrator(`
 			update active_node set
 				hostname = ?,
@@ -73,6 +74,7 @@ func AttemptElection() (bool, error) {
 		}
 	}
 	{
+		// Update last_seen_active is this very node is already the active node
 		sqlResult, err := db.ExecOrchestrator(`
 			update active_node set
 				last_seen_active=now()
