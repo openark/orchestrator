@@ -418,32 +418,49 @@ func auditInstanceAnalysisInChangelog(instanceKey *InstanceKey, analysisCode Ana
 	// to verify no two orchestrator services are doing this without coordinating (namely, one dies, the other taking its place
 	// and has no familiarity of the former's cache)
 	analysisChangeWriteAttemptCounter.Inc(1)
-	sqlResult, err := db.ExecOrchestrator(`
-			insert into database_instance_last_analysis (
+
+	lastAnalysisChanged := false
+	{
+		sqlResult, err := db.ExecOrchestrator(`
+			update database_instance_last_analysis set
+				analysis = ?,
+				analysis_timestamp = now()
+			where
+				hostname = ?
+				and port = ?
+				and analysis != ?
+			`,
+			string(analysisCode), instanceKey.Hostname, instanceKey.Port, string(analysisCode),
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
+		rows, err := sqlResult.RowsAffected()
+		if err != nil {
+			return log.Errore(err)
+		}
+		lastAnalysisChanged = (rows > 0)
+	}
+	if !lastAnalysisChanged {
+		_, err := db.ExecOrchestrator(`
+			insert ignore into database_instance_last_analysis (
 					hostname, port, analysis_timestamp, analysis
 				) values (
 					?, ?, now(), ?
-				) on duplicate key update
-					analysis = values(analysis),
-					analysis_timestamp = if(analysis = values(analysis), analysis_timestamp, values(analysis_timestamp))
+				)
 			`,
-		instanceKey.Hostname, instanceKey.Port, string(analysisCode),
-	)
-	if err != nil {
-		return log.Errore(err)
-	}
-	rows, err := sqlResult.RowsAffected()
-	if err != nil {
-		return log.Errore(err)
+			instanceKey.Hostname, instanceKey.Port, string(analysisCode),
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
 	}
 	recentInstantAnalysis.Set(instanceKey.DisplayString(), analysisCode, cache.DefaultExpiration)
-	lastAnalysisChanged := (rows > 0)
-
 	if !lastAnalysisChanged {
 		return nil
 	}
 
-	_, err = db.ExecOrchestrator(`
+	_, err := db.ExecOrchestrator(`
 			insert into database_instance_analysis_changelog (
 					hostname, port, analysis_timestamp, analysis
 				) values (
