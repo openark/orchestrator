@@ -73,6 +73,9 @@ var generalConversions = []regexpMap{
 	rmap(`(?i)now[(][)]`, `datetime('now')`),
 	rmap(`(?i)cast[(][\s]*([\S]+) as signed[\s]*[)]`, `cast($1 as integer)`),
 
+	rmap(`(?i)\bconcat[(][\s]*([^,)]+)[\s]*,[\s]*([^,)]+)[\s]*[)]`, `($1 || $2)`),
+	rmap(`(?i)\bconcat[(][\s]*([^,)]+)[\s]*,[\s]*([^,)]+)[\s]*,[\s]*([^,)]+)[\s]*[)]`, `($1 || $2 || $3)`),
+
 	rmap(`(?i) rlike `, ` like `),
 }
 

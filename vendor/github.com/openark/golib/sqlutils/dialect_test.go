@@ -179,4 +179,34 @@ func TestToSqlite3GeneralConversions(t *testing.T) {
 		result := ToSqlite3Dialect(statement)
 		test.S(t).ExpectEquals(result, "AND master_instance.last_attempted_check <= datetime(master_instance.last_seen, printf('+%d minute', ?))")
 	}
+	{
+		statement := "select concat(master_instance.port, '') as port"
+		result := ToSqlite3Dialect(statement)
+		test.S(t).ExpectEquals(result, "select (master_instance.port || '') as port")
+	}
+	{
+		statement := "select concat( 'abc' , 'def') as s"
+		result := ToSqlite3Dialect(statement)
+		test.S(t).ExpectEquals(result, "select ('abc'  || 'def') as s")
+	}
+	{
+		statement := "select concat( 'abc' , 'def', last.col) as s"
+		result := ToSqlite3Dialect(statement)
+		test.S(t).ExpectEquals(result, "select ('abc'  || 'def' || last.col) as s")
+	}
+	{
+		statement := "select concat(myself.only) as s"
+		result := ToSqlite3Dialect(statement)
+		test.S(t).ExpectEquals(result, "select concat(myself.only) as s")
+	}
+	{
+		statement := "select concat(1, '2', 3, '4') as s"
+		result := ToSqlite3Dialect(statement)
+		test.S(t).ExpectEquals(result, "select concat(1, '2', 3, '4') as s")
+	}
+	{
+		statement := "select group_concat( 'abc' , 'def') as s"
+		result := ToSqlite3Dialect(statement)
+		test.S(t).ExpectEquals(result, "select group_concat( 'abc' , 'def') as s")
+	}
 }
