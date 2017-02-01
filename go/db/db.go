@@ -1035,6 +1035,10 @@ var generateSQLPatches = []string{
 		ALTER TABLE node_health
 			ADD COLUMN first_seen_active timestamp NOT NULL DEFAULT '1971-01-01 00:00:00'
 	`,
+	`
+		ALTER TABLE database_instance
+			ADD COLUMN major_version varchar(16) CHARACTER SET ascii NOT NULL
+	`,
 }
 
 // Track if a TLS has already been configured for topology
@@ -1269,6 +1273,12 @@ func initOrchestratorDB(db *sql.DB) error {
 	deployStatements(db, generateSQLBase)
 	deployStatements(db, generateSQLPatches)
 	registerOrchestratorDeployment(db)
+
+	if config.Config.IsSQLite3() {
+		ExecOrchestrator(`PRAGMA journal_mode = WAL`)
+		ExecOrchestrator(`PRAGMA synchronous = NORMAL`)
+	}
+
 	return nil
 }
 
