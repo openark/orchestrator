@@ -999,11 +999,11 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 func SearchInstances(searchString string) ([](*Instance), error) {
 	searchString = strings.TrimSpace(searchString)
 	condition := `
-			locate(?, hostname) > 0
-			or locate(?, cluster_name) > 0
-			or locate(?, version) > 0
-			or locate(?, version_comment) > 0
-			or locate(?, concat(hostname, ':', port)) > 0
+			instr(hostname, ?) > 0
+			or instr(cluster_name, ?) > 0
+			or instr(version, ?) > 0
+			or instr(version_comment, ?) > 0
+			or instr(concat(hostname, ':', port), ?) > 0
 			or concat(server_id, '') = ?
 			or concat(port, '') = ?
 		`
@@ -1804,6 +1804,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"server_id",
 		"server_uuid",
 		"version",
+		"major_version",
 		"version_comment",
 		"binlog_server",
 		"read_only",
@@ -1871,6 +1872,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.ServerID)
 		args = append(args, instance.ServerUUID)
 		args = append(args, instance.Version)
+		args = append(args, instance.MajorVersionString())
 		args = append(args, instance.VersionComment)
 		args = append(args, instance.IsBinlogServer())
 		args = append(args, instance.ReadOnly)

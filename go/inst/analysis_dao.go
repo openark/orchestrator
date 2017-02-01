@@ -53,7 +53,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		        	) = 1 /* AS is_last_check_valid */) = 0
 				OR (IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
 		                    AND slave_instance.slave_io_running = 0
-		                    AND slave_instance.last_io_error like '%%error %%connecting to master%%'
+		                    AND slave_instance.last_io_error like '%error %connecting to master%'
 		                    AND slave_instance.slave_sql_running = 1),
 		                0) /* AS count_slaves_failing_to_connect_to_master */ > 0)
 				OR (IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen),
@@ -65,7 +65,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 				OR (MIN(
 		            master_instance.slave_sql_running = 1
 		            AND master_instance.slave_io_running = 0
-		            AND master_instance.last_io_error like '%%error %%connecting to master%%'
+		            AND master_instance.last_io_error like '%error %connecting to master%'
 		          ) /* AS is_failing_to_connect_to_master */)
 				OR (COUNT(slave_instance.server_id) /* AS count_slaves */ > 0)
 			`
@@ -105,7 +105,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		                    AND slave_instance.slave_sql_running = 1),
 		                0) AS count_slaves_failing_to_connect_to_master,
 		        MIN(master_instance.replication_depth) AS replication_depth,
-		        GROUP_CONCAT(slave_instance.Hostname, ':', slave_instance.Port) as slave_hosts,
+		        GROUP_CONCAT(concat(slave_instance.Hostname, ':', slave_instance.Port)) as slave_hosts,
 		        MIN(
 		            master_instance.slave_sql_running = 1
 		            AND master_instance.slave_io_running = 0
@@ -163,10 +163,11 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 								AND slave_instance.log_slave_updates
 								AND slave_instance.binlog_format = 'ROW'),
               0) AS count_row_based_loggin_slaves,
-						COUNT(DISTINCT IF(
-							slave_instance.log_bin AND slave_instance.log_slave_updates,
-								substring_index(slave_instance.version, '.', 2),
-								NULL)
+						COUNT(DISTINCT case
+								when slave_instance.log_bin AND slave_instance.log_slave_updates
+								then slave_instance.major_version
+								else NULL
+							end
 						) AS count_distinct_logging_major_versions
 		    FROM
 		        database_instance master_instance
@@ -484,26 +485,29 @@ func ExpireInstanceAnalysisChangelog() error {
 }
 
 // ReadReplicationAnalysisChangelog
-func ReadReplicationAnalysisChangelog() ([]ReplicationAnalysisChangelog, error) {
-	res := []ReplicationAnalysisChangelog{}
+func ReadReplicationAnalysisChangelog() (res [](*ReplicationAnalysisChangelog), err error) {
 	query := `
 		select
-            hostname,
-            port,
-			group_concat(analysis_timestamp,';',analysis order by changelog_id) as changelog
+      hostname,
+      port,
+			analysis_timestamp,
+			analysis
 		from
 			database_instance_analysis_changelog
-		group by
-			hostname, port
+		order by
+			hostname, port, changelog_id
 		`
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
-		analysisChangelog := ReplicationAnalysisChangelog{}
+	analysisChangelog := &ReplicationAnalysisChangelog{}
+	err = db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+		key := InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
 
-		analysisChangelog.AnalyzedInstanceKey.Hostname = m.GetString("hostname")
-		analysisChangelog.AnalyzedInstanceKey.Port = m.GetInt("port")
-		analysisChangelog.Changelog = m.GetString("changelog")
+		if !analysisChangelog.AnalyzedInstanceKey.Equals(&key) {
+			analysisChangelog = &ReplicationAnalysisChangelog{AnalyzedInstanceKey: key}
+			res = append(res, analysisChangelog)
+		}
+		analysisEntry := fmt.Sprintf("%s;%s,", m.GetString("analysis_timestamp"), m.GetString("analysis"))
+		analysisChangelog.Changelog = fmt.Sprintf("%s%s", analysisChangelog.Changelog, analysisEntry)
 
-		res = append(res, analysisChangelog)
 		return nil
 	})
 
