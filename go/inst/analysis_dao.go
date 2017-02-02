@@ -502,11 +502,11 @@ func ReadReplicationAnalysisChangelog() (res [](*ReplicationAnalysisChangelog), 
 		key := InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
 
 		if !analysisChangelog.AnalyzedInstanceKey.Equals(&key) {
-			analysisChangelog = &ReplicationAnalysisChangelog{AnalyzedInstanceKey: key}
+			analysisChangelog = &ReplicationAnalysisChangelog{AnalyzedInstanceKey: key, Changelog: []string{}}
 			res = append(res, analysisChangelog)
 		}
 		analysisEntry := fmt.Sprintf("%s;%s,", m.GetString("analysis_timestamp"), m.GetString("analysis"))
-		analysisChangelog.Changelog = fmt.Sprintf("%s%s", analysisChangelog.Changelog, analysisEntry)
+		analysisChangelog.Changelog = append(analysisChangelog.Changelog, analysisEntry)
 
 		return nil
 	})
