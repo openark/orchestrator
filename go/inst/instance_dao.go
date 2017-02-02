@@ -1448,25 +1448,44 @@ func InjectUnseenMasters() error {
 // appears on the hostname_resolved table; this means some time in the past their hostname was unresovled, and now
 // resovled to a different value; the old hostname is never accessed anymore and the old entry should be removed.
 func ForgetUnseenInstancesDifferentlyResolved() error {
-	sqlResult, err := db.ExecOrchestrator(`
-		DELETE FROM
-			database_instance
-		USING
-		    hostname_resolve
-		    JOIN database_instance ON (hostname_resolve.hostname = database_instance.hostname)
-		WHERE
-		    hostname_resolve.hostname != hostname_resolve.resolved_hostname
-		    AND (last_checked <= last_seen) IS NOT TRUE
-		`,
-	)
-	if err != nil {
-		return log.Errore(err)
+	query := `
+			select
+				database_instance.hostname, database_instance.port
+			from
+					hostname_resolve
+					JOIN database_instance ON (hostname_resolve.hostname = database_instance.hostname)
+			where
+					hostname_resolve.hostname != hostname_resolve.resolved_hostname
+					AND ifnull(last_checked <= last_seen, 0) = 0
+	`
+	keys := NewInstanceKeyMap()
+	err := db.QueryOrchestrator(query, nil, func(m sqlutils.RowMap) error {
+		key := InstanceKey{
+			Hostname: m.GetString("hostname"),
+			Port:     m.GetInt("port"),
+		}
+		keys.AddKey(key)
+		return nil
+	})
+	var rowsAffected int64 = 0
+	for _, key := range keys.GetInstanceKeys() {
+		sqlResult, err := db.ExecOrchestrator(`
+			delete from
+				database_instance
+			where
+		    hostname = ? and port = ?
+			`, sqlutils.Args(key.Hostname, key.Port),
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
+		rows, err := sqlResult.RowsAffected()
+		if err != nil {
+			return log.Errore(err)
+		}
+		rowsAffected = rowsAffected + rows
 	}
-	rows, err := sqlResult.RowsAffected()
-	if err != nil {
-		return log.Errore(err)
-	}
-	AuditOperation("forget-unseen-differently-resolved", nil, fmt.Sprintf("Forgotten instances: %d", rows))
+	AuditOperation("forget-unseen-differently-resolved", nil, fmt.Sprintf("Forgotten instances: %d", rowsAffected))
 	return err
 }
 

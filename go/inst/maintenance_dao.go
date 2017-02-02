@@ -236,12 +236,13 @@ func ExpireMaintenance() error {
 		res, err := db.ExecOrchestrator(`
 			update
 				database_instance_maintenance
-				left join node_health on (processing_node_hostname = node_health.hostname AND processing_node_token = node_health.token)
 			set
-				database_instance_maintenance.maintenance_active = NULL
+				maintenance_active = NULL
 			where
-				node_health.last_seen_active IS NULL
-				and explicitly_bounded = 0
+				explicitly_bounded = 0
+				and concat(processing_node_hostname, ':', processing_node_token) not in (
+					select concat(hostname, ':', token) from node_health
+				)
 			`,
 		)
 		if err != nil {
