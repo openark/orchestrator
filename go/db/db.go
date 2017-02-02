@@ -1143,7 +1143,6 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 func translateStatement(statement string) (string, error) {
 	if config.Config.IsSQLite3() {
 		statement = sqlutils.ToSqlite3Dialect(statement)
-		fmt.Println(statement)
 	}
 	return statement, nil
 }
@@ -1245,7 +1244,10 @@ func deployStatements(db *sql.DB, queries []string) error {
 			if !sqlutils.IsAlterTable(query) && !sqlutils.IsCreateIndex(query) {
 				return log.Fatalf("Cannot initiate orchestrator: %+v; query=%+v", err, query)
 			}
-			log.Errorf("Error initiating orchestrator: %+v; query=%+v", err, query)
+			if !strings.Contains(err.Error(), "duplicate column name") &&
+				!strings.Contains(err.Error(), "already exists") {
+				log.Errorf("Error initiating orchestrator: %+v; query=%+v", err, query)
+			}
 		}
 	}
 	if config.Config.IsMySQL() {
