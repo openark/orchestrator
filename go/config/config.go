@@ -460,7 +460,7 @@ func (this *Configuration) postReadAdjustments() error {
 		}
 	}
 
-	if this.IsSQLite3() && this.SQLite3DataFile == "" {
+	if this.IsSQLite() && this.SQLite3DataFile == "" {
 		return fmt.Errorf("SQLite3DataFile must be set when BackendDB is sqlite3")
 	}
 	if this.RemoteSSHForMasterFailover && this.RemoteSSHCommand == "" {
@@ -469,8 +469,8 @@ func (this *Configuration) postReadAdjustments() error {
 	return nil
 }
 
-func (this *Configuration) IsSQLite3() bool {
-	return this.BackendDB == "sqlite3"
+func (this *Configuration) IsSQLite() bool {
+	return strings.Contains(this.BackendDB, "sqlite")
 }
 
 func (this *Configuration) IsMySQL() bool {

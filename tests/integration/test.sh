@@ -11,14 +11,31 @@ tests_path=$(dirname $0)
 test_logfile=/tmp/orchestrator-test.log
 test_outfile=/tmp/orchestrator-test.out
 test_diff_file=/tmp/orchestrator-test.diff
+test_query_file=/tmp/orchestrator-test.sql
+test_config_file=/tmp/orchestrator.conf.json
 orchestrator_binary=/tmp/orchestrator-test
 exec_command_file=/tmp/orchestrator-test.bash
-
+db_type="mysql"
+sqlite_file="/tmp/orchestrator.db"
 test_pattern="${1:-.}"
 
-verify_mysql() {
-  if [ "$(mysql test -e "select 1" -ss)" != "1" ] ; then
-    echo "Cannot verify mysql"
+
+function run_queries() {
+  queries_file="$1"
+
+  if [ "$db_type" == "sqlite" ] ; then
+    cat $queries_file | sed -e "s/last_checked - interval 1 minute/datetime('last_checked', '-1 minute')/g" | sqlite3 $sqlite_file
+  else
+    # Assume mysql
+    mysql --default-character-set=utf8mb4 test -ss < $queries_file
+  fi
+}
+
+check_db() {
+  echo "select 1;" > $test_query_file
+  query_result="$(run_queries $test_query_file)"
+  if [ "$query_result" != "1" ] ; then
+    echo "Cannot execute queries"
     exit 1
   fi
 }
@@ -40,11 +57,11 @@ test_single() {
   echo -n "Testing: $test_name"
 
   echo_dot
-  mysql --default-character-set=utf8mb4 test < $tests_path/create-per-test.sql
+  run_queries $tests_path/create-per-test.sql
 
   echo_dot
   if [ -f $tests_path/$test_name/create.sql ] ; then
-    mysql --default-character-set=utf8mb4 test < $tests_path/$test_name/create.sql
+    run_queries $tests_path/$test_name/create.sql
   fi
 
   extra_args=""
@@ -53,7 +70,7 @@ test_single() {
   fi
   #
   cmd="$orchestrator_binary \
-    --config=${tests_path}/orchestrator.conf.json
+    --config=${test_config_file}
     --debug \
     --stack \
     ${extra_args[@]}"
@@ -65,7 +82,7 @@ test_single() {
   execution_result=$?
 
   if [ -f $tests_path/$test_name/destroy.sql ] ; then
-    mysql --default-character-set=utf8mb4 test < $tests_path/$test_name/destroy.sql
+    run_queries $tests_path/$test_name/destroy.sql
   fi
 
   if [ -f $tests_path/$test_name/expect_failure ] ; then
@@ -113,12 +130,40 @@ build_binary() {
   go build -o $orchestrator_binary go/cmd/orchestrator/main.go
 }
 
+
+deploy_internal_db() {
+  echo "Deploying db"
+  cmd="$orchestrator_binary \
+    --config=${tests_path}/orchestrator.conf.json
+    --debug \
+    --stack \
+    -c redeploy-internal-db"
+  echo_dot
+  echo $cmd > $exec_command_file
+  echo_dot
+  bash $exec_command_file 1> $test_outfile 2> $test_logfile
+  echo "done $?"
+}
+
+generate_config_file() {
+  cp ${tests_path}/orchestrator.conf.json ${test_config_file}
+  sed -i -e "s/backend-db-placeholder/${db_type}/g" ${test_config_file}
+  sed -i -e "s^sqlite-data-file-placeholder^${sqlite_file}^g" ${test_config_file}
+}
+
 test_all() {
   build_binary
   if [ $? -ne 0 ] ; then
     echo "ERROR build failed"
     return 1
   fi
+  generate_config_file
+  deploy_internal_db
+  if [ $? -ne 0 ] ; then
+    echo "ERROR deploy failed"
+    return 1
+  fi
+
   find $tests_path ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
     test_single "$test_name"
     if [ $? -ne 0 ] ; then
@@ -131,5 +176,5 @@ test_all() {
   done
 }
 
-verify_mysql
+check_db
 test_all

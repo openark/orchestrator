@@ -329,7 +329,7 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
-		CREATE INDEX cluster_name_idx_database_instance_topology_history ON database_instance_topology_history (snapshot_unix_timestamp, cluster_name)
+		CREATE INDEX cluster_name_idx_database_instance_topology_history ON database_instance_topology_history (snapshot_unix_timestamp, cluster_name(128))
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS candidate_database_instance (
@@ -531,7 +531,7 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
-		CREATE INDEX hostname_port_recorded_timestmp_idx_database_instance_coordinates_history ON database_instance_coordinates_history (hostname, port, recorded_timestamp)
+		CREATE INDEX hostname_port_recorded_idx_database_instance_coordinates_history ON database_instance_coordinates_history (hostname, port, recorded_timestamp)
 	`,
 	`
 		CREATE INDEX recorded_timestmp_idx_database_instance_coordinates_history ON database_instance_coordinates_history (recorded_timestamp)
@@ -1106,7 +1106,7 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 		return nil, nil
 	}
 	var fromCache bool
-	if config.Config.IsSQLite3() {
+	if config.Config.IsSQLite() {
 		db, fromCache, err = sqlutils.GetSQLiteDB(config.Config.SQLite3DataFile)
 	} else {
 		mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&interpolateParams=%t",
@@ -1141,7 +1141,7 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 }
 
 func translateStatement(statement string) (string, error) {
-	if config.Config.IsSQLite3() {
+	if config.Config.IsSQLite() {
 		statement = sqlutils.ToSqlite3Dialect(statement)
 	}
 	return statement, nil
@@ -1245,7 +1245,9 @@ func deployStatements(db *sql.DB, queries []string) error {
 				return log.Fatalf("Cannot initiate orchestrator: %+v; query=%+v", err, query)
 			}
 			if !strings.Contains(err.Error(), "duplicate column name") &&
-				!strings.Contains(err.Error(), "already exists") {
+				!strings.Contains(err.Error(), "Duplicate column name") &&
+				!strings.Contains(err.Error(), "already exists") &&
+				!strings.Contains(err.Error(), "Duplicate key name") {
 				log.Errorf("Error initiating orchestrator: %+v; query=%+v", err, query)
 			}
 		}
@@ -1276,7 +1278,7 @@ func initOrchestratorDB(db *sql.DB) error {
 	deployStatements(db, generateSQLPatches)
 	registerOrchestratorDeployment(db)
 
-	if config.Config.IsSQLite3() {
+	if config.Config.IsSQLite() {
 		ExecOrchestrator(`PRAGMA journal_mode = WAL`)
 		ExecOrchestrator(`PRAGMA synchronous = NORMAL`)
 	}

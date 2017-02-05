@@ -49,8 +49,6 @@ var createTableConversions = []regexpMap{
 	rmap(`(?i)add column (.*int) not null[\s]*$`, `add column $1 not null default 0`),
 	rmap(`(?i)add column (.* text) not null[\s]*$`, `add column $1 not null default ''`),
 	rmap(`(?i)add column (.* varchar.*) not null[\s]*$`, `add column $1 not null default ''`),
-
-	/* sqlite3-skip */
 }
 
 var insertConversions = []regexpMap{
@@ -77,6 +75,8 @@ var generalConversions = []regexpMap{
 	rmap(`(?i)\bconcat[(][\s]*([^,)]+)[\s]*,[\s]*([^,)]+)[\s]*,[\s]*([^,)]+)[\s]*[)]`, `($1 || $2 || $3)`),
 
 	rmap(`(?i) rlike `, ` like `),
+
+	rmap(`(?i)create index([\s\S]+)[(][\s]*[0-9]+[\s]*[)]([\s\S]+)`, `create index ${1}${2}`),
 }
 
 var (
