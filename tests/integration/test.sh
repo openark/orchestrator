@@ -4,7 +4,7 @@
 # See https://github.com/github/orchestrator/tree/doc/local-tests.md
 #
 
-# Usage: localtests/test/sh [filter]
+# Usage: localtests/test/sh [mysql|sqlite] [filter]
 # By default, runs all tests. Given filter, will only run tests matching given regep
 
 tests_path=$(dirname $0)
@@ -17,8 +17,6 @@ orchestrator_binary=/tmp/orchestrator-test
 exec_command_file=/tmp/orchestrator-test.bash
 db_type=""
 sqlite_file="/tmp/orchestrator.db"
-test_pattern="${1:-.}"
-
 
 function run_queries() {
   queries_file="$1"
@@ -158,6 +156,7 @@ test_all() {
     return 1
   fi
 
+  test_pattern="${1:-.}"
   find $tests_path ! -path . -type d -mindepth 1 -maxdepth 1 | xargs ls -td1 | cut -d "/" -f 4 | egrep "$test_pattern" | while read test_name ; do
     test_single "$test_name"
     if [ $? -ne 0 ] ; then
@@ -176,7 +175,7 @@ test_db() {
   echo "###################"
   generate_config_file
   check_db
-  test_all
+  test_all ${@:2}
 }
 
 main() {
@@ -186,9 +185,18 @@ main() {
     return 1
   fi
 
-  for db in "mysql" "sqlite" ; do
-    test_db $db
+  test_dbs=""
+  if [ "$1" == "mysql" ] ; then
+    test_dbs="mysql"
+    shift
+  elif [ "$1" == "sqlite" ] ; then
+    test_dbs="sqlite"
+    shift
+  fi
+  test_dbs=${test_dbs:-"mysql sqlite"}
+  for db in $(echo $test_dbs) ; do
+    test_db $db "$@"
   done
 }
 
-main
+main "$@"
