@@ -15,7 +15,7 @@ test_query_file=/tmp/orchestrator-test.sql
 test_config_file=/tmp/orchestrator.conf.json
 orchestrator_binary=/tmp/orchestrator-test
 exec_command_file=/tmp/orchestrator-test.bash
-db_type="mysql"
+db_type=""
 sqlite_file="/tmp/orchestrator.db"
 test_pattern="${1:-.}"
 
@@ -152,12 +152,6 @@ generate_config_file() {
 }
 
 test_all() {
-  build_binary
-  if [ $? -ne 0 ] ; then
-    echo "ERROR build failed"
-    return 1
-  fi
-  generate_config_file
   deploy_internal_db
   if [ $? -ne 0 ] ; then
     echo "ERROR deploy failed"
@@ -176,5 +170,25 @@ test_all() {
   done
 }
 
-check_db
-test_all
+test_db() {
+  db_type="$1"
+  echo "testing vs $db_type"
+  echo "###################"
+  generate_config_file
+  check_db
+  test_all
+}
+
+main() {
+  build_binary
+  if [ $? -ne 0 ] ; then
+    echo "ERROR build failed"
+    return 1
+  fi
+
+  for db in "mysql" "sqlite" ; do
+    test_db $db
+  done
+}
+
+main
