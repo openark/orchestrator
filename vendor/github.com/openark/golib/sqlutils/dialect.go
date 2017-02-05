@@ -82,6 +82,7 @@ var generalConversions = []regexpMap{
 var (
 	identifyCreateTableStatement = regexp.MustCompile(regexpSpaces(`(?i)^[\s]*create table`))
 	identifyCreateIndexStatement = regexp.MustCompile(regexpSpaces(`(?i)^[\s]*create( unique|) index`))
+	identifyDropIndexStatement   = regexp.MustCompile(regexpSpaces(`(?i)^[\s]*drop index`))
 	identifyAlterTableStatement  = regexp.MustCompile(regexpSpaces(`(?i)^[\s]*alter table`))
 	identifyInsertStatement      = regexp.MustCompile(regexpSpaces(`(?i)^[\s]*(insert|replace)`))
 )
@@ -107,6 +108,10 @@ func IsCreateTable(statement string) bool {
 
 func IsCreateIndex(statement string) bool {
 	return identifyCreateIndexStatement.MatchString(statement)
+}
+
+func IsDropIndex(statement string) bool {
+	return identifyDropIndexStatement.MatchString(statement)
 }
 
 func IsAlterTable(statement string) bool {
