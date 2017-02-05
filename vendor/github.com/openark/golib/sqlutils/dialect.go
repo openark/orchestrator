@@ -77,6 +77,7 @@ var generalConversions = []regexpMap{
 	rmap(`(?i) rlike `, ` like `),
 
 	rmap(`(?i)create index([\s\S]+)[(][\s]*[0-9]+[\s]*[)]([\s\S]+)`, `create index ${1}${2}`),
+	rmap(`(?i)drop index ([\S]+) on ([\S]+)`, `drop index if exists $1`),
 }
 
 var (
