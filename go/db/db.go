@@ -76,10 +76,19 @@ var generateSQLBase = []string{
         ) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+				DROP INDEX cluster_name_idx ON database_instance
+	`,
+	`
 				CREATE INDEX cluster_name_idx_database_instance ON database_instance(cluster_name)
 	`,
 	`
+				DROP INDEX last_checked_idx ON database_instance
+	`,
+	`
 				CREATE INDEX last_checked_idx_database_instance ON database_instance(last_checked)
+	`,
+	`
+				DROP INDEX last_seen_idx ON database_instance
 	`,
 	`
 				CREATE INDEX last_seen_idx_database_instance ON database_instance(last_seen)
@@ -96,6 +105,9 @@ var generateSQLBase = []string{
           reason text CHARACTER SET utf8 NOT NULL,
           PRIMARY KEY (database_instance_maintenance_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+				DROP INDEX maintenance_uidx ON database_instance_maintenance
 	`,
 	`
 				CREATE UNIQUE INDEX maintenance_uidx_database_instance_maintenance ON database_instance_maintenance (maintenance_active, hostname, port)
@@ -117,6 +129,9 @@ var generateSQLBase = []string{
         ) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+				DROP INDEX process_started_at_idx ON database_instance_long_running_queries
+	`,
+	`
 				CREATE INDEX process_started_at_idx_database_instance_long_running_queries ON database_instance_long_running_queries (process_started_at)
 	`,
 	`
@@ -131,7 +146,13 @@ var generateSQLBase = []string{
         ) ENGINE=InnoDB DEFAULT CHARSET=latin1
 	`,
 	`
+				DROP INDEX audit_timestamp_idx ON audit
+	`,
+	`
 				CREATE INDEX audit_timestamp_idx_audit ON audit (audit_timestamp)
+	`,
+	`
+				DROP INDEX host_port_idx ON audit
 	`,
 	`
 				CREATE INDEX host_port_idx_audit ON audit (hostname, port, audit_timestamp)
@@ -150,13 +171,25 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+				DROP INDEX token_idx ON host_agent
+	`,
+	`
 				CREATE INDEX token_idx_host_agent ON host_agent (token)
+	`,
+	`
+				DROP INDEX last_submitted_idx ON host_agent
 	`,
 	`
 				CREATE INDEX last_submitted_idx_host_agent ON host_agent (last_submitted)
 	`,
 	`
+				DROP INDEX last_checked_idx ON host_agent
+	`,
+	`
 				CREATE INDEX last_checked_idx_host_agent ON host_agent (last_checked)
+	`,
+	`
+				DROP INDEX last_seen_idx ON host_agent
 	`,
 	`
 				CREATE INDEX last_seen_idx_host_agent ON host_agent (last_seen)
@@ -174,16 +207,31 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+				DROP INDEX target_hostname_idx ON agent_seed
+	`,
+	`
 				CREATE INDEX target_hostname_idx_agent_seed ON agent_seed (target_hostname,is_complete)
+	`,
+	`
+				DROP INDEX source_hostname_idx ON agent_seed
 	`,
 	`
 				CREATE INDEX source_hostname_idx_agent_seed ON agent_seed (source_hostname,is_complete)
 	`,
 	`
+				DROP INDEX start_timestamp_idx ON agent_seed
+	`,
+	`
 				CREATE INDEX start_timestamp_idx_agent_seed ON agent_seed (start_timestamp)
 	`,
 	`
+				DROP INDEX is_complete_idx ON agent_seed
+	`,
+	`
 				CREATE INDEX is_complete_idx_agent_seed ON agent_seed (is_complete,start_timestamp)
+	`,
+	`
+				DROP INDEX is_successful_idx ON agent_seed
 	`,
 	`
 				CREATE INDEX is_successful_idx_agent_seed ON agent_seed (is_successful, start_timestamp)
@@ -199,6 +247,9 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+				DROP INDEX agent_seed_idx ON agent_seed_state
+	`,
+	`
 				CREATE INDEX agent_seed_idx_agent_seed_state ON agent_seed_state (agent_seed_id, state_timestamp)
 	`,
 	`
@@ -212,13 +263,25 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+		DROP INDEX attribute_name_idx ON host_attributes
+	`,
+	`
 		CREATE INDEX attribute_name_idx_host_attributes ON host_attributes (attribute_name)
+	`,
+	`
+		DROP INDEX attribute_value_idx ON host_attributes
 	`,
 	`
 		CREATE INDEX attribute_value_idx_host_attributes ON host_attributes (attribute_value)
 	`,
 	`
+		DROP INDEX submit_timestamp_idx ON host_attributes
+	`,
+	`
 		CREATE INDEX submit_timestamp_idx_host_attributes ON host_attributes (submit_timestamp)
+	`,
+	`
+		DROP INDEX expire_timestamp_idx ON host_attributes
 	`,
 	`
 		CREATE INDEX expire_timestamp_idx_host_attributes ON host_attributes (expire_timestamp)
@@ -230,6 +293,9 @@ var generateSQLBase = []string{
 		  resolved_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		  PRIMARY KEY (hostname)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		DROP INDEX resolved_timestamp_idx ON hostname_resolve
 	`,
 	`
 		CREATE INDEX resolved_timestamp_idx_hostname_resolve ON hostname_resolve (resolved_timestamp)
@@ -288,10 +354,19 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+		DROP INDEX in_active_start_period_idx ON topology_recovery
+	`,
+	`
 		CREATE INDEX in_active_start_period_idx_topology_recovery ON topology_recovery (in_active_period, start_active_period)
 	`,
 	`
+		DROP INDEX start_active_period_idx ON topology_recovery
+	`,
+	`
 		CREATE INDEX start_active_period_idx_topology_recovery ON topology_recovery (start_active_period)
+	`,
+	`
+		DROP INDEX hostname_port_active_period_uidx ON topology_recovery
 	`,
 	`
 		CREATE UNIQUE INDEX hostname_port_active_period_uidx_topology_recovery ON topology_recovery (hostname, port, in_active_period, end_active_period_unixtime)
@@ -304,6 +379,9 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+		DROP INDEX unresolved_hostname_idx ON hostname_unresolve
+	`,
+	`
 		CREATE INDEX unresolved_hostname_idx_hostname_unresolve ON hostname_unresolve (unresolved_hostname)
 	`,
 	`
@@ -313,6 +391,9 @@ var generateSQLBase = []string{
 			pool varchar(128) NOT NULL,
 			PRIMARY KEY (hostname, port, pool)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		DROP INDEX pool_idx ON database_instance_pool
 	`,
 	`
 		CREATE INDEX pool_idx_database_instance_pool ON database_instance_pool (pool)
@@ -329,6 +410,9 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+		DROP INDEX cluster_name_idx ON database_instance_topology_history
+	`,
+	`
 		CREATE INDEX cluster_name_idx_database_instance_topology_history ON database_instance_topology_history (snapshot_unix_timestamp, cluster_name(128))
 	`,
 	`
@@ -338,6 +422,9 @@ var generateSQLBase = []string{
 			last_suggested TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			PRIMARY KEY (hostname, port)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		DROP INDEX last_suggested_idx ON candidate_database_instance
 	`,
 	`
 		CREATE INDEX last_suggested_idx_candidate_database_instance ON candidate_database_instance (last_suggested)
@@ -373,7 +460,13 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+		DROP INDEX hostname_port_active_period_uidx ON topology_failure_detection
+	`,
+	`
 		CREATE UNIQUE INDEX hostname_port_active_period_uidx_topology_failure_detection ON topology_failure_detection (hostname, port, in_active_period, end_active_period_unixtime)
+	`,
+	`
+		DROP INDEX in_active_start_period_idx ON topology_failure_detection
 	`,
 	`
 		CREATE INDEX in_active_start_period_idx_topology_failure_detection ON topology_failure_detection (in_active_period, start_active_period)
@@ -387,7 +480,13 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+		DROP INDEX hostname ON hostname_resolve_history
+	`,
+	`
 		CREATE INDEX hostname_idx_hostname_resolve_history ON hostname_resolve_history (hostname)
+	`,
+	`
+		DROP INDEX resolved_timestamp_idx ON hostname_resolve_history
 	`,
 	`
 		CREATE INDEX resolved_timestamp_idx_hostname_resolve_history ON hostname_resolve_history (resolved_timestamp)
@@ -401,7 +500,13 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+		DROP INDEX hostname ON hostname_unresolve_history
+	`,
+	`
 		CREATE INDEX hostname_idx_hostname_unresolve_history ON hostname_unresolve_history (hostname)
+	`,
+	`
+		DROP INDEX last_registered_idx ON hostname_unresolve_history
 	`,
 	`
 		CREATE INDEX last_registered_idx_hostname_unresolve_history ON hostname_unresolve_history (last_registered)
@@ -412,6 +517,9 @@ var generateSQLBase = []string{
 			domain_name varchar(128) NOT NULL,
 			PRIMARY KEY (cluster_name)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		DROP INDEX domain_name_idx ON cluster_domain_name
 	`,
 	`
 		CREATE INDEX domain_name_idx_cluster_domain_name ON cluster_domain_name (domain_name)
@@ -432,10 +540,19 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+		DROP INDEX equivalence_uidx ON master_position_equivalence
+	`,
+	`
 		CREATE UNIQUE INDEX equivalence_uidx_master_position_equivalence ON master_position_equivalence (master1_hostname, master1_port, master1_binary_log_file, master1_binary_log_pos, master2_hostname, master2_port)
 	`,
 	`
+		DROP INDEX master2_idx ON master_position_equivalence
+	`,
+	`
 		CREATE INDEX master2_idx_master_position_equivalence ON master_position_equivalence (master2_hostname, master2_port, master2_binary_log_file, master2_binary_log_pos)
+	`,
+	`
+		DROP INDEX last_suggested_idx ON master_position_equivalence
 	`,
 	`
 		CREATE INDEX last_suggested_idx_master_position_equivalence ON master_position_equivalence (last_suggested)
@@ -457,7 +574,13 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+		DROP INDEX begin_timestamp_idx ON async_request
+	`,
+	`
 		CREATE INDEX begin_timestamp_idx_async_request ON async_request (begin_timestamp)
+	`,
+	`
+		DROP INDEX end_timestamp_idx ON async_request
 	`,
 	`
 		CREATE INDEX end_timestamp_idx_async_request ON async_request (end_timestamp)
@@ -474,6 +597,9 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+		DROP INDEX cluster_blocked_idx ON blocked_topology_recovery
+	`,
+	`
 		CREATE INDEX cluster_blocked_idx_blocked_topology_recovery ON blocked_topology_recovery (cluster_name, last_blocked_timestamp)
 	`,
 	`
@@ -484,6 +610,9 @@ var generateSQLBase = []string{
 		  analysis varchar(128) NOT NULL,
 		  PRIMARY KEY (hostname, port)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		DROP INDEX analysis_timestamp_idx ON database_instance_last_analysis
 	`,
 	`
 		CREATE INDEX analysis_timestamp_idx_database_instance_last_analysis ON database_instance_last_analysis (analysis_timestamp)
@@ -499,6 +628,9 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+		DROP INDEX analysis_timestamp_idx ON database_instance_analysis_changelog
+	`,
+	`
 		CREATE INDEX analysis_timestamp_idx_database_instance_analysis_changelog ON database_instance_analysis_changelog (analysis_timestamp)
 	`,
 	`
@@ -512,7 +644,13 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+		DROP INDEX first_seen_active_idx ON node_health_history
+	`,
+	`
 		CREATE INDEX first_seen_active_idx_node_health_history ON node_health_history (first_seen_active)
+	`,
+	`
+		DROP INDEX hostname_token_idx ON node_health_history
 	`,
 	`
 		CREATE UNIQUE INDEX hostname_token_idx_node_health_history ON node_health_history (hostname, token)
@@ -531,7 +669,13 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+		DROP INDEX hostname_port_recorded_timestmp_idx ON database_instance_coordinates_history
+	`,
+	`
 		CREATE INDEX hostname_port_recorded_idx_database_instance_coordinates_history ON database_instance_coordinates_history (hostname, port, recorded_timestamp)
+	`,
+	`
+		DROP INDEX recorded_timestmp_idx ON database_instance_coordinates_history
 	`,
 	`
 		CREATE INDEX recorded_timestmp_idx_database_instance_coordinates_history ON database_instance_coordinates_history (recorded_timestamp)
@@ -549,7 +693,13 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+		DROP INDEX hostname_port_file_idx ON database_instance_binlog_files_history
+	`,
+	`
 		CREATE UNIQUE INDEX hostname_port_file_idx_database_instance_binlog_files_history ON database_instance_binlog_files_history (hostname, port, binary_log_file)
+	`,
+	`
+		DROP INDEX last_seen_idx ON database_instance_binlog_files_history
 	`,
 	`
 		CREATE INDEX last_seen_idx_database_instance_binlog_files_history ON database_instance_binlog_files_history (last_seen)
@@ -566,7 +716,13 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
+		DROP INDEX public_token_idx ON access_token
+	`,
+	`
 		CREATE UNIQUE INDEX public_token_uidx_access_token ON access_token (public_token)
+	`,
+	`
+		DROP INDEX generated_at_idx ON access_token
 	`,
 	`
 		CREATE INDEX generated_at_idx_access_token ON access_token (generated_at)
@@ -583,6 +739,9 @@ var generateSQLBase = []string{
 			prev_seen timestamp NOT NULL DEFAULT '1971-01-01 00:00:00',
 			PRIMARY KEY (hostname, port)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		DROP INDEX current_seen_idx ON database_instance_recent_relaylog_history
 	`,
 	`
 		CREATE INDEX current_seen_idx_database_instance_recent_relaylog_history ON database_instance_recent_relaylog_history (current_seen)
@@ -1241,11 +1400,12 @@ func deployStatements(db *sql.DB, queries []string) error {
 			if strings.Contains(err.Error(), "syntax error") {
 				return log.Fatalf("Cannot initiate orchestrator: %+v; query=%+v", err, query)
 			}
-			if !sqlutils.IsAlterTable(query) && !sqlutils.IsCreateIndex(query) {
+			if !sqlutils.IsAlterTable(query) && !sqlutils.IsCreateIndex(query) && !sqlutils.IsDropIndex(query) {
 				return log.Fatalf("Cannot initiate orchestrator: %+v; query=%+v", err, query)
 			}
 			if !strings.Contains(err.Error(), "duplicate column name") &&
 				!strings.Contains(err.Error(), "Duplicate column name") &&
+				!strings.Contains(err.Error(), "check that column/key exists") &&
 				!strings.Contains(err.Error(), "already exists") &&
 				!strings.Contains(err.Error(), "Duplicate key name") {
 				log.Errorf("Error initiating orchestrator: %+v; query=%+v", err, query)
