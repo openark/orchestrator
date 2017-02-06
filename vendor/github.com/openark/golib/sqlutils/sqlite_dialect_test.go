@@ -106,6 +106,20 @@ func TestToSqlite3AlterTable(t *testing.T) {
 				on database_instance (master_host, master_port)
 			`))
 	}
+	{
+		statement := `
+				ALTER TABLE
+					topology_recovery
+					ADD KEY last_detection_idx (last_detection_id)
+			`
+		result := stripSpaces(ToSqlite3Dialect(statement))
+		test.S(t).ExpectEquals(result, stripSpaces(`
+			create index
+				last_detection_idx_topology_recovery
+				on topology_recovery (last_detection_id)
+			`))
+	}
+
 }
 
 func TestCreateIndex(t *testing.T) {

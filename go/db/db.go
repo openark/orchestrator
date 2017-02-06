@@ -522,7 +522,7 @@ var generateSQLBase = []string{
 		DROP INDEX domain_name_idx ON cluster_domain_name
 	`,
 	`
-		CREATE INDEX domain_name_idx_cluster_domain_name ON cluster_domain_name (domain_name)
+		CREATE INDEX domain_name_idx_cluster_domain_name ON cluster_domain_name (domain_name(32))
 	`,
 	`
 		CREATE TABLE IF NOT EXISTS master_position_equivalence (
