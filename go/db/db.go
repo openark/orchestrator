@@ -1267,6 +1267,9 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 	var fromCache bool
 	if config.Config.IsSQLite() {
 		db, fromCache, err = sqlutils.GetSQLiteDB(config.Config.SQLite3DataFile)
+		if err == nil && !fromCache {
+			log.Debugf("Connected to orchestrator backend: sqlite on %v", config.Config.SQLite3DataFile)
+		}
 	} else {
 		mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&interpolateParams=%t",
 			config.Config.MySQLOrchestratorUser,
@@ -1282,18 +1285,21 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 			mysql_uri, _ = SetupMySQLOrchestratorTLS(mysql_uri)
 		}
 		db, fromCache, err = sqlutils.GetDB(mysql_uri)
+		if err == nil && !fromCache {
+			log.Debugf("Connected to orchestrator backend: sqlite on %v", config.Config.SQLite3DataFile)
+			// do not show the password but do show what we connect to.
+			safe_mysql_uri := fmt.Sprintf("%s:?@tcp(%s:%d)/%s?timeout=%ds", config.Config.MySQLOrchestratorUser,
+				config.Config.MySQLOrchestratorHost, config.Config.MySQLOrchestratorPort, config.Config.MySQLOrchestratorDatabase, config.Config.MySQLConnectTimeoutSeconds)
+			log.Debugf("Connected to orchestrator backend: %v", safe_mysql_uri)
+			if config.Config.MySQLOrchestratorMaxPoolConnections > 0 {
+				log.Debugf("Orchestrator pool SetMaxOpenConns: %d", config.Config.MySQLOrchestratorMaxPoolConnections)
+				db.SetMaxOpenConns(config.Config.MySQLOrchestratorMaxPoolConnections)
+			}
+		}
 	}
 	if err == nil && !fromCache {
 		initOrchestratorDB(db)
 
-		// do not show the password but do show what we connect to.
-		safe_mysql_uri := fmt.Sprintf("%s:?@tcp(%s:%d)/%s?timeout=%ds", config.Config.MySQLOrchestratorUser,
-			config.Config.MySQLOrchestratorHost, config.Config.MySQLOrchestratorPort, config.Config.MySQLOrchestratorDatabase, config.Config.MySQLConnectTimeoutSeconds)
-		log.Debugf("Connected to orchestrator backend: %v", safe_mysql_uri)
-		if config.Config.MySQLOrchestratorMaxPoolConnections > 0 {
-			log.Debugf("Orchestrator pool SetMaxOpenConns: %d", config.Config.MySQLOrchestratorMaxPoolConnections)
-			db.SetMaxOpenConns(config.Config.MySQLOrchestratorMaxPoolConnections)
-		}
 		db.SetMaxIdleConns(10)
 	}
 	return db, err
