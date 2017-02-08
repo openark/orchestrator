@@ -40,9 +40,13 @@ create event if not exists
   on completion preserve
   enable
   do
-    begin
+    main: begin
       DECLARE lock_result INT;
       DECLARE CONTINUE HANDLER FOR SQLEXCEPTION BEGIN END;
+
+      IF @@global.read_only = 1 THEN
+        LEAVE main;
+      END IF;
 
       SET lock_result = GET_LOCK('pseudo_gtid_status', 0);
       IF lock_result = 1 THEN
@@ -82,7 +86,7 @@ create event if not exists
         ;
         SET lock_result = RELEASE_LOCK('pseudo_gtid_status');
       END IF;
-    end
+    end main
 $$
 
 delimiter ;
