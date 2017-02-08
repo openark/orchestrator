@@ -25,8 +25,8 @@ import (
 	"github.com/github/orchestrator/go/app"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/inst"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/math"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/math"
 )
 
 var AppVersion, GitCommit string

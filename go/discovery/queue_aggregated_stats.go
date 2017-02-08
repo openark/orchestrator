@@ -19,7 +19,7 @@ package discovery
 import (
 	"github.com/montanaflynn/stats"
 
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 )
 
 // AggregatedQueuedEntries contains aggregate information some part queue metrics

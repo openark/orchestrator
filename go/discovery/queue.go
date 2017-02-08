@@ -31,7 +31,7 @@ import (
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/inst"
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 )
 
 // QueueMetric contains the queue's active and queued sizes

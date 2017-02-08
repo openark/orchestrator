@@ -31,8 +31,8 @@ import (
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/remote"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/util"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/util"
 )
 
 var thisInstanceKey *inst.InstanceKey

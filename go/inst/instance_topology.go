@@ -24,8 +24,8 @@ import (
 	"time"
 
 	"github.com/github/orchestrator/go/config"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/math"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/math"
 )
 
 type StopReplicationMethod string
