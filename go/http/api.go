@@ -124,6 +124,20 @@ func (this *HttpAPI) Instance(params martini.Params, r render.Render, req *http.
 	r.JSON(200, instance)
 }
 
+// AsyncDiscover issues an asynchronous read on an instance. This is
+// useful for bulk loads of a new set of instances and will not block
+// if the instance is slow to respond or not reachable.
+func (this *HttpAPI) AsyncDiscover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	go this.Discover(params, r, req, user)
+
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Asynchronous discovery initiated for Instance: %+v", instanceKey)})
+}
+
 // Discover issues a synchronous read on an instance
 func (this *HttpAPI) Discover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -2407,6 +2421,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	// Instance management:
 	this.registerRequest(m, "instance/:host/:port", this.Instance)
 	this.registerRequest(m, "discover/:host/:port", this.Discover)
+	this.registerRequest(m, "async-discover/:host/:port", this.AsyncDiscover)
 	this.registerRequest(m, "refresh/:host/:port", this.Refresh)
 	this.registerRequest(m, "forget/:host/:port", this.Forget)
 	this.registerRequest(m, "begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance)
