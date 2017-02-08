@@ -32,7 +32,7 @@ import (
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/gzip"
 	"github.com/martini-contrib/render"
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 )
 
 var sslPEMPassword []byte

@@ -30,7 +30,7 @@ import (
 	"github.com/github/orchestrator/go/os"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/remote"
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
 )
