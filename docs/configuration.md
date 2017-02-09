@@ -53,23 +53,23 @@ The following is an incomplete list of configuration parameters. "Complete" is a
 * `PhysicalEnvironmentPattern`  (string), Regexp pattern with one group, extracting physical environment info from hostname (e.g. combination of datacenter & prod/dev env)
 * `DenyAutoPromotionHostnamePattern`  (string), Orchestrator will not auto-promote hosts with name matching patterb (via -c recovery; for example, avoid promoting dev-dedicated machines)
 * `ServeAgentsHttp`     (bool), should *orchestrator* accept agent registrations and serve agent-related requests (see [Agents](#agents))
-* `AgentsUseSSL (bool), When `true` orchestrator will listen on agents port with SSL as well as connect to agents via SSL (see [SSL and TLS](#ssl-and-tls))
-* `AgentsUseMutualTLS (bool), When `true` Use mutual TLS for the server to agent communication
-* `AgentSSLSkipVerify (bool), When using SSL for the Agent, should we ignore SSL certification error
-* `AgentSSLPrivateKeyFile (string), Name of Agent SSL private key file, applies only when `AgentsUseSSL` = `true`
-* `AgentSSLCertFile (string), Name of Agent SSL certification file, applies only when `AgentsUseSSL` = `true`
-* `AgentSSLCAFile (string), Name of the Agent Certificate Authority file, applies only when `AgentsUseSSL` = `true`
-* `AgentSSLValidOUs ([]string), Valid organizational units when using mutual TLS to communicate with the agents
-* `UseSSL (bool), Use SSL on the server web port (see [SSL and TLS](#ssl-and-tls))
-* `UseMutualTLS (bool), When `true` Use mutual TLS for the server's web and API connections
-* `SSLSkipVerify (bool), When using SSL, should we ignore SSL certification error
-* `SSLPrivateKeyFile (string), Name of SSL private key file, applies only when `UseSSL` = `true`
-* `SSLCertFile (string), Name of SSL certification file, applies only when `UseSSL` = `true`
-* `SSLCAFile (string), Name of the Certificate Authority file, applies only when `UseSSL` = `true`
-* `SSLValidOUs ([]string), Valid organizational units when using mutual TLS
-* `StatusEndpoint (string), Override the status endpoint.  Defaults to `/api/status`
-* `StatusSimpleHealth (bool), If true, calling the status endpoint will use the simplified health check
-* `StatusOUVerify (bool), If true, try to verify OUs when Mutual TLS is on.  Defaults to false
+* `AgentsUseSSL` (bool), When `true` orchestrator will listen on agents port with SSL as well as connect to agents via SSL (see [SSL and TLS](#ssl-and-tls))
+* `AgentsUseMutualTLS` (bool), When `true` Use mutual TLS for the server to agent communication
+* `AgentSSLSkipVerify` (bool), When using SSL for the Agent, should we ignore SSL certification error
+* `AgentSSLPrivateKeyFile` (string), Name of Agent SSL private key file, applies only when `AgentsUseSSL` = `true`
+* `AgentSSLCertFile` (string), Name of Agent SSL certification file, applies only when `AgentsUseSSL` = `true`
+* `AgentSSLCAFile` (string), Name of the Agent Certificate Authority file, applies only when `AgentsUseSSL` = `true`
+* `AgentSSLValidOUs` ([]string), Valid organizational units when using mutual TLS to communicate with the agents
+* `UseSSL` (bool), Use SSL on the server web port (see [SSL and TLS](#ssl-and-tls))
+* `UseMutualTLS` (bool), When `true` Use mutual TLS for the server's web and API connections
+* `SSLSkipVerify` (bool), When using SSL, should we ignore SSL certification error
+* `SSLPrivateKeyFile` (string), Name of SSL private key file, applies only when `UseSSL` = `true`
+* `SSLCertFile` (string), Name of SSL certification file, applies only when `UseSSL` = `true`
+* `SSLCAFile` (string), Name of the Certificate Authority file, applies only when `UseSSL` = `true`
+* `SSLValidOUs` ([]string), Valid organizational units when using mutual TLS
+* `StatusEndpoint` (string), Override the status endpoint.  Defaults to `/api/status`
+* `StatusSimpleHealth` (bool), If true, calling the status endpoint will use the simplified health check
+* `StatusOUVerify` (bool), If true, try to verify OUs when Mutual TLS is on.  Defaults to false
 * `HttpTimeoutSeconds`  (int),    HTTP GET request timeout (when connecting to _orchestrator-agent_)
 * `AgentPollMinutes`     (uint), interval at which *orchestrator* contacts agents for brief status update
 * `UnseenAgentForgetHours`     (uint), time without contact after which an agent is forgotten
