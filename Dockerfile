@@ -21,5 +21,6 @@ RUN set -ex \
     && apk del .build-deps \
     && rm -rf /tmp/*
 
+WORKDIR /usr/local/orchestrator
 ADD docker/entrypoint.sh /entrypoint.sh
 CMD /entrypoint.sh
