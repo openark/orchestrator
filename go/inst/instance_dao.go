@@ -694,12 +694,8 @@ func BulkReadInstance() ([](*InstanceKey), error) {
 	if len(instances) > 0 {
 		readInstanceCounter.Inc(int64(len(instances)))
 
-		for i := range instances {
-			instanceKeys = append(instanceKeys,
-				&InstanceKey{
-					Hostname: instances[i].Key.Hostname,
-					Port:     instances[i].Key.Port,
-				})
+		for _, instance := range instances {
+			instanceKeys = append(instanceKeys, &instance.Key)
 		}
 		// sort on orchestrator and not the backend (should be redundant)
 		sort.Sort(byNamePort(instanceKeys))
