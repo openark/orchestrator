@@ -15,6 +15,7 @@ latest [API source code](https://github.com/github/orchestrator/blob/master/go/h
 * `/api/instance/:host/:port`: reads and returns an instance's details (example `/api/instance/mysql10/3306`)
 * `/api/discover/:host/:port`: discover given instance (a running `orchestrator` service will pick it up from there and
 recursively scan the entire topology)
+* `/api/async-discover/:host/:port`: similar to discover (which is a synchronous action) this works asynchronously
 * `/api/refresh/:host/:port`: synchronously re-read instance status
 * `/api/forget/:host/:port`: remove records of this instance. It may be automatically rediscovered by
   following up on its master or one of its replicas.
