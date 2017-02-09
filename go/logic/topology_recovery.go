@@ -30,7 +30,7 @@ import (
 	"github.com/github/orchestrator/go/os"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/remote"
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
 )
@@ -861,13 +861,18 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 	if !recoveryResolved {
 		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will next attempt regrouping of replicas")
 		// Plan B: regroup (we wish to reduce cross-DC replication streams)
-		_, _, _, _, regroupPromotedReplica, err := inst.RegroupReplicas(failedInstanceKey, true, nil, nil)
-		if err != nil {
-			topologyRecovery.AddError(err)
-			log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: regroup failed on: %+v", err)
+		lostReplicas, _, _, _, regroupPromotedReplica, regroupError := inst.RegroupReplicas(failedInstanceKey, true, nil, nil)
+		if regroupError != nil {
+			topologyRecovery.AddError(regroupError)
+			log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: regroup failed on: %+v", regroupError)
 		}
 		if regroupPromotedReplica != nil {
 			topologyRecovery.ParticipatingInstanceKeys.AddKey(regroupPromotedReplica.Key)
+			if len(lostReplicas) == 0 && regroupError == nil {
+				// Seems like the regroup worked flawlessly. The local replica took over all of its siblings.
+				// We can consider this host to be the successor.
+				successorInstance = regroupPromotedReplica
+			}
 		}
 		// Plan C: try replacement intermediate master in other DC...
 		if candidateSiblingOfIntermediateMaster != nil && candidateSiblingOfIntermediateMaster.DataCenter != intermediateMasterInstance.DataCenter {
@@ -878,20 +883,22 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 	if !recoveryResolved {
 		// Do we still have leftovers? some replicas couldn't move? Couldn't regroup? Only left with regroup's resulting leader?
 		// nothing moved?
-		// We don't care much if regroup made it or not. We prefer that it made it, in whcih case we only need to relocate up
+		// We don't care much if regroup made it or not. We prefer that it made it, in which case we only need to relocate up
 		// one replica, but the operation is still valid if regroup partially/completely failed. We just promote anything
 		// not regrouped.
 		// So, match up all that's left, plan D
 		log.Debugf("topology_recovery: - RecoverDeadIntermediateMaster: will next attempt to relocate up from %+v", *failedInstanceKey)
 
-		var errs []error
-		var relocatedReplicas [](*inst.Instance)
-		relocatedReplicas, successorInstance, err, errs = inst.RelocateReplicas(failedInstanceKey, &analysisEntry.AnalyzedInstanceMasterKey, "")
+		relocatedReplicas, masterInstance, err, errs := inst.RelocateReplicas(failedInstanceKey, &analysisEntry.AnalyzedInstanceMasterKey, "")
 		topologyRecovery.AddErrors(errs)
 		topologyRecovery.ParticipatingInstanceKeys.AddKey(analysisEntry.AnalyzedInstanceMasterKey)
 
 		if len(relocatedReplicas) > 0 {
 			recoveryResolved = true
+			if successorInstance == nil {
+				// There could have been a local replica taking over its siblings. We'd like to consider that one as successor.
+				successorInstance = masterInstance
+			}
 			inst.AuditOperation("recover-dead-intermediate-master", failedInstanceKey, fmt.Sprintf("Relocated replicas under: %+v %d errors: %+v", successorInstance.Key, len(errs), errs))
 		} else {
 			err = log.Errorf("topology_recovery: RecoverDeadIntermediateMaster failed to match up any replica from %+v", *failedInstanceKey)

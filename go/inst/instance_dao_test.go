@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	test "github.com/outbrain/golib/tests"
+	test "github.com/openark/golib/tests"
 )
 
 var (
