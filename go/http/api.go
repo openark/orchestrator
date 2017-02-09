@@ -28,10 +28,12 @@ import (
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/render"
 
+	"github.com/openark/golib/log"
 	"github.com/openark/golib/util"
 
 	"github.com/github/orchestrator/go/agent"
 	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/discovery"
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/process"
@@ -1593,6 +1595,41 @@ func (this *HttpAPI) BulkInstances(params martini.Params, r render.Render, req *
 	r.JSON(200, instances)
 }
 
+// DiscoveryQueueMetricsRaw returns the raw queue metrics (active and
+// queued values), data taken secondly for the last N seconds.
+func (this *HttpAPI) DiscoveryQueueMetricsRaw(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+	log.Debugf("DiscoveryQueueMetricsRaw: seconds: %d", seconds)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to generate discovery queue  aggregated metrics"})
+		return
+	}
+
+	queue := discovery.CreateOrReturnQueue("DEFAULT")
+	metrics := queue.DiscoveryQueueMetrics(seconds)
+	log.Debugf("Raw data: %+v", metrics)
+
+	r.JSON(200, metrics)
+}
+
+// DiscoveryQueueMetricsAggregated returns a single value showing the metrics of the discovery queue over the last N seconds.
+// This is expected to be called every 60 seconds (?) and the config setting of the retention period is currently hard-coded.
+// See go/discovery/ for more information.
+func (this *HttpAPI) DiscoveryQueueMetricsAggregated(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+	log.Debugf("DiscoveryQueueMetricsAggregated: seconds: %d", seconds)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to generate discovery queue  aggregated metrics"})
+		return
+	}
+
+	queue := discovery.CreateOrReturnQueue("DEFAULT")
+	aggregated := queue.AggregatedDiscoveryQueueMetrics(seconds)
+	log.Debugf("Aggregated data: %+v", aggregated)
+
+	r.JSON(200, aggregated)
+}
+
 // Agents provides complete list of registered agents (See https://github.com/github/orchestrator-agent)
 func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -2486,6 +2523,10 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	// Bulk access to information
 	this.registerRequest(m, "bulk-instances", this.BulkInstances)
 	this.registerRequest(m, "bulk-promotion-rules", this.BulkPromotionRules)
+
+	// Monitoring
+	this.registerRequest(m, "discovery-queue-metrics-raw/:seconds", this.DiscoveryQueueMetricsRaw)
+	this.registerRequest(m, "discovery-queue-metrics-aggregated/:seconds", this.DiscoveryQueueMetricsAggregated)
 
 	// Agents
 	this.registerRequest(m, "agents", this.Agents)
