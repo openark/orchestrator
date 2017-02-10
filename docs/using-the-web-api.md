@@ -13,6 +13,7 @@ The following is a brief listing of the web API exposed by `orchestrator`. Docum
 latest [API source code](https://github.com/github/orchestrator/blob/master/go/http/api.go) for the de-facto lsiting (scroll to end of file).
 
 * `/api/instance/:host/:port`: reads and returns an instance's details (example `/api/instance/mysql10/3306`)
+* `/api/async-discover/:host/:port`: trigger an asynchronous discovery of the given instance
 * `/api/discover/:host/:port`: discover given instance (a running `orchestrator` service will pick it up from there and
 recursively scan the entire topology)
 * `/api/async-discover/:host/:port`: similar to discover (which is a synchronous action) this works asynchronously
