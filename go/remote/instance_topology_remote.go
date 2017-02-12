@@ -148,7 +148,7 @@ func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsCh
 		if !found {
 			return instance, err
 		}
-		log.Debugf("SyncReplicaRelayLogs: correlated next-coordinates on %+v are %+v", fromInstance.Key, *nextCoordinates)
+		log.Debugf("SyncReplicaRelayLogs: correlated next-coordinates of %+v on %+v are %+v", instance.Key, fromInstance.Key, *nextCoordinates)
 
 		// We now have the correlation info needed to proceed with remote calls
 		sudoCommand := ""
