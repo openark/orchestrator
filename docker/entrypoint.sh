@@ -4,8 +4,8 @@ cat <<EOF > /etc/orchestrator.conf.json
 {
   "Debug": true,
   "ListenAddress": ":3000",
-  "MySQLTopologyUser": "${ORC_TOPOLOGY_USER:-:orchestrator}",
-  "MySQLTopologyPassword": "${ORC_TOPOLOGY_PASSOWRD:-:orchestrator}",
+  "MySQLTopologyUser": "${ORC_TOPOLOGY_USER:-orchestrator}",
+  "MySQLTopologyPassword": "${ORC_TOPOLOGY_PASSWORD:-orchestrator}",
   "MySQLOrchestratorHost": "${ORC_DB_HOST:-db}",
   "MySQLOrchestratorPort": ${ORC_DB_PORT:-3306},
   "MySQLOrchestratorDatabase": "${ORC_DB_NAME:-orchestrator}",
