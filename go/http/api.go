@@ -23,6 +23,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/auth"
@@ -32,10 +33,12 @@ import (
 	"github.com/openark/golib/util"
 
 	"github.com/github/orchestrator/go/agent"
+	"github.com/github/orchestrator/go/collection"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/discovery"
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/logic"
+	"github.com/github/orchestrator/go/metrics/query"
 	"github.com/github/orchestrator/go/process"
 )
 
@@ -94,6 +97,8 @@ type HttpAPI struct {
 }
 
 var API HttpAPI = HttpAPI{}
+var discoveryMetrics = collection.CreateOrReturnCollection("DISCOVERY_METRICS")
+var queryMetrics = collection.CreateOrReturnCollection("BACKEND_WRITES")
 
 func (this *HttpAPI) getInstanceKey(host string, port string) (inst.InstanceKey, error) {
 	instanceKey, err := inst.NewInstanceKeyFromStrings(host, port)
@@ -1595,6 +1600,40 @@ func (this *HttpAPI) BulkInstances(params martini.Params, r render.Render, req *
 	r.JSON(200, instances)
 }
 
+// DiscoveryMetricsRaw will return the last X seconds worth of discovery information in time based order as a JSON array
+func (this *HttpAPI) DiscoveryMetricsRaw(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+	if err != nil || seconds <= 0 {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Invalid value provided for seconds"})
+		return
+	}
+
+	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
+	json, err := discovery.JSONSince(discoveryMetrics, refTime)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to determine start time. Perhaps seconds value is wrong?"})
+		return
+	}
+	log.Debugf("DiscoveryMetricsRaw data: retrieved %d entries from discovery.MC", len(json))
+
+	r.JSON(200, json)
+}
+
+// DiscoveryMetricsAggregated will return a single set of aggregated metrics for raw values collected since the
+// specified time.
+func (this *HttpAPI) DiscoveryMetricsAggregated(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+
+	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
+	aggregated, err := discovery.AggregatedSince(discoveryMetrics, refTime)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to generate aggregated discovery metrics"})
+		return
+	}
+	// log.Debugf("DiscoveryMetricsAggregated data: %+v", aggregated)
+	r.JSON(200, aggregated)
+}
+
 // DiscoveryQueueMetricsRaw returns the raw queue metrics (active and
 // queued values), data taken secondly for the last N seconds.
 func (this *HttpAPI) DiscoveryQueueMetricsRaw(params martini.Params, r render.Render, req *http.Request, user auth.User) {
@@ -1607,7 +1646,7 @@ func (this *HttpAPI) DiscoveryQueueMetricsRaw(params martini.Params, r render.Re
 
 	queue := discovery.CreateOrReturnQueue("DEFAULT")
 	metrics := queue.DiscoveryQueueMetrics(seconds)
-	log.Debugf("Raw data: %+v", metrics)
+	log.Debugf("DiscoveryQueueMetricsRaw data: %+v", metrics)
 
 	r.JSON(200, metrics)
 }
@@ -1619,13 +1658,49 @@ func (this *HttpAPI) DiscoveryQueueMetricsAggregated(params martini.Params, r re
 	seconds, err := strconv.Atoi(params["seconds"])
 	log.Debugf("DiscoveryQueueMetricsAggregated: seconds: %d", seconds)
 	if err != nil {
-		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to generate discovery queue  aggregated metrics"})
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to generate discovery queue aggregated metrics"})
 		return
 	}
 
 	queue := discovery.CreateOrReturnQueue("DEFAULT")
 	aggregated := queue.AggregatedDiscoveryQueueMetrics(seconds)
-	log.Debugf("Aggregated data: %+v", aggregated)
+	log.Debugf("DiscoveryQueueMetricsAggregated data: %+v", aggregated)
+
+	r.JSON(200, aggregated)
+}
+
+// BackendQueryMetricsRaw returns the raw backend query metrics
+func (this *HttpAPI) BackendQueryMetricsRaw(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+	log.Debugf("BackendQueryMetricsRaw: seconds: %d", seconds)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to generate raw backend query metrics"})
+		return
+	}
+
+	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
+	m, err := queryMetrics.Since(refTime)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to return backend query metrics"})
+		return
+	}
+
+	log.Debugf("BackendQueryMetricsRaw data: %+v", m)
+
+	r.JSON(200, m)
+}
+
+func (this *HttpAPI) BackendQueryMetricsAggregated(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+	log.Debugf("BackendQueryMetricsAggregated: seconds: %d", seconds)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to aggregated generate backend query metrics"})
+		return
+	}
+
+	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
+	aggregated := query.AggregatedSince(queryMetrics, refTime)
+	log.Debugf("BackendQueryMetricsAggregated data: %+v", aggregated)
 
 	r.JSON(200, aggregated)
 }
@@ -2525,8 +2600,12 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "bulk-promotion-rules", this.BulkPromotionRules)
 
 	// Monitoring
+	this.registerRequest(m, "discovery-metrics-raw/:seconds", this.DiscoveryMetricsRaw)
+	this.registerRequest(m, "discovery-metrics-aggregated/:seconds", this.DiscoveryMetricsAggregated)
 	this.registerRequest(m, "discovery-queue-metrics-raw/:seconds", this.DiscoveryQueueMetricsRaw)
 	this.registerRequest(m, "discovery-queue-metrics-aggregated/:seconds", this.DiscoveryQueueMetricsAggregated)
+	this.registerRequest(m, "backend-query-metrics-raw/:seconds", this.BackendQueryMetricsRaw)
+	this.registerRequest(m, "backend-query-metrics-aggregated/:seconds", this.BackendQueryMetricsAggregated)
 
 	// Agents
 	this.registerRequest(m, "agents", this.Agents)
