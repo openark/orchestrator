@@ -144,7 +144,7 @@ function build() {
       tags="--tags 'libsqlite3 darwin'"
     ;;
   esac
-  gobuild="go build $tags ${opt_race} -ldflags \"$ldflags\" -o $builddir/orchestrator${prefix}/orchestrator/orchestrator go/cmd/orchestrator/main.go"
+  gobuild="go build -i $tags ${opt_race} -ldflags \"$ldflags\" -o $builddir/orchestrator${prefix}/orchestrator/orchestrator go/cmd/orchestrator/main.go"
 
   case $os in
     'linux')
