@@ -141,7 +141,7 @@ deploy_internal_db() {
   echo $cmd > $exec_command_file
   echo_dot
   bash $exec_command_file 1> $test_outfile 2> $test_logfile
-  echo "done $?"
+  echo "- deploy_internal_db result: $?"
 }
 
 generate_config_file() {
@@ -174,11 +174,11 @@ test_all() {
 
 test_db() {
   db_type="$1"
-  echo "testing vs $db_type"
-  echo "###################"
+  echo "### testing via $db_type"
   generate_config_file
   check_db
   test_all ${@:2}
+  echo "- done testing via $db_type"
 }
 
 main() {
