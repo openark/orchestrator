@@ -416,21 +416,6 @@ func getNextBinlogEventsChunk(instance *Instance, startingCoordinates BinlogCoor
 	return events, err
 }
 
-// rpad formats the binlog coordinates to a given size. If the size
-// increases this value is modified so it can be reused later. This
-// is to ensure consistent formatting in debug output.
-func rpad(coordinates BinlogCoordinates, length *int) string {
-	s := fmt.Sprintf("%+v", coordinates)
-	if len(s) > *length {
-		*length = len(s)
-	}
-
-	if len(s) >= *length {
-		return s
-	}
-	return fmt.Sprintf("%s%s", s, strings.Repeat(" ", *length-len(s)))
-}
-
 // used by GetNextBinlogCoordinatesToMatch to format debug information appropriately
 // format the event information in debug output
 func formatEventCleanly(event BinlogEvent, length *int) string {
