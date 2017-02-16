@@ -1201,14 +1201,15 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
 	case inst.UnreachableMasterWithStaleSlaves:
 		checkAndRecoverFunction = checkAndRecoverUnreachableMasterWithStaleSlaves
-	}
-	// Right now this is mostly causing noise with no clear action.
-	// Will revisit this in the future.
-	// case inst.AllMasterSlavesStale:
-	// 	checkAndRecoverFunction = checkAndRecoverGenericProblem
-
-	if checkAndRecoverFunction == nil {
+		// Right now this is mostly causing noise with no clear action.
+		// Will revisit this in the future.
+		// case inst.AllMasterSlavesStale:
+		// 	checkAndRecoverFunction = checkAndRecoverGenericProblem
+	default:
 		// Unhandled problem type
+		log.Warningf("executeCheckAndRecoverFunction: Ignoring unhandled analysisEntry: %+v; key: %+v",
+			analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
+
 		return false, nil, nil
 	}
 	// we have a recovery function; its execution still depends on filters if not disabled.
