@@ -19,7 +19,7 @@ package inst
 import (
 	"fmt"
 
-	"github.com/outbrain/golib/sqlutils"
+	"github.com/openark/golib/sqlutils"
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"

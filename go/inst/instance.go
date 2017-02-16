@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/github/orchestrator/go/config"
-	"github.com/outbrain/golib/math"
+	"github.com/openark/golib/math"
 )
 
 // CandidatePromotionRule describe the promotion preference/rule for an instance.
@@ -106,6 +106,10 @@ type Instance struct {
 	SecondsSinceLastSeen sql.NullInt64
 	CountMySQLSnapshots  int
 
+	// Careful. IsCandidate and PromotionRule are used together
+	// and probably need to be merged. IsCandidate's value may
+	// be picked up from daabase_candidate_instance's value when
+	// reading an instance from the db.
 	IsCandidate          bool
 	PromotionRule        CandidatePromotionRule
 	IsDowntimed          bool

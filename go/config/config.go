@@ -25,7 +25,7 @@ import (
 
 	"gopkg.in/gcfg.v1"
 
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 )
 
 var (
@@ -83,6 +83,7 @@ type Configuration struct {
 	SnapshotTopologiesIntervalHours              uint     // Interval in hour between snapshot-topologies invocation. Default: 0 (disabled)
 	DiscoveryMaxConcurrency                      uint     // Number of goroutines doing hosts discovery
 	DiscoveryQueueCapacity                       uint     // Buffer size of the discovery queue. Should be greater than the number of DB instances being discovered
+	DiscoveryQueueMaxStatisticsSize              int      // The maximum number of individual secondly statistics taken of the discovery queue
 	InstanceBulkOperationsWaitTimeoutSeconds     uint     // Time to wait on a single instance when doing bulk (many instances) operation
 	ActiveNodeExpireSeconds                      uint     // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
 	NodeHealthExpiry                             bool     // Do we expire the node_health table? Usually this is true but it might be disabled on command line tools if an orchestrator daemon is running.
@@ -185,12 +186,16 @@ type Configuration struct {
 	MasterFailoverDetachReplicaMasterHost        bool              // Should orchestrator issue a detach-replica-master-host on newly promoted master (this makes sure the new master will not attempt to replicate old master if that comes back to life). Defaults 'false'. Meaningless if ApplyMySQLPromotionAfterMasterFailover is 'true'.
 	PostponeSlaveRecoveryOnLagMinutes            uint              // Synonym to PostponeReplicaRecoveryOnLagMinutes
 	PostponeReplicaRecoveryOnLagMinutes          uint              // On crash recovery, replicas that are lagging more than given minutes are only resurrected late in the recovery process, after master/IM has been elected and processes executed. Value of 0 disables this feature
+	RemoteSSHForMasterFailover                   bool              // Should orchestrator attempt a remote-ssh relaylog-synching upon master failover? Requires RemoteSSHCommand
+	RemoteSSHCommand                             string            // A `ssh` command to be used by recovery process to read/apply relaylogs. If provided, this variable must contain the text "{hostname}". The remote SSH login must have the privileges to read/write relay logs. Example: "setuidgid remoteuser ssh {hostname}"
+	RemoteSSHCommandUseSudo                      bool              // Should orchestrator apply 'sudo' on the remote host upon SSH command
 	OSCIgnoreHostnameFilters                     []string          // OSC replicas recommendation will ignore replica hostnames matching given patterns
 	GraphiteAddr                                 string            // Optional; address of graphite port. If supplied, metrics will be written here
 	GraphitePath                                 string            // Prefix for graphite path. May include {hostname} magic placeholder
 	GraphiteConvertHostnameDotsToUnderscores     bool              // If true, then hostname's dots are converted to underscores before being used in graphite path
 	GraphitePollSeconds                          int               // Graphite writes interval. 0 disables.
 	URLPrefix                                    string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
+	MaxOutdatedKeysToShow                        int               // Maximum number of keys to show in ContinousDiscovery. If the number of polled hosts grows too far then showing the complete list is not ideal.
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -245,6 +250,7 @@ func newConfiguration() *Configuration {
 		DiscoverByShowSlaveHosts:                     false,
 		DiscoveryMaxConcurrency:                      300,
 		DiscoveryQueueCapacity:                       100000,
+		DiscoveryQueueMaxStatisticsSize:              120,
 		InstanceBulkOperationsWaitTimeoutSeconds:     10,
 		ActiveNodeExpireSeconds:                      5,
 		NodeHealthExpiry:                             true,
@@ -338,12 +344,16 @@ func newConfiguration() *Configuration {
 		MasterFailoverLostInstancesDowntimeMinutes:   0,
 		MasterFailoverDetachSlaveMasterHost:          false,
 		PostponeSlaveRecoveryOnLagMinutes:            0,
+		RemoteSSHForMasterFailover:                   false,
+		RemoteSSHCommand:                             "",
+		RemoteSSHCommandUseSudo:                      true,
 		OSCIgnoreHostnameFilters:                     []string{},
 		GraphiteAddr:                                 "",
 		GraphitePath:                                 "",
 		GraphiteConvertHostnameDotsToUnderscores:     true,
 		GraphitePollSeconds:                          60,
 		URLPrefix:                                    "",
+		MaxOutdatedKeysToShow:                        64,
 	}
 }
 
@@ -440,6 +450,15 @@ func (this *Configuration) postReadAdjustments() error {
 		this.URLPrefix = strings.TrimLeft(this.URLPrefix, "/")
 		this.URLPrefix = strings.TrimRight(this.URLPrefix, "/")
 		this.URLPrefix = "/" + this.URLPrefix
+	}
+
+	if this.RemoteSSHCommand != "" {
+		if !strings.Contains(this.RemoteSSHCommand, "{hostname}") {
+			return fmt.Errorf("config's RemoteSSHCommand must either be empty, or contain a '{hostname}' placeholder")
+		}
+	}
+	if this.RemoteSSHForMasterFailover && this.RemoteSSHCommand == "" {
+		return fmt.Errorf("RemoteSSHCommand is required when RemoteSSHForMasterFailover is set")
 	}
 	return nil
 }

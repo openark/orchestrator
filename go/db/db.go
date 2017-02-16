@@ -24,8 +24,8 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/ssl"
 	"github.com/go-sql-driver/mysql"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 )
 
 var (
@@ -504,6 +504,13 @@ var generateSQLBase = []string{
 		  PRIMARY KEY (disable_recovery)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS cluster_alias_override (
+		  cluster_name varchar(128) CHARACTER SET ascii NOT NULL,
+		  alias varchar(128) NOT NULL,
+		  PRIMARY KEY (cluster_name)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 // generateSQLPatches contains DDLs for patching schema to the latest version.
@@ -867,6 +874,14 @@ var generateSQLPatches = []string{
 		ALTER TABLE
 			database_instance
 			ADD COLUMN version_comment varchar(128) NOT NULL DEFAULT ''
+	`,
+	`
+		ALTER TABLE active_node
+			ADD COLUMN first_seen_active timestamp NOT NULL DEFAULT '1971-01-01 00:00:00'
+	`,
+	`
+		ALTER TABLE node_health
+			ADD COLUMN first_seen_active timestamp NOT NULL DEFAULT '1971-01-01 00:00:00'
 	`,
 }
 

@@ -24,9 +24,9 @@ import (
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/math"
-	"github.com/outbrain/golib/sqlutils"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/math"
+	"github.com/openark/golib/sqlutils"
 	"github.com/patrickmn/go-cache"
 )
 
@@ -205,6 +205,209 @@ func getLastPseudoGTIDEntryInRelayLogs(instance *Instance, minBinlogCoordinates 
 		}
 	}
 	return nil, "", log.Errorf("Cannot find pseudo GTID entry in relay logs of %+v", instance.Key)
+}
+
+func readBinlogEvent(binlogEvent *BinlogEvent, m sqlutils.RowMap) error {
+	binlogEvent.NextEventPos = m.GetInt64("End_log_pos")
+	binlogEvent.Coordinates.LogPos = m.GetInt64("Pos")
+	binlogEvent.EventType = m.GetString("Event_type")
+	binlogEvent.Info = m.GetString("Info")
+	return nil
+}
+
+func ReadBinlogEventAtRelayLogCoordinates(instanceKey *InstanceKey, relaylogCoordinates *BinlogCoordinates) (binlogEvent *BinlogEvent, err error) {
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return nil, err
+	}
+	queryRowsFunc := sqlutils.QueryRowsMap
+	if config.Config.BufferBinlogEvents {
+		queryRowsFunc = sqlutils.QueryRowsMapBuffered
+	}
+	query := fmt.Sprintf("show relaylog events in '%s' FROM %d LIMIT 1", relaylogCoordinates.LogFile, relaylogCoordinates.LogPos)
+	binlogEvent = &BinlogEvent{
+		Coordinates: *relaylogCoordinates,
+	}
+	err = queryRowsFunc(db, query, func(m sqlutils.RowMap) error {
+		return readBinlogEvent(binlogEvent, m)
+	})
+	return binlogEvent, err
+}
+
+// Try and find the last position of a pseudo GTID query entry in the given binary log.
+// Also return the full text of that entry.
+// maxCoordinates is the position beyond which we should not read. This is relevant when reading relay logs; in particular,
+// the last relay log. We must be careful not to scan for Pseudo-GTID entries past the position executed by the SQL thread.
+// maxCoordinates == nil means no limit.
+func getLastExecutedEntryInRelaylog(instanceKey *InstanceKey, binlog string, minCoordinates *BinlogCoordinates, maxCoordinates *BinlogCoordinates) (binlogEvent *BinlogEvent, err error) {
+	if binlog == "" {
+		return nil, log.Errorf("getLastExecutedEntryInRelaylog: empty binlog file name for %+v. maxCoordinates = %+v", *instanceKey, maxCoordinates)
+	}
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return nil, err
+	}
+	binlogEvent = &BinlogEvent{
+		Coordinates: BinlogCoordinates{LogFile: binlog, LogPos: 0, Type: RelayLog},
+	}
+
+	moreRowsExpected := true
+	var relyLogMinPos int64 = 0
+	if minCoordinates != nil && minCoordinates.LogFile == binlog {
+		log.Debugf("getLastExecutedEntryInRelaylog: starting with %+v", *minCoordinates)
+		relyLogMinPos = minCoordinates.LogPos
+	}
+
+	queryRowsFunc := sqlutils.QueryRowsMap
+	if config.Config.BufferBinlogEvents {
+		queryRowsFunc = sqlutils.QueryRowsMapBuffered
+	}
+	step := 0
+	for moreRowsExpected {
+		query := fmt.Sprintf("show relaylog events in '%s' FROM %d LIMIT %d,%d", binlog, relyLogMinPos, (step * config.Config.BinlogEventsChunkSize), config.Config.BinlogEventsChunkSize)
+
+		moreRowsExpected = false
+		err = queryRowsFunc(db, query, func(m sqlutils.RowMap) error {
+			moreRowsExpected = true
+			return readBinlogEvent(binlogEvent, m)
+		})
+		if err != nil {
+			return nil, err
+		}
+		step++
+	}
+
+	// Not found? return nil. an error is reserved to SQL problems.
+	if binlogEvent.Coordinates.LogPos == 0 {
+		return nil, nil
+	}
+	return binlogEvent, err
+}
+
+func GetLastExecutedEntryInRelayLogs(instance *Instance, minBinlogCoordinates *BinlogCoordinates, recordedInstanceRelayLogCoordinates BinlogCoordinates) (binlogEvent *BinlogEvent, err error) {
+	// Look for last GTID in relay logs:
+	// Since MySQL does not provide with a SHOW RELAY LOGS command, we heuristically start from current
+	// relay log (indiciated by Relay_log_file) and walk backwards.
+
+	currentRelayLog := recordedInstanceRelayLogCoordinates
+	for err == nil {
+		log.Debugf("Searching for latest entry in relaylog %+v of %+v, up to pos %+v", currentRelayLog.LogFile, instance.Key, recordedInstanceRelayLogCoordinates)
+		if binlogEvent, err = getLastExecutedEntryInRelaylog(&instance.Key, currentRelayLog.LogFile, minBinlogCoordinates, &recordedInstanceRelayLogCoordinates); err != nil {
+			return nil, err
+		} else if binlogEvent != nil {
+			log.Debugf("Found entry in %+v, %+v", instance.Key, binlogEvent.Coordinates)
+			return binlogEvent, err
+		}
+		if minBinlogCoordinates != nil && minBinlogCoordinates.LogFile == currentRelayLog.LogFile {
+			// We tried and failed with the minBinlogCoordinates hint. We no longer require it,
+			// and continue with exhaustive search.
+			minBinlogCoordinates = nil
+			log.Debugf("Heuristic relaylog search failed; continuing exhaustive search")
+			// And we do NOT iterate to previous log file: we scan same log faile again, with no heuristic
+		} else {
+			currentRelayLog, err = currentRelayLog.PreviousFileCoordinates()
+		}
+	}
+	return binlogEvent, err
+}
+
+// SearchBinlogEntryInRelaylog
+func searchEventInRelaylog(instanceKey *InstanceKey, binlog string, searchEvent *BinlogEvent, minCoordinates *BinlogCoordinates) (binlogCoordinates, nextCoordinates *BinlogCoordinates, found bool, err error) {
+	binlogCoordinates = &BinlogCoordinates{LogFile: binlog, LogPos: 0, Type: RelayLog}
+	nextCoordinates = &BinlogCoordinates{LogFile: binlog, LogPos: 0, Type: RelayLog}
+	if binlog == "" {
+		return binlogCoordinates, nextCoordinates, false, log.Errorf("SearchEventInRelaylog: empty relaylog file name for %+v", *instanceKey)
+	}
+
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return binlogCoordinates, nextCoordinates, false, err
+	}
+
+	moreRowsExpected := true
+	var relyLogMinPos int64 = 0
+	if minCoordinates != nil && minCoordinates.LogFile == binlog {
+		log.Debugf("SearchEventInRelaylog: starting with %+v", *minCoordinates)
+		relyLogMinPos = minCoordinates.LogPos
+	}
+	binlogEvent := &BinlogEvent{
+		Coordinates: BinlogCoordinates{LogFile: binlog, LogPos: 0, Type: RelayLog},
+	}
+
+	queryRowsFunc := sqlutils.QueryRowsMap
+	if config.Config.BufferBinlogEvents {
+		queryRowsFunc = sqlutils.QueryRowsMapBuffered
+	}
+	skipRestOfBinlog := false
+
+	step := 0
+	for moreRowsExpected {
+		query := fmt.Sprintf("show relaylog events in '%s' FROM %d LIMIT %d,%d", binlog, relyLogMinPos, (step * config.Config.BinlogEventsChunkSize), config.Config.BinlogEventsChunkSize)
+
+		// We don't know in advance when we will hit the end of the binlog. We will implicitly understand it when our
+		// `show binlog events` query does not return any row.
+		moreRowsExpected = false
+		err = queryRowsFunc(db, query, func(m sqlutils.RowMap) error {
+			if binlogCoordinates.LogPos != 0 && nextCoordinates.LogPos != 0 {
+				// Entry found!
+				skipRestOfBinlog = true
+				return nil
+			}
+			if skipRestOfBinlog {
+				return nil
+			}
+			moreRowsExpected = true
+
+			if binlogCoordinates.LogPos == 0 {
+				readBinlogEvent(binlogEvent, m)
+				if binlogEvent.EqualsIgnoreCoordinates(searchEvent) {
+					// found it!
+					binlogCoordinates.LogPos = m.GetInt64("Pos")
+				}
+			} else if nextCoordinates.LogPos == 0 {
+				// found binlogCoordinates: the next coordinates are nextCoordinates :P
+				nextCoordinates.LogPos = m.GetInt64("Pos")
+			}
+			return nil
+		})
+		if err != nil {
+			return binlogCoordinates, nextCoordinates, (binlogCoordinates.LogPos != 0), err
+		}
+		if skipRestOfBinlog {
+			return binlogCoordinates, nextCoordinates, (binlogCoordinates.LogPos != 0), err
+		}
+		step++
+	}
+	return binlogCoordinates, nextCoordinates, (binlogCoordinates.LogPos != 0), err
+}
+
+func SearchEventInRelayLogs(searchEvent *BinlogEvent, instance *Instance, minBinlogCoordinates *BinlogCoordinates, recordedInstanceRelayLogCoordinates BinlogCoordinates) (binlogCoordinates, nextCoordinates *BinlogCoordinates, found bool, err error) {
+	// Since MySQL does not provide with a SHOW RELAY LOGS command, we heuristically start from current
+	// relay log (indiciated by Relay_log_file) and walk backwards.
+	log.Debugf("will search for event %+v", *searchEvent)
+	if minBinlogCoordinates != nil {
+		log.Debugf("Starting with coordinates: %+v", *minBinlogCoordinates)
+	}
+	currentRelayLog := recordedInstanceRelayLogCoordinates
+	for err == nil {
+		log.Debugf("Searching for event in relaylog %+v of %+v, up to pos %+v", currentRelayLog.LogFile, instance.Key, recordedInstanceRelayLogCoordinates)
+		if binlogCoordinates, nextCoordinates, found, err = searchEventInRelaylog(&instance.Key, currentRelayLog.LogFile, searchEvent, minBinlogCoordinates); err != nil {
+			return nil, nil, false, err
+		} else if binlogCoordinates != nil && found {
+			log.Debugf("Found event in %+v, %+v", instance.Key, *binlogCoordinates)
+			return binlogCoordinates, nextCoordinates, found, err
+		}
+		if minBinlogCoordinates != nil && minBinlogCoordinates.LogFile == currentRelayLog.LogFile {
+			// We tried and failed with the minBinlogCoordinates hint. We no longer require it,
+			// and continue with exhaustive search.
+			minBinlogCoordinates = nil
+			log.Debugf("Heuristic relaylog search failed; continuing exhaustive search")
+			// And we do NOT iterate to previous log file: we scan same log faile again, with no heuristic
+		} else {
+			currentRelayLog, err = currentRelayLog.PreviousFileCoordinates()
+		}
+	}
+	return binlogCoordinates, nextCoordinates, found, err
 }
 
 // SearchEntryInBinlog Given a binlog entry text (query), search it in the given binary log of a given instance

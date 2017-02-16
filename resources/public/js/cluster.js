@@ -1067,9 +1067,10 @@ function Cluster() {
       var instanceFullNames = [];
       instances.forEach(function(instance) {
         var instanceDescription = instance.title + " " + instance.Version;
-        if ($.cookie("anonymize") == "true") {
+        if (isAnonymized()) {
           instanceDescription = anonymizeInstanceId(instance.id);
         }
+        instanceDescription += ", " + instance.SlaveLagSeconds.Int64 + "s lag";
         incrementProblems("", instanceDescription)
         instanceFullNames.push(getInstanceTitle(instance.Key.Hostname, instance.Key.Port));
         if (instance.inMaintenanceProblem()) {
@@ -1245,33 +1246,11 @@ function Cluster() {
     });
   }
 
-
-  function anonymizeInstanceId(instanceId) {
-    var tokens = instanceId.split("__");
-    return "instance-" + md5(tokens[1]).substring(0, 4) + ":" + tokens[2];
-  }
-
   function anonymizeIfNeedBe(message) {
-    if ($.cookie("anonymize") == "true") {
+    if (isAnonymized()) {
       message = message.replace(/<strong>.*?<\/strong>/g, "############");
     }
     return message;
-  }
-
-  function anonymize() {
-    var _ = function() {
-      $("#cluster_container .instance[data-nodeid]").each(function() {
-        var instanceId = $(this).attr("data-nodeid");
-        $(this).find("h3 .pull-left").html(anonymizeInstanceId(instanceId));
-        $(this).find("h3").attr("title", anonymizeInstanceId(instanceId));
-      });
-      $(".instance-content .instance-basic-info").each(function() {
-        tokens = jQuery(this).html().split(" ", 2);
-        tokens.push("");
-        jQuery(this).html(tokens[0].match(/[^.]+[.][^.]+/) + " " + tokens[1])
-      });
-    }();
-    $("#cluster_container div.floating_background").html("");
   }
 
   function addSidebarInfoPopoverContent(content, prepend) {
@@ -1355,7 +1334,7 @@ function Cluster() {
     // Anonymize
     {
       var glyph = $("#cluster_sidebar [data-bullet=anonymize] .glyphicon");
-      if ($.cookie("anonymize") == "true") {
+      if (isAnonymized()) {
         glyph.addClass("text-info");
         glyph.attr("title", "Cancel anonymize");
       } else {
@@ -1511,10 +1490,6 @@ function Cluster() {
 
     reviewReplicationAnalysis(replicationAnalysis);
 
-    if ($.cookie("anonymize") == "true") {
-      anonymize();
-    }
-
     instances.forEach(function(instance) {
       if (instance.isMaster) {
         getData("/api/recently-active-instance-recovery/" + instance.Key.Hostname + "/" + instance.Key.Port, function(recoveries) {
@@ -1555,7 +1530,7 @@ function Cluster() {
       var visualAlias = (alias ? alias : currentClusterName())
       document.title = document.title.split(" - ")[0] + " - " + visualAlias;
 
-      if (!($.cookie("anonymize") == "true")) {
+      if (!isAnonymized()) {
         $("#cluster_container").append('<div class="floating_background">' + visualAlias + '</div>');
         $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="' + clusterInfo.ClusterAlias + '">Alias: ' + alias + '</a></li>');
       }
@@ -1571,7 +1546,7 @@ function Cluster() {
       if ($.cookie("pool-indicator") == "true") {
         $("#dropdown-context a[data-command=pool-indicator]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
       }
-      if ($.cookie("anonymize") == "true") {
+      if (isAnonymized()) {
         $("#dropdown-context a[data-command=anonymize]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
       }
       if (isColorizeDC()) {
@@ -1642,7 +1617,7 @@ function Cluster() {
       location.reload();
     });
     $("body").on("click", "a[data-command=anonymize]", function(event) {
-      if ($.cookie("anonymize") == "true") {
+      if (isAnonymized()) {
         $.cookie("anonymize", "false", {
           path: '/',
           expires: 1

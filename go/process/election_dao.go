@@ -19,23 +19,24 @@ package process
 import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 )
 
 // AttemptElection tries to grab leadership (become active node)
 func AttemptElection() (bool, error) {
 	sqlResult, err := db.ExecOrchestrator(`
 			insert ignore into active_node (
-					anchor, hostname, token, last_seen_active
+					anchor, hostname, token, first_seen_active, last_seen_active
 				) values (
-					1, ?, ?, now()
+					1, ?, ?, now(), now()
 				) on duplicate key update
-					hostname = if(last_seen_active < now() - interval ? second, values(hostname), hostname),
-					token    = if(last_seen_active < now() - interval ? second, values(token),    token),
-					last_seen_active = if(hostname = values(hostname) and token = values(token), values(last_seen_active), last_seen_active)					
+					hostname          = if(last_seen_active < now() - interval ? second, values(hostname),          hostname),
+					token             = if(last_seen_active < now() - interval ? second, values(token),             token),
+					first_seen_active = if(last_seen_active < now() - interval ? second, values(first_seen_active), first_seen_active),
+					last_seen_active = if(hostname = values(hostname) and token = values(token), values(last_seen_active), last_seen_active)
 			`,
-		ThisHostname, ProcessToken.Hash, config.Config.ActiveNodeExpireSeconds, config.Config.ActiveNodeExpireSeconds,
+		ThisHostname, ProcessToken.Hash, config.Config.ActiveNodeExpireSeconds, config.Config.ActiveNodeExpireSeconds, config.Config.ActiveNodeExpireSeconds,
 	)
 	if err != nil {
 		return false, log.Errore(err)
@@ -48,9 +49,9 @@ func AttemptElection() (bool, error) {
 func GrabElection() error {
 	_, err := db.ExecOrchestrator(`
 			replace into active_node (
-					anchor, hostname, token, last_seen_active
+					anchor, hostname, token, first_seen_active, last_seen_active
 				) values (
-					1, ?, ?, NOW()
+					1, ?, ?, now(), now()
 				)
 			`,
 		ThisHostname, ProcessToken.Hash,
@@ -65,25 +66,27 @@ func Reelect() error {
 }
 
 // ElectedNode returns the details of the elected node, as well as answering the question "is this process the elected one"?
-func ElectedNode() (hostname string, token string, isElected bool, err error) {
+func ElectedNode() (node NodeHealth, isElected bool, err error) {
 	query := `
-		select 
+		select
 			hostname,
-			token
-		from 
+			token,
+			first_seen_active,
+			last_seen_Active
+		from
 			active_node
 		where
 			anchor = 1
 		`
 	err = db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
-		hostname = m.GetString("hostname")
-		token = m.GetString("token")
+		node.Hostname = m.GetString("hostname")
+		node.Token = m.GetString("token")
+		node.FirstSeenActive = m.GetString("first_seen_active")
+		node.LastSeenActive = m.GetString("last_seen_active")
+
 		return nil
 	})
 
-	if err != nil {
-		log.Errore(err)
-	}
-	isElected = (hostname == ThisHostname && token == ProcessToken.Hash)
-	return hostname, token, isElected, err
+	isElected = (node.Hostname == ThisHostname && node.Token == ProcessToken.Hash)
+	return node, isElected, log.Errore(err)
 }

@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/github/orchestrator/go/config"
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 )
 
 // Event entries may contains table IDs (can be different for same tables on different servers)
@@ -61,6 +61,17 @@ func (this *BinlogEvent) NormalizeInfo() {
 	for reg, replace := range eventInfoTransformations {
 		this.Info = reg.ReplaceAllString(this.Info, replace)
 	}
+}
+
+func (this *BinlogEvent) Equals(other *BinlogEvent) bool {
+	return this.Coordinates.Equals(&other.Coordinates) &&
+		this.NextEventPos == other.NextEventPos &&
+		this.EventType == other.EventType && this.Info == other.Info
+}
+
+func (this *BinlogEvent) EqualsIgnoreCoordinates(other *BinlogEvent) bool {
+	return this.NextEventPos == other.NextEventPos &&
+		this.EventType == other.EventType && this.Info == other.Info
 }
 
 const maxEmptyEventsEvents int = 10
