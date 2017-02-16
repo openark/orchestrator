@@ -168,22 +168,26 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	// First we've ever heard of this instance. Continue investigation:
 	instance, err = inst.ReadTopologyInstanceBufferable(&instanceKey, config.Config.BufferInstanceWrites, latency)
 	// panic can occur (IO stuff). Therefore it may happen
-	// that instance is nil. Check it.
+	// that instance is nil. Check it, but first get the timing metrics.
+	totalLatency := latency.Elapsed("total")
+	backendLatency := latency.Elapsed("backend")
+	instanceLatency := latency.Elapsed("instance")
+
 	if instance == nil {
 		failedDiscoveriesCounter.Inc(1)
 		discoveryMetrics.Append(&discovery.Metric{
 			Timestamp:       time.Now(),
 			InstanceKey:     instanceKey,
-			TotalLatency:    latency.Elapsed("total"),
-			BackendLatency:  latency.Elapsed("backend"),
-			InstanceLatency: latency.Elapsed("instance"),
+			TotalLatency:    totalLatency,
+			BackendLatency:  backendLatency,
+			InstanceLatency: instanceLatency,
 			Err:             err,
 		})
 		log.Warningf("discoverInstance(%+v) instance is nil in %.3fs (Backend: %.3fs, Instance: %.3fs), error=%+v",
 			instanceKey,
-			latency.ElapsedSeconds("total"),
-			latency.ElapsedSeconds("backend"),
-			latency.ElapsedSeconds("instance"),
+			totalLatency,
+			backendLatency,
+			instanceLatency,
 			err)
 		return
 	}
@@ -191,18 +195,18 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	discoveryMetrics.Append(&discovery.Metric{
 		Timestamp:       time.Now(),
 		InstanceKey:     instanceKey,
-		TotalLatency:    latency.Elapsed("total"),
-		BackendLatency:  latency.Elapsed("backend"),
-		InstanceLatency: latency.Elapsed("instance"),
+		TotalLatency:    totalLatency,
+		BackendLatency:  backendLatency,
+		InstanceLatency: instanceLatency,
 		Err:             nil,
 	})
 	log.Debugf("Discovered host: %+v, master: %+v, version: %+v in %.3fs (Backend: %.3fs, Instance: %.3fs)",
 		instance.Key,
 		instance.MasterKey,
 		instance.Version,
-		latency.ElapsedSeconds("total"),
-		latency.ElapsedSeconds("backend"),
-		latency.ElapsedSeconds("instance"))
+		totalLatency,
+		backendLatency,
+		instanceLatency)
 
 	if atomic.LoadInt64(&isElectedNode) == 0 {
 		// Maybe this node was elected before, but isn't elected anymore.
