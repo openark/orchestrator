@@ -19,6 +19,7 @@ package discovery
 // Collect discovery metrics and manage their storage and retrieval for monitoring purposes.
 
 import (
+	"reflect"
 	"time"
 
 	"github.com/github/orchestrator/go/inst"
@@ -39,29 +40,13 @@ func (m Metric) When() time.Time {
 	return m.Timestamp
 }
 
-// Equal compares if to Metrics are the same
-func (m *Metric) Equal(m2 *Metric) bool {
-	if m == nil && m2 == nil {
-		return true // assume the same "empty" value
-	}
-	if m == nil || m2 == nil {
-		return false // one or the other is "empty" so they must be different
-	}
-	return m.Timestamp == m2.Timestamp &&
-		m.InstanceKey == m2.InstanceKey &&
-		m.BackendLatency == m2.BackendLatency &&
-		m.InstanceLatency == m2.InstanceLatency &&
-		m.TotalLatency == m2.TotalLatency &&
-		m.Err == m2.Err
-}
-
 // MetricsEqual compares two slices of Metrics to see if they are the same
 func MetricsEqual(m1, m2 [](*Metric)) bool {
 	if len(m1) != len(m2) {
 		return false
 	}
 	for i := range m1 {
-		if !m1[i].Equal(m2[i]) {
+		if !reflect.DeepEqual(m1[i],m2[i]) {
 			return false
 		}
 	}
