@@ -185,9 +185,9 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		})
 		log.Warningf("discoverInstance(%+v) instance is nil in %.3fs (Backend: %.3fs, Instance: %.3fs), error=%+v",
 			instanceKey,
-			totalLatency,
-			backendLatency,
-			instanceLatency,
+			totalLatency.Seconds(),
+			backendLatency.Seconds(),
+			instanceLatency.Seconds(),
 			err)
 		return
 	}
@@ -204,9 +204,9 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		instance.Key,
 		instance.MasterKey,
 		instance.Version,
-		totalLatency,
-		backendLatency,
-		instanceLatency)
+		totalLatency.Seconds(),
+		backendLatency.Seconds(),
+		instanceLatency.Seconds())
 
 	if atomic.LoadInt64(&isElectedNode) == 0 {
 		// Maybe this node was elected before, but isn't elected anymore.
