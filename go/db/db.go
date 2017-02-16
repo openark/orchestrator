@@ -1286,7 +1286,6 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 		}
 		db, fromCache, err = sqlutils.GetDB(mysql_uri)
 		if err == nil && !fromCache {
-			log.Debugf("Connected to orchestrator backend: sqlite on %v", config.Config.SQLite3DataFile)
 			// do not show the password but do show what we connect to.
 			safe_mysql_uri := fmt.Sprintf("%s:?@tcp(%s:%d)/%s?timeout=%ds", config.Config.MySQLOrchestratorUser,
 				config.Config.MySQLOrchestratorHost, config.Config.MySQLOrchestratorPort, config.Config.MySQLOrchestratorDatabase, config.Config.MySQLConnectTimeoutSeconds)
