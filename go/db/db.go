@@ -815,9 +815,12 @@ var generateSQLPatches = []string{
 			ADD COLUMN relay_log_pos bigint unsigned NOT NULL AFTER relay_log_file
 	`,
 	`
+		DROP INDEX master_host_port_idx ON database_instance
+	`,
+	`
 		ALTER TABLE
 			database_instance
-			ADD INDEX master_host_port_idx (master_host, master_port)
+			ADD INDEX master_host_port_idx_database_instance (master_host, master_port)
 	`,
 	`
 		ALTER TABLE
