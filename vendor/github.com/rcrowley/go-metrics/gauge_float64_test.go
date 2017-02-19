@@ -36,3 +36,24 @@ func TestGetOrRegisterGaugeFloat64(t *testing.T) {
 		t.Fatal(g)
 	}
 }
+
+func TestFunctionalGaugeFloat64(t *testing.T) {
+	var counter float64
+	fg := NewFunctionalGaugeFloat64(func() float64 {
+		counter++
+		return counter
+	})
+	fg.Value()
+	fg.Value()
+	if counter != 2 {
+		t.Error("counter != 2")
+	}
+}
+
+func TestGetOrRegisterFunctionalGaugeFloat64(t *testing.T) {
+	r := NewRegistry()
+	NewRegisteredFunctionalGaugeFloat64("foo", r, func() float64 { return 47 })
+	if g := GetOrRegisterGaugeFloat64("foo", r); 47 != g.Value() {
+		t.Fatal(g)
+	}
+}
