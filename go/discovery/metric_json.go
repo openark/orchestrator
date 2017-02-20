@@ -26,10 +26,10 @@ import (
 	"github.com/github/orchestrator/go/collection"
 )
 
-// myfloat is to force the JSON output to show 3 decimal places
-type myfloat float64
+// formattedFloat is to force the JSON output to show 3 decimal places
+type formattedFloat float64
 
-func (m myfloat) String() string {
+func (m formattedFloat) String() string {
 	return fmt.Sprintf(".3f", m)
 }
 
@@ -38,9 +38,9 @@ type MetricJSON struct {
 	Timestamp              time.Time
 	Hostname               string
 	Port                   int
-	BackendLatencySeconds  myfloat
-	InstanceLatencySeconds myfloat
-	TotalLatencySeconds    myfloat
+	BackendLatencySeconds  formattedFloat
+	InstanceLatencySeconds formattedFloat
+	TotalLatencySeconds    formattedFloat
 	Err                    error
 }
 
@@ -63,9 +63,9 @@ func JSONSince(c *collection.Collection, t time.Time) ([](MetricJSON), error) {
 			Timestamp: m.Timestamp,
 			Hostname:  m.InstanceKey.Hostname,
 			Port:      m.InstanceKey.Port,
-			BackendLatencySeconds:  myfloat(m.BackendLatency.Seconds()),
-			InstanceLatencySeconds: myfloat(m.InstanceLatency.Seconds()),
-			TotalLatencySeconds:    myfloat(m.TotalLatency.Seconds()),
+			BackendLatencySeconds:  formattedFloat(m.BackendLatency.Seconds()),
+			InstanceLatencySeconds: formattedFloat(m.InstanceLatency.Seconds()),
+			TotalLatencySeconds:    formattedFloat(m.TotalLatency.Seconds()),
 			Err:                    m.Err,
 		}
 		s = append(s, mj)
