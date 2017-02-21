@@ -87,7 +87,7 @@ type Configuration struct {
 	DiscoveryCollectionRetentionSeconds          uint     // Number of seconds to retain the discovery collection information
 	InstanceBulkOperationsWaitTimeoutSeconds     uint     // Time to wait on a single instance when doing bulk (many instances) operation
 	ActiveNodeExpireSeconds                      uint     // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
-	NodeHealthExpiry                             bool     // Do we expire the node_health table? Usually this is true but it might be disabled on command line tools if an orchestrator daemon is running.
+	NodeHealthExpiry                             bool     // Do we expire the node_health table on every cli/http run? By default this is true, but if we have many systems involved it's better to delegate this exclusively to the active node.
 	HostnameResolveMethod                        string   // Method by which to "normalize" hostname ("none"/"default"/"cname")
 	MySQLHostnameResolveMethod                   string   // Method by which to "normalize" hostname via MySQL server. ("none"/"@@hostname"/"@@report_host"; default "@@hostname")
 	SkipBinlogServerUnresolveCheck               bool     // Skip the double-check that an unresolved hostname resolves back to same hostname for binlog servers
