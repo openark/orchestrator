@@ -51,7 +51,7 @@ type Configuration struct {
 	MySQLTopologyUseMutualTLS                    bool   // Turn on TLS authentication with the Topology MySQL instances
 	MySQLTopologyMaxPoolConnections              int    // Max concurrent connections on any topology instance
 	DatabaselessMode__experimental               bool   // !!!EXPERIMENTAL!!! Orchestrator will execute without speaking to a backend database; super-standalone mode
-	SkipOrchestratorDatabaseUpdate               bool   // When true, do not check backend database schema nor attempt to update it. Useful when you may be running ,utiple versions of orchestrator, and you only wish certain boxes to dictate the db structure (or else any time a different orchestrator version runs it will rebuild database schema)
+	SkipOrchestratorDatabaseUpdate               bool   // When true, do not check backend database schema nor attempt to update it. Useful when you may be running multiple versions of orchestrator, and you only wish certain boxes to dictate the db structure (or else any time a different orchestrator version runs it will rebuild database schema)
 	MySQLOrchestratorHost                        string
 	MySQLOrchestratorMaxPoolConnections          int // The maximum size of the connection pool to the Orchestrator backend.
 	MySQLOrchestratorPort                        uint
