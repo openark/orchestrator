@@ -964,8 +964,9 @@ func OpenOrchestrator() (*sql.DB, error) {
 	}
 	db, fromCache, err := sqlutils.GetDB(mysql_uri)
 	if err == nil && !fromCache {
-		initOrchestratorDB(db)
-
+		if !config.Config.SkipOrchestratorDatabaseUpdate {
+			initOrchestratorDB(db)
+		}
 		// do not show the password but do show what we connect to.
 		safe_mysql_uri := fmt.Sprintf("%s:?@tcp(%s:%d)/%s?timeout=%ds", config.Config.MySQLOrchestratorUser,
 			config.Config.MySQLOrchestratorHost, config.Config.MySQLOrchestratorPort, config.Config.MySQLOrchestratorDatabase, config.Config.MySQLConnectTimeoutSeconds)
