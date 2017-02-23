@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/github/orchestrator/go/agent"
+	"github.com/github/orchestrator/go/collection"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/discovery"
 	"github.com/github/orchestrator/go/inst"
@@ -32,7 +33,10 @@ import (
 	"github.com/openark/golib/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
+	"github.com/sjmudd/stopwatch"
 )
+
+const discoveryMetricsName = "DISCOVERY_METRICS"
 
 // discoveryQueue is a channel of deduplicated instanceKey-s
 // that were requested for discovery.  It can be continuously updated
@@ -44,6 +48,7 @@ var failedDiscoveriesCounter = metrics.NewCounter()
 var discoveryQueueLengthGauge = metrics.NewGauge()
 var discoveryRecentCountGauge = metrics.NewGauge()
 var isElectedGauge = metrics.NewGauge()
+var discoveryMetrics = collection.CreateOrReturnCollection(discoveryMetricsName)
 
 var isElectedNode int64 = 0
 
@@ -71,13 +76,21 @@ func acceptSignals() {
 	c := make(chan os.Signal, 1)
 
 	signal.Notify(c, syscall.SIGHUP)
+	signal.Notify(c, syscall.SIGTERM)
 	go func() {
 		for sig := range c {
 			switch sig {
 			case syscall.SIGHUP:
 				log.Debugf("Received SIGHUP. Reloading configuration")
-				config.Reload()
 				inst.AuditOperation("reload-configuration", nil, "Triggered via SIGHUP")
+				config.Reload()
+				discoveryMetrics.SetExpirePeriod(time.Duration(config.Config.DiscoveryCollectionRetentionSeconds) * time.Second)
+			case syscall.SIGTERM:
+				log.Debugf("Received SIGTERM. Shutting down orchestrator")
+				discoveryMetrics.StopAutoExpiration()
+				// probably should poke other go routines to stop cleanly here ...
+				inst.AuditOperation("shutdown", nil, "Triggered via SIGTERM")
+				os.Exit(0)
 			}
 		}
 	}()
@@ -112,12 +125,21 @@ func handleDiscoveryRequests() {
 	}
 }
 
-// discoverInstance will attempt discovering an instance (unless it is already up to date) and will
-// list down its master and replicas (if any) for further discovery.
+// discoverInstance will attempt to discover (poll) an instance (unless
+// it is already up to date) and will also ensure that its master and
+// replicas (if any) are also checked.
 func discoverInstance(instanceKey inst.InstanceKey) {
-	start := time.Now()
+	// create stopwatch entries
+	latency := stopwatch.NewNamedStopwatch()
+	latency.AddMany([]string{
+		"backend",
+		"instance",
+		"total"})
+	latency.Start("total") // start the total stopwatch (not changed anywhere else)
+
 	defer func() {
-		discoveryTime := time.Since(start)
+		latency.Stop("total")
+		discoveryTime := latency.Elapsed("total")
 		if discoveryTime > time.Duration(config.Config.InstancePollSeconds)*time.Second {
 			log.Warningf("discoverInstance for key %v took %.4fs", instanceKey, discoveryTime.Seconds())
 		}
@@ -133,7 +155,9 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
+	latency.Start("backend")
 	instance, found, err := inst.ReadInstance(&instanceKey)
+	latency.Stop("backend")
 	if found && instance.IsUpToDate && instance.IsLastCheckValid {
 		// we've already discovered this one. Skip!
 		return
@@ -142,16 +166,47 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	discoveriesCounter.Inc(1)
 
 	// First we've ever heard of this instance. Continue investigation:
-	instance, err = inst.ReadTopologyInstanceBufferable(&instanceKey, config.Config.BufferInstanceWrites)
+	instance, err = inst.ReadTopologyInstanceBufferable(&instanceKey, config.Config.BufferInstanceWrites, latency)
 	// panic can occur (IO stuff). Therefore it may happen
-	// that instance is nil. Check it.
+	// that instance is nil. Check it, but first get the timing metrics.
+	totalLatency := latency.Elapsed("total")
+	backendLatency := latency.Elapsed("backend")
+	instanceLatency := latency.Elapsed("instance")
+
 	if instance == nil {
 		failedDiscoveriesCounter.Inc(1)
-		log.Warningf("discoverInstance(%+v) instance is nil in %.3fs, error=%+v", instanceKey, time.Since(start).Seconds(), err)
+		discoveryMetrics.Append(&discovery.Metric{
+			Timestamp:       time.Now(),
+			InstanceKey:     instanceKey,
+			TotalLatency:    totalLatency,
+			BackendLatency:  backendLatency,
+			InstanceLatency: instanceLatency,
+			Err:             err,
+		})
+		log.Warningf("discoverInstance(%+v) instance is nil in %.3fs (Backend: %.3fs, Instance: %.3fs), error=%+v",
+			instanceKey,
+			totalLatency.Seconds(),
+			backendLatency.Seconds(),
+			instanceLatency.Seconds(),
+			err)
 		return
 	}
 
-	log.Debugf("Discovered host: %+v, master: %+v, version: %+v in %.3fs", instance.Key, instance.MasterKey, instance.Version, time.Since(start).Seconds())
+	discoveryMetrics.Append(&discovery.Metric{
+		Timestamp:       time.Now(),
+		InstanceKey:     instanceKey,
+		TotalLatency:    totalLatency,
+		BackendLatency:  backendLatency,
+		InstanceLatency: instanceLatency,
+		Err:             nil,
+	})
+	log.Debugf("Discovered host: %+v, master: %+v, version: %+v in %.3fs (Backend: %.3fs, Instance: %.3fs)",
+		instance.Key,
+		instance.MasterKey,
+		instance.Version,
+		totalLatency.Seconds(),
+		backendLatency.Seconds(),
+		instanceLatency.Seconds())
 
 	if atomic.LoadInt64(&isElectedNode) == 0 {
 		// Maybe this node was elected before, but isn't elected anymore.
@@ -172,6 +227,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	}
 }
 
+// onDiscoveryTick handles the actions to take to discover/poll instances
 func onDiscoveryTick() {
 	wasAlreadyElected := atomic.LoadInt64(&isElectedNode)
 	myIsElectedNode, err := process.AttemptElection()
@@ -204,6 +260,7 @@ func onDiscoveryTick() {
 		go process.RegisterNode("", "", false)
 	}
 
+	// avoid any logging unless there's something to be done
 	if len(instanceKeys) > 0 {
 		if len(instanceKeys) > config.Config.MaxOutdatedKeysToShow {
 			log.Debugf("polling %d outdated keys", len(instanceKeys))
