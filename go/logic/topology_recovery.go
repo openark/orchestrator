@@ -1209,6 +1209,11 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 
 	if checkAndRecoverFunction == nil {
 		// Unhandled problem type
+		if analysisEntry.Analysis != inst.NoProblem {
+			log.Warningf("executeCheckAndRecoverFunction: Ignoring unhandled analysisEntry: %+v; key: %+v",
+				analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
+		}
+
 		return false, nil, nil
 	}
 	// we have a recovery function; its execution still depends on filters if not disabled.
@@ -1275,9 +1280,9 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 				promotedReplicaKey = topologyRecovery.SuccessorKey
 			}
 		} else if recoveryDisabledGlobally {
-			log.Infof("CheckAndRecover: InstanceKey: %+v, candidateInstanceKey: %+v, "+
+			log.Infof("CheckAndRecover: Analysis: %+v, InstanceKey: %+v, candidateInstanceKey: %+v, "+
 				"skipProcesses: %v: NOT Recovering host (disabled globally)",
-				analysisEntry.AnalyzedInstanceKey, candidateInstanceKey, skipProcesses)
+				analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, candidateInstanceKey, skipProcesses)
 		} else {
 			go executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, false, skipProcesses)
 		}
