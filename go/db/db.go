@@ -1093,6 +1093,9 @@ func initOrchestratorDB(db *sql.DB) error {
 		// Already deployed with this version
 		return nil
 	}
+	if config.Config.PanicIfDifferentDatabaseDeploy && config.RuntimeCLIFlags.ConfiguredVersion != "" && !versionAlreadyDeployed {
+		log.Fatalf("PanicIfDifferentDatabaseDeploy is set. Configured version %s is not the version found in the database", config.RuntimeCLIFlags.ConfiguredVersion)
+	}
 	log.Debugf("Migrating database schema")
 	deployStatements(db, generateSQLBase, true)
 	deployStatements(db, generateSQLPatches, false)
