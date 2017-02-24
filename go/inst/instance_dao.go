@@ -18,22 +18,28 @@ package inst
 
 import (
 	"bytes"
+	"database/sql"
 	"errors"
 	"fmt"
 	"regexp"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/github/orchestrator/go/attributes"
-	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/db"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/math"
 	"github.com/openark/golib/sqlutils"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
+	"github.com/sjmudd/stopwatch"
+
+	"github.com/github/orchestrator/go/attributes"
+	"github.com/github/orchestrator/go/collection"
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/db"
+	"github.com/github/orchestrator/go/metrics/query"
 )
 
 const backendDBConcurrency = 20
@@ -56,6 +62,7 @@ var instanceKeyInformativeClusterName *cache.Cache
 var readTopologyInstanceCounter = metrics.NewCounter()
 var readInstanceCounter = metrics.NewCounter()
 var writeInstanceCounter = metrics.NewCounter()
+var backendWrites = collection.CreateOrReturnCollection("BACKEND_WRITES")
 
 func init() {
 	metrics.Register("instance.read_topology", readTopologyInstanceCounter)
@@ -84,8 +91,28 @@ func InitializeInstanceDao() {
 
 // ExecDBWriteFunc chooses how to execute a write onto the database: whether synchronuously or not
 func ExecDBWriteFunc(f func() error) error {
+	m := query.NewMetric()
+
 	instanceWriteChan <- true
-	defer func() { recover(); <-instanceWriteChan }()
+	m.WaitLatency = time.Since(m.Timestamp)
+
+	// catch the exec time and error if there is one
+	defer func() {
+		if r := recover(); r != nil {
+			if _, ok := r.(runtime.Error); ok {
+				panic(r)
+			}
+
+			if s, ok := r.(string); ok {
+				m.Err = errors.New(s)
+			} else {
+				m.Err = r.(error)
+			}
+		}
+		m.ExecuteLatency = time.Since(m.Timestamp.Add(m.WaitLatency))
+		backendWrites.Append(m)
+		<-instanceWriteChan // assume this takes no time
+	}()
 	res := f()
 	return res
 }
@@ -99,14 +126,84 @@ func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err err
 	return log.Errorf("ReadTopologyInstance(%+v) %+v: %+v", *instanceKey, hint, err)
 }
 
+// ReadTopologyInstance collects information on the state of a MySQL
+// server and writes the result synchronously to the orchestrator
+// backend.
 func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
-	return ReadTopologyInstanceBufferable(instanceKey, false)
+	return ReadTopologyInstanceBufferable(instanceKey, false, nil)
 }
 
-// ReadTopologyInstance connects to a topology MySQL instance and reads its configuration and
-// replication status. It writes read info into orchestrator's backend.
-// Writes are optionally buffered.
-func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool) (*Instance, error) {
+// Is this an error which means that we shouldn't try going more queries for this discovery attempt?
+func unrecoverableError(err error) bool {
+	contains := []string{
+		"getsockopt: connection refused",
+		"i/o timeout",
+		"no such host",
+	}
+	for _, k := range contains {
+		if strings.Contains(err.Error(), k) {
+			return true
+		}
+	}
+	return false
+}
+
+// Check if the instance is a MaxScale binlog server (a proxy not a real
+// MySQL server) and also update the resolved hostname
+func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStopwatch) (bool, string, error) {
+	var (
+		err              error
+		isMaxScale       bool
+		resolvedHostname string
+	)
+
+	latency.Start("instance")
+	err = sqlutils.QueryRowsMap(db, "show variables like 'maxscale%'", func(m sqlutils.RowMap) error {
+		if m.GetString("Variable_name") == "MAXSCALE_VERSION" {
+			originalVersion := m.GetString("Value")
+			if originalVersion == "" {
+				originalVersion = m.GetString("value")
+			}
+			if originalVersion == "" {
+				originalVersion = "0.0.0"
+			}
+			instance.Version = originalVersion + "-maxscale"
+			instance.ServerID = 0
+			instance.ServerUUID = ""
+			instance.Uptime = 0
+			instance.Binlog_format = "INHERIT"
+			instance.ReadOnly = true
+			instance.LogBinEnabled = true
+			instance.LogSlaveUpdatesEnabled = true
+			resolvedHostname = instance.Key.Hostname
+			latency.Start("backend")
+			UpdateResolvedHostname(resolvedHostname, resolvedHostname)
+			latency.Stop("backend")
+			isMaxScale = true
+		}
+		return nil
+	})
+	latency.Stop("instance")
+
+	// Detect failed connection attempts and don't report the command
+	// we are executing as that might be confusing.
+	if err != nil {
+		if strings.Contains(err.Error(), "getsockopt: connection refused") || strings.Contains(err.Error(), "no such host") {
+			logReadTopologyInstanceError(&instance.Key, "checkMaxScale", err)
+		} else {
+			logReadTopologyInstanceError(&instance.Key, "show variables like 'maxscale%'", err)
+		}
+	}
+
+	return isMaxScale, resolvedHostname, err
+}
+
+// ReadTopologyInstanceBufferable connects to a topology MySQL instance
+// and collects information on the server and its replication state.
+// It writes the information retrieved into orchestrator's backend.
+// - writes are optionally buffered.
+// - timing information can be collected for the stages performed.
+func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool, latency *stopwatch.NamedStopwatch) (*Instance, error) {
 	defer func() {
 		if err := recover(); err != nil {
 			logReadTopologyInstanceError(instanceKey, "Unexpected, aborting", fmt.Errorf("%+v", err))
@@ -125,66 +222,51 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 	var resolveErr error
 
 	if !instanceKey.IsValid() {
-		_ = UpdateInstanceLastAttemptedCheck(instanceKey)
+		latency.Start("backend")
+		if err := UpdateInstanceLastAttemptedCheck(instanceKey); err != nil {
+			log.Errorf("ReadTopologyInstanceBufferable: %+v: %v", instanceKey, err)
+		}
+		latency.Stop("backend")
 		return instance, fmt.Errorf("ReadTopologyInstance will not act on invalid instance key: %+v", *instanceKey)
 	}
 
+	latency.Start("instance")
 	db, err := db.OpenDiscovery(instanceKey.Hostname, instanceKey.Port)
+	latency.Stop("instance")
 	if err != nil {
 		goto Cleanup
 	}
 
 	instance.Key = *instanceKey
 
-	{
-		// Is this MaxScale? (a proxy, not a real server)
-		err = sqlutils.QueryRowsMap(db, "show variables like 'maxscale%'", func(m sqlutils.RowMap) error {
-			variableName := m.GetString("Variable_name")
-			if variableName == "MAXSCALE_VERSION" {
-				originalVersion := m.GetString("Value")
-				if originalVersion == "" {
-					originalVersion = m.GetString("value")
-				}
-				if originalVersion == "" {
-					originalVersion = "0.0.0"
-				}
-				instance.Version = originalVersion + "-maxscale"
-				instance.ServerID = 0
-				instance.ServerUUID = ""
-				instance.Uptime = 0
-				instance.Binlog_format = "INHERIT"
-				instance.ReadOnly = true
-				instance.LogBinEnabled = true
-				instance.LogSlaveUpdatesEnabled = true
-				resolvedHostname = instance.Key.Hostname
-				UpdateResolvedHostname(resolvedHostname, resolvedHostname)
-				isMaxScale = true
-			}
-			return nil
-		})
-		if err != nil {
-			logReadTopologyInstanceError(instanceKey, "show variables like 'maxscale%'", err)
-			// We do not "goto Cleanup" here, although it should be the correct flow.
-			// Reason is 5.7's new security feature that requires GRANTs on performance_schema.session_variables.
-			// There is a wrong decision making in this design and the migration path to 5.7 will be difficult.
-			// I don't want orchestrator to put even more burden on this.
-			// If the statement errors, then we are unable to determine that this is maxscale, hence assume it is not.
-			// In which case there would be other queries sent to the server that are not affected by 5.7 behavior, and that will fail.
-		}
-	}
+	if isMaxScale, resolvedHostname, err = instance.checkMaxScale(db, latency); err != nil {
+		// We do not "goto Cleanup" here, although it should be the correct flow.
+		// Reason is 5.7's new security feature that requires GRANTs on performance_schema.session_variables.
+		// There is a wrong decision making in this design and the migration path to 5.7 will be difficult.
+		// I don't want orchestrator to put even more burden on this.
+		// If the statement errors, then we are unable to determine that this is maxscale, hence assume it is not.
+		// In which case there would be other queries sent to the server that are not affected by 5.7 behavior, and that will fail.
 
-	if isMaxScale && strings.Contains(instance.Version, "1.1.0") {
-		isMaxScale110 = true
-	}
-	if isMaxScale110 {
-		// Buggy buggy maxscale 1.1.0. Reported Master_Host can be corrupted.
-		// Therefore we (currently) take @@hostname (which is masquarading as master host anyhow)
-		err = db.QueryRow("select @@hostname").Scan(&maxScaleMasterHostname)
-		if err != nil {
+		// Certain errors are not recoverable (for this discovery process) so it's fine to go to Cleanup
+		if unrecoverableError(err) {
 			goto Cleanup
 		}
 	}
+
 	if isMaxScale {
+		if strings.Contains(instance.Version, "1.1.0") {
+			isMaxScale110 = true
+
+			// Buggy buggy maxscale 1.1.0. Reported Master_Host can be corrupted.
+			// Therefore we (currently) take @@hostname (which is masquerading as master host anyhow)
+			latency.Start("instance")
+			err = db.QueryRow("select @@hostname").Scan(&maxScaleMasterHostname)
+			latency.Stop("instance")
+			if err != nil {
+				goto Cleanup
+			}
+		}
+		latency.Start("instance")
 		if isMaxScale110 {
 			// Only this is supported:
 			db.QueryRow("select @@server_id").Scan(&instance.ServerID)
@@ -192,12 +274,14 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 			db.QueryRow("select @@global.server_id").Scan(&instance.ServerID)
 			db.QueryRow("select @@global.server_uuid").Scan(&instance.ServerUUID)
 		}
-	}
-
-	if !isMaxScale {
+		latency.Stop("instance")
+	} else {
+		// NOT MaxScale
 		var mysqlHostname, mysqlReportHost string
+		latency.Start("instance")
 		err = db.QueryRow("select @@global.hostname, ifnull(@@global.report_host, ''), @@global.server_id, @@global.version, @@global.version_comment, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
 			&mysqlHostname, &mysqlReportHost, &instance.ServerID, &instance.Version, &instance.VersionComment, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
+		latency.Stop("instance")
 		if err != nil {
 			goto Cleanup
 		}
@@ -222,16 +306,20 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 			// ...
 			// @@gtid_mode only available in Orcale MySQL >= 5.6
 			// Previous version just issued this query brute-force, but I don't like errors being issued where they shouldn't.
+			latency.Start("instance")
 			_ = db.QueryRow("select @@global.gtid_mode = 'ON', @@global.server_uuid, @@global.gtid_purged, @@global.master_info_repository = 'TABLE'").Scan(&instance.SupportsOracleGTID, &instance.ServerUUID, &instance.GtidPurged, &masterInfoRepositoryOnTable)
 			if masterInfoRepositoryOnTable {
 				_ = db.QueryRow("select count(*) > 0 and MAX(User_name) != '' from mysql.slave_master_info").Scan(&instance.ReplicationCredentialsAvailable)
 			}
+			latency.Stop("instance")
 		}
 	}
 	{
 		var dummy string
 		// show global status works just as well with 5.6 & 5.7 (5.7 moves variables to performance_schema)
+		latency.Start("instance")
 		err = db.QueryRow("show global status like 'Uptime'").Scan(&dummy, &instance.Uptime)
+		latency.Stop("instance")
 
 		if err != nil {
 			logReadTopologyInstanceError(instanceKey, "show global status like 'Uptime'", err)
@@ -245,7 +333,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 		}
 	}
 	if resolvedHostname != instance.Key.Hostname {
+		latency.Start("backend")
 		UpdateResolvedHostname(instance.Key.Hostname, resolvedHostname)
+		latency.Stop("backend")
 		instance.Key.Hostname = resolvedHostname
 	}
 	if instance.Key.Hostname == "" {
@@ -271,6 +361,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 		// This can be overriden by later invocation of DetectPhysicalEnvironmentQuery
 	}
 
+	latency.Start("instance")
 	err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
 		instance.HasReplicationCredentials = (m.GetString("Master_User") != "")
 		instance.Slave_IO_Running = (m.GetString("Slave_IO_Running") == "Yes")
@@ -324,6 +415,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 		slaveStatusFound = true
 		return nil
 	})
+	latency.Stop("instance")
 	if err != nil {
 		goto Cleanup
 	}
@@ -333,12 +425,14 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 	}
 
 	if instance.LogBinEnabled {
+		latency.Start("instance")
 		err = sqlutils.QueryRowsMap(db, "show master status", func(m sqlutils.RowMap) error {
 			var err error
 			instance.SelfBinlogCoordinates.LogFile = m.GetString("File")
 			instance.SelfBinlogCoordinates.LogPos = m.GetInt64("Position")
 			return err
 		})
+		latency.Stop("instance")
 		if err != nil {
 			goto Cleanup
 		}
@@ -354,6 +448,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 	// Get replicas, either by SHOW SLAVE HOSTS or via PROCESSLIST
 	// MaxScale does not support PROCESSLIST, so SHOW SLAVE HOSTS is the only option
 	if config.Config.DiscoverByShowSlaveHosts || isMaxScale {
+		latency.Start("instance")
 		err := sqlutils.QueryRowsMap(db, `show slave hosts`,
 			func(m sqlutils.RowMap) error {
 				// MaxScale 1.1 may trigger an error with this command, but
@@ -363,8 +458,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 				host := m.GetString("Host")
 				port := m.GetString("Port")
 				if host == "" || port == "" {
-					if isMaxScale110 && host == "" && port == "0" {
-						// MaxScale 1.1.0 reports a bad response sometimes so ignore it.
+					if isMaxScale && host == "" && port == "0" {
+						// MaxScale reports a bad response sometimes so ignore it.
+						// - seen in 1.1.0 and 1.4.3.4
 						return nil
 					}
 					// otherwise report the error to the caller
@@ -378,12 +474,14 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 				}
 				return err
 			})
+		latency.Stop("instance")
 
 		logReadTopologyInstanceError(instanceKey, "show slave hosts", err)
 	}
 	if !foundByShowSlaveHosts && !isMaxScale {
 		// Either not configured to read SHOW SLAVE HOSTS or nothing was there.
 		// Discover by processlist
+		latency.Start("instance")
 		err := sqlutils.QueryRowsMap(db, `
         	select
         		substring_index(host, ':', 1) as slave_hostname
@@ -402,12 +500,14 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 				instance.AddReplicaKey(&replicaKey)
 				return err
 			})
+		latency.Stop("instance")
 
 		logReadTopologyInstanceError(instanceKey, "processlist", err)
 	}
 
 	if config.Config.ReadLongRunningQueries && !isMaxScale {
 		// Get long running processes
+		latency.Start("instance")
 		err := sqlutils.QueryRowsMap(db, `
 				  select
 				    id,
@@ -447,12 +547,14 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 				longRunningProcesses = append(longRunningProcesses, process)
 				return nil
 			})
+		latency.Stop("instance")
 
 		logReadTopologyInstanceError(instanceKey, "processlist, long queries", err)
 	}
 
 	instance.UsingPseudoGTID = false
 	if config.Config.DetectPseudoGTIDQuery != "" && !isMaxScale {
+		latency.Start("instance")
 		if resultData, err := sqlutils.QueryResultData(db, config.Config.DetectPseudoGTIDQuery); err == nil {
 			if len(resultData) > 0 {
 				if len(resultData[0]) > 0 {
@@ -464,9 +566,11 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 		} else {
 			logReadTopologyInstanceError(instanceKey, "DetectPseudoGTIDQuery", err)
 		}
+		latency.Stop("instance")
 	}
 
 	if config.Config.SlaveLagQuery != "" && !isMaxScale {
+		latency.Start("instance")
 		if err := db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SlaveLagSeconds); err == nil {
 			if instance.SlaveLagSeconds.Valid && instance.SlaveLagSeconds.Int64 < 0 {
 				log.Warningf("Host: %+v, instance.SlaveLagSeconds < 0 [%+v], correcting to 0", instanceKey, instance.SlaveLagSeconds.Int64)
@@ -476,36 +580,49 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 			instance.SlaveLagSeconds = instance.SecondsBehindMaster
 			logReadTopologyInstanceError(instanceKey, "SlaveLagQuery", err)
 		}
+		latency.Stop("instance")
 	}
 
 	if config.Config.DetectDataCenterQuery != "" && !isMaxScale {
+		latency.Start("instance")
 		err := db.QueryRow(config.Config.DetectDataCenterQuery).Scan(&instance.DataCenter)
+		latency.Stop("instance")
 		logReadTopologyInstanceError(instanceKey, "DetectDataCenterQuery", err)
 	}
 
 	if config.Config.DetectPhysicalEnvironmentQuery != "" && !isMaxScale {
+		latency.Start("instance")
 		err := db.QueryRow(config.Config.DetectPhysicalEnvironmentQuery).Scan(&instance.PhysicalEnvironment)
+		latency.Stop("instance")
 		logReadTopologyInstanceError(instanceKey, "DetectPhysicalEnvironmentQuery", err)
 	}
 
 	if config.Config.DetectInstanceAliasQuery != "" && !isMaxScale {
+		latency.Start("instance")
 		err := db.QueryRow(config.Config.DetectInstanceAliasQuery).Scan(&instance.InstanceAlias)
+		latency.Stop("instance")
 		logReadTopologyInstanceError(instanceKey, "DetectInstanceAliasQuery", err)
 	}
 
 	if config.Config.DetectSemiSyncEnforcedQuery != "" && !isMaxScale {
+		latency.Start("instance")
 		err := db.QueryRow(config.Config.DetectSemiSyncEnforcedQuery).Scan(&instance.SemiSyncEnforced)
+		latency.Stop("instance")
 		logReadTopologyInstanceError(instanceKey, "DetectSemiSyncEnforcedQuery", err)
 	}
 
 	{
+		latency.Start("backend")
 		err = ReadInstanceClusterAttributes(instance)
+		latency.Stop("backend")
 		logReadTopologyInstanceError(instanceKey, "ReadInstanceClusterAttributes", err)
 	}
 
 	// First read the current PromotionRule from candidate_database_instance.
 	{
+		latency.Start("backend")
 		err = ReadInstancePromotionRule(instance)
+		latency.Stop("backend")
 		logReadTopologyInstanceError(instanceKey, "ReadInstancePromotionRule", err)
 	}
 	// Then check if the instance wants to set a different PromotionRule.
@@ -513,6 +630,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 	// time an instance is discovered, and setting a rule like "must_not".
 	if config.Config.DetectPromotionRuleQuery != "" && !isMaxScale {
 		var value string
+		latency.Start("instance")
 		err := db.QueryRow(config.Config.DetectPromotionRuleQuery).Scan(&value)
 		logReadTopologyInstanceError(instanceKey, "DetectPromotionRuleQuery", err)
 		promotionRule, err := ParseCandidatePromotionRule(value)
@@ -525,13 +643,16 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 			err = RegisterCandidateInstance(instanceKey, promotionRule)
 			logReadTopologyInstanceError(instanceKey, "RegisterCandidateInstance", err)
 		}
+		latency.Stop("instance")
 	}
 
 	ReadClusterAliasOverride(instance)
 	if instance.SuggestedClusterAlias == "" && instance.ReplicationDepth == 0 && config.Config.DetectClusterAliasQuery != "" && !isMaxScale {
 		// Only need to do on masters
 		clusterAlias := ""
+		latency.Start("instance")
 		err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
+		latency.Stop("instance")
 		if err != nil {
 			clusterAlias = ""
 			logReadTopologyInstanceError(instanceKey, "DetectClusterAliasQuery", err)
@@ -541,38 +662,46 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool)
 	if instance.ReplicationDepth == 0 && config.Config.DetectClusterDomainQuery != "" && !isMaxScale {
 		// Only need to do on masters
 		domainName := ""
+		latency.Start("instance")
 		if err := db.QueryRow(config.Config.DetectClusterDomainQuery).Scan(&domainName); err != nil {
 			domainName = ""
 			logReadTopologyInstanceError(instanceKey, "DetectClusterDomainQuery", err)
 		}
+		latency.Stop("instance")
 		if domainName != "" {
+			latency.Start("backend")
 			err := WriteClusterDomainName(instance.ClusterName, domainName)
+			latency.Stop("backend")
 			logReadTopologyInstanceError(instanceKey, "WriteClusterDomainName", err)
 		}
 	}
 
 Cleanup:
 	readTopologyInstanceCounter.Inc(1)
-	logReadTopologyInstanceError(instanceKey, "Cleanup", err)
+	//	logReadTopologyInstanceError(instanceKey, "ReadTopologyInstanceBufferable", err)	// don't write here and a few lines later.
 	if instanceFound {
 		instance.IsLastCheckValid = true
 		instance.IsRecentlyChecked = true
 		instance.IsUpToDate = true
+		latency.Start("backend")
 		if bufferWrites {
 			enqueueInstanceWrite(instance, instanceFound, err)
 		} else {
 			writeInstance(instance, instanceFound, err)
 		}
 		WriteLongRunningProcesses(&instance.Key, longRunningProcesses)
+		latency.Stop("backend")
 		return instance, nil
 	}
 
 	// Something is wrong, could be network-wise. Record that we
 	// tried to check the instance. last_attempted_check is also
 	// updated on success by writeInstance.
+	latency.Start("backend")
 	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
 	_ = UpdateInstanceLastChecked(&instance.Key)
-	return nil, fmt.Errorf("Failed ReadTopologyInstance")
+	latency.Stop("backend")
+	return nil, fmt.Errorf("ReadTopologyInstanceBufferable failed: %v", err)
 }
 
 // ReadClusterAliasOverride reads and applies SuggestedClusterAlias based on cluster_alias_override
@@ -682,10 +811,14 @@ func (this byNamePort) Less(i, j int) bool {
 // - I must use readInstancesByCondition to ensure all column
 //   settings are correct.
 func BulkReadInstance() ([](*InstanceKey), error) {
+	// no condition (I want all rows) and no sorting (but this is done by Hostname, Port anyway)
+	const (
+		condition = "1=1"
+		orderBy   = ""
+	)
 	var instanceKeys [](*InstanceKey)
 
-	// no condition (I want all rows) and no sorting (but this is done by Hostname, Port anyway)
-	instances, err := readInstancesByCondition("", nil, "")
+	instances, err := readInstancesByCondition(condition, nil, orderBy)
 	if err != nil {
 		return nil, fmt.Errorf("BulkReadInstance: %+v", err)
 	}
@@ -710,10 +843,9 @@ func ReadInstancePromotionRule(instance *Instance) (err error) {
 	}
 
 	var promotionRule CandidatePromotionRule = NeutralPromoteRule
-	// Read the cluster_name of the _master_ of our instance, derive it from there.
 	query := `
 			select
-					ifnull(nullif(promotion_rule, ''), 'neutral') as promotion_rule
+				ifnull(nullif(promotion_rule, ''), 'neutral') as promotion_rule
 				from candidate_database_instance
 				where hostname=? and port=?
 	`
