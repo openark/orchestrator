@@ -86,6 +86,7 @@ type Configuration struct {
 	DiscoveryMaxConcurrency                      uint     // Number of goroutines doing hosts discovery
 	DiscoveryQueueCapacity                       uint     // Buffer size of the discovery queue. Should be greater than the number of DB instances being discovered
 	DiscoveryQueueMaxStatisticsSize              int      // The maximum number of individual secondly statistics taken of the discovery queue
+	DiscoveryCollectionRetentionSeconds          uint     // Number of seconds to retain the discovery collection information
 	InstanceBulkOperationsWaitTimeoutSeconds     uint     // Time to wait on a single instance when doing bulk (many instances) operation
 	ActiveNodeExpireSeconds                      uint     // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
 	NodeHealthExpiry                             bool     // Do we expire the node_health table? Usually this is true but it might be disabled on command line tools if an orchestrator daemon is running.
@@ -255,6 +256,7 @@ func newConfiguration() *Configuration {
 		DiscoveryMaxConcurrency:                      300,
 		DiscoveryQueueCapacity:                       100000,
 		DiscoveryQueueMaxStatisticsSize:              120,
+		DiscoveryCollectionRetentionSeconds:          120,
 		InstanceBulkOperationsWaitTimeoutSeconds:     10,
 		ActiveNodeExpireSeconds:                      5,
 		NodeHealthExpiry:                             true,

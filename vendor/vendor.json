@@ -23,6 +23,12 @@
 			"path": "github.com/patrickmn/go-cache",
 			"revision": "1881a9bccb818787f68c52bfba648c6cf34c34fa",
 			"revisionTime": "2016-01-27T17:00:04Z"
+		},
+		{
+			"checksumSHA1": "/r6ySR3hhHOXoxpCvWdCMXQMZxw=",
+			"path": "github.com/sjmudd/stopwatch",
+			"revision": "637ef30077b7a4d31e70e7a2b9e1e690333be7be",
+			"revisionTime": "2017-01-03T08:58:48Z"
 		}
 	],
 	"rootPath": "github.com/github/orchestrator"
