@@ -327,7 +327,7 @@ func ContinuousDiscovery() {
 			}()
 		case <-instancePollTick:
 			go func() {
-				// This tick does NOT do instance poll (these are handled by the oversmapling discoveryTick)
+				// This tick does NOT do instance poll (these are handled by the oversampling discoveryTick)
 				// But rather should invoke such routinely operations that need to be as (or roughly as) frequent
 				// as instance poll
 				if atomic.LoadInt64(&isElectedNode) == 1 {
