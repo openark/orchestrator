@@ -110,6 +110,8 @@ func HealthTest() (*HealthStatus, error) {
 	return &health, nil
 }
 
+// ContinuousRegistration will continuously update the node_health
+// table showing that the current process is still running.
 func ContinuousRegistration(extraInfo string, command string) {
 	if continuousRegistrationInitiated {
 		// This is a simple mechanism to make sure this function is not being called multiple times in the lifespan of this process.
@@ -120,25 +122,28 @@ func ContinuousRegistration(extraInfo string, command string) {
 	continuousRegistrationInitiated = true
 
 	tickOperation := func(firstTime bool) {
-		RegisterNode(extraInfo, command, firstTime)
-		expireAvailableNodes()
+		if _, err := RegisterNode(extraInfo, command, firstTime); err != nil {
+			log.Errorf("ContinuousRegistration: RegisterNode failed: %+v", err)
+		}
 	}
 	// First one is synchronous
 	tickOperation(true)
 	go func() {
 		registrationTick := time.Tick(time.Duration(registrationPollSeconds) * time.Second)
 		for range registrationTick {
-			go tickOperation(false)
+			// We already run inside a go-routine so
+			// do not do this asynchronously.  If we
+			// get stuck then we don't want to fill up
+			// the backend pool with connections running
+			// this maintenance operation.
+			tickOperation(false)
 		}
 	}()
 }
 
-// expireAvailableNodes is an aggressive purging method to remove node entries who have skipped
-// their keepalive for two times
-func expireAvailableNodes() error {
-	if !config.Config.NodeHealthExpiry {
-		return nil
-	}
+// ExpireAvailableNodes is an aggressive purging method to remove
+// node entries who have skipped their keepalive for two times.
+func ExpireAvailableNodes() {
 	_, err := db.ExecOrchestrator(`
 			delete
 				from node_health
@@ -147,10 +152,13 @@ func expireAvailableNodes() error {
 			`,
 		registrationPollSeconds*2,
 	)
-	return log.Errore(err)
+	if err != nil {
+		log.Errorf("ExpireAvailableNodes: failed to remove old entries: %+v", err)
+	}
 }
 
-// ExpireNodesHistory cleans up the nodes history
+// ExpireNodesHistory cleans up the nodes history and is run by
+// the orchestrator active node.
 func ExpireNodesHistory() error {
 	_, err := db.ExecOrchestrator(`
 			delete
