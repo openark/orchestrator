@@ -135,7 +135,16 @@ function build() {
   prefix="$4"
   ldflags="-X main.AppVersion=${RELEASE_VERSION} -X main.GitCommit=${GIT_COMMIT}"
   echo "Building via $(go version)"
-  gobuild="go build ${opt_race} -ldflags \"$ldflags\" -o $builddir/orchestrator${prefix}/orchestrator/orchestrator go/cmd/orchestrator/main.go"
+  tags=""
+  case $os in
+    'linux')
+      tags="--tags 'libsqlite3 linux'"
+    ;;
+    'darwin')
+      tags="--tags 'libsqlite3 darwin'"
+    ;;
+  esac
+  gobuild="go build -i $tags ${opt_race} -ldflags \"$ldflags\" -o $builddir/orchestrator${prefix}/orchestrator/orchestrator go/cmd/orchestrator/main.go"
 
   case $os in
     'linux')
