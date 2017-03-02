@@ -27,7 +27,7 @@ import (
 	"github.com/openark/golib/sqlutils"
 )
 
-const RegistrationPollSeconds = 10
+const registrationPollSeconds = 10
 
 type NodeHealth struct {
 	Hostname        string
@@ -116,10 +116,7 @@ func HealthTest() (*HealthStatus, error) {
 }
 
 // ContinuousRegistration will continuously update the node_health
-// table showing that the current process is still running. If
-// NodeHealthExpiry is true old data will also be periodically
-// expired. This may not be convenient on large setups in which
-// case the expiry will be done by the orchestrator active node.
+// table showing that the current process is still running.
 func ContinuousRegistration(extraInfo string, command string) {
 	if continuousRegistrationInitiated {
 		// This is a simple mechanism to make sure this function is not being called multiple times in the lifespan of this process.
@@ -133,32 +130,31 @@ func ContinuousRegistration(extraInfo string, command string) {
 		if _, err := RegisterNode(extraInfo, command, firstTime); err != nil {
 			log.Errorf("ContinuousRegistration: RegisterNode failed: %+v", err)
 		}
-		if config.Config.NodeHealthExpiry {
-			if err := ExpireAvailableNodes(); err != nil {
-				log.Errorf("ContinuousRegistration: ExpireAvailableNodes failed: %+v", err)
-			}
-		}
 	}
 	// First one is synchronous
 	tickOperation(true)
 	go func() {
-		registrationTick := time.Tick(time.Duration(RegistrationPollSeconds) * time.Second)
+		registrationTick := time.Tick(time.Duration(registrationPollSeconds) * time.Second)
 		for range registrationTick {
-			// We already run inside a go-routine so do not do this asynchronously.
-			// If we get stuck then we don't want to fill up the backend pool with connections running this maintenance operation.
+			// We already run inside a go-routine so
+			// do not do this asynchronously.  If we
+			// get stuck then we don't want to fill up
+			// the backend pool with connections running
+			// this maintenance operation.
 			tickOperation(false)
 		}
 	}()
 }
 
-// ExpireAvailableNodes is an aggressive purging method to remove node entries who have skipped
-// their keepalive for two times
-func ExpireAvailableNodes() error {
+// ExpireAvailableNodes is an aggressive purging method to remove
+// node entries who have skipped their keepalive for two times.
+func ExpireAvailableNodes() {
 	// Ensure this is only running once in each process
 	expiryMutex.Lock()
 	if expiryRunning {
 		expiryMutex.Unlock()
-		return log.Errorf("ExpireAvailableNodes: still running")
+		log.Errorf("ExpireAvailableNodes: still running")
+		return
 	}
 	expiryRunning = true
 	expiryMutex.Unlock()
@@ -169,20 +165,20 @@ func ExpireAvailableNodes() error {
 			where
 				last_seen_active < now() - interval ? second
 			`,
-		RegistrationPollSeconds*2,
+		registrationPollSeconds*2,
 	)
+	if err != nil {
+		log.Errorf("ExpireAvailableNodes: failed to remove old entries: %+v", err)
+	}
 
 	// show we're done
 	expiryMutex.Lock()
 	expiryRunning = false
 	expiryMutex.Unlock()
-
-	return log.Errore(err)
 }
 
-// ExpireNodesHistory cleans up the nodes history and is usually run
-// by ContinuousRegistration() unless NodeHealthExpiry is false in whic
-// case this will be done by the orchestrator active node.
+// ExpireNodesHistory cleans up the nodes history and is run by
+// the orchestrator active node.
 func ExpireNodesHistory() error {
 	_, err := db.ExecOrchestrator(`
 			delete
@@ -212,7 +208,7 @@ func ReadAvailableNodes(onlyHttpNodes bool) (nodes [](*NodeHealth), err error) {
 			hostname
 		`
 
-	err = db.QueryOrchestrator(query, sqlutils.Args(RegistrationPollSeconds*2, extraInfo), func(m sqlutils.RowMap) error {
+	err = db.QueryOrchestrator(query, sqlutils.Args(registrationPollSeconds*2, extraInfo), func(m sqlutils.RowMap) error {
 		nodeHealth := &NodeHealth{
 			Hostname:        m.GetString("hostname"),
 			Token:           m.GetString("token"),

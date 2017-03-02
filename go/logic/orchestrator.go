@@ -291,7 +291,6 @@ func ContinuousDiscovery() {
 	inst.LoadHostnameResolveCache()
 	go handleDiscoveryRequests()
 
-	nodeHealthExpiryTick := time.Tick(time.Duration(process.RegistrationPollSeconds) * time.Second)
 	discoveryTick := time.Tick(time.Duration(config.Config.GetDiscoveryPollSeconds()) * time.Second)
 	instancePollTick := time.Tick(time.Duration(config.Config.InstancePollSeconds) * time.Second)
 	caretakingTick := time.Tick(time.Minute)
@@ -309,18 +308,6 @@ func ContinuousDiscovery() {
 	}
 	for {
 		select {
-		case <-nodeHealthExpiryTick:
-			// If we do not explicitly expire health
-			// details on every node (NodeHealthExpiry =
-			// true) then this will be done by the
-			// active node only.
-			if !config.Config.NodeHealthExpiry && atomic.LoadInt64(&isElectedNode) == 1 {
-				go func() {
-					if err := process.ExpireAvailableNodes(); err != nil {
-						log.Errorf("ContinuousDiscovery: process.ExpireAvailableNodes failed: %+v", err)
-					}
-				}()
-			}
 		case <-discoveryTick:
 			go func() {
 				onDiscoveryTick()
@@ -359,6 +346,7 @@ func ContinuousDiscovery() {
 					go inst.FlushNontrivialResolveCacheToDatabase()
 					go process.ExpireNodesHistory()
 					go process.ExpireAccessTokens()
+					go process.ExpireAvailableNodes()
 				} else {
 					// Take this opportunity to refresh yourself
 					go inst.LoadHostnameResolveCache()
