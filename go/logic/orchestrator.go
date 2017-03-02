@@ -346,6 +346,7 @@ func ContinuousDiscovery() {
 					go inst.FlushNontrivialResolveCacheToDatabase()
 					go process.ExpireNodesHistory()
 					go process.ExpireAccessTokens()
+					go process.ExpireAvailableNodes()
 				} else {
 					// Take this opportunity to refresh yourself
 					go inst.LoadHostnameResolveCache()
