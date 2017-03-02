@@ -18,7 +18,6 @@ package process
 
 import (
 	"database/sql"
-	"sync"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
