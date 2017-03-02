@@ -54,11 +54,7 @@ const (
 	OrchestratorExecutionHttpMode                           = "HttpMode"
 )
 
-var (
-	continuousRegistrationInitiated bool       = false
-	expiryMutex                     sync.Mutex // lock for ExpireAvailableNodes
-	expiryRunning                   bool       // is ExpireAvailableNodes running
-)
+var continuousRegistrationInitiated bool = false
 
 // RegisterNode writes down this node in the node_health table
 func RegisterNode(extraInfo string, command string, firstTime bool) (sql.Result, error) {
@@ -149,16 +145,6 @@ func ContinuousRegistration(extraInfo string, command string) {
 // ExpireAvailableNodes is an aggressive purging method to remove
 // node entries who have skipped their keepalive for two times.
 func ExpireAvailableNodes() {
-	// Ensure this is only running once in each process
-	expiryMutex.Lock()
-	if expiryRunning {
-		expiryMutex.Unlock()
-		log.Errorf("ExpireAvailableNodes: still running")
-		return
-	}
-	expiryRunning = true
-	expiryMutex.Unlock()
-
 	_, err := db.ExecOrchestrator(`
 			delete
 				from node_health
@@ -170,11 +156,6 @@ func ExpireAvailableNodes() {
 	if err != nil {
 		log.Errorf("ExpireAvailableNodes: failed to remove old entries: %+v", err)
 	}
-
-	// show we're done
-	expiryMutex.Lock()
-	expiryRunning = false
-	expiryMutex.Unlock()
 }
 
 // ExpireNodesHistory cleans up the nodes history and is run by
