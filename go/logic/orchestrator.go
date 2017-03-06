@@ -81,12 +81,12 @@ func acceptSignals() {
 		for sig := range c {
 			switch sig {
 			case syscall.SIGHUP:
-				log.Debugf("Received SIGHUP. Reloading configuration")
+				log.Infof("Received SIGHUP. Reloading configuration")
 				inst.AuditOperation("reload-configuration", nil, "Triggered via SIGHUP")
 				config.Reload()
 				discoveryMetrics.SetExpirePeriod(time.Duration(config.Config.DiscoveryCollectionRetentionSeconds) * time.Second)
 			case syscall.SIGTERM:
-				log.Debugf("Received SIGTERM. Shutting down orchestrator")
+				log.Infof("Received SIGTERM. Shutting down orchestrator")
 				discoveryMetrics.StopAutoExpiration()
 				// probably should poke other go routines to stop cleanly here ...
 				inst.AuditOperation("shutdown", nil, "Triggered via SIGTERM")
@@ -314,7 +314,7 @@ func ContinuousDiscovery() {
 			}()
 		case <-instancePollTick:
 			go func() {
-				// This tick does NOT do instance poll (these are handled by the oversmapling discoveryTick)
+				// This tick does NOT do instance poll (these are handled by the oversampling discoveryTick)
 				// But rather should invoke such routinely operations that need to be as (or roughly as) frequent
 				// as instance poll
 				if atomic.LoadInt64(&isElectedNode) == 1 {
@@ -345,6 +345,7 @@ func ContinuousDiscovery() {
 					go inst.FlushNontrivialResolveCacheToDatabase()
 					go process.ExpireNodesHistory()
 					go process.ExpireAccessTokens()
+					go process.ExpireAvailableNodes()
 				} else {
 					// Take this opportunity to refresh yourself
 					go inst.LoadHostnameResolveCache()

@@ -1300,8 +1300,9 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 		}
 	}
 	if err == nil && !fromCache {
-		initOrchestratorDB(db)
-
+		if !config.Config.SkipOrchestratorDatabaseUpdate {
+			initOrchestratorDB(db)
+		}
 		db.SetMaxIdleConns(10)
 	}
 	return db, err
@@ -1440,6 +1441,9 @@ func initOrchestratorDB(db *sql.DB) error {
 	if versionAlreadyDeployed && config.RuntimeCLIFlags.ConfiguredVersion != "" && err == nil {
 		// Already deployed with this version
 		return nil
+	}
+	if config.Config.PanicIfDifferentDatabaseDeploy && config.RuntimeCLIFlags.ConfiguredVersion != "" && !versionAlreadyDeployed {
+		log.Fatalf("PanicIfDifferentDatabaseDeploy is set. Configured version %s is not the version found in the database", config.RuntimeCLIFlags.ConfiguredVersion)
 	}
 	log.Debugf("Migrating database schema")
 	deployStatements(db, generateSQLBase)
