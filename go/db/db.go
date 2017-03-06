@@ -964,8 +964,9 @@ func OpenOrchestrator() (*sql.DB, error) {
 	}
 	db, fromCache, err := sqlutils.GetDB(mysql_uri)
 	if err == nil && !fromCache {
-		initOrchestratorDB(db)
-
+		if !config.Config.SkipOrchestratorDatabaseUpdate {
+			initOrchestratorDB(db)
+		}
 		// do not show the password but do show what we connect to.
 		safe_mysql_uri := fmt.Sprintf("%s:?@tcp(%s:%d)/%s?timeout=%ds", config.Config.MySQLOrchestratorUser,
 			config.Config.MySQLOrchestratorHost, config.Config.MySQLOrchestratorPort, config.Config.MySQLOrchestratorDatabase, config.Config.MySQLConnectTimeoutSeconds)
@@ -1091,6 +1092,9 @@ func initOrchestratorDB(db *sql.DB) error {
 	if versionAlreadyDeployed && config.RuntimeCLIFlags.ConfiguredVersion != "" && err == nil {
 		// Already deployed with this version
 		return nil
+	}
+	if config.Config.PanicIfDifferentDatabaseDeploy && config.RuntimeCLIFlags.ConfiguredVersion != "" && !versionAlreadyDeployed {
+		log.Fatalf("PanicIfDifferentDatabaseDeploy is set. Configured version %s is not the version found in the database", config.RuntimeCLIFlags.ConfiguredVersion)
 	}
 	log.Debugf("Migrating database schema")
 	deployStatements(db, generateSQLBase, true)
