@@ -138,6 +138,9 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			    	SUM(
 				    		slave_instance.oracle_gtid
 				    	) AS count_oracle_gtid_slaves,
+			      IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
+	              AND slave_instance.oracle_gtid != 0),
+              0) AS count_valid_oracle_gtid_slaves,
 			    	SUM(
 				    		slave_instance.binlog_server
 				    	) AS count_binlog_server_slaves,
@@ -230,8 +233,8 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		a.SlaveHosts = *NewInstanceKeyMap()
 		a.SlaveHosts.ReadCommaDelimitedList(m.GetString("slave_hosts"))
 
-		countOracleGTIDSlaves := m.GetUint("count_oracle_gtid_slaves")
-		a.OracleGTIDImmediateTopology = countOracleGTIDSlaves > 0 && a.CountValidReplicas > 0
+		countValidOracleGTIDSlaves := m.GetUint("count_valid_oracle_gtid_slaves")
+		a.OracleGTIDImmediateTopology = countValidOracleGTIDSlaves == a.CountValidReplicas && a.CountValidReplicas > 0
 		countValidMariaDBGTIDSlaves := m.GetUint("count_valid_mariadb_gtid_slaves")
 		a.MariaDBGTIDImmediateTopology = countValidMariaDBGTIDSlaves == a.CountValidReplicas && a.CountValidReplicas > 0
 		countValidBinlogServerSlaves := m.GetUint("count_valid_binlog_server_slaves")
