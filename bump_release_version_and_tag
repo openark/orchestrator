@@ -12,7 +12,7 @@
 # - the tag will be pushed to origin (may need fixing)
 
 # Which remote to push the changes to (default origin)
-origin=${1:-origin}
+remote=${1:-origin}
 diff=$(git diff)
 rc=$?
 if [ $rc != 0 ]; then
@@ -57,4 +57,4 @@ echo "Adding new tag: $new_tag"
 git tag $new_tag
 echo "Pushing changes and new tag..."
 git push
-git push "$origin" $new_tag
+git push "$remote" $new_tag
