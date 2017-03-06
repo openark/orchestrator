@@ -1379,6 +1379,8 @@ func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecov
 	}
 	log.Debugf("Will demote %+v and promote %+v instead", clusterMaster.Key, designatedInstance.Key)
 
+	replicationUser, replicationPassword, replicationCredentialsError := inst.ReadReplicationCredentials(&designatedInstance.Key)
+
 	if designatedInstance, err = inst.StopSlave(&designatedInstance.Key); err != nil {
 		return nil, nil, err
 	}
@@ -1408,6 +1410,13 @@ func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecov
 	}
 
 	clusterMaster, err = inst.ChangeMasterTo(&clusterMaster.Key, &designatedInstance.Key, promotedMasterCoordinates, false, inst.GTIDHintNeutral)
+
+	if designatedInstance.ReplicationCredentialsAvailable && !clusterMaster.HasReplicationCredentials && replicationCredentialsError == nil {
+		_, credentialsErr := inst.ChangeMasterCredentials(&clusterMaster.Key, replicationUser, replicationPassword)
+		if err == nil {
+			err = credentialsErr
+		}
+	}
 
 	return topologyRecovery, promotedMasterCoordinates, err
 }
