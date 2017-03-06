@@ -81,12 +81,12 @@ func acceptSignals() {
 		for sig := range c {
 			switch sig {
 			case syscall.SIGHUP:
-				log.Debugf("Received SIGHUP. Reloading configuration")
+				log.Infof("Received SIGHUP. Reloading configuration")
 				inst.AuditOperation("reload-configuration", nil, "Triggered via SIGHUP")
 				config.Reload()
 				discoveryMetrics.SetExpirePeriod(time.Duration(config.Config.DiscoveryCollectionRetentionSeconds) * time.Second)
 			case syscall.SIGTERM:
-				log.Debugf("Received SIGTERM. Shutting down orchestrator")
+				log.Infof("Received SIGTERM. Shutting down orchestrator")
 				discoveryMetrics.StopAutoExpiration()
 				// probably should poke other go routines to stop cleanly here ...
 				inst.AuditOperation("shutdown", nil, "Triggered via SIGTERM")
