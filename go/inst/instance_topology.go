@@ -21,6 +21,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
@@ -1695,9 +1696,62 @@ func GetSortedReplicas(masterKey *InstanceKey, stopReplicationMethod StopReplica
 	return replicas, err
 }
 
+func MultiMatchBelowIndependently(replicas [](*Instance), belowKey *InstanceKey, postponedFunctionsContainer *PostponedFunctionsContainer) (matchedReplicas [](*Instance), belowInstance *Instance, err error, errs []error) {
+	replicas = RemoveInstance(replicas, belowKey)
+	if len(replicas) == 0 {
+		// Nothing to do
+		return matchedReplicas, belowInstance, err, errs
+	}
+
+	belowInstance, found, err := ReadInstance(belowKey)
+	if err != nil || !found {
+		return matchedReplicas, belowInstance, err, errs
+	}
+
+	log.Infof("Will match %+v replicas below %+v via Pseudo-GTID, independently", len(replicas), belowKey)
+
+	barrier := make(chan *InstanceKey)
+	replicaMutex := &sync.Mutex{}
+
+	for _, replica := range replicas {
+		replica := replica
+
+		// Parallelize repoints
+		go func() {
+			defer func() { barrier <- &replica.Key }()
+			ExecuteOnTopology(func() {
+				replica, _, replicaErr := MatchBelow(&replica.Key, belowKey, true)
+
+				replicaMutex.Lock()
+				defer replicaMutex.Unlock()
+
+				if replicaErr == nil {
+					matchedReplicas = append(matchedReplicas, replica)
+				} else {
+					errs = append(errs, replicaErr)
+				}
+			})
+		}()
+	}
+	for range replicas {
+		<-barrier
+	}
+	if len(errs) == len(replicas) {
+		// All returned with error
+		return matchedReplicas, belowInstance, fmt.Errorf("moveReplicasViaGTID: Error on all %+v operations", len(errs)), errs
+	}
+	AuditOperation("multi-match-below-independent", belowKey, fmt.Sprintf("matched %d/%d replicas below %+v via Pseudo-GTID", len(matchedReplicas), len(replicas), belowKey))
+
+	return matchedReplicas, belowInstance, err, errs
+
+}
+
 // MultiMatchBelow will efficiently match multiple replicas below a given instance.
 // It is assumed that all given replicas are siblings
 func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlreadyStopped bool, postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), *Instance, error, []error) {
+	if config.Config.PseudoGTIDPreferIndependentMultiMatch {
+		return MultiMatchBelowIndependently(replicas, belowKey, postponedFunctionsContainer)
+	}
 	res := [](*Instance){}
 	errs := []error{}
 	replicaMutex := make(chan bool, 1)

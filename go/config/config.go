@@ -162,6 +162,7 @@ type Configuration struct {
 	PseudoGTIDMonotonicHint                      string            // subtring in Pseudo-GTID entry which indicates Pseudo-GTID entries are expected to be monotonically increasing
 	DetectPseudoGTIDQuery                        string            // Optional query which is used to authoritatively decide whether pseudo gtid is enabled on instance
 	PseudoGTIDCoordinatesHistoryHeuristicMinutes int               // Significantly reducing Pseudo-GTID lookup time, this indicates the most recent N minutes binlog position where search for Pseudo-GTID will heuristically begin (there is a fallback on fullscan if unsuccessful)
+	PseudoGTIDPreferIndependentMultiMatch        bool              // if 'false', a multi-replica Pseudo-GTID operation will attempt grouping replicas via Pseudo-GTID, and make less binlog computations. However it may cause servers in same bucket wait for one another, which could delay some servers from being repointed. There is a tradeoff between total operation time for all servers, and per-server time. When 'true', Pseudo-GTID matching will operate per server, independently. This will cause waste of same calculations, but no two servers will wait on one another.
 	BinlogEventsChunkSize                        int               // Chunk size (X) for SHOW BINLOG|RELAYLOG EVENTS LIMIT ?,X statements. Smaller means less locking and mroe work to be done
 	BufferBinlogEvents                           bool              // Should we used buffered read on SHOW BINLOG|RELAYLOG EVENTS -- releases the database lock sooner (recommended)
 	SkipBinlogEventsContaining                   []string          // When scanning/comparing binlogs for Pseudo-GTID, skip entries containing given texts. These are NOT regular expressions (would consume too much CPU while scanning binlogs), just substrings to find.
@@ -327,6 +328,7 @@ func newConfiguration() *Configuration {
 		PseudoGTIDMonotonicHint:                      "",
 		DetectPseudoGTIDQuery:                        "",
 		PseudoGTIDCoordinatesHistoryHeuristicMinutes: 2,
+		PseudoGTIDPreferIndependentMultiMatch:        false,
 		BinlogEventsChunkSize:                        10000,
 		BufferBinlogEvents:                           true,
 		SkipBinlogEventsContaining:                   []string{},
