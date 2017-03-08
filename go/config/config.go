@@ -478,9 +478,26 @@ func (this *Configuration) postReadAdjustments() error {
 func read(fileName string) (*Configuration, error) {
 	b, err := ioutil.ReadFile(fileName)
 	if err != nil {
-		return nil, err
+		log.Fatal("Cannot read config file:", fileName, err)
 	}
 
+	validate(b, fileName)
+
+	decoder := json.NewDecoder(bytes.NewBuffer(b))
+	err = decoder.Decode(Config)
+	if err == nil {
+		log.Infof("Read config: %s", fileName)
+	} else {
+		log.Fatal("Cannot read config file:", fileName, err)
+	}
+	if err := Config.postReadAdjustments(); err != nil {
+		log.Fatale(err)
+	}
+
+	return Config, err
+}
+
+func validate(config []byte, fileName string) {
 	// list Configuration fields
 	var knownOpt = make(map[string]bool)
 	c := reflect.ValueOf(Config).Elem().Type()
@@ -490,8 +507,8 @@ func read(fileName string) (*Configuration, error) {
 
 	// validate config keys; parsing config into a map first
 	var m = make(map[string]interface{})
-	decoder := json.NewDecoder(bytes.NewBuffer(b))
-	err = decoder.Decode(&m)
+	decoder := json.NewDecoder(bytes.NewBuffer(config))
+	err := decoder.Decode(&m)
 	if err != nil {
 		log.Fatal("Cannot read config file:", fileName, err)
 	}
@@ -508,20 +525,6 @@ func read(fileName string) (*Configuration, error) {
 			log.Fatalf("Unexpected config option '%s' in %s", k, fileName)
 		}
 	}
-
-	// do read config
-	decoder = json.NewDecoder(bytes.NewBuffer(b))
-	err = decoder.Decode(Config)
-	if err == nil {
-		log.Infof("Read config: %s", fileName)
-	} else {
-		log.Fatal("Cannot read config file:", fileName, err)
-	}
-	if err := Config.postReadAdjustments(); err != nil {
-		log.Fatale(err)
-	}
-
-	return Config, err
 }
 
 // Read reads configuration from zero, either, some or all given files, in order of input.
