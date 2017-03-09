@@ -1749,9 +1749,9 @@ func MultiMatchBelowIndependently(replicas [](*Instance), belowKey *InstanceKey,
 // MultiMatchBelow will efficiently match multiple replicas below a given instance.
 // It is assumed that all given replicas are siblings
 func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlreadyStopped bool, postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), *Instance, error, []error) {
-	if config.Config.PseudoGTIDPreferIndependentMultiMatch {
-		return MultiMatchBelowIndependently(replicas, belowKey, postponedFunctionsContainer)
-	}
+	// if config.Config.PseudoGTIDPreferIndependentMultiMatch {
+	// 	return MultiMatchBelowIndependently(replicas, belowKey, postponedFunctionsContainer)
+	// }
 	res := [](*Instance){}
 	errs := []error{}
 	replicaMutex := make(chan bool, 1)
