@@ -196,7 +196,7 @@ main() {
     test_dbs="sqlite"
     shift
   fi
-  test_dbs=${test_dbs:-"mysql sqlite"}
+  test_dbs=${test_dbs:-"mysql"}
   for db in $(echo $test_dbs) ; do
     test_db $db "$@"
   done
