@@ -300,7 +300,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			resolvedHostname = instance.Key.Hostname
 		}
 
-		if instance.IsOracleMySQL() && !instance.IsSmallerMajorVersionByString("5.6") {
+		if (instance.IsOracleMySQL() || instance.IsPercona()) && !instance.IsSmallerMajorVersionByString("5.6") {
 			var masterInfoRepositoryOnTable bool
 			// Stuff only supported on Oracle MySQL >= 5.6
 			// ...
