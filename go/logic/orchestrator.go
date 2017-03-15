@@ -216,7 +216,13 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 
 	// Investigate replicas:
 	for _, replicaKey := range instance.SlaveHosts.GetInstanceKeys() {
-		replicaKey := replicaKey
+		replicaKey := replicaKey // not needed? no concurrency here?
+
+		// Avoid noticing some hosts we would otherwise discover
+		if inst.RegexpMatchPatterns(replicaKey.Hostname, config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
+			continue
+		}
+
 		if replicaKey.IsValid() {
 			discoveryQueue.Push(replicaKey)
 		}
