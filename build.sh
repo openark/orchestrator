@@ -33,6 +33,7 @@ usage() {
 function precheck() {
   local target
   local ok=0 # return err. so shell exit code
+  target="$1"
 
   if [[ "$target" == "linux" ]]; then
     if [[ ! -x "$( which fpm )" ]]; then
