@@ -94,7 +94,7 @@ type ReplicationAnalysis struct {
 
 type ReplicationAnalysisChangelog struct {
 	AnalyzedInstanceKey InstanceKey
-	Changelog           string
+	Changelog           []string
 }
 
 // ReadReplicaHostsFromString parses and reads replica keys from comma delimited string
