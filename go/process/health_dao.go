@@ -17,7 +17,6 @@
 package process
 
 import (
-	"database/sql"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
@@ -56,7 +55,7 @@ const (
 var continuousRegistrationInitiated bool = false
 
 // RegisterNode writes down this node in the node_health table
-func RegisterNode(extraInfo string, command string, firstTime bool) (sql.Result, error) {
+func RegisterNode(extraInfo string, command string, firstTime bool) (healthy bool, err error) {
 	if firstTime {
 		db.ExecOrchestrator(`
 			insert ignore into node_health_history
@@ -68,37 +67,63 @@ func RegisterNode(extraInfo string, command string, firstTime bool) (sql.Result,
 			config.RuntimeCLIFlags.ConfiguredVersion,
 		)
 	}
-	return db.ExecOrchestrator(`
-			insert into node_health
+	{
+		sqlResult, err := db.ExecOrchestrator(`
+			update node_health set
+				last_seen_active = now(),
+				extra_info = case when ? != '' then ? else extra_info end,
+				app_version = ?
+			where
+				hostname = ?
+				and token = ?
+			`,
+			extraInfo, extraInfo, config.RuntimeCLIFlags.ConfiguredVersion, ThisHostname, ProcessToken.Hash,
+		)
+		if err != nil {
+			return false, log.Errore(err)
+		}
+		rows, err := sqlResult.RowsAffected()
+		if err != nil {
+			return false, log.Errore(err)
+		}
+		if rows > 0 {
+			return true, nil
+		}
+	}
+	{
+		sqlResult, err := db.ExecOrchestrator(`
+			insert ignore into node_health
 				(hostname, token, first_seen_active, last_seen_active, extra_info, command, app_version)
 			values
 				(?, ?, now(), now(), ?, ?, ?)
-			on duplicate key update
-				token=values(token),
-				last_seen_active=values(last_seen_active),
-				extra_info=if(values(extra_info) != '', values(extra_info), extra_info),
-				app_version=values(app_version)
 			`,
-		ThisHostname, ProcessToken.Hash, extraInfo, command,
-		config.RuntimeCLIFlags.ConfiguredVersion,
-	)
+			ThisHostname, ProcessToken.Hash, extraInfo, command,
+			config.RuntimeCLIFlags.ConfiguredVersion,
+		)
+		if err != nil {
+			return false, log.Errore(err)
+		}
+		rows, err := sqlResult.RowsAffected()
+		if err != nil {
+			return false, log.Errore(err)
+		}
+		if rows > 0 {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // HealthTest attempts to write to the backend database and get a result
 func HealthTest() (*HealthStatus, error) {
 	health := HealthStatus{Healthy: false, Hostname: ThisHostname, Token: ProcessToken.Hash}
 
-	sqlResult, err := RegisterNode("", "", false)
+	healthy, err := RegisterNode("", "", false)
 	if err != nil {
 		health.Error = err
 		return &health, log.Errore(err)
 	}
-	rows, err := sqlResult.RowsAffected()
-	if err != nil {
-		health.Error = err
-		return &health, log.Errore(err)
-	}
-	health.Healthy = (rows > 0)
+	health.Healthy = healthy
 	health.ActiveNode, health.IsActiveNode, err = ElectedNode()
 	if err != nil {
 		health.Error = err

@@ -300,7 +300,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			resolvedHostname = instance.Key.Hostname
 		}
 
-		if instance.IsOracleMySQL() && !instance.IsSmallerMajorVersionByString("5.6") {
+		if (instance.IsOracleMySQL() || instance.IsPercona()) && !instance.IsSmallerMajorVersionByString("5.6") {
 			var masterInfoRepositoryOnTable bool
 			// Stuff only supported on Oracle MySQL >= 5.6
 			// ...
@@ -517,7 +517,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				    command,
 				    time,
 				    state,
-				    left(processlist.info, 1024) as info,
+				    substr(processlist.info, 1, 1024) as info,
 				    now() - interval time second as started_at
 				  from
 				    information_schema.processlist
@@ -942,17 +942,14 @@ func readInstancesByCondition(condition string, args []interface{}, sort string)
 		query := fmt.Sprintf(`
 		select
 			*,
-			timestampdiff(second, last_checked, now()) as seconds_since_last_checked,
-			(last_checked <= last_seen) is true as is_last_check_valid,
-			timestampdiff(second, last_seen, now()) as seconds_since_last_seen,
+			unix_timestamp() - unix_timestamp(last_checked) as seconds_since_last_checked,
+			ifnull(last_checked <= last_seen, 0) as is_last_check_valid,
+			unix_timestamp() - unix_timestamp(last_seen) as seconds_since_last_seen,
 			candidate_database_instance.last_suggested is not null
 				 and candidate_database_instance.promotion_rule in ('must', 'prefer') as is_candidate,
 			ifnull(nullif(candidate_database_instance.promotion_rule, ''), 'neutral') as promotion_rule,
 			ifnull(unresolved_hostname, '') as unresolved_hostname,
-			(
-    		database_instance_downtime.downtime_active IS NULL
-    		or database_instance_downtime.end_timestamp < NOW()
-    	) is false as is_downtimed,
+			(database_instance_downtime.downtime_active is not null and ifnull(database_instance_downtime.end_timestamp, now()) > now()) as is_downtimed,
     	ifnull(database_instance_downtime.reason, '') as downtime_reason,
     	ifnull(database_instance_downtime.owner, '') as downtime_owner,
     	ifnull(database_instance_downtime.end_timestamp, '') as downtime_end_timestamp
@@ -1102,10 +1099,10 @@ func ReadUnseenInstances() ([](*Instance), error) {
 // ReadProblemInstances reads all instances with problems
 func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 	condition := `
-			cluster_name LIKE IF(? = '', '%', ?)
+			cluster_name LIKE (CASE WHEN ? = '' THEN '%' ELSE ? END)
 			and (
 				(last_seen < last_checked)
-				or (not ifnull(timestampdiff(second, last_checked, now()) <= ?, false))
+				or (unix_timestamp() - unix_timestamp(last_checked) > ?)
 				or (not slave_sql_running)
 				or (not slave_io_running)
 				or (abs(cast(seconds_behind_master as signed) - cast(sql_delay as signed)) > ?)
@@ -1140,11 +1137,11 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 func SearchInstances(searchString string) ([](*Instance), error) {
 	searchString = strings.TrimSpace(searchString)
 	condition := `
-			locate(?, hostname) > 0
-			or locate(?, cluster_name) > 0
-			or locate(?, version) > 0
-			or locate(?, version_comment) > 0
-			or locate(?, concat(hostname, ':', port)) > 0
+			instr(hostname, ?) > 0
+			or instr(cluster_name, ?) > 0
+			or instr(version, ?) > 0
+			or instr(version_comment, ?) > 0
+			or instr(concat(hostname, ':', port), ?) > 0
 			or concat(server_id, '') = ?
 			or concat(port, '') = ?
 		`
@@ -1589,25 +1586,44 @@ func InjectUnseenMasters() error {
 // appears on the hostname_resolved table; this means some time in the past their hostname was unresovled, and now
 // resovled to a different value; the old hostname is never accessed anymore and the old entry should be removed.
 func ForgetUnseenInstancesDifferentlyResolved() error {
-	sqlResult, err := db.ExecOrchestrator(`
-		DELETE FROM
-			database_instance
-		USING
-		    hostname_resolve
-		    JOIN database_instance ON (hostname_resolve.hostname = database_instance.hostname)
-		WHERE
-		    hostname_resolve.hostname != hostname_resolve.resolved_hostname
-		    AND (last_checked <= last_seen) IS NOT TRUE
-		`,
-	)
-	if err != nil {
-		return log.Errore(err)
+	query := `
+			select
+				database_instance.hostname, database_instance.port
+			from
+					hostname_resolve
+					JOIN database_instance ON (hostname_resolve.hostname = database_instance.hostname)
+			where
+					hostname_resolve.hostname != hostname_resolve.resolved_hostname
+					AND ifnull(last_checked <= last_seen, 0) = 0
+	`
+	keys := NewInstanceKeyMap()
+	err := db.QueryOrchestrator(query, nil, func(m sqlutils.RowMap) error {
+		key := InstanceKey{
+			Hostname: m.GetString("hostname"),
+			Port:     m.GetInt("port"),
+		}
+		keys.AddKey(key)
+		return nil
+	})
+	var rowsAffected int64 = 0
+	for _, key := range keys.GetInstanceKeys() {
+		sqlResult, err := db.ExecOrchestrator(`
+			delete from
+				database_instance
+			where
+		    hostname = ? and port = ?
+			`, sqlutils.Args(key.Hostname, key.Port),
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
+		rows, err := sqlResult.RowsAffected()
+		if err != nil {
+			return log.Errore(err)
+		}
+		rowsAffected = rowsAffected + rows
 	}
-	rows, err := sqlResult.RowsAffected()
-	if err != nil {
-		return log.Errore(err)
-	}
-	AuditOperation("forget-unseen-differently-resolved", nil, fmt.Sprintf("Forgotten instances: %d", rows))
+	AuditOperation("forget-unseen-differently-resolved", nil, fmt.Sprintf("Forgotten instances: %d", rowsAffected))
 	return err
 }
 
@@ -1857,13 +1873,13 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 		from
 			database_instance
 		where
-			if (
-				last_attempted_check <= last_checked,
-				last_checked < now() - interval ? second,
-				last_checked < now() - interval (? * 2) second
-			)
+			case
+				when last_attempted_check <= last_checked
+				then last_checked < now() - interval ? second
+				else last_checked < now() - interval ? second
+			end
 			`
-	args := sqlutils.Args(config.Config.InstancePollSeconds, config.Config.InstancePollSeconds)
+	args := sqlutils.Args(config.Config.InstancePollSeconds, 2*config.Config.InstancePollSeconds)
 
 	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
@@ -1945,6 +1961,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"server_id",
 		"server_uuid",
 		"version",
+		"major_version",
 		"version_comment",
 		"binlog_server",
 		"read_only",
@@ -2012,6 +2029,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.ServerID)
 		args = append(args, instance.ServerUUID)
 		args = append(args, instance.Version)
+		args = append(args, instance.MajorVersionString())
 		args = append(args, instance.VersionComment)
 		args = append(args, instance.IsBinlogServer())
 		args = append(args, instance.ReadOnly)
@@ -2349,8 +2367,8 @@ func RecordInstanceCoordinatesHistory() error {
 			_, err := db.ExecOrchestrator(`
         	delete from database_instance_coordinates_history
 			where
-				recorded_timestamp < NOW() - INTERVAL (? + 5) MINUTE
-				`, config.Config.PseudoGTIDCoordinatesHistoryHeuristicMinutes,
+				recorded_timestamp < NOW() - INTERVAL ? MINUTE
+				`, (config.Config.PseudoGTIDCoordinatesHistoryHeuristicMinutes + 5),
 			)
 			return log.Errore(err)
 		}
@@ -2505,40 +2523,6 @@ func RecordInstanceBinlogFileHistory() error {
 				on duplicate key update
 					last_seen = VALUES(last_seen),
 					binary_log_pos = VALUES(binary_log_pos)
-				`,
-		)
-		return log.Errore(err)
-	}
-	return ExecDBWriteFunc(writeFunc)
-}
-
-// UpdateInstanceRecentRelaylogHistory updates the database_instance_recent_relaylog_history
-// table listing the current relaylog coordinates and the one-before.
-// This information can be used to diagnoze a stale-replication scenario (for example, master is locked down
-// and although replicas are connected, they're not making progress)
-func UpdateInstanceRecentRelaylogHistory() error {
-	writeFunc := func() error {
-		_, err := db.ExecOrchestrator(`
-        	insert into
-        		database_instance_recent_relaylog_history (
-							hostname, port,
-							current_relay_log_file, current_relay_log_pos, current_seen,
-							prev_relay_log_file, prev_relay_log_pos
-						)
-						select
-								hostname, port,
-								relay_log_file, relay_log_pos, last_seen,
-								'', 0
-							from database_instance
-							where
-								relay_log_file != ''
-						on duplicate key update
-							prev_relay_log_file = current_relay_log_file,
-							prev_relay_log_pos = current_relay_log_pos,
-							prev_seen = current_seen,
-							current_relay_log_file = values(current_relay_log_file),
-							current_relay_log_pos = values (current_relay_log_pos),
-							current_seen = values(current_seen)
 				`,
 		)
 		return log.Errore(err)
