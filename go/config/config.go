@@ -51,6 +51,8 @@ type Configuration struct {
 	MySQLTopologyUseMutualTLS                    bool   // Turn on TLS authentication with the Topology MySQL instances
 	MySQLTopologyMaxPoolConnections              int    // Max concurrent connections on any topology instance
 	DatabaselessMode__experimental               bool   // !!!EXPERIMENTAL!!! Orchestrator will execute without speaking to a backend database; super-standalone mode
+	BackendDB                                    string // EXPERIMENTAL: type of backend db; either "mysql" or "sqlite3"
+	SQLite3DataFile                              string // when BackendDB == "sqlite3", full path to sqlite3 datafile
 	SkipOrchestratorDatabaseUpdate               bool   // When true, do not check backend database schema nor attempt to update it. Useful when you may be running multiple versions of orchestrator, and you only wish certain boxes to dictate the db structure (or else any time a different orchestrator version runs it will rebuild database schema)
 	PanicIfDifferentDatabaseDeploy               bool   // When true, and this process finds the orchestrator backend DB was provisioned by a different version, panic
 	MySQLOrchestratorHost                        string
@@ -160,6 +162,7 @@ type Configuration struct {
 	PseudoGTIDMonotonicHint                      string            // subtring in Pseudo-GTID entry which indicates Pseudo-GTID entries are expected to be monotonically increasing
 	DetectPseudoGTIDQuery                        string            // Optional query which is used to authoritatively decide whether pseudo gtid is enabled on instance
 	PseudoGTIDCoordinatesHistoryHeuristicMinutes int               // Significantly reducing Pseudo-GTID lookup time, this indicates the most recent N minutes binlog position where search for Pseudo-GTID will heuristically begin (there is a fallback on fullscan if unsuccessful)
+	PseudoGTIDPreferIndependentMultiMatch        bool              // if 'false', a multi-replica Pseudo-GTID operation will attempt grouping replicas via Pseudo-GTID, and make less binlog computations. However it may cause servers in same bucket wait for one another, which could delay some servers from being repointed. There is a tradeoff between total operation time for all servers, and per-server time. When 'true', Pseudo-GTID matching will operate per server, independently. This will cause waste of same calculations, but no two servers will wait on one another.
 	BinlogEventsChunkSize                        int               // Chunk size (X) for SHOW BINLOG|RELAYLOG EVENTS LIMIT ?,X statements. Smaller means less locking and mroe work to be done
 	BufferBinlogEvents                           bool              // Should we used buffered read on SHOW BINLOG|RELAYLOG EVENTS -- releases the database lock sooner (recommended)
 	SkipBinlogEventsContaining                   []string          // When scanning/comparing binlogs for Pseudo-GTID, skip entries containing given texts. These are NOT regular expressions (would consume too much CPU while scanning binlogs), just substrings to find.
@@ -228,6 +231,8 @@ func newConfiguration() *Configuration {
 		StatusEndpoint:                               "/api/status",
 		StatusSimpleHealth:                           true,
 		StatusOUVerify:                               false,
+		BackendDB:                                    "mysql",
+		SQLite3DataFile:                              "",
 		SkipOrchestratorDatabaseUpdate:               false,
 		PanicIfDifferentDatabaseDeploy:               false,
 		MySQLOrchestratorMaxPoolConnections:          128, // limit concurrent conns to backend DB
@@ -323,6 +328,7 @@ func newConfiguration() *Configuration {
 		PseudoGTIDMonotonicHint:                      "",
 		DetectPseudoGTIDQuery:                        "",
 		PseudoGTIDCoordinatesHistoryHeuristicMinutes: 2,
+		PseudoGTIDPreferIndependentMultiMatch:        false,
 		BinlogEventsChunkSize:                        10000,
 		BufferBinlogEvents:                           true,
 		SkipBinlogEventsContaining:                   []string{},
@@ -461,10 +467,22 @@ func (this *Configuration) postReadAdjustments() error {
 			return fmt.Errorf("config's RemoteSSHCommand must either be empty, or contain a '{hostname}' placeholder")
 		}
 	}
+
+	if this.IsSQLite() && this.SQLite3DataFile == "" {
+		return fmt.Errorf("SQLite3DataFile must be set when BackendDB is sqlite3")
+	}
 	if this.RemoteSSHForMasterFailover && this.RemoteSSHCommand == "" {
 		return fmt.Errorf("RemoteSSHCommand is required when RemoteSSHForMasterFailover is set")
 	}
 	return nil
+}
+
+func (this *Configuration) IsSQLite() bool {
+	return strings.Contains(this.BackendDB, "sqlite")
+}
+
+func (this *Configuration) IsMySQL() bool {
+	return this.BackendDB == "mysql" || this.BackendDB == ""
 }
 
 // read reads configuration from given file, or silently skips if the file does not exist.

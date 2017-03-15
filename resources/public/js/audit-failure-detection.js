@@ -57,7 +57,7 @@ $(document).ready(function() {
       var changelog = changelogMap[getInstanceId(audit.AnalysisEntry.AnalyzedInstanceKey.Hostname, audit.AnalysisEntry.AnalyzedInstanceKey.Port)];
       if (changelog) {
         moreInfo += '<div>Changelog :<ul>';
-        changelog.split(",").reverse().forEach(function(changelogEntry) {
+        changelog.reverse().forEach(function(changelogEntry) {
           var changelogEntryTokens = changelogEntry.split(';');
           var changelogEntryTimestamp = changelogEntryTokens[0];
           var changelogEntryAnalysis = changelogEntryTokens[1];
