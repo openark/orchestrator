@@ -318,7 +318,6 @@ func ContinuousDiscovery() {
 				// But rather should invoke such routinely operations that need to be as (or roughly as) frequent
 				// as instance poll
 				if atomic.LoadInt64(&isElectedNode) == 1 {
-					go inst.UpdateInstanceRecentRelaylogHistory()
 					go inst.RecordInstanceCoordinatesHistory()
 				}
 			}()

@@ -33,6 +33,7 @@ usage() {
 function precheck() {
   local target
   local ok=0 # return err. so shell exit code
+  target="$1"
 
   if [[ "$target" == "linux" ]]; then
     if [[ ! -x "$( which fpm )" ]]; then
@@ -135,7 +136,7 @@ function build() {
   prefix="$4"
   ldflags="-X main.AppVersion=${RELEASE_VERSION} -X main.GitCommit=${GIT_COMMIT}"
   echo "Building via $(go version)"
-  gobuild="go build ${opt_race} -ldflags \"$ldflags\" -o $builddir/orchestrator${prefix}/orchestrator/orchestrator go/cmd/orchestrator/main.go"
+  gobuild="go build -i ${opt_race} -ldflags \"$ldflags\" -o $builddir/orchestrator${prefix}/orchestrator/orchestrator go/cmd/orchestrator/main.go"
 
   case $os in
     'linux')

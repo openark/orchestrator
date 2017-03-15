@@ -1697,15 +1697,15 @@ func GetSortedReplicas(masterKey *InstanceKey, stopReplicationMethod StopReplica
 }
 
 func MultiMatchBelowIndependently(replicas [](*Instance), belowKey *InstanceKey, postponedFunctionsContainer *PostponedFunctionsContainer) (matchedReplicas [](*Instance), belowInstance *Instance, err error, errs []error) {
-	replicas = RemoveInstance(replicas, belowKey)
-	if len(replicas) == 0 {
-		// Nothing to do
-		return matchedReplicas, belowInstance, err, errs
-	}
-
 	belowInstance, found, err := ReadInstance(belowKey)
 	if err != nil || !found {
 		return matchedReplicas, belowInstance, err, errs
+	}
+
+	replicas = RemoveInstance(replicas, belowKey)
+	if len(replicas) == 0 {
+		// Nothing to do
+		return replicas, belowInstance, err, errs
 	}
 
 	log.Infof("Will match %+v replicas below %+v via Pseudo-GTID, independently", len(replicas), belowKey)
@@ -1738,12 +1738,11 @@ func MultiMatchBelowIndependently(replicas [](*Instance), belowKey *InstanceKey,
 	}
 	if len(errs) == len(replicas) {
 		// All returned with error
-		return matchedReplicas, belowInstance, fmt.Errorf("moveReplicasViaGTID: Error on all %+v operations", len(errs)), errs
+		return matchedReplicas, belowInstance, fmt.Errorf("MultiMatchBelowIndependently: Error on all %+v operations", len(errs)), errs
 	}
 	AuditOperation("multi-match-below-independent", belowKey, fmt.Sprintf("matched %d/%d replicas below %+v via Pseudo-GTID", len(matchedReplicas), len(replicas), belowKey))
 
 	return matchedReplicas, belowInstance, err, errs
-
 }
 
 // MultiMatchBelow will efficiently match multiple replicas below a given instance.
