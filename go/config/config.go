@@ -55,6 +55,8 @@ type Configuration struct {
 	MySQLTopologyUseMutualTLS                    bool   // Turn on TLS authentication with the Topology MySQL instances
 	MySQLTopologyMaxPoolConnections              int    // Max concurrent connections on any topology instance
 	DatabaselessMode__experimental               bool   // !!!EXPERIMENTAL!!! Orchestrator will execute without speaking to a backend database; super-standalone mode
+	BackendDB                                    string // EXPERIMENTAL: type of backend db; either "mysql" or "sqlite3"
+	SQLite3DataFile                              string // when BackendDB == "sqlite3", full path to sqlite3 datafile
 	SkipOrchestratorDatabaseUpdate               bool   // When true, do not check backend database schema nor attempt to update it. Useful when you may be running multiple versions of orchestrator, and you only wish certain boxes to dictate the db structure (or else any time a different orchestrator version runs it will rebuild database schema)
 	PanicIfDifferentDatabaseDeploy               bool   // When true, and this process finds the orchestrator backend DB was provisioned by a different version, panic
 	MySQLOrchestratorHost                        string
@@ -233,6 +235,8 @@ func newConfiguration() *Configuration {
 		StatusEndpoint:                               "/api/status",
 		StatusSimpleHealth:                           true,
 		StatusOUVerify:                               false,
+		BackendDB:                                    "mysql",
+		SQLite3DataFile:                              "",
 		SkipOrchestratorDatabaseUpdate:               false,
 		PanicIfDifferentDatabaseDeploy:               false,
 		MySQLOrchestratorMaxPoolConnections:          128, // limit concurrent conns to backend DB
@@ -467,10 +471,22 @@ func (this *Configuration) postReadAdjustments() error {
 			return fmt.Errorf("config's RemoteSSHCommand must either be empty, or contain a '{hostname}' placeholder")
 		}
 	}
+
+	if this.IsSQLite() && this.SQLite3DataFile == "" {
+		return fmt.Errorf("SQLite3DataFile must be set when BackendDB is sqlite3")
+	}
 	if this.RemoteSSHForMasterFailover && this.RemoteSSHCommand == "" {
 		return fmt.Errorf("RemoteSSHCommand is required when RemoteSSHForMasterFailover is set")
 	}
 	return nil
+}
+
+func (this *Configuration) IsSQLite() bool {
+	return strings.Contains(this.BackendDB, "sqlite")
+}
+
+func (this *Configuration) IsMySQL() bool {
+	return this.BackendDB == "mysql" || this.BackendDB == ""
 }
 
 // read reads configuration from given file, or silently skips if the file does not exist.
