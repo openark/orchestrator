@@ -71,6 +71,11 @@ func init() {
 	ometrics.OnGraphiteTick(func() { isElectedGauge.Update(int64(atomic.LoadInt64(&isElectedNode))) })
 }
 
+// used in several places
+func instancePollSecondsDuration() time.Duration {
+	return time.Duration(config.Config.InstancePollSeconds) * time.Second
+}
+
 // acceptSignals registers for OS signals
 func acceptSignals() {
 	c := make(chan os.Signal, 1)
@@ -140,7 +145,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	defer func() {
 		latency.Stop("total")
 		discoveryTime := latency.Elapsed("total")
-		if discoveryTime > time.Duration(config.Config.InstancePollSeconds)*time.Second {
+		if discoveryTime > instancePollSecondsDuration() {
 			log.Warningf("discoverInstance for key %v took %.4fs", instanceKey, discoveryTime.Seconds())
 		}
 	}()
@@ -150,7 +155,10 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
-	if existsInCacheError := recentDiscoveryOperationKeys.Add(instanceKey.DisplayString(), true, cache.DefaultExpiration); existsInCacheError != nil {
+	// Calculate the expiry period each time as InstancePollSeconds
+	// _may_ change during the run of the process (via SIGHUP) and
+	// it is not possible to change the cache's default expiry..
+	if existsInCacheError := recentDiscoveryOperationKeys.Add(instanceKey.DisplayString(), true, instancePollSecondsDuration()); existsInCacheError != nil {
 		// Just recently attempted
 		return
 	}
@@ -292,13 +300,14 @@ func ContinuousDiscovery() {
 	}
 
 	log.Infof("Starting continuous discovery")
-	recentDiscoveryOperationKeys = cache.New(time.Duration(config.Config.InstancePollSeconds)*time.Second, time.Second)
+	recentDiscoveryOperationKeys = cache.New(instancePollSecondsDuration(), time.Second)
 
 	inst.LoadHostnameResolveCache()
 	go handleDiscoveryRequests()
 
+	// Careful: config.Config.GetDiscoveryPollSeconds() is CONSTANT. It can never change.
 	discoveryTick := time.Tick(time.Duration(config.Config.GetDiscoveryPollSeconds()) * time.Second)
-	instancePollTick := time.Tick(time.Duration(config.Config.InstancePollSeconds) * time.Second)
+	instancePollTick := time.Tick(instancePollSecondsDuration())
 	caretakingTick := time.Tick(time.Minute)
 	recoveryTick := time.Tick(time.Duration(config.Config.RecoveryPollSeconds) * time.Second)
 	var snapshotTopologiesTick <-chan time.Time
