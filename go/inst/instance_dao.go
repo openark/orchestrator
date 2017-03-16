@@ -198,16 +198,6 @@ func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStop
 	return isMaxScale, resolvedHostname, err
 }
 
-// RegexpMatchPattern returns true if s matches any of the provided regexpPatterns
-func RegexpMatchPatterns(s string, regexpPatterns []string) bool {
-	for _, filter := range regexpPatterns {
-		if matched, err := regexp.MatchString(filter, s); err == nil && matched {
-			return true
-		}
-	}
-	return false
-}
-
 // ReadTopologyInstanceBufferable connects to a topology MySQL instance
 // and collects information on the server and its replication state.
 // It writes the information retrieved into orchestrator's backend.

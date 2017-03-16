@@ -158,3 +158,13 @@ func IsSmallerBinlogFormat(binlogFormat string, otherBinlogFormat string) bool {
 	}
 	return false
 }
+
+// RegexpMatchPattern returns true if s matches any of the provided regexpPatterns
+func RegexpMatchPatterns(s string, regexpPatterns []string) bool {
+	for _, filter := range regexpPatterns {
+		if matched, err := regexp.MatchString(filter, s); err == nil && matched {
+			return true
+		}
+	}
+	return false
+}
