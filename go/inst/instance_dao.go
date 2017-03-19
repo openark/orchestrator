@@ -466,6 +466,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 					// otherwise report the error to the caller
 					return fmt.Errorf("ReadTopologyInstance(%+v) 'show slave hosts' returned row with <host,port>: <%v,%v>", instanceKey, host, port)
 				}
+
 				// Note: NewInstanceKeyFromStrings calls ResolveHostname() implicitly
 				replicaKey, err := NewInstanceKeyFromStrings(host, port)
 				if err == nil && replicaKey.IsValid() {
@@ -480,7 +481,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	}
 	if !foundByShowSlaveHosts && !isMaxScale {
 		// Either not configured to read SHOW SLAVE HOSTS or nothing was there.
-		// Discover by processlist
+		// Discover by information_schema.processlist
 		latency.Start("instance")
 		err := sqlutils.QueryRowsMap(db, `
         	select
@@ -488,8 +489,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
         	from
         		information_schema.processlist
         	where
-        		command='Binlog Dump'
-        		or command='Binlog Dump GTID'
+                        command IN ('Binlog Dump', 'Binlog Dump GTID')
         		`,
 			func(m sqlutils.RowMap) error {
 				cname, resolveErr := ResolveHostname(m.GetString("slave_hostname"))
@@ -1121,10 +1121,8 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 		if instance.IsDowntimed {
 			skip = true
 		}
-		for _, filter := range config.Config.ProblemIgnoreHostnameFilters {
-			if matched, _ := regexp.MatchString(filter, instance.Key.Hostname); matched {
-				skip = true
-			}
+		if RegexpMatchPatterns(instance.Key.Hostname, config.Config.ProblemIgnoreHostnameFilters) {
+			skip = true
 		}
 		if !skip {
 			reportedInstances = append(reportedInstances, instance)
@@ -1257,22 +1255,16 @@ func ReadClusterCandidateInstances(clusterName string) ([](*Instance), error) {
 func filterOSCInstances(instances [](*Instance)) [](*Instance) {
 	result := [](*Instance){}
 	for _, instance := range instances {
-		skipThisHost := false
-		for _, filter := range config.Config.OSCIgnoreHostnameFilters {
-			if matched, _ := regexp.MatchString(filter, instance.Key.Hostname); matched {
-				skipThisHost = true
-			}
+		if RegexpMatchPatterns(instance.Key.Hostname, config.Config.OSCIgnoreHostnameFilters) {
+			continue
 		}
 		if instance.IsBinlogServer() {
-			skipThisHost = true
+			continue
 		}
-
 		if !instance.IsLastCheckValid {
-			skipThisHost = true
+			continue
 		}
-		if !skipThisHost {
-			result = append(result, instance)
-		}
+		result = append(result, instance)
 	}
 	return result
 }
