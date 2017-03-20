@@ -599,6 +599,10 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 	// And this is the end; whether successful or not, we're done.
 	ResolveRecovery(topologyRecovery, promotedReplica)
 	if promotedReplica != nil {
+		if config.Config.FailMasterPromotionIfSQLThreadNotUpToDate && !promotedReplica.SQLThreadUpToDate() {
+			return false, nil, log.Errorf("Promoted replica %+v: sql thread is not up to date (relay logs still unapplied). Aborting promotion", promotedReplica.Key)
+		}
+
 		// Success!
 		recoverDeadMasterSuccessCounter.Inc(1)
 

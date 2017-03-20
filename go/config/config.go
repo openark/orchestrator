@@ -189,6 +189,7 @@ type Configuration struct {
 	MasterFailoverLostInstancesDowntimeMinutes   uint              // Number of minutes to downtime any server that was lost after a master failover (including failed master & lost replicas). 0 to disable
 	MasterFailoverDetachSlaveMasterHost          bool              // synonym to MasterFailoverDetachReplicaMasterHost
 	MasterFailoverDetachReplicaMasterHost        bool              // Should orchestrator issue a detach-replica-master-host on newly promoted master (this makes sure the new master will not attempt to replicate old master if that comes back to life). Defaults 'false'. Meaningless if ApplyMySQLPromotionAfterMasterFailover is 'true'.
+	FailMasterPromotionIfSQLThreadNotUpToDate    bool              // when true, and a master failover takes place, if candidate master has not consumed all relay logs, promotion is aborted with error
 	PostponeSlaveRecoveryOnLagMinutes            uint              // Synonym to PostponeReplicaRecoveryOnLagMinutes
 	PostponeReplicaRecoveryOnLagMinutes          uint              // On crash recovery, replicas that are lagging more than given minutes are only resurrected late in the recovery process, after master/IM has been elected and processes executed. Value of 0 disables this feature
 	RemoteSSHForMasterFailover                   bool              // Should orchestrator attempt a remote-ssh relaylog-synching upon master failover? Requires RemoteSSHCommand
@@ -354,6 +355,7 @@ func newConfiguration() *Configuration {
 		ApplyMySQLPromotionAfterMasterFailover:       false,
 		MasterFailoverLostInstancesDowntimeMinutes:   0,
 		MasterFailoverDetachSlaveMasterHost:          false,
+		FailMasterPromotionIfSQLThreadNotUpToDate:    false,
 		PostponeSlaveRecoveryOnLagMinutes:            0,
 		RemoteSSHForMasterFailover:                   false,
 		RemoteSSHCommand:                             "",
