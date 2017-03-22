@@ -1349,7 +1349,7 @@ func ForceMasterTakeover(clusterName string, destination *inst.Instance) (topolo
 func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecovery, promotedMasterCoordinates *inst.BinlogCoordinates, err error) {
 	clusterMasters, err := inst.ReadClusterWriteableMaster(clusterName)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Cannot deduce cluster master for %+v", clusterName)
+		return nil, nil, fmt.Errorf("Cannot deduce cluster master for %+v; error: %+v", clusterName, err)
 	}
 	if len(clusterMasters) != 1 {
 		return nil, nil, fmt.Errorf("Cannot deduce cluster master for %+v. Found %+v potential masters", clusterName, len(clusterMasters))
