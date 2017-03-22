@@ -567,7 +567,7 @@ function normalizeInstance(instance) {
   instance.replicationAttemptingToRun = instance.Slave_SQL_Running || instance.Slave_IO_Running;
   instance.replicationLagReasonable = Math.abs(instance.SlaveLagSeconds.Int64 - instance.SQLDelay) <= 10;
   instance.isSeenRecently = instance.SecondsSinceLastSeen.Valid && instance.SecondsSinceLastSeen.Int64 <= 3600;
-  instance.usingGTID = instance.UsingOracleGTID || instance.UsingMariaDBGTID;
+  instance.usingGTID = instance.UsingOracleGTID || instance.SupportsOracleGTID || instance.UsingMariaDBGTID;
   instance.isMaxScale = (instance.Version.indexOf("maxscale") >= 0);
 
   // used by cluster-tree
