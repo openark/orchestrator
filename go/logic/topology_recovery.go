@@ -1359,7 +1359,7 @@ func ForceMasterTakeover(clusterName string, destination *inst.Instance) (topolo
 func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecovery, promotedMasterCoordinates *inst.BinlogCoordinates, err error) {
 	clusterMasters, err := inst.ReadClusterWriteableMaster(clusterName)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Cannot deduce cluster master for %+v", clusterName)
+		return nil, nil, fmt.Errorf("Cannot deduce cluster master for %+v; error: %+v", clusterName, err)
 	}
 	if len(clusterMasters) != 1 {
 		return nil, nil, fmt.Errorf("Cannot deduce cluster master for %+v. Found %+v potential masters", clusterName, len(clusterMasters))
@@ -1388,6 +1388,8 @@ func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecov
 		return nil, nil, fmt.Errorf("Desginated instance %+v seems to be lagging to much for thie operation. Aborting.", designatedInstance.Key)
 	}
 	log.Debugf("Will demote %+v and promote %+v instead", clusterMaster.Key, designatedInstance.Key)
+
+	replicationUser, replicationPassword, replicationCredentialsError := inst.ReadReplicationCredentials(&designatedInstance.Key)
 
 	if designatedInstance, err = inst.StopSlave(&designatedInstance.Key); err != nil {
 		return nil, nil, err
@@ -1418,6 +1420,13 @@ func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecov
 	}
 
 	clusterMaster, err = inst.ChangeMasterTo(&clusterMaster.Key, &designatedInstance.Key, promotedMasterCoordinates, false, inst.GTIDHintNeutral)
+
+	if designatedInstance.ReplicationCredentialsAvailable && !clusterMaster.HasReplicationCredentials && replicationCredentialsError == nil {
+		_, credentialsErr := inst.ChangeMasterCredentials(&clusterMaster.Key, replicationUser, replicationPassword)
+		if err == nil {
+			err = credentialsErr
+		}
+	}
 
 	return topologyRecovery, promotedMasterCoordinates, err
 }
