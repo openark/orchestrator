@@ -29,7 +29,8 @@ import (
 type AggregatedDiscoveryMetrics struct {
 	FirstSeen                       time.Time // timestamp of the first data seen
 	LastSeen                        time.Time // timestamp of the last data seen
-	CountDistinctInstanceKeys       int       // number of distinct Instances seen
+	CountDistinctInstanceKeys       int       // number of distinct Instances seen (note: this may not be true: distinct = succeeded + failed)
+	CountDistinctOkInstanceKeys     int       // number of distinct Instances which succeeded
 	CountDistinctFailedInstanceKeys int       // number of distinct Instances which failed
 	FailedDiscoveries               uint64    // number of failed discoveries
 	SuccessfulDiscoveries           uint64    // number of successful discoveries
@@ -79,7 +80,7 @@ func aggregate(results []collection.Metric) AggregatedDiscoveryMetrics {
 		counters[v] = 0
 	}
 	// initialise names
-	for _, v := range []string{"InstanceKeys", "FailedInstanceKeys"} {
+	for _, v := range []string{"InstanceKeys", "FailedInstanceKeys", "OkInstanceKeys"} {
 		names[v] = make(map[string]int)
 	}
 	// initialise timers
@@ -99,12 +100,18 @@ func aggregate(results []collection.Metric) AggregatedDiscoveryMetrics {
 			last = v.Timestamp
 		}
 
-		// successful names
+		// different names
 		x := names["InstanceKeys"]
 		x[v.InstanceKey.String()] = 1 // Value doesn't matter
 		names["InstanceKeys"] = x
-		// failed names
-		if v.Err != nil {
+
+		if v.Err == nil {
+			// ok names
+			x := names["OkInstanceKeys"]
+			x[v.InstanceKey.String()] = 1 // Value doesn't matter
+			names["OkInstanceKeys"] = x
+		} else {
+			// failed names
 			x := names["FailedInstanceKeys"]
 			x[v.InstanceKey.String()] = 1 // Value doesn't matter
 			names["FailedInstanceKeys"] = x
