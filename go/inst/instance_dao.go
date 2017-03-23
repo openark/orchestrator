@@ -150,12 +150,10 @@ func unrecoverableError(err error) bool {
 
 // Check if the instance is a MaxScale binlog server (a proxy not a real
 // MySQL server) and also update the resolved hostname
-func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStopwatch) (bool, string, error) {
-	var (
-		err              error
-		isMaxScale       bool
-		resolvedHostname string
-	)
+func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStopwatch) (isMaxScale bool, resolvedHostname string, err error) {
+	if config.Config.SkipMaxScaleCheck {
+		return isMaxScale, resolvedHostname, err
+	}
 
 	latency.Start("instance")
 	err = sqlutils.QueryRowsMap(db, "show variables like 'maxscale%'", func(m sqlutils.RowMap) error {
