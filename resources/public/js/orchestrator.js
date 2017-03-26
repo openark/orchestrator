@@ -331,7 +331,7 @@ function openNodeModal(node) {
   addNodeModalDataAttribute("Has binary logs", booleanString(node.LogBinEnabled));
   if (node.LogBinEnabled) {
     var format = node.Binlog_format;
-    if (format == 'ROW' && instance.BinlogRowImage != '') {
+    if (format == 'ROW' && node.BinlogRowImage != '') {
       format = format + "/" + node.BinlogRowImage;
     }
     addNodeModalDataAttribute("Binlog format", format);
