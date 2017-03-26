@@ -64,6 +64,7 @@ type Instance struct {
 	FlavorName             string
 	ReadOnly               bool
 	Binlog_format          string
+	BinlogRowImage         string
 	LogBinEnabled          bool
 	LogSlaveUpdatesEnabled bool
 	SelfBinlogCoordinates  BinlogCoordinates
