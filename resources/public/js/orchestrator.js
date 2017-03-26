@@ -330,7 +330,11 @@ function openNodeModal(node) {
 
   addNodeModalDataAttribute("Has binary logs", booleanString(node.LogBinEnabled));
   if (node.LogBinEnabled) {
-    addNodeModalDataAttribute("Binlog format", node.Binlog_format);
+    var format = node.Binlog_format;
+    if (format == 'ROW' && node.BinlogRowImage != '') {
+      format = format + "/" + node.BinlogRowImage;
+    }
+    addNodeModalDataAttribute("Binlog format", format);
     var td = addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
     $('#node_modal button[data-btn=take-siblings]').appendTo(td.find("div"))
   }
@@ -849,7 +853,11 @@ function renderInstanceElement(popoverElement, instance, renderType) {
       identityHtml += instance.Version;
     }
     if (instance.LogBinEnabled) {
-      identityHtml += " " + instance.Binlog_format;
+      var format = instance.Binlog_format;
+      if (format == 'ROW' && instance.BinlogRowImage != '') {
+        format = format + "/" + instance.BinlogRowImage.substring(0,1);
+      }
+      identityHtml += " " + format;
     }
     if (!isAnonymized()) {
       identityHtml += ', ' + instance.FlavorName;

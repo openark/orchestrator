@@ -1201,6 +1201,11 @@ var generateSQLPatches = []string{
 		ALTER TABLE database_instance
 			ADD COLUMN major_version varchar(16) CHARACTER SET ascii NOT NULL
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN binlog_row_image varchar(16) CHARACTER SET ascii NOT NULL
+	`,
 }
 
 // Track if a TLS has already been configured for topology
