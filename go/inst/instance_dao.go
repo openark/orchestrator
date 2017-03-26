@@ -150,12 +150,10 @@ func unrecoverableError(err error) bool {
 
 // Check if the instance is a MaxScale binlog server (a proxy not a real
 // MySQL server) and also update the resolved hostname
-func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStopwatch) (bool, string, error) {
-	var (
-		err              error
-		isMaxScale       bool
-		resolvedHostname string
-	)
+func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStopwatch) (isMaxScale bool, resolvedHostname string, err error) {
+	if config.Config.SkipMaxScaleCheck {
+		return isMaxScale, resolvedHostname, err
+	}
 
 	latency.Start("instance")
 	err = sqlutils.QueryRowsMap(db, "show variables like 'maxscale%'", func(m sqlutils.RowMap) error {
@@ -307,7 +305,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			// @@gtid_mode only available in Orcale MySQL >= 5.6
 			// Previous version just issued this query brute-force, but I don't like errors being issued where they shouldn't.
 			latency.Start("instance")
-			_ = db.QueryRow("select @@global.gtid_mode = 'ON', @@global.server_uuid, @@global.gtid_purged, @@global.master_info_repository = 'TABLE'").Scan(&instance.SupportsOracleGTID, &instance.ServerUUID, &instance.GtidPurged, &masterInfoRepositoryOnTable)
+			_ = db.QueryRow("select @@global.gtid_mode = 'ON', @@global.server_uuid, @@global.gtid_purged, @@global.master_info_repository = 'TABLE', @@global.binlog_row_image").Scan(&instance.SupportsOracleGTID, &instance.ServerUUID, &instance.GtidPurged, &masterInfoRepositoryOnTable, &instance.BinlogRowImage)
 			if masterInfoRepositoryOnTable {
 				_ = db.QueryRow("select count(*) > 0 and MAX(User_name) != '' from mysql.slave_master_info").Scan(&instance.ReplicationCredentialsAvailable)
 			}
@@ -872,6 +870,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.VersionComment = m.GetString("version_comment")
 	instance.ReadOnly = m.GetBool("read_only")
 	instance.Binlog_format = m.GetString("binlog_format")
+	instance.BinlogRowImage = m.GetString("binlog_row_image")
 	instance.LogBinEnabled = m.GetBool("log_bin")
 	instance.LogSlaveUpdatesEnabled = m.GetBool("log_slave_updates")
 	instance.MasterKey.Hostname = m.GetString("master_host")
@@ -1958,6 +1957,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"binlog_server",
 		"read_only",
 		"binlog_format",
+		"binlog_row_image",
 		"log_bin",
 		"log_slave_updates",
 		"binary_log_file",
@@ -2026,6 +2026,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.IsBinlogServer())
 		args = append(args, instance.ReadOnly)
 		args = append(args, instance.Binlog_format)
+		args = append(args, instance.BinlogRowImage)
 		args = append(args, instance.LogBinEnabled)
 		args = append(args, instance.LogSlaveUpdatesEnabled)
 		args = append(args, instance.SelfBinlogCoordinates.LogFile)
