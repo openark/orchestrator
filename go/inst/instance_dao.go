@@ -2130,7 +2130,7 @@ func flushInstanceWriteBuffer() {
 			lastseen = append(lastseen, upd.instance)
 		} else {
 			instances = append(instances, upd.instance)
-			log.Debugf("writeInstance: will not update database_instance.last_seen due to error: %+v", upd.lastError)
+			log.Debugf("flushInstanceWriteBuffer: will not update database_instance.last_seen due to error: %+v", upd.lastError)
 		}
 	}
 	// sort instances by instanceKey (table pk) to make locking predictable
@@ -2147,7 +2147,7 @@ func flushInstanceWriteBuffer() {
 			return log.Errorf("flushInstanceWriteBuffer last_seen: %v", err)
 		}
 
-		writeInstanceCounter.Inc(int64(len(instances)))
+		writeInstanceCounter.Inc(int64(len(instances)+len(lastseen)))
 		return nil
 	}
 	err := ExecDBWriteFunc(writeFunc)
