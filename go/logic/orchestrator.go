@@ -45,6 +45,7 @@ var discoveryQueue *discovery.Queue
 
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
+var instancePollSecondsExceededCounter = metrics.NewCounter()
 var discoveryQueueLengthGauge = metrics.NewGauge()
 var discoveryRecentCountGauge = metrics.NewGauge()
 var isElectedGauge = metrics.NewGauge()
@@ -57,6 +58,7 @@ var recentDiscoveryOperationKeys *cache.Cache
 func init() {
 	metrics.Register("discoveries.attempt", discoveriesCounter)
 	metrics.Register("discoveries.fail", failedDiscoveriesCounter)
+	metrics.Register("discoveries.instance_poll_seconds_exceeded", instancePollSecondsExceededCounter)
 	metrics.Register("discoveries.queue_length", discoveryQueueLengthGauge)
 	metrics.Register("discoveries.recent_count", discoveryRecentCountGauge)
 	metrics.Register("elect.is_elected", isElectedGauge)
@@ -146,7 +148,8 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		latency.Stop("total")
 		discoveryTime := latency.Elapsed("total")
 		if discoveryTime > instancePollSecondsDuration() {
-			log.Warningf("discoverInstance for key %v took %.4fs", instanceKey, discoveryTime.Seconds())
+			instancePollSecondsExceededCounter.Inc(1)
+			log.Warningf("discoverInstance exceeded InstancePollSeconds for %+v, took %.4fs", instanceKey, discoveryTime.Seconds())
 		}
 	}()
 
