@@ -2147,7 +2147,7 @@ func flushInstanceWriteBuffer() {
 			return log.Errorf("flushInstanceWriteBuffer last_seen: %v", err)
 		}
 
-		writeInstanceCounter.Inc(int64(len(instances)+len(lastseen)))
+		writeInstanceCounter.Inc(int64(len(instances) + len(lastseen)))
 		return nil
 	}
 	err := ExecDBWriteFunc(writeFunc)
