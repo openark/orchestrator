@@ -150,3 +150,29 @@ func TestRecoveryPeriodBlock(t *testing.T) {
 		test.S(t).ExpectEquals(c.RecoveryPeriodBlockSeconds, 15)
 	}
 }
+
+func TestValidConfig(t *testing.T) {
+	var c = []byte(`
+		{
+			"EnableSyslog": false,
+			"Debug": true,
+			"_dummy_valid_underscored_param": true
+		}
+	`)
+
+	err := validate(c, "test")
+	test.S(t).ExpectNil(err)
+}
+
+func TestInvalidConfig(t *testing.T) {
+	var c = []byte(`
+		{
+			"InvalidConfigParam:": 500,
+			"EnableSyslog": false,
+			"Debug": true
+		}
+	`)
+
+	err := validate(c, "test")
+	test.S(t).ExpectNotNil(err)
+}

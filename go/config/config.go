@@ -491,31 +491,32 @@ func (this *Configuration) IsMySQL() bool {
 	return this.BackendDB == "mysql" || this.BackendDB == ""
 }
 
-// read reads configuration from given file, or silently skips if the file does not exist.
-// If the file does exist, then it is expected to be in valid JSON format or the function bails out.
+// read reads configuration from given file. It expects the file to exist
+// and be in a valid JSON format.
 func read(fileName string) (*Configuration, error) {
 	b, err := ioutil.ReadFile(fileName)
 	if err != nil {
-		log.Fatal("Cannot read config file:", fileName, err)
+		return nil, fmt.Errorf("Cannot read config file: %s; %s", fileName, err)
 	}
 
-	validate(b, fileName)
+	if err := validate(b, fileName); err != nil {
+		return nil, err
+	}
 
 	decoder := json.NewDecoder(bytes.NewBuffer(b))
-	err = decoder.Decode(Config)
-	if err == nil {
-		log.Infof("Read config: %s", fileName)
-	} else {
-		log.Fatal("Cannot read config file:", fileName, err)
+	if err := decoder.Decode(Config); err != nil {
+		return nil, fmt.Errorf("Cannot decode config file: %s; %s", fileName, err)
 	}
+
+	log.Infof("Read config: %s", fileName)
 	if err := Config.postReadAdjustments(); err != nil {
-		log.Fatale(err)
+		return nil, err
 	}
 
 	return Config, err
 }
 
-func validate(config []byte, fileName string) {
+func validate(config []byte, fileName string) error {
 	// list Configuration fields
 	var knownOpt = make(map[string]bool)
 	c := reflect.ValueOf(Config).Elem().Type()
@@ -528,7 +529,7 @@ func validate(config []byte, fileName string) {
 	decoder := json.NewDecoder(bytes.NewBuffer(config))
 	err := decoder.Decode(&m)
 	if err != nil {
-		log.Fatal("Cannot read config file:", fileName, err)
+		return fmt.Errorf("Cannot decode config file: %s; %s", fileName, err)
 	}
 	params := make([]string, 0, len(m))
 	for k, _ := range m {
@@ -540,16 +541,23 @@ func validate(config []byte, fileName string) {
 	sort.Strings(params)
 	for _, k := range params {
 		if !knownOpt[k] {
-			log.Fatalf("Unexpected config option '%s' in %s", k, fileName)
+			return fmt.Errorf("Unexpected config option '%s' in %s", k, fileName)
 		}
 	}
+	return nil
 }
 
-// Read reads configuration from zero, either, some or all given files, in order of input.
-// A file can override configuration provided in previous file.
+// Read reads configuration from zero, either, some or all given files, in
+// order of input.  If a file does not exist it is skipped silently.  A file
+// can override configuration provided in previous file.
 func Read(fileNames ...string) *Configuration {
 	for _, fileName := range fileNames {
-		read(fileName)
+		if _, err := os.Stat(fileName); os.IsNotExist(err) {
+			continue
+		}
+		if _, err := read(fileName); err != nil {
+			log.Fatale(err)
+		}
 	}
 	readFileNames = fileNames
 	return Config
@@ -568,7 +576,12 @@ func ForceRead(fileName string) *Configuration {
 // Reload re-reads configuration from last used files
 func Reload() *Configuration {
 	for _, fileName := range readFileNames {
-		read(fileName)
+		if _, err := os.Stat(fileName); os.IsNotExist(err) {
+			continue
+		}
+		if _, err := read(fileName); err != nil {
+			log.Errore(err)
+		}
 	}
 	return Config
 }
