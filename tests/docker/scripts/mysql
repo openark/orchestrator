@@ -1,0 +1,323 @@
+#!/bin/sh
+#
+# setup a topology like this (all 5.7 atm)
+#
+# mysql
+#
+myname=$(basename $0)
+myhostname=$(hostname -s)
+
+# simple wrapper to show the running host and time
+msg_info () {
+	echo "$(date) $myhostname $myname[$$]: $@"
+}
+
+# stupid stderr issue that comes to stdout and needs filtering away
+filter () {
+	grep -v "Using a password on the command line interface can be insecure"
+}
+
+# Ping a container to see if MySQL is up
+mysql_ping () {
+	local name=$1
+	docker exec -it $name mysqladmin $MYSQL_CREDENTIALS ping >/dev/null 2>&1
+}
+
+# 5.6 takes ~3 min to come up (when other boxes are coming up)
+wait_for_mysql_to_come_up () {
+	local name=$1
+
+	msg_info "$name: Waiting for MySQL to come up..."
+	up=1
+	count=240
+	while [ $count -gt 0 ]; do
+		# stderr gets directed to stdout ?
+		if ! mysql_ping $name; then
+			sleep 1
+		else
+			up=0
+			break
+		fi
+		count=$((count - 1))
+	done
+	[ $up = 0 ]
+}
+
+cleanup_container () {
+	local name=$1
+
+	# if the directories are missing then don't worry
+	test -d $BASEDIR/$name || return 0
+	test -d $BASEDIR || return 0
+
+	msg_info "- stopping $name"
+	docker stop $name || :
+	msg_info "- removing $name"
+	docker rm $name || :
+
+	#msg_info "- removing $name's external files"
+	for f in create_replication_user.sql my.cnf; do
+		( test -f $BASEDIR/$name/$f && rm $BASEDIR/$name/$f ) || :
+	done
+
+	{ test -d $BASEDIR/$name && rmdir $BASEDIR/$name; } ||\
+		msg_info "WARNING: $BASEDIR/$name was not empty so not deleted"
+}
+
+check_mysql_containers () {
+	local containers="$1"
+	local mysql_up
+	local container_up
+
+	# check instances are up
+	msg_info "Checking MySQL containers ($containers)..."
+
+	for name in $containers; do
+		container_up=$(container_up_or_down $name)
+
+		case $container_up in
+		UP)
+			mysql_up=$(mysql_up_or_down $name)
+
+			if echo $mysql_up | grep -q UP; then
+				master=$(slave_status $name Master_Host)
+				if [ -z "$master" ]; then
+					printf "%15s container: %s, mysql: %s, NOT A SLAVE\n" "$name:" "$container_up" "$mysql_up"
+				else
+					io_running=$(slave_status $name Slave_IO_Running)
+					sql_running=$(slave_status $name Slave_SQL_Running)
+					printf "%15s container: %s, mysql: %s, master: %s, IO_Running: %s, SQL_Running: %s\n" "$name:" "$container_up" "$mysql_up" "$master" "$io_running" "$sql_running"
+				fi
+			else
+				printf "%16s container: %s, mysql: %s\n" "$name:" "$container_up" "$mysql_up"
+			fi
+			;;
+		DOWN)
+				printf "%16s container: %s\n" "$name:" "$container_up"
+			;;
+		*)
+		esac
+
+
+	done
+}
+
+check_orchestrator_containers () {
+	local containers="$1"
+	local container_up
+	local name
+
+	# check instances are up
+	msg_info "Checking orchestrator containers ($containers)..."
+
+	for name in $containers; do
+		container_up=$(container_up_or_down $name)
+
+		case $container_up in
+		UP)
+				local orchestrator_up=$(orchestrator_up_or_down $name)
+				printf "%16s container: %s\n" "$name:" "$container_up, orchestrator: $orchestrator_up"
+			;;
+		DOWN)
+				printf "%16s container: %s\n" "$name:" "$container_up"
+			;;
+		*)
+		esac
+	done
+}
+
+# Is the container there?
+container_up_or_down () {
+	local name=$1
+
+	if docker ps | cut -c126- | grep -v NAMES | grep -qw $name; then
+		echo "UP"
+	else
+		echo "DOWN"
+	fi
+}
+
+# is the orchestrator daemon running?
+orchestrator_up_or_down () {
+	local name=$1
+
+	if docker exec -it $name ps -auwx | grep -v ^USER | grep -v init_orchestrator | grep -q orchestrator; then
+		echo "UP"
+	else
+		echo "DOWN"
+	fi
+}
+
+# Is MySQL up?
+mysql_up_or_down () {
+	local name=$1
+
+	if mysql_ping $name; then
+		echo "UP"
+	else
+		echo "DOWN"
+	fi
+}
+
+slave_status () {
+	local name=$1
+	local var=$2
+
+	docker exec -i $name mysql $mysql_verbose $MYSQL_CREDENTIALS -e "SHOW SLAVE STATUS\G" 2>&1 |\
+		filter |\
+		grep -E "($var:)" |\
+		awk '{ print $2 }'
+}
+
+set -e
+
+BASEDIR=${BASEDIR:-tests/docker/root}
+
+create_test_user () {
+	local name=$1
+
+	msg_info "$name: Add test user"
+	cat <<-EOF | docker exec -i $name mysql $mysql_verbose $MYSQL_CREDENTIALS
+CREATE USER '$TEST_USER'@'$TEST_NETWORK' IDENTIFIED BY '$TEST_PASSWORD';
+GRANT ALL PRIVILEGES ON *.* TO '$TEST_USER'@'$TEST_NETWORK';
+	CREATE DATABASE IF NOT EXISTS test DEFAULT CHARACTER SET utf8mb4; 
+	EOF
+}
+
+create_my_cnf () {
+	local name=$1
+
+	cat <<-EOF > $BASEDIR/$name/my.cnf
+# generate the same config for all boxes (for now)
+[mysqld]
+# disgusting random server_id generation
+server_id = 1$(perl -e "print chr(48 + rand(10)) for 1..5")
+log_bin = binlog
+relay_log = relaylog
+log_slave_updates
+skip_name_resolve
+sync_binlog = 1
+report_host = $name
+innodb_log_file_size = 32M
+innodb_buffer_pool_size = 8M
+	EOF
+}
+
+docker_run () {
+	local name=$1
+	local h
+
+	msg_info "$name: Starting container (image: $DOCKER_IMAGE)"
+	docker run --name $name \
+		-p 127.0.0.1:$EXPOSED_PORT:$MYSQL_PORT \
+		--network $NETWORK_NAME \
+		-v $BASEDIR/$name:/etc/mysql/conf.d \
+		-e MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD \
+		-d $DOCKER_IMAGE
+}
+
+set -e
+
+DOCKER_IMAGE=mysql:5.7
+NETWORK_NAME=test_network
+MYSQL_ROOT_PASSWORD=my-secret-pw
+MYSQL_CREDENTIALS="-uroot -h127.0.0.1 -p$MYSQL_ROOT_PASSWORD"
+MASTER="mysql"
+TEST_USER=test_user
+TEST_PASSWORD=test_pass
+TEST_NETWORK='%' # horrible
+MYSQL_PORT=3306
+EXPOSED_PORT=63306
+
+start () {
+	local name
+
+	msg_info "Create network $NETWORK_NAME..."
+	docker network create $NETWORK_NAME --driver=bridge --subnet=10.10.10.0/24
+
+	# create needed directory layout with config files
+	msg_info "Creating required directory layouts under $BASEDIR..."
+	test -d $BASEDIR || mkdir -p $BASEDIR
+	for name in $MASTER; do
+		msg_info "Ensuring directory for $name exists..."
+		test -d $BASEDIR/$name || mkdir -p $BASEDIR/$name
+		create_my_cnf $name
+	done
+
+	# start up instances
+	msg_info "Starting up containers..."
+	for name in $MASTER; do
+		msg_info "Start up $name..."
+		docker_run $name
+	done
+
+	# check for them all to be running
+	msg_info "Waiting for containers to initialise..."
+	for name in $MASTER; do
+		wait_for_mysql_to_come_up $name
+		msg_info "$name is up"
+	done
+
+        # Could do this on only the master/imaster that we want,
+        # but need to check due to replication that the user doesn't
+        # already exist. So do it this way for now. It's easier.
+        msg_info "Add replication users to containers..."
+        for name in $MASTER; do
+                create_test_user $name || :
+        done
+
+	msg_info "Setup of mysql complete"
+}
+
+stop () {
+	local name
+
+	# stop master
+	msg_info "Stopping and removing containers ($MASTER)..."
+	for name in $MASTER; do
+		cleanup_container $name
+	done
+	if test -d $BASEDIR; then
+		 rmdir $BASEDIR || :    # don't care too much about this yet, fix later
+	else
+		:    # don't care too much about this yet, fix later
+	fi
+
+	msg_info "- removing network"
+	docker network rm $NETWORK_NAME || :
+	msg_info "Finished"
+}
+
+# first check we have docker installed
+docker=$(which docker)
+if [ -z "$docker" ]; then
+	echo "$myname: This script requires docker to be installed."
+	echo "docker is not in PATH. Please ensure it is installed aan in the path for this script to work."
+	exit 1
+fi
+
+mysql_verbose=
+while getopts v flag; do
+	case $flag in
+	v)	mysql_verbose=-vvv;;
+	*)	echo "Invalid flag $flag. Exiting"
+		exit 1
+	esac
+done
+shift $(($OPTIND - 1))
+
+case $1 in
+start)
+	start
+	;;
+stop)
+	stop
+	;;
+status)
+	# check instances are up
+	check_mysql_containers "$MASTER"
+	;;
+*)
+	echo "Usage $0 <start|stop>"
+	exit 1
+esac
