@@ -1326,7 +1326,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("end-maintenance", "Instance management", `Remove maintenance lock from an instance`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			err := inst.EndMaintenanceByInstanceKey(instanceKey)
+			_, err := inst.EndMaintenanceByInstanceKey(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
