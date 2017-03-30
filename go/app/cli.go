@@ -1359,7 +1359,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("end-downtime", "Instance management", `Indicate an instance is no longer downtimed`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			err := inst.EndDowntime(instanceKey)
+			_, err := inst.EndDowntime(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}

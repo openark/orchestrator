@@ -342,7 +342,7 @@ func (this *HttpAPI) EndDowntime(params martini.Params, r render.Render, req *ht
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	err = inst.EndDowntime(&instanceKey)
+	_, err = inst.EndDowntime(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
