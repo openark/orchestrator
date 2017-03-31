@@ -71,20 +71,37 @@ func aggregate(results []collection.Metric) AggregatedDiscoveryMetrics {
 		last  time.Time
 	)
 
-	counters := make(map[string]uint64)             // map of string based counters
-	names := make(map[string](map[string]int))      // map of string based names (using a map)
-	timings := make(map[string](stats.Float64Data)) // map of string based float64 values
+	type counterKey string
+	type hostKey string
+	type timerKey string
+	const (
+		FailedDiscoveries     counterKey = "FailedDiscoveries"
+		Discoveries                      = "Discoveries"
+		InstanceKeys          hostKey    = "InstanceKeys"
+		OkInstanceKeys                   = "OkInstanceKeys"
+		FailedInstanceKeys               = "FailedInstanceKeys"
+		TotalSeconds          timerKey   = "TotalSeconds"
+		BackendSeconds                   = "BackendSeconds"
+		InstanceSeconds                  = "InstanceSeconds"
+		FailedTotalSeconds               = "FailedTotalSeconds"
+		FailedBackendSeconds             = "FailedBackendSeconds"
+		FailedInstanceSeconds            = "FailedInstanceSeconds"
+	)
+
+	counters := make(map[counterKey]uint64)           // map of string based counters
+	names := make(map[hostKey](map[string]int))       // map of string based names (using a map)
+	timings := make(map[timerKey](stats.Float64Data)) // map of string based float64 values
 
 	// initialise counters
-	for _, v := range []string{"FailedDiscoveries", "Discoveries"} {
+	for _, v := range []counterKey{FailedDiscoveries, Discoveries} {
 		counters[v] = 0
 	}
 	// initialise names
-	for _, v := range []string{"InstanceKeys", "FailedInstanceKeys", "OkInstanceKeys"} {
+	for _, v := range []hostKey{InstanceKeys, FailedInstanceKeys, OkInstanceKeys} {
 		names[v] = make(map[string]int)
 	}
 	// initialise timers
-	for _, v := range []string{"TotalSeconds", "BackendSeconds", "InstanceSeconds", "FailedTotalSeconds", "FailedBackendSeconds", "FailedInstanceSeconds"} {
+	for _, v := range []timerKey{TotalSeconds, BackendSeconds, InstanceSeconds, FailedTotalSeconds, FailedBackendSeconds, FailedInstanceSeconds} {
 		timings[v] = nil
 	}
 
@@ -101,9 +118,9 @@ func aggregate(results []collection.Metric) AggregatedDiscoveryMetrics {
 		}
 
 		// different names
-		x := names["InstanceKeys"]
+		x := names[InstanceKeys]
 		x[v.InstanceKey.String()] = 1 // Value doesn't matter
-		names["InstanceKeys"] = x
+		names[InstanceKeys] = x
 
 		if v.Err == nil {
 			// ok names
@@ -112,61 +129,61 @@ func aggregate(results []collection.Metric) AggregatedDiscoveryMetrics {
 			names["OkInstanceKeys"] = x
 		} else {
 			// failed names
-			x := names["FailedInstanceKeys"]
+			x := names[FailedInstanceKeys]
 			x[v.InstanceKey.String()] = 1 // Value doesn't matter
-			names["FailedInstanceKeys"] = x
+			names[FailedInstanceKeys] = x
 		}
 
 		// discoveries
-		counters["Discoveries"]++
+		counters[Discoveries]++
 		if v.Err != nil {
-			counters["FailedDiscoveries"]++
+			counters[FailedDiscoveries]++
 		}
 
 		// All timings
-		timings["TotalSeconds"] = append(timings["TotalSeconds"], v.TotalLatency.Seconds())
-		timings["BackendSeconds"] = append(timings["BackendSeconds"], v.BackendLatency.Seconds())
-		timings["InstanceSeconds"] = append(timings["InstanceSeconds"], v.InstanceLatency.Seconds())
+		timings[TotalSeconds] = append(timings[TotalSeconds], v.TotalLatency.Seconds())
+		timings[BackendSeconds] = append(timings[BackendSeconds], v.BackendLatency.Seconds())
+		timings[InstanceSeconds] = append(timings[InstanceSeconds], v.InstanceLatency.Seconds())
 
 		// Failed timings
 		if v.Err != nil {
-			timings["FailedTotalSeconds"] = append(timings["FailedTotalSeconds"], v.TotalLatency.Seconds())
-			timings["FailedBackendSeconds"] = append(timings["FailedBackendSeconds"], v.BackendLatency.Seconds())
-			timings["FailedInstanceSeconds"] = append(timings["FailedInstanceSeconds"], v.InstanceLatency.Seconds())
+			timings[FailedTotalSeconds] = append(timings[FailedTotalSeconds], v.TotalLatency.Seconds())
+			timings[FailedBackendSeconds] = append(timings[FailedBackendSeconds], v.BackendLatency.Seconds())
+			timings[FailedInstanceSeconds] = append(timings[FailedInstanceSeconds], v.InstanceLatency.Seconds())
 		}
 	}
 
 	return AggregatedDiscoveryMetrics{
 		FirstSeen:                       first,
 		LastSeen:                        last,
-		CountDistinctInstanceKeys:       len(names["InstanceKeys"]),
-		CountDistinctFailedInstanceKeys: len(names["FailedInstanceKeys"]),
-		FailedDiscoveries:               counters["FailedDiscoveries"],
-		SuccessfulDiscoveries:           counters["Discoveries"],
-		MeanTotalSeconds:                mean(timings["TotalSeconds"]),
-		MeanBackendSeconds:              mean(timings["BackendSeconds"]),
-		MeanInstanceSeconds:             mean(timings["InstanceSeconds"]),
-		FailedMeanTotalSeconds:          mean(timings["FailedTotalSeconds"]),
-		FailedMeanBackendSeconds:        mean(timings["FailedBackendSeconds"]),
-		FailedMeanInstanceSeconds:       mean(timings["FailedInstanceSeconds"]),
-		MaxTotalSeconds:                 max(timings["TotalSeconds"]),
-		MaxBackendSeconds:               max(timings["BackendSeconds"]),
-		MaxInstanceSeconds:              max(timings["InstanceSeconds"]),
-		FailedMaxTotalSeconds:           max(timings["FailedTotalSeconds"]),
-		FailedMaxBackendSeconds:         max(timings["FailedBackendSeconds"]),
-		FailedMaxInstanceSeconds:        max(timings["FailedInstanceSeconds"]),
-		MedianTotalSeconds:              median(timings["TotalSeconds"]),
-		MedianBackendSeconds:            median(timings["BackendSeconds"]),
-		MedianInstanceSeconds:           median(timings["InstanceSeconds"]),
-		FailedMedianTotalSeconds:        median(timings["FailedTotalSeconds"]),
-		FailedMedianBackendSeconds:      median(timings["FailedBackendSeconds"]),
-		FailedMedianInstanceSeconds:     median(timings["FailedInstanceSeconds"]),
-		P95TotalSeconds:                 percentile(timings["TotalSeconds"], 95),
-		P95BackendSeconds:               percentile(timings["BackendSeconds"], 95),
-		P95InstanceSeconds:              percentile(timings["InstanceSeconds"], 95),
-		FailedP95TotalSeconds:           percentile(timings["FailedTotalSeconds"], 95),
-		FailedP95BackendSeconds:         percentile(timings["FailedBackendSeconds"], 95),
-		FailedP95InstanceSeconds:        percentile(timings["FailedInstanceSeconds"], 95),
+		CountDistinctInstanceKeys:       len(names[InstanceKeys]),
+		CountDistinctFailedInstanceKeys: len(names[FailedInstanceKeys]),
+		FailedDiscoveries:               counters[FailedDiscoveries],
+		SuccessfulDiscoveries:           counters[Discoveries],
+		MeanTotalSeconds:                mean(timings[TotalSeconds]),
+		MeanBackendSeconds:              mean(timings[BackendSeconds]),
+		MeanInstanceSeconds:             mean(timings[InstanceSeconds]),
+		FailedMeanTotalSeconds:          mean(timings[FailedTotalSeconds]),
+		FailedMeanBackendSeconds:        mean(timings[FailedBackendSeconds]),
+		FailedMeanInstanceSeconds:       mean(timings[FailedInstanceSeconds]),
+		MaxTotalSeconds:                 max(timings[TotalSeconds]),
+		MaxBackendSeconds:               max(timings[BackendSeconds]),
+		MaxInstanceSeconds:              max(timings[InstanceSeconds]),
+		FailedMaxTotalSeconds:           max(timings[FailedTotalSeconds]),
+		FailedMaxBackendSeconds:         max(timings[FailedBackendSeconds]),
+		FailedMaxInstanceSeconds:        max(timings[FailedInstanceSeconds]),
+		MedianTotalSeconds:              median(timings[TotalSeconds]),
+		MedianBackendSeconds:            median(timings[BackendSeconds]),
+		MedianInstanceSeconds:           median(timings[InstanceSeconds]),
+		FailedMedianTotalSeconds:        median(timings[FailedTotalSeconds]),
+		FailedMedianBackendSeconds:      median(timings[FailedBackendSeconds]),
+		FailedMedianInstanceSeconds:     median(timings[FailedInstanceSeconds]),
+		P95TotalSeconds:                 percentile(timings[TotalSeconds], 95),
+		P95BackendSeconds:               percentile(timings[BackendSeconds], 95),
+		P95InstanceSeconds:              percentile(timings[InstanceSeconds], 95),
+		FailedP95TotalSeconds:           percentile(timings[FailedTotalSeconds], 95),
+		FailedP95BackendSeconds:         percentile(timings[FailedBackendSeconds], 95),
+		FailedP95InstanceSeconds:        percentile(timings[FailedInstanceSeconds], 95),
 	}
 }
 
