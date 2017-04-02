@@ -178,6 +178,10 @@ test_db() {
   generate_config_file
   check_db
   test_all ${@:2}
+  if [ $? -ne 0 ] ; then
+    echo "test_db failed"
+    return 1
+  fi
   echo "- done testing via $db_type"
 }
 
@@ -199,6 +203,10 @@ main() {
   test_dbs=${test_dbs:-"mysql"}
   for db in $(echo $test_dbs) ; do
     test_db $db "$@"
+    if [ $? -ne 0 ] ; then
+      echo "+ FAIL: test_db $db $@"
+      return 1
+    fi
   done
 }
 
