@@ -1,4 +1,4 @@
-orchestrator [[Documentation]](https://github.com/github/orchestrator/tree/master/docs)
+orchestrator [[Documentation]](https://github.com/github/orchestrator/tree/master/docs) [![Build Status](https://travis-ci.org/github/orchestrator.png)](https://travis-ci.org/github/orchestrator) [![Downloads]( 	https://img.shields.io/github/downloads/github/orchestrator.png)](https://github.com/github/orchestrator/releases) 
 ============
 
 ![Orcehstrator logo](https://github.com/github/orchestrator/raw/master/docs/images/orchestrator-logo-wide.png)
