@@ -32,6 +32,8 @@ var (
 	envVariableRegexp = regexp.MustCompile("[$][{](.*)[}]")
 )
 
+var ConfigurationLoaded chan bool = make(chan bool)
+
 // Configuration makes for orchestrator configuration input, which can be provided by user via JSON formatted file.
 // Some of the parameteres have reasonable default values, and some (like database credentials) are
 // strictly expected from user.
@@ -536,4 +538,14 @@ func Reload() *Configuration {
 		read(fileName)
 	}
 	return Config
+}
+
+// MarkConfigurationLoaded is called once configuration has first been loaded.
+// Listeners on ConfigurationLoaded will get a notification
+func MarkConfigurationLoaded() {
+	go func() {
+		for {
+			ConfigurationLoaded <- true
+		}
+	}()
 }

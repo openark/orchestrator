@@ -107,7 +107,7 @@ const (
 	MasterRecoveryRemoteSSH                       = "MasterRecoveryRemoteSSH"
 )
 
-var emergencyReadTopologyInstanceMap = cache.New(time.Duration(config.Config.InstancePollSeconds)*time.Second, time.Second)
+var emergencyReadTopologyInstanceMap *cache.Cache
 
 // InstancesByCountReplicas sorts instances by umber of replicas, descending
 type InstancesByCountReplicas [](*inst.Instance)
@@ -148,6 +148,14 @@ func init() {
 	metrics.Register("recover.unreach_master_stale_slaves.start", recoverUnreachableMasterWithStaleSlavesCounter)
 	metrics.Register("recover.unreach_master_stale_slaves.success", recoverUnreachableMasterWithStaleSlavesSuccessCounter)
 	metrics.Register("recover.unreach_master_stale_slaves.fail", recoverUnreachableMasterWithStaleSlavesFailureCounter)
+
+	go initializeTopologyRecoveryPostConfiguration()
+}
+
+func initializeTopologyRecoveryPostConfiguration() {
+	<-config.ConfigurationLoaded
+
+	emergencyReadTopologyInstanceMap = cache.New(time.Second, time.Second)
 }
 
 // replaceCommandPlaceholders replaces agreed-upon placeholders with analysis data

@@ -46,14 +46,22 @@ func (this HostnameUnresolve) String() string {
 	return fmt.Sprintf("%s %s", this.hostname, this.unresolvedHostname)
 }
 
+var hostnameResolvesLightweightCache *cache.Cache
+var hostnameResolvesLightweightCacheLoadedOnceFromDB bool = false
+
 func init() {
 	if config.Config.ExpiryHostnameResolvesMinutes < 1 {
 		config.Config.ExpiryHostnameResolvesMinutes = 1
 	}
+
+	go initializeResolvePostConfiguration()
 }
 
-var hostnameResolvesLightweightCache = cache.New(time.Duration(config.Config.ExpiryHostnameResolvesMinutes)*time.Minute, time.Minute)
-var hostnameResolvesLightweightCacheLoadedOnceFromDB bool = false
+func initializeResolvePostConfiguration() {
+	<-config.ConfigurationLoaded
+
+	hostnameResolvesLightweightCache = cache.New(time.Duration(config.Config.ExpiryHostnameResolvesMinutes)*time.Minute, time.Minute)
+}
 
 func HostnameResolveMethodIsNone() bool {
 	return strings.ToLower(config.Config.HostnameResolveMethod) == "none"
