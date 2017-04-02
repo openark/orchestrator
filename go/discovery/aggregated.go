@@ -124,9 +124,9 @@ func aggregate(results []collection.Metric) AggregatedDiscoveryMetrics {
 
 		if v.Err == nil {
 			// ok names
-			x := names["OkInstanceKeys"]
+			x := names[OkInstanceKeys]
 			x[v.InstanceKey.String()] = 1 // Value doesn't matter
-			names["OkInstanceKeys"] = x
+			names[OkInstanceKeys] = x
 		} else {
 			// failed names
 			x := names[FailedInstanceKeys]
