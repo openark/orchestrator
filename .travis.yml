@@ -1,0 +1,26 @@
+# http://docs.travis-ci.com/user/languages/go/
+language: go
+
+go: 1.8
+
+os:
+  - linux
+#
+# before_install:
+#   - >
+#     repo=`basename $PWD`;
+#     localDir=`dirname $PWD`;
+#     cfDir="`dirname $localDir`/orchestrator";
+#     if [[ "$localDir" != "$cfDir" ]];
+#     then
+#       mv "$localDir" "$cfDir";
+#       cd ../../orchestrator/$repo;
+#       export TRAVIS_BUILD_DIR=`dirname $TRAVIS_BUILD_DIR`/$repo;
+#     fi;
+
+install: true
+
+script: script/cibuild
+
+notifications:
+  email: false
