@@ -253,7 +253,7 @@ func (this *HttpAPI) EndMaintenance(params martini.Params, r render.Render, req 
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	err = inst.EndMaintenance(maintenanceKey)
+	_, err = inst.EndMaintenance(maintenanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -274,7 +274,7 @@ func (this *HttpAPI) EndMaintenanceByInstanceKey(params martini.Params, r render
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	err = inst.EndMaintenanceByInstanceKey(&instanceKey)
+	_, err = inst.EndMaintenanceByInstanceKey(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -342,7 +342,7 @@ func (this *HttpAPI) EndDowntime(params martini.Params, r render.Render, req *ht
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	err = inst.EndDowntime(&instanceKey)
+	_, err = inst.EndDowntime(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return

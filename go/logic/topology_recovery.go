@@ -17,6 +17,7 @@
 package logic
 
 import (
+	"encoding/json"
 	"fmt"
 	goos "os"
 	"sort"
@@ -68,6 +69,7 @@ type TopologyRecovery struct {
 	AcknowledgedComment       string
 	LastDetectionId           int64
 	RelatedRecoveryId         int64
+	RecoveryType              MasterRecoveryType
 }
 
 func NewTopologyRecovery(replicationAnalysis inst.ReplicationAnalysis) *TopologyRecovery {
@@ -78,6 +80,7 @@ func NewTopologyRecovery(replicationAnalysis inst.ReplicationAnalysis) *Topology
 	topologyRecovery.ParticipatingInstanceKeys = *inst.NewInstanceKeyMap()
 	topologyRecovery.AllErrors = []string{}
 	topologyRecovery.PostponedFunctions = [](func() error){}
+	topologyRecovery.RecoveryType = NotMasterRecovery
 	return topologyRecovery
 }
 
@@ -97,7 +100,8 @@ func (this *TopologyRecovery) AddErrors(errs []error) {
 type MasterRecoveryType string
 
 const (
-	MasterRecoveryGTID         MasterRecoveryType = "MasterRecoveryGTID"
+	NotMasterRecovery          MasterRecoveryType = "NotMasterRecovery"
+	MasterRecoveryGTID                            = "MasterRecoveryGTID"
 	MasterRecoveryPseudoGTID                      = "MasterRecoveryPseudoGTID"
 	MasterRecoveryBinlogServer                    = "MasterRecoveryBinlogServer"
 	MasterRecoveryRemoteSSH                       = "MasterRecoveryRemoteSSH"
@@ -420,6 +424,7 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 	} else if config.Config.RemoteSSHForMasterFailover {
 		masterRecoveryType = MasterRecoveryRemoteSSH
 	}
+	topologyRecovery.RecoveryType = masterRecoveryType
 	log.Infof("topology_recovery: RecoverDeadMaster: masterRecoveryType=%+v", masterRecoveryType)
 
 	switch masterRecoveryType {
@@ -1244,6 +1249,11 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	if topologyRecovery == nil {
 		return recoveryAttempted, topologyRecovery, err
 	}
+	if b, err := json.Marshal(topologyRecovery); err == nil {
+		log.Infof("Topology recovery: %+v", string(b))
+	} else {
+		log.Infof("Topology recovery: %+v", *topologyRecovery)
+	}
 	if !skipProcesses {
 		if topologyRecovery.SuccessorKey == nil {
 			// Execute general unsuccessful post failover processes
@@ -1313,11 +1323,22 @@ func ForceExecuteRecovery(clusterName string, analysisCode inst.AnalysisCode, fa
 		return recoveryAttempted, topologyRecovery, err
 	}
 
-	analysisEntry := inst.ReplicationAnalysis{
-		Analysis:            analysisCode,
-		ClusterDetails:      *clusterInfo,
-		AnalyzedInstanceKey: *failedInstanceKey,
+	analysisEntry := inst.ReplicationAnalysis{}
+
+	clusterAnalysisEntries, err := inst.GetReplicationAnalysis(clusterInfo.ClusterName, true, false)
+	if err != nil {
+		return recoveryAttempted, topologyRecovery, err
 	}
+
+	for _, entry := range clusterAnalysisEntries {
+		if entry.AnalyzedInstanceKey.Equals(failedInstanceKey) {
+			analysisEntry = entry
+		}
+	}
+	analysisEntry.Analysis = analysisCode // we force this analysis
+	analysisEntry.ClusterDetails = *clusterInfo
+	analysisEntry.AnalyzedInstanceKey = *failedInstanceKey
+
 	return executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, true, skipProcesses)
 }
 
@@ -1422,8 +1443,11 @@ func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecov
 	if topologyRecovery.SuccessorKey == nil {
 		return nil, nil, fmt.Errorf("Recovery attempted yet no replica promoted")
 	}
-
-	clusterMaster, err = inst.ChangeMasterTo(&clusterMaster.Key, &designatedInstance.Key, promotedMasterCoordinates, false, inst.GTIDHintNeutral)
+	var gitHint inst.OperationGTIDHint = inst.GTIDHintNeutral
+	if topologyRecovery.RecoveryType == MasterRecoveryGTID {
+		gitHint = inst.GTIDHintForce
+	}
+	clusterMaster, err = inst.ChangeMasterTo(&clusterMaster.Key, &designatedInstance.Key, promotedMasterCoordinates, false, gitHint)
 
 	if designatedInstance.ReplicationCredentialsAvailable && !clusterMaster.HasReplicationCredentials && replicationCredentialsError == nil {
 		_, credentialsErr := inst.ChangeMasterCredentials(&clusterMaster.Key, replicationUser, replicationPassword)
