@@ -6,6 +6,9 @@ go: 1.8
 os:
   - linux
 
+env:
+- MYSQL_USER=root
+
 before_install:
   - >
     repo=`basename $PWD`;
