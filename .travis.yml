@@ -17,6 +17,7 @@ before_install:
       cd ../../orchestrator/$repo;
       export TRAVIS_BUILD_DIR=`dirname $TRAVIS_BUILD_DIR`/$repo;
     fi;
+  - mysql -e 'CREATE DATABASE IF NOT EXISTS test;'
 
 install: true
 
