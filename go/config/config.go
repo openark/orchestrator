@@ -548,4 +548,6 @@ func MarkConfigurationLoaded() {
 			ConfigurationLoaded <- true
 		}
 	}()
+	// wait for it
+	<-ConfigurationLoaded
 }

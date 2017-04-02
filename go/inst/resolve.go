@@ -53,7 +53,6 @@ func init() {
 	if config.Config.ExpiryHostnameResolvesMinutes < 1 {
 		config.Config.ExpiryHostnameResolvesMinutes = 1
 	}
-
 	go initializeResolvePostConfiguration()
 }
 
