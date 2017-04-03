@@ -116,7 +116,6 @@
   "SkipBinlogEventsContaining": [],
   "ReduceReplicationAnalysisCount": true,
   "FailureDetectionPeriodBlockMinutes": 60,
-  "AutoRecoveryGloballyEnabled": false,
   "RecoveryPollSeconds": 10,
   "RecoveryPeriodBlockMinutes": 60,
   "RecoveryPeriodBlockSeconds": 3600,
