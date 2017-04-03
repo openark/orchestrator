@@ -107,7 +107,7 @@ const (
 	MasterRecoveryRemoteSSH                       = "MasterRecoveryRemoteSSH"
 )
 
-var emergencyReadTopologyInstanceMap = cache.New(time.Duration(config.Config.InstancePollSeconds)*time.Second, time.Second)
+var emergencyReadTopologyInstanceMap *cache.Cache
 
 // InstancesByCountReplicas sorts instances by umber of replicas, descending
 type InstancesByCountReplicas [](*inst.Instance)
@@ -148,6 +148,14 @@ func init() {
 	metrics.Register("recover.unreach_master_stale_slaves.start", recoverUnreachableMasterWithStaleSlavesCounter)
 	metrics.Register("recover.unreach_master_stale_slaves.success", recoverUnreachableMasterWithStaleSlavesSuccessCounter)
 	metrics.Register("recover.unreach_master_stale_slaves.fail", recoverUnreachableMasterWithStaleSlavesFailureCounter)
+
+	go initializeTopologyRecoveryPostConfiguration()
+}
+
+func initializeTopologyRecoveryPostConfiguration() {
+	<-config.ConfigurationLoaded
+
+	emergencyReadTopologyInstanceMap = cache.New(time.Second, time.Second)
 }
 
 // replaceCommandPlaceholders replaces agreed-upon placeholders with analysis data
@@ -461,15 +469,14 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 		topologyRecovery.AddPostponedFunction(postponedFunction)
 	}
 	if config.Config.MasterFailoverLostInstancesDowntimeMinutes > 0 {
-		postponedFunction := func() error {
+		func() error {
 			inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
 			for _, replica := range lostReplicas {
 				replica := replica
 				inst.BeginDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
 			}
 			return nil
-		}
-		topologyRecovery.AddPostponedFunction(postponedFunction)
+		}()
 	}
 
 	if promotedReplica == nil {
@@ -629,12 +636,11 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			}
 			topologyRecovery.AddPostponedFunction(postponedFunction)
 		}
-		postponedFunction := func() error {
+		func() error {
 			log.Infof("topology_recovery: - RecoverDeadMaster: updating cluster_alias")
 			inst.ReplaceAliasClusterName(analysisEntry.AnalyzedInstanceKey.StringCode(), promotedReplica.Key.StringCode())
 			return nil
-		}
-		topologyRecovery.AddPostponedFunction(postponedFunction)
+		}()
 
 		attributes.SetGeneralAttribute(analysisEntry.ClusterDetails.ClusterDomain, promotedReplica.Key.StringCode())
 	} else {
@@ -1056,15 +1062,14 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 		topologyRecovery.AddPostponedFunction(postponedFunction)
 	}
 	if config.Config.MasterFailoverLostInstancesDowntimeMinutes > 0 {
-		postponedFunction := func() error {
+		func() error {
 			inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
 			for _, replica := range lostReplicas {
 				replica := replica
 				inst.BeginDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
 			}
 			return nil
-		}
-		topologyRecovery.AddPostponedFunction(postponedFunction)
+		}()
 	}
 
 	return promotedReplica, lostReplicas, err

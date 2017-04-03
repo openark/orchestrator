@@ -25,6 +25,7 @@ import (
 	"net"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -46,14 +47,24 @@ func (this HostnameUnresolve) String() string {
 	return fmt.Sprintf("%s %s", this.hostname, this.unresolvedHostname)
 }
 
+var hostnameResolvesLightweightCache *cache.Cache
+var hostnameResolvesLightweightCacheInit = &sync.Mutex{}
+var hostnameResolvesLightweightCacheLoadedOnceFromDB bool = false
+
 func init() {
 	if config.Config.ExpiryHostnameResolvesMinutes < 1 {
 		config.Config.ExpiryHostnameResolvesMinutes = 1
 	}
 }
 
-var hostnameResolvesLightweightCache = cache.New(time.Duration(config.Config.ExpiryHostnameResolvesMinutes)*time.Minute, time.Minute)
-var hostnameResolvesLightweightCacheLoadedOnceFromDB bool = false
+func getHostnameResolvesLightweightCache() *cache.Cache {
+	hostnameResolvesLightweightCacheInit.Lock()
+	defer hostnameResolvesLightweightCacheInit.Unlock()
+	if hostnameResolvesLightweightCache == nil {
+		hostnameResolvesLightweightCache = cache.New(time.Duration(config.Config.ExpiryHostnameResolvesMinutes)*time.Minute, time.Minute)
+	}
+	return hostnameResolvesLightweightCache
+}
 
 func HostnameResolveMethodIsNone() bool {
 	return strings.ToLower(config.Config.HostnameResolveMethod) == "none"
@@ -98,7 +109,7 @@ func ResolveHostname(hostname string) (string, error) {
 	}
 
 	// First go to lightweight cache
-	if resolvedHostname, found := hostnameResolvesLightweightCache.Get(hostname); found {
+	if resolvedHostname, found := getHostnameResolvesLightweightCache().Get(hostname); found {
 		return resolvedHostname.(string), nil
 	}
 
@@ -109,7 +120,7 @@ func ResolveHostname(hostname string) (string, error) {
 		// let's try and get the resolved hostname from database.
 		if !HostnameResolveMethodIsNone() {
 			if resolvedHostname, err := ReadResolvedHostname(hostname); err == nil && resolvedHostname != "" {
-				hostnameResolvesLightweightCache.Set(hostname, resolvedHostname, 0)
+				getHostnameResolvesLightweightCache().Set(hostname, resolvedHostname, 0)
 				return resolvedHostname, nil
 			}
 		}
@@ -129,7 +140,7 @@ func ResolveHostname(hostname string) (string, error) {
 	if err != nil {
 		// Problem. What we'll do is cache the hostname for just one minute, so as to avoid flooding requests
 		// on one hand, yet make it refresh shortly on the other hand. Anyway do not write to database.
-		hostnameResolvesLightweightCache.Set(hostname, resolvedHostname, time.Minute)
+		getHostnameResolvesLightweightCache().Set(hostname, resolvedHostname, time.Minute)
 		return hostname, err
 	}
 	// Good result! Cache it, also to DB
@@ -145,10 +156,10 @@ func UpdateResolvedHostname(hostname string, resolvedHostname string) bool {
 	if resolvedHostname == "" {
 		return false
 	}
-	if existingResolvedHostname, found := hostnameResolvesLightweightCache.Get(hostname); found && (existingResolvedHostname == resolvedHostname) {
+	if existingResolvedHostname, found := getHostnameResolvesLightweightCache().Get(hostname); found && (existingResolvedHostname == resolvedHostname) {
 		return false
 	}
-	hostnameResolvesLightweightCache.Set(hostname, resolvedHostname, 0)
+	getHostnameResolvesLightweightCache().Set(hostname, resolvedHostname, 0)
 	if !HostnameResolveMethodIsNone() {
 		WriteResolvedHostname(hostname, resolvedHostname)
 	}
@@ -168,7 +179,7 @@ func loadHostnameResolveCacheFromDatabase() error {
 		return err
 	}
 	for _, hostnameResolve := range allHostnamesResolves {
-		hostnameResolvesLightweightCache.Set(hostnameResolve.hostname, hostnameResolve.resolvedHostname, 0)
+		getHostnameResolvesLightweightCache().Set(hostnameResolve.hostname, hostnameResolve.resolvedHostname, 0)
 	}
 	hostnameResolvesLightweightCacheLoadedOnceFromDB = true
 	return nil
@@ -180,7 +191,7 @@ func FlushNontrivialResolveCacheToDatabase() error {
 	}
 	items, _ := HostnameResolveCache()
 	for hostname := range items {
-		resolvedHostname, found := hostnameResolvesLightweightCache.Get(hostname)
+		resolvedHostname, found := getHostnameResolvesLightweightCache().Get(hostname)
 		if found && (resolvedHostname.(string) != hostname) {
 			WriteResolvedHostname(hostname, resolvedHostname.(string))
 		}
@@ -190,13 +201,13 @@ func FlushNontrivialResolveCacheToDatabase() error {
 
 func ResetHostnameResolveCache() error {
 	err := deleteHostnameResolves()
-	hostnameResolvesLightweightCache.Flush()
+	getHostnameResolvesLightweightCache().Flush()
 	hostnameResolvesLightweightCacheLoadedOnceFromDB = false
 	return err
 }
 
 func HostnameResolveCache() (map[string]cache.Item, error) {
-	return hostnameResolvesLightweightCache.Items(), nil
+	return getHostnameResolvesLightweightCache().Items(), nil
 }
 
 func UnresolveHostname(instanceKey *InstanceKey) (InstanceKey, bool, error) {
