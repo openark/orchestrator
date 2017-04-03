@@ -111,6 +111,7 @@ $(document).ready(function() {
       }
       moreInfo += '<div><a href="' + appUrl('/web/audit-failure-detection/id/' + audit.LastDetectionId) + '">Related detection</a></div>';
       moreInfo += '<div>Proccessed by <code>' + audit.ProcessingNodeHostname + '</code></div>';
+      moreInfo += '<div><a href="' + appUrl('/web/audit-recovery-steps/' + audit.UID) + '">Recovery steps</a></div>';
       row.appendTo('#audit tbody');
 
       var row = $('<tr/>');
