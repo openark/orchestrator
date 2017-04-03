@@ -33,7 +33,17 @@ import (
 const maxEmptyBinlogFiles int = 10
 const maxEventInfoDisplayLength int = 200
 
-var instanceBinlogEntryCache = cache.New(time.Duration(10)*time.Minute, time.Minute)
+var instanceBinlogEntryCache *cache.Cache
+
+func init() {
+	go initializeBinlogDaoPostConfiguration()
+}
+
+func initializeBinlogDaoPostConfiguration() {
+	<-config.ConfigurationLoaded
+
+	instanceBinlogEntryCache = cache.New(time.Duration(10)*time.Minute, time.Minute)
+}
 
 func compilePseudoGTIDPattern() (pseudoGTIDRegexp *regexp.Regexp, err error) {
 	log.Debugf("PseudoGTIDPatternIsFixedSubstring: %+v", config.Config.PseudoGTIDPatternIsFixedSubstring)
