@@ -130,8 +130,7 @@ func main() {
 		inst.EnableAuditSyslog()
 	}
 	config.RuntimeCLIFlags.ConfiguredVersion = AppVersion
-
-	inst.InitializeInstanceDao()
+	config.MarkConfigurationLoaded()
 
 	if len(flag.Args()) == 0 && *command == "" {
 		// No command, no argument: just prompt
