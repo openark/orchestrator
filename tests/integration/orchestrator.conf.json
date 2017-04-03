@@ -60,7 +60,6 @@
   "RemoveTextFromHostnameDisplay": ".mydomain.com:3306",
   "ReadOnly": false,
   "AuthenticationMethod": "",
-  "OAuthClientID": "7bcec5c3853caf1c335e",
   "OAuthClientSecret": "8e089355237f52e118b7f8110e5022caccd4abb0",
   "OAuthScopes": [
     "user:email",
