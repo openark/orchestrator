@@ -19,7 +19,7 @@
   "MySQLOrchestratorHost": "localhost",
   "MySQLOrchestratorPort": 3306,
   "MySQLOrchestratorDatabase": "test",
-  "MySQLOrchestratorUser": "",
+  "MySQLOrchestratorUser": "mysql-user-placeholder",
   "MySQLOrchestratorPassword": "",
   "MySQLOrchestratorCredentialsConfigFile": "",
   "MySQLOrchestratorSSLPrivateKeyFile": "",
