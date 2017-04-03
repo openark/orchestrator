@@ -2,7 +2,7 @@
 
 [![build status](https://travis-ci.org/github/orchestrator.svg)](https://travis-ci.org/github/orchestrator) [![downloads](https://img.shields.io/github/downloads/github/orchestrator/total.svg)](https://github.com/github/orchestrator/releases) [![release](https://img.shields.io/github/release/github/orchestrator.svg)](https://github.com/github/orchestrator/releases)
 
-![Orcehstrator logo](https://github.com/github/orchestrator/raw/master/docs/images/orchestrator-logo-wide.png)
+![Orchestrator logo](https://github.com/github/orchestrator/raw/master/docs/images/orchestrator-logo-wide.png)
 
 `orchestrator` is a MySQL replication topology management and visualization tool, allowing for:
 
