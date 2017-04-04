@@ -19,8 +19,8 @@ package inst
 import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -63,7 +63,7 @@ func WriteResolvedHostname(hostname string, resolvedHostname string) error {
 				values
 					(?, ?, NOW())
 				on duplicate key update
-					hostname=if(values(hostname) != resolved_hostname, values(hostname), hostname),
+					hostname=values(hostname),
 					resolved_timestamp=values(resolved_timestamp)
 			`,
 				hostname,
@@ -215,7 +215,7 @@ func WriteHostnameUnresolve(instanceKey *InstanceKey, unresolvedHostname string)
 			return log.Errore(err)
 		}
 		_, err = db.ExecOrchestrator(`
-	        	replace into hostname_unresolve_history (
+        	replace into hostname_unresolve_history (
         		hostname,
         		unresolved_hostname,
         		last_registered)
@@ -232,7 +232,7 @@ func WriteHostnameUnresolve(instanceKey *InstanceKey, unresolvedHostname string)
 func DeregisterHostnameUnresolve(instanceKey *InstanceKey) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	delete from hostname_unresolve
+      	delete from hostname_unresolve
 				where hostname=?
 				`, instanceKey.Hostname,
 		)
@@ -245,7 +245,7 @@ func DeregisterHostnameUnresolve(instanceKey *InstanceKey) error {
 func ExpireHostnameUnresolve() error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	delete from hostname_unresolve
+      	delete from hostname_unresolve
 				where last_registered < NOW() - INTERVAL ? MINUTE
 				`, config.Config.ExpiryHostnameResolvesMinutes,
 		)
@@ -260,8 +260,8 @@ func ForgetExpiredHostnameResolves() error {
 			delete
 				from hostname_resolve
 			where
-				resolved_timestamp < NOW() - interval (? * 2) minute`,
-		config.Config.ExpiryHostnameResolvesMinutes,
+				resolved_timestamp < NOW() - interval ? minute`,
+		2*config.Config.ExpiryHostnameResolvesMinutes,
 	)
 	return err
 }

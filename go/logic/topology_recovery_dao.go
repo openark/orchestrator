@@ -24,8 +24,8 @@ import (
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/process"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 )
 
 // AttemptFailureDetectionRegistration tries to add a failure-detection entry; if this fails that means the problem has already been detected
@@ -244,16 +244,39 @@ func ExpireBlockedRecoveries() error {
 	// Older recovery is acknowledged by now, hence blocked recovery should be released.
 	// Do NOTE that the data in blocked_topology_recovery is only used for auditing: it is NOT the data
 	// based on which we make automated decisions.
-	_, err := db.ExecOrchestrator(`
-			delete
-				from blocked_topology_recovery
-				using
-					blocked_topology_recovery
-					left join topology_recovery on (blocking_recovery_id = topology_recovery.recovery_id and acknowledged = 0)
+
+	query := `
+		select
+				blocked_topology_recovery.hostname,
+				blocked_topology_recovery.port
+			from
+				blocked_topology_recovery
+				left join topology_recovery on (blocking_recovery_id = topology_recovery.recovery_id and acknowledged = 0)
+			where
+				acknowledged is null
+		`
+	expiredKeys := inst.NewInstanceKeyMap()
+	err := db.QueryOrchestrator(query, sqlutils.Args(), func(m sqlutils.RowMap) error {
+		key := inst.InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
+		expiredKeys.AddKey(key)
+		return nil
+	})
+
+	for _, expiredKey := range expiredKeys.GetInstanceKeys() {
+		_, err := db.ExecOrchestrator(`
+				delete
+					from blocked_topology_recovery
 				where
-					acknowledged is null
-			`,
-	)
+						hostname = ?
+						and port = ?
+				`,
+			expiredKey.Hostname, expiredKey.Port,
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
+	}
+
 	if err != nil {
 		return log.Errore(err)
 	}
@@ -284,7 +307,7 @@ func acknowledgeRecoveries(owner string, comment string, markEndRecovery bool, w
 	query := fmt.Sprintf(`
 			update topology_recovery set
 				in_active_period = 0,
-				end_active_period_unixtime = IF(end_active_period_unixtime = 0, UNIX_TIMESTAMP(), end_active_period_unixtime),
+				end_active_period_unixtime = case when end_active_period_unixtime = 0 then UNIX_TIMESTAMP() else end_active_period_unixtime end,
 				%s
 				acknowledged = 1,
 				acknowledged_at = NOW(),

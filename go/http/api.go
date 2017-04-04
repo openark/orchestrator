@@ -23,17 +23,22 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/render"
 
-	"github.com/outbrain/golib/util"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/util"
 
 	"github.com/github/orchestrator/go/agent"
+	"github.com/github/orchestrator/go/collection"
 	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/discovery"
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/logic"
+	"github.com/github/orchestrator/go/metrics/query"
 	"github.com/github/orchestrator/go/process"
 )
 
@@ -92,6 +97,8 @@ type HttpAPI struct {
 }
 
 var API HttpAPI = HttpAPI{}
+var discoveryMetrics = collection.CreateOrReturnCollection("DISCOVERY_METRICS")
+var queryMetrics = collection.CreateOrReturnCollection("BACKEND_WRITES")
 
 func (this *HttpAPI) getInstanceKey(host string, port string) (inst.InstanceKey, error) {
 	instanceKey, err := inst.NewInstanceKeyFromStrings(host, port)
@@ -122,6 +129,20 @@ func (this *HttpAPI) Instance(params martini.Params, r render.Render, req *http.
 		return
 	}
 	r.JSON(200, instance)
+}
+
+// AsyncDiscover issues an asynchronous read on an instance. This is
+// useful for bulk loads of a new set of instances and will not block
+// if the instance is slow to respond or not reachable.
+func (this *HttpAPI) AsyncDiscover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	go this.Discover(params, r, req, user)
+
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Asynchronous discovery initiated for Instance: %+v", instanceKey)})
 }
 
 // Discover issues a synchronous read on an instance
@@ -232,7 +253,7 @@ func (this *HttpAPI) EndMaintenance(params martini.Params, r render.Render, req 
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	err = inst.EndMaintenance(maintenanceKey)
+	_, err = inst.EndMaintenance(maintenanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -253,7 +274,7 @@ func (this *HttpAPI) EndMaintenanceByInstanceKey(params martini.Params, r render
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	err = inst.EndMaintenanceByInstanceKey(&instanceKey)
+	_, err = inst.EndMaintenanceByInstanceKey(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -321,7 +342,7 @@ func (this *HttpAPI) EndDowntime(params martini.Params, r render.Render, req *ht
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	err = inst.EndDowntime(&instanceKey)
+	_, err = inst.EndDowntime(&instanceKey)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -1288,7 +1309,7 @@ func (this *HttpAPI) ClusterOSCReplicas(params martini.Params, r render.Render, 
 }
 
 // SetClusterAlias will change an alias for a given clustername
-func (this *HttpAPI) SetClusterAlias(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+func (this *HttpAPI) SetClusterAliasManualOverride(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
@@ -1296,7 +1317,7 @@ func (this *HttpAPI) SetClusterAlias(params martini.Params, r render.Render, req
 	clusterName := params["clusterName"]
 	alias := req.URL.Query().Get("alias")
 
-	err := inst.SetClusterAlias(clusterName, alias)
+	err := inst.SetClusterAliasManualOverride(clusterName, alias)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -1577,6 +1598,111 @@ func (this *HttpAPI) BulkInstances(params martini.Params, r render.Render, req *
 	}
 
 	r.JSON(200, instances)
+}
+
+// DiscoveryMetricsRaw will return the last X seconds worth of discovery information in time based order as a JSON array
+func (this *HttpAPI) DiscoveryMetricsRaw(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+	if err != nil || seconds <= 0 {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Invalid value provided for seconds"})
+		return
+	}
+
+	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
+	json, err := discovery.JSONSince(discoveryMetrics, refTime)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to determine start time. Perhaps seconds value is wrong?"})
+		return
+	}
+	log.Debugf("DiscoveryMetricsRaw data: retrieved %d entries from discovery.MC", len(json))
+
+	r.JSON(200, json)
+}
+
+// DiscoveryMetricsAggregated will return a single set of aggregated metrics for raw values collected since the
+// specified time.
+func (this *HttpAPI) DiscoveryMetricsAggregated(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+
+	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
+	aggregated, err := discovery.AggregatedSince(discoveryMetrics, refTime)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to generate aggregated discovery metrics"})
+		return
+	}
+	// log.Debugf("DiscoveryMetricsAggregated data: %+v", aggregated)
+	r.JSON(200, aggregated)
+}
+
+// DiscoveryQueueMetricsRaw returns the raw queue metrics (active and
+// queued values), data taken secondly for the last N seconds.
+func (this *HttpAPI) DiscoveryQueueMetricsRaw(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+	log.Debugf("DiscoveryQueueMetricsRaw: seconds: %d", seconds)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to generate discovery queue  aggregated metrics"})
+		return
+	}
+
+	queue := discovery.CreateOrReturnQueue("DEFAULT")
+	metrics := queue.DiscoveryQueueMetrics(seconds)
+	log.Debugf("DiscoveryQueueMetricsRaw data: %+v", metrics)
+
+	r.JSON(200, metrics)
+}
+
+// DiscoveryQueueMetricsAggregated returns a single value showing the metrics of the discovery queue over the last N seconds.
+// This is expected to be called every 60 seconds (?) and the config setting of the retention period is currently hard-coded.
+// See go/discovery/ for more information.
+func (this *HttpAPI) DiscoveryQueueMetricsAggregated(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+	log.Debugf("DiscoveryQueueMetricsAggregated: seconds: %d", seconds)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to generate discovery queue aggregated metrics"})
+		return
+	}
+
+	queue := discovery.CreateOrReturnQueue("DEFAULT")
+	aggregated := queue.AggregatedDiscoveryQueueMetrics(seconds)
+	log.Debugf("DiscoveryQueueMetricsAggregated data: %+v", aggregated)
+
+	r.JSON(200, aggregated)
+}
+
+// BackendQueryMetricsRaw returns the raw backend query metrics
+func (this *HttpAPI) BackendQueryMetricsRaw(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+	log.Debugf("BackendQueryMetricsRaw: seconds: %d", seconds)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to generate raw backend query metrics"})
+		return
+	}
+
+	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
+	m, err := queryMetrics.Since(refTime)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to return backend query metrics"})
+		return
+	}
+
+	log.Debugf("BackendQueryMetricsRaw data: %+v", m)
+
+	r.JSON(200, m)
+}
+
+func (this *HttpAPI) BackendQueryMetricsAggregated(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+	log.Debugf("BackendQueryMetricsAggregated: seconds: %d", seconds)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to aggregated generate backend query metrics"})
+		return
+	}
+
+	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
+	aggregated := query.AggregatedSince(queryMetrics, refTime)
+	log.Debugf("BackendQueryMetricsAggregated data: %+v", aggregated)
+
+	r.JSON(200, aggregated)
 }
 
 // Agents provides complete list of registered agents (See https://github.com/github/orchestrator-agent)
@@ -2400,13 +2526,14 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "cluster-info/:clusterName", this.ClusterInfo)
 	this.registerRequest(m, "cluster-info/alias/:clusterAlias", this.ClusterInfoByAlias)
 	this.registerRequest(m, "cluster-osc-slaves/:clusterName", this.ClusterOSCReplicas)
-	this.registerRequest(m, "set-cluster-alias/:clusterName", this.SetClusterAlias)
+	this.registerRequest(m, "set-cluster-alias/:clusterName", this.SetClusterAliasManualOverride)
 	this.registerRequest(m, "clusters", this.Clusters)
 	this.registerRequest(m, "clusters-info", this.ClustersInfo)
 
 	// Instance management:
 	this.registerRequest(m, "instance/:host/:port", this.Instance)
 	this.registerRequest(m, "discover/:host/:port", this.Discover)
+	this.registerRequest(m, "async-discover/:host/:port", this.AsyncDiscover)
 	this.registerRequest(m, "refresh/:host/:port", this.Refresh)
 	this.registerRequest(m, "forget/:host/:port", this.Forget)
 	this.registerRequest(m, "begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance)
@@ -2469,8 +2596,16 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "deregister-hostname-unresolve/:host/:port", this.DeregisterHostnameUnresolve)
 	this.registerRequest(m, "register-hostname-unresolve/:host/:port/:virtualname", this.RegisterHostnameUnresolve)
 	// Bulk access to information
-	this.registerRequest(m, "/api/bulk-instances", this.BulkInstances)
-	this.registerRequest(m, "/api/bulk-promotion-rules", this.BulkPromotionRules)
+	this.registerRequest(m, "bulk-instances", this.BulkInstances)
+	this.registerRequest(m, "bulk-promotion-rules", this.BulkPromotionRules)
+
+	// Monitoring
+	this.registerRequest(m, "discovery-metrics-raw/:seconds", this.DiscoveryMetricsRaw)
+	this.registerRequest(m, "discovery-metrics-aggregated/:seconds", this.DiscoveryMetricsAggregated)
+	this.registerRequest(m, "discovery-queue-metrics-raw/:seconds", this.DiscoveryQueueMetricsRaw)
+	this.registerRequest(m, "discovery-queue-metrics-aggregated/:seconds", this.DiscoveryQueueMetricsAggregated)
+	this.registerRequest(m, "backend-query-metrics-raw/:seconds", this.BackendQueryMetricsRaw)
+	this.registerRequest(m, "backend-query-metrics-aggregated/:seconds", this.BackendQueryMetricsAggregated)
 
 	// Agents
 	this.registerRequest(m, "agents", this.Agents)

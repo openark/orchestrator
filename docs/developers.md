@@ -40,9 +40,9 @@ Once your backend MySQL setup is complete, issue:
     IDENTIFIED BY 'orch_backend_password';
 
 `orchestrator` uses a configuration file whose search path is either `/etc/orchestrator.conf.json`,  `conf/orchestrator.conf.json` or `orchestrator.conf.json`.
-The repository includes a file called `conf/orchestrator.conf.json.sample` with some basic settings. Issue:
+The repository includes a file called `conf/orchestrator-sample.conf.json` with some basic settings. Issue:
 
-	cp conf/orchestrator.conf.json.sample conf/orchestrator.conf.json
+	cp conf/orchestrator-sample.conf.json conf/orchestrator.conf.json
 
 The `conf/orchestrator.conf.json` file is not part of the repository and there is in fact a `.gitignore` entry for this file.
 

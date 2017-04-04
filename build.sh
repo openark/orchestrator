@@ -6,6 +6,8 @@
 #
 set -e
 
+mydir=$(dirname $0)
+GIT_COMMIT=$(git rev-parse HEAD)
 RELEASE_VERSION=
 RELEASE_SUBVERSION=
 TOPDIR=/tmp/orchestrator-release
@@ -29,16 +31,18 @@ usage() {
 }
 
 function precheck() {
-  local target
+  local target build_only
   local ok=0 # return err. so shell exit code
+  target="$1"
+  build_only="$2"
 
   if [[ "$target" == "linux" ]]; then
-    if [[ ! -x "$( which fpm )" ]]; then
+    if [[ $build_only -eq 0 ]] && [[ ! -x "$( which fpm )" ]]; then
       echo "Please install fpm and ensure it is in PATH (typically: 'gem install fpm')"
       ok=1
     fi
 
-    if [[ ! -x "$( which rpmbuild )" ]]; then
+    if [[ $build_only -eq 0 ]] && [[ ! -x "$( which rpmbuild )" ]]; then
       echo "rpmbuild not in PATH, rpm will not be built (OS/X: 'brew install rpm')"
     fi
   fi
@@ -80,7 +84,7 @@ function oinstall() {
   builddir="$1"
   prefix="$2"
 
-  cd  $(dirname $0)
+  cd  $mydir
   gofmt -s -w  go/
   rsync -qa ./resources $builddir/orchestrator${prefix}/orchestrator/
   rsync -qa ./conf/orchestrator-sample.* $builddir/orchestrator${prefix}/orchestrator/
@@ -96,7 +100,7 @@ function package() {
 
   cd $TOPDIR
 
-  echo "Release version is ${RELEASE_VERSION}"
+  echo "Release version is ${RELEASE_VERSION} ( ${GIT_COMMIT} )"
 
   case $target in
     'linux')
@@ -131,9 +135,9 @@ function build() {
   arch="$2"
   builddir="$3"
   prefix="$4"
-  ldflags="-X main.AppVersion=${RELEASE_VERSION}"
+  ldflags="-X main.AppVersion=${RELEASE_VERSION} -X main.GitCommit=${GIT_COMMIT}"
   echo "Building via $(go version)"
-  gobuild="go build ${opt_race} -ldflags \"$ldflags\" -o $builddir/orchestrator${prefix}/orchestrator/orchestrator go/cmd/orchestrator/main.go"
+  gobuild="go build -i ${opt_race} -ldflags \"$ldflags\" -o $builddir/orchestrator${prefix}/orchestrator/orchestrator go/cmd/orchestrator/main.go"
 
   case $os in
     'linux')
@@ -155,11 +159,11 @@ function main() {
   build_only=$4
 
   if [ -z "${RELEASE_VERSION}" ] ; then
-    RELEASE_VERSION=$(cat RELEASE_VERSION)
+    RELEASE_VERSION=$(cat $mydir/RELEASE_VERSION)
   fi
   RELEASE_VERSION="${RELEASE_VERSION}${RELEASE_SUBVERSION}"
 
-  precheck "$target"
+  precheck "$target" "$build_only"
   builddir=$( setuptree "$prefix" )
   oinstall "$builddir" "$prefix"
   build "$target" "$arch" "$builddir" "$prefix"

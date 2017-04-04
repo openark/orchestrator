@@ -23,7 +23,7 @@ import (
 	"strings"
 
 	"github.com/github/orchestrator/go/config"
-	"github.com/outbrain/golib/math"
+	"github.com/openark/golib/math"
 )
 
 // CandidatePromotionRule describe the promotion preference/rule for an instance.
@@ -64,6 +64,7 @@ type Instance struct {
 	FlavorName             string
 	ReadOnly               bool
 	Binlog_format          string
+	BinlogRowImage         string
 	LogBinEnabled          bool
 	LogSlaveUpdatesEnabled bool
 	SelfBinlogCoordinates  BinlogCoordinates
@@ -106,6 +107,10 @@ type Instance struct {
 	SecondsSinceLastSeen sql.NullInt64
 	CountMySQLSnapshots  int
 
+	// Careful. IsCandidate and PromotionRule are used together
+	// and probably need to be merged. IsCandidate's value may
+	// be picked up from daabase_candidate_instance's value when
+	// reading an instance from the db.
 	IsCandidate          bool
 	PromotionRule        CandidatePromotionRule
 	IsDowntimed          bool
@@ -232,6 +237,16 @@ func (this *Instance) applyFlavorName() {
 	} else {
 		this.FlavorName = "unknown"
 	}
+}
+
+// FlavorNameAndMajorVersion returns a string of the combined
+// flavor and major version which is useful in some checks.
+func (this *Instance) FlavorNameAndMajorVersion() string {
+	if this.FlavorName == "" {
+		this.applyFlavorName()
+	}
+
+	return this.FlavorName + "-" + this.MajorVersionString()
 }
 
 // IsReplica makes simple heuristics to decide whether this insatnce is a replica of another instance

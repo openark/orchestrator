@@ -30,8 +30,9 @@ import (
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/process"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/util"
+	"github.com/github/orchestrator/go/remote"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/util"
 )
 
 var thisInstanceKey *inst.InstanceKey
@@ -589,6 +590,107 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 		}
+		// relay-log based synchronization
+	case registerCliCommand("align-via-relay-logs", "Remote relay log relocation", `Align instance's data by comparing and applying another instance's relay logs`):
+		{
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance, err := inst.ReadTopologyInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce target instance:", destination)
+			}
+			otherInstance, err := inst.ReadTopologyInstance(destinationKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if otherInstance == nil {
+				log.Fatalf("Instance not found: %+v", *destinationKey)
+			}
+
+			_, err = agent.SyncReplicaRelayLogs(instance, otherInstance)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instance.Key.DisplayString())
+		}
+		// relay-log based synchronization
+	case registerCliCommand("align-via-relay-logs-ssh", "Remote relay log relocation", `Align instance's data by comparing and applying another instance's relay logs`):
+		{
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance, err := inst.ReadTopologyInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce target instance:", destination)
+			}
+			otherInstance, err := inst.ReadTopologyInstance(destinationKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if otherInstance == nil {
+				log.Fatalf("Instance not found: %+v", *destinationKey)
+			}
+
+			_, err = remote.SyncReplicaRelayLogs(instance, otherInstance, remote.SyncRelaylogsChangeMasterToSharedMasterFunc, false)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instance.Key.DisplayString())
+		}
+	case registerCliCommand("regroup-replicas-ssh", "Remote relay log relocation", `Regroup replicas of a given instance by syncing their relay logs over SSH`):
+		{
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			instance := validateInstanceIsFound(instanceKey)
+
+			_, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instance, remote.SyncRelaylogsChangeMasterToSourceReplicaFunc, nil, true, postponedFunctionsContainer)
+			postponedFunctionsContainer.InvokePostponed()
+
+			log.Infof("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
+			for _, replica := range syncedReplicas {
+				fmt.Println(replica.Key.DisplayString())
+			}
+			if err != nil {
+				log.Fatale(err)
+			}
+		}
+	case registerCliCommand("sync-replicas-relaylogs", "Remote relay log relocation", `Given master, sync all of its replicas by remotely copying and applying relaylogs`):
+		{
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			instance := validateInstanceIsFound(instanceKey)
+
+			_, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instance, remote.SyncRelaylogsChangeMasterToSharedMasterFunc, nil, false, postponedFunctionsContainer)
+			postponedFunctionsContainer.InvokePostponed()
+
+			log.Infof("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
+			for _, replica := range syncedReplicas {
+				fmt.Println(replica.Key.DisplayString())
+			}
+			if err != nil {
+				log.Fatale(err)
+			}
+		}
+
 		// General replication commands
 	case registerCliCommand("enable-gtid", "Replication, general", `If possible, turn on GTID replication`):
 		{
@@ -809,6 +911,65 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(fmt.Sprintf("%+v:%s", *coordinates, text))
 		}
+	case registerCliCommand("last-executed-relay-entry", "Binary logs", `Find coordinates of last executed relay log entry`):
+		{
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance, err := inst.ReadTopologyInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			minCoordinates, err := inst.GetPreviousKnownRelayLogCoordinatesForInstance(instance)
+			if err != nil {
+				log.Fatalf("Error reading last known coordinates for %+v: %+v", instance.Key, err)
+			}
+			binlogEvent, err := inst.GetLastExecutedEntryInRelayLogs(instance, minCoordinates, instance.RelaylogCoordinates)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(fmt.Sprintf("%+v:%d", *binlogEvent, binlogEvent.NextEventPos))
+		}
+	case registerCliCommand("correlate-relaylog-pos", "Binary logs", `Given an instance (-i) and relaylog coordinates (--binlog=file:pos), find the correlated coordinates in another instance's relay logs (-d)`):
+		{
+			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance, err := inst.ReadTopologyInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce target instance:", destination)
+			}
+			otherInstance, err := inst.ReadTopologyInstance(destinationKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if otherInstance == nil {
+				log.Fatalf("Instance not found: %+v", *destinationKey)
+			}
+
+			var relaylogCoordinates *inst.BinlogCoordinates
+			if *config.RuntimeCLIFlags.BinlogFile != "" {
+				if relaylogCoordinates, err = inst.ParseBinlogCoordinates(*config.RuntimeCLIFlags.BinlogFile); err != nil {
+					log.Fatalf("Expecing --binlog argument as file:pos")
+				}
+			}
+			instanceCoordinates, correlatedCoordinates, nextCoordinates, _, err := inst.CorrelateRelaylogCoordinates(instance, relaylogCoordinates, otherInstance)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(fmt.Sprintf("%+v;%+v;%+v", *instanceCoordinates, *correlatedCoordinates, *nextCoordinates))
+		}
 	case registerCliCommand("find-binlog-entry", "Binary logs", `Get binlog file:pos of entry given by --pattern (exact full match, not a regular expression) in a given instance`):
 		{
 			if pattern == "" {
@@ -940,8 +1101,17 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			clusters, err := inst.ReadClusters()
 			if err != nil {
 				log.Fatale(err)
-			} else {
-				fmt.Println(strings.Join(clusters, "\n"))
+			}
+			fmt.Println(strings.Join(clusters, "\n"))
+		}
+	case registerCliCommand("clusters-alias", "Information", `List all clusters known to orchestrator`):
+		{
+			clusters, err := inst.ReadClustersInfo("")
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, cluster := range clusters {
+				fmt.Println(fmt.Sprintf("%s\t%s", cluster.ClusterName, cluster.ClusterAlias))
 			}
 		}
 	case registerCliCommand("all-clusters-masters", "Information", `List of writeable masters, one per cluster`):
@@ -1156,7 +1326,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("end-maintenance", "Instance management", `Remove maintenance lock from an instance`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			err := inst.EndMaintenanceByInstanceKey(instanceKey)
+			_, err := inst.EndMaintenanceByInstanceKey(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1189,7 +1359,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("end-downtime", "Instance management", `Indicate an instance is no longer downtimed`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			err := inst.EndDowntime(instanceKey)
+			_, err := inst.EndDowntime(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1272,6 +1442,29 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			fmt.Println(fmt.Sprintf("%d recoveries acknowldged", countRecoveries))
+		}
+	case registerCliCommand("get-best-master-replacement", "Recovery", `Information command suggesting the best would-be replacement to master of given cluster`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			masters, err := inst.ReadClusterWriteableMaster(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if len(masters) == 0 {
+				log.Fatalf("No writeable masters found for cluster %+v", clusterName)
+			}
+			clusterMaster := masters[0]
+
+			replicas, err := inst.ReadReplicaInstances(&clusterMaster.Key)
+			if err != nil {
+				log.Fatale(err)
+			}
+
+			replacement, err := logic.GetBestMasterReplacementFromAmongItsReplicas(clusterMaster, replicas, false)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(replacement.Key.DisplayString())
 		}
 	// Instance meta
 	case registerCliCommand("register-candidate", "Instance, meta", `Indicate that a specific instance is a preferred candidate for master promotion`):

@@ -25,8 +25,10 @@ import (
 	"syscall"
 
 	"github.com/github/orchestrator/go/config"
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 )
+
+var EmptyEnv = []string{}
 
 // CommandRun executes some text as a command. This is assumed to be
 // text that will be run by a shell so we need to write out the
