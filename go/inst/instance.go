@@ -176,22 +176,22 @@ func (this *Instance) IsSmallerMajorVersionByString(otherVersion string) bool {
 	return IsSmallerMajorVersion(this.Version, otherVersion)
 }
 
-// IsMariaDB checkes whether this is any version of MariaDB
+// IsMariaDB checks whether this is any version of MariaDB
 func (this *Instance) IsMariaDB() bool {
 	return strings.Contains(this.Version, "MariaDB")
 }
 
-// IsPercona checkes whether this is any version of Percona Server
+// IsPercona checks whether this is any version of Percona Server
 func (this *Instance) IsPercona() bool {
 	return strings.Contains(this.VersionComment, "Percona")
 }
 
-// isMaxScale checkes whether this is any version of MaxScale
+// isMaxScale checks whether this is any version of MaxScale
 func (this *Instance) isMaxScale() bool {
 	return strings.Contains(this.Version, "maxscale")
 }
 
-// IsMaxScale checkes whether this is any type of a binlog server (currently only maxscale)
+// IsBinlogServer checks whether this is any type of a binlog server (currently only maxscale)
 func (this *Instance) IsBinlogServer() bool {
 	if this.isMaxScale() {
 		return true
@@ -199,7 +199,7 @@ func (this *Instance) IsBinlogServer() bool {
 	return false
 }
 
-// IsOracleMySQL checkes whether this is an Oracle MySQL distribution
+// IsOracleMySQL checks whether this is an Oracle MySQL distribution
 func (this *Instance) IsOracleMySQL() bool {
 	if this.IsMariaDB() {
 		return false
