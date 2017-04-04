@@ -31,12 +31,20 @@ import (
 var analysisChangeWriteAttemptCounter = metrics.NewCounter()
 var analysisChangeWriteCounter = metrics.NewCounter()
 
+var recentInstantAnalysis *cache.Cache
+
 func init() {
 	metrics.Register("analysis.change.write.attempt", analysisChangeWriteAttemptCounter)
 	metrics.Register("analysis.change.write", analysisChangeWriteCounter)
+
+	go initializeAnalysisDaoPostConfiguration()
 }
 
-var recentInstantAnalysis = cache.New(time.Duration(config.Config.RecoveryPollSeconds*2)*time.Second, time.Second)
+func initializeAnalysisDaoPostConfiguration() {
+	<-config.ConfigurationLoaded
+
+	recentInstantAnalysis = cache.New(time.Duration(config.Config.RecoveryPollSeconds*2)*time.Second, time.Second)
+}
 
 // GetReplicationAnalysis will check for replication problems (dead master; unreachable master; etc)
 func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnalysis bool) ([]ReplicationAnalysis, error) {
