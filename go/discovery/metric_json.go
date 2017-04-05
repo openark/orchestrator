@@ -30,7 +30,7 @@ import (
 type formattedFloat float64
 
 func (m formattedFloat) String() string {
-	return fmt.Sprintf(".3f", m)
+	return fmt.Sprintf("%.3f", m)
 }
 
 // MetricJSON holds a structure which represents some discovery latency information
