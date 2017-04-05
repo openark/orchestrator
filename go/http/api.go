@@ -2238,6 +2238,19 @@ func (this *HttpAPI) AuditFailureDetection(params martini.Params, r render.Rende
 	r.JSON(200, audits)
 }
 
+// AuditRecoverySteps returns audited steps of a given recovery
+func (this *HttpAPI) AuditRecoverySteps(params martini.Params, r render.Render, req *http.Request) {
+	recoveryUID := params["uid"]
+	audits, err := logic.ReadTopologyRecoverySteps(recoveryUID)
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, audits)
+}
+
 // ReadReplicationAnalysisChangelog lists instances and their analysis changelog
 func (this *HttpAPI) ReadReplicationAnalysisChangelog(params martini.Params, r render.Render, req *http.Request) {
 	changelogs, err := inst.ReadReplicationAnalysisChangelog()
@@ -2255,7 +2268,9 @@ func (this *HttpAPI) AuditRecovery(params martini.Params, r render.Render, req *
 	var audits []logic.TopologyRecovery
 	var err error
 
-	if recoveryId, derr := strconv.ParseInt(params["id"], 10, 0); derr == nil && recoveryId > 0 {
+	if recoveryUID := params["uid"]; recoveryUID != "" {
+		audits, err = logic.ReadRecoveryByUID(recoveryUID)
+	} else if recoveryId, derr := strconv.ParseInt(params["id"], 10, 0); derr == nil && recoveryId > 0 {
 		audits, err = logic.ReadRecovery(recoveryId)
 	} else {
 		page, derr := strconv.Atoi(params["page"])
@@ -2559,8 +2574,10 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "audit-recovery", this.AuditRecovery)
 	this.registerRequest(m, "audit-recovery/:page", this.AuditRecovery)
 	this.registerRequest(m, "audit-recovery/id/:id", this.AuditRecovery)
+	this.registerRequest(m, "audit-recovery/uid/:uid", this.AuditRecovery)
 	this.registerRequest(m, "audit-recovery/cluster/:clusterName", this.AuditRecovery)
 	this.registerRequest(m, "audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
+	this.registerRequest(m, "audit-recovery-steps/:uid", this.AuditRecoverySteps)
 	this.registerRequest(m, "active-cluster-recovery/:clusterName", this.ActiveClusterRecovery)
 	this.registerRequest(m, "recently-active-cluster-recovery/:clusterName", this.RecentlyActiveClusterRecovery)
 	this.registerRequest(m, "recently-active-instance-recovery/:host/:port", this.RecentlyActiveInstanceRecovery)
