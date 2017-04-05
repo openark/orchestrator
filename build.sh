@@ -31,10 +31,9 @@ usage() {
 }
 
 function precheck() {
-  local target build_only
+  local target="$1"
+  local build_only="$2"
   local ok=0 # return err. so shell exit code
-  target="$1"
-  build_only="$2"
 
   if [[ "$target" == "linux" ]]; then
     if [[ $build_only -eq 0 ]] && [[ ! -x "$( which fpm )" ]]; then
@@ -152,11 +151,11 @@ function build() {
 }
 
 function main() {
-  local target arch builddir prefix build_only
-  target="$1"
-  arch="$2"
-  prefix="$3"
-  build_only=$4
+  local target="$1"
+  local arch="$2"
+  local prefix="$3"
+  local build_only=$4
+  local builddir
 
   if [ -z "${RELEASE_VERSION}" ] ; then
     RELEASE_VERSION=$(cat $mydir/RELEASE_VERSION)
@@ -214,8 +213,17 @@ while getopts a:t:p:s:v:dbhr flag; do
 done
 
 shift $(( OPTIND - 1 ));
-target=${target:-"linux"} # default for target is linux
-arch=${arch:-"amd64"} # default for arch is amd64
+
+if [ -z "$target" ]; then
+	uname=$(uname)
+	case $uname in
+	Linux)	target=linux;;
+	Darwin)	target=darwin;;
+	*)	echo "Unexpected OS from uname: $uname. Exiting"
+		exit 1
+	esac
+fi
+arch=${arch:-"amd64"} # default for arch is amd64 but should take from environment
 prefix=${prefix:-"/usr/local"}
 
 [[ $debug -eq 1 ]] && set -x
