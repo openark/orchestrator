@@ -493,6 +493,7 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 			return nil
 		}()
 	}
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: %d postponed functions", topologyRecovery.PostponedFunctionsContainer.Len()))
 
 	if promotedReplica == nil {
 		message := "Failure: no replica promoted."
