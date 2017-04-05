@@ -50,7 +50,7 @@ func compilePseudoGTIDPattern() (pseudoGTIDRegexp *regexp.Regexp, err error) {
 	if config.Config.PseudoGTIDPatternIsFixedSubstring {
 		return nil, nil
 	}
-	log.Debugf("Compiling PseudoGTIDPattern")
+	log.Debugf("Compiling PseudoGTIDPattern: %q", config.Config.PseudoGTIDPattern)
 	return regexp.Compile(config.Config.PseudoGTIDPattern)
 }
 
