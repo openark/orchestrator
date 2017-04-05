@@ -22,7 +22,7 @@ import (
 	"github.com/openark/golib/log"
 )
 
-// AggregatedQueuedEntries contains aggregate information some part queue metrics
+// AggregatedQueueMetrics contains aggregate information some part queue metrics
 type AggregatedQueueMetrics struct {
 	ActiveMinEntries    float64
 	ActiveMeanEntries   float64
