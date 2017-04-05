@@ -774,6 +774,15 @@ var generateSQLBase = []string{
 			PRIMARY KEY (cluster_name)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS topology_recovery_steps (
+			recovery_step_id bigint unsigned not null auto_increment,
+			recovery_uid varchar(128) CHARACTER SET ascii NOT NULL,
+			audit_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			message text CHARACTER SET utf8 NOT NULL,
+			PRIMARY KEY (recovery_step_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 // generateSQLPatches contains DDLs for patching schema to the latest version.
@@ -1205,6 +1214,16 @@ var generateSQLPatches = []string{
 		ALTER TABLE
 			database_instance
 			ADD COLUMN binlog_row_image varchar(16) CHARACTER SET ascii NOT NULL
+	`,
+	`
+		ALTER TABLE topology_recovery
+			ADD COLUMN uid varchar(128) CHARACTER SET ascii NOT NULL
+	`,
+	`
+		CREATE INDEX uid_idx_topology_recovery ON topology_recovery(uid)
+	`,
+	`
+		CREATE INDEX recovery_uid_idx_topology_recovery_steps ON topology_recovery_steps(recovery_uid)
 	`,
 }
 
