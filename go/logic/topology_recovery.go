@@ -234,10 +234,12 @@ func applyEnvironmentVariables(topologyRecovery *TopologyRecovery) []string {
 // executeProcesses executes a list of processes
 func executeProcesses(processes []string, description string, topologyRecovery *TopologyRecovery, failOnError bool) error {
 	var err error
-	for _, command := range processes {
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("running %d %s hooks", len(processes), description))
+	for i, command := range processes {
 		command := replaceCommandPlaceholders(command, topologyRecovery)
 		env := applyEnvironmentVariables(topologyRecovery)
 
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("running %s hook #%d", description, i))
 		if cmdErr := os.CommandRun(command, env); cmdErr == nil {
 			log.Infof("Executed %s command: %s", description, command)
 		} else {
@@ -251,6 +253,7 @@ func executeProcesses(processes []string, description string, topologyRecovery *
 			}
 		}
 	}
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("done running %s hooks", description))
 	return err
 }
 
@@ -625,6 +628,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 
 		// Success!
 		recoverDeadMasterSuccessCounter.Inc(1)
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: successfully promoted %+v", promotedReplica.Key))
 
 		if config.Config.ApplyMySQLPromotionAfterMasterFailover {
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: will apply MySQL changes to promoted master"))
