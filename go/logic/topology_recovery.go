@@ -1290,7 +1290,9 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 			executeProcesses(config.Config.PostFailoverProcesses, "PostFailoverProcesses", topologyRecovery, false)
 		}
 	}
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Invoking %d postponed functions", topologyRecovery.PostponedFunctionsContainer.Len()))
 	topologyRecovery.InvokePostponed()
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Invoked %d postponed functions", topologyRecovery.PostponedFunctionsContainer.Len()))
 	return recoveryAttempted, topologyRecovery, err
 }
 
