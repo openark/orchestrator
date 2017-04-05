@@ -42,7 +42,13 @@ import (
 	"github.com/github/orchestrator/go/metrics/query"
 )
 
-const backendDBConcurrency = 20
+const (
+	backendDBConcurrency   = 20
+	error1045AccessDenied  = "Error 1045: Access denied for user"
+	errorConnectionRefused = "getsockopt: connection refused"
+	errorNoSuchHost        = "no such host"
+	errorIOTimeout         = "i/o timeout"
+)
 
 var instanceReadChan = make(chan bool, backendDBConcurrency)
 var instanceWriteChan = make(chan bool, backendDBConcurrency)
@@ -59,18 +65,23 @@ func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
 var instanceKeyInformativeClusterName *cache.Cache
 
+var accessDeniedCounter = metrics.NewCounter()
 var readTopologyInstanceCounter = metrics.NewCounter()
 var readInstanceCounter = metrics.NewCounter()
 var writeInstanceCounter = metrics.NewCounter()
 var backendWrites = collection.CreateOrReturnCollection("BACKEND_WRITES")
 
 func init() {
+	metrics.Register("instance.access_denied", accessDeniedCounter)
 	metrics.Register("instance.read_topology", readTopologyInstanceCounter)
 	metrics.Register("instance.read", readInstanceCounter)
 	metrics.Register("instance.write", writeInstanceCounter)
+
+	go initializeInstanceDao()
 }
 
-func InitializeInstanceDao() {
+func initializeInstanceDao() {
+	<-config.ConfigurationLoaded
 	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
 	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
 
@@ -118,12 +129,22 @@ func ExecDBWriteFunc(f func() error) error {
 }
 
 // logReadTopologyInstanceError logs an error, if applicable, for a ReadTopologyInstance operation,
-// providing context and hint as for the source of the error.
+// providing context and hint as for the source of the error. If there's no hint just provide the
+// original error.
 func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err error) error {
 	if err == nil {
 		return nil
 	}
-	return log.Errorf("ReadTopologyInstance(%+v) %+v: %+v", *instanceKey, hint, err)
+	var msg string
+	if hint == "" {
+		msg = fmt.Sprintf("ReadTopologyInstance(%+v): %+v", *instanceKey, err)
+	} else {
+		msg = fmt.Sprintf("ReadTopologyInstance(%+v) %+v: %+v",
+			*instanceKey,
+			strings.Replace(hint, "%", "%%", -1), // escape %
+			err)
+	}
+	return log.Errorf(msg)
 }
 
 // ReadTopologyInstance collects information on the state of a MySQL
@@ -136,9 +157,10 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 // Is this an error which means that we shouldn't try going more queries for this discovery attempt?
 func unrecoverableError(err error) bool {
 	contains := []string{
-		"getsockopt: connection refused",
-		"i/o timeout",
-		"no such host",
+		error1045AccessDenied,
+		errorConnectionRefused,
+		errorIOTimeout,
+		errorNoSuchHost,
 	}
 	for _, k := range contains {
 		if strings.Contains(err.Error(), k) {
@@ -186,8 +208,11 @@ func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStop
 	// Detect failed connection attempts and don't report the command
 	// we are executing as that might be confusing.
 	if err != nil {
-		if strings.Contains(err.Error(), "getsockopt: connection refused") || strings.Contains(err.Error(), "no such host") {
-			logReadTopologyInstanceError(&instance.Key, "checkMaxScale", err)
+		if strings.Contains(err.Error(), error1045AccessDenied) {
+			accessDeniedCounter.Inc(1)
+		}
+		if unrecoverableError(err) {
+			logReadTopologyInstanceError(&instance.Key, "", err)
 		} else {
 			logReadTopologyInstanceError(&instance.Key, "show variables like 'maxscale%'", err)
 		}
