@@ -599,3 +599,10 @@ func SetDatabaselessMode__experimental() {
 
 	config.DatabaselessMode__experimental = true
 }
+
+func SetStatusOUVerify(value bool) {
+	lock.Lock()
+	defer lock.Unlock()
+
+	config.StatusOUVerify = value
+}
