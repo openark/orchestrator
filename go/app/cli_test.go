@@ -8,7 +8,7 @@ import (
 )
 
 func init() {
-	config.Config.HostnameResolveMethod = "none"
+	config.Config().HostnameResolveMethod = "none"
 	config.MarkConfigurationLoaded()
 	log.SetLevel(log.ERROR)
 }

@@ -69,42 +69,42 @@ func (this *HttpWeb) Index(params martini.Params, r render.Render, req *http.Req
 
 func (this *HttpWeb) Clusters(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/clusters", map[string]interface{}{
-		"agentsHttpActive":              config.Config.ServeAgentsHttp,
+		"agentsHttpActive":              config.Config().ServeAgentsHttp,
 		"title":                         "clusters",
 		"activePage":                    "cluster",
 		"autoshow_problems":             false,
 		"authorizedForAction":           isAuthorizedForAction(req, user),
 		"userId":                        getUserId(req, user),
-		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
+		"removeTextFromHostnameDisplay": config.Config().RemoveTextFromHostnameDisplay,
 		"prefix":                        this.URLPrefix,
 	})
 }
 
 func (this *HttpWeb) ClustersAnalysis(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/clusters_analysis", map[string]interface{}{
-		"agentsHttpActive":              config.Config.ServeAgentsHttp,
+		"agentsHttpActive":              config.Config().ServeAgentsHttp,
 		"title":                         "clusters",
 		"activePage":                    "cluster",
 		"autoshow_problems":             false,
 		"authorizedForAction":           isAuthorizedForAction(req, user),
 		"userId":                        getUserId(req, user),
-		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
+		"removeTextFromHostnameDisplay": config.Config().RemoveTextFromHostnameDisplay,
 		"prefix":                        this.URLPrefix,
 	})
 }
 
 func (this *HttpWeb) Cluster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/cluster", map[string]interface{}{
-		"agentsHttpActive":              config.Config.ServeAgentsHttp,
+		"agentsHttpActive":              config.Config().ServeAgentsHttp,
 		"title":                         "cluster",
 		"activePage":                    "cluster",
 		"clusterName":                   params["clusterName"],
 		"autoshow_problems":             true,
 		"contextMenuVisible":            true,
-		"pseudoGTIDModeEnabled":         (config.Config.PseudoGTIDPattern != ""),
+		"pseudoGTIDModeEnabled":         (config.Config().PseudoGTIDPattern != ""),
 		"authorizedForAction":           isAuthorizedForAction(req, user),
 		"userId":                        getUserId(req, user),
-		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
+		"removeTextFromHostnameDisplay": config.Config().RemoveTextFromHostnameDisplay,
 		"compactDisplay":                req.URL.Query().Get("compact"),
 		"prefix":                        this.URLPrefix,
 	})
@@ -146,16 +146,16 @@ func (this *HttpWeb) ClusterByInstance(params martini.Params, r render.Render, r
 
 func (this *HttpWeb) ClusterPools(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/cluster_pools", map[string]interface{}{
-		"agentsHttpActive":              config.Config.ServeAgentsHttp,
+		"agentsHttpActive":              config.Config().ServeAgentsHttp,
 		"title":                         "cluster pools",
 		"activePage":                    "cluster_pools",
 		"clusterName":                   params["clusterName"],
 		"autoshow_problems":             false, // because pool screen by default expands all hosts
 		"contextMenuVisible":            true,
-		"pseudoGTIDModeEnabled":         (config.Config.PseudoGTIDPattern != ""),
+		"pseudoGTIDModeEnabled":         (config.Config().PseudoGTIDPattern != ""),
 		"authorizedForAction":           isAuthorizedForAction(req, user),
 		"userId":                        getUserId(req, user),
-		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
+		"removeTextFromHostnameDisplay": config.Config().RemoveTextFromHostnameDisplay,
 		"compactDisplay":                req.URL.Query().Get("compact"),
 		"prefix":                        this.URLPrefix,
 	})
@@ -167,7 +167,7 @@ func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Re
 		searchString = req.URL.Query().Get("s")
 	}
 	r.HTML(200, "templates/search", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"agentsHttpActive":    config.Config().ServeAgentsHttp,
 		"title":               "search",
 		"activePage":          "search",
 		"searchString":        searchString,
@@ -181,7 +181,7 @@ func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Re
 func (this *HttpWeb) Discover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 
 	r.HTML(200, "templates/discover", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"agentsHttpActive":    config.Config().ServeAgentsHttp,
 		"title":               "discover",
 		"activePage":          "discover",
 		"authorizedForAction": isAuthorizedForAction(req, user),
@@ -198,7 +198,7 @@ func (this *HttpWeb) LongQueries(params martini.Params, r render.Render, req *ht
 	}
 
 	r.HTML(200, "templates/long_queries", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"agentsHttpActive":    config.Config().ServeAgentsHttp,
 		"title":               "long queries",
 		"activePage":          "queries",
 		"authorizedForAction": isAuthorizedForAction(req, user),
@@ -216,7 +216,7 @@ func (this *HttpWeb) Audit(params martini.Params, r render.Render, req *http.Req
 	}
 
 	r.HTML(200, "templates/audit", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"agentsHttpActive":    config.Config().ServeAgentsHttp,
 		"title":               "audit",
 		"activePage":          "audit",
 		"authorizedForAction": isAuthorizedForAction(req, user),
@@ -240,7 +240,7 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 	}
 
 	r.HTML(200, "templates/audit_recovery", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"agentsHttpActive":    config.Config().ServeAgentsHttp,
 		"title":               "audit-recovery",
 		"activePage":          "audit",
 		"authorizedForAction": isAuthorizedForAction(req, user),
@@ -264,7 +264,7 @@ func (this *HttpWeb) AuditFailureDetection(params martini.Params, r render.Rende
 	}
 
 	r.HTML(200, "templates/audit_failure_detection", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"agentsHttpActive":    config.Config().ServeAgentsHttp,
 		"title":               "audit-failure-detection",
 		"activePage":          "audit",
 		"authorizedForAction": isAuthorizedForAction(req, user),
@@ -280,7 +280,7 @@ func (this *HttpWeb) AuditRecoverySteps(params martini.Params, r render.Render, 
 	recoveryUID := params["uid"]
 
 	r.HTML(200, "templates/audit_recovery_steps", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"agentsHttpActive":    config.Config().ServeAgentsHttp,
 		"title":               "audit-recovery-steps",
 		"activePage":          "audit",
 		"authorizedForAction": isAuthorizedForAction(req, user),
@@ -293,7 +293,7 @@ func (this *HttpWeb) AuditRecoverySteps(params martini.Params, r render.Render, 
 
 func (this *HttpWeb) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/agents", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"agentsHttpActive":    config.Config().ServeAgentsHttp,
 		"title":               "agents",
 		"activePage":          "agents",
 		"authorizedForAction": isAuthorizedForAction(req, user),
@@ -305,7 +305,7 @@ func (this *HttpWeb) Agents(params martini.Params, r render.Render, req *http.Re
 
 func (this *HttpWeb) Agent(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/agent", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"agentsHttpActive":    config.Config().ServeAgentsHttp,
 		"title":               "agent",
 		"activePage":          "agents",
 		"authorizedForAction": isAuthorizedForAction(req, user),
@@ -318,7 +318,7 @@ func (this *HttpWeb) Agent(params martini.Params, r render.Render, req *http.Req
 
 func (this *HttpWeb) AgentSeedDetails(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/agent_seed_details", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"agentsHttpActive":    config.Config().ServeAgentsHttp,
 		"title":               "agent seed details",
 		"activePage":          "agents",
 		"authorizedForAction": isAuthorizedForAction(req, user),
@@ -331,7 +331,7 @@ func (this *HttpWeb) AgentSeedDetails(params martini.Params, r render.Render, re
 
 func (this *HttpWeb) Seeds(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	r.HTML(200, "templates/seeds", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"agentsHttpActive":    config.Config().ServeAgentsHttp,
 		"title":               "seeds",
 		"activePage":          "agents",
 		"authorizedForAction": isAuthorizedForAction(req, user),
@@ -344,7 +344,7 @@ func (this *HttpWeb) Seeds(params martini.Params, r render.Render, req *http.Req
 func (this *HttpWeb) Home(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 
 	r.HTML(200, "templates/home", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"agentsHttpActive":    config.Config().ServeAgentsHttp,
 		"title":               "home",
 		"activePage":          "home",
 		"authorizedForAction": isAuthorizedForAction(req, user),
@@ -357,7 +357,7 @@ func (this *HttpWeb) Home(params martini.Params, r render.Render, req *http.Requ
 func (this *HttpWeb) About(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 
 	r.HTML(200, "templates/about", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"agentsHttpActive":    config.Config().ServeAgentsHttp,
 		"title":               "about",
 		"activePage":          "home",
 		"authorizedForAction": isAuthorizedForAction(req, user),
@@ -370,7 +370,7 @@ func (this *HttpWeb) About(params martini.Params, r render.Render, req *http.Req
 func (this *HttpWeb) KeepCalm(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 
 	r.HTML(200, "templates/keep-calm", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"agentsHttpActive":    config.Config().ServeAgentsHttp,
 		"title":               "Keep Calm",
 		"activePage":          "home",
 		"authorizedForAction": isAuthorizedForAction(req, user),
@@ -383,7 +383,7 @@ func (this *HttpWeb) KeepCalm(params martini.Params, r render.Render, req *http.
 func (this *HttpWeb) FAQ(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 
 	r.HTML(200, "templates/faq", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"agentsHttpActive":    config.Config().ServeAgentsHttp,
 		"title":               "FAQ",
 		"activePage":          "home",
 		"authorizedForAction": isAuthorizedForAction(req, user),
@@ -396,7 +396,7 @@ func (this *HttpWeb) FAQ(params martini.Params, r render.Render, req *http.Reque
 func (this *HttpWeb) Status(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 
 	r.HTML(200, "templates/status", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
+		"agentsHttpActive":    config.Config().ServeAgentsHttp,
 		"title":               "status",
 		"activePage":          "home",
 		"authorizedForAction": isAuthorizedForAction(req, user),

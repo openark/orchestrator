@@ -82,12 +82,12 @@ func init() {
 
 func initializeInstanceDao() {
 	<-config.ConfigurationLoaded
-	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
-	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
+	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config().InstanceWriteBufferSize)
+	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config().InstancePollSeconds/2)*time.Second, time.Second)
 
 	// spin off instance write buffer flushing
 	go func() {
-		flushTick := time.Tick(time.Duration(config.Config.InstanceFlushIntervalMilliseconds) * time.Millisecond)
+		flushTick := time.Tick(time.Duration(config.Config().InstanceFlushIntervalMilliseconds) * time.Millisecond)
 		for {
 			// it is time to flush
 			select {
@@ -173,7 +173,7 @@ func unrecoverableError(err error) bool {
 // Check if the instance is a MaxScale binlog server (a proxy not a real
 // MySQL server) and also update the resolved hostname
 func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStopwatch) (isMaxScale bool, resolvedHostname string, err error) {
-	if config.Config.SkipMaxScaleCheck {
+	if config.Config().SkipMaxScaleCheck {
 		return isMaxScale, resolvedHostname, err
 	}
 
@@ -308,7 +308,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		if err != nil {
 			goto Cleanup
 		}
-		switch strings.ToLower(config.Config.MySQLHostnameResolveMethod) {
+		switch strings.ToLower(config.Config().MySQLHostnameResolveMethod) {
 		case "none":
 			resolvedHostname = instance.Key.Hostname
 		case "default", "hostname", "@@hostname":
@@ -365,8 +365,8 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		err = fmt.Errorf("ReadTopologyInstance: empty hostname (%+v). Bailing out", *instanceKey)
 		goto Cleanup
 	}
-	if config.Config.DataCenterPattern != "" {
-		if pattern, err := regexp.Compile(config.Config.DataCenterPattern); err == nil {
+	if config.Config().DataCenterPattern != "" {
+		if pattern, err := regexp.Compile(config.Config().DataCenterPattern); err == nil {
 			match := pattern.FindStringSubmatch(instance.Key.Hostname)
 			if len(match) != 0 {
 				instance.DataCenter = match[1]
@@ -374,8 +374,8 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		}
 		// This can be overriden by later invocation of DetectDataCenterQuery
 	}
-	if config.Config.PhysicalEnvironmentPattern != "" {
-		if pattern, err := regexp.Compile(config.Config.PhysicalEnvironmentPattern); err == nil {
+	if config.Config().PhysicalEnvironmentPattern != "" {
+		if pattern, err := regexp.Compile(config.Config().PhysicalEnvironmentPattern); err == nil {
 			match := pattern.FindStringSubmatch(instance.Key.Hostname)
 			if len(match) != 0 {
 				instance.PhysicalEnvironment = match[1]
@@ -470,7 +470,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 
 	// Get replicas, either by SHOW SLAVE HOSTS or via PROCESSLIST
 	// MaxScale does not support PROCESSLIST, so SHOW SLAVE HOSTS is the only option
-	if config.Config.DiscoverByShowSlaveHosts || isMaxScale {
+	if config.Config().DiscoverByShowSlaveHosts || isMaxScale {
 		latency.Start("instance")
 		err := sqlutils.QueryRowsMap(db, `show slave hosts`,
 			func(m sqlutils.RowMap) error {
@@ -528,7 +528,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		logReadTopologyInstanceError(instanceKey, "processlist", err)
 	}
 
-	if config.Config.ReadLongRunningQueries && !isMaxScale {
+	if config.Config().ReadLongRunningQueries && !isMaxScale {
 		// Get long running processes
 		latency.Start("instance")
 		err := sqlutils.QueryRowsMap(db, `
@@ -576,9 +576,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	}
 
 	instance.UsingPseudoGTID = false
-	if config.Config.DetectPseudoGTIDQuery != "" && !isMaxScale {
+	if config.Config().DetectPseudoGTIDQuery != "" && !isMaxScale {
 		latency.Start("instance")
-		if resultData, err := sqlutils.QueryResultData(db, config.Config.DetectPseudoGTIDQuery); err == nil {
+		if resultData, err := sqlutils.QueryResultData(db, config.Config().DetectPseudoGTIDQuery); err == nil {
 			if len(resultData) > 0 {
 				if len(resultData[0]) > 0 {
 					if resultData[0][0].Valid && resultData[0][0].String == "1" {
@@ -592,9 +592,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		latency.Stop("instance")
 	}
 
-	if config.Config.SlaveLagQuery != "" && !isMaxScale {
+	if config.Config().SlaveLagQuery != "" && !isMaxScale {
 		latency.Start("instance")
-		if err := db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SlaveLagSeconds); err == nil {
+		if err := db.QueryRow(config.Config().SlaveLagQuery).Scan(&instance.SlaveLagSeconds); err == nil {
 			if instance.SlaveLagSeconds.Valid && instance.SlaveLagSeconds.Int64 < 0 {
 				log.Warningf("Host: %+v, instance.SlaveLagSeconds < 0 [%+v], correcting to 0", instanceKey, instance.SlaveLagSeconds.Int64)
 				instance.SlaveLagSeconds.Int64 = 0
@@ -606,30 +606,30 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		latency.Stop("instance")
 	}
 
-	if config.Config.DetectDataCenterQuery != "" && !isMaxScale {
+	if config.Config().DetectDataCenterQuery != "" && !isMaxScale {
 		latency.Start("instance")
-		err := db.QueryRow(config.Config.DetectDataCenterQuery).Scan(&instance.DataCenter)
+		err := db.QueryRow(config.Config().DetectDataCenterQuery).Scan(&instance.DataCenter)
 		latency.Stop("instance")
 		logReadTopologyInstanceError(instanceKey, "DetectDataCenterQuery", err)
 	}
 
-	if config.Config.DetectPhysicalEnvironmentQuery != "" && !isMaxScale {
+	if config.Config().DetectPhysicalEnvironmentQuery != "" && !isMaxScale {
 		latency.Start("instance")
-		err := db.QueryRow(config.Config.DetectPhysicalEnvironmentQuery).Scan(&instance.PhysicalEnvironment)
+		err := db.QueryRow(config.Config().DetectPhysicalEnvironmentQuery).Scan(&instance.PhysicalEnvironment)
 		latency.Stop("instance")
 		logReadTopologyInstanceError(instanceKey, "DetectPhysicalEnvironmentQuery", err)
 	}
 
-	if config.Config.DetectInstanceAliasQuery != "" && !isMaxScale {
+	if config.Config().DetectInstanceAliasQuery != "" && !isMaxScale {
 		latency.Start("instance")
-		err := db.QueryRow(config.Config.DetectInstanceAliasQuery).Scan(&instance.InstanceAlias)
+		err := db.QueryRow(config.Config().DetectInstanceAliasQuery).Scan(&instance.InstanceAlias)
 		latency.Stop("instance")
 		logReadTopologyInstanceError(instanceKey, "DetectInstanceAliasQuery", err)
 	}
 
-	if config.Config.DetectSemiSyncEnforcedQuery != "" && !isMaxScale {
+	if config.Config().DetectSemiSyncEnforcedQuery != "" && !isMaxScale {
 		latency.Start("instance")
-		err := db.QueryRow(config.Config.DetectSemiSyncEnforcedQuery).Scan(&instance.SemiSyncEnforced)
+		err := db.QueryRow(config.Config().DetectSemiSyncEnforcedQuery).Scan(&instance.SemiSyncEnforced)
 		latency.Stop("instance")
 		logReadTopologyInstanceError(instanceKey, "DetectSemiSyncEnforcedQuery", err)
 	}
@@ -651,10 +651,10 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	// Then check if the instance wants to set a different PromotionRule.
 	// We'll set it here on their behalf so there's no race between the first
 	// time an instance is discovered, and setting a rule like "must_not".
-	if config.Config.DetectPromotionRuleQuery != "" && !isMaxScale {
+	if config.Config().DetectPromotionRuleQuery != "" && !isMaxScale {
 		var value string
 		latency.Start("instance")
-		err := db.QueryRow(config.Config.DetectPromotionRuleQuery).Scan(&value)
+		err := db.QueryRow(config.Config().DetectPromotionRuleQuery).Scan(&value)
 		logReadTopologyInstanceError(instanceKey, "DetectPromotionRuleQuery", err)
 		promotionRule, err := ParseCandidatePromotionRule(value)
 		logReadTopologyInstanceError(instanceKey, "ParseCandidatePromotionRule", err)
@@ -670,11 +670,11 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	}
 
 	ReadClusterAliasOverride(instance)
-	if instance.SuggestedClusterAlias == "" && instance.ReplicationDepth == 0 && config.Config.DetectClusterAliasQuery != "" && !isMaxScale {
+	if instance.SuggestedClusterAlias == "" && instance.ReplicationDepth == 0 && config.Config().DetectClusterAliasQuery != "" && !isMaxScale {
 		// Only need to do on masters
 		clusterAlias := ""
 		latency.Start("instance")
-		err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
+		err := db.QueryRow(config.Config().DetectClusterAliasQuery).Scan(&clusterAlias)
 		latency.Stop("instance")
 		if err != nil {
 			clusterAlias = ""
@@ -682,11 +682,11 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		}
 		instance.SuggestedClusterAlias = clusterAlias
 	}
-	if instance.ReplicationDepth == 0 && config.Config.DetectClusterDomainQuery != "" && !isMaxScale {
+	if instance.ReplicationDepth == 0 && config.Config().DetectClusterDomainQuery != "" && !isMaxScale {
 		// Only need to do on masters
 		domainName := ""
 		latency.Start("instance")
-		if err := db.QueryRow(config.Config.DetectClusterDomainQuery).Scan(&domainName); err != nil {
+		if err := db.QueryRow(config.Config().DetectClusterDomainQuery).Scan(&domainName); err != nil {
 			domainName = ""
 			logReadTopologyInstanceError(instanceKey, "DetectClusterDomainQuery", err)
 		}
@@ -754,7 +754,7 @@ func ReadClusterAliasOverride(instance *Instance) (err error) {
 // It is a non-recursive function and so-called-recursion is performed upon periodic reading of
 // instances.
 func ReadInstanceClusterAttributes(instance *Instance) (err error) {
-	if config.Config.DatabaselessMode__experimental {
+	if config.Config().DatabaselessMode__experimental {
 		return nil
 	}
 
@@ -861,7 +861,7 @@ func BulkReadInstance() ([](*InstanceKey), error) {
 }
 
 func ReadInstancePromotionRule(instance *Instance) (err error) {
-	if config.Config.DatabaselessMode__experimental {
+	if config.Config().DatabaselessMode__experimental {
 		return nil
 	}
 
@@ -935,8 +935,8 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.IsCoMaster = m.GetBool("is_co_master")
 	instance.ReplicationCredentialsAvailable = m.GetBool("replication_credentials_available")
 	instance.HasReplicationCredentials = m.GetBool("has_replication_credentials")
-	instance.IsUpToDate = (m.GetUint("seconds_since_last_checked") <= config.Config.InstancePollSeconds)
-	instance.IsRecentlyChecked = (m.GetUint("seconds_since_last_checked") <= config.Config.InstancePollSeconds*5)
+	instance.IsUpToDate = (m.GetUint("seconds_since_last_checked") <= config.Config().InstancePollSeconds)
+	instance.IsRecentlyChecked = (m.GetUint("seconds_since_last_checked") <= config.Config().InstancePollSeconds*5)
 	instance.LastSeenTimestamp = m.GetString("last_seen")
 	instance.IsLastCheckValid = m.GetBool("is_last_check_valid")
 	instance.SecondsSinceLastSeen = m.GetNullInt64("seconds_since_last_seen")
@@ -1010,7 +1010,7 @@ func readInstancesByCondition(condition string, args []interface{}, sort string)
 
 // ReadInstance reads an instance from the orchestrator backend database
 func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
-	if config.Config.DatabaselessMode__experimental {
+	if config.Config().DatabaselessMode__experimental {
 		instance, err := ReadTopologyInstance(instanceKey)
 		return instance, (err == nil), err
 	}
@@ -1134,7 +1134,7 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 			)
 		`
 
-	args := sqlutils.Args(clusterName, clusterName, config.Config.InstancePollSeconds, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
+	args := sqlutils.Args(clusterName, clusterName, config.Config().InstancePollSeconds, config.Config().ReasonableReplicationLagSeconds, config.Config().ReasonableReplicationLagSeconds)
 	instances, err := readInstancesByCondition(condition, args, "")
 	if err != nil {
 		return instances, err
@@ -1145,7 +1145,7 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 		if instance.IsDowntimed {
 			skip = true
 		}
-		if RegexpMatchPatterns(instance.Key.Hostname, config.Config.ProblemIgnoreHostnameFilters) {
+		if RegexpMatchPatterns(instance.Key.Hostname, config.Config().ProblemIgnoreHostnameFilters) {
 			skip = true
 		}
 		if !skip {
@@ -1279,7 +1279,7 @@ func ReadClusterCandidateInstances(clusterName string) ([](*Instance), error) {
 func filterOSCInstances(instances [](*Instance)) [](*Instance) {
 	result := [](*Instance){}
 	for _, instance := range instances {
-		if RegexpMatchPatterns(instance.Key.Hostname, config.Config.OSCIgnoreHostnameFilters) {
+		if RegexpMatchPatterns(instance.Key.Hostname, config.Config().OSCIgnoreHostnameFilters) {
 			continue
 		}
 		if instance.IsBinlogServer() {
@@ -1694,7 +1694,7 @@ func ResolveUnknownMasterHostnameResolves() error {
 // ReadCountMySQLSnapshots is a utility method to return registered number of snapshots for a given list of hosts
 func ReadCountMySQLSnapshots(hostnames []string) (map[string]int, error) {
 	res := make(map[string]int)
-	if !config.Config.ServeAgentsHttp {
+	if !config.Config().ServeAgentsHttp {
 		return res, nil
 	}
 	query := fmt.Sprintf(`
@@ -1895,7 +1895,7 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 				else last_checked < now() - interval ? second
 			end
 			`
-	args := sqlutils.Args(config.Config.InstancePollSeconds, 2*config.Config.InstancePollSeconds)
+	args := sqlutils.Args(config.Config().InstancePollSeconds, 2*config.Config().InstancePollSeconds)
 
 	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
@@ -2132,7 +2132,7 @@ var instanceWriteBuffer chan instanceUpdateObject
 var forceFlushInstanceWriteBuffer = make(chan bool)
 
 func enqueueInstanceWrite(instance *Instance, instanceWasActuallyFound bool, lastError error) {
-	if len(instanceWriteBuffer) == config.Config.InstanceWriteBufferSize {
+	if len(instanceWriteBuffer) == config.Config().InstanceWriteBufferSize {
 		// Signal the "flushing" gorouting that there's work.
 		// We prefer doing all bulk flushes from one goroutine.
 		forceFlushInstanceWriteBuffer <- true
@@ -2266,7 +2266,7 @@ func ForgetLongUnseenInstances() error {
 				from database_instance
 			where
 				last_seen < NOW() - interval ? hour`,
-		config.Config.UnseenInstanceForgetHours,
+		config.Config().UnseenInstanceForgetHours,
 	)
 	if err != nil {
 		return log.Errore(err)
@@ -2367,7 +2367,7 @@ func ExpireCandidateInstances() error {
 		_, err := db.ExecOrchestrator(`
         	delete from candidate_database_instance
 				where last_suggested < NOW() - INTERVAL ? MINUTE
-				`, config.Config.CandidateInstanceExpireMinutes,
+				`, config.Config().CandidateInstanceExpireMinutes,
 		)
 		if err != nil {
 			return log.Errore(err)
@@ -2386,7 +2386,7 @@ func RecordInstanceCoordinatesHistory() error {
         	delete from database_instance_coordinates_history
 			where
 				recorded_timestamp < NOW() - INTERVAL ? MINUTE
-				`, (config.Config.PseudoGTIDCoordinatesHistoryHeuristicMinutes + 5),
+				`, (config.Config().PseudoGTIDCoordinatesHistoryHeuristicMinutes + 5),
 			)
 			return log.Errore(err)
 		}
@@ -2429,7 +2429,7 @@ func GetHeuristiclyRecentCoordinatesForInstance(instanceKey *InstanceKey) (selfC
 			recorded_timestamp desc
 			limit 1
 			`
-	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port, config.Config.PseudoGTIDCoordinatesHistoryHeuristicMinutes), func(m sqlutils.RowMap) error {
+	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port, config.Config().PseudoGTIDCoordinatesHistoryHeuristicMinutes), func(m sqlutils.RowMap) error {
 		selfCoordinates = &BinlogCoordinates{LogFile: m.GetString("binary_log_file"), LogPos: m.GetInt64("binary_log_pos")}
 		relayLogCoordinates = &BinlogCoordinates{LogFile: m.GetString("relay_log_file"), LogPos: m.GetInt64("relay_log_pos")}
 
@@ -2517,13 +2517,13 @@ func RecordInstanceBinlogFileHistory() error {
         	delete from database_instance_binlog_files_history
 			where
 				last_seen < NOW() - INTERVAL ? DAY
-				`, config.Config.BinlogFileHistoryDays,
+				`, config.Config().BinlogFileHistoryDays,
 			)
 			return log.Errore(err)
 		}
 		ExecDBWriteFunc(writeFunc)
 	}
-	if config.Config.BinlogFileHistoryDays == 0 {
+	if config.Config().BinlogFileHistoryDays == 0 {
 		return nil
 	}
 	writeFunc := func() error {

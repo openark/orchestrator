@@ -113,20 +113,20 @@ func main() {
 		config.Read("/etc/orchestrator.conf.json", "conf/orchestrator.conf.json", "orchestrator.conf.json")
 	}
 	if *config.RuntimeCLIFlags.Databaseless {
-		config.Config.DatabaselessMode__experimental = true
+		config.SetDatabaselessMode__experimental()
 	}
-	if config.Config.Debug {
+	if config.Config().Debug {
 		log.SetLevel(log.DEBUG)
 	}
 	if *quiet {
 		// Override!!
 		log.SetLevel(log.ERROR)
 	}
-	if config.Config.EnableSyslog {
+	if config.Config().EnableSyslog {
 		log.EnableSyslogWriter("orchestrator")
 		log.SetSyslogLevel(log.INFO)
 	}
-	if config.Config.AuditToSyslog {
+	if config.Config().AuditToSyslog {
 		inst.EnableAuditSyslog()
 	}
 	config.RuntimeCLIFlags.ConfiguredVersion = AppVersion

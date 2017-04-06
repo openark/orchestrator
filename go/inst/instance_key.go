@@ -50,7 +50,7 @@ func NewRawInstanceKey(hostPort string) (*InstanceKey, error) {
 // The port part is optional; there will be no name resolve
 func ParseRawInstanceKeyLoose(hostPort string) (*InstanceKey, error) {
 	if !strings.Contains(hostPort, ":") {
-		return &InstanceKey{Hostname: hostPort, Port: config.Config.DefaultInstancePort}, nil
+		return &InstanceKey{Hostname: hostPort, Port: config.Config().DefaultInstancePort}, nil
 	}
 	return NewRawInstanceKey(hostPort)
 }
@@ -88,7 +88,7 @@ func ParseInstanceKey(hostPort string) (*InstanceKey, error) {
 // The port part is optional
 func ParseInstanceKeyLoose(hostPort string) (*InstanceKey, error) {
 	if !strings.Contains(hostPort, ":") {
-		return &InstanceKey{Hostname: hostPort, Port: config.Config.DefaultInstancePort}, nil
+		return &InstanceKey{Hostname: hostPort, Port: config.Config().DefaultInstancePort}, nil
 	}
 	return ParseInstanceKey(hostPort)
 }

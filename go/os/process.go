@@ -76,7 +76,7 @@ func CommandRun(commandText string, env []string, arguments ...string) error {
 // file and returns the exec.Command which can be executed together
 // with the script name that was created.
 func generateShellScript(commandText string, env []string, arguments ...string) (*exec.Cmd, string, error) {
-	shell := config.Config.ProcessesShellCommand
+	shell := config.Config().ProcessesShellCommand
 
 	commandBytes := []byte(commandText)
 	tmpFile, err := ioutil.TempFile("", "orchestrator-process-cmd-")

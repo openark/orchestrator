@@ -51,12 +51,12 @@ func InitHttpClient() {
 		return
 	}
 
-	httpTimeout := time.Duration(time.Duration(config.Config.HttpTimeoutSeconds) * time.Second)
+	httpTimeout := time.Duration(time.Duration(config.Config().HttpTimeoutSeconds) * time.Second)
 	dialTimeout := func(network, addr string) (net.Conn, error) {
 		return net.DialTimeout(network, addr, httpTimeout)
 	}
 	httpTransport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config.AgentSSLSkipVerify},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config().AgentSSLSkipVerify},
 		Dial:            dialTimeout,
 		ResponseHeaderTimeout: httpTimeout,
 	}
@@ -120,7 +120,7 @@ func SubmitAgent(hostname string, port int, token string) (string, error) {
 	}
 
 	// Try to discover topology instances when an agent submits
-	if config.Config.AgentAutoDiscover {
+	if config.Config().AgentAutoDiscover {
 		DiscoverAgentInstance(hostname, port)
 	}
 
@@ -152,7 +152,7 @@ func ForgetLongUnseenAgents() error {
 				from host_agent
 			where
 				last_submitted < NOW() - interval ? hour`,
-		config.Config.UnseenAgentForgetHours,
+		config.Config().UnseenAgentForgetHours,
 	)
 	return err
 }
@@ -168,7 +168,7 @@ func ReadOutdatedAgentsHosts() ([]string, error) {
 		where
 			IFNULL(last_checked < now() - interval ? minute, true)
 			`
-	err := db.QueryOrchestrator(query, sqlutils.Args(config.Config.AgentPollMinutes), func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestrator(query, sqlutils.Args(config.Config().AgentPollMinutes), func(m sqlutils.RowMap) error {
 		hostname := m.GetString("hostname")
 		res = append(res, hostname)
 		return nil
@@ -293,7 +293,7 @@ func UpdateAgentInfo(hostname string, agent Agent) error {
 // baseAgentUri returns the base URI for accessing an agent
 func baseAgentUri(agentHostname string, agentPort int) string {
 	protocol := "http"
-	if config.Config.AgentsUseSSL {
+	if config.Config().AgentsUseSSL {
 		protocol = "https"
 	}
 	uri := fmt.Sprintf("%s://%s:%d/api", protocol, agentHostname, agentPort)
@@ -654,7 +654,7 @@ func FailStaleSeeds() error {
 								where
 									agent_seed.agent_seed_id = agent_seed_state.agent_seed_id
 						) < now() - interval ? minute`,
-		config.Config.StaleSeedFailMinutes,
+		config.Config().StaleSeedFailMinutes,
 	)
 	return err
 }

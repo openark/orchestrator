@@ -50,7 +50,7 @@ root@myorchestrator [orchestrator]> select * from candidate_database_instance;
 2 rows in set (0.00 sec)
 */
 func BulkReadCandidateDatabaseInstance() ([]CandidateDatabaseInstance, error) {
-	if config.Config.DatabaselessMode__experimental {
+	if config.Config().DatabaselessMode__experimental {
 		return nil, nil // no data to return if not using a database
 	}
 

@@ -75,7 +75,7 @@ func init() {
 
 // used in several places
 func instancePollSecondsDuration() time.Duration {
-	return time.Duration(config.Config.InstancePollSeconds) * time.Second
+	return time.Duration(config.Config().InstancePollSeconds) * time.Second
 }
 
 // acceptSignals registers for OS signals
@@ -91,7 +91,7 @@ func acceptSignals() {
 				log.Infof("Received SIGHUP. Reloading configuration")
 				inst.AuditOperation("reload-configuration", nil, "Triggered via SIGHUP")
 				config.Reload()
-				discoveryMetrics.SetExpirePeriod(time.Duration(config.Config.DiscoveryCollectionRetentionSeconds) * time.Second)
+				discoveryMetrics.SetExpirePeriod(time.Duration(config.Config().DiscoveryCollectionRetentionSeconds) * time.Second)
 			case syscall.SIGTERM:
 				log.Infof("Received SIGTERM. Shutting down orchestrator")
 				discoveryMetrics.StopAutoExpiration()
@@ -109,7 +109,7 @@ func handleDiscoveryRequests() {
 	discoveryQueue = discovery.CreateOrReturnQueue("DEFAULT")
 
 	// create a pool of discovery workers
-	for i := uint(0); i < config.Config.DiscoveryMaxConcurrency; i++ {
+	for i := uint(0); i < config.Config().DiscoveryMaxConcurrency; i++ {
 		go func() {
 			for {
 				instanceKey := discoveryQueue.Consume()
@@ -177,7 +177,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	discoveriesCounter.Inc(1)
 
 	// First we've ever heard of this instance. Continue investigation:
-	instance, err = inst.ReadTopologyInstanceBufferable(&instanceKey, config.Config.BufferInstanceWrites, latency)
+	instance, err = inst.ReadTopologyInstanceBufferable(&instanceKey, config.Config().BufferInstanceWrites, latency)
 	// panic can occur (IO stuff). Therefore it may happen
 	// that instance is nil. Check it, but first get the timing metrics.
 	totalLatency := latency.Elapsed("total")
@@ -230,7 +230,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		replicaKey := replicaKey // not needed? no concurrency here?
 
 		// Avoid noticing some hosts we would otherwise discover
-		if inst.RegexpMatchPatterns(replicaKey.Hostname, config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
+		if inst.RegexpMatchPatterns(replicaKey.Hostname, config.Config().DiscoveryIgnoreReplicaHostnameFilters) {
 			continue
 		}
 
@@ -279,7 +279,7 @@ func onDiscoveryTick() {
 
 	// avoid any logging unless there's something to be done
 	if len(instanceKeys) > 0 {
-		if len(instanceKeys) > config.Config.MaxOutdatedKeysToShow {
+		if len(instanceKeys) > config.Config().MaxOutdatedKeysToShow {
 			log.Debugf("polling %d outdated keys", len(instanceKeys))
 		} else {
 			log.Debugf("outdated keys: %+v", instanceKeys)
@@ -298,7 +298,7 @@ func onDiscoveryTick() {
 // periodically investigated and their status captured, and long since unseen instances are
 // purged and forgotten.
 func ContinuousDiscovery() {
-	if config.Config.DatabaselessMode__experimental {
+	if config.Config().DatabaselessMode__experimental {
 		log.Fatal("Cannot execute continuous mode in databaseless mode")
 	}
 
@@ -308,14 +308,14 @@ func ContinuousDiscovery() {
 	inst.LoadHostnameResolveCache()
 	go handleDiscoveryRequests()
 
-	// Careful: config.Config.GetDiscoveryPollSeconds() is CONSTANT. It can never change.
-	discoveryTick := time.Tick(time.Duration(config.Config.GetDiscoveryPollSeconds()) * time.Second)
+	// Careful: config.Config().GetDiscoveryPollSeconds() is CONSTANT. It can never change.
+	discoveryTick := time.Tick(time.Duration(config.Config().GetDiscoveryPollSeconds()) * time.Second)
 	instancePollTick := time.Tick(instancePollSecondsDuration())
 	caretakingTick := time.Tick(time.Minute)
-	recoveryTick := time.Tick(time.Duration(config.Config.RecoveryPollSeconds) * time.Second)
+	recoveryTick := time.Tick(time.Duration(config.Config().RecoveryPollSeconds) * time.Second)
 	var snapshotTopologiesTick <-chan time.Time
-	if config.Config.SnapshotTopologiesIntervalHours > 0 {
-		snapshotTopologiesTick = time.Tick(time.Duration(config.Config.SnapshotTopologiesIntervalHours) * time.Hour)
+	if config.Config().SnapshotTopologiesIntervalHours > 0 {
+		snapshotTopologiesTick = time.Tick(time.Duration(config.Config().SnapshotTopologiesIntervalHours) * time.Hour)
 	}
 
 	go ometrics.InitGraphiteMetrics()
@@ -412,7 +412,7 @@ func ContinuousAgentsPoll() {
 
 	go discoverSeededAgents()
 
-	tick := time.Tick(time.Duration(config.Config.GetDiscoveryPollSeconds()) * time.Second)
+	tick := time.Tick(time.Duration(config.Config().GetDiscoveryPollSeconds()) * time.Second)
 	caretakingTick := time.Tick(time.Hour)
 	for range tick {
 		agentsHosts, _ := agent.ReadOutdatedAgentsHosts()

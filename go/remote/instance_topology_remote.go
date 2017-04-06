@@ -62,7 +62,7 @@ var SyncRelaylogsChangeMasterToTargetReplicaFunc SyncRelaylogsChangeMasterIdenti
 
 func TestRemoteCommandOnInstance(instanceKey *inst.InstanceKey) error {
 	sudoCommand := ""
-	if config.Config.RemoteSSHCommandUseSudo {
+	if config.Config().RemoteSSHCommandUseSudo {
 		sudoCommand = "sudo -i"
 	}
 
@@ -74,7 +74,7 @@ func TestRemoteCommandOnInstance(instanceKey *inst.InstanceKey) error {
 
 	randomToken := process.NewToken()
 
-	command := config.Config.RemoteSSHCommand
+	command := config.Config().RemoteSSHCommand
 	command = strings.Replace(command, "{hostname}", instanceKey.Hostname, -1)
 	command = fmt.Sprintf("%s '%s echo %s' > %s", command, sudoCommand, randomToken.Hash, tempFile.Name())
 	if err := orcos.CommandRun(command, orcos.EmptyEnv); err != nil {
@@ -116,7 +116,7 @@ func applySyncRelaylogsChangeMasterIdentityFunc(syncRelaylogsChangeMasterIdentit
 
 // SyncReplicaRelayLogs will align siblings by applying relaylogs from one to the other, via remote SSH
 func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsChangeMasterIdentityFunc SyncRelaylogsChangeMasterIdentityFunc, startReplication bool) (*inst.Instance, error) {
-	if config.Config.RemoteSSHCommand == "" {
+	if config.Config().RemoteSSHCommand == "" {
 		return instance, fmt.Errorf("RemoteSSHCommand not configured")
 	}
 	log.Debugf("Testing SSH on %+v", instance.Key)
@@ -152,7 +152,7 @@ func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsCh
 
 		// We now have the correlation info needed to proceed with remote calls
 		sudoCommand := ""
-		if config.Config.RemoteSSHCommandUseSudo {
+		if config.Config().RemoteSSHCommandUseSudo {
 			sudoCommand = "sudo -i"
 		}
 
@@ -183,7 +183,7 @@ func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsCh
 		defer os.Remove(localRelayLogContentsFile.Name())
 		localRelayLogContentsCopyFileName := fmt.Sprintf("%s.copy", localRelayLogContentsFile.Name())
 		{
-			command := config.Config.RemoteSSHCommand
+			command := config.Config().RemoteSSHCommand
 			command = strings.Replace(command, "{hostname}", fromInstance.Key.Hostname, -1)
 			command = fmt.Sprintf("cat %s | %s '%s' > %s", getRelayLogContentsScriptFile.Name(), command, sudoCommand, localRelayLogContentsFile.Name())
 			if err := orcos.CommandRun(command, orcos.EmptyEnv); err != nil {
@@ -193,7 +193,7 @@ func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsCh
 		log.Debugf("Have fetched relay logs from %s, output file is %s", fromInstance.Key.Hostname, localRelayLogContentsFile.Name())
 		// Copy local relay log contents to target host:
 		{
-			command := config.Config.RemoteSSHCommand
+			command := config.Config().RemoteSSHCommand
 			command = strings.Replace(command, "{hostname}", instance.Key.Hostname, -1)
 			command = fmt.Sprintf("cat %s | %s '%s cat - > %s'", localRelayLogContentsFile.Name(), command, sudoCommand, localRelayLogContentsCopyFileName)
 			if err := orcos.CommandRun(command, orcos.EmptyEnv); err != nil {
@@ -225,7 +225,7 @@ func SyncReplicaRelayLogs(instance, fromInstance *inst.Instance, syncRelaylogsCh
 
 		// apply relaylog contents on target host:
 		{
-			command := config.Config.RemoteSSHCommand
+			command := config.Config().RemoteSSHCommand
 			command = strings.Replace(command, "{hostname}", instance.Key.Hostname, -1)
 			command = fmt.Sprintf("cat %s | %s '%s'", applyRelayLogContentsScriptFile.Name(), command, sudoCommand)
 			if err := orcos.CommandRun(command, orcos.EmptyEnv); err != nil {
@@ -307,8 +307,8 @@ func SyncReplicasRelayLogs(
 
 		toBePostponed := false
 		if postponedFunctionsContainer != nil {
-			if config.Config.PostponeReplicaRecoveryOnLagMinutes > 0 &&
-				applyToReplica.SQLDelay > config.Config.PostponeReplicaRecoveryOnLagMinutes*60 {
+			if config.Config().PostponeReplicaRecoveryOnLagMinutes > 0 &&
+				applyToReplica.SQLDelay > config.Config().PostponeReplicaRecoveryOnLagMinutes*60 {
 				toBePostponed = true
 			}
 			if applyToReplica.DataCenter != master.DataCenter {

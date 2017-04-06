@@ -80,7 +80,7 @@ func ClearActiveFailureDetections() error {
 				in_active_period = 1
 				AND start_active_period < NOW() - INTERVAL ? MINUTE
 			`,
-		config.Config.FailureDetectionPeriodBlockMinutes,
+		config.Config().FailureDetectionPeriodBlockMinutes,
 	)
 	return log.Errore(err)
 }
@@ -197,7 +197,7 @@ func ClearActiveRecoveries() error {
 				in_active_period = 1
 				AND start_active_period < NOW() - INTERVAL ? SECOND
 			`,
-		config.Config.RecoveryPeriodBlockSeconds,
+		config.Config().RecoveryPeriodBlockSeconds,
 	)
 	return log.Errore(err)
 }
@@ -290,7 +290,7 @@ func ExpireBlockedRecoveries() error {
 				from blocked_topology_recovery
 				where
 					last_blocked_timestamp < NOW() - interval ? second
-			`, (config.Config.RecoveryPollSeconds * 2),
+			`, (config.Config().RecoveryPollSeconds * 2),
 	)
 	return log.Errore(err)
 }
@@ -562,7 +562,7 @@ func ReadCompletedRecoveries(page int) ([]TopologyRecovery, error) {
 	limit := `
 		limit ?
 		offset ?`
-	return readRecoveries(`where end_recovery is not null`, limit, sqlutils.Args(config.Config.AuditPageSize, page*config.Config.AuditPageSize))
+	return readRecoveries(`where end_recovery is not null`, limit, sqlutils.Args(config.Config().AuditPageSize, page*config.Config().AuditPageSize))
 }
 
 // ReadRecovery reads completed recovery entry/audit entires from topology_recovery
@@ -595,7 +595,7 @@ func ReadRecentRecoveries(clusterName string, unacknowledgedOnly bool, page int)
 	limit := `
 		limit ?
 		offset ?`
-	args = append(args, config.Config.AuditPageSize, page*config.Config.AuditPageSize)
+	args = append(args, config.Config().AuditPageSize, page*config.Config().AuditPageSize)
 	return readRecoveries(whereClause, limit, args)
 }
 
@@ -658,7 +658,7 @@ func ReadRecentFailureDetections(page int) ([]TopologyRecovery, error) {
 	limit := `
 		limit ?
 		offset ?`
-	return readFailureDetections(``, limit, sqlutils.Args(config.Config.AuditPageSize, page*config.Config.AuditPageSize))
+	return readFailureDetections(``, limit, sqlutils.Args(config.Config().AuditPageSize, page*config.Config().AuditPageSize))
 }
 
 // ReadFailureDetection

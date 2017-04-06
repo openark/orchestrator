@@ -57,9 +57,9 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 		clusterName, _ = GetClusterName(instanceKey)
 	}
 
-	if config.Config.AuditLogFile != "" {
+	if config.Config().AuditLogFile != "" {
 		go func() error {
-			f, err := os.OpenFile(config.Config.AuditLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
+			f, err := os.OpenFile(config.Config().AuditLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 			if err != nil {
 				return log.Errore(err)
 			}
@@ -126,7 +126,7 @@ func ReadRecentAudit(instanceKey *InstanceKey, page int) ([]Audit, error) {
 		limit ?
 		offset ?
 		`, whereCondition)
-	args = append(args, config.Config.AuditPageSize, page*config.Config.AuditPageSize)
+	args = append(args, config.Config().AuditPageSize, page*config.Config().AuditPageSize)
 	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		audit := Audit{}
 		audit.AuditId = m.GetInt64("audit_id")
@@ -156,7 +156,7 @@ func ExpireAudit() error {
 			where
 				audit_timestamp < NOW() - INTERVAL ? DAY 
 			`,
-			config.Config.AuditPurgeDays,
+			config.Config().AuditPurgeDays,
 		)
 		return err
 	}

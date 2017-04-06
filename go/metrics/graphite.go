@@ -31,29 +31,29 @@ var graphiteTickCallbacks [](func())
 
 // InitGraphiteMetrics is called once in the lifetime of the app, after config has been loaded
 func InitGraphiteMetrics() error {
-	if config.Config.GraphiteAddr == "" {
+	if config.Config().GraphiteAddr == "" {
 		return nil
 	}
-	if config.Config.GraphitePollSeconds <= 0 {
+	if config.Config().GraphitePollSeconds <= 0 {
 		return nil
 	}
-	if config.Config.GraphitePath == "" {
+	if config.Config().GraphitePath == "" {
 		return log.Errorf("No graphite path provided (see GraphitePath config variable). Will not log to graphite")
 	}
-	addr, err := net.ResolveTCPAddr("tcp", config.Config.GraphiteAddr)
+	addr, err := net.ResolveTCPAddr("tcp", config.Config().GraphiteAddr)
 	if err != nil {
 		return log.Errore(err)
 	}
 	graphitePathHostname := process.ThisHostname
-	if config.Config.GraphiteConvertHostnameDotsToUnderscores {
+	if config.Config().GraphiteConvertHostnameDotsToUnderscores {
 		graphitePathHostname = strings.Replace(graphitePathHostname, ".", "_", -1)
 	}
-	graphitePath := config.Config.GraphitePath
+	graphitePath := config.Config().GraphitePath
 	graphitePath = strings.Replace(graphitePath, "{hostname}", graphitePathHostname, -1)
 
-	log.Debugf("Will log to graphite on %+v, %+v", config.Config.GraphiteAddr, graphitePath)
+	log.Debugf("Will log to graphite on %+v, %+v", config.Config().GraphiteAddr, graphitePath)
 
-	graphiteCallbackTick := time.Tick(time.Duration(config.Config.GraphitePollSeconds) * time.Second)
+	graphiteCallbackTick := time.Tick(time.Duration(config.Config().GraphitePollSeconds) * time.Second)
 	go func() {
 		go graphite.Graphite(metrics.DefaultRegistry, 1*time.Minute, graphitePath, addr)
 		for range graphiteCallbackTick {

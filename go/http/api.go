@@ -1711,7 +1711,7 @@ func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Re
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	if !config.Config.ServeAgentsHttp {
+	if !config.Config().ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
@@ -1732,7 +1732,7 @@ func (this *HttpAPI) Agent(params martini.Params, r render.Render, req *http.Req
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	if !config.Config.ServeAgentsHttp {
+	if !config.Config().ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
@@ -1753,7 +1753,7 @@ func (this *HttpAPI) AgentUnmount(params martini.Params, r render.Render, req *h
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	if !config.Config.ServeAgentsHttp {
+	if !config.Config().ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
@@ -1774,7 +1774,7 @@ func (this *HttpAPI) AgentMountLV(params martini.Params, r render.Render, req *h
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	if !config.Config.ServeAgentsHttp {
+	if !config.Config().ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
@@ -1795,7 +1795,7 @@ func (this *HttpAPI) AgentCreateSnapshot(params martini.Params, r render.Render,
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	if !config.Config.ServeAgentsHttp {
+	if !config.Config().ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
@@ -1816,7 +1816,7 @@ func (this *HttpAPI) AgentRemoveLV(params martini.Params, r render.Render, req *
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	if !config.Config.ServeAgentsHttp {
+	if !config.Config().ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
@@ -1837,7 +1837,7 @@ func (this *HttpAPI) AgentMySQLStop(params martini.Params, r render.Render, req 
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	if !config.Config.ServeAgentsHttp {
+	if !config.Config().ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
@@ -1858,7 +1858,7 @@ func (this *HttpAPI) AgentMySQLStart(params martini.Params, r render.Render, req
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	if !config.Config.ServeAgentsHttp {
+	if !config.Config().ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
@@ -1878,7 +1878,7 @@ func (this *HttpAPI) AgentCustomCommand(params martini.Params, r render.Render, 
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	if !config.Config.ServeAgentsHttp {
+	if !config.Config().ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
@@ -1900,7 +1900,7 @@ func (this *HttpAPI) AgentSeed(params martini.Params, r render.Render, req *http
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	if !config.Config.ServeAgentsHttp {
+	if !config.Config().ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
@@ -1921,7 +1921,7 @@ func (this *HttpAPI) AgentActiveSeeds(params martini.Params, r render.Render, re
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	if !config.Config.ServeAgentsHttp {
+	if !config.Config().ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
@@ -1942,7 +1942,7 @@ func (this *HttpAPI) AgentRecentSeeds(params martini.Params, r render.Render, re
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	if !config.Config.ServeAgentsHttp {
+	if !config.Config().ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
@@ -1963,7 +1963,7 @@ func (this *HttpAPI) AgentSeedDetails(params martini.Params, r render.Render, re
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	if !config.Config.ServeAgentsHttp {
+	if !config.Config().ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
@@ -1985,7 +1985,7 @@ func (this *HttpAPI) AgentSeedStates(params martini.Params, r render.Render, req
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	if !config.Config.ServeAgentsHttp {
+	if !config.Config().ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
@@ -2007,7 +2007,7 @@ func (this *HttpAPI) Seeds(params martini.Params, r render.Render, req *http.Req
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	if !config.Config.ServeAgentsHttp {
+	if !config.Config().ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
@@ -2028,7 +2028,7 @@ func (this *HttpAPI) AbortSeed(params martini.Params, r render.Render, req *http
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	if !config.Config.ServeAgentsHttp {
+	if !config.Config().ServeAgentsHttp {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
@@ -2075,7 +2075,7 @@ func (this *HttpAPI) StatusCheck(params martini.Params, r render.Render, req *ht
 	// SimpleHealthTest just checks to see if we can connect to the database.  Lighter weight if you intend to call it a lot
 	var health *process.HealthStatus
 	var err error
-	if config.Config.StatusSimpleHealth {
+	if config.Config().StatusSimpleHealth {
 		health, err = process.SimpleHealthTest()
 	} else {
 		health, err = process.HealthTest()
@@ -2207,9 +2207,9 @@ func (this *HttpAPI) RegisterCandidate(params martini.Params, r render.Render, r
 // AutomatedRecoveryFilters retuens list of clusters which are configured with automated recovery
 func (this *HttpAPI) AutomatedRecoveryFilters(params martini.Params, r render.Render, req *http.Request) {
 	automatedRecoveryMap := make(map[string]interface{})
-	automatedRecoveryMap["RecoverMasterClusterFilters"] = config.Config.RecoverMasterClusterFilters
-	automatedRecoveryMap["RecoverIntermediateMasterClusterFilters"] = config.Config.RecoverIntermediateMasterClusterFilters
-	automatedRecoveryMap["RecoveryIgnoreHostnameFilters"] = config.Config.RecoveryIgnoreHostnameFilters
+	automatedRecoveryMap["RecoverMasterClusterFilters"] = config.Config().RecoverMasterClusterFilters
+	automatedRecoveryMap["RecoverIntermediateMasterClusterFilters"] = config.Config().RecoverIntermediateMasterClusterFilters
+	automatedRecoveryMap["RecoveryIgnoreHostnameFilters"] = config.Config().RecoveryIgnoreHostnameFilters
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Automated recovery configuration details"), Details: automatedRecoveryMap})
 }
@@ -2643,5 +2643,5 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "seeds", this.Seeds)
 
 	// Configurable status check endpoint
-	m.Get(config.Config.StatusEndpoint, this.StatusCheck)
+	m.Get(config.Config().StatusEndpoint, this.StatusCheck)
 }

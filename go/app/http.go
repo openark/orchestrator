@@ -49,7 +49,7 @@ func Http(continuousDiscovery bool) {
 	process.ContinuousRegistration(process.OrchestratorExecutionHttpMode, "")
 
 	martini.Env = martini.Prod
-	if config.Config.ServeAgentsHttp {
+	if config.Config().ServeAgentsHttp {
 		go agentsHttp()
 	}
 	standardHttp(continuousDiscovery)
@@ -58,14 +58,14 @@ func Http(continuousDiscovery bool) {
 // Iterate over the private keys and get passwords for them
 // Don't prompt for a password a second time if the files are the same
 func promptForSSLPasswords() {
-	if ssl.IsEncryptedPEM(config.Config.SSLPrivateKeyFile) {
-		sslPEMPassword = ssl.GetPEMPassword(config.Config.SSLPrivateKeyFile)
+	if ssl.IsEncryptedPEM(config.Config().SSLPrivateKeyFile) {
+		sslPEMPassword = ssl.GetPEMPassword(config.Config().SSLPrivateKeyFile)
 	}
-	if ssl.IsEncryptedPEM(config.Config.AgentSSLPrivateKeyFile) {
-		if config.Config.AgentSSLPrivateKeyFile == config.Config.SSLPrivateKeyFile {
+	if ssl.IsEncryptedPEM(config.Config().AgentSSLPrivateKeyFile) {
+		if config.Config().AgentSSLPrivateKeyFile == config.Config().SSLPrivateKeyFile {
 			agentSSLPEMPassword = sslPEMPassword
 		} else {
-			agentSSLPEMPassword = ssl.GetPEMPassword(config.Config.AgentSSLPrivateKeyFile)
+			agentSSLPEMPassword = ssl.GetPEMPassword(config.Config().AgentSSLPrivateKeyFile)
 		}
 	}
 }
@@ -74,18 +74,18 @@ func promptForSSLPasswords() {
 func standardHttp(continuousDiscovery bool) {
 	m := martini.Classic()
 
-	switch strings.ToLower(config.Config.AuthenticationMethod) {
+	switch strings.ToLower(config.Config().AuthenticationMethod) {
 	case "basic":
 		{
-			if config.Config.HTTPAuthUser == "" {
+			if config.Config().HTTPAuthUser == "" {
 				// Still allowed; may be disallowed in future versions
 				log.Warning("AuthenticationMethod is configured as 'basic' but HTTPAuthUser undefined. Running without authentication.")
 			}
-			m.Use(auth.Basic(config.Config.HTTPAuthUser, config.Config.HTTPAuthPassword))
+			m.Use(auth.Basic(config.Config().HTTPAuthUser, config.Config().HTTPAuthPassword))
 		}
 	case "multi":
 		{
-			if config.Config.HTTPAuthUser == "" {
+			if config.Config().HTTPAuthUser == "" {
 				// Still allowed; may be disallowed in future versions
 				log.Fatal("AuthenticationMethod is configured as 'multi' but HTTPAuthUser undefined")
 			}
@@ -95,7 +95,7 @@ func standardHttp(continuousDiscovery bool) {
 					// Will be treated as "read-only"
 					return true
 				}
-				return auth.SecureCompare(username, config.Config.HTTPAuthUser) && auth.SecureCompare(password, config.Config.HTTPAuthPassword)
+				return auth.SecureCompare(username, config.Config().HTTPAuthUser) && auth.SecureCompare(password, config.Config().HTTPAuthPassword)
 			}))
 		}
 	default:
@@ -112,9 +112,9 @@ func standardHttp(continuousDiscovery bool) {
 		Layout:          "templates/layout",
 		HTMLContentType: "text/html",
 	}))
-	m.Use(martini.Static("resources/public", martini.StaticOptions{Prefix: config.Config.URLPrefix}))
-	if config.Config.UseMutualTLS {
-		m.Use(ssl.VerifyOUs(config.Config.SSLValidOUs))
+	m.Use(martini.Static("resources/public", martini.StaticOptions{Prefix: config.Config().URLPrefix}))
+	if config.Config().UseMutualTLS {
+		m.Use(ssl.VerifyOUs(config.Config().SSLValidOUs))
 	}
 
 	inst.SetMaintenanceOwner(process.ThisHostname)
@@ -122,21 +122,21 @@ func standardHttp(continuousDiscovery bool) {
 	if continuousDiscovery {
 		// start to expire metric collection info
 		discoveryMetrics = collection.CreateOrReturnCollection(discoveryMetricsName)
-		discoveryMetrics.SetExpirePeriod(time.Duration(config.Config.DiscoveryCollectionRetentionSeconds) * time.Second)
+		discoveryMetrics.SetExpirePeriod(time.Duration(config.Config().DiscoveryCollectionRetentionSeconds) * time.Second)
 
 		log.Info("Starting Discovery")
 		go logic.ContinuousDiscovery()
 	}
 	log.Info("Registering endpoints")
-	http.API.URLPrefix = config.Config.URLPrefix
-	http.Web.URLPrefix = config.Config.URLPrefix
+	http.API.URLPrefix = config.Config().URLPrefix
+	http.Web.URLPrefix = config.Config().URLPrefix
 	http.API.RegisterRequests(m)
 	http.Web.RegisterRequests(m)
 
 	// Serve
-	if config.Config.ListenSocket != "" {
-		log.Infof("Starting HTTP listener on unix socket %v", config.Config.ListenSocket)
-		unixListener, err := net.Listen("unix", config.Config.ListenSocket)
+	if config.Config().ListenSocket != "" {
+		log.Infof("Starting HTTP listener on unix socket %v", config.Config().ListenSocket)
+		unixListener, err := net.Listen("unix", config.Config().ListenSocket)
 		if err != nil {
 			log.Fatale(err)
 		}
@@ -144,22 +144,22 @@ func standardHttp(continuousDiscovery bool) {
 		if err := nethttp.Serve(unixListener, m); err != nil {
 			log.Fatale(err)
 		}
-	} else if config.Config.UseSSL {
+	} else if config.Config().UseSSL {
 		log.Info("Starting HTTPS listener")
-		tlsConfig, err := ssl.NewTLSConfig(config.Config.SSLCAFile, config.Config.UseMutualTLS)
+		tlsConfig, err := ssl.NewTLSConfig(config.Config().SSLCAFile, config.Config().UseMutualTLS)
 		if err != nil {
 			log.Fatale(err)
 		}
-		tlsConfig.InsecureSkipVerify = config.Config.SSLSkipVerify
-		if err = ssl.AppendKeyPairWithPassword(tlsConfig, config.Config.SSLCertFile, config.Config.SSLPrivateKeyFile, sslPEMPassword); err != nil {
+		tlsConfig.InsecureSkipVerify = config.Config().SSLSkipVerify
+		if err = ssl.AppendKeyPairWithPassword(tlsConfig, config.Config().SSLCertFile, config.Config().SSLPrivateKeyFile, sslPEMPassword); err != nil {
 			log.Fatale(err)
 		}
-		if err = ssl.ListenAndServeTLS(config.Config.ListenAddress, m, tlsConfig); err != nil {
+		if err = ssl.ListenAndServeTLS(config.Config().ListenAddress, m, tlsConfig); err != nil {
 			log.Fatale(err)
 		}
 	} else {
-		log.Infof("Starting HTTP listener on %+v", config.Config.ListenAddress)
-		if err := nethttp.ListenAndServe(config.Config.ListenAddress, m); err != nil {
+		log.Infof("Starting HTTP listener on %+v", config.Config().ListenAddress)
+		if err := nethttp.ListenAndServe(config.Config().ListenAddress, m); err != nil {
 			log.Fatale(err)
 		}
 	}
@@ -171,8 +171,8 @@ func agentsHttp() {
 	m := martini.Classic()
 	m.Use(gzip.All())
 	m.Use(render.Renderer())
-	if config.Config.AgentsUseMutualTLS {
-		m.Use(ssl.VerifyOUs(config.Config.AgentSSLValidOUs))
+	if config.Config().AgentsUseMutualTLS {
+		m.Use(ssl.VerifyOUs(config.Config().AgentSSLValidOUs))
 	}
 
 	log.Info("Starting agents listener")
@@ -180,26 +180,26 @@ func agentsHttp() {
 	agent.InitHttpClient()
 	go logic.ContinuousAgentsPoll()
 
-	http.AgentsAPI.URLPrefix = config.Config.URLPrefix
+	http.AgentsAPI.URLPrefix = config.Config().URLPrefix
 	http.AgentsAPI.RegisterRequests(m)
 
 	// Serve
-	if config.Config.AgentsUseSSL {
+	if config.Config().AgentsUseSSL {
 		log.Info("Starting agent HTTPS listener")
-		tlsConfig, err := ssl.NewTLSConfig(config.Config.AgentSSLCAFile, config.Config.AgentsUseMutualTLS)
+		tlsConfig, err := ssl.NewTLSConfig(config.Config().AgentSSLCAFile, config.Config().AgentsUseMutualTLS)
 		if err != nil {
 			log.Fatale(err)
 		}
-		tlsConfig.InsecureSkipVerify = config.Config.AgentSSLSkipVerify
-		if err = ssl.AppendKeyPairWithPassword(tlsConfig, config.Config.AgentSSLCertFile, config.Config.AgentSSLPrivateKeyFile, agentSSLPEMPassword); err != nil {
+		tlsConfig.InsecureSkipVerify = config.Config().AgentSSLSkipVerify
+		if err = ssl.AppendKeyPairWithPassword(tlsConfig, config.Config().AgentSSLCertFile, config.Config().AgentSSLPrivateKeyFile, agentSSLPEMPassword); err != nil {
 			log.Fatale(err)
 		}
-		if err = ssl.ListenAndServeTLS(config.Config.AgentsServerPort, m, tlsConfig); err != nil {
+		if err = ssl.ListenAndServeTLS(config.Config().AgentsServerPort, m, tlsConfig); err != nil {
 			log.Fatale(err)
 		}
 	} else {
 		log.Info("Starting agent HTTP listener")
-		if err := nethttp.ListenAndServe(config.Config.AgentsServerPort, m); err != nil {
+		if err := nethttp.ListenAndServe(config.Config().AgentsServerPort, m); err != nil {
 			log.Fatale(err)
 		}
 	}
