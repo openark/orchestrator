@@ -69,7 +69,8 @@ var accessDeniedCounter = metrics.NewCounter()
 var readTopologyInstanceCounter = metrics.NewCounter()
 var readInstanceCounter = metrics.NewCounter()
 var writeInstanceCounter = metrics.NewCounter()
-var backendWrites = collection.CreateOrReturnCollection("BACKEND_WRITES")
+var backendWrites = collection.CreateOrReturnCollection(collection.BackendWrites)
+var instanceBufferedWriteMetrics = collection.CreateOrReturnCollection(collection.FlushInstanceWrites)
 
 func init() {
 	metrics.Register("instance.access_denied", accessDeniedCounter)
@@ -2112,6 +2113,7 @@ func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, up
 	if _, err := db.ExecOrchestrator(sql, args...); err != nil {
 		return err
 	}
+	writeInstanceCounter.Inc(int64(len(instances)))
 	return nil
 }
 
@@ -2149,6 +2151,8 @@ func flushInstanceWriteBuffer() {
 		return
 	}
 
+	wbm := NewWriteBufferMetric() // prepare metric
+
 	for i := 0; i < len(instanceWriteBuffer); i++ {
 		upd := <-instanceWriteBuffer
 		if upd.instanceWasActuallyFound && upd.lastError == nil {
@@ -2167,18 +2171,23 @@ func flushInstanceWriteBuffer() {
 		if err != nil {
 			return log.Errorf("flushInstanceWriteBuffer writemany: %v", err)
 		}
+		writeInstanceCounter.Inc(int64(len(instances)))
+
 		err = writeManyInstances(lastseen, true, true)
 		if err != nil {
 			return log.Errorf("flushInstanceWriteBuffer last_seen: %v", err)
 		}
 
-		writeInstanceCounter.Inc(int64(len(instances) + len(lastseen)))
+		writeInstanceCounter.Inc(int64(len(lastseen)))
 		return nil
 	}
 	err := ExecDBWriteFunc(writeFunc)
 	if err != nil {
 		log.Errorf("flushInstanceWriteBuffer: %v", err)
 	}
+
+	wbm.Update(len(instances)+len(lastseen), err)
+	instanceBufferedWriteMetrics.Append(wbm)
 }
 
 // writeInstance stores an instance in the orchestrator backend
