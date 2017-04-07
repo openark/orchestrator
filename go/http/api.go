@@ -122,9 +122,9 @@ type HttpAPI struct {
 }
 
 var API HttpAPI = HttpAPI{}
-var discoveryMetrics = collection.CreateOrReturnCollection("DISCOVERY_METRICS")
-var queryMetrics = collection.CreateOrReturnCollection("BACKEND_WRITES")
-var instanceBufferedWriteMetrics = collection.CreateOrReturnCollection("FLUSH_INSTANCE_WRITES")
+var discoveryMetrics = collection.CreateOrReturnCollection(collection.DiscoveryMetrics)
+var queryMetrics = collection.CreateOrReturnCollection(collection.BackendWrites)
+var instanceBufferedWriteMetrics = collection.CreateOrReturnCollection(collection.FlushInstanceWrites)
 
 func (this *HttpAPI) getInstanceKey(host string, port string) (inst.InstanceKey, error) {
 	instanceKey, err := inst.NewResolveInstanceKeyStrings(host, port)

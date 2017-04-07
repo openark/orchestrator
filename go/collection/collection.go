@@ -85,18 +85,28 @@ type Collection struct {
 	expirePeriod time.Duration // time to keep the collection information for
 }
 
+// This is a collection name
+type Name string
+
+const (
+	// Some fixed collections we use, to avoid using strings everywhere
+	BackendWrites       Name = "BACKEND_WRITES"
+	DiscoveryMetrics    Name = "DISCOVERY_METRICS"
+	FlushInstanceWrites Name = "FLUSH_INSTANCE_WRITES"
+)
+
 // hard-coded at every second
 const defaultExpireTickerPeriod = time.Second
 
 // backendMetricCollection contains the last N backend "channelled"
 // metrics which can then be accessed via an API call for monitoring.
 var (
-	namedCollection     map[string](*Collection)
+	namedCollection     map[Name](*Collection)
 	namedCollectionLock sync.Mutex
 )
 
 func init() {
-	namedCollection = make(map[string](*Collection))
+	namedCollection = make(map[Name](*Collection))
 }
 
 // StopMonitoring stops monitoring all the collections
@@ -109,7 +119,7 @@ func StopMonitoring() {
 // CreateOrReturnCollection allows for creation of a new collection or
 // returning a pointer to an existing one given the name. This allows access
 // to the data structure from the api interface (http/api.go) and also when writing (inst).
-func CreateOrReturnCollection(name string) *Collection {
+func CreateOrReturnCollection(name Name) *Collection {
 	namedCollectionLock.Lock()
 	defer namedCollectionLock.Unlock()
 	if q, found := namedCollection[name]; found {
