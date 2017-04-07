@@ -99,6 +99,7 @@ type HttpAPI struct {
 var API HttpAPI = HttpAPI{}
 var discoveryMetrics = collection.CreateOrReturnCollection("DISCOVERY_METRICS")
 var queryMetrics = collection.CreateOrReturnCollection("BACKEND_WRITES")
+var instanceBufferedWriteMetrics = collection.CreateOrReturnCollection("FLUSH_INSTANCE_WRITES")
 
 func (this *HttpAPI) getInstanceKey(host string, port string) (inst.InstanceKey, error) {
 	instanceKey, err := inst.NewInstanceKeyFromStrings(host, port)
@@ -1705,6 +1706,42 @@ func (this *HttpAPI) BackendQueryMetricsAggregated(params martini.Params, r rend
 	r.JSON(200, aggregated)
 }
 
+func (this *HttpAPI) InstanceBufferedWriteMetricsRaw(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+	log.Debugf("InstanceBufferedWriteMetricsRaw: seconds: %d", seconds)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to generate raw instance buffere write metrics"})
+		return
+	}
+
+	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
+	m, err := instanceBufferedWriteMetrics.Since(refTime)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to return backend query metrics"})
+		return
+	}
+
+	log.Debugf("InstanceBufferedWritesMetricsRaw data: %+v", m)
+
+	r.JSON(200, m)
+}
+
+// InstanceBufferedWriteMetricsAggregated provides aggregate metrics of the instance buffered writes
+func (this *HttpAPI) InstanceBufferedWriteMetricsAggregated(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+	log.Debugf("InstanceBufferedWriteMetricsAggregated: seconds: %d", seconds)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unable to generate aggregated instance buffered write metrics"})
+		return
+	}
+
+	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
+	aggregated := inst.WriteBufferAggregatedSince(instanceBufferedWriteMetrics, refTime)
+	log.Debugf("InstanceBufferedWriteMetricsAggregated data: %+v", aggregated)
+
+	r.JSON(200, aggregated)
+}
+
 // Agents provides complete list of registered agents (See https://github.com/github/orchestrator-agent)
 func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -2623,6 +2660,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "discovery-queue-metrics-aggregated/:seconds", this.DiscoveryQueueMetricsAggregated)
 	this.registerRequest(m, "backend-query-metrics-raw/:seconds", this.BackendQueryMetricsRaw)
 	this.registerRequest(m, "backend-query-metrics-aggregated/:seconds", this.BackendQueryMetricsAggregated)
+	this.registerRequest(m, "instance-buffered-write-metrics-raw/:seconds", this.InstanceBufferedWriteMetricsRaw)
+	this.registerRequest(m, "instance-buffered-write-metrics-aggregated/:seconds", this.InstanceBufferedWriteMetricsAggregated)
 
 	// Agents
 	this.registerRequest(m, "agents", this.Agents)
