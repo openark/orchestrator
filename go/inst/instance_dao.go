@@ -724,7 +724,7 @@ Cleanup:
 	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
 	_ = UpdateInstanceLastChecked(&instance.Key)
 	latency.Stop("backend")
-	return nil, fmt.Errorf("ReadTopologyInstanceBufferable failed: %v", err)
+	return nil, err
 }
 
 // ReadClusterAliasOverride reads and applies SuggestedClusterAlias based on cluster_alias_override
