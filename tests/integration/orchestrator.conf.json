@@ -50,7 +50,6 @@
   "CandidateInstanceExpireMinutes": 60,
   "AuditLogFile": "/tmp/orchestrator-audit.log",
   "AuditToSyslog": false,
-  "AuditPageSize": 20,
   "AuditPurgeDays": 365,
   "RemoveTextFromHostnameDisplay": ".mydomain.com:3306",
   "ReadOnly": false,

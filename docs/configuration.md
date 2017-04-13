@@ -36,7 +36,6 @@ The following is an incomplete list of configuration parameters. "Complete" is a
 * `MaintenanceExpireMinutes`  (int), Minutes after which a maintenance flag is considered stale and is cleared
 * `MaintenancePurgeDays`  (int), Days after which maintenance entries are purged from the database
 * `AuditLogFile`  (string), Name of log file for audit operations. Disabled when empty.
-* `AuditPageSize`       (int), Number of entries in an audit page
 * `RemoveTextFromHostnameDisplay` (string), Text to strip off the hostname on cluster/clusters pages. Save pixels (e.g. `mycompany.com`)
 * `ReadOnly`				(bool) When `"true"`, no write operations (e.g. stopping a replica, repointing replicas, discovering) are allowed
 * `AuthenticationMethod`    (string), type of authentication. Either empty (no authentication, default), `"basic"`, `"multi"` or `"proxy"`. See [Security](#security) section.
