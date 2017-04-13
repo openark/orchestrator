@@ -44,7 +44,6 @@
   "CandidateInstanceExpireMinutes": 60,
   "AuditLogFile": "",
   "AuditToSyslog": false,
-  "AuditPurgeDays": 365,
   "RemoveTextFromHostnameDisplay": ".mydomain.com:3306",
   "ReadOnly": false,
   "AuthenticationMethod": "",

@@ -156,7 +156,7 @@ func ExpireAudit() error {
 			where
 				audit_timestamp < NOW() - INTERVAL ? DAY
 			`,
-			config.Config.AuditPurgeDays,
+			config.AuditPurgeDays,
 		)
 		return err
 	}
