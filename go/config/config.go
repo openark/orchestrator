@@ -166,7 +166,6 @@ type Configuration struct {
 	PseudoGTIDCoordinatesHistoryHeuristicMinutes int               // Significantly reducing Pseudo-GTID lookup time, this indicates the most recent N minutes binlog position where search for Pseudo-GTID will heuristically begin (there is a fallback on fullscan if unsuccessful)
 	PseudoGTIDPreferIndependentMultiMatch        bool              // if 'false', a multi-replica Pseudo-GTID operation will attempt grouping replicas via Pseudo-GTID, and make less binlog computations. However it may cause servers in same bucket wait for one another, which could delay some servers from being repointed. There is a tradeoff between total operation time for all servers, and per-server time. When 'true', Pseudo-GTID matching will operate per server, independently. This will cause waste of same calculations, but no two servers will wait on one another.
 	BinlogEventsChunkSize                        int               // Chunk size (X) for SHOW BINLOG|RELAYLOG EVENTS LIMIT ?,X statements. Smaller means less locking and mroe work to be done
-	BufferBinlogEvents                           bool              // Should we used buffered read on SHOW BINLOG|RELAYLOG EVENTS -- releases the database lock sooner (recommended)
 	SkipBinlogEventsContaining                   []string          // When scanning/comparing binlogs for Pseudo-GTID, skip entries containing given texts. These are NOT regular expressions (would consume too much CPU while scanning binlogs), just substrings to find.
 	ReduceReplicationAnalysisCount               bool              // When true, replication analysis will only report instances where possibility of handled problems is possible in the first place (e.g. will not report most leaf nodes, that are mostly uninteresting). When false, provides an entry for every known instance
 	FailureDetectionPeriodBlockMinutes           int               // The time for which an instance's failure discovery is kept "active", so as to avoid concurrent "discoveries" of the instance's failure; this preceeds any recovery process, if any.
@@ -334,7 +333,6 @@ func newConfiguration() *Configuration {
 		PseudoGTIDCoordinatesHistoryHeuristicMinutes: 2,
 		PseudoGTIDPreferIndependentMultiMatch:        false,
 		BinlogEventsChunkSize:                        10000,
-		BufferBinlogEvents:                           true,
 		SkipBinlogEventsContaining:                   []string{},
 		ReduceReplicationAnalysisCount:               true,
 		FailureDetectionPeriodBlockMinutes:           60,

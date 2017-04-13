@@ -111,7 +111,6 @@
   "PseudoGTIDMonotonicHint": "asc:",
   "DetectPseudoGTIDQuery": "",
   "BinlogEventsChunkSize": 10000,
-  "BufferBinlogEvents": true,
   "SkipBinlogEventsContaining": [],
   "ReduceReplicationAnalysisCount": true,
   "FailureDetectionPeriodBlockMinutes": 60,
