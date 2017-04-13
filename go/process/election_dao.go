@@ -59,7 +59,7 @@ func AttemptElection() (bool, error) {
 				anchor = 1
 			  and last_seen_active < (now() - interval ? second)
 		`,
-			ThisHostname, ProcessToken.Hash, config.Config.ActiveNodeExpireSeconds,
+			ThisHostname, ProcessToken.Hash, config.ActiveNodeExpireSeconds,
 		)
 		if err != nil {
 			return false, log.Errore(err)

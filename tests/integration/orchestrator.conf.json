@@ -36,7 +36,6 @@
   "UnseenInstanceForgetHours": 240,
   "SnapshotTopologiesIntervalHours": 0,
   "InstanceBulkOperationsWaitTimeoutSeconds": 10,
-  "ActiveNodeExpireSeconds": 12,
   "HostnameResolveMethod": "default",
   "MySQLHostnameResolveMethod": "@@hostname",
   "SkipBinlogServerUnresolveCheck": true,

@@ -35,9 +35,10 @@ var (
 var ConfigurationLoaded chan bool = make(chan bool)
 
 const (
-	DiscoveryPollSeconds  = 1
-	BinlogFileHistoryDays = 1
-	MaintenanceOwner      = "orchestrator"
+	DiscoveryPollSeconds    = 1
+	ActiveNodeExpireSeconds = 5
+	BinlogFileHistoryDays   = 1
+	MaintenanceOwner        = "orchestrator"
 )
 
 // Configuration makes for orchestrator configuration input, which can be provided by user via JSON formatted file.
@@ -96,7 +97,6 @@ type Configuration struct {
 	DiscoveryQueueMaxStatisticsSize              int      // The maximum number of individual secondly statistics taken of the discovery queue
 	DiscoveryCollectionRetentionSeconds          uint     // Number of seconds to retain the discovery collection information
 	InstanceBulkOperationsWaitTimeoutSeconds     uint     // Time to wait on a single instance when doing bulk (many instances) operation
-	ActiveNodeExpireSeconds                      uint     // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
 	HostnameResolveMethod                        string   // Method by which to "normalize" hostname ("none"/"default"/"cname")
 	MySQLHostnameResolveMethod                   string   // Method by which to "normalize" hostname via MySQL server. ("none"/"@@hostname"/"@@report_host"; default "@@hostname")
 	SkipBinlogServerUnresolveCheck               bool     // Skip the double-check that an unresolved hostname resolves back to same hostname for binlog servers
@@ -258,7 +258,6 @@ func newConfiguration() *Configuration {
 		DiscoveryQueueMaxStatisticsSize:              120,
 		DiscoveryCollectionRetentionSeconds:          120,
 		InstanceBulkOperationsWaitTimeoutSeconds:     10,
-		ActiveNodeExpireSeconds:                      5,
 		HostnameResolveMethod:                        "default",
 		MySQLHostnameResolveMethod:                   "@@hostname",
 		SkipBinlogServerUnresolveCheck:               true,

@@ -27,7 +27,6 @@ The following is an incomplete list of configuration parameters. "Complete" is a
 * `UnseenInstanceForgetHours`   (uint), Number of hours after which an unseen instance is forgotten
 * `DiscoveryQueueMaxStatisticsSize` (int), Maximum number of secondly discovery queue statistic entries to keep
 * `InstanceBulkOperationsWaitTimeoutSeconds`  (uint), Time to wait on a single instance when doing bulk (many instances) operation
-* `ActiveNodeExpireSeconds` (uint), Maximum time to wait for active node to send keepalive before attempting to take over as active node.
 * `HostnameResolveMethod`		(string), Type of hostname resolve method (either `"none"` or `"cname"`)
 * `ExpiryHostnameResolvesMinutes`	(int), Number of minute after which a hostname resolve expires (hostname resolve are cached for up to this number of minutes)
 * `RejectHostnameResolvePattern`  (string), Regexp pattern for resolved hostname that will not be accepted (not cached, not written to db). This is done to avoid storing wrong resolves due to network glitches.
