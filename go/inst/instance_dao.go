@@ -756,10 +756,6 @@ func ReadClusterAliasOverride(instance *Instance) (err error) {
 // It is a non-recursive function and so-called-recursion is performed upon periodic reading of
 // instances.
 func ReadInstanceClusterAttributes(instance *Instance) (err error) {
-	if config.Config.DatabaselessMode__experimental {
-		return nil
-	}
-
 	var masterMasterKey InstanceKey
 	var masterClusterName string
 	var masterReplicationDepth uint
@@ -863,10 +859,6 @@ func BulkReadInstance() ([](*InstanceKey), error) {
 }
 
 func ReadInstancePromotionRule(instance *Instance) (err error) {
-	if config.Config.DatabaselessMode__experimental {
-		return nil
-	}
-
 	var promotionRule CandidatePromotionRule = NeutralPromoteRule
 	query := `
 			select
@@ -1012,11 +1004,6 @@ func readInstancesByCondition(condition string, args []interface{}, sort string)
 
 // ReadInstance reads an instance from the orchestrator backend database
 func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
-	if config.Config.DatabaselessMode__experimental {
-		instance, err := ReadTopologyInstance(instanceKey)
-		return instance, (err == nil), err
-	}
-
 	condition := `
 			hostname = ?
 			and port = ?

@@ -1288,9 +1288,6 @@ func SetupMySQLTopologyTLS(uri string) (string, error) {
 
 // OpenTopology returns the DB instance for the orchestrator backed database
 func OpenOrchestrator() (db *sql.DB, err error) {
-	if config.Config.DatabaselessMode__experimental {
-		return nil, nil
-	}
 	var fromCache bool
 	if config.Config.IsSQLite() {
 		db, fromCache, err = sqlutils.GetSQLiteDB(config.Config.SQLite3DataFile)
@@ -1506,9 +1503,6 @@ func execInternal(db *sql.DB, query string, args ...interface{}) (sql.Result, er
 
 // ExecOrchestrator will execute given query on the orchestrator backend database.
 func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
-	if config.Config.DatabaselessMode__experimental {
-		return DummySqlResult{}, nil
-	}
 	var err error
 	query, err = translateStatement(query)
 	if err != nil {
@@ -1528,9 +1522,6 @@ func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
 
 // QueryRowsMapOrchestrator
 func QueryOrchestratorRowsMap(query string, on_row func(sqlutils.RowMap) error) error {
-	if config.Config.DatabaselessMode__experimental {
-		return nil
-	}
 	query, err := translateStatement(query)
 	if err != nil {
 		return log.Fatalf("Cannot query orchestrator: %+v; query=%+v", err, query)
@@ -1545,9 +1536,6 @@ func QueryOrchestratorRowsMap(query string, on_row func(sqlutils.RowMap) error) 
 
 // QueryOrchestrator
 func QueryOrchestrator(query string, argsArray []interface{}, on_row func(sqlutils.RowMap) error) error {
-	if config.Config.DatabaselessMode__experimental {
-		return nil
-	}
 	query, err := translateStatement(query)
 	if err != nil {
 		return log.Fatalf("Cannot query orchestrator: %+v; query=%+v", err, query)
@@ -1562,9 +1550,6 @@ func QueryOrchestrator(query string, argsArray []interface{}, on_row func(sqluti
 
 // QueryOrchestratorRowsMapBuffered
 func QueryOrchestratorRowsMapBuffered(query string, on_row func(sqlutils.RowMap) error) error {
-	if config.Config.DatabaselessMode__experimental {
-		return nil
-	}
 	query, err := translateStatement(query)
 	if err != nil {
 		return log.Fatalf("Cannot query orchestrator: %+v; query=%+v", err, query)
@@ -1579,9 +1564,6 @@ func QueryOrchestratorRowsMapBuffered(query string, on_row func(sqlutils.RowMap)
 
 // QueryOrchestratorBuffered
 func QueryOrchestratorBuffered(query string, argsArray []interface{}, on_row func(sqlutils.RowMap) error) error {
-	if config.Config.DatabaselessMode__experimental {
-		return nil
-	}
 	query, err := translateStatement(query)
 	if err != nil {
 		return log.Fatalf("Cannot query orchestrator: %+v; query=%+v", err, query)
