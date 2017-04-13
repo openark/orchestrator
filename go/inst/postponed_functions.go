@@ -47,3 +47,7 @@ func (this *PostponedFunctionsContainer) InvokePostponed() (err error) {
 	}
 	return err
 }
+
+func (this *PostponedFunctionsContainer) Len() int {
+	return len(this.PostponedFunctions)
+}

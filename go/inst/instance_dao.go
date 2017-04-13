@@ -233,6 +233,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		}
 	}()
 
+	readingStartTime := time.Now()
 	instance := NewInstance()
 	instanceFound := false
 	foundByShowSlaveHosts := false
@@ -703,6 +704,7 @@ Cleanup:
 	readTopologyInstanceCounter.Inc(1)
 	//	logReadTopologyInstanceError(instanceKey, "ReadTopologyInstanceBufferable", err)	// don't write here and a few lines later.
 	if instanceFound {
+		instance.LastReadingTime = time.Since(readingStartTime)
 		instance.IsLastCheckValid = true
 		instance.IsRecentlyChecked = true
 		instance.IsUpToDate = true
