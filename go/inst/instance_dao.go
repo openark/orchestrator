@@ -529,53 +529,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		logReadTopologyInstanceError(instanceKey, "processlist", err)
 	}
 
-	if config.Config.ReadLongRunningQueries && !isMaxScale {
-		// Get long running processes
-		latency.Start("instance")
-		err := sqlutils.QueryRowsMap(db, `
-				  select
-				    id,
-				    user,
-				    host,
-				    db,
-				    command,
-				    time,
-				    state,
-				    substr(processlist.info, 1, 1024) as info,
-				    now() - interval time second as started_at
-				  from
-				    information_schema.processlist
-				  where
-				    time > 60
-				    and command != 'Sleep'
-				    and id != connection_id()
-				    and user != 'system user'
-				    and command != 'Binlog dump'
-				    and command != 'Binlog Dump GTID'
-				    and user != 'event_scheduler'
-				  order by
-				    time desc
-        		`,
-			func(m sqlutils.RowMap) error {
-				process := Process{}
-				process.Id = m.GetInt64("id")
-				process.User = m.GetString("user")
-				process.Host = m.GetString("host")
-				process.Db = m.GetString("db")
-				process.Command = m.GetString("command")
-				process.Time = m.GetInt64("time")
-				process.State = m.GetString("state")
-				process.Info = m.GetString("info")
-				process.StartedAt = m.GetString("started_at")
-
-				longRunningProcesses = append(longRunningProcesses, process)
-				return nil
-			})
-		latency.Stop("instance")
-
-		logReadTopologyInstanceError(instanceKey, "processlist, long queries", err)
-	}
-
 	instance.UsingPseudoGTID = false
 	if config.Config.DetectPseudoGTIDQuery != "" && !isMaxScale {
 		latency.Start("instance")

@@ -16,7 +16,6 @@
   "#": "-----",
   "DiscoverByShowSlaveHosts": true,
   "InstancePollSeconds": 5,
-  "ReadLongRunningQueries": true,
   "HostnameResolveMethod": "default",
   "MySQLHostnameResolveMethod": "@@hostname",
   "ReasonableReplicationLagSeconds": 10,

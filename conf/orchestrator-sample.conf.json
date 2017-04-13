@@ -27,7 +27,6 @@
   "SlaveStartPostWaitMilliseconds": 1000,
   "DiscoverByShowSlaveHosts": true,
   "InstancePollSeconds": 5,
-  "ReadLongRunningQueries": true,
   "UnseenInstanceForgetHours": 240,
   "SnapshotTopologiesIntervalHours": 0,
   "InstanceBulkOperationsWaitTimeoutSeconds": 10,
