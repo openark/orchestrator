@@ -34,6 +34,10 @@ var (
 
 var ConfigurationLoaded chan bool = make(chan bool)
 
+const (
+	BinlogFileHistoryDays = 1
+)
+
 // Configuration makes for orchestrator configuration input, which can be provided by user via JSON formatted file.
 // Some of the parameteres have reasonable default values, and some (like database credentials) are
 // strictly expected from user.
@@ -84,7 +88,6 @@ type Configuration struct {
 	InstanceFlushIntervalMilliseconds            int      // Max interval between instance write buffer flushes
 	ReadLongRunningQueries                       bool     // Whether orchestrator should read and record current long running executing queries.
 	SkipMaxScaleCheck                            bool     // If you don't ever have MaxScale BinlogServer in your topology (and most people don't), set this to 'true' to save some pointless queries
-	BinlogFileHistoryDays                        int      // When > 0, amount of days for which orchestrator records per-instance binlog files & sizes
 	UnseenInstanceForgetHours                    uint     // Number of hours after which an unseen instance is forgotten
 	SnapshotTopologiesIntervalHours              uint     // Interval in hour between snapshot-topologies invocation. Default: 0 (disabled)
 	DiscoveryMaxConcurrency                      uint     // Number of goroutines doing hosts discovery
@@ -255,7 +258,6 @@ func newConfiguration() *Configuration {
 		InstanceFlushIntervalMilliseconds:            100,
 		ReadLongRunningQueries:                       true,
 		SkipMaxScaleCheck:                            false,
-		BinlogFileHistoryDays:                        0,
 		UnseenInstanceForgetHours:                    240,
 		SnapshotTopologiesIntervalHours:              0,
 		SlaveStartPostWaitMilliseconds:               1000,

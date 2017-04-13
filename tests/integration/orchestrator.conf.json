@@ -34,7 +34,6 @@
   "DiscoverByShowSlaveHosts": true,
   "InstancePollSeconds": 5,
   "ReadLongRunningQueries": true,
-  "BinlogFileHistoryDays": 10,
   "UnseenInstanceForgetHours": 240,
   "SnapshotTopologiesIntervalHours": 0,
   "DiscoveryPollSeconds": 1,

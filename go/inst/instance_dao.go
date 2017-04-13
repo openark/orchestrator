@@ -2506,14 +2506,11 @@ func RecordInstanceBinlogFileHistory() error {
         	delete from database_instance_binlog_files_history
 			where
 				last_seen < NOW() - INTERVAL ? DAY
-				`, config.Config.BinlogFileHistoryDays,
+				`, config.BinlogFileHistoryDays,
 			)
 			return log.Errore(err)
 		}
 		ExecDBWriteFunc(writeFunc)
-	}
-	if config.Config.BinlogFileHistoryDays == 0 {
-		return nil
 	}
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
