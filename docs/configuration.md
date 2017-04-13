@@ -25,7 +25,6 @@ The following is an incomplete list of configuration parameters. "Complete" is a
 * `DiscoverByShowSlaveHosts`    (bool), Attempt `SHOW SLAVE HOSTS` before `SHOW PROCESSLIST`
 * `InstancePollSeconds`         (uint), Number of seconds between instance reads
 * `UnseenInstanceForgetHours`   (uint), Number of hours after which an unseen instance is forgotten
-* `DiscoveryPollSeconds`        (uint), Auto/continuous discovery of instances sleep time between polls
 * `DiscoveryQueueMaxStatisticsSize` (int), Maximum number of secondly discovery queue statistic entries to keep
 * `InstanceBulkOperationsWaitTimeoutSeconds`  (uint), Time to wait on a single instance when doing bulk (many instances) operation
 * `ActiveNodeExpireSeconds` (uint), Maximum time to wait for active node to send keepalive before attempting to take over as active node.

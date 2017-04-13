@@ -35,7 +35,6 @@
   "InstancePollSeconds": 5,
   "UnseenInstanceForgetHours": 240,
   "SnapshotTopologiesIntervalHours": 0,
-  "DiscoveryPollSeconds": 1,
   "InstanceBulkOperationsWaitTimeoutSeconds": 10,
   "ActiveNodeExpireSeconds": 12,
   "HostnameResolveMethod": "default",

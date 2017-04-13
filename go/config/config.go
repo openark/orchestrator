@@ -35,6 +35,7 @@ var (
 var ConfigurationLoaded chan bool = make(chan bool)
 
 const (
+	DiscoveryPollSeconds  = 1
 	BinlogFileHistoryDays = 1
 	MaintenanceOwner      = "orchestrator"
 )
@@ -212,14 +213,6 @@ type Configuration struct {
 func (this *Configuration) ToJSONString() string {
 	b, _ := json.Marshal(this)
 	return string(b)
-}
-
-func (this *Configuration) GetDiscoveryPollSeconds() uint {
-	// Turning `DiscoveryPollSeconds` into hard coded value. I see no reason anymore why this would be configurable.
-	// After a couple years working with this I just set it to 1 whereever.
-	// Not making this value configurable solves other problems like inter-dependency between this value
-	// and others, like `InstancePollSeconds`, like cache timeouts etc.
-	return 1
 }
 
 // Config is *the* configuration instance, used globally to get configuration data
