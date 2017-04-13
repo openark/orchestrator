@@ -36,6 +36,7 @@ var ConfigurationLoaded chan bool = make(chan bool)
 
 const (
 	BinlogFileHistoryDays = 1
+	MaintenanceOwner      = "orchestrator"
 )
 
 // Configuration makes for orchestrator configuration input, which can be provided by user via JSON formatted file.
@@ -104,7 +105,6 @@ type Configuration struct {
 	ReasonableReplicationLagSeconds              int      // Above this value is considered a problem
 	ProblemIgnoreHostnameFilters                 []string // Will minimize problem visualization for hostnames matching given regexp filters
 	VerifyReplicationFilters                     bool     // Include replication filters check before approving topology refactoring
-	MaintenanceOwner                             string   // (Default) name of maintenance owner to use if none provided
 	ReasonableMaintenanceReplicationLagSeconds   int      // Above this value move-up and move-below are blocked
 	MaintenanceExpireMinutes                     uint     // Minutes after which a maintenance flag is considered stale and is cleared
 	MaintenancePurgeDays                         uint     // Days after which maintenance entries are purged from the database
@@ -276,7 +276,6 @@ func newConfiguration() *Configuration {
 		ReasonableReplicationLagSeconds:              10,
 		ProblemIgnoreHostnameFilters:                 []string{},
 		VerifyReplicationFilters:                     false,
-		MaintenanceOwner:                             "orchestrator",
 		ReasonableMaintenanceReplicationLagSeconds:   20,
 		MaintenanceExpireMinutes:                     10,
 		MaintenancePurgeDays:                         365,

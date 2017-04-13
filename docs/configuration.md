@@ -34,7 +34,6 @@ The following is an incomplete list of configuration parameters. "Complete" is a
 * `RejectHostnameResolvePattern`  (string), Regexp pattern for resolved hostname that will not be accepted (not cached, not written to db). This is done to avoid storing wrong resolves due to network glitches.
 * `ReasonableReplicationLagSeconds` (int), Above this value is considered a problem
 * `VerifyReplicationFilters`  (bool), Include replication filters check before approving topology refactoring (e.g. `orchestrator` will not allow placing a non-filteres replica under a filtered one)
-* `MaintenanceOwner`  (string), (Default) name of maintenance owner to use if none provided
 * `ReasonableMaintenanceReplicationLagSeconds` (int), Above this value move-up and move-below are blocked
 * `MaintenanceExpireMinutes`  (int), Minutes after which a maintenance flag is considered stale and is cleared
 * `MaintenancePurgeDays`  (int), Days after which maintenance entries are purged from the database

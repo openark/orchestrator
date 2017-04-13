@@ -40,7 +40,6 @@
   "ReasonableReplicationLagSeconds": 10,
   "ProblemIgnoreHostnameFilters": [],
   "VerifyReplicationFilters": false,
-  "MaintenanceOwner": "orchestrator",
   "ReasonableMaintenanceReplicationLagSeconds": 20,
   "MaintenanceExpireMinutes": 10,
   "MaintenancePurgeDays": 365,
