@@ -30,7 +30,6 @@
   "DefaultInstancePort": 3306,
   "SkipOrchestratorDatabaseUpdate": false,
   "SlaveLagQuery": "",
-  "SlaveStartPostWaitMilliseconds": 1000,
   "DiscoverByShowSlaveHosts": true,
   "InstancePollSeconds": 5,
   "UnseenInstanceForgetHours": 240,

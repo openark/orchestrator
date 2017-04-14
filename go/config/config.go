@@ -85,7 +85,6 @@ type Configuration struct {
 	DefaultInstancePort                          int      // In case port was not specified on command line
 	SlaveLagQuery                                string   // Synonym to ReplicationLagQuery
 	ReplicationLagQuery                          string   // custom query to check on replica lg (e.g. heartbeat table)
-	SlaveStartPostWaitMilliseconds               int      // Time to wait after START SLAVE before re-readong instance (give replica chance to connect to master)
 	DiscoverByShowSlaveHosts                     bool     // Attempt SHOW SLAVE HOSTS before PROCESSLIST
 	InstancePollSeconds                          uint     // Number of seconds between instance reads
 	InstanceWriteBufferSize                      int      // Instance write buffer size (max number of instances to flush in one INSERT ODKU)
@@ -251,7 +250,6 @@ func newConfiguration() *Configuration {
 		SkipMaxScaleCheck:                            false,
 		UnseenInstanceForgetHours:                    240,
 		SnapshotTopologiesIntervalHours:              0,
-		SlaveStartPostWaitMilliseconds:               1000,
 		DiscoverByShowSlaveHosts:                     false,
 		DiscoveryMaxConcurrency:                      300,
 		DiscoveryQueueCapacity:                       100000,

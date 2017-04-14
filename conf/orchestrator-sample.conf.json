@@ -24,7 +24,6 @@
   "MySQLOrchestratorUseMutualTLS": false,
   "MySQLConnectTimeoutSeconds": 1,
   "DefaultInstancePort": 3306,
-  "SlaveStartPostWaitMilliseconds": 1000,
   "DiscoverByShowSlaveHosts": true,
   "InstancePollSeconds": 5,
   "UnseenInstanceForgetHours": 240,

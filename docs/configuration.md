@@ -21,7 +21,6 @@ The following is an incomplete list of configuration parameters. "Complete" is a
 * `SkipOrchestratorDatabaseUpdate`  (bool), When false, orchestrator will attempt to create & update all tables in backend database; when true, this is skipped. It makes sense to skip on command-line invocations and to enable for http or occasional invocations, or just after upgrades
 * `ReplicaLagQuery`               (string), custom query to check on replica lg (e.g. heartbeat table). If unprovided,
   replica's `Seconds_Behind_Master` is used.
-* `SlaveStartPostWaitMilliseconds`  (int), Time to wait after `START SLAVE` before re-reading instance (give replica chance to connect to master)
 * `DiscoverByShowSlaveHosts`    (bool), Attempt `SHOW SLAVE HOSTS` before `SHOW PROCESSLIST`
 * `InstancePollSeconds`         (uint), Number of seconds between instance reads
 * `UnseenInstanceForgetHours`   (uint), Number of hours after which an unseen instance is forgotten
