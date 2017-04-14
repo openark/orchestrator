@@ -2339,6 +2339,22 @@ func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern str
 
 // RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.
 func RegisterCandidateInstance(instanceKey *InstanceKey, promotionRule CandidatePromotionRule) error {
+	// Work around for https://github.com/github/orchestrator/issues/39
+	// - set IsCandidate based on promotionRule
+	//
+	// read instance information from the orchestrator backend
+	if instance, found, err := ReadInstance(instanceKey); err == nil && found {
+		// determine what the modifed rule should be
+		newIsCandidate := (promotionRule == MustPromoteRule) || (promotionRule == PreferPromoteRule)
+
+		if instance.IsCandidate != newIsCandidate {
+			log.Debugf("RegisterCandidateInstance: %+v: Changing IsCandidate from %v to %v", instance.Key, instance.IsCandidate, newIsCandidate)
+			instance.IsCandidate = newIsCandidate
+			writeInstance(instance, false, nil)
+		}
+	}
+	// silently ignore errors from earlier (not ideal)
+
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
 				insert into candidate_database_instance (
