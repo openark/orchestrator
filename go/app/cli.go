@@ -293,7 +293,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicas(instanceKey, false, func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.DisplayString()) }, postponedFunctionsContainer)
 			lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 
-			postponedFunctionsContainer.InvokePostponed()
+			postponedFunctionsContainer.Wait()
 			if promotedReplica == nil {
 				log.Fatalf("Could not regroup replicas of %+v; error: %+v", *instanceKey, err)
 			}
@@ -580,7 +580,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 
 			lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasPseudoGTID(instanceKey, false, func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.DisplayString()) }, postponedFunctionsContainer)
 			lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
-			postponedFunctionsContainer.InvokePostponed()
+			postponedFunctionsContainer.Wait()
 			if promotedReplica == nil {
 				log.Fatalf("Could not regroup replicas of %+v; error: %+v", *instanceKey, err)
 			}
@@ -661,7 +661,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			instance := validateInstanceIsFound(instanceKey)
 
 			_, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instance, remote.SyncRelaylogsChangeMasterToSourceReplicaFunc, nil, true, postponedFunctionsContainer)
-			postponedFunctionsContainer.InvokePostponed()
+			postponedFunctionsContainer.Wait()
 
 			log.Infof("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
 			for _, replica := range syncedReplicas {
@@ -680,7 +680,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			instance := validateInstanceIsFound(instanceKey)
 
 			_, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instance, remote.SyncRelaylogsChangeMasterToSharedMasterFunc, nil, false, postponedFunctionsContainer)
-			postponedFunctionsContainer.InvokePostponed()
+			postponedFunctionsContainer.Wait()
 
 			log.Infof("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
 			for _, replica := range syncedReplicas {
