@@ -719,7 +719,7 @@ Cleanup:
 	readTopologyInstanceCounter.Inc(1)
 	//	logReadTopologyInstanceError(instanceKey, "ReadTopologyInstanceBufferable", err)	// don't write here and a few lines later.
 	if instanceFound {
-		instance.LastReadingTime = time.Since(readingStartTime)
+		instance.LastDiscoveryLatency = time.Since(readingStartTime)
 		instance.IsLastCheckValid = true
 		instance.IsRecentlyChecked = true
 		instance.IsUpToDate = true
@@ -966,6 +966,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.UnresolvedHostname = m.GetString("unresolved_hostname")
 	instance.AllowTLS = m.GetBool("allow_tls")
 	instance.InstanceAlias = m.GetString("instance_alias")
+	instance.LastDiscoveryLatency = time.Duration(m.GetInt64("last_discovery_latency")) * time.Nanosecond
 
 	instance.SlaveHosts.ReadJson(slaveHostsJSON)
 	instance.applyFlavorName()
@@ -2039,6 +2040,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"allow_tls",
 		"semi_sync_enforced",
 		"instance_alias",
+		"last_discovery_latency",
 	}
 
 	var values []string = make([]string, len(columns), len(columns))
@@ -2108,6 +2110,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.AllowTLS)
 		args = append(args, instance.SemiSyncEnforced)
 		args = append(args, instance.InstanceAlias)
+		args = append(args, instance.LastDiscoveryLatency.Nanoseconds())
 	}
 
 	sql, err := mkInsertOdku("database_instance", columns, values, len(instances), insertIgnore)

@@ -1749,7 +1749,7 @@ func MultiMatchBelowIndependently(replicas [](*Instance), belowKey *InstanceKey,
 					// we're configured to postpone operation on this replica so as not to delay everyone else.
 					postpone = true
 				}
-				if replica.LastReadingTime > ReasonableReadingTime {
+				if replica.LastDiscoveryLatency > ReasonableDiscoveryLatency {
 					postpone = true
 				}
 			}

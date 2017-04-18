@@ -39,7 +39,7 @@ const (
 	MustNotPromoteRule                          = "must_not"
 )
 
-const ReasonableReadingTime = 500 * time.Millisecond
+const ReasonableDiscoveryLatency = 500 * time.Millisecond
 
 // ParseCandidatePromotionRule returns a CandidatePromotionRule by name.
 // It returns an error if there is no known rule by the given name.
@@ -123,7 +123,7 @@ type Instance struct {
 	UnresolvedHostname   string
 	AllowTLS             bool
 
-	LastReadingTime time.Duration
+	LastDiscoveryLatency time.Duration
 }
 
 // NewInstance creates a new, empty instance
