@@ -236,6 +236,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		}
 	}()
 
+	readingStartTime := time.Now()
 	instance := NewInstance()
 	instanceFound := false
 	foundByShowSlaveHosts := false
@@ -706,6 +707,7 @@ Cleanup:
 	readTopologyInstanceCounter.Inc(1)
 	//	logReadTopologyInstanceError(instanceKey, "ReadTopologyInstanceBufferable", err)	// don't write here and a few lines later.
 	if instanceFound {
+		instance.LastReadingTime = time.Since(readingStartTime)
 		instance.IsLastCheckValid = true
 		instance.IsRecentlyChecked = true
 		instance.IsUpToDate = true
@@ -727,7 +729,7 @@ Cleanup:
 	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
 	_ = UpdateInstanceLastChecked(&instance.Key)
 	latency.Stop("backend")
-	return nil, fmt.Errorf("ReadTopologyInstanceBufferable failed: %v", err)
+	return nil, err
 }
 
 // ReadClusterAliasOverride reads and applies SuggestedClusterAlias based on cluster_alias_override

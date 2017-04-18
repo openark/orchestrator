@@ -1719,7 +1719,7 @@ func MultiMatchBelowIndependently(replicas [](*Instance), belowKey *InstanceKey,
 		// Parallelize repoints
 		go func() {
 			defer func() { barrier <- &replica.Key }()
-			ExecuteOnTopology(func() {
+			matchFunc := func() error {
 				replica, _, replicaErr := MatchBelow(&replica.Key, belowKey, true)
 
 				replicaMutex.Lock()
@@ -1730,7 +1730,26 @@ func MultiMatchBelowIndependently(replicas [](*Instance), belowKey *InstanceKey,
 				} else {
 					errs = append(errs, replicaErr)
 				}
-			})
+				return replicaErr
+			}
+			postpone := false
+			if postponedFunctionsContainer != nil {
+				if config.Config.PostponeReplicaRecoveryOnLagMinutes > 0 &&
+					replica.SQLDelay > config.Config.PostponeReplicaRecoveryOnLagMinutes*60 {
+					// This replica is lagging very much, AND
+					// we're configured to postpone operation on this replica so as not to delay everyone else.
+					postpone = true
+				}
+				if replica.LastReadingTime > ReasonableReadingTime {
+					postpone = true
+				}
+			}
+			if postpone {
+				postponedFunctionsContainer.AddPostponedFunction(matchFunc)
+				// We bail out and trust our invoker to later call upon this postponed function
+			} else {
+				ExecuteOnTopology(func() { matchFunc() })
+			}
 		}()
 	}
 	for range replicas {
@@ -1839,7 +1858,7 @@ func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlre
 						len(bucketReplicas) == 1 {
 						// This replica is the only one in the bucket, AND it's lagging very much, AND
 						// we're configured to postpone operation on this replica so as not to delay everyone else.
-						(*postponedFunctionsContainer).AddPostponedFunction(matchFunc)
+						postponedFunctionsContainer.AddPostponedFunction(matchFunc)
 						return
 						// We bail out and trust our invoker to later call upon this postponed function
 					}

@@ -17,33 +17,37 @@
 package inst
 
 import (
+	"sync"
+	"sync/atomic"
+
 	"github.com/openark/golib/log"
 )
 
 type PostponedFunctionsContainer struct {
-	PostponedFunctions [](func() error)
+	waitGroup      sync.WaitGroup
+	countFunctions int64
 }
 
 func NewPostponedFunctionsContainer() *PostponedFunctionsContainer {
 	postponedFunctionsContainer := &PostponedFunctionsContainer{}
-	postponedFunctionsContainer.PostponedFunctions = [](func() error){}
 	return postponedFunctionsContainer
 }
 
-func (this *PostponedFunctionsContainer) AddPostponedFunction(f func() error) {
-	this.PostponedFunctions = append(this.PostponedFunctions, f)
+func (this *PostponedFunctionsContainer) AddPostponedFunction(postponedFunction func() error) {
+	atomic.AddInt64(&this.countFunctions, 1)
+	this.waitGroup.Add(1)
+	go func() {
+		defer this.waitGroup.Done()
+		postponedFunction()
+	}()
 }
 
-func (this *PostponedFunctionsContainer) InvokePostponed() (err error) {
-	if len(this.PostponedFunctions) == 0 {
-		return
-	}
-	log.Debugf("PostponedFunctionsContainer: invoking %+v postponed functions", len(this.PostponedFunctions))
-	for _, postponedFunction := range this.PostponedFunctions {
-		ferr := postponedFunction()
-		if err == nil {
-			err = ferr
-		}
-	}
-	return err
+func (this *PostponedFunctionsContainer) Wait() {
+	log.Debugf("PostponedFunctionsContainer: waiting on %+v postponed functions", this.Len())
+	this.waitGroup.Wait()
+	log.Debugf("PostponedFunctionsContainer: done waiting")
+}
+
+func (this *PostponedFunctionsContainer) Len() int64 {
+	return atomic.LoadInt64(&this.countFunctions)
 }
