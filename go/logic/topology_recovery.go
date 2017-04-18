@@ -63,7 +63,6 @@ type TopologyRecovery struct {
 	RecoveryEndTimestamp      string
 	ProcessingNodeHostname    string
 	ProcessingNodeToken       string
-	PostponedFunctions        [](func() error)
 	Acknowledged              bool
 	AcknowledgedAt            string
 	AcknowledgedBy            string
@@ -81,7 +80,6 @@ func NewTopologyRecovery(replicationAnalysis inst.ReplicationAnalysis) *Topology
 	topologyRecovery.LostReplicas = *inst.NewInstanceKeyMap()
 	topologyRecovery.ParticipatingInstanceKeys = *inst.NewInstanceKeyMap()
 	topologyRecovery.AllErrors = []string{}
-	topologyRecovery.PostponedFunctions = [](func() error){}
 	topologyRecovery.RecoveryType = NotMasterRecovery
 	return topologyRecovery
 }
@@ -1292,9 +1290,9 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 			executeProcesses(config.Config.PostFailoverProcesses, "PostFailoverProcesses", topologyRecovery, false)
 		}
 	}
-	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Invoking %d postponed functions", topologyRecovery.PostponedFunctionsContainer.Len()))
-	topologyRecovery.InvokePostponed()
-	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Invoked %d postponed functions", topologyRecovery.PostponedFunctionsContainer.Len()))
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Waiting for %d postponed functions", topologyRecovery.PostponedFunctionsContainer.Len()))
+	topologyRecovery.Wait()
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Executed %d postponed functions", topologyRecovery.PostponedFunctionsContainer.Len()))
 	return recoveryAttempted, topologyRecovery, err
 }
 
