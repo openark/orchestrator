@@ -26,12 +26,10 @@ import (
 	"github.com/openark/golib/sqlutils"
 )
 
-var (
-	EmptyArgs []interface{}
-)
-
 type DummySqlResult struct {
 }
+
+var EmptyArgs []interface{}
 
 func (this DummySqlResult) LastInsertId() (int64, error) {
 	return 0, nil
@@ -1247,10 +1245,15 @@ func openTopology(host string, port int, readTimeout int) (*sql.DB, error) {
 	if config.Config.MySQLTopologyUseMutualTLS {
 		mysql_uri, _ = SetupMySQLTopologyTLS(mysql_uri)
 	}
+
 	db, _, err := sqlutils.GetDB(mysql_uri)
+	if err != nil {
+		return nil, err
+	}
+
 	db.SetMaxOpenConns(config.Config.MySQLTopologyMaxPoolConnections)
 	db.SetMaxIdleConns(config.Config.MySQLTopologyMaxPoolConnections)
-	return db, err
+	return db, nil
 }
 
 // OpenTopology returns the DB instance for the orchestrator backed database
