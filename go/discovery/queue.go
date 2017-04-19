@@ -82,7 +82,7 @@ func CreateOrReturnQueue(name string) *Queue {
 		name:         name,
 		queuedKeys:   make(map[inst.InstanceKey]time.Time),
 		consumedKeys: make(map[inst.InstanceKey]time.Time),
-		queue:        make(chan inst.InstanceKey, config.Config.DiscoveryQueueCapacity),
+		queue:        make(chan inst.InstanceKey, config.Config().DiscoveryQueueCapacity),
 	}
 	go q.startMonitoring()
 
@@ -119,8 +119,8 @@ func (q *Queue) collectStatistics() {
 	q.metrics = append(q.metrics, QueueMetric{Queued: len(q.queuedKeys), Active: len(q.consumedKeys)})
 
 	// remove old entries if we get too big
-	if len(q.metrics) > config.Config.DiscoveryQueueMaxStatisticsSize {
-		q.metrics = q.metrics[len(q.metrics)-config.Config.DiscoveryQueueMaxStatisticsSize:]
+	if len(q.metrics) > config.Config().DiscoveryQueueMaxStatisticsSize {
+		q.metrics = q.metrics[len(q.metrics)-config.Config().DiscoveryQueueMaxStatisticsSize:]
 	}
 }
 
@@ -166,7 +166,7 @@ func (q *Queue) Consume() inst.InstanceKey {
 
 	// alarm if have been waiting for too long
 	timeOnQueue := time.Since(q.queuedKeys[key])
-	if timeOnQueue > time.Duration(config.Config.InstancePollSeconds)*time.Second {
+	if timeOnQueue > time.Duration(config.Config().InstancePollSeconds)*time.Second {
 		log.Warningf("key %v spent %.4fs waiting on a discoveryQueue", key, timeOnQueue.Seconds())
 	}
 

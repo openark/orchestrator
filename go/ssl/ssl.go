@@ -72,7 +72,7 @@ func NewTLSConfig(caFile string, mutualTLS bool) (*tls.Config, error) {
 // Verify that the OU of the presented client certificate matches the list
 // of Valid OUs
 func Verify(r *nethttp.Request, validOUs []string) error {
-	if strings.Contains(r.URL.String(), config.Config.StatusEndpoint) && !config.Config.StatusOUVerify {
+	if strings.Contains(r.URL.String(), config.Config().StatusEndpoint) && !config.Config().StatusOUVerify {
 		return nil
 	}
 	if r.TLS == nil {

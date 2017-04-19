@@ -208,7 +208,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	}
 
 	if instance != "" && !strings.Contains(instance, ":") {
-		instance = fmt.Sprintf("%s:%d", instance, config.Config.DefaultInstancePort)
+		instance = fmt.Sprintf("%s:%d", instance, config.Config().DefaultInstancePort)
 	}
 
 	instanceKey, err := inst.ParseInstanceKey(instance)
@@ -222,7 +222,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	}
 
 	if destination != "" && !strings.Contains(destination, ":") {
-		destination = fmt.Sprintf("%s:%d", destination, config.Config.DefaultInstancePort)
+		destination = fmt.Sprintf("%s:%d", destination, config.Config().DefaultInstancePort)
 	}
 	destinationKey, err := inst.ParseInstanceKey(destination)
 	if err != nil {
@@ -232,7 +232,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		destinationKey = inst.ReadFuzzyInstanceKeyIfPossible(destinationKey)
 	}
 	if hostname, err := os.Hostname(); err == nil {
-		thisInstanceKey = &inst.InstanceKey{Hostname: hostname, Port: int(config.Config.DefaultInstancePort)}
+		thisInstanceKey = &inst.InstanceKey{Hostname: hostname, Port: int(config.Config().DefaultInstancePort)}
 	}
 	postponedFunctionsContainer := inst.NewPostponedFunctionsContainer()
 
@@ -1567,7 +1567,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("dump-config", "Meta", `Print out configuration in JSON format`):
 		{
-			jsonString := config.Config.ToJSONString()
+			jsonString := config.Config().ToJSONString()
 			fmt.Println(jsonString)
 		}
 	case registerCliCommand("show-resolve-hosts", "Meta", `Show the content of the hostname_resolve table. Generally used for debugging`):

@@ -46,7 +46,7 @@ func ExpireClusterDomainName() error {
 		_, err := db.ExecOrchestrator(`
     	delete from cluster_domain_name
 				where last_registered < NOW() - INTERVAL ? MINUTE
-				`, config.Config.ExpiryHostnameResolvesMinutes,
+				`, config.Config().ExpiryHostnameResolvesMinutes,
 		)
 		return log.Errore(err)
 	}

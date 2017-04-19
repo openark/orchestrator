@@ -26,7 +26,7 @@ import (
 // BeginDowntime will make mark an instance as downtimed (or override existing downtime period)
 func BeginDowntime(instanceKey *InstanceKey, owner string, reason string, durationSeconds uint) error {
 	if durationSeconds == 0 {
-		durationSeconds = config.Config.MaintenanceExpireMinutes * 60
+		durationSeconds = config.Config().MaintenanceExpireMinutes * 60
 	}
 	_, err := db.ExecOrchestrator(`
 			insert
@@ -94,7 +94,7 @@ func ExpireDowntime() error {
 				downtime_active is null
 				and end_timestamp < NOW() - INTERVAL ? DAY
 			`,
-			config.Config.MaintenancePurgeDays,
+			config.Config().MaintenancePurgeDays,
 		)
 		if err != nil {
 			return log.Errore(err)

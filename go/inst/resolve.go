@@ -52,8 +52,8 @@ var hostnameResolvesLightweightCacheInit = &sync.Mutex{}
 var hostnameResolvesLightweightCacheLoadedOnceFromDB bool = false
 
 func init() {
-	if config.Config.ExpiryHostnameResolvesMinutes < 1 {
-		config.Config.ExpiryHostnameResolvesMinutes = 1
+	if config.Config().ExpiryHostnameResolvesMinutes < 1 {
+		config.Config().ExpiryHostnameResolvesMinutes = 1
 	}
 }
 
@@ -61,13 +61,13 @@ func getHostnameResolvesLightweightCache() *cache.Cache {
 	hostnameResolvesLightweightCacheInit.Lock()
 	defer hostnameResolvesLightweightCacheInit.Unlock()
 	if hostnameResolvesLightweightCache == nil {
-		hostnameResolvesLightweightCache = cache.New(time.Duration(config.Config.ExpiryHostnameResolvesMinutes)*time.Minute, time.Minute)
+		hostnameResolvesLightweightCache = cache.New(time.Duration(config.Config().ExpiryHostnameResolvesMinutes)*time.Minute, time.Minute)
 	}
 	return hostnameResolvesLightweightCache
 }
 
 func HostnameResolveMethodIsNone() bool {
-	return strings.ToLower(config.Config.HostnameResolveMethod) == "none"
+	return strings.ToLower(config.Config().HostnameResolveMethod) == "none"
 }
 
 // GetCNAME resolves an IP or hostname into a normalized valid CNAME
@@ -81,7 +81,7 @@ func GetCNAME(hostname string) (string, error) {
 }
 
 func resolveHostname(hostname string) (string, error) {
-	switch strings.ToLower(config.Config.HostnameResolveMethod) {
+	switch strings.ToLower(config.Config().HostnameResolveMethod) {
 	case "none":
 		return hostname, nil
 	case "default":
@@ -129,10 +129,10 @@ func ResolveHostname(hostname string) (string, error) {
 	// Unfound: resolve!
 	log.Debugf("Hostname unresolved yet: %s", hostname)
 	resolvedHostname, err := resolveHostname(hostname)
-	if config.Config.RejectHostnameResolvePattern != "" {
+	if config.Config().RejectHostnameResolvePattern != "" {
 		// Reject, don't even cache
-		if matched, _ := regexp.MatchString(config.Config.RejectHostnameResolvePattern, resolvedHostname); matched {
-			log.Warningf("ResolveHostname: %+v resolved to %+v but rejected due to RejectHostnameResolvePattern '%+v'", hostname, resolvedHostname, config.Config.RejectHostnameResolvePattern)
+		if matched, _ := regexp.MatchString(config.Config().RejectHostnameResolvePattern, resolvedHostname); matched {
+			log.Warningf("ResolveHostname: %+v resolved to %+v but rejected due to RejectHostnameResolvePattern '%+v'", hostname, resolvedHostname, config.Config().RejectHostnameResolvePattern)
 			return hostname, nil
 		}
 	}
@@ -187,7 +187,7 @@ func loadHostnameResolveCacheFromDatabase() error {
 
 func FlushNontrivialResolveCacheToDatabase() error {
 	if !HostnameResolveMethodIsNone() {
-		return log.Errorf("FlushNontrivialResolveCacheToDatabase() called, but HostnameResolveMethod is %+v", config.Config.HostnameResolveMethod)
+		return log.Errorf("FlushNontrivialResolveCacheToDatabase() called, but HostnameResolveMethod is %+v", config.Config().HostnameResolveMethod)
 	}
 	items, _ := HostnameResolveCache()
 	for hostname := range items {
@@ -229,7 +229,7 @@ func UnresolveHostname(instanceKey *InstanceKey) (InstanceKey, bool, error) {
 	if err != nil {
 		return *instanceKey, false, log.Errore(err)
 	}
-	if instance.IsBinlogServer() && config.Config.SkipBinlogServerUnresolveCheck {
+	if instance.IsBinlogServer() && config.Config().SkipBinlogServerUnresolveCheck {
 		// Do nothing. Everything is assumed to be fine.
 	} else if instance.Key.Hostname != instanceKey.Hostname {
 		// Resolve(Unresolve(hostname)) != hostname ==> Bad; reject

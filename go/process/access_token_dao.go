@@ -63,7 +63,7 @@ func AcquireAccessToken(publicToken string) (secretToken string, err error) {
 						or is_reentrant=1
 					)
 			`,
-		publicToken, config.Config.AccessTokenUseExpirySeconds,
+		publicToken, config.Config().AccessTokenUseExpirySeconds,
 	)
 	if err != nil {
 		return secretToken, log.Errore(err)
@@ -101,7 +101,7 @@ func TokenIsValid(publicToken string, secretToken string) (result bool, err erro
 					or is_reentrant = 1
 				)
 		`
-	err = db.QueryOrchestrator(query, sqlutils.Args(publicToken, secretToken, config.Config.AccessTokenExpiryMinutes), func(m sqlutils.RowMap) error {
+	err = db.QueryOrchestrator(query, sqlutils.Args(publicToken, secretToken, config.Config().AccessTokenExpiryMinutes), func(m sqlutils.RowMap) error {
 		result = m.GetInt("valid_token") > 0
 		return nil
 	})
@@ -117,7 +117,7 @@ func ExpireAccessTokens() error {
 				generated_at < now() - interval ? minute
 				and is_reentrant = 0
 			`,
-		config.Config.AccessTokenExpiryMinutes,
+		config.Config().AccessTokenExpiryMinutes,
 	)
 	return log.Errore(err)
 }

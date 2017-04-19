@@ -1237,28 +1237,28 @@ var orchestratorTLSConfigured bool = false
 // It has lower read timeout than OpenTopology and is intended to
 // be used with low-latency discovery queries.
 func OpenDiscovery(host string, port int) (*sql.DB, error) {
-	return openTopology(host, port, config.Config.MySQLDiscoveryReadTimeoutSeconds)
+	return openTopology(host, port, config.Config().MySQLDiscoveryReadTimeoutSeconds)
 }
 
 // OpenTopology returns a DB instance to access a topology instance.
 func OpenTopology(host string, port int) (*sql.DB, error) {
-	return openTopology(host, port, config.Config.MySQLTopologyReadTimeoutSeconds)
+	return openTopology(host, port, config.Config().MySQLTopologyReadTimeoutSeconds)
 }
 
 func openTopology(host string, port int, readTimeout int) (*sql.DB, error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/?timeout=%ds&readTimeout=%ds",
-		config.Config.MySQLTopologyUser,
-		config.Config.MySQLTopologyPassword,
+		config.Config().MySQLTopologyUser,
+		config.Config().MySQLTopologyPassword,
 		host, port,
-		config.Config.MySQLConnectTimeoutSeconds,
+		config.Config().MySQLConnectTimeoutSeconds,
 		readTimeout,
 	)
-	if config.Config.MySQLTopologyUseMutualTLS {
+	if config.Config().MySQLTopologyUseMutualTLS {
 		mysql_uri, _ = SetupMySQLTopologyTLS(mysql_uri)
 	}
 	db, _, err := sqlutils.GetDB(mysql_uri)
-	db.SetMaxOpenConns(config.Config.MySQLTopologyMaxPoolConnections)
-	db.SetMaxIdleConns(config.Config.MySQLTopologyMaxPoolConnections)
+	db.SetMaxOpenConns(config.Config().MySQLTopologyMaxPoolConnections)
+	db.SetMaxIdleConns(config.Config().MySQLTopologyMaxPoolConnections)
 	return db, err
 }
 
@@ -1268,14 +1268,14 @@ func openTopology(host string, port int, readTimeout int) (*sql.DB, error) {
 // TODO: Way to have password mixed with TLS for various nodes in the topology.  Currently everything is TLS or everything is password
 func SetupMySQLTopologyTLS(uri string) (string, error) {
 	if !topologyTLSConfigured {
-		tlsConfig, err := ssl.NewTLSConfig(config.Config.MySQLTopologySSLCAFile, !config.Config.MySQLTopologySSLSkipVerify)
+		tlsConfig, err := ssl.NewTLSConfig(config.Config().MySQLTopologySSLCAFile, !config.Config().MySQLTopologySSLSkipVerify)
 		// Drop to TLS 1.0 for talking to MySQL
 		tlsConfig.MinVersion = tls.VersionTLS10
 		if err != nil {
 			return "", log.Fatalf("Can't create TLS configuration for Topology connection %s: %s", uri, err)
 		}
-		tlsConfig.InsecureSkipVerify = config.Config.MySQLTopologySSLSkipVerify
-		if err = ssl.AppendKeyPair(tlsConfig, config.Config.MySQLTopologySSLCertFile, config.Config.MySQLTopologySSLPrivateKeyFile); err != nil {
+		tlsConfig.InsecureSkipVerify = config.Config().MySQLTopologySSLSkipVerify
+		if err = ssl.AppendKeyPair(tlsConfig, config.Config().MySQLTopologySSLCertFile, config.Config().MySQLTopologySSLPrivateKeyFile); err != nil {
 			return "", log.Fatalf("Can't setup TLS key pairs for %s: %s", uri, err)
 		}
 		if err = mysql.RegisterTLSConfig("topology", tlsConfig); err != nil {
@@ -1288,43 +1288,43 @@ func SetupMySQLTopologyTLS(uri string) (string, error) {
 
 // OpenTopology returns the DB instance for the orchestrator backed database
 func OpenOrchestrator() (db *sql.DB, err error) {
-	if config.Config.DatabaselessMode__experimental {
+	if config.Config().DatabaselessMode__experimental {
 		return nil, nil
 	}
 	var fromCache bool
-	if config.Config.IsSQLite() {
-		db, fromCache, err = sqlutils.GetSQLiteDB(config.Config.SQLite3DataFile)
+	if config.Config().IsSQLite() {
+		db, fromCache, err = sqlutils.GetSQLiteDB(config.Config().SQLite3DataFile)
 		if err == nil && !fromCache {
-			log.Debugf("Connected to orchestrator backend: sqlite on %v", config.Config.SQLite3DataFile)
+			log.Debugf("Connected to orchestrator backend: sqlite on %v", config.Config().SQLite3DataFile)
 		}
 	} else {
 		mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&interpolateParams=%t",
-			config.Config.MySQLOrchestratorUser,
-			config.Config.MySQLOrchestratorPassword,
-			config.Config.MySQLOrchestratorHost,
-			config.Config.MySQLOrchestratorPort,
-			config.Config.MySQLOrchestratorDatabase,
-			config.Config.MySQLConnectTimeoutSeconds,
-			config.Config.MySQLOrchestratorReadTimeoutSeconds,
-			config.Config.MySQLInterpolateParams,
+			config.Config().MySQLOrchestratorUser,
+			config.Config().MySQLOrchestratorPassword,
+			config.Config().MySQLOrchestratorHost,
+			config.Config().MySQLOrchestratorPort,
+			config.Config().MySQLOrchestratorDatabase,
+			config.Config().MySQLConnectTimeoutSeconds,
+			config.Config().MySQLOrchestratorReadTimeoutSeconds,
+			config.Config().MySQLInterpolateParams,
 		)
-		if config.Config.MySQLOrchestratorUseMutualTLS {
+		if config.Config().MySQLOrchestratorUseMutualTLS {
 			mysql_uri, _ = SetupMySQLOrchestratorTLS(mysql_uri)
 		}
 		db, fromCache, err = sqlutils.GetDB(mysql_uri)
 		if err == nil && !fromCache {
 			// do not show the password but do show what we connect to.
-			safe_mysql_uri := fmt.Sprintf("%s:?@tcp(%s:%d)/%s?timeout=%ds", config.Config.MySQLOrchestratorUser,
-				config.Config.MySQLOrchestratorHost, config.Config.MySQLOrchestratorPort, config.Config.MySQLOrchestratorDatabase, config.Config.MySQLConnectTimeoutSeconds)
+			safe_mysql_uri := fmt.Sprintf("%s:?@tcp(%s:%d)/%s?timeout=%ds", config.Config().MySQLOrchestratorUser,
+				config.Config().MySQLOrchestratorHost, config.Config().MySQLOrchestratorPort, config.Config().MySQLOrchestratorDatabase, config.Config().MySQLConnectTimeoutSeconds)
 			log.Debugf("Connected to orchestrator backend: %v", safe_mysql_uri)
-			if config.Config.MySQLOrchestratorMaxPoolConnections > 0 {
-				log.Debugf("Orchestrator pool SetMaxOpenConns: %d", config.Config.MySQLOrchestratorMaxPoolConnections)
-				db.SetMaxOpenConns(config.Config.MySQLOrchestratorMaxPoolConnections)
+			if config.Config().MySQLOrchestratorMaxPoolConnections > 0 {
+				log.Debugf("Orchestrator pool SetMaxOpenConns: %d", config.Config().MySQLOrchestratorMaxPoolConnections)
+				db.SetMaxOpenConns(config.Config().MySQLOrchestratorMaxPoolConnections)
 			}
 		}
 	}
 	if err == nil && !fromCache {
-		if !config.Config.SkipOrchestratorDatabaseUpdate {
+		if !config.Config().SkipOrchestratorDatabaseUpdate {
 			initOrchestratorDB(db)
 		}
 		db.SetMaxIdleConns(10)
@@ -1333,7 +1333,7 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 }
 
 func translateStatement(statement string) (string, error) {
-	if config.Config.IsSQLite() {
+	if config.Config().IsSQLite() {
 		statement = sqlutils.ToSqlite3Dialect(statement)
 	}
 	return statement, nil
@@ -1377,14 +1377,14 @@ func registerOrchestratorDeployment(db *sql.DB) error {
 // Modify the supplied URI to call the TLS config
 func SetupMySQLOrchestratorTLS(uri string) (string, error) {
 	if !orchestratorTLSConfigured {
-		tlsConfig, err := ssl.NewTLSConfig(config.Config.MySQLOrchestratorSSLCAFile, true)
+		tlsConfig, err := ssl.NewTLSConfig(config.Config().MySQLOrchestratorSSLCAFile, true)
 		// Drop to TLS 1.0 for talking to MySQL
 		tlsConfig.MinVersion = tls.VersionTLS10
 		if err != nil {
 			return "", log.Fatalf("Can't create TLS configuration for Orchestrator connection %s: %s", uri, err)
 		}
-		tlsConfig.InsecureSkipVerify = config.Config.MySQLOrchestratorSSLSkipVerify
-		if err = ssl.AppendKeyPair(tlsConfig, config.Config.MySQLOrchestratorSSLCertFile, config.Config.MySQLOrchestratorSSLPrivateKeyFile); err != nil {
+		tlsConfig.InsecureSkipVerify = config.Config().MySQLOrchestratorSSLSkipVerify
+		if err = ssl.AppendKeyPair(tlsConfig, config.Config().MySQLOrchestratorSSLCertFile, config.Config().MySQLOrchestratorSSLPrivateKeyFile); err != nil {
 			return "", log.Fatalf("Can't setup TLS key pairs for %s: %s", uri, err)
 		}
 		if err = mysql.RegisterTLSConfig("orchestrator", tlsConfig); err != nil {
@@ -1411,7 +1411,7 @@ func deployStatements(db *sql.DB, queries []string) error {
 	// along with the "invalid" definition, and then go ahead and fix those definitions via following ALTER statements.
 	// My bad.
 	originalSqlMode := ""
-	if config.Config.IsMySQL() {
+	if config.Config().IsMySQL() {
 		err = tx.QueryRow(`select @@session.sql_mode`).Scan(&originalSqlMode)
 		if _, err := tx.Exec(`set @@session.sql_mode=REPLACE(@@session.sql_mode, 'NO_ZERO_DATE', '')`); err != nil {
 			log.Fatale(err)
@@ -1445,7 +1445,7 @@ func deployStatements(db *sql.DB, queries []string) error {
 			}
 		}
 	}
-	if config.Config.IsMySQL() {
+	if config.Config().IsMySQL() {
 		if _, err := tx.Exec(`set session sql_mode=?`, originalSqlMode); err != nil {
 			log.Fatale(err)
 		}
@@ -1466,7 +1466,7 @@ func initOrchestratorDB(db *sql.DB) error {
 		// Already deployed with this version
 		return nil
 	}
-	if config.Config.PanicIfDifferentDatabaseDeploy && config.RuntimeCLIFlags.ConfiguredVersion != "" && !versionAlreadyDeployed {
+	if config.Config().PanicIfDifferentDatabaseDeploy && config.RuntimeCLIFlags.ConfiguredVersion != "" && !versionAlreadyDeployed {
 		log.Fatalf("PanicIfDifferentDatabaseDeploy is set. Configured version %s is not the version found in the database", config.RuntimeCLIFlags.ConfiguredVersion)
 	}
 	log.Debugf("Migrating database schema")
@@ -1474,7 +1474,7 @@ func initOrchestratorDB(db *sql.DB) error {
 	deployStatements(db, generateSQLPatches)
 	registerOrchestratorDeployment(db)
 
-	if config.Config.IsSQLite() {
+	if config.Config().IsSQLite() {
 		ExecOrchestrator(`PRAGMA journal_mode = WAL`)
 		ExecOrchestrator(`PRAGMA synchronous = NORMAL`)
 	}
@@ -1506,7 +1506,7 @@ func execInternal(db *sql.DB, query string, args ...interface{}) (sql.Result, er
 
 // ExecOrchestrator will execute given query on the orchestrator backend database.
 func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
-	if config.Config.DatabaselessMode__experimental {
+	if config.Config().DatabaselessMode__experimental {
 		return DummySqlResult{}, nil
 	}
 	var err error
@@ -1519,7 +1519,7 @@ func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
 		return nil, err
 	}
 	dbexec := sqlutils.Exec
-	if config.Config.MySQLInterpolateParams {
+	if config.Config().MySQLInterpolateParams {
 		dbexec = sqlutils.ExecNoPrepare
 	}
 	res, err := dbexec(db, query, args...)
@@ -1528,7 +1528,7 @@ func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
 
 // QueryRowsMapOrchestrator
 func QueryOrchestratorRowsMap(query string, on_row func(sqlutils.RowMap) error) error {
-	if config.Config.DatabaselessMode__experimental {
+	if config.Config().DatabaselessMode__experimental {
 		return nil
 	}
 	query, err := translateStatement(query)
@@ -1545,7 +1545,7 @@ func QueryOrchestratorRowsMap(query string, on_row func(sqlutils.RowMap) error) 
 
 // QueryOrchestrator
 func QueryOrchestrator(query string, argsArray []interface{}, on_row func(sqlutils.RowMap) error) error {
-	if config.Config.DatabaselessMode__experimental {
+	if config.Config().DatabaselessMode__experimental {
 		return nil
 	}
 	query, err := translateStatement(query)
@@ -1562,7 +1562,7 @@ func QueryOrchestrator(query string, argsArray []interface{}, on_row func(sqluti
 
 // QueryOrchestratorRowsMapBuffered
 func QueryOrchestratorRowsMapBuffered(query string, on_row func(sqlutils.RowMap) error) error {
-	if config.Config.DatabaselessMode__experimental {
+	if config.Config().DatabaselessMode__experimental {
 		return nil
 	}
 	query, err := translateStatement(query)
@@ -1579,7 +1579,7 @@ func QueryOrchestratorRowsMapBuffered(query string, on_row func(sqlutils.RowMap)
 
 // QueryOrchestratorBuffered
 func QueryOrchestratorBuffered(query string, argsArray []interface{}, on_row func(sqlutils.RowMap) error) error {
-	if config.Config.DatabaselessMode__experimental {
+	if config.Config().DatabaselessMode__experimental {
 		return nil
 	}
 	query, err := translateStatement(query)

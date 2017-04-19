@@ -8,27 +8,27 @@ import (
 )
 
 func init() {
-	Config.HostnameResolveMethod = "none"
+	Config().HostnameResolveMethod = "none"
 	log.SetLevel(log.ERROR)
 }
 
 func TestReplicationLagQuery(t *testing.T) {
 	{
-		c := newConfiguration()
+		c := defaultConfiguration()
 		c.SlaveLagQuery = "select 3"
 		c.ReplicationLagQuery = "select 4"
 		err := c.postReadAdjustments()
 		test.S(t).ExpectNotNil(err)
 	}
 	{
-		c := newConfiguration()
+		c := defaultConfiguration()
 		c.SlaveLagQuery = "select 3"
 		c.ReplicationLagQuery = "select 3"
 		err := c.postReadAdjustments()
 		test.S(t).ExpectNil(err)
 	}
 	{
-		c := newConfiguration()
+		c := defaultConfiguration()
 		c.SlaveLagQuery = "select 3"
 		c.ReplicationLagQuery = ""
 		err := c.postReadAdjustments()
@@ -39,21 +39,21 @@ func TestReplicationLagQuery(t *testing.T) {
 
 func TestPostponeReplicaRecoveryOnLagMinutes(t *testing.T) {
 	{
-		c := newConfiguration()
+		c := defaultConfiguration()
 		c.PostponeSlaveRecoveryOnLagMinutes = 3
 		c.PostponeReplicaRecoveryOnLagMinutes = 5
 		err := c.postReadAdjustments()
 		test.S(t).ExpectNotNil(err)
 	}
 	{
-		c := newConfiguration()
+		c := defaultConfiguration()
 		c.PostponeSlaveRecoveryOnLagMinutes = 3
 		c.PostponeReplicaRecoveryOnLagMinutes = 3
 		err := c.postReadAdjustments()
 		test.S(t).ExpectNil(err)
 	}
 	{
-		c := newConfiguration()
+		c := defaultConfiguration()
 		c.PostponeSlaveRecoveryOnLagMinutes = 3
 		c.PostponeReplicaRecoveryOnLagMinutes = 0
 		err := c.postReadAdjustments()
@@ -64,7 +64,7 @@ func TestPostponeReplicaRecoveryOnLagMinutes(t *testing.T) {
 
 func TestMasterFailoverDetachReplicaMasterHost(t *testing.T) {
 	{
-		c := newConfiguration()
+		c := defaultConfiguration()
 		c.MasterFailoverDetachSlaveMasterHost = false
 		c.MasterFailoverDetachReplicaMasterHost = false
 		err := c.postReadAdjustments()
@@ -72,7 +72,7 @@ func TestMasterFailoverDetachReplicaMasterHost(t *testing.T) {
 		test.S(t).ExpectFalse(c.MasterFailoverDetachReplicaMasterHost)
 	}
 	{
-		c := newConfiguration()
+		c := defaultConfiguration()
 		c.MasterFailoverDetachSlaveMasterHost = false
 		c.MasterFailoverDetachReplicaMasterHost = true
 		err := c.postReadAdjustments()
@@ -80,7 +80,7 @@ func TestMasterFailoverDetachReplicaMasterHost(t *testing.T) {
 		test.S(t).ExpectTrue(c.MasterFailoverDetachReplicaMasterHost)
 	}
 	{
-		c := newConfiguration()
+		c := defaultConfiguration()
 		c.MasterFailoverDetachSlaveMasterHost = true
 		c.MasterFailoverDetachReplicaMasterHost = false
 		err := c.postReadAdjustments()
@@ -91,7 +91,7 @@ func TestMasterFailoverDetachReplicaMasterHost(t *testing.T) {
 
 func TestMasterFailoverDetachDetachLostReplicasAfterMasterFailover(t *testing.T) {
 	{
-		c := newConfiguration()
+		c := defaultConfiguration()
 		c.DetachLostSlavesAfterMasterFailover = false
 		c.DetachLostReplicasAfterMasterFailover = false
 		err := c.postReadAdjustments()
@@ -99,7 +99,7 @@ func TestMasterFailoverDetachDetachLostReplicasAfterMasterFailover(t *testing.T)
 		test.S(t).ExpectFalse(c.DetachLostReplicasAfterMasterFailover)
 	}
 	{
-		c := newConfiguration()
+		c := defaultConfiguration()
 		c.DetachLostSlavesAfterMasterFailover = false
 		c.DetachLostReplicasAfterMasterFailover = true
 		err := c.postReadAdjustments()
@@ -107,7 +107,7 @@ func TestMasterFailoverDetachDetachLostReplicasAfterMasterFailover(t *testing.T)
 		test.S(t).ExpectTrue(c.DetachLostReplicasAfterMasterFailover)
 	}
 	{
-		c := newConfiguration()
+		c := defaultConfiguration()
 		c.DetachLostSlavesAfterMasterFailover = true
 		c.DetachLostReplicasAfterMasterFailover = false
 		err := c.postReadAdjustments()
@@ -118,7 +118,7 @@ func TestMasterFailoverDetachDetachLostReplicasAfterMasterFailover(t *testing.T)
 
 func TestRecoveryPeriodBlock(t *testing.T) {
 	{
-		c := newConfiguration()
+		c := defaultConfiguration()
 		c.RecoveryPeriodBlockSeconds = 0
 		c.RecoveryPeriodBlockMinutes = 0
 		err := c.postReadAdjustments()
@@ -126,7 +126,7 @@ func TestRecoveryPeriodBlock(t *testing.T) {
 		test.S(t).ExpectEquals(c.RecoveryPeriodBlockSeconds, 0)
 	}
 	{
-		c := newConfiguration()
+		c := defaultConfiguration()
 		c.RecoveryPeriodBlockSeconds = 30
 		c.RecoveryPeriodBlockMinutes = 1
 		err := c.postReadAdjustments()
@@ -134,7 +134,7 @@ func TestRecoveryPeriodBlock(t *testing.T) {
 		test.S(t).ExpectEquals(c.RecoveryPeriodBlockSeconds, 30)
 	}
 	{
-		c := newConfiguration()
+		c := defaultConfiguration()
 		c.RecoveryPeriodBlockSeconds = 0
 		c.RecoveryPeriodBlockMinutes = 2
 		err := c.postReadAdjustments()
@@ -142,7 +142,7 @@ func TestRecoveryPeriodBlock(t *testing.T) {
 		test.S(t).ExpectEquals(c.RecoveryPeriodBlockSeconds, 120)
 	}
 	{
-		c := newConfiguration()
+		c := defaultConfiguration()
 		c.RecoveryPeriodBlockSeconds = 15
 		c.RecoveryPeriodBlockMinutes = 0
 		err := c.postReadAdjustments()

@@ -35,8 +35,8 @@ type ClusterInfo struct {
 
 // ReadRecoveryInfo
 func (this *ClusterInfo) ReadRecoveryInfo() {
-	this.HasAutomatedMasterRecovery = this.filtersMatchCluster(config.Config.RecoverMasterClusterFilters)
-	this.HasAutomatedIntermediateMasterRecovery = this.filtersMatchCluster(config.Config.RecoverIntermediateMasterClusterFilters)
+	this.HasAutomatedMasterRecovery = this.filtersMatchCluster(config.Config().RecoverMasterClusterFilters)
+	this.HasAutomatedIntermediateMasterRecovery = this.filtersMatchCluster(config.Config().RecoverIntermediateMasterClusterFilters)
 }
 
 // filtersMatchCluster will see whether the given filters match the given cluster details
@@ -76,9 +76,9 @@ func (this *ClusterInfo) ApplyClusterAlias() {
 		return
 	}
 	// Try out the hard-wired config:
-	for pattern := range config.Config.ClusterNameToAlias {
+	for pattern := range config.Config().ClusterNameToAlias {
 		if matched, _ := regexp.MatchString(pattern, this.ClusterName); matched {
-			this.ClusterAlias = config.Config.ClusterNameToAlias[pattern]
+			this.ClusterAlias = config.Config().ClusterNameToAlias[pattern]
 		}
 	}
 }

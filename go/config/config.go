@@ -22,6 +22,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 
 	"gopkg.in/gcfg.v1"
 
@@ -222,11 +223,27 @@ func (this *Configuration) GetDiscoveryPollSeconds() uint {
 	return 1
 }
 
-// Config is *the* configuration instance, used globally to get configuration data
-var Config = newConfiguration()
-var readFileNames []string
+// config is a private copy of the global configuration
+var config = defaultConfiguration()
 
-func newConfiguration() *Configuration {
+// records a copy of the file names read at startup.
+var readFileNames []string
+var lock sync.RWMutex
+
+// Config() returns a copy of the pointer to the configuration to
+// avoid it being overwritten while the configuration is being read
+// or reloaded.
+func Config() *Configuration {
+	lock.RLock()
+	defer lock.RUnlock()
+
+	c := config
+
+	return c
+}
+
+// defaultConfiguration returns the orchestrator default configuration settings
+func defaultConfiguration() *Configuration {
 	return &Configuration{
 		Debug:                                        false,
 		EnableSyslog:                                 false,
@@ -376,6 +393,10 @@ func newConfiguration() *Configuration {
 }
 
 func (this *Configuration) postReadAdjustments() error {
+	// lock the configuration before potentially changing it
+	lock.Lock()
+	defer lock.Unlock()
+
 	if this.MySQLOrchestratorCredentialsConfigFile != "" {
 		mySQLConfig := struct {
 			Client struct {
@@ -493,51 +514,71 @@ func (this *Configuration) IsMySQL() bool {
 	return this.BackendDB == "mysql" || this.BackendDB == ""
 }
 
-// read reads configuration from given file, or silently skips if the file does not exist.
-// If the file does exist, then it is expected to be in valid JSON format or the function bails out.
-func read(fileName string) (*Configuration, error) {
+// read reads configuration from given file, or silently skips if
+// the file does not exist.  If the file does exist, then it is
+// expected to be in valid JSON format or the function bails out.
+// - a current configuration is provided and changes are applied to
+//   that.
+func read(fileName string, c *Configuration) error {
 	file, err := os.Open(fileName)
 	if err == nil {
 		decoder := json.NewDecoder(file)
-		err := decoder.Decode(Config)
+		err := decoder.Decode(c) // modify provided config
 		if err == nil {
 			log.Infof("Read config: %s", fileName)
 		} else {
 			log.Fatal("Cannot read config file:", fileName, err)
 		}
-		if err := Config.postReadAdjustments(); err != nil {
+		if err := c.postReadAdjustments(); err != nil {
 			log.Fatale(err)
 		}
 	}
-	return Config, err
+	return err
 }
 
-// Read reads configuration from zero, either, some or all given files, in order of input.
-// A file can override configuration provided in previous file.
-func Read(fileNames ...string) *Configuration {
+// Read reads configuration information from zero or more files
+// after first applying the default configuration.  Each file can
+// override configuration provided in the previous file.
+// - the final configuration can be read by calling Config()
+func Read(fileNames ...string) {
+	c := defaultConfiguration()
+
 	for _, fileName := range fileNames {
-		read(fileName)
+		read(fileName, c) // ignore errors!
 	}
 	readFileNames = fileNames
-	return Config
+
+	lock.Lock()
+	config = c // modify global config
+	lock.Unlock()
 }
 
 // ForceRead reads configuration from given file name or bails out if it fails
-func ForceRead(fileName string) *Configuration {
-	_, err := read(fileName)
+func ForceRead(fileName string) {
+	c := defaultConfiguration()
+
+	err := read(fileName, c)
 	if err != nil {
 		log.Fatal("Cannot read config file:", fileName, err)
 	}
 	readFileNames = []string{fileName}
-	return Config
+
+	lock.Lock()
+	config = c // modify global config
+	lock.Unlock()
 }
 
 // Reload re-reads configuration from last used files
-func Reload() *Configuration {
+func Reload() {
+	c := defaultConfiguration()
+
 	for _, fileName := range readFileNames {
-		read(fileName)
+		read(fileName, c) // ignore errors!
 	}
-	return Config
+
+	lock.Lock()
+	config = c // modify global config
+	lock.Unlock()
 }
 
 // MarkConfigurationLoaded is called once configuration has first been loaded.
@@ -550,4 +591,18 @@ func MarkConfigurationLoaded() {
 	}()
 	// wait for it
 	<-ConfigurationLoaded
+}
+
+func SetDatabaselessMode__experimental() {
+	lock.Lock()
+	defer lock.Unlock()
+
+	config.DatabaselessMode__experimental = true
+}
+
+func SetStatusOUVerify(value bool) {
+	lock.Lock()
+	defer lock.Unlock()
+
+	config.StatusOUVerify = value
 }

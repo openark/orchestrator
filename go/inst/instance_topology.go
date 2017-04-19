@@ -1265,7 +1265,7 @@ Cleanup:
 // and return found coordinates as well as entry text
 func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordinates BinlogCoordinates, maxBinlogCoordinates *BinlogCoordinates, exhaustiveSearch bool, expectedBinlogFormat *string) (instancePseudoGtidCoordinates *BinlogCoordinates, instancePseudoGtidText string, err error) {
 
-	if config.Config.PseudoGTIDPattern == "" {
+	if config.Config().PseudoGTIDPattern == "" {
 		return instancePseudoGtidCoordinates, instancePseudoGtidText, fmt.Errorf("PseudoGTIDPattern not configured; cannot use Pseudo-GTID")
 	}
 
@@ -1303,7 +1303,7 @@ func CorrelateBinlogCoordinates(instance *Instance, binlogCoordinates *BinlogCoo
 	if err != nil {
 		return nil, 0, err
 	}
-	entriesMonotonic := (config.Config.PseudoGTIDMonotonicHint != "") && strings.Contains(instancePseudoGtidText, config.Config.PseudoGTIDMonotonicHint)
+	entriesMonotonic := (config.Config().PseudoGTIDMonotonicHint != "") && strings.Contains(instancePseudoGtidText, config.Config().PseudoGTIDMonotonicHint)
 	minBinlogCoordinates, _, err := GetHeuristiclyRecentCoordinatesForInstance(&otherInstance.Key)
 	otherInstancePseudoGtidCoordinates, err := SearchEntryInInstanceBinlogs(otherInstance, instancePseudoGtidText, entriesMonotonic, minBinlogCoordinates)
 	if err != nil {
@@ -1373,7 +1373,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	if err != nil {
 		return instance, nil, err
 	}
-	if config.Config.PseudoGTIDPattern == "" {
+	if config.Config().PseudoGTIDPattern == "" {
 		return instance, nil, fmt.Errorf("PseudoGTIDPattern not configured; cannot use Pseudo-GTID")
 	}
 	if instanceKey.Equals(otherKey) {
@@ -1672,7 +1672,7 @@ func sortedReplicas(replicas [](*Instance), stopReplicationMethod StopReplicatio
 	if len(replicas) == 0 {
 		return replicas
 	}
-	replicas = StopSlaves(replicas, stopReplicationMethod, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
+	replicas = StopSlaves(replicas, stopReplicationMethod, time.Duration(config.Config().InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
 	replicas = RemoveNilInstances(replicas)
 
 	sortInstances(replicas)
@@ -1767,14 +1767,14 @@ func MultiMatchBelowIndependently(replicas [](*Instance), belowKey *InstanceKey,
 // MultiMatchBelow will efficiently match multiple replicas below a given instance.
 // It is assumed that all given replicas are siblings
 func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlreadyStopped bool, postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), *Instance, error, []error) {
-	if config.Config.PseudoGTIDPreferIndependentMultiMatch {
+	if config.Config().PseudoGTIDPreferIndependentMultiMatch {
 		return MultiMatchBelowIndependently(replicas, belowKey, postponedFunctionsContainer)
 	}
 	res := [](*Instance){}
 	errs := []error{}
 	replicaMutex := make(chan bool, 1)
 
-	if config.Config.PseudoGTIDPattern == "" {
+	if config.Config().PseudoGTIDPattern == "" {
 		return res, nil, fmt.Errorf("PseudoGTIDPattern not configured; cannot use Pseudo-GTID"), errs
 	}
 
@@ -1809,7 +1809,7 @@ func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlre
 		log.Debugf("MultiMatchBelow: stopping %d replicas nicely", len(replicas))
 		// We want the replicas to have SQL thread up to date with IO thread.
 		// We will wait for them (up to a timeout) to do so.
-		replicas = StopSlavesNicely(replicas, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
+		replicas = StopSlavesNicely(replicas, time.Duration(config.Config().InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
 	}
 	replicas = RemoveNilInstances(replicas)
 	sort.Sort(sort.Reverse(InstancesByExecBinlogCoordinates(replicas)))
@@ -1853,8 +1853,8 @@ func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlre
 						return nil
 					}
 					if postponedFunctionsContainer != nil &&
-						config.Config.PostponeReplicaRecoveryOnLagMinutes > 0 &&
-						replica.SQLDelay > config.Config.PostponeReplicaRecoveryOnLagMinutes*60 &&
+						config.Config().PostponeReplicaRecoveryOnLagMinutes > 0 &&
+						replica.SQLDelay > config.Config().PostponeReplicaRecoveryOnLagMinutes*60 &&
 						len(bucketReplicas) == 1 {
 						// This replica is the only one in the bucket, AND it's lagging very much, AND
 						// we're configured to postpone operation on this replica so as not to delay everyone else.
@@ -2097,7 +2097,7 @@ func IsBannedFromBeingCandidateReplica(replica *Instance) bool {
 		log.Debugf("instance %+v is banned because of promotion rule", replica.Key)
 		return true
 	}
-	for _, filter := range config.Config.PromotionIgnoreHostnameFilters {
+	for _, filter := range config.Config().PromotionIgnoreHostnameFilters {
 		if matched, _ := regexp.MatchString(filter, replica.Key.Hostname); matched {
 			return true
 		}
@@ -2283,7 +2283,7 @@ func RegroupReplicasPseudoGTID(masterKey *InstanceKey, returnReplicaEvenOnFailur
 		return aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, candidateReplica, err
 	}
 
-	if config.Config.PseudoGTIDPattern == "" {
+	if config.Config().PseudoGTIDPattern == "" {
 		return aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, candidateReplica, fmt.Errorf("PseudoGTIDPattern not configured; cannot use Pseudo-GTID")
 	}
 

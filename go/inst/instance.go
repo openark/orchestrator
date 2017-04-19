@@ -351,7 +351,7 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 			return false, fmt.Errorf("Cannot replicate from %+v binlog format on %+v to %+v on %+v", other.Binlog_format, other.Key, this.Binlog_format, this.Key)
 		}
 	}
-	if config.Config.VerifyReplicationFilters {
+	if config.Config().VerifyReplicationFilters {
 		if other.HasReplicationFilters && !this.HasReplicationFilters {
 			return false, fmt.Errorf("%+v has replication filters", other.Key)
 		}
@@ -366,9 +366,9 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 func (this *Instance) HasReasonableMaintenanceReplicationLag() bool {
 	// replicas with SQLDelay are a special case
 	if this.SQLDelay > 0 {
-		return math.AbsInt64(this.SecondsBehindMaster.Int64-int64(this.SQLDelay)) <= int64(config.Config.ReasonableMaintenanceReplicationLagSeconds)
+		return math.AbsInt64(this.SecondsBehindMaster.Int64-int64(this.SQLDelay)) <= int64(config.Config().ReasonableMaintenanceReplicationLagSeconds)
 	}
-	return this.SecondsBehindMaster.Int64 <= int64(config.Config.ReasonableMaintenanceReplicationLagSeconds)
+	return this.SecondsBehindMaster.Int64 <= int64(config.Config().ReasonableMaintenanceReplicationLagSeconds)
 }
 
 // CanMove returns true if this instance's state allows it to be repositioned. For example,
@@ -451,7 +451,7 @@ func (this *Instance) LagStatusString() string {
 	if this.IsReplica() && !this.SecondsBehindMaster.Valid {
 		return "null"
 	}
-	if this.IsReplica() && this.SlaveLagSeconds.Int64 > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
+	if this.IsReplica() && this.SlaveLagSeconds.Int64 > int64(config.Config().ReasonableMaintenanceReplicationLagSeconds) {
 		return fmt.Sprintf("%+vs", this.SlaveLagSeconds.Int64)
 	}
 	return fmt.Sprintf("%+vs", this.SlaveLagSeconds.Int64)

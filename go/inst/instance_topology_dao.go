@@ -385,8 +385,8 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 	log.Infof("Started slave on %+v", instanceKey)
-	if config.Config.SlaveStartPostWaitMilliseconds > 0 {
-		time.Sleep(time.Duration(config.Config.SlaveStartPostWaitMilliseconds) * time.Millisecond)
+	if config.Config().SlaveStartPostWaitMilliseconds > 0 {
+		time.Sleep(time.Duration(config.Config().SlaveStartPostWaitMilliseconds) * time.Millisecond)
 	}
 
 	instance, err = ReadTopologyInstance(instanceKey)

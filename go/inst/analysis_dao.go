@@ -43,16 +43,16 @@ func init() {
 func initializeAnalysisDaoPostConfiguration() {
 	<-config.ConfigurationLoaded
 
-	recentInstantAnalysis = cache.New(time.Duration(config.Config.RecoveryPollSeconds*2)*time.Second, time.Second)
+	recentInstantAnalysis = cache.New(time.Duration(config.Config().RecoveryPollSeconds*2)*time.Second, time.Second)
 }
 
 // GetReplicationAnalysis will check for replication problems (dead master; unreachable master; etc)
 func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnalysis bool) ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
-	args := sqlutils.Args(2*config.Config.InstancePollSeconds, clusterName)
+	args := sqlutils.Args(2*config.Config().InstancePollSeconds, clusterName)
 	analysisQueryReductionClause := ``
-	if config.Config.ReduceReplicationAnalysisCount {
+	if config.Config().ReduceReplicationAnalysisCount {
 		analysisQueryReductionClause = `
 			HAVING
 				(MIN(
@@ -77,7 +77,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		          ) /* AS is_failing_to_connect_to_master */)
 				OR (COUNT(slave_instance.server_id) /* AS count_slaves */ > 0)
 			`
-		args = append(args, 2*config.Config.InstancePollSeconds)
+		args = append(args, 2*config.Config().InstancePollSeconds)
 	}
 	// "OR count_slaves > 0" above is a recent addition, which, granted, makes some previous conditions redundant.
 	// It gives more output, and more "NoProblem" messages that I am now interested in for purpose of auditing in database_instance_analysis_changelog
@@ -366,7 +366,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 				return
 			}
 			skipThisHost := false
-			for _, filter := range config.Config.RecoveryIgnoreHostnameFilters {
+			for _, filter := range config.Config().RecoveryIgnoreHostnameFilters {
 				if matched, _ := regexp.MatchString(filter, a.AnalyzedInstanceKey.Hostname); matched {
 					skipThisHost = true
 				}
@@ -491,7 +491,7 @@ func ExpireInstanceAnalysisChangelog() error {
 			where
 				analysis_timestamp < now() - interval ? hour
 			`,
-		config.Config.UnseenInstanceForgetHours,
+		config.Config().UnseenInstanceForgetHours,
 	)
 	return log.Errore(err)
 }

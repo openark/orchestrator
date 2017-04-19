@@ -37,7 +37,7 @@ func GetMaintenanceOwner() string {
 	if maintenanceOwner != "" {
 		return maintenanceOwner
 	}
-	return config.Config.MaintenanceOwner
+	return config.Config().MaintenanceOwner
 }
 
 func SetMaintenanceOwner(owner string) {
