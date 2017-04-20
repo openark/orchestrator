@@ -285,7 +285,7 @@ func newConfiguration() *Configuration {
 		AuditToSyslog:                                false,
 		RemoveTextFromHostnameDisplay:                "",
 		ReadOnly:                                     false,
-		AuthenticationMethod:                         "basic",
+		AuthenticationMethod:                         "",
 		HTTPAuthUser:                                 "",
 		HTTPAuthPassword:                             "",
 		AuthUserHeader:                               "X-Forwarded-User",
