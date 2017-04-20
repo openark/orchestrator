@@ -1225,6 +1225,11 @@ var generateSQLPatches = []string{
 	`
 		CREATE INDEX recovery_uid_idx_topology_recovery_steps ON topology_recovery_steps(recovery_uid)
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN last_discovery_latency bigint not null
+	`,
 }
 
 // Track if a TLS has already been configured for topology
