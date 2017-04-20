@@ -1650,8 +1650,13 @@ Cleanup:
 }
 
 // sortInstances shuffles given list of instances according to some logic
+func sortInstancesDataCenterHint(instances [](*Instance), dataCenterHint string) {
+	sort.Sort(sort.Reverse(NewInstancesSorterByExec(instances, dataCenterHint)))
+}
+
+// sortInstances shuffles given list of instances according to some logic
 func sortInstances(instances [](*Instance)) {
-	sort.Sort(sort.Reverse(InstancesByExecBinlogCoordinates(instances)))
+	sortInstancesDataCenterHint(instances, "")
 }
 
 // getReplicasForSorting returns a list of replicas of a given master potentially for candidate choosing
@@ -1664,18 +1669,22 @@ func getReplicasForSorting(masterKey *InstanceKey, includeBinlogServerSubReplica
 	return replicas, err
 }
 
+func sortedReplicas(replicas [](*Instance), stopReplicationMethod StopReplicationMethod) [](*Instance) {
+	return sortedReplicasDataCenterHint(replicas, stopReplicationMethod, "")
+}
+
 // sortedReplicas returns the list of replicas of some master, sorted by exec coordinates
 // (most up-to-date replica first).
 // This function assumes given `replicas` argument is indeed a list of instances all replicating
 // from the same master (the result of `getReplicasForSorting()` is appropriate)
-func sortedReplicas(replicas [](*Instance), stopReplicationMethod StopReplicationMethod) [](*Instance) {
+func sortedReplicasDataCenterHint(replicas [](*Instance), stopReplicationMethod StopReplicationMethod, dataCenterHint string) [](*Instance) {
 	if len(replicas) == 0 {
 		return replicas
 	}
 	replicas = StopSlaves(replicas, stopReplicationMethod, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
 	replicas = RemoveNilInstances(replicas)
 
-	sortInstances(replicas)
+	sortInstancesDataCenterHint(replicas, dataCenterHint)
 	for _, replica := range replicas {
 		log.Debugf("- sorted replica: %+v %+v", replica.Key, replica.ExecBinlogCoordinates)
 	}
@@ -1740,7 +1749,7 @@ func MultiMatchBelowIndependently(replicas [](*Instance), belowKey *InstanceKey,
 					// we're configured to postpone operation on this replica so as not to delay everyone else.
 					postpone = true
 				}
-				if replica.LastReadingTime > ReasonableReadingTime {
+				if replica.LastDiscoveryLatency > ReasonableDiscoveryLatency {
 					postpone = true
 				}
 			}
@@ -1812,7 +1821,7 @@ func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlre
 		replicas = StopSlavesNicely(replicas, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
 	}
 	replicas = RemoveNilInstances(replicas)
-	sort.Sort(sort.Reverse(InstancesByExecBinlogCoordinates(replicas)))
+	sort.Sort(sort.Reverse(NewInstancesSorterByExec(replicas, belowInstance.DataCenter)))
 
 	// Optimizations:
 	// replicas which broke on the same Exec-coordinates can be handled in the exact same way:
@@ -2216,6 +2225,10 @@ func GetCandidateReplica(masterKey *InstanceKey, forRematchPurposes bool) (*Inst
 	laterReplicas := [](*Instance){}
 	cannotReplicateReplicas := [](*Instance){}
 
+	dataCenterHint := ""
+	if master, _, _ := ReadInstance(masterKey); master != nil {
+		dataCenterHint = master.DataCenter
+	}
 	replicas, err := getReplicasForSorting(masterKey, false)
 	if err != nil {
 		return candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err
@@ -2224,7 +2237,7 @@ func GetCandidateReplica(masterKey *InstanceKey, forRematchPurposes bool) (*Inst
 	if forRematchPurposes {
 		stopReplicationMethod = StopReplicationNicely
 	}
-	replicas = sortedReplicas(replicas, stopReplicationMethod)
+	replicas = sortedReplicasDataCenterHint(replicas, stopReplicationMethod, dataCenterHint)
 	if err != nil {
 		return candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err
 	}
