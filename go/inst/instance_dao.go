@@ -42,7 +42,13 @@ import (
 	"github.com/github/orchestrator/go/metrics/query"
 )
 
-const backendDBConcurrency = 20
+const (
+	backendDBConcurrency   = 20
+	error1045AccessDenied  = "Error 1045: Access denied for user"
+	errorConnectionRefused = "getsockopt: connection refused"
+	errorNoSuchHost        = "no such host"
+	errorIOTimeout         = "i/o timeout"
+)
 
 var instanceReadChan = make(chan bool, backendDBConcurrency)
 var instanceWriteChan = make(chan bool, backendDBConcurrency)
@@ -59,18 +65,23 @@ func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
 var instanceKeyInformativeClusterName *cache.Cache
 
+var accessDeniedCounter = metrics.NewCounter()
 var readTopologyInstanceCounter = metrics.NewCounter()
 var readInstanceCounter = metrics.NewCounter()
 var writeInstanceCounter = metrics.NewCounter()
 var backendWrites = collection.CreateOrReturnCollection("BACKEND_WRITES")
 
 func init() {
+	metrics.Register("instance.access_denied", accessDeniedCounter)
 	metrics.Register("instance.read_topology", readTopologyInstanceCounter)
 	metrics.Register("instance.read", readInstanceCounter)
 	metrics.Register("instance.write", writeInstanceCounter)
+
+	go initializeInstanceDao()
 }
 
-func InitializeInstanceDao() {
+func initializeInstanceDao() {
+	<-config.ConfigurationLoaded
 	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
 	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
 
@@ -118,12 +129,22 @@ func ExecDBWriteFunc(f func() error) error {
 }
 
 // logReadTopologyInstanceError logs an error, if applicable, for a ReadTopologyInstance operation,
-// providing context and hint as for the source of the error.
+// providing context and hint as for the source of the error. If there's no hint just provide the
+// original error.
 func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err error) error {
 	if err == nil {
 		return nil
 	}
-	return log.Errorf("ReadTopologyInstance(%+v) %+v: %+v", *instanceKey, hint, err)
+	var msg string
+	if hint == "" {
+		msg = fmt.Sprintf("ReadTopologyInstance(%+v): %+v", *instanceKey, err)
+	} else {
+		msg = fmt.Sprintf("ReadTopologyInstance(%+v) %+v: %+v",
+			*instanceKey,
+			strings.Replace(hint, "%", "%%", -1), // escape %
+			err)
+	}
+	return log.Errorf(msg)
 }
 
 // ReadTopologyInstance collects information on the state of a MySQL
@@ -136,9 +157,10 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 // Is this an error which means that we shouldn't try going more queries for this discovery attempt?
 func unrecoverableError(err error) bool {
 	contains := []string{
-		"getsockopt: connection refused",
-		"i/o timeout",
-		"no such host",
+		error1045AccessDenied,
+		errorConnectionRefused,
+		errorIOTimeout,
+		errorNoSuchHost,
 	}
 	for _, k := range contains {
 		if strings.Contains(err.Error(), k) {
@@ -150,12 +172,10 @@ func unrecoverableError(err error) bool {
 
 // Check if the instance is a MaxScale binlog server (a proxy not a real
 // MySQL server) and also update the resolved hostname
-func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStopwatch) (bool, string, error) {
-	var (
-		err              error
-		isMaxScale       bool
-		resolvedHostname string
-	)
+func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStopwatch) (isMaxScale bool, resolvedHostname string, err error) {
+	if config.Config.SkipMaxScaleCheck {
+		return isMaxScale, resolvedHostname, err
+	}
 
 	latency.Start("instance")
 	err = sqlutils.QueryRowsMap(db, "show variables like 'maxscale%'", func(m sqlutils.RowMap) error {
@@ -188,14 +208,32 @@ func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStop
 	// Detect failed connection attempts and don't report the command
 	// we are executing as that might be confusing.
 	if err != nil {
-		if strings.Contains(err.Error(), "getsockopt: connection refused") || strings.Contains(err.Error(), "no such host") {
-			logReadTopologyInstanceError(&instance.Key, "checkMaxScale", err)
+		if strings.Contains(err.Error(), error1045AccessDenied) {
+			accessDeniedCounter.Inc(1)
+		}
+		if unrecoverableError(err) {
+			logReadTopologyInstanceError(&instance.Key, "", err)
 		} else {
 			logReadTopologyInstanceError(&instance.Key, "show variables like 'maxscale%'", err)
 		}
 	}
 
 	return isMaxScale, resolvedHostname, err
+}
+
+// AreReplicationThreadsRunning checks if both IO and SQL threads are running
+func AreReplicationThreadsRunning(instanceKey *InstanceKey) (replicationThreadsRunning bool, err error) {
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return replicationThreadsRunning, err
+	}
+	err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
+		ioThreadRunning := (m.GetString("Slave_IO_Running") == "Yes")
+		sqlThreadRunning := (m.GetString("Slave_SQL_Running") == "Yes")
+		replicationThreadsRunning = ioThreadRunning && sqlThreadRunning
+		return nil
+	})
+	return replicationThreadsRunning, err
 }
 
 // ReadTopologyInstanceBufferable connects to a topology MySQL instance
@@ -210,6 +248,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		}
 	}()
 
+	readingStartTime := time.Now()
 	instance := NewInstance()
 	instanceFound := false
 	foundByShowSlaveHosts := false
@@ -307,7 +346,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			// @@gtid_mode only available in Orcale MySQL >= 5.6
 			// Previous version just issued this query brute-force, but I don't like errors being issued where they shouldn't.
 			latency.Start("instance")
-			_ = db.QueryRow("select @@global.gtid_mode = 'ON', @@global.server_uuid, @@global.gtid_purged, @@global.master_info_repository = 'TABLE'").Scan(&instance.SupportsOracleGTID, &instance.ServerUUID, &instance.GtidPurged, &masterInfoRepositoryOnTable)
+			_ = db.QueryRow("select @@global.gtid_mode = 'ON', @@global.server_uuid, @@global.gtid_purged, @@global.master_info_repository = 'TABLE', @@global.binlog_row_image").Scan(&instance.SupportsOracleGTID, &instance.ServerUUID, &instance.GtidPurged, &masterInfoRepositoryOnTable, &instance.BinlogRowImage)
 			if masterInfoRepositoryOnTable {
 				_ = db.QueryRow("select count(*) > 0 and MAX(User_name) != '' from mysql.slave_master_info").Scan(&instance.ReplicationCredentialsAvailable)
 			}
@@ -466,6 +505,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 					// otherwise report the error to the caller
 					return fmt.Errorf("ReadTopologyInstance(%+v) 'show slave hosts' returned row with <host,port>: <%v,%v>", instanceKey, host, port)
 				}
+
 				// Note: NewInstanceKeyFromStrings calls ResolveHostname() implicitly
 				replicaKey, err := NewInstanceKeyFromStrings(host, port)
 				if err == nil && replicaKey.IsValid() {
@@ -480,7 +520,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	}
 	if !foundByShowSlaveHosts && !isMaxScale {
 		// Either not configured to read SHOW SLAVE HOSTS or nothing was there.
-		// Discover by processlist
+		// Discover by information_schema.processlist
 		latency.Start("instance")
 		err := sqlutils.QueryRowsMap(db, `
         	select
@@ -488,8 +528,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
         	from
         		information_schema.processlist
         	where
-        		command='Binlog Dump'
-        		or command='Binlog Dump GTID'
+                        command IN ('Binlog Dump', 'Binlog Dump GTID')
         		`,
 			func(m sqlutils.RowMap) error {
 				cname, resolveErr := ResolveHostname(m.GetString("slave_hostname"))
@@ -680,6 +719,7 @@ Cleanup:
 	readTopologyInstanceCounter.Inc(1)
 	//	logReadTopologyInstanceError(instanceKey, "ReadTopologyInstanceBufferable", err)	// don't write here and a few lines later.
 	if instanceFound {
+		instance.LastDiscoveryLatency = time.Since(readingStartTime)
 		instance.IsLastCheckValid = true
 		instance.IsRecentlyChecked = true
 		instance.IsUpToDate = true
@@ -701,7 +741,7 @@ Cleanup:
 	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
 	_ = UpdateInstanceLastChecked(&instance.Key)
 	latency.Stop("backend")
-	return nil, fmt.Errorf("ReadTopologyInstanceBufferable failed: %v", err)
+	return nil, err
 }
 
 // ReadClusterAliasOverride reads and applies SuggestedClusterAlias based on cluster_alias_override
@@ -872,6 +912,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.VersionComment = m.GetString("version_comment")
 	instance.ReadOnly = m.GetBool("read_only")
 	instance.Binlog_format = m.GetString("binlog_format")
+	instance.BinlogRowImage = m.GetString("binlog_row_image")
 	instance.LogBinEnabled = m.GetBool("log_bin")
 	instance.LogSlaveUpdatesEnabled = m.GetBool("log_slave_updates")
 	instance.MasterKey.Hostname = m.GetString("master_host")
@@ -925,6 +966,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.UnresolvedHostname = m.GetString("unresolved_hostname")
 	instance.AllowTLS = m.GetBool("allow_tls")
 	instance.InstanceAlias = m.GetString("instance_alias")
+	instance.LastDiscoveryLatency = time.Duration(m.GetInt64("last_discovery_latency")) * time.Nanosecond
 
 	instance.SlaveHosts.ReadJson(slaveHostsJSON)
 	instance.applyFlavorName()
@@ -1121,10 +1163,8 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 		if instance.IsDowntimed {
 			skip = true
 		}
-		for _, filter := range config.Config.ProblemIgnoreHostnameFilters {
-			if matched, _ := regexp.MatchString(filter, instance.Key.Hostname); matched {
-				skip = true
-			}
+		if RegexpMatchPatterns(instance.Key.Hostname, config.Config.ProblemIgnoreHostnameFilters) {
+			skip = true
 		}
 		if !skip {
 			reportedInstances = append(reportedInstances, instance)
@@ -1257,22 +1297,16 @@ func ReadClusterCandidateInstances(clusterName string) ([](*Instance), error) {
 func filterOSCInstances(instances [](*Instance)) [](*Instance) {
 	result := [](*Instance){}
 	for _, instance := range instances {
-		skipThisHost := false
-		for _, filter := range config.Config.OSCIgnoreHostnameFilters {
-			if matched, _ := regexp.MatchString(filter, instance.Key.Hostname); matched {
-				skipThisHost = true
-			}
+		if RegexpMatchPatterns(instance.Key.Hostname, config.Config.OSCIgnoreHostnameFilters) {
+			continue
 		}
 		if instance.IsBinlogServer() {
-			skipThisHost = true
+			continue
 		}
-
 		if !instance.IsLastCheckValid {
-			skipThisHost = true
+			continue
 		}
-		if !skipThisHost {
-			result = append(result, instance)
-		}
+		result = append(result, instance)
 	}
 	return result
 }
@@ -1966,6 +2000,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"binlog_server",
 		"read_only",
 		"binlog_format",
+		"binlog_row_image",
 		"log_bin",
 		"log_slave_updates",
 		"binary_log_file",
@@ -2005,6 +2040,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"allow_tls",
 		"semi_sync_enforced",
 		"instance_alias",
+		"last_discovery_latency",
 	}
 
 	var values []string = make([]string, len(columns), len(columns))
@@ -2034,6 +2070,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.IsBinlogServer())
 		args = append(args, instance.ReadOnly)
 		args = append(args, instance.Binlog_format)
+		args = append(args, instance.BinlogRowImage)
 		args = append(args, instance.LogBinEnabled)
 		args = append(args, instance.LogSlaveUpdatesEnabled)
 		args = append(args, instance.SelfBinlogCoordinates.LogFile)
@@ -2073,6 +2110,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.AllowTLS)
 		args = append(args, instance.SemiSyncEnforced)
 		args = append(args, instance.InstanceAlias)
+		args = append(args, instance.LastDiscoveryLatency.Nanoseconds())
 	}
 
 	sql, err := mkInsertOdku("database_instance", columns, values, len(instances), insertIgnore)
@@ -2137,7 +2175,7 @@ func flushInstanceWriteBuffer() {
 			lastseen = append(lastseen, upd.instance)
 		} else {
 			instances = append(instances, upd.instance)
-			log.Debugf("writeInstance: will not update database_instance.last_seen due to error: %+v", upd.lastError)
+			log.Debugf("flushInstanceWriteBuffer: will not update database_instance.last_seen due to error: %+v", upd.lastError)
 		}
 	}
 	// sort instances by instanceKey (table pk) to make locking predictable
@@ -2154,7 +2192,7 @@ func flushInstanceWriteBuffer() {
 			return log.Errorf("flushInstanceWriteBuffer last_seen: %v", err)
 		}
 
-		writeInstanceCounter.Inc(int64(len(instances)))
+		writeInstanceCounter.Inc(int64(len(instances) + len(lastseen)))
 		return nil
 	}
 	err := ExecDBWriteFunc(writeFunc)

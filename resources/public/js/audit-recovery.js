@@ -96,7 +96,7 @@ $(document).ready(function() {
         moreInfo += "</ul></div>";
       }
       if (audit.AnalysisEntry.SlaveHosts.length > 0) {
-        moreInfo += '<div>' + audit.AnalysisEntry.CountReplicas + ' replicting hosts :<ul>';
+        moreInfo += '<div>' + audit.AnalysisEntry.CountReplicas + ' replicating hosts :<ul>';
         audit.AnalysisEntry.SlaveHosts.forEach(function(instanceKey) {
           moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
         });
@@ -111,6 +111,7 @@ $(document).ready(function() {
       }
       moreInfo += '<div><a href="' + appUrl('/web/audit-failure-detection/id/' + audit.LastDetectionId) + '">Related detection</a></div>';
       moreInfo += '<div>Proccessed by <code>' + audit.ProcessingNodeHostname + '</code></div>';
+      moreInfo += '<div><a href="' + appUrl('/web/audit-recovery-steps/' + audit.UID) + '">Recovery steps</a></div>';
       row.appendTo('#audit tbody');
 
       var row = $('<tr/>');

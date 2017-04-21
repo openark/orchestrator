@@ -22,7 +22,32 @@ for more detail.
 
 Injecting Pseudo GTID can be done via:
 - MySQL's [event_scheduler](https://dev.mysql.com/doc/refman/5.7/en/event-scheduler.html) (see examples below)
-- External injection, see [sample files](https://github.com/github/orchestrator/tree/master/resources/pseudo-gtid): script to inject pseudo-gtid, start-stop script to serve as daemon, and a puppet module.
+- External injection, see [sample files](https://github.com/github/orchestrator/tree/master/resources/pseudo-gtid):
+  - script to inject pseudo-gtid
+  - start-stop script to serve as daemon on `/etc/init.d/pseudo-gtid`
+  - a puppet module.
+
+### Advantages of Pseudo-GTID
+
+- Vendor neutral; works on both Oracle and MariaDB, even both combined.
+- No configuration changes. Your replication setup remains as it is.
+- No commitment. You can choose to move away from Pseudo-GTID at any time; just stop writing P-GTID entries.
+- Pseudo-GTID allows **arbitrary refactoring**, relocating replicas from one place to another
+- Pseudo-GTID enables master crash recovery by aligning all replicas and healing the topology
+- Pseudo-GTID enables intermediate master recovery by either aligning or relocating all orphaned replicas.
+- Pseudo-GTID implies crash-safe replication for replicas running with:
+  - `log-slave-updates`
+  - `sync_binlog=1`
+- As opposed to MySQL `5.6`, servers don't _have to_ run with `log-slave-updates`, though `log-slave-updates` is recommended.
+
+### Limitations
+- Active-Active master-master replication not supported
+  - Active-passive master-master replication, where Pseudo-GTID is injected on the active master only, _is supported_.
+- Replicas that don't run `log-slave-updates` are synced via relay logs. MySQL's default aggressive purging of relay logs implies that if a crash happens on a master, and a replica's relay logs have just been rotated (i.e. immediately also purged), then there's no Pseudo-GTID info in the relay logs to use for healing the topology
+  - Frequent injections of P-GTID mitigate this problem. We inject P-GTID every `5sec`.
+- When a replica reads Statement Based Replication relay logs and relays Row Based Replication binary logs (i.e. master has `binlog_format=STATEMENT` and replica has `binlog_format=ROW`), then `orchestrator` matches Pseudo-GTID via relay logs. See the above bullet for limitations on relay logs.
+- You cannot match two servers where one is fully RBR (receives and writes Row Based Replication logs) and the other is fully SBR. Such scenario can happen when migrating from SBR based topology to RBR topology.
+- An edge case scenario is known when replicating from `5.6` to `5.7`: `5.7` adds `ANONYMOUS` statements to the binary logs, which `orchestrator` knows how to skip. However if `5.6`->`5.7` replication breaks (e.g. dead master) and an `ANONYMOUS` statement is the last statement in the binary log, `orchestrator` is unable at this time to align the servers.
 
 
 #### Ascending Pseudo GTID via DROP VIEW IF EXISTS & INSERT INTO ... ON DUPLICATE KEY UPDATE

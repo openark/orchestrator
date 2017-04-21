@@ -31,12 +31,20 @@ import (
 var analysisChangeWriteAttemptCounter = metrics.NewCounter()
 var analysisChangeWriteCounter = metrics.NewCounter()
 
+var recentInstantAnalysis *cache.Cache
+
 func init() {
 	metrics.Register("analysis.change.write.attempt", analysisChangeWriteAttemptCounter)
 	metrics.Register("analysis.change.write", analysisChangeWriteCounter)
+
+	go initializeAnalysisDaoPostConfiguration()
 }
 
-var recentInstantAnalysis = cache.New(time.Duration(config.Config.RecoveryPollSeconds*2)*time.Second, time.Second)
+func initializeAnalysisDaoPostConfiguration() {
+	<-config.ConfigurationLoaded
+
+	recentInstantAnalysis = cache.New(time.Duration(config.Config.RecoveryPollSeconds*2)*time.Second, time.Second)
+}
 
 // GetReplicationAnalysis will check for replication problems (dead master; unreachable master; etc)
 func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnalysis bool) ([]ReplicationAnalysis, error) {
@@ -317,6 +325,10 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountValidReplicas < a.CountReplicas && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas == 0 {
 			a.Analysis = DeadIntermediateMasterAndSomeSlaves
 			a.Description = "Intermediate master cannot be reached by orchestrator; some of its replicas are unreachable and none of its reachable replicas is replicating"
+			//
+		} else if !a.IsMaster && !a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicas == 0 {
+			a.Analysis = DeadIntermediateMasterAndSlaves
+			a.Description = "Intermediate master cannot be reached by orchestrator and all of its replicas are unreachable"
 			//
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
 			a.Analysis = UnreachableIntermediateMaster

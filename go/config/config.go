@@ -32,6 +32,8 @@ var (
 	envVariableRegexp = regexp.MustCompile("[$][{](.*)[}]")
 )
 
+var ConfigurationLoaded chan bool = make(chan bool)
+
 // Configuration makes for orchestrator configuration input, which can be provided by user via JSON formatted file.
 // Some of the parameteres have reasonable default values, and some (like database credentials) are
 // strictly expected from user.
@@ -82,6 +84,7 @@ type Configuration struct {
 	BufferInstanceWrites                         bool     // Set to 'true' for write-optimization on backend table (compromise: writes can be stale and overwrite non stale data)
 	InstanceFlushIntervalMilliseconds            int      // Max interval between instance write buffer flushes
 	ReadLongRunningQueries                       bool     // Whether orchestrator should read and record current long running executing queries.
+	SkipMaxScaleCheck                            bool     // If you don't ever have MaxScale BinlogServer in your topology (and most people don't), set this to 'true' to save some pointless queries
 	BinlogFileHistoryDays                        int      // When > 0, amount of days for which orchestrator records per-instance binlog files & sizes
 	UnseenInstanceForgetHours                    uint     // Number of hours after which an unseen instance is forgotten
 	SnapshotTopologiesIntervalHours              uint     // Interval in hour between snapshot-topologies invocation. Default: 0 (disabled)
@@ -189,6 +192,7 @@ type Configuration struct {
 	MasterFailoverLostInstancesDowntimeMinutes   uint              // Number of minutes to downtime any server that was lost after a master failover (including failed master & lost replicas). 0 to disable
 	MasterFailoverDetachSlaveMasterHost          bool              // synonym to MasterFailoverDetachReplicaMasterHost
 	MasterFailoverDetachReplicaMasterHost        bool              // Should orchestrator issue a detach-replica-master-host on newly promoted master (this makes sure the new master will not attempt to replicate old master if that comes back to life). Defaults 'false'. Meaningless if ApplyMySQLPromotionAfterMasterFailover is 'true'.
+	FailMasterPromotionIfSQLThreadNotUpToDate    bool              // when true, and a master failover takes place, if candidate master has not consumed all relay logs, promotion is aborted with error
 	PostponeSlaveRecoveryOnLagMinutes            uint              // Synonym to PostponeReplicaRecoveryOnLagMinutes
 	PostponeReplicaRecoveryOnLagMinutes          uint              // On crash recovery, replicas that are lagging more than given minutes are only resurrected late in the recovery process, after master/IM has been elected and processes executed. Value of 0 disables this feature
 	RemoteSSHForMasterFailover                   bool              // Should orchestrator attempt a remote-ssh relaylog-synching upon master failover? Requires RemoteSSHCommand
@@ -201,6 +205,7 @@ type Configuration struct {
 	GraphitePollSeconds                          int               // Graphite writes interval. 0 disables.
 	URLPrefix                                    string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
 	MaxOutdatedKeysToShow                        int               // Maximum number of keys to show in ContinousDiscovery. If the number of polled hosts grows too far then showing the complete list is not ideal.
+	DiscoveryIgnoreReplicaHostnameFilters        []string          // Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -252,6 +257,7 @@ func newConfiguration() *Configuration {
 		BufferInstanceWrites:                         false,
 		InstanceFlushIntervalMilliseconds:            100,
 		ReadLongRunningQueries:                       true,
+		SkipMaxScaleCheck:                            false,
 		BinlogFileHistoryDays:                        0,
 		UnseenInstanceForgetHours:                    240,
 		SnapshotTopologiesIntervalHours:              0,
@@ -353,6 +359,7 @@ func newConfiguration() *Configuration {
 		ApplyMySQLPromotionAfterMasterFailover:       false,
 		MasterFailoverLostInstancesDowntimeMinutes:   0,
 		MasterFailoverDetachSlaveMasterHost:          false,
+		FailMasterPromotionIfSQLThreadNotUpToDate:    false,
 		PostponeSlaveRecoveryOnLagMinutes:            0,
 		RemoteSSHForMasterFailover:                   false,
 		RemoteSSHCommand:                             "",
@@ -364,6 +371,7 @@ func newConfiguration() *Configuration {
 		GraphitePollSeconds:                          60,
 		URLPrefix:                                    "",
 		MaxOutdatedKeysToShow:                        64,
+		DiscoveryIgnoreReplicaHostnameFilters:        []string{},
 	}
 }
 
@@ -530,4 +538,16 @@ func Reload() *Configuration {
 		read(fileName)
 	}
 	return Config
+}
+
+// MarkConfigurationLoaded is called once configuration has first been loaded.
+// Listeners on ConfigurationLoaded will get a notification
+func MarkConfigurationLoaded() {
+	go func() {
+		for {
+			ConfigurationLoaded <- true
+		}
+	}()
+	// wait for it
+	<-ConfigurationLoaded
 }

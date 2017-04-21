@@ -140,7 +140,11 @@ deploy_internal_db() {
   echo_dot
   echo $cmd > $exec_command_file
   echo_dot
-  bash $exec_command_file 1> $test_outfile 2> $test_logfile
+  bash $exec_command_file 1> $test_outfile
+  if [ $? -ne 0 ] ; then
+    echo "ERROR deploy internal db failed"
+    return 1
+  fi
   echo "- deploy_internal_db result: $?"
 }
 
@@ -148,6 +152,7 @@ generate_config_file() {
   cp ${tests_path}/orchestrator.conf.json ${test_config_file}
   sed -i -e "s/backend-db-placeholder/${db_type}/g" ${test_config_file}
   sed -i -e "s^sqlite-data-file-placeholder^${sqlite_file}^g" ${test_config_file}
+  sed -i -e "s^mysql-user-placeholder^${MYSQL_USER:-}^g" ${test_config_file}
   echo "- generate_config_file OK"
 }
 
@@ -178,6 +183,10 @@ test_db() {
   generate_config_file
   check_db
   test_all ${@:2}
+  if [ $? -ne 0 ] ; then
+    echo "test_db failed"
+    return 1
+  fi
   echo "- done testing via $db_type"
 }
 
@@ -199,6 +208,10 @@ main() {
   test_dbs=${test_dbs:-"mysql sqlite"}
   for db in $(echo $test_dbs) ; do
     test_db $db "$@"
+    if [ $? -ne 0 ] ; then
+      echo "+ FAIL: test_db $db $@"
+      return 1
+    fi
   done
 }
 

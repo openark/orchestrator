@@ -29,7 +29,7 @@ func BeginDowntime(instanceKey *InstanceKey, owner string, reason string, durati
 		durationSeconds = config.Config.MaintenanceExpireMinutes * 60
 	}
 	_, err := db.ExecOrchestrator(`
-			insert 
+			insert
 				into database_instance_downtime (
 					hostname, port, downtime_active, begin_timestamp, end_timestamp, owner, reason
 				) VALUES (
@@ -58,15 +58,15 @@ func BeginDowntime(instanceKey *InstanceKey, owner string, reason string, durati
 }
 
 // EndDowntime will remove downtime flag from an instance
-func EndDowntime(instanceKey *InstanceKey) error {
+func EndDowntime(instanceKey *InstanceKey) (wasDowntimed bool, err error) {
 	res, err := db.ExecOrchestrator(`
 			update
 				database_instance_downtime
-			set  
+			set
 				downtime_active = NULL,
 				end_timestamp = NOW()
 			where
-				hostname = ? 
+				hostname = ?
 				and port = ?
 				and downtime_active = 1
 			`,
@@ -74,16 +74,14 @@ func EndDowntime(instanceKey *InstanceKey) error {
 		instanceKey.Port,
 	)
 	if err != nil {
-		return log.Errore(err)
+		return wasDowntimed, log.Errore(err)
 	}
 
-	if affected, _ := res.RowsAffected(); affected == 0 {
-		err = fmt.Errorf("Instance is not in downtime mode: %+v", instanceKey)
-	} else {
-		// success
+	if affected, _ := res.RowsAffected(); affected > 0 {
+		wasDowntimed = true
 		AuditOperation("end-downtime", instanceKey, "")
 	}
-	return err
+	return wasDowntimed, err
 }
 
 // ExpireDowntime will remove the maintenance flag on old downtimes
@@ -94,7 +92,7 @@ func ExpireDowntime() error {
 				database_instance_downtime
 			where
 				downtime_active is null
-				and end_timestamp < NOW() - INTERVAL ? DAY 
+				and end_timestamp < NOW() - INTERVAL ? DAY
 			`,
 			config.Config.MaintenancePurgeDays,
 		)
@@ -109,11 +107,11 @@ func ExpireDowntime() error {
 		res, err := db.ExecOrchestrator(`
 			update
 				database_instance_downtime
-			set  
-				downtime_active = NULL				
+			set
+				downtime_active = NULL
 			where
 				downtime_active = 1
-				and end_timestamp < NOW() 
+				and end_timestamp < NOW()
 			`,
 		)
 		if err != nil {

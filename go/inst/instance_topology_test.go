@@ -18,6 +18,7 @@ var (
 
 func init() {
 	config.Config.HostnameResolveMethod = "none"
+	config.MarkConfigurationLoaded()
 	log.SetLevel(log.ERROR)
 }
 
@@ -86,6 +87,17 @@ func TestSortInstancesSameCoordinatesDifferingVersions(t *testing.T) {
 	sortInstances(instances)
 	test.S(t).ExpectEquals(instances[0].Key, i810Key)
 	test.S(t).ExpectEquals(instances[5].Key, i720Key)
+}
+
+func TestSortInstancesDataCenterHint(t *testing.T) {
+	instances, instancesMap := generateTestInstances()
+	for _, instance := range instances {
+		instance.ExecBinlogCoordinates = instances[0].ExecBinlogCoordinates
+		instance.DataCenter = "somedc"
+	}
+	instancesMap[i810Key.StringCode()].DataCenter = "localdc"
+	sortInstancesDataCenterHint(instances, "localdc")
+	test.S(t).ExpectEquals(instances[0].Key, i810Key)
 }
 
 func TestGetPriorityMajorVersionForCandidate(t *testing.T) {

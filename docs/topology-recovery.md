@@ -20,6 +20,7 @@ At this time recovery requires either GTID, [Pseudo GTID](#pseudo-gtid) or Binlo
 * DeadIntermediateMasterWithSingleSlaveFailingToConnect
 * DeadIntermediateMasterWithSingleSlave
 * DeadIntermediateMasterAndSomeSlaves
+* DeadIntermediateMasterAndSlaves
 * AllIntermediateMasterSlavesFailingToConnectOrDead
 * AllIntermediateMasterSlavesNotReplicating
 * UnreachableIntermediateMaster
