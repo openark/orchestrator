@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
 	"regexp"
@@ -42,18 +42,18 @@ var recentInstantAnalysis = cache.New(time.Duration(config.Config.RecoveryPollSe
 func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnalysis bool) ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
-	args := sqlutils.Args(config.Config.InstancePollSeconds, clusterName)
+	args := sqlutils.Args(2*config.Config.InstancePollSeconds, clusterName)
 	analysisQueryReductionClause := ``
 	if config.Config.ReduceReplicationAnalysisCount {
 		analysisQueryReductionClause = `
 			HAVING
 				(MIN(
 		        		master_instance.last_checked <= master_instance.last_seen
-		        		AND master_instance.last_attempted_check <= master_instance.last_seen + INTERVAL (2 * ?) SECOND
-		        	) IS TRUE /* AS is_last_check_valid */) = 0
+		        		AND master_instance.last_attempted_check <= master_instance.last_seen + INTERVAL ? SECOND
+		        	) = 1 /* AS is_last_check_valid */) = 0
 				OR (IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
 		                    AND slave_instance.slave_io_running = 0
-		                    AND slave_instance.last_io_error RLIKE 'error (connecting|reconnecting) to master'
+		                    AND slave_instance.last_io_error like '%error %connecting to master%'
 		                    AND slave_instance.slave_sql_running = 1),
 		                0) /* AS count_slaves_failing_to_connect_to_master */ > 0)
 				OR (IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen),
@@ -65,11 +65,11 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 				OR (MIN(
 		            master_instance.slave_sql_running = 1
 		            AND master_instance.slave_io_running = 0
-		            AND master_instance.last_io_error RLIKE 'error (connecting|reconnecting) to master'
+		            AND master_instance.last_io_error like '%error %connecting to master%'
 		          ) /* AS is_failing_to_connect_to_master */)
 				OR (COUNT(slave_instance.server_id) /* AS count_slaves */ > 0)
 			`
-		args = append(args, config.Config.InstancePollSeconds)
+		args = append(args, 2*config.Config.InstancePollSeconds)
 	}
 	// "OR count_slaves > 0" above is a recent addition, which, granted, makes some previous conditions redundant.
 	// It gives more output, and more "NoProblem" messages that I am now interested in for purpose of auditing in database_instance_analysis_changelog
@@ -83,11 +83,11 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
 		        MIN(
 		        		master_instance.last_checked <= master_instance.last_seen
-		        		AND master_instance.last_attempted_check <= master_instance.last_seen + INTERVAL (2 * ?) SECOND
-		        	) IS TRUE AS is_last_check_valid,
+		        		AND master_instance.last_attempted_check <= master_instance.last_seen + INTERVAL ? SECOND
+		        	) = 1 AS is_last_check_valid,
 		        MIN(master_instance.master_host IN ('' , '_')
 		            OR master_instance.master_port = 0
-								OR left(master_instance.master_host, 2) = '//') AS is_master,
+								OR substr(master_instance.master_host, 1, 2) = '//') AS is_master,
 		        MIN(master_instance.is_co_master) AS is_co_master,
 		        MIN(CONCAT(master_instance.hostname,
 		                ':',
@@ -101,30 +101,25 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		                0) AS count_valid_replicating_slaves,
 		        IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
 		                    AND slave_instance.slave_io_running = 0
-		                    AND slave_instance.last_io_error RLIKE 'error (connecting|reconnecting) to master'
+		                    AND slave_instance.last_io_error like '%%error %%connecting to master%%'
 		                    AND slave_instance.slave_sql_running = 1),
 		                0) AS count_slaves_failing_to_connect_to_master,
-						IFNULL(SUM(
-									current_relay_log_file=prev_relay_log_file
-									and current_relay_log_pos=prev_relay_log_pos
-									and current_seen != prev_seen),
-								0) AS count_stale_slaves,
 		        MIN(master_instance.replication_depth) AS replication_depth,
-		        GROUP_CONCAT(slave_instance.Hostname, ':', slave_instance.Port) as slave_hosts,
+		        GROUP_CONCAT(concat(slave_instance.Hostname, ':', slave_instance.Port)) as slave_hosts,
 		        MIN(
 		            master_instance.slave_sql_running = 1
 		            AND master_instance.slave_io_running = 0
-		            AND master_instance.last_io_error RLIKE 'error (connecting|reconnecting) to master'
+		            AND master_instance.last_io_error like '%%error %%connecting to master%%'
 		          ) AS is_failing_to_connect_to_master,
-		        MIN(
-				    		database_instance_downtime.downtime_active IS NULL
-				    		OR database_instance_downtime.end_timestamp < NOW()
-			    		) IS FALSE AS is_downtimed,
+						MIN(
+								database_instance_downtime.downtime_active is not null
+								and ifnull(database_instance_downtime.end_timestamp, now()) > now()
+							) AS is_downtimed,
 			    	MIN(
 				    		IFNULL(database_instance_downtime.end_timestamp, '')
 				    	) AS downtime_end_timestamp,
 			    	MIN(
-				    		IFNULL(TIMESTAMPDIFF(SECOND, NOW(), database_instance_downtime.end_timestamp), 0)
+				    		IFNULL(unix_timestamp() - unix_timestamp(database_instance_downtime.end_timestamp), 0)
 				    	) AS downtime_remaining_seconds,
 			    	MIN(
 				    		master_instance.binlog_server
@@ -168,10 +163,11 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 								AND slave_instance.log_slave_updates
 								AND slave_instance.binlog_format = 'ROW'),
               0) AS count_row_based_loggin_slaves,
-						COUNT(DISTINCT IF(
-							slave_instance.log_bin AND slave_instance.log_slave_updates,
-								substring_index(slave_instance.version, '.', 2),
-								NULL)
+						COUNT(DISTINCT case
+								when slave_instance.log_bin AND slave_instance.log_slave_updates
+								then slave_instance.major_version
+								else NULL
+							end
 						) AS count_distinct_logging_major_versions
 		    FROM
 		        database_instance master_instance
@@ -221,7 +217,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		a.CountValidReplicas = m.GetUint("count_valid_slaves")
 		a.CountValidReplicatingReplicas = m.GetUint("count_valid_replicating_slaves")
 		a.CountReplicasFailingToConnectToMaster = m.GetUint("count_slaves_failing_to_connect_to_master")
-		a.CountStaleReplicas = m.GetUint("count_stale_slaves")
+		a.CountStaleReplicas = 0
 		a.ReplicationDepth = m.GetUint("replication_depth")
 		a.IsFailingToConnectToMaster = m.GetBool("is_failing_to_connect_to_master")
 		a.IsDowntimed = m.GetBool("is_downtimed")
@@ -322,6 +318,10 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			a.Analysis = DeadIntermediateMasterAndSomeSlaves
 			a.Description = "Intermediate master cannot be reached by orchestrator; some of its replicas are unreachable and none of its reachable replicas is replicating"
 			//
+		} else if !a.IsMaster && !a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicas == 0 {
+			a.Analysis = DeadIntermediateMasterAndSlaves
+			a.Description = "Intermediate master cannot be reached by orchestrator and all of its replicas are unreachable"
+			//
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
 			a.Analysis = UnreachableIntermediateMaster
 			a.Description = "Intermediate master cannot be reached by orchestrator but it has replicating replicas; possibly a network/host issue"
@@ -418,32 +418,49 @@ func auditInstanceAnalysisInChangelog(instanceKey *InstanceKey, analysisCode Ana
 	// to verify no two orchestrator services are doing this without coordinating (namely, one dies, the other taking its place
 	// and has no familiarity of the former's cache)
 	analysisChangeWriteAttemptCounter.Inc(1)
-	sqlResult, err := db.ExecOrchestrator(`
+
+	lastAnalysisChanged := false
+	{
+		sqlResult, err := db.ExecOrchestrator(`
+			update database_instance_last_analysis set
+				analysis = ?,
+				analysis_timestamp = now()
+			where
+				hostname = ?
+				and port = ?
+				and analysis != ?
+			`,
+			string(analysisCode), instanceKey.Hostname, instanceKey.Port, string(analysisCode),
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
+		rows, err := sqlResult.RowsAffected()
+		if err != nil {
+			return log.Errore(err)
+		}
+		lastAnalysisChanged = (rows > 0)
+	}
+	if !lastAnalysisChanged {
+		_, err := db.ExecOrchestrator(`
 			insert ignore into database_instance_last_analysis (
 					hostname, port, analysis_timestamp, analysis
 				) values (
 					?, ?, now(), ?
-				) on duplicate key update
-					analysis = values(analysis),
-					analysis_timestamp = if(analysis = values(analysis), analysis_timestamp, values(analysis_timestamp))
+				)
 			`,
-		instanceKey.Hostname, instanceKey.Port, string(analysisCode),
-	)
-	if err != nil {
-		return log.Errore(err)
-	}
-	rows, err := sqlResult.RowsAffected()
-	if err != nil {
-		return log.Errore(err)
+			instanceKey.Hostname, instanceKey.Port, string(analysisCode),
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
 	}
 	recentInstantAnalysis.Set(instanceKey.DisplayString(), analysisCode, cache.DefaultExpiration)
-	lastAnalysisChanged := (rows > 0)
-
 	if !lastAnalysisChanged {
 		return nil
 	}
 
-	_, err = db.ExecOrchestrator(`
+	_, err := db.ExecOrchestrator(`
 			insert into database_instance_analysis_changelog (
 					hostname, port, analysis_timestamp, analysis
 				) values (
@@ -472,26 +489,29 @@ func ExpireInstanceAnalysisChangelog() error {
 }
 
 // ReadReplicationAnalysisChangelog
-func ReadReplicationAnalysisChangelog() ([]ReplicationAnalysisChangelog, error) {
-	res := []ReplicationAnalysisChangelog{}
+func ReadReplicationAnalysisChangelog() (res [](*ReplicationAnalysisChangelog), err error) {
 	query := `
 		select
-            hostname,
-            port,
-			group_concat(analysis_timestamp,';',analysis order by changelog_id) as changelog
+      hostname,
+      port,
+			analysis_timestamp,
+			analysis
 		from
 			database_instance_analysis_changelog
-		group by
-			hostname, port
+		order by
+			hostname, port, changelog_id
 		`
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
-		analysisChangelog := ReplicationAnalysisChangelog{}
+	analysisChangelog := &ReplicationAnalysisChangelog{}
+	err = db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+		key := InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
 
-		analysisChangelog.AnalyzedInstanceKey.Hostname = m.GetString("hostname")
-		analysisChangelog.AnalyzedInstanceKey.Port = m.GetInt("port")
-		analysisChangelog.Changelog = m.GetString("changelog")
+		if !analysisChangelog.AnalyzedInstanceKey.Equals(&key) {
+			analysisChangelog = &ReplicationAnalysisChangelog{AnalyzedInstanceKey: key, Changelog: []string{}}
+			res = append(res, analysisChangelog)
+		}
+		analysisEntry := fmt.Sprintf("%s;%s,", m.GetString("analysis_timestamp"), m.GetString("analysis"))
+		analysisChangelog.Changelog = append(analysisChangelog.Changelog, analysisEntry)
 
-		res = append(res, analysisChangelog)
 		return nil
 	})
 

@@ -1,6 +1,6 @@
 # Configuration
 
-The following is a complete list of configuration parameters. "Complete" is always behind the latest code; you may also want to look at [config.go](https://github.com/github/orchestrator/blob/master/src/github.com/github/orchestrator/config/config.go)
+The following is an incomplete list of configuration parameters. "Complete" is always behind the latest code; you may also want to look at [config.go](https://github.com/github/orchestrator/blob/master/go/config/config.go)
 
 * `Debug`                   (bool), set debug mode (similar to --debug option)
 * `ListenAddress`           (string), host & port to listen on (default `":3000"`). You can limit connections to local machine via `"127.0.0.1:3000"`
@@ -19,13 +19,14 @@ The following is a complete list of configuration parameters. "Complete" is alwa
 * `MySQLHostnameResolveMethod` (string), Method to resolve how to reach the MySQL instance. This is more powerful than `HostnameResolveMethod` and is ideal for complex setups like multiple instances on a host with a VIP per instance. Defaults to `none` but can be set to `@@report_host`
 * `DefaultInstancePort` (int), In case port was not specified on command line (default value for this default is `3306`)
 * `SkipOrchestratorDatabaseUpdate`  (bool), When false, orchestrator will attempt to create & update all tables in backend database; when true, this is skipped. It makes sense to skip on command-line invocations and to enable for http or occasional invocations, or just after upgrades
-* `SlaveLagQuery`               (string), custom query to check on replica lg (e.g. heartbeat table). If unprovided,
+* `ReplicaLagQuery`               (string), custom query to check on replica lg (e.g. heartbeat table). If unprovided,
   replica's `Seconds_Behind_Master` is used.
 * `SlaveStartPostWaitMilliseconds`  (int), Time to wait after `START SLAVE` before re-reading instance (give replica chance to connect to master)
 * `DiscoverByShowSlaveHosts`    (bool), Attempt `SHOW SLAVE HOSTS` before `SHOW PROCESSLIST`
 * `InstancePollSeconds`         (uint), Number of seconds between instance reads
 * `UnseenInstanceForgetHours`   (uint), Number of hours after which an unseen instance is forgotten
 * `DiscoveryPollSeconds`        (uint), Auto/continuous discovery of instances sleep time between polls
+* `DiscoveryQueueMaxStatisticsSize` (int), Maximum number of secondly discovery queue statistic entries to keep
 * `InstanceBulkOperationsWaitTimeoutSeconds`  (uint), Time to wait on a single instance when doing bulk (many instances) operation
 * `ActiveNodeExpireSeconds` (uint), Maximum time to wait for active node to send keepalive before attempting to take over as active node.
 * `HostnameResolveMethod`		(string), Type of hostname resolve method (either `"none"` or `"cname"`)
@@ -53,23 +54,23 @@ The following is a complete list of configuration parameters. "Complete" is alwa
 * `PhysicalEnvironmentPattern`  (string), Regexp pattern with one group, extracting physical environment info from hostname (e.g. combination of datacenter & prod/dev env)
 * `DenyAutoPromotionHostnamePattern`  (string), Orchestrator will not auto-promote hosts with name matching patterb (via -c recovery; for example, avoid promoting dev-dedicated machines)
 * `ServeAgentsHttp`     (bool), should *orchestrator* accept agent registrations and serve agent-related requests (see [Agents](#agents))
-* `AgentsUseSSL (bool), When `true` orchestrator will listen on agents port with SSL as well as connect to agents via SSL (see [SSL and TLS](#ssl-and-tls))
-* `AgentsUseMutualTLS (bool), When `true` Use mutual TLS for the server to agent communication
-* `AgentSSLSkipVerify (bool), When using SSL for the Agent, should we ignore SSL certification error
-* `AgentSSLPrivateKeyFile (string), Name of Agent SSL private key file, applies only when `AgentsUseSSL` = `true`
-* `AgentSSLCertFile (string), Name of Agent SSL certification file, applies only when `AgentsUseSSL` = `true`
-* `AgentSSLCAFile (string), Name of the Agent Certificate Authority file, applies only when `AgentsUseSSL` = `true`
-* `AgentSSLValidOUs ([]string), Valid organizational units when using mutual TLS to communicate with the agents
-* `UseSSL (bool), Use SSL on the server web port (see [SSL and TLS](#ssl-and-tls))
-* `UseMutualTLS (bool), When `true` Use mutual TLS for the server's web and API connections
-* `SSLSkipVerify (bool), When using SSL, should we ignore SSL certification error
-* `SSLPrivateKeyFile (string), Name of SSL private key file, applies only when `UseSSL` = `true`
-* `SSLCertFile (string), Name of SSL certification file, applies only when `UseSSL` = `true`
-* `SSLCAFile (string), Name of the Certificate Authority file, applies only when `UseSSL` = `true`
-* `SSLValidOUs ([]string), Valid organizational units when using mutual TLS
-* `StatusEndpoint (string), Override the status endpoint.  Defaults to `/api/status`
-* `StatusSimpleHealth (bool), If true, calling the status endpoint will use the simplified health check
-* `StatusOUVerify (bool), If true, try to verify OUs when Mutual TLS is on.  Defaults to false
+* `AgentsUseSSL` (bool), When `true` orchestrator will listen on agents port with SSL as well as connect to agents via SSL (see [SSL and TLS](#ssl-and-tls))
+* `AgentsUseMutualTLS` (bool), When `true` Use mutual TLS for the server to agent communication
+* `AgentSSLSkipVerify` (bool), When using SSL for the Agent, should we ignore SSL certification error
+* `AgentSSLPrivateKeyFile` (string), Name of Agent SSL private key file, applies only when `AgentsUseSSL` = `true`
+* `AgentSSLCertFile` (string), Name of Agent SSL certification file, applies only when `AgentsUseSSL` = `true`
+* `AgentSSLCAFile` (string), Name of the Agent Certificate Authority file, applies only when `AgentsUseSSL` = `true`
+* `AgentSSLValidOUs` ([]string), Valid organizational units when using mutual TLS to communicate with the agents
+* `UseSSL` (bool), Use SSL on the server web port (see [SSL and TLS](#ssl-and-tls))
+* `UseMutualTLS` (bool), When `true` Use mutual TLS for the server's web and API connections
+* `SSLSkipVerify` (bool), When using SSL, should we ignore SSL certification error
+* `SSLPrivateKeyFile` (string), Name of SSL private key file, applies only when `UseSSL` = `true`
+* `SSLCertFile` (string), Name of SSL certification file, applies only when `UseSSL` = `true`
+* `SSLCAFile` (string), Name of the Certificate Authority file, applies only when `UseSSL` = `true`
+* `SSLValidOUs` ([]string), Valid organizational units when using mutual TLS
+* `StatusEndpoint` (string), Override the status endpoint.  Defaults to `/api/status`
+* `StatusSimpleHealth` (bool), If true, calling the status endpoint will use the simplified health check
+* `StatusOUVerify` (bool), If true, try to verify OUs when Mutual TLS is on.  Defaults to false
 * `HttpTimeoutSeconds`  (int),    HTTP GET request timeout (when connecting to _orchestrator-agent_)
 * `AgentPollMinutes`     (uint), interval at which *orchestrator* contacts agents for brief status update
 * `UnseenAgentForgetHours`     (uint), time without contact after which an agent is forgotten
@@ -84,7 +85,7 @@ The following is a complete list of configuration parameters. "Complete" is alwa
 * `RecoverMasterClusterFilters` ([]string), Only do master recovery on clusters matching these regexp patterns (of course the ``.*`` pattern matches everything)
 * `RecoverIntermediateMasterClusterFilters` ([]string), Only do intermediate-master recovery on clusters matching these regexp patterns (of course the ``.*`` pattern matches everything)
 
-See [sample config file](https://github.com/github/orchestrator/blob/master/conf/orchestrator.conf.json) in master branch.
+See [sample config file](https://github.com/github/orchestrator/blob/master/conf/orchestrator-simple.conf.json) in master branch.
 
 #### Minimal config to work with
 
@@ -136,7 +137,7 @@ See [security](#security) section.
 
 Use a heartbeat mechanism (as with [pt-heartbeat](http://www.percona.com/doc/percona-toolkit/2.1/pt-heartbeat.html)), and configure:
 ```
-  "SlaveLagQuery": "select slave_lag_seconds from heartbeat_table",
+  "ReplicationLagQuery": "select replication_lag_seconds from heartbeat_table",
 ```
 
 If you have multiple instances on same host, you must configure your MySQL servers with `report_host` and `report_port` and add:

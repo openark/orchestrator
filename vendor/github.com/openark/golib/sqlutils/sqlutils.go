@@ -22,7 +22,7 @@ import (
 	"errors"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 	"strconv"
 	"strings"
 	"sync"
@@ -127,21 +127,33 @@ var knownDBsMutex = &sync.Mutex{}
 
 // GetDB returns a DB instance based on uri.
 // bool result indicates whether the DB was returned from cache; err
-func GetDB(mysql_uri string) (*sql.DB, bool, error) {
+func GetGenericDB(driverName, dataSourceName string) (*sql.DB, bool, error) {
 	knownDBsMutex.Lock()
 	defer func() {
 		knownDBsMutex.Unlock()
 	}()
 
 	var exists bool
-	if _, exists = knownDBs[mysql_uri]; !exists {
-		if db, err := sql.Open("mysql", mysql_uri); err == nil {
-			knownDBs[mysql_uri] = db
+	if _, exists = knownDBs[dataSourceName]; !exists {
+		if db, err := sql.Open(driverName, dataSourceName); err == nil {
+			knownDBs[dataSourceName] = db
 		} else {
 			return db, exists, err
 		}
 	}
-	return knownDBs[mysql_uri], exists, nil
+	return knownDBs[dataSourceName], exists, nil
+}
+
+// GetDB returns a MySQL DB instance based on uri.
+// bool result indicates whether the DB was returned from cache; err
+func GetDB(mysql_uri string) (*sql.DB, bool, error) {
+	return GetGenericDB("mysql", mysql_uri)
+}
+
+// GetDB returns a SQLite DB instance based on DB file name.
+// bool result indicates whether the DB was returned from cache; err
+func GetSQLiteDB(dbFile string) (*sql.DB, bool, error) {
+	return GetGenericDB("sqlite3", dbFile)
 }
 
 // RowToArray is a convenience function, typically not called directly, which maps a

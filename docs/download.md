@@ -1,10 +1,12 @@
 # Download
 
-`Orchestrator` is released as open source and is available at [GitHub](https://github.com/github/orchestrator).
+`orchestrator` is released as open source and is available at [GitHub](https://github.com/github/orchestrator).
 Find official releases in https://github.com/github/orchestrator/releases
 
-For developers: `Orchestrator` is go-gettable. Issue:
+`orchestrator` packages can be found in https://packagecloud.io/github/orchestrator
 
-	go get github.com/github/orchestrator
+For developers: `orchestrator` is go-gettable. Issue:
 
-Orchestrator for [developers](developers.md)
+	go get github.com/github/orchestrator/...
+
+See [Orchestrator for developers](developers.md)

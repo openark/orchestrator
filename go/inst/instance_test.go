@@ -18,8 +18,8 @@ package inst
 
 import (
 	"github.com/github/orchestrator/go/config"
-	"github.com/outbrain/golib/log"
-	test "github.com/outbrain/golib/tests"
+	"github.com/openark/golib/log"
+	test "github.com/openark/golib/tests"
 	"testing"
 )
 
