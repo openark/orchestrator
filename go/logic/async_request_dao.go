@@ -133,7 +133,7 @@ func ExpireAsyncRequests() error {
 			where
 				end_timestamp IS NULL
 				and begin_timestamp < NOW() - INTERVAL ? MINUTE
-			`, config.Config.MaintenanceExpireMinutes,
+			`, config.MaintenanceExpireMinutes,
 	)
 	if err != nil {
 		log.Errore(err)

@@ -43,7 +43,6 @@
   "ProblemIgnoreHostnameFilters": [],
   "VerifyReplicationFilters": false,
   "ReasonableMaintenanceReplicationLagSeconds": 20,
-  "MaintenanceExpireMinutes": 10,
   "CandidateInstanceExpireMinutes": 60,
   "AuditLogFile": "/tmp/orchestrator-audit.log",
   "AuditToSyslog": false,

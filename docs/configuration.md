@@ -31,7 +31,6 @@ The following is an incomplete list of configuration parameters. "Complete" is a
 * `ReasonableReplicationLagSeconds` (int), Above this value is considered a problem
 * `VerifyReplicationFilters`  (bool), Include replication filters check before approving topology refactoring (e.g. `orchestrator` will not allow placing a non-filteres replica under a filtered one)
 * `ReasonableMaintenanceReplicationLagSeconds` (int), Above this value move-up and move-below are blocked
-* `MaintenanceExpireMinutes`  (int), Minutes after which a maintenance flag is considered stale and is cleared
 * `AuditLogFile`  (string), Name of log file for audit operations. Disabled when empty.
 * `RemoveTextFromHostnameDisplay` (string), Text to strip off the hostname on cluster/clusters pages. Save pixels (e.g. `mycompany.com`)
 * `ReadOnly`				(bool) When `"true"`, no write operations (e.g. stopping a replica, repointing replicas, discovering) are allowed
