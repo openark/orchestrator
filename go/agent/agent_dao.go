@@ -120,9 +120,7 @@ func SubmitAgent(hostname string, port int, token string) (string, error) {
 	}
 
 	// Try to discover topology instances when an agent submits
-	if config.Config.AgentAutoDiscover {
-		DiscoverAgentInstance(hostname, port)
-	}
+	go DiscoverAgentInstance(hostname, port)
 
 	return hostname, err
 }

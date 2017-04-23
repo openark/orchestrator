@@ -90,7 +90,6 @@
   "StatusSimpleHealth": true,
   "StatusOUVerify": false,
   "AgentPollMinutes": 60,
-  "AgentAutoDiscover": false,
   "UnseenAgentForgetHours": 6,
   "StaleSeedFailMinutes": 60,
   "SeedAcceptableBytesDiff": 8192,

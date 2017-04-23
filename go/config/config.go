@@ -62,6 +62,7 @@ var deprecatedConfigurationVariables = []string{
 	"MaintenancePurgeDays",
 	"MaintenanceExpireMinutes",
 	"HttpTimeoutSeconds",
+	"AgentAutoDiscover",
 }
 
 // Configuration makes for orchestrator configuration input, which can be provided by user via JSON formatted file.
@@ -174,7 +175,6 @@ type Configuration struct {
 	StatusSimpleHealth                           bool              // If true, calling the status endpoint will use the simplified health check
 	StatusOUVerify                               bool              // If true, try to verify OUs when Mutual TLS is on.  Defaults to false
 	AgentPollMinutes                             uint              // Minutes between agent polling
-	AgentAutoDiscover                            bool              // If true, instances should automatically discover when an agent is submitted
 	UnseenAgentForgetHours                       uint              // Number of hours after which an unseen agent is forgotten
 	StaleSeedFailMinutes                         uint              // Number of minutes after which a stale (no progress) seed is considered failed.
 	SeedAcceptableBytesDiff                      int64             // Difference in bytes between seed source & target data size that is still considered as successful copy
@@ -322,7 +322,6 @@ func newConfiguration() *Configuration {
 		SSLCertFile:                                  "",
 		SSLCAFile:                                    "",
 		AgentPollMinutes:                             60,
-		AgentAutoDiscover:                            false,
 		UnseenAgentForgetHours:                       6,
 		StaleSeedFailMinutes:                         60,
 		SeedAcceptableBytesDiff:                      8192,
