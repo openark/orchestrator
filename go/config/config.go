@@ -41,6 +41,7 @@ const (
 	MaintenanceOwner                = "orchestrator"
 	AuditPageSize                   = 20
 	AuditPurgeDays                  = 31
+	MaintenancePurgeDays            = 31
 	MySQLTopologyMaxPoolConnections = 3
 )
 
@@ -56,6 +57,7 @@ var deprecatedConfigurationVariables = []string{
 	"AuditPurgeDays",
 	"SlaveStartPostWaitMilliseconds",
 	"MySQLTopologyMaxPoolConnections",
+	"MaintenancePurgeDays",
 }
 
 // Configuration makes for orchestrator configuration input, which can be provided by user via JSON formatted file.
@@ -122,7 +124,6 @@ type Configuration struct {
 	VerifyReplicationFilters                     bool     // Include replication filters check before approving topology refactoring
 	ReasonableMaintenanceReplicationLagSeconds   int      // Above this value move-up and move-below are blocked
 	MaintenanceExpireMinutes                     uint     // Minutes after which a maintenance flag is considered stale and is cleared
-	MaintenancePurgeDays                         uint     // Days after which maintenance entries are purged from the database
 	CandidateInstanceExpireMinutes               uint     // Minutes after which a suggestion to use an instance as a candidate replica (to be preferably promoted on master failover) is expired.
 	AuditLogFile                                 string   // Name of log file for audit operations. Disabled when empty.
 	AuditToSyslog                                bool     // If true, audit messages are written to syslog
@@ -279,7 +280,6 @@ func newConfiguration() *Configuration {
 		VerifyReplicationFilters:                     false,
 		ReasonableMaintenanceReplicationLagSeconds:   20,
 		MaintenanceExpireMinutes:                     10,
-		MaintenancePurgeDays:                         365,
 		CandidateInstanceExpireMinutes:               60,
 		AuditLogFile:                                 "",
 		AuditToSyslog:                                false,

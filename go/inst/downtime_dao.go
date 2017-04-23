@@ -94,7 +94,7 @@ func ExpireDowntime() error {
 				downtime_active is null
 				and end_timestamp < NOW() - INTERVAL ? DAY
 			`,
-			config.Config.MaintenancePurgeDays,
+			config.MaintenancePurgeDays,
 		)
 		if err != nil {
 			return log.Errore(err)

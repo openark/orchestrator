@@ -38,7 +38,6 @@
   "VerifyReplicationFilters": false,
   "ReasonableMaintenanceReplicationLagSeconds": 20,
   "MaintenanceExpireMinutes": 10,
-  "MaintenancePurgeDays": 365,
   "CandidateInstanceExpireMinutes": 60,
   "AuditLogFile": "",
   "AuditToSyslog": false,
