@@ -323,7 +323,8 @@ func SyncReplicasRelayLogs(
 		if toBePostponed {
 			log.Debugf("SyncReplicasRelayLogs: postponing relaylog sync on %+v", applyToReplica.Key)
 			postponedReplicas = append(postponedReplicas, applyToReplica)
-			(*postponedFunctionsContainer).AddPostponedFunction(func() error { return applyToReplicaFunc(applyToReplica) })
+			f := func() error { return applyToReplicaFunc(applyToReplica) }
+			(*postponedFunctionsContainer).AddPostponedFunction(f, fmt.Sprintf("sync-replicas-relaylogs %+v", applyToReplica.Key))
 		} else {
 			log.Debugf("SyncReplicasRelayLogs: applying relaylog sync on %+v", applyToReplica.Key)
 			countImmediateApply++

@@ -1266,9 +1266,6 @@ func ReadFuzzyInstance(fuzzyInstanceKey *InstanceKey) (*Instance, error) {
 
 // ReadLostInRecoveryInstances returns all instances (potentially filtered by cluster)
 // which are currently indicated as downtimed due to being lost during a topology recovery.
-// Keep in mind:
-// - instances are only marked as such when config's MasterFailoverLostInstancesDowntimeMinutes > 0
-// - The downtime expires at some point
 func ReadLostInRecoveryInstances(clusterName string) ([](*Instance), error) {
 	condition := `
 		ifnull(

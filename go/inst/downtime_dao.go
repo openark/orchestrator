@@ -84,8 +84,61 @@ func EndDowntime(instanceKey *InstanceKey) (wasDowntimed bool, err error) {
 	return wasDowntimed, err
 }
 
+// renewLostInRecoveryDowntime renews hosts who are downtimed due to being lost in recovery, such that
+// their downtime never expires.
+func renewLostInRecoveryDowntime() error {
+	_, err := db.ExecOrchestrator(`
+			update
+				database_instance_downtime
+			set
+				end_timestamp = NOW() + INTERVAL ? SECOND
+			where
+				end_timestamp > NOW()
+				and reason = ?
+			`,
+		config.LostInRecoveryDowntimeSeconds,
+		DowntimeLostInRecoveryMessage,
+	)
+
+	return err
+}
+
+// expireLostInRecoveryDowntime expires downtime for servers who have been lost in recovery in the last,
+// but are now replicating.
+func expireLostInRecoveryDowntime() error {
+	instances, err := ReadLostInRecoveryInstances("")
+	if err != nil {
+		return err
+	}
+	for _, instance := range instances {
+		if instance.IsLastCheckValid && instance.ReplicaRunning() {
+			_, err := db.ExecOrchestrator(`
+				delete from
+					database_instance_downtime
+				where
+					hostname = ?
+					and port = ?
+					`,
+				instance.Key.Hostname, instance.Key.Port,
+			)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return err
+}
+
 // ExpireDowntime will remove the maintenance flag on old downtimes
 func ExpireDowntime() error {
+	if err := renewLostInRecoveryDowntime(); err != nil {
+		return log.Errore(err)
+	}
+	if err := expireLostInRecoveryDowntime(); err != nil {
+		return log.Errore(err)
+	}
+
 	{
 		res, err := db.ExecOrchestrator(`
 			delete from
