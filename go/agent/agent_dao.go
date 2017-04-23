@@ -51,7 +51,7 @@ func InitHttpClient() {
 		return
 	}
 
-	httpTimeout := time.Duration(time.Duration(config.Config.HttpTimeoutSeconds) * time.Second)
+	httpTimeout := time.Duration(time.Duration(config.AgentHttpTimeoutSeconds) * time.Second)
 	dialTimeout := func(network, addr string) (net.Conn, error) {
 		return net.DialTimeout(network, addr, httpTimeout)
 	}

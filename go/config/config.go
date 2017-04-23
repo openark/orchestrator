@@ -44,6 +44,7 @@ const (
 	MaintenancePurgeDays            = 31
 	MySQLTopologyMaxPoolConnections = 3
 	MaintenanceExpireMinutes        = 10
+	AgentHttpTimeoutSeconds         = 60
 )
 
 var deprecatedConfigurationVariables = []string{
@@ -60,6 +61,7 @@ var deprecatedConfigurationVariables = []string{
 	"MySQLTopologyMaxPoolConnections",
 	"MaintenancePurgeDays",
 	"MaintenanceExpireMinutes",
+	"HttpTimeoutSeconds",
 }
 
 // Configuration makes for orchestrator configuration input, which can be provided by user via JSON formatted file.
@@ -171,7 +173,6 @@ type Configuration struct {
 	StatusEndpoint                               string            // Override the status endpoint.  Defaults to '/api/status'
 	StatusSimpleHealth                           bool              // If true, calling the status endpoint will use the simplified health check
 	StatusOUVerify                               bool              // If true, try to verify OUs when Mutual TLS is on.  Defaults to false
-	HttpTimeoutSeconds                           int               // Number of idle seconds before HTTP GET request times out (when accessing orchestrator-agent)
 	AgentPollMinutes                             uint              // Minutes between agent polling
 	AgentAutoDiscover                            bool              // If true, instances should automatically discover when an agent is submitted
 	UnseenAgentForgetHours                       uint              // Number of hours after which an unseen agent is forgotten
@@ -320,7 +321,6 @@ func newConfiguration() *Configuration {
 		SSLPrivateKeyFile:                            "",
 		SSLCertFile:                                  "",
 		SSLCAFile:                                    "",
-		HttpTimeoutSeconds:                           60,
 		AgentPollMinutes:                             60,
 		AgentAutoDiscover:                            false,
 		UnseenAgentForgetHours:                       6,

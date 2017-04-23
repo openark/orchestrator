@@ -63,7 +63,6 @@ The following is an incomplete list of configuration parameters. "Complete" is a
 * `StatusEndpoint` (string), Override the status endpoint.  Defaults to `/api/status`
 * `StatusSimpleHealth` (bool), If true, calling the status endpoint will use the simplified health check
 * `StatusOUVerify` (bool), If true, try to verify OUs when Mutual TLS is on.  Defaults to false
-* `HttpTimeoutSeconds`  (int),    HTTP GET request timeout (when connecting to _orchestrator-agent_)
 * `AgentPollMinutes`     (uint), interval at which *orchestrator* contacts agents for brief status update
 * `UnseenAgentForgetHours`     (uint), time without contact after which an agent is forgotten
 * `StaleSeedFailMinutes`     (uint), time after which a seed with no state update is considered to be failed

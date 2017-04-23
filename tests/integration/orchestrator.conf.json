@@ -89,7 +89,6 @@
   "StatusEndpoint": "/api/status",
   "StatusSimpleHealth": true,
   "StatusOUVerify": false,
-  "HttpTimeoutSeconds": 60,
   "AgentPollMinutes": 60,
   "AgentAutoDiscover": false,
   "UnseenAgentForgetHours": 6,
