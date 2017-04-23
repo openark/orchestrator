@@ -7,7 +7,6 @@ The following is an incomplete list of configuration parameters. "Complete" is a
 * `MySQLTopologyUser`       (string), credentials for replication topology servers (masters & replicas)
 * `MySQLTopologyPassword`   (string), credentials for replication topology servers (masters & replicas)
 * `MySQLTopologyCredentialsConfigFile` (string), as an alternative to providing `MySQLTopologyUser`, `MySQLTopologyPassword`, name of file in `my.cnf`-like format where credentials are stored.
-* `MySQLTopologyMaxPoolConnections` (int), Max concurrent connections on any topology instance
 * `MySQLOrchestratorHost`   (string), hostname for backend MySQL server
 * `MySQLOrchestratorPort`   (uint), port for backend MySQL server
 * `MySQLOrchestratorDatabase`   (string), name of backend MySQL server schema

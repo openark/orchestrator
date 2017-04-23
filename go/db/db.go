@@ -1262,8 +1262,8 @@ func openTopology(host string, port int, readTimeout int) (*sql.DB, error) {
 		mysql_uri, _ = SetupMySQLTopologyTLS(mysql_uri)
 	}
 	db, _, err := sqlutils.GetDB(mysql_uri)
-	db.SetMaxOpenConns(config.Config.MySQLTopologyMaxPoolConnections)
-	db.SetMaxIdleConns(config.Config.MySQLTopologyMaxPoolConnections)
+	db.SetMaxOpenConns(config.MySQLTopologyMaxPoolConnections)
+	db.SetMaxIdleConns(config.MySQLTopologyMaxPoolConnections)
 	return db, err
 }
 

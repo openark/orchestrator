@@ -12,7 +12,6 @@
   "MySQLTopologySSLCAFile": "",
   "MySQLTopologySSLSkipVerify": true,
   "MySQLTopologyUseMutualTLS": false,
-  "MySQLTopologyMaxPoolConnections": 3,
   "BackendDB": "backend-db-placeholder",
   "SQLite3DataFile": "sqlite-data-file-placeholder",
   "MySQLOrchestratorHost": "localhost",

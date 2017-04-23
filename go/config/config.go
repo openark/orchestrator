@@ -35,12 +35,13 @@ var (
 var ConfigurationLoaded chan bool = make(chan bool)
 
 const (
-	DiscoveryPollSeconds    = 1
-	ActiveNodeExpireSeconds = 5
-	BinlogFileHistoryDays   = 1
-	MaintenanceOwner        = "orchestrator"
-	AuditPageSize           = 20
-	AuditPurgeDays          = 31
+	DiscoveryPollSeconds            = 1
+	ActiveNodeExpireSeconds         = 5
+	BinlogFileHistoryDays           = 1
+	MaintenanceOwner                = "orchestrator"
+	AuditPageSize                   = 20
+	AuditPurgeDays                  = 31
+	MySQLTopologyMaxPoolConnections = 3
 )
 
 var retiredConfigurationVariables = []string{
@@ -73,7 +74,6 @@ type Configuration struct {
 	MySQLTopologySSLCAFile                       string // Certificate Authority PEM file used to authenticate with a Topology mysql instance with TLS
 	MySQLTopologySSLSkipVerify                   bool   // If true, do not strictly validate mutual TLS certs for Topology mysql instances
 	MySQLTopologyUseMutualTLS                    bool   // Turn on TLS authentication with the Topology MySQL instances
-	MySQLTopologyMaxPoolConnections              int    // Max concurrent connections on any topology instance
 	BackendDB                                    string // EXPERIMENTAL: type of backend db; either "mysql" or "sqlite3"
 	SQLite3DataFile                              string // when BackendDB == "sqlite3", full path to sqlite3 datafile
 	SkipOrchestratorDatabaseUpdate               bool   // When true, do not check backend database schema nor attempt to update it. Useful when you may be running multiple versions of orchestrator, and you only wish certain boxes to dictate the db structure (or else any time a different orchestrator version runs it will rebuild database schema)
@@ -247,7 +247,6 @@ func newConfiguration() *Configuration {
 		PanicIfDifferentDatabaseDeploy:               false,
 		MySQLOrchestratorMaxPoolConnections:          128, // limit concurrent conns to backend DB
 		MySQLOrchestratorPort:                        3306,
-		MySQLTopologyMaxPoolConnections:              3,
 		MySQLTopologyUseMutualTLS:                    false,
 		MySQLOrchestratorUseMutualTLS:                false,
 		MySQLConnectTimeoutSeconds:                   2,

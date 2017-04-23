@@ -10,7 +10,6 @@
   "MySQLTopologySSLCAFile": "",
   "MySQLTopologySSLSkipVerify": true,
   "MySQLTopologyUseMutualTLS": false,
-  "MySQLTopologyMaxPoolConnections": 3,
   "MySQLOrchestratorHost": "127.0.0.1",
   "MySQLOrchestratorPort": 3306,
   "MySQLOrchestratorDatabase": "orchestrator",
