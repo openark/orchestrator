@@ -44,7 +44,7 @@ const (
 	MySQLTopologyMaxPoolConnections = 3
 )
 
-var retiredConfigurationVariables = []string{
+var deprecatedConfigurationVariables = []string{
 	"DatabaselessMode__experimental",
 	"BufferBinlogEvents",
 	"BinlogFileHistoryDays",
@@ -55,6 +55,7 @@ var retiredConfigurationVariables = []string{
 	"AuditPageSize",
 	"AuditPurgeDays",
 	"SlaveStartPostWaitMilliseconds",
+	"MySQLTopologyMaxPoolConnections",
 }
 
 // Configuration makes for orchestrator configuration input, which can be provided by user via JSON formatted file.
