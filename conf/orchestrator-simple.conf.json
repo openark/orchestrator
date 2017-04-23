@@ -47,7 +47,6 @@
   "PseudoGTIDPatternIsFixedSubstring": false,
   "PseudoGTIDMonotonicHint": "asc:",
   "DetectPseudoGTIDQuery": "",
-  "PseudoGTIDCoordinatesHistoryHeuristicMinutes": 2,
   "#": "-----",
   "#": "Recovery related config:",
   "#": "-----",

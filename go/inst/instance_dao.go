@@ -2346,7 +2346,7 @@ func RecordInstanceCoordinatesHistory() error {
         	delete from database_instance_coordinates_history
 			where
 				recorded_timestamp < NOW() - INTERVAL ? MINUTE
-				`, (config.Config.PseudoGTIDCoordinatesHistoryHeuristicMinutes + 5),
+				`, (config.PseudoGTIDCoordinatesHistoryHeuristicMinutes + 5),
 			)
 			return log.Errore(err)
 		}
@@ -2389,7 +2389,7 @@ func GetHeuristiclyRecentCoordinatesForInstance(instanceKey *InstanceKey) (selfC
 			recorded_timestamp desc
 			limit 1
 			`
-	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port, config.Config.PseudoGTIDCoordinatesHistoryHeuristicMinutes), func(m sqlutils.RowMap) error {
+	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port, config.PseudoGTIDCoordinatesHistoryHeuristicMinutes), func(m sqlutils.RowMap) error {
 		selfCoordinates = &BinlogCoordinates{LogFile: m.GetString("binary_log_file"), LogPos: m.GetInt64("binary_log_pos")}
 		relayLogCoordinates = &BinlogCoordinates{LogFile: m.GetString("relay_log_file"), LogPos: m.GetInt64("relay_log_pos")}
 
