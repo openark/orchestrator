@@ -60,15 +60,11 @@ func BeginDowntime(instanceKey *InstanceKey, owner string, reason string, durati
 // EndDowntime will remove downtime flag from an instance
 func EndDowntime(instanceKey *InstanceKey) (wasDowntimed bool, err error) {
 	res, err := db.ExecOrchestrator(`
-			update
+			delete from
 				database_instance_downtime
-			set
-				downtime_active = NULL,
-				end_timestamp = NOW()
 			where
 				hostname = ?
 				and port = ?
-				and downtime_active = 1
 			`,
 		instanceKey.Hostname,
 		instanceKey.Port,
@@ -112,22 +108,12 @@ func expireLostInRecoveryDowntime() error {
 	}
 	for _, instance := range instances {
 		if instance.IsLastCheckValid && instance.ReplicaRunning() {
-			_, err := db.ExecOrchestrator(`
-				delete from
-					database_instance_downtime
-				where
-					hostname = ?
-					and port = ?
-					`,
-				instance.Key.Hostname, instance.Key.Port,
-			)
-			if err != nil {
+			if _, err := EndDowntime(&instance.Key); err != nil {
 				return err
 			}
 		}
 	}
-
-	return err
+	return nil
 }
 
 // ExpireDowntime will remove the maintenance flag on old downtimes
@@ -138,33 +124,12 @@ func ExpireDowntime() error {
 	if err := expireLostInRecoveryDowntime(); err != nil {
 		return log.Errore(err)
 	}
-
 	{
 		res, err := db.ExecOrchestrator(`
 			delete from
 				database_instance_downtime
 			where
-				downtime_active is null
-				and end_timestamp < NOW() - INTERVAL ? DAY
-			`,
-			config.Config.MaintenancePurgeDays,
-		)
-		if err != nil {
-			return log.Errore(err)
-		}
-		if rowsAffected, _ := res.RowsAffected(); rowsAffected > 0 {
-			AuditOperation("expire-downtime", nil, fmt.Sprintf("Purged %d historical entries", rowsAffected))
-		}
-	}
-	{
-		res, err := db.ExecOrchestrator(`
-			update
-				database_instance_downtime
-			set
-				downtime_active = NULL
-			where
-				downtime_active = 1
-				and end_timestamp < NOW()
+				end_timestamp < NOW()
 			`,
 		)
 		if err != nil {
