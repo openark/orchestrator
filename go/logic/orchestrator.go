@@ -338,6 +338,7 @@ func ContinuousDiscovery() {
 				if atomic.LoadInt64(&isElectedNode) == 1 {
 					go inst.RecordInstanceCoordinatesHistory()
 					go inst.UpdateClusterAliases()
+					go inst.ExpireDowntime()
 				}
 			}()
 		case <-caretakingTick:
@@ -353,7 +354,6 @@ func ContinuousDiscovery() {
 					go inst.InjectUnseenMasters()
 					go inst.ResolveUnknownMasterHostnameResolves()
 					go inst.ExpireMaintenance()
-					go inst.ExpireDowntime()
 					go inst.ExpireCandidateInstances()
 					go inst.ExpireHostnameUnresolve()
 					go inst.ExpireClusterDomainName()
