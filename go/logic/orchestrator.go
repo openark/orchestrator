@@ -259,9 +259,9 @@ func onDiscoveryTick() {
 
 	if !myIsElectedNode {
 		if electedNode, _, err := process.ElectedNode(); err == nil {
-			log.Debugf("Not elected as active node; active node: %v; polling", electedNode.Hostname)
+			log.Infof("Not elected as active node; active node: %v; polling", electedNode.Hostname)
 		} else {
-			log.Debugf("Not elected as active node; active node: Unable to determine: %v; polling", err)
+			log.Infof("Not elected as active node; active node: Unable to determine: %v; polling", err)
 		}
 		return
 	}
