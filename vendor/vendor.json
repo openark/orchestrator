@@ -13,6 +13,12 @@
 			"revisionTime": "2016-08-02T11:38:42Z"
 		},
 		{
+			"checksumSHA1": "nuEoYgwp9jYIM6EnoS4YhoPtFPU=",
+			"path": "github.com/martini-contrib/render",
+			"revision": "ec18f8345a1181146728238980606fb1d6f40e8c",
+			"revisionTime": "2015-07-07T14:21:08Z"
+		},
+		{
 			"checksumSHA1": "8ZzNq0gd68Ghtdvo/JdRqpzbnuM=",
 			"path": "github.com/montanaflynn/stats",
 			"revision": "f8cd06f93c6c1b06028caafb88b540fc820f77c1",
