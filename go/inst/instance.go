@@ -120,6 +120,7 @@ type Instance struct {
 	DowntimeReason       string
 	DowntimeOwner        string
 	DowntimeEndTimestamp string
+	ElapsedDowntime      time.Duration
 	UnresolvedHostname   string
 	AllowTLS             bool
 

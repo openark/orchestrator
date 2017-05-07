@@ -18,23 +18,29 @@ package inst
 
 import (
 	"sync"
-	"sync/atomic"
 
 	"github.com/openark/golib/log"
 )
 
 type PostponedFunctionsContainer struct {
-	waitGroup      sync.WaitGroup
-	countFunctions int64
+	waitGroup    sync.WaitGroup
+	mutex        sync.Mutex
+	descriptions []string
 }
 
 func NewPostponedFunctionsContainer() *PostponedFunctionsContainer {
-	postponedFunctionsContainer := &PostponedFunctionsContainer{}
+	postponedFunctionsContainer := &PostponedFunctionsContainer{
+		descriptions: []string{},
+	}
 	return postponedFunctionsContainer
 }
 
-func (this *PostponedFunctionsContainer) AddPostponedFunction(postponedFunction func() error) {
-	atomic.AddInt64(&this.countFunctions, 1)
+func (this *PostponedFunctionsContainer) AddPostponedFunction(postponedFunction func() error, description string) {
+	this.mutex.Lock()
+	defer this.mutex.Unlock()
+
+	this.descriptions = append(this.descriptions, description)
+
 	this.waitGroup.Add(1)
 	go func() {
 		defer this.waitGroup.Done()
@@ -48,6 +54,16 @@ func (this *PostponedFunctionsContainer) Wait() {
 	log.Debugf("PostponedFunctionsContainer: done waiting")
 }
 
-func (this *PostponedFunctionsContainer) Len() int64 {
-	return atomic.LoadInt64(&this.countFunctions)
+func (this *PostponedFunctionsContainer) Len() int {
+	this.mutex.Lock()
+	defer this.mutex.Unlock()
+
+	return len(this.descriptions)
+}
+
+func (this *PostponedFunctionsContainer) Descriptions() []string {
+	this.mutex.Lock()
+	defer this.mutex.Unlock()
+
+	return this.descriptions
 }
