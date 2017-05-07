@@ -1230,6 +1230,12 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN last_discovery_latency bigint not null
 	`,
+	`
+		CREATE INDEX end_timestamp_idx_database_instance_downtime ON database_instance_downtime(end_timestamp)
+	`,
+	`
+		CREATE INDEX suggested_cluster_alias_idx_database_instance ON database_instance(suggested_cluster_alias)
+	`,
 }
 
 // Track if a TLS has already been configured for topology
