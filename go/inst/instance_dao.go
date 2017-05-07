@@ -221,6 +221,21 @@ func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStop
 	return isMaxScale, resolvedHostname, err
 }
 
+// AreReplicationThreadsRunning checks if both IO and SQL threads are running
+func AreReplicationThreadsRunning(instanceKey *InstanceKey) (replicationThreadsRunning bool, err error) {
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return replicationThreadsRunning, err
+	}
+	err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
+		ioThreadRunning := (m.GetString("Slave_IO_Running") == "Yes")
+		sqlThreadRunning := (m.GetString("Slave_SQL_Running") == "Yes")
+		replicationThreadsRunning = ioThreadRunning && sqlThreadRunning
+		return nil
+	})
+	return replicationThreadsRunning, err
+}
+
 // ReadTopologyInstanceBufferable connects to a topology MySQL instance
 // and collects information on the server and its replication state.
 // It writes the information retrieved into orchestrator's backend.
@@ -233,6 +248,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		}
 	}()
 
+	readingStartTime := time.Now()
 	instance := NewInstance()
 	instanceFound := false
 	foundByShowSlaveHosts := false
@@ -703,6 +719,7 @@ Cleanup:
 	readTopologyInstanceCounter.Inc(1)
 	//	logReadTopologyInstanceError(instanceKey, "ReadTopologyInstanceBufferable", err)	// don't write here and a few lines later.
 	if instanceFound {
+		instance.LastDiscoveryLatency = time.Since(readingStartTime)
 		instance.IsLastCheckValid = true
 		instance.IsRecentlyChecked = true
 		instance.IsUpToDate = true
@@ -724,7 +741,7 @@ Cleanup:
 	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
 	_ = UpdateInstanceLastChecked(&instance.Key)
 	latency.Stop("backend")
-	return nil, fmt.Errorf("ReadTopologyInstanceBufferable failed: %v", err)
+	return nil, err
 }
 
 // ReadClusterAliasOverride reads and applies SuggestedClusterAlias based on cluster_alias_override
@@ -946,9 +963,11 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.DowntimeReason = m.GetString("downtime_reason")
 	instance.DowntimeOwner = m.GetString("downtime_owner")
 	instance.DowntimeEndTimestamp = m.GetString("downtime_end_timestamp")
+	instance.ElapsedDowntime = time.Second * time.Duration(m.GetInt("elapsed_downtime_seconds"))
 	instance.UnresolvedHostname = m.GetString("unresolved_hostname")
 	instance.AllowTLS = m.GetBool("allow_tls")
 	instance.InstanceAlias = m.GetString("instance_alias")
+	instance.LastDiscoveryLatency = time.Duration(m.GetInt64("last_discovery_latency")) * time.Nanosecond
 
 	instance.SlaveHosts.ReadJson(slaveHostsJSON)
 	instance.applyFlavorName()
@@ -975,7 +994,8 @@ func readInstancesByCondition(condition string, args []interface{}, sort string)
 			ifnull(unresolved_hostname, '') as unresolved_hostname,
 			(database_instance_downtime.downtime_active is not null and ifnull(database_instance_downtime.end_timestamp, now()) > now()) as is_downtimed,
     	ifnull(database_instance_downtime.reason, '') as downtime_reason,
-    	ifnull(database_instance_downtime.owner, '') as downtime_owner,
+			ifnull(database_instance_downtime.owner, '') as downtime_owner,
+			ifnull(unix_timestamp() - unix_timestamp(begin_timestamp), 0) as elapsed_downtime_seconds,
     	ifnull(database_instance_downtime.end_timestamp, '') as downtime_end_timestamp
 		from
 			database_instance
@@ -1248,9 +1268,6 @@ func ReadFuzzyInstance(fuzzyInstanceKey *InstanceKey) (*Instance, error) {
 
 // ReadLostInRecoveryInstances returns all instances (potentially filtered by cluster)
 // which are currently indicated as downtimed due to being lost during a topology recovery.
-// Keep in mind:
-// - instances are only marked as such when config's MasterFailoverLostInstancesDowntimeMinutes > 0
-// - The downtime expires at some point
 func ReadLostInRecoveryInstances(clusterName string) ([](*Instance), error) {
 	condition := `
 		ifnull(
@@ -2022,6 +2039,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"allow_tls",
 		"semi_sync_enforced",
 		"instance_alias",
+		"last_discovery_latency",
 	}
 
 	var values []string = make([]string, len(columns), len(columns))
@@ -2091,6 +2109,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.AllowTLS)
 		args = append(args, instance.SemiSyncEnforced)
 		args = append(args, instance.InstanceAlias)
+		args = append(args, instance.LastDiscoveryLatency.Nanoseconds())
 	}
 
 	sql, err := mkInsertOdku("database_instance", columns, values, len(instances), insertIgnore)

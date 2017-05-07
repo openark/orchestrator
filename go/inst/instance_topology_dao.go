@@ -355,6 +355,30 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
+// sleep immediately after START SLAVE for a capped duration, until both replication threads are running.
+// This is to give slack to IO thread to connect and begin streaming, and to SQL thread to start applying.
+// Sleep is incremental with ongoing attempt to see whether replication is already up
+func startSlavePostSleep(instanceKey *InstanceKey) error {
+	waitDuration := time.Second
+	waitInterval := 10 * time.Millisecond
+	startTime := time.Now()
+
+	for time.Since(startTime) < waitDuration {
+		repliationRunning, err := AreReplicationThreadsRunning(instanceKey)
+		if err != nil {
+			return err
+		}
+		if repliationRunning {
+			return nil
+		}
+		time.Sleep(waitInterval)
+		if waitInterval < waitDuration {
+			waitInterval = 2 * waitInterval
+		}
+	}
+	return nil
+}
+
 // StartSlave starts replication on a given instance.
 func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -385,9 +409,8 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 	log.Infof("Started slave on %+v", instanceKey)
-	if config.Config.SlaveStartPostWaitMilliseconds > 0 {
-		time.Sleep(time.Duration(config.Config.SlaveStartPostWaitMilliseconds) * time.Millisecond)
-	}
+
+	startSlavePostSleep(instanceKey)
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/math"
@@ -37,6 +38,8 @@ const (
 	PreferNotPromoteRule                        = "prefer_not"
 	MustNotPromoteRule                          = "must_not"
 )
+
+const ReasonableDiscoveryLatency = 500 * time.Millisecond
 
 // ParseCandidatePromotionRule returns a CandidatePromotionRule by name.
 // It returns an error if there is no known rule by the given name.
@@ -117,8 +120,11 @@ type Instance struct {
 	DowntimeReason       string
 	DowntimeOwner        string
 	DowntimeEndTimestamp string
+	ElapsedDowntime      time.Duration
 	UnresolvedHostname   string
 	AllowTLS             bool
+
+	LastDiscoveryLatency time.Duration
 }
 
 // NewInstance creates a new, empty instance
