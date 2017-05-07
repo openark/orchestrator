@@ -268,9 +268,6 @@ Elaborating on recovery-related configuration:
 the refactored topology, should orchestrator forcibly issue a `detach-replica` command to make sure they don't accidentally resume
 replication in the future.
 
-- `MasterFailoverLostInstancesDowntimeMinutes`: when non-zero, and after master promotion, orchestrator will downtime lost
-replicas and dead master for given number of minutes.
-
 - `PostponeSlaveRecoveryOnLagMinutes`: some recovery operations can be pushed to be the very last steps; so that more urgent
 operations (e.g. change DNS entries) could be applied faster. Fixing replicas that are lagging at time of recovery (either because of `MASTER_DELAY` configuration or just because they were busy) could take a substantial time due to binary log exhaustive search (GTID & Pseudo-GTID). This variable defines the threshold above which a lagging replica's rewiring is pushed till the last moment.
 

@@ -182,3 +182,32 @@ func ReplaceAliasClusterName(oldClusterName string, newClusterName string) (err 
 	}
 	return err
 }
+
+// ReadUnambiguousSuggestedClusterAliases reads hostname:port who have suggested cluster aliases,
+// where no one else shares said suggested cluster alias. Such hostname:port are likely true owners
+// of the alias.
+func ReadUnambiguousSuggestedClusterAliases() (result map[string]InstanceKey, err error) {
+	result = map[string]InstanceKey{}
+
+	query := `
+		select
+			suggested_cluster_alias,
+			min(hostname) as hostname,
+			min(port) as port
+		from
+			database_instance
+		where
+			suggested_cluster_alias != ''
+		group by
+			suggested_cluster_alias
+		having
+			count(*) = 1
+		`
+	err = db.QueryOrchestrator(query, sqlutils.Args(), func(m sqlutils.RowMap) error {
+		key := InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
+		suggestedAlias := m.GetString("suggested_cluster_alias")
+		result[suggestedAlias] = key
+		return nil
+	})
+	return result, err
+}
