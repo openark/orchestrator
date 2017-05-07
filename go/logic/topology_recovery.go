@@ -345,7 +345,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 				_, err = inst.Repoint(&binlogServerReplica.Key, &promotedReplica.Key, inst.GTIDHintDeny)
 				return err
 			}
-			topologyRecovery.AddPostponedFunction(postponedFunction)
+			topologyRecovery.AddPostponedFunction(postponedFunction, fmt.Sprintf("recoverDeadMasterInBinlogServerTopology, moving binlog server %+v", binlogServerReplica.Key))
 		}
 	}()
 
@@ -471,6 +471,9 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 	}
 	topologyRecovery.AddError(err)
 	lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
+	for _, replica := range lostReplicas {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: - lost replica: %+v", replica.Key))
+	}
 
 	if promotedReplica != nil && len(lostReplicas) > 0 && config.Config.DetachLostReplicasAfterMasterFailover {
 		postponedFunction := func() error {
@@ -481,18 +484,18 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 			}
 			return nil
 		}
-		topologyRecovery.AddPostponedFunction(postponedFunction)
+		topologyRecovery.AddPostponedFunction(postponedFunction, fmt.Sprintf("RecoverDeadMaster, detach %+v lost replicas", len(lostReplicas)))
 	}
-	if config.Config.MasterFailoverLostInstancesDowntimeMinutes > 0 {
-		func() error {
-			inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
-			for _, replica := range lostReplicas {
-				replica := replica
-				inst.BeginDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
-			}
-			return nil
-		}()
-	}
+
+	func() error {
+		inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds)
+		for _, replica := range lostReplicas {
+			replica := replica
+			inst.BeginDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds)
+		}
+		return nil
+	}()
+
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: %d postponed functions", topologyRecovery.PostponedFunctionsContainer.Len()))
 
 	if promotedReplica == nil {
@@ -655,7 +658,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 				inst.DetachReplicaMasterHost(&promotedReplica.Key)
 				return nil
 			}
-			topologyRecovery.AddPostponedFunction(postponedFunction)
+			topologyRecovery.AddPostponedFunction(postponedFunction, fmt.Sprintf("RecoverDeadMaster, detaching promoted master host %+v", promotedReplica.Key))
 		}
 		func() error {
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: updating cluster_alias"))
@@ -1080,18 +1083,17 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 			}
 			return nil
 		}
-		topologyRecovery.AddPostponedFunction(postponedFunction)
+		topologyRecovery.AddPostponedFunction(postponedFunction, fmt.Sprintf("RecoverDeadCoMaster, detaching %+v replicas", len(lostReplicas)))
 	}
-	if config.Config.MasterFailoverLostInstancesDowntimeMinutes > 0 {
-		func() error {
-			inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
-			for _, replica := range lostReplicas {
-				replica := replica
-				inst.BeginDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
-			}
-			return nil
-		}()
-	}
+
+	func() error {
+		inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds)
+		for _, replica := range lostReplicas {
+			replica := replica
+			inst.BeginDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds)
+		}
+		return nil
+	}()
 
 	return promotedReplica, lostReplicas, err
 }
