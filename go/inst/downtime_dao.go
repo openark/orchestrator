@@ -18,6 +18,8 @@ package inst
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 	"github.com/openark/golib/log"
@@ -60,15 +62,11 @@ func BeginDowntime(instanceKey *InstanceKey, owner string, reason string, durati
 // EndDowntime will remove downtime flag from an instance
 func EndDowntime(instanceKey *InstanceKey) (wasDowntimed bool, err error) {
 	res, err := db.ExecOrchestrator(`
-			update
+			delete from
 				database_instance_downtime
-			set
-				downtime_active = NULL,
-				end_timestamp = NOW()
 			where
 				hostname = ?
 				and port = ?
-				and downtime_active = 1
 			`,
 		instanceKey.Hostname,
 		instanceKey.Port,
@@ -84,34 +82,86 @@ func EndDowntime(instanceKey *InstanceKey) (wasDowntimed bool, err error) {
 	return wasDowntimed, err
 }
 
+// renewLostInRecoveryDowntime renews hosts who are downtimed due to being lost in recovery, such that
+// their downtime never expires.
+func renewLostInRecoveryDowntime() error {
+	_, err := db.ExecOrchestrator(`
+			update
+				database_instance_downtime
+			set
+				end_timestamp = NOW() + INTERVAL ? SECOND
+			where
+				end_timestamp > NOW()
+				and reason = ?
+			`,
+		config.LostInRecoveryDowntimeSeconds,
+		DowntimeLostInRecoveryMessage,
+	)
+
+	return err
+}
+
+// expireLostInRecoveryDowntime expires downtime for servers who have been lost in recovery in the last,
+// but are now replicating.
+func expireLostInRecoveryDowntime() error {
+	instances, err := ReadLostInRecoveryInstances("")
+	if err != nil {
+		return err
+	}
+	if len(instances) == 0 {
+		return nil
+	}
+	unambiguousAliases, err := ReadUnambiguousSuggestedClusterAliases()
+	if err != nil {
+		return err
+	}
+	for _, instance := range instances {
+		// We _may_ expire this downtime, but only after a minute
+		// This is a graceful period, during which other servers can claim ownership of the alias,
+		// or can update their own cluster name to match a new master's name
+		if instance.ElapsedDowntime < time.Minute {
+			continue
+		}
+		if !instance.IsLastCheckValid {
+			continue
+		}
+		endDowntime := false
+		if instance.ReplicaRunning() {
+			// back, alive, replicating in some topology
+			endDowntime = true
+		} else if instance.ReplicationDepth == 0 {
+			// instance makes the appearance of a master
+			if unambiguousKey, ok := unambiguousAliases[instance.SuggestedClusterAlias]; ok {
+				if unambiguousKey.Equals(&instance.Key) {
+					// This instance seems to be a master, which is valid, and has a suggested alias,
+					// and is the _only_ one to have this suggested alias (i.e. no one took its place)
+					endDowntime = true
+				}
+			}
+		}
+		if endDowntime {
+			if _, err := EndDowntime(&instance.Key); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // ExpireDowntime will remove the maintenance flag on old downtimes
 func ExpireDowntime() error {
+	if err := renewLostInRecoveryDowntime(); err != nil {
+		return log.Errore(err)
+	}
+	if err := expireLostInRecoveryDowntime(); err != nil {
+		return log.Errore(err)
+	}
 	{
 		res, err := db.ExecOrchestrator(`
 			delete from
 				database_instance_downtime
 			where
-				downtime_active is null
-				and end_timestamp < NOW() - INTERVAL ? DAY
-			`,
-			config.Config.MaintenancePurgeDays,
-		)
-		if err != nil {
-			return log.Errore(err)
-		}
-		if rowsAffected, _ := res.RowsAffected(); rowsAffected > 0 {
-			AuditOperation("expire-downtime", nil, fmt.Sprintf("Purged %d historical entries", rowsAffected))
-		}
-	}
-	{
-		res, err := db.ExecOrchestrator(`
-			update
-				database_instance_downtime
-			set
-				downtime_active = NULL
-			where
-				downtime_active = 1
-				and end_timestamp < NOW()
+				end_timestamp < NOW()
 			`,
 		)
 		if err != nil {
