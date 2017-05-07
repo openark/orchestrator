@@ -623,10 +623,8 @@ Cheatsheet:
                 assuming some_alias is a known cluster alias (see ClusterNameToAlias or DetectClusterAliasQuery configuration)
 
 				which-lost-in-recovery
-						List instances marked as downtimed for being lost in a recovery process. This depends on the configuration
-						of MasterFailoverLostInstancesDowntimeMinutes. The output of this command lists heuristically recent
-						"lost" instances that probabaly should be recycled. Note that when the 'downtime' flag expires (or
-						is reset by '-c end-downtime') an instance no longer appears on this list.
+						List instances marked as downtimed for being lost in a recovery process. The output of this command lists
+            "lost" instances that probabaly should be recycled. 
 						The topology recovery process injects a magic hint when downtiming lost instances, that is picked up
 						by this command. Examples:
 
