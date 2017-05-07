@@ -63,7 +63,6 @@ type TopologyRecovery struct {
 	RecoveryEndTimestamp      string
 	ProcessingNodeHostname    string
 	ProcessingNodeToken       string
-	PostponedFunctions        [](func() error)
 	Acknowledged              bool
 	AcknowledgedAt            string
 	AcknowledgedBy            string
@@ -81,7 +80,6 @@ func NewTopologyRecovery(replicationAnalysis inst.ReplicationAnalysis) *Topology
 	topologyRecovery.LostReplicas = *inst.NewInstanceKeyMap()
 	topologyRecovery.ParticipatingInstanceKeys = *inst.NewInstanceKeyMap()
 	topologyRecovery.AllErrors = []string{}
-	topologyRecovery.PostponedFunctions = [](func() error){}
 	topologyRecovery.RecoveryType = NotMasterRecovery
 	return topologyRecovery
 }
@@ -182,6 +180,7 @@ func replaceCommandPlaceholders(command string, topologyRecovery *TopologyRecove
 	command = strings.Replace(command, "{autoMasterRecovery}", fmt.Sprint(analysisEntry.ClusterDetails.HasAutomatedMasterRecovery), -1)
 	command = strings.Replace(command, "{autoIntermediateMasterRecovery}", fmt.Sprint(analysisEntry.ClusterDetails.HasAutomatedIntermediateMasterRecovery), -1)
 	command = strings.Replace(command, "{orchestratorHost}", process.ThisHostname, -1)
+	command = strings.Replace(command, "{recoveryUID}", topologyRecovery.UID, -1)
 
 	command = strings.Replace(command, "{isSuccessful}", fmt.Sprint(topologyRecovery.SuccessorKey != nil), -1)
 	if topologyRecovery.SuccessorKey != nil {
@@ -219,6 +218,7 @@ func applyEnvironmentVariables(topologyRecovery *TopologyRecovery) []string {
 	env = append(env, fmt.Sprintf("ORC_IS_SUCCESSFUL=%s", (topologyRecovery.SuccessorKey != nil)))
 	env = append(env, fmt.Sprintf("ORC_LOST_REPLICAS=%s", topologyRecovery.LostReplicas.ToCommaDelimitedList()))
 	env = append(env, fmt.Sprintf("ORC_REPLICA_HOSTS=%s", analysisEntry.SlaveHosts.ToCommaDelimitedList()))
+	env = append(env, fmt.Sprintf("ORC_RECOVERY_UID=%s", topologyRecovery.UID))
 
 	if topologyRecovery.SuccessorKey != nil {
 		env = append(env, fmt.Sprintf("ORC_SUCCESSOR_HOST=%s", topologyRecovery.SuccessorKey.Hostname))
@@ -234,10 +234,12 @@ func applyEnvironmentVariables(topologyRecovery *TopologyRecovery) []string {
 // executeProcesses executes a list of processes
 func executeProcesses(processes []string, description string, topologyRecovery *TopologyRecovery, failOnError bool) error {
 	var err error
-	for _, command := range processes {
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("running %d %s hooks", len(processes), description))
+	for i, command := range processes {
 		command := replaceCommandPlaceholders(command, topologyRecovery)
 		env := applyEnvironmentVariables(topologyRecovery)
 
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("running %s hook #%d", description, i))
 		if cmdErr := os.CommandRun(command, env); cmdErr == nil {
 			log.Infof("Executed %s command: %s", description, command)
 		} else {
@@ -251,6 +253,7 @@ func executeProcesses(processes []string, description string, topologyRecovery *
 			}
 		}
 	}
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("done running %s hooks", description))
 	return err
 }
 
@@ -342,7 +345,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 				_, err = inst.Repoint(&binlogServerReplica.Key, &promotedReplica.Key, inst.GTIDHintDeny)
 				return err
 			}
-			topologyRecovery.AddPostponedFunction(postponedFunction)
+			topologyRecovery.AddPostponedFunction(postponedFunction, fmt.Sprintf("recoverDeadMasterInBinlogServerTopology, moving binlog server %+v", binlogServerReplica.Key))
 		}
 	}()
 
@@ -446,24 +449,31 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 	switch masterRecoveryType {
 	case MasterRecoveryGTID:
 		{
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: regrouping replicas via GTID"))
 			lostReplicas, _, cannotReplicateReplicas, promotedReplica, err = inst.RegroupReplicasGTID(failedInstanceKey, true, nil)
 		}
 	case MasterRecoveryPseudoGTID:
 		{
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: regrouping replicas via Pseudo-GTID"))
 			lostReplicas, _, _, cannotReplicateReplicas, promotedReplica, err = inst.RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(failedInstanceKey, true, nil, &topologyRecovery.PostponedFunctionsContainer)
 		}
 	case MasterRecoveryBinlogServer:
 		{
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: recovering via binlog servers"))
 			promotedReplica, err = recoverDeadMasterInBinlogServerTopology(topologyRecovery)
 		}
 	case MasterRecoveryRemoteSSH:
 		{
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: recovering via relaylog sync"))
 			promotedReplica, _, lostReplicas, _, err = recoverDeadMasterViaRelaylogSync(topologyRecovery)
 			//promotedReplica, _, lostReplicas, _, err = recoverDeadMasterViaRelaylogSyncCombined(topologyRecovery)
 		}
 	}
 	topologyRecovery.AddError(err)
 	lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
+	for _, replica := range lostReplicas {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: - lost replica: %+v", replica.Key))
+	}
 
 	if promotedReplica != nil && len(lostReplicas) > 0 && config.Config.DetachLostReplicasAfterMasterFailover {
 		postponedFunction := func() error {
@@ -474,23 +484,28 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 			}
 			return nil
 		}
-		topologyRecovery.AddPostponedFunction(postponedFunction)
-	}
-	if config.Config.MasterFailoverLostInstancesDowntimeMinutes > 0 {
-		func() error {
-			inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
-			for _, replica := range lostReplicas {
-				replica := replica
-				inst.BeginDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
-			}
-			return nil
-		}()
+		topologyRecovery.AddPostponedFunction(postponedFunction, fmt.Sprintf("RecoverDeadMaster, detach %+v lost replicas", len(lostReplicas)))
 	}
 
+	func() error {
+		inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds)
+		for _, replica := range lostReplicas {
+			replica := replica
+			inst.BeginDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds)
+		}
+		return nil
+	}()
+
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: %d postponed functions", topologyRecovery.PostponedFunctionsContainer.Len()))
+
 	if promotedReplica == nil {
-		inst.AuditOperation("recover-dead-master", failedInstanceKey, "Failure: no replica promoted.")
+		message := "Failure: no replica promoted."
+		AuditTopologyRecovery(topologyRecovery, message)
+		inst.AuditOperation("recover-dead-master", failedInstanceKey, message)
 	} else {
-		inst.AuditOperation("recover-dead-master", failedInstanceKey, fmt.Sprintf("promoted replica: %+v", promotedReplica.Key))
+		message := fmt.Sprintf("promoted replica: %+v", promotedReplica.Key)
+		AuditTopologyRecovery(topologyRecovery, message)
+		inst.AuditOperation("recover-dead-master", failedInstanceKey, message)
 	}
 	return promotedReplica, lostReplicas, err
 }
@@ -625,6 +640,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 
 		// Success!
 		recoverDeadMasterSuccessCounter.Inc(1)
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: successfully promoted %+v", promotedReplica.Key))
 
 		if config.Config.ApplyMySQLPromotionAfterMasterFailover {
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: will apply MySQL changes to promoted master"))
@@ -642,7 +658,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 				inst.DetachReplicaMasterHost(&promotedReplica.Key)
 				return nil
 			}
-			topologyRecovery.AddPostponedFunction(postponedFunction)
+			topologyRecovery.AddPostponedFunction(postponedFunction, fmt.Sprintf("RecoverDeadMaster, detaching promoted master host %+v", promotedReplica.Key))
 		}
 		func() error {
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: updating cluster_alias"))
@@ -1067,18 +1083,17 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 			}
 			return nil
 		}
-		topologyRecovery.AddPostponedFunction(postponedFunction)
+		topologyRecovery.AddPostponedFunction(postponedFunction, fmt.Sprintf("RecoverDeadCoMaster, detaching %+v replicas", len(lostReplicas)))
 	}
-	if config.Config.MasterFailoverLostInstancesDowntimeMinutes > 0 {
-		func() error {
-			inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
-			for _, replica := range lostReplicas {
-				replica := replica
-				inst.BeginDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.Config.MasterFailoverLostInstancesDowntimeMinutes*60)
-			}
-			return nil
-		}()
-	}
+
+	func() error {
+		inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds)
+		for _, replica := range lostReplicas {
+			replica := replica
+			inst.BeginDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds)
+		}
+		return nil
+	}()
 
 	return promotedReplica, lostReplicas, err
 }
@@ -1277,7 +1292,9 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 			executeProcesses(config.Config.PostFailoverProcesses, "PostFailoverProcesses", topologyRecovery, false)
 		}
 	}
-	topologyRecovery.InvokePostponed()
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Waiting for %d postponed functions", topologyRecovery.PostponedFunctionsContainer.Len()))
+	topologyRecovery.Wait()
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Executed %d postponed functions", topologyRecovery.PostponedFunctionsContainer.Len()))
 	return recoveryAttempted, topologyRecovery, err
 }
 
