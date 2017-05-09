@@ -661,8 +661,10 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			topologyRecovery.AddPostponedFunction(postponedFunction, fmt.Sprintf("RecoverDeadMaster, detaching promoted master host %+v", promotedReplica.Key))
 		}
 		func() error {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: updating cluster_alias"))
-			inst.ReplaceAliasClusterName(analysisEntry.AnalyzedInstanceKey.StringCode(), promotedReplica.Key.StringCode())
+			before := analysisEntry.AnalyzedInstanceKey.StringCode()
+			after := promotedReplica.Key.StringCode()
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: updating cluster_alias: %v -> %v", before, after))
+			inst.ReplaceAliasClusterName(before, after)
 			return nil
 		}()
 
