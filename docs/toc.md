@@ -22,6 +22,7 @@
 - [Bugs](bugs.md)
 - [Contributions](contributions.md)
 - [Who uses Orchestrator?](users.md)
+- [Presentations](presentations.md)
 
 ## Quick guides
 
