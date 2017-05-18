@@ -10,6 +10,6 @@ you would like to be added please send a pull request to github.com/github/orche
 Please keep this list in alphabetical order and include the company name and url and
 a short description of usage.
 
-* [Booking.com](http://www.booking.com) - used in production
+* [Booking.com](http://www.booking.com)
 * [GitHub Inc](http://www.github.com)
 * [Rentalcars.com](http://www.rentalcars.com) - evaluationg in production
