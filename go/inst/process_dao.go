@@ -18,8 +18,8 @@ package inst
 
 import (
 	"github.com/github/orchestrator/go/db"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 )
 
 // WriteLongRunningProcesses rewrites current state of long running processes for given instance
@@ -40,11 +40,11 @@ func WriteLongRunningProcesses(instanceKey *InstanceKey, processes []Process) er
 
 		for _, process := range processes {
 			_, merr := db.ExecOrchestrator(`
-	        	insert ignore into database_instance_long_running_queries (
-	        		hostname,
-	        		port,
-	        		process_id,
-	        		process_started_at,
+      	insert ignore into database_instance_long_running_queries (
+      		hostname,
+      		port,
+      		process_id,
+      		process_started_at,
 					process_user,
 					process_host,
 					process_db,

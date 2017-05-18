@@ -15,6 +15,7 @@ latest [API source code](https://github.com/github/orchestrator/blob/master/go/h
 * `/api/instance/:host/:port`: reads and returns an instance's details (example `/api/instance/mysql10/3306`)
 * `/api/discover/:host/:port`: discover given instance (a running `orchestrator` service will pick it up from there and
 recursively scan the entire topology)
+* `/api/async-discover/:host/:port`: similar to discover (which is a synchronous action) this works asynchronously
 * `/api/refresh/:host/:port`: synchronously re-read instance status
 * `/api/forget/:host/:port`: remove records of this instance. It may be automatically rediscovered by
   following up on its master or one of its replicas.
@@ -61,6 +62,13 @@ The following bulk retrieval rules are intended for allowing the information ins
 * `/api/bulk-instance`: provide a json list of instances in the form of Hostname Port
 * `/api/bulk-promotion-rules`: provide a json list of instance promotion rules in the form of Hostname Port PromotionRule
 
+The following URLs for collecting monitoring information
+* `/api/discovery-metrics-raw/:seconds`: list the raw discovery metrics for the last specified number of seconds. Raw discovery metric data is kept for DiscoveryCollectionRetentionSeconds seconds (default: 120)
+* `/api/discovery-metrics-aggregated/:seconds`: provide aggregated data for the discovery metrics over the last specified number of seconds.
+* `/api/discovery-queue-metrics-raw/:seconds`: return a list of active and queued number discovery keys over the requested number of seconds
+* `/api/discovery-queue-metrics-aggregated/:seconds`: return aggregated data based on the raw data mentioned above
+* `/api/backend-query-metrics-raw/:seconds`: return the raw metrics on queries sent to the backend in the period specified
+* `/api/backend-query-metrics-aggregated/:seconds`: return a set of aggregated values based on the raw numbers above
 
 #### Instance JSON breakdown
 

@@ -25,12 +25,18 @@ import (
 
 	"gopkg.in/gcfg.v1"
 
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 )
 
 var (
 	envVariableRegexp = regexp.MustCompile("[$][{](.*)[}]")
 )
+
+const (
+	LostInRecoveryDowntimeSeconds = 60 * 60 * 24 * 365
+)
+
+var ConfigurationLoaded chan bool = make(chan bool)
 
 // Configuration makes for orchestrator configuration input, which can be provided by user via JSON formatted file.
 // Some of the parameteres have reasonable default values, and some (like database credentials) are
@@ -51,6 +57,10 @@ type Configuration struct {
 	MySQLTopologyUseMutualTLS                    bool   // Turn on TLS authentication with the Topology MySQL instances
 	MySQLTopologyMaxPoolConnections              int    // Max concurrent connections on any topology instance
 	DatabaselessMode__experimental               bool   // !!!EXPERIMENTAL!!! Orchestrator will execute without speaking to a backend database; super-standalone mode
+	BackendDB                                    string // EXPERIMENTAL: type of backend db; either "mysql" or "sqlite3"
+	SQLite3DataFile                              string // when BackendDB == "sqlite3", full path to sqlite3 datafile
+	SkipOrchestratorDatabaseUpdate               bool   // When true, do not check backend database schema nor attempt to update it. Useful when you may be running multiple versions of orchestrator, and you only wish certain boxes to dictate the db structure (or else any time a different orchestrator version runs it will rebuild database schema)
+	PanicIfDifferentDatabaseDeploy               bool   // When true, and this process finds the orchestrator backend DB was provisioned by a different version, panic
 	MySQLOrchestratorHost                        string
 	MySQLOrchestratorMaxPoolConnections          int // The maximum size of the connection pool to the Orchestrator backend.
 	MySQLOrchestratorPort                        uint
@@ -78,14 +88,16 @@ type Configuration struct {
 	BufferInstanceWrites                         bool     // Set to 'true' for write-optimization on backend table (compromise: writes can be stale and overwrite non stale data)
 	InstanceFlushIntervalMilliseconds            int      // Max interval between instance write buffer flushes
 	ReadLongRunningQueries                       bool     // Whether orchestrator should read and record current long running executing queries.
+	SkipMaxScaleCheck                            bool     // If you don't ever have MaxScale BinlogServer in your topology (and most people don't), set this to 'true' to save some pointless queries
 	BinlogFileHistoryDays                        int      // When > 0, amount of days for which orchestrator records per-instance binlog files & sizes
 	UnseenInstanceForgetHours                    uint     // Number of hours after which an unseen instance is forgotten
 	SnapshotTopologiesIntervalHours              uint     // Interval in hour between snapshot-topologies invocation. Default: 0 (disabled)
 	DiscoveryMaxConcurrency                      uint     // Number of goroutines doing hosts discovery
 	DiscoveryQueueCapacity                       uint     // Buffer size of the discovery queue. Should be greater than the number of DB instances being discovered
+	DiscoveryQueueMaxStatisticsSize              int      // The maximum number of individual secondly statistics taken of the discovery queue
+	DiscoveryCollectionRetentionSeconds          uint     // Number of seconds to retain the discovery collection information
 	InstanceBulkOperationsWaitTimeoutSeconds     uint     // Time to wait on a single instance when doing bulk (many instances) operation
 	ActiveNodeExpireSeconds                      uint     // Maximum time to wait for active node to send keepalive before attempting to take over as active node.
-	NodeHealthExpiry                             bool     // Do we expire the node_health table? Usually this is true but it might be disabled on command line tools if an orchestrator daemon is running.
 	HostnameResolveMethod                        string   // Method by which to "normalize" hostname ("none"/"default"/"cname")
 	MySQLHostnameResolveMethod                   string   // Method by which to "normalize" hostname via MySQL server. ("none"/"@@hostname"/"@@report_host"; default "@@hostname")
 	SkipBinlogServerUnresolveCheck               bool     // Skip the double-check that an unresolved hostname resolves back to same hostname for binlog servers
@@ -157,6 +169,7 @@ type Configuration struct {
 	PseudoGTIDMonotonicHint                      string            // subtring in Pseudo-GTID entry which indicates Pseudo-GTID entries are expected to be monotonically increasing
 	DetectPseudoGTIDQuery                        string            // Optional query which is used to authoritatively decide whether pseudo gtid is enabled on instance
 	PseudoGTIDCoordinatesHistoryHeuristicMinutes int               // Significantly reducing Pseudo-GTID lookup time, this indicates the most recent N minutes binlog position where search for Pseudo-GTID will heuristically begin (there is a fallback on fullscan if unsuccessful)
+	PseudoGTIDPreferIndependentMultiMatch        bool              // if 'false', a multi-replica Pseudo-GTID operation will attempt grouping replicas via Pseudo-GTID, and make less binlog computations. However it may cause servers in same bucket wait for one another, which could delay some servers from being repointed. There is a tradeoff between total operation time for all servers, and per-server time. When 'true', Pseudo-GTID matching will operate per server, independently. This will cause waste of same calculations, but no two servers will wait on one another.
 	BinlogEventsChunkSize                        int               // Chunk size (X) for SHOW BINLOG|RELAYLOG EVENTS LIMIT ?,X statements. Smaller means less locking and mroe work to be done
 	BufferBinlogEvents                           bool              // Should we used buffered read on SHOW BINLOG|RELAYLOG EVENTS -- releases the database lock sooner (recommended)
 	SkipBinlogEventsContaining                   []string          // When scanning/comparing binlogs for Pseudo-GTID, skip entries containing given texts. These are NOT regular expressions (would consume too much CPU while scanning binlogs), just substrings to find.
@@ -183,14 +196,20 @@ type Configuration struct {
 	MasterFailoverLostInstancesDowntimeMinutes   uint              // Number of minutes to downtime any server that was lost after a master failover (including failed master & lost replicas). 0 to disable
 	MasterFailoverDetachSlaveMasterHost          bool              // synonym to MasterFailoverDetachReplicaMasterHost
 	MasterFailoverDetachReplicaMasterHost        bool              // Should orchestrator issue a detach-replica-master-host on newly promoted master (this makes sure the new master will not attempt to replicate old master if that comes back to life). Defaults 'false'. Meaningless if ApplyMySQLPromotionAfterMasterFailover is 'true'.
+	FailMasterPromotionIfSQLThreadNotUpToDate    bool              // when true, and a master failover takes place, if candidate master has not consumed all relay logs, promotion is aborted with error
 	PostponeSlaveRecoveryOnLagMinutes            uint              // Synonym to PostponeReplicaRecoveryOnLagMinutes
 	PostponeReplicaRecoveryOnLagMinutes          uint              // On crash recovery, replicas that are lagging more than given minutes are only resurrected late in the recovery process, after master/IM has been elected and processes executed. Value of 0 disables this feature
+	RemoteSSHForMasterFailover                   bool              // Should orchestrator attempt a remote-ssh relaylog-synching upon master failover? Requires RemoteSSHCommand
+	RemoteSSHCommand                             string            // A `ssh` command to be used by recovery process to read/apply relaylogs. If provided, this variable must contain the text "{hostname}". The remote SSH login must have the privileges to read/write relay logs. Example: "setuidgid remoteuser ssh {hostname}"
+	RemoteSSHCommandUseSudo                      bool              // Should orchestrator apply 'sudo' on the remote host upon SSH command
 	OSCIgnoreHostnameFilters                     []string          // OSC replicas recommendation will ignore replica hostnames matching given patterns
 	GraphiteAddr                                 string            // Optional; address of graphite port. If supplied, metrics will be written here
 	GraphitePath                                 string            // Prefix for graphite path. May include {hostname} magic placeholder
 	GraphiteConvertHostnameDotsToUnderscores     bool              // If true, then hostname's dots are converted to underscores before being used in graphite path
 	GraphitePollSeconds                          int               // Graphite writes interval. 0 disables.
 	URLPrefix                                    string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
+	MaxOutdatedKeysToShow                        int               // Maximum number of keys to show in ContinousDiscovery. If the number of polled hosts grows too far then showing the complete list is not ideal.
+	DiscoveryIgnoreReplicaHostnameFilters        []string          // Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -221,6 +240,10 @@ func newConfiguration() *Configuration {
 		StatusEndpoint:                               "/api/status",
 		StatusSimpleHealth:                           true,
 		StatusOUVerify:                               false,
+		BackendDB:                                    "mysql",
+		SQLite3DataFile:                              "",
+		SkipOrchestratorDatabaseUpdate:               false,
+		PanicIfDifferentDatabaseDeploy:               false,
 		MySQLOrchestratorMaxPoolConnections:          128, // limit concurrent conns to backend DB
 		MySQLOrchestratorPort:                        3306,
 		MySQLTopologyMaxPoolConnections:              3,
@@ -238,6 +261,7 @@ func newConfiguration() *Configuration {
 		BufferInstanceWrites:                         false,
 		InstanceFlushIntervalMilliseconds:            100,
 		ReadLongRunningQueries:                       true,
+		SkipMaxScaleCheck:                            false,
 		BinlogFileHistoryDays:                        0,
 		UnseenInstanceForgetHours:                    240,
 		SnapshotTopologiesIntervalHours:              0,
@@ -245,9 +269,10 @@ func newConfiguration() *Configuration {
 		DiscoverByShowSlaveHosts:                     false,
 		DiscoveryMaxConcurrency:                      300,
 		DiscoveryQueueCapacity:                       100000,
+		DiscoveryQueueMaxStatisticsSize:              120,
+		DiscoveryCollectionRetentionSeconds:          120,
 		InstanceBulkOperationsWaitTimeoutSeconds:     10,
 		ActiveNodeExpireSeconds:                      5,
-		NodeHealthExpiry:                             true,
 		HostnameResolveMethod:                        "default",
 		MySQLHostnameResolveMethod:                   "@@hostname",
 		SkipBinlogServerUnresolveCheck:               true,
@@ -313,6 +338,7 @@ func newConfiguration() *Configuration {
 		PseudoGTIDMonotonicHint:                      "",
 		DetectPseudoGTIDQuery:                        "",
 		PseudoGTIDCoordinatesHistoryHeuristicMinutes: 2,
+		PseudoGTIDPreferIndependentMultiMatch:        false,
 		BinlogEventsChunkSize:                        10000,
 		BufferBinlogEvents:                           true,
 		SkipBinlogEventsContaining:                   []string{},
@@ -337,13 +363,19 @@ func newConfiguration() *Configuration {
 		ApplyMySQLPromotionAfterMasterFailover:       false,
 		MasterFailoverLostInstancesDowntimeMinutes:   0,
 		MasterFailoverDetachSlaveMasterHost:          false,
+		FailMasterPromotionIfSQLThreadNotUpToDate:    false,
 		PostponeSlaveRecoveryOnLagMinutes:            0,
+		RemoteSSHForMasterFailover:                   false,
+		RemoteSSHCommand:                             "",
+		RemoteSSHCommandUseSudo:                      true,
 		OSCIgnoreHostnameFilters:                     []string{},
 		GraphiteAddr:                                 "",
 		GraphitePath:                                 "",
 		GraphiteConvertHostnameDotsToUnderscores:     true,
 		GraphitePollSeconds:                          60,
 		URLPrefix:                                    "",
+		MaxOutdatedKeysToShow:                        64,
+		DiscoveryIgnoreReplicaHostnameFilters:        []string{},
 	}
 }
 
@@ -441,7 +473,28 @@ func (this *Configuration) postReadAdjustments() error {
 		this.URLPrefix = strings.TrimRight(this.URLPrefix, "/")
 		this.URLPrefix = "/" + this.URLPrefix
 	}
+
+	if this.RemoteSSHCommand != "" {
+		if !strings.Contains(this.RemoteSSHCommand, "{hostname}") {
+			return fmt.Errorf("config's RemoteSSHCommand must either be empty, or contain a '{hostname}' placeholder")
+		}
+	}
+
+	if this.IsSQLite() && this.SQLite3DataFile == "" {
+		return fmt.Errorf("SQLite3DataFile must be set when BackendDB is sqlite3")
+	}
+	if this.RemoteSSHForMasterFailover && this.RemoteSSHCommand == "" {
+		return fmt.Errorf("RemoteSSHCommand is required when RemoteSSHForMasterFailover is set")
+	}
 	return nil
+}
+
+func (this *Configuration) IsSQLite() bool {
+	return strings.Contains(this.BackendDB, "sqlite")
+}
+
+func (this *Configuration) IsMySQL() bool {
+	return this.BackendDB == "mysql" || this.BackendDB == ""
 }
 
 // read reads configuration from given file, or silently skips if the file does not exist.
@@ -489,4 +542,16 @@ func Reload() *Configuration {
 		read(fileName)
 	}
 	return Config
+}
+
+// MarkConfigurationLoaded is called once configuration has first been loaded.
+// Listeners on ConfigurationLoaded will get a notification
+func MarkConfigurationLoaded() {
+	go func() {
+		for {
+			ConfigurationLoaded <- true
+		}
+	}()
+	// wait for it
+	<-ConfigurationLoaded
 }

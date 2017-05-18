@@ -21,11 +21,20 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/math"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/math"
+)
+
+type StopReplicationMethod string
+
+const (
+	NoStopReplication     StopReplicationMethod = "NoStopReplication"
+	StopReplicationNormal                       = "StopReplicationNormal"
+	StopReplicationNicely                       = "StopReplicationNicely"
 )
 
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
@@ -1260,8 +1269,8 @@ func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordin
 		return instancePseudoGtidCoordinates, instancePseudoGtidText, fmt.Errorf("PseudoGTIDPattern not configured; cannot use Pseudo-GTID")
 	}
 
-	minBinlogCoordinates, minRelaylogCoordinates, err := GetHeuristiclyRecentCoordinatesForInstance(&instance.Key)
-	if instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled && (expectedBinlogFormat == nil || instance.Binlog_format == *expectedBinlogFormat) {
+	if instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled && !*config.RuntimeCLIFlags.SkipBinlogSearch && (expectedBinlogFormat == nil || instance.Binlog_format == *expectedBinlogFormat) {
+		minBinlogCoordinates, _, _ := GetHeuristiclyRecentCoordinatesForInstance(&instance.Key)
 		// Well no need to search this instance's binary logs if it doesn't have any...
 		// With regard log-slave-updates, some edge cases are possible, like having this instance's log-slave-updates
 		// enabled/disabled (of course having restarted it)
@@ -1273,6 +1282,7 @@ func FindLastPseudoGTIDEntry(instance *Instance, recordedInstanceRelayLogCoordin
 		instancePseudoGtidCoordinates, instancePseudoGtidText, err = getLastPseudoGTIDEntryInInstance(instance, minBinlogCoordinates, maxBinlogCoordinates, exhaustiveSearch)
 	}
 	if err != nil || instancePseudoGtidCoordinates == nil {
+		minRelaylogCoordinates, _ := GetPreviousKnownRelayLogCoordinatesForInstance(instance)
 		// Unable to find pseudo GTID in binary logs.
 		// Then MAYBE we are lucky enough (chances are we are, if this replica did not crash) that we can
 		// extract the Pseudo GTID entry from the last (current) relay log file.
@@ -1322,6 +1332,35 @@ func CorrelateBinlogCoordinates(instance *Instance, binlogCoordinates *BinlogCoo
 		return nil, 0, err
 	}
 	return nextBinlogCoordinatesToMatch, countMatchedEvents, nil
+}
+
+func CorrelateRelaylogCoordinates(instance *Instance, relaylogCoordinates *BinlogCoordinates, otherInstance *Instance) (instanceCoordinates, correlatedCoordinates, nextCoordinates *BinlogCoordinates, found bool, err error) {
+	// The two servers are expected to have the same master, or this doesn't work
+	if !instance.MasterKey.Equals(&otherInstance.MasterKey) {
+		return instanceCoordinates, correlatedCoordinates, nextCoordinates, found, log.Errorf("CorrelateRelaylogCoordinates requires sibling instances, however %+v has master %+v, and %+v has master %+v", instance.Key, instance.MasterKey, otherInstance.Key, otherInstance.MasterKey)
+	}
+	var binlogEvent *BinlogEvent
+	if relaylogCoordinates == nil {
+		instanceCoordinates = &instance.RelaylogCoordinates
+		if minCoordinates, err := GetPreviousKnownRelayLogCoordinatesForInstance(instance); err != nil {
+			return instanceCoordinates, correlatedCoordinates, nextCoordinates, found, err
+		} else if binlogEvent, err = GetLastExecutedEntryInRelayLogs(instance, minCoordinates, instance.RelaylogCoordinates); err != nil {
+			return instanceCoordinates, correlatedCoordinates, nextCoordinates, found, err
+		}
+	} else {
+		instanceCoordinates = relaylogCoordinates
+		relaylogCoordinates.Type = RelayLog
+		if binlogEvent, err = ReadBinlogEventAtRelayLogCoordinates(&instance.Key, relaylogCoordinates); err != nil {
+			return instanceCoordinates, correlatedCoordinates, nextCoordinates, found, err
+		}
+	}
+
+	_, minCoordinates, err := GetHeuristiclyRecentCoordinatesForInstance(&otherInstance.Key)
+	if err != nil {
+		return instanceCoordinates, correlatedCoordinates, nextCoordinates, found, err
+	}
+	correlatedCoordinates, nextCoordinates, found, err = SearchEventInRelayLogs(binlogEvent, otherInstance, minCoordinates, otherInstance.RelaylogCoordinates)
+	return instanceCoordinates, correlatedCoordinates, nextCoordinates, found, err
 }
 
 // MatchBelow will attempt moving instance indicated by instanceKey below its the one indicated by otherKey.
@@ -1611,8 +1650,13 @@ Cleanup:
 }
 
 // sortInstances shuffles given list of instances according to some logic
+func sortInstancesDataCenterHint(instances [](*Instance), dataCenterHint string) {
+	sort.Sort(sort.Reverse(NewInstancesSorterByExec(instances, dataCenterHint)))
+}
+
+// sortInstances shuffles given list of instances according to some logic
 func sortInstances(instances [](*Instance)) {
-	sort.Sort(sort.Reverse(InstancesByExecBinlogCoordinates(instances)))
+	sortInstancesDataCenterHint(instances, "")
 }
 
 // getReplicasForSorting returns a list of replicas of a given master potentially for candidate choosing
@@ -1625,21 +1669,22 @@ func getReplicasForSorting(masterKey *InstanceKey, includeBinlogServerSubReplica
 	return replicas, err
 }
 
+func sortedReplicas(replicas [](*Instance), stopReplicationMethod StopReplicationMethod) [](*Instance) {
+	return sortedReplicasDataCenterHint(replicas, stopReplicationMethod, "")
+}
+
 // sortedReplicas returns the list of replicas of some master, sorted by exec coordinates
 // (most up-to-date replica first).
 // This function assumes given `replicas` argument is indeed a list of instances all replicating
 // from the same master (the result of `getReplicasForSorting()` is appropriate)
-func sortedReplicas(replicas [](*Instance), shouldStopSlaves bool) [](*Instance) {
+func sortedReplicasDataCenterHint(replicas [](*Instance), stopReplicationMethod StopReplicationMethod, dataCenterHint string) [](*Instance) {
 	if len(replicas) == 0 {
 		return replicas
 	}
-	if shouldStopSlaves {
-		log.Debugf("sortedReplicas: stopping %d replicas nicely", len(replicas))
-		replicas = StopSlavesNicely(replicas, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
-	}
+	replicas = StopSlaves(replicas, stopReplicationMethod, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
 	replicas = RemoveNilInstances(replicas)
 
-	sortInstances(replicas)
+	sortInstancesDataCenterHint(replicas, dataCenterHint)
 	for _, replica := range replicas {
 		log.Debugf("- sorted replica: %+v %+v", replica.Key, replica.ExecBinlogCoordinates)
 	}
@@ -1647,9 +1692,93 @@ func sortedReplicas(replicas [](*Instance), shouldStopSlaves bool) [](*Instance)
 	return replicas
 }
 
+// GetSortedReplicas reads list of replicas of a given master, and returns them sorted by exec coordinates
+// (most up-to-date replica first).
+func GetSortedReplicas(masterKey *InstanceKey, stopReplicationMethod StopReplicationMethod) (replicas [](*Instance), err error) {
+	if replicas, err = getReplicasForSorting(masterKey, false); err != nil {
+		return replicas, err
+	}
+	replicas = sortedReplicas(replicas, stopReplicationMethod)
+	if len(replicas) == 0 {
+		return replicas, fmt.Errorf("No replicas found for %+v", *masterKey)
+	}
+	return replicas, err
+}
+
+func MultiMatchBelowIndependently(replicas [](*Instance), belowKey *InstanceKey, postponedFunctionsContainer *PostponedFunctionsContainer) (matchedReplicas [](*Instance), belowInstance *Instance, err error, errs []error) {
+	belowInstance, found, err := ReadInstance(belowKey)
+	if err != nil || !found {
+		return matchedReplicas, belowInstance, err, errs
+	}
+
+	replicas = RemoveInstance(replicas, belowKey)
+	if len(replicas) == 0 {
+		// Nothing to do
+		return replicas, belowInstance, err, errs
+	}
+
+	log.Infof("Will match %+v replicas below %+v via Pseudo-GTID, independently", len(replicas), belowKey)
+
+	barrier := make(chan *InstanceKey)
+	replicaMutex := &sync.Mutex{}
+
+	for _, replica := range replicas {
+		replica := replica
+
+		// Parallelize repoints
+		go func() {
+			defer func() { barrier <- &replica.Key }()
+			matchFunc := func() error {
+				replica, _, replicaErr := MatchBelow(&replica.Key, belowKey, true)
+
+				replicaMutex.Lock()
+				defer replicaMutex.Unlock()
+
+				if replicaErr == nil {
+					matchedReplicas = append(matchedReplicas, replica)
+				} else {
+					errs = append(errs, replicaErr)
+				}
+				return replicaErr
+			}
+			postpone := false
+			if postponedFunctionsContainer != nil {
+				if config.Config.PostponeReplicaRecoveryOnLagMinutes > 0 &&
+					replica.SQLDelay > config.Config.PostponeReplicaRecoveryOnLagMinutes*60 {
+					// This replica is lagging very much, AND
+					// we're configured to postpone operation on this replica so as not to delay everyone else.
+					postpone = true
+				}
+				if replica.LastDiscoveryLatency > ReasonableDiscoveryLatency {
+					postpone = true
+				}
+			}
+			if postpone {
+				postponedFunctionsContainer.AddPostponedFunction(matchFunc, fmt.Sprintf("multi-match-below-independent %+v", replica.Key))
+				// We bail out and trust our invoker to later call upon this postponed function
+			} else {
+				ExecuteOnTopology(func() { matchFunc() })
+			}
+		}()
+	}
+	for range replicas {
+		<-barrier
+	}
+	if len(errs) == len(replicas) {
+		// All returned with error
+		return matchedReplicas, belowInstance, fmt.Errorf("MultiMatchBelowIndependently: Error on all %+v operations", len(errs)), errs
+	}
+	AuditOperation("multi-match-below-independent", belowKey, fmt.Sprintf("matched %d/%d replicas below %+v via Pseudo-GTID", len(matchedReplicas), len(replicas), belowKey))
+
+	return matchedReplicas, belowInstance, err, errs
+}
+
 // MultiMatchBelow will efficiently match multiple replicas below a given instance.
 // It is assumed that all given replicas are siblings
 func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlreadyStopped bool, postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), *Instance, error, []error) {
+	if config.Config.PseudoGTIDPreferIndependentMultiMatch {
+		return MultiMatchBelowIndependently(replicas, belowKey, postponedFunctionsContainer)
+	}
 	res := [](*Instance){}
 	errs := []error{}
 	replicaMutex := make(chan bool, 1)
@@ -1692,7 +1821,7 @@ func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlre
 		replicas = StopSlavesNicely(replicas, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
 	}
 	replicas = RemoveNilInstances(replicas)
-	sort.Sort(sort.Reverse(InstancesByExecBinlogCoordinates(replicas)))
+	sort.Sort(sort.Reverse(NewInstancesSorterByExec(replicas, belowInstance.DataCenter)))
 
 	// Optimizations:
 	// replicas which broke on the same Exec-coordinates can be handled in the exact same way:
@@ -1738,7 +1867,7 @@ func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlre
 						len(bucketReplicas) == 1 {
 						// This replica is the only one in the bucket, AND it's lagging very much, AND
 						// we're configured to postpone operation on this replica so as not to delay everyone else.
-						(*postponedFunctionsContainer).AddPostponedFunction(matchFunc)
+						postponedFunctionsContainer.AddPostponedFunction(matchFunc, fmt.Sprintf("multi-match-below %+v", replica.Key))
 						return
 						// We bail out and trust our invoker to later call upon this postponed function
 					}
@@ -1972,7 +2101,7 @@ func isValidAsCandidateMasterInBinlogServerTopology(replica *Instance) bool {
 	return true
 }
 
-func isBannedFromBeingCandidateReplica(replica *Instance) bool {
+func IsBannedFromBeingCandidateReplica(replica *Instance) bool {
 	if replica.PromotionRule == MustNotPromoteRule {
 		log.Debugf("instance %+v is banned because of promotion rule", replica.Key)
 		return true
@@ -2046,7 +2175,7 @@ func chooseCandidateReplica(replicas [](*Instance)) (candidateReplica *Instance,
 	for _, replica := range replicas {
 		replica := replica
 		if isGenerallyValidAsCandidateReplica(replica) &&
-			!isBannedFromBeingCandidateReplica(replica) &&
+			!IsBannedFromBeingCandidateReplica(replica) &&
 			!IsSmallerMajorVersion(priorityMajorVersion, replica.MajorVersionString()) &&
 			!IsSmallerBinlogFormat(priorityBinlogFormat, replica.Binlog_format) {
 			// this is the one
@@ -2059,7 +2188,7 @@ func chooseCandidateReplica(replicas [](*Instance)) (candidateReplica *Instance,
 		// Instead, pick a (single) replica which is not banned.
 		for _, replica := range replicas {
 			replica := replica
-			if !isBannedFromBeingCandidateReplica(replica) {
+			if !IsBannedFromBeingCandidateReplica(replica) {
 				// this is the one
 				candidateReplica = replica
 				break
@@ -2096,11 +2225,19 @@ func GetCandidateReplica(masterKey *InstanceKey, forRematchPurposes bool) (*Inst
 	laterReplicas := [](*Instance){}
 	cannotReplicateReplicas := [](*Instance){}
 
+	dataCenterHint := ""
+	if master, _, _ := ReadInstance(masterKey); master != nil {
+		dataCenterHint = master.DataCenter
+	}
 	replicas, err := getReplicasForSorting(masterKey, false)
 	if err != nil {
 		return candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err
 	}
-	replicas = sortedReplicas(replicas, forRematchPurposes)
+	stopReplicationMethod := NoStopReplication
+	if forRematchPurposes {
+		stopReplicationMethod = StopReplicationNicely
+	}
+	replicas = sortedReplicasDataCenterHint(replicas, stopReplicationMethod, dataCenterHint)
 	if err != nil {
 		return candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err
 	}
@@ -2127,7 +2264,7 @@ func GetCandidateReplicaOfBinlogServerTopology(masterKey *InstanceKey) (candidat
 	if err != nil {
 		return candidateReplica, err
 	}
-	replicas = sortedReplicas(replicas, false)
+	replicas = sortedReplicas(replicas, NoStopReplication)
 	if len(replicas) == 0 {
 		return candidateReplica, fmt.Errorf("No replicas found for %+v", *masterKey)
 	}
@@ -2136,7 +2273,7 @@ func GetCandidateReplicaOfBinlogServerTopology(masterKey *InstanceKey) (candidat
 		if candidateReplica != nil {
 			break
 		}
-		if isValidAsCandidateMasterInBinlogServerTopology(replica) && !isBannedFromBeingCandidateReplica(replica) {
+		if isValidAsCandidateMasterInBinlogServerTopology(replica) && !IsBannedFromBeingCandidateReplica(replica) {
 			// this is the one
 			candidateReplica = replica
 		}

@@ -22,8 +22,8 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/process"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 )
 
 // ReadActiveMaintenance returns the list of currently active maintenance entries
@@ -35,7 +35,7 @@ func ReadActiveMaintenance() ([]Maintenance, error) {
 			hostname,
 			port,
 			begin_timestamp,
-			timestampdiff(second, begin_timestamp, now()) as seconds_elapsed,
+			unix_timestamp() - unix_timestamp(begin_timestamp) as seconds_elapsed,
 			maintenance_active,
 			owner,
 			reason
@@ -113,7 +113,7 @@ func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) (in
 }
 
 // EndMaintenanceByInstanceKey will terminate an active maintenance using given instanceKey as hint
-func EndMaintenanceByInstanceKey(instanceKey *InstanceKey) error {
+func EndMaintenanceByInstanceKey(instanceKey *InstanceKey) (wasMaintenance bool, err error) {
 	res, err := db.ExecOrchestrator(`
 			update
 				database_instance_maintenance
@@ -129,16 +129,15 @@ func EndMaintenanceByInstanceKey(instanceKey *InstanceKey) error {
 		instanceKey.Port,
 	)
 	if err != nil {
-		return log.Errore(err)
+		return wasMaintenance, log.Errore(err)
 	}
 
-	if affected, _ := res.RowsAffected(); affected == 0 {
-		err = fmt.Errorf("Instance is not in maintenance mode: %+v", instanceKey)
-	} else {
+	if affected, _ := res.RowsAffected(); affected > 0 {
 		// success
+		wasMaintenance = true
 		AuditOperation("end-maintenance", instanceKey, "")
 	}
-	return err
+	return wasMaintenance, err
 }
 
 // ReadMaintenanceInstanceKey will return the instanceKey for active maintenance by maintenanceToken
@@ -170,7 +169,7 @@ func ReadMaintenanceInstanceKey(maintenanceToken int64) (*InstanceKey, error) {
 }
 
 // EndMaintenance will terminate an active maintenance via maintenanceToken
-func EndMaintenance(maintenanceToken int64) error {
+func EndMaintenance(maintenanceToken int64) (wasMaintenance bool, err error) {
 	res, err := db.ExecOrchestrator(`
 			update
 				database_instance_maintenance
@@ -183,16 +182,15 @@ func EndMaintenance(maintenanceToken int64) error {
 		maintenanceToken,
 	)
 	if err != nil {
-		return log.Errore(err)
+		return wasMaintenance, log.Errore(err)
 	}
-	if affected, _ := res.RowsAffected(); affected == 0 {
-		err = fmt.Errorf("Instance is not in maintenance mode; token = %+v", maintenanceToken)
-	} else {
+	if affected, _ := res.RowsAffected(); affected > 0 {
 		// success
+		wasMaintenance = true
 		instanceKey, _ := ReadMaintenanceInstanceKey(maintenanceToken)
 		AuditOperation("end-maintenance", instanceKey, fmt.Sprintf("maintenanceToken: %d", maintenanceToken))
 	}
-	return err
+	return wasMaintenance, err
 }
 
 // ExpireMaintenance will remove the maintenance flag on old maintenances and on bounded maintenances
@@ -236,12 +234,13 @@ func ExpireMaintenance() error {
 		res, err := db.ExecOrchestrator(`
 			update
 				database_instance_maintenance
-				left join node_health on (processing_node_hostname = node_health.hostname AND processing_node_token = node_health.token)
 			set
-				database_instance_maintenance.maintenance_active = NULL
+				maintenance_active = NULL
 			where
-				node_health.last_seen_active IS NULL
-				and explicitly_bounded = 0
+				explicitly_bounded = 0
+				and concat(processing_node_hostname, ':', processing_node_token) not in (
+					select concat(hostname, ':', token) from node_health
+				)
 			`,
 		)
 		if err != nil {

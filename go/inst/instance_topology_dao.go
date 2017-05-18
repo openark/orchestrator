@@ -23,8 +23,8 @@ import (
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 )
 
 // Max concurrency for bulk topology operations
@@ -246,16 +246,21 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 
-	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave io_thread`)
-	_, err = ExecInstanceNoPrepare(instanceKey, `start slave sql_thread`)
+	// stop io_thread, start sql_thread but catch any errors
+	for _, cmd := range []string{`stop slave io_thread`, `start slave sql_thread`} {
+		if _, err = ExecInstanceNoPrepare(instanceKey, cmd); err != nil {
+			return nil, log.Errorf("%+v: StopSlaveNicely: %q failed: %+v", *instanceKey, cmd, err)
+		}
+	}
 
 	if instance.SQLDelay == 0 {
 		// Otherwise we don't bother.
 		startTime := time.Now()
 		for upToDate := false; !upToDate; {
-			if timeout > 0 && time.Since(startTime) >= timeout {
+			timeSinceStartTime := time.Since(startTime)
+			if timeout > 0 && timeSinceStartTime >= timeout {
 				// timeout
-				return nil, log.Errorf("StopSlaveNicely timeout on %+v", *instanceKey)
+				return nil, log.Errorf("%+v: StopSlaveNicely timeout after %+v", *instanceKey, timeSinceStartTime)
 			}
 			instance, err = ReadTopologyInstance(instanceKey)
 			if err != nil {
@@ -285,11 +290,15 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	return instance, err
 }
 
-// StopSlavesNicely will attemt to stop all given replicas nicely, up to timeout
-func StopSlavesNicely(replicas [](*Instance), timeout time.Duration) [](*Instance) {
+// StopSlaves will stop replication concurrently on given set of replicas.
+// It will potentially do nothing, or attempt to stop _nicely_ or just stop normally, all according to stopReplicationMethod
+func StopSlaves(replicas [](*Instance), stopReplicationMethod StopReplicationMethod, timeout time.Duration) [](*Instance) {
+	if stopReplicationMethod == NoStopReplication {
+		return replicas
+	}
 	refreshedReplicas := [](*Instance){}
 
-	log.Debugf("Stopping %d replicas nicely", len(replicas))
+	log.Debugf("Stopping %d replicas via %s", len(replicas), string(stopReplicationMethod))
 	// use concurrency but wait for all to complete
 	barrier := make(chan *Instance)
 	for _, replica := range replicas {
@@ -300,7 +309,9 @@ func StopSlavesNicely(replicas [](*Instance), timeout time.Duration) [](*Instanc
 			defer func() { barrier <- *updatedReplica }()
 			// Wait your turn to read a replica
 			ExecuteOnTopology(func() {
-				StopSlaveNicely(&replica.Key, timeout)
+				if stopReplicationMethod == StopReplicationNicely {
+					StopSlaveNicely(&replica.Key, timeout)
+				}
 				replica, _ = StopSlave(&replica.Key)
 				updatedReplica = &replica
 			})
@@ -310,6 +321,11 @@ func StopSlavesNicely(replicas [](*Instance), timeout time.Duration) [](*Instanc
 		refreshedReplicas = append(refreshedReplicas, <-barrier)
 	}
 	return refreshedReplicas
+}
+
+// StopSlavesNicely will attemt to stop all given replicas nicely, up to timeout
+func StopSlavesNicely(replicas [](*Instance), timeout time.Duration) [](*Instance) {
+	return StopSlaves(replicas, StopReplicationNicely, timeout)
 }
 
 // StopSlave stops replication on a given instance
@@ -337,6 +353,30 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 
 	log.Infof("Stopped slave on %+v, Self:%+v, Exec:%+v", *instanceKey, instance.SelfBinlogCoordinates, instance.ExecBinlogCoordinates)
 	return instance, err
+}
+
+// sleep immediately after START SLAVE for a capped duration, until both replication threads are running.
+// This is to give slack to IO thread to connect and begin streaming, and to SQL thread to start applying.
+// Sleep is incremental with ongoing attempt to see whether replication is already up
+func startSlavePostSleep(instanceKey *InstanceKey) error {
+	waitDuration := time.Second
+	waitInterval := 10 * time.Millisecond
+	startTime := time.Now()
+
+	for time.Since(startTime) < waitDuration {
+		repliationRunning, err := AreReplicationThreadsRunning(instanceKey)
+		if err != nil {
+			return err
+		}
+		if repliationRunning {
+			return nil
+		}
+		time.Sleep(waitInterval)
+		if waitInterval < waitDuration {
+			waitInterval = 2 * waitInterval
+		}
+	}
+	return nil
 }
 
 // StartSlave starts replication on a given instance.
@@ -369,9 +409,8 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 	log.Infof("Started slave on %+v", instanceKey)
-	if config.Config.SlaveStartPostWaitMilliseconds > 0 {
-		time.Sleep(time.Duration(config.Config.SlaveStartPostWaitMilliseconds) * time.Millisecond)
-	}
+
+	startSlavePostSleep(instanceKey)
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err
@@ -581,6 +620,7 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 		return instance, log.Errore(err)
 	}
 	WriteMasterPositionEquivalence(&originalMasterKey, &originalExecBinlogCoordinates, changeToMasterKey, masterBinlogCoordinates)
+	ResetInstanceRelaylogCoordinatesHistory(instanceKey)
 
 	log.Infof("ChangeMasterTo: Changed master on %+v to: %+v, %+v. GTID: %+v", *instanceKey, masterKey, masterBinlogCoordinates, changedViaGTID)
 

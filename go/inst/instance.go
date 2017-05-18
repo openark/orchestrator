@@ -21,9 +21,10 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/github/orchestrator/go/config"
-	"github.com/outbrain/golib/math"
+	"github.com/openark/golib/math"
 )
 
 // CandidatePromotionRule describe the promotion preference/rule for an instance.
@@ -37,6 +38,8 @@ const (
 	PreferNotPromoteRule                        = "prefer_not"
 	MustNotPromoteRule                          = "must_not"
 )
+
+const ReasonableDiscoveryLatency = 500 * time.Millisecond
 
 // ParseCandidatePromotionRule returns a CandidatePromotionRule by name.
 // It returns an error if there is no known rule by the given name.
@@ -60,8 +63,11 @@ type Instance struct {
 	ServerID               uint
 	ServerUUID             string
 	Version                string
+	VersionComment         string
+	FlavorName             string
 	ReadOnly               bool
 	Binlog_format          string
+	BinlogRowImage         string
 	LogBinEnabled          bool
 	LogSlaveUpdatesEnabled bool
 	SelfBinlogCoordinates  BinlogCoordinates
@@ -104,14 +110,21 @@ type Instance struct {
 	SecondsSinceLastSeen sql.NullInt64
 	CountMySQLSnapshots  int
 
+	// Careful. IsCandidate and PromotionRule are used together
+	// and probably need to be merged. IsCandidate's value may
+	// be picked up from daabase_candidate_instance's value when
+	// reading an instance from the db.
 	IsCandidate          bool
 	PromotionRule        CandidatePromotionRule
 	IsDowntimed          bool
 	DowntimeReason       string
 	DowntimeOwner        string
 	DowntimeEndTimestamp string
+	ElapsedDowntime      time.Duration
 	UnresolvedHostname   string
 	AllowTLS             bool
+
+	LastDiscoveryLatency time.Duration
 }
 
 // NewInstance creates a new, empty instance
@@ -174,17 +187,22 @@ func (this *Instance) IsSmallerMajorVersionByString(otherVersion string) bool {
 	return IsSmallerMajorVersion(this.Version, otherVersion)
 }
 
-// IsMariaDB checkes whether this is any version of MariaDB
+// IsMariaDB checks whether this is any version of MariaDB
 func (this *Instance) IsMariaDB() bool {
 	return strings.Contains(this.Version, "MariaDB")
 }
 
-// isMaxScale checkes whether this is any version of MaxScale
+// IsPercona checks whether this is any version of Percona Server
+func (this *Instance) IsPercona() bool {
+	return strings.Contains(this.VersionComment, "Percona")
+}
+
+// isMaxScale checks whether this is any version of MaxScale
 func (this *Instance) isMaxScale() bool {
 	return strings.Contains(this.Version, "maxscale")
 }
 
-// IsMaxScale checkes whether this is any type of a binlog server (currently only maxscale)
+// IsBinlogServer checks whether this is any type of a binlog server (currently only maxscale)
 func (this *Instance) IsBinlogServer() bool {
 	if this.isMaxScale() {
 		return true
@@ -192,9 +210,12 @@ func (this *Instance) IsBinlogServer() bool {
 	return false
 }
 
-// IsOracleMySQL checkes whether this is an Oracle MySQL distribution
+// IsOracleMySQL checks whether this is an Oracle MySQL distribution
 func (this *Instance) IsOracleMySQL() bool {
 	if this.IsMariaDB() {
+		return false
+	}
+	if this.IsPercona() {
 		return false
 	}
 	if this.isMaxScale() {
@@ -206,22 +227,32 @@ func (this *Instance) IsOracleMySQL() bool {
 	return true
 }
 
-// NameAndMarjorVersionString returns something like MariaDB-10.1 MaxScale-1.4 MySQL-5.7
-func (instance *Instance) NameAndMajorVersionString() string {
-	var name string
-	if instance == nil {
-		return name // empty string
-	} else if instance.IsOracleMySQL() {
-		name = "MySQL"
-	} else if instance.IsMariaDB() {
-		name = "MariaDB"
-	} else if instance.isMaxScale() {
-		name = "MaxScale"
+// applyFlavorName
+func (this *Instance) applyFlavorName() {
+	if this == nil {
+		return
+	}
+	if this.IsOracleMySQL() {
+		this.FlavorName = "MySQL"
+	} else if this.IsMariaDB() {
+		this.FlavorName = "MariaDB"
+	} else if this.IsPercona() {
+		this.FlavorName = "Percona"
+	} else if this.isMaxScale() {
+		this.FlavorName = "MaxScale"
 	} else {
-		name = "unknown"
+		this.FlavorName = "unknown"
+	}
+}
+
+// FlavorNameAndMajorVersion returns a string of the combined
+// flavor and major version which is useful in some checks.
+func (this *Instance) FlavorNameAndMajorVersion() string {
+	if this.FlavorName == "" {
+		this.applyFlavorName()
 	}
 
-	return name + "-" + instance.MajorVersionString()
+	return this.FlavorName + "-" + this.MajorVersionString()
 }
 
 // IsReplica makes simple heuristics to decide whether this insatnce is a replica of another instance
