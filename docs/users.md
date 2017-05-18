@@ -12,3 +12,4 @@ a short description of usage.
 
 * [Booking.com](http://www.booking.com) - used in production
 * [GitHub Inc](http://www.github.com)
+* [Rentalcars.com](http://www.rentalcars.com) - evaluationg in production
