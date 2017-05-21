@@ -36,11 +36,7 @@ import (
 )
 
 // IsRecoveryDisabled returns true if Recoveries are disabled globally
-func IsRecoveryDisabled() (bool, error) {
-	var (
-		disabled bool // default is false!
-		err      error
-	)
+func IsRecoveryDisabled() (disabled bool, err error) {
 	query := `
 		SELECT
 			COUNT(*) as mycount

@@ -259,9 +259,9 @@ func onDiscoveryTick() {
 
 	if !myIsElectedNode {
 		if electedNode, _, err := process.ElectedNode(); err == nil {
-			log.Debugf("Not elected as active node; active node: %v; polling", electedNode.Hostname)
+			log.Infof("Not elected as active node; active node: %v; polling", electedNode.Hostname)
 		} else {
-			log.Debugf("Not elected as active node; active node: Unable to determine: %v; polling", err)
+			log.Infof("Not elected as active node; active node: Unable to determine: %v; polling", err)
 		}
 		return
 	}
@@ -333,6 +333,7 @@ func ContinuousDiscovery() {
 				if atomic.LoadInt64(&isElectedNode) == 1 {
 					go inst.RecordInstanceCoordinatesHistory()
 					go inst.UpdateClusterAliases()
+					go inst.ExpireDowntime()
 				}
 			}()
 		case <-caretakingTick:
@@ -348,7 +349,6 @@ func ContinuousDiscovery() {
 					go inst.InjectUnseenMasters()
 					go inst.ResolveUnknownMasterHostnameResolves()
 					go inst.ExpireMaintenance()
-					go inst.ExpireDowntime()
 					go inst.ExpireCandidateInstances()
 					go inst.ExpireHostnameUnresolve()
 					go inst.ExpireClusterDomainName()

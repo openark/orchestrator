@@ -32,6 +32,10 @@ var (
 	envVariableRegexp = regexp.MustCompile("[$][{](.*)[}]")
 )
 
+const (
+	LostInRecoveryDowntimeSeconds = 60 * 60 * 24 * 365
+)
+
 var ConfigurationLoaded chan bool = make(chan bool)
 
 const (

@@ -49,6 +49,7 @@ recovery itself.
 - Run as a service; orchestrator multi-service HA
 - HTTP security/authentication methods
 - Coupled with [orchestrator-agent](https://github.com/github/orchestrator-agent), seed new/corrupt instances
+- There is also an [orchestrator-mysql](https://groups.google.com/forum/#!forum/orchestrator-mysql) Google groups forum to discuss topics related to orchestrator
 - More...
 
 Read the [Orchestrator documentation](https://github.com/github/orchestrator/tree/master/docs)
