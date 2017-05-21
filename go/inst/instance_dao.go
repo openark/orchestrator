@@ -172,13 +172,13 @@ func unrecoverableError(err error) bool {
 
 // Check if the instance is a MaxScale binlog server (a proxy not a real
 // MySQL server) and also update the resolved hostname
-func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStopwatch) (isMaxScale bool, resolvedHostname string, err error) {
+func (instance *Instance) checkMaxScale(dbh *sql.DB, latency *stopwatch.NamedStopwatch) (isMaxScale bool, resolvedHostname string, err error) {
 	if config.Config.SkipMaxScaleCheck {
 		return isMaxScale, resolvedHostname, err
 	}
 
 	latency.Start("instance")
-	err = sqlutils.QueryRowsMap(db, "show variables like 'maxscale%'", func(m sqlutils.RowMap) error {
+	err = sqlutils.QueryRowsMap(dbh, "show variables like 'maxscale%'", func(m sqlutils.RowMap) error {
 		if m.GetString("Variable_name") == "MAXSCALE_VERSION" {
 			originalVersion := m.GetString("Value")
 			if originalVersion == "" {
@@ -208,6 +208,9 @@ func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStop
 	// Detect failed connection attempts and don't report the command
 	// we are executing as that might be confusing.
 	if err != nil {
+		// catch the possible need to use TLS (will be applied on the next discovery)
+		db.CatchTLSRequirementError(instance.Key.Hostname, instance.Key.Port, err)
+
 		if strings.Contains(err.Error(), error1045AccessDenied) {
 			accessDeniedCounter.Inc(1)
 		}
