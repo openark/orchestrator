@@ -774,6 +774,15 @@ var generateSQLBase = []string{
 			PRIMARY KEY (cluster_name)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS topology_recovery_steps (
+			recovery_step_id bigint unsigned not null auto_increment,
+			recovery_uid varchar(128) CHARACTER SET ascii NOT NULL,
+			audit_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			message text CHARACTER SET utf8 NOT NULL,
+			PRIMARY KEY (recovery_step_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 // generateSQLPatches contains DDLs for patching schema to the latest version.
@@ -1206,6 +1215,27 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN binlog_row_image varchar(16) CHARACTER SET ascii NOT NULL
 	`,
+	`
+		ALTER TABLE topology_recovery
+			ADD COLUMN uid varchar(128) CHARACTER SET ascii NOT NULL
+	`,
+	`
+		CREATE INDEX uid_idx_topology_recovery ON topology_recovery(uid)
+	`,
+	`
+		CREATE INDEX recovery_uid_idx_topology_recovery_steps ON topology_recovery_steps(recovery_uid)
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN last_discovery_latency bigint not null
+	`,
+	`
+		CREATE INDEX end_timestamp_idx_database_instance_downtime ON database_instance_downtime(end_timestamp)
+	`,
+	`
+		CREATE INDEX suggested_cluster_alias_idx_database_instance ON database_instance(suggested_cluster_alias)
+	`,
 }
 
 // Track if a TLS has already been configured for topology
@@ -1238,8 +1268,8 @@ func openTopology(host string, port int, readTimeout int) (*sql.DB, error) {
 		mysql_uri, _ = SetupMySQLTopologyTLS(mysql_uri)
 	}
 	db, _, err := sqlutils.GetDB(mysql_uri)
-	db.SetMaxOpenConns(config.Config.MySQLTopologyMaxPoolConnections)
-	db.SetMaxIdleConns(config.Config.MySQLTopologyMaxPoolConnections)
+	db.SetMaxOpenConns(config.MySQLTopologyMaxPoolConnections)
+	db.SetMaxIdleConns(config.MySQLTopologyMaxPoolConnections)
 	return db, err
 }
 
@@ -1269,9 +1299,6 @@ func SetupMySQLTopologyTLS(uri string) (string, error) {
 
 // OpenTopology returns the DB instance for the orchestrator backed database
 func OpenOrchestrator() (db *sql.DB, err error) {
-	if config.Config.DatabaselessMode__experimental {
-		return nil, nil
-	}
 	var fromCache bool
 	if config.Config.IsSQLite() {
 		db, fromCache, err = sqlutils.GetSQLiteDB(config.Config.SQLite3DataFile)
@@ -1487,9 +1514,6 @@ func execInternal(db *sql.DB, query string, args ...interface{}) (sql.Result, er
 
 // ExecOrchestrator will execute given query on the orchestrator backend database.
 func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
-	if config.Config.DatabaselessMode__experimental {
-		return DummySqlResult{}, nil
-	}
 	var err error
 	query, err = translateStatement(query)
 	if err != nil {
@@ -1509,9 +1533,6 @@ func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
 
 // QueryRowsMapOrchestrator
 func QueryOrchestratorRowsMap(query string, on_row func(sqlutils.RowMap) error) error {
-	if config.Config.DatabaselessMode__experimental {
-		return nil
-	}
 	query, err := translateStatement(query)
 	if err != nil {
 		return log.Fatalf("Cannot query orchestrator: %+v; query=%+v", err, query)
@@ -1526,9 +1547,6 @@ func QueryOrchestratorRowsMap(query string, on_row func(sqlutils.RowMap) error) 
 
 // QueryOrchestrator
 func QueryOrchestrator(query string, argsArray []interface{}, on_row func(sqlutils.RowMap) error) error {
-	if config.Config.DatabaselessMode__experimental {
-		return nil
-	}
 	query, err := translateStatement(query)
 	if err != nil {
 		return log.Fatalf("Cannot query orchestrator: %+v; query=%+v", err, query)
@@ -1543,9 +1561,6 @@ func QueryOrchestrator(query string, argsArray []interface{}, on_row func(sqluti
 
 // QueryOrchestratorRowsMapBuffered
 func QueryOrchestratorRowsMapBuffered(query string, on_row func(sqlutils.RowMap) error) error {
-	if config.Config.DatabaselessMode__experimental {
-		return nil
-	}
 	query, err := translateStatement(query)
 	if err != nil {
 		return log.Fatalf("Cannot query orchestrator: %+v; query=%+v", err, query)
@@ -1560,9 +1575,6 @@ func QueryOrchestratorRowsMapBuffered(query string, on_row func(sqlutils.RowMap)
 
 // QueryOrchestratorBuffered
 func QueryOrchestratorBuffered(query string, argsArray []interface{}, on_row func(sqlutils.RowMap) error) error {
-	if config.Config.DatabaselessMode__experimental {
-		return nil
-	}
 	query, err := translateStatement(query)
 	if err != nil {
 		return log.Fatalf("Cannot query orchestrator: %+v; query=%+v", err, query)

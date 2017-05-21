@@ -72,7 +72,7 @@ func ReadActiveMaintenance() ([]Maintenance, error) {
 func BeginBoundedMaintenance(instanceKey *InstanceKey, owner string, reason string, durationSeconds uint, explicitlyBounded bool) (int64, error) {
 	var maintenanceToken int64 = 0
 	if durationSeconds == 0 {
-		durationSeconds = config.Config.MaintenanceExpireMinutes * 60
+		durationSeconds = config.MaintenanceExpireMinutes * 60
 	}
 	res, err := db.ExecOrchestrator(`
 			insert ignore
@@ -113,7 +113,7 @@ func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) (in
 }
 
 // EndMaintenanceByInstanceKey will terminate an active maintenance using given instanceKey as hint
-func EndMaintenanceByInstanceKey(instanceKey *InstanceKey) error {
+func EndMaintenanceByInstanceKey(instanceKey *InstanceKey) (wasMaintenance bool, err error) {
 	res, err := db.ExecOrchestrator(`
 			update
 				database_instance_maintenance
@@ -129,16 +129,15 @@ func EndMaintenanceByInstanceKey(instanceKey *InstanceKey) error {
 		instanceKey.Port,
 	)
 	if err != nil {
-		return log.Errore(err)
+		return wasMaintenance, log.Errore(err)
 	}
 
-	if affected, _ := res.RowsAffected(); affected == 0 {
-		err = fmt.Errorf("Instance is not in maintenance mode: %+v", instanceKey)
-	} else {
+	if affected, _ := res.RowsAffected(); affected > 0 {
 		// success
+		wasMaintenance = true
 		AuditOperation("end-maintenance", instanceKey, "")
 	}
-	return err
+	return wasMaintenance, err
 }
 
 // ReadMaintenanceInstanceKey will return the instanceKey for active maintenance by maintenanceToken
@@ -170,7 +169,7 @@ func ReadMaintenanceInstanceKey(maintenanceToken int64) (*InstanceKey, error) {
 }
 
 // EndMaintenance will terminate an active maintenance via maintenanceToken
-func EndMaintenance(maintenanceToken int64) error {
+func EndMaintenance(maintenanceToken int64) (wasMaintenance bool, err error) {
 	res, err := db.ExecOrchestrator(`
 			update
 				database_instance_maintenance
@@ -183,16 +182,15 @@ func EndMaintenance(maintenanceToken int64) error {
 		maintenanceToken,
 	)
 	if err != nil {
-		return log.Errore(err)
+		return wasMaintenance, log.Errore(err)
 	}
-	if affected, _ := res.RowsAffected(); affected == 0 {
-		err = fmt.Errorf("Instance is not in maintenance mode; token = %+v", maintenanceToken)
-	} else {
+	if affected, _ := res.RowsAffected(); affected > 0 {
 		// success
+		wasMaintenance = true
 		instanceKey, _ := ReadMaintenanceInstanceKey(maintenanceToken)
 		AuditOperation("end-maintenance", instanceKey, fmt.Sprintf("maintenanceToken: %d", maintenanceToken))
 	}
-	return err
+	return wasMaintenance, err
 }
 
 // ExpireMaintenance will remove the maintenance flag on old maintenances and on bounded maintenances
@@ -205,7 +203,7 @@ func ExpireMaintenance() error {
 				maintenance_active is null
 				and end_timestamp < NOW() - INTERVAL ? DAY
 			`,
-			config.Config.MaintenancePurgeDays,
+			config.MaintenancePurgeDays,
 		)
 		if err != nil {
 			return log.Errore(err)

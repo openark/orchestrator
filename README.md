@@ -1,7 +1,8 @@
-orchestrator [[Documentation]](https://github.com/github/orchestrator/tree/master/docs)
-============
+# orchestrator [[Documentation]](https://github.com/github/orchestrator/tree/master/docs)
 
-![Orcehstrator logo](https://github.com/github/orchestrator/raw/master/docs/images/orchestrator-logo-wide.png)
+[![build status](https://travis-ci.org/github/orchestrator.svg)](https://travis-ci.org/github/orchestrator) [![downloads](https://img.shields.io/github/downloads/github/orchestrator/total.svg)](https://github.com/github/orchestrator/releases) [![release](https://img.shields.io/github/release/github/orchestrator.svg)](https://github.com/github/orchestrator/releases)
+
+![Orchestrator logo](https://github.com/github/orchestrator/raw/master/docs/images/orchestrator-logo-wide.png)
 
 `orchestrator` is a MySQL replication topology management and visualization tool, allowing for:
 
@@ -48,6 +49,7 @@ recovery itself.
 - Run as a service; orchestrator multi-service HA
 - HTTP security/authentication methods
 - Coupled with [orchestrator-agent](https://github.com/github/orchestrator-agent), seed new/corrupt instances
+- There is also an [orchestrator-mysql](https://groups.google.com/forum/#!forum/orchestrator-mysql) Google groups forum to discuss topics related to orchestrator
 - More...
 
 Read the [Orchestrator documentation](https://github.com/github/orchestrator/tree/master/docs)

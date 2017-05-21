@@ -246,16 +246,21 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 
-	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave io_thread`)
-	_, err = ExecInstanceNoPrepare(instanceKey, `start slave sql_thread`)
+	// stop io_thread, start sql_thread but catch any errors
+	for _, cmd := range []string{`stop slave io_thread`, `start slave sql_thread`} {
+		if _, err = ExecInstanceNoPrepare(instanceKey, cmd); err != nil {
+			return nil, log.Errorf("%+v: StopSlaveNicely: %q failed: %+v", *instanceKey, cmd, err)
+		}
+	}
 
 	if instance.SQLDelay == 0 {
 		// Otherwise we don't bother.
 		startTime := time.Now()
 		for upToDate := false; !upToDate; {
-			if timeout > 0 && time.Since(startTime) >= timeout {
+			timeSinceStartTime := time.Since(startTime)
+			if timeout > 0 && timeSinceStartTime >= timeout {
 				// timeout
-				return nil, log.Errorf("StopSlaveNicely timeout on %+v", *instanceKey)
+				return nil, log.Errorf("%+v: StopSlaveNicely timeout after %+v", *instanceKey, timeSinceStartTime)
 			}
 			instance, err = ReadTopologyInstance(instanceKey)
 			if err != nil {
@@ -350,6 +355,30 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
+// sleep immediately after START SLAVE for a capped duration, until both replication threads are running.
+// This is to give slack to IO thread to connect and begin streaming, and to SQL thread to start applying.
+// Sleep is incremental with ongoing attempt to see whether replication is already up
+func startSlavePostSleep(instanceKey *InstanceKey) error {
+	waitDuration := time.Second
+	waitInterval := 10 * time.Millisecond
+	startTime := time.Now()
+
+	for time.Since(startTime) < waitDuration {
+		repliationRunning, err := AreReplicationThreadsRunning(instanceKey)
+		if err != nil {
+			return err
+		}
+		if repliationRunning {
+			return nil
+		}
+		time.Sleep(waitInterval)
+		if waitInterval < waitDuration {
+			waitInterval = 2 * waitInterval
+		}
+	}
+	return nil
+}
+
 // StartSlave starts replication on a given instance.
 func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -380,9 +409,8 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 	log.Infof("Started slave on %+v", instanceKey)
-	if config.Config.SlaveStartPostWaitMilliseconds > 0 {
-		time.Sleep(time.Duration(config.Config.SlaveStartPostWaitMilliseconds) * time.Millisecond)
-	}
+
+	startSlavePostSleep(instanceKey)
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	return instance, err

@@ -33,14 +33,24 @@ import (
 const maxEmptyBinlogFiles int = 10
 const maxEventInfoDisplayLength int = 200
 
-var instanceBinlogEntryCache = cache.New(time.Duration(10)*time.Minute, time.Minute)
+var instanceBinlogEntryCache *cache.Cache
+
+func init() {
+	go initializeBinlogDaoPostConfiguration()
+}
+
+func initializeBinlogDaoPostConfiguration() {
+	<-config.ConfigurationLoaded
+
+	instanceBinlogEntryCache = cache.New(time.Duration(10)*time.Minute, time.Minute)
+}
 
 func compilePseudoGTIDPattern() (pseudoGTIDRegexp *regexp.Regexp, err error) {
 	log.Debugf("PseudoGTIDPatternIsFixedSubstring: %+v", config.Config.PseudoGTIDPatternIsFixedSubstring)
 	if config.Config.PseudoGTIDPatternIsFixedSubstring {
 		return nil, nil
 	}
-	log.Debugf("Compiling PseudoGTIDPattern")
+	log.Debugf("Compiling PseudoGTIDPattern: %q", config.Config.PseudoGTIDPattern)
 	return regexp.Compile(config.Config.PseudoGTIDPattern)
 }
 
@@ -91,11 +101,8 @@ func getLastPseudoGTIDEntryInBinlog(pseudoGTIDRegexp *regexp.Regexp, instanceKey
 		}
 
 		moreRowsExpected = false
-		queryRowsFunc := sqlutils.QueryRowsMap
-		if config.Config.BufferBinlogEvents {
-			queryRowsFunc = sqlutils.QueryRowsMapBuffered
-		}
-		err = queryRowsFunc(db, query, func(m sqlutils.RowMap) error {
+
+		err = sqlutils.QueryRowsMapBuffered(db, query, func(m sqlutils.RowMap) error {
 			moreRowsExpected = true
 			nextPos = m.GetInt64("End_log_pos")
 			binlogEntryInfo := m.GetString("Info")
@@ -220,15 +227,12 @@ func ReadBinlogEventAtRelayLogCoordinates(instanceKey *InstanceKey, relaylogCoor
 	if err != nil {
 		return nil, err
 	}
-	queryRowsFunc := sqlutils.QueryRowsMap
-	if config.Config.BufferBinlogEvents {
-		queryRowsFunc = sqlutils.QueryRowsMapBuffered
-	}
+
 	query := fmt.Sprintf("show relaylog events in '%s' FROM %d LIMIT 1", relaylogCoordinates.LogFile, relaylogCoordinates.LogPos)
 	binlogEvent = &BinlogEvent{
 		Coordinates: *relaylogCoordinates,
 	}
-	err = queryRowsFunc(db, query, func(m sqlutils.RowMap) error {
+	err = sqlutils.QueryRowsMapBuffered(db, query, func(m sqlutils.RowMap) error {
 		return readBinlogEvent(binlogEvent, m)
 	})
 	return binlogEvent, err
@@ -258,16 +262,12 @@ func getLastExecutedEntryInRelaylog(instanceKey *InstanceKey, binlog string, min
 		relyLogMinPos = minCoordinates.LogPos
 	}
 
-	queryRowsFunc := sqlutils.QueryRowsMap
-	if config.Config.BufferBinlogEvents {
-		queryRowsFunc = sqlutils.QueryRowsMapBuffered
-	}
 	step := 0
 	for moreRowsExpected {
 		query := fmt.Sprintf("show relaylog events in '%s' FROM %d LIMIT %d,%d", binlog, relyLogMinPos, (step * config.Config.BinlogEventsChunkSize), config.Config.BinlogEventsChunkSize)
 
 		moreRowsExpected = false
-		err = queryRowsFunc(db, query, func(m sqlutils.RowMap) error {
+		err = sqlutils.QueryRowsMapBuffered(db, query, func(m sqlutils.RowMap) error {
 			moreRowsExpected = true
 			return readBinlogEvent(binlogEvent, m)
 		})
@@ -334,10 +334,6 @@ func searchEventInRelaylog(instanceKey *InstanceKey, binlog string, searchEvent 
 		Coordinates: BinlogCoordinates{LogFile: binlog, LogPos: 0, Type: RelayLog},
 	}
 
-	queryRowsFunc := sqlutils.QueryRowsMap
-	if config.Config.BufferBinlogEvents {
-		queryRowsFunc = sqlutils.QueryRowsMapBuffered
-	}
 	skipRestOfBinlog := false
 
 	step := 0
@@ -347,7 +343,7 @@ func searchEventInRelaylog(instanceKey *InstanceKey, binlog string, searchEvent 
 		// We don't know in advance when we will hit the end of the binlog. We will implicitly understand it when our
 		// `show binlog events` query does not return any row.
 		moreRowsExpected = false
-		err = queryRowsFunc(db, query, func(m sqlutils.RowMap) error {
+		err = sqlutils.QueryRowsMapBuffered(db, query, func(m sqlutils.RowMap) error {
 			if binlogCoordinates.LogPos != 0 && nextCoordinates.LogPos != 0 {
 				// Entry found!
 				skipRestOfBinlog = true
@@ -437,11 +433,8 @@ func SearchEntryInBinlog(pseudoGTIDRegexp *regexp.Regexp, instanceKey *InstanceK
 		// We don't know in advance when we will hit the end of the binlog. We will implicitly understand it when our
 		// `show binlog events` query does not return any row.
 		moreRowsExpected = false
-		queryRowsFunc := sqlutils.QueryRowsMap
-		if config.Config.BufferBinlogEvents {
-			queryRowsFunc = sqlutils.QueryRowsMapBuffered
-		}
-		err = queryRowsFunc(db, query, func(m sqlutils.RowMap) error {
+
+		err = sqlutils.QueryRowsMapBuffered(db, query, func(m sqlutils.RowMap) error {
 			if binlogCoordinates.LogPos != 0 {
 				// Entry found!
 				skipRestOfBinlog = true

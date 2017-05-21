@@ -26,41 +26,55 @@ var (
 	DowntimeLostInRecoveryMessage = "lost-in-recovery"
 )
 
-// InstancesByExecBinlogCoordinates is a sortabel type for BinlogCoordinates
-type InstancesByExecBinlogCoordinates [](*Instance)
+type InstancesSorterByExec struct {
+	instances  [](*Instance)
+	dataCenter string
+}
 
-func (this InstancesByExecBinlogCoordinates) Len() int      { return len(this) }
-func (this InstancesByExecBinlogCoordinates) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
-func (this InstancesByExecBinlogCoordinates) Less(i, j int) bool {
+func NewInstancesSorterByExec(instances [](*Instance), dataCenter string) *InstancesSorterByExec {
+	return &InstancesSorterByExec{
+		instances:  instances,
+		dataCenter: dataCenter,
+	}
+}
+
+func (this *InstancesSorterByExec) Len() int { return len(this.instances) }
+func (this *InstancesSorterByExec) Swap(i, j int) {
+	this.instances[i], this.instances[j] = this.instances[j], this.instances[i]
+}
+func (this *InstancesSorterByExec) Less(i, j int) bool {
 	// Returning "true" in this function means [i] is "smaller" than [j],
 	// which will lead to [j] be a better candidate for promotion
 
 	// Sh*t happens. We just might get nil while attempting to discover/recover
-	if this[i] == nil {
+	if this.instances[i] == nil {
 		return false
 	}
-	if this[j] == nil {
+	if this.instances[j] == nil {
 		return true
 	}
-	if this[i].ExecBinlogCoordinates.Equals(&this[j].ExecBinlogCoordinates) {
+	if this.instances[i].ExecBinlogCoordinates.Equals(&this.instances[j].ExecBinlogCoordinates) {
 		// Secondary sorting: "smaller" if not logging replica updates
-		if this[j].LogSlaveUpdatesEnabled && !this[i].LogSlaveUpdatesEnabled {
+		if this.instances[j].LogSlaveUpdatesEnabled && !this.instances[i].LogSlaveUpdatesEnabled {
 			return true
 		}
 		// Next sorting: "smaller" if of higher version (this will be reversed eventually)
 		// Idea is that given 5.6 a& 5.7 both of the exact position, we will want to promote
 		// the 5.6 on top of 5.7, as the other way around is invalid
-		if this[j].IsSmallerMajorVersion(this[i]) {
+		if this.instances[j].IsSmallerMajorVersion(this.instances[i]) {
 			return true
 		}
 		// Next sorting: "smaller" if of larger binlog-format (this will be reversed eventually)
 		// Idea is that given ROW & STATEMENT both of the exact position, we will want to promote
 		// the STATEMENT on top of ROW, as the other way around is invalid
-		if this[j].IsSmallerBinlogFormat(this[i]) {
+		if this.instances[j].IsSmallerBinlogFormat(this.instances[i]) {
+			return true
+		}
+		if this.instances[j].DataCenter == this.dataCenter && this.instances[i].DataCenter != this.dataCenter {
 			return true
 		}
 	}
-	return this[i].ExecBinlogCoordinates.SmallerThan(&this[j].ExecBinlogCoordinates)
+	return this.instances[i].ExecBinlogCoordinates.SmallerThan(&this.instances[j].ExecBinlogCoordinates)
 }
 
 // filterInstancesByPattern will filter given array of instances according to regular expression pattern
