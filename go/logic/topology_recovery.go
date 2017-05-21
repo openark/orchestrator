@@ -885,7 +885,7 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 			return
 		}
 		if err != nil || len(errs) > 0 {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) did not complete: %+v", candidateSibling.Key, err))
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadIntermediateMaster: move to candidate intermediate master (%+v) did not complete: err: %+v, errs: %+v", candidateSibling.Key, err, errs))
 			return
 		}
 		if err == nil {
@@ -1268,10 +1268,29 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	// we have a recovery function; its execution still depends on filters if not disabled.
 	log.Debugf("executeCheckAndRecoverFunction: proceeeding with %+v; skipProcesses: %+v", analysisEntry.AnalyzedInstanceKey, skipProcesses)
 
+	// At this point we have validated there's a failure scenario for which we have a recovery path.
+
+	// Initiate detection:
 	if _, err := checkAndExecuteFailureDetectionProcesses(analysisEntry, skipProcesses); err != nil {
 		return false, nil, err
 	}
+	// We don't mind whether detection really executed the processes or not
+	// (it may have been silenced due to previous detection). We only care there's no error.
 
+	// We're about to embark on recovery shortly...
+
+	// Check for recovery being disabled globally
+	if recoveryDisabledGlobally, err := IsRecoveryDisabled(); err != nil {
+		// Unexpected. Shouldn't get this
+		log.Errorf("Unable to determine if recovery is disabled globally: %v", err)
+	} else if recoveryDisabledGlobally {
+		log.Infof("CheckAndRecover: Analysis: %+v, InstanceKey: %+v, candidateInstanceKey: %+v, "+
+			"skipProcesses: %v: NOT Recovering host (disabled globally)",
+			analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, candidateInstanceKey, skipProcesses)
+		return false, nil, err
+	}
+
+	// Actually attempt recovery:
 	recoveryAttempted, topologyRecovery, err = checkAndRecoverFunction(analysisEntry, candidateInstanceKey, forceInstanceRecovery, skipProcesses)
 	if !recoveryAttempted {
 		return recoveryAttempted, topologyRecovery, err
@@ -1307,11 +1326,6 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 	if err != nil {
 		return false, nil, log.Errore(err)
 	}
-	// Check for recovery being disabled globally
-	recoveryDisabledGlobally, err := IsRecoveryDisabled()
-	if err != nil {
-		log.Warningf("Unable to determine if recovery is disabled globally: %v", err)
-	}
 	if *config.RuntimeCLIFlags.Noop {
 		log.Debugf("--noop provided; will not execute processes")
 		skipProcesses = true
@@ -1335,10 +1349,6 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 			if topologyRecovery != nil {
 				promotedReplicaKey = topologyRecovery.SuccessorKey
 			}
-		} else if recoveryDisabledGlobally {
-			log.Infof("CheckAndRecover: Analysis: %+v, InstanceKey: %+v, candidateInstanceKey: %+v, "+
-				"skipProcesses: %v: NOT Recovering host (disabled globally)",
-				analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, candidateInstanceKey, skipProcesses)
 		} else {
 			go executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, false, skipProcesses)
 		}

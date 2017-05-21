@@ -7,7 +7,6 @@ The following is an incomplete list of configuration parameters. "Complete" is a
 * `MySQLTopologyUser`       (string), credentials for replication topology servers (masters & replicas)
 * `MySQLTopologyPassword`   (string), credentials for replication topology servers (masters & replicas)
 * `MySQLTopologyCredentialsConfigFile` (string), as an alternative to providing `MySQLTopologyUser`, `MySQLTopologyPassword`, name of file in `my.cnf`-like format where credentials are stored.
-* `MySQLTopologyMaxPoolConnections` (int), Max concurrent connections on any topology instance
 * `MySQLOrchestratorHost`   (string), hostname for backend MySQL server
 * `MySQLOrchestratorPort`   (uint), port for backend MySQL server
 * `MySQLOrchestratorDatabase`   (string), name of backend MySQL server schema
@@ -21,25 +20,18 @@ The following is an incomplete list of configuration parameters. "Complete" is a
 * `SkipOrchestratorDatabaseUpdate`  (bool), When false, orchestrator will attempt to create & update all tables in backend database; when true, this is skipped. It makes sense to skip on command-line invocations and to enable for http or occasional invocations, or just after upgrades
 * `ReplicaLagQuery`               (string), custom query to check on replica lg (e.g. heartbeat table). If unprovided,
   replica's `Seconds_Behind_Master` is used.
-* `SlaveStartPostWaitMilliseconds`  (int), Time to wait after `START SLAVE` before re-reading instance (give replica chance to connect to master)
 * `DiscoverByShowSlaveHosts`    (bool), Attempt `SHOW SLAVE HOSTS` before `SHOW PROCESSLIST`
 * `InstancePollSeconds`         (uint), Number of seconds between instance reads
 * `UnseenInstanceForgetHours`   (uint), Number of hours after which an unseen instance is forgotten
-* `DiscoveryPollSeconds`        (uint), Auto/continuous discovery of instances sleep time between polls
 * `DiscoveryQueueMaxStatisticsSize` (int), Maximum number of secondly discovery queue statistic entries to keep
 * `InstanceBulkOperationsWaitTimeoutSeconds`  (uint), Time to wait on a single instance when doing bulk (many instances) operation
-* `ActiveNodeExpireSeconds` (uint), Maximum time to wait for active node to send keepalive before attempting to take over as active node.
 * `HostnameResolveMethod`		(string), Type of hostname resolve method (either `"none"` or `"cname"`)
 * `ExpiryHostnameResolvesMinutes`	(int), Number of minute after which a hostname resolve expires (hostname resolve are cached for up to this number of minutes)
 * `RejectHostnameResolvePattern`  (string), Regexp pattern for resolved hostname that will not be accepted (not cached, not written to db). This is done to avoid storing wrong resolves due to network glitches.
 * `ReasonableReplicationLagSeconds` (int), Above this value is considered a problem
 * `VerifyReplicationFilters`  (bool), Include replication filters check before approving topology refactoring (e.g. `orchestrator` will not allow placing a non-filteres replica under a filtered one)
-* `MaintenanceOwner`  (string), (Default) name of maintenance owner to use if none provided
 * `ReasonableMaintenanceReplicationLagSeconds` (int), Above this value move-up and move-below are blocked
-* `MaintenanceExpireMinutes`  (int), Minutes after which a maintenance flag is considered stale and is cleared
-* `MaintenancePurgeDays`  (int), Days after which maintenance entries are purged from the database
 * `AuditLogFile`  (string), Name of log file for audit operations. Disabled when empty.
-* `AuditPageSize`       (int), Number of entries in an audit page
 * `RemoveTextFromHostnameDisplay` (string), Text to strip off the hostname on cluster/clusters pages. Save pixels (e.g. `mycompany.com`)
 * `ReadOnly`				(bool) When `"true"`, no write operations (e.g. stopping a replica, repointing replicas, discovering) are allowed
 * `AuthenticationMethod`    (string), type of authentication. Either empty (no authentication, default), `"basic"`, `"multi"` or `"proxy"`. See [Security](#security) section.
@@ -71,7 +63,6 @@ The following is an incomplete list of configuration parameters. "Complete" is a
 * `StatusEndpoint` (string), Override the status endpoint.  Defaults to `/api/status`
 * `StatusSimpleHealth` (bool), If true, calling the status endpoint will use the simplified health check
 * `StatusOUVerify` (bool), If true, try to verify OUs when Mutual TLS is on.  Defaults to false
-* `HttpTimeoutSeconds`  (int),    HTTP GET request timeout (when connecting to _orchestrator-agent_)
 * `AgentPollMinutes`     (uint), interval at which *orchestrator* contacts agents for brief status update
 * `UnseenAgentForgetHours`     (uint), time without contact after which an agent is forgotten
 * `StaleSeedFailMinutes`     (uint), time after which a seed with no state update is considered to be failed
@@ -79,7 +70,6 @@ The following is an incomplete list of configuration parameters. "Complete" is a
 * `PseudoGTIDMonotonicHint` (string), Optional, subtring in Pseudo-GTID entry which indicates Pseudo-GTID entries are expected to be monotonically increasing
 * `DetectPseudoGTIDQuery` (string), Optional query which is used to authoritatively decide whether pseudo gtid is enabled on instance
 * `BinlogEventsChunkSize` (int), Chunk size (X) for `SHOW BINLOG|RELAYLOG EVENTS LIMIT ?,X` statements. Smaller means less locking and more work to be done. Recommendation: keep `10000` or below, due to locking issues.
-* `BufferBinlogEvents`  (bool), Should we used buffered read on `SHOW BINLOG|RELAYLOG EVENTS` -- releases the database lock sooner (recommended).
 * `RecoveryPeriodBlockSeconds`  (int), The time for which an instance's recovery is kept "active", so as to avoid concurrent recoveries on smae instance as well as flapping
 * `RecoveryIgnoreHostnameFilters` ([]string), Recovery analysis will completely ignore hosts matching given patterns
 * `RecoverMasterClusterFilters` ([]string), Only do master recovery on clusters matching these regexp patterns (of course the ``.*`` pattern matches everything)

@@ -22,7 +22,6 @@ type CLIFlags struct {
 	SkipUnresolve      *bool
 	SkipUnresolveCheck *bool
 	BinlogFile         *string
-	Databaseless       *bool
 	GrabElection       *bool
 	Version            *bool
 	Statement          *string

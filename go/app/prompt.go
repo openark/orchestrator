@@ -713,19 +713,19 @@ Cheatsheet:
             to possible chaos). Locks are placed in the backend database, and so multiple orchestrator instances are safe.
             Operations automatically acquire locks and release them. This command manually acquires a lock, and will
             block other operations on the instance until lock is released.
-            Note that orchestrator automatically assumes locks to be expired after MaintenanceExpireMinutes (in config).
+            Note that orchestrator automatically assumes locks to be expired after MaintenanceExpireMinutes (hard coded value).
             Examples:
 
             orchestrator -c begin-maintenance -i instance.to.lock.com --duration=3h --reason="load testing; do not disturb"
                 accepted duration format: 10s, 30m, 24h, 3d, 4w
 
             orchestrator -c begin-maintenance -i instance.to.lock.com --reason="load testing; do not disturb"
-                --duration not given; default to config's MaintenanceExpireMinutes
+                --duration not given; default to MaintenanceExpireMinutes (hard coded value)
 
         end-maintenance
             Remove maintenance lock; such lock may have been gained by an explicit begin-maintenance command implicitly
             by a topology change. You should generally only remove locks you have placed manually; orchestrator will
-            automatically expire locks after MaintenanceExpireMinutes (in config).
+            automatically expire locks after MaintenanceExpireMinutes (hard coded value).
             Example:
 
             orchestrator -c end-maintenance -i locked.instance.com
@@ -737,14 +737,14 @@ Cheatsheet:
             Downtime is different than maintanence in that it places no lock (mainenance uses an exclusive lock on the instance).
             It is OK to downtime an instance that is already downtimed -- the new begin-downtime command will override whatever
             previous downtime attributes there were on downtimes instance.
-            Note that orchestrator automatically assumes downtime to be expired after MaintenanceExpireMinutes (in config).
+            Note that orchestrator automatically assumes downtime to be expired after MaintenanceExpireMinutes (hard coded value).
             Examples:
 
             orchestrator -c begin-downtime -i instance.to.downtime.com --duration=3h --reason="dba handling; do not do recovery"
                 accepted duration format: 10s, 30m, 24h, 3d, 4w
 
             orchestrator -c begin-downtime -i instance.to.lock.com --reason="dba handling; do not do recovery"
-                --duration not given; default to config's MaintenanceExpireMinutes
+                --duration not given; default to MaintenanceExpireMinutes (hard coded value)
 
         end-downtime
             Indicate an instance is no longer downtimed. Typically you should not need to use this since
