@@ -534,13 +534,13 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		// Discover by information_schema.processlist
 		latency.Start("instance")
 		err := sqlutils.QueryRowsMap(db, `
-        	select
-        		substring_index(host, ':', 1) as slave_hostname
-        	from
-        		information_schema.processlist
-        	where
-                        command IN ('Binlog Dump', 'Binlog Dump GTID')
-        		`,
+      	select
+      		substring_index(host, ':', 1) as slave_hostname
+      	from
+      		information_schema.processlist
+      	where
+          command IN ('Binlog Dump', 'Binlog Dump GTID')
+  		`,
 			func(m sqlutils.RowMap) error {
 				cname, resolveErr := ResolveHostname(m.GetString("slave_hostname"))
 				if resolveErr != nil {
