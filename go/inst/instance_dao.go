@@ -532,8 +532,11 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	if !foundByShowSlaveHosts && !isMaxScale {
 		// Either not configured to read SHOW SLAVE HOSTS or nothing was there.
 		// Discover by information_schema.processlist
-		latency.Start("instance")
-		err := sqlutils.QueryRowsMap(db, `
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			latency.Start("instance")
+			err := sqlutils.QueryRowsMap(db, `
       	select
       		substring_index(host, ':', 1) as slave_hostname
       	from
@@ -541,18 +544,19 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
       	where
           command IN ('Binlog Dump', 'Binlog Dump GTID')
   		`,
-			func(m sqlutils.RowMap) error {
-				cname, resolveErr := ResolveHostname(m.GetString("slave_hostname"))
-				if resolveErr != nil {
-					logReadTopologyInstanceError(instanceKey, "ResolveHostname: processlist", resolveErr)
-				}
-				replicaKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
-				instance.AddReplicaKey(&replicaKey)
-				return err
-			})
-		latency.Stop("instance")
+				func(m sqlutils.RowMap) error {
+					cname, resolveErr := ResolveHostname(m.GetString("slave_hostname"))
+					if resolveErr != nil {
+						logReadTopologyInstanceError(instanceKey, "ResolveHostname: processlist", resolveErr)
+					}
+					replicaKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
+					instance.AddReplicaKey(&replicaKey)
+					return err
+				})
+			latency.Stop("instance")
 
-		logReadTopologyInstanceError(instanceKey, "processlist", err)
+			logReadTopologyInstanceError(instanceKey, "processlist", err)
+		}()
 	}
 
 	instance.UsingPseudoGTID = false
@@ -656,21 +660,25 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	// We'll set it here on their behalf so there's no race between the first
 	// time an instance is discovered, and setting a rule like "must_not".
 	if config.Config.DetectPromotionRuleQuery != "" && !isMaxScale {
-		var value string
-		latency.Start("instance")
-		err := db.QueryRow(config.Config.DetectPromotionRuleQuery).Scan(&value)
-		logReadTopologyInstanceError(instanceKey, "DetectPromotionRuleQuery", err)
-		promotionRule, err := ParseCandidatePromotionRule(value)
-		logReadTopologyInstanceError(instanceKey, "ParseCandidatePromotionRule", err)
-		if err == nil {
-			// We need to update candidate_database_instance.
-			// We register the rule even if it hasn't changed,
-			// to bump the last_suggested time.
-			instance.PromotionRule = promotionRule
-			err = RegisterCandidateInstance(instanceKey, promotionRule)
-			logReadTopologyInstanceError(instanceKey, "RegisterCandidateInstance", err)
-		}
-		latency.Stop("instance")
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			var value string
+			latency.Start("instance")
+			err := db.QueryRow(config.Config.DetectPromotionRuleQuery).Scan(&value)
+			logReadTopologyInstanceError(instanceKey, "DetectPromotionRuleQuery", err)
+			promotionRule, err := ParseCandidatePromotionRule(value)
+			logReadTopologyInstanceError(instanceKey, "ParseCandidatePromotionRule", err)
+			if err == nil {
+				// We need to update candidate_database_instance.
+				// We register the rule even if it hasn't changed,
+				// to bump the last_suggested time.
+				instance.PromotionRule = promotionRule
+				err = RegisterCandidateInstance(instanceKey, promotionRule)
+				logReadTopologyInstanceError(instanceKey, "RegisterCandidateInstance", err)
+			}
+			latency.Stop("instance")
+		}()
 	}
 
 	ReadClusterAliasOverride(instance)
