@@ -544,53 +544,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		logReadTopologyInstanceError(instanceKey, "processlist", err)
 	}
 
-	if config.Config.ReadLongRunningQueries && !isMaxScale {
-		// Get long running processes
-		latency.Start("instance")
-		err := sqlutils.QueryRowsMap(db, `
-				  select
-				    id,
-				    user,
-				    host,
-				    db,
-				    command,
-				    time,
-				    state,
-				    substr(processlist.info, 1, 1024) as info,
-				    now() - interval time second as started_at
-				  from
-				    information_schema.processlist
-				  where
-				    time > 60
-				    and command != 'Sleep'
-				    and id != connection_id()
-				    and user != 'system user'
-				    and command != 'Binlog dump'
-				    and command != 'Binlog Dump GTID'
-				    and user != 'event_scheduler'
-				  order by
-				    time desc
-        		`,
-			func(m sqlutils.RowMap) error {
-				process := Process{}
-				process.Id = m.GetInt64("id")
-				process.User = m.GetString("user")
-				process.Host = m.GetString("host")
-				process.Db = m.GetString("db")
-				process.Command = m.GetString("command")
-				process.Time = m.GetInt64("time")
-				process.State = m.GetString("state")
-				process.Info = m.GetString("info")
-				process.StartedAt = m.GetString("started_at")
-
-				longRunningProcesses = append(longRunningProcesses, process)
-				return nil
-			})
-		latency.Stop("instance")
-
-		logReadTopologyInstanceError(instanceKey, "processlist, long queries", err)
-	}
-
 	instance.UsingPseudoGTID = false
 	if config.Config.DetectPseudoGTIDQuery != "" && !isMaxScale {
 		latency.Start("instance")
@@ -771,10 +724,6 @@ func ReadClusterAliasOverride(instance *Instance) (err error) {
 // It is a non-recursive function and so-called-recursion is performed upon periodic reading of
 // instances.
 func ReadInstanceClusterAttributes(instance *Instance) (err error) {
-	if config.Config.DatabaselessMode__experimental {
-		return nil
-	}
-
 	var masterMasterKey InstanceKey
 	var masterClusterName string
 	var masterReplicationDepth uint
@@ -878,10 +827,6 @@ func BulkReadInstance() ([](*InstanceKey), error) {
 }
 
 func ReadInstancePromotionRule(instance *Instance) (err error) {
-	if config.Config.DatabaselessMode__experimental {
-		return nil
-	}
-
 	var promotionRule CandidatePromotionRule = NeutralPromoteRule
 	query := `
 			select
@@ -1030,11 +975,6 @@ func readInstancesByCondition(condition string, args []interface{}, sort string)
 
 // ReadInstance reads an instance from the orchestrator backend database
 func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
-	if config.Config.DatabaselessMode__experimental {
-		instance, err := ReadTopologyInstance(instanceKey)
-		return instance, (err == nil), err
-	}
-
 	condition := `
 			hostname = ?
 			and port = ?
@@ -2405,7 +2345,7 @@ func RecordInstanceCoordinatesHistory() error {
         	delete from database_instance_coordinates_history
 			where
 				recorded_timestamp < NOW() - INTERVAL ? MINUTE
-				`, (config.Config.PseudoGTIDCoordinatesHistoryHeuristicMinutes + 5),
+				`, (config.PseudoGTIDCoordinatesHistoryHeuristicMinutes + 5),
 			)
 			return log.Errore(err)
 		}
@@ -2448,7 +2388,7 @@ func GetHeuristiclyRecentCoordinatesForInstance(instanceKey *InstanceKey) (selfC
 			recorded_timestamp desc
 			limit 1
 			`
-	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port, config.Config.PseudoGTIDCoordinatesHistoryHeuristicMinutes), func(m sqlutils.RowMap) error {
+	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port, config.PseudoGTIDCoordinatesHistoryHeuristicMinutes), func(m sqlutils.RowMap) error {
 		selfCoordinates = &BinlogCoordinates{LogFile: m.GetString("binary_log_file"), LogPos: m.GetInt64("binary_log_pos")}
 		relayLogCoordinates = &BinlogCoordinates{LogFile: m.GetString("relay_log_file"), LogPos: m.GetInt64("relay_log_pos")}
 
@@ -2536,14 +2476,11 @@ func RecordInstanceBinlogFileHistory() error {
         	delete from database_instance_binlog_files_history
 			where
 				last_seen < NOW() - INTERVAL ? DAY
-				`, config.Config.BinlogFileHistoryDays,
+				`, config.BinlogFileHistoryDays,
 			)
 			return log.Errore(err)
 		}
 		ExecDBWriteFunc(writeFunc)
-	}
-	if config.Config.BinlogFileHistoryDays == 0 {
-		return nil
 	}
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`

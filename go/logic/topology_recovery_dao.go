@@ -562,7 +562,7 @@ func ReadCompletedRecoveries(page int) ([]TopologyRecovery, error) {
 	limit := `
 		limit ?
 		offset ?`
-	return readRecoveries(`where end_recovery is not null`, limit, sqlutils.Args(config.Config.AuditPageSize, page*config.Config.AuditPageSize))
+	return readRecoveries(`where end_recovery is not null`, limit, sqlutils.Args(config.AuditPageSize, page*config.AuditPageSize))
 }
 
 // ReadRecovery reads completed recovery entry/audit entires from topology_recovery
@@ -595,7 +595,7 @@ func ReadRecentRecoveries(clusterName string, unacknowledgedOnly bool, page int)
 	limit := `
 		limit ?
 		offset ?`
-	args = append(args, config.Config.AuditPageSize, page*config.Config.AuditPageSize)
+	args = append(args, config.AuditPageSize, page*config.AuditPageSize)
 	return readRecoveries(whereClause, limit, args)
 }
 
@@ -658,7 +658,7 @@ func ReadRecentFailureDetections(page int) ([]TopologyRecovery, error) {
 	limit := `
 		limit ?
 		offset ?`
-	return readFailureDetections(``, limit, sqlutils.Args(config.Config.AuditPageSize, page*config.Config.AuditPageSize))
+	return readFailureDetections(``, limit, sqlutils.Args(config.AuditPageSize, page*config.AuditPageSize))
 }
 
 // ReadFailureDetection

@@ -73,7 +73,7 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 		}()
 	}
 	_, err := db.ExecOrchestrator(`
-			insert 
+			insert
 				into audit (
 					audit_timestamp, audit_type, hostname, port, cluster_name, message
 				) VALUES (
@@ -111,14 +111,14 @@ func ReadRecentAudit(instanceKey *InstanceKey, page int) ([]Audit, error) {
 		args = append(args, instanceKey.Hostname, instanceKey.Port)
 	}
 	query := fmt.Sprintf(`
-		select 
+		select
 			audit_id,
 			audit_timestamp,
 			audit_type,
 			hostname,
 			port,
 			message
-		from 
+		from
 			audit
 		%s
 		order by
@@ -126,7 +126,7 @@ func ReadRecentAudit(instanceKey *InstanceKey, page int) ([]Audit, error) {
 		limit ?
 		offset ?
 		`, whereCondition)
-	args = append(args, config.Config.AuditPageSize, page*config.Config.AuditPageSize)
+	args = append(args, config.AuditPageSize, page*config.AuditPageSize)
 	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		audit := Audit{}
 		audit.AuditId = m.GetInt64("audit_id")
@@ -154,9 +154,9 @@ func ExpireAudit() error {
  		delete from
 				audit
 			where
-				audit_timestamp < NOW() - INTERVAL ? DAY 
+				audit_timestamp < NOW() - INTERVAL ? DAY
 			`,
-			config.Config.AuditPurgeDays,
+			config.AuditPurgeDays,
 		)
 		return err
 	}
