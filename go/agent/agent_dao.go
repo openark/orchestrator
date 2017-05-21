@@ -51,7 +51,7 @@ func InitHttpClient() {
 		return
 	}
 
-	httpTimeout := time.Duration(time.Duration(config.Config.HttpTimeoutSeconds) * time.Second)
+	httpTimeout := time.Duration(time.Duration(config.AgentHttpTimeoutSeconds) * time.Second)
 	dialTimeout := func(network, addr string) (net.Conn, error) {
 		return net.DialTimeout(network, addr, httpTimeout)
 	}
@@ -120,9 +120,7 @@ func SubmitAgent(hostname string, port int, token string) (string, error) {
 	}
 
 	// Try to discover topology instances when an agent submits
-	if config.Config.AgentAutoDiscover {
-		DiscoverAgentInstance(hostname, port)
-	}
+	go DiscoverAgentInstance(hostname, port)
 
 	return hostname, err
 }

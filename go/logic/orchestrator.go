@@ -298,18 +298,13 @@ func onDiscoveryTick() {
 // periodically investigated and their status captured, and long since unseen instances are
 // purged and forgotten.
 func ContinuousDiscovery() {
-	if config.Config.DatabaselessMode__experimental {
-		log.Fatal("Cannot execute continuous mode in databaseless mode")
-	}
-
 	log.Infof("Starting continuous discovery")
 	recentDiscoveryOperationKeys = cache.New(instancePollSecondsDuration(), time.Second)
 
 	inst.LoadHostnameResolveCache()
 	go handleDiscoveryRequests()
 
-	// Careful: config.Config.GetDiscoveryPollSeconds() is CONSTANT. It can never change.
-	discoveryTick := time.Tick(time.Duration(config.Config.GetDiscoveryPollSeconds()) * time.Second)
+	discoveryTick := time.Tick(config.DiscoveryPollSeconds * time.Second)
 	instancePollTick := time.Tick(instancePollSecondsDuration())
 	caretakingTick := time.Tick(time.Minute)
 	recoveryTick := time.Tick(time.Duration(config.Config.RecoveryPollSeconds) * time.Second)
@@ -412,7 +407,7 @@ func ContinuousAgentsPoll() {
 
 	go discoverSeededAgents()
 
-	tick := time.Tick(time.Duration(config.Config.GetDiscoveryPollSeconds()) * time.Second)
+	tick := time.Tick(config.DiscoveryPollSeconds * time.Second)
 	caretakingTick := time.Tick(time.Hour)
 	for range tick {
 		agentsHosts, _ := agent.ReadOutdatedAgentsHosts()
