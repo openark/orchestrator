@@ -783,6 +783,26 @@ var generateSQLBase = []string{
 			PRIMARY KEY (recovery_step_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS raft_store (
+			store_id bigint unsigned not null auto_increment,
+			store_key varbinary(512) not null,
+			store_value blob not null,
+			PRIMARY KEY (store_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX store_key_idx_raft_store ON raft_store (store_key)
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS raft_log (
+			log_index bigint unsigned not null auto_increment,
+			term bigint not null,
+			log_type int not null,
+			data blob not null,
+			PRIMARY KEY (log_index)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 // generateSQLPatches contains DDLs for patching schema to the latest version.
@@ -1305,6 +1325,8 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 		if err == nil && !fromCache {
 			log.Debugf("Connected to orchestrator backend: sqlite on %v", config.Config.SQLite3DataFile)
 		}
+		db.SetMaxOpenConns(2)
+		db.SetMaxIdleConns(2)
 	} else {
 		mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&interpolateParams=%t",
 			config.Config.MySQLOrchestratorUser,

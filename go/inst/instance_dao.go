@@ -1213,7 +1213,7 @@ func ReadLostInRecoveryInstances(clusterName string) ([](*Instance), error) {
 		ifnull(
 			database_instance_downtime.downtime_active = 1
 			and database_instance_downtime.end_timestamp > now()
-			and database_instance_downtime.reason = ?, false)
+			and database_instance_downtime.reason = ?, 0)
 		and ? IN ('', cluster_name)
 	`
 	return readInstancesByCondition(condition, sqlutils.Args(DowntimeLostInRecoveryMessage, clusterName), "cluster_name asc, replication_depth asc")
