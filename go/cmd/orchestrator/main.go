@@ -133,7 +133,6 @@ func main() {
 		fmt.Println(app.AppPrompt)
 		return
 	}
-	inst.LoadHostnameResolveCache()
 
 	switch {
 	case len(flag.Args()) == 0 || flag.Arg(0) == "cli":

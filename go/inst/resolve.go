@@ -119,10 +119,11 @@ func ResolveHostname(hostname string) (string, error) {
 		// Anyway, it seems like the cache was not loaded from DB. Before doing real resolves,
 		// let's try and get the resolved hostname from database.
 		if !HostnameResolveMethodIsNone() {
-			if resolvedHostname, err := ReadResolvedHostname(hostname); err == nil && resolvedHostname != "" {
-				getHostnameResolvesLightweightCache().Set(hostname, resolvedHostname, 0)
-				return resolvedHostname, nil
-			}
+			go func() {
+				if resolvedHostname, err := ReadResolvedHostname(hostname); err == nil && resolvedHostname != "" {
+					getHostnameResolvesLightweightCache().Set(hostname, resolvedHostname, 0)
+				}
+			}()
 		}
 	}
 
