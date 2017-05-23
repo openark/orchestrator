@@ -17,43 +17,11 @@
 package process
 
 import (
-	"time"
-
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
-	"github.com/github/orchestrator/go/raft"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )
-
-const registrationPollSeconds = 10
-
-type NodeHealth struct {
-	Hostname        string
-	Token           string
-	AppVersion      string
-	FirstSeenActive string
-	LastSeenActive  string
-}
-
-type HealthStatus struct {
-	Healthy        bool
-	Hostname       string
-	Token          string
-	IsActiveNode   bool
-	ActiveNode     NodeHealth
-	Error          error
-	AvailableNodes [](*NodeHealth)
-}
-
-type OrchestratorExecutionMode string
-
-const (
-	OrchestratorExecutionCliMode  OrchestratorExecutionMode = "CLIMode"
-	OrchestratorExecutionHttpMode                           = "HttpMode"
-)
-
-var continuousRegistrationInitiated bool = false
 
 // RegisterNode writes down this node in the node_health table
 func RegisterNode(extraInfo string, command string, firstTime bool) (healthy bool, err error) {
@@ -113,63 +81,6 @@ func RegisterNode(extraInfo string, command string, firstTime bool) (healthy boo
 		}
 	}
 	return false, nil
-}
-
-// HealthTest attempts to write to the backend database and get a result
-func HealthTest() (*HealthStatus, error) {
-	health := HealthStatus{Healthy: false, Hostname: ThisHostname, Token: ProcessToken.Hash}
-
-	healthy, err := RegisterNode("", "", false)
-	if err != nil {
-		health.Error = err
-		return &health, log.Errore(err)
-	}
-	health.Healthy = healthy
-	if orcraft.IsRaftEnabled() {
-		health.ActiveNode.Hostname = orcraft.GetLeader()
-		health.IsActiveNode = orcraft.IsLeader()
-	} else {
-		health.ActiveNode, health.IsActiveNode, err = ElectedNode()
-		if err != nil {
-			health.Error = err
-			return &health, log.Errore(err)
-		}
-	}
-
-	health.AvailableNodes, err = ReadAvailableNodes(true)
-
-	return &health, nil
-}
-
-// ContinuousRegistration will continuously update the node_health
-// table showing that the current process is still running.
-func ContinuousRegistration(extraInfo string, command string) {
-	if continuousRegistrationInitiated {
-		// This is a simple mechanism to make sure this function is not being called multiple times in the lifespan of this process.
-		// It is not concurrency-protected.
-		// Original use case: multiple instances as in "-i instance1,instance2,instance3" flag
-		return
-	}
-	continuousRegistrationInitiated = true
-
-	tickOperation := func(firstTime bool) {
-		if _, err := RegisterNode(extraInfo, command, firstTime); err != nil {
-			log.Errorf("ContinuousRegistration: RegisterNode failed: %+v", err)
-		}
-	}
-	// First one is synchronous
-	tickOperation(true)
-	go func() {
-		registrationTick := time.Tick(time.Duration(registrationPollSeconds) * time.Second)
-		for range registrationTick {
-			// We already run inside a go-routine so
-			// do not do this asynchronously.  If we
-			// get stuck then we don't want to fill up
-			// the backend pool with connections running
-			// this maintenance operation.
-			tickOperation(false)
-		}
-	}()
 }
 
 // ExpireAvailableNodes is an aggressive purging method to remove
