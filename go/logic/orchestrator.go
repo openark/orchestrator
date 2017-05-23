@@ -81,6 +81,13 @@ func IsLeader() bool {
 	return atomic.LoadInt64(&isElectedNode) == 1
 }
 
+func IsLeaderOrActive() bool {
+	if orcraft.IsRaftEnabled() {
+		return true
+	}
+	return atomic.LoadInt64(&isElectedNode) == 1
+}
+
 // used in several places
 func instancePollSecondsDuration() time.Duration {
 	return time.Duration(config.Config.InstancePollSeconds) * time.Second
@@ -123,7 +130,7 @@ func handleDiscoveryRequests() {
 				instanceKey := discoveryQueue.Consume()
 				// Possibly this used to be the elected node, but has
 				// been demoted, while still the queue is full.
-				if !IsLeader() {
+				if !IsLeaderOrActive() {
 					log.Debugf("Node apparently demoted. Skipping discovery of %+v. "+
 						"Remaining queue size: %+v", instanceKey, discoveryQueue.QueueLen())
 
@@ -227,7 +234,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		backendLatency.Seconds(),
 		instanceLatency.Seconds())
 
-	if !IsLeader() {
+	if !IsLeaderOrActive() {
 		// Maybe this node was elected before, but isn't elected anymore.
 		// If not elected, stop drilling up/down the topology
 		return
@@ -338,7 +345,7 @@ func ContinuousDiscovery() {
 				// This tick does NOT do instance poll (these are handled by the oversampling discoveryTick)
 				// But rather should invoke such routinely operations that need to be as (or roughly as) frequent
 				// as instance poll
-				if IsLeader() {
+				if IsLeaderOrActive() {
 					go inst.RecordInstanceCoordinatesHistory()
 					go inst.UpdateClusterAliases()
 					go inst.ExpireDowntime()
@@ -347,7 +354,7 @@ func ContinuousDiscovery() {
 		case <-caretakingTick:
 			// Various periodic internal maintenance tasks
 			go func() {
-				if IsLeader() {
+				if IsLeaderOrActive() {
 					go inst.RecordInstanceBinlogFileHistory()
 					go inst.ForgetLongUnseenInstances()
 					go inst.ForgetUnseenInstancesDifferentlyResolved()
@@ -374,12 +381,14 @@ func ContinuousDiscovery() {
 			}()
 		case <-recoveryTick:
 			go func() {
-				if IsLeader() {
+				if IsLeaderOrActive() {
 					go ClearActiveFailureDetections()
 					go ClearActiveRecoveries()
 					go ExpireBlockedRecoveries()
 					go AcknowledgeCrashedRecoveries()
 					go inst.ExpireInstanceAnalysisChangelog()
+				}
+				if IsLeader() {
 					go CheckAndRecover(nil, nil, false)
 				}
 			}()
