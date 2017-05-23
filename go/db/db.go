@@ -1325,8 +1325,8 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 		if err == nil && !fromCache {
 			log.Debugf("Connected to orchestrator backend: sqlite on %v", config.Config.SQLite3DataFile)
 		}
-		db.SetMaxOpenConns(2)
-		db.SetMaxIdleConns(2)
+		db.SetMaxOpenConns(1)
+		db.SetMaxIdleConns(1)
 	} else {
 		mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&interpolateParams=%t",
 			config.Config.MySQLOrchestratorUser,
