@@ -302,8 +302,6 @@ func onDiscoveryTick() {
 			log.Debugf("outdated keys: %+v", instanceKeys)
 		}
 		for _, instanceKey := range instanceKeys {
-			instanceKey := instanceKey
-
 			if instanceKey.IsValid() {
 				discoveryQueue.Push(instanceKey)
 			}
