@@ -145,7 +145,7 @@ func ResolveHostname(hostname string) (string, error) {
 	}
 	// Good result! Cache it, also to DB
 	log.Debugf("Cache hostname resolve %s as %s", hostname, resolvedHostname)
-	UpdateResolvedHostname(hostname, resolvedHostname)
+	go UpdateResolvedHostname(hostname, resolvedHostname)
 	return resolvedHostname, nil
 }
 

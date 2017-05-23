@@ -316,7 +316,6 @@ func ContinuousDiscovery() {
 	log.Infof("Starting continuous discovery")
 	recentDiscoveryOperationKeys = cache.New(instancePollSecondsDuration(), time.Second)
 
-	inst.LoadHostnameResolveCache()
 	go handleDiscoveryRequests()
 
 	discoveryTick := time.Tick(config.DiscoveryPollSeconds * time.Second)
