@@ -30,6 +30,7 @@ import (
 	"github.com/github/orchestrator/go/inst"
 	ometrics "github.com/github/orchestrator/go/metrics"
 	"github.com/github/orchestrator/go/process"
+	"github.com/github/orchestrator/go/raft"
 	"github.com/openark/golib/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
@@ -71,6 +72,13 @@ func init() {
 		discoveryRecentCountGauge.Update(int64(recentDiscoveryOperationKeys.ItemCount()))
 	})
 	ometrics.OnGraphiteTick(func() { isElectedGauge.Update(int64(atomic.LoadInt64(&isElectedNode))) })
+}
+
+func IsLeader() bool {
+	if orcraft.IsRaftEnabled() {
+		return orcraft.IsLeader()
+	}
+	return atomic.LoadInt64(&isElectedNode) == 1
 }
 
 // used in several places
@@ -115,7 +123,7 @@ func handleDiscoveryRequests() {
 				instanceKey := discoveryQueue.Consume()
 				// Possibly this used to be the elected node, but has
 				// been demoted, while still the queue is full.
-				if atomic.LoadInt64(&isElectedNode) != 1 {
+				if !IsLeader() {
 					log.Debugf("Node apparently demoted. Skipping discovery of %+v. "+
 						"Remaining queue size: %+v", instanceKey, discoveryQueue.QueueLen())
 
@@ -219,7 +227,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		backendLatency.Seconds(),
 		instanceLatency.Seconds())
 
-	if atomic.LoadInt64(&isElectedNode) == 0 {
+	if !IsLeader() {
 		// Maybe this node was elected before, but isn't elected anymore.
 		// If not elected, stop drilling up/down the topology
 		return
@@ -246,7 +254,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 
 // onDiscoveryTick handles the actions to take to discover/poll instances
 func onDiscoveryTick() {
-	wasAlreadyElected := atomic.LoadInt64(&isElectedNode)
+	wasAlreadyElected := IsLeader()
 	myIsElectedNode, err := process.AttemptElection()
 	if err != nil {
 		log.Errore(err)
@@ -272,7 +280,7 @@ func onDiscoveryTick() {
 		log.Errore(err)
 	}
 
-	if wasAlreadyElected == 0 {
+	if !wasAlreadyElected {
 		// Just turned to be leader!
 		go process.RegisterNode("", "", false)
 	}
@@ -330,7 +338,7 @@ func ContinuousDiscovery() {
 				// This tick does NOT do instance poll (these are handled by the oversampling discoveryTick)
 				// But rather should invoke such routinely operations that need to be as (or roughly as) frequent
 				// as instance poll
-				if atomic.LoadInt64(&isElectedNode) == 1 {
+				if IsLeader() {
 					go inst.RecordInstanceCoordinatesHistory()
 					go inst.UpdateClusterAliases()
 					go inst.ExpireDowntime()
@@ -339,7 +347,7 @@ func ContinuousDiscovery() {
 		case <-caretakingTick:
 			// Various periodic internal maintenance tasks
 			go func() {
-				if atomic.LoadInt64(&isElectedNode) == 1 {
+				if IsLeader() {
 					go inst.RecordInstanceBinlogFileHistory()
 					go inst.ForgetLongUnseenInstances()
 					go inst.ForgetUnseenInstancesDifferentlyResolved()
@@ -366,7 +374,7 @@ func ContinuousDiscovery() {
 			}()
 		case <-recoveryTick:
 			go func() {
-				if atomic.LoadInt64(&isElectedNode) == 1 {
+				if IsLeader() {
 					go ClearActiveFailureDetections()
 					go ClearActiveRecoveries()
 					go ExpireBlockedRecoveries()

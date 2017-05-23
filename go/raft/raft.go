@@ -22,6 +22,10 @@ const RaftDBFile = "freno-raft.db"
 
 var store *Store
 
+func IsRaftEnabled() bool {
+	return store != nil
+}
+
 // Setup creates the entire raft shananga. Creates the store, associates with the throttler,
 // contacts peer nodes, and subscribes to leader changes to export them.
 func Setup() error {
