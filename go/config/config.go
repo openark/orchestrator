@@ -487,6 +487,9 @@ func (this *Configuration) postReadAdjustments() error {
 	if this.IsSQLite() && this.SQLite3DataFile == "" {
 		return fmt.Errorf("SQLite3DataFile must be set when BackendDB is sqlite3")
 	}
+	if this.IsSQLite() {
+		this.HostnameResolveMethod = "none"
+	}
 	if this.RemoteSSHForMasterFailover && this.RemoteSSHCommand == "" {
 		return fmt.Errorf("RemoteSSHCommand is required when RemoteSSHForMasterFailover is set")
 	}
