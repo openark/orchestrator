@@ -129,7 +129,7 @@ func standardHttp(continuousDiscovery bool) {
 		log.Info("Starting Discovery")
 		go logic.ContinuousDiscovery()
 	}
-	if config.Config.RaftBind != "" {
+	if config.Config.RaftEnabled {
 		if err := orcraft.Setup(); err != nil {
 			log.Fatale(err)
 		}

@@ -92,6 +92,7 @@ type Configuration struct {
 	SQLite3DataFile                            string // when BackendDB == "sqlite3", full path to sqlite3 datafile
 	SkipOrchestratorDatabaseUpdate             bool   // When true, do not check backend database schema nor attempt to update it. Useful when you may be running multiple versions of orchestrator, and you only wish certain boxes to dictate the db structure (or else any time a different orchestrator version runs it will rebuild database schema)
 	PanicIfDifferentDatabaseDeploy             bool   // When true, and this process finds the orchestrator backend DB was provisioned by a different version, panic
+	RaftEnabled                                bool   // When true, setup orchestrator in a raft consensus layout. When false (default) all Raft* variables are ignored
 	RaftBind                                   string
 	RaftDataDir                                string
 	DefaultRaftPort                            int      // if a RaftNodes entry does not specify port, use this one
