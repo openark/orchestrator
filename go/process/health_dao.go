@@ -21,6 +21,7 @@ import (
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
+	"github.com/github/orchestrator/go/raft"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )
@@ -124,10 +125,15 @@ func HealthTest() (*HealthStatus, error) {
 		return &health, log.Errore(err)
 	}
 	health.Healthy = healthy
-	health.ActiveNode, health.IsActiveNode, err = ElectedNode()
-	if err != nil {
-		health.Error = err
-		return &health, log.Errore(err)
+	if orcraft.IsRaftEnabled() {
+		health.ActiveNode.Hostname = orcraft.GetLeader()
+		health.IsActiveNode = orcraft.IsLeader()
+	} else {
+		health.ActiveNode, health.IsActiveNode, err = ElectedNode()
+		if err != nil {
+			health.Error = err
+			return &health, log.Errore(err)
+		}
 	}
 
 	health.AvailableNodes, err = ReadAvailableNodes(true)

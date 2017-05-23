@@ -262,26 +262,28 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 // onDiscoveryTick handles the actions to take to discover/poll instances
 func onDiscoveryTick() {
 	wasAlreadyElected := IsLeader()
-	myIsElectedNode, err := process.AttemptElection()
-	if err != nil {
-		log.Errore(err)
-	}
-	if myIsElectedNode {
-		atomic.StoreInt64(&isElectedNode, 1)
-	} else {
-		atomic.StoreInt64(&isElectedNode, 0)
-	}
 
-	if !myIsElectedNode {
-		if electedNode, _, err := process.ElectedNode(); err == nil {
-			log.Infof("Not elected as active node; active node: %v; polling", electedNode.Hostname)
-		} else {
-			log.Infof("Not elected as active node; active node: Unable to determine: %v; polling", err)
+	if !orcraft.IsRaftEnabled() {
+		myIsElectedNode, err := process.AttemptElection()
+		if err != nil {
+			log.Errore(err)
 		}
+		if myIsElectedNode {
+			atomic.StoreInt64(&isElectedNode, 1)
+		} else {
+			atomic.StoreInt64(&isElectedNode, 0)
+		}
+		if !myIsElectedNode {
+			if electedNode, _, err := process.ElectedNode(); err == nil {
+				log.Infof("Not elected as active node; active node: %v; polling", electedNode.Hostname)
+			} else {
+				log.Infof("Not elected as active node; active node: Unable to determine: %v; polling", err)
+			}
+		}
+	}
+	if !IsLeaderOrActive() {
 		return
 	}
-
-	// I'm elected!
 	instanceKeys, err := inst.ReadOutdatedInstanceKeys()
 	if err != nil {
 		log.Errore(err)
