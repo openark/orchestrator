@@ -318,6 +318,85 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		latency.Stop("instance")
 	} else {
 		// NOT MaxScale
+
+		// We begin with a few operations we can run concurrently, and which do not depend on anything
+		{
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				var dummy string
+				// show global status works just as well with 5.6 & 5.7 (5.7 moves variables to performance_schema)
+				latency.Start("instance")
+				err = db.QueryRow("show global status like 'Uptime'").Scan(&dummy, &instance.Uptime)
+				latency.Stop("instance")
+
+				if err != nil {
+					logReadTopologyInstanceError(instanceKey, "show global status like 'Uptime'", err)
+
+					// We do not "goto Cleanup" here, although it should be the correct flow.
+					// Reason is 5.7's new security feature that requires GRANTs on performance_schema.global_variables.
+					// There is a wrong decisionmaking in this design and the migration path to 5.7 will be difficult.
+					// I don't want orchestrator to put even more burden on this. The 'Uptime' variable is not that important
+					// so as to completely fail reading a 5.7 instance.
+					// This is supposed to be fixed in 5.7.9
+				}
+			}()
+		}
+
+		if instance.LogBinEnabled {
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				latency.Start("instance")
+				err = sqlutils.QueryRowsMap(db, "show master status", func(m sqlutils.RowMap) error {
+					var err error
+					instance.SelfBinlogCoordinates.LogFile = m.GetString("File")
+					instance.SelfBinlogCoordinates.LogPos = m.GetInt64("Position")
+					return err
+				})
+				latency.Stop("instance")
+			}()
+		}
+
+		instance.UsingPseudoGTID = false
+		if config.Config.DetectPseudoGTIDQuery != "" {
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				latency.Start("instance")
+				if resultData, err := sqlutils.QueryResultData(db, config.Config.DetectPseudoGTIDQuery); err == nil {
+					if len(resultData) > 0 {
+						if len(resultData[0]) > 0 {
+							if resultData[0][0].Valid && resultData[0][0].String == "1" {
+								instance.UsingPseudoGTID = true
+							}
+						}
+					}
+				} else {
+					logReadTopologyInstanceError(instanceKey, "DetectPseudoGTIDQuery", err)
+				}
+				latency.Stop("instance")
+			}()
+		}
+
+		if config.Config.SlaveLagQuery != "" {
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				latency.Start("instance")
+				if err := db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SlaveLagSeconds); err == nil {
+					if instance.SlaveLagSeconds.Valid && instance.SlaveLagSeconds.Int64 < 0 {
+						log.Warningf("Host: %+v, instance.SlaveLagSeconds < 0 [%+v], correcting to 0", instanceKey, instance.SlaveLagSeconds.Int64)
+						instance.SlaveLagSeconds.Int64 = 0
+					}
+				} else {
+					instance.SlaveLagSeconds = instance.SecondsBehindMaster
+					logReadTopologyInstanceError(instanceKey, "SlaveLagQuery", err)
+				}
+				latency.Stop("instance")
+			}()
+		}
+
 		var mysqlHostname, mysqlReportHost string
 		latency.Start("instance")
 		err = db.QueryRow("select @@global.hostname, ifnull(@@global.report_host, ''), @@global.server_id, @@global.version, @@global.version_comment, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
@@ -358,28 +437,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				latency.Stop("instance")
 			}()
 		}
-	}
-	{
-		waitGroup.Add(1)
-		go func() {
-			defer waitGroup.Done()
-			var dummy string
-			// show global status works just as well with 5.6 & 5.7 (5.7 moves variables to performance_schema)
-			latency.Start("instance")
-			err = db.QueryRow("show global status like 'Uptime'").Scan(&dummy, &instance.Uptime)
-			latency.Stop("instance")
-
-			if err != nil {
-				logReadTopologyInstanceError(instanceKey, "show global status like 'Uptime'", err)
-
-				// We do not "goto Cleanup" here, although it should be the correct flow.
-				// Reason is 5.7's new security feature that requires GRANTs on performance_schema.global_variables.
-				// There is a wrong decisionmaking in this design and the migration path to 5.7 will be difficult.
-				// I don't want orchestrator to put even more burden on this. The 'Uptime' variable is not that important
-				// so as to completely fail reading a 5.7 instance.
-				// This is supposed to be fixed in 5.7.9
-			}
-		}()
 	}
 	if resolvedHostname != instance.Key.Hostname {
 		latency.Start("backend")
@@ -473,21 +530,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		goto Cleanup
 	}
 
-	if instance.LogBinEnabled {
-		waitGroup.Add(1)
-		go func() {
-			defer waitGroup.Done()
-			latency.Start("instance")
-			err = sqlutils.QueryRowsMap(db, "show master status", func(m sqlutils.RowMap) error {
-				var err error
-				instance.SelfBinlogCoordinates.LogFile = m.GetString("File")
-				instance.SelfBinlogCoordinates.LogPos = m.GetInt64("Position")
-				return err
-			})
-			latency.Stop("instance")
-		}()
-	}
-
 	instanceFound = true
 
 	// -------------------------------------------------------------------------
@@ -556,45 +598,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			latency.Stop("instance")
 
 			logReadTopologyInstanceError(instanceKey, "processlist", err)
-		}()
-	}
-
-	instance.UsingPseudoGTID = false
-	if config.Config.DetectPseudoGTIDQuery != "" && !isMaxScale {
-		waitGroup.Add(1)
-		go func() {
-			defer waitGroup.Done()
-			latency.Start("instance")
-			if resultData, err := sqlutils.QueryResultData(db, config.Config.DetectPseudoGTIDQuery); err == nil {
-				if len(resultData) > 0 {
-					if len(resultData[0]) > 0 {
-						if resultData[0][0].Valid && resultData[0][0].String == "1" {
-							instance.UsingPseudoGTID = true
-						}
-					}
-				}
-			} else {
-				logReadTopologyInstanceError(instanceKey, "DetectPseudoGTIDQuery", err)
-			}
-			latency.Stop("instance")
-		}()
-	}
-
-	if config.Config.SlaveLagQuery != "" && !isMaxScale {
-		waitGroup.Add(1)
-		go func() {
-			defer waitGroup.Done()
-			latency.Start("instance")
-			if err := db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SlaveLagSeconds); err == nil {
-				if instance.SlaveLagSeconds.Valid && instance.SlaveLagSeconds.Int64 < 0 {
-					log.Warningf("Host: %+v, instance.SlaveLagSeconds < 0 [%+v], correcting to 0", instanceKey, instance.SlaveLagSeconds.Int64)
-					instance.SlaveLagSeconds.Int64 = 0
-				}
-			} else {
-				instance.SlaveLagSeconds = instance.SecondsBehindMaster
-				logReadTopologyInstanceError(instanceKey, "SlaveLagQuery", err)
-			}
-			latency.Stop("instance")
 		}()
 	}
 
