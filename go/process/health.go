@@ -17,6 +17,7 @@
 package process
 
 import (
+	"sync"
 	"time"
 
 	"github.com/github/orchestrator/go/raft"
@@ -50,13 +51,13 @@ const (
 	OrchestratorExecutionHttpMode                           = "HttpMode"
 )
 
-var continuousRegistrationInitiated bool = false
+var continuousRegistrationOnce sync.Once
 
 // HealthTest attempts to write to the backend database and get a result
 func HealthTest() (*HealthStatus, error) {
 	health := HealthStatus{Healthy: false, Hostname: ThisHostname, Token: ProcessToken.Hash}
 
-	healthy, err := RegisterNode("", "", false)
+	healthy, err := RegisterNode("", "")
 	if err != nil {
 		health.Error = err
 		return &health, log.Errore(err)
@@ -81,30 +82,24 @@ func HealthTest() (*HealthStatus, error) {
 // ContinuousRegistration will continuously update the node_health
 // table showing that the current process is still running.
 func ContinuousRegistration(extraInfo string, command string) {
-	if continuousRegistrationInitiated {
-		// This is a simple mechanism to make sure this function is not being called multiple times in the lifespan of this process.
-		// It is not concurrency-protected.
-		// Original use case: multiple instances as in "-i instance1,instance2,instance3" flag
-		return
-	}
-	continuousRegistrationInitiated = true
-
-	tickOperation := func(firstTime bool) {
-		if _, err := RegisterNode(extraInfo, command, firstTime); err != nil {
-			log.Errorf("ContinuousRegistration: RegisterNode failed: %+v", err)
+	continuousRegistrationOnce.Do(func() {
+		tickOperation := func() {
+			if _, err := RegisterNode(extraInfo, command); err != nil {
+				log.Errorf("ContinuousRegistration: RegisterNode failed: %+v", err)
+			}
 		}
-	}
-	// First one is synchronous
-	tickOperation(true)
-	go func() {
-		registrationTick := time.Tick(time.Duration(registrationPollSeconds) * time.Second)
-		for range registrationTick {
-			// We already run inside a go-routine so
-			// do not do this asynchronously.  If we
-			// get stuck then we don't want to fill up
-			// the backend pool with connections running
-			// this maintenance operation.
-			tickOperation(false)
-		}
-	}()
+		// First one is synchronous
+		tickOperation()
+		go func() {
+			registrationTick := time.Tick(time.Duration(registrationPollSeconds) * time.Second)
+			for range registrationTick {
+				// We already run inside a go-routine so
+				// do not do this asynchronously.  If we
+				// get stuck then we don't want to fill up
+				// the backend pool with connections running
+				// this maintenance operation.
+				tickOperation()
+			}
+		}()
+	})
 }

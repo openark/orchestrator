@@ -17,15 +17,19 @@
 package process
 
 import (
+	"sync"
+
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )
 
+var registerNodeOnce sync.Once
+
 // RegisterNode writes down this node in the node_health table
-func RegisterNode(extraInfo string, command string, firstTime bool) (healthy bool, err error) {
-	if firstTime {
+func RegisterNode(extraInfo string, command string) (healthy bool, err error) {
+	registerNodeOnce.Do(func() {
 		db.ExecOrchestrator(`
 			insert ignore into node_health_history
 				(hostname, token, first_seen_active, extra_info, command, app_version)
@@ -35,7 +39,7 @@ func RegisterNode(extraInfo string, command string, firstTime bool) (healthy boo
 			ThisHostname, ProcessToken.Hash, extraInfo, command,
 			config.RuntimeCLIFlags.ConfiguredVersion,
 		)
-	}
+	})
 	{
 		sqlResult, err := db.ExecOrchestrator(`
 			update node_health set
