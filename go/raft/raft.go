@@ -19,6 +19,7 @@ import (
 	"github.com/hashicorp/raft"
 )
 
+var RaftNotRunning = fmt.Errorf("raft is not configured/running")
 var store *Store
 
 func IsRaftEnabled() bool {
@@ -78,6 +79,9 @@ func GetState() raft.RaftState {
 
 // PublishCommand will distribute a command across the group
 func PublishCommand(op string, value interface{}) error {
+	if !IsRaftEnabled() {
+		return RaftNotRunning
+	}
 	b, err := json.Marshal(value)
 	if err != nil {
 		return err

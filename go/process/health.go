@@ -17,7 +17,6 @@
 package process
 
 import (
-	"encoding/json"
 	"sync"
 	"time"
 
@@ -72,13 +71,12 @@ const (
 var continuousRegistrationOnce sync.Once
 
 func RegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
+	nodeHealth.LastReported = time.Now()
 	if orcraft.IsRaftEnabled() {
-		nodeHealth.LastReported = time.Now()
-		b, err := json.Marshal(nodeHealth)
-		if err != nil {
-			return false, err
+		if orcraft.IsLeader() {
+			err := orcraft.PublishCommand("register-node", nodeHealth)
+			return err == nil, err
 		}
-		return true, orcraft.PublishCommand("register-node", b)
 	}
 	return WriteRegisterNode(nodeHealth)
 }

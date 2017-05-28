@@ -28,9 +28,6 @@ import (
 // RegisterNode writes down this node in the node_health table
 func WriteRegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
 	timeNow := time.Now()
-	if nodeHealth == ThisNodeHealth {
-		nodeHealth.LastReported = timeNow
-	}
 	reportedAgo := timeNow.Sub(nodeHealth.LastReported)
 	reportedSecondsAgo := int64(reportedAgo.Seconds())
 	if reportedSecondsAgo > registrationPollSeconds*2 {

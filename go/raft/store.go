@@ -3,7 +3,6 @@ package orcraft
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"strings"
@@ -92,7 +91,7 @@ func (store *Store) Open(peerNodes []string) error {
 	log.Debugf("raft: logStore=%+v", logStore)
 
 	// Instantiate the Raft systems.
-	if store.raft, err = raft.NewRaft(config, store, logStore, logStore, snapshots, peerStore, transport); err != nil {
+	if store.raft, err = raft.NewRaft(config, (*fsm)(store), logStore, logStore, snapshots, peerStore, transport); err != nil {
 		return fmt.Errorf("error creating new raft: %s", err)
 	}
 	log.Infof("new raft created")
@@ -126,27 +125,10 @@ func (store *Store) genericCommand(op string, b []byte) error {
 	}
 
 	f := store.raft.Apply(b, raftTimeout)
-	return f.Error()
-}
-
-// Apply applies a Raft log entry to the key-value store.
-func (store *Store) Apply(l *raft.Log) interface{} {
-	var c storeCommand
-	if err := json.Unmarshal(l.Data, &c); err != nil {
-		log.Errorf("failed to unmarshal command: %s", err.Error())
+	if err = f.Error(); err != nil {
+		return err
 	}
-
-	return store.applier.ApplyCommand(c.Op, c.Value)
-}
-
-// Snapshot returns a snapshot object of freno's state
-func (store *Store) Snapshot() (raft.FSMSnapshot, error) {
-	snapshot := newFsmSnapshot()
-	return snapshot, nil
-}
-
-// Restore restores freno state
-func (store *Store) Restore(rc io.ReadCloser) error {
-	defer rc.Close()
+	r := f.Response()
+	log.Debugf("=====response: %+v", r)
 	return nil
 }

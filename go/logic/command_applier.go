@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 
 	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/process"
 
 	"github.com/openark/golib/log"
 )
@@ -33,7 +34,7 @@ func NewCommandApplier() *CommandApplier {
 	return applier
 }
 
-func (applier *CommandApplier) ApplyCommand(op string, value []byte) error {
+func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{} {
 	log.Debugf("orchestrator/raft: applying command: %s", op)
 	switch op {
 	case "register-node":
@@ -46,20 +47,32 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) error {
 	return log.Errorf("Unknown command op: %s", op)
 }
 
-func (applier *CommandApplier) registerNode(value []byte) error {
+func (applier *CommandApplier) registerNode(value []byte) interface{} {
+	nodeHealth := process.NodeHealth{}
+	if err := json.Unmarshal(value, &nodeHealth); err != nil {
+		return log.Errore(err)
+	}
+	log.Debugf("====== nodeHealth: %+v", nodeHealth)
+	if _, err := process.WriteRegisterNode(&nodeHealth); err != nil {
+		return log.Errore(err)
+	}
 
-	return nil
+	return &nodeHealth
 }
 
-func (applier *CommandApplier) discover(value []byte) error {
+func (applier *CommandApplier) discover(value []byte) interface{} {
 	instanceKey := inst.InstanceKey{}
 	if err := json.Unmarshal(value, &instanceKey); err != nil {
 		return log.Errore(err)
 	}
-	_, err := inst.ReadTopologyInstance(&instanceKey)
-	return err
+	if instance, err := inst.ReadTopologyInstance(&instanceKey); err != nil {
+		return log.Errore(err)
+	} else {
+		return instance
+	}
 }
-func (applier *CommandApplier) forget(value []byte) error {
+
+func (applier *CommandApplier) forget(value []byte) interface{} {
 	instanceKey := inst.InstanceKey{}
 	if err := json.Unmarshal(value, &instanceKey); err != nil {
 		return log.Errore(err)
