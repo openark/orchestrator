@@ -76,8 +76,8 @@ func GetState() raft.RaftState {
 }
 
 // PublishCommand will distribute a command across the group
-func PublishCommand(op string, value []byte, allowFollower bool) error {
-	return store.genericCommand(op, value, allowFollower)
+func PublishCommand(op string, value []byte) error {
+	return store.genericCommand(op, value)
 }
 
 // Monitor is a utility function to routinely observe leadership state.

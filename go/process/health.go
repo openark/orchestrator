@@ -78,7 +78,7 @@ func RegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
 		if err != nil {
 			return false, err
 		}
-		return true, orcraft.PublishCommand("register-node", b, true)
+		return true, orcraft.PublishCommand("register-node", b)
 	}
 	return WriteRegisterNode(nodeHealth)
 }
