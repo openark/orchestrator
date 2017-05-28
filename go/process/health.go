@@ -49,6 +49,12 @@ func NewNodeHealth() *NodeHealth {
 	}
 }
 
+func (nodeHealth *NodeHealth) Update() *NodeHealth {
+	nodeHealth.Hostname = ThisHostname
+	nodeHealth.LastReported = time.Now()
+	return nodeHealth
+}
+
 var ThisNodeHealth = NewNodeHealth()
 
 type HealthStatus struct {
@@ -71,7 +77,7 @@ const (
 var continuousRegistrationOnce sync.Once
 
 func RegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
-	nodeHealth.LastReported = time.Now()
+	nodeHealth.Update()
 	if orcraft.IsRaftEnabled() {
 		if orcraft.IsLeader() {
 			err := orcraft.PublishCommand("register-node", nodeHealth)
