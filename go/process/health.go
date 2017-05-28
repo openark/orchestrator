@@ -39,6 +39,7 @@ type NodeHealth struct {
 
 	LastReported time.Time
 	once         sync.Once
+	onceUpdate   sync.Once
 }
 
 func NewNodeHealth() *NodeHealth {
@@ -50,7 +51,11 @@ func NewNodeHealth() *NodeHealth {
 }
 
 func (nodeHealth *NodeHealth) Update() *NodeHealth {
-	nodeHealth.Hostname = ThisHostname
+	nodeHealth.onceUpdate.Do(func() {
+		nodeHealth.Hostname = ThisHostname
+		nodeHealth.Token = ProcessToken.Hash
+		nodeHealth.AppVersion = config.RuntimeCLIFlags.ConfiguredVersion
+	})
 	nodeHealth.LastReported = time.Now()
 	return nodeHealth
 }
