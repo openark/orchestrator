@@ -115,12 +115,12 @@ func (store *Store) Join(addr string) error {
 
 // genericCommand requests consensus for applying a single command.
 // This is an internal orchestrator implementation
-func (store *Store) genericCommand(op string, value []byte) error {
+func (store *Store) genericCommand(op string, b []byte) error {
 	if store.raft.State() != raft.Leader {
 		return fmt.Errorf("not leader")
 	}
 
-	b, err := json.Marshal(&storeCommand{Op: op, Value: value})
+	b, err := json.Marshal(&storeCommand{Op: op, Value: b})
 	if err != nil {
 		return err
 	}

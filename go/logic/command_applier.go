@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 
 	"github.com/github/orchestrator/go/inst"
-	"github.com/github/orchestrator/go/process"
 
 	"github.com/openark/golib/log"
 )
@@ -41,18 +40,15 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) error {
 		return applier.registerNode(value)
 	case "discover":
 		return applier.discover(value)
+	case "forget":
+		return applier.forget(value)
 	}
 	return log.Errorf("Unknown command op: %s", op)
 }
 
 func (applier *CommandApplier) registerNode(value []byte) error {
-	health := process.NodeHealth{}
-	if err := json.Unmarshal(value, &health); err != nil {
-		return log.Errore(err)
-	}
-	log.Debugf("health is %+v", health)
-	_, err := process.WriteRegisterNode(&health)
-	return err
+
+	return nil
 }
 
 func (applier *CommandApplier) discover(value []byte) error {
@@ -61,5 +57,13 @@ func (applier *CommandApplier) discover(value []byte) error {
 		return log.Errore(err)
 	}
 	_, err := inst.ReadTopologyInstance(&instanceKey)
+	return err
+}
+func (applier *CommandApplier) forget(value []byte) error {
+	instanceKey := inst.InstanceKey{}
+	if err := json.Unmarshal(value, &instanceKey); err != nil {
+		return log.Errore(err)
+	}
+	err := inst.ForgetInstance(&instanceKey)
 	return err
 }

@@ -8,6 +8,7 @@
 package orcraft
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -76,8 +77,12 @@ func GetState() raft.RaftState {
 }
 
 // PublishCommand will distribute a command across the group
-func PublishCommand(op string, value []byte) error {
-	return store.genericCommand(op, value)
+func PublishCommand(op string, value interface{}) error {
+	b, err := json.Marshal(value)
+	if err != nil {
+		return err
+	}
+	return store.genericCommand(op, b)
 }
 
 // Monitor is a utility function to routinely observe leadership state.

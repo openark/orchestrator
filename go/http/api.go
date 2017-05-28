@@ -164,15 +164,10 @@ func (this *HttpAPI) Discover(params martini.Params, r render.Render, req *http.
 		return
 	}
 
-	go func() {
-		if orcraft.IsRaftEnabled() {
-			b, err := json.Marshal(instanceKey)
-			if err != nil {
-				return
-			}
-			orcraft.PublishCommand("discover", b)
-		}
-	}()
+	if orcraft.IsRaftEnabled() {
+		go orcraft.PublishCommand("discover", instanceKey)
+	}
+
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance discovered: %+v", instance.Key), Details: instance})
 }
 
@@ -209,6 +204,9 @@ func (this *HttpAPI) Forget(params martini.Params, r render.Render, req *http.Re
 
 	inst.ForgetInstance(rawInstanceKey)
 
+	if orcraft.IsRaftEnabled() {
+		go orcraft.PublishCommand("forget", rawInstanceKey)
+	}
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance forgotten: %+v", *rawInstanceKey)})
 }
 
