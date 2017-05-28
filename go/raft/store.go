@@ -115,8 +115,8 @@ func (store *Store) Join(addr string) error {
 
 // genericCommand requests consensus for applying a single command.
 // This is an internal orchestrator implementation
-func (store *Store) genericCommand(op string, value []byte) error {
-	if store.raft.State() != raft.Leader {
+func (store *Store) genericCommand(op string, value []byte, allowFollower bool) error {
+	if store.raft.State() != raft.Leader && !allowFollower {
 		return fmt.Errorf("not leader")
 	}
 
