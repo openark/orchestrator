@@ -17,6 +17,7 @@
 package process
 
 import (
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -34,6 +35,8 @@ type NodeHealth struct {
 	AppVersion      string
 	FirstSeenActive string
 	LastSeenActive  string
+	ExtraInfo       string
+	Command         string
 
 	LastReported time.Time
 	once         sync.Once
@@ -68,11 +71,23 @@ const (
 
 var continuousRegistrationOnce sync.Once
 
+func RegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
+	if orcraft.IsRaftEnabled() {
+		nodeHealth.LastReported = time.Now()
+		b, err := json.Marshal(nodeHealth)
+		if err != nil {
+			return false, err
+		}
+		return true, orcraft.PublishCommand("register-node", b)
+	}
+	return WriteRegisterNode(nodeHealth)
+}
+
 // HealthTest attempts to write to the backend database and get a result
 func HealthTest() (*HealthStatus, error) {
 	health := HealthStatus{Healthy: false, Hostname: ThisHostname, Token: ProcessToken.Hash}
 
-	healthy, err := RegisterNode(ThisNodeHealth, "", "")
+	healthy, err := RegisterNode(ThisNodeHealth)
 	if err != nil {
 		health.Error = err
 		return &health, log.Errore(err)
@@ -97,9 +112,11 @@ func HealthTest() (*HealthStatus, error) {
 // ContinuousRegistration will continuously update the node_health
 // table showing that the current process is still running.
 func ContinuousRegistration(extraInfo string, command string) {
+	ThisNodeHealth.ExtraInfo = extraInfo
+	ThisNodeHealth.Command = command
 	continuousRegistrationOnce.Do(func() {
 		tickOperation := func() {
-			if _, err := RegisterNode(ThisNodeHealth, extraInfo, command); err != nil {
+			if _, err := RegisterNode(ThisNodeHealth); err != nil {
 				log.Errorf("ContinuousRegistration: RegisterNode failed: %+v", err)
 			}
 		}

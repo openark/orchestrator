@@ -291,7 +291,7 @@ func onDiscoveryTick() {
 
 	if !wasAlreadyElected {
 		// Just turned to be leader!
-		go process.RegisterNode(process.ThisNodeHealth, "", "")
+		go process.RegisterNode(process.ThisNodeHealth)
 	}
 
 	// avoid any logging unless there's something to be done
@@ -330,6 +330,13 @@ func ContinuousDiscovery() {
 
 	go ometrics.InitGraphiteMetrics()
 	go acceptSignals()
+
+	if config.Config.RaftEnabled {
+		if err := orcraft.Setup(NewCommandApplier()); err != nil {
+			log.Fatale(err)
+		}
+		go orcraft.Monitor()
+	}
 
 	if *config.RuntimeCLIFlags.GrabElection {
 		process.GrabElection()

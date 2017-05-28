@@ -26,9 +26,9 @@ func IsRaftEnabled() bool {
 
 // Setup creates the entire raft shananga. Creates the store, associates with the throttler,
 // contacts peer nodes, and subscribes to leader changes to export them.
-func Setup() error {
+func Setup(applier CommandApplier) error {
 	log.Debugf("Setting up raft")
-	store = NewStore(config.Config.RaftDataDir, normalizeRaftNode(config.Config.RaftBind))
+	store = NewStore(config.Config.RaftDataDir, normalizeRaftNode(config.Config.RaftBind), applier)
 	peerNodes := []string{}
 	for _, raftNode := range config.Config.RaftNodes {
 		peerNodes = append(peerNodes, normalizeRaftNode(raftNode))
@@ -73,6 +73,11 @@ func GetLeader() string {
 // GetState returns current raft state
 func GetState() raft.RaftState {
 	return getRaft().State()
+}
+
+// PublishCommand will distribute a command across the group
+func PublishCommand(op string, value []byte) error {
+	return store.genericCommand(op, value)
 }
 
 // Monitor is a utility function to routinely observe leadership state.

@@ -26,7 +26,7 @@ import (
 )
 
 // RegisterNode writes down this node in the node_health table
-func RegisterNode(nodeHealth *NodeHealth, extraInfo string, command string) (healthy bool, err error) {
+func WriteRegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
 	timeNow := time.Now()
 	if nodeHealth == ThisNodeHealth {
 		nodeHealth.LastReported = timeNow
@@ -45,7 +45,7 @@ func RegisterNode(nodeHealth *NodeHealth, extraInfo string, command string) (hea
 			values
 				(?, ?, NOW(), ?, ?, ?)
 			`,
-			nodeHealth.Hostname, nodeHealth.Token, extraInfo, command,
+			nodeHealth.Hostname, nodeHealth.Token, nodeHealth.ExtraInfo, nodeHealth.Command,
 			nodeHealth.AppVersion,
 		)
 	})
@@ -60,7 +60,7 @@ func RegisterNode(nodeHealth *NodeHealth, extraInfo string, command string) (hea
 				and token = ?
 			`,
 			reportedSecondsAgo,
-			extraInfo, extraInfo,
+			nodeHealth.ExtraInfo, nodeHealth.ExtraInfo,
 			nodeHealth.AppVersion,
 			nodeHealth.Hostname, nodeHealth.Token,
 		)
@@ -86,7 +86,7 @@ func RegisterNode(nodeHealth *NodeHealth, extraInfo string, command string) (hea
 			`,
 			nodeHealth.Hostname, nodeHealth.Token,
 			reportedSecondsAgo, reportedSecondsAgo,
-			extraInfo, command,
+			nodeHealth.ExtraInfo, nodeHealth.Command,
 			nodeHealth.AppVersion,
 		)
 		if err != nil {

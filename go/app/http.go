@@ -29,7 +29,6 @@ import (
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/process"
-	"github.com/github/orchestrator/go/raft"
 	"github.com/github/orchestrator/go/ssl"
 
 	"github.com/go-martini/martini"
@@ -129,13 +128,7 @@ func standardHttp(continuousDiscovery bool) {
 		log.Info("Starting Discovery")
 		go logic.ContinuousDiscovery()
 	}
-	if config.Config.RaftEnabled {
-		if err := orcraft.Setup(); err != nil {
-			log.Fatale(err)
-		}
-		go orcraft.Monitor()
 
-	}
 	log.Info("Registering endpoints")
 	http.API.URLPrefix = config.Config.URLPrefix
 	http.Web.URLPrefix = config.Config.URLPrefix

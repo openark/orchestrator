@@ -24,18 +24,21 @@ type Store struct {
 	raftBind string
 
 	raft *raft.Raft // The consensus mechanism
+
+	applier CommandApplier
 }
 
 type storeCommand struct {
-	op    string
-	value []byte
+	Op    string `json:"op,omitempty"`
+	Value []byte `json:"value,omitempty"`
 }
 
 // NewStore inits and returns a new store
-func NewStore(raftDir string, raftBind string) *Store {
+func NewStore(raftDir string, raftBind string, applier CommandApplier) *Store {
 	return &Store{
 		raftDir:  raftDir,
 		raftBind: raftBind,
+		applier:  applier,
 	}
 }
 
@@ -111,12 +114,13 @@ func (store *Store) Join(addr string) error {
 }
 
 // genericCommand requests consensus for applying a single command.
-func (store *Store) ApplyCommand(op string, value []byte) error {
+// This is an internal orchestrator implementation
+func (store *Store) genericCommand(op string, value []byte) error {
 	if store.raft.State() != raft.Leader {
 		return fmt.Errorf("not leader")
 	}
 
-	b, err := json.Marshal(&storeCommand{op: op, value: value})
+	b, err := json.Marshal(&storeCommand{Op: op, Value: value})
 	if err != nil {
 		return err
 	}
@@ -132,11 +136,7 @@ func (store *Store) Apply(l *raft.Log) interface{} {
 		log.Errorf("failed to unmarshal command: %s", err.Error())
 	}
 
-	log.Debugf("orchestrator/raft: applying command: %+v", c)
-	switch c.op {
-	case "register-health":
-	}
-	return log.Errorf("unrecognized command operation: %s", c.op)
+	return store.applier.ApplyCommand(c.Op, c.Value)
 }
 
 // Snapshot returns a snapshot object of freno's state

@@ -19,6 +19,7 @@ package process
 import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
+	"github.com/github/orchestrator/go/raft"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )
@@ -102,6 +103,9 @@ func AttemptElection() (bool, error) {
 
 // GrabElection forcibly grabs leadership. Use with care!!
 func GrabElection() error {
+	if orcraft.IsRaftEnabled() {
+		return nil
+	}
 	_, err := db.ExecOrchestrator(`
 			replace into active_node (
 					anchor, hostname, token, first_seen_active, last_seen_active
