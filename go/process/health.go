@@ -20,11 +20,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/github/orchestrator/go/config"
+
 	"github.com/github/orchestrator/go/raft"
 	"github.com/openark/golib/log"
 )
 
-const registrationPollSeconds = 10
+const registrationPollSeconds = 5
 
 type NodeHealth struct {
 	Hostname        string
@@ -32,7 +34,20 @@ type NodeHealth struct {
 	AppVersion      string
 	FirstSeenActive string
 	LastSeenActive  string
+
+	LastReported time.Time
+	once         sync.Once
 }
+
+func NewNodeHealth() *NodeHealth {
+	return &NodeHealth{
+		Hostname:   ThisHostname,
+		Token:      ProcessToken.Hash,
+		AppVersion: config.RuntimeCLIFlags.ConfiguredVersion,
+	}
+}
+
+var ThisNodeHealth = NewNodeHealth()
 
 type HealthStatus struct {
 	Healthy        bool
@@ -57,7 +72,7 @@ var continuousRegistrationOnce sync.Once
 func HealthTest() (*HealthStatus, error) {
 	health := HealthStatus{Healthy: false, Hostname: ThisHostname, Token: ProcessToken.Hash}
 
-	healthy, err := RegisterNode("", "")
+	healthy, err := RegisterNode(ThisNodeHealth, "", "")
 	if err != nil {
 		health.Error = err
 		return &health, log.Errore(err)
@@ -84,7 +99,7 @@ func HealthTest() (*HealthStatus, error) {
 func ContinuousRegistration(extraInfo string, command string) {
 	continuousRegistrationOnce.Do(func() {
 		tickOperation := func() {
-			if _, err := RegisterNode(extraInfo, command); err != nil {
+			if _, err := RegisterNode(ThisNodeHealth, extraInfo, command); err != nil {
 				log.Errorf("ContinuousRegistration: RegisterNode failed: %+v", err)
 			}
 		}

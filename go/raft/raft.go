@@ -18,8 +18,6 @@ import (
 	"github.com/hashicorp/raft"
 )
 
-const RaftDBFile = "freno-raft.db"
-
 var store *Store
 
 func IsRaftEnabled() bool {

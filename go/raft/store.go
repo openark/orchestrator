@@ -1,7 +1,9 @@
 package orcraft
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strings"
@@ -22,6 +24,11 @@ type Store struct {
 	raftBind string
 
 	raft *raft.Raft // The consensus mechanism
+}
+
+type storeCommand struct {
+	op    string
+	value []byte
 }
 
 // NewStore inits and returns a new store
@@ -82,7 +89,7 @@ func (store *Store) Open(peerNodes []string) error {
 	log.Debugf("raft: logStore=%+v", logStore)
 
 	// Instantiate the Raft systems.
-	if store.raft, err = raft.NewRaft(config, (*fsm)(store), logStore, logStore, snapshots, peerStore, transport); err != nil {
+	if store.raft, err = raft.NewRaft(config, store, logStore, logStore, snapshots, peerStore, transport); err != nil {
 		return fmt.Errorf("error creating new raft: %s", err)
 	}
 	log.Infof("new raft created")
@@ -100,5 +107,46 @@ func (store *Store) Join(addr string) error {
 		return f.Error()
 	}
 	log.Infof("node at %s joined successfully", addr)
+	return nil
+}
+
+// genericCommand requests consensus for applying a single command.
+func (store *Store) ApplyCommand(op string, value []byte) error {
+	if store.raft.State() != raft.Leader {
+		return fmt.Errorf("not leader")
+	}
+
+	b, err := json.Marshal(&storeCommand{op: op, value: value})
+	if err != nil {
+		return err
+	}
+
+	f := store.raft.Apply(b, raftTimeout)
+	return f.Error()
+}
+
+// Apply applies a Raft log entry to the key-value store.
+func (store *Store) Apply(l *raft.Log) interface{} {
+	var c storeCommand
+	if err := json.Unmarshal(l.Data, &c); err != nil {
+		log.Errorf("failed to unmarshal command: %s", err.Error())
+	}
+
+	log.Debugf("orchestrator/raft: applying command: %+v", c)
+	switch c.op {
+	case "register-health":
+	}
+	return log.Errorf("unrecognized command operation: %s", c.op)
+}
+
+// Snapshot returns a snapshot object of freno's state
+func (store *Store) Snapshot() (raft.FSMSnapshot, error) {
+	snapshot := newFsmSnapshot()
+	return snapshot, nil
+}
+
+// Restore restores freno state
+func (store *Store) Restore(rc io.ReadCloser) error {
+	defer rc.Close()
 	return nil
 }

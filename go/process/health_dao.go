@@ -17,7 +17,7 @@
 package process
 
 import (
-	"sync"
+	"time"
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
@@ -25,32 +25,44 @@ import (
 	"github.com/openark/golib/sqlutils"
 )
 
-var registerNodeOnce sync.Once
-
 // RegisterNode writes down this node in the node_health table
-func RegisterNode(extraInfo string, command string) (healthy bool, err error) {
-	registerNodeOnce.Do(func() {
+func RegisterNode(nodeHealth *NodeHealth, extraInfo string, command string) (healthy bool, err error) {
+	timeNow := time.Now()
+	if nodeHealth == ThisNodeHealth {
+		nodeHealth.LastReported = timeNow
+	}
+	reportedAgo := timeNow.Sub(nodeHealth.LastReported)
+	reportedSecondsAgo := int64(reportedAgo.Seconds())
+	if reportedSecondsAgo > registrationPollSeconds*2 {
+		// This entry is too old. No reason to persist it; already expired.
+		return false, nil
+	}
+
+	nodeHealth.once.Do(func() {
 		db.ExecOrchestrator(`
 			insert ignore into node_health_history
 				(hostname, token, first_seen_active, extra_info, command, app_version)
 			values
 				(?, ?, NOW(), ?, ?, ?)
 			`,
-			ThisHostname, ProcessToken.Hash, extraInfo, command,
-			config.RuntimeCLIFlags.ConfiguredVersion,
+			nodeHealth.Hostname, nodeHealth.Token, extraInfo, command,
+			nodeHealth.AppVersion,
 		)
 	})
 	{
 		sqlResult, err := db.ExecOrchestrator(`
 			update node_health set
-				last_seen_active = now(),
+				last_seen_active = now() - interval ? second,
 				extra_info = case when ? != '' then ? else extra_info end,
 				app_version = ?
 			where
 				hostname = ?
 				and token = ?
 			`,
-			extraInfo, extraInfo, config.RuntimeCLIFlags.ConfiguredVersion, ThisHostname, ProcessToken.Hash,
+			reportedSecondsAgo,
+			extraInfo, extraInfo,
+			nodeHealth.AppVersion,
+			nodeHealth.Hostname, nodeHealth.Token,
 		)
 		if err != nil {
 			return false, log.Errore(err)
@@ -67,11 +79,15 @@ func RegisterNode(extraInfo string, command string) (healthy bool, err error) {
 		sqlResult, err := db.ExecOrchestrator(`
 			insert ignore into node_health
 				(hostname, token, first_seen_active, last_seen_active, extra_info, command, app_version)
-			values
-				(?, ?, now(), now(), ?, ?, ?)
+			values (
+				?, ?,
+				now() - interval ? second, now() - interval ? second,
+				?, ?, ?)
 			`,
-			ThisHostname, ProcessToken.Hash, extraInfo, command,
-			config.RuntimeCLIFlags.ConfiguredVersion,
+			nodeHealth.Hostname, nodeHealth.Token,
+			reportedSecondsAgo, reportedSecondsAgo,
+			extraInfo, command,
+			nodeHealth.AppVersion,
 		)
 		if err != nil {
 			return false, log.Errore(err)
