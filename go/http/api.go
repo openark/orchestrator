@@ -40,6 +40,7 @@ import (
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/metrics/query"
 	"github.com/github/orchestrator/go/process"
+	"github.com/github/orchestrator/go/raft"
 )
 
 // APIResponseCode is an OK/ERROR response code
@@ -163,6 +164,15 @@ func (this *HttpAPI) Discover(params martini.Params, r render.Render, req *http.
 		return
 	}
 
+	go func() {
+		if orcraft.IsRaftEnabled() {
+			b, err := json.Marshal(instanceKey)
+			if err != nil {
+				return
+			}
+			orcraft.PublishCommand("discover", b)
+		}
+	}()
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance discovered: %+v", instance.Key), Details: instance})
 }
 
