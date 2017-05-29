@@ -1476,7 +1476,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			err = inst.RegisterCandidateInstance(instanceKey, promotionRule)
+			err = inst.RegisterCandidateInstance(inst.NewCandidateDatabaseInstance(instanceKey, promotionRule))
 			if err != nil {
 				log.Fatale(err)
 			}

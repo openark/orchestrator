@@ -2218,7 +2218,13 @@ func (this *HttpAPI) RegisterCandidate(params martini.Params, r render.Render, r
 		return
 	}
 
-	err = inst.RegisterCandidateInstance(&instanceKey, promotionRule)
+	candidate := inst.NewCandidateDatabaseInstance(&instanceKey, promotionRule)
+
+	if orcraft.IsRaftEnabled() {
+		err = orcraft.PublishCommand("register-candidate", candidate)
+	} else {
+		err = inst.RegisterCandidateInstance(candidate)
+	}
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})

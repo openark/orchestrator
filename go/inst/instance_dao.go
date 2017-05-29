@@ -632,7 +632,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			// We register the rule even if it hasn't changed,
 			// to bump the last_suggested time.
 			instance.PromotionRule = promotionRule
-			err = RegisterCandidateInstance(instanceKey, promotionRule)
+			err = RegisterCandidateInstance(NewCandidateDatabaseInstance(instanceKey, promotionRule))
 			logReadTopologyInstanceError(instanceKey, "RegisterCandidateInstance", err)
 		}
 		latency.Stop("instance")
@@ -2295,7 +2295,7 @@ func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern str
 }
 
 // RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.
-func RegisterCandidateInstance(instanceKey *InstanceKey, promotionRule CandidatePromotionRule) error {
+func RegisterCandidateInstance(candidate *CandidateDatabaseInstance) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
 				insert into candidate_database_instance (
@@ -2309,7 +2309,7 @@ func RegisterCandidateInstance(instanceKey *InstanceKey, promotionRule Candidate
 						port=values(port),
 						last_suggested=now(),
 						promotion_rule=values(promotion_rule)
-				`, instanceKey.Hostname, instanceKey.Port, string(promotionRule),
+				`, candidate.Hostname, candidate.Port, string(candidate.PromotionRule),
 		)
 		if err != nil {
 			return log.Errore(err)

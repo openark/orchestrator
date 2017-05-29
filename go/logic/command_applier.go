@@ -47,6 +47,8 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.beginDowntime(value)
 	case "end-downtime":
 		return applier.endDowntime(value)
+	case "register-candidate":
+		return applier.registerCandidate(value)
 	}
 	return log.Errorf("Unknown command op: %s", op)
 }
@@ -97,5 +99,14 @@ func (applier *CommandApplier) endDowntime(value []byte) interface{} {
 		return log.Errore(err)
 	}
 	_, err := inst.EndDowntime(&instanceKey)
+	return err
+}
+
+func (applier *CommandApplier) registerCandidate(value []byte) interface{} {
+	candidate := inst.CandidateDatabaseInstance{}
+	if err := json.Unmarshal(value, &candidate); err != nil {
+		return log.Errore(err)
+	}
+	err := inst.RegisterCandidateInstance(&candidate)
 	return err
 }

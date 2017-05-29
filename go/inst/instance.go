@@ -27,32 +27,7 @@ import (
 	"github.com/openark/golib/math"
 )
 
-// CandidatePromotionRule describe the promotion preference/rule for an instance.
-// It maps to promotion_rule column in candidate_database_instance
-type CandidatePromotionRule string
-
-const (
-	MustPromoteRule      CandidatePromotionRule = "must"
-	PreferPromoteRule                           = "prefer"
-	NeutralPromoteRule                          = "neutral"
-	PreferNotPromoteRule                        = "prefer_not"
-	MustNotPromoteRule                          = "must_not"
-)
-
 const ReasonableDiscoveryLatency = 500 * time.Millisecond
-
-// ParseCandidatePromotionRule returns a CandidatePromotionRule by name.
-// It returns an error if there is no known rule by the given name.
-func ParseCandidatePromotionRule(ruleName string) (CandidatePromotionRule, error) {
-	switch ruleName {
-	case "prefer", "neutral", "must_not":
-		return CandidatePromotionRule(ruleName), nil
-	case "must", "prefer_not":
-		return CandidatePromotionRule(""), fmt.Errorf("CandidatePromotionRule: %v not supported yet", ruleName)
-	default:
-		return CandidatePromotionRule(""), fmt.Errorf("Invalid CandidatePromotionRule: %v", ruleName)
-	}
-}
 
 // Instance represents a database instance, including its current configuration & status.
 // It presents important replication configuration and detailed replication status.
