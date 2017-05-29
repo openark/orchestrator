@@ -130,7 +130,7 @@ func (store *Store) genericCommand(op string, b []byte) error {
 	if err = f.Error(); err != nil {
 		return err
 	}
-	r := f.Response()
-	log.Debugf("=====response: %+v", r)
+	// optionally read response here, e.g.:
+	// r := f.Response()
 	return nil
 }
