@@ -1466,11 +1466,18 @@ func (this *HttpAPI) DeregisterHostnameUnresolve(params martini.Params, r render
 	if instKey, err := this.getInstanceKey(params["host"], params["port"]); err == nil {
 		instanceKey = &instKey
 	}
-	if err := inst.DeregisterHostnameUnresolve(instanceKey); err != nil {
+
+	var err error
+	registration := inst.NewHostnameRegistration(instanceKey, "")
+	if orcraft.IsRaftEnabled() {
+		err = orcraft.PublishCommand("register-hostname-unresolve", registration)
+	} else {
+		err = inst.RegisterHostnameUnresolve(registration)
+	}
+	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
-
 	r.JSON(200, &APIResponse{Code: OK, Message: "Hostname deregister unresolve completed"})
 }
 
@@ -1485,11 +1492,18 @@ func (this *HttpAPI) RegisterHostnameUnresolve(params martini.Params, r render.R
 	if instKey, err := this.getInstanceKey(params["host"], params["port"]); err == nil {
 		instanceKey = &instKey
 	}
-	if err := inst.RegisterHostnameUnresolve(instanceKey, params["virtualname"]); err != nil {
+	hostname := params["virtualname"]
+	var err error
+	registration := inst.NewHostnameRegistration(instanceKey, hostname)
+	if orcraft.IsRaftEnabled() {
+		err = orcraft.PublishCommand("register-hostname-unresolve", registration)
+	} else {
+		err = inst.RegisterHostnameUnresolve(registration)
+	}
+	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
-
 	r.JSON(200, &APIResponse{Code: OK, Message: "Hostname register unresolve completed"})
 }
 
@@ -2367,10 +2381,10 @@ func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r rende
 		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
+	var err error
 
 	clusterName := params["clusterName"]
 	if params["clusterAlias"] != "" {
-		var err error
 		clusterName, err = inst.GetClusterByAlias(params["clusterAlias"])
 		if err != nil {
 			r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -2387,13 +2401,20 @@ func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r rende
 	if userId == "" {
 		userId = inst.GetMaintenanceOwner()
 	}
-	countAcnowledgedRecoveries, err := logic.AcknowledgeClusterRecoveries(clusterName, userId, comment)
+	var countAcknowledgedRecoveries int64
+	if orcraft.IsRaftEnabled() {
+		ack := logic.NewRecoveryAcknowledgement(userId, comment)
+		ack.ClusterName = clusterName
+		orcraft.PublishCommand("ack-recovery", ack)
+	} else {
+		countAcknowledgedRecoveries, err = logic.AcknowledgeClusterRecoveries(clusterName, userId, comment)
+	}
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(200, countAcnowledgedRecoveries)
+	r.JSON(200, countAcknowledgedRecoveries)
 }
 
 // ClusterInfo provides details of a given cluster
@@ -2418,13 +2439,20 @@ func (this *HttpAPI) AcknowledgeInstanceRecoveries(params martini.Params, r rend
 	if userId == "" {
 		userId = inst.GetMaintenanceOwner()
 	}
-	countAcnowledgedRecoveries, err := logic.AcknowledgeInstanceRecoveries(&instanceKey, userId, comment)
+	var countAcknowledgedRecoveries int64
+	if orcraft.IsRaftEnabled() {
+		ack := logic.NewRecoveryAcknowledgement(userId, comment)
+		ack.Key = instanceKey
+		orcraft.PublishCommand("ack-recovery", ack)
+	} else {
+		countAcknowledgedRecoveries, err = logic.AcknowledgeInstanceRecoveries(&instanceKey, userId, comment)
+	}
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(200, countAcnowledgedRecoveries)
+	r.JSON(200, countAcknowledgedRecoveries)
 }
 
 // ClusterInfo provides details of a given cluster
@@ -2448,13 +2476,13 @@ func (this *HttpAPI) AcknowledgeRecovery(params martini.Params, r render.Render,
 	if userId == "" {
 		userId = inst.GetMaintenanceOwner()
 	}
-	countAcnowledgedRecoveries, err := logic.AcknowledgeRecovery(recoveryId, userId, comment)
+	countAcknowledgedRecoveries, err := logic.AcknowledgeRecovery(recoveryId, userId, comment)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(200, countAcnowledgedRecoveries)
+	r.JSON(200, countAcknowledgedRecoveries)
 }
 
 // BlockedRecoveries reads list of currently blocked recoveries, optionally filtered by cluster name

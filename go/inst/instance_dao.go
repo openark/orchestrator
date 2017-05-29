@@ -1223,8 +1223,8 @@ func ReadLostInRecoveryInstances(clusterName string) ([](*Instance), error) {
 func ReadClusterCandidateInstances(clusterName string) ([](*Instance), error) {
 	condition := `
 			cluster_name = ?
-			and (hostname, port) in (
-				select hostname, port
+			and concat(hostname, ':', port) in (
+				select concat(hostname, ':', port)
 					from candidate_database_instance
 					where promotion_rule in ('must', 'prefer')
 			)

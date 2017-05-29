@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 
 	"github.com/github/orchestrator/go/inst"
-	"github.com/github/orchestrator/go/process"
 
 	"github.com/openark/golib/log"
 )
@@ -49,21 +48,16 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.endDowntime(value)
 	case "register-candidate":
 		return applier.registerCandidate(value)
+	case "ack-recovery":
+		return applier.ackRecovery(value)
+	case "register-hostname-unresolve":
+		return applier.registerHostnameUnresolve(value)
 	}
 	return log.Errorf("Unknown command op: %s", op)
 }
 
 func (applier *CommandApplier) registerNode(value []byte) interface{} {
-	nodeHealth := process.NodeHealth{}
-	if err := json.Unmarshal(value, &nodeHealth); err != nil {
-		return log.Errore(err)
-	}
-	log.Debugf("====== nodeHealth: %+v", nodeHealth)
-	if _, err := process.WriteRegisterNode(&nodeHealth); err != nil {
-		return log.Errore(err)
-	}
-
-	return &nodeHealth
+	return nil
 }
 
 func (applier *CommandApplier) discover(value []byte) interface{} {
@@ -108,5 +102,35 @@ func (applier *CommandApplier) registerCandidate(value []byte) interface{} {
 		return log.Errore(err)
 	}
 	err := inst.RegisterCandidateInstance(&candidate)
+	return err
+}
+
+func (applier *CommandApplier) ackRecovery(value []byte) interface{} {
+	ack := RecoveryAcknowledgement{}
+	err := json.Unmarshal(value, &ack)
+	if err != nil {
+		return log.Errore(err)
+	}
+	if ack.ClusterName != "" {
+		_, err = AcknowledgeClusterRecoveries(ack.ClusterName, ack.Owner, ack.Comment)
+	}
+	if ack.Key.IsValid() {
+		_, err = AcknowledgeInstanceRecoveries(&ack.Key, ack.Owner, ack.Comment)
+	}
+	return err
+}
+
+func (applier *CommandApplier) registerHostnameUnresolve(value []byte) interface{} {
+	ack := RecoveryAcknowledgement{}
+	err := json.Unmarshal(value, &ack)
+	if err != nil {
+		return log.Errore(err)
+	}
+	if ack.ClusterName != "" {
+		_, err = AcknowledgeClusterRecoveries(ack.ClusterName, ack.Owner, ack.Comment)
+	}
+	if ack.Key.IsValid() {
+		_, err = AcknowledgeInstanceRecoveries(&ack.Key, ack.Owner, ack.Comment)
+	}
 	return err
 }

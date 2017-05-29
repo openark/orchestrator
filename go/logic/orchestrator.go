@@ -292,6 +292,7 @@ func onDiscoveryTick() {
 	if !wasAlreadyElected {
 		// Just turned to be leader!
 		go process.RegisterNode(process.ThisNodeHealth)
+		go inst.ExpireMaintenance()
 	}
 
 	// avoid any logging unless there's something to be done

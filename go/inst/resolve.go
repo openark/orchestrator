@@ -47,6 +47,25 @@ func (this HostnameUnresolve) String() string {
 	return fmt.Sprintf("%s %s", this.hostname, this.unresolvedHostname)
 }
 
+type HostnameRegistration struct {
+	Key      InstanceKey
+	Hostname string
+}
+
+func NewHostnameRegistration(instanceKey *InstanceKey, hostname string) *HostnameRegistration {
+	return &HostnameRegistration{
+		Key:      *instanceKey,
+		Hostname: hostname,
+	}
+}
+
+func NewHostnameDeregistration(instanceKey *InstanceKey) *HostnameRegistration {
+	return &HostnameRegistration{
+		Key:      *instanceKey,
+		Hostname: "",
+	}
+}
+
 var hostnameResolvesLightweightCache *cache.Cache
 var hostnameResolvesLightweightCacheInit = &sync.Mutex{}
 var hostnameResolvesLightweightCacheLoadedOnceFromDB bool = false
@@ -242,6 +261,9 @@ func UnresolveHostname(instanceKey *InstanceKey) (InstanceKey, bool, error) {
 	return *unresolvedKey, true, nil
 }
 
-func RegisterHostnameUnresolve(instanceKey *InstanceKey, unresolvedHostname string) (err error) {
-	return WriteHostnameUnresolve(instanceKey, unresolvedHostname)
+func RegisterHostnameUnresolve(registration *HostnameRegistration) (err error) {
+	if registration.Hostname == "" {
+		return DeleteHostnameUnresolve(&registration.Key)
+	}
+	return WriteHostnameUnresolve(&registration.Key, registration.Hostname)
 }

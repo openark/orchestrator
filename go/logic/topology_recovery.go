@@ -36,6 +36,31 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
+type RecoveryAcknowledgement struct {
+	CreatedAt time.Time
+	Owner     string
+	Comment   string
+
+	Key         inst.InstanceKey
+	ClusterName string
+}
+
+func NewRecoveryAcknowledgement(owner string, comment string) *RecoveryAcknowledgement {
+	return &RecoveryAcknowledgement{
+		CreatedAt: time.Now(),
+		Owner:     owner,
+		Comment:   comment,
+	}
+}
+
+func NewInternalAcknowledgement() *RecoveryAcknowledgement {
+	return &RecoveryAcknowledgement{
+		CreatedAt: time.Now(),
+		Owner:     "orchestrator",
+		Comment:   "internal",
+	}
+}
+
 // BlockedTopologyRecovery represents an entry in the blocked_topology_recovery table
 type BlockedTopologyRecovery struct {
 	FailedInstanceKey    inst.InstanceKey

@@ -1485,7 +1485,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("register-hostname-unresolve", "Instance, meta", `Assigns the given instance a virtual (aka "unresolved") name`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			err := inst.RegisterHostnameUnresolve(instanceKey, hostnameFlag)
+			err := inst.RegisterHostnameUnresolve(inst.NewHostnameRegistration(instanceKey, hostnameFlag))
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1494,7 +1494,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("deregister-hostname-unresolve", "Instance, meta", `Explicitly deregister/dosassociate a hostname with an "unresolved" name`):
 		{
 			instanceKey = deduceInstanceKeyIfNeeded(instance, instanceKey, true)
-			err := inst.DeregisterHostnameUnresolve(instanceKey)
+			err := inst.RegisterHostnameUnresolve(inst.NewHostnameDeregistration(instanceKey))
 			if err != nil {
 				log.Fatale(err)
 			}
