@@ -1,5 +1,5 @@
 /*
-   Copyright 2015 Shlomi Noach, courtesy Booking.com
+   Copyright 2017 Shlomi Noach, GitHub Inc.
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -43,6 +43,10 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.discover(value)
 	case "forget":
 		return applier.forget(value)
+	case "begin-downtime":
+		return applier.beginDowntime(value)
+	case "end-downtime":
+		return applier.endDowntime(value)
 	}
 	return log.Errorf("Unknown command op: %s", op)
 }
@@ -65,11 +69,8 @@ func (applier *CommandApplier) discover(value []byte) interface{} {
 	if err := json.Unmarshal(value, &instanceKey); err != nil {
 		return log.Errore(err)
 	}
-	if instance, err := inst.ReadTopologyInstance(&instanceKey); err != nil {
-		return log.Errore(err)
-	} else {
-		return instance
-	}
+	discoverInstance(instanceKey)
+	return nil
 }
 
 func (applier *CommandApplier) forget(value []byte) interface{} {
@@ -78,5 +79,23 @@ func (applier *CommandApplier) forget(value []byte) interface{} {
 		return log.Errore(err)
 	}
 	err := inst.ForgetInstance(&instanceKey)
+	return err
+}
+
+func (applier *CommandApplier) beginDowntime(value []byte) interface{} {
+	downtime := inst.Downtime{}
+	if err := json.Unmarshal(value, &downtime); err != nil {
+		return log.Errore(err)
+	}
+	err := inst.BeginDowntime(&downtime)
+	return err
+}
+
+func (applier *CommandApplier) endDowntime(value []byte) interface{} {
+	instanceKey := inst.InstanceKey{}
+	if err := json.Unmarshal(value, &instanceKey); err != nil {
+		return log.Errore(err)
+	}
+	_, err := inst.EndDowntime(&instanceKey)
 	return err
 }

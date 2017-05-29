@@ -200,10 +200,11 @@ func (this *HttpAPI) Forget(params martini.Params, r render.Render, req *http.Re
 	// We ignore errors: we're looking to do a destructive operation anyhow.
 	rawInstanceKey, _ := inst.NewRawInstanceKey(fmt.Sprintf("%s:%s", params["host"], params["port"]))
 
-	inst.ForgetInstance(rawInstanceKey)
-
-	go orcraft.PublishCommand("forget", rawInstanceKey)
-
+	if orcraft.IsRaftEnabled() {
+		orcraft.PublishCommand("forget", rawInstanceKey)
+	} else {
+		inst.ForgetInstance(rawInstanceKey)
+	}
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance forgotten: %+v", *rawInstanceKey)})
 }
 
@@ -324,8 +325,13 @@ func (this *HttpAPI) BeginDowntime(params martini.Params, r render.Render, req *
 			return
 		}
 	}
-
-	err = inst.BeginDowntime(&instanceKey, params["owner"], params["reason"], uint(durationSeconds))
+	duration := time.Duration(durationSeconds) * time.Second
+	downtime := inst.NewDowntime(&instanceKey, params["owner"], params["reason"], duration)
+	if orcraft.IsRaftEnabled() {
+		err = orcraft.PublishCommand("begin-downtime", downtime)
+	} else {
+		err = inst.BeginDowntime(downtime)
+	}
 
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error(), Details: instanceKey})
@@ -347,7 +353,11 @@ func (this *HttpAPI) EndDowntime(params martini.Params, r render.Render, req *ht
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	_, err = inst.EndDowntime(&instanceKey)
+	if orcraft.IsRaftEnabled() {
+		err = orcraft.PublishCommand("end-downtime", instanceKey)
+	} else {
+		_, err = inst.EndDowntime(&instanceKey)
+	}
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return

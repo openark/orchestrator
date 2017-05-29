@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/github/orchestrator/go/agent"
 	"github.com/github/orchestrator/go/config"
@@ -1348,7 +1349,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 					log.Fatalf("Duration value must be non-negative. Given value: %d", durationSeconds)
 				}
 			}
-			err := inst.BeginDowntime(instanceKey, inst.GetMaintenanceOwner(), reason, uint(durationSeconds))
+			duration := time.Duration(durationSeconds) * time.Second
+			err := inst.BeginDowntime(inst.NewDowntime(instanceKey, inst.GetMaintenanceOwner(), reason, duration))
 			if err == nil {
 				log.Infof("Downtime duration: %d seconds", durationSeconds)
 			} else {
