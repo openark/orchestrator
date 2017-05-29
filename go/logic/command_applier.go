@@ -121,16 +121,10 @@ func (applier *CommandApplier) ackRecovery(value []byte) interface{} {
 }
 
 func (applier *CommandApplier) registerHostnameUnresolve(value []byte) interface{} {
-	ack := RecoveryAcknowledgement{}
-	err := json.Unmarshal(value, &ack)
-	if err != nil {
+	registration := inst.HostnameRegistration{}
+	if err := json.Unmarshal(value, &registration); err != nil {
 		return log.Errore(err)
 	}
-	if ack.ClusterName != "" {
-		_, err = AcknowledgeClusterRecoveries(ack.ClusterName, ack.Owner, ack.Comment)
-	}
-	if ack.Key.IsValid() {
-		_, err = AcknowledgeInstanceRecoveries(&ack.Key, ack.Owner, ack.Comment)
-	}
+	err := inst.RegisterHostnameUnresolve(&registration)
 	return err
 }
