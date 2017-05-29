@@ -35,7 +35,7 @@ func WriteRegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
 		return false, nil
 	}
 
-	nodeHealth.once.Do(func() {
+	nodeHealth.onceHistory.Do(func() {
 		db.ExecOrchestrator(`
 			insert ignore into node_health_history
 				(hostname, token, first_seen_active, extra_info, command, app_version)
@@ -72,6 +72,7 @@ func WriteRegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
 			return true, nil
 		}
 	}
+	// Got here? The UPDATE didn't work. Row isn't there.
 	{
 		sqlResult, err := db.ExecOrchestrator(`
 			insert ignore into node_health

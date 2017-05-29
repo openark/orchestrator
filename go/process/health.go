@@ -38,7 +38,7 @@ type NodeHealth struct {
 	Command         string
 
 	LastReported time.Time
-	once         sync.Once
+	onceHistory  sync.Once
 	onceUpdate   sync.Once
 }
 
@@ -83,12 +83,6 @@ var continuousRegistrationOnce sync.Once
 
 func RegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
 	nodeHealth.Update()
-	if orcraft.IsRaftEnabled() {
-		if orcraft.IsLeader() {
-			err := orcraft.PublishCommand("register-node", nodeHealth)
-			return err == nil, err
-		}
-	}
 	return WriteRegisterNode(nodeHealth)
 }
 
