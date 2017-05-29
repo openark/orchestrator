@@ -79,6 +79,7 @@ func (store *Store) Open(peerNodes []string) error {
 		config.EnableSingleNode = true
 		config.DisableBootstrapAfterElect = false
 	}
+	config.SnapshotThreshold = 8
 
 	// Create the snapshot store. This allows the Raft to truncate the log.
 	snapshots, err := raft.NewFileSnapshotStore(store.raftDir, retainSnapshotCount, os.Stderr)
