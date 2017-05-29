@@ -48,21 +48,24 @@ func (this HostnameUnresolve) String() string {
 }
 
 type HostnameRegistration struct {
-	Key      InstanceKey
-	Hostname string
+	CreatedAt time.Time
+	Key       InstanceKey
+	Hostname  string
 }
 
 func NewHostnameRegistration(instanceKey *InstanceKey, hostname string) *HostnameRegistration {
 	return &HostnameRegistration{
-		Key:      *instanceKey,
-		Hostname: hostname,
+		CreatedAt: time.Now(),
+		Key:       *instanceKey,
+		Hostname:  hostname,
 	}
 }
 
 func NewHostnameDeregistration(instanceKey *InstanceKey) *HostnameRegistration {
 	return &HostnameRegistration{
-		Key:      *instanceKey,
-		Hostname: "",
+		CreatedAt: time.Now(),
+		Key:       *instanceKey,
+		Hostname:  "",
 	}
 }
 
@@ -264,6 +267,10 @@ func UnresolveHostname(instanceKey *InstanceKey) (InstanceKey, bool, error) {
 func RegisterHostnameUnresolve(registration *HostnameRegistration) (err error) {
 	if registration.Hostname == "" {
 		return DeleteHostnameUnresolve(&registration.Key)
+	}
+	if registration.CreatedAt.Add(time.Duration(config.Config.ExpiryHostnameResolvesMinutes) * time.Minute).Before(time.Now()) {
+		// already expired.
+		return nil
 	}
 	return WriteHostnameUnresolve(&registration.Key, registration.Hostname)
 }
