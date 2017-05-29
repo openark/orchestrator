@@ -1516,7 +1516,13 @@ func (this *HttpAPI) SubmitPoolInstances(params martini.Params, r render.Render,
 	pool := params["pool"]
 	instances := req.URL.Query().Get("instances")
 
-	err := inst.ApplyPoolInstances(pool, instances)
+	var err error
+	submission := inst.NewPoolInstancesSubmission(pool, instances)
+	if orcraft.IsRaftEnabled() {
+		err = orcraft.PublishCommand("submit-pool-instances", submission)
+	} else {
+		err = inst.ApplyPoolInstances(submission)
+	}
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return

@@ -1040,7 +1040,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if pool == "" {
 				log.Fatal("Please submit --pool")
 			}
-			err := inst.ApplyPoolInstances(pool, instance)
+			err := inst.ApplyPoolInstances(inst.NewPoolInstancesSubmission(pool, instance))
 			if err != nil {
 				log.Fatale(err)
 			}

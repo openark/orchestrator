@@ -52,6 +52,8 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.ackRecovery(value)
 	case "register-hostname-unresolve":
 		return applier.registerHostnameUnresolve(value)
+	case "submit-pool-instances":
+		return applier.submitPoolInstances(value)
 	}
 	return log.Errorf("Unknown command op: %s", op)
 }
@@ -126,5 +128,13 @@ func (applier *CommandApplier) registerHostnameUnresolve(value []byte) interface
 		return log.Errore(err)
 	}
 	err := inst.RegisterHostnameUnresolve(&registration)
+	return err
+}
+func (applier *CommandApplier) submitPoolInstances(value []byte) interface{} {
+	submission := inst.PoolInstancesSubmission{}
+	if err := json.Unmarshal(value, &submission); err != nil {
+		return log.Errore(err)
+	}
+	err := inst.ApplyPoolInstances(&submission)
 	return err
 }
