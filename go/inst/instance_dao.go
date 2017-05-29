@@ -343,21 +343,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			}()
 		}
 
-		if instance.LogBinEnabled {
-			waitGroup.Add(1)
-			go func() {
-				defer waitGroup.Done()
-				latency.Start("instance")
-				err = sqlutils.QueryRowsMap(db, "show master status", func(m sqlutils.RowMap) error {
-					var err error
-					instance.SelfBinlogCoordinates.LogFile = m.GetString("File")
-					instance.SelfBinlogCoordinates.LogPos = m.GetInt64("Position")
-					return err
-				})
-				latency.Stop("instance")
-			}()
-		}
-
 		instance.UsingPseudoGTID = false
 		if config.Config.DetectPseudoGTIDQuery != "" {
 			waitGroup.Add(1)
@@ -418,6 +403,21 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			resolvedHostname = mysqlReportHost
 		default:
 			resolvedHostname = instance.Key.Hostname
+		}
+
+		if instance.LogBinEnabled {
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				latency.Start("instance")
+				err = sqlutils.QueryRowsMap(db, "show master status", func(m sqlutils.RowMap) error {
+					var err error
+					instance.SelfBinlogCoordinates.LogFile = m.GetString("File")
+					instance.SelfBinlogCoordinates.LogPos = m.GetInt64("Position")
+					return err
+				})
+				latency.Stop("instance")
+			}()
 		}
 
 		if (instance.IsOracleMySQL() || instance.IsPercona()) && !instance.IsSmallerMajorVersionByString("5.6") {
