@@ -17,6 +17,8 @@
 package orcraft
 
 import (
+	"github.com/openark/golib/log"
+
 	"github.com/hashicorp/raft"
 )
 
@@ -30,9 +32,11 @@ func newFsmSnapshot() *fsmSnapshot {
 
 // Persist
 func (f *fsmSnapshot) Persist(sink raft.SnapshotSink) error {
+	log.Debugf("fsmSnapshot.Persist()")
 	return sink.Close()
 }
 
 // Release
 func (f *fsmSnapshot) Release() {
+	log.Debugf("fsmSnapshot.Release()")
 }
