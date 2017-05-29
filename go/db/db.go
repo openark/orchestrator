@@ -1534,6 +1534,15 @@ func execInternal(db *sql.DB, query string, args ...interface{}) (sql.Result, er
 	return res, err
 }
 
+// PrepareTransaction is a convenience method for preparing a transaction while manipulating dialect
+func PrepareTransaction(tx *sql.Tx, query string) (stmt *sql.Stmt, err error) {
+	query, err = translateStatement(query)
+	if err != nil {
+		return stmt, err
+	}
+	return tx.Prepare(query)
+}
+
 // ExecOrchestrator will execute given query on the orchestrator backend database.
 func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
 	var err error
