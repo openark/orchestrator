@@ -638,7 +638,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		go func() {
 			defer waitGroup.Done()
 			var value string
-			latency.Start("instance")
 			err := db.QueryRow(config.Config.DetectPromotionRuleQuery).Scan(&value)
 			logReadTopologyInstanceError(instanceKey, "DetectPromotionRuleQuery", err)
 			promotionRule, err := ParseCandidatePromotionRule(value)
@@ -651,7 +650,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				err = RegisterCandidateInstance(instanceKey, promotionRule)
 				logReadTopologyInstanceError(instanceKey, "RegisterCandidateInstance", err)
 			}
-			latency.Stop("instance")
 		}()
 	}
 
@@ -659,9 +657,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	if instance.SuggestedClusterAlias == "" && instance.ReplicationDepth == 0 && config.Config.DetectClusterAliasQuery != "" && !isMaxScale {
 		// Only need to do on masters
 		clusterAlias := ""
-		latency.Start("instance")
 		err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
-		latency.Stop("instance")
 		if err != nil {
 			clusterAlias = ""
 			logReadTopologyInstanceError(instanceKey, "DetectClusterAliasQuery", err)
