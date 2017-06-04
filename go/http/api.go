@@ -2066,6 +2066,15 @@ func (this *HttpAPI) LBCheck(params martini.Params, r render.Render, req *http.R
 	r.JSON(200, "OK")
 }
 
+// LBCheck returns a constant respnse, and this can be used by load balancers that expect a given string.
+func (this *HttpAPI) LeaderCheck(params martini.Params, r render.Render, req *http.Request) {
+	if logic.IsLeader() {
+		r.JSON(200, "OK")
+	} else {
+		r.JSON(http.StatusNotFound, "Not leader")
+	}
+}
+
 // A configurable endpoint that can be for regular status checks or whatever.  While similar to
 // Health() this returns 500 on failure.  This will prevent issues for those that have come to
 // expect a 200
@@ -2604,6 +2613,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "headers", this.Headers)
 	this.registerRequest(m, "health", this.Health)
 	this.registerRequest(m, "lb-check", this.LBCheck)
+	this.registerRequest(m, "_ping", this.LBCheck)
+	this.registerRequest(m, "leader-check", this.LeaderCheck)
 	this.registerRequest(m, "grab-election", this.GrabElection)
 	this.registerRequest(m, "reelect", this.Reelect)
 	this.registerRequest(m, "reload-configuration", this.ReloadConfiguration)

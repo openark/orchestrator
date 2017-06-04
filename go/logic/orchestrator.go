@@ -73,6 +73,10 @@ func init() {
 	ometrics.OnGraphiteTick(func() { isElectedGauge.Update(int64(atomic.LoadInt64(&isElectedNode))) })
 }
 
+func IsLeader() bool {
+	return atomic.LoadInt64(&isElectedNode) == 1
+}
+
 // used in several places
 func instancePollSecondsDuration() time.Duration {
 	return time.Duration(config.Config.InstancePollSeconds) * time.Second
