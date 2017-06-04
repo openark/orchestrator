@@ -395,8 +395,6 @@ func ContinuousDiscovery() {
 					go ExpireBlockedRecoveries()
 					go AcknowledgeCrashedRecoveries()
 					go inst.ExpireInstanceAnalysisChangelog()
-				}
-				if IsLeader() {
 					go CheckAndRecover(nil, nil, false)
 				}
 			}()

@@ -30,6 +30,7 @@ import (
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/os"
 	"github.com/github/orchestrator/go/process"
+	"github.com/github/orchestrator/go/raft"
 	"github.com/github/orchestrator/go/remote"
 	"github.com/openark/golib/log"
 	"github.com/patrickmn/go-cache"
@@ -1221,17 +1222,17 @@ func emergentlyReadTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analy
 
 // checkAndExecuteFailureDetectionProcesses tries to register for failure detection and potentially executes
 // failure-detection processes.
-func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (processesExecutionAttempted bool, err error) {
+func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (detectionRegistrationSuccess bool, processesExecutionAttempted bool, err error) {
 	if ok, _ := AttemptFailureDetectionRegistration(&analysisEntry); !ok {
-		return false, nil
+		return false, false, nil
 	}
 	log.Infof("topology_recovery: detected %+v failure on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
 	// Execute on-detection processes
 	if skipProcesses {
-		return false, nil
+		return true, false, nil
 	}
 	err = executeProcesses(config.Config.OnFailureDetectionProcesses, "OnFailureDetectionProcesses", NewTopologyRecovery(analysisEntry), true)
-	return true, err
+	return true, true, err
 }
 
 // executeCheckAndRecoverFunction will choose the correct check & recovery function based on analysis.
@@ -1297,7 +1298,13 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	// At this point we have validated there's a failure scenario for which we have a recovery path.
 
 	// Initiate detection:
-	if _, err := checkAndExecuteFailureDetectionProcesses(analysisEntry, skipProcesses); err != nil {
+	registrationSuccess, _, err := checkAndExecuteFailureDetectionProcesses(analysisEntry, skipProcesses)
+	if registrationSuccess {
+		if orcraft.IsRaftEnabled() {
+			orcraft.PublishCommand("register-failure-detection", analysisEntry)
+		}
+	}
+	if err != nil {
 		return false, nil, err
 	}
 	// We don't mind whether detection really executed the processes or not
@@ -1314,6 +1321,16 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 			"skipProcesses: %v: NOT Recovering host (disabled globally)",
 			analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, candidateInstanceKey, skipProcesses)
 		return false, nil, err
+	}
+
+	if orcraft.IsRaftEnabled() {
+		// with raft, all nodes can run detection; but only the leader proceeds to failover.
+		if !orcraft.IsLeader() {
+			log.Infof("CheckAndRecover: Analysis: %+v, InstanceKey: %+v, candidateInstanceKey: %+v, "+
+				"skipProcesses: %v: NOT Recovering host (raft non-leader)",
+				analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, candidateInstanceKey, skipProcesses)
+			return false, nil, err
+		}
 	}
 
 	// Actually attempt recovery:
