@@ -444,8 +444,11 @@ func (this *Configuration) postReadAdjustments() error {
 		if this.ReplicationLagQuery != "" && this.SlaveLagQuery != "" && this.ReplicationLagQuery != this.SlaveLagQuery {
 			return fmt.Errorf("config's ReplicationLagQuery and SlaveLagQuery are synonyms and cannot both be defined")
 		}
+		// Make sure both are turned identical:
 		if this.SlaveLagQuery != "" {
 			this.ReplicationLagQuery = this.SlaveLagQuery
+		} else {
+			this.SlaveLagQuery = this.ReplicationLagQuery
 		}
 	}
 
