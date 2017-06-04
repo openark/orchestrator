@@ -147,6 +147,6 @@ func (applier *CommandApplier) registerFailureDetection(value []byte) interface{
 	if err := json.Unmarshal(value, &analysisEntry); err != nil {
 		return log.Errore(err)
 	}
-	ok, err := AttemptFailureDetectionRegistration(&analysisEntry)
-	return nil
+	_, err := AttemptFailureDetectionRegistration(&analysisEntry)
+	return err
 }

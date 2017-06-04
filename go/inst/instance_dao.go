@@ -677,8 +677,8 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				// We register the rule even if it hasn't changed,
 				// to bump the last_suggested time.
 				instance.PromotionRule = promotionRule
-				err = RegisterCandidateInstance(instanceKey, promotionRule)
-				logReadTopologyInstanceError(NewCandidateDatabaseInstance(instanceKey, "RegisterCandidateInstance", err))
+				err = RegisterCandidateInstance(NewCandidateDatabaseInstance(instanceKey, promotionRule))
+				logReadTopologyInstanceError(instanceKey, "RegisterCandidateInstance", err)
 			}
 			latency.Stop("instance")
 		}()
