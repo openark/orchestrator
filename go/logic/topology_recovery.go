@@ -129,6 +129,13 @@ type TopologyRecoveryStep struct {
 	Message     string
 }
 
+func NewTopologyRecoveryStep(uid string, message string) *TopologyRecoveryStep {
+	return &TopologyRecoveryStep{
+		RecoveryUID: uid,
+		Message:     message,
+	}
+}
+
 type MasterRecoveryType string
 
 const (
@@ -188,6 +195,20 @@ func initializeTopologyRecoveryPostConfiguration() {
 	<-config.ConfigurationLoaded
 
 	emergencyReadTopologyInstanceMap = cache.New(time.Second, time.Second)
+}
+
+// AuditTopologyRecovery audits a single step in a topology recovery process.
+func AuditTopologyRecovery(topologyRecovery *TopologyRecovery, message string) error {
+	log.Infof("topology_recovery: %s", message)
+	if topologyRecovery == nil {
+		return nil
+	}
+
+	recoveryStep := NewTopologyRecoveryStep(topologyRecovery.UID, message)
+	if orcraft.IsRaftEnabled() {
+		return orcraft.PublishCommand("write-recovery-step", recoveryStep)
+	}
+	return writeTopologyRecoveryStep(recoveryStep)
 }
 
 // replaceCommandPlaceholders replaces agreed-upon placeholders with analysis data

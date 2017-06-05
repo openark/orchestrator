@@ -706,18 +706,14 @@ func ReadBlockedRecoveries(clusterName string) ([]BlockedTopologyRecovery, error
 	return res, log.Errore(err)
 }
 
-// AuditTopologyRecovery audits a single step in a topology recovery process.
-func AuditTopologyRecovery(topologyRecovery *TopologyRecovery, message string) error {
-	log.Infof("topology_recovery: %s", message)
-	if topologyRecovery == nil {
-		return nil
-	}
+// writeTopologyRecoveryStep writes down a single step in a recovery process
+func writeTopologyRecoveryStep(topologyRecoveryStep *TopologyRecoveryStep) error {
 	_, err := db.ExecOrchestrator(`
 			insert
 				into topology_recovery_steps (
 					recovery_uid, audit_at, message
 				) values (?, now(), ?)
-			`, topologyRecovery.UID, message,
+			`, topologyRecoveryStep.RecoveryUID, topologyRecoveryStep.Message,
 	)
 	return log.Errore(err)
 }

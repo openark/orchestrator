@@ -56,6 +56,8 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.submitPoolInstances(value)
 	case "register-failure-detection":
 		return applier.registerFailureDetection(value)
+	case "write-recovery-step":
+		return applier.writeRecoveryStep(value)
 	}
 	return log.Errorf("Unknown command op: %s", op)
 }
@@ -148,5 +150,14 @@ func (applier *CommandApplier) registerFailureDetection(value []byte) interface{
 		return log.Errore(err)
 	}
 	_, err := AttemptFailureDetectionRegistration(&analysisEntry)
+	return err
+}
+
+func (applier *CommandApplier) writeRecoveryStep(value []byte) interface{} {
+	topologyRecoveryStep := TopologyRecoveryStep{}
+	if err := json.Unmarshal(value, &topologyRecoveryStep); err != nil {
+		return log.Errore(err)
+	}
+	err := writeTopologyRecoveryStep(&topologyRecoveryStep)
 	return err
 }
