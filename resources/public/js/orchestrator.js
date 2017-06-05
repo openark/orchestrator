@@ -82,6 +82,10 @@ function isAnonymized() {
   return ($.cookie("anonymize") == "true");
 }
 
+function isCompactDisplay() {
+  return ($.cookie("compact-display") == "true");
+}
+
 function anonymizeInstanceId(instanceId) {
   var tokens = instanceId.split("__");
   return "instance-" + md5(tokens[1]).substring(0, 4) + ":" + tokens[2];
