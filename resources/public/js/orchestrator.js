@@ -83,7 +83,7 @@ function isAnonymized() {
 }
 
 function isCompactDisplay() {
-	return ($.cookie("compact-display") == "true");
+  return ($.cookie("compact-display") == "true");
 }
 
 function anonymizeInstanceId(instanceId) {
