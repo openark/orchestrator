@@ -29,7 +29,7 @@ import (
 )
 
 // AttemptFailureDetectionRegistration tries to add a failure-detection entry; if this fails that means the problem has already been detected
-func AttemptFailureDetectionRegistration(analysisEntry *inst.ReplicationAnalysis) (bool, error) {
+func AttemptFailureDetectionRegistration(analysisEntry *inst.ReplicationAnalysis) (registrationSuccessful bool, err error) {
 	sqlResult, err := db.ExecOrchestrator(`
 			insert ignore
 				into topology_failure_detection (
@@ -66,7 +66,10 @@ func AttemptFailureDetectionRegistration(analysisEntry *inst.ReplicationAnalysis
 		return false, log.Errore(err)
 	}
 	rows, err := sqlResult.RowsAffected()
-	return (err == nil && rows > 0), err
+	if err != nil {
+		return false, log.Errore(err)
+	}
+	return (rows > 0), nil
 }
 
 // ClearActiveFailureDetections clears the "in_active_period" flag for old-enough detections, thereby allowing for
