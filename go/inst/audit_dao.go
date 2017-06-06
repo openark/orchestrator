@@ -95,7 +95,7 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 			syslogWriter.Info(logMessage)
 		}()
 	}
-	log.Debugf(logMessage)
+	log.Infof(logMessage)
 	auditOperationCounter.Inc(1)
 
 	return err
