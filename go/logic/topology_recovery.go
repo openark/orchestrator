@@ -1364,8 +1364,6 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 			}
 		} else {
 			analysisEntry := analysisEntry
-			candidateInstanceKey := candidateInstanceKey
-			skipProcesses := skipProcesses
 			go func() {
 				_, _, err := executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, false, skipProcesses)
 				log.Errore(err)
