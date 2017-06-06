@@ -1197,6 +1197,7 @@ func emergentlyReadTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analy
 // failure-detection processes.
 func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (processesExecutionAttempted bool, err error) {
 	if ok, _ := AttemptFailureDetectionRegistration(&analysisEntry); !ok {
+		log.Debugf("executeCheckAndRecoverFunction: could not register %+v detection on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
 		return false, nil
 	}
 	log.Infof("topology_recovery: detected %+v failure on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
@@ -1213,27 +1214,36 @@ func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnal
 func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
 	var checkAndRecoverFunction func(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) = nil
 
+	isRecoverableFailure := false
 	switch analysisEntry.Analysis {
 	case inst.DeadMaster:
 		checkAndRecoverFunction = checkAndRecoverDeadMaster
+		isRecoverableFailure = true
 	case inst.DeadMasterAndSomeSlaves:
 		checkAndRecoverFunction = checkAndRecoverDeadMaster
+		isRecoverableFailure = true
 	case inst.DeadIntermediateMaster:
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
+		isRecoverableFailure = true
 	case inst.DeadIntermediateMasterAndSomeSlaves:
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
+		isRecoverableFailure = true
 	case inst.DeadIntermediateMasterWithSingleSlaveFailingToConnect:
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
+		isRecoverableFailure = true
 	case inst.DeadIntermediateMasterAndSlaves:
 		checkAndRecoverFunction = checkAndRecoverGenericProblem
 	case inst.AllIntermediateMasterSlavesFailingToConnectOrDead:
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
+		isRecoverableFailure = true
 	case inst.AllIntermediateMasterSlavesNotReplicating:
 		checkAndRecoverFunction = nil
 	case inst.DeadCoMaster:
 		checkAndRecoverFunction = checkAndRecoverDeadCoMaster
+		isRecoverableFailure = true
 	case inst.DeadCoMasterAndSomeSlaves:
 		checkAndRecoverFunction = checkAndRecoverDeadCoMaster
+		isRecoverableFailure = true
 	case inst.DeadMasterAndSlaves:
 		checkAndRecoverFunction = checkAndRecoverGenericProblem
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
@@ -1259,14 +1269,14 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	if checkAndRecoverFunction == nil {
 		// Unhandled problem type
 		if analysisEntry.Analysis != inst.NoProblem {
-			log.Warningf("executeCheckAndRecoverFunction: Ignoring unhandled analysisEntry: %+v; key: %+v",
+			log.Warningf("executeCheckAndRecoverFunction: ignoring analysisEntry that has no action plan: %+v; key: %+v",
 				analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
 		}
 
 		return false, nil, nil
 	}
 	// we have a recovery function; its execution still depends on filters if not disabled.
-	log.Debugf("executeCheckAndRecoverFunction: proceeeding with %+v; skipProcesses: %+v", analysisEntry.AnalyzedInstanceKey, skipProcesses)
+	log.Debugf("executeCheckAndRecoverFunction: proceeeding with %+v on %+v; isRecoverable?: %+v; skipProcesses: %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, isRecoverableFailure, skipProcesses)
 
 	// At this point we have validated there's a failure scenario for which we have a recovery path.
 
