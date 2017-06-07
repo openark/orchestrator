@@ -1195,8 +1195,8 @@ func emergentlyReadTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analy
 
 // checkAndExecuteFailureDetectionProcesses tries to register for failure detection and potentially executes
 // failure-detection processes.
-func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (processesExecutionAttempted bool, err error) {
-	if ok, _ := AttemptFailureDetectionRegistration(&analysisEntry); !ok {
+func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, isActionableRecovery bool, skipProcesses bool) (processesExecutionAttempted bool, err error) {
+	if ok, _ := AttemptFailureDetectionRegistration(&analysisEntry, isActionableRecovery); !ok {
 		log.Infof("executeCheckAndRecoverFunction: could not register %+v detection on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
 		return false, nil
 	}
@@ -1214,36 +1214,36 @@ func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnal
 func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
 	var checkAndRecoverFunction func(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) = nil
 
-	isRecoverableFailure := false
+	isActionableRecovery := false
 	switch analysisEntry.Analysis {
 	case inst.DeadMaster:
 		checkAndRecoverFunction = checkAndRecoverDeadMaster
-		isRecoverableFailure = true
+		isActionableRecovery = true
 	case inst.DeadMasterAndSomeSlaves:
 		checkAndRecoverFunction = checkAndRecoverDeadMaster
-		isRecoverableFailure = true
+		isActionableRecovery = true
 	case inst.DeadIntermediateMaster:
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
-		isRecoverableFailure = true
+		isActionableRecovery = true
 	case inst.DeadIntermediateMasterAndSomeSlaves:
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
-		isRecoverableFailure = true
+		isActionableRecovery = true
 	case inst.DeadIntermediateMasterWithSingleSlaveFailingToConnect:
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
-		isRecoverableFailure = true
+		isActionableRecovery = true
 	case inst.DeadIntermediateMasterAndSlaves:
 		checkAndRecoverFunction = checkAndRecoverGenericProblem
 	case inst.AllIntermediateMasterSlavesFailingToConnectOrDead:
 		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
-		isRecoverableFailure = true
+		isActionableRecovery = true
 	case inst.AllIntermediateMasterSlavesNotReplicating:
 		checkAndRecoverFunction = nil
 	case inst.DeadCoMaster:
 		checkAndRecoverFunction = checkAndRecoverDeadCoMaster
-		isRecoverableFailure = true
+		isActionableRecovery = true
 	case inst.DeadCoMasterAndSomeSlaves:
 		checkAndRecoverFunction = checkAndRecoverDeadCoMaster
-		isRecoverableFailure = true
+		isActionableRecovery = true
 	case inst.DeadMasterAndSlaves:
 		checkAndRecoverFunction = checkAndRecoverGenericProblem
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
@@ -1276,18 +1276,18 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 		return false, nil, nil
 	}
 	// we have a recovery function; its execution still depends on filters if not disabled.
-	log.Infof("executeCheckAndRecoverFunction: proceeding with %+v detection on %+v; isRecoverable?: %+v; skipProcesses: %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, isRecoverableFailure, skipProcesses)
+	log.Infof("executeCheckAndRecoverFunction: proceeding with %+v detection on %+v; isActionable?: %+v; skipProcesses: %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, isActionableRecovery, skipProcesses)
 
 	// At this point we have validated there's a failure scenario for which we have a recovery path.
 
 	// Initiate detection:
-	if _, err := checkAndExecuteFailureDetectionProcesses(analysisEntry, skipProcesses); err != nil {
+	if _, err := checkAndExecuteFailureDetectionProcesses(analysisEntry, isActionableRecovery, skipProcesses); err != nil {
 		log.Errorf("executeCheckAndRecoverFunction: error on failure detection: %+v", err)
 		return false, nil, err
 	}
 	// We don't mind whether detection really executed the processes or not
 	// (it may have been silenced due to previous detection). We only care there's no error.
-	log.Infof("executeCheckAndRecoverFunction: proceeding with %+v recovery on %+v; isRecoverable?: %+v; skipProcesses: %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, isRecoverableFailure, skipProcesses)
+	log.Infof("executeCheckAndRecoverFunction: proceeding with %+v recovery on %+v; isRecoverable?: %+v; skipProcesses: %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, isActionableRecovery, skipProcesses)
 
 	// We're about to embark on recovery shortly...
 

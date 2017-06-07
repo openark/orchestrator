@@ -29,7 +29,7 @@ import (
 )
 
 // AttemptFailureDetectionRegistration tries to add a failure-detection entry; if this fails that means the problem has already been detected
-func AttemptFailureDetectionRegistration(analysisEntry *inst.ReplicationAnalysis) (registrationSuccessful bool, err error) {
+func AttemptFailureDetectionRegistration(analysisEntry *inst.ReplicationAnalysis, isActionableRecovery bool) (registrationSuccessful bool, err error) {
 	sqlResult, err := db.ExecOrchestrator(`
 			insert ignore
 				into topology_failure_detection (
@@ -44,7 +44,8 @@ func AttemptFailureDetectionRegistration(analysisEntry *inst.ReplicationAnalysis
 					cluster_name,
 					cluster_alias,
 					count_affected_slaves,
-					slave_hosts
+					slave_hosts,
+					is_actionable
 				) values (
 					?,
 					?,
@@ -57,10 +58,11 @@ func AttemptFailureDetectionRegistration(analysisEntry *inst.ReplicationAnalysis
 					?,
 					?,
 					?,
+					?,
 					?
 				)
 			`, analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port, process.ThisHostname, process.ProcessToken.Hash,
-		string(analysisEntry.Analysis), analysisEntry.ClusterDetails.ClusterName, analysisEntry.ClusterDetails.ClusterAlias, analysisEntry.CountReplicas, analysisEntry.SlaveHosts.ToCommaDelimitedList(),
+		string(analysisEntry.Analysis), analysisEntry.ClusterDetails.ClusterName, analysisEntry.ClusterDetails.ClusterAlias, analysisEntry.CountReplicas, analysisEntry.SlaveHosts.ToCommaDelimitedList(), isActionableRecovery,
 	)
 	if err != nil {
 		return false, log.Errore(err)
