@@ -19,6 +19,7 @@ package logic
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	goos "os"
 	"sort"
 	"strings"
@@ -1342,7 +1343,9 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 		log.Infof("--noop provided; will not execute processes")
 		skipProcesses = true
 	}
-	for _, analysisEntry := range replicationAnalysis {
+	// intentionally iterating entries in random order
+	for i := range rand.Perm(len(replicationAnalysis)) {
+		analysisEntry := replicationAnalysis[i]
 		if specificInstance != nil {
 			// We are looking for a specific instance; if this is not the one, skip!
 			if !specificInstance.Equals(&analysisEntry.AnalyzedInstanceKey) {
@@ -1363,7 +1366,6 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 				promotedReplicaKey = topologyRecovery.SuccessorKey
 			}
 		} else {
-			analysisEntry := analysisEntry
 			go func() {
 				_, _, err := executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, false, skipProcesses)
 				log.Errore(err)
