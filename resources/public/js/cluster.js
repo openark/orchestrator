@@ -285,8 +285,9 @@ function Cluster() {
       openNodeModal(_instancesMap[draggedNodeId]);
       return false;
     });
+
     $("body").on("click", ".instance a[data-command], .instance button[data-command]", function(e) {
-      var target = $(e.target);
+      var target = $(e.target).closest("a");
       var instanceEl = target.closest(".instance");
       e.draggedNodeId = instanceEl.attr("data-nodeid");
 
