@@ -23,6 +23,10 @@ function Cluster() {
       apiCommand("/api/recover-lite/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
       return true;
     },
+    "force-master-failover": function(e) {
+      apiCommand("/api/force-master-failover/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
+      return true;
+    },
     "match-up-replicas": function(e) {
       apiCommand("/api/match-up-replicas/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
       return true;
@@ -1366,6 +1370,10 @@ function Cluster() {
     recoveryListing.append('<li><a href="#" data-btn="auto-lite" data-command="recover-auto-lite">Auto (do not execute hooks/processes)</a></li>');
     recoveryListing.append('<li role="separator" class="divider"></li>');
 
+    if (instance.isMaster) {
+      recoveryListing.append('<li><a href="#" data-btn="force-master-failover" data-command="force-master-failover"><div class="glyphicon glyphicon-exclamation-sign text-danger"></div> <span class="text-danger">Force fail over <strong>now</strong> (even if normal handling would not fail over)</span></a></li>');
+      recoveryListing.append('<li role="separator" class="divider"></li>');
+    }
     if (!instance.isMaster) {
       recoveryListing.append('<li><a href="#" data-btn="match-up-replicas" data-command="match-up-replicas">Match up replicas to <code>' + instance.masterTitle + '</code></a></li>');
     }
