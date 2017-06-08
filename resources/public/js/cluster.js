@@ -27,24 +27,16 @@ function Cluster() {
       apiCommand("/api/force-master-failover/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
       return true;
     },
-    "match-up-replicas": function(e) {
-      apiCommand("/api/match-up-replicas/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
-      return true;
-    },
-    "regroup-replicas": function(e) {
-      apiCommand("/api/regroup-replicas/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
-      return true;
-    },
     "recover-suggested-successor": function(e) {
-      var suggestedSuccessorHost = $(e.target).attr("data-suggested-successor-host");
-      var suggestedSuccessorPort = $(e.target).attr("data-suggested-successor-port");
+      var suggestedSuccessorHost = $(e.target).attr("data-successor-host");
+      var suggestedSuccessorPort = $(e.target).attr("data-successor-port");
       apiCommand("/api/recover/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port + "/" + suggestedSuccessorHost + "/" + suggestedSuccessorPort);
       return true;
     },
-    "match-replicas": function(e) {
-      var belowHost = $(e.target).attr("data-below-host");
-      var belowPort = $(e.target).attr("data-below-port");
-      apiCommand("/api/match-replicas/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port + "/" + belowHost + "/" + belowPort);
+    "relocate-replicas": function(e) {
+      var belowHost = $(e.target).attr("data-successor-host");
+      var belowPort = $(e.target).attr("data-successor-port");
+      apiCommand("/api/relocate-replicas/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port + "/" + belowHost + "/" + belowPort);
       return true;
     },
     "make-master": function(e) {
@@ -1367,21 +1359,11 @@ function Cluster() {
     popoverElement.find(".popover-footer .dropdown").append('<button type="button" class="btn btn-xs btn-default dropdown-toggle" id="recover_dropdown_' + instance.id + '" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="glyphicon glyphicon-heart text-danger"></span> Recover <span class="caret"></span></button><ul class="dropdown-menu" aria-labelledby="recover_dropdown_' + instance.id + '"></ul>');
     popoverElement.find(".popover-footer .dropdown").append('<ul class="dropdown-menu" aria-labelledby="recover_dropdown_' + instance.id + '"></ul>');
     var recoveryListing = popoverElement.find(".dropdown ul");
-    recoveryListing.append('<li><a href="#" data-btn="auto" data-command="recover-auto">Auto (implies running external hooks/processes)</a></li>');
-    recoveryListing.append('<li><a href="#" data-btn="auto-lite" data-command="recover-auto-lite">Auto (do not execute hooks/processes)</a></li>');
-    recoveryListing.append('<li role="separator" class="divider"></li>');
 
     if (instance.isMaster) {
       recoveryListing.append('<li><a href="#" data-btn="force-master-failover" data-command="force-master-failover"><div class="glyphicon glyphicon-exclamation-sign text-danger"></div> <span class="text-danger">Force fail over <strong>now</strong> (even if normal handling would not fail over)</span></a></li>');
       recoveryListing.append('<li role="separator" class="divider"></li>');
-    }
-    if (!instance.isMaster) {
-      recoveryListing.append('<li><a href="#" data-btn="match-up-replicas" data-command="match-up-replicas">Match up replicas to <code>' + instance.masterTitle + '</code></a></li>');
-    }
-    if (instance.children && instance.children.length > 1) {
-      recoveryListing.append('<li><a href="#" data-btn="regroup-replicas" data-command="regroup-replicas">Regroup replicas (auto pick best replica, only heals topology, no external processes)</a></li>');
-    }
-    if (instance.isMaster) {
+
       // Suggest successor
       instance.children.forEach(function(replica) {
         if (!replica.LogBinEnabled) {
@@ -1400,8 +1382,13 @@ function Cluster() {
           return
         }
         recoveryListing.append(
-          '<li><a href="#" data-btn="recover-suggested-successor" data-command="recover-suggested-successor" data-suggested-successor-host="' + replica.Key.Hostname + '" data-suggested-successor-port="' + replica.Key.Port + '">Regroup replicas, try to promote <code>' + replica.title + '</code></a></li>');
+          '<li><a href="#" data-btn="recover-suggested-successor" data-command="recover-suggested-successor" data-successor-host="' + replica.Key.Hostname + '" data-successor-port="' + replica.Key.Port + '">Recover, try to promote <code>' + replica.title + '</code></a></li>');
       });
+    }
+    if (!instance.isMaster) {
+      recoveryListing.append('<li><a href="#" data-btn="auto" data-command="recover-auto">Auto (implies running external hooks/processes)</a></li>');
+      recoveryListing.append('<li role="separator" class="divider"></li>');
+      recoveryListing.append('<li><a href="#" data-btn="relocate-replicas" data-command="relocate-replicas" data-successor-host="' + instance.MasterKey.Hostname + '" data-successor-port="' + instance.MasterKey.Port + '">Relocate replicas to <code>' + instance.masterTitle + '</code></a></li>');
     }
     if (instance.masterNode) {
       // Intermediate master; suggest successor
@@ -1422,11 +1409,10 @@ function Cluster() {
           return
         }
         recoveryListing.append(
-          '<li><a href="#" data-btn="match-replicas" data-command="match-replicas" data-below-host="' + sibling.Key.Hostname + '" data-below-port="' + sibling.Key.Port + '">Match all replicas below <code>' + sibling.title + '</code></a></li>');
+          '<li><a href="#" data-btn="relocate-replicas" data-command="relocate-replicas" data-successor-host="' + sibling.Key.Hostname + '" data-successor-port="' + sibling.Key.Port + '">Relocate replicas to <code>' + sibling.title + '</code></a></li>');
       });
     }
   }
-
 
   function reviewReplicationAnalysis(replicationAnalysis) {
     var instancesMap = _instancesMap;
