@@ -1236,6 +1236,17 @@ var generateSQLPatches = []string{
 	`
 		CREATE INDEX suggested_cluster_alias_idx_database_instance ON database_instance(suggested_cluster_alias)
 	`,
+	`
+		ALTER TABLE
+			topology_failure_detection
+			ADD COLUMN is_actionable tinyint not null default 0
+	`,
+	`
+		DROP INDEX hostname_port_active_period_uidx_topology_failure_detection ON topology_failure_detection
+	`,
+	`
+		CREATE UNIQUE INDEX host_port_active_recoverable_uidx_topology_failure_detection ON topology_failure_detection (hostname, port, in_active_period, end_active_period_unixtime, is_actionable)
+	`,
 }
 
 // Track if a TLS has already been configured for topology
