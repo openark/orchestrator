@@ -165,7 +165,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	// Calculate the expiry period each time as InstancePollSeconds
 	// _may_ change during the run of the process (via SIGHUP) and
 	// it is not possible to change the cache's default expiry..
-	if existsInCacheError := recentDiscoveryOperationKeys.Add(instanceKey.DisplayString(), true, instancePollSecondsDuration()); existsInCacheError != nil {
+	if existsInCacheError := recentDiscoveryOperationKeys.Add(instanceKey.String(), true, instancePollSecondsDuration()); existsInCacheError != nil {
 		// Just recently attempted
 		return
 	}

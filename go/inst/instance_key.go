@@ -155,17 +155,7 @@ func (this *InstanceKey) ReattachedKey() *InstanceKey {
 	return &InstanceKey{Hostname: this.Hostname[len(detachHint):], Port: this.Port}
 }
 
-// StringCode returns an official string representation of this key
-func (this *InstanceKey) StringCode() string {
-	return fmt.Sprintf("%s:%d", this.Hostname, this.Port)
-}
-
-// DisplayString returns a user-friendly string representation of this key
-func (this *InstanceKey) DisplayString() string {
-	return this.StringCode()
-}
-
 // String returns a user-friendly string representation of this key
 func (this InstanceKey) String() string {
-	return this.StringCode()
+	return fmt.Sprintf("%s:%d", this.Hostname, this.Port)
 }

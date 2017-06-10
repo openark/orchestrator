@@ -55,7 +55,7 @@ func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*In
 			prefix += "- "
 		}
 	}
-	entry := fmt.Sprintf("%s%s", prefix, instance.Key.DisplayString())
+	entry := fmt.Sprintf("%s%s", prefix, instance.Key.String())
 	if extendedOutput {
 		entry = fmt.Sprintf("%s %s", entry, instance.HumanReadableDescription())
 	}
@@ -1127,7 +1127,7 @@ func ReattachReplicaMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 		goto Cleanup
 	}
 	// Just in case this instance used to be a master:
-	ReplaceAliasClusterName(instanceKey.StringCode(), reattachedMasterKey.StringCode())
+	ReplaceAliasClusterName(instanceKey.String(), reattachedMasterKey.String())
 
 Cleanup:
 	instance, _ = StartSlave(instanceKey)

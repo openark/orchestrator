@@ -684,14 +684,14 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			topologyRecovery.AddPostponedFunction(postponedFunction, fmt.Sprintf("RecoverDeadMaster, detaching promoted master host %+v", promotedReplica.Key))
 		}
 		func() error {
-			before := analysisEntry.AnalyzedInstanceKey.StringCode()
-			after := promotedReplica.Key.StringCode()
+			before := analysisEntry.AnalyzedInstanceKey.String()
+			after := promotedReplica.Key.String()
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: updating cluster_alias: %v -> %v", before, after))
 			inst.ReplaceAliasClusterName(before, after)
 			return nil
 		}()
 
-		attributes.SetGeneralAttribute(analysisEntry.ClusterDetails.ClusterDomain, promotedReplica.Key.StringCode())
+		attributes.SetGeneralAttribute(analysisEntry.ClusterDetails.ClusterDomain, promotedReplica.Key.String())
 	} else {
 		recoverDeadMasterFailureCounter.Inc(1)
 	}
@@ -1194,7 +1194,7 @@ func checkAndRecoverGenericProblem(analysisEntry inst.ReplicationAnalysis, candi
 // Force a re-read of a topology instance; this is done because we need to substantiate a suspicion
 // that we may have a failover scenario. we want to speed up reading the complete picture.
 func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
-	if existsInCacheError := emergencyReadTopologyInstanceMap.Add(instanceKey.StringCode(), true, cache.DefaultExpiration); existsInCacheError != nil {
+	if existsInCacheError := emergencyReadTopologyInstanceMap.Add(instanceKey.String(), true, cache.DefaultExpiration); existsInCacheError != nil {
 		// Just recently attempted
 		return
 	}

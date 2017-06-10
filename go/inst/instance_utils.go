@@ -84,7 +84,7 @@ func filterInstancesByPattern(instances [](*Instance), pattern string) [](*Insta
 	}
 	filtered := [](*Instance){}
 	for _, instance := range instances {
-		if matched, _ := regexp.MatchString(pattern, instance.Key.DisplayString()); matched {
+		if matched, _ := regexp.MatchString(pattern, instance.Key.String()); matched {
 			filtered = append(filtered, instance)
 		}
 	}
