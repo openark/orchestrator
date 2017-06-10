@@ -211,12 +211,12 @@ func applyEnvironmentVariables(topologyRecovery *TopologyRecovery) []string {
 	env = append(env, fmt.Sprintf("ORC_FAILURE_CLUSTER=%s", analysisEntry.ClusterDetails.ClusterName))
 	env = append(env, fmt.Sprintf("ORC_FAILURE_CLUSTER_ALIAS=%s", analysisEntry.ClusterDetails.ClusterAlias))
 	env = append(env, fmt.Sprintf("ORC_FAILURE_CLUSTER_DOMAIN=%s", analysisEntry.ClusterDetails.ClusterDomain))
-	env = append(env, fmt.Sprintf("ORC_COUNT_REPLICAS=%s", analysisEntry.CountReplicas))
-	env = append(env, fmt.Sprintf("ORC_IS_DOWNTIMED=%s", analysisEntry.IsDowntimed))
-	env = append(env, fmt.Sprintf("ORC_AUTO_MASTER_RECOVERY=%s", analysisEntry.ClusterDetails.HasAutomatedMasterRecovery))
-	env = append(env, fmt.Sprintf("ORC_AUTO_INTERMEDIATE_MASTER_RECOVERY=%s", analysisEntry.ClusterDetails.HasAutomatedIntermediateMasterRecovery))
+	env = append(env, fmt.Sprintf("ORC_COUNT_REPLICAS=%d", analysisEntry.CountReplicas))
+	env = append(env, fmt.Sprintf("ORC_IS_DOWNTIMED=%v", analysisEntry.IsDowntimed))
+	env = append(env, fmt.Sprintf("ORC_AUTO_MASTER_RECOVERY=%v", analysisEntry.ClusterDetails.HasAutomatedMasterRecovery))
+	env = append(env, fmt.Sprintf("ORC_AUTO_INTERMEDIATE_MASTER_RECOVERY=%v", analysisEntry.ClusterDetails.HasAutomatedIntermediateMasterRecovery))
 	env = append(env, fmt.Sprintf("ORC_ORCHESTRATOR_HOST=%s", process.ThisHostname))
-	env = append(env, fmt.Sprintf("ORC_IS_SUCCESSFUL=%s", (topologyRecovery.SuccessorKey != nil)))
+	env = append(env, fmt.Sprintf("ORC_IS_SUCCESSFUL=%v", (topologyRecovery.SuccessorKey != nil)))
 	env = append(env, fmt.Sprintf("ORC_LOST_REPLICAS=%s", topologyRecovery.LostReplicas.ToCommaDelimitedList()))
 	env = append(env, fmt.Sprintf("ORC_REPLICA_HOSTS=%s", analysisEntry.SlaveHosts.ToCommaDelimitedList()))
 	env = append(env, fmt.Sprintf("ORC_RECOVERY_UID=%s", topologyRecovery.UID))
@@ -234,27 +234,49 @@ func applyEnvironmentVariables(topologyRecovery *TopologyRecovery) []string {
 
 // executeProcesses executes a list of processes
 func executeProcesses(processes []string, description string, topologyRecovery *TopologyRecovery, failOnError bool) error {
+	if len(processes) == 0 {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("No %s hooks to run", description))
+		return nil
+	}
+
 	var err error
-	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("running %d %s hooks", len(processes), description))
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Running %d %s hooks", len(processes), description))
 	for i, command := range processes {
+		fullDescription := fmt.Sprintf("%s hook %d of %d", description, i+1, len(processes))
+
 		command := replaceCommandPlaceholders(command, topologyRecovery)
 		env := applyEnvironmentVariables(topologyRecovery)
 
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("running %s hook #%d", description, i))
+		// Log the command to be run and record how long it takes as this may be useful
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Running %s: %s", fullDescription, command))
+		start := time.Now()
 		if cmdErr := os.CommandRun(command, env); cmdErr == nil {
-			log.Infof("Executed %s command: %s", description, command)
+			info := fmt.Sprintf("Completed %s in %v",
+				fullDescription, time.Since(start))
+			AuditTopologyRecovery(topologyRecovery, info)
+			log.Infof(info)
 		} else {
+			info := fmt.Sprintf("Execution of %s failed in %v with error: %v",
+				fullDescription, time.Since(start), cmdErr)
+			AuditTopologyRecovery(topologyRecovery, info)
+			log.Errorf(info)
+			// FIXME: It would be good to additionally include command execution output to the auditing
+
 			if err == nil {
 				// Note first error
 				err = cmdErr
 			}
-			log.Errorf("Failed to execute %s command: %s", description, command)
 			if failOnError {
+				AuditTopologyRecovery(
+					topologyRecovery,
+					fmt.Sprintf("Not running further %s hooks", description))
 				return err
 			}
 		}
 	}
-	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("done running %s hooks", description))
+	AuditTopologyRecovery(
+		topologyRecovery,
+		fmt.Sprintf("done running %s hooks", description))
 	return err
 }
 
