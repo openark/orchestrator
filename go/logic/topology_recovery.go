@@ -1218,8 +1218,8 @@ func emergentlyReadTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analy
 
 // checkAndExecuteFailureDetectionProcesses tries to register for failure detection and potentially executes
 // failure-detection processes.
-func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, isActionableRecovery bool, skipProcesses bool) (processesExecutionAttempted bool, err error) {
-	if ok, _ := AttemptFailureDetectionRegistration(&analysisEntry, isActionableRecovery); !ok {
+func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (processesExecutionAttempted bool, err error) {
+	if ok, _ := AttemptFailureDetectionRegistration(&analysisEntry); !ok {
 		log.Infof("executeCheckAndRecoverFunction: could not register %+v detection on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
 		return false, nil
 	}
@@ -1278,7 +1278,7 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode) (
 	return nil, false
 }
 
-func runEmergentOperations(analysisEntry inst.ReplicationAnalysis) {
+func runEmergentOperations(analysisEntry *inst.ReplicationAnalysis) {
 	switch analysisEntry.Analysis {
 	case inst.DeadMasterAndSlaves:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
@@ -1297,7 +1297,8 @@ func runEmergentOperations(analysisEntry inst.ReplicationAnalysis) {
 // It executes the function synchronuously
 func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
 	checkAndRecoverFunction, isActionableRecovery := getCheckAndRecoverFunction(analysisEntry.Analysis)
-	runEmergentOperations(analysisEntry)
+	analysisEntry.IsActionableRecovery = isActionableRecovery
+	runEmergentOperations(&analysisEntry)
 
 	if checkAndRecoverFunction == nil {
 		// Unhandled problem type
@@ -1314,7 +1315,7 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	// At this point we have validated there's a failure scenario for which we have a recovery path.
 
 	// Initiate detection:
-	if _, err := checkAndExecuteFailureDetectionProcesses(analysisEntry, isActionableRecovery, skipProcesses); err != nil {
+	if _, err := checkAndExecuteFailureDetectionProcesses(analysisEntry, skipProcesses); err != nil {
 		log.Errorf("executeCheckAndRecoverFunction: error on failure detection: %+v", err)
 		return false, nil, err
 	}
