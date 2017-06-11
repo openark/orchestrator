@@ -1384,6 +1384,15 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(promotedInstanceKey.DisplayString())
 			}
 		}
+	case registerCliCommand("force-master-failover", "Recovery", `Forcibly discard master and initiate a failover, even if orchestrator doesn't see a problem. This command lets orchestrator choose the replacement master`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			topologyRecovery, err := logic.ForceMasterFailover(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(topologyRecovery.SuccessorKey.DisplayString())
+		}
 	case registerCliCommand("force-master-takeover", "Recovery", `Forcibly discard master and promote another (direct child) instance instead, even if everything is running well`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
