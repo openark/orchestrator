@@ -624,7 +624,7 @@ Cheatsheet:
 
 				which-lost-in-recovery
 						List instances marked as downtimed for being lost in a recovery process. The output of this command lists
-            "lost" instances that probabaly should be recycled.
+            "lost" instances that probably should be recycled.
 						The topology recovery process injects a magic hint when downtiming lost instances, that is picked up
 						by this command. Examples:
 
