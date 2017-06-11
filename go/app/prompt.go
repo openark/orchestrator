@@ -624,7 +624,7 @@ Cheatsheet:
 
 				which-lost-in-recovery
 						List instances marked as downtimed for being lost in a recovery process. The output of this command lists
-            "lost" instances that probabaly should be recycled. 
+            "lost" instances that probably should be recycled.
 						The topology recovery process injects a magic hint when downtiming lost instances, that is picked up
 						by this command. Examples:
 
@@ -770,6 +770,14 @@ Cheatsheet:
             as in "-c recover". Orchestratir will *not* execute external processes.
 
             orchestrator -c recover-lite -i dead.instance.com --debug
+
+				force-master-failover
+            Forcibly begin a master failover process, even if orchestrator does not see anything wrong
+            in particular with the master.
+            - This will not work in a master-master configuration
+						- Orchestrator just treats this command as a DeadMaster failover scenario
+            - Orchestrator will issue all relevant pre-failover and post-failover external processes.
+            - Orchestrator will not attempt to recover/reconnect the old master
 
 				force-master-takeover
 						Forcibly discard master and promote another (direct child) instance instead, even if everything is running well.
