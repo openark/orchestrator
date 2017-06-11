@@ -1425,6 +1425,33 @@ func ForceExecuteRecovery(clusterName string, analysisCode inst.AnalysisCode, fa
 	return executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, true, skipProcesses)
 }
 
+// ForceMasterFailover *trusts* master of given cluster is dead and initiates a failover
+func ForceMasterFailover(clusterName string) (topologyRecovery *TopologyRecovery, err error) {
+	clusterMasters, err := inst.ReadClusterWriteableMaster(clusterName)
+	if err != nil {
+		return nil, fmt.Errorf("Cannot deduce cluster master for %+v", clusterName)
+	}
+	if len(clusterMasters) != 1 {
+		return nil, fmt.Errorf("Cannot deduce cluster master for %+v", clusterName)
+	}
+	clusterMaster := clusterMasters[0]
+
+	recoveryAttempted, topologyRecovery, err := ForceExecuteRecovery(clusterName, inst.DeadMaster, &clusterMaster.Key, nil, false)
+	if err != nil {
+		return nil, err
+	}
+	if !recoveryAttempted {
+		return nil, fmt.Errorf("Unexpected error: recovery not attempted. This should not happen")
+	}
+	if topologyRecovery == nil {
+		return nil, fmt.Errorf("Recovery attempted but with no results. This should not happen")
+	}
+	if topologyRecovery.SuccessorKey == nil {
+		return nil, fmt.Errorf("Recovery attempted yet no replica promoted")
+	}
+	return topologyRecovery, nil
+}
+
 // ForceMasterTakeover *trusts* master of given cluster is dead and fails over to designated instance,
 // which has to be its direct child.
 func ForceMasterTakeover(clusterName string, destination *inst.Instance) (topologyRecovery *TopologyRecovery, err error) {
