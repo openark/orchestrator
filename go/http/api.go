@@ -2221,6 +2221,37 @@ func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.R
 	}
 }
 
+// ForceMasterFailover fails over a master (even if there's no particular problem with the master)
+func (this *HttpAPI) ForceMasterFailover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, found, err := inst.ReadInstance(&instanceKey)
+	if (!found) || (err != nil) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot read instance: %+v", instanceKey)})
+		return
+	}
+
+	topologyRecovery, err := logic.ForceMasterFailover(instance.ClusterName)
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	fmt.Println(topologyRecovery.SuccessorKey.DisplayString())
+
+	if topologyRecovery.SuccessorKey != nil {
+		r.JSON(200, &APIResponse{Code: OK, Message: "Master failed over", Details: topologyRecovery})
+	} else {
+		r.JSON(200, &APIResponse{Code: OK, Message: "Master not failed over", Details: topologyRecovery})
+	}
+}
+
 // Registers promotion preference for given instance
 func (this *HttpAPI) RegisterCandidate(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -2629,6 +2660,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "recover/:host/:port/:candidateHost/:candidatePort", this.Recover)
 	this.registerRequest(m, "recover-lite/:host/:port", this.RecoverLite)
 	this.registerRequest(m, "recover-lite/:host/:port/:candidateHost/:candidatePort", this.RecoverLite)
+	this.registerRequest(m, "force-master-failover/:host/:port", this.ForceMasterFailover)
 	this.registerRequest(m, "register-candidate/:host/:port/:promotionRule", this.RegisterCandidate)
 	this.registerRequest(m, "automated-recovery-filters", this.AutomatedRecoveryFilters)
 	this.registerRequest(m, "audit-failure-detection", this.AuditFailureDetection)
