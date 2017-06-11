@@ -1266,8 +1266,9 @@ func emergentlyReadTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analy
 
 // checkAndExecuteFailureDetectionProcesses tries to register for failure detection and potentially executes
 // failure-detection processes.
-func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, isActionableRecovery bool, skipProcesses bool) (detectionRegistrationSuccess bool, processesExecutionAttempted bool, err error) {
-	if ok, _ := AttemptFailureDetectionRegistration(&analysisEntry, isActionableRecovery); !ok {
+func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (detectionRegistrationSuccess bool, processesExecutionAttempted bool, err error) {
+	if ok, _ := AttemptFailureDetectionRegistration(&analysisEntry); !ok {
+		log.Infof("executeCheckAndRecoverFunction: could not register %+v detection on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
 		return false, false, nil
 	}
 	log.Infof("topology_recovery: detected %+v failure on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
@@ -1279,62 +1280,73 @@ func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnal
 	return true, true, err
 }
 
-// executeCheckAndRecoverFunction will choose the correct check & recovery function based on analysis.
-// It executes the function synchronuously
-func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
-	var checkAndRecoverFunction func(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) = nil
-
-	isActionableRecovery := false
-	switch analysisEntry.Analysis {
+func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode) (
+	checkAndRecoverFunction func(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error),
+	isActionableRecovery bool,
+) {
+	switch analysisCode {
+	// master
 	case inst.DeadMaster:
-		checkAndRecoverFunction = checkAndRecoverDeadMaster
-		isActionableRecovery = true
+		return checkAndRecoverDeadMaster, true
 	case inst.DeadMasterAndSomeSlaves:
-		checkAndRecoverFunction = checkAndRecoverDeadMaster
-		isActionableRecovery = true
-	case inst.DeadIntermediateMaster:
-		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
-		isActionableRecovery = true
-	case inst.DeadIntermediateMasterAndSomeSlaves:
-		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
-		isActionableRecovery = true
-	case inst.DeadIntermediateMasterWithSingleSlaveFailingToConnect:
-		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
-		isActionableRecovery = true
-	case inst.DeadIntermediateMasterAndSlaves:
-		checkAndRecoverFunction = checkAndRecoverGenericProblem
-	case inst.AllIntermediateMasterSlavesFailingToConnectOrDead:
-		checkAndRecoverFunction = checkAndRecoverDeadIntermediateMaster
-		isActionableRecovery = true
-	case inst.AllIntermediateMasterSlavesNotReplicating:
-		checkAndRecoverFunction = nil
-	case inst.DeadCoMaster:
-		checkAndRecoverFunction = checkAndRecoverDeadCoMaster
-		isActionableRecovery = true
-	case inst.DeadCoMasterAndSomeSlaves:
-		checkAndRecoverFunction = checkAndRecoverDeadCoMaster
-		isActionableRecovery = true
-	case inst.DeadMasterAndSlaves:
-		checkAndRecoverFunction = checkAndRecoverGenericProblem
-		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
-	case inst.UnreachableMaster:
-		checkAndRecoverFunction = checkAndRecoverGenericProblem
-		go emergentlyReadTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
-	case inst.AllMasterSlavesNotReplicating:
-		checkAndRecoverFunction = checkAndRecoverGenericProblem
-		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
-	case inst.AllMasterSlavesNotReplicatingOrDead:
-		checkAndRecoverFunction = checkAndRecoverGenericProblem
-		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
-	case inst.FirstTierSlaveFailingToConnectToMaster:
-		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
+		return checkAndRecoverDeadMaster, true
 	case inst.UnreachableMasterWithStaleSlaves:
-		checkAndRecoverFunction = checkAndRecoverUnreachableMasterWithStaleSlaves
+		return checkAndRecoverUnreachableMasterWithStaleSlaves, true
+	// intermediate master
+	case inst.DeadIntermediateMaster:
+		return checkAndRecoverDeadIntermediateMaster, true
+	case inst.DeadIntermediateMasterAndSomeSlaves:
+		return checkAndRecoverDeadIntermediateMaster, true
+	case inst.DeadIntermediateMasterWithSingleSlaveFailingToConnect:
+		return checkAndRecoverDeadIntermediateMaster, true
+	case inst.AllIntermediateMasterSlavesFailingToConnectOrDead:
+		return checkAndRecoverDeadIntermediateMaster, true
+	case inst.DeadIntermediateMasterAndSlaves:
+		return checkAndRecoverGenericProblem, false
+	// co-master
+	case inst.DeadCoMaster:
+		return checkAndRecoverDeadCoMaster, true
+	case inst.DeadCoMasterAndSomeSlaves:
+		return checkAndRecoverDeadCoMaster, true
+	// master, non actionable
+	case inst.DeadMasterAndSlaves:
+		return checkAndRecoverGenericProblem, false
+	case inst.UnreachableMaster:
+		return checkAndRecoverGenericProblem, false
+	case inst.AllMasterSlavesNotReplicating:
+		return checkAndRecoverGenericProblem, false
+	case inst.AllMasterSlavesNotReplicatingOrDead:
+		return checkAndRecoverGenericProblem, false
 	}
 	// Right now this is mostly causing noise with no clear action.
 	// Will revisit this in the future.
 	// case inst.AllMasterSlavesStale:
-	// 	checkAndRecoverFunction = checkAndRecoverGenericProblem
+	//   return checkAndRecoverGenericProblem, false
+
+	return nil, false
+}
+
+func runEmergentOperations(analysisEntry *inst.ReplicationAnalysis) {
+	switch analysisEntry.Analysis {
+	case inst.DeadMasterAndSlaves:
+		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
+	case inst.UnreachableMaster:
+		go emergentlyReadTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
+	case inst.AllMasterSlavesNotReplicating:
+		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
+	case inst.AllMasterSlavesNotReplicatingOrDead:
+		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
+	case inst.FirstTierSlaveFailingToConnectToMaster:
+		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
+	}
+}
+
+// executeCheckAndRecoverFunction will choose the correct check & recovery function based on analysis.
+// It executes the function synchronuously
+func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
+	checkAndRecoverFunction, isActionableRecovery := getCheckAndRecoverFunction(analysisEntry.Analysis)
+	analysisEntry.IsActionableRecovery = isActionableRecovery
+	runEmergentOperations(&analysisEntry)
 
 	if checkAndRecoverFunction == nil {
 		// Unhandled problem type
@@ -1351,7 +1363,7 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	// At this point we have validated there's a failure scenario for which we have a recovery path.
 
 	// Initiate detection:
-	registrationSuccess, _, err := checkAndExecuteFailureDetectionProcesses(analysisEntry, isActionableRecovery, skipProcesses)
+	registrationSuccess, _, err := checkAndExecuteFailureDetectionProcesses(analysisEntry, skipProcesses)
 	if registrationSuccess {
 		if orcraft.IsRaftEnabled() {
 			orcraft.PublishCommand("register-failure-detection", analysisEntry)
