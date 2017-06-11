@@ -262,7 +262,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), destinationKey.DisplayString()))
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.String(), destinationKey.String()))
 		}
 	case registerCliCommand("relocate-replicas", "Smart relocation", `Relocates all or part of the replicas of a given instance under another instance`):
 		{
@@ -278,7 +278,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 					log.Errore(e)
 				}
 				for _, replica := range replicas {
-					fmt.Println(replica.Key.DisplayString())
+					fmt.Println(replica.Key.String())
 				}
 			}
 		}
@@ -290,7 +290,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicas(instanceKey, false, func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.DisplayString()) }, postponedFunctionsContainer)
+			lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicas(instanceKey, false, func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.String()) }, postponedFunctionsContainer)
 			lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 
 			postponedFunctionsContainer.Wait()
@@ -298,7 +298,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatalf("Could not regroup replicas of %+v; error: %+v", *instanceKey, err)
 			}
 			fmt.Println(fmt.Sprintf("%s lost: %d, trivial: %d, pseudo-gtid: %d",
-				promotedReplica.Key.DisplayString(), len(lostReplicas), len(equalReplicas), len(aheadReplicas)))
+				promotedReplica.Key.String(), len(lostReplicas), len(equalReplicas), len(aheadReplicas)))
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -312,7 +312,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), instance.MasterKey.DisplayString()))
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.String(), instance.MasterKey.String()))
 		}
 	case registerCliCommand("move-up-replicas", "Classic file:pos relocation", `Moves replicas of the given instance one level up the topology`):
 		{
@@ -329,7 +329,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 					log.Errore(e)
 				}
 				for _, replica := range movedReplicas {
-					fmt.Println(replica.Key.DisplayString())
+					fmt.Println(replica.Key.String())
 				}
 			}
 		}
@@ -343,7 +343,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), destinationKey.DisplayString()))
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.String(), destinationKey.String()))
 		}
 	case registerCliCommand("move-equivalent", "Classic file:pos relocation", `Moves a replica beneath another server, based on previously recorded "equivalence coordinates"`):
 		{
@@ -355,7 +355,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), destinationKey.DisplayString()))
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.String(), destinationKey.String()))
 		}
 	case registerCliCommand("repoint", "Classic file:pos relocation", `Make the given instance replicate from another instance without changing the binglog coordinates. Use with care`):
 		{
@@ -365,7 +365,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), instance.MasterKey.DisplayString()))
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.String(), instance.MasterKey.String()))
 		}
 	case registerCliCommand("repoint-replicas", "Classic file:pos relocation", `Repoint all replicas of given instance to replicate back from the instance. Use with care`):
 		{
@@ -378,7 +378,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 					log.Errore(e)
 				}
 				for _, replica := range repointedReplicas {
-					fmt.Println(fmt.Sprintf("%s<%s", replica.Key.DisplayString(), instanceKey.DisplayString()))
+					fmt.Println(fmt.Sprintf("%s<%s", replica.Key.String(), instanceKey.String()))
 				}
 			}
 		}
@@ -392,7 +392,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("take-master", "Classic file:pos relocation", `Turn an instance into a master of its own master; essentially switch the two.`):
 		{
@@ -404,7 +404,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("make-co-master", "Classic file:pos relocation", `Create a master-master replication. Given instance is a replica which replicates directly from a master.`):
 		{
@@ -413,7 +413,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("get-candidate-replica", "Classic file:pos relocation", `Information command suggesting the most up-to-date replica of a given instance that is good for promotion`):
 		{
@@ -426,7 +426,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			} else {
-				fmt.Println(instance.Key.DisplayString())
+				fmt.Println(instance.Key.String())
 			}
 		}
 	case registerCliCommand("regroup-replicas-bls", "Binlog server relocation", `Regroup Binlog Server replicas of a given instance`):
@@ -441,7 +441,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if promotedBinlogServer == nil {
 				log.Fatalf("Could not regroup binlog server replicas of %+v; error: %+v", *instanceKey, err)
 			}
-			fmt.Println(promotedBinlogServer.Key.DisplayString())
+			fmt.Println(promotedBinlogServer.Key.String())
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -457,7 +457,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), destinationKey.DisplayString()))
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.String(), destinationKey.String()))
 		}
 	case registerCliCommand("move-replicas-gtid", "GTID relocation", `Moves all replicas of a given instance under another (destination) instance using GTID`):
 		{
@@ -473,7 +473,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 					log.Errore(e)
 				}
 				for _, replica := range movedReplicas {
-					fmt.Println(replica.Key.DisplayString())
+					fmt.Println(replica.Key.String())
 				}
 			}
 		}
@@ -485,14 +485,14 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			lostReplicas, movedReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasGTID(instanceKey, false, func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.DisplayString()) })
+			lostReplicas, movedReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasGTID(instanceKey, false, func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.String()) })
 			lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 
 			if promotedReplica == nil {
 				log.Fatalf("Could not regroup replicas of %+v; error: %+v", *instanceKey, err)
 			}
 			fmt.Println(fmt.Sprintf("%s lost: %d, moved: %d",
-				promotedReplica.Key.DisplayString(), len(lostReplicas), len(movedReplicas)))
+				promotedReplica.Key.String(), len(lostReplicas), len(movedReplicas)))
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -508,7 +508,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), destinationKey.DisplayString()))
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.String(), destinationKey.String()))
 		}
 	case registerCliCommand("match-up", "Pseudo-GTID relocation", `Transport the replica one level up the hierarchy, making it child of its grandparent, using Pseudo-GTID`):
 		{
@@ -517,7 +517,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), instance.MasterKey.DisplayString()))
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.String(), instance.MasterKey.String()))
 		}
 	case registerCliCommand("rematch", "Pseudo-GTID relocation", `Reconnect a replica onto its master, via PSeudo-GTID.`):
 		{
@@ -526,7 +526,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.DisplayString(), instance.MasterKey.DisplayString()))
+			fmt.Println(fmt.Sprintf("%s<%s", instanceKey.String(), instance.MasterKey.String()))
 		}
 	case registerCliCommand("match-replicas", "Pseudo-GTID relocation", `Matches all replicas of a given instance under another (destination) instance using Pseudo-GTID`):
 		{
@@ -547,7 +547,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 					log.Errore(e)
 				}
 				for _, replica := range matchedReplicas {
-					fmt.Println(replica.Key.DisplayString())
+					fmt.Println(replica.Key.String())
 				}
 			}
 		}
@@ -566,7 +566,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 					log.Errore(e)
 				}
 				for _, replica := range matchedReplicas {
-					fmt.Println(replica.Key.DisplayString())
+					fmt.Println(replica.Key.String())
 				}
 			}
 		}
@@ -578,14 +578,14 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasPseudoGTID(instanceKey, false, func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.DisplayString()) }, postponedFunctionsContainer)
+			lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasPseudoGTID(instanceKey, false, func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.String()) }, postponedFunctionsContainer)
 			lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 			postponedFunctionsContainer.Wait()
 			if promotedReplica == nil {
 				log.Fatalf("Could not regroup replicas of %+v; error: %+v", *instanceKey, err)
 			}
 			fmt.Println(fmt.Sprintf("%s lost: %d, trivial: %d, pseudo-gtid: %d",
-				promotedReplica.Key.DisplayString(), len(lostReplicas), len(equalReplicas), len(aheadReplicas)))
+				promotedReplica.Key.String(), len(lostReplicas), len(equalReplicas), len(aheadReplicas)))
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -619,7 +619,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instance.Key.DisplayString())
+			fmt.Println(instance.Key.String())
 		}
 		// relay-log based synchronization
 	case registerCliCommand("align-via-relay-logs-ssh", "Remote relay log relocation", `Align instance's data by comparing and applying another instance's relay logs`):
@@ -650,7 +650,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instance.Key.DisplayString())
+			fmt.Println(instance.Key.String())
 		}
 	case registerCliCommand("regroup-replicas-ssh", "Remote relay log relocation", `Regroup replicas of a given instance by syncing their relay logs over SSH`):
 		{
@@ -665,7 +665,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 
 			log.Infof("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
 			for _, replica := range syncedReplicas {
-				fmt.Println(replica.Key.DisplayString())
+				fmt.Println(replica.Key.String())
 			}
 			if err != nil {
 				log.Fatale(err)
@@ -684,7 +684,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 
 			log.Infof("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
 			for _, replica := range syncedReplicas {
-				fmt.Println(replica.Key.DisplayString())
+				fmt.Println(replica.Key.String())
 			}
 			if err != nil {
 				log.Fatale(err)
@@ -699,7 +699,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("disable-gtid", "Replication, general", `Turn off GTID replication, back to file:pos replication`):
 		{
@@ -708,7 +708,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("reset-master-gtid-remove-own-uuid", "Replication, general", `Reset master on instance, remove GTID entries generated by instance`):
 		{
@@ -717,7 +717,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("skip-query", "Replication, general", `Skip a single statement on a replica; either when running with GTID or without`):
 		{
@@ -726,7 +726,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("stop-slave", "Replication, general", `Issue a STOP SLAVE on an instance`):
 		{
@@ -735,7 +735,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("start-slave", "Replication, general", `Issue a START SLAVE on an instance`):
 		{
@@ -744,7 +744,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("restart-slave", "Replication, general", `STOP and START SLAVE on an instance`):
 		{
@@ -753,7 +753,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("reset-slave", "Replication, general", `Issues a RESET SLAVE command; use with care`):
 		{
@@ -762,7 +762,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("detach-replica", "Replication, general", `Stops replication and modifies binlog position into an impossible, yet reversible, value.`):
 		{
@@ -771,7 +771,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("reattach-replica", "Replication, general", `Undo a detach-replica operation`):
 		{
@@ -780,7 +780,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("detach-replica-master-host", "Replication, general", `Stops replication and modifies Master_Host into an impossible, yet reversible, value.`):
 		{
@@ -792,7 +792,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("reattach-replica-master-host", "Replication, general", `Undo a detach-replica-master-host operation`):
 		{
@@ -804,7 +804,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("master-pos-wait", "Replication, general", `Wait until replica reaches given replication coordinates (--binlog=file:pos)`):
 		{
@@ -828,7 +828,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("restart-slave-statements", "Replication, general", `Get a list of statements to execute to stop then restore replica to same execution state. Provide --statement for injected statement`):
 		{
@@ -852,7 +852,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("set-writeable", "Instance", `Turn an instance writeable, via SET GLOBAL read_only := 0`):
 		{
@@ -861,7 +861,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 		// Binary log operations
 	case registerCliCommand("flush-binary-logs", "Binary logs", `Flush binary logs on an instance`):
@@ -876,7 +876,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("purge-binary-logs", "Binary logs", `Purge binary logs of an instance`):
 		{
@@ -890,7 +890,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("last-pseudo-gtid", "Binary logs", `Find latest Pseudo-GTID entry in instance's binary logs`):
 		{
@@ -1063,7 +1063,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			} else {
 				for _, instance := range instances {
-					fmt.Println(instance.Key.DisplayString())
+					fmt.Println(instance.Key.String())
 				}
 			}
 		}
@@ -1078,7 +1078,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			} else {
 				for _, instance := range instances {
-					fmt.Println(instance.Key.DisplayString())
+					fmt.Println(instance.Key.String())
 				}
 			}
 		}
@@ -1092,7 +1092,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			} else {
 				for _, instance := range instances {
-					fmt.Println(instance.Key.DisplayString())
+					fmt.Println(instance.Key.String())
 				}
 			}
 		}
@@ -1121,7 +1121,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			} else {
 				for _, instance := range instances {
-					fmt.Println(instance.Key.DisplayString())
+					fmt.Println(instance.Key.String())
 				}
 			}
 		}
@@ -1141,7 +1141,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			} else {
 				for _, instance := range instances {
-					fmt.Println(instance.Key.DisplayString())
+					fmt.Println(instance.Key.String())
 				}
 			}
 		}
@@ -1152,7 +1152,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatalf("Unable to get master: unresolved instance")
 			}
 			instance := validateInstanceIsFound(instanceKey)
-			fmt.Println(instance.Key.DisplayString())
+			fmt.Println(instance.Key.String())
 		}
 	case registerCliCommand("which-cluster", "Information", `Output the name of the cluster an instance belongs to, or error if unknown to orchestrator`):
 		{
@@ -1175,7 +1175,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("which-cluster-master", "Information", `Output the name of the master in a given cluster`):
 		{
@@ -1187,7 +1187,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if len(masters) == 0 {
 				log.Fatalf("No writeable masters found for cluster %+v", clusterName)
 			}
-			fmt.Println(masters[0].Key.DisplayString())
+			fmt.Println(masters[0].Key.String())
 		}
 	case registerCliCommand("which-cluster-instances", "Information", `Output the list of instances participating in same cluster as given instance`):
 		{
@@ -1197,7 +1197,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			for _, clusterInstance := range instances {
-				fmt.Println(clusterInstance.Key.DisplayString())
+				fmt.Println(clusterInstance.Key.String())
 			}
 		}
 	case registerCliCommand("which-cluster-osc-replicas", "Information", `Output a list of replicas in a cluster, that could serve as a pt-online-schema-change operation control replicas`):
@@ -1208,7 +1208,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			for _, clusterInstance := range instances {
-				fmt.Println(clusterInstance.Key.DisplayString())
+				fmt.Println(clusterInstance.Key.String())
 			}
 		}
 	case registerCliCommand("which-cluster-gh-ost-replicas", "Information", `Output a list of replicas in a cluster, that could serve as a gh-ost working server`):
@@ -1219,7 +1219,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			for _, clusterInstance := range instances {
-				fmt.Println(clusterInstance.Key.DisplayString())
+				fmt.Println(clusterInstance.Key.String())
 			}
 		}
 	case registerCliCommand("which-master", "Information", `Output the fully-qualified hostname:port representation of a given instance's master`):
@@ -1230,7 +1230,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			instance := validateInstanceIsFound(instanceKey)
 			if instance.MasterKey.IsValid() {
-				fmt.Println(instance.MasterKey.DisplayString())
+				fmt.Println(instance.MasterKey.String())
 			}
 		}
 	case registerCliCommand("which-replicas", "Information", `Output the fully-qualified hostname:port list of replicas of a given instance`):
@@ -1244,7 +1244,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			for _, replica := range replicas {
-				fmt.Println(replica.Key.DisplayString())
+				fmt.Println(replica.Key.String())
 			}
 		}
 	case registerCliCommand("which-lost-in-recovery", "Information", `List instances marked as downtimed for being lost in a recovery process`):
@@ -1254,7 +1254,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			for _, instance := range instances {
-				fmt.Println(instance.Key.DisplayString())
+				fmt.Println(instance.Key.String())
 			}
 		}
 	case registerCliCommand("instance-status", "Information", `Output short status on a given instance`):
@@ -1283,7 +1283,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instance.Key.DisplayString())
+			fmt.Println(instance.Key.String())
 		}
 	case registerCliCommand("forget", "Instance management", `Forget about an instance's existence`):
 		{
@@ -1295,7 +1295,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(rawInstanceKey.DisplayString())
+			fmt.Println(rawInstanceKey.String())
 		}
 	case registerCliCommand("begin-maintenance", "Instance management", `Request a maintenance lock on an instance`):
 		{
@@ -1321,7 +1321,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("end-maintenance", "Instance management", `Remove maintenance lock from an instance`):
 		{
@@ -1330,7 +1330,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("begin-downtime", "Instance management", `Mark an instance as downtimed`):
 		{
@@ -1354,7 +1354,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			} else {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("end-downtime", "Instance management", `Indicate an instance is no longer downtimed`):
 		{
@@ -1363,7 +1363,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 		// Recovery & analysis
 	case registerCliCommand("recover", "Recovery", `Do auto-recovery given a dead instance`), registerCliCommand("recover-lite", "Recovery", `Do auto-recovery given a dead instance. Orchestrator chooses the best course of actionwithout executing external processes`):
@@ -1381,7 +1381,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				if promotedInstanceKey == nil {
 					log.Fatalf("Recovery attempted yet no replica promoted")
 				}
-				fmt.Println(promotedInstanceKey.DisplayString())
+				fmt.Println(promotedInstanceKey.String())
 			}
 		}
 	case registerCliCommand("force-master-takeover", "Recovery", `Forcibly discard master and promote another (direct child) instance instead, even if everything is running well`):
@@ -1395,7 +1395,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(topologyRecovery.SuccessorKey.DisplayString())
+			fmt.Println(topologyRecovery.SuccessorKey.String())
 		}
 	case registerCliCommand("graceful-master-takeover", "Recovery", `Gracefully discard master and promote another (direct child) instance instead, even if everything is running well`):
 		{
@@ -1404,7 +1404,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(topologyRecovery.SuccessorKey.DisplayString())
+			fmt.Println(topologyRecovery.SuccessorKey.String())
 			fmt.Println(*promotedMasterCoordinates)
 			log.Debugf("Promoted %+v as new master. Binlog coordinates at time of promotion: %+v", topologyRecovery.SuccessorKey, *promotedMasterCoordinates)
 		}
@@ -1415,7 +1415,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			for _, entry := range analysis {
-				fmt.Println(fmt.Sprintf("%s (cluster %s): %s", entry.AnalyzedInstanceKey.DisplayString(), entry.ClusterDetails.ClusterName, entry.AnalysisString()))
+				fmt.Println(fmt.Sprintf("%s (cluster %s): %s", entry.AnalyzedInstanceKey.String(), entry.ClusterDetails.ClusterName, entry.AnalysisString()))
 			}
 		}
 	case registerCliCommand("ack-cluster-recoveries", "Recovery", `Acknowledge recoveries for a given cluster; this unblocks pending future recoveries`):
@@ -1464,7 +1464,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(replacement.Key.DisplayString())
+			fmt.Println(replacement.Key.String())
 		}
 	// Instance meta
 	case registerCliCommand("register-candidate", "Instance, meta", `Indicate that a specific instance is a preferred candidate for master promotion`):
@@ -1478,7 +1478,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("register-hostname-unresolve", "Instance, meta", `Assigns the given instance a virtual (aka "unresolved") name`):
 		{
@@ -1487,7 +1487,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("deregister-hostname-unresolve", "Instance, meta", `Explicitly deregister/dosassociate a hostname with an "unresolved" name`):
 		{
@@ -1496,7 +1496,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 	case registerCliCommand("set-heuristic-domain-instance", "Instance, meta", `Associate domain name of given cluster with what seems to be the writer master for that cluster`):
 		{
@@ -1505,7 +1505,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(instanceKey.DisplayString())
+			fmt.Println(instanceKey.String())
 		}
 
 		// meta
@@ -1543,7 +1543,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if rawInstanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			if conn, err := net.Dial("tcp", rawInstanceKey.DisplayString()); err == nil {
+			if conn, err := net.Dial("tcp", rawInstanceKey.String()); err == nil {
 				log.Debugf("tcp test is good; got connection %+v", conn)
 				conn.Close()
 			} else {
@@ -1552,7 +1552,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if cname, err := inst.GetCNAME(rawInstanceKey.Hostname); err == nil {
 				log.Debugf("GetCNAME() %+v, %+v", cname, err)
 				rawInstanceKey.Hostname = cname
-				fmt.Println(rawInstanceKey.DisplayString())
+				fmt.Println(rawInstanceKey.String())
 			} else {
 				log.Fatale(err)
 			}

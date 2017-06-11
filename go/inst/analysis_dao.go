@@ -414,11 +414,11 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 // To not repeat recurring analysis code, the database_instance_last_analysis table is used, so that only changes to
 // analysis codes are written.
 func auditInstanceAnalysisInChangelog(instanceKey *InstanceKey, analysisCode AnalysisCode) error {
-	if lastWrittenAnalysis, found := recentInstantAnalysis.Get(instanceKey.DisplayString()); found {
+	if lastWrittenAnalysis, found := recentInstantAnalysis.Get(instanceKey.String()); found {
 		if lastWrittenAnalysis == analysisCode {
 			// Surely nothing new.
 			// And let's expand the timeout
-			recentInstantAnalysis.Set(instanceKey.DisplayString(), analysisCode, cache.DefaultExpiration)
+			recentInstantAnalysis.Set(instanceKey.String(), analysisCode, cache.DefaultExpiration)
 			return nil
 		}
 	}
@@ -463,7 +463,7 @@ func auditInstanceAnalysisInChangelog(instanceKey *InstanceKey, analysisCode Ana
 			return log.Errore(err)
 		}
 	}
-	recentInstantAnalysis.Set(instanceKey.DisplayString(), analysisCode, cache.DefaultExpiration)
+	recentInstantAnalysis.Set(instanceKey.String(), analysisCode, cache.DefaultExpiration)
 	if !lastAnalysisChanged {
 		return nil
 	}

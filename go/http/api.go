@@ -211,7 +211,7 @@ func (this *HttpAPI) Resolve(params martini.Params, r render.Render, req *http.R
 		return
 	}
 
-	if conn, err := net.Dial("tcp", instanceKey.DisplayString()); err == nil {
+	if conn, err := net.Dial("tcp", instanceKey.String()); err == nil {
 		conn.Close()
 	} else {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
@@ -913,7 +913,7 @@ func (this *HttpAPI) RegroupReplicas(params martini.Params, r render.Render, req
 	}
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("promoted replica: %s, lost: %d, trivial: %d, pseudo-gtid: %d",
-		promotedReplica.Key.DisplayString(), len(lostReplicas), len(equalReplicas), len(aheadReplicas)), Details: promotedReplica.Key})
+		promotedReplica.Key.String(), len(lostReplicas), len(equalReplicas), len(aheadReplicas)), Details: promotedReplica.Key})
 }
 
 // RegroupReplicas attempts to pick a replica of a given instance and make it take its siblings, efficiently,
@@ -938,7 +938,7 @@ func (this *HttpAPI) RegroupReplicasPseudoGTID(params martini.Params, r render.R
 	}
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("promoted replica: %s, lost: %d, trivial: %d, pseudo-gtid: %d",
-		promotedReplica.Key.DisplayString(), len(lostReplicas), len(equalReplicas), len(aheadReplicas)), Details: promotedReplica.Key})
+		promotedReplica.Key.String(), len(lostReplicas), len(equalReplicas), len(aheadReplicas)), Details: promotedReplica.Key})
 }
 
 // RegroupReplicasGTID attempts to pick a replica of a given instance and make it take its siblings, efficiently, using GTID
@@ -962,7 +962,7 @@ func (this *HttpAPI) RegroupReplicasGTID(params martini.Params, r render.Render,
 	}
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("promoted replica: %s, lost: %d, moved: %d",
-		promotedReplica.Key.DisplayString(), len(lostReplicas), len(movedReplicas)), Details: promotedReplica.Key})
+		promotedReplica.Key.String(), len(lostReplicas), len(movedReplicas)), Details: promotedReplica.Key})
 }
 
 // RegroupReplicasBinlogServers attempts to pick a replica of a given instance and make it take its siblings, efficiently, using GTID
@@ -985,7 +985,7 @@ func (this *HttpAPI) RegroupReplicasBinlogServers(params martini.Params, r rende
 	}
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("promoted binlog server: %s",
-		promotedBinlogServer.Key.DisplayString()), Details: promotedBinlogServer.Key})
+		promotedBinlogServer.Key.String()), Details: promotedBinlogServer.Key})
 }
 
 // MakeMaster attempts to make the given instance a master, and match its siblings to be its replicas
