@@ -772,7 +772,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 		replicationDepth = masterReplicationDepth + 1
 		clusterName = masterClusterName
 	}
-	clusterNameByInstanceKey := instance.Key.StringCode()
+	clusterNameByInstanceKey := instance.Key.String()
 	if clusterName == "" {
 		// Nothing from master; we set it to be named after the instance itself
 		clusterName = clusterNameByInstanceKey
@@ -782,7 +782,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 	if masterMasterKey.Equals(&instance.Key) {
 		// co-master calls for special case, in fear of the infinite loop
 		isCoMaster = true
-		clusterNameByCoMasterKey := instance.MasterKey.StringCode()
+		clusterNameByCoMasterKey := instance.MasterKey.String()
 		if clusterName != clusterNameByInstanceKey && clusterName != clusterNameByCoMasterKey {
 			// Can be caused by a co-master topology failover
 			log.Errorf("ReadInstanceClusterAttributes: in co-master topology %s is not in (%s, %s). Forcing it to become one of them", clusterName, clusterNameByInstanceKey, clusterNameByCoMasterKey)
@@ -1556,7 +1556,7 @@ func InjectUnseenMasters() error {
 	operations := 0
 	for _, masterKey := range unseenMasterKeys {
 		masterKey := masterKey
-		clusterName := masterKey.StringCode()
+		clusterName := masterKey.String()
 		// minimal details:
 		instance := Instance{Key: masterKey, Version: "Unknown", ClusterName: clusterName}
 		if err := writeInstance(&instance, false, nil); err == nil {
@@ -1717,7 +1717,7 @@ func PopulateInstancesAgents(instances [](*Instance)) error {
 }
 
 func GetClusterName(instanceKey *InstanceKey) (clusterName string, err error) {
-	if clusterName, found := instanceKeyInformativeClusterName.Get(instanceKey.StringCode()); found {
+	if clusterName, found := instanceKeyInformativeClusterName.Get(instanceKey.String()); found {
 		return clusterName.(string), nil
 	}
 	query := `
@@ -1731,7 +1731,7 @@ func GetClusterName(instanceKey *InstanceKey) (clusterName string, err error) {
 			`
 	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port), func(m sqlutils.RowMap) error {
 		clusterName = m.GetString("cluster_name")
-		instanceKeyInformativeClusterName.Set(instanceKey.StringCode(), clusterName, cache.DefaultExpiration)
+		instanceKeyInformativeClusterName.Set(instanceKey.String(), clusterName, cache.DefaultExpiration)
 		return nil
 	})
 
@@ -1823,7 +1823,7 @@ func HeuristicallyApplyClusterDomainInstanceAttribute(clusterName string) (insta
 		return nil, fmt.Errorf("Found %+v potential master for cluster %+v", len(masters), clusterName)
 	}
 	instanceKey = &masters[0].Key
-	return instanceKey, attributes.SetGeneralAttribute(clusterInfo.ClusterDomain, instanceKey.StringCode())
+	return instanceKey, attributes.SetGeneralAttribute(clusterInfo.ClusterDomain, instanceKey.String())
 }
 
 // GetHeuristicClusterDomainInstanceAttribute attempts detecting the cluster domain

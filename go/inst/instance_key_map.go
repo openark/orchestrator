@@ -83,7 +83,7 @@ func (this *InstanceKeyMap) ToJSONString() string {
 func (this *InstanceKeyMap) ToCommaDelimitedList() string {
 	keyDisplays := []string{}
 	for key := range *this {
-		keyDisplays = append(keyDisplays, key.DisplayString())
+		keyDisplays = append(keyDisplays, key.String())
 	}
 	return strings.Join(keyDisplays, ",")
 }
