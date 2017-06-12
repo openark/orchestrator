@@ -344,3 +344,10 @@ func InClauseStringValues(terms []string) string {
 func Args(args ...interface{}) []interface{} {
 	return args
 }
+
+func NilIfZero(i int64) interface{} {
+	if i == 0 {
+		return nil
+	}
+	return i
+}

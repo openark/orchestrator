@@ -328,7 +328,7 @@ func (this *HttpAPI) BeginDowntime(params martini.Params, r render.Render, req *
 	duration := time.Duration(durationSeconds) * time.Second
 	downtime := inst.NewDowntime(&instanceKey, params["owner"], params["reason"], duration)
 	if orcraft.IsRaftEnabled() {
-		err = orcraft.PublishCommand("begin-downtime", downtime)
+		_, err = orcraft.PublishCommand("begin-downtime", downtime)
 	} else {
 		err = inst.BeginDowntime(downtime)
 	}
@@ -354,7 +354,7 @@ func (this *HttpAPI) EndDowntime(params martini.Params, r render.Render, req *ht
 		return
 	}
 	if orcraft.IsRaftEnabled() {
-		err = orcraft.PublishCommand("end-downtime", instanceKey)
+		_, err = orcraft.PublishCommand("end-downtime", instanceKey)
 	} else {
 		_, err = inst.EndDowntime(&instanceKey)
 	}
@@ -1470,7 +1470,7 @@ func (this *HttpAPI) DeregisterHostnameUnresolve(params martini.Params, r render
 	var err error
 	registration := inst.NewHostnameRegistration(instanceKey, "")
 	if orcraft.IsRaftEnabled() {
-		err = orcraft.PublishCommand("register-hostname-unresolve", registration)
+		_, err = orcraft.PublishCommand("register-hostname-unresolve", registration)
 	} else {
 		err = inst.RegisterHostnameUnresolve(registration)
 	}
@@ -1496,7 +1496,7 @@ func (this *HttpAPI) RegisterHostnameUnresolve(params martini.Params, r render.R
 	var err error
 	registration := inst.NewHostnameRegistration(instanceKey, hostname)
 	if orcraft.IsRaftEnabled() {
-		err = orcraft.PublishCommand("register-hostname-unresolve", registration)
+		_, err = orcraft.PublishCommand("register-hostname-unresolve", registration)
 	} else {
 		err = inst.RegisterHostnameUnresolve(registration)
 	}
@@ -1519,7 +1519,7 @@ func (this *HttpAPI) SubmitPoolInstances(params martini.Params, r render.Render,
 	var err error
 	submission := inst.NewPoolInstancesSubmission(pool, instances)
 	if orcraft.IsRaftEnabled() {
-		err = orcraft.PublishCommand("submit-pool-instances", submission)
+		_, err = orcraft.PublishCommand("submit-pool-instances", submission)
 	} else {
 		err = inst.ApplyPoolInstances(submission)
 	}
@@ -2272,7 +2272,7 @@ func (this *HttpAPI) RegisterCandidate(params martini.Params, r render.Render, r
 	candidate := inst.NewCandidateDatabaseInstance(&instanceKey, promotionRule)
 
 	if orcraft.IsRaftEnabled() {
-		err = orcraft.PublishCommand("register-candidate", candidate)
+		_, err = orcraft.PublishCommand("register-candidate", candidate)
 	} else {
 		err = inst.RegisterCandidateInstance(candidate)
 	}

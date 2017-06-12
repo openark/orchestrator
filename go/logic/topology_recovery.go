@@ -101,7 +101,7 @@ type TopologyRecovery struct {
 
 func NewTopologyRecovery(replicationAnalysis inst.ReplicationAnalysis) *TopologyRecovery {
 	topologyRecovery := &TopologyRecovery{}
-	topologyRecovery.UID = fmt.Sprintf("%d:%s", time.Now().Nanosecond(), process.NewToken().Hash)
+	topologyRecovery.UID = process.PrettyUniqueToken()
 	topologyRecovery.AnalysisEntry = replicationAnalysis
 	topologyRecovery.SuccessorKey = nil
 	topologyRecovery.LostReplicas = *inst.NewInstanceKeyMap()
@@ -125,6 +125,7 @@ func (this *TopologyRecovery) AddErrors(errs []error) {
 }
 
 type TopologyRecoveryStep struct {
+	Id          int64
 	RecoveryUID string
 	AuditAt     string
 	Message     string
@@ -206,10 +207,14 @@ func AuditTopologyRecovery(topologyRecovery *TopologyRecovery, message string) e
 	}
 
 	recoveryStep := NewTopologyRecoveryStep(topologyRecovery.UID, message)
-	if orcraft.IsRaftEnabled() {
-		return orcraft.PublishCommand("write-recovery-step", recoveryStep)
+	if err := writeTopologyRecoveryStep(recoveryStep); err != nil {
+		return err
 	}
-	return writeTopologyRecoveryStep(recoveryStep)
+	if orcraft.IsRaftEnabled() {
+		_, err := orcraft.PublishCommand("write-recovery-step", recoveryStep)
+		return err
+	}
+	return nil
 }
 
 // replaceCommandPlaceholders replaces agreed-upon placeholders with analysis data

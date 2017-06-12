@@ -87,13 +87,13 @@ func GetState() raft.RaftState {
 }
 
 // PublishCommand will distribute a command across the group
-func PublishCommand(op string, value interface{}) error {
+func PublishCommand(op string, value interface{}) (response interface{}, err error) {
 	if !IsRaftEnabled() {
-		return RaftNotRunning
+		return nil, RaftNotRunning
 	}
 	b, err := json.Marshal(value)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	return store.genericCommand(op, b)
 }

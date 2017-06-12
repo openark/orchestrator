@@ -24,6 +24,7 @@ import (
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/process"
+	"github.com/github/orchestrator/go/raft"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )
@@ -108,6 +109,72 @@ func clearAcknowledgedFailureDetections(whereClause string, args []interface{}) 
 	return log.Errore(err)
 }
 
+func writeTopologyRecovery(topologyRecovery *TopologyRecovery) (*TopologyRecovery, error) {
+	analysisEntry := topologyRecovery.AnalysisEntry
+	sqlResult, err := db.ExecOrchestrator(`
+			insert ignore
+				into topology_recovery (
+					recovery_id,
+					uid,
+					hostname,
+					port,
+					in_active_period,
+					start_active_period,
+					end_active_period_unixtime,
+					processing_node_hostname,
+					processcing_node_token,
+					analysis,
+					cluster_name,
+					cluster_alias,
+					count_affected_slaves,
+					slave_hosts,
+					last_detection_id
+				) values (
+					?,
+					?,
+					?,
+					?,
+					1,
+					NOW(),
+					0,
+					?,
+					?,
+					?,
+					?,
+					?,
+					?,
+					?,
+					(select ifnull(max(detection_id), 0) from topology_failure_detection where hostname=? and port=?)
+				)
+			`,
+		sqlutils.NilIfZero(topologyRecovery.Id),
+		topologyRecovery.UID,
+		analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port,
+		process.ThisHostname, process.ProcessToken.Hash,
+		string(analysisEntry.Analysis),
+		analysisEntry.ClusterDetails.ClusterName,
+		analysisEntry.ClusterDetails.ClusterAlias,
+		analysisEntry.CountReplicas, analysisEntry.SlaveHosts.ToCommaDelimitedList(),
+		analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port,
+	)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := sqlResult.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	if rows == 0 {
+		return nil, nil
+	}
+	lastInsertId, err := sqlResult.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+	topologyRecovery.Id = lastInsertId
+	return topologyRecovery, nil
+}
+
 // AttemptRecoveryRegistration tries to add a recovery entry; if this fails that means recovery is already in place.
 func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, failIfFailedInstanceInActiveRecovery bool, failIfClusterInActiveRecovery bool) (*TopologyRecovery, error) {
 	if failIfFailedInstanceInActiveRecovery {
@@ -142,55 +209,17 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, failIf
 	}
 
 	topologyRecovery := NewTopologyRecovery(*analysisEntry)
-	sqlResult, err := db.ExecOrchestrator(`
-			insert ignore
-				into topology_recovery (
-					uid,
-					hostname,
-					port,
-					in_active_period,
-					start_active_period,
-					end_active_period_unixtime,
-					processing_node_hostname,
-					processcing_node_token,
-					analysis,
-					cluster_name,
-					cluster_alias,
-					count_affected_slaves,
-					slave_hosts,
-					last_detection_id
-				) values (
-					?,
-					?,
-					?,
-					1,
-					NOW(),
-					0,
-					?,
-					?,
-					?,
-					?,
-					?,
-					?,
-					?,
-					(select ifnull(max(detection_id), 0) from topology_failure_detection where hostname=? and port=?)
-				)
-			`, topologyRecovery.UID, analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port, process.ThisHostname, process.ProcessToken.Hash,
-		string(analysisEntry.Analysis), analysisEntry.ClusterDetails.ClusterName, analysisEntry.ClusterDetails.ClusterAlias, analysisEntry.CountReplicas, analysisEntry.SlaveHosts.ToCommaDelimitedList(),
-		analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port,
-	)
+
+	topologyRecovery, err := writeTopologyRecovery(topologyRecovery)
 	if err != nil {
 		return nil, log.Errore(err)
 	}
-	rows, err := sqlResult.RowsAffected()
-	if err != nil {
-		return nil, log.Errore(err)
+	if orcraft.IsRaftEnabled() {
+		_, err := orcraft.PublishCommand("write-recovery", topologyRecovery)
+		if err != nil {
+			return nil, log.Errore(err)
+		}
 	}
-	if rows == 0 {
-		return nil, nil
-	}
-	// Success
-	topologyRecovery.Id, _ = sqlResult.LastInsertId()
 	return topologyRecovery, nil
 }
 
@@ -716,13 +745,17 @@ func ReadBlockedRecoveries(clusterName string) ([]BlockedTopologyRecovery, error
 
 // writeTopologyRecoveryStep writes down a single step in a recovery process
 func writeTopologyRecoveryStep(topologyRecoveryStep *TopologyRecoveryStep) error {
-	_, err := db.ExecOrchestrator(`
-			insert
+	sqlResult, err := db.ExecOrchestrator(`
+			insert ignore
 				into topology_recovery_steps (
-					recovery_uid, audit_at, message
-				) values (?, now(), ?)
-			`, topologyRecoveryStep.RecoveryUID, topologyRecoveryStep.Message,
+					recovery_step_id, recovery_uid, audit_at, message
+				) values (?, ?, now(), ?)
+			`, sqlutils.NilIfZero(topologyRecoveryStep.Id), topologyRecoveryStep.RecoveryUID, topologyRecoveryStep.Message,
 	)
+	if err != nil {
+		return log.Errore(err)
+	}
+	topologyRecoveryStep.Id, err = sqlResult.LastInsertId()
 	return log.Errore(err)
 }
 
@@ -731,7 +764,7 @@ func ReadTopologyRecoverySteps(recoveryUID string) ([]TopologyRecoveryStep, erro
 	res := []TopologyRecoveryStep{}
 	query := `
 		select
-			recovery_uid, audit_at, message
+			recovery_step_id, recovery_uid, audit_at, message
 		from
 			topology_recovery_steps
 		where
@@ -742,6 +775,7 @@ func ReadTopologyRecoverySteps(recoveryUID string) ([]TopologyRecoveryStep, erro
 	err := db.QueryOrchestrator(query, sqlutils.Args(recoveryUID), func(m sqlutils.RowMap) error {
 		recoveryStep := TopologyRecoveryStep{}
 		recoveryStep.RecoveryUID = recoveryUID
+		recoveryStep.Id = m.GetInt64("recovery_step_id")
 		recoveryStep.AuditAt = m.GetString("audit_at")
 		recoveryStep.Message = m.GetString("message")
 

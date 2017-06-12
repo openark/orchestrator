@@ -20,6 +20,8 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
+	"time"
 )
 
 func GetHash(input []byte) string {
@@ -46,4 +48,8 @@ func NewToken() *Token {
 	return &Token{
 		Hash: GetHash(GetRandomData()),
 	}
+}
+
+func PrettyUniqueToken() string {
+	return fmt.Sprintf("%d:%s", time.Now().Nanosecond(), NewToken().Hash)
 }

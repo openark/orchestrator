@@ -56,6 +56,8 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.submitPoolInstances(value)
 	case "register-failure-detection":
 		return applier.registerFailureDetection(value)
+	case "write-recovery":
+		return applier.writeRecovery(value)
 	case "write-recovery-step":
 		return applier.writeRecoveryStep(value)
 	}
@@ -150,6 +152,15 @@ func (applier *CommandApplier) registerFailureDetection(value []byte) interface{
 		return log.Errore(err)
 	}
 	_, err := AttemptFailureDetectionRegistration(&analysisEntry)
+	return err
+}
+
+func (applier *CommandApplier) writeRecovery(value []byte) interface{} {
+	topologyRecovery := TopologyRecovery{}
+	if err := json.Unmarshal(value, &topologyRecovery); err != nil {
+		return log.Errore(err)
+	}
+	_, err := writeTopologyRecovery(&topologyRecovery)
 	return err
 }
 
