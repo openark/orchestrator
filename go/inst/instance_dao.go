@@ -44,15 +44,11 @@ import (
 )
 
 const (
-	backendDBConcurrency   = 20
 	error1045AccessDenied  = "Error 1045: Access denied for user"
 	errorConnectionRefused = "getsockopt: connection refused"
 	errorNoSuchHost        = "no such host"
 	errorIOTimeout         = "i/o timeout"
 )
-
-var instanceReadChan = make(chan bool, backendDBConcurrency)
-var instanceWriteChan = make(chan bool, backendDBConcurrency)
 
 // InstancesByCountSlaveHosts is a sortable type for Instance
 type InstancesByCountSlaveHosts [](*Instance)
@@ -62,6 +58,10 @@ func (this InstancesByCountSlaveHosts) Swap(i, j int) { this[i], this[j] = this[
 func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
 }
+
+// Note: These channel sizes are not dynamically re-configurable.
+var instanceReadChan chan bool
+var instanceWriteChan chan bool
 
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
 var instanceKeyInformativeClusterName *cache.Cache
@@ -81,10 +81,19 @@ func init() {
 	go initializeInstanceDao()
 }
 
+// initializeInstanceDao waits for the configuration to be loaded prior
+// to performing certain tasks.
 func initializeInstanceDao() {
 	<-config.ConfigurationLoaded
 	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
 	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
+
+	// the read/write throttling settings are handled here
+	log.Infof("Creating backend read/write channels of size %d/%d respectively",
+		config.Config.BackendDBReadConcurrency,
+		config.Config.BackendDBWriteConcurrency)
+	instanceReadChan = make(chan bool, config.Config.BackendDBReadConcurrency)
+	instanceWriteChan = make(chan bool, config.Config.BackendDBWriteConcurrency)
 
 	// spin off instance write buffer flushing
 	go func() {

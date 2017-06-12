@@ -228,6 +228,8 @@ type Configuration struct {
 	URLPrefix                                  string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
 	MaxOutdatedKeysToShow                      int               // Maximum number of keys to show in ContinousDiscovery. If the number of polled hosts grows too far then showing the complete list is not ideal.
 	DiscoveryIgnoreReplicaHostnameFilters      []string          // Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps
+	BackendDBReadConcurrency                   uint              // The number of backend reads that can happen concurrently.  Only expect to change this if your query load is very high.
+	BackendDBWriteConcurrency                  uint              // The number of backend writes that can happen concurrently.  Only expect to change this if your query load is very high.
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -371,6 +373,8 @@ func newConfiguration() *Configuration {
 		URLPrefix:                                  "",
 		MaxOutdatedKeysToShow:                      64,
 		DiscoveryIgnoreReplicaHostnameFilters:      []string{},
+		BackendDBReadConcurrency:                   20,
+		BackendDBWriteConcurrency:                  20,
 	}
 }
 
