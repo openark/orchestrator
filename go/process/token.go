@@ -51,5 +51,5 @@ func NewToken() *Token {
 }
 
 func PrettyUniqueToken() string {
-	return fmt.Sprintf("%d:%s", time.Now().Nanosecond(), NewToken().Hash)
+	return fmt.Sprintf("%d:%s", time.Now().UnixNano(), NewToken().Hash)
 }
