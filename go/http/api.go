@@ -1323,6 +1323,18 @@ func (this *HttpAPI) ClusterOSCReplicas(params martini.Params, r render.Render, 
 	r.JSON(200, instances)
 }
 
+// Instances returns the list of all instances
+func (this *HttpAPI) Instances(params martini.Params, r render.Render, req *http.Request) {
+	instances, err := inst.SearchInstances("")
+
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(200, instances)
+}
+
 // SetClusterAlias will change an alias for a given clustername
 func (this *HttpAPI) SetClusterAliasManualOverride(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -2639,6 +2651,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "set-cluster-alias/:clusterName", this.SetClusterAliasManualOverride)
 	this.registerRequest(m, "clusters", this.Clusters)
 	this.registerRequest(m, "clusters-info", this.ClustersInfo)
+	this.registerRequest(m, "instances", this.Instances)
 
 	// Instance management:
 	this.registerRequest(m, "instance/:host/:port", this.Instance)
