@@ -152,6 +152,7 @@ func handleDiscoveryRequests() {
 // replicas (if any) are also checked.
 func discoverInstance(instanceKey inst.InstanceKey) {
 	if inst.InstanceIsForgotten(&instanceKey) {
+		log.Debugf("discoverInstance: skipping discovery of %+v because it is set to be forgotten", instanceKey)
 		return
 	}
 	// create stopwatch entries
