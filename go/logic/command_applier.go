@@ -36,6 +36,8 @@ func NewCommandApplier() *CommandApplier {
 func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{} {
 	log.Debugf("orchestrator/raft: applying command: %s", op)
 	switch op {
+	case "heartbeat":
+		return nil
 	case "register-node":
 		return applier.registerNode(value)
 	case "discover":
@@ -73,7 +75,7 @@ func (applier *CommandApplier) discover(value []byte) interface{} {
 	if err := json.Unmarshal(value, &instanceKey); err != nil {
 		return log.Errore(err)
 	}
-	discoverInstance(instanceKey, true)
+	discoverInstance(instanceKey)
 	return nil
 }
 

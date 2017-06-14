@@ -139,7 +139,7 @@ func handleDiscoveryRequests() {
 					continue
 				}
 
-				discoverInstance(instanceKey, false)
+				discoverInstance(instanceKey)
 
 				discoveryQueue.Release(instanceKey)
 			}
@@ -150,11 +150,9 @@ func handleDiscoveryRequests() {
 // discoverInstance will attempt to discover (poll) an instance (unless
 // it is already up to date) and will also ensure that its master and
 // replicas (if any) are also checked.
-func discoverInstance(instanceKey inst.InstanceKey, abortIfForgotten bool) {
-	if abortIfForgotten {
-		if inst.InstanceIsForgotten(&instanceKey) {
-			return
-		}
+func discoverInstance(instanceKey inst.InstanceKey) {
+	if inst.InstanceIsForgotten(&instanceKey) {
+		return
 	}
 	// create stopwatch entries
 	latency := stopwatch.NewNamedStopwatch()
