@@ -65,6 +65,7 @@ func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
 var instanceKeyInformativeClusterName *cache.Cache
+var forgetInstanceKeys *cache.Cache
 
 var accessDeniedCounter = metrics.NewCounter()
 var readTopologyInstanceCounter = metrics.NewCounter()
@@ -85,7 +86,7 @@ func initializeInstanceDao() {
 	<-config.ConfigurationLoaded
 	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
 	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
-
+	forgetInstanceKeys = cache.New(time.Duration(config.Config.InstancePollSeconds*2)*time.Second, time.Second)
 	// spin off instance write buffer flushing
 	go func() {
 		flushTick := time.Tick(time.Duration(config.Config.InstanceFlushIntervalMilliseconds) * time.Millisecond)
@@ -1871,7 +1872,8 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
 		if merr != nil {
 			log.Errore(merr)
-		} else {
+		} else if _, found := forgetInstanceKeys.Get(instanceKey.StringCode()); !found {
+			// only if not in "forget" cache
 			res = append(res, *instanceKey)
 		}
 		// We don;t return an error because we want to keep filling the outdated instances list.
@@ -2227,6 +2229,7 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 		instanceKey.Hostname,
 		instanceKey.Port,
 	)
+	forgetInstanceKeys.Set(instanceKey.StringCode(), true, cache.DefaultExpiration)
 	AuditOperation("forget", instanceKey, "")
 	return err
 }
