@@ -1872,7 +1872,7 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
 		if merr != nil {
 			log.Errore(merr)
-		} else if _, found := forgetInstanceKeys.Get(instanceKey.StringCode()); !found {
+		} else if !InstanceIsForgotten(instanceKey) {
 			// only if not in "forget" cache
 			res = append(res, *instanceKey)
 		}
@@ -2216,6 +2216,11 @@ func UpdateInstanceLastAttemptedCheck(instanceKey *InstanceKey) error {
 		return nil
 	}
 	return ExecDBWriteFunc(writeFunc)
+}
+
+func InstanceIsForgotten(instanceKey *InstanceKey) bool {
+	_, found := forgetInstanceKeys.Get(instanceKey.StringCode())
+	return found
 }
 
 // ForgetInstance removes an instance entry from the orchestrator backed database.
