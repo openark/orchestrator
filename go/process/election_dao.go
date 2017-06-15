@@ -104,7 +104,7 @@ func AttemptElection() (bool, error) {
 // GrabElection forcibly grabs leadership. Use with care!!
 func GrabElection() error {
 	if orcraft.IsRaftEnabled() {
-		return nil
+		return log.Errorf("Cannot GrabElection on raft setup")
 	}
 	_, err := db.ExecOrchestrator(`
 			replace into active_node (
@@ -120,6 +120,9 @@ func GrabElection() error {
 
 // Reelect clears the way for re-elections. Active node is immediately demoted.
 func Reelect() error {
+	if orcraft.IsRaftEnabled() {
+		return log.Errorf("Cannot Reelect on raft setup")
+	}
 	_, err := db.ExecOrchestrator(`delete from active_node where anchor = 1`)
 	return log.Errore(err)
 }
