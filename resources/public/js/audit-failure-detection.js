@@ -6,6 +6,7 @@ $(document).ready(function() {
   }
   $.get(appUrl(uri), function(auditEntries) {
     $.get(appUrl("/api/replication-analysis-changelog"), function(analysisChangelog) {
+      analysisChangelog = analysisChangelog || [];
       displayAudit(auditEntries, analysisChangelog);
     }, "json");
   }, "json");
