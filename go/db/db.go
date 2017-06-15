@@ -803,6 +803,14 @@ var generateSQLBase = []string{
 			PRIMARY KEY (log_index)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS raft_snapshot (
+			snapshot_id bigint unsigned not null auto_increment,
+			snapshot_name varchar(128) CHARACTER SET utf8 NOT NULL,
+			snapshot_meta varchar(4096) CHARACTER SET utf8 NOT NULL,
+			PRIMARY KEY (snapshot_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 // generateSQLPatches contains DDLs for patching schema to the latest version.
