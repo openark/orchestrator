@@ -5,6 +5,7 @@ $(document).ready(function() {
     uri = "/api/audit-failure-detection/id/" + detectionId();
   }
   $.get(appUrl(uri), function(auditEntries) {
+    auditEntries = auditEntries || [];
     $.get(appUrl("/api/replication-analysis-changelog"), function(analysisChangelog) {
       analysisChangelog = analysisChangelog || [];
       displayAudit(auditEntries, analysisChangelog);
