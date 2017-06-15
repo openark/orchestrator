@@ -18,7 +18,7 @@ It provides with slick visualization of your topologies, including replication p
 
 Refactoring replication topologies can be a matter of drag & drop a replica under another master. Moving replicas around is safe: `orchestrator` will reject an illegal refactoring attempt.
 
-Find grained control is achieved by various command line options.
+Fine-grained control is achieved by various command line options.
 
 #### Recovery
 
