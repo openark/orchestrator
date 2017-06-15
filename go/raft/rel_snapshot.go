@@ -69,7 +69,6 @@ func (b *bufferedFile) Close() error {
 // on a base directory. The `retain` parameter controls how many
 // snapshots are retained. Must be at least 1.
 func NewRelSnapshotStoreWithLogger(retain int, logger *golog.Logger) (*RelSnapshotStore, error) {
-	log.Debugf("NewRelSnapshotStoreWithLogger")
 	if retain < 1 {
 		return nil, log.Errorf("must retain at least one snapshot")
 	}
@@ -90,7 +89,6 @@ func NewRelSnapshotStoreWithLogger(retain int, logger *golog.Logger) (*RelSnapsh
 // on a base directory. The `retain` parameter controls how many
 // snapshots are retained. Must be at least 1.
 func NewRelSnapshotStore(retain int, logOutput io.Writer) (*RelSnapshotStore, error) {
-	log.Debugf("NewRelSnapshotStore")
 	if logOutput == nil {
 		logOutput = os.Stderr
 	}
@@ -106,7 +104,6 @@ func snapshotName(term, index uint64) string {
 
 // Create is used to start a new snapshot
 func (f *RelSnapshotStore) Create(index, term uint64, peers []byte) (raft.SnapshotSink, error) {
-	log.Debugf("Create")
 	// Create a new path
 	name := snapshotName(term, index)
 
@@ -137,7 +134,6 @@ func (f *RelSnapshotStore) Create(index, term uint64, peers []byte) (raft.Snapsh
 
 // List returns available snapshots in the store.
 func (f *RelSnapshotStore) List() ([]*raft.SnapshotMeta, error) {
-	log.Debugf("List")
 	// Get the eligible snapshots
 	snapshots, err := f.getSnapshots()
 	if err != nil {
@@ -157,7 +153,6 @@ func (f *RelSnapshotStore) List() ([]*raft.SnapshotMeta, error) {
 
 // readSnapshots reads snapshots by query
 func (f *RelSnapshotStore) readSnapshots(query string, args []interface{}) (snapMeta []*relSnapshotMeta, err error) {
-	log.Debugf("readSnapshots")
 	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		snapshotMetaText := m.GetString("snapshot_meta")
 
@@ -169,13 +164,10 @@ func (f *RelSnapshotStore) readSnapshots(query string, args []interface{}) (snap
 		snapMeta = append(snapMeta, meta)
 		return nil
 	})
-	log.Debugf("readSnapshots returns %+v", snapMeta)
 	return snapMeta, log.Errore(err)
 }
 
 func (f *RelSnapshotStore) readMeta(name string) (*relSnapshotMeta, error) {
-	log.Debugf("readMeta")
-	fmt.Println(fmt.Sprintf("======= readMeta %+v", name))
 	query := `select snapshot_meta from raft_snapshot where snapshot_name=?`
 	snapshots, err := f.readSnapshots(query, sqlutils.Args(name))
 	if err != nil {
@@ -189,16 +181,12 @@ func (f *RelSnapshotStore) readMeta(name string) (*relSnapshotMeta, error) {
 
 // getSnapshots returns all the known snapshots.
 func (f *RelSnapshotStore) getSnapshots() (snapMeta []*relSnapshotMeta, err error) {
-	log.Debugf("getSnapshots")
-	fmt.Println(fmt.Sprintf("======= getSnapshots"))
 	query := `select snapshot_meta from raft_snapshot order by snapshot_id desc`
 	return f.readSnapshots(query, sqlutils.Args())
 }
 
 // Open takes a snapshot ID and returns a ReadCloser for that snapshot.
 func (f *RelSnapshotStore) Open(id string) (*raft.SnapshotMeta, io.ReadCloser, error) {
-	log.Debugf("Open")
-	fmt.Println(fmt.Sprintf("======= Open %+v", id))
 	// Get the metadata
 	meta, err := f.readMeta(id)
 	if err != nil {
@@ -210,8 +198,6 @@ func (f *RelSnapshotStore) Open(id string) (*raft.SnapshotMeta, io.ReadCloser, e
 
 // ReapSnapshots reaps any snapshots beyond the retain count.
 func (f *RelSnapshotStore) ReapSnapshots() error {
-	log.Debugf("ReapSnapshots")
-	fmt.Println(fmt.Sprintf("======= ReapSnapshots"))
 	snapshots, err := f.getSnapshots()
 	if err != nil {
 		f.logger.Printf("[ERR] snapshot: Failed to get snapshots: %v", err)
@@ -236,13 +222,11 @@ func (s *RelSnapshotSink) ID() string {
 // Write is used to append to the state file. We write to the
 // buffered IO object to reduce the amount of context switches.
 func (s *RelSnapshotSink) Write(b []byte) (int, error) {
-	log.Debugf("Write")
 	return 0, nil
 }
 
 // Close is used to indicate a successful end.
 func (s *RelSnapshotSink) Close() error {
-	log.Debugf("Close")
 	// Make sure close is idempotent
 	if s.closed {
 		return nil
@@ -264,7 +248,6 @@ func (s *RelSnapshotSink) Close() error {
 
 // Cancel is used to indicate an unsuccessful end.
 func (s *RelSnapshotSink) Cancel() error {
-	log.Debugf("Cancel")
 	// Make sure close is idempotent
 	if s.closed {
 		return nil
@@ -276,8 +259,6 @@ func (s *RelSnapshotSink) Cancel() error {
 
 // writeMeta is used to write out the metadata we have.
 func (s *RelSnapshotSink) writeMeta() error {
-	log.Debugf("writeMeta")
-	fmt.Println(fmt.Sprintf("======= writeMeta"))
 	b, err := json.Marshal(&s.meta)
 	if err != nil {
 		return log.Errore(err)
