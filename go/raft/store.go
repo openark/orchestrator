@@ -47,7 +47,7 @@ func (store *Store) Open(peerNodes []string) error {
 	// Setup Raft configuration.
 	config := raft.DefaultConfig()
 	config.SnapshotThreshold = 1
-	config.SnapshotInterval = time.Minute
+	config.SnapshotInterval = 30 * time.Second
 
 	// Setup Raft communication.
 	addr, err := net.ResolveTCPAddr("tcp", store.raftBind)
