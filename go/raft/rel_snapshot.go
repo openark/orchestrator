@@ -5,27 +5,39 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	golog "log"
 	"os"
 	"time"
 
 	"github.com/github/orchestrator/go/db"
 
 	"github.com/hashicorp/raft"
+	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )
+
+type dummyReadCloser struct {
+}
+
+func (c *dummyReadCloser) Close() error {
+	return nil
+}
+
+func (c *dummyReadCloser) Read(p []byte) (n int, err error) {
+	return 0, nil
+}
 
 // RelSnapshotStore implements the SnapshotStore interface and allows
 // snapshots to be made on the local disk.
 type RelSnapshotStore struct {
 	retain int
-	logger *log.Logger
+	logger *golog.Logger
 }
 
 // RelSnapshotSink implements SnapshotSink with a file.
 type RelSnapshotSink struct {
 	store  *RelSnapshotStore
-	logger *log.Logger
+	logger *golog.Logger
 	meta   relSnapshotMeta
 
 	closed bool
@@ -56,12 +68,13 @@ func (b *bufferedFile) Close() error {
 // NewRelSnapshotStoreWithLogger creates a new RelSnapshotStore based
 // on a base directory. The `retain` parameter controls how many
 // snapshots are retained. Must be at least 1.
-func NewRelSnapshotStoreWithLogger(retain int, logger *log.Logger) (*RelSnapshotStore, error) {
+func NewRelSnapshotStoreWithLogger(retain int, logger *golog.Logger) (*RelSnapshotStore, error) {
+	log.Debugf("NewRelSnapshotStoreWithLogger")
 	if retain < 1 {
-		return nil, fmt.Errorf("must retain at least one snapshot")
+		return nil, log.Errorf("must retain at least one snapshot")
 	}
 	if logger == nil {
-		logger = log.New(os.Stderr, "", log.LstdFlags)
+		logger = golog.New(os.Stderr, "", golog.LstdFlags)
 	}
 
 	// Setup the store
@@ -77,10 +90,11 @@ func NewRelSnapshotStoreWithLogger(retain int, logger *log.Logger) (*RelSnapshot
 // on a base directory. The `retain` parameter controls how many
 // snapshots are retained. Must be at least 1.
 func NewRelSnapshotStore(retain int, logOutput io.Writer) (*RelSnapshotStore, error) {
+	log.Debugf("NewRelSnapshotStore")
 	if logOutput == nil {
 		logOutput = os.Stderr
 	}
-	return NewRelSnapshotStoreWithLogger(retain, log.New(logOutput, "", log.LstdFlags))
+	return NewRelSnapshotStoreWithLogger(retain, golog.New(logOutput, "", golog.LstdFlags))
 }
 
 // snapshotName generates a name for the snapshot.
@@ -92,6 +106,7 @@ func snapshotName(term, index uint64) string {
 
 // Create is used to start a new snapshot
 func (f *RelSnapshotStore) Create(index, term uint64, peers []byte) (raft.SnapshotSink, error) {
+	log.Debugf("Create")
 	// Create a new path
 	name := snapshotName(term, index)
 
@@ -113,7 +128,7 @@ func (f *RelSnapshotStore) Create(index, term uint64, peers []byte) (raft.Snapsh
 	// Write out the meta data
 	if err := sink.writeMeta(); err != nil {
 		f.logger.Printf("[ERR] snapshot: Failed to write metadata: %v", err)
-		return nil, err
+		return nil, log.Errore(err)
 	}
 
 	// Done
@@ -122,11 +137,12 @@ func (f *RelSnapshotStore) Create(index, term uint64, peers []byte) (raft.Snapsh
 
 // List returns available snapshots in the store.
 func (f *RelSnapshotStore) List() ([]*raft.SnapshotMeta, error) {
+	log.Debugf("List")
 	// Get the eligible snapshots
 	snapshots, err := f.getSnapshots()
 	if err != nil {
 		f.logger.Printf("[ERR] snapshot: Failed to get snapshots: %v", err)
-		return nil, err
+		return nil, log.Errore(err)
 	}
 
 	var snapMeta []*raft.SnapshotMeta
@@ -139,8 +155,9 @@ func (f *RelSnapshotStore) List() ([]*raft.SnapshotMeta, error) {
 	return snapMeta, nil
 }
 
-// getSnapshots returns all the known snapshots.
-func (f *RelSnapshotStore) readsSnapshots(query string, args []interface{}) (snapMeta []*relSnapshotMeta, err error) {
+// readSnapshots reads snapshots by query
+func (f *RelSnapshotStore) readSnapshots(query string, args []interface{}) (snapMeta []*relSnapshotMeta, err error) {
+	log.Debugf("readSnapshots")
 	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		snapshotMetaText := m.GetString("snapshot_meta")
 
@@ -152,51 +169,59 @@ func (f *RelSnapshotStore) readsSnapshots(query string, args []interface{}) (sna
 		snapMeta = append(snapMeta, meta)
 		return nil
 	})
-
-	return snapMeta, err
+	log.Debugf("readSnapshots returns %+v", snapMeta)
+	return snapMeta, log.Errore(err)
 }
 
 func (f *RelSnapshotStore) readMeta(name string) (*relSnapshotMeta, error) {
-	query := `select snapshot_meta from raft_snapshot where name=?`
-	snapshots, err := f.readsSnapshots(query, sqlutils.Args(name))
+	log.Debugf("readMeta")
+	fmt.Println(fmt.Sprintf("======= readMeta %+v", name))
+	query := `select snapshot_meta from raft_snapshot where snapshot_name=?`
+	snapshots, err := f.readSnapshots(query, sqlutils.Args(name))
 	if err != nil {
-		return nil, err
+		return nil, log.Errore(err)
 	}
 	if len(snapshots) == 1 {
 		return snapshots[0], nil
 	}
-	return nil, fmt.Errorf("Found %+v snapshots for %s", len(snapshots), name)
+	return nil, log.Errorf("Found %+v snapshots for %s", len(snapshots), name)
 }
 
 // getSnapshots returns all the known snapshots.
 func (f *RelSnapshotStore) getSnapshots() (snapMeta []*relSnapshotMeta, err error) {
+	log.Debugf("getSnapshots")
+	fmt.Println(fmt.Sprintf("======= getSnapshots"))
 	query := `select snapshot_meta from raft_snapshot order by snapshot_id desc`
-	return f.readsSnapshots(query, sqlutils.Args())
+	return f.readSnapshots(query, sqlutils.Args())
 }
 
 // Open takes a snapshot ID and returns a ReadCloser for that snapshot.
-func (f *RelSnapshotStore) Open(id string) (*raft.SnapshotMeta, error) {
+func (f *RelSnapshotStore) Open(id string) (*raft.SnapshotMeta, io.ReadCloser, error) {
+	log.Debugf("Open")
+	fmt.Println(fmt.Sprintf("======= Open %+v", id))
 	// Get the metadata
 	meta, err := f.readMeta(id)
 	if err != nil {
 		f.logger.Printf("[ERR] snapshot: Failed to get meta data to open snapshot: %v", err)
-		return nil, err
+		return nil, nil, log.Errore(err)
 	}
-	return &meta.SnapshotMeta, nil
+	return &meta.SnapshotMeta, &dummyReadCloser{}, nil
 }
 
 // ReapSnapshots reaps any snapshots beyond the retain count.
 func (f *RelSnapshotStore) ReapSnapshots() error {
+	log.Debugf("ReapSnapshots")
+	fmt.Println(fmt.Sprintf("======= ReapSnapshots"))
 	snapshots, err := f.getSnapshots()
 	if err != nil {
 		f.logger.Printf("[ERR] snapshot: Failed to get snapshots: %v", err)
-		return err
+		return log.Errore(err)
 	}
 
 	for i := f.retain; i < len(snapshots); i++ {
 		if _, err := db.ExecOrchestrator(`delete from raft_snapshot where snapshot_name=?`, snapshots[i].ID); err != nil {
 			f.logger.Printf("[ERR] snapshot: Failed to reap snapshot %v: %v", snapshots[i].ID, err)
-			return err
+			return log.Errore(err)
 		}
 	}
 	return nil
@@ -211,11 +236,13 @@ func (s *RelSnapshotSink) ID() string {
 // Write is used to append to the state file. We write to the
 // buffered IO object to reduce the amount of context switches.
 func (s *RelSnapshotSink) Write(b []byte) (int, error) {
+	log.Debugf("Write")
 	return 0, nil
 }
 
 // Close is used to indicate a successful end.
 func (s *RelSnapshotSink) Close() error {
+	log.Debugf("Close")
 	// Make sure close is idempotent
 	if s.closed {
 		return nil
@@ -224,12 +251,12 @@ func (s *RelSnapshotSink) Close() error {
 	// Write out the meta data
 	if err := s.writeMeta(); err != nil {
 		s.logger.Printf("[ERR] snapshot: Failed to write metadata: %v", err)
-		return err
+		return log.Errore(err)
 	}
 
 	// Reap any old snapshots
 	if err := s.store.ReapSnapshots(); err != nil {
-		return err
+		return log.Errore(err)
 	}
 
 	return nil
@@ -237,6 +264,7 @@ func (s *RelSnapshotSink) Close() error {
 
 // Cancel is used to indicate an unsuccessful end.
 func (s *RelSnapshotSink) Cancel() error {
+	log.Debugf("Cancel")
 	// Make sure close is idempotent
 	if s.closed {
 		return nil
@@ -248,16 +276,18 @@ func (s *RelSnapshotSink) Cancel() error {
 
 // writeMeta is used to write out the metadata we have.
 func (s *RelSnapshotSink) writeMeta() error {
+	log.Debugf("writeMeta")
+	fmt.Println(fmt.Sprintf("======= writeMeta"))
 	b, err := json.Marshal(&s.meta)
 	if err != nil {
-		return err
+		return log.Errore(err)
 	}
 	snapshotMetaText := string(b)
 	_, err = db.ExecOrchestrator(`
-		insert into raft_snapshot
+		replace into raft_snapshot
 			(snapshot_id, snapshot_name, snapshot_meta)
 		values
 			(null, ?, ?)
 			`, s.meta.ID, snapshotMetaText)
-	return err
+	return log.Errore(err)
 }

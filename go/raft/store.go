@@ -83,7 +83,8 @@ func (store *Store) Open(peerNodes []string) error {
 	}
 
 	// Create the snapshot store. This allows the Raft to truncate the log.
-	snapshots, err := raft.NewFileSnapshotStore(store.raftDir, retainSnapshotCount, os.Stderr)
+	//snapshots, err := raft.NewFileSnapshotStore(store.raftDir, retainSnapshotCount, os.Stderr)
+	snapshots, err := NewRelSnapshotStore(retainSnapshotCount, os.Stderr)
 	if err != nil {
 		return log.Errorf("file snapshot store: %s", err)
 	}

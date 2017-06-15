@@ -811,6 +811,9 @@ var generateSQLBase = []string{
 			PRIMARY KEY (snapshot_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE UNIQUE INDEX snapshot_name_uidx_raft_snapshot ON raft_snapshot (snapshot_name)
+	`,
 }
 
 // generateSQLPatches contains DDLs for patching schema to the latest version.
