@@ -18,14 +18,17 @@ package inst
 
 import (
 	"fmt"
+	"regexp"
+	"time"
+
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
+	"github.com/github/orchestrator/go/process"
+
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
-	"regexp"
-	"time"
 )
 
 var analysisChangeWriteAttemptCounter = metrics.NewCounter()
@@ -212,7 +215,11 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			    count_slaves DESC
 	`, analysisQueryReductionClause)
 	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
-		a := ReplicationAnalysis{Analysis: NoProblem}
+		a := ReplicationAnalysis{
+			Analysis:               NoProblem,
+			ProcessingNodeHostname: process.ThisHostname,
+			ProcessingNodeToken:    process.ProcessToken.Hash,
+		}
 
 		a.IsMaster = m.GetBool("is_master")
 		a.IsCoMaster = m.GetBool("is_co_master")
@@ -405,9 +412,17 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 	})
 
 	if err != nil {
-		log.Errore(err)
+		getConcensusReplicationAnalysis(result)
 	}
-	return result, err
+	return result, log.Errore(err)
+}
+
+func getConcensusReplicationAnalysis(analysisEntries []ReplicationAnalysis) {
+	analysisMap := make(AnalysisMap)
+	for _, analysisEntry := range analysisEntries {
+		instanceAnalysis := NewInstanceAnalysis(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
+		analysisMap[instanceAnalysis.String()] = &analysisEntry
+	}
 }
 
 // auditInstanceAnalysisInChangelog will write down an instance's analysis in the database_instance_analysis_changelog table.

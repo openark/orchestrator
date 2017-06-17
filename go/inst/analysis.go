@@ -17,6 +17,7 @@
 package inst
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -60,6 +61,22 @@ const (
 	MultipleMajorVersionsLoggingSlaves                                   = "MultipleMajorVersionsLoggingSlaves"
 )
 
+type InstanceAnalysis struct {
+	key      *InstanceKey
+	analysis AnalysisCode
+}
+
+func NewInstanceAnalysis(instanceKey *InstanceKey, analysis AnalysisCode) *InstanceAnalysis {
+	return &InstanceAnalysis{
+		key:      instanceKey,
+		analysis: analysis,
+	}
+}
+
+func (instanceAnalysis *InstanceAnalysis) String() string {
+	return fmt.Sprintf("%s:%s", instanceAnalysis.key.StringCode(), string(instanceAnalysis.analysis))
+}
+
 // ReplicationAnalysis notes analysis on replication chain status, per instance
 type ReplicationAnalysis struct {
 	AnalyzedInstanceKey                       InstanceKey
@@ -92,7 +109,13 @@ type ReplicationAnalysis struct {
 	CountRowBasedLoggingReplicas              uint
 	CountDistinctMajorVersionsLoggingReplicas uint
 	IsActionableRecovery                      bool
+
+	ProcessingNodeHostname       string
+	ProcessingNodeToken          string
+	CountAdditionalAgreeingNodes int
 }
+
+type AnalysisMap map[string](*ReplicationAnalysis)
 
 type ReplicationAnalysisChangelog struct {
 	AnalyzedInstanceKey InstanceKey
