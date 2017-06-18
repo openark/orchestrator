@@ -1278,6 +1278,10 @@ var generateSQLPatches = []string{
 	`
 		CREATE UNIQUE INDEX host_port_active_recoverable_uidx_topology_failure_detection ON topology_failure_detection (hostname, port, in_active_period, end_active_period_unixtime, is_actionable)
 	`,
+	`
+		ALTER TABLE raft_snapshot
+			ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	`,
 }
 
 // Track if a TLS has already been configured for topology

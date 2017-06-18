@@ -266,9 +266,9 @@ func (s *RelSnapshotSink) writeMeta() error {
 	snapshotMetaText := string(b)
 	_, err = db.ExecOrchestrator(`
 		replace into raft_snapshot
-			(snapshot_id, snapshot_name, snapshot_meta)
+			(snapshot_id, snapshot_name, snapshot_meta, created_at)
 		values
-			(null, ?, ?)
+			(null, ?, ?, now())
 			`, s.meta.ID, snapshotMetaText)
 	return log.Errore(err)
 }
