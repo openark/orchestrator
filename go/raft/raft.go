@@ -112,10 +112,6 @@ func Monitor() {
 				leaderHint = fmt.Sprintf("%s (this host)", leaderHint)
 			}
 			log.Debugf("raft leader is %s; state: %s", leaderHint, GetState().String())
-
-			if IsLeader() {
-				go PublishCommand("heartbeat", "")
-			}
 		}
 	}
 }
