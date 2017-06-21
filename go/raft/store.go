@@ -14,7 +14,8 @@ import (
 )
 
 const (
-	retainSnapshotCount = 2
+	retainSnapshotCount = 2880
+	snapshotInterval    = 30 * time.Second
 	raftTimeout         = 10 * time.Second
 )
 
@@ -47,7 +48,7 @@ func (store *Store) Open(peerNodes []string) error {
 	// Setup Raft configuration.
 	config := raft.DefaultConfig()
 	config.SnapshotThreshold = 1
-	config.SnapshotInterval = 30 * time.Second
+	config.SnapshotInterval = snapshotInterval
 
 	// Setup Raft communication.
 	addr, err := net.ResolveTCPAddr("tcp", store.raftBind)
