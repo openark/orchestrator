@@ -91,6 +91,7 @@ type ReplicationAnalysis struct {
 	CountMixedBasedLoggingReplicas            uint
 	CountRowBasedLoggingReplicas              uint
 	CountDistinctMajorVersionsLoggingReplicas uint
+	IsActionableRecovery                      bool
 }
 
 type ReplicationAnalysisChangelog struct {
