@@ -86,6 +86,10 @@ func GetState() raft.RaftState {
 	return getRaft().State()
 }
 
+func StepDown() {
+	getRaft().StepDown()
+}
+
 // PublishCommand will distribute a command across the group
 func PublishCommand(op string, value interface{}) (response interface{}, err error) {
 	if !IsRaftEnabled() {
