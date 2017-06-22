@@ -109,9 +109,9 @@ type ReplicationAnalysis struct {
 	CountRowBasedLoggingReplicas              uint
 	CountDistinctMajorVersionsLoggingReplicas uint
 	IsActionableRecovery                      bool
-	ProcessingNodeHostname       string
-	ProcessingNodeToken          string
-	CountAdditionalAgreeingNodes int
+	ProcessingNodeHostname                    string
+	ProcessingNodeToken                       string
+	CountAdditionalAgreeingNodes              int
 }
 
 type AnalysisMap map[string](*ReplicationAnalysis)
