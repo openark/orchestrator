@@ -86,10 +86,6 @@ func GetState() raft.RaftState {
 	return getRaft().State()
 }
 
-func StepDown() {
-	getRaft().StepDown()
-}
-
 // PublishCommand will distribute a command across the group
 func PublishCommand(op string, value interface{}) (response interface{}, err error) {
 	if !IsRaftEnabled() {
@@ -105,17 +101,22 @@ func PublishCommand(op string, value interface{}) (response interface{}, err err
 // Monitor is a utility function to routinely observe leadership state.
 // It doesn't actually do much; merely takes notes.
 func Monitor() {
-	t := time.NewTicker(5 * time.Second)
-
+	t := time.Tick(5 * time.Second)
+	heartbeat := time.Tick(1 * time.Minute)
 	for {
 		select {
-		case <-t.C:
+		case <-t:
 			leaderHint := GetLeader()
 
 			if IsLeader() {
 				leaderHint = fmt.Sprintf("%s (this host)", leaderHint)
 			}
 			log.Debugf("raft leader is %s; state: %s", leaderHint, GetState().String())
+
+		case <-heartbeat:
+			if IsLeader() {
+				go PublishCommand("heartbeat", "")
+			}
 		}
 	}
 }
