@@ -1176,6 +1176,27 @@ func (this *HttpAPI) StopSlaveNicely(params martini.Params, r render.Render, req
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica stopped nicely: %+v", instance.Key), Details: instance})
 }
 
+// FlushBinaryLogs runs a single FLUSH BINARY LOGS
+func (this *HttpAPI) FlushBinaryLogs(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, err := inst.FlushBinaryLogs(&instanceKey, 1)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Binary logs flushed on: %+v", instance.Key), Details: instance})
+}
+
 // MasterEquivalent provides (possibly empty) list of master coordinates equivalent to the given ones
 func (this *HttpAPI) MasterEquivalent(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -2652,7 +2673,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "enable-gtid/:host/:port", this.EnableGTID)
 	this.registerRequest(m, "disable-gtid/:host/:port", this.DisableGTID)
 	this.registerRequest(m, "skip-query/:host/:port", this.SkipQuery)
-	this.registerRequest(m, "start-slave/:host/:port", this.StartSlave)
+	this.registerRequest(m, "delave/:host/:port", this.StartSlave)
 	this.registerRequest(m, "restart-slave/:host/:port", this.RestartSlave)
 	this.registerRequest(m, "stop-slave/:host/:port", this.StopSlave)
 	this.registerRequest(m, "stop-slave-nice/:host/:port", this.StopSlaveNicely)
@@ -2660,6 +2681,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "detach-slave/:host/:port", this.DetachReplica)
 	this.registerRequest(m, "reattach-slave/:host/:port", this.ReattachReplica)
 	this.registerRequest(m, "reattach-slave-master-host/:host/:port", this.ReattachReplicaMasterHost)
+	this.registerRequest(m, "flush-binary-logs/:host/:port", this.FlushBinaryLogs)
 
 	// Instance:
 	this.registerRequest(m, "set-read-only/:host/:port", this.SetReadOnly)

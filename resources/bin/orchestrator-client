@@ -231,6 +231,7 @@ function run_command() {
     "skip-query") general_instance_command ;;
     "set-read-only") general_instance_command ;;
     "set-writeable") general_instance_command ;;
+    "flush-binary-logs") general_instance_command ;;
     *) fail "Unsupported command $command" ;;
   esac
 }
