@@ -135,9 +135,32 @@ function discover() {
   print_details | filter_key | print_key
 }
 
+function instance() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "instance/$instance_hostport"
+  print_response | filter_key | print_key
+}
+
+function which_master() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "instance/$instance_hostport"
+  print_response | filter_master_key | print_key
+}
+
+function which_cluster() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "cluster-info/${alias:-$instance}"
+  print_response | jq -r '.ClusterName'
+}
+
 function which_cluster_instances() {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "cluster/${alias:-$instance}"
+  print_response | filter_keys | print_key
+}
+
+function all_clusters_masters() {
+  api "masters"
   print_response | filter_keys | print_key
 }
 
@@ -173,7 +196,11 @@ function run_command() {
   case $command in
     "discover") discover ;;
     "forget") forget ;;
+    "instance") instance ;;
+    "which-master") which_master ;;
     "which-cluster-instances") which_cluster_instances ;;
+    "which-cluster") which_cluster ;;
+    "all-clusters-masters") all_clusters_masters ;;
     "end-downtime") end_downtime ;;
     "relocate") relocate ;;
     "relocate-replicas") relocate_replicas ;;

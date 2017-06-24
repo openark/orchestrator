@@ -1295,7 +1295,12 @@ func (this *HttpAPI) ClusterByInstance(params martini.Params, r render.Render, r
 
 // ClusterInfo provides details of a given cluster
 func (this *HttpAPI) ClusterInfo(params martini.Params, r render.Render, req *http.Request) {
-	clusterInfo, err := inst.ReadClusterInfo(params["clusterName"])
+	clusterName, err := figureClusterName(params["clusterName"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	clusterInfo, err := inst.ReadClusterInfo(clusterName)
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -1368,6 +1373,18 @@ func (this *HttpAPI) ClustersInfo(params martini.Params, r render.Render, req *h
 	}
 
 	r.JSON(http.StatusOK, clustersInfo)
+}
+
+// Clusters provides list of known masters
+func (this *HttpAPI) Masters(params martini.Params, r render.Render, req *http.Request) {
+	instances, err := inst.ReadWriteableClustersMasters()
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, instances)
 }
 
 // Search provides list of instances matching given search param via various criteria.
@@ -2650,6 +2667,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "set-cluster-alias/:clusterName", this.SetClusterAliasManualOverride)
 	this.registerRequest(m, "clusters", this.Clusters)
 	this.registerRequest(m, "clusters-info", this.ClustersInfo)
+	this.registerRequest(m, "masters", this.Masters)
 
 	// Instance management:
 	this.registerRequest(m, "instance/:host/:port", this.Instance)
