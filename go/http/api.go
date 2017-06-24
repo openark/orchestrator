@@ -2156,14 +2156,59 @@ func (this *HttpAPI) ReloadConfiguration(params martini.Params, r render.Render,
 }
 
 // ReplicationAnalysis retuens list of issues
-func (this *HttpAPI) ReplicationAnalysis(params martini.Params, r render.Render, req *http.Request) {
-	analysis, err := inst.GetReplicationAnalysis(params["clusterName"], true, false)
+func (this *HttpAPI) replicationAnalysis(clusterName string, instanceKey *inst.InstanceKey, params martini.Params, r render.Render, req *http.Request) {
+	analysis, err := inst.GetReplicationAnalysis(clusterName, true, false)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get analysis: %+v", err)})
 		return
 	}
+	// Possibly filter single instance
+	if instanceKey != nil {
+		filtered := analysis[:0]
+		for _, analysisEntry := range analysis {
+			if instanceKey.Equals(&analysisEntry.AnalyzedInstanceKey) {
+				filtered = append(filtered, analysisEntry)
+			}
+		}
+		analysis = filtered
+	}
 
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Analysis"), Details: analysis})
+}
+
+// ReplicationAnalysis retuens list of issues
+func (this *HttpAPI) ReplicationAnalysis(params martini.Params, r render.Render, req *http.Request) {
+	this.replicationAnalysis("", nil, params, r, req)
+}
+
+// ReplicationAnalysis retuens list of issues
+func (this *HttpAPI) ReplicationAnalysisForCluster(params martini.Params, r render.Render, req *http.Request) {
+	clusterName := params["clusterName"]
+
+	var err error
+	if clusterName, err = inst.DeduceClusterName(params["clusterName"]); err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get analysis: %+v", err)})
+		return
+	}
+	if clusterName == "" {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get cluster name: %+v", params["clusterName"])})
+		return
+	}
+	this.replicationAnalysis(clusterName, nil, params, r, req)
+}
+
+// ReplicationAnalysis retuens list of issues
+func (this *HttpAPI) ReplicationAnalysisForKey(params martini.Params, r render.Render, req *http.Request) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get analysis: %+v", err)})
+		return
+	}
+	if !instanceKey.IsValid() {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get analysis: invalid key %+v", instanceKey)})
+		return
+	}
+	this.replicationAnalysis("", &instanceKey, params, r, req)
 }
 
 // RecoverLite attempts recovery on a given instance, without executing external processes
@@ -2615,7 +2660,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 
 	// Recovery:
 	this.registerRequest(m, "replication-analysis", this.ReplicationAnalysis)
-	this.registerRequest(m, "replication-analysis/:clusterName", this.ReplicationAnalysis)
+	this.registerRequest(m, "replication-analysis/:clusterName", this.ReplicationAnalysisForCluster)
+	this.registerRequest(m, "replication-analysis/instance/:host/:port", this.ReplicationAnalysisForKey)
 	this.registerRequest(m, "recover/:host/:port", this.Recover)
 	this.registerRequest(m, "recover/:host/:port/:candidateHost/:candidatePort", this.Recover)
 	this.registerRequest(m, "recover-lite/:host/:port", this.RecoverLite)
