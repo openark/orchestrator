@@ -1,9 +1,10 @@
 
-function addStatusTableData(name, column1, column2) {
+function addStatusTableData(name, column1, column2, column3) {
 	$("#orchestratorStatusTable").append(
 	        '<tr><td>' + name + '</td>' +
                 '<td>' + column1 + '</td>' +
-                '<td><code class="text-info">' + column2 + '</code></td></tr>'
+	            '<td><code class="text-info">' + column2 + '</code></td>' +
+				'<td><code class="text-info">' + column3 + '</code></td></tr>'
 	);
 }
 function addStatusActionButton(name, uri) {
@@ -22,6 +23,12 @@ $(document).ready(function () {
 	var statusObject = $("#orchestratorStatus .panel-body");
     $.get(appUrl("/api/health/"), function (health) {
     	statusObject.prepend('<h4>'+health.Message+'</h4>')
+        $("#orchestratorStatusTable").append(
+            '<tr><td></td>' +
+            '<td><b>Hostname</b></td>' +
+            '<td><b>Running Since</b></td>' +
+            '<td><b>App Version</b></td></tr>'
+        );
     	health.Details.AvailableNodes.forEach(function(node) {
 				var app_version = node.AppVersion;
 				if (app_version == "") {
@@ -30,7 +37,6 @@ $(document).ready(function () {
 				var message = '';
 				message += '<code class="text-info"><strong>';
 				message += node.Hostname;
-				message += ' <span class="text-info">[Running since '+node.FirstSeenActive+']</span>';
 				message += '</strong></code>';
 				message += '</br>';
 
@@ -43,7 +49,9 @@ $(document).ready(function () {
     		}
 				message += '</code>';
 
-    		addStatusTableData("Available node", message, app_version);
+                var running_since ='<span class="text-info">'+node.FirstSeenActive+'</span>';
+
+            addStatusTableData("Available node", message, running_since, app_version);
     	})
 
     	var userId = getUserId();
@@ -51,7 +59,7 @@ $(document).ready(function () {
     		userId = "[unknown]"
     	}
     	var userStatus = (isAuthorizedForAction() ? "admin" : "read only");
-    	addStatusTableData("You", userId + ", " + userStatus, "");
+        addStatusTableData("You", userId + ", " + userStatus, "", "");
 
     	if (isAuthorizedForAction()) {
     		addStatusActionButton("Reload configuration", "reload-configuration");
