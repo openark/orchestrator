@@ -1929,9 +1929,9 @@ func mkInsertOdku(table string, columns []string, values []string, nrRows int, i
 	return q.String(), nil
 }
 
-func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bool, updateLastSeen bool) (string, []interface{}) {
+func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bool, updateLastSeen bool) (string, []interface{}, error) {
 	if len(instances) == 0 {
-		return "", nil
+		return "", nil, nil
 	}
 
 	insertIgnore := false
@@ -2067,10 +2067,10 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 
 	sql, err := mkInsertOdku("database_instance", columns, values, len(instances), insertIgnore)
 	if err != nil {
-		log.Fatalf("Failed to build query: %v", err)
+		return sql, args, log.Errorf("Failed to build query: %v", err)
 	}
 
-	return sql, args
+	return sql, args, nil
 }
 
 // writeManyInstances stores instances in the orchestrator backend
@@ -2079,7 +2079,10 @@ func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, up
 		return nil // nothing to write
 	}
 
-	sql, args := mkInsertOdkuForInstances(instances, instanceWasActuallyFound, updateLastSeen)
+	sql, args, err := mkInsertOdkuForInstances(instances, instanceWasActuallyFound, updateLastSeen)
+	if err != nil {
+		return err
+	}
 
 	if _, err := db.ExecOrchestrator(sql, args...); err != nil {
 		return err
@@ -2515,4 +2518,58 @@ func RecordInstanceBinlogFileHistory() error {
 		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
+}
+
+// FigureClusterName will make a best effort to deduce a cluster name using either a given alias
+// or an instanceKey. First attempt is at alias, and if that doesn't work, we try instanceKey.
+func FigureClusterName(clusterAlias string, instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (clusterName string, err error) {
+	if clusterAlias != "" {
+		if clusterName, err = ReadClusterNameByAlias(clusterAlias); err == nil && clusterName != "" {
+			return clusterName, nil
+		}
+	}
+	if clusterAlias != "" {
+		// We're still here? So this wasn't an exact cluster name. Let's check if it's fuzzy:
+		fuzzyInstanceKey, err := ParseRawInstanceKeyLoose(clusterAlias)
+		if err != nil {
+			return clusterName, log.Errore(err)
+		}
+		if clusterName, err = FindClusterNameByFuzzyInstanceKey(fuzzyInstanceKey); clusterName == "" {
+			return clusterName, log.Errorf("Unable to determine cluster name by alias %+v", clusterAlias)
+		}
+		return clusterName, log.Errore(err)
+	}
+	// So there is no alias. Let's check by instance key
+	instanceKey = ReadFuzzyInstanceKeyIfPossible(instanceKey)
+	if instanceKey == nil && thisInstanceKey != nil {
+		instanceKey = thisInstanceKey
+	}
+	if instanceKey == nil {
+		return clusterName, log.Errorf("Unable to figure cluster: unresolved instance")
+	}
+	instance, _, err := ReadInstance(instanceKey)
+	if err != nil {
+		return clusterName, log.Errore(err)
+	}
+	if instance == nil {
+		return clusterName, log.Errorf("Unable to figure cluster: unresolved instance")
+	}
+	clusterName = instance.ClusterName
+
+	if clusterName == "" {
+		return clusterName, log.Errorf("Unable to determine cluster name")
+	}
+	return clusterName, nil
+}
+
+// Common code to deduce the instance's instanceKey if not defined.
+func FigureInstanceKey(instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (*InstanceKey, error) {
+	if figuredKey := ReadFuzzyInstanceKeyIfPossible(instanceKey); figuredKey != nil {
+		return figuredKey, nil
+	}
+	figuredKey := thisInstanceKey
+	if figuredKey == nil {
+		return nil, log.Errorf("Cannot deduce instance %+v", instanceKey)
+	}
+	return figuredKey, nil
 }
