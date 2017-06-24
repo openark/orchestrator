@@ -1160,26 +1160,6 @@ func FindFuzzyInstances(fuzzyInstanceKey *InstanceKey) ([](*Instance), error) {
 	return readInstancesByCondition(condition, sqlutils.Args(fuzzyInstanceKey.Hostname, fuzzyInstanceKey.Port), `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
 }
 
-// FindClusterNameByFuzzyInstanceKey attempts to find a uniquely identifyable cluster name
-// given a fuzze key. It hopes to find instances matching given fuzzy key such that they all
-// belong to same cluster
-func FindClusterNameByFuzzyInstanceKey(fuzzyInstanceKey *InstanceKey) (string, error) {
-	clusterNames := make(map[string]bool)
-	instances, err := FindFuzzyInstances(fuzzyInstanceKey)
-	if err != nil {
-		return "", err
-	}
-	for _, instance := range instances {
-		clusterNames[instance.ClusterName] = true
-	}
-	if len(clusterNames) == 1 {
-		for clusterName := range clusterNames {
-			return clusterName, nil
-		}
-	}
-	return "", log.Errorf("findClusterNameByFuzzyInstanceKey: cannot uniquely identify cluster name by %+v", *fuzzyInstanceKey)
-}
-
 // ReadFuzzyInstanceKey accepts a fuzzy instance key and expects to return a single, fully qualified,
 // known instance key.
 func ReadFuzzyInstanceKey(fuzzyInstanceKey *InstanceKey) *InstanceKey {
@@ -2522,48 +2502,50 @@ func RecordInstanceBinlogFileHistory() error {
 
 // FigureClusterName will make a best effort to deduce a cluster name using either a given alias
 // or an instanceKey. First attempt is at alias, and if that doesn't work, we try instanceKey.
-func FigureClusterName(clusterAlias string, instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (clusterName string, err error) {
-	if clusterAlias != "" {
-		if clusterName, err = ReadClusterNameByAlias(clusterAlias); err == nil && clusterName != "" {
-			return clusterName, nil
-		}
-	}
-	if clusterAlias != "" {
-		// We're still here? So this wasn't an exact cluster name. Let's check if it's fuzzy:
-		fuzzyInstanceKey, err := ParseRawInstanceKeyLoose(clusterAlias)
-		if err != nil {
-			return clusterName, log.Errore(err)
-		}
-		clusterName, err = FindClusterNameByFuzzyInstanceKey(fuzzyInstanceKey)
-		if err != nil {
-			return clusterName, log.Errore(err)
-		}
-		if clusterName == "" {
-			return clusterName, log.Errorf("Unable to determine cluster name by alias %+v", clusterAlias)
-		}
-		return clusterName, log.Errore(err)
-	}
-	// So there is no alias. Let's check by instance key
-	instanceKey = ReadFuzzyInstanceKeyIfPossible(instanceKey)
-	if instanceKey == nil && thisInstanceKey != nil {
-		instanceKey = thisInstanceKey
-	}
-	if instanceKey == nil {
-		return clusterName, log.Errorf("Unable to figure cluster: unresolved instance")
-	}
-	instance, _, err := ReadInstance(instanceKey)
-	if err != nil {
-		return clusterName, log.Errore(err)
-	}
-	if instance == nil {
-		return clusterName, log.Errorf("Unable to figure cluster: unresolved instance")
-	}
-	clusterName = instance.ClusterName
+func FigureClusterName(clusterHint string, instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (clusterName string, err error) {
+	// Look for exact matches, first.
 
-	if clusterName == "" {
-		return clusterName, log.Errorf("Unable to determine cluster name")
+	// Exact cluster name match:
+	if clusterInfo, err := ReadClusterInfo(clusterHint); err == nil && clusterInfo != nil {
+		return clusterInfo.ClusterName, nil
 	}
-	return clusterName, nil
+	// Exact cluster alias match:
+	if clustersInfo, err := ReadClustersInfo(""); err == nil {
+		for _, clusterInfo := range clustersInfo {
+			if clusterInfo.ClusterAlias == clusterHint {
+				return clusterInfo.ClusterName, nil
+			}
+		}
+	}
+	clusterByInstanceKey := func(instanceKey *InstanceKey) (hasResult bool, clusterName string, err error) {
+		if instanceKey == nil {
+			return false, "", nil
+		}
+		instance, _, err := ReadInstance(instanceKey)
+		if err != nil {
+			return true, clusterName, log.Errore(err)
+		}
+		if instance != nil {
+			if instance.ClusterName == "" {
+				return true, clusterName, log.Errorf("Unable to determine cluster name")
+			}
+			return true, instance.ClusterName, nil
+		}
+		return false, "", nil
+	}
+	// exact instance key:
+	if hasResult, clusterName, err := clusterByInstanceKey(instanceKey); hasResult {
+		return clusterName, err
+	}
+	// fuzzy instance key:
+	if hasResult, clusterName, err := clusterByInstanceKey(ReadFuzzyInstanceKeyIfPossible(instanceKey)); hasResult {
+		return clusterName, err
+	}
+	//  Let's see about _this_ instance
+	if hasResult, clusterName, err := clusterByInstanceKey(thisInstanceKey); hasResult {
+		return clusterName, err
+	}
+	return clusterName, log.Errorf("Unable to determine cluster name")
 }
 
 // FigureInstanceKey tries to figure out a key

@@ -50,12 +50,12 @@ function check_requirements() {
   which -s jq   || fail "cannot find jq"
 }
 
-function verify_nonempty() {
+function assert_nonempty() {
   name="$1"
   value="$2"
 
   if [ -z "$value" ] ; then
-    fail "$name is empty"
+    fail "$name must be provided"
   fi
 }
 
@@ -91,12 +91,22 @@ function api() {
   uri="$orchestrator_api/$path"
   # echo $uri
   api_response=$(curl -s $uri | jq '.')
+  if [ "$(echo $api_response | jq -r 'type')" == "array" ] ; then
+    return
+  fi
+  if [ "$(echo $api_response | jq -r 'has("Code")')" == "false" ] ; then
+    return
+  fi
   api_details=$(echo $api_response | jq '.Details')
   if echo $api_response | jq -r '.Code' | grep -q "ERROR" ; then
     echo $api_response | jq -r '.Message' | xargs >&2 echo
     [ "$api_details" != "null" ] && echo $api_details
     exit 1
   fi
+}
+
+function print_response {
+  echo $api_response
 }
 
 function print_details {
@@ -120,32 +130,38 @@ function print_key {
 }
 
 function discover() {
-  verify_nonempty "instance" $instance_hostport
+  assert_nonempty "instance" "$instance_hostport"
   api "discover/$instance_hostport"
   print_details | filter_key | print_key
 }
 
+function which_cluster_instances() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "cluster/${alias:-$instance}"
+  print_response | filter_keys | print_key
+}
+
 function forget() {
-  verify_nonempty "instance" $instance_hostport
+  assert_nonempty "instance" "$instance_hostport"
   api "forget/$instance_hostport"
 }
 
 function end_downtime() {
-  verify_nonempty "instance" $instance_hostport
+  assert_nonempty "instance" "$instance_hostport"
   api "end-downtime/$instance_hostport"
   print_details | print_key
 }
 
 function relocate() {
-  verify_nonempty "instance" $instance_hostport
-  verify_nonempty "destination" $destination_hostport
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "destination" "$destination_hostport"
   api "relocate/$instance_hostport/$destination_hostport"
   echo "$(print_details | filter_key | print_key)<$(print_details | filter_master_key | print_key)"
 }
 
 function relocate_replicas() {
-  verify_nonempty "instance" $instance_hostport
-  verify_nonempty "destination" $destination_hostport
+  assert_nonempty "instance" $instance_hostport
+  assert_nonempty "destination" $destination_hostport
   api "relocate-replicas/$instance_hostport/$destination_hostport"
   print_details | filter_keys | print_key
 }
@@ -157,6 +173,7 @@ function run_command() {
   case $command in
     "discover") discover ;;
     "forget") forget ;;
+    "which-cluster-instances") which_cluster_instances ;;
     "end-downtime") end_downtime ;;
     "relocate") relocate ;;
     "relocate-replicas") relocate_replicas ;;

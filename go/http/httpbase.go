@@ -134,5 +134,6 @@ func getUserId(req *http.Request, user auth.User) string {
 
 // figureClusterName is a convenience function to get a cluster name from hints
 func figureClusterName(hint string) (clusterName string, err error) {
-	return inst.FigureClusterName(hint, &inst.InstanceKey{Hostname: hint}, nil)
+	instanceKey, _ := inst.ParseRawInstanceKeyLoose(hint)
+	return inst.FigureClusterName(hint, instanceKey, nil)
 }
