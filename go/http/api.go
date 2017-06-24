@@ -70,6 +70,7 @@ var apiSynonyms = map[string]string{
 }
 
 var registeredPaths = []string{}
+var emptyInstanceKey inst.InstanceKey
 
 func (this *APIResponseCode) MarshalJSON() ([]byte, error) {
 	return json.Marshal(this.String())
@@ -117,7 +118,14 @@ var queryMetrics = collection.CreateOrReturnCollection("BACKEND_WRITES")
 
 func (this *HttpAPI) getInstanceKey(host string, port string) (inst.InstanceKey, error) {
 	instanceKey, err := inst.NewInstanceKeyFromStrings(host, port)
-	return *instanceKey, err
+	if err != nil {
+		return emptyInstanceKey, err
+	}
+	instanceKey, err = inst.FigureInstanceKey(instanceKey, nil)
+	if err != nil {
+		return emptyInstanceKey, err
+	}
+	return *instanceKey, nil
 }
 
 func (this *HttpAPI) getBinlogCoordinates(logFile string, logPos string) (inst.BinlogCoordinates, error) {
@@ -128,6 +136,23 @@ func (this *HttpAPI) getBinlogCoordinates(logFile string, logPos string) (inst.B
 	}
 
 	return coordinates, err
+}
+
+// InstanceReplicas lists all replicas of given instance
+func (this *HttpAPI) InstanceReplicas(params martini.Params, r render.Render, req *http.Request) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	replicas, err := inst.ReadReplicaInstances(&instanceKey)
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot read instance: %+v", instanceKey)})
+		return
+	}
+	r.JSON(http.StatusOK, replicas)
 }
 
 // Instance reads and returns an instance's details.
@@ -2668,6 +2693,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "clusters", this.Clusters)
 	this.registerRequest(m, "clusters-info", this.ClustersInfo)
 	this.registerRequest(m, "masters", this.Masters)
+	this.registerRequest(m, "instance-replicas/:host/:port", this.InstanceReplicas)
 
 	// Instance management:
 	this.registerRequest(m, "instance/:host/:port", this.Instance)

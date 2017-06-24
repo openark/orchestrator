@@ -147,6 +147,12 @@ function which_master() {
   print_response | filter_master_key | print_key
 }
 
+function which_replicas() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "instance-replicas/$instance_hostport"
+  print_response | filter_keys | print_key
+}
+
 function which_cluster() {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "cluster-info/${alias:-$instance}"
@@ -198,6 +204,7 @@ function run_command() {
     "forget") forget ;;
     "instance") instance ;;
     "which-master") which_master ;;
+    "which-replicas") which_replicas ;;
     "which-cluster-instances") which_cluster_instances ;;
     "which-cluster") which_cluster ;;
     "all-clusters-masters") all_clusters_masters ;;
