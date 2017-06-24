@@ -1,6 +1,6 @@
 #!/bin/bash
 
-orchestrator_api="http://localhost:3000/api"
+orchestrator_api="http://localhost:3000"
 
 command=
 instance=
@@ -77,8 +77,17 @@ function to_hostport {
   fi
 }
 
+function normalize_orchestrator_api() {
+  if [[ ! $orchestrator_api == *"/api" ]]; then
+    orchestrator_api=${orchestrator_api%/}
+    orchestrator_api="$orchestrator_api/api"
+  fi
+}
+
 function api() {
   path="$1"
+
+  normalize_orchestrator_api
   uri="$orchestrator_api/$path"
   # echo $uri
   api_response=$(curl -s $uri | jq '.')
