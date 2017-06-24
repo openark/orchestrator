@@ -363,7 +363,7 @@ func (this *HttpAPI) EndDowntime(params martini.Params, r render.Render, req *ht
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Downtime ended: %+v", instanceKey)})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Downtime ended: %+v", instanceKey), Details: instanceKey})
 }
 
 // MoveUp attempts to move an instance up the topology

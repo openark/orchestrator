@@ -1,0 +1,165 @@
+#!/bin/bash
+
+orchestrator_api="http://localhost:3000/api"
+
+command=
+instance=
+destination=
+alias=
+
+instance_hostport=
+destination_hostport=
+default_port=3306
+
+api_response=
+api_details=
+
+# Transform long options to short ones
+for arg in "$@"; do
+  shift
+  case "$arg" in
+    "--help")    set -- "$@" "-h" ;;
+    "--command") set -- "$@" "-c" ;;
+    "--alias")   set -- "$@" "-a" ;;
+    *)           set -- "$@" "$arg"
+  esac
+done
+
+while getopts "c:i:d:s:a:D:" OPTION
+do
+  case $OPTION in
+    c) command=$OPTARG ;;
+    i) instance=$OPTARG ;;
+    d) destination=$OPTARG ;;
+    s) destination=$OPTARG ;;
+    a) alias=$OPTARG ;;
+    D) default_port=$OPTARG ;;
+  esac
+done
+
+function fail() {
+  message="$1"
+  echo "$message"
+  exit 1
+}
+
+function check_requirements() {
+  which -s curl || fail "cannot find curl"
+  which -s jq   || fail "cannot find jq"
+}
+
+function verify_nonempty() {
+  name="$1"
+  value="$2"
+
+  if [ -z "$value" ] ; then
+    fail "$name is empty"
+  fi
+}
+
+# to_hostport transforms:
+# - fqdn:port => fqdn/port
+# - fqdn => fqdn/default_port
+function to_hostport {
+  instance_key="$1"
+
+  if [ -z "$instance_key" ] ; then
+    echo ""
+    return
+  fi
+
+  if [[ $instance_key == *":"* ]]; then
+    echo $instance_key | tr ':' '/'
+  else
+    echo "$instance_key/$default_port"
+  fi
+}
+
+function api() {
+  path="$1"
+  uri="$orchestrator_api/$path"
+  # echo $uri
+  api_response=$(curl -s $uri | jq '.')
+  api_details=$(echo $api_response | jq '.Details')
+  if echo $api_response | jq -r '.Code' | grep -q "ERROR" ; then
+    echo $api_response | jq -r '.Message' | xargs >&2 echo
+    [ "$api_details" != "null" ] && echo $api_details
+    exit 1
+  fi
+}
+
+function print_details {
+  echo $api_details
+}
+
+function filter_key {
+  cat - | jq '.Key'
+}
+
+function filter_master_key {
+  cat - | jq '.MasterKey'
+}
+
+function filter_keys {
+  cat - | jq '.[] | .Key'
+}
+
+function print_key {
+  cat - | jq -r '. | (.Hostname + ":" + (.Port | tostring))'
+}
+
+function discover() {
+  verify_nonempty "instance" $instance_hostport
+  api "discover/$instance_hostport"
+  print_details | filter_key | print_key
+}
+
+function forget() {
+  verify_nonempty "instance" $instance_hostport
+  api "forget/$instance_hostport"
+}
+
+function end_downtime() {
+  verify_nonempty "instance" $instance_hostport
+  api "end-downtime/$instance_hostport"
+  print_details | print_key
+}
+
+function relocate() {
+  verify_nonempty "instance" $instance_hostport
+  verify_nonempty "destination" $destination_hostport
+  api "relocate/$instance_hostport/$destination_hostport"
+  echo "$(print_details | filter_key | print_key)<$(print_details | filter_master_key | print_key)"
+}
+
+function relocate_replicas() {
+  verify_nonempty "instance" $instance_hostport
+  verify_nonempty "destination" $destination_hostport
+  api "relocate-replicas/$instance_hostport/$destination_hostport"
+  print_details | filter_keys | print_key
+}
+
+function run_command() {
+  if [ -z "$command" ] ; then
+    fail "No command given. Use -c or --command"
+  fi
+  case $command in
+    "discover") discover ;;
+    "forget") forget ;;
+    "end-downtime") end_downtime ;;
+    "relocate") relocate ;;
+    "relocate-replicas") relocate_replicas ;;
+    *) fail "Unsupported command $command" ;;
+  esac
+}
+
+function main() {
+  check_requirements
+
+  instance_hostport=$(to_hostport $instance)
+  destination_hostport=$(to_hostport $destination)
+
+  run_command
+}
+
+main
