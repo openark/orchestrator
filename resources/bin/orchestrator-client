@@ -21,11 +21,12 @@ for arg in "$@"; do
     "--help")    set -- "$@" "-h" ;;
     "--command") set -- "$@" "-c" ;;
     "--alias")   set -- "$@" "-a" ;;
+    "--orchestrator-api")   set -- "$@" "-U" ;;
     *)           set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:" OPTION
+while getopts "c:i:d:s:a:D:U:" OPTION
 do
   case $OPTION in
     c) command=$OPTARG ;;
@@ -34,6 +35,7 @@ do
     s) destination=$OPTARG ;;
     a) alias=$OPTARG ;;
     D) default_port=$OPTARG ;;
+    U) orchestrator_api=$OPTARG ;;
   esac
 done
 
