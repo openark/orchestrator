@@ -2534,7 +2534,11 @@ func FigureClusterName(clusterAlias string, instanceKey *InstanceKey, thisInstan
 		if err != nil {
 			return clusterName, log.Errore(err)
 		}
-		if clusterName, err = FindClusterNameByFuzzyInstanceKey(fuzzyInstanceKey); clusterName == "" {
+		clusterName, err = FindClusterNameByFuzzyInstanceKey(fuzzyInstanceKey)
+		if err != nil {
+			return clusterName, log.Errore(err)
+		}
+		if clusterName == "" {
 			return clusterName, log.Errorf("Unable to determine cluster name by alias %+v", clusterAlias)
 		}
 		return clusterName, log.Errore(err)
@@ -2562,7 +2566,7 @@ func FigureClusterName(clusterAlias string, instanceKey *InstanceKey, thisInstan
 	return clusterName, nil
 }
 
-// Common code to deduce the instance's instanceKey if not defined.
+// FigureInstanceKey tries to figure out a key
 func FigureInstanceKey(instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (*InstanceKey, error) {
 	if figuredKey := ReadFuzzyInstanceKeyIfPossible(instanceKey); figuredKey != nil {
 		return figuredKey, nil

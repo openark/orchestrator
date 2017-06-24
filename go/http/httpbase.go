@@ -24,6 +24,7 @@ import (
 	"github.com/martini-contrib/auth"
 
 	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/process"
 )
 
@@ -129,4 +130,9 @@ func getUserId(req *http.Request, user auth.User) string {
 			return ""
 		}
 	}
+}
+
+// figureClusterName is a convenience function to get a cluster name from hints
+func figureClusterName(hint string) (clusterName string, err error) {
+	return inst.FigureClusterName(hint, &inst.InstanceKey{Hostname: hint}, nil)
 }

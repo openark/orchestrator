@@ -1248,7 +1248,13 @@ func (this *HttpAPI) KillQuery(params martini.Params, r render.Render, req *http
 
 // Cluster provides list of instances in given cluster
 func (this *HttpAPI) Cluster(params martini.Params, r render.Render, req *http.Request) {
-	instances, err := inst.ReadClusterInstances(params["clusterName"])
+	clusterName, err := figureClusterName(params["clusterName"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	instances, err := inst.ReadClusterInstances(clusterName)
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
