@@ -195,6 +195,15 @@ function relocate_replicas() {
   print_details | filter_keys | print_key
 }
 
+function general_instance_command() {
+  path="${1:-$command}"
+
+  assert_nonempty "instance" "$instance_hostport"
+  api "$path/$instance_hostport"
+  print_details | filter_key | print_key
+}
+
+
 function run_command() {
   if [ -z "$command" ] ; then
     fail "No command given. Use -c or --command"
@@ -211,6 +220,17 @@ function run_command() {
     "end-downtime") end_downtime ;;
     "relocate") relocate ;;
     "relocate-replicas") relocate_replicas ;;
+    "stop-slave") general_instance_command ;;
+    "stop-slave-nice") general_instance_command ;;
+    "start-slave") general_instance_command ;;
+    "restart-slave") general_instance_command ;;
+    "reset-slave") general_instance_command ;;
+    "detach-replica") general_instance_command ;;
+    "reattach-replica") general_instance_command ;;
+    "reattach-replica-master-host") general_instance_command ;;
+    "skip-query") general_instance_command ;;
+    "set-read-only") general_instance_command ;;
+    "set-writeable") general_instance_command ;;
     *) fail "Unsupported command $command" ;;
   esac
 }
