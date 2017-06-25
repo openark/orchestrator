@@ -2338,7 +2338,7 @@ func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.R
 	if recoveryAttempted {
 		Respond(r, &APIResponse{Code: OK, Message: "Action taken", Details: instanceKey})
 	} else {
-		Respond(r, &APIResponse{Code: OK, Message: "No action taken", Details: instanceKey})
+		Respond(r, &APIResponse{Code: ERROR, Message: "No action taken", Details: instanceKey})
 	}
 }
 

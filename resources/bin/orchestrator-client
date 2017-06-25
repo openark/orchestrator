@@ -17,39 +17,16 @@ default_port=3306
 api_response=
 api_details=
 
-# Transform long options to short ones
-# declare -A LONGOPTS
-#
-# function add_longopt() {
-#   longopt="$1"
-#   shortopt="$2"
-#   LONGOPTS["-${longopt}"]="$shortopt"
-#   LONGOPTS["--${longopt}"]="$shortopt"
-# }
-# add_longopt "help" "h"
-# add_longopt "command" "c"
-# add_longopt "alias" "a"
-# add_longopt "owner" "o"
-# add_longopt "reason" "r"
-# add_longopt "duration" "u"
-# add_longopt "orchestrator-api" "U"
-
 for arg in "$@"; do
   shift
-  # shortopt=${LONGOPTS["$arg"]}
-  # if [ -z $shortopt ] ; then
-  #   set -- "$@" "$arg"
-  # else
-  #   set -- "$@" "-${shortopt}" ;;
-  # fi
   case "$arg" in
-    "--help")    set -- "$@" "-h" ;;
-    "--command") set -- "$@" "-c" ;;
-    "--alias")   set -- "$@" "-a" ;;
-    "--owner")   set -- "$@" "-o" ;;
-    "--reason")  set -- "$@" "-r" ;;
-    "--duration")   set -- "$@" "-u" ;;
-    "--orchestrator-api")   set -- "$@" "-U" ;;
+    "-help"|"--help")       set -- "$@" "-h" ;;
+    "-command"|"--command") set -- "$@" "-c" ;;
+    "-alias"|"--alias")     set -- "$@" "-a" ;;
+    "-owner"|"--owner")     set -- "$@" "-o" ;;
+    "-reason"|"--reason")   set -- "$@" "-r" ;;
+    "-duration"|"--duration") set -- "$@" "-u" ;;
+    "-api"|"--api")   set -- "$@" "-U" ;;
     *)           set -- "$@" "$arg"
   esac
 done
@@ -236,6 +213,20 @@ function end_downtime() {
   print_details | print_key
 }
 
+function begin_maintenance() {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "owner" "$owner"
+  assert_nonempty "reason" "$reason"
+  api "begin-maintenance/$instance_hostport/$(urlencode "$owner")/$(urlencode "$reason")"
+  print_details | print_key
+}
+
+function end_maintenance() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "end-maintenance/$instance_hostport"
+  print_details | print_key
+}
+
 function general_singular_relocate_command() {
   path="${1:-$command}"
 
@@ -292,6 +283,10 @@ function general_instance_command() {
   print_details | filter_key | print_key
 }
 
+function replication_analysis() {
+  api "replication-analysis"
+  print_details | jq -r '.[] | (.AnalyzedInstanceKey.Hostname + ":" + (.AnalyzedInstanceKey.Port | tostring) + " (cluster " + .ClusterDetails.ClusterName + "): ") + .Analysis'
+}
 
 function run_command() {
   if [ -z "$command" ] ; then
@@ -310,6 +305,8 @@ function run_command() {
     "all-clusters-masters") all_clusters_masters ;;
     "begin-downtime") begin_downtime ;;
     "end-downtime") end_downtime ;;
+    "begin-maintenance") begin_maintenance ;;
+    "end-maintenance") end_maintenance ;;
     "move-up") general_singular_relocate_command ;;
     "match-up") general_singular_relocate_command ;;
     "make-co-master") general_singular_relocate_command ;;
@@ -339,6 +336,8 @@ function run_command() {
     "set-read-only") general_instance_command ;;
     "set-writeable") general_instance_command ;;
     "flush-binary-logs") general_instance_command ;;
+
+    "replication-analysis") replication_analysis ;;
     *) fail "Unsupported command $command" ;;
   esac
 }
