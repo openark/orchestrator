@@ -6,6 +6,9 @@ command=
 instance=
 destination=
 alias=
+owner="$(whoami | xargs)"
+reason=
+duration="10m"
 
 instance_hostport=
 destination_hostport=
@@ -15,18 +18,43 @@ api_response=
 api_details=
 
 # Transform long options to short ones
+# declare -A LONGOPTS
+#
+# function add_longopt() {
+#   longopt="$1"
+#   shortopt="$2"
+#   LONGOPTS["-${longopt}"]="$shortopt"
+#   LONGOPTS["--${longopt}"]="$shortopt"
+# }
+# add_longopt "help" "h"
+# add_longopt "command" "c"
+# add_longopt "alias" "a"
+# add_longopt "owner" "o"
+# add_longopt "reason" "r"
+# add_longopt "duration" "u"
+# add_longopt "orchestrator-api" "U"
+
 for arg in "$@"; do
   shift
+  # shortopt=${LONGOPTS["$arg"]}
+  # if [ -z $shortopt ] ; then
+  #   set -- "$@" "$arg"
+  # else
+  #   set -- "$@" "-${shortopt}" ;;
+  # fi
   case "$arg" in
     "--help")    set -- "$@" "-h" ;;
     "--command") set -- "$@" "-c" ;;
     "--alias")   set -- "$@" "-a" ;;
+    "--owner")   set -- "$@" "-o" ;;
+    "--reason")  set -- "$@" "-r" ;;
+    "--duration")   set -- "$@" "-u" ;;
     "--orchestrator-api")   set -- "$@" "-U" ;;
     *)           set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:" OPTION
 do
   case $OPTION in
     c) command=$OPTARG ;;
@@ -34,6 +62,9 @@ do
     d) destination=$OPTARG ;;
     s) destination=$OPTARG ;;
     a) alias=$OPTARG ;;
+    o) owner=$OPTARG ;;
+    r) reason=$OPTARG ;;
+    u) duration=$OPTARG ;;
     D) default_port=$OPTARG ;;
     U) orchestrator_api=$OPTARG ;;
   esac
@@ -84,13 +115,18 @@ function normalize_orchestrator_api() {
   fi
 }
 
+function urlencode() {
+  uri="$1"
+  echo "$uri" | jq -s -R -r @uri | tr -d '\n'
+}
+
 function api() {
   path="$1"
 
   normalize_orchestrator_api
   uri="$orchestrator_api/$path"
   # echo $uri
-  api_response=$(curl -s $uri | jq '.')
+  api_response=$(curl -s "$uri" | jq '.')
   if [ "$(echo $api_response | jq -r 'type')" == "array" ] ; then
     return
   fi
@@ -170,15 +206,68 @@ function all_clusters_masters() {
   print_response | filter_keys | print_key
 }
 
+function clusters() {
+  api "clusters-info"
+  print_response | jq -r '.[].ClusterName'
+}
+
+function clusters_alias() {
+  api "clusters-info"
+  print_response | jq -r '.[] | (.ClusterName + "," + .ClusterAlias)'
+}
+
 function forget() {
   assert_nonempty "instance" "$instance_hostport"
   api "forget/$instance_hostport"
+}
+
+function begin_downtime() {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "owner" "$owner"
+  assert_nonempty "reason" "$reason"
+  assert_nonempty "duration" "$duration"
+  api "begin-downtime/$instance_hostport/$(urlencode "$owner")/$(urlencode "$reason")/$duration"
+  print_details | print_key
 }
 
 function end_downtime() {
   assert_nonempty "instance" "$instance_hostport"
   api "end-downtime/$instance_hostport"
   print_details | print_key
+}
+
+function general_singular_relocate_command() {
+  path="${1:-$command}"
+
+  assert_nonempty "instance" "$instance_hostport"
+  api "${path}/$instance_hostport"
+  echo "$(print_details | filter_key | print_key)<$(print_details | filter_master_key | print_key)"
+}
+
+function general_relocate_command() {
+  path="${1:-$command}"
+
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "destination" "$destination_hostport"
+  api "${path}/$instance_hostport/$destination_hostport"
+  echo "$(print_details | filter_key | print_key)<$(print_details | filter_master_key | print_key)"
+}
+
+function general_singular_relocate_replicas_command() {
+  path="${1:-$command}"
+
+  assert_nonempty "instance" "$instance_hostport"
+  api "${path}/$instance_hostport/$destination_hostport"
+  print_details | filter_keys | print_key
+}
+
+function general_relocate_replicas_command() {
+  path="${1:-$command}"
+
+  assert_nonempty "instance" $instance_hostport
+  assert_nonempty "destination" $destination_hostport
+  api "${path}/$instance_hostport/$destination_hostport"
+  print_details | filter_keys | print_key
 }
 
 function relocate() {
@@ -211,15 +300,33 @@ function run_command() {
   case $command in
     "discover") discover ;;
     "forget") forget ;;
+    "clusters") clusters ;;
+    "clusters-alias") clusters_alias ;;
     "instance") instance ;;
     "which-master") which_master ;;
     "which-replicas") which_replicas ;;
     "which-cluster-instances") which_cluster_instances ;;
     "which-cluster") which_cluster ;;
     "all-clusters-masters") all_clusters_masters ;;
+    "begin-downtime") begin_downtime ;;
     "end-downtime") end_downtime ;;
-    "relocate") relocate ;;
-    "relocate-replicas") relocate_replicas ;;
+    "move-up") general_singular_relocate_command ;;
+    "match-up") general_singular_relocate_command ;;
+    "make-co-master") general_singular_relocate_command ;;
+    "take-master") general_singular_relocate_command ;;
+    "take-siblings") general_singular_relocate_command ;;
+    "match-up") general_singular_relocate_command ;;
+    "relocate") general_relocate_command ;;
+    "match") general_relocate_command ;;
+    "repoint") general_relocate_command ;;
+    "move-below") general_relocate_command ;;
+    "move-below-gtid") general_relocate_command ;;
+    "move-equivalent") general_relocate_command ;;
+    "move-up-replicas") general_singular_relocate_replicas_command ;;
+    "match-up-replicas") general_singular_relocate_replicas_command ;;
+    "repoint-replicas") general_singular_relocate_replicas_command ;;
+    "relocate-replicas") general_relocate_replicas_command ;;
+    "move-replicas-gtid") general_relocate_replicas_command ;;
     "stop-slave") general_instance_command ;;
     "stop-slave-nice") general_instance_command ;;
     "start-slave") general_instance_command ;;

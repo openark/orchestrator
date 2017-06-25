@@ -279,7 +279,7 @@ func (this *HttpAPI) BeginMaintenance(params martini.Params, r render.Render, re
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Maintenance begun: %+v", instanceKey)})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Maintenance begun: %+v", instanceKey), Details: instanceKey})
 }
 
 // EndMaintenance terminates maintenance mode
@@ -299,7 +299,7 @@ func (this *HttpAPI) EndMaintenance(params martini.Params, r render.Render, req 
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Maintenance ended: %+v", maintenanceKey)})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Maintenance ended: %+v", maintenanceKey), Details: maintenanceKey})
 }
 
 // EndMaintenanceByInstanceKey terminates maintenance mode for given instance
@@ -320,7 +320,7 @@ func (this *HttpAPI) EndMaintenanceByInstanceKey(params martini.Params, r render
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Maintenance ended: %+v", instanceKey)})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Maintenance ended: %+v", instanceKey), Details: instanceKey})
 }
 
 // Maintenance provides list of instance under active maintenance
@@ -367,7 +367,7 @@ func (this *HttpAPI) BeginDowntime(params martini.Params, r render.Render, req *
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Downtime begun: %+v", instanceKey)})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Downtime begun: %+v", instanceKey), Details: instanceKey})
 }
 
 // EndDowntime terminates downtime (removes downtime flag) for an instance
@@ -430,7 +430,34 @@ func (this *HttpAPI) MoveUpReplicas(params martini.Params, r render.Render, req 
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Moved up %d replicas of %+v below %+v; %d errors: %+v", len(replicas), instanceKey, newMaster.Key, len(errs), errs), Details: newMaster.Key})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Moved up %d replicas of %+v below %+v; %d errors: %+v", len(replicas), instanceKey, newMaster.Key, len(errs), errs), Details: replicas})
+}
+
+// Repoint positiones a replica under another (or same) master with exact same coordinates.
+// Useful for binlog servers
+func (this *HttpAPI) Repoint(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	belowKey, err := this.getInstanceKey(params["belowHost"], params["belowPort"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	instance, err := inst.Repoint(&instanceKey, &belowKey, inst.GTIDHintNeutral)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance %+v repointed below %+v", instanceKey, belowKey), Details: instance})
 }
 
 // MoveUpReplicas attempts to move up all replicas of an instance
@@ -451,7 +478,7 @@ func (this *HttpAPI) RepointReplicas(params martini.Params, r render.Render, req
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Repointed %d replicas of %+v", len(replicas), instanceKey), Details: instanceKey})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Repointed %d replicas of %+v", len(replicas), instanceKey), Details: replicas})
 }
 
 // MakeCoMaster attempts to make an instance co-master with its own master
@@ -2644,6 +2671,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "move-up-slaves/:host/:port", this.MoveUpReplicas)
 	this.registerRequest(m, "move-below/:host/:port/:siblingHost/:siblingPort", this.MoveBelow)
 	this.registerRequest(m, "move-equivalent/:host/:port/:belowHost/:belowPort", this.MoveEquivalent)
+	this.registerRequest(m, "repoint/:host/:port/:belowHost/:belowPort", this.Repoint)
 	this.registerRequest(m, "repoint-slaves/:host/:port", this.RepointReplicas)
 	this.registerRequest(m, "make-co-master/:host/:port", this.MakeCoMaster)
 	this.registerRequest(m, "enslave-siblings/:host/:port", this.TakeSiblings)
@@ -2673,7 +2701,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "enable-gtid/:host/:port", this.EnableGTID)
 	this.registerRequest(m, "disable-gtid/:host/:port", this.DisableGTID)
 	this.registerRequest(m, "skip-query/:host/:port", this.SkipQuery)
-	this.registerRequest(m, "delave/:host/:port", this.StartSlave)
+	this.registerRequest(m, "start-slave/:host/:port", this.StartSlave)
 	this.registerRequest(m, "restart-slave/:host/:port", this.RestartSlave)
 	this.registerRequest(m, "stop-slave/:host/:port", this.StopSlave)
 	this.registerRequest(m, "stop-slave-nice/:host/:port", this.StopSlaveNicely)
