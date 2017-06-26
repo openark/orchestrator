@@ -93,12 +93,12 @@ func RegisterNode(extraInfo string, command string, firstTime bool) (healthy boo
 		}
 	}
 	{
-		db_backend := ""
+		dbBackend := ""
 		if config.Config.IsSQLite() {
-			db_backend = config.Config.SQLite3DataFile
+			dbBackend = config.Config.SQLite3DataFile
 		} else {
-			db_backend = config.Config.MySQLOrchestratorHost + ":" +
-				fmt.Sprintf("%d", config.Config.MySQLOrchestratorPort)
+			dbBackend = fmt.Sprintf("%s:%d", config.Config.MySQLOrchestratorHost,
+				config.Config.MySQLOrchestratorPort)
 		}
 		sqlResult, err := db.ExecOrchestrator(`
 			insert ignore into node_health
@@ -108,7 +108,7 @@ func RegisterNode(extraInfo string, command string, firstTime bool) (healthy boo
 			`,
 			ThisHostname, ProcessToken.Hash, extraInfo, command,
 			config.RuntimeCLIFlags.ConfiguredVersion,
-			db_backend,
+			dbBackend,
 		)
 		if err != nil {
 			return false, log.Errore(err)
