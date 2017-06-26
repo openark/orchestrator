@@ -28,7 +28,7 @@ $(document).ready(function () {
             '<tr><td></td>' +
             '<td><b>Hostname</b></td>' +
             '<td><b>Running Since</b></td>' +
-            '<td><b>MySQL Backend</b></td>' +
+            '<td><b>DB Backend</b></td>' +
             '<td><b>App Version</b></td></tr>'
         );
     	health.Details.AvailableNodes.forEach(function(node) {
@@ -52,7 +52,7 @@ $(document).ready(function () {
 				message += '</code>';
 
                 var running_since ='<span class="text-info">'+node.FirstSeenActive+'</span>';
-				var address = node.MySQLBackendHostname + ':' + node.MySQLBackendPort;
+				var address = node.DBBackend;
 
             addStatusTableData("Available node", message, running_since, address, app_version);
     	})

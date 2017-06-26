@@ -1249,8 +1249,7 @@ var generateSQLPatches = []string{
 	`,
 	`
 		ALTER TABLE node_health
-			ADD COLUMN mysql_backend_hostname varchar(128) CHARACTER SET ascii,
-			ADD COLUMN mysql_backend_port smallint UNSIGNED
+			ADD COLUMN db_backend varchar(255) CHARACTER SET ascii NOT NULL DEFAULT ""
 	`,
 }
 
