@@ -19,6 +19,7 @@ package process
 import (
 	"time"
 
+	"fmt"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 	"github.com/openark/golib/log"
@@ -33,6 +34,7 @@ type NodeHealth struct {
 	AppVersion      string
 	FirstSeenActive string
 	LastSeenActive  string
+	DBBackend       string
 }
 
 type HealthStatus struct {
@@ -91,14 +93,22 @@ func RegisterNode(extraInfo string, command string, firstTime bool) (healthy boo
 		}
 	}
 	{
+		dbBackend := ""
+		if config.Config.IsSQLite() {
+			dbBackend = config.Config.SQLite3DataFile
+		} else {
+			dbBackend = fmt.Sprintf("%s:%d", config.Config.MySQLOrchestratorHost,
+				config.Config.MySQLOrchestratorPort)
+		}
 		sqlResult, err := db.ExecOrchestrator(`
 			insert ignore into node_health
-				(hostname, token, first_seen_active, last_seen_active, extra_info, command, app_version)
+				(hostname, token, first_seen_active, last_seen_active, extra_info, command, app_version, db_backend)
 			values
-				(?, ?, now(), now(), ?, ?, ?)
+				(?, ?, now(), now(), ?, ?, ?, ?)
 			`,
 			ThisHostname, ProcessToken.Hash, extraInfo, command,
 			config.RuntimeCLIFlags.ConfiguredVersion,
+			dbBackend,
 		)
 		if err != nil {
 			return false, log.Errore(err)
@@ -203,7 +213,7 @@ func ReadAvailableNodes(onlyHttpNodes bool) (nodes [](*NodeHealth), err error) {
 	}
 	query := `
 		select
-			hostname, token, app_version, first_seen_active, last_seen_active
+			hostname, token, app_version, first_seen_active, last_seen_active, db_backend
 		from
 			node_health
 		where
@@ -220,6 +230,7 @@ func ReadAvailableNodes(onlyHttpNodes bool) (nodes [](*NodeHealth), err error) {
 			AppVersion:      m.GetString("app_version"),
 			FirstSeenActive: m.GetString("first_seen_active"),
 			LastSeenActive:  m.GetString("last_seen_active"),
+			DBBackend:       m.GetString("db_backend"),
 		}
 		nodes = append(nodes, nodeHealth)
 		return nil
