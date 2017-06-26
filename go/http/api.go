@@ -1321,7 +1321,7 @@ func (this *HttpAPI) KillQuery(params martini.Params, r render.Render, req *http
 
 // Cluster provides list of instances in given cluster
 func (this *HttpAPI) Cluster(params martini.Params, r render.Render, req *http.Request) {
-	clusterName, err := figureClusterName(params["clusterName"])
+	clusterName, err := figureClusterName(params["clusterHint"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -1368,7 +1368,7 @@ func (this *HttpAPI) ClusterByInstance(params martini.Params, r render.Render, r
 
 // ClusterInfo provides details of a given cluster
 func (this *HttpAPI) ClusterInfo(params martini.Params, r render.Render, req *http.Request) {
-	clusterName, err := figureClusterName(params["clusterName"])
+	clusterName, err := figureClusterName(params["clusterHint"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -2330,16 +2330,44 @@ func (this *HttpAPI) Recover(params martini.Params, r render.Render, req *http.R
 	}
 
 	skipProcesses := (req.URL.Query().Get("skipProcesses") == "true") || (params["skipProcesses"] == "true")
-	recoveryAttempted, _, err := logic.CheckAndRecover(&instanceKey, candidateKey, skipProcesses)
+	recoveryAttempted, promotedInstanceKey, err := logic.CheckAndRecover(&instanceKey, candidateKey, skipProcesses)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error(), Details: instanceKey})
+		return
+	}
+	if !recoveryAttempted {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Recovery not attempted", Details: instanceKey})
+		return
+	}
+	if promotedInstanceKey == nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Recovery attempted but no instance promoted", Details: instanceKey})
+		return
+	}
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Recovery executed on %+v", instanceKey), Details: *promotedInstanceKey})
+}
+
+// GracefulMasterTakeover gracefully fails over a master onto its single replica.
+func (this *HttpAPI) GracefulMasterTakeover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	clusterName, err := figureClusterName(getClusterHint(params))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	if recoveryAttempted {
-		Respond(r, &APIResponse{Code: OK, Message: "Action taken", Details: instanceKey})
-	} else {
-		Respond(r, &APIResponse{Code: ERROR, Message: "No action taken", Details: instanceKey})
+	topologyRecovery, _, err := logic.GracefulMasterTakeover(clusterName)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error(), Details: topologyRecovery})
+		return
 	}
+	if topologyRecovery.SuccessorKey == nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: "graceful-master-takeover: no successor promoted", Details: topologyRecovery})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: "graceful-master-takeover: successor promoted", Details: topologyRecovery})
 }
 
 // ForceMasterFailover fails over a master (even if there's no particular problem with the master)
@@ -2348,28 +2376,20 @@ func (this *HttpAPI) ForceMasterFailover(params martini.Params, r render.Render,
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	clusterName, err := figureClusterName(getClusterHint(params))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	instance, found, err := inst.ReadInstance(&instanceKey)
-	if (!found) || (err != nil) {
-		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot read instance: %+v", instanceKey)})
-		return
-	}
-
-	topologyRecovery, err := logic.ForceMasterFailover(instance.ClusterName)
+	topologyRecovery, err := logic.ForceMasterFailover(clusterName)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	fmt.Println(topologyRecovery.SuccessorKey.DisplayString())
-
 	if topologyRecovery.SuccessorKey != nil {
 		Respond(r, &APIResponse{Code: OK, Message: "Master failed over", Details: topologyRecovery})
 	} else {
-		Respond(r, &APIResponse{Code: OK, Message: "Master not failed over", Details: topologyRecovery})
+		Respond(r, &APIResponse{Code: ERROR, Message: "Master not failed over", Details: topologyRecovery})
 	}
 }
 
@@ -2733,10 +2753,10 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "search", this.Search)
 
 	// Cluster
-	this.registerRequest(m, "cluster/:clusterName", this.Cluster)
+	this.registerRequest(m, "cluster/:clusterHint", this.Cluster)
 	this.registerRequest(m, "cluster/alias/:clusterAlias", this.ClusterByAlias)
 	this.registerRequest(m, "cluster/instance/:host/:port", this.ClusterByInstance)
-	this.registerRequest(m, "cluster-info/:clusterName", this.ClusterInfo)
+	this.registerRequest(m, "cluster-info/:clusterHint", this.ClusterInfo)
 	this.registerRequest(m, "cluster-info/alias/:clusterAlias", this.ClusterInfoByAlias)
 	this.registerRequest(m, "cluster-osc-slaves/:clusterName", this.ClusterOSCReplicas)
 	this.registerRequest(m, "set-cluster-alias/:clusterName", this.SetClusterAliasManualOverride)
@@ -2766,7 +2786,10 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "recover/:host/:port/:candidateHost/:candidatePort", this.Recover)
 	this.registerRequest(m, "recover-lite/:host/:port", this.RecoverLite)
 	this.registerRequest(m, "recover-lite/:host/:port/:candidateHost/:candidatePort", this.RecoverLite)
+	this.registerRequest(m, "graceful-master-takeover/:host/:port", this.GracefulMasterTakeover)
+	this.registerRequest(m, "graceful-master-takeover/:clusterHint", this.GracefulMasterTakeover)
 	this.registerRequest(m, "force-master-failover/:host/:port", this.ForceMasterFailover)
+	this.registerRequest(m, "force-master-failover/:clusterHint", this.ForceMasterFailover)
 	this.registerRequest(m, "register-candidate/:host/:port/:promotionRule", this.RegisterCandidate)
 	this.registerRequest(m, "automated-recovery-filters", this.AutomatedRecoveryFilters)
 	this.registerRequest(m, "audit-failure-detection", this.AuditFailureDetection)

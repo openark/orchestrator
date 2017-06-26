@@ -112,7 +112,7 @@ function api() {
   fi
   api_details=$(echo $api_response | jq '.Details')
   if echo $api_response | jq -r '.Code' | grep -q "ERROR" ; then
-    echo $api_response | jq -r '.Message' | xargs >&2 echo
+    echo $api_response | jq -r '.Message' | tr -d "'" | xargs >&2 echo
     [ "$api_details" != "null" ] && echo $api_details
     exit 1
   fi
@@ -288,6 +288,24 @@ function replication_analysis() {
   print_details | jq -r '.[] | (.AnalyzedInstanceKey.Hostname + ":" + (.AnalyzedInstanceKey.Port | tostring) + " (cluster " + .ClusterDetails.ClusterName + "): ") + .Analysis'
 }
 
+function recover() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "recover/$instance_hostport"
+  print_details | print_key
+}
+
+function graceful_master_takeover() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "graceful-master-takeover/${alias:-$instance}"
+  print_details | jq '.SuccessorKey' | print_key
+}
+
+function force_master_failover() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "force-master-failover/${alias:-$instance}"
+  print_details | jq '.SuccessorKey' | print_key
+}
+
 function run_command() {
   if [ -z "$command" ] ; then
     fail "No command given. Use -c or --command"
@@ -336,6 +354,9 @@ function run_command() {
     "set-read-only") general_instance_command ;;
     "set-writeable") general_instance_command ;;
     "flush-binary-logs") general_instance_command ;;
+    "recover") recover ;;
+    "graceful-master-takeover") graceful_master_takeover ;;
+    "force-master-failover") force_master_failover ;;
 
     "replication-analysis") replication_analysis ;;
     *) fail "Unsupported command $command" ;;

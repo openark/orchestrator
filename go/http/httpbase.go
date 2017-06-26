@@ -132,6 +132,19 @@ func getUserId(req *http.Request, user auth.User) string {
 	}
 }
 
+func getClusterHint(params map[string]string) string {
+	if params["clusterHint"] != "" {
+		return params["clusterHint"]
+	}
+	if params["clusterName"] != "" {
+		return params["clusterName"]
+	}
+	if params["host"] != "" && params["port"] != "" {
+		return fmt.Sprintf("%s:%s", params["host"], params["port"])
+	}
+	return ""
+}
+
 // figureClusterName is a convenience function to get a cluster name from hints
 func figureClusterName(hint string) (clusterName string, err error) {
 	instanceKey, _ := inst.ParseRawInstanceKeyLoose(hint)
