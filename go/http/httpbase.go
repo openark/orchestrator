@@ -64,6 +64,10 @@ func isAuthorizedForAction(req *http.Request, user auth.User) bool {
 					return true
 				}
 			}
+			// check the user's group is one of those listed here
+			if len(config.Config.PowerAuthGroups) > 0 && userInGroups(authUser, config.Config.PowerAuthGroups) {
+				return true
+			}
 			return false
 		}
 	case "token":
