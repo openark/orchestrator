@@ -313,6 +313,7 @@ function run_command() {
   case $command in
     "discover") discover ;;
     "forget") forget ;;
+
     "clusters") clusters ;;
     "clusters-alias") clusters_alias ;;
     "instance") instance ;;
@@ -321,10 +322,12 @@ function run_command() {
     "which-cluster-instances") which_cluster_instances ;;
     "which-cluster") which_cluster ;;
     "all-clusters-masters") all_clusters_masters ;;
+
     "begin-downtime") begin_downtime ;;
     "end-downtime") end_downtime ;;
     "begin-maintenance") begin_maintenance ;;
     "end-maintenance") end_maintenance ;;
+
     "move-up") general_singular_relocate_command ;;
     "match-up") general_singular_relocate_command ;;
     "make-co-master") general_singular_relocate_command ;;
@@ -342,6 +345,7 @@ function run_command() {
     "repoint-replicas") general_singular_relocate_replicas_command ;;
     "relocate-replicas") general_relocate_replicas_command ;;
     "move-replicas-gtid") general_relocate_replicas_command ;;
+
     "stop-slave") general_instance_command ;;
     "stop-slave-nice") general_instance_command ;;
     "start-slave") general_instance_command ;;
@@ -354,6 +358,7 @@ function run_command() {
     "set-read-only") general_instance_command ;;
     "set-writeable") general_instance_command ;;
     "flush-binary-logs") general_instance_command ;;
+
     "recover") recover ;;
     "graceful-master-takeover") graceful_master_takeover ;;
     "force-master-failover") force_master_failover ;;
