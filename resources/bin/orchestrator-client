@@ -9,6 +9,7 @@ alias=
 owner="$(whoami | xargs)"
 reason=
 duration="10m"
+promotion_rule=
 
 instance_hostport=
 destination_hostport=
@@ -25,13 +26,14 @@ for arg in "$@"; do
     "-alias"|"--alias")     set -- "$@" "-a" ;;
     "-owner"|"--owner")     set -- "$@" "-o" ;;
     "-reason"|"--reason")   set -- "$@" "-r" ;;
+    "-promotion-rule"|"--promotion-rule")   set -- "$@" "-R" ;;
     "-duration"|"--duration") set -- "$@" "-u" ;;
     "-api"|"--api")   set -- "$@" "-U" ;;
     *)           set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:" OPTION
 do
   case $OPTION in
     c) command=$OPTARG ;;
@@ -42,6 +44,7 @@ do
     o) owner=$OPTARG ;;
     r) reason=$OPTARG ;;
     u) duration=$OPTARG ;;
+    R) promotion_rule=$OPTARG ;;
     D) default_port=$OPTARG ;;
     U) orchestrator_api=$OPTARG ;;
   esac
@@ -227,6 +230,13 @@ function end_maintenance() {
   print_details | print_key
 }
 
+function register_candidate() {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "promotion-rule" "$promotion_rule"
+  api "register-candidate/$instance_hostport/$promotion_rule"
+  print_details | print_key
+}
+
 function general_singular_relocate_command() {
   path="${1:-$command}"
 
@@ -327,6 +337,7 @@ function run_command() {
     "end-downtime") end_downtime ;;
     "begin-maintenance") begin_maintenance ;;
     "end-maintenance") end_maintenance ;;
+    "register-candidate") register_candidate ;;
 
     "move-up") general_singular_relocate_command ;;
     "match-up") general_singular_relocate_command ;;
