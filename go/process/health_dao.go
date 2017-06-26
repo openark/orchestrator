@@ -28,11 +28,13 @@ import (
 const registrationPollSeconds = 10
 
 type NodeHealth struct {
-	Hostname        string
-	Token           string
-	AppVersion      string
-	FirstSeenActive string
-	LastSeenActive  string
+	Hostname             string
+	Token                string
+	AppVersion           string
+	FirstSeenActive      string
+	LastSeenActive       string
+	MySQLBackendHostname string
+	MySQLBackendPort     int
 }
 
 type HealthStatus struct {
@@ -93,12 +95,15 @@ func RegisterNode(extraInfo string, command string, firstTime bool) (healthy boo
 	{
 		sqlResult, err := db.ExecOrchestrator(`
 			insert ignore into node_health
-				(hostname, token, first_seen_active, last_seen_active, extra_info, command, app_version)
+				(hostname, token, first_seen_active, last_seen_active, extra_info, command, app_version,
+				mysql_backend_hostname, mysql_backend_port)
 			values
-				(?, ?, now(), now(), ?, ?, ?)
+				(?, ?, now(), now(), ?, ?, ?, ?, ?)
 			`,
 			ThisHostname, ProcessToken.Hash, extraInfo, command,
 			config.RuntimeCLIFlags.ConfiguredVersion,
+			config.Config.MySQLOrchestratorHost,
+			config.Config.MySQLOrchestratorPort,
 		)
 		if err != nil {
 			return false, log.Errore(err)
@@ -203,7 +208,8 @@ func ReadAvailableNodes(onlyHttpNodes bool) (nodes [](*NodeHealth), err error) {
 	}
 	query := `
 		select
-			hostname, token, app_version, first_seen_active, last_seen_active
+			hostname, token, app_version, first_seen_active, last_seen_active, mysql_backend_hostname,
+			mysql_backend_port
 		from
 			node_health
 		where
@@ -215,11 +221,13 @@ func ReadAvailableNodes(onlyHttpNodes bool) (nodes [](*NodeHealth), err error) {
 
 	err = db.QueryOrchestrator(query, sqlutils.Args(registrationPollSeconds*2, extraInfo), func(m sqlutils.RowMap) error {
 		nodeHealth := &NodeHealth{
-			Hostname:        m.GetString("hostname"),
-			Token:           m.GetString("token"),
-			AppVersion:      m.GetString("app_version"),
-			FirstSeenActive: m.GetString("first_seen_active"),
-			LastSeenActive:  m.GetString("last_seen_active"),
+			Hostname:             m.GetString("hostname"),
+			Token:                m.GetString("token"),
+			AppVersion:           m.GetString("app_version"),
+			FirstSeenActive:      m.GetString("first_seen_active"),
+			LastSeenActive:       m.GetString("last_seen_active"),
+			MySQLBackendHostname: m.GetString("mysql_backend_hostname"),
+			MySQLBackendPort:     m.GetInt("mysql_backend_port"),
 		}
 		nodes = append(nodes, nodeHealth)
 		return nil

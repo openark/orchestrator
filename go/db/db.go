@@ -1247,6 +1247,11 @@ var generateSQLPatches = []string{
 	`
 		CREATE UNIQUE INDEX host_port_active_recoverable_uidx_topology_failure_detection ON topology_failure_detection (hostname, port, in_active_period, end_active_period_unixtime, is_actionable)
 	`,
+	`
+		ALTER TABLE node_health
+			ADD COLUMN mysql_backend_hostname varchar(128) CHARACTER SET ascii,
+			ADD COLUMN mysql_backend_port smallint UNSIGNED
+	`,
 }
 
 // Track if a TLS has already been configured for topology
