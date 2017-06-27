@@ -1206,10 +1206,22 @@ func ReadLostInRecoveryInstances(clusterName string) ([](*Instance), error) {
 		ifnull(
 			database_instance_downtime.downtime_active = 1
 			and database_instance_downtime.end_timestamp > now()
-			and database_instance_downtime.reason = ?, false)
+			and database_instance_downtime.reason = ?, 0)
 		and ? IN ('', cluster_name)
 	`
 	return readInstancesByCondition(condition, sqlutils.Args(DowntimeLostInRecoveryMessage, clusterName), "cluster_name asc, replication_depth asc")
+}
+
+// ReadDowntimedInstances returns all instances currently downtimed, potentially filtered by cluster
+func ReadDowntimedInstances(clusterName string) ([](*Instance), error) {
+	condition := `
+		ifnull(
+			database_instance_downtime.downtime_active = 1
+			and database_instance_downtime.end_timestamp > now()
+			, 0)
+		and ? IN ('', cluster_name)
+	`
+	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "cluster_name asc, replication_depth asc")
 }
 
 // ReadClusterCandidateInstances reads cluster instances which are also marked as candidates

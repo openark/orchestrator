@@ -201,6 +201,17 @@ function forget() {
   api "forget/$instance_hostport"
 }
 
+function all_clusters_instances() {
+  api "all-instances"
+  print_response | filter_keys | print_key
+}
+
+function downtimed() {
+  api "downtimed/${alias:-$instance}"
+  print_response | filter_keys | print_key
+}
+
+
 function begin_downtime() {
   assert_nonempty "instance" "$instance_hostport"
   assert_nonempty "owner" "$owner"
@@ -332,6 +343,8 @@ function run_command() {
     "which-cluster-instances") which_cluster_instances ;;
     "which-cluster") which_cluster ;;
     "all-clusters-masters") all_clusters_masters ;;
+    "all-clusters-instances") all_clusters_instances ;;
+    "downtimed") downtimed ;;
 
     "begin-downtime") begin_downtime ;;
     "end-downtime") end_downtime ;;

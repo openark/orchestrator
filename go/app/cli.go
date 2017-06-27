@@ -1189,6 +1189,17 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(instance.MasterKey.DisplayString())
 			}
 		}
+	case registerCliCommand("which-downtimed-instances", "Information", `List instances currently downtimed, potentially filtered by cluster`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			instances, err := inst.ReadDowntimedInstances(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, clusterInstance := range instances {
+				fmt.Println(clusterInstance.Key.DisplayString())
+			}
+		}
 	case registerCliCommand("which-replicas", "Information", `Output the fully-qualified hostname:port list of replicas of a given instance`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)

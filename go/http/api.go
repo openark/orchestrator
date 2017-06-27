@@ -1460,6 +1460,40 @@ func (this *HttpAPI) Masters(params martini.Params, r render.Render, req *http.R
 	r.JSON(http.StatusOK, instances)
 }
 
+// Downtimed lists downtimed instances, potentially filtered by cluster
+func (this *HttpAPI) Downtimed(params martini.Params, r render.Render, req *http.Request) {
+	clusterName := ""
+	if clusterHint := getClusterHint(params); clusterHint != "" {
+		var err error
+		clusterName, err = figureClusterName(clusterHint)
+		if err != nil {
+			Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+			return
+		}
+	}
+
+	instances, err := inst.ReadDowntimedInstances(clusterName)
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, instances)
+}
+
+// AllInstances lists all known instances
+func (this *HttpAPI) AllInstances(params martini.Params, r render.Render, req *http.Request) {
+	instances, err := inst.FindInstances(".")
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, instances)
+}
+
 // Search provides list of instances matching given search param via various criteria.
 func (this *HttpAPI) Search(params martini.Params, r render.Render, req *http.Request) {
 	searchString := params["searchString"]
@@ -2764,6 +2798,9 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "clusters-info", this.ClustersInfo)
 	this.registerRequest(m, "masters", this.Masters)
 	this.registerRequest(m, "instance-replicas/:host/:port", this.InstanceReplicas)
+	this.registerRequest(m, "all-instances", this.AllInstances)
+	this.registerRequest(m, "downtimed", this.Downtimed)
+	this.registerRequest(m, "downtimed/:clusterHint", this.Downtimed)
 
 	// Instance management:
 	this.registerRequest(m, "instance/:host/:port", this.Instance)
