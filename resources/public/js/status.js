@@ -1,10 +1,11 @@
 
-function addStatusTableData(name, column1, column2, column3) {
+function addStatusTableData(name, column1, column2, column3, column4) {
 	$("#orchestratorStatusTable").append(
 	        '<tr><td>' + name + '</td>' +
                 '<td>' + column1 + '</td>' +
-	            '<td><code class="text-info">' + column2 + '</code></td>' +
-				'<td><code class="text-info">' + column3 + '</code></td></tr>'
+                '<td><code class="text-info">' + column2 + '</code></td>' +
+                '<td><code class="text-info">' + column3 + '</code></td>' +
+                '<td><code class="text-info">' + column4 + '</code></td></tr>'
 	);
 }
 function addStatusActionButton(name, uri) {
@@ -27,6 +28,7 @@ $(document).ready(function () {
             '<tr><td></td>' +
             '<td><b>Hostname</b></td>' +
             '<td><b>Running Since</b></td>' +
+            '<td><b>DB Backend</b></td>' +
             '<td><b>App Version</b></td></tr>'
         );
     	health.Details.AvailableNodes.forEach(function(node) {
@@ -50,8 +52,9 @@ $(document).ready(function () {
 				message += '</code>';
 
                 var running_since ='<span class="text-info">'+node.FirstSeenActive+'</span>';
+				var address = node.DBBackend;
 
-            addStatusTableData("Available node", message, running_since, app_version);
+            addStatusTableData("Available node", message, running_since, address, app_version);
     	})
 
     	var userId = getUserId();
@@ -59,7 +62,7 @@ $(document).ready(function () {
     		userId = "[unknown]"
     	}
     	var userStatus = (isAuthorizedForAction() ? "admin" : "read only");
-        addStatusTableData("You", userId + ", " + userStatus, "", "");
+        addStatusTableData("You", userId + ", " + userStatus, "", "", "");
 
     	if (isAuthorizedForAction()) {
     		addStatusActionButton("Reload configuration", "reload-configuration");
