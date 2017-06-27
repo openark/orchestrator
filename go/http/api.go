@@ -1665,7 +1665,7 @@ func (this *HttpAPI) GetHeuristicClusterPoolInstances(params martini.Params, r r
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	clusterName, err := inst.ReadClusterNameByAlias(params["clusterName"])
+	clusterName, err := figureClusterName(getClusterHint(params))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return

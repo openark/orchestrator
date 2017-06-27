@@ -223,6 +223,13 @@ function submit_pool_instances() {
   print_details | jq -r
 }
 
+function which_heuristic_cluster_pool_instances() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  # pool is optional
+  api "heuristic-cluster-pool-instances/${alias:-$instance}/${pool}"
+  print_details | filter_keys | print_key
+}
+
 function begin_downtime() {
   assert_nonempty "instance" "$instance_hostport"
   assert_nonempty "owner" "$owner"
@@ -380,6 +387,7 @@ function run_command() {
     "downtimed") downtimed ;;
 
     "submit-pool-instances") submit_pool_instances ;;
+    "which-heuristic-cluster-pool-instances") which_heuristic_cluster_pool_instances ;;
 
     "begin-downtime") begin_downtime ;;
     "end-downtime") end_downtime ;;

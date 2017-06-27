@@ -1404,6 +1404,7 @@ func GetClusterHeuristicLag(clusterName string) (int64, error) {
 // GetHeuristicClusterPoolInstances returns instances of a cluster which are also pooled. If `pool` argument
 // is empty, all pools are considered, otherwise, only instances of given pool are considered.
 func GetHeuristicClusterPoolInstances(clusterName string, pool string) (result [](*Instance), err error) {
+	result = [](*Instance){}
 	instances, err := ReadClusterInstances(clusterName)
 	if err != nil {
 		return result, err
