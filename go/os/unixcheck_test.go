@@ -33,9 +33,9 @@ func init() {
 	// If you find a case where the tests fail due to user differences please
 	// adjust the test cases appropriately.
 	testCases = []testCase{
-		testCase{"root", []string{"root", "wheel"}, true},
-		testCase{"root", []string{"not_in_this_group"}, false},
-		testCase{"not_found_user", []string{"not_in_this_group"}, false},
+		{"root", []string{"root", "wheel"}, true},
+		{"root", []string{"not_in_this_group"}, false},
+		{"not_found_user", []string{"not_in_this_group"}, false},
 	}
 }
 

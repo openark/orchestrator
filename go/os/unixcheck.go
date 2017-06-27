@@ -23,8 +23,8 @@ import (
 	"github.com/openark/golib/log"
 )
 
-// check if the given user is in the given unix groups
-// - it might be good to cache this?
+// UserInGroups checks if the given username is in the given unix
+// groups.  It might be worth caching this for performance reasons.
 func UserInGroups(authUser string, powerAuthGroups []string) bool {
 	// these conditions are treated as false
 	if authUser == "" || len(powerAuthGroups) == 0 {
@@ -55,7 +55,7 @@ func UserInGroups(authUser string, powerAuthGroups []string) bool {
 	for _, gid := range gids {
 		group, err := user.LookupGroupId(gid)
 		if err != nil {
-			log.Errorf("Failed to lookup group id for gid %d: %v", group, err)
+			log.Errorf("Failed to lookup group id for gid %s: %v", gid, err) // yes gids are strings!
 			return false
 		}
 
