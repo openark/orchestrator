@@ -2689,8 +2689,8 @@ func (this *HttpAPI) BlockedRecoveries(params martini.Params, r render.Render, r
 	r.JSON(http.StatusOK, blockedRecoveries)
 }
 
-// DisableRecoveries globally disables recoveries
-func (this *HttpAPI) DisableRecoveries(params martini.Params, r render.Render, req *http.Request) {
+// DisableGlobalRecoveries globally disables recoveries
+func (this *HttpAPI) DisableGlobalRecoveries(params martini.Params, r render.Render, req *http.Request) {
 	err := logic.DisableRecovery()
 
 	if err != nil {
@@ -2698,11 +2698,11 @@ func (this *HttpAPI) DisableRecoveries(params martini.Params, r render.Render, r
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: "Globally disabled recoveries", Details: true})
+	Respond(r, &APIResponse{Code: OK, Message: "Globally disabled recoveries", Details: "disabled"})
 }
 
-// EnableRecoveries globally enables recoveries
-func (this *HttpAPI) EnableRecoveries(params martini.Params, r render.Render, req *http.Request) {
+// EnableGlobalRecoveries globally enables recoveries
+func (this *HttpAPI) EnableGlobalRecoveries(params martini.Params, r render.Render, req *http.Request) {
 	err := logic.EnableRecovery()
 
 	if err != nil {
@@ -2710,7 +2710,22 @@ func (this *HttpAPI) EnableRecoveries(params martini.Params, r render.Render, re
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: "Globally enabled recoveries", Details: true})
+	Respond(r, &APIResponse{Code: OK, Message: "Globally enabled recoveries", Details: "enabled"})
+}
+
+// CheckGlobalRecoveries checks whether
+func (this *HttpAPI) CheckGlobalRecoveries(params martini.Params, r render.Render, req *http.Request) {
+	isDisabled, err := logic.IsRecoveryDisabled()
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	details := "enabled"
+	if isDisabled {
+		details = "disabled"
+	}
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Global recoveries %+v", details), Details: details})
 }
 
 func (this *HttpAPI) getSynonymPath(path string) (synonymPath string) {
@@ -2873,8 +2888,9 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "ack-recovery/:recoveryId", this.AcknowledgeRecovery)
 	this.registerRequest(m, "blocked-recoveries", this.BlockedRecoveries)
 	this.registerRequest(m, "blocked-recoveries/cluster/:clusterName", this.BlockedRecoveries)
-	this.registerRequest(m, "disable-recoveries", this.DisableRecoveries)
-	this.registerRequest(m, "enable-recoveries", this.EnableRecoveries)
+	this.registerRequest(m, "disable-global-recoveries", this.DisableGlobalRecoveries)
+	this.registerRequest(m, "enable-global-recoveries", this.EnableGlobalRecoveries)
+	this.registerRequest(m, "check-global-recoveries", this.CheckGlobalRecoveries)
 
 	// General
 	this.registerRequest(m, "problems", this.Problems)

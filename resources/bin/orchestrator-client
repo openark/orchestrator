@@ -346,13 +346,18 @@ function ack_cluster_recoveries() {
 }
 
 function disable_global_recoveries() {
-  api "disable-recoveries"
-  print_details
+  api "disable-global-recoveries"
+  print_details | jq -r
 }
 
 function enable_global_recoveries() {
-  api "enable-recoveries"
-  print_details
+  api "enable-global-recoveries"
+  print_details | jq -r
+}
+
+function check_global_recoveries() {
+  api "check-global-recoveries"
+  print_details | jq -r
 }
 
 function run_command() {
@@ -419,6 +424,7 @@ function run_command() {
     "ack-cluster-recoveries") ack_cluster_recoveries ;;
     "disable-global-recoveries") disable_global_recoveries ;;
     "enable-global-recoveries") enable_global_recoveries ;;
+    "check-global-recoveries") check_global_recoveries ;;
 
     "replication-analysis") replication_analysis ;;
     *) fail "Unsupported command $command" ;;
