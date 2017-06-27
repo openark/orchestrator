@@ -24,6 +24,7 @@ import (
 	"github.com/martini-contrib/auth"
 
 	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/os"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/raft"
 )
@@ -69,6 +70,10 @@ func isAuthorizedForAction(req *http.Request, user auth.User) bool {
 				if configPowerAuthUser == "*" || configPowerAuthUser == authUser {
 					return true
 				}
+			}
+			// check the user's group is one of those listed here
+			if len(config.Config.PowerAuthGroups) > 0 && os.UserInGroups(authUser, config.Config.PowerAuthGroups) {
+				return true
 			}
 			return false
 		}
