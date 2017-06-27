@@ -1,6 +1,6 @@
 #!/bin/bash
 
-orchestrator_api="http://localhost:3000"
+orchestrator_api="${ORCHESTRATOR_API:-http://localhost:3000}"
 
 command=
 instance=
@@ -22,16 +22,16 @@ api_details=
 for arg in "$@"; do
   shift
   case "$arg" in
-    "-help"|"--help")       set -- "$@" "-h" ;;
-    "-command"|"--command") set -- "$@" "-c" ;;
-    "-alias"|"--alias")     set -- "$@" "-a" ;;
-    "-owner"|"--owner")     set -- "$@" "-o" ;;
-    "-reason"|"--reason")   set -- "$@" "-r" ;;
-    "-promotion-rule"|"--promotion-rule")   set -- "$@" "-R" ;;
-    "-duration"|"--duration") set -- "$@" "-u" ;;
-    "-pool"|"--pool") set -- "$@" "-l" ;;
-    "-api"|"--api")   set -- "$@" "-U" ;;
-    *)           set -- "$@" "$arg"
+    "-help"|"--help")                     set -- "$@" "-h" ;;
+    "-command"|"--command")               set -- "$@" "-c" ;;
+    "-alias"|"--alias")                   set -- "$@" "-a" ;;
+    "-owner"|"--owner")                   set -- "$@" "-o" ;;
+    "-reason"|"--reason")                 set -- "$@" "-r" ;;
+    "-promotion-rule"|"--promotion-rule") set -- "$@" "-R" ;;
+    "-duration"|"--duration")             set -- "$@" "-u" ;;
+    "-pool"|"--pool")                     set -- "$@" "-l" ;;
+    "-api"|"--api")                       set -- "$@" "-U" ;;
+    *)                                    set -- "$@" "$arg"
   esac
 done
 
@@ -220,8 +220,8 @@ function submit_pool_instances() {
   assert_nonempty "instance" "$instance"
   assert_nonempty "pool" "$pool"
   api "submit-pool-instances/$pool?instances=$(urlencode "$instance")"
+  print_details | jq -r
 }
-
 
 function begin_downtime() {
   assert_nonempty "instance" "$instance_hostport"
@@ -338,6 +338,23 @@ function force_master_failover() {
   print_details | jq '.SuccessorKey' | print_key
 }
 
+function ack_cluster_recoveries() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  assert_nonempty "reason" "$reason"
+  api "ack-recovery/cluster/${alias:-$instance}?comment=$(urlencode $reason)"
+  print_details
+}
+
+function disable_global_recoveries() {
+  api "disable-recoveries"
+  print_details
+}
+
+function enable_global_recoveries() {
+  api "enable-recoveries"
+  print_details
+}
+
 function run_command() {
   if [ -z "$command" ] ; then
     fail "No command given. Use -c or --command"
@@ -399,6 +416,9 @@ function run_command() {
     "recover") recover ;;
     "graceful-master-takeover") graceful_master_takeover ;;
     "force-master-failover") force_master_failover ;;
+    "ack-cluster-recoveries") ack_cluster_recoveries ;;
+    "disable-global-recoveries") disable_global_recoveries ;;
+    "enable-global-recoveries") enable_global_recoveries ;;
 
     "replication-analysis") replication_analysis ;;
     *) fail "Unsupported command $command" ;;

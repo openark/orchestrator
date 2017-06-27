@@ -1638,7 +1638,7 @@ func (this *HttpAPI) SubmitPoolInstances(params martini.Params, r render.Render,
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Applied %s pool instances", pool)})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Applied %s pool instances", pool), Details: pool})
 }
 
 // SubmitPoolHostnames (re-)applies the list of hostnames for a given pool
@@ -2613,7 +2613,7 @@ func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r rende
 		return
 	}
 
-	r.JSON(http.StatusOK, countAcnowledgedRecoveries)
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Acknowledged %s recoveries on %+v", countAcnowledgedRecoveries, clusterName), Details: countAcnowledgedRecoveries})
 }
 
 // ClusterInfo provides details of a given cluster
@@ -2687,6 +2687,30 @@ func (this *HttpAPI) BlockedRecoveries(params martini.Params, r render.Render, r
 	}
 
 	r.JSON(http.StatusOK, blockedRecoveries)
+}
+
+// DisableRecoveries globally disables recoveries
+func (this *HttpAPI) DisableRecoveries(params martini.Params, r render.Render, req *http.Request) {
+	err := logic.DisableRecovery()
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: "Globally disabled recoveries", Details: true})
+}
+
+// EnableRecoveries globally enables recoveries
+func (this *HttpAPI) EnableRecoveries(params martini.Params, r render.Render, req *http.Request) {
+	err := logic.EnableRecovery()
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: "Globally enabled recoveries", Details: true})
 }
 
 func (this *HttpAPI) getSynonymPath(path string) (synonymPath string) {
@@ -2849,6 +2873,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "ack-recovery/:recoveryId", this.AcknowledgeRecovery)
 	this.registerRequest(m, "blocked-recoveries", this.BlockedRecoveries)
 	this.registerRequest(m, "blocked-recoveries/cluster/:clusterName", this.BlockedRecoveries)
+	this.registerRequest(m, "disable-recoveries", this.DisableRecoveries)
+	this.registerRequest(m, "enable-recoveries", this.EnableRecoveries)
 
 	// General
 	this.registerRequest(m, "problems", this.Problems)
