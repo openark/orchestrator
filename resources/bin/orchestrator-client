@@ -10,6 +10,7 @@ owner="$(whoami | xargs)"
 reason=
 duration="10m"
 promotion_rule=
+pool=
 
 instance_hostport=
 destination_hostport=
@@ -28,12 +29,13 @@ for arg in "$@"; do
     "-reason"|"--reason")   set -- "$@" "-r" ;;
     "-promotion-rule"|"--promotion-rule")   set -- "$@" "-R" ;;
     "-duration"|"--duration") set -- "$@" "-u" ;;
+    "-pool"|"--pool") set -- "$@" "-l" ;;
     "-api"|"--api")   set -- "$@" "-U" ;;
     *)           set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:l:" OPTION
 do
   case $OPTION in
     c) command=$OPTARG ;;
@@ -45,6 +47,7 @@ do
     r) reason=$OPTARG ;;
     u) duration=$OPTARG ;;
     R) promotion_rule=$OPTARG ;;
+    l) pool=$OPTARG ;;
     D) default_port=$OPTARG ;;
     U) orchestrator_api=$OPTARG ;;
   esac
@@ -211,6 +214,14 @@ function downtimed() {
   print_response | filter_keys | print_key
 }
 
+function submit_pool_instances() {
+  # 'instance' is comma delimited, e.g.
+  #   myinstance1.com:3306,myinstance2.com:3306,myinstance3.com:3306
+  assert_nonempty "instance" "$instance"
+  assert_nonempty "pool" "$pool"
+  api "submit-pool-instances/$pool?instances=$(urlencode "$instance")"
+}
+
 
 function begin_downtime() {
   assert_nonempty "instance" "$instance_hostport"
@@ -345,6 +356,8 @@ function run_command() {
     "all-clusters-masters") all_clusters_masters ;;
     "all-clusters-instances") all_clusters_instances ;;
     "downtimed") downtimed ;;
+
+    "submit-pool-instances") submit_pool_instances ;;
 
     "begin-downtime") begin_downtime ;;
     "end-downtime") end_downtime ;;
