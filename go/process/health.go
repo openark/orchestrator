@@ -36,7 +36,7 @@ type NodeHealth struct {
 	LastSeenActive  string
 	ExtraInfo       string
 	Command         string
-DBBackend       string
+	DBBackend       string
 
 	LastReported time.Time
 	onceHistory  sync.Once

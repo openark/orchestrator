@@ -93,7 +93,7 @@ func WriteRegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
 			nodeHealth.Hostname, nodeHealth.Token,
 			reportedSecondsAgo, reportedSecondsAgo,
 			nodeHealth.ExtraInfo, nodeHealth.Command,
-			nodeHealth.AppVersion, dbBackend    
+			nodeHealth.AppVersion, dbBackend,
 		)
 		if err != nil {
 			return false, log.Errore(err)
