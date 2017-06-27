@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package http
+package os
 
 import (
 	"os/user"
@@ -25,7 +25,7 @@ import (
 
 // check if the given user is in the given unix groups
 // - it might be good to cache this?
-func userInGroups(authUser string, powerAuthGroups []string) bool {
+func UserInGroups(authUser string, powerAuthGroups []string) bool {
 	// these conditions are treated as false
 	if authUser == "" || len(powerAuthGroups) == 0 {
 		return false

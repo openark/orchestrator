@@ -13,7 +13,7 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 */
-package http
+package os
 
 import (
 	"testing"
@@ -42,7 +42,7 @@ func init() {
 // test the users etc
 func TestUsers(t *testing.T) {
 	for _, v := range testCases {
-		if got := userInGroups(v.user, v.powerUsers); got != v.expected {
+		if got := UserInGroups(v.user, v.powerUsers); got != v.expected {
 			t.Errorf("userInGroups(%q,%+v) failed. Got %v, Expected %v", v.user, v.powerUsers, got, v.expected)
 		}
 	}
