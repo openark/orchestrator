@@ -1247,6 +1247,10 @@ var generateSQLPatches = []string{
 	`
 		CREATE UNIQUE INDEX host_port_active_recoverable_uidx_topology_failure_detection ON topology_failure_detection (hostname, port, in_active_period, end_active_period_unixtime, is_actionable)
 	`,
+	`
+		ALTER TABLE node_health
+			ADD COLUMN db_backend varchar(255) CHARACTER SET ascii NOT NULL DEFAULT ""
+	`,
 }
 
 // Track if a TLS has already been configured for topology
@@ -1346,7 +1350,23 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 		if !config.Config.SkipOrchestratorDatabaseUpdate {
 			initOrchestratorDB(db)
 		}
-		db.SetMaxIdleConns(10)
+		// A low value here will trigger reconnects which could
+		// make the number of backend connections hit the tcp
+		// limit. That's bad.  I could make this setting dynamic
+		// but then people need to know which value to use. For now
+		// allow up to 25% of MySQLOrchestratorMaxPoolConnections
+		// to be idle.  That should provide a good number which
+		// does not keep the maximum number of connections open but
+		// at the same time does not trigger disconnections and
+		// reconnections too frequently.
+		maxIdleConns := int(config.Config.MySQLOrchestratorMaxPoolConnections * 25 / 100)
+		if maxIdleConns < 10 {
+			maxIdleConns = 10
+		}
+		log.Infof("Connecting to backend: maxConnections: %d, maxIdleConns: %d",
+			config.Config.MySQLOrchestratorMaxPoolConnections,
+			maxIdleConns)
+		db.SetMaxIdleConns(maxIdleConns)
 	}
 	return db, err
 }
