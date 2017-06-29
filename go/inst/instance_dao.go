@@ -357,22 +357,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			}()
 		}
 
-		if config.Config.SlaveLagQuery != "" {
-			waitGroup.Add(1)
-			go func() {
-				defer waitGroup.Done()
-				if err := db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SlaveLagSeconds); err == nil {
-					if instance.SlaveLagSeconds.Valid && instance.SlaveLagSeconds.Int64 < 0 {
-						log.Warningf("Host: %+v, instance.SlaveLagSeconds < 0 [%+v], correcting to 0", instanceKey, instance.SlaveLagSeconds.Int64)
-						instance.SlaveLagSeconds.Int64 = 0
-					}
-				} else {
-					instance.SlaveLagSeconds = instance.SecondsBehindMaster
-					logReadTopologyInstanceError(instanceKey, "SlaveLagQuery", err)
-				}
-			}()
-		}
-
 		var mysqlHostname, mysqlReportHost string
 		err = db.QueryRow("select @@global.hostname, ifnull(@@global.report_host, ''), @@global.server_id, @@global.version, @@global.version_comment, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
 			&mysqlHostname, &mysqlReportHost, &instance.ServerID, &instance.Version, &instance.VersionComment, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
@@ -511,6 +495,22 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	if isMaxScale && !slaveStatusFound {
 		err = fmt.Errorf("No 'SHOW SLAVE STATUS' output found for a MaxScale instance: %+v", instanceKey)
 		goto Cleanup
+	}
+
+	if config.Config.ReplicationLagQuery != "" && !isMaxScale {
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			if err := db.QueryRow(config.Config.ReplicationLagQuery).Scan(&instance.SlaveLagSeconds); err == nil {
+				if instance.SlaveLagSeconds.Valid && instance.SlaveLagSeconds.Int64 < 0 {
+					log.Warningf("Host: %+v, instance.SlaveLagSeconds < 0 [%+v], correcting to 0", instanceKey, instance.SlaveLagSeconds.Int64)
+					instance.SlaveLagSeconds.Int64 = 0
+				}
+			} else {
+				instance.SlaveLagSeconds = instance.SecondsBehindMaster
+				logReadTopologyInstanceError(instanceKey, "ReplicationLagQuery", err)
+			}
+		}()
 	}
 
 	instanceFound = true
