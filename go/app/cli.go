@@ -98,7 +98,7 @@ func commandsListing() string {
 func availableCommandsUsage() string {
 	return fmt.Sprintf(`Available commands (-c):
 %+v
-Run 'orchestrator' for full blown documentation
+Run 'orchestrator help <command>' for detailed help on given command, e.g. 'orchestrator help relocate'
 
 Usage for most commands:
 	orchestrator -c <command> [-i <instance.fqdn>[,<instance.fqdn>]* ] [-d <destination.fqdn>] [--verbose|--debug]
@@ -1644,4 +1644,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	default:
 		log.Fatalf("Unknown command: \"%s\". %s", command, availableCommandsUsage())
 	}
+}
+
+func HelpCommand(command string) {
+	fmt.Println(CommandHelp[command])
 }
