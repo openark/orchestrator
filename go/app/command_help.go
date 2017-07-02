@@ -10,6 +10,23 @@ import (
 	"strings"
 )
 
+const AppPrompt string = `
+orchestrator [-c command] [-i instance] [-d destination] [--verbose|--debug] [... cli ] | http
+
+Cheatsheet:
+    Run orchestrator in HTTP mode:
+
+        orchestrator --debug http
+
+    See all possible commands:
+
+        orchestrator help
+
+    Detailed help for a given command (e.g. "relocate")
+
+        orchestrator help relocate
+`
+
 var CommandHelp map[string]string
 
 func init() {
