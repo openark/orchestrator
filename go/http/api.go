@@ -2185,7 +2185,7 @@ func (this *HttpAPI) RaftYield(params martini.Params, r render.Render, req *http
 		return
 	}
 
-	orcraft.PublishCommand("yield-to", params["node"])
+	orcraft.PublishYield(params["node"])
 
 	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Asynchronously yielded")})
 

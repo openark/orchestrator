@@ -90,7 +90,7 @@ func StepDown() {
 	getRaft().StepDown()
 }
 
-func Yield() {
+func yield() {
 	getRaft().Yield()
 }
 
@@ -118,6 +118,10 @@ func PublishCommand(op string, value interface{}) (response interface{}, err err
 		return nil, err
 	}
 	return store.genericCommand(op, b)
+}
+
+func PublishYield(toPeer string) (response interface{}, err error) {
+	return store.genericCommand("yield", []byte(toPeer))
 }
 
 // Monitor is a utility function to routinely observe leadership state.

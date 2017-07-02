@@ -35,6 +35,16 @@ func (f *fsm) Apply(l *raft.Log) interface{} {
 		log.Errorf("failed to unmarshal command: %s", err.Error())
 	}
 
+	if c.Op == "yield" {
+		toPeer := string(c.Value)
+		isThisPeer, err := IsPeer(toPeer)
+		if err != nil {
+			log.Errorf("failed to unmarshal command: %s", err.Error())
+		} else if !isThisPeer {
+			yield()
+		}
+		return "yield"
+	}
 	return store.applier.ApplyCommand(c.Op, c.Value)
 }
 
