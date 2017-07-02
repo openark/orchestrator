@@ -43,6 +43,7 @@ func (f *fsm) Apply(l *raft.Log) interface{} {
 		}
 		if isThisPeer {
 			log.Debugf("Will not yield to myself")
+			return nil
 		}
 		log.Debugf("Yielding to %s", toPeer)
 		return yield()
