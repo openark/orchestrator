@@ -1645,7 +1645,3 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		log.Fatalf("Unknown command: \"%s\". %s", command, availableCommandsUsage())
 	}
 }
-
-func HelpCommand(command string) {
-	fmt.Println(CommandHelp[command])
-}

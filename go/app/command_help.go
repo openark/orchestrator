@@ -6,6 +6,7 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -881,4 +882,9 @@ func init() {
 	for key := range CommandHelp {
 		CommandHelp[key] = strings.Trim(CommandHelp[key], "\n")
 	}
+}
+
+func HelpCommand(command string) {
+	fmt.Println(
+		fmt.Sprintf("%s:\n%s", command, CommandHelp[command]))
 }
