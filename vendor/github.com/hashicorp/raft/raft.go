@@ -1947,7 +1947,7 @@ func (r *Raft) StepDown() error {
 // following duration.
 func (r *Raft) Yield() error {
 	atomic.StoreInt64(&r.suspendLeadership, 1)
-	yieldDuration := r.conf.HeartbeatTimeout * 3
+	yieldDuration := r.conf.HeartbeatTimeout * 5 // time enough for the yielded-to peer to become leader
 	go time.AfterFunc(yieldDuration, func() {
 		atomic.StoreInt64(&r.suspendLeadership, 0)
 	})
