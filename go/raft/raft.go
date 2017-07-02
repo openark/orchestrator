@@ -90,8 +90,11 @@ func StepDown() {
 	getRaft().StepDown()
 }
 
-func yield() {
-	getRaft().Yield()
+func yield() error {
+	if !IsRaftEnabled() {
+		return RaftNotRunning
+	}
+	return getRaft().Yield()
 }
 
 func GetPeers() ([]string, error) {

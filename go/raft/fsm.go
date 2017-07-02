@@ -39,11 +39,12 @@ func (f *fsm) Apply(l *raft.Log) interface{} {
 		toPeer := string(c.Value)
 		isThisPeer, err := IsPeer(toPeer)
 		if err != nil {
-			log.Errorf("failed to unmarshal command: %s", err.Error())
-		} else if !isThisPeer {
-			yield()
+			return log.Errorf("failed to unmarshal command: %s", err.Error())
 		}
-		return "yield"
+		if isThisPeer {
+			log.Debugf("Will not yield to myself")
+		}
+		return yield()
 	}
 	return store.applier.ApplyCommand(c.Op, c.Value)
 }
