@@ -60,6 +60,7 @@ func main() {
 	config.RuntimeCLIFlags.GrabElection = flag.Bool("grab-election", false, "Grab leadership (only applies to continuous mode)")
 	config.RuntimeCLIFlags.PromotionRule = flag.String("promotion-rule", "prefer", "Promotion rule for register-andidate (prefer|neutral|must_not)")
 	config.RuntimeCLIFlags.Version = flag.Bool("version", false, "Print version and exit")
+	config.RuntimeCLIFlags.SkipContinuousRegistration = flag.Bool("skip-continuous-registration", false, "Skip cli commands performaing continuous registration (to reduce orchestratrator backend db load")
 	flag.Parse()
 
 	if *destination != "" && *sibling != "" {
