@@ -246,7 +246,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	}
 	inst.SetMaintenanceOwner(owner)
 
-	if !skipDatabaseCommands {
+	if !skipDatabaseCommands && !*config.RuntimeCLIFlags.SkipContinuousRegistration {
 		process.ContinuousRegistration(string(process.OrchestratorExecutionCliMode), command)
 	}
 	// begin commands
