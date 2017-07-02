@@ -1601,7 +1601,7 @@ func (this *HttpAPI) DeregisterHostnameUnresolve(params martini.Params, r render
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: "Hostname deregister unresolve completed"})
+	Respond(r, &APIResponse{Code: OK, Message: "Hostname deregister unresolve completed", Details: instanceKey})
 }
 
 // RegisterHostnameUnresolve registers the unresolve name to use
@@ -1620,7 +1620,7 @@ func (this *HttpAPI) RegisterHostnameUnresolve(params martini.Params, r render.R
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: "Hostname register unresolve completed"})
+	Respond(r, &APIResponse{Code: OK, Message: "Hostname register unresolve completed", Details: instanceKey})
 }
 
 // SubmitPoolInstances (re-)applies the list of hostnames for a given pool

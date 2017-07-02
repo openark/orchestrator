@@ -11,6 +11,7 @@ reason=
 duration="10m"
 promotion_rule=
 pool=
+hostname_flag=
 
 instance_hostport=
 destination_hostport=
@@ -30,12 +31,13 @@ for arg in "$@"; do
     "-promotion-rule"|"--promotion-rule") set -- "$@" "-R" ;;
     "-duration"|"--duration")             set -- "$@" "-u" ;;
     "-pool"|"--pool")                     set -- "$@" "-l" ;;
+    "-hostname"|"--hostname")             set -- "$@" "-H" ;;
     "-api"|"--api")                       set -- "$@" "-U" ;;
     *)                                    set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:l:" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:" OPTION
 do
   case $OPTION in
     c) command=$OPTARG ;;
@@ -48,6 +50,7 @@ do
     u) duration=$OPTARG ;;
     R) promotion_rule=$OPTARG ;;
     l) pool=$OPTARG ;;
+    H) hostname_flag=$OPTARG ;;
     D) default_port=$OPTARG ;;
     U) orchestrator_api=$OPTARG ;;
   esac
@@ -266,6 +269,19 @@ function register_candidate() {
   print_details | print_key
 }
 
+function register_hostname_unresolve() {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "hostname" "$hostname_flag"
+  api "register-hostname-unresolve/$instance_hostport/$hostname_flag"
+  print_details | print_key
+}
+
+function deregister_hostname_unresolve() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "deregister-hostname-unresolve/$instance_hostport"
+  print_details | print_key
+}
+
 function general_singular_relocate_command() {
   path="${1:-$command}"
 
@@ -394,6 +410,8 @@ function run_command() {
     "begin-maintenance") begin_maintenance ;;
     "end-maintenance") end_maintenance ;;
     "register-candidate") register_candidate ;;
+    "register-hostname-unresolve") register_hostname_unresolve ;;
+    "deregister-hostname-unresolve") deregister_hostname_unresolve ;;
 
     "move-up") general_singular_relocate_command ;;
     "match-up") general_singular_relocate_command ;;
