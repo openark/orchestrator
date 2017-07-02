@@ -157,6 +157,12 @@ function discover() {
   print_details | filter_key | print_key
 }
 
+function ascii_topology() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "topology/${alias:-$instance}"
+  print_details | jq -r '.'
+}
+
 function instance() {
   assert_nonempty "instance" "$instance_hostport"
   api "instance/$instance_hostport"
@@ -391,6 +397,7 @@ function run_command() {
     "discover") discover ;;
     "forget") forget ;;
 
+    "topology") ascii_topology ;;
     "clusters") clusters ;;
     "clusters-alias") clusters_alias ;;
     "instance") instance ;;

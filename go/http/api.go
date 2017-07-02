@@ -1319,6 +1319,23 @@ func (this *HttpAPI) KillQuery(params martini.Params, r render.Render, req *http
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Query killed on : %+v", instance.Key), Details: instance})
 }
 
+// AsciiTopology returns an ascii graph of cluster's instances
+func (this *HttpAPI) AsciiTopology(params martini.Params, r render.Render, req *http.Request) {
+	clusterName, err := figureClusterName(params["clusterHint"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	asciiOutput, err := inst.ASCIITopology(clusterName, "")
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Topology for cluster %s", clusterName), Details: asciiOutput})
+}
+
 // Cluster provides list of instances in given cluster
 func (this *HttpAPI) Cluster(params martini.Params, r render.Render, req *http.Request) {
 	clusterName, err := figureClusterName(params["clusterHint"])
@@ -2840,6 +2857,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "all-instances", this.AllInstances)
 	this.registerRequest(m, "downtimed", this.Downtimed)
 	this.registerRequest(m, "downtimed/:clusterHint", this.Downtimed)
+	this.registerRequest(m, "topology/:clusterHint", this.AsciiTopology)
+	this.registerRequest(m, "topology/:host/:port", this.AsciiTopology)
 
 	// Instance management:
 	this.registerRequest(m, "instance/:host/:port", this.Instance)
