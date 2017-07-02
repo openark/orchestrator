@@ -23,7 +23,8 @@ type Store struct {
 	raftDir  string
 	raftBind string
 
-	raft *raft.Raft // The consensus mechanism
+	raft      *raft.Raft // The consensus mechanism
+	peerStore raft.PeerStore
 
 	applier CommandApplier
 }
@@ -99,6 +100,7 @@ func (store *Store) Open(peerNodes []string) error {
 	if store.raft, err = raft.NewRaft(config, (*fsm)(store), logStore, logStore, snapshots, peerStore, transport); err != nil {
 		return fmt.Errorf("error creating new raft: %s", err)
 	}
+	store.peerStore = peerStore
 	log.Infof("new raft created")
 
 	return nil

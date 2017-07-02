@@ -2174,6 +2174,43 @@ func (this *HttpAPI) Reelect(params martini.Params, r render.Render, req *http.R
 
 }
 
+// Reelect causes re-elections for an active node
+func (this *HttpAPI) RaftYield(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	if !orcraft.IsRaftEnabled() {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "raft-yield: not running with raft setup"})
+		return
+	}
+
+	orcraft.PublishCommand("yield-to", params["node"])
+
+	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Asynchronously yielded")})
+
+}
+
+// RaftPeers returns the list of peers in a raft setup
+func (this *HttpAPI) RaftPeers(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	if !orcraft.IsRaftEnabled() {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: "raft-nodes: not running with raft setup"})
+		return
+	}
+
+	peers, err := orcraft.GetPeers()
+	if err != nil {
+		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get raft peers: %+v", err)})
+		return
+	}
+
+	r.JSON(200, peers)
+}
+
 // ReloadConfiguration reloads confiug settings (not all of which will apply after change)
 func (this *HttpAPI) ReloadConfiguration(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -2762,6 +2799,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "_ping", this.LBCheck)
 	this.registerRequest(m, "leader-check", this.LeaderCheck)
 	this.registerRequest(m, "grab-election", this.GrabElection)
+	this.registerRequest(m, "raft-yield/:node", this.RaftYield)
+	this.registerRequest(m, "raft-peers", this.RaftPeers)
 	this.registerRequest(m, "reelect", this.Reelect)
 	this.registerRequest(m, "reload-configuration", this.ReloadConfiguration)
 	this.registerRequest(m, "reload-cluster-alias", this.ReloadClusterAlias)

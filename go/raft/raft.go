@@ -90,6 +90,24 @@ func StepDown() {
 	getRaft().StepDown()
 }
 
+func Yield() {
+	getRaft().Yield()
+}
+
+func GetPeers() ([]string, error) {
+	if !IsRaftEnabled() {
+		return []string{}, RaftNotRunning
+	}
+	return store.peerStore.Peers()
+}
+
+func IsPeer(peer string) (bool, error) {
+	if !IsRaftEnabled() {
+		return false, RaftNotRunning
+	}
+	return (store.raftBind == peer), nil
+}
+
 // PublishCommand will distribute a command across the group
 func PublishCommand(op string, value interface{}) (response interface{}, err error) {
 	if !IsRaftEnabled() {
