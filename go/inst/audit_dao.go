@@ -89,7 +89,7 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 	if err != nil {
 		return log.Errore(err)
 	}
-	logMessage := fmt.Sprintf("auditType:%s instance:%s cluster:%s message:%s", auditType, instanceKey.DisplayString(), clusterName, message)
+	logMessage := fmt.Sprintf("auditType:%s instance:%s cluster:%s message:%s", auditType, instanceKey.String(), clusterName, message)
 	if syslogWriter != nil {
 		go func() {
 			syslogWriter.Info(logMessage)

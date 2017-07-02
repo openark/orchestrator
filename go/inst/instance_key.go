@@ -160,12 +160,9 @@ func (this *InstanceKey) StringCode() string {
 	return fmt.Sprintf("%s:%d", this.Hostname, this.Port)
 }
 
-// DisplayString returns a user-friendly string representation of this key
-func (this *InstanceKey) DisplayString() string {
-	return this.StringCode()
-}
-
-// String returns a user-friendly string representation of this key
+// String returns a user-friendly string representation of this key.
+// - currently the same as StringCode() but do not merge the two
+//   functions for reasons explained in https://github.com/github/orchestrator/pull/202
 func (this InstanceKey) String() string {
 	return this.StringCode()
 }
