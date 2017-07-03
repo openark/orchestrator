@@ -218,6 +218,12 @@ function all_instances() {
   print_response | filter_keys | print_key
 }
 
+function which_cluster_osc_replicas() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "cluster-osc-replicas/${alias:-$instance}"
+  print_response | filter_keys | print_key
+}
+
 function downtimed() {
   api "downtimed/${alias:-$instance}"
   print_response | filter_keys | print_key
@@ -393,6 +399,7 @@ function run_command() {
   if [ -z "$command" ] ; then
     fail "No command given. Use -c or --command"
   fi
+  command=$(echo $command | sed -e 's/slave/replica/')
   case $command in
     "discover") discover ;;
     "forget") forget ;;
@@ -400,13 +407,14 @@ function run_command() {
     "topology") ascii_topology ;;
     "clusters") clusters ;;
     "clusters-alias") clusters_alias ;;
-    "instance") instance ;;
+    "instance"|"which-instance") instance ;;
     "which-master") which_master ;;
     "which-replicas") which_replicas ;;
     "which-cluster-instances") which_cluster_instances ;;
     "which-cluster") which_cluster ;;
     "all-clusters-masters") all_clusters_masters ;;
     "all-instances") all_instances ;;
+    "which-cluster-osc-replicas") which_cluster_osc_replicas ;;
     "downtimed") downtimed ;;
 
     "submit-pool-instances") submit_pool_instances ;;
