@@ -27,4 +27,4 @@ Configure `orchestrator` to take action on discovery:
 }
 ```
 
-There are many magic variables (as `{failureCluster}`, above) that you can send to your external hooks. See full list in [topology-recovery](topology-recovery.md)
+There are many magic variables (as `{failureCluster}`, above) that you can send to your external hooks. See full list in [Topology recovery](topology-recovery.md)
