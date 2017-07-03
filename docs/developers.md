@@ -18,16 +18,13 @@ If you would like to build `orchestrator` on your own machine, or eventually sub
 
 Clone the repo anywhere on your filesystem via
 
-```shell
-$ git clone git@github.com:github/orchestrator.git
-$ cd orchestrator
-```
+	git clone git@github.com:github/orchestrator.git
+	cd orchestrator
 
 Build `orchestrator` via
 
-```shell
-$ script/build
-```
+	script/build
+
 
 You will find the binary as `bin/orchestrator`
 
@@ -37,20 +34,18 @@ Why would you want this? Because this will empower you with building `.DEB`, `.r
 
 - Make sure `GOPATH` is set
 - Issue:
-```shell
-$ go get github.com/github/orchestrator/...
-$ cd $GOPATH:/src/github.com/github/orchestrator
-```
+
+	go get github.com/github/orchestrator/...
+	cd $GOPATH:/src/github.com/github/orchestrator
+
 - Compile or run via:
-```shell
-$ go build -i go/cmd/orchestrator/main.go
-$ go run go/cmd/orchestrator/main.go
-```
+
+	go build -i go/cmd/orchestrator/main.go
+	go run go/cmd/orchestrator/main.go
 
 - Create packages via:
-```shell
-./build.sh
-```
+
+	./build.sh
 
 To create packages you will need to have:
 
@@ -92,14 +87,11 @@ Edit the above as as fit for your MySQL backend install.
 
 You should now be able to:
 
-```shell
-go run go/cmd/orchestrator/main.go http
-```
+	go run go/cmd/orchestrator/main.go http
 
 or, if you used the easy clone + build process:
-```shell
-bin/orchestrator http
-```
+
+	bin/orchestrator http
 
 This will also invoke initial setup of your database environment (creating necessary tables in the `orchestrator` schema).
 
@@ -139,9 +131,7 @@ If you want to submit [pull-requests](https://help.github.com/articles/using-pul
 
 Setting up the environment is basically the same, except you don't want to
 
-```shell
-$ go get github.com/github/orchestrator/...
-```
+	go get github.com/github/orchestrator/...
 
 But instead clone your own repository.
 
