@@ -213,7 +213,7 @@ function forget() {
   api "forget/$instance_hostport"
 }
 
-function all_clusters_instances() {
+function all_instances() {
   api "all-instances"
   print_response | filter_keys | print_key
 }
@@ -406,7 +406,7 @@ function run_command() {
     "which-cluster-instances") which_cluster_instances ;;
     "which-cluster") which_cluster ;;
     "all-clusters-masters") all_clusters_masters ;;
-    "all-clusters-instances") all_clusters_instances ;;
+    "all-instances") all_instances ;;
     "downtimed") downtimed ;;
 
     "submit-pool-instances") submit_pool_instances ;;
