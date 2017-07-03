@@ -1,4 +1,30 @@
 #!/bin/bash
+#
+# orchestrator-client: a warapper script for calling upon orchestrator's API
+#
+# This script serves as a command lien client for orchestrator. It talks to orchestrator
+# by invoking GET requests on orchestrator's API. It formats and normalizes output, converting from
+# JSON format to textual format.
+#
+# Command line options and output format are intentionally compatible with the CLI variation of
+# orchestrator.
+#
+# With this script, you can conveniently talk to orchestrator without needing to have the
+# orchestrator binary, configuration files, database access etc.
+#
+# Prerequisite:
+#   set the ORCHESTRATOR_API variable to point to your orchestrator service. Example:
+#   export ORCHESTRATOR_API="http://orchestrator.myservice.com:3000/api"
+#
+# Usage:
+#   orchestrator -c <command> [flags...]
+# Examples:
+#   orchestrator -c all-instances
+#   orchestrator -c which-replicas -i some.master.com:3306
+#   orchestrator -c which-cluster-instances --alias mycluster
+#   orchestrator -c replication-analysis
+#   orchestrator -c register-candidate -i candidate.host.com:3306 --promotion-rule=prefer
+#   orchestrator -c recover -i failed.host.com:3306
 
 orchestrator_api="${ORCHESTRATOR_API:-http://localhost:3000}"
 
