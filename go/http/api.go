@@ -1444,18 +1444,6 @@ func (this *HttpAPI) ClusterOSCReplicas(params martini.Params, r render.Render, 
 	r.JSON(http.StatusOK, instances)
 }
 
-// Instances returns the list of all instances
-func (this *HttpAPI) Instances(params martini.Params, r render.Render, req *http.Request) {
-	instances, err := inst.SearchInstances("")
-
-	if err != nil {
-		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
-		return
-	}
-
-	r.JSON(200, instances)
-}
-
 // SetClusterAlias will change an alias for a given clustername
 func (this *HttpAPI) SetClusterAliasManualOverride(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -1647,7 +1635,7 @@ func (this *HttpAPI) DeregisterHostnameUnresolve(params martini.Params, r render
 	}
 
 	var err error
-	registration := inst.NewHostnameDeregistration(instanceKey, "")
+	registration := inst.NewHostnameDeregistration(instanceKey)
 	if orcraft.IsRaftEnabled() {
 		_, err = orcraft.PublishCommand("register-hostname-unresolve", registration)
 	} else {
@@ -2345,38 +2333,37 @@ func (this *HttpAPI) Reelect(params martini.Params, r render.Render, req *http.R
 // Reelect causes re-elections for an active node
 func (this *HttpAPI) RaftYield(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
-		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
 	if !orcraft.IsRaftEnabled() {
-		r.JSON(200, &APIResponse{Code: ERROR, Message: "raft-yield: not running with raft setup"})
+		Respond(r, &APIResponse{Code: ERROR, Message: "raft-yield: not running with raft setup"})
 		return
 	}
 
 	orcraft.PublishYield(params["node"])
 
-	r.JSON(200, &APIResponse{Code: OK, Message: fmt.Sprintf("Asynchronously yielded")})
-
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Asynchronously yielded")})
 }
 
 // RaftPeers returns the list of peers in a raft setup
 func (this *HttpAPI) RaftPeers(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
-		r.JSON(200, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
 	if !orcraft.IsRaftEnabled() {
-		r.JSON(200, &APIResponse{Code: ERROR, Message: "raft-nodes: not running with raft setup"})
+		Respond(r, &APIResponse{Code: ERROR, Message: "raft-nodes: not running with raft setup"})
 		return
 	}
 
 	peers, err := orcraft.GetPeers()
 	if err != nil {
-		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get raft peers: %+v", err)})
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get raft peers: %+v", err)})
 		return
 	}
 
-	r.JSON(200, peers)
+	r.JSON(http.StatusOK, peers)
 }
 
 // ReloadConfiguration reloads confiug settings (not all of which will apply after change)
@@ -2424,11 +2411,11 @@ func (this *HttpAPI) ReplicationAnalysisForCluster(params martini.Params, r rend
 
 	var err error
 	if clusterName, err = inst.DeduceClusterName(params["clusterName"]); err != nil {
-		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get analysis: %+v", err)})
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get analysis: %+v", err)})
 		return
 	}
 	if clusterName == "" {
-		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get cluster name: %+v", params["clusterName"])})
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get cluster name: %+v", params["clusterName"])})
 		return
 	}
 	this.replicationAnalysis(clusterName, nil, params, r, req)
@@ -2438,11 +2425,11 @@ func (this *HttpAPI) ReplicationAnalysisForCluster(params martini.Params, r rend
 func (this *HttpAPI) ReplicationAnalysisForKey(params martini.Params, r render.Render, req *http.Request) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 	if err != nil {
-		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get analysis: %+v", err)})
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get analysis: %+v", err)})
 		return
 	}
 	if !instanceKey.IsValid() {
-		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get analysis: invalid key %+v", instanceKey)})
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot get analysis: invalid key %+v", instanceKey)})
 		return
 	}
 	this.replicationAnalysis("", &instanceKey, params, r, req)
@@ -2733,7 +2720,7 @@ func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r rende
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Acknowledged %s recoveries on %+v", countAcnowledgedRecoveries, clusterName), Details: countAcnowledgedRecoveries})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Acknowledged %s recoveries on %+v", countAcknowledgedRecoveries, clusterName), Details: countAcknowledgedRecoveries})
 }
 
 // ClusterInfo provides details of a given cluster
@@ -2771,7 +2758,7 @@ func (this *HttpAPI) AcknowledgeInstanceRecoveries(params martini.Params, r rend
 		return
 	}
 
-	r.JSON(http.StatusOK, countAcnowledgedRecoveries)
+	r.JSON(http.StatusOK, countAcknowledgedRecoveries)
 }
 
 // ClusterInfo provides details of a given cluster
@@ -2801,7 +2788,7 @@ func (this *HttpAPI) AcknowledgeRecovery(params martini.Params, r render.Render,
 		return
 	}
 
-	r.JSON(http.StatusOK, countAcnowledgedRecoveries)
+	r.JSON(http.StatusOK, countAcknowledgedRecoveries)
 }
 
 // BlockedRecoveries reads list of currently blocked recoveries, optionally filtered by cluster name
