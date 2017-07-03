@@ -4,32 +4,62 @@
 
 If you would like to build `orchestrator` on your own machine, or eventually submit PRs, follow this guide.
 
-#### Requirements
+### Requirements
 
-`orchestrator` is built on Linux. OS/X should generally follow same guidelines. I have no hint about MS Windows, and the
-build is incompatible with Windows.
+- `orchestrator` is built on Linux and OS/X. I have no hint about MS Windows, and the build is incompatible with Windows.
 
-#### Go setup
+- `Go 1.7` or higher.
 
-You will need to have a *Go 1.5* or higher environment. *1.5* is required as of Dec 2015 due to [vendor directories](https://golang.org/cmd/go/#hdr-Vendor_Directories) - Go's package dependencies solution.
+### Clone repo
 
-With `1.5` you will need to
+`orchestrator` is built with `Go`. `Go` is picky about where you place your code (tl;dr: in a well structured path under `$GOPATH`). However the good news is we have the scripting to go around that (no pun intended).
 
-	export GO15VENDOREXPERIMENT=1
+### Easy clone + builds
 
-This guide assumes you have set your Go environment, along with `GOPATH`.
+Clone the repo anywhere on your filesystem via
 
-To get started, issue
+```shell
+$ git clone git@github.com:github/orchestrator.git
+$ cd orchestrator
+```
 
-	go get github.com/github/orchestrator/...
+Build `orchestrator` via
 
-Change directory into `$GOPATH:/src/github.com/github/orchestrator`
+```shell
+$ script/build
+```
 
-Test that your code builds via
+You will find the binary as `bin/orchestrator`
 
-	go run go/cmd/orchestrator/main.go
+### Not as easy clone + builds
 
-#### DB setup
+Why would you want this? Because this will empower you with building `.DEB`, `.rpm` packages for both Linux and OS/X.
+
+- Make sure `GOPATH` is set
+- Issue:
+```shell
+$ go get github.com/github/orchestrator/...
+$ cd $GOPATH:/src/github.com/github/orchestrator
+```
+- Compile or run via:
+```shell
+$ go build -i go/cmd/orchestrator/main.go
+$ go run go/cmd/orchestrator/main.go
+```
+
+- Create packages via:
+```shell
+./build.sh
+```
+
+To create packages you will need to have:
+
+ - [fpm](https://github.com/jordansissel/fpm), which assumes you have `ruby` and `ruby-gems`
+ - `rpmbuild`
+ - `go`, `gofmt` in path
+ - `tar`
+
+### DB setup
 
 `orchestrator` requires a MySQL backend to run. This could be installed anywhere. I usually use [mysqlsandbox](http://mysqlsandbox.net/) for local installations. You may choose to just install mysql-server on your dev machine.
 
@@ -60,9 +90,16 @@ Edit the above as as fit for your MySQL backend install.
 
 #### Executing from dev environment
 
-You should now be able to
+You should now be able to:
 
-	go run go/cmd/orchestrator/main.go http
+```shell
+go run go/cmd/orchestrator/main.go http
+```
+
+or, if you used the easy clone + build process:
+```shell
+bin/orchestrator http
+```
 
 This will also invoke initial setup of your database environment (creating necessary tables in the `orchestrator` schema).
 
@@ -70,7 +107,8 @@ Browse into `http://localhost:3000` or replace `localhoast` with your dev hostna
 
 Now to make stuff interesting.
 
-#### Grant access to orchestrator on all your MySQL servers
+### Grant access to orchestrator on all your MySQL servers
+
 For `orchestrator` to detect your replication topologies, it must also have an account on each and every topology. At this stage this has to be the
 same account (same user, same password) for all topologies. On each of your masters, issue the following:
 
@@ -84,7 +122,7 @@ Replace `orch_host` with hostname or orchestrator machine (or do your wildcards 
     "MySQLTopologyUser": "orchestrator",
     "MySQLTopologyPassword": "orch_topology_password",
 
-#### Discovering MySQL instances
+### Discovering MySQL instances
 
 Go to the `Discovery` page at `http://localhost:3000/web/discover`. Type in a hostname & port for a known MySQL instance, preferably one that is part of a larger topology (again I like using _MySQLSandbox_ for such test environments). Submit it.
 
@@ -95,42 +133,15 @@ If you've made it this far, you've done 90% of the work. You may consider config
 "want to have" sub-sections under [configuration](Orchestrator-Manual#configuration).
 
 
-#### Building
-
-To build an `orchestrator` package, use the `build.sh` script:
-
-	bash build.sh
-
-You will need:
-
- - [fpm](https://github.com/jordansissel/fpm), which assumes you have `ruby` and `ruby-gems`
- - `rpmbuild`
- - `go`, `gofmt` in path
- - `tar`
-
- Current `build.sh` usage is:
-
- ```
- usage() {
-  echo
-  echo "Usage: $0 [-t target ] [-a arch ] [ -p prefix ] [-h] [-d]"
-  echo "Options:"
-  echo "-h Show this screen"
-  echo "-t (linux|darwin) Target OS Default:(linux)"
-  echo "-a (amd64|386) Arch Default:(amd64)"
-  echo "-d debug output"
-  echo "-p build prefix Default:(/usr/local)"
-  echo
-}
-```
-
 ### Forking and Pull-Requesting
 
 If you want to submit [pull-requests](https://help.github.com/articles/using-pull-requests/) you should first fork `http://github.com/github/orchestrator`.
 
 Setting up the environment is basically the same, except you don't want to
 
-	go get github.com/github/orchestrator/...
+```shell
+$ go get github.com/github/orchestrator/...
+```
 
 But instead clone your own repository.
 
