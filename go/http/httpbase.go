@@ -24,6 +24,8 @@ import (
 	"github.com/martini-contrib/auth"
 
 	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/os"
 	"github.com/github/orchestrator/go/process"
 )
 
@@ -63,6 +65,10 @@ func isAuthorizedForAction(req *http.Request, user auth.User) bool {
 				if configPowerAuthUser == "*" || configPowerAuthUser == authUser {
 					return true
 				}
+			}
+			// check the user's group is one of those listed here
+			if len(config.Config.PowerAuthGroups) > 0 && os.UserInGroups(authUser, config.Config.PowerAuthGroups) {
+				return true
 			}
 			return false
 		}
@@ -129,4 +135,23 @@ func getUserId(req *http.Request, user auth.User) string {
 			return ""
 		}
 	}
+}
+
+func getClusterHint(params map[string]string) string {
+	if params["clusterHint"] != "" {
+		return params["clusterHint"]
+	}
+	if params["clusterName"] != "" {
+		return params["clusterName"]
+	}
+	if params["host"] != "" && params["port"] != "" {
+		return fmt.Sprintf("%s:%s", params["host"], params["port"])
+	}
+	return ""
+}
+
+// figureClusterName is a convenience function to get a cluster name from hints
+func figureClusterName(hint string) (clusterName string, err error) {
+	instanceKey, _ := inst.ParseRawInstanceKeyLoose(hint)
+	return inst.FigureClusterName(hint, instanceKey, nil)
 }

@@ -147,6 +147,7 @@ type Configuration struct {
 	HTTPAuthPassword                           string            // Password for HTTP Basic authentication
 	AuthUserHeader                             string            // HTTP header indicating auth user, when AuthenticationMethod is "proxy"
 	PowerAuthUsers                             []string          // On AuthenticationMethod == "proxy", list of users that can make changes. All others are read-only.
+	PowerAuthGroups                            []string          // list of unix groups the authenticated user must be a member of to make changes.
 	AccessTokenUseExpirySeconds                uint              // Time by which an issued token must be used
 	AccessTokenExpiryMinutes                   uint              // Time after which HTTP access token expires
 	ClusterNameToAlias                         map[string]string // map between regex matching cluster name to a human friendly alias
@@ -298,6 +299,7 @@ func newConfiguration() *Configuration {
 		HTTPAuthPassword:                           "",
 		AuthUserHeader:                             "X-Forwarded-User",
 		PowerAuthUsers:                             []string{"*"},
+		PowerAuthGroups:                            []string{},
 		AccessTokenUseExpirySeconds:                60,
 		AccessTokenExpiryMinutes:                   1440,
 		ClusterNameToAlias:                         make(map[string]string),
