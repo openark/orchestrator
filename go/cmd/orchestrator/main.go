@@ -135,7 +135,7 @@ func main() {
 		return
 	}
 
-  helpTopic := ""
+	helpTopic := ""
 	if flag.Arg(0) == "help" {
 		if flag.Arg(1) != "" {
 			helpTopic = flag.Arg(1)
@@ -150,7 +150,7 @@ func main() {
 		}
 	}
 
-  switch {
+	switch {
 	case helpTopic != "":
 		app.HelpCommand(helpTopic)
 	case len(flag.Args()) == 0 || flag.Arg(0) == "cli":

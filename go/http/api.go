@@ -1672,7 +1672,7 @@ func (this *HttpAPI) RegisterHostnameUnresolve(params martini.Params, r render.R
 		instanceKey = &instKey
 	}
 
-  hostname := params["virtualname"]
+	hostname := params["virtualname"]
 	var err error
 	registration := inst.NewHostnameRegistration(instanceKey, hostname)
 	if orcraft.IsRaftEnabled() {
