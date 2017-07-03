@@ -10,7 +10,7 @@
 - [Executing via command line](executing-via-command-line.md)
 - [Using the Web interface](using-the-web-interface.md)
 - [Using the web API](using-the-web-api.md)
-- [Using orchestrator-client](using orchestrator-client.md): a no binary/config needed script that wraps API calls
+- [Using orchestrator-client](using-orchestrator-client.md): a no binary/config needed script that wraps API calls
 - [Security](security.md)
 - [SSL and TLS](ssl-and-tls.md)
 - [Status Checks](status-checks.md)
