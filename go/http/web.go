@@ -95,11 +95,13 @@ func (this *HttpWeb) ClustersAnalysis(params martini.Params, r render.Render, re
 }
 
 func (this *HttpWeb) Cluster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	clusterName, _ := figureClusterName(params["clusterName"])
+
 	r.HTML(200, "templates/cluster", map[string]interface{}{
 		"agentsHttpActive":              config.Config.ServeAgentsHttp,
 		"title":                         "cluster",
 		"activePage":                    "cluster",
-		"clusterName":                   params["clusterName"],
+		"clusterName":                   clusterName,
 		"autoshow_problems":             true,
 		"contextMenuVisible":            true,
 		"pseudoGTIDModeEnabled":         (config.Config.PseudoGTIDPattern != ""),
@@ -146,11 +148,12 @@ func (this *HttpWeb) ClusterByInstance(params martini.Params, r render.Render, r
 }
 
 func (this *HttpWeb) ClusterPools(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	clusterName, _ := figureClusterName(params["clusterName"])
 	r.HTML(200, "templates/cluster_pools", map[string]interface{}{
 		"agentsHttpActive":              config.Config.ServeAgentsHttp,
 		"title":                         "cluster pools",
 		"activePage":                    "cluster_pools",
-		"clusterName":                   params["clusterName"],
+		"clusterName":                   clusterName,
 		"autoshow_problems":             false, // because pool screen by default expands all hosts
 		"contextMenuVisible":            true,
 		"pseudoGTIDModeEnabled":         (config.Config.PseudoGTIDPattern != ""),
@@ -240,7 +243,7 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 	if err != nil {
 		recoveryId = 0
 	}
-
+	clusterName, _ := figureClusterName(params["clusterName"])
 	r.HTML(200, "templates/audit_recovery", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "audit-recovery",
@@ -249,7 +252,7 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
 		"page":                page,
-		"clusterName":         params["clusterName"],
+		"clusterName":         clusterName,
 		"recoveryId":          recoveryId,
 		"prefix":              this.URLPrefix,
 	})

@@ -49,7 +49,8 @@ func mkTestInstances() []*Instance {
 func TestMkInsertOdku(t *testing.T) {
 	instances := mkTestInstances()
 
-	sql, args := mkInsertOdkuForInstances(nil, true, true)
+	sql, args, err := mkInsertOdkuForInstances(nil, true, true)
+	test.S(t).ExpectNil(err)
 	test.S(t).ExpectEquals(sql, "")
 	test.S(t).ExpectEquals(len(args), 0)
 
@@ -63,8 +64,8 @@ func TestMkInsertOdku(t *testing.T) {
         `
 	a1 := `i710, 3306, 0, 710, , 5.6.7, 5.6, MySQL, false, false, STATEMENT, FULL, false, false, , 0, , 0, false, false, false, false, false, , , false, false, , 0, mysql.000007, 10, , 0, , , {0 false}, {0 false}, 0, 0, [], , , , , 0, false, false, false, false, false, , 0, `
 
-	sql1, args1 := mkInsertOdkuForInstances(instances[:1], false, true)
-
+	sql1, args1, err := mkInsertOdkuForInstances(instances[:1], false, true)
+	test.S(t).ExpectNil(err)
 	test.S(t).ExpectEquals(normalizeQuery(sql1), normalizeQuery(s1))
 	test.S(t).ExpectEquals(stripSpaces(fmtArgs(args1)), stripSpaces(a1))
 
@@ -84,8 +85,8 @@ func TestMkInsertOdku(t *testing.T) {
 		i730, 3306, 0, 730, , 5.6.7, 5.6, MySQL, false, false, STATEMENT, FULL, false, false, , 0, , 0, false, false, false, false, false, , , false, false, , 0, mysql.000007, 30, , 0, , , {0 false}, {0 false}, 0, 0, [], , , , , 0, false, false, false, false, false, , 0,
 		`
 
-	sql3, args3 := mkInsertOdkuForInstances(instances[:3], true, true)
-
+	sql3, args3, err := mkInsertOdkuForInstances(instances[:3], true, true)
+	test.S(t).ExpectNil(err)
 	test.S(t).ExpectEquals(normalizeQuery(sql3), normalizeQuery(s3))
 	test.S(t).ExpectEquals(stripSpaces(fmtArgs(args3)), stripSpaces(a3))
 }
