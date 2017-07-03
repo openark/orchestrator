@@ -35,17 +35,17 @@ Why would you want this? Because this will empower you with building `.DEB`, `.r
 - Make sure `GOPATH` is set
 - Issue:
 
-	go get github.com/github/orchestrator/...
-	cd $GOPATH:/src/github.com/github/orchestrator
+	  go get github.com/github/orchestrator/...
+	  cd $GOPATH:/src/github.com/github/orchestrator
 
 - Compile or run via:
 
-	go build -i go/cmd/orchestrator/main.go
-	go run go/cmd/orchestrator/main.go
+	  go build -i go/cmd/orchestrator/main.go
+	  go run go/cmd/orchestrator/main.go
 
 - Create packages via:
 
-	./build.sh
+	  ./build.sh
 
 To create packages you will need to have:
 
