@@ -60,7 +60,7 @@ func ApplyPoolInstances(submission *PoolInstancesSubmission) error {
 	if submission.DelimitedInstances != "" {
 		instancesStrings := strings.Split(submission.DelimitedInstances, ",")
 		for _, instanceString := range instancesStrings {
-
+			instanceString = strings.TrimSpace(instanceString)
 			instanceKey, err := ParseInstanceKeyLoose(instanceString)
 			if config.Config.SupportFuzzyPoolHostnames {
 				instanceKey = ReadFuzzyInstanceKeyIfPossible(instanceKey)
