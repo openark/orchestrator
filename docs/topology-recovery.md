@@ -130,8 +130,10 @@ an already running (and incomplete) recovery on the very same instance the manua
 Perhaps `orchestrator` doesn't see the big picture. You wish to kick a master failover _right now_. You will run:
 
 * Command line: `orchestrator -c force-master-failover --alias mycluster`
+
   or `orchestrator -c force-master-failover -i instance.in.that.cluster`
 * Web API: `/api/force-master-failover/mycluster`
+
   or `/api/force-master-failover/instance.in.that.cluster/3306`
 
 
