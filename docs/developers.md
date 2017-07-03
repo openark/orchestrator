@@ -47,12 +47,12 @@ Why would you want this? Because this will empower you with building `.DEB`, `.r
 
 	  ./build.sh
 
-To create packages you will need to have:
+	To create packages you will need to have:
 
- - [fpm](https://github.com/jordansissel/fpm), which assumes you have `ruby` and `ruby-gems`
- - `rpmbuild`
- - `go`, `gofmt` in path
- - `tar`
+	 - [fpm](https://github.com/jordansissel/fpm), which assumes you have `ruby` and `ruby-gems`
+	 - `rpmbuild`
+	 - `go`, `gofmt` in path
+	 - `tar`
 
 ### DB setup
 
