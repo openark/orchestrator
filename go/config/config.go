@@ -36,7 +36,7 @@ const (
 	LostInRecoveryDowntimeSeconds = 60 * 60 * 24 * 365
 )
 
-var ConfigurationLoaded chan bool = make(chan bool)
+var configurationLoaded chan bool = make(chan bool)
 
 const (
 	DiscoveryPollSeconds                         = 1
@@ -549,9 +549,15 @@ func Reload() *Configuration {
 func MarkConfigurationLoaded() {
 	go func() {
 		for {
-			ConfigurationLoaded <- true
+			configurationLoaded <- true
 		}
 	}()
 	// wait for it
-	<-ConfigurationLoaded
+	<-configurationLoaded
+}
+
+// WaitForConfigurationToBeLoaded does just that. It will return after
+// the configuration file has been read off disk.
+func WaitForConfigurationToBeLoaded() {
+	<-configurationLoaded
 }
