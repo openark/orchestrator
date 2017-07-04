@@ -2,6 +2,19 @@
 
 Also consult the [Orchestrator first steps](first-steps.md) page.
 
+`orchestrator` supports two ways of running operations from command line:
+
+- Using the `orchestrator` binary (topic of this document)
+  - You will deploy `orchestrator` on ops/app boxes, but not run it as a service.
+  - You will deploy the configuration file for the `orchestrator` binary to be able to
+    connect to the backend DB.
+- Using the [orchestrator-client](using-orchestrator-client.md) script.
+  - You will only need the `orchestrator-client` script on your ops/app boxes.
+  - You will not need any config file nor binaries.
+  - You will need to specify the `ORCHESTRATOR_API` environment variable.
+
+The two are (mostly) compatible. This document discusses the first option.
+
 Following is a synopsis of command line samples. For simplicity, we assume `orchestrator` is in your path.
 If not, replace `orchestrator` with `/path/to/orchestrator`.
 

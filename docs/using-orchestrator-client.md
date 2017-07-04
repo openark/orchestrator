@@ -10,6 +10,8 @@ With `orchestrator-client`, you:
 - Do not need to deploy `orchestrator` configuration everywhere; only on service hosts
 - Do not need to make access to backend DB
 - Need to have access to the HTTP api
+- Need to set the `ORCHESTRATOR_API` environment variable.
+  e.g. `export ORCHESTRATOR_API=https://orchestrator.myservice.com:3000/api`
 
 ### Sample usage
 
