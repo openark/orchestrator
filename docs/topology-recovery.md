@@ -91,7 +91,7 @@ have replication filters? Which versions of MySQL? etc.). It is very (very) like
 A "really-not-simple" recovery case is that of a `DeadMaster`. `orchestrator` will try to:
 
 - Find the most advanced replica
-- Promote it, enslaving its siblings
+- Promote it, taking over its siblings
 - Bring siblings up to date
 - Check if there was a pre-defined "candidate replica"
 - Promote that over the previously chosen replica
