@@ -28,6 +28,8 @@ Build `orchestrator` via
 
 You will find the binary as `bin/orchestrator`
 
+This is the same script used by CI to build & test `orchestrator`.
+
 ### Not as easy clone + builds
 
 Why would you want this? Because this will empower you with building `.DEB`, `.rpm` packages for both Linux and OS/X.
