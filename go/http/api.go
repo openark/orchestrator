@@ -1521,7 +1521,7 @@ func (this *HttpAPI) Downtimed(params martini.Params, r render.Render, req *http
 
 // AllInstances lists all known instances
 func (this *HttpAPI) AllInstances(params martini.Params, r render.Render, req *http.Request) {
-	instances, err := inst.FindInstances(".")
+	instances, err := inst.SearchInstances("")
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
