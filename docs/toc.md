@@ -4,15 +4,16 @@
 - [License](license.md)
 - [Download](download.md)
 - [Requirements](requirements.md)
-- [Installation](install.md)
-- [Execution](execution.md)
+- [Installation](install.md): installing the service/binary
+- [Configuration](configuration.md): breakdown of major configuration variables by topic.
+- [Execution](execution.md): running the `orchestrator` service.
 - [Executing via command line](executing-via-command-line.md)
 - [Using the Web interface](using-the-web-interface.md)
 - [Using the web API](using-the-web-api.md)
+- [Using orchestrator-client](using-orchestrator-client.md): a no binary/config needed script that wraps API calls
 - [Security](security.md)
 - [SSL and TLS](ssl-and-tls.md)
 - [Status Checks](status-checks.md)
-- [Configuration](configuration.md)
 - [Pseudo GTID](pseudo-gtid.md)
 - [Topology recovery](topology-recovery.md)
 - [Agents](agents.md)

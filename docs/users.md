@@ -12,4 +12,8 @@ a short description of usage.
 
 * [Booking.com](http://www.booking.com)
 * [GitHub Inc](http://www.github.com)
-* [Rentalcars.com](http://www.rentalcars.com) - evaluationg in production
+* [Goggle/Vitess](http://vitess.io)
+* [Outbrain](http://www.outbrain.com)
+* [Rentalcars.com](http://www.rentalcars.com) - evaluating in production
+* [Square](http://squareup.com)
+* [Wix](http://www.wix.com)
