@@ -1093,7 +1093,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("all-instances", "Information", `The complete list of known instances`):
 		{
-			instances, err := inst.FindInstances(".")
+			instances, err := inst.SearchInstances("")
 			if err != nil {
 				log.Fatale(err)
 			} else {

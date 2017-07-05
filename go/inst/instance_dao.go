@@ -1146,9 +1146,23 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 }
 
 // FindInstances reads all instances whose name matches given pattern
-func FindInstances(regexpPattern string) ([](*Instance), error) {
-	condition := `hostname rlike ?`
-	return readInstancesByCondition(condition, sqlutils.Args(regexpPattern), `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
+func FindInstances(regexpPattern string) (result [](*Instance), err error) {
+	result = [](*Instance){}
+	r, err := regexp.Compile(regexpPattern)
+	if err != nil {
+		return result, err
+	}
+	condition := `1=1`
+	unfiltered, err := readInstancesByCondition(condition, sqlutils.Args(), `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
+	if err != nil {
+		return unfiltered, err
+	}
+	for _, instance := range unfiltered {
+		if r.MatchString(instance.Key.DisplayString()) {
+			result = append(result, instance)
+		}
+	}
+	return result, nil
 }
 
 // FindFuzzyInstances return instances whose names are like the one given (host & port substrings)
