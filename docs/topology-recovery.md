@@ -91,7 +91,7 @@ have replication filters? Which versions of MySQL? etc.). It is very (very) like
 A "really-not-simple" recovery case is that of a `DeadMaster`. `orchestrator` will try to:
 
 - Find the most advanced replica
-- Promote it, enslaving its siblings
+- Promote it, taking over its siblings
 - Bring siblings up to date
 - Check if there was a pre-defined "candidate replica"
 - Promote that over the previously chosen replica
@@ -125,13 +125,23 @@ Manual recoveries don't block on `RecoveryPeriodBlockSeconds` (read more in next
 `RecoverMasterClusterFilters` and `RecoverIntermediateMasterClusterFilters`. A manual recovery will only block on
 an already running (and incomplete) recovery on the very same instance the manual recovery wishes to operate on.
 
+### Manual, forced failover
+
+Perhaps `orchestrator` doesn't see the big picture. You wish to kick a master failover _right now_. You will run:
+
+* Command line: `orchestrator -c force-master-failover --alias mycluster`
+
+  or `orchestrator -c force-master-failover -i instance.in.that.cluster`
+* Web API: `/api/force-master-failover/mycluster`
+
+  or `/api/force-master-failover/instance.in.that.cluster/3306`
+
+
 ### Automated recovery
 
-By default turned off, automatic recovery may be applied for specific clusters. For greater resolution, different configuration
-applies for master recovery and for intermediate-master recovery. Detailed breakdown of recovery-related configuration follows.
+Opt-in, automatic recovery may be applied for specific clusters. For greater resolution, different configuration applies for master recovery and for intermediate-master recovery. Detailed breakdown of recovery-related configuration follows.
 
-The analysis mechanism runs at all times, and checks periodically for failure/recovery scenarios. It will make an
-automated recovery for:
+The analysis mechanism runs at all times, and checks periodically for failure/recovery scenarios. It will make an automated recovery for:
 
 - An actionable type of scenario (duh)
 - For an instance that is not downtimed

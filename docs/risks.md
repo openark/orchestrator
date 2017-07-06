@@ -1,23 +1,26 @@
 # Risks
 
 Most of the time `orchestrator` only reads status from your topologies. Default configuration is to poll each instance once per minute.
-This is very relaxed, and you can go way more intensive than that. But do be aware that `orchestrator` opens connections to all your servers
-(and typically reuses them).
 
-Actual risk begins when you modify instances. Namely moving replicas around the topology. `Orchestrator` does its best to:
+`orchestrator` will connect to your topology servers, and will cap number of concurrent connections.
+
+You may use `orchestrator` to refactor your topologies: move replicas around and change the replication tree. `orchestrator` will do its best to:
 
 1. Make sure you only move an instance to a location where it is valid for it to replicate (e.g. that you don't put a 5.5 server below a 5.6 server)
-2. Make sure you move an instance at the right time (ie the instance and whicever affected servers are not lagging badly, so that operation can compeltely in a timely manner).
+2. Make sure you move an instance at the right time (ie the instance and whichever affected servers are not lagging badly, so that operation can compeletely in a timely manner).
 3. Do the math correctly: stop the replica at the right time, roll it forward to the right position, `CHANGE MASTER` to the correct location & position.
 
-All the above is tested, and have been put to practice in our production topologies. We have not witnessed a miscalculation or misprotection throughout our production use.
+The above is well tested.
 
-When `orchestrator` encounters an error throughout the moving process, it does its best to rollback. However extreme cases such as a new master crashing in the middle of the move
-may leave the topology unstable (though the same instance could crash before the move and leave whatever topology it was in charge of unstable just as well).
-Or someone manually tampering with replication even while `orchestrator` is moving the replica around. Point being - weird
-and evil stuff can happen, and there is a risk in a replica losing its position vs. its master.
+You may use `orchestrator` to failover your topologies. You will be concerned that:
 
-Now that you're a bit more scared, it's time to reflect: how much did your hands tremble when you navigated your replicas _by hand_ up and down through the topology?
-We suspect the automation provided by `orchestrator` makes for a _safer_ management mechanism than we get with our shaking hands.
+- `orchestrator` doesn't failover when there is no need.
+- `orchestrator` does fail over when there is a need.
+- A failover doesn't lose too many servers
+- Failover ends with a consistent topology
 
-Also, read the [LICENSE](https://github.com/github/orchestrator/blob/master/LICENSE), and especially the "WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND" part.
+Failovers are inherently tied to your deployments through hooks.
+
+There's always risk with failovers. Make sure to test them.
+
+Please make sure to read the [LICENSE](https://github.com/github/orchestrator/blob/master/LICENSE), and especially the "WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND" part.
