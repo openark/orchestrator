@@ -29,6 +29,7 @@ type CLIFlags struct {
 	ConfiguredVersion          string
 	SkipBinlogSearch           *bool
 	SkipContinuousRegistration *bool
+	EnableDatabaseUpdate       *bool
 }
 
 var RuntimeCLIFlags CLIFlags
