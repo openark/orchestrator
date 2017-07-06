@@ -1,12 +1,12 @@
 FROM alpine
 
-EXPOSE  3000
+EXPOSE 3000
 
 ENV GOPATH=/tmp/go
 
 RUN set -ex \
+    && apk add --update --no-cache bash \
     && apk add --update --no-cache --virtual .build-deps \
-        bash \
         rsync \
         git \
         go \

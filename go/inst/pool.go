@@ -41,7 +41,7 @@ func ApplyPoolInstances(pool string, instancesList string) error {
 	if instancesList != "" {
 		instancesStrings := strings.Split(instancesList, ",")
 		for _, instanceString := range instancesStrings {
-
+			instanceString = strings.TrimSpace(instanceString)
 			instanceKey, err := ParseInstanceKeyLoose(instanceString)
 			if config.Config.SupportFuzzyPoolHostnames {
 				instanceKey = ReadFuzzyInstanceKeyIfPossible(instanceKey)
