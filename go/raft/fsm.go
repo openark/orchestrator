@@ -36,7 +36,7 @@ func (f *fsm) Apply(l *raft.Log) interface{} {
 	}
 
 	if c.Op == "yield" {
-		toPeer := string(c.Value)
+		toPeer := normalizeRaftNode(string(c.Value))
 		isThisPeer, err := IsPeer(toPeer)
 		if err != nil {
 			return log.Errorf("failed to unmarshal command: %s", err.Error())
