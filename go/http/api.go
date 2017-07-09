@@ -2366,6 +2366,21 @@ func (this *HttpAPI) RaftPeers(params martini.Params, r render.Render, req *http
 	r.JSON(http.StatusOK, peers)
 }
 
+// RaftState returns the state of this raft node
+func (this *HttpAPI) RaftState(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	if !orcraft.IsRaftEnabled() {
+		Respond(r, &APIResponse{Code: ERROR, Message: "raft-state: not running with raft setup"})
+		return
+	}
+
+	state := orcraft.GetState()
+	r.JSON(http.StatusOK, state)
+}
+
 // ReloadConfiguration reloads confiug settings (not all of which will apply after change)
 func (this *HttpAPI) ReloadConfiguration(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -3029,6 +3044,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "grab-election", this.GrabElection)
 	this.registerRequest(m, "raft-yield/:node", this.RaftYield)
 	this.registerRequest(m, "raft-peers", this.RaftPeers)
+	this.registerRequest(m, "raft-state", this.RaftState)
 	this.registerRequest(m, "reelect", this.Reelect)
 	this.registerRequest(m, "reload-configuration", this.ReloadConfiguration)
 	this.registerRequest(m, "reload-cluster-alias", this.ReloadClusterAlias)
