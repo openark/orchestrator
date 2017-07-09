@@ -88,6 +88,7 @@ func acceptSignals() {
 
 	signal.Notify(c, syscall.SIGHUP)
 	signal.Notify(c, syscall.SIGTERM)
+	signal.Notify(c, syscall.SIGINT)
 	go func() {
 		for sig := range c {
 			switch sig {
@@ -102,6 +103,11 @@ func acceptSignals() {
 				// probably should poke other go routines to stop cleanly here ...
 				inst.AuditOperation("shutdown", nil, "Triggered via SIGTERM")
 				os.Exit(0)
+			case syscall.SIGINT:
+				log.Infof("Received SIGINT. Cleaning up before shutdown.")
+				inst.AuditOperation("rollback", nil, "Triggered via SIGINT")
+				inst.Rollback()
+				os.Exit(1)
 			}
 		}
 	}()

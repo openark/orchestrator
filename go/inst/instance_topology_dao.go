@@ -338,6 +338,7 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 	if !instance.IsReplica() {
 		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
+	AddRollbackAction("start_slave", instanceKey.StringCode())
 	_, err = ExecInstanceNoPrepare(instanceKey, `stop slave`)
 	if err != nil {
 		// Patch; current MaxScale behavior for STOP SLAVE is to throw an error if replica already stopped.
