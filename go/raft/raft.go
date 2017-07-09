@@ -124,6 +124,7 @@ func PublishCommand(op string, value interface{}) (response interface{}, err err
 }
 
 func PublishYield(toPeer string) (response interface{}, err error) {
+	toPeer = normalizeRaftNode(toPeer)
 	return store.genericCommand("yield", []byte(toPeer))
 }
 
