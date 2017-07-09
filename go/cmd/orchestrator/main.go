@@ -61,6 +61,7 @@ func main() {
 	config.RuntimeCLIFlags.PromotionRule = flag.String("promotion-rule", "prefer", "Promotion rule for register-andidate (prefer|neutral|must_not)")
 	config.RuntimeCLIFlags.Version = flag.Bool("version", false, "Print version and exit")
 	config.RuntimeCLIFlags.SkipContinuousRegistration = flag.Bool("skip-continuous-registration", false, "Skip cli commands performaing continuous registration (to reduce orchestratrator backend db load")
+	config.RuntimeCLIFlags.EnableDatabaseUpdate = flag.Bool("enable-database-update", false, "Enable database update, overrides SkipOrchestratorDatabaseUpdate")
 	flag.Parse()
 
 	if *destination != "" && *sibling != "" {
@@ -111,6 +112,9 @@ func main() {
 		config.ForceRead(*configFile)
 	} else {
 		config.Read("/etc/orchestrator.conf.json", "conf/orchestrator.conf.json", "orchestrator.conf.json")
+	}
+	if *config.RuntimeCLIFlags.EnableDatabaseUpdate {
+		config.Config.SkipOrchestratorDatabaseUpdate = false
 	}
 	if config.Config.Debug {
 		log.SetLevel(log.DEBUG)
