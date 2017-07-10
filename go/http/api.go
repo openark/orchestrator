@@ -2327,7 +2327,6 @@ func (this *HttpAPI) Reelect(params martini.Params, r render.Render, req *http.R
 	}
 
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Set re-elections")})
-
 }
 
 // Reelect causes re-elections for an active node
@@ -2369,7 +2368,7 @@ func (this *HttpAPI) RaftState(params martini.Params, r render.Render, req *http
 		return
 	}
 
-	state := orcraft.GetState()
+	state := orcraft.GetState().String()
 	r.JSON(http.StatusOK, state)
 }
 
