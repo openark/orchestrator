@@ -1,0 +1,510 @@
+#!/bin/bash
+#
+# orchestrator-client: a warapper script for calling upon orchestrator's API
+#
+# This script serves as a command lien client for orchestrator. It talks to orchestrator
+# by invoking GET requests on orchestrator's API. It formats and normalizes output, converting from
+# JSON format to textual format.
+#
+# Command line options and output format are intentionally compatible with the CLI variation of
+# orchestrator.
+#
+# With this script, you can conveniently talk to orchestrator without needing to have the
+# orchestrator binary, configuration files, database access etc.
+#
+# Prerequisite:
+#   set the ORCHESTRATOR_API variable to point to your orchestrator service. Example:
+#   export ORCHESTRATOR_API="http://orchestrator.myservice.com:3000/api"
+#
+# Usage:
+#   orchestrator -c <command> [flags...]
+# Examples:
+#   orchestrator -c all-instances
+#   orchestrator -c which-replicas -i some.master.com:3306
+#   orchestrator -c which-cluster-instances --alias mycluster
+#   orchestrator -c replication-analysis
+#   orchestrator -c register-candidate -i candidate.host.com:3306 --promotion-rule=prefer
+#   orchestrator -c recover -i failed.host.com:3306
+
+orchestrator_api="${ORCHESTRATOR_API:-http://localhost:3000}"
+
+command=
+instance=
+destination=
+alias=
+owner="$(whoami | xargs)"
+reason=
+duration="10m"
+promotion_rule=
+pool=
+hostname_flag=
+
+instance_hostport=
+destination_hostport=
+default_port=3306
+
+api_response=
+api_details=
+
+for arg in "$@"; do
+  shift
+  case "$arg" in
+    "-help"|"--help")                     set -- "$@" "-h" ;;
+    "-command"|"--command")               set -- "$@" "-c" ;;
+    "-alias"|"--alias")                   set -- "$@" "-a" ;;
+    "-owner"|"--owner")                   set -- "$@" "-o" ;;
+    "-reason"|"--reason")                 set -- "$@" "-r" ;;
+    "-promotion-rule"|"--promotion-rule") set -- "$@" "-R" ;;
+    "-duration"|"--duration")             set -- "$@" "-u" ;;
+    "-pool"|"--pool")                     set -- "$@" "-l" ;;
+    "-hostname"|"--hostname")             set -- "$@" "-H" ;;
+    "-api"|"--api")                       set -- "$@" "-U" ;;
+    *)                                    set -- "$@" "$arg"
+  esac
+done
+
+while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:" OPTION
+do
+  case $OPTION in
+    c) command=$OPTARG ;;
+    i) instance=$OPTARG ;;
+    d) destination=$OPTARG ;;
+    s) destination=$OPTARG ;;
+    a) alias=$OPTARG ;;
+    o) owner=$OPTARG ;;
+    r) reason=$OPTARG ;;
+    u) duration=$OPTARG ;;
+    R) promotion_rule=$OPTARG ;;
+    l) pool=$OPTARG ;;
+    H) hostname_flag=$OPTARG ;;
+    D) default_port=$OPTARG ;;
+    U) orchestrator_api=$OPTARG ;;
+  esac
+done
+
+function fail() {
+  message="$1"
+  echo "$message"
+  exit 1
+}
+
+function check_requirements() {
+  which -s curl || fail "cannot find curl"
+  which -s jq   || fail "cannot find jq"
+}
+
+function assert_nonempty() {
+  name="$1"
+  value="$2"
+
+  if [ -z "$value" ] ; then
+    fail "$name must be provided"
+  fi
+}
+
+# to_hostport transforms:
+# - fqdn:port => fqdn/port
+# - fqdn => fqdn/default_port
+function to_hostport {
+  instance_key="$1"
+
+  if [ -z "$instance_key" ] ; then
+    echo ""
+    return
+  fi
+
+  if [[ $instance_key == *":"* ]]; then
+    echo $instance_key | tr ':' '/'
+  else
+    echo "$instance_key/$default_port"
+  fi
+}
+
+function normalize_orchestrator_api() {
+  if [[ ! $orchestrator_api == *"/api" ]]; then
+    orchestrator_api=${orchestrator_api%/}
+    orchestrator_api="$orchestrator_api/api"
+  fi
+}
+
+function urlencode() {
+  uri="$1"
+  echo "$uri" | jq -s -R -r @uri | tr -d '\n'
+}
+
+function api() {
+  path="$1"
+
+  normalize_orchestrator_api
+  uri="$orchestrator_api/$path"
+  # echo $uri
+  api_response=$(curl -s "$uri" | jq '.')
+  if [ "$(echo $api_response | jq -r 'type')" == "array" ] ; then
+    return
+  fi
+  if [ "$(echo $api_response | jq -r 'has("Code")')" == "false" ] ; then
+    return
+  fi
+  api_details=$(echo $api_response | jq '.Details')
+  if echo $api_response | jq -r '.Code' | grep -q "ERROR" ; then
+    echo $api_response | jq -r '.Message' | tr -d "'" | xargs >&2 echo
+    [ "$api_details" != "null" ] && echo $api_details
+    exit 1
+  fi
+}
+
+function print_response {
+  echo $api_response
+}
+
+function print_details {
+  echo $api_details
+}
+
+function filter_key {
+  cat - | jq '.Key'
+}
+
+function filter_master_key {
+  cat - | jq '.MasterKey'
+}
+
+function filter_keys {
+  cat - | jq '.[] | .Key'
+}
+
+function print_key {
+  cat - | jq -r '. | (.Hostname + ":" + (.Port | tostring))'
+}
+
+function discover() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "discover/$instance_hostport"
+  print_details | filter_key | print_key
+}
+
+function ascii_topology() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "topology/${alias:-$instance}"
+  print_details | jq -r '.'
+}
+
+function instance() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "instance/$instance_hostport"
+  print_response | filter_key | print_key
+}
+
+function which_master() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "instance/$instance_hostport"
+  print_response | filter_master_key | print_key
+}
+
+function which_replicas() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "instance-replicas/$instance_hostport"
+  print_response | filter_keys | print_key
+}
+
+function which_cluster() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "cluster-info/${alias:-$instance}"
+  print_response | jq -r '.ClusterName'
+}
+
+function which_cluster_instances() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "cluster/${alias:-$instance}"
+  print_response | filter_keys | print_key
+}
+
+function all_clusters_masters() {
+  api "masters"
+  print_response | filter_keys | print_key
+}
+
+function clusters() {
+  api "clusters-info"
+  print_response | jq -r '.[].ClusterName'
+}
+
+function clusters_alias() {
+  api "clusters-info"
+  print_response | jq -r '.[] | (.ClusterName + "," + .ClusterAlias)'
+}
+
+function forget() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "forget/$instance_hostport"
+}
+
+function all_instances() {
+  api "all-instances"
+  print_response | filter_keys | print_key
+}
+
+function which_cluster_osc_replicas() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "cluster-osc-replicas/${alias:-$instance}"
+  print_response | filter_keys | print_key
+}
+
+function downtimed() {
+  api "downtimed/${alias:-$instance}"
+  print_response | filter_keys | print_key
+}
+
+function submit_pool_instances() {
+  # 'instance' is comma delimited, e.g.
+  #   myinstance1.com:3306,myinstance2.com:3306,myinstance3.com:3306
+  assert_nonempty "instance" "$instance"
+  assert_nonempty "pool" "$pool"
+  api "submit-pool-instances/$pool?instances=$(urlencode "$instance")"
+  print_details | jq -r
+}
+
+function which_heuristic_cluster_pool_instances() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  # pool is optional
+  api "heuristic-cluster-pool-instances/${alias:-$instance}/${pool}"
+  print_details | filter_keys | print_key
+}
+
+function begin_downtime() {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "owner" "$owner"
+  assert_nonempty "reason" "$reason"
+  assert_nonempty "duration" "$duration"
+  api "begin-downtime/$instance_hostport/$(urlencode "$owner")/$(urlencode "$reason")/$duration"
+  print_details | print_key
+}
+
+function end_downtime() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "end-downtime/$instance_hostport"
+  print_details | print_key
+}
+
+function begin_maintenance() {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "owner" "$owner"
+  assert_nonempty "reason" "$reason"
+  api "begin-maintenance/$instance_hostport/$(urlencode "$owner")/$(urlencode "$reason")"
+  print_details | print_key
+}
+
+function end_maintenance() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "end-maintenance/$instance_hostport"
+  print_details | print_key
+}
+
+function register_candidate() {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "promotion-rule" "$promotion_rule"
+  api "register-candidate/$instance_hostport/$promotion_rule"
+  print_details | print_key
+}
+
+function register_hostname_unresolve() {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "hostname" "$hostname_flag"
+  api "register-hostname-unresolve/$instance_hostport/$hostname_flag"
+  print_details | print_key
+}
+
+function deregister_hostname_unresolve() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "deregister-hostname-unresolve/$instance_hostport"
+  print_details | print_key
+}
+
+function general_singular_relocate_command() {
+  path="${1:-$command}"
+
+  assert_nonempty "instance" "$instance_hostport"
+  api "${path}/$instance_hostport"
+  echo "$(print_details | filter_key | print_key)<$(print_details | filter_master_key | print_key)"
+}
+
+function general_relocate_command() {
+  path="${1:-$command}"
+
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "destination" "$destination_hostport"
+  api "${path}/$instance_hostport/$destination_hostport"
+  echo "$(print_details | filter_key | print_key)<$(print_details | filter_master_key | print_key)"
+}
+
+function general_singular_relocate_replicas_command() {
+  path="${1:-$command}"
+
+  assert_nonempty "instance" "$instance_hostport"
+  api "${path}/$instance_hostport/$destination_hostport"
+  print_details | filter_keys | print_key
+}
+
+function general_relocate_replicas_command() {
+  path="${1:-$command}"
+
+  assert_nonempty "instance" $instance_hostport
+  assert_nonempty "destination" $destination_hostport
+  api "${path}/$instance_hostport/$destination_hostport"
+  print_details | filter_keys | print_key
+}
+
+function relocate() {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "destination" "$destination_hostport"
+  api "relocate/$instance_hostport/$destination_hostport"
+  echo "$(print_details | filter_key | print_key)<$(print_details | filter_master_key | print_key)"
+}
+
+function relocate_replicas() {
+  assert_nonempty "instance" $instance_hostport
+  assert_nonempty "destination" $destination_hostport
+  api "relocate-replicas/$instance_hostport/$destination_hostport"
+  print_details | filter_keys | print_key
+}
+
+function general_instance_command() {
+  path="${1:-$command}"
+
+  assert_nonempty "instance" "$instance_hostport"
+  api "$path/$instance_hostport"
+  print_details | filter_key | print_key
+}
+
+function replication_analysis() {
+  api "replication-analysis"
+  print_details | jq -r '.[] | (.AnalyzedInstanceKey.Hostname + ":" + (.AnalyzedInstanceKey.Port | tostring) + " (cluster " + .ClusterDetails.ClusterName + "): ") + .Analysis'
+}
+
+function recover() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "recover/$instance_hostport"
+  print_details | print_key
+}
+
+function graceful_master_takeover() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "graceful-master-takeover/${alias:-$instance}"
+  print_details | jq '.SuccessorKey' | print_key
+}
+
+function force_master_failover() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "force-master-failover/${alias:-$instance}"
+  print_details | jq '.SuccessorKey' | print_key
+}
+
+function ack_cluster_recoveries() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  assert_nonempty "reason" "$reason"
+  api "ack-recovery/cluster/${alias:-$instance}?comment=$(urlencode $reason)"
+  print_details
+}
+
+function disable_global_recoveries() {
+  api "disable-global-recoveries"
+  print_details | jq -r
+}
+
+function enable_global_recoveries() {
+  api "enable-global-recoveries"
+  print_details | jq -r
+}
+
+function check_global_recoveries() {
+  api "check-global-recoveries"
+  print_details | jq -r
+}
+
+function run_command() {
+  if [ -z "$command" ] ; then
+    fail "No command given. Use -c or --command"
+  fi
+  command=$(echo $command | sed -e 's/slave/replica/')
+  case $command in
+    "discover") discover ;;
+    "forget") forget ;;
+
+    "topology") ascii_topology ;;
+    "clusters") clusters ;;
+    "clusters-alias") clusters_alias ;;
+    "instance"|"which-instance") instance ;;
+    "which-master") which_master ;;
+    "which-replicas") which_replicas ;;
+    "which-cluster-instances") which_cluster_instances ;;
+    "which-cluster") which_cluster ;;
+    "all-clusters-masters") all_clusters_masters ;;
+    "all-instances") all_instances ;;
+    "which-cluster-osc-replicas") which_cluster_osc_replicas ;;
+    "downtimed") downtimed ;;
+
+    "submit-pool-instances") submit_pool_instances ;;
+    "which-heuristic-cluster-pool-instances") which_heuristic_cluster_pool_instances ;;
+
+    "begin-downtime") begin_downtime ;;
+    "end-downtime") end_downtime ;;
+    "begin-maintenance") begin_maintenance ;;
+    "end-maintenance") end_maintenance ;;
+    "register-candidate") register_candidate ;;
+    "register-hostname-unresolve") register_hostname_unresolve ;;
+    "deregister-hostname-unresolve") deregister_hostname_unresolve ;;
+
+    "move-up") general_singular_relocate_command ;;
+    "match-up") general_singular_relocate_command ;;
+    "make-co-master") general_singular_relocate_command ;;
+    "take-master") general_singular_relocate_command ;;
+    "take-siblings") general_singular_relocate_command ;;
+    "match-up") general_singular_relocate_command ;;
+    "relocate") general_relocate_command ;;
+    "match") general_relocate_command ;;
+    "repoint") general_relocate_command ;;
+    "move-below") general_relocate_command ;;
+    "move-below-gtid") general_relocate_command ;;
+    "move-equivalent") general_relocate_command ;;
+    "move-up-replicas") general_singular_relocate_replicas_command ;;
+    "match-up-replicas") general_singular_relocate_replicas_command ;;
+    "repoint-replicas") general_singular_relocate_replicas_command ;;
+    "relocate-replicas") general_relocate_replicas_command ;;
+    "move-replicas-gtid") general_relocate_replicas_command ;;
+
+    "stop-slave") general_instance_command ;;
+    "stop-slave-nice") general_instance_command ;;
+    "start-slave") general_instance_command ;;
+    "restart-slave") general_instance_command ;;
+    "reset-slave") general_instance_command ;;
+    "detach-replica") general_instance_command ;;
+    "reattach-replica") general_instance_command ;;
+    "reattach-replica-master-host") general_instance_command ;;
+    "skip-query") general_instance_command ;;
+    "set-read-only") general_instance_command ;;
+    "set-writeable") general_instance_command ;;
+    "flush-binary-logs") general_instance_command ;;
+
+    "recover") recover ;;
+    "graceful-master-takeover") graceful_master_takeover ;;
+    "force-master-failover") force_master_failover ;;
+    "ack-cluster-recoveries") ack_cluster_recoveries ;;
+    "disable-global-recoveries") disable_global_recoveries ;;
+    "enable-global-recoveries") enable_global_recoveries ;;
+    "check-global-recoveries") check_global_recoveries ;;
+
+    "replication-analysis") replication_analysis ;;
+    *) fail "Unsupported command $command" ;;
+  esac
+}
+
+function main() {
+  check_requirements
+
+  instance_hostport=$(to_hostport $instance)
+  destination_hostport=$(to_hostport $destination)
+
+  run_command
+}
+
+main

@@ -4,7 +4,7 @@
 
 ![Orchestrator logo](https://github.com/github/orchestrator/raw/master/docs/images/orchestrator-logo-wide.png)
 
-`orchestrator` is a MySQL replication topology management and visualization tool, allowing for:
+`orchestrator` is a MySQL high availability and replication management tool, allowing for:
 
 #### Discovery
 
@@ -18,7 +18,7 @@ It provides with slick visualization of your topologies, including replication p
 
 Refactoring replication topologies can be a matter of drag & drop a replica under another master. Moving replicas around is safe: `orchestrator` will reject an illegal refactoring attempt.
 
-Find grained control is achieved by various command line options.
+Fine-grained control is achieved by various command line options.
 
 #### Recovery
 
@@ -39,14 +39,16 @@ recovery itself.
 
 ![Orcehstrator screenshot](https://github.com/github/orchestrator/raw/master/docs/images/orchestrator-simple-topology.png)
 
-#### More
+#### Additional perks
 
-- Auditing
-- Supports Pseudo-GTID
+- Highly available
+- Controlled master takeovers
+- Manual failovers
+- Failover auditing
+- Audited operations
+- Pseudo-GTID
 - Datacenter/physical location awareness
-- Maintenenace/downtime server states
 - MySQL-Pool association
-- Run as a service; orchestrator multi-service HA
 - HTTP security/authentication methods
 - Coupled with [orchestrator-agent](https://github.com/github/orchestrator-agent), seed new/corrupt instances
 - There is also an [orchestrator-mysql](https://groups.google.com/forum/#!forum/orchestrator-mysql) Google groups forum to discuss topics related to orchestrator

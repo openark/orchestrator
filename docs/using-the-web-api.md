@@ -1,74 +1,32 @@
 ## Using the web API
 
+`orchestrator` provides with an elaborate web API.
+
 A keen web developer would notice (via Firebug or Developer Tools) how the web interface
 completely relies on JSON API requests.
 
-The JSON API provides with all the maintenance functionality you can find in the web interface or the
-command line mode.
+The API can be used by developers for purpose of automation.
 
-> Most users will not be interested in accessing the API. If you're unsure: you don't need it.
-> For creators of frameworks and maintenance tools, it may provide with great powers (and great responsibility).
+### A very very brief look at a few API commands
 
-The following is a brief listing of the web API exposed by `orchestrator`. Documentation tends to fall behind the code; see the
-latest [API source code](https://github.com/github/orchestrator/blob/master/go/http/api.go) for the de-facto lsiting (scroll to end of file).
+By way of example:
 
 * `/api/instance/:host/:port`: reads and returns an instance's details (example `/api/instance/mysql10/3306`)
-* `/api/discover/:host/:port`: discover given instance (a running `orchestrator` service will pick it up from there and
-recursively scan the entire topology)
-* `/api/async-discover/:host/:port`: similar to discover (which is a synchronous action) this works asynchronously
-* `/api/refresh/:host/:port`: synchronously re-read instance status
-* `/api/forget/:host/:port`: remove records of this instance. It may be automatically rediscovered by
-  following up on its master or one of its replicas.
-* `/api/resolve/:host/:port`: check if hostname resolves and whether TCP connection can be established (example: `/api/resolve/myhost.mydomain/3306`)  
+* `/api/discover/:host/:port`: discover given instance (a running `orchestrator` service will pick it up from there and recursively scan the entire topology)
 * `/api/relocate/:host/:port/:belowHost/:belowPort` (attempt to) move an instance below another instance.
-`Orchestrator` picks best course of action.
+`orchestrator` picks best course of action.
 * `/api/relocate-replicas/:host/:port/:belowHost/:belowPort` (attempt to) move replicas of an instance below another instance.
-`Orchestrator` picks best course of action.
-* `/api/move-up/:host/:port` (attempt to) move this instance up the topology (make it child of its grandparent)
-* `/api/move-below/:host/:port/:siblingHost/:siblingPort` (attempt to) move an instance below its sibling.
-  the two provided instances must be siblings: replicas of the same master. (example `/api/move-below/mysql10/3306/mysql24/3306`)
-* `/api/make-co-master/:host/:port` (attempt to) make this instance co-master with its own master, creating a
-  circular master-master topology.
-* `/api/reset-slave/:host/:port` reset a replica, breaking replication (destructive operation)
-* `/api/begin-maintenance/:host/:port/:owner/:reason`: declares and begins maintenance mode for an instance.
-  While in maintenance mode, `orchestrator` will not allow moving this instance.
-  (example `/api/begin-maintenance/mysql10/3306/gromit/upgrading+mysql+version`)
-* `/api/end-maintenance/:host/:port`: end maintenance on instance
-* `/api/end-maintenance/:maintenanceKey` end maintenance on instance, based on maintenance key given on `begin-maintenance`
-* `/api/start-slave/:host/:port`: issue a `START SLAVE` on an instance
-* `/api/stop-slave/:host/:port`: issue a `STOP SLAVE` on an instance
-* `/api/stop-slave-nice/:host/:port`: stop a replica such that the SQL thread is aligned with IO thread
-* `/api/set-read-only/:host/:port`: issue a `SET GLOBAL read_only := 1` on an instance
-* `/api/set-writeable/:host/:port`: issue a `SET GLOBAL read_only := 0` on an instance
-* `/api/kill-query/:host/:port/:process`: kill a query (denoted by process id) on given instance. Synchronous call.
-* `/api/maintenance`: list instances in active maintenance mode
-* `/api/cluster/:clusterName`: list instances in a topology cluster. Each topology is automatically given a unique
-  name. At this point the name is set by the topology's master (and if there's a master-master setup, then one of the masters).
-  For example, a topology's name might be `mysql10:3306`, based on the understanding the server `mysql10` on port `3306`
-  is the master of the topology.  
-* `/api/clusters`: list names of known topologies.
-* `/api/clusters-info`: list known clusters (topologies) and basic info
-* `/api/cluster-pool-instances/:clusterName`: get pool information
-* `/api/search/:searchString`: list instances matching search string
-* `/api/problems`: list instances who have known problems (e.g. not replicating, lagging etc.)
-* `/api/long-queries`: list of long running queries on all topologies (queries running for over 60 seconds, excluding replication and event-scheduler queries)
-* `/api/long-queries/:filter`: list of long running queries on all topologies, filtered by text match
-* `/api/audit`: show most recent audit entries
-* `/api/audit/:page`: show latest audit entries, paginated (example: `/api/audit/3` for 3rd page)
-* `/api/deregister-hostname-unresolve/:host/:port`:  unregister the given mapping for the given host
-* `/api/register-hostname-unresolve/:host/:port/:virtualname`: register the host which should be used when unresolving the given virtual name
+`orchestrator` picks best course of action.
+* `/api/recover/:host/:post`: initiate recovery on given instance, assuming there is something to recover from.
+* `/api/force-master-failover/:mycluster`: force an immediate failover on given cluster.
 
-The following bulk retrieval rules are intended for allowing the information inside orchestrator to be used by external systems.
-* `/api/bulk-instance`: provide a json list of instances in the form of Hostname Port
-* `/api/bulk-promotion-rules`: provide a json list of instance promotion rules in the form of Hostname Port PromotionRule
+### Full listing
 
-The following URLs for collecting monitoring information
-* `/api/discovery-metrics-raw/:seconds`: list the raw discovery metrics for the last specified number of seconds. Raw discovery metric data is kept for DiscoveryCollectionRetentionSeconds seconds (default: 120)
-* `/api/discovery-metrics-aggregated/:seconds`: provide aggregated data for the discovery metrics over the last specified number of seconds.
-* `/api/discovery-queue-metrics-raw/:seconds`: return a list of active and queued number discovery keys over the requested number of seconds
-* `/api/discovery-queue-metrics-aggregated/:seconds`: return aggregated data based on the raw data mentioned above
-* `/api/backend-query-metrics-raw/:seconds`: return the raw metrics on queries sent to the backend in the period specified
-* `/api/backend-query-metrics-aggregated/:seconds`: return a set of aggregated values based on the raw numbers above
+The de-facto listing is the code, please see [api.go](https://github.com/github/orchestrator/blob/master/go/http/api.go) (scroll down to `RegisterRequests`).
+
+You may also appreciate looking at [orchestrator-client](using-orchestrator-client.md) ([source code](https://github.com/github/orchestrator/blob/master/resources/bin/orchestrator-client)) to see how command line interface is translated to API calls.
+
+Or, just use the [orchestrator-client](using-orchestrator-client.md) as your API client, this is what it was made for.
 
 #### Instance JSON breakdown
 
@@ -150,6 +108,8 @@ This sample is followed by a field breakdown:
     "UnresolvedHostname": ""
 }
 ```
+
+The structure of an Instance evolves and documentation will always fall behind. Having said that, key attributes are:
 
 * `Key`: unique indicator for the instance: a combination of host & port
 * `ServerID`: the MySQL `server_id` param
