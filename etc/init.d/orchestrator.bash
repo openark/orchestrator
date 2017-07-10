@@ -17,6 +17,13 @@ DESC="orchestrator: MySQL replication management and visualization"
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
 
+# Limit the number of file descriptors (and sockets) used by
+# orchestrator.  This setting should be fine in most cases but a
+# large busy environment may # reach this limit. If exceeded expect
+# to see errors of the form:
+#   2017-06-12 02:33:09 ERROR dial tcp 10.1.2.3:3306: connect: cannot assign requested address
+# To avoid touching this script you can use /etc/orchestrator_profile
+# to increase this limit.
 ulimit -n 16384
 
 # The file /etc/orchestrator_profile can be used to inject pre-service execution
