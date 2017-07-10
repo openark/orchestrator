@@ -89,8 +89,8 @@ function fail() {
 }
 
 function check_requirements() {
-  which -s curl || fail "cannot find curl"
-  which -s jq   || fail "cannot find jq"
+  which curl > /dev/null 2>&1 || fail "cannot find curl"
+  which jq   > /dev/null 2>&1 || fail "cannot find jq"
 }
 
 function assert_nonempty() {
