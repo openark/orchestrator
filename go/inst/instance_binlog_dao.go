@@ -40,7 +40,7 @@ func init() {
 }
 
 func initializeBinlogDaoPostConfiguration() {
-	<-config.ConfigurationLoaded
+	config.WaitForConfigurationToBeLoaded()
 
 	instanceBinlogEntryCache = cache.New(time.Duration(10)*time.Minute, time.Minute)
 }

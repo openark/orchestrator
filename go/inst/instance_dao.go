@@ -83,7 +83,7 @@ func init() {
 }
 
 func initializeInstanceDao() {
-	<-config.ConfigurationLoaded
+	config.WaitForConfigurationToBeLoaded()
 	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
 	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
 	forgetInstanceKeys = cache.New(time.Duration(config.Config.InstancePollSeconds*2)*time.Second, time.Second)

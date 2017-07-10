@@ -44,7 +44,7 @@ func init() {
 }
 
 func initializeAnalysisDaoPostConfiguration() {
-	<-config.ConfigurationLoaded
+	config.WaitForConfigurationToBeLoaded()
 
 	recentInstantAnalysis = cache.New(time.Duration(config.Config.RecoveryPollSeconds*2)*time.Second, time.Second)
 }
