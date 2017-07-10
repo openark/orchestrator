@@ -22,6 +22,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"strconv"
+	"text/template"
 
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/auth"
@@ -51,7 +52,7 @@ func (this *HttpWeb) getInstanceKey(host string, port string) (inst.InstanceKey,
 }
 
 func (this *HttpWeb) AccessToken(params martini.Params, r render.Render, req *http.Request, resp http.ResponseWriter, user auth.User) {
-	publicToken := req.URL.Query().Get("publicToken")
+	publicToken := template.JSEscapeString(req.URL.Query().Get("publicToken"))
 	err := authenticateToken(publicToken, resp)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -94,18 +95,20 @@ func (this *HttpWeb) ClustersAnalysis(params martini.Params, r render.Render, re
 }
 
 func (this *HttpWeb) Cluster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	clusterName, _ := figureClusterName(params["clusterName"])
+
 	r.HTML(200, "templates/cluster", map[string]interface{}{
 		"agentsHttpActive":              config.Config.ServeAgentsHttp,
 		"title":                         "cluster",
 		"activePage":                    "cluster",
-		"clusterName":                   params["clusterName"],
+		"clusterName":                   clusterName,
 		"autoshow_problems":             true,
 		"contextMenuVisible":            true,
 		"pseudoGTIDModeEnabled":         (config.Config.PseudoGTIDPattern != ""),
 		"authorizedForAction":           isAuthorizedForAction(req, user),
 		"userId":                        getUserId(req, user),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
-		"compactDisplay":                req.URL.Query().Get("compact"),
+		"compactDisplay":                template.JSEscapeString(req.URL.Query().Get("compact")),
 		"prefix":                        this.URLPrefix,
 	})
 }
@@ -145,18 +148,19 @@ func (this *HttpWeb) ClusterByInstance(params martini.Params, r render.Render, r
 }
 
 func (this *HttpWeb) ClusterPools(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	clusterName, _ := figureClusterName(params["clusterName"])
 	r.HTML(200, "templates/cluster_pools", map[string]interface{}{
 		"agentsHttpActive":              config.Config.ServeAgentsHttp,
 		"title":                         "cluster pools",
 		"activePage":                    "cluster_pools",
-		"clusterName":                   params["clusterName"],
+		"clusterName":                   clusterName,
 		"autoshow_problems":             false, // because pool screen by default expands all hosts
 		"contextMenuVisible":            true,
 		"pseudoGTIDModeEnabled":         (config.Config.PseudoGTIDPattern != ""),
 		"authorizedForAction":           isAuthorizedForAction(req, user),
 		"userId":                        getUserId(req, user),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
-		"compactDisplay":                req.URL.Query().Get("compact"),
+		"compactDisplay":                template.JSEscapeString(req.URL.Query().Get("compact")),
 		"prefix":                        this.URLPrefix,
 	})
 }
@@ -166,6 +170,7 @@ func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Re
 	if searchString == "" {
 		searchString = req.URL.Query().Get("s")
 	}
+	searchString = template.JSEscapeString(searchString)
 	r.HTML(200, "templates/search", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "search",
@@ -194,7 +199,7 @@ func (this *HttpWeb) Discover(params martini.Params, r render.Render, req *http.
 func (this *HttpWeb) LongQueries(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	filter := params["filter"]
 	if filter == "" {
-		filter = req.URL.Query().Get("filter")
+		filter = template.JSEscapeString(req.URL.Query().Get("filter"))
 	}
 
 	r.HTML(200, "templates/long_queries", map[string]interface{}{
@@ -238,7 +243,7 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 	if err != nil {
 		recoveryId = 0
 	}
-
+	clusterName, _ := figureClusterName(params["clusterName"])
 	r.HTML(200, "templates/audit_recovery", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
 		"title":               "audit-recovery",
@@ -247,7 +252,7 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
 		"page":                page,
-		"clusterName":         params["clusterName"],
+		"clusterName":         clusterName,
 		"recoveryId":          recoveryId,
 		"prefix":              this.URLPrefix,
 	})

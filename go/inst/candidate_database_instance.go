@@ -21,7 +21,6 @@ import (
 
 	"github.com/openark/golib/sqlutils"
 
-	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 )
 
@@ -50,10 +49,6 @@ root@myorchestrator [orchestrator]> select * from candidate_database_instance;
 2 rows in set (0.00 sec)
 */
 func BulkReadCandidateDatabaseInstance() ([]CandidateDatabaseInstance, error) {
-	if config.Config.DatabaselessMode__experimental {
-		return nil, nil // no data to return if not using a database
-	}
-
 	var candidateDatabaseInstances []CandidateDatabaseInstance
 
 	// Read all promotion rules from the table
