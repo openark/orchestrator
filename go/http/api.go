@@ -2348,10 +2348,6 @@ func (this *HttpAPI) RaftYield(params martini.Params, r render.Render, req *http
 
 // RaftPeers returns the list of peers in a raft setup
 func (this *HttpAPI) RaftPeers(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !orcraft.IsRaftEnabled() {
 		Respond(r, &APIResponse{Code: ERROR, Message: "raft-nodes: not running with raft setup"})
 		return
@@ -2368,10 +2364,6 @@ func (this *HttpAPI) RaftPeers(params martini.Params, r render.Render, req *http
 
 // RaftState returns the state of this raft node
 func (this *HttpAPI) RaftState(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
 	if !orcraft.IsRaftEnabled() {
 		Respond(r, &APIResponse{Code: ERROR, Message: "raft-state: not running with raft setup"})
 		return
