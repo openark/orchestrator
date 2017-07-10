@@ -36,7 +36,7 @@ const (
 	LostInRecoveryDowntimeSeconds = 60 * 60 * 24 * 365
 )
 
-var ConfigurationLoaded chan bool = make(chan bool)
+var configurationLoaded chan bool = make(chan bool)
 
 const (
 	DiscoveryPollSeconds                         = 1
@@ -227,7 +227,7 @@ type Configuration struct {
 	GraphiteConvertHostnameDotsToUnderscores   bool              // If true, then hostname's dots are converted to underscores before being used in graphite path
 	GraphitePollSeconds                        int               // Graphite writes interval. 0 disables.
 	URLPrefix                                  string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
-	MaxOutdatedKeysToShow                      int               // Maximum number of keys to show in ContinousDiscovery. If the number of polled hosts grows too far then showing the complete list is not ideal.
+	MaxOutdatedKeysToShow                      int               // Maximum number of keys to show in ContinuousDiscovery. If the number of polled hosts grows too far then showing the complete list is not ideal.
 	DiscoveryIgnoreReplicaHostnameFilters      []string          // Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps
 }
 
@@ -549,9 +549,15 @@ func Reload() *Configuration {
 func MarkConfigurationLoaded() {
 	go func() {
 		for {
-			ConfigurationLoaded <- true
+			configurationLoaded <- true
 		}
 	}()
 	// wait for it
-	<-ConfigurationLoaded
+	<-configurationLoaded
+}
+
+// WaitForConfigurationToBeLoaded does just that. It will return after
+// the configuration file has been read off disk.
+func WaitForConfigurationToBeLoaded() {
+	<-configurationLoaded
 }
