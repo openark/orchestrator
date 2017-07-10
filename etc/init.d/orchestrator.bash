@@ -40,7 +40,8 @@ start_daemon () {
 	# collect and print PID of started process
 	echo $!
 	# space for optional processing after starting orchestrator
-	post_start_daemon_hook
+	# - redirect stdout to stderro to prevent this corrupting the pid info
+	post_start_daemon_hook 1>&2
 }
 
 # The file /etc/orchestrator_profile can be used to inject pre-service execution
