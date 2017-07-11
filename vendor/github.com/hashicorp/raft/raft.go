@@ -1388,6 +1388,8 @@ func (r *Raft) appendEntries(rpc RPC, a *AppendEntriesRequest) {
 				r.logger.Printf("[WARN] raft: Failed to get previous log: %d %v (last: %d)",
 					a.PrevLogEntry, err, lastIdx)
 				resp.NoRetryBackoff = true
+				asyncNotifyCh(r.shutdownCh)
+
 				return
 			}
 			prevLogTerm = prevLog.Term
