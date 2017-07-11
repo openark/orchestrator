@@ -814,6 +814,16 @@ var generateSQLBase = []string{
 	`
 		CREATE UNIQUE INDEX snapshot_name_uidx_raft_snapshot ON raft_snapshot (snapshot_name)
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS database_instance_peer_analysis (
+			peer varchar(128) NOT NULL,
+		  hostname varchar(128) NOT NULL,
+		  port smallint(5) unsigned NOT NULL,
+		  analysis_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  analysis varchar(128) NOT NULL,
+		  PRIMARY KEY (peer, hostname, port)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }
 
 // generateSQLPatches contains DDLs for patching schema to the latest version.

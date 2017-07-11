@@ -74,8 +74,12 @@ func NewInstanceAnalysis(instanceKey *InstanceKey, analysis AnalysisCode) *Insta
 }
 
 func (instanceAnalysis *InstanceAnalysis) String() string {
-	return fmt.Sprintf("%s:%s", instanceAnalysis.key.StringCode(), string(instanceAnalysis.analysis))
+	return fmt.Sprintf("%s/%s", instanceAnalysis.key.StringCode(), string(instanceAnalysis.analysis))
 }
+
+// PeerAnalysisMap indicates the number of peers agreeing on an analysis.
+// Key of this map is a InstanceAnalysis.String()
+type PeerAnalysisMap map[string]int
 
 // ReplicationAnalysis notes analysis on replication chain status, per instance
 type ReplicationAnalysis struct {

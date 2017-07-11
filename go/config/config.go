@@ -97,6 +97,7 @@ type Configuration struct {
 	RaftDataDir                                string
 	DefaultRaftPort                            int      // if a RaftNodes entry does not specify port, use this one
 	RaftNodes                                  []string // Raft nodes to make initial connection with
+	ExpectFailureAnalysisConcensus             bool
 	MySQLOrchestratorHost                      string
 	MySQLOrchestratorMaxPoolConnections        int // The maximum size of the connection pool to the Orchestrator backend.
 	MySQLOrchestratorPort                      uint
@@ -264,6 +265,7 @@ func newConfiguration() *Configuration {
 		RaftDataDir:                                "",
 		DefaultRaftPort:                            10008,
 		RaftNodes:                                  []string{},
+		ExpectFailureAnalysisConcensus:             true,
 		MySQLOrchestratorMaxPoolConnections:        128, // limit concurrent conns to backend DB
 		MySQLOrchestratorPort:                      3306,
 		MySQLTopologyUseMutualTLS:                  false,

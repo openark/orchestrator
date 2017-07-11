@@ -81,6 +81,14 @@ func GetLeader() string {
 	return getRaft().Leader()
 }
 
+func QuorumSize() (int, error) {
+	peers, err := GetPeers()
+	if err != nil {
+		return 0, err
+	}
+	return len(peers)/2 + 1, nil
+}
+
 // GetState returns current raft state
 func GetState() raft.RaftState {
 	return getRaft().State()
