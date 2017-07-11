@@ -26,6 +26,24 @@ SCRIPTNAME=/etc/init.d/$NAME
 # to increase this limit.
 ulimit -n 16384
 
+# initially noop but can adjust according by modifying orchestrator_profile
+# - see https://github.com/github/orchestrator/issues/227 for more details.
+post_start_daemon_hook () {
+	# by default do nothing
+	:
+}
+
+# Start the orchestrator daemon in the background
+start_daemon () {
+	# start up daemon in the background
+	$DAEMON_PATH/$DAEMON $DAEMONOPTS >> /var/log/${NAME}.log 2>&1 &
+	# collect and print PID of started process
+	echo $!
+	# space for optional processing after starting orchestrator
+	# - redirect stdout to stderro to prevent this corrupting the pid info
+	post_start_daemon_hook 1>&2
+}
+
 # The file /etc/orchestrator_profile can be used to inject pre-service execution
 # scripts, such as exporting variables or whatever. It's yours!
 [ -f /etc/orchestrator_profile ] && . /etc/orchestrator_profile
@@ -34,7 +52,7 @@ case "$1" in
   start)
     printf "%-50s" "Starting $NAME..."
     cd $DAEMON_PATH
-    PID=$(./$DAEMON $DAEMONOPTS >> /var/log/${NAME}.log 2>&1 & echo $!)
+    PID=$(start_daemon)
     #echo "Saving PID" $PID " to " $PIDFILE
     if [ -z $PID ]; then
       printf "%s\n" "Fail"
