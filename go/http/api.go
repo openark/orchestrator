@@ -248,6 +248,26 @@ func (this *HttpAPI) Forget(params martini.Params, r render.Render, req *http.Re
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance forgotten: %+v", *rawInstanceKey)})
 }
 
+// ForgetCluster forgets all instacnes of a cluster
+func (this *HttpAPI) ForgetCluster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	clusterName, err := figureClusterName(params["clusterHint"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	if orcraft.IsRaftEnabled() {
+		orcraft.PublishCommand("forget-cluster", clusterName)
+	} else {
+		inst.ForgetCluster(clusterName)
+	}
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Cluster forgotten: %+v", clusterName)})
+}
+
 // Resolve tries to resolve hostname and then checks to see if port is open on that host.
 func (this *HttpAPI) Resolve(params martini.Params, r render.Render, req *http.Request) {
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
@@ -2969,6 +2989,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "async-discover/:host/:port", this.AsyncDiscover)
 	this.registerRequest(m, "refresh/:host/:port", this.Refresh)
 	this.registerRequest(m, "forget/:host/:port", this.Forget)
+	this.registerRequest(m, "forget-cluster/:clusterHint", this.ForgetCluster)
 	this.registerRequest(m, "begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance)
 	this.registerRequest(m, "end-maintenance/:host/:port", this.EndMaintenanceByInstanceKey)
 	this.registerRequest(m, "end-maintenance/:maintenanceKey", this.EndMaintenance)

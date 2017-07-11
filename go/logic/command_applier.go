@@ -44,6 +44,8 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.discover(value)
 	case "forget":
 		return applier.forget(value)
+	case "forget-cluster":
+		return applier.forgetCluster(value)
 	case "begin-downtime":
 		return applier.beginDowntime(value)
 	case "end-downtime":
@@ -85,6 +87,15 @@ func (applier *CommandApplier) forget(value []byte) interface{} {
 		return log.Errore(err)
 	}
 	err := inst.ForgetInstance(&instanceKey)
+	return err
+}
+
+func (applier *CommandApplier) forgetCluster(value []byte) interface{} {
+	var clusterName string
+	if err := json.Unmarshal(value, &clusterName); err != nil {
+		return log.Errore(err)
+	}
+	err := inst.ForgetCluster(clusterName)
 	return err
 }
 
