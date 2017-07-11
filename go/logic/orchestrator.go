@@ -133,14 +133,11 @@ func handleDiscoveryRequests() {
 				if !IsLeaderOrActive() {
 					log.Debugf("Node apparently demoted. Skipping discovery of %+v. "+
 						"Remaining queue size: %+v", instanceKey, discoveryQueue.QueueLen())
-
 					discoveryQueue.Release(instanceKey)
-
 					continue
 				}
 
 				discoverInstance(instanceKey)
-
 				discoveryQueue.Release(instanceKey)
 			}
 		}()

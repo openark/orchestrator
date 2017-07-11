@@ -2088,7 +2088,13 @@ func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, up
 		return nil // nothing to write
 	}
 
-	sql, args, err := mkInsertOdkuForInstances(instances, instanceWasActuallyFound, updateLastSeen)
+	writeInstances := [](*Instance){}
+	for _, instance := range instances {
+		if !InstanceIsForgotten(&instance.Key) {
+			writeInstances = append(writeInstances, instance)
+		}
+	}
+	sql, args, err := mkInsertOdkuForInstances(writeInstances, instanceWasActuallyFound, updateLastSeen)
 	if err != nil {
 		return err
 	}
