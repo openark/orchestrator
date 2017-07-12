@@ -1367,6 +1367,17 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 
 	// At this point we have validated there's a failure scenario for which we have a recovery path.
 
+	if orcraft.IsRaftEnabled() {
+		// with raft, all nodes can (and should) run analysis,
+		// but only the leader proceeds to execute detection hooks and then to failover.
+		if !orcraft.IsLeader() {
+			log.Infof("CheckAndRecover: Analysis: %+v, InstanceKey: %+v, candidateInstanceKey: %+v, "+
+				"skipProcesses: %v: NOT detecting/recovering host (raft non-leader)",
+				analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, candidateInstanceKey, skipProcesses)
+			return false, nil, err
+		}
+	}
+
 	// Initiate detection:
 	registrationSuccess, _, err := checkAndExecuteFailureDetectionProcesses(analysisEntry, skipProcesses)
 	if registrationSuccess {
@@ -1393,16 +1404,6 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 			"skipProcesses: %v: NOT Recovering host (disabled globally)",
 			analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, candidateInstanceKey, skipProcesses)
 		return false, nil, err
-	}
-
-	if orcraft.IsRaftEnabled() {
-		// with raft, all nodes can run detection; but only the leader proceeds to failover.
-		if !orcraft.IsLeader() {
-			log.Infof("CheckAndRecover: Analysis: %+v, InstanceKey: %+v, candidateInstanceKey: %+v, "+
-				"skipProcesses: %v: NOT Recovering host (raft non-leader)",
-				analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, candidateInstanceKey, skipProcesses)
-			return false, nil, err
-		}
 	}
 
 	// Actually attempt recovery:
