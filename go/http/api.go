@@ -2349,7 +2349,7 @@ func (this *HttpAPI) Reelect(params martini.Params, r render.Render, req *http.R
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Set re-elections")})
 }
 
-// Reelect causes re-elections for an active node
+// RaftYield yields to a specified host
 func (this *HttpAPI) RaftYield(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -2359,9 +2359,21 @@ func (this *HttpAPI) RaftYield(params martini.Params, r render.Render, req *http
 		Respond(r, &APIResponse{Code: ERROR, Message: "raft-yield: not running with raft setup"})
 		return
 	}
-
 	orcraft.PublishYield(params["node"])
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Asynchronously yielded")})
+}
 
+// RaftYieldHint yields to a host whose name contains given hint (e.g. DC)
+func (this *HttpAPI) RaftYieldHint(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	if !orcraft.IsRaftEnabled() {
+		Respond(r, &APIResponse{Code: ERROR, Message: "raft-yield-hint: not running with raft setup"})
+		return
+	}
+	orcraft.PublishYieldHostnameHint(params["hint"])
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Asynchronously yielded")})
 }
 
@@ -3055,6 +3067,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "leader-check", this.LeaderCheck)
 	this.registerRequest(m, "grab-election", this.GrabElection)
 	this.registerRequest(m, "raft-yield/:node", this.RaftYield)
+	this.registerRequest(m, "raft-yield-hint/:hint", this.RaftYieldHint)
 	this.registerRequest(m, "raft-peers", this.RaftPeers)
 	this.registerRequest(m, "raft-state", this.RaftState)
 	this.registerRequest(m, "reelect", this.Reelect)

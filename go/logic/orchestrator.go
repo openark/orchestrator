@@ -334,7 +334,7 @@ func ContinuousDiscovery() {
 	go acceptSignals()
 
 	if config.Config.RaftEnabled {
-		if err := orcraft.Setup(NewCommandApplier()); err != nil {
+		if err := orcraft.Setup(NewCommandApplier(), process.ThisHostname); err != nil {
 			log.Fatale(err)
 		}
 		go orcraft.Monitor()

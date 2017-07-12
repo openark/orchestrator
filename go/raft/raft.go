@@ -28,8 +28,14 @@ import (
 	"github.com/hashicorp/raft"
 )
 
+const (
+	YieldCommand     = "yield"
+	YieldHintCommand = "yield-hint"
+)
+
 var RaftNotRunning = fmt.Errorf("raft is not configured/running")
 var store *Store
+var ThisHostname string
 
 func IsRaftEnabled() bool {
 	return store != nil
@@ -37,8 +43,9 @@ func IsRaftEnabled() bool {
 
 // Setup creates the entire raft shananga. Creates the store, associates with the throttler,
 // contacts peer nodes, and subscribes to leader changes to export them.
-func Setup(applier CommandApplier) error {
+func Setup(applier CommandApplier, thisHostname string) error {
 	log.Debugf("Setting up raft")
+	ThisHostname = thisHostname
 	store = NewStore(config.Config.RaftDataDir, normalizeRaftNode(config.Config.RaftBind), applier)
 	peerNodes := []string{}
 	for _, raftNode := range config.Config.RaftNodes {
@@ -133,7 +140,11 @@ func PublishCommand(op string, value interface{}) (response interface{}, err err
 
 func PublishYield(toPeer string) (response interface{}, err error) {
 	toPeer = normalizeRaftNode(toPeer)
-	return store.genericCommand("yield", []byte(toPeer))
+	return store.genericCommand(YieldCommand, []byte(toPeer))
+}
+
+func PublishYieldHostnameHint(hostnameHint string) (response interface{}, err error) {
+	return store.genericCommand(YieldHintCommand, []byte(hostnameHint))
 }
 
 // Monitor is a utility function to routinely observe leadership state.

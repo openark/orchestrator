@@ -19,6 +19,7 @@ package orcraft
 import (
 	"encoding/json"
 	"io"
+	"strings"
 
 	"github.com/openark/golib/log"
 
@@ -35,20 +36,44 @@ func (f *fsm) Apply(l *raft.Log) interface{} {
 		log.Errorf("failed to unmarshal command: %s", err.Error())
 	}
 
-	if c.Op == "yield" {
+	if c.Op == YieldCommand {
 		toPeer := normalizeRaftNode(string(c.Value))
-		isThisPeer, err := IsPeer(toPeer)
-		if err != nil {
-			return log.Errorf("failed to unmarshal command: %s", err.Error())
-		}
-		if isThisPeer {
-			log.Debugf("Will not yield to myself")
-			return nil
-		}
-		log.Debugf("Yielding to %s", toPeer)
-		return yield()
+		return f.yield(toPeer)
+	}
+	if c.Op == YieldHintCommand {
+		hint := string(c.Value)
+		return f.yieldByHint(hint)
 	}
 	return store.applier.ApplyCommand(c.Op, c.Value)
+}
+
+// yield yields to a suggested peer, or does nothing if this peer IS the suggested peer
+func (f *fsm) yield(toPeer string) interface{} {
+	isThisPeer, err := IsPeer(toPeer)
+	if err != nil {
+		return log.Errorf("failed to unmarshal command: %s", err.Error())
+	}
+	if isThisPeer {
+		log.Debugf("Will not yield to myself")
+		return nil
+	}
+	log.Debugf("Yielding to %s", toPeer)
+	return yield()
+}
+
+// yieldByHint yields to a host that contains given hint
+func (f *fsm) yieldByHint(hint string) interface{} {
+	if hint == "" {
+		log.Debugf("Will not yield by empty hint")
+		return nil
+	}
+	isThisHost := strings.Contains(ThisHostname, hint)
+	if isThisHost {
+		log.Debugf("Will not yield to myself")
+		return nil
+	}
+	log.Debugf("Yielding to hinted %s", hint)
+	return yield()
 }
 
 // Snapshot returns a snapshot object of freno's state
