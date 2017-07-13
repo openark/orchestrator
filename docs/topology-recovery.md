@@ -182,7 +182,7 @@ Downtime is explicitly created for this purpose: to allow the DBA a way to suppr
 `orchestrator` supports hooks -- external scripts invoked through the recovery process. These are arrays of commands invoked through
 shell, in particular `bash`. Hooks are:
 
-- `OnFailureDetectionProcesses`: called when a failure/recovery known scenario is detected. These scripts are called befroe even
+- `OnFailureDetectionProcesses`: called when a failure/recovery known scenario is detected. These scripts are called before even
   deciding whether action should be taken.
 - `PreFailoverProcesses`: called after deciding to take action on a scenario. Order of execution is sequential. A failure
   (non-zero exit status) of any process *aborts the recovery operation*. This is your chance to decide whether to go on with
