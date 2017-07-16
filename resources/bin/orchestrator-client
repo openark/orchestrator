@@ -269,7 +269,7 @@ function submit_pool_instances() {
   assert_nonempty "instance" "$instance"
   assert_nonempty "pool" "$pool"
   api "submit-pool-instances/$pool?instances=$(urlencode "$instance")"
-  print_details | jq -r
+  print_details | jq -r .
 }
 
 function which_heuristic_cluster_pool_instances() {
@@ -416,17 +416,17 @@ function ack_cluster_recoveries() {
 
 function disable_global_recoveries() {
   api "disable-global-recoveries"
-  print_details | jq -r
+  print_details | jq -r .
 }
 
 function enable_global_recoveries() {
   api "enable-global-recoveries"
-  print_details | jq -r
+  print_details | jq -r .
 }
 
 function check_global_recoveries() {
   api "check-global-recoveries"
-  print_details | jq -r
+  print_details | jq -r .
 }
 
 function raft_leader_hostname() {
@@ -447,7 +447,7 @@ function raft_elect_leader() {
   if print_response | jq -r . | grep -q Leader ; then
     # confirmed raft is running well
     api "raft-yield-hint/${hostname_flag}"
-    print_details | jq -r
+    print_details | jq -r .
   else
     fail "Cannot determine raft state"
   fi
