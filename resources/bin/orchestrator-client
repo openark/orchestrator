@@ -84,7 +84,7 @@ done
 
 function fail() {
   message="$1"
-  echo "$message"
+  >&2 echo "$message"
   exit 1
 }
 
