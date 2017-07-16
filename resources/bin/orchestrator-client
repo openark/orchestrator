@@ -142,6 +142,9 @@ function api() {
   if [ "$(echo $api_response | jq -r 'type')" == "array" ] ; then
     return
   fi
+  if [ "$(echo $api_response | jq -r 'type')" == "string" ] ; then
+    return
+  fi
   if [ "$(echo $api_response | jq -r 'has("Code")')" == "false" ] ; then
     return
   fi
@@ -253,6 +256,11 @@ function which_cluster_osc_replicas() {
 function downtimed() {
   api "downtimed/${alias:-$instance}"
   print_response | filter_keys | print_key
+}
+
+function dominant_dc() {
+  api "masters"
+  print_response | jq -r '.[].DataCenter' | sort | uniq -c | sort -nr | head -n 1 | awk '{print $2}'
 }
 
 function submit_pool_instances() {
@@ -421,6 +429,30 @@ function check_global_recoveries() {
   print_details | jq -r
 }
 
+function raft_leader_hostname() {
+  api "raft-state"
+  if print_response | jq -r . | grep -q Leader ; then
+    # confirmed raft is running well
+    api "status"
+    print_details | jq -r '.Hostname'
+  else
+    fail "Cannot determine raft state"
+  fi
+}
+
+# raft_elect_leader elects the raft leader by using --hostname as hint
+function raft_elect_leader() {
+  assert_nonempty "hostname" "$hostname_flag"
+  api "raft-state"
+  if print_response | jq -r . | grep -q Leader ; then
+    # confirmed raft is running well
+    api "raft-yield-hint/${hostname_flag}"
+    print_details | jq -r
+  else
+    fail "Cannot determine raft state"
+  fi
+}
+
 function run_command() {
   if [ -z "$command" ] ; then
     fail "No command given. Use -c or --command"
@@ -442,6 +474,7 @@ function run_command() {
     "all-instances") all_instances ;;
     "which-cluster-osc-replicas") which_cluster_osc_replicas ;;
     "downtimed") downtimed ;;
+    "dominant-dc") dominant_dc ;;
 
     "submit-pool-instances") submit_pool_instances ;;
     "which-heuristic-cluster-pool-instances") which_heuristic_cluster_pool_instances ;;
@@ -494,6 +527,10 @@ function run_command() {
     "check-global-recoveries") check_global_recoveries ;;
 
     "replication-analysis") replication_analysis ;;
+
+    "raft-leader-hostname") raft_leader_hostname ;;
+    "raft-elect-leader") raft_elect_leader ;;
+
     *) fail "Unsupported command $command" ;;
   esac
 }

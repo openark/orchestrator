@@ -2373,8 +2373,9 @@ func (this *HttpAPI) RaftYieldHint(params martini.Params, r render.Render, req *
 		Respond(r, &APIResponse{Code: ERROR, Message: "raft-yield-hint: not running with raft setup"})
 		return
 	}
-	orcraft.PublishYieldHostnameHint(params["hint"])
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Asynchronously yielded")})
+	hint := params["hint"]
+	orcraft.PublishYieldHostnameHint(hint)
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Asynchronously yielded by hint %s", hint), Details: hint})
 }
 
 // RaftPeers returns the list of peers in a raft setup
