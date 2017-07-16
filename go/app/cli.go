@@ -132,6 +132,9 @@ func validateInstanceIsFound(instanceKey *inst.InstanceKey) (instance *inst.Inst
 // CliWrapper is called from main and allows for the instance parameter
 // to take multiple instance names separated by a comma or whitespace.
 func CliWrapper(command string, strict bool, instances string, destination string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string, hostnameFlag string) {
+	if config.Config.RaftEnabled {
+		log.Fatalf(`Orchestrator configured to run raft ("RaftEnabled": true). All access must go through the web API of the active raft node. You may use the orchestrator-client script which has a similar interface to the command line invocation.`)
+	}
 	r := regexp.MustCompile(`[ ,\r\n\t]+`)
 	tokens := r.Split(instances, -1)
 	switch command {
