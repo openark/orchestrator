@@ -45,12 +45,56 @@ This setup provides semi HA for `orchestrator`. Two variations available:
   - `orchestrator` will be able to recover the death of a backend master even if in the middle of runnign a recovery (recovery will re-initiate on alternate master)
   - **Split brain is possible**. Depending on your setup, physical locations, type of proxy, there can be different `orchestrator` service nodes speaking to different backend `MySQL` servers. This scenario can lead two two `orchestrator` services which consider themselves as "active", both of which will run failovers independently, which would lead to topology corruption.
 
+To access your `orchestrator` service you may speak to any healthy node.
+
+Both these setups are well known to run in production for very large environments.
+
 ### HA via shared backend
 
 ![orchestrator HA via shared backend](images/orchestrator-ha-shared-backend.png)
 
+HA is achieved by highly available shared backend. Existing solutions are:
+
+- Galera
+- XtraDB Cluster
+- InnoDB Cluster
+- NDB Cluster
+
+In all of the above the MySQL nodes run synchronous replication (using the common terminology).
+
+Two variations exist:
+
+- Your Galera/XtraDB Cluster/InnoDB Cluster runs with a single-writer node. Multiple `orchestrator` nodes will speak to the single writer DB, probably via proxy. If the writer DB fails, the backend cluster promotes a different DB as writer; it is up to your proxy to identify that and direct `orchestrator`'s traffic to the promoted server.
+
+- Your Galera/XtraDB Cluster/InnoDB Cluster runs in multiple writers mode. A nice setup would couple each `orchestrator` node with a DB server (possibly on the very same box). Since replication is synchronous there is no split brain. Only one `orchestrator` node can ever be the leader, and that leader will only speak with a consensus of the DB nodes.
+
+In this setup there could be a substantial amount of traffic between the MySQL nodes. In cross-DC setups this may imply larger commit latencies (each commit may need to travel cross DC).
+
+To access your `orchestrator` service you may speak to any healthy node. It is advisable you speak only to the leader via proxy (use `/api/leader-check` as HTTP health check for your proxy).
+
+The latter setup is known to run in production at a very large environment on `3` or `5` nodes setup.
+
+### HA via raft
+
+![orchestrator HA via raft](images/orchestrator-ha-raft.png)
+
+`orchestrator` nodes will directly communicate via `raft` consensus algorithm. Each `orchestrator` node has its own private backend database. This can be `MySQL` or `sqlite`.
+
+Only one `orchestrator` node assumes leadership, and is always a part of a consensus. However all other nodes are independently active and are polling your topologies.
+
+In this setup there is:
+- No communication between the DB nodes.
+- Minimal communication between the `orchestrator`.
+- `*n` communication to `MySQL` topology nodes. A `3` node setup means each topology `MySQL` servr is probed by `3` different `orchestrator` nodes, independently.
+
+It is recommended to run a `3`-node or a `5`-node setup.
+
+To access your `orchestrator` service you may **only** speak to the leader node. Use `/api/leader-check` as HTTP health check for your proxy.
+
+![orchestrator HA via raft](images/orchestrator-ha-raft-proxy.png)
 
 
+`orchestrator/raft` is a newer development, and is being tested in production at this time. Please read the [orchestrator/raft documentation](raft.md) for all implications.
 
 ===
 
