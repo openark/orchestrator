@@ -1,5 +1,59 @@
 # Orchestrator High Availability
 
+`orchestrator` runs as a highly available service. This document lists the various ways of achieving HA for `orchestrator`, as well as less/not highly available setups.
+
+### TL;DR ways to get HA
+
+HA is achieved by choosing either:
+
+- `orchestrator/raft` setup, where `orchestrator` nodes communicate by raft consensus. Each `orchestrator` node has a private database backend, either `MySQL` or `sqlite`. See also [orchestrator/raft documentation](raft.md)
+- Shared backend setup. Multiple `orchestrator` nodes all talk to the same backend, which may be a Galera/XtraDB Cluster/InnoDB Cluster/NDB Cluster. Synchronization is done at the database level.
+
+### Availability types
+
+You may choose different availability types, based on your requirements.
+
+- No high availability: easiest, simplest setup, good for testing or dev setups. Can use `MySQL` or `sqlite`
+- Semi HA: backend is based on normal MySQL replication. `orchestrator` does not eat its own dog food and cannot failover its on backend.
+- HA: as depicted above; support for no single point of failure. Different solutions have different tradeoff in terms of resource utilization, supported software, type of client access.
+
+Discussed below are all options.
+
+### No high availability
+
+![orchestrator no HA](images/orchestrator-ha-no-ha.png)
+
+This setup is good for CI testing, for local dev machines or otherwise experiments. It is a single-`orchestrator` node with a single DB backend.
+
+The DB backend may be a `MySQL` server or it may be a `sqlite` DB, bundled with `orchestrator` (no dependencies, no additional software required)
+
+### Semi HA
+
+![orchestrator semi HA](images/orchestrator-ha-semi-ha.png)
+
+This setup provides semi HA for `orchestrator`. Two variations available:
+
+- Multiple `orchestrator` nodes talk to the same backend database. HA of the `orchestrator` services is achieved. However HA of the backend database is not achieved. Backend database may be a `master` with replicas, but `orchestrator` is unable to eat its own dog food and failover its very backend DB.
+
+  If the backend `master` dies, it takes someone or something else to failover the `orchestrator` service onto a promoted replica.
+
+- Multiple `orchestrator` services all talk to a proxy server, which load balances an active-active `MySQL` master-master setup with `STATEMENT` based replication.
+
+  - The proxy always directs to same server (e.g. `first` algorithm for `HAProxy`) unless that server is dead.
+  - Death of the active master causes `orchestrator` to talk to other master, which may be somewhat behind. `orchestrator` will typically self reapply the missing changes by nature of its continuous discovery.
+  - `orchestrator` queries guarantee `STATEMENT` based replication will not cause duplicate errors, and master-master setup will always achieve consistency.
+  - `orchestrator` will be able to recover the death of a backend master even if in the middle of runnign a recovery (recovery will re-initiate on alternate master)
+  - **Split brain is possible**. Depending on your setup, physical locations, type of proxy, there can be different `orchestrator` service nodes speaking to different backend `MySQL` servers. This scenario can lead two two `orchestrator` services which consider themselves as "active", both of which will run failovers independently, which would lead to topology corruption.
+
+### HA via shared backend
+
+![orchestrator HA via shared backend](images/orchestrator-ha-shared-backend.png)
+
+
+
+
+===
+
 `Orchestrator` makes your MySQL topologies available, but what makes `orchestrator` highly available?
 
 Before drilling down into the details, we should first observe that orchestrator is a service that runs with a MySQL backend. Thus, we need to substantiate the HA of both these components, as well as the continued correctness in the failover process of either of the two or of both.
