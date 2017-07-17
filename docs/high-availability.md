@@ -89,6 +89,8 @@ In this setup there is:
 
 It is recommended to run a `3`-node or a `5`-node setup.
 
+`sqlite` is embedded within `orchestrator` and does not require an external dependency. `MySQL` outperforms `sqlite` on busy setups.
+
 To access your `orchestrator` service you may **only** speak to the leader node. Use `/api/leader-check` as HTTP health check for your proxy.
 
 ![orchestrator HA via raft](images/orchestrator-ha-raft-proxy.png)
