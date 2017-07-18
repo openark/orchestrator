@@ -64,14 +64,18 @@ func init() {
 	metrics.Register("discoveries.recent_count", discoveryRecentCountGauge)
 	metrics.Register("elect.is_elected", isElectedGauge)
 
-	ometrics.OnGraphiteTick(func() { discoveryQueueLengthGauge.Update(int64(discoveryQueue.QueueLen())) })
-	ometrics.OnGraphiteTick(func() {
+	ometrics.OnMetricsTick(func() {
+		discoveryQueueLengthGauge.Update(int64(discoveryQueue.QueueLen()))
+	})
+	ometrics.OnMetricsTick(func() {
 		if recentDiscoveryOperationKeys == nil {
 			return
 		}
 		discoveryRecentCountGauge.Update(int64(recentDiscoveryOperationKeys.ItemCount()))
 	})
-	ometrics.OnGraphiteTick(func() { isElectedGauge.Update(int64(atomic.LoadInt64(&isElectedNode))) })
+	ometrics.OnMetricsTick(func() {
+		isElectedGauge.Update(atomic.LoadInt64(&isElectedNode))
+	})
 }
 
 func IsLeader() bool {
@@ -264,6 +268,13 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 func onDiscoveryTick() {
 	wasAlreadyElected := IsLeader()
 
+	if orcraft.IsRaftEnabled() {
+		if orcraft.IsLeader() {
+			atomic.StoreInt64(&isElectedNode, 1)
+		} else {
+			atomic.StoreInt64(&isElectedNode, 0)
+		}
+	}
 	if !orcraft.IsRaftEnabled() {
 		myIsElectedNode, err := process.AttemptElection()
 		if err != nil {
@@ -330,6 +341,7 @@ func ContinuousDiscovery() {
 		snapshotTopologiesTick = time.Tick(time.Duration(config.Config.SnapshotTopologiesIntervalHours) * time.Hour)
 	}
 
+	go ometrics.InitMetrics()
 	go ometrics.InitGraphiteMetrics()
 	go acceptSignals()
 

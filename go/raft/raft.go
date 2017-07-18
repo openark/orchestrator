@@ -78,9 +78,7 @@ func normalizeRaftNode(node string) string {
 
 // IsLeader tells if this node is the current raft leader
 func IsLeader() bool {
-	future := getRaft().VerifyLeader()
-	err := future.Error()
-	return err == nil
+	return GetState() == raft.Leader
 }
 
 // GetLeader returns identity of raft leader

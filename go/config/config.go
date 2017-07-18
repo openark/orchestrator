@@ -50,6 +50,7 @@ const (
 	MaintenanceExpireMinutes                     = 10
 	AgentHttpTimeoutSeconds                      = 60
 	PseudoGTIDCoordinatesHistoryHeuristicMinutes = 2
+	DebugMetricsIntervalSeconds                  = 10
 )
 
 var deprecatedConfigurationVariables = []string{
