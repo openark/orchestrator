@@ -26,6 +26,10 @@
 #   orchestrator -c register-candidate -i candidate.host.com:3306 --promotion-rule=prefer
 #   orchestrator -c recover -i failed.host.com:3306
 
+# /etc/profile.d/orchestrator-client.sh is for you to set any environment.
+# In particular, you will want to set ORCHESTRATOR_API
+[ -f /etc/profile.d/orchestrator-client.sh ] && . /etc/profile.d/orchestrator-client.sh
+
 orchestrator_api="${ORCHESTRATOR_API:-http://localhost:3000}"
 
 command=
