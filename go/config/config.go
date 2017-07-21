@@ -260,7 +260,7 @@ func newConfiguration() *Configuration {
 		MySQLOrchestratorMaxPoolConnections:        128, // limit concurrent conns to backend DB
 		MySQLOrchestratorPort:                      3306,
 		MySQLTopologyUseMutualTLS:                  false,
-		MySQLTopologyUseMixedTLS:                   false,
+		MySQLTopologyUseMixedTLS:                   true,
 		MySQLOrchestratorUseMutualTLS:              false,
 		MySQLConnectTimeoutSeconds:                 2,
 		MySQLOrchestratorReadTimeoutSeconds:        30,
