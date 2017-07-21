@@ -26,6 +26,7 @@ import (
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 	"github.com/patrickmn/go-cache"
+	"github.com/rcrowley/go-metrics"
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/ssl"
@@ -39,7 +40,19 @@ var topologyTLSConfigured bool = false
 // Track if a TLS has already been configured for Orchestrator
 var orchestratorTLSConfigured bool = false
 
-var requireTLSCache *cache.Cache = cache.New(time.Duration(config.Config.TLSCacheTTL)*time.Second, time.Second)
+var requireTLSCache *cache.Cache = cache.New(time.Duration(config.Config.TLSCacheTTLFactor)*time.Second, time.Second)
+
+var readInstanceTLSCounter = metrics.NewCounter()
+var writeInstanceTLSCounter = metrics.NewCounter()
+var readInstanceTLSCacheCounter = metrics.NewCounter()
+var writeInstanceTLSCacheCounter = metrics.NewCounter()
+
+func init() {
+	metrics.Register("instance_tls.read", readInstanceTLSCounter)
+	metrics.Register("instance_tls.write", writeInstanceTLSCounter)
+	metrics.Register("instance_tls.read_cache", readInstanceTLSCacheCounter)
+	metrics.Register("instance_tls.write_cache", writeInstanceTLSCacheCounter)
+}
 
 func requiresTLS(host string, port int, mysql_uri string) bool {
 	var required int = 0
@@ -49,6 +62,7 @@ func requiresTLS(host string, port int, mysql_uri string) bool {
 
 	if value, found = requireTLSCache.Get(fmt.Sprintf("%s:%d", host, port)); found {
 		required = value.(int)
+		readInstanceTLSCacheCounter.Inc(1)
 	}
 
 	if !found {
@@ -70,6 +84,8 @@ func requiresTLS(host string, port int, mysql_uri string) bool {
 			log.Errore(err)
 			return required != 0
 		}
+
+		readInstanceTLSCounter.Inc(1)
 
 		if first_time {
 			db, _, _ := sqlutils.GetDB(mysql_uri)
@@ -93,9 +109,12 @@ func requiresTLS(host string, port int, mysql_uri string) bool {
 				log.Errore(err)
 				return required != 0
 			}
+
+			writeInstanceTLSCounter.Inc(1)
 		}
 
 		requireTLSCache.Set(fmt.Sprintf("%s:%d", host, port), required, cache.DefaultExpiration)
+		writeInstanceTLSCacheCounter.Inc(1)
 	}
 
 	return required != 0
