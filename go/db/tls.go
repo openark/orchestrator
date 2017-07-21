@@ -40,7 +40,7 @@ var topologyTLSConfigured bool = false
 // Track if a TLS has already been configured for Orchestrator
 var orchestratorTLSConfigured bool = false
 
-var requireTLSCache *cache.Cache = cache.New(time.Duration(config.Config.TLSCacheTTLFactor)*time.Second, time.Second)
+var requireTLSCache *cache.Cache = cache.New(time.Duration(config.Config.TLSCacheTTLFactor*config.Config.InstancePollSeconds)*time.Second, time.Second)
 
 var readInstanceTLSCounter = metrics.NewCounter()
 var writeInstanceTLSCounter = metrics.NewCounter()
