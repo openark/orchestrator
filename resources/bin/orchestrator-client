@@ -186,7 +186,7 @@ function prompt_help() {
   echo "Usage: orchestrator-client -c <command> [flags...]"
   echo "Example: orchestrator-client -c which-master -i some.replica"
   echo "Available commands:"
-  cat "$0" | sed -n '/run_command/,/esac/p' | egrep '".*"[)].*;;' | egrep -o '"(.*?)"' | tr -d '"' | sed -e 's/^/  /'
+  cat "$0" | sed -n '/run_command/,/esac/p' | egrep '".*"[)].*;;' | sed -r -e 's/"(.*?)".*#(.*)/\1~\2/' | column -t -s "~"
 }
 
 function discover() {
@@ -440,32 +440,32 @@ function run_command() {
   command=$(echo $command | sed -e 's/slave/replica/')
   case $command in
     "help") prompt_help ;;
-    "discover") discover ;;
-    "forget") forget ;;
+    "discover") discover ;; # Lookup an instance, investigate it
+    "forget") forget ;;     # Forget about an instance's existence
 
-    "topology") ascii_topology ;;
-    "clusters") clusters ;;
-    "clusters-alias") clusters_alias ;;
-    "instance"|"which-instance") instance ;;
-    "which-master") which_master ;;
-    "which-replicas") which_replicas ;;
-    "which-cluster-instances") which_cluster_instances ;;
-    "which-cluster") which_cluster ;;
-    "all-clusters-masters") all_clusters_masters ;;
-    "all-instances") all_instances ;;
-    "which-cluster-osc-replicas") which_cluster_osc_replicas ;;
-    "downtimed") downtimed ;;
+    "topology") ascii_topology ;;                               # Show an ascii-graph of a replication topology, given a member of that topology
+    "clusters") clusters ;;                                     # List all clusters known to orchestrator
+    "clusters-alias") clusters_alias ;;                         # List all clusters known to orchestrator
+    "instance"|"which-instance") instance ;;                    # Output the fully-qualified hostname:port representation of the given instance, or error if unknown
+    "which-master") which_master ;;                             # Output the fully-qualified hostname:port representation of a given instance's master
+    "which-replicas") which_replicas ;;                         # Output the fully-qualified hostname:port list of replicas of a given instance
+    "which-cluster-instances") which_cluster_instances ;;       # Output the list of instances participating in same cluster as given instance
+    "which-cluster") which_cluster ;;                           # Output the name of the cluster an instance belongs to, or error if unknown to orchestrator
+    "all-clusters-masters") all_clusters_masters ;;             # List of writeable masters, one per cluster
+    "all-instances") all_instances ;;                           # The complete list of known instances
+    "which-cluster-osc-replicas") which_cluster_osc_replicas ;; # Output a list of replicas in a cluster, that could serve as a pt-online-schema-change operation control replicas
+    "downtimed") downtimed ;;                                   # List all downtimed instances
 
-    "submit-pool-instances") submit_pool_instances ;;
-    "which-heuristic-cluster-pool-instances") which_heuristic_cluster_pool_instances ;;
+    "submit-pool-instances") submit_pool_instances ;;           # Submit a pool name with a list of instances in that pool
+    "which-heuristic-cluster-pool-instances") which_heuristic_cluster_pool_instances ;; # List instances of a given cluster which are in either any pool or in a specific pool
 
-    "begin-downtime") begin_downtime ;;
-    "end-downtime") end_downtime ;;
-    "begin-maintenance") begin_maintenance ;;
-    "end-maintenance") end_maintenance ;;
-    "register-candidate") register_candidate ;;
-    "register-hostname-unresolve") register_hostname_unresolve ;;
-    "deregister-hostname-unresolve") deregister_hostname_unresolve ;;
+    "begin-downtime") begin_downtime ;;                               # Mark an instance as downtimed
+    "end-downtime") end_downtime ;;                                   # Indicate an instance is no longer downtimed
+    "begin-maintenance") begin_maintenance ;;                         # Request a maintenance lock on an instance
+    "end-maintenance") end_maintenance ;;                             # Remove maintenance lock from an instance
+    "register-candidate") register_candidate ;;                       # Indicate the promotion rule for a given instance
+    "register-hostname-unresolve") register_hostname_unresolve ;;     # Assigns the given instance a virtual (aka "unresolved") name
+    "deregister-hostname-unresolve") deregister_hostname_unresolve ;; # Explicitly deregister/dosassociate a hostname with an "unresolved" name
 
     "move-up") general_singular_relocate_command ;;
     "match-up") general_singular_relocate_command ;;
