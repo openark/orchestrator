@@ -117,6 +117,7 @@ func (i *InmemTransport) RequestVote(target string, args *RequestVoteRequest, re
 
 // InstallSnapshot implements the Transport interface.
 func (i *InmemTransport) InstallSnapshot(target string, args *InstallSnapshotRequest, resp *InstallSnapshotResponse, data io.Reader) error {
+	fmt.Println("InmemTransport.InstallSnapshot()")
 	rpcResp, err := i.makeRPC(target, args, data, 10*i.timeout)
 	if err != nil {
 		return err
