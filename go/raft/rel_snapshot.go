@@ -58,6 +58,7 @@ type bufferedFile struct {
 }
 
 func (b *bufferedFile) Read(p []byte) (n int, err error) {
+	log.Debugf("===== bufferedFile.Read")
 	return b.bh.Read(p)
 }
 
@@ -134,6 +135,7 @@ func (f *RelSnapshotStore) Create(index, term uint64, peers []byte) (raft.Snapsh
 
 // List returns available snapshots in the store.
 func (f *RelSnapshotStore) List() ([]*raft.SnapshotMeta, error) {
+	log.Debugf("===== RelSnapshotStore.List")
 	// Get the eligible snapshots
 	snapshots, err := f.getSnapshots()
 	if err != nil {
@@ -153,6 +155,7 @@ func (f *RelSnapshotStore) List() ([]*raft.SnapshotMeta, error) {
 
 // readSnapshots reads snapshots by query
 func (f *RelSnapshotStore) readSnapshots(query string, args []interface{}) (snapMeta []*relSnapshotMeta, err error) {
+	log.Debugf("===== RelSnapshotStore.readSnapshots; query=%+v", query)
 	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		snapshotMetaText := m.GetString("snapshot_meta")
 
@@ -168,6 +171,7 @@ func (f *RelSnapshotStore) readSnapshots(query string, args []interface{}) (snap
 }
 
 func (f *RelSnapshotStore) readMeta(name string) (*relSnapshotMeta, error) {
+	log.Debugf("===== RelSnapshotStore.readMeta; name=%+v", name)
 	query := `select snapshot_meta from raft_snapshot where snapshot_name=?`
 	snapshots, err := f.readSnapshots(query, sqlutils.Args(name))
 	if err != nil {
@@ -187,6 +191,7 @@ func (f *RelSnapshotStore) getSnapshots() (snapMeta []*relSnapshotMeta, err erro
 
 // Open takes a snapshot ID and returns a ReadCloser for that snapshot.
 func (f *RelSnapshotStore) Open(id string) (*raft.SnapshotMeta, io.ReadCloser, error) {
+	log.Debugf("===== RelSnapshotStore.Open; id=%+v", id)
 	// Get the metadata
 	meta, err := f.readMeta(id)
 	if err != nil {
