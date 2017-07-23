@@ -24,8 +24,7 @@ func (c *dummyReadCloser) Close() error {
 }
 
 func (c *dummyReadCloser) Read(p []byte) (n int, err error) {
-	// return 0, io.EOF
-	return 0, fmt.Errorf("==== dummyReadCloser refuses to read snapshot, bwahahahahahahaha")
+	return 0, io.EOF
 }
 
 // RelSnapshotStore implements the SnapshotStore interface and allows
