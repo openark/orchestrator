@@ -17,6 +17,7 @@
 package orcraft
 
 import (
+	"database/sql"
 	"encoding/binary"
 
 	"github.com/github/orchestrator/go/db"
@@ -128,6 +129,9 @@ func (relStore *RelationalStore) GetLog(index uint64, log *raft.Log) error {
       from raft_log
       where log_index = ?
     `, index).Scan(&log.Index, &log.Term, &log.Type, &log.Data)
+	if err == sql.ErrNoRows {
+		return raft.ErrLogNotFound
+	}
 	return err
 }
 
