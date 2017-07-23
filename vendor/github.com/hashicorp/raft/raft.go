@@ -724,8 +724,6 @@ func (r *Raft) runCandidate() {
 			// Check if the term is greater than ours, bail
 			if vote.Term > r.getCurrentTerm() {
 				r.logger.Printf("[DEBUG] raft: Newer term discovered, fallback to follower")
-				r.logger.Printf("[DEBUG] raft: Newer term discovered, vote.Term: %+v", vote.Term)
-				r.logger.Printf("[DEBUG] raft: Newer term discovered, r.getCurrentTerm(): %+v", r.getCurrentTerm())
 				r.setState(Follower)
 				r.setCurrentTerm(vote.Term)
 				return
