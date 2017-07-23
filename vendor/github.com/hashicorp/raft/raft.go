@@ -1567,6 +1567,7 @@ func (r *Raft) installSnapshot(rpc RPC, req *InstallSnapshotRequest) {
 	r.setLeader(r.trans.DecodePeer(req.Leader))
 
 	// Create a new snapshot
+	r.logger.Printf("==== installSnapshot create: %+v, %+v,", req.LastLogIndex, req.LastLogTerm)
 	sink, err := r.snapshots.Create(req.LastLogIndex, req.LastLogTerm, req.Peers)
 	if err != nil {
 		r.logger.Printf("[ERR] raft: Failed to create snapshot to install: %v", err)
