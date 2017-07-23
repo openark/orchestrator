@@ -309,7 +309,6 @@ func (n *NetworkTransport) genericRPC(target string, rpcType uint8, args interfa
 
 // InstallSnapshot implements the Transport interface.
 func (n *NetworkTransport) InstallSnapshot(target string, args *InstallSnapshotRequest, resp *InstallSnapshotResponse, data io.Reader) error {
-	n.logger.Printf("NetworkTransport.InstallSnapshot()")
 	// Get a conn, always close for InstallSnapshot
 	conn, err := n.getConn(target)
 	if err != nil {
@@ -330,13 +329,11 @@ func (n *NetworkTransport) InstallSnapshot(target string, args *InstallSnapshotR
 	if err = sendRPC(conn, rpcInstallSnapshot, args); err != nil {
 		return err
 	}
-	n.logger.Printf("NetworkTransport.InstallSnapshot() streaming")
 
 	// Stream the state
 	if _, err = io.Copy(conn.w, data); err != nil {
 		return err
 	}
-	n.logger.Printf("NetworkTransport.InstallSnapshot() flushing")
 
 	// Flush
 	if err = conn.w.Flush(); err != nil {
@@ -345,7 +342,6 @@ func (n *NetworkTransport) InstallSnapshot(target string, args *InstallSnapshotR
 
 	// Decode the response, do not return conn
 	_, err = decodeResponse(conn, resp)
-	n.logger.Printf("NetworkTransport.InstallSnapshot() got response")
 
 	return err
 }
