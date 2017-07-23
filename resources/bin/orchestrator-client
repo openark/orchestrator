@@ -67,9 +67,10 @@ for arg in "$@"; do
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:h" OPTION
 do
   case $OPTION in
+    h) command="help" ;;
     c) command=$OPTARG ;;
     i) instance=$OPTARG ;;
     d) destination=$OPTARG ;;
@@ -179,6 +180,13 @@ function filter_keys {
 
 function print_key {
   cat - | jq -r '. | (.Hostname + ":" + (.Port | tostring))'
+}
+
+function prompt_help() {
+  echo "Usage: orchestrator-client -c <command> [flags...]"
+  echo "Example: orchestrator-client -c which-master -i some.replica"
+  echo "Available commands:"
+  cat "$0" | sed -n '/run_command/,/esac/p' | egrep '".*"[)].*;;' | egrep -o '"(.*?)"' | tr -d '"' | sed -e 's/^/  /'
 }
 
 function discover() {
@@ -431,6 +439,7 @@ function run_command() {
   fi
   command=$(echo $command | sed -e 's/slave/replica/')
   case $command in
+    "help") prompt_help ;;
     "discover") discover ;;
     "forget") forget ;;
 
