@@ -37,8 +37,17 @@ var RaftNotRunning = fmt.Errorf("raft is not configured/running")
 var store *Store
 var ThisHostname string
 
+var fatalRaftErrorChan = make(chan error)
+
 func IsRaftEnabled() bool {
 	return store != nil
+}
+
+func FatalRaftError(err error) error {
+	if err != nil {
+		go func() { fatalRaftErrorChan <- err }()
+	}
+	return err
 }
 
 // Setup creates the entire raft shananga. Creates the store, associates with the throttler,
@@ -164,6 +173,8 @@ func Monitor() {
 			if IsLeader() {
 				go PublishCommand("heartbeat", "")
 			}
+		case err := <-fatalRaftErrorChan:
+			log.Fatale(err)
 		}
 	}
 }

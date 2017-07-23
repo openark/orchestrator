@@ -105,13 +105,10 @@ func snapshotName(term, index uint64) string {
 
 // Create is used to start a new snapshot
 func (f *RelSnapshotStore) Create(index, term uint64, peers []byte) (raft.SnapshotSink, error) {
-	lastIndex := getRaft().LastIndex() // our index
-	if lastIndex < index {
-		return nil, fmt.Errorf("RelSnapshotStore does not support remot e snaoshot stores")
+	if lastWrittenIndex := getRaft().LastIndex(); lastWrittenIndex < index {
+		err := fmt.Errorf("RelSnapshotStore does not support remote snapshot stores")
+		return nil, FatalRaftError(err)
 	}
-	log.Debugf("==== RelSnapshotStore create: %+v, %+v,", index, term)
-
-	log.Debugf("==== RelSnapshotStore create: lastIndex=%+v", lastIndex)
 	// Create a new path
 	name := snapshotName(term, index)
 
