@@ -105,6 +105,7 @@ func snapshotName(term, index uint64) string {
 
 // Create is used to start a new snapshot
 func (f *RelSnapshotStore) Create(index, term uint64, peers []byte) (raft.SnapshotSink, error) {
+	log.Debugf("==== RelSnapshotStore create: %+v, %+v,", index, term)
 	// Create a new path
 	name := snapshotName(term, index)
 
