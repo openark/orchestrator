@@ -1531,7 +1531,7 @@ func (r *Raft) requestVote(rpc RPC, req *RequestVoteRequest) {
 // We must be in the follower state for this, since it means we are
 // too far behind a leader for log replay.
 func (r *Raft) installSnapshot(rpc RPC, req *InstallSnapshotRequest) {
-	fmt.Println(fmt.Sprintf("==== installSnapshot"))
+	r.logger.Printf("==== installSnapshot")
 	defer metrics.MeasureSince([]string{"raft", "rpc", "installSnapshot"}, time.Now())
 	// Setup a response
 	resp := &InstallSnapshotResponse{
@@ -1543,15 +1543,15 @@ func (r *Raft) installSnapshot(rpc RPC, req *InstallSnapshotRequest) {
 		io.Copy(ioutil.Discard, rpc.Reader) // ensure we always consume all the snapshot data from the stream [see issue #212]
 		rpc.Respond(resp, rpcErr)
 	}()
-	fmt.Println(fmt.Sprintf("==== installSnapshot req.Term: %+v", req.Term))
-	fmt.Println(fmt.Sprintf("==== installSnapshot r.getCurrentTerm(): %+v", r.getCurrentTerm()))
+	r.logger.Printf("==== installSnapshot req.Term: %+v", req.Term)
+	r.logger.Printf("==== installSnapshot r.getCurrentTerm(): %+v", r.getCurrentTerm())
 
 	// Ignore an older term
 	if req.Term < r.getCurrentTerm() {
 		r.logger.Printf("[INFO] raft: Ignoring installSnapshot request with older term of %d vs currentTerm %d", req.Term, r.getCurrentTerm())
 		return
 	}
-	fmt.Println(fmt.Sprintf("==== installSnapshot continues"))
+	r.logger.Printf("==== installSnapshot continues")
 
 	// Increase the term if we see a newer one
 	if req.Term > r.getCurrentTerm() {
@@ -1571,7 +1571,7 @@ func (r *Raft) installSnapshot(rpc RPC, req *InstallSnapshotRequest) {
 		rpcErr = fmt.Errorf("failed to create snapshot: %v", err)
 		return
 	}
-	fmt.Println(fmt.Sprintf("==== installSnapshot continues 1"))
+	r.logger.Printf("==== installSnapshot continues 1")
 
 	// Spill the remote snapshot to disk
 	n, err := io.Copy(sink, rpc.Reader)
@@ -1581,7 +1581,7 @@ func (r *Raft) installSnapshot(rpc RPC, req *InstallSnapshotRequest) {
 		rpcErr = err
 		return
 	}
-	fmt.Println(fmt.Sprintf("==== installSnapshot continues 2"))
+	r.logger.Printf("==== installSnapshot continues 2")
 
 	// Check that we received it all
 	if n != req.Size {
@@ -1590,7 +1590,7 @@ func (r *Raft) installSnapshot(rpc RPC, req *InstallSnapshotRequest) {
 		rpcErr = fmt.Errorf("short read")
 		return
 	}
-	fmt.Println(fmt.Sprintf("==== installSnapshot continues 3"))
+	r.logger.Printf("==== installSnapshot continues 3")
 
 	// Finalize the snapshot
 	if err := sink.Close(); err != nil {
@@ -1600,7 +1600,7 @@ func (r *Raft) installSnapshot(rpc RPC, req *InstallSnapshotRequest) {
 	}
 	r.logger.Printf("[INFO] raft: Copied %d bytes to local snapshot", n)
 
-	fmt.Println(fmt.Sprintf("==== installSnapshot continues 4"))
+	r.logger.Printf("==== installSnapshot continues 4")
 	// Restore snapshot
 	future := &restoreFuture{ID: sink.ID()}
 	future.init()
@@ -1610,7 +1610,7 @@ func (r *Raft) installSnapshot(rpc RPC, req *InstallSnapshotRequest) {
 		future.respond(ErrRaftShutdown)
 		return
 	}
-	fmt.Println(fmt.Sprintf("==== installSnapshot continues 5"))
+	r.logger.Printf("==== installSnapshot continues 5")
 
 	// Wait for the restore to happen
 	if err := future.Error(); err != nil {
@@ -1618,26 +1618,26 @@ func (r *Raft) installSnapshot(rpc RPC, req *InstallSnapshotRequest) {
 		rpcErr = err
 		return
 	}
-	fmt.Println(fmt.Sprintf("==== installSnapshot continues 6"))
+	r.logger.Printf("==== installSnapshot continues 6")
 
 	// Update the lastApplied so we don't replay old logs
 	r.setLastApplied(req.LastLogIndex)
 
 	// Update the last stable snapshot info
 	r.setLastSnapshot(req.LastLogIndex, req.LastLogTerm)
-	fmt.Println(fmt.Sprintf("==== installSnapshot continues 7"))
+	r.logger.Printf("==== installSnapshot continues 7")
 
 	// Restore the peer set
 	peers := decodePeers(req.Peers, r.trans)
 	r.peers = ExcludePeer(peers, r.localAddr)
 	r.peerStore.SetPeers(peers)
-	fmt.Println(fmt.Sprintf("==== installSnapshot continues 8"))
+	r.logger.Printf("==== installSnapshot continues 8")
 
 	// Compact logs, continue even if this fails
 	if err := r.compactLogs(req.LastLogIndex); err != nil {
 		r.logger.Printf("[ERR] raft: Failed to compact logs: %v", err)
 	}
-	fmt.Println(fmt.Sprintf("==== installSnapshot continues 9"))
+	r.logger.Printf("==== installSnapshot continues 9")
 
 	r.logger.Printf("[INFO] raft: Installed remote snapshot")
 	resp.Success = true
