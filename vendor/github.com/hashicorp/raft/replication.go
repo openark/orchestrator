@@ -215,20 +215,17 @@ SEND_SNAP:
 // sendLatestSnapshot is used to send the latest snapshot we have
 // down to our follower.
 func (r *Raft) sendLatestSnapshot(s *followerReplication) (bool, error) {
-	r.logger.Printf("==== Raft.sendLatestSnapshot()")
 	// Get the snapshots
 	snapshots, err := r.snapshots.List()
 	if err != nil {
 		r.logger.Printf("[ERR] raft: Failed to list snapshots: %v", err)
 		return false, err
 	}
-	r.logger.Printf("==== Raft.sendLatestSnapshot() listed")
 
 	// Check we have at least a single snapshot
 	if len(snapshots) == 0 {
 		return false, fmt.Errorf("no snapshots found")
 	}
-	r.logger.Printf("==== Raft.sendLatestSnapshot() found")
 
 	// Open the most recent snapshot
 	snapID := snapshots[0].ID
@@ -238,7 +235,6 @@ func (r *Raft) sendLatestSnapshot(s *followerReplication) (bool, error) {
 		return false, err
 	}
 	defer snapshot.Close()
-	r.logger.Printf("==== Raft.sendLatestSnapshot() opened")
 
 	// Setup the request
 	req := InstallSnapshotRequest{
@@ -258,7 +254,6 @@ func (r *Raft) sendLatestSnapshot(s *followerReplication) (bool, error) {
 		s.failures++
 		return false, err
 	}
-	r.logger.Printf("==== Raft.sendLatestSnapshot() called r.trans.InstallSnapshot")
 	metrics.MeasureSince([]string{"raft", "replication", "installSnapshot", s.peer}, start)
 
 	// Check for a newer term, stop running
