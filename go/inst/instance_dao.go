@@ -2223,17 +2223,6 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 		instanceKey.Hostname,
 		instanceKey.Port,
 	)
-	if err != nil {
-		return log.Errore(err)
-	}
-	_, err = db.ExecOrchestrator(`
-			delete
-				from database_instance_tls
-			where
-				hostname = ? and port = ?`,
-		instanceKey.Hostname,
-		instanceKey.Port,
-	)
 	AuditOperation("forget", instanceKey, "")
 	return err
 }
