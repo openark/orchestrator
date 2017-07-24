@@ -18,6 +18,7 @@ package process
 
 import (
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
@@ -27,6 +28,8 @@ import (
 )
 
 const registrationPollSeconds = 5
+
+var lastGoodHealthCheckUnixNano int64
 
 type NodeHealth struct {
 	Hostname        string
@@ -84,7 +87,11 @@ var continuousRegistrationOnce sync.Once
 
 func RegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
 	nodeHealth.Update()
-	return WriteRegisterNode(nodeHealth)
+	healthy, err = WriteRegisterNode(nodeHealth)
+	if healthy {
+		atomic.StoreInt64(&lastGoodHealthCheckUnixNano, time.Now().UnixNano())
+	}
+	return healthy, err
 }
 
 // HealthTest attempts to write to the backend database and get a result
@@ -111,6 +118,14 @@ func HealthTest() (*HealthStatus, error) {
 	health.AvailableNodes, err = ReadAvailableNodes(true)
 
 	return &health, nil
+}
+
+func SinceLastGoodHealthCheck() time.Duration {
+	healthyTimeNano := atomic.LoadInt64(&lastGoodHealthCheckUnixNano)
+	if healthyTimeNano == 0 {
+		return 0
+	}
+	return time.Since(time.Unix(0, healthyTimeNano))
 }
 
 // ContinuousRegistration will continuously update the node_health
