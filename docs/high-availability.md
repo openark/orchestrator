@@ -21,7 +21,7 @@ Discussed below are all options.
 
 ### No high availability
 
-![orchestrator no HA](images/orchestrator-ha-no-ha.png)
+![orchestrator no HA](images/orchestrator-ha--no-ha.png)
 
 This setup is good for CI testing, for local dev machines or otherwise experiments. It is a single-`orchestrator` node with a single DB backend.
 
@@ -29,7 +29,7 @@ The DB backend may be a `MySQL` server or it may be a `sqlite` DB, bundled with 
 
 ### Semi HA
 
-![orchestrator semi HA](images/orchestrator-ha-semi-ha.png)
+![orchestrator semi HA](images/orchestrator-ha--semi-ha.png)
 
 This setup provides semi HA for `orchestrator`. Two variations available:
 
@@ -51,7 +51,7 @@ Both these setups are well known to run in production for very large environment
 
 ### HA via shared backend
 
-![orchestrator HA via shared backend](images/orchestrator-ha-shared-backend.png)
+![orchestrator HA via shared backend](images/orchestrator-ha--shared-backend.png)
 
 HA is achieved by highly available shared backend. Existing solutions are:
 
@@ -76,7 +76,7 @@ The latter setup is known to run in production at a very large environment on `3
 
 ### HA via raft
 
-![orchestrator HA via raft](images/orchestrator-ha-raft.png)
+![orchestrator HA via raft](images/orchestrator-ha--raft.png)
 
 `orchestrator` nodes will directly communicate via `raft` consensus algorithm. Each `orchestrator` node has its own private backend database. This can be `MySQL` or `sqlite`.
 
@@ -93,7 +93,7 @@ It is recommended to run a `3`-node or a `5`-node setup.
 
 To access your `orchestrator` service you may **only** speak to the leader node. Use `/api/leader-check` as HTTP health check for your proxy.
 
-![orchestrator HA via raft](images/orchestrator-ha-raft-proxy.png)
+![orchestrator HA via raft](images/orchestrator-ha--raft-proxy.png)
 
 
 `orchestrator/raft` is a newer development, and is being tested in production at this time. Please read the [orchestrator/raft documentation](raft.md) for all implications.
