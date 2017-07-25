@@ -26,6 +26,10 @@
 #   orchestrator -c register-candidate -i candidate.host.com:3306 --promotion-rule=prefer
 #   orchestrator -c recover -i failed.host.com:3306
 
+# /etc/profile.d/orchestrator-client.sh is for you to set any environment.
+# In particular, you will want to set ORCHESTRATOR_API
+[ -f /etc/profile.d/orchestrator-client.sh ] && . /etc/profile.d/orchestrator-client.sh
+
 orchestrator_api="${ORCHESTRATOR_API:-http://localhost:3000}"
 
 command=
@@ -63,9 +67,10 @@ for arg in "$@"; do
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:h" OPTION
 do
   case $OPTION in
+    h) command="help" ;;
     c) command=$OPTARG ;;
     i) instance=$OPTARG ;;
     d) destination=$OPTARG ;;
@@ -175,6 +180,13 @@ function filter_keys {
 
 function print_key {
   cat - | jq -r '. | (.Hostname + ":" + (.Port | tostring))'
+}
+
+function prompt_help() {
+  echo "Usage: orchestrator-client -c <command> [flags...]"
+  echo "Example: orchestrator-client -c which-master -i some.replica"
+  echo "Available commands:"
+  cat "$0" | sed -n '/run_command/,/esac/p' | egrep '".*"[)].*;;' | sed -r -e 's/"(.*?)".*#(.*)/\1~\2/' | column -t -s "~"
 }
 
 function discover() {
@@ -427,73 +439,79 @@ function run_command() {
   fi
   command=$(echo $command | sed -e 's/slave/replica/')
   case $command in
-    "discover") discover ;;
-    "forget") forget ;;
+    "help") prompt_help ;;
+    "discover") discover ;; # Lookup an instance, investigate it
+    "forget") forget ;;     # Forget about an instance's existence
 
-    "topology") ascii_topology ;;
-    "clusters") clusters ;;
-    "clusters-alias") clusters_alias ;;
-    "instance"|"which-instance") instance ;;
-    "which-master") which_master ;;
-    "which-replicas") which_replicas ;;
-    "which-cluster-instances") which_cluster_instances ;;
-    "which-cluster") which_cluster ;;
-    "all-clusters-masters") all_clusters_masters ;;
-    "all-instances") all_instances ;;
-    "which-cluster-osc-replicas") which_cluster_osc_replicas ;;
-    "downtimed") downtimed ;;
+    "topology") ascii_topology ;;                               # Show an ascii-graph of a replication topology, given a member of that topology
+    "clusters") clusters ;;                                     # List all clusters known to orchestrator
+    "clusters-alias") clusters_alias ;;                         # List all clusters known to orchestrator
+    "instance"|"which-instance") instance ;;                    # Output the fully-qualified hostname:port representation of the given instance, or error if unknown
+    "which-master") which_master ;;                             # Output the fully-qualified hostname:port representation of a given instance's master
+    "which-replicas") which_replicas ;;                         # Output the fully-qualified hostname:port list of replicas of a given instance
+    "which-cluster-instances") which_cluster_instances ;;       # Output the list of instances participating in same cluster as given instance
+    "which-cluster") which_cluster ;;                           # Output the name of the cluster an instance belongs to, or error if unknown to orchestrator
+    "all-clusters-masters") all_clusters_masters ;;             # List of writeable masters, one per cluster
+    "all-instances") all_instances ;;                           # The complete list of known instances
+    "which-cluster-osc-replicas") which_cluster_osc_replicas ;; # Output a list of replicas in a cluster, that could serve as a pt-online-schema-change operation control replicas
+    "downtimed") downtimed ;;                                   # List all downtimed instances
 
-    "submit-pool-instances") submit_pool_instances ;;
-    "which-heuristic-cluster-pool-instances") which_heuristic_cluster_pool_instances ;;
+    "relocate") general_relocate_command ;;                   # Relocate a replica beneath another instance
+    "relocate-replicas") general_relocate_replicas_command ;; # Relocates all or part of the replicas of a given instance under another instance
 
-    "begin-downtime") begin_downtime ;;
-    "end-downtime") end_downtime ;;
-    "begin-maintenance") begin_maintenance ;;
-    "end-maintenance") end_maintenance ;;
-    "register-candidate") register_candidate ;;
-    "register-hostname-unresolve") register_hostname_unresolve ;;
-    "deregister-hostname-unresolve") deregister_hostname_unresolve ;;
+    "match") general_relocate_command ;;                               # Matches a replica beneath another (destination) instance using Pseudo-GTID
+    "match-up") general_singular_relocate_command ;;                   # Transport the replica one level up the hierarchy, making it child of its grandparent, using Pseudo-GTID
+    "match-up-replicas") general_singular_relocate_replicas_command ;; # Matches replicas of the given instance one level up the topology, making them siblings of given instance, using Pseudo-GTID
 
-    "move-up") general_singular_relocate_command ;;
-    "match-up") general_singular_relocate_command ;;
-    "make-co-master") general_singular_relocate_command ;;
-    "take-master") general_singular_relocate_command ;;
-    "take-siblings") general_singular_relocate_command ;;
-    "match-up") general_singular_relocate_command ;;
-    "relocate") general_relocate_command ;;
-    "match") general_relocate_command ;;
-    "repoint") general_relocate_command ;;
-    "move-below") general_relocate_command ;;
-    "move-below-gtid") general_relocate_command ;;
-    "move-equivalent") general_relocate_command ;;
-    "move-up-replicas") general_singular_relocate_replicas_command ;;
-    "match-up-replicas") general_singular_relocate_replicas_command ;;
-    "repoint-replicas") general_singular_relocate_replicas_command ;;
-    "relocate-replicas") general_relocate_replicas_command ;;
-    "move-replicas-gtid") general_relocate_replicas_command ;;
+    "move-up") general_singular_relocate_command ;;                    # Move a replica one level up the topology
+    "move-below") general_relocate_command ;;                          # Moves a replica beneath its sibling. Both replicas must be actively replicating from same master.
+    "move-equivalent") general_relocate_command ;;                     # Moves a replica beneath another server, based on previously recorded "equivalence coordinates"
+    "move-up-replicas") general_singular_relocate_replicas_command ;;  # Moves replicas of the given instance one level up the topology
+    "make-co-master") general_singular_relocate_command ;;             # Create a master-master replication. Given instance is a replica which replicates directly from a master.
+    "take-master") general_singular_relocate_command ;;                # Turn an instance into a master of its own master; essentially switch the two.
+    "take-siblings") general_singular_relocate_command ;;              # Turn all siblings of a replica into its sub-replicas.
 
-    "stop-slave") general_instance_command ;;
-    "stop-slave-nice") general_instance_command ;;
-    "start-slave") general_instance_command ;;
-    "restart-slave") general_instance_command ;;
-    "reset-slave") general_instance_command ;;
-    "detach-replica") general_instance_command ;;
-    "reattach-replica") general_instance_command ;;
-    "reattach-replica-master-host") general_instance_command ;;
-    "skip-query") general_instance_command ;;
-    "set-read-only") general_instance_command ;;
-    "set-writeable") general_instance_command ;;
-    "flush-binary-logs") general_instance_command ;;
+    "move-gtid") general_relocate_command ;;                           # Move a replica beneath another instance via GTID
+    "move-replicas-gtid") general_relocate_replicas_command ;;         # Moves all replicas of a given instance under another (destination) instance using GTID
 
-    "recover") recover ;;
-    "graceful-master-takeover") graceful_master_takeover ;;
-    "force-master-failover") force_master_failover ;;
-    "ack-cluster-recoveries") ack_cluster_recoveries ;;
-    "disable-global-recoveries") disable_global_recoveries ;;
-    "enable-global-recoveries") enable_global_recoveries ;;
-    "check-global-recoveries") check_global_recoveries ;;
+    "repoint") general_relocate_command ;;                             # Make the given instance replicate from another instance without changing the binglog coordinates. Use with care
+    "repoint-replicas") general_singular_relocate_replicas_command ;;  # Repoint all replicas of given instance to replicate back from the instance. Use with care
 
-    "replication-analysis") replication_analysis ;;
+    "submit-pool-instances") submit_pool_instances ;;                  # Submit a pool name with a list of instances in that pool
+    "which-heuristic-cluster-pool-instances") which_heuristic_cluster_pool_instances ;; # List instances of a given cluster which are in either any pool or in a specific pool
+
+    "begin-downtime") begin_downtime ;;                               # Mark an instance as downtimed
+    "end-downtime") end_downtime ;;                                   # Indicate an instance is no longer downtimed
+    "begin-maintenance") begin_maintenance ;;                         # Request a maintenance lock on an instance
+    "end-maintenance") end_maintenance ;;                             # Remove maintenance lock from an instance
+    "register-candidate") register_candidate ;;                       # Indicate the promotion rule for a given instance
+    "register-hostname-unresolve") register_hostname_unresolve ;;     # Assigns the given instance a virtual (aka "unresolved") name
+    "deregister-hostname-unresolve") deregister_hostname_unresolve ;; # Explicitly deregister/dosassociate a hostname with an "unresolved" name
+
+    "stop-slave") general_instance_command ;;                   # Issue a STOP SLAVE on an instance
+    "stop-slave-nice") general_instance_command ;;              # Issue a STOP SLAVE on an instance, make effort to stop such that SQL thread is in sync with IO thread (ie all relay logs consumed)
+    "start-slave") general_instance_command ;;                  # Issue a START SLAVE on an instance
+    "restart-slave") general_instance_command ;;                # Issue STOP and START SLAVE on an instance
+    "reset-slave") general_instance_command ;;                  # Issues a RESET SLAVE command; use with care
+    "detach-replica") general_instance_command ;;               # Stops replication and modifies binlog position into an impossible yet reversible value.
+    "reattach-replica") general_instance_command ;;             # Undo a detach-replica operation
+    "detach-replica-master-host") general_instance_command ;;   # Stops replication and modifies Master_Host into an impossible yet reversible value.
+    "reattach-replica-master-host") general_instance_command ;; # Undo a detach-replica-master-host operation
+    "skip-query") general_instance_command ;;                   # Skip a single statement on a replica; either when running with GTID or without
+
+    "set-read-only") general_instance_command ;;     # Turn an instance read-only, via SET GLOBAL read_only := 1
+    "set-writeable") general_instance_command ;;     # Turn an instance writeable, via SET GLOBAL read_only := 0
+    "flush-binary-logs") general_instance_command ;; # Flush binary logs on an instance
+
+    "recover") recover ;;                                     # Do auto-recovery given a dead instance, assuming orchestrator agrees there's a problem. Override blocking.
+    "graceful-master-takeover") graceful_master_takeover ;;   # Gracefully discard master and promote another (direct child) instance instead, even if everything is running well
+    "force-master-failover") force_master_failover ;;         # Forcibly discard master and initiate a failover, even if orchestrator doesn't see a problem. This command lets orchestrator choose the replacement master
+    "ack-cluster-recoveries") ack_cluster_recoveries ;;       # Acknowledge recoveries for a given cluster; this unblocks pending future recoveries
+    "disable-global-recoveries") disable_global_recoveries ;; # Disallow orchestrator from performing recoveries globally
+    "enable-global-recoveries") enable_global_recoveries ;;   # Allow orchestrator to perform recoveries globally
+    "check-global-recoveries") check_global_recoveries ;;     # Show the global recovery configuration
+
+    "replication-analysis") replication_analysis ;;           # Request an analysis of potential crash incidents in all known topologies
     *) fail "Unsupported command $command" ;;
   esac
 }
