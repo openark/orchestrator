@@ -109,6 +109,12 @@ listen orchestrator
 
 - To join an `orchestrator` node that was down/away longer than what log retention permits, or a node where the database is completely empty, you will need to clone the backend DB from another, active node.
 
-  - With `sqlite` you will `sqlite3 /var/lib/orchestrator/orchestrator.db .dump > /tmp/orchestrator-dump.sql` and load this onto the new node via `sqlite3 /var/lib/orchestrator/orchestrator.db < /tmp/orchestrator-dump.sql`
+  - With `sqlite` you will
+
+```
+active-node$ sqlite3 /var/lib/orchestrator/orchestrator.db .dump > /tmp/orchestrator-dump.sql`
+active-node$ scp /tmp/orchestrator-dump.sql new-node:/tmp/
+new-node$    sqlite3 /var/lib/orchestrator/orchestrator.db < /tmp/orchestrator-dump.sql`
+```
 
   - With `MySQL` use your favorite backup/restore method.
