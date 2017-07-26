@@ -14,6 +14,8 @@ This turns useful in cross data-center (DC) setups. Assume you set three `orches
 
 ### orchestrator/raft setup technical details
 
+See also: [orchestrator/raft vs. synchronous replication setup](raft-vs-sync-repl.md)
+
 #### Service nodes
 
 You will set up `3` or `5` (recommended raft node count) `orchestrator` nodes. Other numbers are also legitimate but you will want at least `3`.
@@ -118,3 +120,11 @@ new-node$    sqlite3 /var/lib/orchestrator/orchestrator.db < /tmp/orchestrator-d
 ```
 
   - With `MySQL` use your favorite backup/restore method.
+
+### Roadmap
+
+Still ongoing and TODO:
+
+- Failure detection to require quorum agreement (i.e. a `DeadMaster` needs to be analyzed by multiple `orchestrator` nodes) in order to kick failover/recovery.
+
+- Support sharing of probing (mutually exclusive to the above): the `leader` will divide the list of servers to probe between all nodes. Potentially by data-center. This will reduce probing load (each MySQL server will be probed by a single node rather than all nodes). All `orchestrator` nodes will see same picture as opposed to independent views.

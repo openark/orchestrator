@@ -9,6 +9,8 @@ HA is achieved by choosing either:
 - `orchestrator/raft` setup, where `orchestrator` nodes communicate by raft consensus. Each `orchestrator` node [has a private database backend](#ha-via-raft), either `MySQL` or `sqlite`. See also [orchestrator/raft documentation](raft.md)
 - [Shared backend](#ha-via-shared-backend) setup. Multiple `orchestrator` nodes all talk to the same backend, which may be a Galera/XtraDB Cluster/InnoDB Cluster/NDB Cluster. Synchronization is done at the database level.
 
+See also: [orchestrator/raft vs. synchronous replication setup](raft-vs-sync-repl.md)
+
 ### Availability types
 
 You may choose different availability types, based on your requirements.
