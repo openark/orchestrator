@@ -18,14 +18,14 @@ General wiring | Each `orchestrator` node has a private backend DB; `orchestrato
 Backend DB | `MySQL` or `SQLite` | `MySQL`
 Backend DB dependency | Service panics if cannot access its own private backend DB | Service _unhealthy_ if cannot access its own private backend DB
 DB data | Independent across DB backends. May vary, but on a stable system converges to same overall picture | Single dataset, synchronously replicated across DB backends.
-DB access | Never access directly. Only `raft` nodes access the backend DB while coordinating/cooperating. Or else inconsistencies can be introduced. | Possible to access directly; all `orchestrator` nodes/clients see exact same picture.
+DB access | Never write directly. Only `raft` nodes access the backend DB while coordinating/cooperating. Or else inconsistencies can be introduced. Reads are OK. | Possible to access & write directly; all `orchestrator` nodes/clients see exact same picture.
 Leader and actions | Single leader. Only the leader runs recoveries. All nodes run discoveries (probing) and self-analysis | Single leader. Only the leader runs discoveries (probing), analysis and recoveries.
 HTTP Access | Must only access the leader (should be enforced by proxy) | May access any healthy node (should be enforced by proxy). For read consistency always best to speak to leader only (can be enforced by proxy)
 Command line | HTTP/API access (e.g. `curl`, `jq`) or `orchestrator-client` script which wraps common HTTP /API calls with familiar command line interface | HTTP/API, and/or `orchestrator-client` script, or `orchestrator ...` command line invocation.
 Install | `orchestrator` service on service nodes only. `orchestrator-client` script anywhere (requires access to HTTP/API). | `orchestrator` service on service nodes. `orchestrator-client` script anywhere (requires access to HTTP/API). `orchestrator` client anywhere (requires access to backend DBs)
 Proxy | HTTP. Must only direct traffic to the leader (`/api/leader-check`) | HTTP. Must only direct traffic to healthy nodes (`/api/status`) ; best to only direct traffic to leader node (`/api/leader-check`)
 Cross DC | Each `orchestrator` node (along with private backend) can run on a different DC. Nodes do not communicate much, low traffic. | Each `orchestrator` node (along with associated backend) can run on a different DC. `orchestrator` nodes do not communicate directly. `MySQL` group replication is chatty. Amount of traffic mostly linear by size of topologies and by polling rate. Write latencies.
-Probing | Each topology server probed by all `orchestrator` nodes | Each topology server probed by single active node
+Probing | Each topology server probed by all `orchestrator` nodes | Each topology server probed by the single active node
 Failure analysis | Performed independently by all nodes | Performed by leader only (DB is shared so all nodes see exact same picture anyhow)
 Failover | Performed by leader node only | Performed by leader node only
 Resiliency to failure | `1` node may go down (`2` on a `5` node cluster) | `1` node may go down (`2` on a `5` node cluster)
