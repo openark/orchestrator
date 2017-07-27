@@ -17,8 +17,11 @@ We will assume and compare:
 General wiring | Each `orchestrator` node has a private backend DB; `orchestrator` nodes communicate by `raft` protocol | Each `orchestrator` node connects to a different `MySQL` member in a synchronous replication group. `orchestrator` nodes do not communicate with each other.
 Backend DB | `MySQL` or `SQLite` | `MySQL`
 DB data | Independent across DB backends. May vary, but on a stable system converges to same overall picture | Single dataset, synchronously replicated across DB backends.
+DB access | Never access directly. Only `raft` nodes access the backend DB while coordinating/cooperating. Or else inconsistencies can be introduced. | Possible to access directly; all `orchestrator` nodes/clients see exact same picture.
 Leader and actions | Single leader. Only the leader runs recoveries. All nodes run discoveries (probing) and self-analysis | Single leader. Only the leader runs discoveries (probing), analysis and recoveries.
 HTTP Access | Must only access the leader (should be enforced by proxy) | May access any healthy node (should be enforced by proxy). For read consistency always best to speak to leader only (can be enforced by proxy)
+Command line | HTTP/API access (e.g. `curl | jq`) or `orchestrator-client` script which wraps common HTTP /API calls with familiar command line interface | HTTP/API, and/or `orchestrator-client` script, or `orchestrator ...` command line invocation.
+Proxy |
 
 Proxy
 Access
