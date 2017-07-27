@@ -121,6 +121,13 @@ new-node$    sqlite3 /var/lib/orchestrator/orchestrator.db < /tmp/orchestrator-d
 
   - With `MySQL` use your favorite backup/restore method.
 
+### Main advantages of orchestrator/raft
+
+- Highly available
+- Consensus: failovers are made by leader node that is member of quorum (not isolated)
+- Supports `SQLite` (embedded) backend, no need for `MySQL` backend though supported.
+- Little cross-node communication ; fit for high latency cross DC networks
+
 ### Roadmap
 
 Still ongoing and TODO:
