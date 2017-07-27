@@ -23,7 +23,7 @@ Leader and actions | Single leader. Only the leader runs recoveries. All nodes r
 HTTP Access | Must only access the leader (should be enforced by proxy) | May access any healthy node (should be enforced by proxy). For read consistency always best to speak to leader only (can be enforced by proxy)
 Command line | HTTP/API access (e.g. `curl`, `jq`) or `orchestrator-client` script which wraps common HTTP /API calls with familiar command line interface | HTTP/API, and/or `orchestrator-client` script, or `orchestrator ...` command line invocation.
 Install | `orchestrator` service on service nodes only. `orchestrator-client` script anywhere (requires access to HTTP/API). | `orchestrator` service on service nodes. `orchestrator-client` script anywhere (requires access to HTTP/API). `orchestrator` client anywhere (requires access to backend DBs)
-HTTP Proxy | Must only direct traffic to the leader (`/api/leader-check`) | Must only direct traffic to healthy nodes (`/api/status`) ; best to only direct traffic to leader node (`/api/leader-check`)
+Proxy | HTTP. Must only direct traffic to the leader (`/api/leader-check`) | HTTP. Must only direct traffic to healthy nodes (`/api/status`) ; best to only direct traffic to leader node (`/api/leader-check`)
 Cross DC | Each `orchestrator` node (along with private backend) can run on a different DC. Nodes do not communicate much, low traffic. | Each `orchestrator` node (along with associated backend) can run on a different DC. `orchestrator` nodes do not communicate directly. `MySQL` group replication is chatty. Amount of traffic mostly linear by size of topologies and by polling rate. Write latencies.
 Probing | Each topology server probed by all `orchestrator` nodes | Each topology server probed by single active node
 Failure analysis | Performed independently by all nodes | Performed by leader only (DB is shared so all nodes see exact same picture anyhow)
@@ -32,6 +32,7 @@ Resiliency to failure | `1` node may go down (`2` on a `5` node cluster) | `1` n
 Node back from short failure | Node rejoins cluster, gets updated with changes. | DB node rejoins cluster, gets updated with changes.
 Node back from long outage | DB must be cloned from healthy node. | Depends on your MySQL backend implementation. Potentially SST/restore from backup.
 
+### Considerations
 
 Here are considerations for choosing between the two approaches:
 
@@ -40,3 +41,7 @@ Here are considerations for choosing between the two approaches:
 - You have high-latency cross DC network: choose `orchestrator/raft`.
 - You don't want to allocate MySQL servers for the `orchestrator` backend: choose `orchestrator/raft` with `SQLite` backend
 - You have thousands of MySQL boxes: choose either, but choose `MySQL` backend which is more write performant than `SQLite`.
+
+### Notes
+
+- Another synchronous replication setup is that of a single writer. This would require an additional proxy between the `orchestrator` nodes and the underlying cluster, and is not considered above.
