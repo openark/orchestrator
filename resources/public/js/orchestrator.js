@@ -819,6 +819,9 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.IsCandidate) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-heart" title="Candidate"></span> ');
     }
+    if (instance.PromotionRule == "prefer_not") {
+      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-thumbs-down" title="Prefer not promote"></span> ');
+    }
     if (instance.PromotionRule == "must_not") {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-ban-circle" title="Must not promote"></span> ');
     }

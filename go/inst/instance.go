@@ -45,9 +45,9 @@ const ReasonableDiscoveryLatency = 500 * time.Millisecond
 // It returns an error if there is no known rule by the given name.
 func ParseCandidatePromotionRule(ruleName string) (CandidatePromotionRule, error) {
 	switch ruleName {
-	case "prefer", "neutral", "must_not":
+	case "prefer", "neutral", "prefer_not", "must_not":
 		return CandidatePromotionRule(ruleName), nil
-	case "must", "prefer_not":
+	case "must":
 		return CandidatePromotionRule(""), fmt.Errorf("CandidatePromotionRule: %v not supported yet", ruleName)
 	default:
 		return CandidatePromotionRule(""), fmt.Errorf("Invalid CandidatePromotionRule: %v", ruleName)

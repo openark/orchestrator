@@ -58,7 +58,7 @@ func main() {
 	config.RuntimeCLIFlags.BinlogFile = flag.String("binlog", "", "Binary log file name")
 	config.RuntimeCLIFlags.Statement = flag.String("statement", "", "Statement/hint")
 	config.RuntimeCLIFlags.GrabElection = flag.Bool("grab-election", false, "Grab leadership (only applies to continuous mode)")
-	config.RuntimeCLIFlags.PromotionRule = flag.String("promotion-rule", "prefer", "Promotion rule for register-andidate (prefer|neutral|must_not)")
+	config.RuntimeCLIFlags.PromotionRule = flag.String("promotion-rule", "prefer", "Promotion rule for register-andidate (prefer|neutral|prefer_not|must_not)")
 	config.RuntimeCLIFlags.Version = flag.Bool("version", false, "Print version and exit")
 	config.RuntimeCLIFlags.SkipContinuousRegistration = flag.Bool("skip-continuous-registration", false, "Skip cli commands performaing continuous registration (to reduce orchestratrator backend db load")
 	config.RuntimeCLIFlags.EnableDatabaseUpdate = flag.Bool("enable-database-update", false, "Enable database update, overrides SkipOrchestratorDatabaseUpdate")
@@ -68,13 +68,13 @@ func main() {
 		log.Fatalf("-s and -d are synonyms, yet both were specified. You're probably doing the wrong thing.")
 	}
 	switch *config.RuntimeCLIFlags.PromotionRule {
-	case "prefer", "neutral", "must_not":
+	case "prefer", "neutral", "prefer_not", "must_not":
 		{
 			// OK
 		}
 	default:
 		{
-			log.Fatalf("-promotion-rule only supports prefer|neutral|must_not")
+			log.Fatalf("-promotion-rule only supports prefer|neutral|prefer_not|must_not")
 		}
 	}
 	if *destination == "" {

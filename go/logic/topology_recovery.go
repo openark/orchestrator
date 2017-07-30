@@ -545,7 +545,8 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 	// The current logic is:
 	// - 1. we prefer to promote a "is_candidate" which is in the same DC & env as the dead intermediate master (or do nothing if the promtoed replica is such one)
 	// - 2. we prefer to promote a "is_candidate" which is in the same DC & env as the promoted replica (or do nothing if the promtoed replica is such one)
-	// - 3. keep to current choice
+	// - 3. we prefer to promote a "neutral" server over a "prefer_not"
+	// - 4. keep to current choice
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("checking if should replace promoted replica with a better candidate"))
 	if candidateInstanceKey == nil {
 		if deadInstance, _, err := inst.ReadInstance(deadInstanceKey); err == nil && deadInstance != nil {
@@ -596,6 +597,29 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 				// OK, better than nothing
 				candidateInstanceKey = &candidateReplica.Key
 				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as promoted instance", promotedReplica.Key, candidateReplica.Key))
+			}
+		}
+	}
+
+	// Still nothing? Then we didn't find a replica marked as "candidate". OK, further down the stream we have:
+	if candidateInstanceKey == nil && promotedReplica.PromotionRule == inst.PreferNotPromoteRule {
+		neutralReplicas, _ := inst.ReadClusterNeutralPromotionRuleInstances(promotedReplica.ClusterName)
+		for _, neutralReplica := range neutralReplicas {
+			if promotedReplica.DataCenter == neutralReplica.DataCenter &&
+				promotedReplica.PhysicalEnvironment == neutralReplica.PhysicalEnvironment &&
+				neutralReplica.MasterKey.Equals(&promotedReplica.Key) {
+				candidateInstanceKey = &neutralReplica.Key
+				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as promoted instance that has prefer_not promotion rule", promotedReplica.Key, neutralReplica.Key))
+			}
+		}
+	}
+	if candidateInstanceKey == nil && promotedReplica.PromotionRule == inst.PreferNotPromoteRule {
+		neutralReplicas, _ := inst.ReadClusterNeutralPromotionRuleInstances(promotedReplica.ClusterName)
+		for _, neutralReplica := range neutralReplicas {
+			if neutralReplica.MasterKey.Equals(&promotedReplica.Key) {
+				// OK, better than nothing
+				candidateInstanceKey = &neutralReplica.Key
+				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on promoted instance having prefer_not promotion rule", promotedReplica.Key, neutralReplica.Key))
 			}
 		}
 	}
