@@ -54,6 +54,7 @@ Each `orchestrator` node has its own, dedicated backend database server. This wo
 You should only send requests to the leader node. To make that happen set up a `HTTP` proxy (e.g HAProxy) on top of the `orchestrator` services.
 
 - Use `/api/leader-check` as health check. At any given time at most one `orchestrator` node will reply with `HTTP 200/OK` to this check; the others will respond with `HTTP 404/Not found`.
+  - Hint: you may use, for example, `/api/leader-check/503` is you explicitly wish to get a `503` response code, or similarly any other code.
 - Only direct traffic to the node that passes this test
 
 As example, this would be a `HAProxy` setup:
