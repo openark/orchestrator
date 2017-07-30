@@ -1238,16 +1238,17 @@ func ReadClusterCandidateInstances(clusterName string) ([](*Instance), error) {
 }
 
 // ReadClusterNeutralPromotionRuleInstances reads cluster instances whose promotion-rule is marked as 'neutral'
-func ReadClusterNeutralPromotionRuleInstances(clusterName string) ([](*Instance), error) {
-	condition := `
-			cluster_name = ?
-			and (hostname, port) in (
-				select hostname, port
-					from candidate_database_instance
-					where promotion_rule = 'neutral'
-			)
-			`
-	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
+func ReadClusterNeutralPromotionRuleInstances(clusterName string) (neutralInstances [](*Instance), err error) {
+	instances, err := ReadClusterInstances(clusterName)
+	if err != nil {
+		return neutralInstances, err
+	}
+	for _, instance := range instances {
+		if instance.PromotionRule == NeutralPromoteRule {
+			neutralInstances = append(neutralInstances, instance)
+		}
+	}
+	return neutralInstances, nil
 }
 
 // filterOSCInstances will filter the given list such that only replicas fit for OSC control remain.
