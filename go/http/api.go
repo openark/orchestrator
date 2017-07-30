@@ -2291,10 +2291,15 @@ func (this *HttpAPI) LBCheck(params martini.Params, r render.Render, req *http.R
 
 // LBCheck returns a constant respnse, and this can be used by load balancers that expect a given string.
 func (this *HttpAPI) LeaderCheck(params martini.Params, r render.Render, req *http.Request) {
+	respondStatus, err := strconv.Atoi(params["errorStatusCode"])
+	if err != nil || respondStatus < 0 {
+		respondStatus = http.StatusNotFound
+	}
+
 	if logic.IsLeader() {
 		r.JSON(http.StatusOK, "OK")
 	} else {
-		r.JSON(http.StatusNotFound, "Not leader")
+		r.JSON(respondStatus, "Not leader")
 	}
 }
 
@@ -3066,6 +3071,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "lb-check", this.LBCheck)
 	this.registerRequest(m, "_ping", this.LBCheck)
 	this.registerRequest(m, "leader-check", this.LeaderCheck)
+	this.registerRequest(m, "leader-check/:errorStatusCode", this.LeaderCheck)
 	this.registerRequest(m, "grab-election", this.GrabElection)
 	this.registerRequest(m, "raft-yield/:node", this.RaftYield)
 	this.registerRequest(m, "raft-yield-hint/:hint", this.RaftYieldHint)
