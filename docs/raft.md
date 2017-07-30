@@ -35,7 +35,7 @@ At this time `orchestrator` nodes to not join dynamically into the cluster. The 
 
 #### Backend DB
 
-Each `orchestrator` node has its own, independent backend database server. This would be either:
+Each `orchestrator` node has its own, dedicated backend database server. This would be either:
 
 - A MySQL backend DB (no replication setup required, but OK if this server has replicas)
 
@@ -87,15 +87,22 @@ listen orchestrator
 
 - In normal times, the three nodes will see a more-or-less identical picture of the topologies. But they will each have their own independent analysis.
 
-- Each `orchestrator` nodes writes to its own private backend DB server (whether `MySQL` or `sqlite`)
+- Each `orchestrator` nodes writes to its own dedicated backend DB server (whether `MySQL` or `sqlite`)
 
-- The `orchestrator` nodes communication is minimal. They do not share discovery info (since they each discover independently). Instead, the _leader_ shares with the other nodes what user instructions is intercepted, such as `begin-downtime`, `register-candidate` etc.
+- The `orchestrator` nodes communication is minimal. They do not share discovery info (since they each discover independently). Instead, the _leader_ shares with the other nodes what user instructions is intercepted, such as:
+
+  - `begin-downtime`
+  - `register-candidate`
+
+    etc.
 
   The _leader_ will also educate its followers about ongoing failovers.
 
+  The communication between `orchestrator` node does not correlate to transactional database commits, and is sparse.
+
 - All user changes must go through the leader, and in particular via the `HTTP API`. You must not manipulate the backend database directly, since such a change will not be published to the other nodes.
 
-- As result, on a `orchestrator/raft`, one may not use the `orchestrator` executable in command line mode: it only works in shared database backend mode, where manipulation of backend database is allowed for anyone.
+- As result, on a `orchestrator/raft`, one may not use the `orchestrator` executable in command line mode: an attempt to run `orchestrator` cli will refuse to run when `raft` mode is enabled. Work is ongoing to allow some commands to run via cli.
 
 - A utility script, [orchestrator-client](using-orchestrator-client.md) is available that provides similar interface as the command line `orchestrator`, and that uses & manipulates `HTTP API` calls.
 
