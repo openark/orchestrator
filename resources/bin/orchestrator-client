@@ -13,8 +13,13 @@
 # orchestrator binary, configuration files, database access etc.
 #
 # Prerequisite:
-#   set the ORCHESTRATOR_API variable to point to your orchestrator service. Example:
-#   export ORCHESTRATOR_API="http://orchestrator.myservice.com:3000/api"
+#   set the ORCHESTRATOR_API variable to point to your orchestrator service.
+#   You may specify a single endpoint, like so:
+#     export ORCHESTRATOR_API="http://orchestrator.myservice.com:3000/api"
+#   Or you may specify multiple endpoints, space delimited, in which case orchestrator will iterate all,
+#   and require one of them to satisfy leader-check. This is your way to provide orchestrator-client
+#   with all service nodes and let it figure out by itself identify of leader, no need for proxy. Example:
+#     export ORCHESTRATOR_API="http://service1:3000/api http://service2:3000/api http://service3:3000/api"
 #
 # Usage:
 #   orchestrator -c <command> [flags...]
@@ -31,6 +36,7 @@
 [ -f /etc/profile.d/orchestrator-client.sh ] && . /etc/profile.d/orchestrator-client.sh
 
 orchestrator_api="${ORCHESTRATOR_API:-http://localhost:3000}"
+leader_api=
 
 command=
 instance=
@@ -129,10 +135,36 @@ function to_hostport {
 }
 
 function normalize_orchestrator_api() {
-  if [[ ! $orchestrator_api == *"/api" ]]; then
-    orchestrator_api=${orchestrator_api%/}
-    orchestrator_api="$orchestrator_api/api"
+  api="${1:-$orchestrator_api}"
+  api=${api%/}
+  if [[ ! $api == *"/api" ]]; then
+    api=${api%/}
+    api="$api/api"
   fi
+  echo $api
+}
+
+
+function detect_leader_api() {
+  # $orchestrator_api may be a single URI (e.g. "http://orchestrator.service/api")
+  # - in which case we just normalize the URL
+  # or it may be a space delimited list, such as "http://host1:3000/api http://host2:3000/api http://host3:3000/api "
+  # - in which case we figure out which of the URLs is the leader
+  leader_api=
+  apis=($orchestrator_api)
+  if [ ${#apis[@]} -eq 1 ] ; then
+    leader_api="$(normalize_orchestrator_api $orchestrator_api)"
+    return
+  fi
+  for api in ${apis[@]} ; do
+    api=$(normalize_orchestrator_api $api)
+    leader_check=$(curl -m 0.5 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
+    if [ "$leader_check" == "200" ] ; then
+      leader_api="$api"
+      return
+    fi
+  done
+  fail "Cannot determine leader from $apis"
 }
 
 function urlencode() {
@@ -143,10 +175,14 @@ function urlencode() {
 function api() {
   path="$1"
 
-  normalize_orchestrator_api
-  uri="$orchestrator_api/$path"
+  detect_leader_api
+  uri="$leader_api/$path"
   # echo $uri
+  set -o pipefail
   api_response=$(curl -s "$uri" | jq '.')
+  if [ $? -ne 0 ] ; then
+    fail "Cannot access orchestrator at ${leader_api}"
+  fi
   if [ "$(echo $api_response | jq -r 'type')" == "array" ] ; then
     return
   fi
