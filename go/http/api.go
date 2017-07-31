@@ -2731,15 +2731,18 @@ func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r rende
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	var err error
 
-	clusterName := params["clusterName"]
+	var clusterName string
+	var err error
 	if params["clusterAlias"] != "" {
 		clusterName, err = inst.GetClusterByAlias(params["clusterAlias"])
-		if err != nil {
-			Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
-			return
-		}
+	} else {
+		clusterName, err = figureClusterName(params["clusterHint"])
+	}
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
 	}
 
 	comment := req.URL.Query().Get("comment")
@@ -3043,7 +3046,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "active-cluster-recovery/:clusterName", this.ActiveClusterRecovery)
 	this.registerRequest(m, "recently-active-cluster-recovery/:clusterName", this.RecentlyActiveClusterRecovery)
 	this.registerRequest(m, "recently-active-instance-recovery/:host/:port", this.RecentlyActiveInstanceRecovery)
-	this.registerRequest(m, "ack-recovery/cluster/:clusterName", this.AcknowledgeClusterRecoveries)
+	this.registerRequest(m, "ack-recovery/cluster/:clusterHint", this.AcknowledgeClusterRecoveries)
 	this.registerRequest(m, "ack-recovery/cluster/alias/:clusterAlias", this.AcknowledgeClusterRecoveries)
 	this.registerRequest(m, "ack-recovery/instance/:host/:port", this.AcknowledgeInstanceRecoveries)
 	this.registerRequest(m, "ack-recovery/:recoveryId", this.AcknowledgeRecovery)
