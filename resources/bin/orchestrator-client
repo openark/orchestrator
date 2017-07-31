@@ -42,6 +42,7 @@ duration="10m"
 promotion_rule=
 pool=
 hostname_flag=
+api_path=
 
 instance_hostport=
 destination_hostport=
@@ -63,11 +64,12 @@ for arg in "$@"; do
     "-pool"|"--pool")                     set -- "$@" "-l" ;;
     "-hostname"|"--hostname")             set -- "$@" "-H" ;;
     "-api"|"--api")                       set -- "$@" "-U" ;;
+    "-path"|"--path")                     set -- "$@" "-P" ;;
     *)                                    set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:h" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:P:h" OPTION
 do
   case $OPTION in
     h) command="help" ;;
@@ -84,6 +86,7 @@ do
     H) hostname_flag=$OPTARG ;;
     D) default_port=$OPTARG ;;
     U) orchestrator_api=$OPTARG ;;
+    P) api_path=$OPTARG ;;
   esac
 done
 
@@ -183,6 +186,12 @@ function filter_keys {
 
 function print_key {
   cat - | jq -r '. | (.Hostname + ":" + (.Port | tostring))'
+}
+
+function api_call() {
+  assert_nonempty "path" "$api_path"
+  api "$api_path"
+  print_response
 }
 
 function prompt_help() {
@@ -471,7 +480,10 @@ function run_command() {
   fi
   command=$(echo $command | sed -e 's/slave/replica/')
   case $command in
-    "help") prompt_help ;;
+    "help") prompt_help ;; # Show available commands
+
+    "api") api_call ;;      # Invoke any API request; provide --path argument
+
     "discover") discover ;; # Lookup an instance, investigate it
     "forget") forget ;;     # Forget about an instance's existence
 
