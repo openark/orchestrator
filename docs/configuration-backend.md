@@ -64,3 +64,5 @@ Default backend is `MySQL`. To setup `SQLite`, use:
 ```
 
 `SQLite` is embedded within `orchestrator`.
+
+If the file indicated by `SQLite3DataFile` does not exist, `orchestrator` will create it. It will need write permissions on given path/file.
