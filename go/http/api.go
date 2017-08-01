@@ -254,7 +254,7 @@ func (this *HttpAPI) ForgetCluster(params martini.Params, r render.Render, req *
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	clusterName, err := figureClusterName(params["clusterHint"])
+	clusterName, err := figureClusterName(getClusterHint(params))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -1356,7 +1356,7 @@ func (this *HttpAPI) KillQuery(params martini.Params, r render.Render, req *http
 
 // AsciiTopology returns an ascii graph of cluster's instances
 func (this *HttpAPI) AsciiTopology(params martini.Params, r render.Render, req *http.Request) {
-	clusterName, err := figureClusterName(params["clusterHint"])
+	clusterName, err := figureClusterName(getClusterHint(params))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -1373,7 +1373,7 @@ func (this *HttpAPI) AsciiTopology(params martini.Params, r render.Render, req *
 
 // Cluster provides list of instances in given cluster
 func (this *HttpAPI) Cluster(params martini.Params, r render.Render, req *http.Request) {
-	clusterName, err := figureClusterName(params["clusterHint"])
+	clusterName, err := figureClusterName(getClusterHint(params))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -1420,7 +1420,7 @@ func (this *HttpAPI) ClusterByInstance(params martini.Params, r render.Render, r
 
 // ClusterInfo provides details of a given cluster
 func (this *HttpAPI) ClusterInfo(params martini.Params, r render.Render, req *http.Request) {
-	clusterName, err := figureClusterName(params["clusterHint"])
+	clusterName, err := figureClusterName(getClusterHint(params))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -1449,7 +1449,7 @@ func (this *HttpAPI) ClusterInfoByAlias(params martini.Params, r render.Render, 
 
 // ClusterOSCReplicas returns heuristic list of OSC replicas
 func (this *HttpAPI) ClusterOSCReplicas(params martini.Params, r render.Render, req *http.Request) {
-	clusterName, err := figureClusterName(params["clusterHint"])
+	clusterName, err := figureClusterName(getClusterHint(params))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -1515,6 +1515,27 @@ func (this *HttpAPI) Masters(params martini.Params, r render.Render, req *http.R
 	}
 
 	r.JSON(http.StatusOK, instances)
+}
+
+// ClusterMaster returns the writable master of a given cluster
+func (this *HttpAPI) ClusterMaster(params martini.Params, r render.Render, req *http.Request) {
+	clusterName, err := figureClusterName(getClusterHint(params))
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	masters, err := inst.ReadClusterWriteableMaster(clusterName)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	if len(masters) == 0 {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("No masters found for %+v", clusterName)})
+		return
+	}
+
+	r.JSON(http.StatusOK, masters[0])
 }
 
 // Downtimed lists downtimed instances, potentially filtered by cluster
@@ -2748,7 +2769,7 @@ func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r rende
 	if params["clusterAlias"] != "" {
 		clusterName, err = inst.GetClusterByAlias(params["clusterAlias"])
 	} else {
-		clusterName, err = figureClusterName(params["clusterHint"])
+		clusterName, err = figureClusterName(getClusterHint(params))
 	}
 
 	if err != nil {
@@ -3008,6 +3029,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "clusters", this.Clusters)
 	this.registerRequest(m, "clusters-info", this.ClustersInfo)
 	this.registerRequest(m, "masters", this.Masters)
+	this.registerRequest(m, "master/:clusterHint", this.ClusterMaster)
 	this.registerRequest(m, "instance-replicas/:host/:port", this.InstanceReplicas)
 	this.registerRequest(m, "all-instances", this.AllInstances)
 	this.registerRequest(m, "downtimed", this.Downtimed)
