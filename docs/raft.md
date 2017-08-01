@@ -29,7 +29,7 @@ At this time `orchestrator` nodes to not join dynamically into the cluster. The 
   "RaftNodes": [
     "ip.of.orchestrator.node1",
     "ip.of.orchestrator.node2",
-    "ip.of.orchestrator.node3",
+    "ip.of.orchestrator.node3"
   ],
 ```
 

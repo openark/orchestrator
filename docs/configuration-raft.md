@@ -11,7 +11,7 @@ Assuming you will run `orchestrator/raft` on a `3` node setup, you will configur
   "RaftNodes": [
     "<ip.of.orchestrator.node1>",
     "<ip.of.orchestrator.node2>",
-    "<ip.of.orchestrator.node3>",
+    "<ip.of.orchestrator.node3>"
   ],
 ```
 
@@ -31,7 +31,7 @@ As example, the following might be a working setup:
   "RaftNodes": [
     "10.0.0.1",
     "10.0.0.2",
-    "10.0.0.3",
+    "10.0.0.3"
   ],
 ```
 
