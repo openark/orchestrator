@@ -175,7 +175,6 @@ function urlencode() {
 function api() {
   path="$1"
 
-  detect_leader_api
   uri="$leader_api/$path"
   # echo $uri
   set -o pipefail
@@ -222,6 +221,10 @@ function filter_keys {
 
 function print_key {
   cat - | jq -r '. | (.Hostname + ":" + (.Port | tostring))'
+}
+
+function which_api() {
+  echo "$leader_api"
 }
 
 function api_call() {
@@ -529,10 +532,11 @@ function run_command() {
   case $command in
     "help") prompt_help ;; # Show available commands
 
-    "api") api_call ;;      # Invoke any API request; provide --path argument
+    "which-api") which_api ;; # Output the HTTP API to be used
+    "api") api_call ;;        # Invoke any API request; provide --path argument
 
-    "discover") discover ;; # Lookup an instance, investigate it
-    "forget") forget ;;     # Forget about an instance's existence
+    "discover") discover ;;   # Lookup an instance, investigate it
+    "forget") forget ;;       # Forget about an instance's existence
 
     "topology") ascii_topology ;;                               # Show an ascii-graph of a replication topology, given a member of that topology
     "clusters") clusters ;;                                     # List all clusters known to orchestrator
@@ -615,6 +619,7 @@ function run_command() {
 
 function main() {
   check_requirements
+  detect_leader_api
 
   instance_hostport=$(to_hostport $instance)
   destination_hostport=$(to_hostport $destination)
