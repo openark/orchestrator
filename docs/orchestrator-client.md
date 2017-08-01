@@ -1,8 +1,10 @@
-# Using orchestrator-client
+# orchestrator-client
 
 [orchestrator-client](https://github.com/github/orchestrator/blob/master/resources/bin/orchestrator-client) is a script that wraps API calls with convenient command line interface.
 
-In fact, it closely mimics the `orchestrator` command line interface.
+It can auto-determine the leader of an `orchestrator` setup and in such case forward all requests to the leader.
+
+It closely mimics the `orchestrator` command line interface.
 
 With `orchestrator-client`, you:
 
@@ -11,8 +13,14 @@ With `orchestrator-client`, you:
 - Do not need to make access to backend DB
 - Need to have access to the HTTP api
 - Need to set the `ORCHESTRATOR_API` environment variable.
-  - Either provide a single endpoint for a proxy, e.g. `export ORCHESTRATOR_API=https://orchestrator.myservice.com:3000/api`
-  - Or provide all `orchestrator` endpoints, and `orchestrator-client` will auto-pick the leader (no need for proxy), e.g.: `export ORCHESTRATOR_API="https://orchestrator.host1:3000/api https://orchestrator.host2:3000/api https://orchestrator.host3:3000/api"`
+  - Either provide a single endpoint for a proxy, e.g.
+```shell
+export ORCHESTRATOR_API=https://orchestrator.myservice.com:3000/api
+```
+  - Or provide all `orchestrator` endpoints, and `orchestrator-client` will auto-pick the leader (no need for proxy), e.g.:
+```shell
+export ORCHESTRATOR_API="https://orchestrator.host1:3000/api https://orchestrator.host2:3000/api https://orchestrator.host3:3000/api"
+```
 
 ### Sample usage
 
@@ -55,8 +63,18 @@ The command line interface makes for a nice wrapper to API calls, whose output i
 
 As example, the command:
 
-    orchestrator-client -c discover -i 127.0.0.1:22987
+```shell
+orchestrator-client -c discover -i 127.0.0.1:22987
+```
 
 Translates to (simplified here for convenience):
 
-    curl "$orchestrator_api/discover/127.0.0.1/22987" | jq '.Details | .Key'
+```shell
+curl "$ORCHESTRATOR_API/discover/127.0.0.1/22987" | jq '.Details | .Key'
+```
+
+### Meta commands
+
+- `orchestrator-client -c help`: list all available commands
+- `orchestrator-client -c which-api`: output the API endpoint `orchestrator-client` would use to invoke a command. This is useful when multiple endpoints are provided via `$ORCHESTRATOR_API`.
+- `orchestrator-client -c api -path clusters`: invoke a generic HTTP API call (in this case `clusters`) and return the raw JSON response.
