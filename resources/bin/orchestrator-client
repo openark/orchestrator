@@ -164,7 +164,7 @@ function detect_leader_api() {
       return
     fi
   done
-  fail "Cannot determine leader from $apis"
+  fail "Cannot determine leader from $orchestrator_api"
 }
 
 function urlencode() {
