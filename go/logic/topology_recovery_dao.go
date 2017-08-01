@@ -373,10 +373,29 @@ func AcknowledgeRecovery(recoveryId int64, owner string, comment string) (countA
 // AcknowledgeClusterRecoveries marks active recoveries for given cluster as acknowledged.
 // This also implied clearing their active period, which in turn enables further recoveries on those topologies
 func AcknowledgeClusterRecoveries(clusterName string, owner string, comment string) (countAcknowledgedEntries int64, err error) {
-	whereClause := `cluster_name = ?`
-	args := sqlutils.Args(clusterName)
-	clearAcknowledgedFailureDetections(whereClause, args)
-	return acknowledgeRecoveries(owner, comment, false, whereClause, args)
+	{
+		whereClause := `cluster_name = ?`
+		args := sqlutils.Args(clusterName)
+		clearAcknowledgedFailureDetections(whereClause, args)
+		count, err := acknowledgeRecoveries(owner, comment, false, whereClause, args)
+		if err != nil {
+			return count, err
+		}
+		countAcknowledgedEntries = countAcknowledgedEntries + count
+	}
+	{
+		clusterInfo, err := inst.ReadClusterInfo(clusterName)
+		whereClause := `cluster_alias = ? and cluster_alias != ''`
+		args := sqlutils.Args(clusterInfo.ClusterAlias)
+		clearAcknowledgedFailureDetections(whereClause, args)
+		count, err := acknowledgeRecoveries(owner, comment, false, whereClause, args)
+		if err != nil {
+			return count, err
+		}
+		countAcknowledgedEntries = countAcknowledgedEntries + count
+
+	}
+	return countAcknowledgedEntries, nil
 }
 
 // AcknowledgeInstanceRecoveries marks active recoveries for given instane as acknowledged.
