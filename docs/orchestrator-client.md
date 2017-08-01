@@ -14,11 +14,10 @@ With `orchestrator-client`, you:
 - Need to have access to the HTTP api
 - Need to set the `ORCHESTRATOR_API` environment variable.
   - Either provide a single endpoint for a proxy, e.g.
-
   ```shell
   export ORCHESTRATOR_API=https://orchestrator.myservice.com:3000/api
   ```
-  - Or provide all `orchestrator` endpoints, and `orchestrator-client` will auto-pick the leader (no need for proxy), e.g.:
+  - Or provide all `orchestrator` endpoints, and `orchestrator-client` will auto-pick the leader (no need for proxy), e.g.
   ```shell
   export ORCHESTRATOR_API="https://orchestrator.host1:3000/api https://orchestrator.host2:3000/api https://orchestrator.host3:3000/api"
   ```
