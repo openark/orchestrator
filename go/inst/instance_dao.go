@@ -84,7 +84,7 @@ func init() {
 // initializeInstanceDao waits for the configuration to be loaded prior
 // to performing certain tasks.
 func initializeInstanceDao() {
-	<-config.ConfigurationLoaded
+	config.WaitForConfigurationToBeLoaded()
 	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
 	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
 

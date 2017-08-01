@@ -160,7 +160,7 @@ func init() {
 }
 
 func initializeTopologyRecoveryPostConfiguration() {
-	<-config.ConfigurationLoaded
+	config.WaitForConfigurationToBeLoaded()
 
 	emergencyReadTopologyInstanceMap = cache.New(time.Second, time.Second)
 }
