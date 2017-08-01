@@ -24,9 +24,9 @@ By way of example:
 
 The de-facto listing is the code, please see [api.go](https://github.com/github/orchestrator/blob/master/go/http/api.go) (scroll down to `RegisterRequests`).
 
-You may also appreciate looking at [orchestrator-client](using-orchestrator-client.md) ([source code](https://github.com/github/orchestrator/blob/master/resources/bin/orchestrator-client)) to see how command line interface is translated to API calls.
+You may also appreciate looking at [orchestrator-client](orchestrator-client.md) ([source code](https://github.com/github/orchestrator/blob/master/resources/bin/orchestrator-client)) to see how command line interface is translated to API calls.
 
-Or, just use the [orchestrator-client](using-orchestrator-client.md) as your API client, this is what it was made for.
+Or, just use the [orchestrator-client](orchestrator-client.md) as your API client, this is what it was made for.
 
 ### Instance JSON breakdown
 

@@ -90,7 +90,7 @@ listen orchestrator
 
 An alternative to the proxy approach is to use `orchestrator-client`.
 
-[orchestrator-client](using-orchestrator-client.md) is a wrapper script that accesses the `orchestrator` service via HTTP API, and provides a command line interface to the user.
+[orchestrator-client](orchestrator-client.md) is a wrapper script that accesses the `orchestrator` service via HTTP API, and provides a command line interface to the user.
 
 It is possible to provide `orchestrator-client` with the full listing of all orchestrator API endpoints. In such case, `orchestrator-client` will figure out which of the endpoints is the leader, and direct requests at that endpoint.
 
@@ -131,7 +131,7 @@ export ORCHESTRATOR_API="https://orchestrator.proxy:80/api"
 
 - As result, on a `orchestrator/raft`, one may not use the `orchestrator` executable in command line mode: an attempt to run `orchestrator` cli will refuse to run when `raft` mode is enabled. Work is ongoing to allow some commands to run via cli.
 
-- A utility script, [orchestrator-client](using-orchestrator-client.md) is available that provides similar interface as the command line `orchestrator`, and that uses & manipulates `HTTP API` calls.
+- A utility script, [orchestrator-client](orchestrator-client.md) is available that provides similar interface as the command line `orchestrator`, and that uses & manipulates `HTTP API` calls.
 
 - You will only install the `orchestrator` binaries on `orchestrator` service nodes, and no where else. The `orchestrator-client` script can be installed wherever you wish to.
 

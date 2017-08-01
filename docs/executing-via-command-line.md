@@ -8,7 +8,7 @@ Also consult the [Orchestrator first steps](first-steps.md) page.
   - You will deploy `orchestrator` on ops/app boxes, but not run it as a service.
   - You will deploy the configuration file for the `orchestrator` binary to be able to
     connect to the backend DB.
-- Using the [orchestrator-client](using-orchestrator-client.md) script.
+- Using the [orchestrator-client](orchestrator-client.md) script.
   - You will only need the `orchestrator-client` script on your ops/app boxes.
   - You will not need any config file nor binaries.
   - You will need to specify the `ORCHESTRATOR_API` environment variable.
