@@ -60,6 +60,8 @@ func main() {
 	config.RuntimeCLIFlags.GrabElection = flag.Bool("grab-election", false, "Grab leadership (only applies to continuous mode)")
 	config.RuntimeCLIFlags.PromotionRule = flag.String("promotion-rule", "prefer", "Promotion rule for register-andidate (prefer|neutral|must_not)")
 	config.RuntimeCLIFlags.Version = flag.Bool("version", false, "Print version and exit")
+	config.RuntimeCLIFlags.SkipContinuousRegistration = flag.Bool("skip-continuous-registration", false, "Skip cli commands performaing continuous registration (to reduce orchestratrator backend db load")
+	config.RuntimeCLIFlags.EnableDatabaseUpdate = flag.Bool("enable-database-update", false, "Enable database update, overrides SkipOrchestratorDatabaseUpdate")
 	flag.Parse()
 
 	if *destination != "" && *sibling != "" {
@@ -111,6 +113,9 @@ func main() {
 	} else {
 		config.Read("/etc/orchestrator.conf.json", "conf/orchestrator.conf.json", "orchestrator.conf.json")
 	}
+	if *config.RuntimeCLIFlags.EnableDatabaseUpdate {
+		config.Config.SkipOrchestratorDatabaseUpdate = false
+	}
 	if config.Config.Debug {
 		log.SetLevel(log.DEBUG)
 	}
@@ -133,7 +138,23 @@ func main() {
 		fmt.Println(app.AppPrompt)
 		return
 	}
+	helpTopic := ""
+	if flag.Arg(0) == "help" {
+		if flag.Arg(1) != "" {
+			helpTopic = flag.Arg(1)
+		}
+		if helpTopic == "" {
+			helpTopic = *command
+		}
+		if helpTopic == "" {
+			// hacky way to make the CLI kick in as if the user typed `orchestrator -c help cli`
+			*command = "help"
+			flag.Args()[0] = "cli"
+		}
+	}
 	switch {
+	case helpTopic != "":
+		app.HelpCommand(helpTopic)
 	case len(flag.Args()) == 0 || flag.Arg(0) == "cli":
 		app.CliWrapper(*command, *strict, *instance, *destination, *owner, *reason, *duration, *pattern, *clusterAlias, *pool, *hostnameFlag)
 	case flag.Arg(0) == "http":

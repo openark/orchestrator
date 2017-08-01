@@ -15,7 +15,7 @@ No. `Orchestrator` is strictly _not_ a monitoring tool. There is no intention to
 ### What kind of replication does orchestrator support?
 
 `Orchestrator` supports "plain-old-MySQL-replication", the one that uses binary log files and positions.
-If you don't know what you're using, this is probably the one. It is the only type of replication up to and including MySQL 5.5.
+If you don't know what you're using, this is probably the one. 
 
 ### Does orchestrator support Row Based Replication?
 

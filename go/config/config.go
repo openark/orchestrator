@@ -36,7 +36,7 @@ const (
 	LostInRecoveryDowntimeSeconds = 60 * 60 * 24 * 365
 )
 
-var ConfigurationLoaded chan bool = make(chan bool)
+var configurationLoaded chan bool = make(chan bool)
 
 const (
 	DiscoveryPollSeconds                         = 1
@@ -88,6 +88,8 @@ type Configuration struct {
 	MySQLTopologySSLCAFile                     string // Certificate Authority PEM file used to authenticate with a Topology mysql instance with TLS
 	MySQLTopologySSLSkipVerify                 bool   // If true, do not strictly validate mutual TLS certs for Topology mysql instances
 	MySQLTopologyUseMutualTLS                  bool   // Turn on TLS authentication with the Topology MySQL instances
+	MySQLTopologyUseMixedTLS                   bool   // Mixed TLS and non-TLS authentication with the Topology MySQL instances
+	TLSCacheTTLFactor                          uint   // Factor of InstancePollSeconds that we set as TLS info cache expiracy
 	BackendDB                                  string // EXPERIMENTAL: type of backend db; either "mysql" or "sqlite3"
 	SQLite3DataFile                            string // when BackendDB == "sqlite3", full path to sqlite3 datafile
 	SkipOrchestratorDatabaseUpdate             bool   // When true, do not check backend database schema nor attempt to update it. Useful when you may be running multiple versions of orchestrator, and you only wish certain boxes to dictate the db structure (or else any time a different orchestrator version runs it will rebuild database schema)
@@ -227,7 +229,7 @@ type Configuration struct {
 	GraphiteConvertHostnameDotsToUnderscores   bool              // If true, then hostname's dots are converted to underscores before being used in graphite path
 	GraphitePollSeconds                        int               // Graphite writes interval. 0 disables.
 	URLPrefix                                  string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
-	MaxOutdatedKeysToShow                      int               // Maximum number of keys to show in ContinousDiscovery. If the number of polled hosts grows too far then showing the complete list is not ideal.
+	MaxOutdatedKeysToShow                      int               // Maximum number of keys to show in ContinuousDiscovery. If the number of polled hosts grows too far then showing the complete list is not ideal.
 	DiscoveryIgnoreReplicaHostnameFilters      []string          // Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps
 }
 
@@ -258,6 +260,7 @@ func newConfiguration() *Configuration {
 		MySQLOrchestratorMaxPoolConnections:        128, // limit concurrent conns to backend DB
 		MySQLOrchestratorPort:                      3306,
 		MySQLTopologyUseMutualTLS:                  false,
+		MySQLTopologyUseMixedTLS:                   true,
 		MySQLOrchestratorUseMutualTLS:              false,
 		MySQLConnectTimeoutSeconds:                 2,
 		MySQLOrchestratorReadTimeoutSeconds:        30,
@@ -265,6 +268,7 @@ func newConfiguration() *Configuration {
 		MySQLTopologyReadTimeoutSeconds:            600,
 		MySQLInterpolateParams:                     false,
 		DefaultInstancePort:                        3306,
+		TLSCacheTTLFactor:                          100,
 		InstancePollSeconds:                        5,
 		InstanceWriteBufferSize:                    100,
 		BufferInstanceWrites:                       false,
@@ -549,9 +553,15 @@ func Reload() *Configuration {
 func MarkConfigurationLoaded() {
 	go func() {
 		for {
-			ConfigurationLoaded <- true
+			configurationLoaded <- true
 		}
 	}()
 	// wait for it
-	<-ConfigurationLoaded
+	<-configurationLoaded
+}
+
+// WaitForConfigurationToBeLoaded does just that. It will return after
+// the configuration file has been read off disk.
+func WaitForConfigurationToBeLoaded() {
+	<-configurationLoaded
 }
