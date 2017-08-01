@@ -821,7 +821,7 @@ var generateSQLBase = []string{
 		  PRIMARY KEY (peer, hostname, port)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
-  `
+	`
 		CREATE TABLE IF NOT EXISTS database_instance_tls (
 			hostname varchar(128) CHARACTER SET ascii NOT NULL,
 			port smallint(5) unsigned NOT NULL,
