@@ -27,9 +27,9 @@ At this time `orchestrator` nodes to not join dynamically into the cluster. The 
   "RaftBind": "<IP of this host>",
   "DefaultRaftPort": 10008,
   "RaftNodes": [
-    "my.orchestrator.node0",
-    "my.orchestrator.node1",
-    "my.orchestrator.node2",
+    "ip.of.orchestrator.node1",
+    "ip.of.orchestrator.node2",
+    "ip.of.orchestrator.node3",
   ],
 ```
 
