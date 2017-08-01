@@ -64,6 +64,10 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.writeRecovery(value)
 	case "write-recovery-step":
 		return applier.writeRecoveryStep(value)
+	case "disable-global-recoveries":
+		return applier.disableGlobalRecoveries(value)
+	case "enable-global-recoveries":
+		return applier.enableGlobalRecoveries(value)
 	}
 	return log.Errorf("Unknown command op: %s", op)
 }
@@ -183,5 +187,15 @@ func (applier *CommandApplier) writeRecoveryStep(value []byte) interface{} {
 		return log.Errore(err)
 	}
 	err := writeTopologyRecoveryStep(&topologyRecoveryStep)
+	return err
+}
+
+func (applier *CommandApplier) disableGlobalRecoveries(value []byte) interface{} {
+	err := DisableRecovery()
+	return err
+}
+
+func (applier *CommandApplier) enableGlobalRecoveries(value []byte) interface{} {
+	err := EnableRecovery()
 	return err
 }
