@@ -95,9 +95,8 @@ It is recommended to run a `3`-node or a `5`-node setup.
 
 To access your `orchestrator` service you may **only** speak to the leader node.
 - Use `/api/leader-check` as HTTP health check for your proxy.
-- Or use `[orchestrator-client](orchestrator-client.md)` with multiple `orchestrator` backends; `orchestrator-client` will figure out the identity of the leader and will send requests to the leader.
+- Or use [orchestrator-client](orchestrator-client.md) with multiple `orchestrator` backends; `orchestrator-client` will figure out the identity of the leader and will send requests to the leader.
 
 ![orchestrator HA via raft](images/orchestrator-ha--raft-proxy.png)
-
 
 `orchestrator/raft` is a newer development, and is being tested in production at this time. Please read the [orchestrator/raft documentation](raft.md) for all implications.
