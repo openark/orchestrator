@@ -19,17 +19,20 @@ package orcraft
 import (
 	"crypto/tls"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
+
+	"github.com/openark/golib/log"
 )
 
 var httpClient *http.Client
 
 func setupHttpClient() error {
-	httpTimeout := time.Duration(time.Duration(config.AgentHttpTimeoutSeconds) * time.Second)
+	httpTimeout := time.Duration(config.ActiveNodeExpireSeconds) * time.Second
 	dialTimeout := func(network, addr string) (net.Conn, error) {
 		return net.DialTimeout(network, addr, httpTimeout)
 	}
@@ -44,11 +47,32 @@ func setupHttpClient() error {
 }
 
 // PeerAPI generates the API path of a raft peer
-func PeerAPI(peer string) string {
+func peerAPI(peer string) string {
 	protocol := "http"
 	if config.Config.UseSSL {
 		protocol = "https"
 	}
 	api := fmt.Sprintf("%s://%s%s/api", protocol, peer, config.Config.ListenAddress)
 	return api
+}
+
+// readResponse returns the body of an HTTP response
+func HttpGet(peer string, path string) ([]byte, error) {
+	url := fmt.Sprintf("%s/%s", peerAPI(peer), path)
+	res, err := httpClient.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return body, log.Errorf("HttpGet: got %d status on %s", res.StatusCode, url)
+	}
+
+	return body, nil
 }
