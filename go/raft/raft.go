@@ -133,6 +133,15 @@ func IsPeer(peer string) (bool, error) {
 	return (store.raftBind == peer), nil
 }
 
+func PeerAPI(peer string) string {
+	protocol := "http"
+	if config.Config.UseSSL {
+		protocol = "https"
+	}
+	api := fmt.Sprintf("%s://%s%s/api", protocol, peer, config.Config.ListenAddress)
+	return api
+}
+
 // PublishCommand will distribute a command across the group
 func PublishCommand(op string, value interface{}) (response interface{}, err error) {
 	if !IsRaftEnabled() {
