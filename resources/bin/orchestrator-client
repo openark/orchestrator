@@ -276,6 +276,12 @@ function which_cluster() {
   print_response | jq -r '.ClusterName'
 }
 
+function which_cluster_master() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "master/${alias:-$instance}"
+  print_response | jq -r '.ClusterName'
+}
+
 function which_cluster_instances() {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "cluster/${alias:-$instance}"
@@ -546,6 +552,7 @@ function run_command() {
     "which-replicas") which_replicas ;;                         # Output the fully-qualified hostname:port list of replicas of a given instance
     "which-cluster-instances") which_cluster_instances ;;       # Output the list of instances participating in same cluster as given instance
     "which-cluster") which_cluster ;;                           # Output the name of the cluster an instance belongs to, or error if unknown to orchestrator
+    "which-cluster-master") which_cluster_master ;;             # Output the name of a writable master in given cluster
     "all-clusters-masters") all_clusters_masters ;;             # List of writeable masters, one per cluster
     "all-instances") all_instances ;;                           # The complete list of known instances
     "which-cluster-osc-replicas") which_cluster_osc_replicas ;; # Output a list of replicas in a cluster, that could serve as a pt-online-schema-change operation control replicas
