@@ -91,7 +91,7 @@ do
     l) pool=$OPTARG ;;
     H) hostname_flag=$OPTARG ;;
     D) default_port=$OPTARG ;;
-    U) orchestrator_api=$OPTARG ;;
+    U) [ ! -z "$OPTARG" ] && orchestrator_api=$OPTARG ;;
     P) api_path=$OPTARG ;;
   esac
 done
