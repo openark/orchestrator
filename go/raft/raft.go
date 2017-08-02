@@ -64,6 +64,8 @@ func Setup(applier CommandApplier, thisHostname string) error {
 		return log.Errorf("failed to open raft store: %s", err.Error())
 	}
 
+	setupHttpClient()
+
 	return nil
 }
 
@@ -131,15 +133,6 @@ func IsPeer(peer string) (bool, error) {
 		return false, RaftNotRunning
 	}
 	return (store.raftBind == peer), nil
-}
-
-func PeerAPI(peer string) string {
-	protocol := "http"
-	if config.Config.UseSSL {
-		protocol = "https"
-	}
-	api := fmt.Sprintf("%s://%s%s/api", protocol, peer, config.Config.ListenAddress)
-	return api
 }
 
 // PublishCommand will distribute a command across the group
