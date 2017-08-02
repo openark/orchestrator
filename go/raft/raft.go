@@ -159,15 +159,6 @@ func PublishYieldHostnameHint(hostnameHint string) (response interface{}, err er
 // Monitor is a utility function to routinely observe leadership state.
 // It doesn't actually do much; merely takes notes.
 func Monitor() {
-	observationChannel := make(chan raft.Observation)
-	observer := raft.NewObserver(observationChannel, true, nil)
-	getRaft().RegisterObserver(observer)
-	go func() {
-		for observation := range observationChannel {
-			log.Debugf("...raft observation: %+v", observation)
-		}
-	}()
-
 	t := time.Tick(5 * time.Second)
 	heartbeat := time.Tick(1 * time.Minute)
 	for {
