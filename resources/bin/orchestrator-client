@@ -48,6 +48,7 @@ duration="10m"
 promotion_rule=
 pool=
 hostname_flag=
+api_path=
 
 instance_hostport=
 destination_hostport=
@@ -69,11 +70,12 @@ for arg in "$@"; do
     "-pool"|"--pool")                     set -- "$@" "-l" ;;
     "-hostname"|"--hostname")             set -- "$@" "-H" ;;
     "-api"|"--api")                       set -- "$@" "-U" ;;
+    "-path"|"--path")                     set -- "$@" "-P" ;;
     *)                                    set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:h" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:P:h" OPTION
 do
   case $OPTION in
     h) command="help" ;;
@@ -90,12 +92,13 @@ do
     H) hostname_flag=$OPTARG ;;
     D) default_port=$OPTARG ;;
     U) orchestrator_api=$OPTARG ;;
+    P) api_path=$OPTARG ;;
   esac
 done
 
 function fail() {
   message="$1"
-  echo "$message"
+  >&2 echo "$message"
   exit 1
 }
 
@@ -183,6 +186,9 @@ function api() {
   if [ "$(echo $api_response | jq -r 'type')" == "array" ] ; then
     return
   fi
+  if [ "$(echo $api_response | jq -r 'type')" == "string" ] ; then
+    return
+  fi
   if [ "$(echo $api_response | jq -r 'has("Code")')" == "false" ] ; then
     return
   fi
@@ -216,6 +222,12 @@ function filter_keys {
 
 function print_key {
   cat - | jq -r '. | (.Hostname + ":" + (.Port | tostring))'
+}
+
+function api_call() {
+  assert_nonempty "path" "$api_path"
+  api "$api_path"
+  print_response
 }
 
 function prompt_help() {
@@ -303,13 +315,18 @@ function downtimed() {
   print_response | filter_keys | print_key
 }
 
+function dominant_dc() {
+  api "masters"
+  print_response | jq -r '.[].DataCenter' | sort | uniq -c | sort -nr | head -n 1 | awk '{print $2}'
+}
+
 function submit_pool_instances() {
   # 'instance' is comma delimited, e.g.
   #   myinstance1.com:3306,myinstance2.com:3306,myinstance3.com:3306
   assert_nonempty "instance" "$instance"
   assert_nonempty "pool" "$pool"
   api "submit-pool-instances/$pool?instances=$(urlencode "$instance")"
-  print_details | jq -r
+  print_details | jq -r .
 }
 
 function which_heuristic_cluster_pool_instances() {
@@ -456,17 +473,52 @@ function ack_cluster_recoveries() {
 
 function disable_global_recoveries() {
   api "disable-global-recoveries"
-  print_details | jq -r
+  print_details | jq -r .
 }
 
 function enable_global_recoveries() {
   api "enable-global-recoveries"
-  print_details | jq -r
+  print_details | jq -r .
 }
 
 function check_global_recoveries() {
   api "check-global-recoveries"
-  print_details | jq -r
+  print_details | jq -r .
+}
+
+function raft_leader() {
+  api "raft-state"
+  if print_response | jq -r . | grep -q Leader ; then
+    # confirmed raft is running well
+    api "raft-leader"
+    print_response | jq -r '.'
+  else
+    fail "Cannot determine raft state"
+  fi
+}
+
+function raft_leader_hostname() {
+  api "raft-state"
+  if print_response | jq -r . | grep -q Leader ; then
+    # confirmed raft is running well
+    api "status"
+    print_details | jq -r '.Hostname'
+  else
+    fail "Cannot determine raft state"
+  fi
+}
+
+# raft_elect_leader elects the raft leader by using --hostname as hint
+function raft_elect_leader() {
+  assert_nonempty "hostname" "$hostname_flag"
+  api "raft-state"
+  if print_response | jq -r . | grep -q Leader ; then
+    # confirmed raft is running well
+    api "raft-yield-hint/${hostname_flag}"
+    print_details | jq -r .
+  else
+    fail "Cannot determine raft state"
+  fi
 }
 
 function run_command() {
@@ -475,7 +527,10 @@ function run_command() {
   fi
   command=$(echo $command | sed -e 's/slave/replica/')
   case $command in
-    "help") prompt_help ;;
+    "help") prompt_help ;; # Show available commands
+
+    "api") api_call ;;      # Invoke any API request; provide --path argument
+
     "discover") discover ;; # Lookup an instance, investigate it
     "forget") forget ;;     # Forget about an instance's existence
 
@@ -491,6 +546,7 @@ function run_command() {
     "all-instances") all_instances ;;                           # The complete list of known instances
     "which-cluster-osc-replicas") which_cluster_osc_replicas ;; # Output a list of replicas in a cluster, that could serve as a pt-online-schema-change operation control replicas
     "downtimed") downtimed ;;                                   # List all downtimed instances
+    "dominant-dc") dominant_dc ;;                               # Name the data center where most masters are found
 
     "relocate") general_relocate_command ;;                   # Relocate a replica beneath another instance
     "relocate-replicas") general_relocate_replicas_command ;; # Relocates all or part of the replicas of a given instance under another instance
@@ -548,6 +604,11 @@ function run_command() {
     "check-global-recoveries") check_global_recoveries ;;     # Show the global recovery configuration
 
     "replication-analysis") replication_analysis ;;           # Request an analysis of potential crash incidents in all known topologies
+
+    "raft-leader") raft_leader ;;                   # Get identify of raft leader, assuming raft setup
+    "raft-leader-hostname") raft_leader_hostname ;; # Get hostname of raft leader, assuming raft setup
+    "raft-elect-leader") raft_elect_leader ;;       # Request raft re-elections, provide hint for new leader's identity
+
     *) fail "Unsupported command $command" ;;
   esac
 }

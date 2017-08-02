@@ -31,11 +31,37 @@ import (
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/os"
 	"github.com/github/orchestrator/go/process"
+	"github.com/github/orchestrator/go/raft"
 	"github.com/github/orchestrator/go/remote"
 	"github.com/openark/golib/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
 )
+
+type RecoveryAcknowledgement struct {
+	CreatedAt time.Time
+	Owner     string
+	Comment   string
+
+	Key         inst.InstanceKey
+	ClusterName string
+}
+
+func NewRecoveryAcknowledgement(owner string, comment string) *RecoveryAcknowledgement {
+	return &RecoveryAcknowledgement{
+		CreatedAt: time.Now(),
+		Owner:     owner,
+		Comment:   comment,
+	}
+}
+
+func NewInternalAcknowledgement() *RecoveryAcknowledgement {
+	return &RecoveryAcknowledgement{
+		CreatedAt: time.Now(),
+		Owner:     "orchestrator",
+		Comment:   "internal",
+	}
+}
 
 // BlockedTopologyRecovery represents an entry in the blocked_topology_recovery table
 type BlockedTopologyRecovery struct {
@@ -75,7 +101,7 @@ type TopologyRecovery struct {
 
 func NewTopologyRecovery(replicationAnalysis inst.ReplicationAnalysis) *TopologyRecovery {
 	topologyRecovery := &TopologyRecovery{}
-	topologyRecovery.UID = fmt.Sprintf("%d:%s", time.Now().Nanosecond(), process.NewToken().Hash)
+	topologyRecovery.UID = process.PrettyUniqueToken()
 	topologyRecovery.AnalysisEntry = replicationAnalysis
 	topologyRecovery.SuccessorKey = nil
 	topologyRecovery.LostReplicas = *inst.NewInstanceKeyMap()
@@ -99,9 +125,17 @@ func (this *TopologyRecovery) AddErrors(errs []error) {
 }
 
 type TopologyRecoveryStep struct {
+	Id          int64
 	RecoveryUID string
 	AuditAt     string
 	Message     string
+}
+
+func NewTopologyRecoveryStep(uid string, message string) *TopologyRecoveryStep {
+	return &TopologyRecoveryStep{
+		RecoveryUID: uid,
+		Message:     message,
+	}
 }
 
 type MasterRecoveryType string
@@ -163,6 +197,24 @@ func initializeTopologyRecoveryPostConfiguration() {
 	config.WaitForConfigurationToBeLoaded()
 
 	emergencyReadTopologyInstanceMap = cache.New(time.Second, time.Second)
+}
+
+// AuditTopologyRecovery audits a single step in a topology recovery process.
+func AuditTopologyRecovery(topologyRecovery *TopologyRecovery, message string) error {
+	log.Infof("topology_recovery: %s", message)
+	if topologyRecovery == nil {
+		return nil
+	}
+
+	recoveryStep := NewTopologyRecoveryStep(topologyRecovery.UID, message)
+	if err := writeTopologyRecoveryStep(recoveryStep); err != nil {
+		return err
+	}
+	if orcraft.IsRaftEnabled() {
+		_, err := orcraft.PublishCommand("write-recovery-step", recoveryStep)
+		return err
+	}
+	return nil
 }
 
 // replaceCommandPlaceholders replaces agreed-upon placeholders with analysis data
@@ -511,10 +563,11 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 	}
 
 	func() error {
-		inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds)
+
+		inst.BeginDowntime(inst.NewDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds))
 		for _, replica := range lostReplicas {
 			replica := replica
-			inst.BeginDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds)
+			inst.BeginDowntime(inst.NewDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds))
 		}
 		return nil
 	}()
@@ -1112,10 +1165,10 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 	}
 
 	func() error {
-		inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds)
+		inst.BeginDowntime(inst.NewDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds))
 		for _, replica := range lostReplicas {
 			replica := replica
-			inst.BeginDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds)
+			inst.BeginDowntime(inst.NewDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds))
 		}
 		return nil
 	}()
@@ -1218,18 +1271,18 @@ func emergentlyReadTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analy
 
 // checkAndExecuteFailureDetectionProcesses tries to register for failure detection and potentially executes
 // failure-detection processes.
-func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (processesExecutionAttempted bool, err error) {
+func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (detectionRegistrationSuccess bool, processesExecutionAttempted bool, err error) {
 	if ok, _ := AttemptFailureDetectionRegistration(&analysisEntry); !ok {
 		log.Infof("executeCheckAndRecoverFunction: could not register %+v detection on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
-		return false, nil
+		return false, false, nil
 	}
 	log.Infof("topology_recovery: detected %+v failure on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
 	// Execute on-detection processes
 	if skipProcesses {
-		return false, nil
+		return true, false, nil
 	}
 	err = executeProcesses(config.Config.OnFailureDetectionProcesses, "OnFailureDetectionProcesses", NewTopologyRecovery(analysisEntry), true)
-	return true, err
+	return true, true, err
 }
 
 func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode) (
@@ -1314,8 +1367,25 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 
 	// At this point we have validated there's a failure scenario for which we have a recovery path.
 
+	if orcraft.IsRaftEnabled() {
+		// with raft, all nodes can (and should) run analysis,
+		// but only the leader proceeds to execute detection hooks and then to failover.
+		if !orcraft.IsLeader() {
+			log.Infof("CheckAndRecover: Analysis: %+v, InstanceKey: %+v, candidateInstanceKey: %+v, "+
+				"skipProcesses: %v: NOT detecting/recovering host (raft non-leader)",
+				analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, candidateInstanceKey, skipProcesses)
+			return false, nil, err
+		}
+	}
+
 	// Initiate detection:
-	if _, err := checkAndExecuteFailureDetectionProcesses(analysisEntry, skipProcesses); err != nil {
+	registrationSuccess, _, err := checkAndExecuteFailureDetectionProcesses(analysisEntry, skipProcesses)
+	if registrationSuccess {
+		if orcraft.IsRaftEnabled() {
+			orcraft.PublishCommand("register-failure-detection", analysisEntry)
+		}
+	}
+	if err != nil {
 		log.Errorf("executeCheckAndRecoverFunction: error on failure detection: %+v", err)
 		return false, nil, err
 	}

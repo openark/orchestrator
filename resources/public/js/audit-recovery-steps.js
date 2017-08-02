@@ -5,7 +5,9 @@ $(document).ready(function() {
   var uri = "/api/audit-recovery-steps/" + recoveryUID();
 
   $.get(appUrl(uri), function(steps) {
+    steps = steps || [];
     $.get(appUrl(recoveryUri), function(recoveryAudits) {
+      recoveryAudits = recoveryAudits || [];
       displayAudit(steps, recoveryAudits);
     }, "json");
   }, "json");

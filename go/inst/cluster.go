@@ -22,6 +22,21 @@ import (
 	"strings"
 )
 
+// mappedClusterNameToAlias attempts to match a cluster with an alias based on
+// configured ClusterNameToAlias map
+func mappedClusterNameToAlias(clusterName string) string {
+	for pattern, alias := range config.Config.ClusterNameToAlias {
+		if pattern == "" {
+			// sanity
+			continue
+		}
+		if matched, _ := regexp.MatchString(pattern, clusterName); matched {
+			return alias
+		}
+	}
+	return ""
+}
+
 // ClusterInfo makes for a cluster status/info summary
 type ClusterInfo struct {
 	ClusterName                            string
@@ -75,10 +90,7 @@ func (this *ClusterInfo) ApplyClusterAlias() {
 		// Already has an alias; abort
 		return
 	}
-	// Try out the hard-wired config:
-	for pattern := range config.Config.ClusterNameToAlias {
-		if matched, _ := regexp.MatchString(pattern, this.ClusterName); matched {
-			this.ClusterAlias = config.Config.ClusterNameToAlias[pattern]
-		}
+	if alias := mappedClusterNameToAlias(this.ClusterName); alias != "" {
+		this.ClusterAlias = alias
 	}
 }

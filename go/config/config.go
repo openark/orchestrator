@@ -50,6 +50,7 @@ const (
 	MaintenanceExpireMinutes                     = 10
 	AgentHttpTimeoutSeconds                      = 60
 	PseudoGTIDCoordinatesHistoryHeuristicMinutes = 2
+	DebugMetricsIntervalSeconds                  = 10
 )
 
 var deprecatedConfigurationVariables = []string{
@@ -94,6 +95,12 @@ type Configuration struct {
 	SQLite3DataFile                            string // when BackendDB == "sqlite3", full path to sqlite3 datafile
 	SkipOrchestratorDatabaseUpdate             bool   // When true, do not check backend database schema nor attempt to update it. Useful when you may be running multiple versions of orchestrator, and you only wish certain boxes to dictate the db structure (or else any time a different orchestrator version runs it will rebuild database schema)
 	PanicIfDifferentDatabaseDeploy             bool   // When true, and this process finds the orchestrator backend DB was provisioned by a different version, panic
+	RaftEnabled                                bool   // When true, setup orchestrator in a raft consensus layout. When false (default) all Raft* variables are ignored
+	RaftBind                                   string
+	RaftDataDir                                string
+	DefaultRaftPort                            int      // if a RaftNodes entry does not specify port, use this one
+	RaftNodes                                  []string // Raft nodes to make initial connection with
+	ExpectFailureAnalysisConcensus             bool
 	MySQLOrchestratorHost                      string
 	MySQLOrchestratorMaxPoolConnections        int // The maximum size of the connection pool to the Orchestrator backend.
 	MySQLOrchestratorPort                      uint
@@ -257,6 +264,11 @@ func newConfiguration() *Configuration {
 		SQLite3DataFile:                            "",
 		SkipOrchestratorDatabaseUpdate:             false,
 		PanicIfDifferentDatabaseDeploy:             false,
+		RaftBind:                                   "127.0.0.1:10008",
+		RaftDataDir:                                "",
+		DefaultRaftPort:                            10008,
+		RaftNodes:                                  []string{},
+		ExpectFailureAnalysisConcensus:             true,
 		MySQLOrchestratorMaxPoolConnections:        128, // limit concurrent conns to backend DB
 		MySQLOrchestratorPort:                      3306,
 		MySQLTopologyUseMutualTLS:                  false,
@@ -486,6 +498,9 @@ func (this *Configuration) postReadAdjustments() error {
 
 	if this.IsSQLite() && this.SQLite3DataFile == "" {
 		return fmt.Errorf("SQLite3DataFile must be set when BackendDB is sqlite3")
+	}
+	if this.IsSQLite() {
+		//		this.HostnameResolveMethod = "none"
 	}
 	if this.RemoteSSHForMasterFailover && this.RemoteSSHCommand == "" {
 		return fmt.Errorf("RemoteSSHCommand is required when RemoteSSHForMasterFailover is set")

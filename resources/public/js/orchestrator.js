@@ -915,6 +915,7 @@ $(document).ready(function() {
   $(".navbar-nav li[data-nav-page='" + activePage() + "']").addClass("active");
 
   $.get(appUrl("/api/clusters-info"), function(clusters) {
+    clusters = clusters || [];
     clusters.forEach(function(cluster) {
       var url = appUrl('/web/cluster/' + cluster.ClusterName)
       var title = cluster.ClusterName;
