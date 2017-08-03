@@ -30,6 +30,7 @@ import (
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/ssl"
+
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/gzip"
@@ -127,6 +128,7 @@ func standardHttp(continuousDiscovery bool) {
 		log.Info("Starting Discovery")
 		go logic.ContinuousDiscovery()
 	}
+
 	log.Info("Registering endpoints")
 	http.API.URLPrefix = config.Config.URLPrefix
 	http.Web.URLPrefix = config.Config.URLPrefix

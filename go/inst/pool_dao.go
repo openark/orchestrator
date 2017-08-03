@@ -28,19 +28,22 @@ import (
 // writePoolInstances will write (and override) a single cluster name mapping
 func writePoolInstances(pool string, instanceKeys [](*InstanceKey)) error {
 	writeFunc := func() error {
-		db, err := db.OpenOrchestrator()
+		dbh, err := db.OpenOrchestrator()
 		if err != nil {
 			return log.Errore(err)
 		}
-
-		tx, err := db.Begin()
-		stmt, err := tx.Prepare(`delete from database_instance_pool where pool = ?`)
+		tx, err := dbh.Begin()
+		stmt, err := db.PrepareTransaction(tx, `delete from database_instance_pool where pool = ?`)
 		_, err = stmt.Exec(pool)
 		if err != nil {
 			tx.Rollback()
 			return log.Errore(err)
 		}
-		stmt, err = tx.Prepare(`insert into database_instance_pool (hostname, port, pool, registered_at) values (?, ?, ?, now())`)
+		stmt, err = db.PrepareTransaction(tx, `insert into database_instance_pool (hostname, port, pool, registered_at) values (?, ?, ?, now())`)
+		if err != nil {
+			tx.Rollback()
+			return log.Errore(err)
+		}
 		for _, instanceKey := range instanceKeys {
 			_, err := stmt.Exec(instanceKey.Hostname, instanceKey.Port, pool)
 			if err != nil {
