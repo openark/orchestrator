@@ -331,6 +331,7 @@ func onDiscoveryTick() {
 // purged and forgotten.
 func ContinuousDiscovery() {
 	log.Infof("Starting continuous discovery")
+	continuousDiscoveryStartTime := time.Now()
 	recentDiscoveryOperationKeys = cache.New(instancePollSecondsDuration(), time.Second)
 
 	inst.LoadHostnameResolveCache()
@@ -412,7 +413,13 @@ func ContinuousDiscovery() {
 					go ExpireBlockedRecoveries()
 					go AcknowledgeCrashedRecoveries()
 					go inst.ExpireInstanceAnalysisChangelog()
-					go CheckAndRecover(nil, nil, false)
+
+					checkAndRecoverWaitPeriod := 3 * time.Duration(config.Config.InstancePollSeconds) * time.Second
+					if time.Since(continuousDiscoveryStartTime) >= checkAndRecoverWaitPeriod {
+						go CheckAndRecover(nil, nil, false)
+					} else {
+						log.Debugf("Waiting for %+v seconds to pass before running failure detection/recovery", checkAndRecoverWaitPeriod.Seconds())
+					}
 				}
 			}()
 		case <-snapshotTopologiesTick:
