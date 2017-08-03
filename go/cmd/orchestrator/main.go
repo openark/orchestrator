@@ -138,6 +138,7 @@ func main() {
 		fmt.Println(app.AppPrompt)
 		return
 	}
+
 	helpTopic := ""
 	if flag.Arg(0) == "help" {
 		if flag.Arg(1) != "" {
@@ -152,6 +153,7 @@ func main() {
 			flag.Args()[0] = "cli"
 		}
 	}
+
 	switch {
 	case helpTopic != "":
 		app.HelpCommand(helpTopic)

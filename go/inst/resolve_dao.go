@@ -228,8 +228,8 @@ func WriteHostnameUnresolve(instanceKey *InstanceKey, unresolvedHostname string)
 	return ExecDBWriteFunc(writeFunc)
 }
 
-// DeregisterHostnameUnresolve removes an unresovle entry
-func DeregisterHostnameUnresolve(instanceKey *InstanceKey) error {
+// DeleteHostnameUnresolve removes an unresolve entry
+func DeleteHostnameUnresolve(instanceKey *InstanceKey) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
       	delete from hostname_unresolve

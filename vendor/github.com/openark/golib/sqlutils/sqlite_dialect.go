@@ -34,7 +34,7 @@ var sqlite3CreateTableConversions = []regexpMap{
 	rmap(`(?i)int[\s]*[(][\s]*([0-9]+)[\s]*[)] unsigned`, `int`),
 	rmap(`(?i)engine[\s]*=[\s]*(innodb|myisam|ndb|memory|tokudb)`, ``),
 	rmap(`(?i)DEFAULT CHARSET[\s]*=[\s]*[\S]+`, ``),
-	rmap(`(?i)int( not null|) auto_increment`, `integer`),
+	rmap(`(?i)[\S]*int( not null|) auto_increment`, `integer`),
 	rmap(`(?i)comment '[^']*'`, ``),
 	rmap(`(?i)after [\S]+`, ``),
 	rmap(`(?i)alter table ([\S]+) add (index|key) ([\S]+) (.+)`, `create index ${3}_${1} on $1 $4`),
