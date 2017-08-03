@@ -414,7 +414,7 @@ func ContinuousDiscovery() {
 					go AcknowledgeCrashedRecoveries()
 					go inst.ExpireInstanceAnalysisChangelog()
 
-					checkAndRecoverWaitPeriod := 3 * time.Duration(config.Config.InstancePollSeconds) * time.Second
+					checkAndRecoverWaitPeriod := 3 * instancePollSecondsDuration()
 					if time.Since(continuousDiscoveryStartTime) >= checkAndRecoverWaitPeriod {
 						go CheckAndRecover(nil, nil, false)
 					} else {
