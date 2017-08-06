@@ -640,7 +640,7 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 					candidateReplica.PhysicalEnvironment == deadInstance.PhysicalEnvironment {
 					// This would make a great candidate
 					candidateInstanceKey = &candidateReplica.Key
-					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as failed instance", promotedReplica.Key, candidateReplica.Key))
+					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as failed instance", *deadInstanceKey, candidateReplica.Key))
 				}
 			}
 		}
