@@ -38,7 +38,7 @@ func ParseCandidatePromotionRule(ruleName string) (CandidatePromotionRule, error
 	switch ruleName {
 	case "prefer", "neutral", "prefer_not", "must_not":
 		return CandidatePromotionRule(ruleName), nil
-	case "must", "prefer_not":
+	case "must":
 		return CandidatePromotionRule(""), fmt.Errorf("CandidatePromotionRule: %v not supported yet", ruleName)
 	default:
 		return CandidatePromotionRule(""), fmt.Errorf("Invalid CandidatePromotionRule: %v", ruleName)
