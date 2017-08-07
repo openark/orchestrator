@@ -34,6 +34,35 @@ However how does `orchestrator` discover completely new topologies?
 
 ##### Promotion rule
 
+Some servers are better candidate for promotion in the event of failovers. Some servers aren't good picks. Examples:
+
+- A server has weaker hardware configuration. You prefer to not promote it.
+- A server is in a remote data center and you don't want to promote it.
+- A server is used as your backup source and has LVM snapshots open at all times. You don't want to promote it.
+- A server has a good setup and is ideal as candidate. You prefer to promote it.
+- A server is OK, and you don't have any particular opinion.
+
+You will announce your preference for a given server to `orchestrator` in the following way:
+
+```
+orchestrator -c register-candidate -i ${::fqdn} --promotion-rule ${promotion_rule}
+```
+
+Supported promotion rules are:
+
+- `prefer`
+- `neutral`
+- `prefer_not`
+- `must_not`
+
+Promotion rules expire after an hour. That's the dynamic nature of `orchestrator`. You will want to setup a cron job that will announce the promotion rule for a server:
+
+```
+*/2 * * * * root "/usr/bin/perl -le 'sleep rand 10' && /usr/bin/orchestrator-client -c register-candidate -i this.hostname.com --promotion-rule prefer"
+```
+
+This setup comes from production environments. The cron entries get updated by `puppet` to reflect the appropriate `promotion_rule`. A server may have `prefer` at this time, and `prefer_not` in 5 minutes from now.
+
 ##### Downtime
 
 ##### Pseudo-GTID
