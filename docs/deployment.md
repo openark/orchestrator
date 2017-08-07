@@ -30,6 +30,8 @@ However how does `orchestrator` discover completely new topologies?
 
   In the above, each host lets `orchestrator` know about itself once per day; newly bootstrapped hosts are discovered the next midnight. The `sleep` in introduced to avoid storming `orchestrator` by all servers at the same time.
 
+  The above uses [orchestrator-client](orchetsrator-client.md), but you may use the [orchestrator cli](executing-via-command-line.md) if running on a shared-backend setup.
+
 ##### Promotion rule
 
 ##### Downtime
