@@ -20,35 +20,50 @@ In a shared backend setup multiple `orchestrator` services will all speak to the
   - Configure all `orchestrator` nodes to access the _same_ backend DB (the master)
   - Optionally you will have your own load balancer to direct traffic to said master, in which case configure all `orchestrator` nodes to access the proxy.
 
+### MySQL backend setup and high availability
+
+Setting up the backend DB is on you. Also, `orchestartor` doesn't eat its own dog food, and cannot recover a failure on its own backend DB.
+You will need to handle, for example, the issue of adding a Galera node, or of managing your proxy health checks etc.
+
+### What to deploy: service
+
+- Deploy the `orchestrator` service onto service boxes.
+  - In a synchronous replication shared backend setup, these may well be the very MySQL boxes, in a `1:1` mapping.
+- Consider adding a proxy on top of the service boxes; the proxy would ideally redirect all traffic to the leader node. There is one and only one leader node, and the status check endpoint is `/api/leader-check`. It is OK to direct traffic to any healthy service. Since all `orchestrator` nodes speak to the same shared backend DB, it is OK to operate some actions from one service node, and other actions from another service nodes. Internal locks are placed to avoid running contradicting or interfering commands.
 
 
-The following hints should clear up some questions:
+### What to deploy: client
 
-- `orchestrator` can run as a linux service
-  - When running as a service, it assumes the role of continuous discovery: a never ending polling of your MySQL topologies
-  - When running as a service, it also provides HTTP API/Web interface
-- `orchestrator` can run in command line mode
-  - Useful for us CLI geeks who want to have greater control and capture all the lovely debug messages
+To interact with orchestrator from shell/automation/scripts, you may choose to:
 
-###### In terms of deployment
+- Directly interact with the HTTP API
+- use the [orchestrator-client](orchestrator-client.md) script.
+  - Deploy `orchestrator-client` on any box from which you wish to interact with `orchestrator`.
+  - Create and edit `/etc/profile.d/orchestrator-client.sh` on those boxes to read:
+    ```
+    ORCHESTRATOR_API="http://your.orchestrator.service.proxy:80/api"
+    ```
+    or
+    ```
+    ORCHESTRATOR_API="http://your.orchestrator.service.host1:80/api http://your.orchestrator.service.host2:80/api http://your.orchestrator.service.host3:80/api"
+    ```
+    In the latter case you will provide the list of all `orchestrator` nodes, and the `orchetsrator-client` script will automatically figure out which is the leader. With this setup your automation will not need a proxy (though you may still wish to use a proxy for web interface users).
 
-- `orchestrator` uses a shared MySQL backend.
--   - `orchestrator` only has state for pending operations (e.g. while a replica is being moved)
-- The backend database will have the state of your multiple topologies.
-- You _can_ and _should_ have more than one `orchestrator` service running with the same MySQL backend.
-  -
-- You should _not_ have more than one MySQL backend.
+    Make sure to chef/puppet/whatever the `ORCHESTRATOR_API` value such that it adapts to changes in your environment.
 
-The MySQL backend is a master server, for which you may have replicas for redundancy or otherwise build your favorite HA solution.
+- The [orchestrator command line](executing-via-command-line.md).
+  - Deploy the `orchestrator` binary (you may use the `orchestrator-cli` distributed package) on any box from which you wish to interact with `orchestrator`.
+  - Create `/etc/orchestrator.conf.json` on those boxes, populate with credentials. This file should generally be the same as for the `orchestrator` service boxes. If you're unsure, use exact same file content.
+  - The `orchestrator` binary will access the shared backend DB. Make sure to give it access. Typicaly this will be port `3306`.
 
-The author of `orchestrator` has deployed it in large environments of thousands of servers, with a single backend database managing them all.
+It is OK to run `orchestrator` CLI even while the `orchestrator` service is operating, since they will all coordinate on the same backend DB.
 
 ###### Orchestrator service
 
 - You _can_ and _should_ have multiple `orchestrator` services running on different machines, all running on the same backend database.
   - When running as a service, `orchestrator` repeatedly attempts to claim _leadership_. Should one `orchestrator` service
     fail, another one will pick up where it left.
-  - Only one service will be the leader at any given time.
+  - Only one service will be the leader at any given time. If a leader steps down, another will take its place. Leader election is performed by means of interacting through the shared backend DB.
   - The leader is the one polling for servers; doing database cleanup; checking for crash recovery scenarios etc.
 - You may choose to have all your `orchestrator` services load-balanced
 
