@@ -18,7 +18,7 @@
 - [Using orchestrator-client](orchestrator-client.md): a no binary/config needed script that wraps API calls
 
 #### Deployment
-- [High-availability](high-availability.md): making `orchestrator` highly available
+- [High availability](high-availability.md): making `orchestrator` highly available
 
 #### Failure detection & recovery
 - [Topology recovery](topology-recovery.md): failure detection and recovery
