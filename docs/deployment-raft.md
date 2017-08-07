@@ -38,7 +38,8 @@ You may choose between using `MySQL` and `SQLite`. See [backend configuration](c
 To interact with orchestrator from shell/automation/scripts, you may choose to:
 
 - Directly interact with the HTTP API
-- use the [orchestrator-client](orchestrator-client.md) script.
+  - You may only interact with the _leader_. A good way to achieve this is using a proxy.
+- Use the [orchestrator-client](orchestrator-client.md) script.
   - Deploy `orchestrator-client` on any box from which you wish to interact with `orchestrator`.
   - Create and edit `/etc/profile.d/orchestrator-client.sh` on those boxes to read:
     ```
