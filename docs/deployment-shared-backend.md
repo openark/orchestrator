@@ -14,7 +14,8 @@ In a shared backend setup multiple `orchestrator` services will all speak to the
 
 - For **synchronous replication**, the advise is:
   - Configure multi-writer mode (each node in the MySQL cluster is writable)
-  - Have `1:1` mapping between `orchestrator` services and `MySQL` nodes: each `orchestrator` service to speak with its own node
+  - Have `1:1` mapping between `orchestrator` services and `MySQL` nodes: each `orchestrator` service to speak with its own node.
+  ![orchestrator deployment, shared backend](images/orchestrator-deployment-shared-backend.png)
 - For **master-replicas** (asynchronous & semi-synchronous), do:
   - Configure all `orchestrator` nodes to access the _same_ backend DB (the master)
   - Optionally you will have your own load balancer to direct traffic to said master, in which case configure all `orchestrator` nodes to access the proxy.
