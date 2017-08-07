@@ -2,7 +2,7 @@
 
 This text describes deployments for [orchestrator on raft](raft.md).
 
-This follows general [deployment](deployment.md).
+This complements general [deployment](deployment.md) documentation.
 
 ### Backend DB
 

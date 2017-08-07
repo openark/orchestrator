@@ -2,7 +2,7 @@
 
 This text describes deployments for shared backend DB. See [High availability](high-availability.md) for the various backend DB setups.
 
-This follows general [deployment](deployment.md).
+This complements general [deployment](deployment.md) documentation.
 
 ### Shared backend
 
