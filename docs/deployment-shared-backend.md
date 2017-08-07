@@ -44,7 +44,7 @@ To interact with orchestrator from shell/automation/scripts, you may choose to:
     ```
     or
     ```
-    ORCHESTRATOR_API="http://your.orchestrator.service.host1:80/api http://your.orchestrator.service.host2:80/api http://your.orchestrator.service.host3:80/api"
+    ORCHESTRATOR_API="http://your.orchestrator.service.host1:3000/api http://your.orchestrator.service.host2:3000/api http://your.orchestrator.service.host3:3000/api"
     ```
     In the latter case you will provide the list of all `orchestrator` nodes, and the `orchetsrator-client` script will automatically figure out which is the leader. With this setup your automation will not need a proxy (though you may still wish to use a proxy for web interface users).
 
