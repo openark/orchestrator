@@ -84,3 +84,32 @@ In the above there are three `orchestrator` nodes in a `raft` cluster, each usin
 Only one `orchestrator` node is the leader.
 
 All `orchestrator` nodes probe the entire `MySQL` fleet. Each `MySQL` server is probed by each of the `raft` members.
+
+### orchestrator/raft operational scenarios
+
+##### A node crashes:
+
+Start the node, start the `MySQL` service if applicable, start the `orchestrator` service. The `orchestrator` service should join the `raft` group, catch up with `raft` replication log and continue as normal.
+
+##### A node crashes for too long, or a node is re-provisioned:
+
+The `raft` replication log is only kept for a couple days. If a node goes offline for longer than that, or if it completely loses data, you will need to recreate the data:
+
+- Stop the `orchestrator` service (or it should automatically PANIC after 1 minute).
+- Copy backend DB data:
+  - If `MySQL`, run backup/restore, either logical or physical.
+  - If `SQLite`, run `.dump` + restore, see [10. Converting An Entire Database To An ASCII Text File](https://sqlite.org/cli.html).
+
+- Start the `orchestrator` service. It should catch up with `raft` replication log and join the `raft` cluster.
+
+##### Replacing a node
+
+Assuming `RaftNodes: ["node1", "node2", "node3"]`, and you wish to replace `node3` with `nodeX`.
+
+- You may take down `node3`, and the `raft` cluster will continue to work as long as `node1` and `node2` are good.
+- Create `nodeX` box. Generate backend db data (see above).
+- On `node1`, `node2` and `nodeX` reconfigure `RaftNodes: ["node1", "node2", "nodeX"]`.
+- Start `orchestrator` on `nodeX`. It will be refused and will not join the cluster because `node1` and `node2` are not yet aware of the change.
+- Restart `orchestrator` on `node1`.
+- Restart `orchestrator` on `node2`.
+  - All three nodes should form a happy cluster at this time.
