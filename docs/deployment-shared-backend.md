@@ -1,6 +1,6 @@
 # Orchestrator deployment: shared backend
 
-This text describes deployments for shared backend DB. While we will depict synchronous replication backend this document applies to all backend DB setups. See [High availability](high-availability.md) for the various backend DB setups.
+This text describes deployments for shared backend DB. See [High availability](high-availability.md) for the various backend DB setups.
 
 This follows general [deployment](deployment.md).
 
@@ -15,7 +15,6 @@ In a shared backend setup multiple `orchestrator` services will all speak to the
 - For **synchronous replication**, the advise is:
   - Configure multi-writer mode (each node in the MySQL cluster is writable)
   - Have `1:1` mapping between `orchestrator` services and `MySQL` nodes: each `orchestrator` service to speak with its own node.
-  ![orchestrator deployment, shared backend](images/orchestrator-deployment-shared-backend.png)
 - For **master-replicas** (asynchronous & semi-synchronous), do:
   - Configure all `orchestrator` nodes to access the _same_ backend DB (the master)
   - Optionally you will have your own load balancer to direct traffic to said master, in which case configure all `orchestrator` nodes to access the proxy.
@@ -58,44 +57,32 @@ To interact with orchestrator from shell/automation/scripts, you may choose to:
 
 It is OK to run `orchestrator` CLI even while the `orchestrator` service is operating, since they will all coordinate on the same backend DB.
 
-###### Orchestrator service
+### Orchestrator service
 
-- You _can_ and _should_ have multiple `orchestrator` services running on different machines, all running on the same backend database.
-  - When running as a service, `orchestrator` repeatedly attempts to claim _leadership_. Should one `orchestrator` service
-    fail, another one will pick up where it left.
-  - Only one service will be the leader at any given time. If a leader steps down, another will take its place. Leader election is performed by means of interacting through the shared backend DB.
-  - The leader is the one polling for servers; doing database cleanup; checking for crash recovery scenarios etc.
-- You may choose to have all your `orchestrator` services load-balanced
+As noted, a single `orchestrator` node will assume leadership. Only the leader will:
 
-###### Orchestrator CLI
-- You _can_ and _should_ have as many deployments of orchestrator CLI as you like, on multiple servers, all configured to work
-  with the _same backend MySQL_
-- You _may_ concurrently issue commands from multiple CLIs, as well as working with the Web UI at the same time.
-- The (single) MySQL backend has the necessary state for managing concurrent operations.
-- `orchestrator` has "maintenance locks" which prevent destructive concurrent operations on the same instance. At worst an
-  operation will be rejected due to not being able to acquire maintenance lock.
+- Discover (probe) your MySQL topologies
+- Run failure detection
+- Run recoveries
 
-The author of `orchestrator` has it deployed on multiple machines
-as a service, behind a load balancer. On the same setup, CLI is
-deployed and can be executed from thousands of machines.
+All nodes will:
 
-##### A visualized example
+- Serve HTTP requests
+- Register their own health check
 
-![Orchestrator deployment](images/orchestrator-deployment.png)
+All nodes may:
 
-In the above four `orchestrator` services are behind an HTTP load balancer. Only one of them is the _leader_ at any given time; they compete for leadership between themselves and recognize if the leader is non doing its duty.
+- Run arbitrary command (e.g. `relocate`, `begin-downtime`)
+- Run recoveries per human request.
 
-To the right: the many topologies polled by `orchestrator`. The leader polls each an every server in those topologies.
+### Orchestrator CLI
 
-On top left: the `orchestrator` MySQL backend: a master & three replicas. All 4 services use the same backend database.
+The CLI executes to fulfill a specific operation. It may choose to probe a few servers, depending on the operation (e.g. `relocate`), or it may probe no server at all and just read data from the backend DB.
 
-Not shown in this picture (for clarity purposes), but the `orchestrator` backend database and its replicas are themselves one of those topologies
-polled by `orchestrator` It eats its own dogfood.
+### A visual example
 
-On left, bottom: `orchestrator` CLI is installed on any and all MySQL servers. All these CLI deployments use the very same
-MySQL backend database.
+![orchestrator deployment, shared backend](images/orchestrator-deployment-shared-backend.png)
 
-Not shown in this picture (for clarity purposes), the MySQL servers on these hosts are being polled by `orchestrator` just as those
-on the right.
+In the above there are three `orchestrator` nodes running on top of a `3` node synchronous replication setup. Each `orchestrator` nodes speaks to a different `MySQL` backend, but those are replicated synchronously and all share the same picture (up to some lag).
 
-You may choose to install `orchestrator` on non-MySQL hosts, of course. It has no MySQL dependencies on the deployed host.
+One `orchestrator` node is elected as leader, and only that node probes the MySQL topologies. It probes all known servers (the above image only shows part of the probes to avoid the spaghetti).
