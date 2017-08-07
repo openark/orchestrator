@@ -6,7 +6,7 @@ This follows general [deployment](deployment.md).
 
 ### Backend DB
 
-You may choose between using `MySQL` and `SQLite`. See [raft configuration](configuration-raft.md).
+You may choose between using `MySQL` and `SQLite`. See [backend configuration](configuration-backend.md).
 
 - For MySQL:
   - The backend servers will be standalone. No replication setup. Each `orchestrator` node will interact with its own dedicated backend server.
