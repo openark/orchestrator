@@ -37,7 +37,10 @@ func (f *fsm) Apply(l *raft.Log) interface{} {
 	}
 
 	if c.Op == YieldCommand {
-		toPeer := normalizeRaftNode(string(c.Value))
+		toPeer, err := normalizeRaftNode(string(c.Value))
+		if err != nil {
+			return log.Errore(err)
+		}
 		return f.yield(toPeer)
 	}
 	if c.Op == YieldHintCommand {
