@@ -65,7 +65,28 @@ This setup comes from production environments. The cron entries get updated by `
 
 ##### Downtime
 
+When a server has a problem, it:
 
+- Will show up in the `problems` dropdown on the web interface.
+- May be considered for recovery (example: server is dead and all of it's replicas are now broken).
+
+You may _downtime_ a server such that:
+- It will not show up in the `problems` dropdown.
+- It will not be considered for recovery.
+
+Downtiming takes place via:
+
+```
+orchestrator-client -c begin-downtime -duration 30m -reason "testing" -owner myself
+```
+
+Some servers may be known to be routinely broken; for example, auto-restore servers; dev boxes; testing boxes. For such servers you may want to have _continuous_ downtime. One way to achieve that it to set so large `-duration 240000h`. But then you need to remember to `end-downtime` if something changes about the box. Continuing the dynamic approach, consider:
+
+```
+*/2 * * * * root "/usr/bin/perl -le 'sleep rand 10' && /data/orchestrator/current/bin/orchestrator -c begin-downtime -i ${::fqdn} --duration=5m --owner=cron --reason=continuous_downtime"
+```
+
+Every `2` minutes, downtime for `5` minutes; this means that as we cancel the cronjob, _downtime_ will expire within `5` minutes.
 
 ##### Pseudo-GTID
 
