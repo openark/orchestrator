@@ -88,7 +88,7 @@ func IsLeader() bool {
 
 func IsLeaderOrActive() bool {
 	if orcraft.IsRaftEnabled() {
-		return true
+		return orcraft.IsPartOfQuorum()
 	}
 	return atomic.LoadInt64(&isElectedNode) == 1
 }
