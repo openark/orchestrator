@@ -100,6 +100,10 @@ The `orchestrator-client` script runs this very API call, wrapping it up and enc
 
 If you're not using GTID, you can inject your own Pseudo-GTID entries, and `orchestrator` will be able to run GTID-like magic such as correlating two unrelated servers and making one replicate from the other.
 
-See [Pseudo-GTID](pseudo-gtid.md) documentation page.
+Read more on the [Pseudo-GTID](pseudo-gtid.md) documentation page.
+
+Use the [pseudo-gtid](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/bin/pseudo-gtid) script as a service. See `pupept` [example](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/puppet).
+
+
 
 ##### Populating meta data
