@@ -19,6 +19,7 @@ package orcraft
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -55,10 +56,18 @@ func FatalRaftError(err error) error {
 func Setup(applier CommandApplier, thisHostname string) error {
 	log.Debugf("Setting up raft")
 	ThisHostname = thisHostname
-	store = NewStore(config.Config.RaftDataDir, normalizeRaftNode(config.Config.RaftBind), applier)
+	raftBind, err := normalizeRaftNode(config.Config.RaftBind)
+	if err != nil {
+		return err
+	}
+	store = NewStore(config.Config.RaftDataDir, raftBind, applier)
 	peerNodes := []string{}
 	for _, raftNode := range config.Config.RaftNodes {
-		peerNodes = append(peerNodes, normalizeRaftNode(raftNode))
+		peerNode, err := normalizeRaftNode(raftNode)
+		if err != nil {
+			return err
+		}
+		peerNodes = append(peerNodes, peerNode)
 	}
 	if err := store.Open(peerNodes); err != nil {
 		return log.Errorf("failed to open raft store: %s", err.Error())
@@ -74,17 +83,38 @@ func getRaft() *raft.Raft {
 	return store.raft
 }
 
+func normalizeRaftHostnameIP(host string) (string, error) {
+	if ip := net.ParseIP(host); ip != nil {
+		// this is a valid IP address.
+		return host, nil
+	}
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return host, err
+	}
+	// resolve success!
+	for _, ip := range ips {
+		return ip.String(), nil
+	}
+	return host, fmt.Errorf("%+v resolved but no IP found", host)
+}
+
 // normalizeRaftNode attempts to make sure there's a port to the given node.
 // It consults the DefaultRaftPort when there isn't
-func normalizeRaftNode(node string) string {
-	if strings.Contains(node, ":") {
-		return node
+func normalizeRaftNode(node string) (string, error) {
+	hostPort := strings.Split(node, ":")
+	host, err := normalizeRaftHostnameIP(hostPort[0])
+	if err != nil {
+		return host, err
 	}
-	if config.Config.DefaultRaftPort == 0 {
-		return node
+	if len(hostPort) > 1 {
+		return fmt.Sprintf("%s:%s", host, hostPort[1]), nil
+	} else if config.Config.DefaultRaftPort != 0 {
+		// No port specified, add one
+		return fmt.Sprintf("%s:%d", host, config.Config.DefaultRaftPort), nil
+	} else {
+		return host, nil
 	}
-	node = fmt.Sprintf("%s:%d", node, config.Config.DefaultRaftPort)
-	return node
 }
 
 // IsLeader tells if this node is the current raft leader
@@ -148,7 +178,10 @@ func PublishCommand(op string, value interface{}) (response interface{}, err err
 }
 
 func PublishYield(toPeer string) (response interface{}, err error) {
-	toPeer = normalizeRaftNode(toPeer)
+	toPeer, err = normalizeRaftNode(toPeer)
+	if err != nil {
+		return "", err
+	}
 	return store.genericCommand(YieldCommand, []byte(toPeer))
 }
 
