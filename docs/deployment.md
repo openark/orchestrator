@@ -88,6 +88,18 @@ Some servers may be known to be routinely broken; for example, auto-restore serv
 
 Every `2` minutes, downtime for `5` minutes; this means that as we cancel the cronjob, _downtime_ will expire within `5` minutes.
 
+Shown above are uses for both `orchestrator-client` and the `orchestrator` command line interface. For completeness, this is how to operate the same via direct API call:
+
+```shell
+$ curl -s "http://my.orchestrator.service:80/api/begin-downtime/my.hostname/3306/wallace/experimenting+failover/45m"
+```
+
+The `orchestrator-client` script runs this very API call, wrapping it up and encoding the URL path. It can also automatically detect the leader, in case you don't want to run through a proxy.
+
 ##### Pseudo-GTID
+
+If you're not using GTID, you can inject your own Pseudo-GTID entries, and `orchestrator` will be able to run GTID-like magic such as correlating two unrelated servers and making one replicate from the other.
+
+See [Pseudo-GTID](pseudo-gtid.md) documentation page.
 
 ##### Populating meta data
