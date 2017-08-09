@@ -131,7 +131,7 @@ or by regular expressions acting on the hostnames:
 
 Queries can be satisfied by injecting data into metadata tables on your master. For example, you may:
 
-```
+```sql
 CREATE TABLE IF NOT EXISTS cluster (
   anchor TINYINT NOT NULL,
   cluster_name VARCHAR(128) CHARSET ascii NOT NULL DEFAULT '',
