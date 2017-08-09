@@ -16,7 +16,7 @@ You may choose between using `MySQL` and `SQLite`. See [backend configuration](c
 
 - For `SQLite`:
   - `SQLite` is bundled with `orchestrator`.
-  - Make sure the `SQLite3DataFile` is writable to the `orchestrator` user.
+  - Make sure the `SQLite3DataFile` is writable by the `orchestrator` user.
 
 ### High availability
 
@@ -28,7 +28,7 @@ You may choose between using `MySQL` and `SQLite`. See [backend configuration](c
   As suggested, you may want to put `orchestrator` service and `MySQL` service on same box. If using `SQLite` there's nothing else to do.
 
 - Consider adding a proxy on top of the service boxes; the proxy would redirect all traffic to the leader node. There is one and only one leader node, and the status check endpoint is `/api/leader-check`.
-  - Clients may _only iteract with the leader_. Setting up a proxy is one way to ensure that. See [proxy section](raft.md#proxy).
+  - Clients must _only iteract with the leader_. Setting up a proxy is one way to ensure that. See [proxy section](raft.md#proxy).
   - Nothing should directly interact with a backend DB. Only the leader is capable of coordinating changes to the data with the other `raft` nodes.
 
 - `orchestrator` nodes communicate between themselves on `DefaultRaftPort`. This port should be open to all `orchestrator` nodes, and no one else needs to have access to this port.
@@ -53,7 +53,7 @@ To interact with orchestrator from shell/automation/scripts, you may choose to:
 
     Make sure to chef/puppet/whatever the `ORCHESTRATOR_API` value such that it adapts to changes in your environment.
 
-You may _not_ use the `orchestrator` command line client. Fortunately `orchestrator-client` provides an almost identical interface as the command lien client.
+You must _not_ use the `orchestrator` command line client. Fortunately `orchestrator-client` provides an almost identical interface as the command lien client.
 
 ### Orchestrator service
 
@@ -67,7 +67,7 @@ However all nodes will:
 - Run failure detection
 - Register their own health check
 
-None-leader nodes may _NOT_:
+None-leader nodes must _NOT_:
 
 - Run arbitrary commands (e.g. `relocate`, `begin-downtime`)
 - Run recoveries per human request.

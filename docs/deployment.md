@@ -19,9 +19,9 @@ Follow these deployment guides:
 
 `orchestrator` auto-discovers boxes joining a topology. If a new replica joins an existing cluster that is monitored by `orchestrator`, it is discovered when `orchestrator` next probes its master.
 
-However how does `orchestrator` discover completely new topologies?
+However, how does `orchestrator` discover completely new topologies?
 
-- You may ask `orchestrator` to _discover_ (probe) any single server in such topology, and from there on it will crawl its way across the entire topology.
+- You may ask `orchestrator` to _discover_ (probe) any single server in such a topology, and from there on it will crawl its way across the entire topology.
 - Or you may choose to just let `orchestrator` know about any single production server you have, routinely. Set up a cronjob on any production `MySQL` server to read:
 
   ```

@@ -12,7 +12,7 @@ The backend database has the _state_ of your topologies. `orchestrator` itself i
 
 In a shared backend setup multiple `orchestrator` services will all speak to the same backend.
 
-- For **synchronous replication**, the advise is:
+- For **synchronous replication**, the advice is:
   - Configure multi-writer mode (each node in the MySQL cluster is writable)
   - Have `1:1` mapping between `orchestrator` services and `MySQL` nodes: each `orchestrator` service to speak with its own node.
 - For **master-replicas** (asynchronous & semi-synchronous), do:
