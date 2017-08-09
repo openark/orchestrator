@@ -106,6 +106,10 @@ On your masters, run the [pseudo-gtid](https://github.com/github/orchestrator/bl
 
 The service will inject Pseudo-GTID entries, to be replicated downstream.
 
-The script assumes the existence of a `meta.pseudo_gtid_status` table. Strictly speaking, this table doesn't have to exist, and you can strip away the code from the [pseudo-gtid](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/bin/pseudo-gtid) script that writes to this table.
+The script assumes the existence of a `meta.pseudo_gtid_status` table. Strictly speaking, this table doesn't have to exist, and you can strip away the code from the [pseudo-gtid](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/bin/pseudo-gtid) script that writes to this table. However, the table comes handy in making the pseudo-GTID entries visible via SQL (they're otherwise only visible in the binary log).
+
+Code for this table creation is found in [pseudo-gtid.sql](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/pseudo-gtid.sql). This SQL file also suggests an alternative to the `pseudo-gtid` service, in the form of `event_scheduler`. Choose your preferred method.
+
+It should be noted that as part of failovers, you should make sure to disable pseudo-GTID on demoted master and enable it on promoted master.
 
 ##### Populating meta data
