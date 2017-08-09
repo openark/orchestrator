@@ -159,10 +159,4 @@ If you manage more that one topology with `orchestrator`, you will need to use s
 
 To move replicas via Pseudo-GTID mechanism, click the **Classic mode** green button on the navigation bar and turn it into **Pseudo GTID mode**. The rules for dragging a replica change: any replica whose SQL thread is up-to-date with the IO-thread (depicted by a win-glass icon) is eligible for dragging. At this point such a replica can be dropped on an accessible sibling or ancestor (including its very own master/parent).
 
-![Orchestrator screenshot](images/orchestrator-pseudo-gtid-dead-relay-master.png)
-
-![Orchestrator screenshot](images/orchestrator-pseudo-gtid-dead-relay-master-begin-drag.png)
-
-![Orchestrator screenshot](images/orchestrator-pseudo-gtid-dead-relay-master-drop.png)
-
-![Orchestrator screenshot](images/orchestrator-pseudo-gtid-dead-relay-master-refactored-1.png)
+![Orchestrator pseudo GTID demo](images/orchestrator-pseudo-gtid-relocate-demo.gif)
