@@ -148,6 +148,10 @@ The logic above also makes sure injected pseudo-gtid entires are in Ascending le
 
 The author of `orchestrator` uses this last method injection.
 
+### Deploying Pseudo-GTID
+
+Please follow [deployment, Pseudo-GTID](deployment.md#pseudo-gtid).
+
 #### Using Pseudo GTID
 
 `orchestrator` will only enable Pseudo-GTID mode if the `PseudoGTIDPattern` configuration variable is non-empty,

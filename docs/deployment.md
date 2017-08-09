@@ -102,8 +102,10 @@ If you're not using GTID, you can inject your own Pseudo-GTID entries, and `orch
 
 Read more on the [Pseudo-GTID](pseudo-gtid.md) documentation page.
 
-Use the [pseudo-gtid](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/bin/pseudo-gtid) script as a service. See `pupept` [example](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/puppet).
+On your masters, run the [pseudo-gtid](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/bin/pseudo-gtid) script as a service. See `pupept` [example](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/puppet).
 
+The service will inject Pseudo-GTID entries, to be replicated downstream.
 
+The script assumes the existence of a `meta.pseudo_gtid_status` table. Strictly speaking, this table doesn't have to exist, and you can strip away the code from the [pseudo-gtid](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/bin/pseudo-gtid) script that writes to this table.
 
 ##### Populating meta data
