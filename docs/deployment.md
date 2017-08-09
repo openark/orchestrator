@@ -113,3 +113,35 @@ Code for this table creation is found in [pseudo-gtid.sql](https://github.com/gi
 It should be noted that as part of failovers, you should make sure to disable pseudo-GTID on demoted master and enable it on promoted master.
 
 ##### Populating meta data
+
+`orchestrator` extracts some metadata from servers:
+- What's the alias for the cluster this instance belongs to?
+- What's the data center a server belongs to?
+- Is semi-sync enforced on this server?
+
+These details are extracted by queries such as:
+- `DetectClusterAliasQuery`
+- `DetectClusterDomainQuery`
+- `DetectDataCenterQuery`
+- `DetectSemiSyncEnforcedQuery`
+
+or by regular expressions acting on the hostnames:
+- `DataCenterPattern`
+- `PhysicalEnvironmentPattern`
+
+Queries can be satisfied by injecting data into metadata tables on your master. For example, you may:
+
+```
+CREATE TABLE IF NOT EXISTS cluster (
+  anchor TINYINT NOT NULL,
+  cluster_name VARCHAR(128) CHARSET ascii NOT NULL DEFAULT '',
+  PRIMARY KEY (anchor)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+```
+
+and populate this table, with, say `1, my_cluster_name`, coupled with:
+```json
+{
+  "DetectClusterAliasQuery": "select cluster_name from meta.cluster where anchor=1"
+}
+```
