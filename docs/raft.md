@@ -24,12 +24,12 @@ At this time `orchestrator` nodes to not join dynamically into the cluster. The 
 
 ```json
   "RaftEnabled": true,
-  "RaftBind": "<IP of this host>",
+  "RaftBind": "<ip.or.fqdn.of.this.orchestrator.node>",
   "DefaultRaftPort": 10008,
   "RaftNodes": [
-    "ip.of.orchestrator.node1",
-    "ip.of.orchestrator.node2",
-    "ip.of.orchestrator.node3"
+    "<ip.or.fqdn.of.orchestrator.node1>",
+    "<ip.or.fqdn.of.orchestrator.node2>",
+    "<ip.or.fqdn.of.orchestrator.node3>"
   ],
 ```
 
