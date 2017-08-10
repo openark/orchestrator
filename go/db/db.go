@@ -460,9 +460,6 @@ var generateSQLBase = []string{
 		DROP INDEX hostname_port_active_period_uidx ON topology_failure_detection
 	`,
 	`
-		CREATE UNIQUE INDEX hostname_port_active_period_uidx_topology_failure_detection ON topology_failure_detection (hostname, port, in_active_period, end_active_period_unixtime)
-	`,
-	`
 		DROP INDEX in_active_start_period_idx ON topology_failure_detection
 	`,
 	`
