@@ -426,7 +426,9 @@ func ContinuousDiscovery() {
 			}()
 		case <-snapshotTopologiesTick:
 			go func() {
-				go inst.SnapshotTopologies()
+				if IsLeaderOrActive() {
+					go inst.SnapshotTopologies()
+				}
 			}()
 		}
 	}
