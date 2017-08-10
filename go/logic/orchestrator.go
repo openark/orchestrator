@@ -88,7 +88,7 @@ func IsLeader() bool {
 
 func IsLeaderOrActive() bool {
 	if orcraft.IsRaftEnabled() {
-		return true
+		return orcraft.IsPartOfQuorum()
 	}
 	return atomic.LoadInt64(&isElectedNode) == 1
 }
@@ -331,6 +331,8 @@ func onDiscoveryTick() {
 // purged and forgotten.
 func ContinuousDiscovery() {
 	log.Infof("Starting continuous discovery")
+	continuousDiscoveryStartTime := time.Now()
+	checkAndRecoverWaitPeriod := 3 * instancePollSecondsDuration()
 	recentDiscoveryOperationKeys = cache.New(instancePollSecondsDuration(), time.Second)
 
 	inst.LoadHostnameResolveCache()
@@ -412,12 +414,21 @@ func ContinuousDiscovery() {
 					go ExpireBlockedRecoveries()
 					go AcknowledgeCrashedRecoveries()
 					go inst.ExpireInstanceAnalysisChangelog()
-					go CheckAndRecover(nil, nil, false)
+
+					go func() {
+						if time.Since(continuousDiscoveryStartTime) >= checkAndRecoverWaitPeriod {
+							CheckAndRecover(nil, nil, false)
+						} else {
+							log.Debugf("Waiting for %+v seconds to pass before running failure detection/recovery", checkAndRecoverWaitPeriod.Seconds())
+						}
+					}()
 				}
 			}()
 		case <-snapshotTopologiesTick:
 			go func() {
-				go inst.SnapshotTopologies()
+				if IsLeaderOrActive() {
+					go inst.SnapshotTopologies()
+				}
 			}()
 		}
 	}
