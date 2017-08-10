@@ -6,21 +6,21 @@ Assuming you will run `orchestrator/raft` on a `3` node setup, you will configur
 
 ```json
   "RaftEnabled": true,
-  "RaftBind": "<ip.of.this.orchestrator.node>",
+  "RaftBind": "<ip.or.fqdn.of.this.orchestrator.node>",
   "DefaultRaftPort": 10008,
   "RaftNodes": [
-    "<ip.of.orchestrator.node1>",
-    "<ip.of.orchestrator.node2>",
-    "<ip.of.orchestrator.node3>"
+    "<ip.or.fqdn.of.orchestrator.node1>",
+    "<ip.or.fqdn.of.orchestrator.node2>",
+    "<ip.or.fqdn.of.orchestrator.node3>"
   ],
 ```
 
 Some breakdown:
 
 - `RaftEnabled` must be set to `true`, otherwise `orchestrator` runs in shared-backend mode.
-- `RaftBind` must be set, use the IP address of local host. This IP will also be listed as one of the `RaftNodes` variable.
+- `RaftBind` must be set, use the IP address or full hostname of local host. This IP or hostname will also be listed as one of the `RaftNodes` variable.
 - `DefaultRaftPort` can be set to any port, but must be consistent across all deployments.
-- `RaftNodes` should list all nodes of the raft cluster. This list will consist of IP addresses (not host names) and will include the value of this host itself as presented in `RaftBind`.
+- `RaftNodes` should list all nodes of the raft cluster. This list will consist of either IP addresses or host names, and will include the value of this host itself as presented in `RaftBind`.
 
 As example, the following might be a working setup:
 
@@ -32,6 +32,18 @@ As example, the following might be a working setup:
     "10.0.0.1",
     "10.0.0.2",
     "10.0.0.3"
+  ],
+```
+
+as well as this:
+```json
+  "RaftEnabled": true,
+  "RaftBind": "node-full-hostname-2.here.com",
+  "DefaultRaftPort": 10008,
+  "RaftNodes": [
+    "node-full-hostname-1.here.com",
+    "node-full-hostname-2.here.com",
+    "node-full-hostname-3.here.com"
   ],
 ```
 

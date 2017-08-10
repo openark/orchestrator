@@ -21,6 +21,7 @@ With `orchestrator-client`, you:
   ```shell
   export ORCHESTRATOR_API="https://orchestrator.host1:3000/api https://orchestrator.host2:3000/api https://orchestrator.host3:3000/api"
   ```
+- You may set up the environment in `/etc/profile.d/orchestrator-client.sh`. If this file exists, it will be inlined by `orchestrator-client`.
 
 ### Sample usage
 

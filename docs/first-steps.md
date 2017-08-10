@@ -176,6 +176,6 @@ Ask `orchestrator` to recover the above dead intermediate master:
 
 #### More
 
-The above should get you up and running. For more please consult the [Manual](Orchestrator-Manual). For CLI commands listing just run
+The above should get you up and running. For more please consult the [Manual](toc.md). For CLI commands listing just run
 
 	orchestrator help
