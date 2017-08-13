@@ -2,7 +2,7 @@
 #
 # orchestrator-client: a warapper script for calling upon orchestrator's API
 #
-# This script serves as a command lien client for orchestrator. It talks to orchestrator
+# This script serves as a command line client for orchestrator. It talks to orchestrator
 # by invoking GET requests on orchestrator's API. It formats and normalizes output, converting from
 # JSON format to textual format.
 #
