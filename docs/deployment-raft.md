@@ -53,7 +53,7 @@ To interact with orchestrator from shell/automation/scripts, you may choose to:
 
     Make sure to chef/puppet/whatever the `ORCHESTRATOR_API` value such that it adapts to changes in your environment.
 
-You must _not_ use the `orchestrator` command line client. Fortunately `orchestrator-client` provides an almost identical interface as the command lien client.
+You must _not_ use the `orchestrator` command line client. Fortunately `orchestrator-client` provides an almost identical interface as the command line client.
 
 ### Orchestrator service
 
