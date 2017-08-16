@@ -252,6 +252,12 @@ function ascii_topology() {
   print_details | jq -r '.'
 }
 
+function search() {
+  assert_nonempty "instance" "$instance"
+  api "search?s=$(urlencode "$instance")"
+  print_response | filter_keys | print_key
+}
+
 function instance() {
   assert_nonempty "instance" "$instance_hostport"
   api "instance/$instance_hostport"
@@ -452,7 +458,13 @@ function general_instance_command() {
 
 function replication_analysis() {
   api "replication-analysis"
-  print_details | jq -r '.[] | (.AnalyzedInstanceKey.Hostname + ":" + (.AnalyzedInstanceKey.Port | tostring) + " (cluster " + .ClusterDetails.ClusterName + "): ") + .Analysis'
+  print_details | jq -r '.[] |
+    if .Analysis == "NoProblem" then
+      (.AnalyzedInstanceKey.Hostname + ":" + (.AnalyzedInstanceKey.Port | tostring) + " (cluster " + .ClusterDetails.ClusterName + "): ") + .StructureAnalysis[0]
+    else
+      (.AnalyzedInstanceKey.Hostname + ":" + (.AnalyzedInstanceKey.Port | tostring) + " (cluster " + .ClusterDetails.ClusterName + "): ") + .Analysis
+    end
+    '
 }
 
 function recover() {
@@ -547,6 +559,7 @@ function run_command() {
     "topology") ascii_topology ;;                               # Show an ascii-graph of a replication topology, given a member of that topology
     "clusters") clusters ;;                                     # List all clusters known to orchestrator
     "clusters-alias") clusters_alias ;;                         # List all clusters known to orchestrator
+    "search") search ;;                                         # Search for instances matching given substring
     "instance"|"which-instance") instance ;;                    # Output the fully-qualified hostname:port representation of the given instance, or error if unknown
     "which-master") which_master ;;                             # Output the fully-qualified hostname:port representation of a given instance's master
     "which-replicas") which_replicas ;;                         # Output the fully-qualified hostname:port list of replicas of a given instance
