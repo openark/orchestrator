@@ -75,6 +75,7 @@ function setuptree() {
   mkdir -p $b/orchestrator${prefix}/orchestrator/
   mkdir -p $b/orchestrator/etc/init.d
   mkdir -p $b/orchestrator-cli/usr/bin
+  mkdir -p $b/orchestrator-client/usr/bin
   echo $b
 }
 
@@ -113,14 +114,22 @@ function package() {
       cd $TOPDIR
       # orchestrator-cli packaging -- executable only
       echo "Creating Distro cli packages"
-      fpm -v "${RELEASE_VERSION}" --epoch 1  -f -s dir -n orchestrator-cli -m shlomi-noach --description "MySQL replication topology management and HA" --url "https://github.com/github/orchestrator" --vendor "GitHub" --license "Apache 2.0" -C $builddir/orchestrator-cli --prefix=/ -t rpm .
-      fpm -v "${RELEASE_VERSION}" --epoch 1  -f -s dir -n orchestrator-cli -m shlomi-noach --description "MySQL replication topology management and HA" --url "https://github.com/github/orchestrator" --vendor "GitHub" --license "Apache 2.0" -C $builddir/orchestrator-cli --prefix=/ -t deb --deb-no-default-config-files .
+      fpm -v "${RELEASE_VERSION}" --epoch 1  -f -s dir -n orchestrator-cli -m shlomi-noach --description "MySQL replication topology management and HA: binary only" --url "https://github.com/github/orchestrator" --vendor "GitHub" --license "Apache 2.0" -C $builddir/orchestrator-cli --prefix=/ -t rpm .
+      fpm -v "${RELEASE_VERSION}" --epoch 1  -f -s dir -n orchestrator-cli -m shlomi-noach --description "MySQL replication topology management and HA: binary only" --url "https://github.com/github/orchestrator" --vendor "GitHub" --license "Apache 2.0" -C $builddir/orchestrator-cli --prefix=/ -t deb --deb-no-default-config-files .
+
+      cd $TOPDIR
+      # orchestrator-client packaging -- shell script only
+      echo "Creating Distro orchestrator-client packages"
+      fpm -v "${RELEASE_VERSION}" --epoch 1  -f -s dir -n orchestrator-client -m shlomi-noach --description "MySQL replication topology management and HA: client script" --url "https://github.com/github/orchestrator" --vendor "GitHub" --license "Apache 2.0" -C $builddir/orchestrator-client --prefix=/ -t rpm .
+      fpm -v "${RELEASE_VERSION}" --epoch 1  -f -s dir -n orchestrator-client -m shlomi-noach --description "MySQL replication topology management and HA: client script" --url "https://github.com/github/orchestrator" --vendor "GitHub" --license "Apache 2.0" -C $builddir/orchestrator-client --prefix=/ -t deb --deb-no-default-config-files .
       ;;
     'darwin')
       echo "Creating Darwin full Package"
       tar -C $builddir/orchestrator -czf $TOPDIR/orchestrator-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
       echo "Creating Darwin cli Package"
       tar -C $builddir/orchestrator-cli -czf $TOPDIR/orchestrator-cli-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
+      echo "Creating Darwin orchestrator-client Package"
+      tar -C $builddir/orchestrator-client -czf $TOPDIR/orchestrator-client-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
       ;;
   esac
 
@@ -148,6 +157,7 @@ function build() {
   esac
   [[ $(find $builddir/orchestrator${prefix}/orchestrator/ -type f -name orchestrator) ]] &&  echo "orchestrator binary created" || (echo "Failed to generate orchestrator binary" ; exit 1)
   cp $builddir/orchestrator${prefix}/orchestrator/orchestrator $builddir/orchestrator-cli/usr/bin && echo "binary copied to orchestrator-cli" || (echo "Failed to copy orchestrator binary to orchestrator-cli" ; exit 1)
+  cp $builddir/orchestrator${prefix}/orchestrator/resources/bin/orchestrator-client $builddir/orchestrator-client/usr/bin && echo "orchestrator-client copied to orchestrator-client/" || (echo "Failed to copy orchestrator-client to orchestrator-client/" ; exit 1)
 }
 
 function main() {
