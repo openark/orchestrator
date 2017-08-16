@@ -98,7 +98,7 @@ end
 
 package_files.each do |full_path|
   next if full_path.include?("SRPM") || full_path.include?("i386") || full_path.include?("i686")
-  next unless (full_path =~ /\/orchestrator[-|_]\d/) or (full_path =~ /\/orchestrator-cli[-|_]\d/)
+  next unless (full_path =~ /\/orchestrator[-|_]\d/) or (full_path =~ /\/orchestrator-cli[-|_]\d/) or (full_path =~ /\/orchestrator-client[-|_]\d/)
   os, distro = case full_path
   when /debian\/7/ then ["Debian 7", "debian/wheezy"]
   when /debian\/8/ then ["Debian 8", "debian/jessie"]
