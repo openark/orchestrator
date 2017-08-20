@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# orchestrator-client: a warapper script for calling upon orchestrator's API
+# orchestrator-client: a wrapper script for calling upon orchestrator's API
 #
 # This script serves as a command line client for orchestrator. It talks to orchestrator
 # by invoking GET requests on orchestrator's API. It formats and normalizes output, converting from
