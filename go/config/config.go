@@ -90,7 +90,7 @@ type Configuration struct {
 	MySQLTopologySSLSkipVerify                 bool   // If true, do not strictly validate mutual TLS certs for Topology mysql instances
 	MySQLTopologyUseMutualTLS                  bool   // Turn on TLS authentication with the Topology MySQL instances
 	MySQLTopologyUseMixedTLS                   bool   // Mixed TLS and non-TLS authentication with the Topology MySQL instances
-	TLSCacheTTLFactor                          uint   // Factor of InstancePollSeconds that we set as TLS info cache expiracy
+	TLSCacheTTLFactor                          uint   // Factor of InstancePollSeconds that we set as TLS info cache expiry
 	BackendDB                                  string // EXPERIMENTAL: type of backend db; either "mysql" or "sqlite3"
 	SQLite3DataFile                            string // when BackendDB == "sqlite3", full path to sqlite3 datafile
 	SkipOrchestratorDatabaseUpdate             bool   // When true, do not check backend database schema nor attempt to update it. Useful when you may be running multiple versions of orchestrator, and you only wish certain boxes to dictate the db structure (or else any time a different orchestrator version runs it will rebuild database schema)
