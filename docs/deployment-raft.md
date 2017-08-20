@@ -53,7 +53,10 @@ To interact with orchestrator from shell/automation/scripts, you may choose to:
 
     Make sure to chef/puppet/whatever the `ORCHESTRATOR_API` value such that it adapts to changes in your environment.
 
-You must _not_ use the `orchestrator` command line client. Fortunately `orchestrator-client` provides an almost identical interface as the command line client.
+- The `orchestrator` command line client will refuse to run given a raft setup, since it interacts directly with the underlying database and doesn't participate in the raft consensus, and thus cannot ensure all raft members will get visibility into it changes.
+  - Fortunately `orchestrator-client` provides an almost identical interface as the command line client.
+  - You may force the command line client to run via `--ignore-raft-setup`. This is a "I know what I'm doing" risk you take. If you do choose to use it, then it makes more sense to connect to the leader's backend DB.
+
 
 ### Orchestrator service
 

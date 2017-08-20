@@ -30,6 +30,7 @@ type CLIFlags struct {
 	SkipBinlogSearch           *bool
 	SkipContinuousRegistration *bool
 	EnableDatabaseUpdate       *bool
+	IgnoreRaftSetup            *bool
 }
 
 var RuntimeCLIFlags CLIFlags
