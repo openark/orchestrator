@@ -117,6 +117,28 @@ var API HttpAPI = HttpAPI{}
 var discoveryMetrics = collection.CreateOrReturnCollection("DISCOVERY_METRICS")
 var queryMetrics = collection.CreateOrReturnCollection("BACKEND_WRITES")
 
+type APIOperationContext struct {
+	req *http.Request
+}
+
+func (this *APIOperationContext) IsIgnoreSanityChecks() bool {
+	if val := this.req.URL.Query().Get("ignoreSanityChecks"); val == "true" || val == "1" {
+		return true
+	}
+	if val := this.req.Header.Get("X-ORCHESTRATOR-IGNORE-SANITY-CHECKS"); val == "true" || val == "1" {
+		return true
+	}
+	return false
+}
+
+func (this *APIOperationContext) IsNoop() bool {
+	return false
+}
+
+func operationContext(req *http.Request) config.OperationContext {
+	return &APIOperationContext{req: req}
+}
+
 func (this *HttpAPI) getInstanceKey(host string, port string) (inst.InstanceKey, error) {
 	instanceKey, err := inst.NewInstanceKeyFromStrings(host, port)
 	if err != nil {
@@ -804,7 +826,7 @@ func (this *HttpAPI) RelocateBelow(params martini.Params, r render.Render, req *
 		return
 	}
 
-	instance, err := inst.RelocateBelow(&instanceKey, &belowKey)
+	instance, err := inst.RelocateBelow(&instanceKey, &belowKey, operationContext(req))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return

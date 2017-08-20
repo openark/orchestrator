@@ -218,7 +218,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
-			_, err := inst.RelocateBelow(instanceKey, destinationKey)
+			_, err := inst.RelocateBelow(instanceKey, destinationKey, config.RuntimeCLIFlags)
 			if err != nil {
 				log.Fatale(err)
 			}

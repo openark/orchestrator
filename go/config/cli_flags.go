@@ -16,9 +16,15 @@
 
 package config
 
+type OperationContext interface {
+	IsNoop() bool
+	IsIgnoreSanityChecks() bool
+}
+
 // CLIFlags stores some command line flags that are globally available in the process' lifetime
 type CLIFlags struct {
 	Noop                       *bool
+	IgnoreSanityChecks         *bool
 	SkipUnresolve              *bool
 	SkipUnresolveCheck         *bool
 	BinlogFile                 *string
@@ -30,6 +36,14 @@ type CLIFlags struct {
 	SkipBinlogSearch           *bool
 	SkipContinuousRegistration *bool
 	EnableDatabaseUpdate       *bool
+}
+
+func (this CLIFlags) IsNoop() bool {
+	return *this.Noop
+}
+
+func (this CLIFlags) IsIgnoreSanityChecks() bool {
+	return *this.IgnoreSanityChecks
 }
 
 var RuntimeCLIFlags CLIFlags

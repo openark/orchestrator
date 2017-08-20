@@ -55,6 +55,7 @@ func main() {
 	config.RuntimeCLIFlags.SkipUnresolve = flag.Bool("skip-unresolve", false, "Do not unresolve a host name")
 	config.RuntimeCLIFlags.SkipUnresolveCheck = flag.Bool("skip-unresolve-check", false, "Skip/ignore checking an unresolve mapping (via hostname_unresolve table) resolves back to same hostname")
 	config.RuntimeCLIFlags.Noop = flag.Bool("noop", false, "Dry run; do not perform destructing operations")
+	config.RuntimeCLIFlags.IgnoreSanityChecks = flag.Bool("ignore-sanity-checks", false, "Override checks that would otherwise fail an operation. NOTE: this is a 'I know what I am doing' at-your-own-risk flag.")
 	config.RuntimeCLIFlags.BinlogFile = flag.String("binlog", "", "Binary log file name")
 	config.RuntimeCLIFlags.Statement = flag.String("statement", "", "Statement/hint")
 	config.RuntimeCLIFlags.GrabElection = flag.Bool("grab-election", false, "Grab leadership (only applies to continuous mode)")
