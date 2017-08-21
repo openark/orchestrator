@@ -239,9 +239,10 @@ func MoveUp(instanceKey *InstanceKey, operationContext config.OperationContext) 
 	if !master.IsReplica() {
 		return instance, fmt.Errorf("master is not a replica itself: %+v", master.Key)
 	}
-
-	if canReplicate, err := instance.CanReplicateFrom(master); canReplicate == false {
-		return instance, err
+	if !operationContext.IsIgnoreSanityChecks() {
+		if canReplicate, err := instance.CanReplicateFrom(master); canReplicate == false {
+			return instance, err
+		}
 	}
 	if master.IsBinlogServer() {
 		// Quick solution via binlog servers
@@ -376,7 +377,7 @@ func MoveUpReplicas(instanceKey *InstanceKey, pattern string) ([](*Instance), *I
 				}
 				if instance.IsBinlogServer() {
 					// Special case. Just repoint
-					replica, err = Repoint(&replica.Key, instanceKey, GTIDHintDeny, operationContext)
+					replica, err = Repoint(&replica.Key, instanceKey, GTIDHintDeny, config.RuntimeCLIFlags)
 					if err != nil {
 						replicaErr = err
 						return
@@ -447,7 +448,7 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey, operationContext config.Ope
 	if sibling.IsBinlogServer() {
 		// Binlog server has same coordinates as master
 		// Easy solution!
-		return Repoint(instanceKey, &sibling.Key, GTIDHintDeny)
+		return Repoint(instanceKey, &sibling.Key, GTIDHintDeny, operationContext)
 	}
 
 	rinstance, _, _ := ReadInstance(&instance.Key)
@@ -463,8 +464,10 @@ func MoveBelow(instanceKey, siblingKey *InstanceKey, operationContext config.Ope
 		return instance, fmt.Errorf("instances are not siblings: %+v, %+v", *instanceKey, *siblingKey)
 	}
 
-	if canReplicate, err := instance.CanReplicateFrom(sibling); !canReplicate {
-		return instance, err
+	if !operationContext.IsIgnoreSanityChecks() {
+		if canReplicate, err := instance.CanReplicateFrom(sibling); !canReplicate {
+			return instance, err
+		}
 	}
 	log.Infof("Will move %+v below %+v", instanceKey, siblingKey)
 
@@ -545,8 +548,10 @@ func moveInstanceBelowViaGTID(instance, otherInstance *Instance, operationContex
 		return instance, merr
 	}
 
-	if canReplicate, err := instance.CanReplicateFrom(otherInstance); !canReplicate {
-		return instance, err
+	if !operationContext.IsIgnoreSanityChecks() {
+		if canReplicate, err := instance.CanReplicateFrom(otherInstance); !canReplicate {
+			return instance, err
+		}
 	}
 	log.Infof("Will move %+v below %+v via GTID", instanceKey, otherInstanceKey)
 
@@ -578,7 +583,7 @@ Cleanup:
 }
 
 // MoveBelowGTID will attempt moving instance indicated by instanceKey below another instance using either Oracle GTID or MariaDB GTID.
-func MoveBelowGTID(instanceKey, otherKey *InstanceKey) (*Instance, error) {
+func MoveBelowGTID(instanceKey, otherKey *InstanceKey, operationContext config.OperationContext) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
@@ -587,7 +592,7 @@ func MoveBelowGTID(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		return instance, err
 	}
-	return moveInstanceBelowViaGTID(instance, other)
+	return moveInstanceBelowViaGTID(instance, other, operationContext)
 }
 
 // moveReplicasViaGTID moves a list of replicas under another instance via GTID, returning those replicas
@@ -612,7 +617,7 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance) (movedReplicas
 			ExecuteOnTopology(func() {
 				var replicaErr error
 				if _, _, canMove := canMoveViaGTID(replica, other); canMove {
-					replica, replicaErr = moveInstanceBelowViaGTID(replica, other)
+					replica, replicaErr = moveInstanceBelowViaGTID(replica, other, config.RuntimeCLIFlags)
 				} else {
 					replicaErr = fmt.Errorf("%+v cannot move below %+v via GTID", replica.Key, other.Key)
 				}
@@ -696,8 +701,10 @@ func Repoint(instanceKey *InstanceKey, masterKey *InstanceKey, gtidHint Operatio
 			return instance, err
 		}
 	}
-	if canReplicate, err := instance.CanReplicateFrom(master); !canReplicate {
-		return instance, err
+	if !operationContext.IsIgnoreSanityChecks() {
+		if canReplicate, err := instance.CanReplicateFrom(master); !canReplicate {
+			return instance, err
+		}
 	}
 
 	// if a binlog server check it is sufficiently up to date
@@ -770,7 +777,7 @@ func RepointTo(replicas [](*Instance), belowKey *InstanceKey) ([](*Instance), er
 		go func() {
 			defer func() { barrier <- &replica.Key }()
 			ExecuteOnTopology(func() {
-				replica, replicaErr := Repoint(&replica.Key, belowKey, GTIDHintNeutral)
+				replica, replicaErr := Repoint(&replica.Key, belowKey, GTIDHintNeutral, config.RuntimeCLIFlags)
 
 				func() {
 					// Instantaneous mutex.
@@ -1152,7 +1159,7 @@ func EnableGTID(instanceKey *InstanceKey) (*Instance, error) {
 
 	log.Infof("Will attempt to enable GTID on %+v", *instanceKey)
 
-	instance, err = Repoint(instanceKey, nil, GTIDHintForce)
+	instance, err = Repoint(instanceKey, nil, GTIDHintForce, config.RuntimeCLIFlags)
 	if err != nil {
 		return instance, err
 	}
@@ -1177,7 +1184,7 @@ func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
 
 	log.Infof("Will attempt to disable GTID on %+v", *instanceKey)
 
-	instance, err = Repoint(instanceKey, nil, GTIDHintDeny)
+	instance, err = Repoint(instanceKey, nil, GTIDHintDeny, config.RuntimeCLIFlags)
 	if err != nil {
 		return instance, err
 	}
@@ -1389,8 +1396,10 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 		return instance, nil, merr
 	}
 
-	if canReplicate, err := instance.CanReplicateFrom(otherInstance); !canReplicate {
-		return instance, nil, err
+	if !operationContext.IsIgnoreSanityChecks() {
+		if canReplicate, err := instance.CanReplicateFrom(otherInstance); !canReplicate {
+			return instance, nil, err
+		}
 	}
 	var nextBinlogCoordinatesToMatch *BinlogCoordinates
 	var countMatchedEvents int
@@ -1444,7 +1453,7 @@ Cleanup:
 }
 
 // RematchReplica will re-match a replica to its master, using pseudo-gtid
-func RematchReplica(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instance, *BinlogCoordinates, error) {
+func RematchReplica(instanceKey *InstanceKey, requireInstanceMaintenance bool, operationContext config.OperationContext) (*Instance, *BinlogCoordinates, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, nil, err
@@ -1453,7 +1462,7 @@ func RematchReplica(instanceKey *InstanceKey, requireInstanceMaintenance bool) (
 	if err != nil || !found {
 		return instance, nil, err
 	}
-	return MatchBelow(instanceKey, &masterInstance.Key, requireInstanceMaintenance)
+	return MatchBelow(instanceKey, &masterInstance.Key, requireInstanceMaintenance, operationContext)
 }
 
 // MakeMaster will take an instance, make all its siblings its replicas (via pseudo-GTID) and make it master
@@ -1529,7 +1538,7 @@ func TakeSiblings(instanceKey *InstanceKey) (*Instance, int, error) {
 	}
 	takenSiblings := 0
 	for _, sibling := range siblings {
-		if _, err := MoveBelow(&sibling.Key, &instance.Key); err == nil {
+		if _, err := MoveBelow(&sibling.Key, &instance.Key, config.RuntimeCLIFlags); err == nil {
 			takenSiblings++
 		}
 	}
@@ -1629,7 +1638,7 @@ func MakeLocalMaster(instanceKey *InstanceKey) (*Instance, error) {
 		goto Cleanup
 	}
 
-	_, _, err = MatchBelow(instanceKey, &grandparentInstance.Key, true, operationContext)
+	_, _, err = MatchBelow(instanceKey, &grandparentInstance.Key, true, config.RuntimeCLIFlags)
 	if err != nil {
 		goto Cleanup
 	}
@@ -1729,7 +1738,7 @@ func MultiMatchBelowIndependently(replicas [](*Instance), belowKey *InstanceKey,
 		go func() {
 			defer func() { barrier <- &replica.Key }()
 			matchFunc := func() error {
-				replica, _, replicaErr := MatchBelow(&replica.Key, belowKey, true)
+				replica, _, replicaErr := MatchBelow(&replica.Key, belowKey, true, config.RuntimeCLIFlags)
 
 				replicaMutex.Lock()
 				defer replicaMutex.Unlock()
@@ -1857,7 +1866,7 @@ func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlre
 					log.Debugf("MultiMatchBelow: attempting replica %+v in bucket %+v", replica.Key, execCoordinates)
 					matchFunc := func() error {
 						ExecuteOnTopology(func() {
-							_, matchedCoordinates, replicaErr = MatchBelow(&replica.Key, &belowInstance.Key, false)
+							_, matchedCoordinates, replicaErr = MatchBelow(&replica.Key, &belowInstance.Key, false, config.RuntimeCLIFlags)
 						})
 						return nil
 					}
@@ -2017,7 +2026,7 @@ func MultiMatchReplicas(masterKey *InstanceKey, belowKey *InstanceKey, pattern s
 }
 
 // MatchUp will move a replica up the replication chain, so that it becomes sibling of its master, via Pseudo-GTID
-func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instance, *BinlogCoordinates, error) {
+func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool, operationContext config.OperationContext) (*Instance, *BinlogCoordinates, error) {
 	instance, found, err := ReadInstance(instanceKey)
 	if err != nil || !found {
 		return nil, nil, err
@@ -2034,7 +2043,7 @@ func MatchUp(instanceKey *InstanceKey, requireInstanceMaintenance bool) (*Instan
 		return instance, nil, fmt.Errorf("master is not a replica itself: %+v", master.Key)
 	}
 
-	return MatchBelow(instanceKey, &master.MasterKey, requireInstanceMaintenance)
+	return MatchBelow(instanceKey, &master.MasterKey, requireInstanceMaintenance, operationContext)
 }
 
 // MatchUpReplicas will move all replicas of given master up the replication chain,
@@ -2399,7 +2408,7 @@ func RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(masterKey *Ins
 		if candidateReplica.ExecBinlogCoordinates.SmallerThan(&mostUpToDateBinlogServer.ExecBinlogCoordinates) {
 			log.Debugf("RegroupReplicasIncludingSubReplicasOfBinlogServers: candidate replica %+v coordinates smaller than binlog server %+v", candidateReplica.Key, mostUpToDateBinlogServer.Key)
 			// Need to align under binlog server...
-			candidateReplica, err = Repoint(&candidateReplica.Key, &mostUpToDateBinlogServer.Key, GTIDHintDeny)
+			candidateReplica, err = Repoint(&candidateReplica.Key, &mostUpToDateBinlogServer.Key, GTIDHintDeny, config.RuntimeCLIFlags)
 			if err != nil {
 				return log.Errore(err)
 			}
@@ -2410,7 +2419,7 @@ func RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(masterKey *Ins
 			}
 			log.Debugf("RegroupReplicasIncludingSubReplicasOfBinlogServers: aligned candidate replica %+v under binlog server %+v", candidateReplica.Key, mostUpToDateBinlogServer.Key)
 			// and move back
-			candidateReplica, err = Repoint(&candidateReplica.Key, masterKey, GTIDHintDeny)
+			candidateReplica, err = Repoint(&candidateReplica.Key, masterKey, GTIDHintDeny, config.RuntimeCLIFlags)
 			if err != nil {
 				return log.Errore(err)
 			}
@@ -2554,17 +2563,17 @@ func relocateBelowInternal(instance, other *Instance, operationContext config.Op
 	// simplest:
 	if InstanceIsMasterOf(other, instance) {
 		// already the desired setup.
-		return Repoint(&instance.Key, &other.Key, GTIDHintNeutral)
+		return Repoint(&instance.Key, &other.Key, GTIDHintNeutral, operationContext)
 	}
 	// Do we have record of equivalent coordinates?
 	if !instance.IsBinlogServer() {
-		if movedInstance, err := MoveEquivalent(&instance.Key, &other.Key); err == nil {
+		if movedInstance, err := MoveEquivalent(&instance.Key, &other.Key, operationContext); err == nil {
 			return movedInstance, nil
 		}
 	}
 	// Try and take advantage of binlog servers:
 	if InstancesAreSiblings(instance, other) && other.IsBinlogServer() {
-		return MoveBelow(&instance.Key, &other.Key)
+		return MoveBelow(&instance.Key, &other.Key, operationContext)
 	}
 	instanceMaster, _, err := ReadInstance(&instance.MasterKey)
 	if err != nil {
@@ -2572,12 +2581,12 @@ func relocateBelowInternal(instance, other *Instance, operationContext config.Op
 	}
 	if instanceMaster != nil && instanceMaster.MasterKey.Equals(&other.Key) && instanceMaster.IsBinlogServer() {
 		// Moving to grandparent via binlog server
-		return Repoint(&instance.Key, &instanceMaster.MasterKey, GTIDHintDeny)
+		return Repoint(&instance.Key, &instanceMaster.MasterKey, GTIDHintDeny, operationContext)
 	}
 	if other.IsBinlogServer() {
 		if instanceMaster != nil && instanceMaster.IsBinlogServer() && InstancesAreSiblings(instanceMaster, other) {
 			// Special case: this is a binlog server family; we move under the uncle, in one single step
-			return Repoint(&instance.Key, &other.Key, GTIDHintDeny)
+			return Repoint(&instance.Key, &other.Key, GTIDHintDeny, operationContext)
 		}
 
 		// Relocate to its master, then repoint to the binlog server
@@ -2596,7 +2605,7 @@ func relocateBelowInternal(instance, other *Instance, operationContext config.Op
 		if _, err := relocateBelowInternal(instance, otherMaster, operationContext); err != nil {
 			return instance, err
 		}
-		return Repoint(&instance.Key, &other.Key, GTIDHintDeny)
+		return Repoint(&instance.Key, &other.Key, GTIDHintDeny, operationContext)
 	}
 	if instance.IsBinlogServer() {
 		// Can only move within the binlog-server family tree
@@ -2606,31 +2615,31 @@ func relocateBelowInternal(instance, other *Instance, operationContext config.Op
 	}
 	// Next, try GTID
 	if _, _, canMove := canMoveViaGTID(instance, other); canMove {
-		return moveInstanceBelowViaGTID(instance, other)
+		return moveInstanceBelowViaGTID(instance, other, operationContext)
 	}
 
 	// Next, try Pseudo-GTID
 	if instance.UsingPseudoGTID && other.UsingPseudoGTID {
 		// We prefer PseudoGTID to anything else because, while it takes longer to run, it does not issue
 		// a STOP SLAVE on any server other than "instance" itself.
-		instance, _, err := MatchBelow(&instance.Key, &other.Key, true)
+		instance, _, err := MatchBelow(&instance.Key, &other.Key, true, operationContext)
 		return instance, err
 	}
 	// No Pseudo-GTID; cehck simple binlog file/pos operations:
 	if InstancesAreSiblings(instance, other) {
 		// If comastering, only move below if it's read-only
 		if !other.IsCoMaster || other.ReadOnly {
-			return MoveBelow(&instance.Key, &other.Key)
+			return MoveBelow(&instance.Key, &other.Key, operationContext)
 		}
 	}
 	// See if we need to MoveUp
 	if instanceMaster != nil && instanceMaster.MasterKey.Equals(&other.Key) {
 		// Moving to grandparent--handles co-mastering writable case
-		return MoveUp(&instance.Key)
+		return MoveUp(&instance.Key, operationContext)
 	}
 	if instanceMaster != nil && instanceMaster.IsBinlogServer() {
 		// Break operation into two: move (repoint) up, then continue
-		if _, err := MoveUp(&instance.Key); err != nil {
+		if _, err := MoveUp(&instance.Key, operationContext); err != nil {
 			return instance, err
 		}
 		return relocateBelowInternal(instance, other, operationContext)
