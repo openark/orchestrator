@@ -26,10 +26,15 @@ import (
 )
 
 // BeginDowntime will make mark an instance as downtimed (or override existing downtime period)
-func BeginDowntime(instanceKey *InstanceKey, owner string, reason string, durationSeconds uint) error {
-	if durationSeconds == 0 {
-		durationSeconds = config.Config.MaintenanceExpireMinutes * 60
+func BeginDowntime(downtime *Downtime) error {
+	if downtime.Duration == 0 {
+		downtime.Duration = config.MaintenanceExpireMinutes * time.Minute
 	}
+	if downtime.Ended() {
+		// No point in writing it down; it's expired
+		return nil
+	}
+
 	_, err := db.ExecOrchestrator(`
 			insert
 				into database_instance_downtime (
@@ -44,17 +49,17 @@ func BeginDowntime(instanceKey *InstanceKey, owner string, reason string, durati
 					owner=values(owner),
 					reason=values(reason)
 			`,
-		instanceKey.Hostname,
-		instanceKey.Port,
-		durationSeconds,
-		owner,
-		reason,
+		downtime.Key.Hostname,
+		downtime.Key.Port,
+		int(downtime.EndsIn().Seconds()),
+		downtime.Owner,
+		downtime.Reason,
 	)
 	if err != nil {
 		return log.Errore(err)
 	}
 
-	AuditOperation("begin-downtime", instanceKey, fmt.Sprintf("owner: %s, reason: %s", owner, reason))
+	AuditOperation("begin-downtime", downtime.Key, fmt.Sprintf("owner: %s, reason: %s", downtime.Owner, downtime.Reason))
 
 	return nil
 }

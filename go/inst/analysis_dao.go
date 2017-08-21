@@ -18,14 +18,18 @@ package inst
 
 import (
 	"fmt"
+	"regexp"
+	"time"
+
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
+	"github.com/github/orchestrator/go/process"
+	"github.com/github/orchestrator/go/raft"
+
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
-	"regexp"
-	"time"
 )
 
 var analysisChangeWriteAttemptCounter = metrics.NewCounter()
@@ -41,7 +45,7 @@ func init() {
 }
 
 func initializeAnalysisDaoPostConfiguration() {
-	<-config.ConfigurationLoaded
+	config.WaitForConfigurationToBeLoaded()
 
 	recentInstantAnalysis = cache.New(time.Duration(config.Config.RecoveryPollSeconds*2)*time.Second, time.Second)
 }
@@ -212,7 +216,11 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			    count_slaves DESC
 	`, analysisQueryReductionClause)
 	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
-		a := ReplicationAnalysis{Analysis: NoProblem}
+		a := ReplicationAnalysis{
+			Analysis:               NoProblem,
+			ProcessingNodeHostname: process.ThisHostname,
+			ProcessingNodeToken:    process.ProcessToken.Hash,
+		}
 
 		a.IsMaster = m.GetBool("is_master")
 		a.IsCoMaster = m.GetBool("is_co_master")
@@ -405,9 +413,40 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 	})
 
 	if err != nil {
-		log.Errore(err)
+		return result, log.Errore(err)
 	}
-	return result, err
+	// TODO: result, err = getConcensusReplicationAnalysis(result)
+	return result, log.Errore(err)
+}
+
+func getConcensusReplicationAnalysis(analysisEntries []ReplicationAnalysis) ([]ReplicationAnalysis, error) {
+	if !orcraft.IsRaftEnabled() {
+		return analysisEntries, nil
+	}
+	if !config.Config.ExpectFailureAnalysisConcensus {
+		return analysisEntries, nil
+	}
+	concensusAnalysisEntries := []ReplicationAnalysis{}
+	peerAnalysisMap, err := ReadPeerAnalysisMap()
+	if err != nil {
+		return analysisEntries, err
+	}
+	quorumSize, err := orcraft.QuorumSize()
+	if err != nil {
+		return analysisEntries, err
+	}
+
+	for _, analysisEntry := range analysisEntries {
+		instanceAnalysis := NewInstanceAnalysis(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
+		analysisKey := instanceAnalysis.String()
+
+		peerAnalysisCount := peerAnalysisMap[analysisKey]
+		if 1+peerAnalysisCount >= quorumSize {
+			// this node and enough other nodes in agreement
+			concensusAnalysisEntries = append(concensusAnalysisEntries, analysisEntry)
+		}
+	}
+	return concensusAnalysisEntries, nil
 }
 
 // auditInstanceAnalysisInChangelog will write down an instance's analysis in the database_instance_analysis_changelog table.
@@ -527,4 +566,30 @@ func ReadReplicationAnalysisChangelog() (res [](*ReplicationAnalysisChangelog), 
 		log.Errore(err)
 	}
 	return res, err
+}
+
+// ReadPeerAnalysisMap reads raft-peer failure analysis, and returns a PeerAnalysisMap,
+// indicating how many peers see which analysis
+func ReadPeerAnalysisMap() (peerAnalysisMap PeerAnalysisMap, err error) {
+	peerAnalysisMap = make(PeerAnalysisMap)
+	query := `
+		select
+      hostname,
+      port,
+			analysis
+		from
+			database_instance_peer_analysis
+		order by
+			peer, hostname, port
+		`
+	err = db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+		instanceKey := InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
+		analysis := m.GetString("analysis")
+		instanceAnalysis := NewInstanceAnalysis(&instanceKey, AnalysisCode(analysis))
+		mapKey := instanceAnalysis.String()
+		peerAnalysisMap[mapKey] = peerAnalysisMap[mapKey] + 1
+
+		return nil
+	})
+	return peerAnalysisMap, log.Errore(err)
 }

@@ -1,6 +1,6 @@
 # First Steps with Orchestrator
 
-You have `Orchestrator` installed and deployed. What can you do with it?
+You have `Orchestrator` installed, deployed  and configured. What can you do with it?
 
 A walk through common commands, mostly on the CLI side
 
@@ -176,6 +176,6 @@ Ask `orchestrator` to recover the above dead intermediate master:
 
 #### More
 
-The above should get you up and running. For more please consult the [Manual](Orchestrator-Manual). For full CLI commands listing jusr run
+The above should get you up and running. For more please consult the [Manual](toc.md). For CLI commands listing just run
 
-	orchestrator
+	orchestrator help

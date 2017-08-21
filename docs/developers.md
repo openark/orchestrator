@@ -4,32 +4,59 @@
 
 If you would like to build `orchestrator` on your own machine, or eventually submit PRs, follow this guide.
 
-#### Requirements
+### Requirements
 
-`orchestrator` is built on Linux. OS/X should generally follow same guidelines. I have no hint about MS Windows, and the
-build is incompatible with Windows.
+- `orchestrator` is built on Linux and OS/X. I have no hint about MS Windows, and the build is incompatible with Windows.
 
-#### Go setup
+- `Go 1.7` or higher.
 
-You will need to have a *Go 1.5* or higher environment. *1.5* is required as of Dec 2015 due to [vendor directories](https://golang.org/cmd/go/#hdr-Vendor_Directories) - Go's package dependencies solution.
+### Clone repo
 
-With `1.5` you will need to
+`orchestrator` is built with `Go`. `Go` is picky about where you place your code (tl;dr: in a well structured path under `$GOPATH`). However the good news is we have the scripting to go around that (no pun intended).
 
-	export GO15VENDOREXPERIMENT=1
+### Easy clone + builds
 
-This guide assumes you have set your Go environment, along with `GOPATH`.
+Clone the repo anywhere on your filesystem via
 
-To get started, issue
+	git clone git@github.com:github/orchestrator.git
+	cd orchestrator
 
-	go get github.com/github/orchestrator/...
+Build `orchestrator` via
 
-Change directory into `$GOPATH:/src/github.com/github/orchestrator`
+	script/build
 
-Test that your code builds via
 
-	go run go/cmd/orchestrator/main.go
+You will find the binary as `bin/orchestrator`
 
-#### DB setup
+This is the same script used by CI to build & test `orchestrator`.
+
+### Not as easy clone + builds
+
+Why would you want this? Because this will empower you with building `.DEB`, `.rpm` packages for both Linux and OS/X.
+
+- Make sure `GOPATH` is set
+- Issue:
+
+	  go get github.com/github/orchestrator/...
+	  cd $GOPATH:/src/github.com/github/orchestrator
+
+- Compile or run via:
+
+	  go build -i go/cmd/orchestrator/main.go
+	  go run go/cmd/orchestrator/main.go
+
+- Create packages via:
+
+	  ./build.sh
+
+	To create packages you will need to have:
+
+	 - [fpm](https://github.com/jordansissel/fpm), which assumes you have `ruby` and `ruby-gems`
+	 - `rpmbuild`
+	 - `go`, `gofmt` in path
+	 - `tar`
+
+### DB setup
 
 `orchestrator` requires a MySQL backend to run. This could be installed anywhere. I usually use [mysqlsandbox](http://mysqlsandbox.net/) for local installations. You may choose to just install mysql-server on your dev machine.
 
@@ -60,9 +87,13 @@ Edit the above as as fit for your MySQL backend install.
 
 #### Executing from dev environment
 
-You should now be able to
+You should now be able to:
 
 	go run go/cmd/orchestrator/main.go http
+
+or, if you used the easy clone + build process:
+
+	bin/orchestrator http
 
 This will also invoke initial setup of your database environment (creating necessary tables in the `orchestrator` schema).
 
@@ -70,7 +101,8 @@ Browse into `http://localhost:3000` or replace `localhoast` with your dev hostna
 
 Now to make stuff interesting.
 
-#### Grant access to orchestrator on all your MySQL servers
+### Grant access to orchestrator on all your MySQL servers
+
 For `orchestrator` to detect your replication topologies, it must also have an account on each and every topology. At this stage this has to be the
 same account (same user, same password) for all topologies. On each of your masters, issue the following:
 
@@ -84,45 +116,16 @@ Replace `orch_host` with hostname or orchestrator machine (or do your wildcards 
     "MySQLTopologyUser": "orchestrator",
     "MySQLTopologyPassword": "orch_topology_password",
 
-#### Discovering MySQL instances
+### Discovering MySQL instances
 
 Go to the `Discovery` page at `http://localhost:3000/web/discover`. Type in a hostname & port for a known MySQL instance, preferably one that is part of a larger topology (again I like using _MySQLSandbox_ for such test environments). Submit it.
 
-Depending on your configuration (`DiscoveryPollSeconds`, `InstancePollSeconds`) this may take a few seconds to a minute for
+Depending on your configuration (`InstancePollSeconds`) this may take a few seconds to a minute for
 `orchestrator` to fully scan the replication topology this instance belongs to, and present it under the [clusters dashboard](http://localhost:3000/web/clusters/).
 
 If you've made it this far, you've done 90% of the work. You may consider configuring Pseudo GTID queries, DC awareness etc. See
 "want to have" sub-sections under [configuration](Orchestrator-Manual#configuration).
 
-
-#### Building
-
-To build an `orchestrator` package, use the `build.sh` script:
-
-	bash build.sh
-
-You will need:
-
- - [fpm](https://github.com/jordansissel/fpm), which assumes you have `ruby` and `ruby-gems`
- - `rpmbuild`
- - `go`, `gofmt` in path
- - `tar`
-
- Current `build.sh` usage is:
-
- ```
- usage() {
-  echo
-  echo "Usage: $0 [-t target ] [-a arch ] [ -p prefix ] [-h] [-d]"
-  echo "Options:"
-  echo "-h Show this screen"
-  echo "-t (linux|darwin) Target OS Default:(linux)"
-  echo "-a (amd64|386) Arch Default:(amd64)"
-  echo "-d debug output"
-  echo "-p build prefix Default:(/usr/local)"
-  echo
-}
-```
 
 ### Forking and Pull-Requesting
 

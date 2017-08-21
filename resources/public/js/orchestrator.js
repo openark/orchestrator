@@ -82,6 +82,10 @@ function isAnonymized() {
   return ($.cookie("anonymize") == "true");
 }
 
+function isCompactDisplay() {
+  return ($.cookie("compact-display") == "true");
+}
+
 function anonymizeInstanceId(instanceId) {
   var tokens = instanceId.split("__");
   return "instance-" + md5(tokens[1]).substring(0, 4) + ":" + tokens[2];
@@ -815,6 +819,12 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.IsCandidate) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-heart" title="Candidate"></span> ');
     }
+    if (instance.PromotionRule == "prefer_not") {
+      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-thumbs-down" title="Prefer not promote"></span> ');
+    }
+    if (instance.PromotionRule == "must_not") {
+      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-ban-circle" title="Must not promote"></span> ');
+    }
     if (instance.inMaintenanceProblem()) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench" title="In maintenance"></span> ');
     }
@@ -908,6 +918,7 @@ $(document).ready(function() {
   $(".navbar-nav li[data-nav-page='" + activePage() + "']").addClass("active");
 
   $.get(appUrl("/api/clusters-info"), function(clusters) {
+    clusters = clusters || [];
     clusters.forEach(function(cluster) {
       var url = appUrl('/web/cluster/' + cluster.ClusterName)
       var title = cluster.ClusterName;
