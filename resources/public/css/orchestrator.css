@@ -30,6 +30,7 @@ body {
     height: auto;
     max-height: 600px;
     overflow-x: hidden;
+    overflow-y: auto;
 }
 
 .navbar-nav > li > .dropdown {
