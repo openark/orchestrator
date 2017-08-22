@@ -24,18 +24,48 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/github/orchestrator/go/attributes"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/inst"
+	ometrics "github.com/github/orchestrator/go/metrics"
 	"github.com/github/orchestrator/go/os"
 	"github.com/github/orchestrator/go/process"
+	"github.com/github/orchestrator/go/raft"
 	"github.com/github/orchestrator/go/remote"
 	"github.com/openark/golib/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
 )
+
+var countPendingRecoveries int64
+
+type RecoveryAcknowledgement struct {
+	CreatedAt time.Time
+	Owner     string
+	Comment   string
+
+	Key         inst.InstanceKey
+	ClusterName string
+}
+
+func NewRecoveryAcknowledgement(owner string, comment string) *RecoveryAcknowledgement {
+	return &RecoveryAcknowledgement{
+		CreatedAt: time.Now(),
+		Owner:     owner,
+		Comment:   comment,
+	}
+}
+
+func NewInternalAcknowledgement() *RecoveryAcknowledgement {
+	return &RecoveryAcknowledgement{
+		CreatedAt: time.Now(),
+		Owner:     "orchestrator",
+		Comment:   "internal",
+	}
+}
 
 // BlockedTopologyRecovery represents an entry in the blocked_topology_recovery table
 type BlockedTopologyRecovery struct {
@@ -75,7 +105,7 @@ type TopologyRecovery struct {
 
 func NewTopologyRecovery(replicationAnalysis inst.ReplicationAnalysis) *TopologyRecovery {
 	topologyRecovery := &TopologyRecovery{}
-	topologyRecovery.UID = fmt.Sprintf("%d:%s", time.Now().Nanosecond(), process.NewToken().Hash)
+	topologyRecovery.UID = process.PrettyUniqueToken()
 	topologyRecovery.AnalysisEntry = replicationAnalysis
 	topologyRecovery.SuccessorKey = nil
 	topologyRecovery.LostReplicas = *inst.NewInstanceKeyMap()
@@ -99,9 +129,17 @@ func (this *TopologyRecovery) AddErrors(errs []error) {
 }
 
 type TopologyRecoveryStep struct {
+	Id          int64
 	RecoveryUID string
 	AuditAt     string
 	Message     string
+}
+
+func NewTopologyRecoveryStep(uid string, message string) *TopologyRecoveryStep {
+	return &TopologyRecoveryStep{
+		RecoveryUID: uid,
+		Message:     message,
+	}
 }
 
 type MasterRecoveryType string
@@ -141,6 +179,7 @@ var recoverDeadCoMasterFailureCounter = metrics.NewCounter()
 var recoverUnreachableMasterWithStaleSlavesCounter = metrics.NewCounter()
 var recoverUnreachableMasterWithStaleSlavesSuccessCounter = metrics.NewCounter()
 var recoverUnreachableMasterWithStaleSlavesFailureCounter = metrics.NewCounter()
+var countPendingRecoveriesGauge = metrics.NewGauge()
 
 func init() {
 	metrics.Register("recover.dead_master.start", recoverDeadMasterCounter)
@@ -155,14 +194,41 @@ func init() {
 	metrics.Register("recover.unreach_master_stale_slaves.start", recoverUnreachableMasterWithStaleSlavesCounter)
 	metrics.Register("recover.unreach_master_stale_slaves.success", recoverUnreachableMasterWithStaleSlavesSuccessCounter)
 	metrics.Register("recover.unreach_master_stale_slaves.fail", recoverUnreachableMasterWithStaleSlavesFailureCounter)
+	metrics.Register("recover.pending", countPendingRecoveriesGauge)
 
 	go initializeTopologyRecoveryPostConfiguration()
+
+	ometrics.OnMetricsTick(func() {
+		countPendingRecoveriesGauge.Update(getCountPendingRecoveries())
+	})
+}
+
+func getCountPendingRecoveries() int64 {
+	return atomic.LoadInt64(&countPendingRecoveries)
 }
 
 func initializeTopologyRecoveryPostConfiguration() {
 	config.WaitForConfigurationToBeLoaded()
 
 	emergencyReadTopologyInstanceMap = cache.New(time.Second, time.Second)
+}
+
+// AuditTopologyRecovery audits a single step in a topology recovery process.
+func AuditTopologyRecovery(topologyRecovery *TopologyRecovery, message string) error {
+	log.Infof("topology_recovery: %s", message)
+	if topologyRecovery == nil {
+		return nil
+	}
+
+	recoveryStep := NewTopologyRecoveryStep(topologyRecovery.UID, message)
+	if err := writeTopologyRecoveryStep(recoveryStep); err != nil {
+		return err
+	}
+	if orcraft.IsRaftEnabled() {
+		_, err := orcraft.PublishCommand("write-recovery-step", recoveryStep)
+		return err
+	}
+	return nil
 }
 
 // replaceCommandPlaceholders replaces agreed-upon placeholders with analysis data
@@ -511,10 +577,11 @@ func RecoverDeadMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (
 	}
 
 	func() error {
-		inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds)
+
+		inst.BeginDowntime(inst.NewDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds))
 		for _, replica := range lostReplicas {
 			replica := replica
-			inst.BeginDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds)
+			inst.BeginDowntime(inst.NewDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds))
 		}
 		return nil
 	}()
@@ -545,9 +612,11 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 	// The current logic is:
 	// - 1. we prefer to promote a "is_candidate" which is in the same DC & env as the dead intermediate master (or do nothing if the promtoed replica is such one)
 	// - 2. we prefer to promote a "is_candidate" which is in the same DC & env as the promoted replica (or do nothing if the promtoed replica is such one)
-	// - 3. keep to current choice
+	// - 3. we prefer to promote a "neutral" server over a "prefer_not"
+	// - 4. keep to current choice
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("checking if should replace promoted replica with a better candidate"))
 	if candidateInstanceKey == nil {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ checking if promoted replica is the ideal candidate"))
 		if deadInstance, _, err := inst.ReadInstance(deadInstanceKey); err == nil && deadInstance != nil {
 			for _, candidateReplica := range candidateReplicas {
 				if promotedReplica.Key.Equals(&candidateReplica.Key) &&
@@ -563,20 +632,22 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 	// We didn't pick the ideal candidate; let's see if we can replace with a candidate from same DC and ENV
 	if candidateInstanceKey == nil {
 		// Try a candidate replica that is in same DC & env as the dead instance
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ searching for an ideal candidate"))
 		if deadInstance, _, err := inst.ReadInstance(deadInstanceKey); err == nil && deadInstance != nil {
 			for _, candidateReplica := range candidateReplicas {
-				if candidateReplica.DataCenter == deadInstance.DataCenter &&
-					candidateReplica.PhysicalEnvironment == deadInstance.PhysicalEnvironment &&
-					candidateReplica.MasterKey.Equals(&promotedReplica.Key) {
+				if canTakeOverPromotedServerAsMaster(candidateReplica, promotedReplica) &&
+					candidateReplica.DataCenter == deadInstance.DataCenter &&
+					candidateReplica.PhysicalEnvironment == deadInstance.PhysicalEnvironment {
 					// This would make a great candidate
 					candidateInstanceKey = &candidateReplica.Key
-					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as failed instance", promotedReplica.Key, candidateReplica.Key))
+					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as failed instance", *deadInstanceKey, candidateReplica.Key))
 				}
 			}
 		}
 	}
 	if candidateInstanceKey == nil {
 		// We cannot find a candidate in same DC and ENV as dead master
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ checking if promoted replica is an OK candidate"))
 		for _, candidateReplica := range candidateReplicas {
 			if promotedReplica.Key.Equals(&candidateReplica.Key) {
 				// Seems like we promoted a candidate replica (though not in same DC and ENV as dead master). Good enough.
@@ -589,10 +660,11 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 	// Still nothing?
 	if candidateInstanceKey == nil {
 		// Try a candidate replica that is in same DC & env as the promoted replica (our promoted replica is not an "is_candidate")
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ searching for a candidate"))
 		for _, candidateReplica := range candidateReplicas {
-			if promotedReplica.DataCenter == candidateReplica.DataCenter &&
-				promotedReplica.PhysicalEnvironment == candidateReplica.PhysicalEnvironment &&
-				candidateReplica.MasterKey.Equals(&promotedReplica.Key) {
+			if canTakeOverPromotedServerAsMaster(candidateReplica, promotedReplica) &&
+				promotedReplica.DataCenter == candidateReplica.DataCenter &&
+				promotedReplica.PhysicalEnvironment == candidateReplica.PhysicalEnvironment {
 				// OK, better than nothing
 				candidateInstanceKey = &candidateReplica.Key
 				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as promoted instance", promotedReplica.Key, candidateReplica.Key))
@@ -600,13 +672,42 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 		}
 	}
 
+	if promotedReplica.PromotionRule == inst.PreferNotPromoteRule {
+		neutralReplicas, _ := inst.ReadClusterNeutralPromotionRuleInstances(promotedReplica.ClusterName)
+
+		if candidateInstanceKey == nil {
+			// Still nothing? Then we didn't find a replica marked as "candidate". OK, further down the stream we have:
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ searching for a neutral server to replace a prefer_not, in same DC and env"))
+			for _, neutralReplica := range neutralReplicas {
+				if canTakeOverPromotedServerAsMaster(neutralReplica, promotedReplica) &&
+					promotedReplica.DataCenter == neutralReplica.DataCenter &&
+					promotedReplica.PhysicalEnvironment == neutralReplica.PhysicalEnvironment {
+					candidateInstanceKey = &neutralReplica.Key
+					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as promoted instance that has prefer_not promotion rule", promotedReplica.Key, neutralReplica.Key))
+				}
+			}
+		}
+		if candidateInstanceKey == nil {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ searching for a neutral server to replace a prefer_not"))
+			for _, neutralReplica := range neutralReplicas {
+				if canTakeOverPromotedServerAsMaster(neutralReplica, promotedReplica) {
+					// OK, better than nothing
+					candidateInstanceKey = &neutralReplica.Key
+					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on promoted instance having prefer_not promotion rule", promotedReplica.Key, neutralReplica.Key))
+				}
+			}
+		}
+	}
+
 	// So do we have a candidate?
 	if candidateInstanceKey == nil {
 		// Found nothing. Stick with promoted replica
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ found no server to promote on top promoted replica"))
 		return promotedReplica, nil
 	}
 	if promotedReplica.Key.Equals(candidateInstanceKey) {
 		// Sanity. It IS the candidate, nothing to promote...
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ sanity check: found our very own server to promote; doing nothing"))
 		return promotedReplica, nil
 	}
 
@@ -757,6 +858,19 @@ func isGenerallyValidAsWouldBeMaster(replica *inst.Instance, requireLogSlaveUpda
 		return false
 	}
 
+	return true
+}
+
+func canTakeOverPromotedServerAsMaster(wantToTakeOver *inst.Instance, toBeTakenOver *inst.Instance) bool {
+	if !isGenerallyValidAsWouldBeMaster(wantToTakeOver, true) {
+		return false
+	}
+	if !wantToTakeOver.MasterKey.Equals(&toBeTakenOver.Key) {
+		return false
+	}
+	if canReplicate, _ := toBeTakenOver.CanReplicateFrom(wantToTakeOver); !canReplicate {
+		return false
+	}
 	return true
 }
 
@@ -1112,10 +1226,10 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 	}
 
 	func() error {
-		inst.BeginDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds)
+		inst.BeginDowntime(inst.NewDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds))
 		for _, replica := range lostReplicas {
 			replica := replica
-			inst.BeginDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds)
+			inst.BeginDowntime(inst.NewDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds))
 		}
 		return nil
 	}()
@@ -1218,18 +1332,18 @@ func emergentlyReadTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analy
 
 // checkAndExecuteFailureDetectionProcesses tries to register for failure detection and potentially executes
 // failure-detection processes.
-func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (processesExecutionAttempted bool, err error) {
+func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (detectionRegistrationSuccess bool, processesExecutionAttempted bool, err error) {
 	if ok, _ := AttemptFailureDetectionRegistration(&analysisEntry); !ok {
-		log.Infof("executeCheckAndRecoverFunction: could not register %+v detection on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
-		return false, nil
+		log.Infof("checkAndExecuteFailureDetectionProcesses: could not register %+v detection on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
+		return false, false, nil
 	}
 	log.Infof("topology_recovery: detected %+v failure on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
 	// Execute on-detection processes
 	if skipProcesses {
-		return false, nil
+		return true, false, nil
 	}
 	err = executeProcesses(config.Config.OnFailureDetectionProcesses, "OnFailureDetectionProcesses", NewTopologyRecovery(analysisEntry), true)
-	return true, err
+	return true, true, err
 }
 
 func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode) (
@@ -1296,6 +1410,9 @@ func runEmergentOperations(analysisEntry *inst.ReplicationAnalysis) {
 // executeCheckAndRecoverFunction will choose the correct check & recovery function based on analysis.
 // It executes the function synchronuously
 func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
+	atomic.AddInt64(&countPendingRecoveries, 1)
+	defer atomic.AddInt64(&countPendingRecoveries, -1)
+
 	checkAndRecoverFunction, isActionableRecovery := getCheckAndRecoverFunction(analysisEntry.Analysis)
 	analysisEntry.IsActionableRecovery = isActionableRecovery
 	runEmergentOperations(&analysisEntry)
@@ -1314,8 +1431,25 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 
 	// At this point we have validated there's a failure scenario for which we have a recovery path.
 
+	if orcraft.IsRaftEnabled() {
+		// with raft, all nodes can (and should) run analysis,
+		// but only the leader proceeds to execute detection hooks and then to failover.
+		if !orcraft.IsLeader() {
+			log.Infof("CheckAndRecover: Analysis: %+v, InstanceKey: %+v, candidateInstanceKey: %+v, "+
+				"skipProcesses: %v: NOT detecting/recovering host (raft non-leader)",
+				analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, candidateInstanceKey, skipProcesses)
+			return false, nil, err
+		}
+	}
+
 	// Initiate detection:
-	if _, err := checkAndExecuteFailureDetectionProcesses(analysisEntry, skipProcesses); err != nil {
+	registrationSuccess, _, err := checkAndExecuteFailureDetectionProcesses(analysisEntry, skipProcesses)
+	if registrationSuccess {
+		if orcraft.IsRaftEnabled() {
+			orcraft.PublishCommand("register-failure-detection", analysisEntry)
+		}
+	}
+	if err != nil {
 		log.Errorf("executeCheckAndRecoverFunction: error on failure detection: %+v", err)
 		return false, nil, err
 	}

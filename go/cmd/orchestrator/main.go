@@ -58,23 +58,24 @@ func main() {
 	config.RuntimeCLIFlags.BinlogFile = flag.String("binlog", "", "Binary log file name")
 	config.RuntimeCLIFlags.Statement = flag.String("statement", "", "Statement/hint")
 	config.RuntimeCLIFlags.GrabElection = flag.Bool("grab-election", false, "Grab leadership (only applies to continuous mode)")
-	config.RuntimeCLIFlags.PromotionRule = flag.String("promotion-rule", "prefer", "Promotion rule for register-andidate (prefer|neutral|must_not)")
+	config.RuntimeCLIFlags.PromotionRule = flag.String("promotion-rule", "prefer", "Promotion rule for register-andidate (prefer|neutral|prefer_not|must_not)")
 	config.RuntimeCLIFlags.Version = flag.Bool("version", false, "Print version and exit")
 	config.RuntimeCLIFlags.SkipContinuousRegistration = flag.Bool("skip-continuous-registration", false, "Skip cli commands performaing continuous registration (to reduce orchestratrator backend db load")
 	config.RuntimeCLIFlags.EnableDatabaseUpdate = flag.Bool("enable-database-update", false, "Enable database update, overrides SkipOrchestratorDatabaseUpdate")
+	config.RuntimeCLIFlags.IgnoreRaftSetup = flag.Bool("ignore-raft-setup", false, "Override RaftEnabled for CLI invocation (CLI by default not allowed for raft setups). NOTE: operations by CLI invocation may not reflect in all raft nodes.")
 	flag.Parse()
 
 	if *destination != "" && *sibling != "" {
 		log.Fatalf("-s and -d are synonyms, yet both were specified. You're probably doing the wrong thing.")
 	}
 	switch *config.RuntimeCLIFlags.PromotionRule {
-	case "prefer", "neutral", "must_not":
+	case "prefer", "neutral", "prefer_not", "must_not":
 		{
 			// OK
 		}
 	default:
 		{
-			log.Fatalf("-promotion-rule only supports prefer|neutral|must_not")
+			log.Fatalf("-promotion-rule only supports prefer|neutral|prefer_not|must_not")
 		}
 	}
 	if *destination == "" {
@@ -138,6 +139,7 @@ func main() {
 		fmt.Println(app.AppPrompt)
 		return
 	}
+
 	helpTopic := ""
 	if flag.Arg(0) == "help" {
 		if flag.Arg(1) != "" {
@@ -152,6 +154,7 @@ func main() {
 			flag.Args()[0] = "cli"
 		}
 	}
+
 	switch {
 	case helpTopic != "":
 		app.HelpCommand(helpTopic)

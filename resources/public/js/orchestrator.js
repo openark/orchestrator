@@ -819,6 +819,9 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.IsCandidate) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-heart" title="Candidate"></span> ');
     }
+    if (instance.PromotionRule == "prefer_not") {
+      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-thumbs-down" title="Prefer not promote"></span> ');
+    }
     if (instance.PromotionRule == "must_not") {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-ban-circle" title="Must not promote"></span> ');
     }
@@ -915,6 +918,17 @@ $(document).ready(function() {
   $(".navbar-nav li[data-nav-page='" + activePage() + "']").addClass("active");
 
   $.get(appUrl("/api/clusters-info"), function(clusters) {
+    clusters = clusters || [];
+
+    function sortAlphabetically(cluster1, cluster2) {
+      var cmp = cluster1.ClusterAlias.localeCompare(cluster2.ClusterAlias);
+      if (cmp == 0) {
+        cmp = cluster1.ClusterName.localeCompare(cluster2.ClusterName);
+      }
+      return cmp;
+    }
+    clusters.sort(sortAlphabetically);
+
     clusters.forEach(function(cluster) {
       var url = appUrl('/web/cluster/' + cluster.ClusterName)
       var title = cluster.ClusterName;

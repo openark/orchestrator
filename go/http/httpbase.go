@@ -27,6 +27,7 @@ import (
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/os"
 	"github.com/github/orchestrator/go/process"
+	"github.com/github/orchestrator/go/raft"
 )
 
 func getProxyAuthUser(req *http.Request) string {
@@ -40,6 +41,11 @@ func getProxyAuthUser(req *http.Request) string {
 // This depends on configured authentication method.
 func isAuthorizedForAction(req *http.Request, user auth.User) bool {
 	if config.Config.ReadOnly {
+		return false
+	}
+
+	if orcraft.IsRaftEnabled() && !orcraft.IsLeader() {
+		// A raft member that is not a leader is unauthorized.
 		return false
 	}
 

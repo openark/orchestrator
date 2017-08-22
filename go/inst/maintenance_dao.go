@@ -214,10 +214,8 @@ func ExpireMaintenance() error {
 	}
 	{
 		res, err := db.ExecOrchestrator(`
-			update
+			delete from
 				database_instance_maintenance
-			set
-				maintenance_active = NULL
 			where
 				maintenance_active = 1
 				and end_timestamp < NOW()
@@ -232,10 +230,8 @@ func ExpireMaintenance() error {
 	}
 	{
 		res, err := db.ExecOrchestrator(`
-			update
+			delete from
 				database_instance_maintenance
-			set
-				maintenance_active = NULL
 			where
 				explicitly_bounded = 0
 				and concat(processing_node_hostname, ':', processing_node_token) not in (
