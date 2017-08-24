@@ -94,6 +94,7 @@ type ReplicationAnalysis struct {
 	CountValidReplicatingReplicas             uint
 	CountReplicasFailingToConnectToMaster     uint
 	CountStaleReplicas                        uint
+	CountDowntimedReplicas                    uint
 	ReplicationDepth                          uint
 	SlaveHosts                                InstanceKeyMap
 	IsFailingToConnectToMaster                bool
