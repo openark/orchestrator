@@ -1343,10 +1343,11 @@ function Cluster() {
 
   function onAnalysisEntry(analysisEntry, instance) {
     var content = '<span><strong>' + analysisEntry.Analysis + (analysisEntry.IsDowntimed ? '<br/>[<i>downtime till ' + analysisEntry.DowntimeEndTimestamp + '</i>]' : '') + "</strong></span>" + "<br/>" + "<span>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</span>";
+    var hasDowntime = analysisEntry.IsDowntimed || analysisEntry.IsReplicasDowntimed
     if (analysisEntry.IsStructureAnalysis) {
-      content = '<div class="pull-left glyphicon glyphicon-exclamation-sign text-warning"></div>' + content;
+      content = '<div class="pull-left glyphicon glyphicon-exclamation-sign '+(hasDowntime ? "text-muted" : "text-warning")+'"></div>' + content;
     } else {
-      content = '<div class="pull-left glyphicon glyphicon-exclamation-sign text-danger"></div>' + content;
+      content = '<div class="pull-left glyphicon glyphicon-exclamation-sign '+(hasDowntime ? "text-muted" : "text-danger")+'"></div>' + content;
     }
     addSidebarInfoPopoverContent(content);
 
@@ -1417,13 +1418,15 @@ function Cluster() {
   function reviewReplicationAnalysis(replicationAnalysis) {
     var instancesMap = _instancesMap;
     var clusterHasReplicationAnalysisIssue = false;
+    var allIssuesAreDowntimed = true;
     var clusterHasStructureAnalysisIssue = false;
     replicationAnalysis.Details.forEach(function(analysisEntry) {
       if (analysisEntry.ClusterDetails.ClusterName != currentClusterName()) {
         return;
       }
-      if (analysisEntry.IsReplicasDowntimed) {
-        return;
+      var hasDowntime = analysisEntry.IsDowntimed || analysisEntry.IsReplicasDowntimed
+      if (!hasDowntime) {
+        allIssuesAreDowntimed = false;
       }
       var instanceId = getInstanceId(analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port);
       var instance = instancesMap[instanceId]
@@ -1440,9 +1443,11 @@ function Cluster() {
       });
     });
     if (clusterHasReplicationAnalysisIssue) {
-      $("#cluster_sidebar [data-bullet=info] div span").addClass("text-danger").addClass("glyphicon-exclamation-sign");;
+      var iconClass = (allIssuesAreDowntimed ? "text-muted" : "text-danger");
+      $("#cluster_sidebar [data-bullet=info] div span").addClass(iconClass).addClass("glyphicon-exclamation-sign");;
     } else if (clusterHasStructureAnalysisIssue) {
-      $("#cluster_sidebar [data-bullet=info] div span").addClass("text-warning").addClass("glyphicon-exclamation-sign");;
+      var iconClass = (allIssuesAreDowntimed ? "text-muted" : "text-warning");
+      $("#cluster_sidebar [data-bullet=info] div span").addClass(iconClass).addClass("glyphicon-exclamation-sign");;
     } else {
       $("#cluster_sidebar [data-bullet=info] div span").addClass("text-info").addClass("glyphicon-info-sign");
     }
