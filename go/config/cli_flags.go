@@ -36,6 +36,7 @@ type CLIFlags struct {
 	SkipBinlogSearch           *bool
 	SkipContinuousRegistration *bool
 	EnableDatabaseUpdate       *bool
+	IgnoreRaftSetup            *bool
 }
 
 func (this CLIFlags) IsNoop() bool {
