@@ -117,7 +117,7 @@ test_single() {
       echo
       echo "ERROR $test_name diff failure. cat $test_diff_file"
       echo "---"
-      cat $test_diff_file"
+      cat $test_diff_file
       echo "---"
       return 1
     fi
