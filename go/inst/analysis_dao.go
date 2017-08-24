@@ -391,15 +391,18 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			if a.IsDowntimed && !includeDowntimed {
 				skipThisHost = true
 			}
-			if a.CountReplicas == a.CountDowntimedReplicas && !includeDowntimed {
+			if a.CountReplicas == a.CountDowntimedReplicas {
 				switch a.Analysis {
 				case AllMasterSlavesNotReplicating,
 					AllMasterSlavesNotReplicatingOrDead,
 					AllCoMasterSlavesNotReplicating,
 					AllIntermediateMasterSlavesFailingToConnectOrDead,
 					AllIntermediateMasterSlavesNotReplicating:
-					skipThisHost = true
+					a.IsReplicasDowntimed = true
 				}
+			}
+			if a.IsReplicasDowntimed && !includeDowntimed {
+				skipThisHost = true
 			}
 			if !skipThisHost {
 				result = append(result, a)

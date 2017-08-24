@@ -1422,6 +1422,9 @@ function Cluster() {
       if (analysisEntry.ClusterDetails.ClusterName != currentClusterName()) {
         return;
       }
+      if (analysisEntry.IsReplicasDowntimed) {
+        return;
+      }
       var instanceId = getInstanceId(analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port);
       var instance = instancesMap[instanceId]
       if (analysisEntry.Analysis in interestingAnalysis) {
