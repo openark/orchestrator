@@ -22,7 +22,10 @@ function run_queries() {
   queries_file="$1"
 
   if [ "$db_type" == "sqlite" ] ; then
-    cat $queries_file | sed -e "s/last_checked - interval 1 minute/datetime('last_checked', '-1 minute')/g" | sqlite3 $sqlite_file
+    cat $queries_file |
+      sed -e "s/last_checked - interval 1 minute/datetime('last_checked', '-1 minute')/g" |
+      sed -e "s/current_timestamp + interval 1 minute/datetime('now', '+1 minute')/g" |
+      sqlite3 $sqlite_file
   else
     # Assume mysql
     mysql --default-character-set=utf8mb4 test -ss < $queries_file
