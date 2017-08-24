@@ -4,4 +4,4 @@ INSERT INTO database_instance_downtime (
   ) values (
     'testhost', 22295, 1, now(), now(), 'test', 'integration test'
   );
-UPDATE database_instance_downtime SET end_timestamp=now() + interval 1 hour;
+UPDATE database_instance_downtime SET end_timestamp=end_timestamp + interval 1 hour;
