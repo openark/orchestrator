@@ -22,14 +22,14 @@
 #     export ORCHESTRATOR_API="http://service1:3000/api http://service2:3000/api http://service3:3000/api"
 #
 # Usage:
-#   orchestrator -c <command> [flags...]
+#   orchestrator-client -c <command> [flags...]
 # Examples:
-#   orchestrator -c all-instances
-#   orchestrator -c which-replicas -i some.master.com:3306
-#   orchestrator -c which-cluster-instances --alias mycluster
-#   orchestrator -c replication-analysis
-#   orchestrator -c register-candidate -i candidate.host.com:3306 --promotion-rule=prefer
-#   orchestrator -c recover -i failed.host.com:3306
+#   orchestrator-client -c all-instances
+#   orchestrator-client -c which-replicas -i some.master.com:3306
+#   orchestrator-client -c which-cluster-instances --alias mycluster
+#   orchestrator-client -c replication-analysis
+#   orchestrator-client -c register-candidate -i candidate.host.com:3306 --promotion-rule=prefer
+#   orchestrator-client -c recover -i failed.host.com:3306
 
 # /etc/profile.d/orchestrator-client.sh is for you to set any environment.
 # In particular, you will want to set ORCHESTRATOR_API
