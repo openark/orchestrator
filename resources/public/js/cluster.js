@@ -1342,7 +1342,13 @@ function Cluster() {
   }
 
   function onAnalysisEntry(analysisEntry, instance) {
-    var content = '<span><strong>' + analysisEntry.Analysis + (analysisEntry.IsDowntimed ? '<br/>[<i>downtime till ' + analysisEntry.DowntimeEndTimestamp + '</i>]' : '') + "</strong></span>" + "<br/>" + "<span>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</span>";
+    var extraText = '';
+    if  (analysisEntry.IsDowntimed) {
+      extraText = '<br/>[<i>downtime till ' + analysisEntry.DowntimeEndTimestamp + '</i>]';
+    } else if (analysisEntry.IsReplicasDowntimed) {
+      extraText = '<br/>[<i>replicas downtimed</i>]';
+    }
+    var content = '<span><strong>' + analysisEntry.Analysis + extraText + "</strong></span>" + "<br/>" + "<span>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</span>";
     var hasDowntime = analysisEntry.IsDowntimed || analysisEntry.IsReplicasDowntimed
     if (analysisEntry.IsStructureAnalysis) {
       content = '<div class="pull-left glyphicon glyphicon-exclamation-sign '+(hasDowntime ? "text-muted" : "text-warning")+'"></div>' + content;
