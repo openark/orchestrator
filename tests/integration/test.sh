@@ -116,6 +116,9 @@ test_single() {
     if [ $diff_result -ne 0 ] ; then
       echo
       echo "ERROR $test_name diff failure. cat $test_diff_file"
+      echo "---"
+      cat $test_diff_file"
+      echo "---"
       return 1
     fi
   fi
