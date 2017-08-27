@@ -7,6 +7,7 @@
 -- + 22296
 -- + 22297
 --
+DELETE FROM database_instance_downtime;
 DELETE FROM database_instance;
 
 INSERT INTO database_instance (hostname, port, last_checked, last_attempted_check, last_seen, uptime, server_id, server_uuid, version, binlog_server, read_only, binlog_format, log_bin, log_slave_updates, binary_log_file, binary_log_pos, master_host, master_port, slave_sql_running, slave_io_running, has_replication_filters, oracle_gtid, executed_gtid_set, gtid_purged, supports_oracle_gtid, mariadb_gtid, pseudo_gtid, master_log_file, read_master_log_pos, relay_master_log_file, exec_master_log_pos, relay_log_file, relay_log_pos, last_sql_error, last_io_error, seconds_behind_master, slave_lag_seconds, sql_delay, allow_tls, num_slave_hosts, slave_hosts, cluster_name, suggested_cluster_alias, data_center, physical_environment, instance_alias, semi_sync_enforced, replication_depth, is_co_master, replication_credentials_available, has_replication_credentials, version_comment, major_version) VALUES ('testhost',22293,'2017-02-02 08:29:57','2017-02-02 08:29:57','2017-02-02 08:29:57',670447,1,'00022293-1111-1111-1111-111111111111','5.6.28-log',0,0,'STATEMENT',1,1,'mysql-bin.000167',137086726,'',0,0,0,0,0,'','',0,0,1,'',0,'',0,'',0,'','',NULL,NULL,0,0,3,'[{\"Hostname\":\"testhost\",\"Port\":22294},{\"Hostname\":\"testhost\",\"Port\":22297},{\"Hostname\":\"testhost\",\"Port\":22296}]','testhost:22293','testhost','ny','','',0,0,0,0,0,'MySQL Community Server (GPL)','5.6');

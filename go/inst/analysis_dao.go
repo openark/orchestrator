@@ -124,14 +124,14 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		            AND master_instance.last_io_error like '%%error %%connecting to master%%'
 		          ) AS is_failing_to_connect_to_master,
 						MIN(
-								database_instance_downtime.downtime_active is not null
-								and ifnull(database_instance_downtime.end_timestamp, now()) > now()
+								master_downtime.downtime_active is not null
+								and ifnull(master_downtime.end_timestamp, now()) > now()
 							) AS is_downtimed,
 			    	MIN(
-				    		IFNULL(database_instance_downtime.end_timestamp, '')
+				    		IFNULL(master_downtime.end_timestamp, '')
 				    	) AS downtime_end_timestamp,
 			    	MIN(
-				    		IFNULL(unix_timestamp() - unix_timestamp(database_instance_downtime.end_timestamp), 0)
+				    		IFNULL(unix_timestamp() - unix_timestamp(master_downtime.end_timestamp), 0)
 				    	) AS downtime_remaining_seconds,
 			    	MIN(
 				    		master_instance.binlog_server
@@ -175,6 +175,10 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 								AND slave_instance.log_slave_updates
 								AND slave_instance.binlog_format = 'ROW'),
               0) AS count_row_based_loggin_slaves,
+						IFNULL(SUM(
+								replica_downtime.downtime_active is not null
+								and ifnull(replica_downtime.end_timestamp, now()) > now()),
+              0) AS count_downtimed_replicas,
 						COUNT(DISTINCT case
 								when slave_instance.log_bin AND slave_instance.log_slave_updates
 								then slave_instance.major_version
@@ -183,23 +187,27 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 						) AS count_distinct_logging_major_versions
 		    FROM
 		        database_instance master_instance
-		            LEFT JOIN
+          LEFT JOIN
 		        hostname_resolve ON (master_instance.hostname = hostname_resolve.hostname)
-		            LEFT JOIN
+          LEFT JOIN
 		        database_instance slave_instance ON (COALESCE(hostname_resolve.resolved_hostname,
 		                master_instance.hostname) = slave_instance.master_host
 		            	AND master_instance.port = slave_instance.master_port)
-		            LEFT JOIN
+          LEFT JOIN
 		        database_instance_maintenance ON (master_instance.hostname = database_instance_maintenance.hostname
 		        		AND master_instance.port = database_instance_maintenance.port
 		        		AND database_instance_maintenance.maintenance_active = 1)
-		            LEFT JOIN
-		        database_instance_downtime ON (master_instance.hostname = database_instance_downtime.hostname
-		        		AND master_instance.port = database_instance_downtime.port
-		        		AND database_instance_downtime.downtime_active = 1)
-		        	LEFT JOIN
+          LEFT JOIN
+		        database_instance_downtime as master_downtime ON (master_instance.hostname = master_downtime.hostname
+		        		AND master_instance.port = master_downtime.port
+		        		AND master_downtime.downtime_active = 1)
+					LEFT JOIN
+		        database_instance_downtime as replica_downtime ON (slave_instance.hostname = replica_downtime.hostname
+		        		AND slave_instance.port = replica_downtime.port
+		        		AND replica_downtime.downtime_active = 1)
+        	LEFT JOIN
 		        cluster_alias ON (cluster_alias.cluster_name = master_instance.cluster_name)
-						  LEFT JOIN
+				  LEFT JOIN
 						database_instance_recent_relaylog_history ON (
 								slave_instance.hostname = database_instance_recent_relaylog_history.hostname
 		        		AND slave_instance.port = database_instance_recent_relaylog_history.port)
@@ -233,6 +241,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		a.CountValidReplicas = m.GetUint("count_valid_slaves")
 		a.CountValidReplicatingReplicas = m.GetUint("count_valid_replicating_slaves")
 		a.CountReplicasFailingToConnectToMaster = m.GetUint("count_slaves_failing_to_connect_to_master")
+		a.CountDowntimedReplicas = m.GetUint("count_downtimed_replicas")
 		a.CountStaleReplicas = 0
 		a.ReplicationDepth = m.GetUint("replication_depth")
 		a.IsFailingToConnectToMaster = m.GetBool("is_failing_to_connect_to_master")
@@ -380,6 +389,19 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 				}
 			}
 			if a.IsDowntimed && !includeDowntimed {
+				skipThisHost = true
+			}
+			if a.CountReplicas == a.CountDowntimedReplicas {
+				switch a.Analysis {
+				case AllMasterSlavesNotReplicating,
+					AllMasterSlavesNotReplicatingOrDead,
+					AllCoMasterSlavesNotReplicating,
+					AllIntermediateMasterSlavesFailingToConnectOrDead,
+					AllIntermediateMasterSlavesNotReplicating:
+					a.IsReplicasDowntimed = true
+				}
+			}
+			if a.IsReplicasDowntimed && !includeDowntimed {
 				skipThisHost = true
 			}
 			if !skipThisHost {
