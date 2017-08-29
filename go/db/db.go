@@ -1313,7 +1313,7 @@ func OpenTopology(host string, port int) (*sql.DB, error) {
 }
 
 func openTopology(host string, port int, readTimeout int) (*sql.DB, error) {
-	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/?timeout=%ds&readTimeout=%ds",
+	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/?timeout=%ds&readTimeout=%ds&interpolateParams=true",
 		config.Config.MySQLTopologyUser,
 		config.Config.MySQLTopologyPassword,
 		host, port,
@@ -1345,7 +1345,7 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 		db.SetMaxOpenConns(1)
 		db.SetMaxIdleConns(1)
 	} else {
-		mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&interpolateParams=%t",
+		mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&interpolateParams=true",
 			config.Config.MySQLOrchestratorUser,
 			config.Config.MySQLOrchestratorPassword,
 			config.Config.MySQLOrchestratorHost,
@@ -1353,7 +1353,6 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 			config.Config.MySQLOrchestratorDatabase,
 			config.Config.MySQLConnectTimeoutSeconds,
 			config.Config.MySQLOrchestratorReadTimeoutSeconds,
-			config.Config.MySQLInterpolateParams,
 		)
 		if config.Config.MySQLOrchestratorUseMutualTLS {
 			mysql_uri, _ = SetupMySQLOrchestratorTLS(mysql_uri)
