@@ -10,4 +10,5 @@ vagrant/db4-post-install.sh
 vagrant/vagrant-ssh-key
 vagrant/vagrant-ssh-key.pub
 Godeps/_workspace
+.gopath/
 main

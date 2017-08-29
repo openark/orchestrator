@@ -17,14 +17,11 @@
 package db
 
 import (
-	"crypto/tls"
 	"database/sql"
 	"fmt"
 	"strings"
 
 	"github.com/github/orchestrator/go/config"
-	"github.com/github/orchestrator/go/ssl"
-	"github.com/go-sql-driver/mysql"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )
@@ -463,9 +460,6 @@ var generateSQLBase = []string{
 		DROP INDEX hostname_port_active_period_uidx ON topology_failure_detection
 	`,
 	`
-		CREATE UNIQUE INDEX hostname_port_active_period_uidx_topology_failure_detection ON topology_failure_detection (hostname, port, in_active_period, end_active_period_unixtime)
-	`,
-	`
 		DROP INDEX in_active_start_period_idx ON topology_failure_detection
 	`,
 	`
@@ -781,6 +775,55 @@ var generateSQLBase = []string{
 			audit_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			message text CHARACTER SET utf8 NOT NULL,
 			PRIMARY KEY (recovery_step_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS raft_store (
+			store_id bigint unsigned not null auto_increment,
+			store_key varbinary(512) not null,
+			store_value blob not null,
+			PRIMARY KEY (store_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX store_key_idx_raft_store ON raft_store (store_key)
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS raft_log (
+			log_index bigint unsigned not null auto_increment,
+			term bigint not null,
+			log_type int not null,
+			data blob not null,
+			PRIMARY KEY (log_index)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS raft_snapshot (
+			snapshot_id bigint unsigned not null auto_increment,
+			snapshot_name varchar(128) CHARACTER SET utf8 NOT NULL,
+			snapshot_meta varchar(4096) CHARACTER SET utf8 NOT NULL,
+			PRIMARY KEY (snapshot_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE UNIQUE INDEX snapshot_name_uidx_raft_snapshot ON raft_snapshot (snapshot_name)
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS database_instance_peer_analysis (
+			peer varchar(128) NOT NULL,
+		  hostname varchar(128) NOT NULL,
+		  port smallint(5) unsigned NOT NULL,
+		  analysis_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  analysis varchar(128) NOT NULL,
+		  PRIMARY KEY (peer, hostname, port)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS database_instance_tls (
+			hostname varchar(128) CHARACTER SET ascii NOT NULL,
+			port smallint(5) unsigned NOT NULL,
+			required tinyint unsigned NOT NULL DEFAULT 0,
+			PRIMARY KEY (hostname,port)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 }
@@ -1248,16 +1291,14 @@ var generateSQLPatches = []string{
 		CREATE UNIQUE INDEX host_port_active_recoverable_uidx_topology_failure_detection ON topology_failure_detection (hostname, port, in_active_period, end_active_period_unixtime, is_actionable)
 	`,
 	`
+		ALTER TABLE raft_snapshot
+			ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	`,
+	`
 		ALTER TABLE node_health
 			ADD COLUMN db_backend varchar(255) CHARACTER SET ascii NOT NULL DEFAULT ""
 	`,
 }
-
-// Track if a TLS has already been configured for topology
-var topologyTLSConfigured bool = false
-
-// Track if a TLS has already been configured for Orchestrator
-var orchestratorTLSConfigured bool = false
 
 // OpenDiscovery returns a DB instance to access a topology instance.
 // It has lower read timeout than OpenTopology and is intended to
@@ -1279,37 +1320,18 @@ func openTopology(host string, port int, readTimeout int) (*sql.DB, error) {
 		config.Config.MySQLConnectTimeoutSeconds,
 		readTimeout,
 	)
-	if config.Config.MySQLTopologyUseMutualTLS {
+
+	if config.Config.MySQLTopologyUseMutualTLS ||
+		(config.Config.MySQLTopologyUseMixedTLS && requiresTLS(host, port, mysql_uri)) {
 		mysql_uri, _ = SetupMySQLTopologyTLS(mysql_uri)
 	}
 	db, _, err := sqlutils.GetDB(mysql_uri)
+	if err != nil {
+		return nil, err
+	}
 	db.SetMaxOpenConns(config.MySQLTopologyMaxPoolConnections)
 	db.SetMaxIdleConns(config.MySQLTopologyMaxPoolConnections)
 	return db, err
-}
-
-// Create a TLS configuration from the config supplied CA, Certificate, and Private key.
-// Register the TLS config with the mysql drivers as the "topology" config
-// Modify the supplied URI to call the TLS config
-// TODO: Way to have password mixed with TLS for various nodes in the topology.  Currently everything is TLS or everything is password
-func SetupMySQLTopologyTLS(uri string) (string, error) {
-	if !topologyTLSConfigured {
-		tlsConfig, err := ssl.NewTLSConfig(config.Config.MySQLTopologySSLCAFile, !config.Config.MySQLTopologySSLSkipVerify)
-		// Drop to TLS 1.0 for talking to MySQL
-		tlsConfig.MinVersion = tls.VersionTLS10
-		if err != nil {
-			return "", log.Fatalf("Can't create TLS configuration for Topology connection %s: %s", uri, err)
-		}
-		tlsConfig.InsecureSkipVerify = config.Config.MySQLTopologySSLSkipVerify
-		if err = ssl.AppendKeyPair(tlsConfig, config.Config.MySQLTopologySSLCertFile, config.Config.MySQLTopologySSLPrivateKeyFile); err != nil {
-			return "", log.Fatalf("Can't setup TLS key pairs for %s: %s", uri, err)
-		}
-		if err = mysql.RegisterTLSConfig("topology", tlsConfig); err != nil {
-			return "", log.Fatalf("Can't register mysql TLS config for topology: %s", err)
-		}
-		topologyTLSConfigured = true
-	}
-	return fmt.Sprintf("%s&tls=topology", uri), nil
 }
 
 // OpenTopology returns the DB instance for the orchestrator backed database
@@ -1320,6 +1342,8 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 		if err == nil && !fromCache {
 			log.Debugf("Connected to orchestrator backend: sqlite on %v", config.Config.SQLite3DataFile)
 		}
+		db.SetMaxOpenConns(1)
+		db.SetMaxIdleConns(1)
 	} else {
 		mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&interpolateParams=%t",
 			config.Config.MySQLOrchestratorUser,
@@ -1409,29 +1433,6 @@ func registerOrchestratorDeployment(db *sql.DB) error {
 	}
 	log.Debugf("Migrated database schema to version [%+v]", config.RuntimeCLIFlags.ConfiguredVersion)
 	return nil
-}
-
-// Create a TLS configuration from the config supplied CA, Certificate, and Private key.
-// Register the TLS config with the mysql drivers as the "orchestrator" config
-// Modify the supplied URI to call the TLS config
-func SetupMySQLOrchestratorTLS(uri string) (string, error) {
-	if !orchestratorTLSConfigured {
-		tlsConfig, err := ssl.NewTLSConfig(config.Config.MySQLOrchestratorSSLCAFile, true)
-		// Drop to TLS 1.0 for talking to MySQL
-		tlsConfig.MinVersion = tls.VersionTLS10
-		if err != nil {
-			return "", log.Fatalf("Can't create TLS configuration for Orchestrator connection %s: %s", uri, err)
-		}
-		tlsConfig.InsecureSkipVerify = config.Config.MySQLOrchestratorSSLSkipVerify
-		if err = ssl.AppendKeyPair(tlsConfig, config.Config.MySQLOrchestratorSSLCertFile, config.Config.MySQLOrchestratorSSLPrivateKeyFile); err != nil {
-			return "", log.Fatalf("Can't setup TLS key pairs for %s: %s", uri, err)
-		}
-		if err = mysql.RegisterTLSConfig("orchestrator", tlsConfig); err != nil {
-			return "", log.Fatalf("Can't register mysql TLS config for orchestrator: %s", err)
-		}
-		orchestratorTLSConfigured = true
-	}
-	return fmt.Sprintf("%s&tls=orchestrator", uri), nil
 }
 
 // deployStatements will issue given sql queries that are not already known to be deployed.
@@ -1541,6 +1542,15 @@ func execInternal(db *sql.DB, query string, args ...interface{}) (sql.Result, er
 	}
 	res, err := sqlutils.ExecSilently(db, query, args...)
 	return res, err
+}
+
+// PrepareTransaction is a convenience method for preparing a transaction while manipulating dialect
+func PrepareTransaction(tx *sql.Tx, query string) (stmt *sql.Stmt, err error) {
+	query, err = translateStatement(query)
+	if err != nil {
+		return stmt, err
+	}
+	return tx.Prepare(query)
 }
 
 // ExecOrchestrator will execute given query on the orchestrator backend database.

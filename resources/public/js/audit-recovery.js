@@ -8,6 +8,7 @@ $(document).ready(function() {
     apiUri = "/api/audit-recovery/id/" + recoveryId();
   }
   $.get(appUrl(apiUri), function(auditEntries) {
+    auditEntries = auditEntries || [];
     displayAudit(auditEntries);
   }, "json");
 

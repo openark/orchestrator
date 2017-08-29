@@ -65,6 +65,7 @@ func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
 var instanceKeyInformativeClusterName *cache.Cache
+var forgetInstanceKeys *cache.Cache
 
 var accessDeniedCounter = metrics.NewCounter()
 var readTopologyInstanceCounter = metrics.NewCounter()
@@ -85,7 +86,7 @@ func initializeInstanceDao() {
 	config.WaitForConfigurationToBeLoaded()
 	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
 	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
-
+	forgetInstanceKeys = cache.New(time.Duration(config.Config.InstancePollSeconds*3)*time.Second, time.Second)
 	// spin off instance write buffer flushing
 	go func() {
 		flushTick := time.Tick(time.Duration(config.Config.InstanceFlushIntervalMilliseconds) * time.Millisecond)
@@ -647,22 +648,31 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				// We register the rule even if it hasn't changed,
 				// to bump the last_suggested time.
 				instance.PromotionRule = promotionRule
-				err = RegisterCandidateInstance(instanceKey, promotionRule)
+				err = RegisterCandidateInstance(NewCandidateDatabaseInstance(instanceKey, promotionRule))
 				logReadTopologyInstanceError(instanceKey, "RegisterCandidateInstance", err)
 			}
 		}()
 	}
 
 	ReadClusterAliasOverride(instance)
-	if instance.SuggestedClusterAlias == "" && instance.ReplicationDepth == 0 && config.Config.DetectClusterAliasQuery != "" && !isMaxScale {
+	if instance.SuggestedClusterAlias == "" && instance.ReplicationDepth == 0 && !isMaxScale {
 		// Only need to do on masters
-		clusterAlias := ""
-		err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
-		if err != nil {
-			clusterAlias = ""
-			logReadTopologyInstanceError(instanceKey, "DetectClusterAliasQuery", err)
+		if config.Config.DetectClusterAliasQuery != "" {
+			clusterAlias := ""
+			err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
+			if err != nil {
+				clusterAlias = ""
+				logReadTopologyInstanceError(instanceKey, "DetectClusterAliasQuery", err)
+			}
+			instance.SuggestedClusterAlias = clusterAlias
 		}
-		instance.SuggestedClusterAlias = clusterAlias
+		if instance.SuggestedClusterAlias == "" {
+			// Not found by DetectClusterAliasQuery...
+			// See if a ClusterNameToAlias configuration applies
+			if clusterAlias := mappedClusterNameToAlias(instance.ClusterName); clusterAlias != "" {
+				instance.SuggestedClusterAlias = clusterAlias
+			}
+		}
 	}
 	if instance.ReplicationDepth == 0 && config.Config.DetectClusterDomainQuery != "" && !isMaxScale {
 		// Only need to do on masters
@@ -1145,9 +1155,23 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 }
 
 // FindInstances reads all instances whose name matches given pattern
-func FindInstances(regexpPattern string) ([](*Instance), error) {
-	condition := `hostname rlike ?`
-	return readInstancesByCondition(condition, sqlutils.Args(regexpPattern), `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
+func FindInstances(regexpPattern string) (result [](*Instance), err error) {
+	result = [](*Instance){}
+	r, err := regexp.Compile(regexpPattern)
+	if err != nil {
+		return result, err
+	}
+	condition := `1=1`
+	unfiltered, err := readInstancesByCondition(condition, sqlutils.Args(), `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
+	if err != nil {
+		return unfiltered, err
+	}
+	for _, instance := range unfiltered {
+		if r.MatchString(instance.Key.DisplayString()) {
+			result = append(result, instance)
+		}
+	}
+	return result, nil
 }
 
 // FindFuzzyInstances return instances whose names are like the one given (host & port substrings)
@@ -1228,13 +1252,27 @@ func ReadDowntimedInstances(clusterName string) ([](*Instance), error) {
 func ReadClusterCandidateInstances(clusterName string) ([](*Instance), error) {
 	condition := `
 			cluster_name = ?
-			and (hostname, port) in (
-				select hostname, port
+			and concat(hostname, ':', port) in (
+				select concat(hostname, ':', port)
 					from candidate_database_instance
 					where promotion_rule in ('must', 'prefer')
 			)
 			`
 	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
+}
+
+// ReadClusterNeutralPromotionRuleInstances reads cluster instances whose promotion-rule is marked as 'neutral'
+func ReadClusterNeutralPromotionRuleInstances(clusterName string) (neutralInstances [](*Instance), err error) {
+	instances, err := ReadClusterInstances(clusterName)
+	if err != nil {
+		return neutralInstances, err
+	}
+	for _, instance := range instances {
+		if instance.PromotionRule == NeutralPromoteRule {
+			neutralInstances = append(neutralInstances, instance)
+		}
+	}
+	return neutralInstances, nil
 }
 
 // filterOSCInstances will filter the given list such that only replicas fit for OSC control remain.
@@ -1864,7 +1902,8 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
 		if merr != nil {
 			log.Errore(merr)
-		} else {
+		} else if !InstanceIsForgotten(instanceKey) {
+			// only if not in "forget" cache
 			res = append(res, *instanceKey)
 		}
 		// We don;t return an error because we want to keep filling the outdated instances list.
@@ -2072,7 +2111,13 @@ func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, up
 		return nil // nothing to write
 	}
 
-	sql, args, err := mkInsertOdkuForInstances(instances, instanceWasActuallyFound, updateLastSeen)
+	writeInstances := [](*Instance){}
+	for _, instance := range instances {
+		if !InstanceIsForgotten(&instance.Key) {
+			writeInstances = append(writeInstances, instance)
+		}
+	}
+	sql, args, err := mkInsertOdkuForInstances(writeInstances, instanceWasActuallyFound, updateLastSeen)
 	if err != nil {
 		return err
 	}
@@ -2212,9 +2257,15 @@ func UpdateInstanceLastAttemptedCheck(instanceKey *InstanceKey) error {
 	return ExecDBWriteFunc(writeFunc)
 }
 
+func InstanceIsForgotten(instanceKey *InstanceKey) bool {
+	_, found := forgetInstanceKeys.Get(instanceKey.StringCode())
+	return found
+}
+
 // ForgetInstance removes an instance entry from the orchestrator backed database.
 // It may be auto-rediscovered through topology or requested for discovery by multiple means.
 func ForgetInstance(instanceKey *InstanceKey) error {
+	forgetInstanceKeys.Set(instanceKey.StringCode(), true, cache.DefaultExpiration)
 	_, err := db.ExecOrchestrator(`
 			delete
 				from database_instance
@@ -2224,6 +2275,30 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 		instanceKey.Port,
 	)
 	AuditOperation("forget", instanceKey, "")
+	return err
+}
+
+// ForgetInstance removes an instance entry from the orchestrator backed database.
+// It may be auto-rediscovered through topology or requested for discovery by multiple means.
+func ForgetCluster(clusterName string) error {
+	clusterInstances, err := ReadClusterInstances(clusterName)
+	if err != nil {
+		return err
+	}
+	if len(clusterInstances) == 0 {
+		return nil
+	}
+	for _, instance := range clusterInstances {
+		forgetInstanceKeys.Set(instance.Key.StringCode(), true, cache.DefaultExpiration)
+		AuditOperation("forget", &instance.Key, "")
+	}
+	_, err = db.ExecOrchestrator(`
+			delete
+				from database_instance
+			where
+				cluster_name = ?`,
+		clusterName,
+	)
 	return err
 }
 
@@ -2304,7 +2379,7 @@ func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern str
 }
 
 // RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.
-func RegisterCandidateInstance(instanceKey *InstanceKey, promotionRule CandidatePromotionRule) error {
+func RegisterCandidateInstance(candidate *CandidateDatabaseInstance) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
 				insert into candidate_database_instance (
@@ -2318,7 +2393,7 @@ func RegisterCandidateInstance(instanceKey *InstanceKey, promotionRule Candidate
 						port=values(port),
 						last_suggested=now(),
 						promotion_rule=values(promotion_rule)
-				`, instanceKey.Hostname, instanceKey.Port, string(promotionRule),
+				`, candidate.Hostname, candidate.Port, string(candidate.PromotionRule),
 		)
 		if err != nil {
 			return log.Errore(err)
