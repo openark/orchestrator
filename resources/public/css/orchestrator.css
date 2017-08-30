@@ -47,6 +47,10 @@ body {
   padding-right: 10px;
 }
 
+#move-instance-method {
+    padding-bottom: 0px;
+}
+
 #move-instance-method button {
     text-transform: capitalize;
 }
