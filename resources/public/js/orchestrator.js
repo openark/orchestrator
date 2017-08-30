@@ -912,9 +912,6 @@ $(document).ready(function() {
 
   $('body').css('background-image', 'url(' + appUrl('/images/tile.png') + ')');
 
-  $(".navbar-nav li").removeClass("active");
-  $(".navbar-nav li[data-nav-page='" + activePage() + "']").addClass("active");
-
   $.get(appUrl("/api/clusters-info"), function(clusters) {
     clusters = clusters || [];
 
