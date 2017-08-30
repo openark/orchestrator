@@ -38,6 +38,15 @@ body {
     padding-top: 15px;
 }
 
+.navbar-nav #searchInput {
+  height: 30px;
+}
+
+.navbar-nav > li > a {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
 #move-instance-method button {
     text-transform: capitalize;
 }

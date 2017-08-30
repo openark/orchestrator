@@ -88,29 +88,18 @@
 						<li><a href="{{.prefix}}/web/audit">General</a></li>
 						<li><a href="{{.prefix}}/web/audit-failure-detection">Failure detection</a></li>
 						<li><a href="{{.prefix}}/web/audit-recovery">Recovery</a></li>
-					</ul>
-				</li>
-
-
-				<li class="dropdown" data-nav-page="extra">
-					<a href="#" class="dropdown-toggle" data-toggle="dropdown">
-                            Extra
-                            <b class="caret"></b>
-                        </a>
-					<ul class="dropdown-menu">
+						<li role="presentation" class="divider"></li>
 						<li><a href="{{.prefix}}/web/agents">Agents</a></li>
 						<li><a href="{{.prefix}}/web/seeds">Seeds</a></li>
-						<li role="presentation" class="divider"></li>
-						<li><a href="{{.prefix}}/web/long-queries">Long queries</a></li>
 					</ul>
 				</li>
 
 				<li data-nav-page="search">
 					<form class="navbar-form navbar-left" role="search" name="searchForm" action="{{.prefix}}/web/search">
 						<div class="form-group">
-							<input type="text" name="s" id="searchInput" class="form-control input-sm" placeholder="Search">
+							<input type="text" name="s" id="searchInput" class="form-control input-xs" placeholder="Search">
 						</div>
-						<button type="submit" class="btn btn-default btn-sm">Search</button>
+						<button type="submit" class="btn btn-default btn-sm"><span class="glyphicon glyphicon-search"></span></button>
 					</form>
 				</li>
 				<li class="dropdown" data-nav-page="context" style="visibility: hidden;">
