@@ -929,10 +929,10 @@ func GetBestMasterReplacementFromAmongItsReplicas(topologyRecovery *TopologyReco
 	return nil, fmt.Errorf("GetBestMasterReplacementFromAmongItsReplicas: cannot find replacement")
 }
 
-// GetCandidateSiblingOfIntermediateMaster chooses the best sibling of a dead intermediate master
-// to whom the IM's replicas can be moved.
+// GetCandidateSiblingOfIntermediateMaster chooses the best sibling
+// of a dead intermediate master under which the IM's replicas can
+// be moved.
 func GetCandidateSiblingOfIntermediateMaster(topologyRecovery *TopologyRecovery, intermediateMasterInstance *inst.Instance) (*inst.Instance, error) {
-
 	siblings, err := inst.ReadReplicaInstances(&intermediateMasterInstance.MasterKey)
 	if err != nil {
 		return nil, err
@@ -943,11 +943,15 @@ func GetCandidateSiblingOfIntermediateMaster(topologyRecovery *TopologyRecovery,
 
 	sort.Sort(sort.Reverse(InstancesByCountReplicas(siblings)))
 
-	// In the next series of steps we attempt to return a good replacement.
-	// None of the below attempts is sure to pick a winning server. Perhaps picked server is not enough up-todate -- but
-	// this has small likelihood in the general case, and, well, it's an attempt. It's a Plan A, but we have Plan B & C if this fails.
+	// Attempt to return a good replacement.
+	//
+	// None of the below attempts is sure to pick a winning
+	// server. Perhaps picked server is not enough up to date,
+	// but this has small likelihood in the general case and,
+	// well, it's an attempt. It's a Plan A, but we have Plan B &
+	// C if this fails.
 
-	// At first, we try to return an "is_candidate" server in same dc & env
+	// 1. search for IsCandidate in same dc & env
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("searching for the best candidate sibling of dead intermediate master %+v", intermediateMasterInstance.Key))
 	for _, sibling := range siblings {
 		sibling := sibling
@@ -959,32 +963,40 @@ func GetCandidateSiblingOfIntermediateMaster(topologyRecovery *TopologyRecovery,
 			return sibling, nil
 		}
 	}
-	// Go for something else in the same DC & ENV
+
+	// 2. search for IsCandidate somewhere else
 	for _, sibling := range siblings {
 		sibling := sibling
 		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) &&
+			sibling.IsCandidate {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found %+v as a replacement for %+v [candidate sibling]", sibling.Key, intermediateMasterInstance.Key))
+			return sibling, nil
+		}
+	}
+
+	// 3. no candidates found so search for something in the same DC & ENV
+	for _, sibling := range siblings {
+		sibling := sibling
+		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) &&
+			sibling.PromotionRule != "must_not" &&
 			sibling.DataCenter == intermediateMasterInstance.DataCenter &&
 			sibling.PhysicalEnvironment == intermediateMasterInstance.PhysicalEnvironment {
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found %+v as a replacement for %+v [same dc & environment]", sibling.Key, intermediateMasterInstance.Key))
 			return sibling, nil
 		}
 	}
-	// Nothing in same DC & env, let's just go for some is_candidate
+
+	// 4. Choose any remaining valid sibling.
 	for _, sibling := range siblings {
 		sibling := sibling
-		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) && sibling.IsCandidate {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found %+v as a replacement for %+v [candidate sibling]", sibling.Key, intermediateMasterInstance.Key))
-			return sibling, nil
-		}
-	}
-	// Havent found an "is_candidate". Just whatever is valid.
-	for _, sibling := range siblings {
-		sibling := sibling
-		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) {
+		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) &&
+			sibling.PromotionRule != "must_not" {
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found %+v as a replacement for %+v [any sibling]", sibling.Key, intermediateMasterInstance.Key))
 			return sibling, nil
 		}
 	}
+
+	// 5. failed to find a replacement
 	return nil, log.Errorf("topology_recovery: cannot find candidate sibling of %+v", intermediateMasterInstance.Key)
 }
 
