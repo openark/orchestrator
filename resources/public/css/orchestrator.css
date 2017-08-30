@@ -19,7 +19,8 @@ body {
 }
 
 .orchestrator-brand img {
-    padding: 0px 8px;
+  padding: 0px;
+  padding-right: 8px;
 }
 
 .table {
