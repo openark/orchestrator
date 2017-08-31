@@ -19,7 +19,8 @@ body {
 }
 
 .orchestrator-brand img {
-    padding: 0px 8px;
+  padding: 0px;
+  padding-right: 8px;
 }
 
 .table {
@@ -36,6 +37,19 @@ body {
 .navbar-nav > li > .dropdown {
     padding-bottom: 15px;
     padding-top: 15px;
+}
+
+.navbar-nav #searchInput {
+  height: 30px;
+}
+
+.navbar-nav > li > a {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+#move-instance-method {
+    padding-bottom: 0px;
 }
 
 #move-instance-method button {

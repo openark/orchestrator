@@ -22,17 +22,18 @@
 #     export ORCHESTRATOR_API="http://service1:3000/api http://service2:3000/api http://service3:3000/api"
 #
 # Usage:
-#   orchestrator -c <command> [flags...]
+#   orchestrator-client -c <command> [flags...]
 # Examples:
-#   orchestrator -c all-instances
-#   orchestrator -c which-replicas -i some.master.com:3306
-#   orchestrator -c which-cluster-instances --alias mycluster
-#   orchestrator -c replication-analysis
-#   orchestrator -c register-candidate -i candidate.host.com:3306 --promotion-rule=prefer
-#   orchestrator -c recover -i failed.host.com:3306
+#   orchestrator-client -c all-instances
+#   orchestrator-client -c which-replicas -i some.master.com:3306
+#   orchestrator-client -c which-cluster-instances --alias mycluster
+#   orchestrator-client -c replication-analysis
+#   orchestrator-client -c register-candidate -i candidate.host.com:3306 --promotion-rule=prefer
+#   orchestrator-client -c recover -i failed.host.com:3306
 
 # /etc/profile.d/orchestrator-client.sh is for you to set any environment.
 # In particular, you will want to set ORCHESTRATOR_API
+myname=$(basename $0)
 [ -f /etc/profile.d/orchestrator-client.sh ] && . /etc/profile.d/orchestrator-client.sh
 
 orchestrator_api="${ORCHESTRATOR_API:-http://localhost:3000}"
@@ -97,7 +98,7 @@ do
 done
 
 function fail() {
-  message="$1"
+  message="$myname[$$]: $1"
   >&2 echo "$message"
   exit 1
 }
@@ -180,7 +181,7 @@ function api() {
   set -o pipefail
   api_response=$(curl -s "$uri" | jq '.')
   if [ $? -ne 0 ] ; then
-    fail "Cannot access orchestrator at ${leader_api}"
+    fail "Cannot access orchestrator at ${leader_api}.  Check ORCHESTRATOR_API is configured correctly and orchestrator is running"
   fi
   if [ "$(echo $api_response | jq -r 'type')" == "array" ] ; then
     return
@@ -238,6 +239,12 @@ function prompt_help() {
   echo "Example: orchestrator-client -c which-master -i some.replica"
   echo "Available commands:"
   cat "$0" | sed -n '/run_command/,/esac/p' | egrep '".*"[)].*;;' | sed -r -e 's/"(.*?)".*#(.*)/\1~\2/' | column -t -s "~"
+}
+
+function async_discover() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "async-discover/$instance_hostport"
+  print_details | filter_key | print_key
 }
 
 function discover() {
@@ -544,7 +551,7 @@ function raft_elect_leader() {
 
 function run_command() {
   if [ -z "$command" ] ; then
-    fail "No command given. Use -c or --command"
+    fail "No command given. Use $myname -c <command> [...] or $myname --command <command> [...] to do something useful"
   fi
   command=$(echo $command | sed -e 's/slave/replica/')
   case $command in
@@ -553,6 +560,8 @@ function run_command() {
     "which-api") which_api ;; # Output the HTTP API to be used
     "api") api_call ;;        # Invoke any API request; provide --path argument
 
+    "async-discover") async_discover ;;                         # Lookup an instance, investigate it asynchronously. Useful for bulk loads
+                                                                # of servers into an empty orchestrator cluster.
     "discover") discover ;;   # Lookup an instance, investigate it
     "forget") forget ;;       # Forget about an instance's existence
 

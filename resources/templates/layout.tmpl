@@ -74,11 +74,11 @@
 					<ul class="dropdown-menu" id="dropdown-clusters">
 						<li><a href="{{.prefix}}/web/clusters/">Dashboard</a></li>
 						<li><a href="{{.prefix}}/web/clusters-analysis/">Failure analysis</a></li>
+						<li><a href="{{.prefix}}/web/discover">Discover</a></li>
 						<li role="presentation" class="divider"></li>
 					</ul>
 				</li>
 
-				<li data-nav-page="discover"><a href="{{.prefix}}/web/discover">Discover</a></li>
 				<li class="dropdown" data-nav-page="audit">
 					<a href="#" class="dropdown-toggle" data-toggle="dropdown">
                             Audit
@@ -88,20 +88,9 @@
 						<li><a href="{{.prefix}}/web/audit">General</a></li>
 						<li><a href="{{.prefix}}/web/audit-failure-detection">Failure detection</a></li>
 						<li><a href="{{.prefix}}/web/audit-recovery">Recovery</a></li>
-					</ul>
-				</li>
-
-
-				<li class="dropdown" data-nav-page="extra">
-					<a href="#" class="dropdown-toggle" data-toggle="dropdown">
-                            Extra
-                            <b class="caret"></b>
-                        </a>
-					<ul class="dropdown-menu">
+						<li role="presentation" class="divider"></li>
 						<li><a href="{{.prefix}}/web/agents">Agents</a></li>
 						<li><a href="{{.prefix}}/web/seeds">Seeds</a></li>
-						<li role="presentation" class="divider"></li>
-						<li><a href="{{.prefix}}/web/long-queries">Long queries</a></li>
 					</ul>
 				</li>
 
@@ -110,7 +99,7 @@
 						<div class="form-group">
 							<input type="text" name="s" id="searchInput" class="form-control input-sm" placeholder="Search">
 						</div>
-						<button type="submit" class="btn btn-default btn-sm">Search</button>
+						<button type="submit" class="btn btn-default btn-sm"><span class="glyphicon glyphicon-search"></span></button>
 					</form>
 				</li>
 				<li class="dropdown" data-nav-page="context" style="visibility: hidden;">
@@ -241,10 +230,6 @@
 	<script>
 		function autoshowProblems() {
 			return "{{.autoshow_problems}}";
-		}
-
-		function activePage() {
-			return "{{.activePage}}";
 		}
 
 		function agentsHttpActive() {
