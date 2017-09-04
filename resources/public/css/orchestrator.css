@@ -384,9 +384,13 @@ body {
 #modalDataAttributesTable td code {
     white-space: normal;
     background-color: inherit;
+    padding: 0px;
 }
 
 #modalDataAttributesTable div.attributes-buttons > button {
+    margin-left: 4px;
+}
+#modalDataAttributesTable div.attributes-buttons > .btn-group {
     margin-left: 4px;
 }
 
@@ -449,12 +453,10 @@ body {
     max-height: 240px;
 }
 
-
 #long_queries div.process-query {
     overflow: auto;
     max-height: 240px;
 }
-
 
 #long_queries div.row > div {
     overflow: auto;
