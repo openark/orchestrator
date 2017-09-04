@@ -368,9 +368,6 @@ body {
 #node_modal .begin-downtime .panel-body {
   background-color: #d9edf7;
 }
-#node_modal .end-downtime .panel-body {
-  background-color: #fcf8e3;
-}
 
 #modalDataAttributesTable tbody tr td:first-child {
   white-space: nowrap;
