@@ -463,13 +463,13 @@ function openNodeModal(node) {
     $('#node_modal [data-description=downtime-status]').html(
       node.DowntimeReason
     );
-    $('#node_modal [data-panel-type=begin-downtime]').hide();
+    $('#node_modal .begin-downtime').hide();
     $('#node_modal button[data-btn=begin-downtime]').hide();
-    $('#node_modal [data-panel-type=end-downtime]').show();
+    $('#node_modal .end-downtime').show();
   } else {
     $('#node_modal [data-panel-type=downtime]').html("Downtime");
-    $('#node_modal [data-panel-type=begin-downtime]').show();
-    $('#node_modal [data-panel-type=end-downtime]').hide();
+    $('#node_modal .begin-downtime').show();
+    $('#node_modal .end-downtime').hide();
     $('#node_modal button[data-btn=end-downtime]').hide();
   }
   $('#node_modal button[data-btn=skip-query]').hide();
