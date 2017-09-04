@@ -459,16 +459,19 @@ function openNodeModal(node) {
   });
 
   if (node.IsDowntimed) {
-    $('#node_modal [data-panel-type=downtime]').html("Downtimed by <strong>" + node.DowntimeOwner + "</strong> until " + node.DowntimeEndTimestamp);
-    $('#node_modal [data-description=downtime-status]').html(
+    $('#node_modal .end-downtime .panel-heading').html("Downtimed by <strong>" + node.DowntimeOwner + "</strong> until " + node.DowntimeEndTimestamp);
+    $('#node_modal .end-downtime .panel-body').html(
       node.DowntimeReason
     );
     $('#node_modal .begin-downtime').hide();
     $('#node_modal button[data-btn=begin-downtime]').hide();
+
+    $('#node_modal .end-downtime').show();
     $('#node_modal button[data-btn=end-downtime]').show();
   } else {
-    $('#node_modal [data-panel-type=downtime]').html("Downtime");
     $('#node_modal .begin-downtime').show();
+    $('#node_modal button[data-btn=begin-downtime]').show();
+
     $('#node_modal .end-downtime').hide();
     $('#node_modal button[data-btn=end-downtime]').hide();
   }
