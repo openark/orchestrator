@@ -144,10 +144,11 @@
 						<h4 class="modal-title"></h4>
 					</div>
 					<div class="modal-body">
-						<div class="panel panel-info">
-							<div class="panel-heading">
-								<div class="" data-panel-type="begin-downtime">
-									<form class="form-inline" role="form">
+
+						<div class="panel panel-default begin-downtime">
+						  <div class="panel-body">
+								<form class="form-inline">
+									<div class="form-group">
 										<input type="text" class="form-control input-sm" id="beginDowntimeOwner" placeholder="owner name" />
 										<input type="text" class="form-control input-sm" id="beginDowntimeReason" placeholder="reason" />
 										<select class="form-control input-sm" id="beginDowntimeDuration">
@@ -159,20 +160,23 @@
 											<option value="2d">2d</option>
 											<option value="7d">7d</option>
 										</select>
-										<button type="button" class="btn btn-info pull-right" data-btn="begin-downtime">
-											<span class="glyphicon glyphicon-volume-off"></span> Begin downtime
-										</button>
-									</form>
-								</div>
-								<div class="" data-panel-type="end-downtime">
-									<div class="pull-left" data-description="downtime-status">
 									</div>
-									<button type="button" class="btn btn-default pull-right" data-btn="end-downtime">
-										<span class="glyphicon glyphicon-volume-up"></span> End downtime
+									<button type="button" class="form-control btn btn-info pull-right" data-btn="begin-downtime">
+										<span class="glyphicon glyphicon-volume-off"></span> Begin downtime
 									</button>
-								</div>
+								</form>
 							</div>
 						</div>
+						<div class="panel panel-default end-downtime">
+						  <div class="panel-body">
+								<div class="pull-left" data-description="downtime-status">
+								</div>
+								<button type="button" class="btn btn-default pull-right" data-btn="end-downtime">
+									<span class="glyphicon glyphicon-volume-up"></span> End downtime
+								</button>
+							</div>
+						</div>
+
 						<table id="modalDataAttributesTable" class="table">
 							<div class="hidden-zone"></div>
 						</table>

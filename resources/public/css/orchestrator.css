@@ -333,6 +333,10 @@ body {
     margin-top: 8px;
 }
 
+#node_modal .modal-dialog {
+  width: 800px;
+}
+
 #node_modal .modal-body {
     padding-bottom: 0px;
 }
@@ -361,9 +365,16 @@ body {
     padding: 5px 9px;
 }
 
-#node_modal [data-panel-type=begin-downtime] .btn {
-	width: auto;
-	display: inline-block;
+#node_modal .begin-downtime .panel-body {
+  background-color: #d9edf7;
+}
+#node_modal .end-downtime .panel-body {
+  background-color: #fcf8e3;
+}
+
+#modalDataAttributesTable tbody tr td:first-child {
+  white-space: nowrap;
+  background-color: #f7f7f7;
 }
 
 #modalDataAttributesTable tbody tr td {
