@@ -465,7 +465,7 @@ function openNodeModal(node) {
     );
     $('#node_modal .begin-downtime').hide();
     $('#node_modal button[data-btn=begin-downtime]').hide();
-    $('#node_modal .end-downtime').show();
+    $('#node_modal button[data-btn=end-downtime]').show();
   } else {
     $('#node_modal [data-panel-type=downtime]').html("Downtime");
     $('#node_modal .begin-downtime').show();
