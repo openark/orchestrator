@@ -826,6 +826,9 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 	if !isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling) {
 		return false
 	}
+	if inst.IsBannedFromBeingCandidateReplica(sibling) {
+		return false
+	}
 	if sibling.HasReplicationFilters != intermediateMasterInstance.HasReplicationFilters {
 		return false
 	}
