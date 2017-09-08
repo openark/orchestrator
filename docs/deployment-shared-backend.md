@@ -26,7 +26,8 @@ You will need to handle, for example, the issue of adding a Galera node, or of m
 
 ### What to deploy: service
 
-- Deploy the `orchestrator` service onto service boxes.
+- Deploy the `orchestrator` service onto service boxes. The decision of how many service boxes  to deploy
+  will depend on your [availability needs](high-availability.md).
   - In a synchronous replication shared backend setup, these may well be the very MySQL boxes, in a `1:1` mapping.
 - Consider adding a proxy on top of the service boxes; the proxy would ideally redirect all traffic to the leader node. There is one and only one leader node, and the status check endpoint is `/api/leader-check`. It is OK to direct traffic to any healthy service. Since all `orchestrator` nodes speak to the same shared backend DB, it is OK to operate some actions from one service node, and other actions from another service nodes. Internal locks are placed to avoid running contradicting or interfering commands.
 
@@ -59,7 +60,9 @@ It is OK to run `orchestrator` CLI even while the `orchestrator` service is oper
 
 ### Orchestrator service
 
-As noted, a single `orchestrator` node will assume leadership. Only the leader will:
+In a shared-backend deployment, you may deploy the number of `orchestrator` nodes as suits your requirements. 
+
+However, as noted, one `orchestrator` node will be [elected leader](http://code.openark.org/blog/mysql/leader-election-using-mysql). Only the leader will:
 
 - Discover (probe) your MySQL topologies
 - Run failure detection
@@ -74,6 +77,8 @@ All nodes may:
 
 - Run arbitrary command (e.g. `relocate`, `begin-downtime`)
 - Run recoveries per human request.
+
+For more details about deploying multiple nodes, please read about [high availability](high-availability.md).
 
 ### Orchestrator CLI
 
