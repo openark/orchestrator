@@ -962,7 +962,15 @@ func GetCandidateSiblingOfIntermediateMaster(topologyRecovery *TopologyRecovery,
 			return sibling, nil
 		}
 	}
-	// Go for something else in the same DC & ENV
+	// No candidate in same DC & env, let's search for a candidate anywhere
+	for _, sibling := range siblings {
+		sibling := sibling
+		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) && sibling.IsCandidate {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found %+v as a replacement for %+v [candidate sibling]", sibling.Key, intermediateMasterInstance.Key))
+			return sibling, nil
+		}
+	}
+	// Go for some valid in the same DC & ENV
 	for _, sibling := range siblings {
 		sibling := sibling
 		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) &&
@@ -972,15 +980,7 @@ func GetCandidateSiblingOfIntermediateMaster(topologyRecovery *TopologyRecovery,
 			return sibling, nil
 		}
 	}
-	// Nothing in same DC & env, let's just go for some is_candidate
-	for _, sibling := range siblings {
-		sibling := sibling
-		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) && sibling.IsCandidate {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found %+v as a replacement for %+v [candidate sibling]", sibling.Key, intermediateMasterInstance.Key))
-			return sibling, nil
-		}
-	}
-	// Havent found an "is_candidate". Just whatever is valid.
+	// Just whatever is valid.
 	for _, sibling := range siblings {
 		sibling := sibling
 		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) {
