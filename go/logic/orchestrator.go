@@ -51,6 +51,7 @@ var instancePollSecondsExceededCounter = metrics.NewCounter()
 var discoveryQueueLengthGauge = metrics.NewGauge()
 var discoveryRecentCountGauge = metrics.NewGauge()
 var isElectedGauge = metrics.NewGauge()
+var isHealthyGauge = metrics.NewGauge()
 var discoveryMetrics = collection.CreateOrReturnCollection(discoveryMetricsName)
 
 var isElectedNode int64 = 0
@@ -64,6 +65,7 @@ func init() {
 	metrics.Register("discoveries.queue_length", discoveryQueueLengthGauge)
 	metrics.Register("discoveries.recent_count", discoveryRecentCountGauge)
 	metrics.Register("elect.is_elected", isElectedGauge)
+	metrics.Register("health.is_healthy", isHealthyGauge)
 
 	ometrics.OnMetricsTick(func() {
 		discoveryQueueLengthGauge.Update(int64(discoveryQueue.QueueLen()))
@@ -76,6 +78,9 @@ func init() {
 	})
 	ometrics.OnMetricsTick(func() {
 		isElectedGauge.Update(atomic.LoadInt64(&isElectedNode))
+	})
+	ometrics.OnMetricsTick(func() {
+		isHealthyGauge.Update(atomic.LoadInt64(&process.LastContinousCheckHealthy))
 	})
 }
 

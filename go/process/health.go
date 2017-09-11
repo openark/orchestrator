@@ -30,6 +30,7 @@ import (
 const registrationPollSeconds = 5
 
 var lastGoodHealthCheckUnixNano int64
+var LastContinousCheckHealthy int64
 
 type NodeHealth struct {
 	Hostname        string
@@ -135,8 +136,14 @@ func ContinuousRegistration(extraInfo string, command string) {
 	ThisNodeHealth.Command = command
 	continuousRegistrationOnce.Do(func() {
 		tickOperation := func() {
-			if _, err := RegisterNode(ThisNodeHealth); err != nil {
+			healthy, err := RegisterNode(ThisNodeHealth)
+			if err != nil {
 				log.Errorf("ContinuousRegistration: RegisterNode failed: %+v", err)
+			}
+			if healthy {
+				atomic.StoreInt64(&LastContinousCheckHealthy, 1)
+			} else {
+				atomic.StoreInt64(&LastContinousCheckHealthy, 0)
 			}
 		}
 		// First one is synchronous
