@@ -90,7 +90,9 @@ func normalizeRaftHostnameIP(host string) (string, error) {
 	}
 	ips, err := net.LookupIP(host)
 	if err != nil {
-		return host, err
+		// resolve failed. But we don't want to fail the entire operation for that
+		log.Errore(err)
+		return host, nil
 	}
 	// resolve success!
 	for _, ip := range ips {
