@@ -32,10 +32,10 @@ import (
 	ometrics "github.com/github/orchestrator/go/metrics"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/raft"
+	"github.com/maurosr/shared-stopwatch"
 	"github.com/openark/golib/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
-	"github.com/sjmudd/stopwatch"
 )
 
 const discoveryMetricsName = "DISCOVERY_METRICS"
@@ -164,14 +164,11 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	}
 	// create stopwatch entries
 	latency := stopwatch.NewNamedStopwatch()
-	latency.AddMany([]string{
-		"backend",
-		"instance",
-		"total"})
-	latency.Start("total") // start the total stopwatch (not changed anywhere else)
+	latency.Add("backend", "instance", "total")
+	latencyTotalStop := latency.Start("total") // start the total stopwatch (not changed anywhere else)
 
 	defer func() {
-		latency.Stop("total")
+		latencyTotalStop()
 		discoveryTime := latency.Elapsed("total")
 		if discoveryTime > instancePollSecondsDuration() {
 			instancePollSecondsExceededCounter.Inc(1)
@@ -192,9 +189,9 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
-	latency.Start("backend")
+	latencyBackendStop := latency.Start("backend")
 	instance, found, err := inst.ReadInstance(&instanceKey)
-	latency.Stop("backend")
+	latencyBackendStop()
 	if found && instance.IsUpToDate && instance.IsLastCheckValid {
 		// we've already discovered this one. Skip!
 		return
