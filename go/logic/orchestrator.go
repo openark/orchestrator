@@ -44,6 +44,7 @@ const discoveryMetricsName = "DISCOVERY_METRICS"
 // that were requested for discovery.  It can be continuously updated
 // as discovery process progresses.
 var discoveryQueue *discovery.Queue
+var snapshotDiscoveryKeys chan inst.InstanceKey
 
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
@@ -59,6 +60,8 @@ var isElectedNode int64 = 0
 var recentDiscoveryOperationKeys *cache.Cache
 
 func init() {
+	snapshotDiscoveryKeys = make(chan inst.InstanceKey, 10)
+
 	metrics.Register("discoveries.attempt", discoveriesCounter)
 	metrics.Register("discoveries.fail", failedDiscoveriesCounter)
 	metrics.Register("discoveries.instance_poll_seconds_exceeded", instancePollSecondsExceededCounter)
@@ -313,6 +316,10 @@ func onDiscoveryTick() {
 		go inst.ExpireMaintenance()
 	}
 
+	countSnapshotKeys := len(snapshotDiscoveryKeys)
+	for i := 0; i < countSnapshotKeys; i++ {
+		instanceKeys = append(instanceKeys, <-snapshotDiscoveryKeys)
+	}
 	// avoid any logging unless there's something to be done
 	if len(instanceKeys) > 0 {
 		if len(instanceKeys) > config.Config.MaxOutdatedKeysToShow {
@@ -354,7 +361,7 @@ func ContinuousDiscovery() {
 	go acceptSignals()
 
 	if config.Config.RaftEnabled {
-		if err := orcraft.Setup(NewCommandApplier(), process.ThisHostname); err != nil {
+		if err := orcraft.Setup(NewCommandApplier(), NewSnapshotDataCreatorApplier(), process.ThisHostname); err != nil {
 			log.Fatale(err)
 		}
 		go orcraft.Monitor()

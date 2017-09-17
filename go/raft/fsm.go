@@ -81,12 +81,13 @@ func (f *fsm) yieldByHint(hint string) interface{} {
 
 // Snapshot returns a snapshot object of freno's state
 func (f *fsm) Snapshot() (raft.FSMSnapshot, error) {
-	snapshot := newFsmSnapshot()
+	snapshot := newFsmSnapshot(f.snapshotCreatorApplier)
 	return snapshot, nil
 }
 
 // Restore restores freno state
 func (f *fsm) Restore(rc io.ReadCloser) error {
 	defer rc.Close()
-	return nil
+
+	return f.snapshotCreatorApplier.Restore(rc)
 }

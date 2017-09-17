@@ -27,7 +27,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
+
+const DateTimeFormat = "2006-01-02 15:04:05.999999"
 
 // RowMap represents one row in a result set. Its objective is to allow
 // for easy, typed getters by column name.
@@ -120,6 +123,13 @@ func (this *RowMap) GetUintD(key string, def uint) uint {
 
 func (this *RowMap) GetBool(key string) bool {
 	return this.GetInt(key) != 0
+}
+
+func (this *RowMap) GetTime(key string) time.Time {
+	if t, err := time.Parse(DateTimeFormat, this.GetString(key)); err == nil {
+		return t
+	}
+	return time.Time{}
 }
 
 // knownDBs is a DB cache by uri

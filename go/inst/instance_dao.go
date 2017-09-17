@@ -1921,6 +1921,33 @@ func GetHeuristicClusterDomainInstanceAttribute(clusterName string) (instanceKey
 // resulted in an actual check! This can happen when TCP/IP connections are hung, in which case the "check"
 // never returns. In such case we multiply interval by a factor, so as not to open too many connections on
 // the instance.
+func ReadAllInstanceKeys() ([]InstanceKey, error) {
+	res := []InstanceKey{}
+	query := `
+		select
+			hostname, port
+		from
+			database_instance
+			`
+	err := db.QueryOrchestrator(query, sqlutils.Args(), func(m sqlutils.RowMap) error {
+		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
+		if merr != nil {
+			log.Errore(merr)
+		} else if !InstanceIsForgotten(instanceKey) {
+			// only if not in "forget" cache
+			res = append(res, *instanceKey)
+		}
+		return nil
+	})
+	return res, log.Errore(err)
+}
+
+// ReadOutdatedInstanceKeys reads and returns keys for all instances that are not up to date (i.e.
+// pre-configured time has passed since they were last checked)
+// But we also check for the case where an attempt at instance checking has been made, that hasn't
+// resulted in an actual check! This can happen when TCP/IP connections are hung, in which case the "check"
+// never returns. In such case we multiply interval by a factor, so as not to open too many connections on
+// the instance.
 func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 	res := []InstanceKey{}
 	query := `
