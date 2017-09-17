@@ -53,14 +53,14 @@ func FatalRaftError(err error) error {
 
 // Setup creates the entire raft shananga. Creates the store, associates with the throttler,
 // contacts peer nodes, and subscribes to leader changes to export them.
-func Setup(applier CommandApplier, thisHostname string) error {
+func Setup(applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier, thisHostname string) error {
 	log.Debugf("Setting up raft")
 	ThisHostname = thisHostname
 	raftBind, err := normalizeRaftNode(config.Config.RaftBind)
 	if err != nil {
 		return err
 	}
-	store = NewStore(config.Config.RaftDataDir, raftBind, applier)
+	store = NewStore(config.Config.RaftDataDir, raftBind, applier, snapshotCreatorApplier)
 	peerNodes := []string{}
 	for _, raftNode := range config.Config.RaftNodes {
 		peerNode, err := normalizeRaftNode(raftNode)

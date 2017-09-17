@@ -32,10 +32,10 @@ import (
 	ometrics "github.com/github/orchestrator/go/metrics"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/raft"
+	"github.com/maurosr/shared-stopwatch"
 	"github.com/openark/golib/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
-	"github.com/sjmudd/stopwatch"
 )
 
 const discoveryMetricsName = "DISCOVERY_METRICS"
@@ -44,6 +44,7 @@ const discoveryMetricsName = "DISCOVERY_METRICS"
 // that were requested for discovery.  It can be continuously updated
 // as discovery process progresses.
 var discoveryQueue *discovery.Queue
+var snapshotDiscoveryKeys chan inst.InstanceKey
 
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
@@ -59,6 +60,8 @@ var isElectedNode int64 = 0
 var recentDiscoveryOperationKeys *cache.Cache
 
 func init() {
+	snapshotDiscoveryKeys = make(chan inst.InstanceKey, 10)
+
 	metrics.Register("discoveries.attempt", discoveriesCounter)
 	metrics.Register("discoveries.fail", failedDiscoveriesCounter)
 	metrics.Register("discoveries.instance_poll_seconds_exceeded", instancePollSecondsExceededCounter)
@@ -164,14 +167,11 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	}
 	// create stopwatch entries
 	latency := stopwatch.NewNamedStopwatch()
-	latency.AddMany([]string{
-		"backend",
-		"instance",
-		"total"})
-	latency.Start("total") // start the total stopwatch (not changed anywhere else)
+	latency.Add("backend", "instance", "total")
+	latencyTotalStop := latency.Start("total") // start the total stopwatch (not changed anywhere else)
 
 	defer func() {
-		latency.Stop("total")
+		latencyTotalStop()
 		discoveryTime := latency.Elapsed("total")
 		if discoveryTime > instancePollSecondsDuration() {
 			instancePollSecondsExceededCounter.Inc(1)
@@ -192,9 +192,9 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		return
 	}
 
-	latency.Start("backend")
+	latencyBackendStop := latency.Start("backend")
 	instance, found, err := inst.ReadInstance(&instanceKey)
-	latency.Stop("backend")
+	latencyBackendStop()
 	if found && instance.IsUpToDate && instance.IsLastCheckValid {
 		// we've already discovered this one. Skip!
 		return
@@ -316,6 +316,10 @@ func onDiscoveryTick() {
 		go inst.ExpireMaintenance()
 	}
 
+	countSnapshotKeys := len(snapshotDiscoveryKeys)
+	for i := 0; i < countSnapshotKeys; i++ {
+		instanceKeys = append(instanceKeys, <-snapshotDiscoveryKeys)
+	}
 	// avoid any logging unless there's something to be done
 	if len(instanceKeys) > 0 {
 		if len(instanceKeys) > config.Config.MaxOutdatedKeysToShow {
@@ -357,7 +361,7 @@ func ContinuousDiscovery() {
 	go acceptSignals()
 
 	if config.Config.RaftEnabled {
-		if err := orcraft.Setup(NewCommandApplier(), process.ThisHostname); err != nil {
+		if err := orcraft.Setup(NewCommandApplier(), NewSnapshotDataCreatorApplier(), process.ThisHostname); err != nil {
 			log.Fatale(err)
 		}
 		go orcraft.Monitor()

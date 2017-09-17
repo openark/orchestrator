@@ -23,6 +23,7 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 )
 
 // BeginDowntime will make mark an instance as downtimed (or override existing downtime period)
@@ -178,4 +179,37 @@ func ExpireDowntime() error {
 	}
 
 	return nil
+}
+
+func ReadDowntime() (result []Downtime, err error) {
+	query := `
+		select
+			hostname,
+			port,
+			begin_timestamp,
+			end_timestamp,
+			owner,
+			reason
+		from
+			database_instance_downtime
+		where
+			end_timestamp > now()
+		`
+	err = db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+		downtime := Downtime{
+			Key: &InstanceKey{},
+		}
+		downtime.Key.Hostname = m.GetString("hostname")
+		downtime.Key.Port = m.GetInt("port")
+		downtime.BeginsAt = m.GetTime("begin_timestamp")
+		downtime.EndsAt = m.GetTime("end_timestamp")
+		downtime.Owner = m.GetString("owner")
+		downtime.Reason = m.GetString("reason")
+
+		downtime.Duration = downtime.EndsAt.Sub(downtime.BeginsAt)
+
+		result = append(result, downtime)
+		return nil
+	})
+	return result, log.Errore(err)
 }
