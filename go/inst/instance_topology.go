@@ -37,9 +37,11 @@ const (
 	StopReplicationNicely                       = "StopReplicationNicely"
 )
 
+var asciiFillerCharacter = " "
+
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
-func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance), extendedOutput bool) []string {
+func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance), extendedOutput bool, fillerCharacter string) []string {
 	if instance == nil {
 		return []string{}
 	}
@@ -48,20 +50,20 @@ func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*In
 	}
 	prefix := ""
 	if depth > 0 {
-		prefix = strings.Repeat(" ", (depth-1)*2)
+		prefix = strings.Repeat(fillerCharacter, (depth-1)*2)
 		if instance.ReplicaRunning() && instance.IsLastCheckValid && instance.IsRecentlyChecked {
-			prefix += "+ "
+			prefix += "+" + fillerCharacter
 		} else {
-			prefix += "- "
+			prefix += "-" + fillerCharacter
 		}
 	}
 	entry := fmt.Sprintf("%s%s", prefix, instance.Key.DisplayString())
 	if extendedOutput {
-		entry = fmt.Sprintf("%s %s", entry, instance.HumanReadableDescription())
+		entry = fmt.Sprintf("%s%s%s", entry, fillerCharacter, instance.HumanReadableDescription())
 	}
 	result := []string{entry}
 	for _, replica := range replicationMap[instance] {
-		replicasResult := getASCIITopologyEntry(depth+1, replica, replicationMap, extendedOutput)
+		replicasResult := getASCIITopologyEntry(depth+1, replica, replicationMap, extendedOutput, fillerCharacter)
 		result = append(result, replicasResult...)
 	}
 	return result
@@ -69,6 +71,7 @@ func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*In
 
 // ASCIITopology returns a string representation of the topology of given cluster.
 func ASCIITopology(clusterName string, historyTimestampPattern string) (result string, err error) {
+	fillerCharacter := asciiFillerCharacter
 	var instances [](*Instance)
 	if historyTimestampPattern == "" {
 		instances, err = ReadClusterInstances(clusterName)
@@ -103,12 +106,12 @@ func ASCIITopology(clusterName string, historyTimestampPattern string) (result s
 	var entries []string
 	if masterInstance != nil {
 		// Single master
-		entries = getASCIITopologyEntry(0, masterInstance, replicationMap, historyTimestampPattern == "")
+		entries = getASCIITopologyEntry(0, masterInstance, replicationMap, historyTimestampPattern == "", fillerCharacter)
 	} else {
 		// Co-masters? For visualization we put each in its own branch while ignoring its other co-masters.
 		for _, instance := range instances {
 			if instance.IsCoMaster {
-				entries = append(entries, getASCIITopologyEntry(1, instance, replicationMap, historyTimestampPattern == "")...)
+				entries = append(entries, getASCIITopologyEntry(1, instance, replicationMap, historyTimestampPattern == "", fillerCharacter)...)
 			}
 		}
 	}
@@ -122,7 +125,7 @@ func ASCIITopology(clusterName string, historyTimestampPattern string) (result s
 			entryIndent := strings.Index(entry, "[")
 			if maxIndent > entryIndent {
 				tokens := strings.Split(entry, "[")
-				newEntry := fmt.Sprintf("%s%s[%s", tokens[0], strings.Repeat(" ", maxIndent-entryIndent), tokens[1])
+				newEntry := fmt.Sprintf("%s%s[%s", tokens[0], strings.Repeat(fillerCharacter, maxIndent-entryIndent), tokens[1])
 				entries[i] = newEntry
 			}
 		}
@@ -593,6 +596,7 @@ func MoveBelowGTID(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 // moveReplicasViaGTID moves a list of replicas under another instance via GTID, returning those replicas
 // that could not be moved (do not use GTID)
 func moveReplicasViaGTID(replicas [](*Instance), other *Instance) (movedReplicas [](*Instance), unmovedReplicas [](*Instance), err error, errs []error) {
+	replicas = RemoveNilInstances(replicas)
 	replicas = RemoveInstance(replicas, &other.Key)
 	if len(replicas) == 0 {
 		// Nothing to do

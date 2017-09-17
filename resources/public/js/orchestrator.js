@@ -361,8 +361,6 @@ function openNodeModal(node) {
     '<a href="' + appUrl('/web/audit/instance/' + node.Key.Hostname + '/' + node.Key.Port) + '">' + node.title + '</a>');
   addNodeModalDataAttribute("Agent",
     '<a href="' + appUrl('/web/agent/' + node.Key.Hostname) + '">' + node.Key.Hostname + '</a>');
-  addNodeModalDataAttribute("Long queries",
-    '<a href="' + appUrl('/web/long-queries?filter=' + node.Key.Hostname) + '">on ' + node.Key.Hostname + '</a>');
 
   $('#node_modal [data-btn]').unbind("click");
 
@@ -461,17 +459,20 @@ function openNodeModal(node) {
   });
 
   if (node.IsDowntimed) {
-    $('#node_modal [data-panel-type=downtime]').html("Downtimed by <strong>" + node.DowntimeOwner + "</strong> until " + node.DowntimeEndTimestamp);
-    $('#node_modal [data-description=downtime-status]').html(
+    $('#node_modal .end-downtime .panel-heading').html("Downtimed by <strong>" + node.DowntimeOwner + "</strong> until " + node.DowntimeEndTimestamp);
+    $('#node_modal .end-downtime .panel-body').html(
       node.DowntimeReason
     );
-    $('#node_modal [data-panel-type=begin-downtime]').hide();
+    $('#node_modal .begin-downtime').hide();
     $('#node_modal button[data-btn=begin-downtime]').hide();
-    $('#node_modal [data-panel-type=end-downtime]').show();
+
+    $('#node_modal .end-downtime').show();
+    $('#node_modal button[data-btn=end-downtime]').show();
   } else {
-    $('#node_modal [data-panel-type=downtime]').html("Downtime");
-    $('#node_modal [data-panel-type=begin-downtime]').show();
-    $('#node_modal [data-panel-type=end-downtime]').hide();
+    $('#node_modal .begin-downtime').show();
+    $('#node_modal button[data-btn=begin-downtime]').show();
+
+    $('#node_modal .end-downtime').hide();
     $('#node_modal button[data-btn=end-downtime]').hide();
   }
   $('#node_modal button[data-btn=skip-query]').hide();
@@ -819,6 +820,9 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.IsCandidate) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-heart" title="Candidate"></span> ');
     }
+    if (instance.PromotionRule == "prefer_not") {
+      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-thumbs-down" title="Prefer not promote"></span> ');
+    }
     if (instance.PromotionRule == "must_not") {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-ban-circle" title="Must not promote"></span> ');
     }
@@ -911,10 +915,18 @@ $(document).ready(function() {
 
   $('body').css('background-image', 'url(' + appUrl('/images/tile.png') + ')');
 
-  $(".navbar-nav li").removeClass("active");
-  $(".navbar-nav li[data-nav-page='" + activePage() + "']").addClass("active");
-
   $.get(appUrl("/api/clusters-info"), function(clusters) {
+    clusters = clusters || [];
+
+    function sortAlphabetically(cluster1, cluster2) {
+      var cmp = cluster1.ClusterAlias.localeCompare(cluster2.ClusterAlias);
+      if (cmp == 0) {
+        cmp = cluster1.ClusterName.localeCompare(cluster2.ClusterName);
+      }
+      return cmp;
+    }
+    clusters.sort(sortAlphabetically);
+
     clusters.forEach(function(cluster) {
       var url = appUrl('/web/cluster/' + cluster.ClusterName)
       var title = cluster.ClusterName;

@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/openark/golib/log"
 	"strconv"
 	"strings"
@@ -342,4 +343,11 @@ func InClauseStringValues(terms []string) string {
 // Convert variable length arguments into arguments array
 func Args(args ...interface{}) []interface{} {
 	return args
+}
+
+func NilIfZero(i int64) interface{} {
+	if i == 0 {
+		return nil
+	}
+	return i
 }

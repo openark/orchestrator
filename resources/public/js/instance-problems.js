@@ -6,10 +6,9 @@ $(document).ready(function() {
     problemsURI += "/" + currentClusterName();
   }
   $.get(appUrl(problemsURI), function(instances) {
-    if (instances == null) {
-      instances = [];
-    }
+    instances = instances || [];
     $.get(appUrl("/api/maintenance"), function(maintenanceList) {
+      maintenanceList = maintenanceList || [];
       normalizeInstances(instances, maintenanceList);
       displayProblemInstances(instances);
     }, "json");

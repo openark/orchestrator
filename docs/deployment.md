@@ -1,69 +1,148 @@
-# Deploying Orchestrator in production
+# Orchestrator deployment in production
 
-This text discusses deployment options for `orchestrator`.
+What does an `orchestrator` deployment look like? What do you need to set in `puppet/chef`? What services need to run and where?
 
-It is assumed you already know how to install `orchestrator` on a production machine and how to configure it with a backend database. It is also assumed you have configured your MySQL servers to allow connections from `orchestrator`.
-If not, please refer to the [installation section](install.md)
+## Deploying the service & clients
 
-The following hints should clear up some questions:
+You will first decide whether you want to run `orchestrator` on a shared backend DB or with a `raft` setup. See [High availability](high-availability.md) for some options, and [orchestrator/raft vs. synchronous replication setup](raft-vs-sync-repl.md) for comparison & discussion.
 
-- `orchestrator` can run as a linux service
-  - When running as a service, it assumes the role of continuous discovery: a never ending polling of your MySQL topologies
-  - When running as a service, it also provides HTTP API/Web interface
-- `orchestrator` can run in command line mode
-  - Useful for us CLI geeks who want to have greater control and capture all the lovely debug messages
+Follow these deployment guides:
 
-###### In terms of deployment
+- Deploying `orchestrator` on [shared backend DB](deployment-shared-backend.md)
+- Deploying `orchestrator` via [raft consensus](deployment-raft.md)
 
-- `orchestrator` uses a MySQL backend.
-- The backend database has the _state_ of your topologies. `orchestrator` is almost stateless.
-  - `orchestrator` only has state for pending operations (e.g. while a replica is being moved)
-- The backend database will have the state of your multiple topologies.
-- You _can_ and _should_ have more than one `orchestrator` running with the same MySQL backend.
-- You should _not_ have more than one MySQL backend.
+## Next steps
 
-The MySQL backend is a master server, for which you may have replicas for redundancy or otherwise build your favorite HA solution.
+`orchestrator` works well in dynamic environments and adapts to changes in inventory, configuration and topology. Its dynamic nature suggests that the environment should interact with it in dynamic nature, as well. Instead of hard-coded configuration, `orchestrator` is happy to accept dynamic hints and requests that change its perspective on the topologies. Once the `orchestrator` services and clients are deployed, consider performing the following actions to take full
+advantage of this.
 
-The author of `orchestrator` has deployed it in large environments of thousands of servers, with a single backend database managing them all.
+### Discovering topologies
 
-###### Orchestrator service
+`orchestrator` auto-discovers boxes joining a topology. If a new replica joins an existing cluster that is monitored by `orchestrator`, it is discovered when `orchestrator` next probes its master.
 
-- You _can_ and _should_ have multiple `orchestrator` services running on different machines, all running on the same backend database.
-  - When running as a service, `orchestrator` repeatedly attempts to claim _leadership_. Should one `orchestrator` service
-    fail, another one will pick up where it left.
-  - Only one service will be the leader at any given time.
-  - The leader is the one polling for servers; doing database cleanup; checking for crash recovery scenarios etc.
-- You may choose to have all your `orchestrator` services load-balanced
+However, how does `orchestrator` discover completely new topologies?
 
-###### Orchestrator CLI
-- You _can_ and _should_ have as many deployments of orchestrator CLI as you like, on multiple servers, all configured to work
-  with the _same backend MySQL_
-- You _may_ concurrently issue commands from multiple CLIs, as well as working with the Web UI at the same time.
-- The (single) MySQL backend has the necessary state for managing concurrent operations.
-- `orchestrator` has "maintenance locks" which prevent destructive concurrent operations on the same instance. At worst an
-  operation will be rejected due to not being able to acquire maintenance lock.
+- You may ask `orchestrator` to _discover_ (probe) any single server in such a topology, and from there on it will crawl its way across the entire topology.
+- Or you may choose to just let `orchestrator` know about any single production server you have, routinely. Set up a cronjob on any production `MySQL` server to read:
 
-The author of `orchestrator` has it deployed on multiple machines
-as a service, behind a load balancer. On the same setup, CLI is
-deployed and can be executed from thousands of machines.
+  ```
+  0 0 * * * root "/usr/bin/perl -le 'sleep rand 600' && /usr/bin/orchestrator-client -c discover -i this.hostname.com"
+  ```
 
-##### A visualized example
+  In the above, each host lets `orchestrator` know about itself once per day; newly bootstrapped hosts are discovered the next midnight. The `sleep` in introduced to avoid storming `orchestrator` by all servers at the same time.
 
-![Orchestrator deployment](images/orchestrator-deployment.png)
+  The above uses [orchestrator-client](orchestrator-client.md), but you may use the [orchestrator cli](executing-via-command-line.md) if running on a shared-backend setup.
 
-In the above four `orchestrator` services are behind an HTTP load balancer. Only one of them is the _leader_ at any given time; they compete for leadership between themselves and recognize if the leader is non doing its duty.
+### Adding promotion rules
 
-To the right: the many topologies polled by `orchestrator`. The leader polls each an every server in those topologies.
+Some servers are better candidate for promotion in the event of failovers. Some servers aren't good picks. Examples:
 
-On top left: the `orchestrator` MySQL backend: a master & three replicas. All 4 services use the same backend database.
+- A server has weaker hardware configuration. You prefer to not promote it.
+- A server is in a remote data center and you don't want to promote it.
+- A server is used as your backup source and has LVM snapshots open at all times. You don't want to promote it.
+- A server has a good setup and is ideal as candidate. You prefer to promote it.
+- A server is OK, and you don't have any particular opinion.
 
-Not shown in this picture (for clarity purposes), but the `orchestrator` backend database and its replicas are themselves one of those topologies
-polled by `orchestrator` It eats its own dogfood.
+You will announce your preference for a given server to `orchestrator` in the following way:
 
-On left, bottom: `orchestrator` CLI is installed on any and all MySQL servers. All these CLI deployments use the very same
-MySQL backend database.
+```
+orchestrator -c register-candidate -i ${::fqdn} --promotion-rule ${promotion_rule}
+```
 
-Not shown in this picture (for clarity purposes), the MySQL servers on these hosts are being polled by `orchestrator` just as those
-on the right.
+Supported promotion rules are:
 
-You may choose to install `orchestrator` on non-MySQL hosts, of course. It has no MySQL dependencies on the deployed host.
+- `prefer`
+- `neutral`
+- `prefer_not`
+- `must_not`
+
+Promotion rules expire after an hour. That's the dynamic nature of `orchestrator`. You will want to setup a cron job that will announce the promotion rule for a server:
+
+```
+*/2 * * * * root "/usr/bin/perl -le 'sleep rand 10' && /usr/bin/orchestrator-client -c register-candidate -i this.hostname.com --promotion-rule prefer"
+```
+
+This setup comes from production environments. The cron entries get updated by `puppet` to reflect the appropriate `promotion_rule`. A server may have `prefer` at this time, and `prefer_not` in 5 minutes from now. Integrate your own service discovery method, your own scripting, to provide with your up-to-date `promotion-rule`.
+
+### Downtiming
+
+When a server has a problem, it:
+
+- Will show up in the `problems` dropdown on the web interface.
+- May be considered for recovery (example: server is dead and all of it's replicas are now broken).
+
+You may _downtime_ a server such that:
+- It will not show up in the `problems` dropdown.
+- It will not be considered for recovery.
+
+Downtiming takes place via:
+
+```
+orchestrator-client -c begin-downtime -duration 30m -reason "testing" -owner myself
+```
+
+Some servers may be known to be routinely broken; for example, auto-restore servers; dev boxes; testing boxes. For such servers you may want to have _continuous_ downtime. One way to achieve that it to set so large `-duration 240000h`. But then you need to remember to `end-downtime` if something changes about the box. Continuing the dynamic approach, consider:
+
+```
+*/2 * * * * root "/usr/bin/perl -le 'sleep rand 10' && /data/orchestrator/current/bin/orchestrator -c begin-downtime -i ${::fqdn} --duration=5m --owner=cron --reason=continuous_downtime"
+```
+
+Every `2` minutes, downtime for `5` minutes; this means that as we cancel the cronjob, _downtime_ will expire within `5` minutes.
+
+Shown above are uses for both `orchestrator-client` and the `orchestrator` command line interface. For completeness, this is how to operate the same via direct API call:
+
+```shell
+$ curl -s "http://my.orchestrator.service:80/api/begin-downtime/my.hostname/3306/wallace/experimenting+failover/45m"
+```
+
+The `orchestrator-client` script runs this very API call, wrapping it up and encoding the URL path. It can also automatically detect the leader, in case you don't want to run through a proxy.
+
+### Using Pseudo-GTID
+
+If you're not using GTID, you can inject your own Pseudo-GTID entries, and `orchestrator` will be able to run GTID-like magic such as correlating two unrelated servers and making one replicate from the other.
+
+Read more on the [Pseudo-GTID](pseudo-gtid.md) documentation page.
+
+On your masters, run the [pseudo-gtid](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/bin/pseudo-gtid) script as a service. See `pupept` [example](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/puppet).
+
+The service will inject Pseudo-GTID entries, to be replicated downstream.
+
+The script assumes the existence of a `meta.pseudo_gtid_status` table. Strictly speaking, this table doesn't have to exist, and you can strip away the code from the [pseudo-gtid](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/bin/pseudo-gtid) script that writes to this table. However, the table comes handy in making the pseudo-GTID entries visible via SQL (they're otherwise only visible in the binary log).
+
+Code for this table creation is found in [pseudo-gtid.sql](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/pseudo-gtid.sql). This SQL file also suggests an alternative to the `pseudo-gtid` service, in the form of `event_scheduler`. Choose your preferred method.
+
+It should be noted that as part of failovers, you should make sure to disable pseudo-GTID on demoted master and enable it on promoted master.
+
+### Populating meta data
+
+`orchestrator` extracts some metadata from servers:
+- What's the alias for the cluster this instance belongs to?
+- What's the data center a server belongs to?
+- Is semi-sync enforced on this server?
+
+These details are extracted by queries such as:
+- `DetectClusterAliasQuery`
+- `DetectClusterDomainQuery`
+- `DetectDataCenterQuery`
+- `DetectSemiSyncEnforcedQuery`
+
+or by regular expressions acting on the hostnames:
+- `DataCenterPattern`
+- `PhysicalEnvironmentPattern`
+
+Queries can be satisfied by injecting data into metadata tables on your master. For example, you may:
+
+```sql
+CREATE TABLE IF NOT EXISTS cluster (
+  anchor TINYINT NOT NULL,
+  cluster_name VARCHAR(128) CHARSET ascii NOT NULL DEFAULT '',
+  PRIMARY KEY (anchor)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+```
+
+and populate this table, with, say `1, my_cluster_name`, coupled with:
+```json
+{
+  "DetectClusterAliasQuery": "select cluster_name from meta.cluster where anchor=1"
+}
+```

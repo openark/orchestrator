@@ -24,11 +24,11 @@ By way of example:
 
 The de-facto listing is the code, please see [api.go](https://github.com/github/orchestrator/blob/master/go/http/api.go) (scroll down to `RegisterRequests`).
 
-You may also appreciate looking at [orchestrator-client](using-orchestrator-client.md) ([source code](https://github.com/github/orchestrator/blob/master/resources/bin/orchestrator-client)) to see how command line interface is translated to API calls.
+You may also appreciate looking at [orchestrator-client](orchestrator-client.md) ([source code](https://github.com/github/orchestrator/blob/master/resources/bin/orchestrator-client)) to see how command line interface is translated to API calls.
 
-Or, just use the [orchestrator-client](using-orchestrator-client.md) as your API client, this is what it was made for.
+Or, just use the [orchestrator-client](orchestrator-client.md) as your API client, this is what it was made for.
 
-#### Instance JSON breakdown
+### Instance JSON breakdown
 
 Many API calls return _instance objects_, describing a single MySQL server.
 This sample is followed by a field breakdown:
@@ -150,3 +150,46 @@ The structure of an Instance evolves and documentation will always fall behind. 
 * `CountMySQLSnapshots`: number of known snapshots (data provided by `orchestrator-agent`)
 * `IsCandidate`: (metadata) `true` when this instance has been marked as _candidate_ via the `register-candidate` CLI command. Can be used in crash recovery for prioritizing failover options
 * `UnresolvedHostname`: name this host _unresolves_ to, as indicated by the `register-hostname-unresolve` CLI command
+
+### Cheatsheet
+
+Here are a few useful examples of API usage:
+
+- Get general information about a cluster:
+```
+curl -s "http://my.orchestrator.service.com/api/cluster-info/my_cluster" | jq .
+
+{
+  "ClusterName": "my-cluster-fqdn:3306",
+  "ClusterAlias": "my_cluster",
+  "ClusterDomain": "my-cluster.com",
+  "CountInstances": 10,
+  "HeuristicLag": 0,
+  "HasAutomatedMasterRecovery": true,
+  "HasAutomatedIntermediateMasterRecovery": true
+}
+```
+
+- Find hosts in `my_cluster` that don't have binary logging:
+```
+curl -s "http://my.orchestrator.service.com/api/cluster/alias/my_cluster" | jq '.[] | select(.LogBinEnabled==false) .Key.Hostname' -r
+
+```
+
+- Find direct replicas of `my_cluster`'s master:
+```
+curl -s "http://my.orchestrator.service.com/api/cluster/alias/my_cluster" | jq '.[] | select(.ReplicationDepth==1) .Key.Hostname' -r
+```
+
+or:
+
+```
+master=$(curl -s "http://my.orchestrator.service.com/api/cluster-info/my_cluster" | jq '.ClusterName' | tr ':' '/')
+curl -s "http://my.orchestrator.service.com/api/instance-replicas/${master}" | jq '.[] | .Key.Hostname' -r
+```
+
+- Find all intermediate masters in `my_cluster`:
+
+```
+curl -s "http://my.orchestrator.service.com/api/cluster/alias/my_cluster" | jq '.[] | select(.MasterKey.Hostname!="") | select(.SlaveHosts!=[]) .Key.Hostname'
+```

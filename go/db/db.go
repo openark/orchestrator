@@ -460,9 +460,6 @@ var generateSQLBase = []string{
 		DROP INDEX hostname_port_active_period_uidx ON topology_failure_detection
 	`,
 	`
-		CREATE UNIQUE INDEX hostname_port_active_period_uidx_topology_failure_detection ON topology_failure_detection (hostname, port, in_active_period, end_active_period_unixtime)
-	`,
-	`
 		DROP INDEX in_active_start_period_idx ON topology_failure_detection
 	`,
 	`
@@ -778,6 +775,47 @@ var generateSQLBase = []string{
 			audit_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			message text CHARACTER SET utf8 NOT NULL,
 			PRIMARY KEY (recovery_step_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS raft_store (
+			store_id bigint unsigned not null auto_increment,
+			store_key varbinary(512) not null,
+			store_value blob not null,
+			PRIMARY KEY (store_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX store_key_idx_raft_store ON raft_store (store_key)
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS raft_log (
+			log_index bigint unsigned not null auto_increment,
+			term bigint not null,
+			log_type int not null,
+			data blob not null,
+			PRIMARY KEY (log_index)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS raft_snapshot (
+			snapshot_id bigint unsigned not null auto_increment,
+			snapshot_name varchar(128) CHARACTER SET utf8 NOT NULL,
+			snapshot_meta varchar(4096) CHARACTER SET utf8 NOT NULL,
+			PRIMARY KEY (snapshot_id)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE UNIQUE INDEX snapshot_name_uidx_raft_snapshot ON raft_snapshot (snapshot_name)
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS database_instance_peer_analysis (
+			peer varchar(128) NOT NULL,
+		  hostname varchar(128) NOT NULL,
+		  port smallint(5) unsigned NOT NULL,
+		  analysis_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		  analysis varchar(128) NOT NULL,
+		  PRIMARY KEY (peer, hostname, port)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
@@ -1253,6 +1291,10 @@ var generateSQLPatches = []string{
 		CREATE UNIQUE INDEX host_port_active_recoverable_uidx_topology_failure_detection ON topology_failure_detection (hostname, port, in_active_period, end_active_period_unixtime, is_actionable)
 	`,
 	`
+		ALTER TABLE raft_snapshot
+			ADD COLUMN created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+	`,
+	`
 		ALTER TABLE node_health
 			ADD COLUMN db_backend varchar(255) CHARACTER SET ascii NOT NULL DEFAULT ""
 	`,
@@ -1271,7 +1313,7 @@ func OpenTopology(host string, port int) (*sql.DB, error) {
 }
 
 func openTopology(host string, port int, readTimeout int) (*sql.DB, error) {
-	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/?timeout=%ds&readTimeout=%ds",
+	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/?timeout=%ds&readTimeout=%ds&interpolateParams=true",
 		config.Config.MySQLTopologyUser,
 		config.Config.MySQLTopologyPassword,
 		host, port,
@@ -1300,8 +1342,10 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 		if err == nil && !fromCache {
 			log.Debugf("Connected to orchestrator backend: sqlite on %v", config.Config.SQLite3DataFile)
 		}
+		db.SetMaxOpenConns(1)
+		db.SetMaxIdleConns(1)
 	} else {
-		mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&interpolateParams=%t",
+		mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&interpolateParams=true",
 			config.Config.MySQLOrchestratorUser,
 			config.Config.MySQLOrchestratorPassword,
 			config.Config.MySQLOrchestratorHost,
@@ -1309,7 +1353,6 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 			config.Config.MySQLOrchestratorDatabase,
 			config.Config.MySQLConnectTimeoutSeconds,
 			config.Config.MySQLOrchestratorReadTimeoutSeconds,
-			config.Config.MySQLInterpolateParams,
 		)
 		if config.Config.MySQLOrchestratorUseMutualTLS {
 			mysql_uri, _ = SetupMySQLOrchestratorTLS(mysql_uri)
@@ -1498,6 +1541,15 @@ func execInternal(db *sql.DB, query string, args ...interface{}) (sql.Result, er
 	}
 	res, err := sqlutils.ExecSilently(db, query, args...)
 	return res, err
+}
+
+// PrepareTransaction is a convenience method for preparing a transaction while manipulating dialect
+func PrepareTransaction(tx *sql.Tx, query string) (stmt *sql.Stmt, err error) {
+	query, err = translateStatement(query)
+	if err != nil {
+		return stmt, err
+	}
+	return tx.Prepare(query)
 }
 
 // ExecOrchestrator will execute given query on the orchestrator backend database.

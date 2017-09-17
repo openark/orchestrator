@@ -24,6 +24,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/github/orchestrator/go/agent"
 	"github.com/github/orchestrator/go/config"
@@ -131,6 +132,9 @@ func validateInstanceIsFound(instanceKey *inst.InstanceKey) (instance *inst.Inst
 // CliWrapper is called from main and allows for the instance parameter
 // to take multiple instance names separated by a comma or whitespace.
 func CliWrapper(command string, strict bool, instances string, destination string, owner string, reason string, duration string, pattern string, clusterAlias string, pool string, hostnameFlag string) {
+	if config.Config.RaftEnabled && !*config.RuntimeCLIFlags.IgnoreRaftSetup {
+		log.Fatalf(`Orchestrator configured to run raft ("RaftEnabled": true). All access must go through the web API of the active raft node. You may use the orchestrator-client script which has a similar interface to the command line invocation. You may override this with --ignore-raft-setup`)
+	}
 	r := regexp.MustCompile(`[ ,\r\n\t]+`)
 	tokens := r.Split(instances, -1)
 	switch command {
@@ -995,7 +999,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if pool == "" {
 				log.Fatal("Please submit --pool")
 			}
-			err := inst.ApplyPoolInstances(pool, instance)
+			err := inst.ApplyPoolInstances(inst.NewPoolInstancesSubmission(pool, instance))
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1092,7 +1096,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("all-instances", "Information", `The complete list of known instances`):
 		{
-			instances, err := inst.FindInstances(".")
+			instances, err := inst.SearchInstances("")
 			if err != nil {
 				log.Fatale(err)
 			} else {
@@ -1320,7 +1324,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 					log.Fatalf("Duration value must be non-negative. Given value: %d", durationSeconds)
 				}
 			}
-			err := inst.BeginDowntime(instanceKey, inst.GetMaintenanceOwner(), reason, uint(durationSeconds))
+			duration := time.Duration(durationSeconds) * time.Second
+			err := inst.BeginDowntime(inst.NewDowntime(instanceKey, inst.GetMaintenanceOwner(), reason, duration))
 			if err == nil {
 				log.Infof("Downtime duration: %d seconds", durationSeconds)
 			} else {
@@ -1455,7 +1460,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			err = inst.RegisterCandidateInstance(instanceKey, promotionRule)
+			err = inst.RegisterCandidateInstance(inst.NewCandidateDatabaseInstance(instanceKey, promotionRule))
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1464,7 +1469,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("register-hostname-unresolve", "Instance, meta", `Assigns the given instance a virtual (aka "unresolved") name`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			err := inst.RegisterHostnameUnresolve(instanceKey, hostnameFlag)
+			err := inst.RegisterHostnameUnresolve(inst.NewHostnameRegistration(instanceKey, hostnameFlag))
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1473,7 +1478,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("deregister-hostname-unresolve", "Instance, meta", `Explicitly deregister/dosassociate a hostname with an "unresolved" name`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			err := inst.DeregisterHostnameUnresolve(instanceKey)
+			err := inst.RegisterHostnameUnresolve(inst.NewHostnameDeregistration(instanceKey))
 			if err != nil {
 				log.Fatale(err)
 			}
