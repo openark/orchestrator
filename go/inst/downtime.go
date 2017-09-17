@@ -26,26 +26,25 @@ type Downtime struct {
 	Reason   string
 	Duration time.Duration
 	BeginsAt time.Time
+	EndsAt   time.Time
 }
 
 func NewDowntime(instanceKey *InstanceKey, owner string, reason string, duration time.Duration) *Downtime {
-	return &Downtime{
+	downtime := &Downtime{
 		Key:      instanceKey,
 		Owner:    owner,
 		Reason:   reason,
 		Duration: duration,
 		BeginsAt: time.Now(),
 	}
-}
-
-func (downtime *Downtime) EndsAt() time.Time {
-	return downtime.BeginsAt.Add(downtime.Duration)
+	downtime.EndsAt = downtime.BeginsAt.Add(downtime.Duration)
+	return downtime
 }
 
 func (downtime *Downtime) Ended() bool {
-	return downtime.EndsAt().Before(time.Now())
+	return downtime.EndsAt.Before(time.Now())
 }
 
 func (downtime *Downtime) EndsIn() time.Duration {
-	return downtime.EndsAt().Sub(time.Now())
+	return downtime.EndsAt.Sub(time.Now())
 }
