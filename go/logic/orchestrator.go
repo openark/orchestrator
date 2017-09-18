@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -45,6 +46,7 @@ const discoveryMetricsName = "DISCOVERY_METRICS"
 // as discovery process progresses.
 var discoveryQueue *discovery.Queue
 var snapshotDiscoveryKeys chan inst.InstanceKey
+var snapshotDiscoveryKeysMutex sync.Mutex
 
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
@@ -319,10 +321,17 @@ func onDiscoveryTick() {
 		go inst.ExpireMaintenance()
 	}
 
-	countSnapshotKeys := len(snapshotDiscoveryKeys)
-	for i := 0; i < countSnapshotKeys; i++ {
-		instanceKeys = append(instanceKeys, <-snapshotDiscoveryKeys)
-	}
+	func() {
+		// Normally onDiscoveryTick() shouldn't run concurrently. It is kicked by a ticker.
+		// However it _is_ invoked inside a goroutine. I like to be safe here.
+		snapshotDiscoveryKeysMutex.Lock()
+		defer snapshotDiscoveryKeysMutex.Unlock()
+
+		countSnapshotKeys := len(snapshotDiscoveryKeys)
+		for i := 0; i < countSnapshotKeys; i++ {
+			instanceKeys = append(instanceKeys, <-snapshotDiscoveryKeys)
+		}
+	}()
 	// avoid any logging unless there's something to be done
 	if len(instanceKeys) > 0 {
 		if len(instanceKeys) > config.Config.MaxOutdatedKeysToShow {

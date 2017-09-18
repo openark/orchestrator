@@ -85,17 +85,22 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 		allKeys, _ := inst.ReadAllInstanceKeys()
 		for _, key := range allKeys {
 			if !instanceKeyMap.HasKey(key) {
-				log.Debugf("raft Restore(): forgetting %+v", key)
 				inst.ForgetInstance(&key)
 			}
 		}
 		for _, key := range instanceKeyMap.GetInstanceKeys() {
-			log.Debugf("raft Restore(): discovering %+v", key)
 			go func() {
 				snapshotDiscoveryKeys <- key
 			}()
 		}
 	}
+	// downtime
+	{
+		for _, downtime := range snapshotData.DowntimedInstances {
+			inst.BeginDowntime(&downtime)
+		}
+	}
+
 	log.Debugf("raft restore applied")
 	return nil
 }
