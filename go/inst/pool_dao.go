@@ -144,6 +144,7 @@ func ReadAllPoolInstancesSubmissions() ([]PoolInstancesSubmission, error) {
 		submission := PoolInstancesSubmission{}
 		submission.Pool = m.GetString("pool")
 		submission.CreatedAt = m.GetTime("registered_at")
+		submission.RegisteredAt = m.GetString("registered_at")
 		submission.DelimitedInstances = m.GetString("hosts")
 		result = append(result, submission)
 		return nil

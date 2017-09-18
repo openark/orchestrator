@@ -29,7 +29,7 @@ type SnapshotData struct {
 	Keys               []inst.InstanceKey
 	DowntimedInstances []inst.Downtime
 	Candidates         []inst.CandidateDatabaseInstance
-	HostnameUnresolves []inst.HostnameUnresolve
+	HostnameUnresolves []inst.HostnameRegistration
 	Pools              []inst.PoolInstancesSubmission
 	RecoveryDisabled   bool
 }
@@ -47,7 +47,7 @@ func CreateSnapshotData() *SnapshotData {
 	// candidates
 	snapshotData.Candidates, _ = inst.BulkReadCandidateDatabaseInstance()
 	// unresolve
-	snapshotData.HostnameUnresolves, _ = inst.ReadAllHostnameUnresolves()
+	snapshotData.HostnameUnresolves, _ = inst.ReadAllHostnameUnresolvesRegistrations()
 	// pool
 	snapshotData.Pools, _ = inst.ReadAllPoolInstancesSubmissions()
 	// recovery
@@ -100,7 +100,28 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 			inst.BeginDowntime(&downtime)
 		}
 	}
-
+	// candidates
+	{
+		for _, candidate := range snapshotData.Candidates {
+			inst.RegisterCandidateInstance(&candidate)
+		}
+	}
+	// HostnameUnresolves
+	{
+		for _, registration := range snapshotData.HostnameUnresolves {
+			inst.RegisterHostnameUnresolve(&registration)
+		}
+	}
+	// Pools
+	{
+		for _, submission := range snapshotData.Pools {
+			inst.ApplyPoolInstances(&submission)
+		}
+	}
+	// recovery disable
+	{
+		SetRecoveryDisabled(snapshotData.RecoveryDisabled)
+	}
 	log.Debugf("raft restore applied")
 	return nil
 }

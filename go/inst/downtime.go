@@ -21,12 +21,14 @@ import (
 )
 
 type Downtime struct {
-	Key      *InstanceKey
-	Owner    string
-	Reason   string
-	Duration time.Duration
-	BeginsAt time.Time
-	EndsAt   time.Time
+	Key            *InstanceKey
+	Owner          string
+	Reason         string
+	Duration       time.Duration
+	BeginsAt       time.Time
+	EndsAt         time.Time
+	BeginsAtString string
+	EndsAtString   string
 }
 
 func NewDowntime(instanceKey *InstanceKey, owner string, reason string, duration time.Duration) *Downtime {

@@ -2407,26 +2407,28 @@ func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern str
 
 // RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.
 func RegisterCandidateInstance(candidate *CandidateDatabaseInstance) error {
+	args := sqlutils.Args(candidate.Hostname, candidate.Port, string(candidate.PromotionRule))
+	lastSuggestedHint := "now()"
+	if candidate.LastSuggested != "" {
+		lastSuggestedHint = "?"
+		args = append(args, candidate.LastSuggested)
+	}
+	query := fmt.Sprintf(`
+			insert into candidate_database_instance (
+					hostname,
+					port,
+					promotion_rule,
+					last_suggested
+				) values (?, ?, %s, ?)
+				on duplicate key update
+					hostname=values(hostname),
+					port=values(port),
+					last_suggested=now(),
+					promotion_rule=values(promotion_rule)
+			`, lastSuggestedHint)
 	writeFunc := func() error {
-		_, err := db.ExecOrchestrator(`
-				insert into candidate_database_instance (
-						hostname,
-						port,
-						last_suggested,
-						promotion_rule)
-					values (?, ?, NOW(), ?)
-					on duplicate key update
-						hostname=values(hostname),
-						port=values(port),
-						last_suggested=now(),
-						promotion_rule=values(promotion_rule)
-				`, candidate.Hostname, candidate.Port, string(candidate.PromotionRule),
-		)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
+		_, err := db.ExecOrchestrator(query, args...)
+		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }
