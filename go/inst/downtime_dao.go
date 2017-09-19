@@ -32,7 +32,6 @@ func BeginDowntime(downtime *Downtime) (err error) {
 		downtime.Duration = config.MaintenanceExpireMinutes * time.Minute
 	}
 	if downtime.EndsAtString != "" {
-		log.Debugf("............. as string: %s", downtime.EndsAtString)
 		_, err = db.ExecOrchestrator(`
 				insert
 					into database_instance_downtime (
