@@ -97,6 +97,13 @@ func (store *Store) Open(peerNodes []string) error {
 	// Create the log store and stable store.
 	logStore := NewRelationalStore()
 	log.Debugf("raft: logStore=%+v", logStore)
+	if snapshotsList, err := snapshots.List(); err == nil && len(snapshotsList) == 0 {
+		log.Debugf("raft: cannot find any snapshots.")
+		if firstIndex, _ := logStore.FirstIndex(); firstIndex > 1 {
+			log.Debugf("raft: log store first index is %+v. Since no spanshots exist I will purge the log store", firstIndex)
+			logStore.DeleteAll()
+		}
+	}
 
 	// Instantiate the Raft systems.
 	if store.raft, err = raft.NewRaft(config, (*fsm)(store), logStore, logStore, snapshots, peerStore, transport); err != nil {
