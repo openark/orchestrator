@@ -89,5 +89,9 @@ func (f *fsm) Snapshot() (raft.FSMSnapshot, error) {
 func (f *fsm) Restore(rc io.ReadCloser) error {
 	defer rc.Close()
 
+	if !isRaftSetupComplete() {
+		log.Debugf("......... not restoring on raft startup")
+		return nil
+	}
 	return f.snapshotCreatorApplier.Restore(rc)
 }

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
@@ -36,6 +37,7 @@ const (
 
 var RaftNotRunning = fmt.Errorf("raft is not configured/running")
 var store *Store
+var raftSetupComplete int64
 var ThisHostname string
 
 var fatalRaftErrorChan = make(chan error)
@@ -75,7 +77,12 @@ func Setup(applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier
 
 	setupHttpClient()
 
+	atomic.StoreInt64(&raftSetupComplete, 1)
 	return nil
+}
+
+func isRaftSetupComplete() bool {
+	return atomic.LoadInt64(&raftSetupComplete) == 1
 }
 
 // getRaft is a convenience method
