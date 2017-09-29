@@ -31,6 +31,11 @@ type fsm Store
 
 // Apply applies a Raft log entry to the key-value store.
 func (f *fsm) Apply(l *raft.Log) interface{} {
+	if !isRaftSetupComplete() {
+		log.Debugf("......... not applying command on raft startup")
+		return nil
+	}
+
 	var c storeCommand
 	if err := json.Unmarshal(l.Data, &c); err != nil {
 		log.Errorf("failed to unmarshal command: %s", err.Error())
@@ -47,6 +52,7 @@ func (f *fsm) Apply(l *raft.Log) interface{} {
 		hint := string(c.Value)
 		return f.yieldByHint(hint)
 	}
+	log.Debugf("orchestrator/raft: applying command %+v: %s", l.Index, c.Op)
 	return store.applier.ApplyCommand(c.Op, c.Value)
 }
 

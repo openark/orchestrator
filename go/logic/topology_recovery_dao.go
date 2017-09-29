@@ -31,13 +31,30 @@ import (
 
 // AttemptFailureDetectionRegistration tries to add a failure-detection entry; if this fails that means the problem has already been detected
 func AttemptFailureDetectionRegistration(analysisEntry *inst.ReplicationAnalysis) (registrationSuccessful bool, err error) {
-	sqlResult, err := db.ExecOrchestrator(`
+	args := sqlutils.Args(
+		analysisEntry.AnalyzedInstanceKey.Hostname,
+		analysisEntry.AnalyzedInstanceKey.Port,
+		process.ThisHostname,
+		process.ProcessToken.Hash,
+		string(analysisEntry.Analysis),
+		analysisEntry.ClusterDetails.ClusterName,
+		analysisEntry.ClusterDetails.ClusterAlias,
+		analysisEntry.CountReplicas,
+		analysisEntry.SlaveHosts.ToCommaDelimitedList(),
+		analysisEntry.IsActionableRecovery,
+	)
+	startActivePeriodHint := "now()"
+	if analysisEntry.StartActivePeriod != "" {
+		startActivePeriodHint = "?"
+		args = append(args, analysisEntry.StartActivePeriod)
+	}
+
+	query := fmt.Sprintf(`
 			insert ignore
 				into topology_failure_detection (
 					hostname,
 					port,
 					in_active_period,
-					start_active_period,
 					end_active_period_unixtime,
 					processing_node_hostname,
 					processcing_node_token,
@@ -46,12 +63,12 @@ func AttemptFailureDetectionRegistration(analysisEntry *inst.ReplicationAnalysis
 					cluster_alias,
 					count_affected_slaves,
 					slave_hosts,
-					is_actionable
+					is_actionable,
+					start_active_period
 				) values (
 					?,
 					?,
 					1,
-					NOW(),
 					0,
 					?,
 					?,
@@ -60,14 +77,12 @@ func AttemptFailureDetectionRegistration(analysisEntry *inst.ReplicationAnalysis
 					?,
 					?,
 					?,
-					?
+					?,
+					%s
 				)
-			`, analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port,
-		process.ThisHostname, process.ProcessToken.Hash,
-		string(analysisEntry.Analysis), analysisEntry.ClusterDetails.ClusterName,
-		analysisEntry.ClusterDetails.ClusterAlias, analysisEntry.CountReplicas,
-		analysisEntry.SlaveHosts.ToCommaDelimitedList(), analysisEntry.IsActionableRecovery,
-	)
+			`, startActivePeriodHint)
+
+	sqlResult, err := db.ExecOrchestrator(query, args...)
 	if err != nil {
 		return false, log.Errore(err)
 	}
@@ -697,6 +712,7 @@ func readFailureDetections(whereCondition string, limit string, args []interface
 		failureDetection.AnalysisEntry.ClusterDetails.ClusterAlias = m.GetString("cluster_alias")
 		failureDetection.AnalysisEntry.CountReplicas = m.GetUint("count_affected_slaves")
 		failureDetection.AnalysisEntry.ReadReplicaHostsFromString(m.GetString("slave_hosts"))
+		failureDetection.AnalysisEntry.StartActivePeriod = m.GetString("start_active_period")
 
 		failureDetection.RelatedRecoveryId = m.GetInt64("related_recovery_id")
 

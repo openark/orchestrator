@@ -23,6 +23,7 @@ import (
 	"github.com/github/orchestrator/go/inst"
 
 	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 )
 
 type SnapshotData struct {
@@ -32,6 +33,7 @@ type SnapshotData struct {
 	HostnameUnresolves []inst.HostnameRegistration
 	Pools              []inst.PoolInstancesSubmission
 	RecoveryDisabled   bool
+	FailureDetections  []TopologyRecovery
 }
 
 func NewSnapshotData() *SnapshotData {
@@ -50,6 +52,8 @@ func CreateSnapshotData() *SnapshotData {
 	snapshotData.HostnameUnresolves, _ = inst.ReadAllHostnameUnresolvesRegistrations()
 	// pool
 	snapshotData.Pools, _ = inst.ReadAllPoolInstancesSubmissions()
+	// detections
+	snapshotData.FailureDetections, _ = readFailureDetections("", "", sqlutils.Args())
 	// recovery
 	snapshotData.RecoveryDisabled, _ = IsRecoveryDisabled()
 
@@ -116,6 +120,12 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 	{
 		for _, submission := range snapshotData.Pools {
 			inst.ApplyPoolInstances(&submission)
+		}
+	}
+	// detections
+	{
+		for _, detection := range snapshotData.FailureDetections {
+			AttemptFailureDetectionRegistration(&detection.AnalysisEntry)
 		}
 	}
 	// recovery disable
