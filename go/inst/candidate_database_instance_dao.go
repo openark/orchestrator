@@ -52,7 +52,7 @@ func BulkReadCandidateDatabaseInstance() ([]CandidateDatabaseInstance, error) {
 			Hostname:      m.GetString("hostname"),
 			Port:          m.GetInt("port"),
 			PromotionRule: CandidatePromotionRule(m.GetString("promotion_rule")),
-			LastSuggested: m.GetString("last_suggested"),
+			LastSuggested: m.GetTime("last_suggested"),
 		}
 		// add to end of candidateDatabaseInstances
 		candidateDatabaseInstances = append(candidateDatabaseInstances, cdi)

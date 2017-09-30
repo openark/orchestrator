@@ -2409,7 +2409,7 @@ func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern str
 func RegisterCandidateInstance(candidate *CandidateDatabaseInstance) error {
 	args := sqlutils.Args(candidate.Hostname, candidate.Port, string(candidate.PromotionRule))
 	lastSuggestedHint := "now()"
-	if candidate.LastSuggested != "" {
+	if !candidate.LastSuggested.IsZero() {
 		lastSuggestedHint = "?"
 		args = append(args, candidate.LastSuggested)
 	}

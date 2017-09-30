@@ -18,6 +18,7 @@ package inst
 
 import (
 	"fmt"
+	"time"
 )
 
 // CandidateDatabaseInstance contains information about explicit promotion rules for an instance
@@ -25,7 +26,7 @@ type CandidateDatabaseInstance struct {
 	Hostname      string
 	Port          int
 	PromotionRule CandidatePromotionRule
-	LastSuggested string
+	LastSuggested time.Time
 }
 
 func NewCandidateDatabaseInstance(instanceKey *InstanceKey, promotionRule CandidatePromotionRule) *CandidateDatabaseInstance {
@@ -33,6 +34,7 @@ func NewCandidateDatabaseInstance(instanceKey *InstanceKey, promotionRule Candid
 		Hostname:      instanceKey.Hostname,
 		Port:          instanceKey.Port,
 		PromotionRule: promotionRule,
+		LastSuggested: time.Now(),
 	}
 }
 

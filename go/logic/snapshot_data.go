@@ -38,6 +38,7 @@ type SnapshotData struct {
 	RecoveryDisabled   bool
 	FailureDetections  []TopologyRecovery
 
+	RawCandidates sqlutils.ResultData
 	RawDetections sqlutils.ResultData
 	RawRecovery   sqlutils.ResultData
 }
@@ -72,7 +73,7 @@ func CreateSnapshotData() *SnapshotData {
 	// downtime
 	snapshotData.DowntimedInstances, _ = inst.ReadDowntime()
 	// candidates
-	snapshotData.Candidates, _ = inst.BulkReadCandidateDatabaseInstance()
+	// snapshotData.Candidates, _ = inst.BulkReadCandidateDatabaseInstance()
 	// unresolve
 	snapshotData.HostnameUnresolves, _ = inst.ReadAllHostnameUnresolvesRegistrations()
 	// pool
@@ -82,6 +83,7 @@ func CreateSnapshotData() *SnapshotData {
 	// recovery
 	snapshotData.RecoveryDisabled, _ = IsRecoveryDisabled()
 
+	readTableData("candidate_database_instance", &snapshotData.RawCandidates)
 	readTableData("topology_failure_detection", &snapshotData.RawDetections)
 	readTableData("topology_recovery", &snapshotData.RawRecovery)
 
@@ -133,11 +135,11 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 		}
 	}
 	// candidates
-	{
-		for _, candidate := range snapshotData.Candidates {
-			inst.RegisterCandidateInstance(&candidate)
-		}
-	}
+	// {
+	// 	for _, candidate := range snapshotData.Candidates {
+	// 		inst.RegisterCandidateInstance(&candidate)
+	// 	}
+	// }
 	// HostnameUnresolves
 	{
 		for _, registration := range snapshotData.HostnameUnresolves {
@@ -151,13 +153,14 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 		}
 	}
 	// detections
-	{
-		for _, detection := range snapshotData.FailureDetections {
-			AttemptFailureDetectionRegistration(&detection.AnalysisEntry)
-		}
-		writeTableData("topology_failure_detection", &snapshotData.RawDetections)
-	}
+	// {
+	// 	for _, detection := range snapshotData.FailureDetections {
+	// 		AttemptFailureDetectionRegistration(&detection.AnalysisEntry)
+	// 	}
+	// }
+	writeTableData("candidate_database_instance", &snapshotData.RawCandidates)
 	writeTableData("topology_recovery", &snapshotData.RawRecovery)
+	writeTableData("topology_failure_detection", &snapshotData.RawDetections)
 
 	// recovery disable
 	{
