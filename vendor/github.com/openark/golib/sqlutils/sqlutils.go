@@ -47,6 +47,18 @@ func (this *CellData) MarshalJSON() ([]byte, error) {
 	}
 }
 
+// UnmarshalJSON reds this object from JSON
+func (this *CellData) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	(*this).String = s
+	(*this).Valid = true
+
+	return nil
+}
+
 func (this *CellData) NullString() *sql.NullString {
 	return (*sql.NullString)(this)
 }
@@ -62,6 +74,14 @@ func (this *RowData) MarshalJSON() ([]byte, error) {
 		cells[i] = &d
 	}
 	return json.Marshal(cells)
+}
+
+func (this *RowData) Args() []interface{} {
+	result := make([]interface{}, len(*this))
+	for i := range *this {
+		result[i] = (*(*this)[i].NullString())
+	}
+	return result
 }
 
 // ResultData is an ordered row set of RowData
@@ -360,4 +380,26 @@ func NilIfZero(i int64) interface{} {
 		return nil
 	}
 	return i
+}
+
+func ScanTable(db *sql.DB, tableName string) (ResultData, error) {
+	query := fmt.Sprintf("select * from %s", tableName)
+	return QueryResultData(db, query)
+}
+
+func WriteTable(db *sql.DB, tableName string, values ResultData) (err error) {
+	if len(values) == 0 {
+		return nil
+	}
+	placeholders := make([]string, len(values[0]))
+	for i := range placeholders {
+		placeholders[i] = "?"
+	}
+	query := fmt.Sprintf("replace into %s values (%s)", tableName, strings.Join(placeholders, ","))
+	for _, rowData := range values {
+		if _, execErr := db.Exec(query, rowData.Args()...); execErr != nil {
+			err = execErr
+		}
+	}
+	return err
 }

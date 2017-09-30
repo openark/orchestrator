@@ -20,11 +20,14 @@ import (
 	"encoding/json"
 	"io"
 
+	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/inst"
 
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )
+
+type rawRelationalData [][]interface{}
 
 type SnapshotData struct {
 	Keys               []inst.InstanceKey
@@ -34,11 +37,33 @@ type SnapshotData struct {
 	Pools              []inst.PoolInstancesSubmission
 	RecoveryDisabled   bool
 	FailureDetections  []TopologyRecovery
+
+	RawDetections sqlutils.ResultData
+	RawRecovery   sqlutils.ResultData
 }
 
 func NewSnapshotData() *SnapshotData {
 	return &SnapshotData{}
 }
+
+func readTableData(tableName string, data *sqlutils.ResultData) error {
+	orcdb, err := db.OpenOrchestrator()
+	if err != nil {
+		return log.Errore(err)
+	}
+	*data, err = sqlutils.ScanTable(orcdb, tableName)
+	return log.Errore(err)
+}
+
+func writeTableData(tableName string, data *sqlutils.ResultData) error {
+	orcdb, err := db.OpenOrchestrator()
+	if err != nil {
+		return log.Errore(err)
+	}
+	err = sqlutils.WriteTable(orcdb, tableName, *data)
+	return log.Errore(err)
+}
+
 func CreateSnapshotData() *SnapshotData {
 	snapshotData := NewSnapshotData()
 
@@ -56,6 +81,9 @@ func CreateSnapshotData() *SnapshotData {
 	snapshotData.FailureDetections, _ = readFailureDetections("", "", sqlutils.Args())
 	// recovery
 	snapshotData.RecoveryDisabled, _ = IsRecoveryDisabled()
+
+	readTableData("topology_failure_detection", &snapshotData.RawDetections)
+	readTableData("topology_recovery", &snapshotData.RawRecovery)
 
 	log.Debugf("raft snapshot data created")
 	return snapshotData
@@ -127,7 +155,10 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 		for _, detection := range snapshotData.FailureDetections {
 			AttemptFailureDetectionRegistration(&detection.AnalysisEntry)
 		}
+		writeTableData("topology_failure_detection", &snapshotData.RawDetections)
 	}
+	writeTableData("topology_recovery", &snapshotData.RawRecovery)
+
 	// recovery disable
 	{
 		SetRecoveryDisabled(snapshotData.RecoveryDisabled)
