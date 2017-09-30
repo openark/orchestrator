@@ -2419,7 +2419,7 @@ func RegisterCandidateInstance(candidate *CandidateDatabaseInstance) error {
 					port,
 					promotion_rule,
 					last_suggested
-				) values (?, ?, %s, ?)
+				) values (?, ?, ?, %s)
 				on duplicate key update
 					hostname=values(hostname),
 					port=values(port),
