@@ -15,7 +15,7 @@ import (
 
 const (
 	retainSnapshotCount = 288
-	snapshotInterval    = 10 * time.Minute
+	snapshotInterval    = 10 * time.Second
 	raftTimeout         = 10 * time.Second
 )
 

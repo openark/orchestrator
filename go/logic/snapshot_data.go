@@ -27,8 +27,6 @@ import (
 	"github.com/openark/golib/sqlutils"
 )
 
-type rawRelationalData [][]interface{}
-
 type SnapshotData struct {
 	Keys               []inst.InstanceKey
 	DowntimedInstances []inst.Downtime
@@ -38,16 +36,16 @@ type SnapshotData struct {
 	RecoveryDisabled   bool
 	FailureDetections  []TopologyRecovery
 
-	RawCandidates sqlutils.ResultData
-	RawDetections sqlutils.ResultData
-	RawRecovery   sqlutils.ResultData
+	RawCandidates sqlutils.NamedResultData
+	RawDetections sqlutils.NamedResultData
+	RawRecovery   sqlutils.NamedResultData
 }
 
 func NewSnapshotData() *SnapshotData {
 	return &SnapshotData{}
 }
 
-func readTableData(tableName string, data *sqlutils.ResultData) error {
+func readTableData(tableName string, data *sqlutils.NamedResultData) error {
 	orcdb, err := db.OpenOrchestrator()
 	if err != nil {
 		return log.Errore(err)
@@ -56,7 +54,7 @@ func readTableData(tableName string, data *sqlutils.ResultData) error {
 	return log.Errore(err)
 }
 
-func writeTableData(tableName string, data *sqlutils.ResultData) error {
+func writeTableData(tableName string, data *sqlutils.NamedResultData) error {
 	orcdb, err := db.OpenOrchestrator()
 	if err != nil {
 		return log.Errore(err)

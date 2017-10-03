@@ -86,6 +86,10 @@ func (this *RowData) Args() []interface{} {
 
 // ResultData is an ordered row set of RowData
 type ResultData []RowData
+type NamedResultData struct {
+	Columns []string
+	Data    ResultData
+}
 
 var EmptyResultData = ResultData{}
 
@@ -289,8 +293,9 @@ func QueryResultData(db *sql.DB, query string, args ...interface{}) (ResultData,
 }
 
 // QueryResultDataNamed returns a raw array of rows, with column names
-func QueryResultDataNamed(db *sql.DB, query string, args ...interface{}) (ResultData, []string, error) {
-	return queryResultData(db, query, true, args...)
+func QueryNamedResultData(db *sql.DB, query string, args ...interface{}) (NamedResultData, error) {
+	resultData, columns, err := queryResultData(db, query, true, args...)
+	return NamedResultData{Columns: columns, Data: resultData}, err
 }
 
 // QueryRowsMapBuffered reads data from the database into a buffer, and only then applies the given function per row.
@@ -382,21 +387,26 @@ func NilIfZero(i int64) interface{} {
 	return i
 }
 
-func ScanTable(db *sql.DB, tableName string) (ResultData, error) {
+func ScanTable(db *sql.DB, tableName string) (NamedResultData, error) {
 	query := fmt.Sprintf("select * from %s", tableName)
-	return QueryResultData(db, query)
+	return QueryNamedResultData(db, query)
 }
 
-func WriteTable(db *sql.DB, tableName string, values ResultData) (err error) {
-	if len(values) == 0 {
+func WriteTable(db *sql.DB, tableName string, data NamedResultData) (err error) {
+	if len(data.Data) == 0 {
 		return nil
 	}
-	placeholders := make([]string, len(values[0]))
+	placeholders := make([]string, len(data.Columns))
 	for i := range placeholders {
 		placeholders[i] = "?"
 	}
-	query := fmt.Sprintf("replace into %s values (%s)", tableName, strings.Join(placeholders, ","))
-	for _, rowData := range values {
+	query := fmt.Sprintf(
+		`replace into %s (%s) values (%s)`,
+		tableName,
+		strings.Join(data.Columns, ","),
+		strings.Join(placeholders, ","),
+	)
+	for _, rowData := range data.Data {
 		if _, execErr := db.Exec(query, rowData.Args()...); execErr != nil {
 			err = execErr
 		}
