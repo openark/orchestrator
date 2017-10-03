@@ -125,6 +125,7 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 			}
 		}
 		for _, key := range instanceKeyMap.GetInstanceKeys() {
+			key := key
 			go func() {
 				snapshotDiscoveryKeys <- key
 			}()
