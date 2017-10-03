@@ -32,7 +32,7 @@ import (
 	"github.com/github/orchestrator/go/ssl"
 )
 
-const Error3159 = "Error 3159: Connections using insecure transport are prohibited while --require_secure_transport=ON."
+const Error3159 = "Error 3159:"
 
 // Track if a TLS has already been configured for topology
 var topologyTLSConfigured bool = false
@@ -55,69 +55,38 @@ func init() {
 }
 
 func requiresTLS(host string, port int, mysql_uri string) bool {
-	var required int = 0
-	var first_time bool = true
-	var found bool = false
-	var value interface{}
+	cacheKey := fmt.Sprintf("%s:%d", host, port)
 
-	if value, found = requireTLSCache.Get(fmt.Sprintf("%s:%d", host, port)); found {
-		required = value.(int)
+	if value, found := requireTLSCache.Get(cacheKey); found {
 		readInstanceTLSCacheCounter.Inc(1)
+		return value.(bool)
 	}
 
-	if !found {
-		query := `
-			select
-				required
-			from
-				database_instance_tls
-			where
-				hostname = ?
-				and port = ?
+	required := false
+	db, _, _ := sqlutils.GetDB(mysql_uri)
+	if err := db.Ping(); err != nil && strings.Contains(err.Error(), Error3159) {
+		required = true
+	}
+
+	query := `
+			insert into
+				database_instance_tls (
+					hostname, port, required
+				) values (
+					?, ?, ?
+				)
+				on duplicate key update
+					required=values(required)
 				`
-		err := QueryOrchestrator(query, sqlutils.Args(host, port), func(m sqlutils.RowMap) error {
-			required = m.GetInt("required")
-			first_time = false
-			return nil
-		})
-		if err != nil {
-			log.Errore(err)
-			return required != 0
-		}
-
-		readInstanceTLSCounter.Inc(1)
-
-		if first_time {
-			db, _, _ := sqlutils.GetDB(mysql_uri)
-			err = db.Ping()
-			if err != nil && strings.Contains(err.Error(), Error3159) {
-				required = 1
-			} else {
-				required = 0
-			}
-
-			insert := `
-				insert into
-					database_instance_tls
-				set
-					hostname = ?,
-					port = ?,
-					required = ?
-					`
-			_, err = ExecOrchestrator(insert, host, port, required)
-			if err != nil {
-				log.Errore(err)
-				return required != 0
-			}
-
-			writeInstanceTLSCounter.Inc(1)
-		}
-
-		requireTLSCache.Set(fmt.Sprintf("%s:%d", host, port), required, cache.DefaultExpiration)
-		writeInstanceTLSCacheCounter.Inc(1)
+	if _, err := ExecOrchestrator(query, host, port, required); err != nil {
+		log.Errore(err)
 	}
+	writeInstanceTLSCounter.Inc(1)
 
-	return required != 0
+	requireTLSCache.Set(cacheKey, required, cache.DefaultExpiration)
+	writeInstanceTLSCacheCounter.Inc(1)
+
+	return required
 }
 
 // Create a TLS configuration from the config supplied CA, Certificate, and Private key.
@@ -137,11 +106,11 @@ func SetupMySQLTopologyTLS(uri string) (string, error) {
 			config.Config.MySQLTopologySSLCertFile != "" ||
 			config.Config.MySQLTopologySSLPrivateKeyFile != "" {
 			if err = ssl.AppendKeyPair(tlsConfig, config.Config.MySQLTopologySSLCertFile, config.Config.MySQLTopologySSLPrivateKeyFile); err != nil {
-				return "", log.Fatalf("Can't setup TLS key pairs for %s: %s", uri, err)
+				return "", log.Errorf("Can't setup TLS key pairs for %s: %s", uri, err)
 			}
 		}
 		if err = mysql.RegisterTLSConfig("topology", tlsConfig); err != nil {
-			return "", log.Fatalf("Can't register mysql TLS config for topology: %s", err)
+			return "", log.Errorf("Can't register mysql TLS config for topology: %s", err)
 		}
 		topologyTLSConfigured = true
 	}
