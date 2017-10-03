@@ -396,6 +396,9 @@ func WriteTable(db *sql.DB, tableName string, data NamedResultData) (err error) 
 	if len(data.Data) == 0 {
 		return nil
 	}
+	if len(data.Columns) == 0 {
+		return nil
+	}
 	placeholders := make([]string, len(data.Columns))
 	for i := range placeholders {
 		placeholders[i] = "?"

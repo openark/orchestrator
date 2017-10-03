@@ -28,17 +28,22 @@ import (
 )
 
 type SnapshotData struct {
-	Keys               []inst.InstanceKey
-	DowntimedInstances []inst.Downtime
-	Candidates         []inst.CandidateDatabaseInstance
-	HostnameUnresolves []inst.HostnameRegistration
-	Pools              []inst.PoolInstancesSubmission
-	RecoveryDisabled   bool
-	FailureDetections  []TopologyRecovery
+	Keys             []inst.InstanceKey
+	RecoveryDisabled bool
 
-	RawCandidates sqlutils.NamedResultData
-	RawDetections sqlutils.NamedResultData
-	RawRecovery   sqlutils.NamedResultData
+	ClusterAlias,
+	ClusterAliasOverride,
+	ClusterDomainName,
+	HostAttributes,
+	AccessToken,
+	PoolInstances,
+	HostnameResolves,
+	HostnameUnresolves,
+	DowntimedInstances,
+	Candidates,
+	Detections,
+	Recovery,
+	RecoverySteps sqlutils.NamedResultData
 }
 
 func NewSnapshotData() *SnapshotData {
@@ -68,22 +73,21 @@ func CreateSnapshotData() *SnapshotData {
 
 	// keys
 	snapshotData.Keys, _ = inst.ReadAllInstanceKeys()
-	// downtime
-	snapshotData.DowntimedInstances, _ = inst.ReadDowntime()
-	// candidates
-	// snapshotData.Candidates, _ = inst.BulkReadCandidateDatabaseInstance()
-	// unresolve
-	snapshotData.HostnameUnresolves, _ = inst.ReadAllHostnameUnresolvesRegistrations()
-	// pool
-	snapshotData.Pools, _ = inst.ReadAllPoolInstancesSubmissions()
-	// detections
-	snapshotData.FailureDetections, _ = readFailureDetections("", "", sqlutils.Args())
-	// recovery
 	snapshotData.RecoveryDisabled, _ = IsRecoveryDisabled()
 
-	readTableData("candidate_database_instance", &snapshotData.RawCandidates)
-	readTableData("topology_failure_detection", &snapshotData.RawDetections)
-	readTableData("topology_recovery", &snapshotData.RawRecovery)
+	readTableData("cluster_alias", &snapshotData.ClusterAlias)
+	readTableData("cluster_alias_override", &snapshotData.ClusterAliasOverride)
+	readTableData("cluster_domain_name", &snapshotData.ClusterDomainName)
+	readTableData("access_token", &snapshotData.AccessToken)
+	readTableData("host_attributes", &snapshotData.HostAttributes)
+	readTableData("database_instance_pool", &snapshotData.PoolInstances)
+	readTableData("hostname_resolve", &snapshotData.HostnameResolves)
+	readTableData("hostname_unresolve", &snapshotData.HostnameUnresolves)
+	readTableData("database_instance_downtime", &snapshotData.DowntimedInstances)
+	readTableData("candidate_database_instance", &snapshotData.Candidates)
+	readTableData("topology_failure_detection", &snapshotData.Detections)
+	readTableData("topology_recovery", &snapshotData.Recovery)
+	readTableData("topology_recovery_steps", &snapshotData.RecoverySteps)
 
 	log.Debugf("raft snapshot data created")
 	return snapshotData
@@ -126,39 +130,19 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 			}()
 		}
 	}
-	// downtime
-	{
-		for _, downtime := range snapshotData.DowntimedInstances {
-			inst.BeginDowntime(&downtime)
-		}
-	}
-	// candidates
-	// {
-	// 	for _, candidate := range snapshotData.Candidates {
-	// 		inst.RegisterCandidateInstance(&candidate)
-	// 	}
-	// }
-	// HostnameUnresolves
-	{
-		for _, registration := range snapshotData.HostnameUnresolves {
-			inst.RegisterHostnameUnresolve(&registration)
-		}
-	}
-	// Pools
-	{
-		for _, submission := range snapshotData.Pools {
-			inst.ApplyPoolInstances(&submission)
-		}
-	}
-	// detections
-	// {
-	// 	for _, detection := range snapshotData.FailureDetections {
-	// 		AttemptFailureDetectionRegistration(&detection.AnalysisEntry)
-	// 	}
-	// }
-	writeTableData("candidate_database_instance", &snapshotData.RawCandidates)
-	writeTableData("topology_recovery", &snapshotData.RawRecovery)
-	writeTableData("topology_failure_detection", &snapshotData.RawDetections)
+	writeTableData("cluster_alias", &snapshotData.ClusterAlias)
+	writeTableData("cluster_alias_override", &snapshotData.ClusterAliasOverride)
+	writeTableData("cluster_domain_name", &snapshotData.ClusterDomainName)
+	writeTableData("access_token", &snapshotData.AccessToken)
+	writeTableData("host_attributes", &snapshotData.HostAttributes)
+	writeTableData("database_instance_pool", &snapshotData.PoolInstances)
+	writeTableData("hostname_resolve", &snapshotData.HostnameResolves)
+	writeTableData("hostname_unresolve", &snapshotData.HostnameUnresolves)
+	writeTableData("database_instance_downtime", &snapshotData.DowntimedInstances)
+	writeTableData("candidate_database_instance", &snapshotData.Candidates)
+	writeTableData("topology_recovery", &snapshotData.Recovery)
+	writeTableData("topology_failure_detection", &snapshotData.Detections)
+	writeTableData("topology_recovery_steps", &snapshotData.RecoverySteps)
 
 	// recovery disable
 	{
