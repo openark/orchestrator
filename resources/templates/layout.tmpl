@@ -74,11 +74,11 @@
 					<ul class="dropdown-menu" id="dropdown-clusters">
 						<li><a href="{{.prefix}}/web/clusters/">Dashboard</a></li>
 						<li><a href="{{.prefix}}/web/clusters-analysis/">Failure analysis</a></li>
+						<li><a href="{{.prefix}}/web/discover">Discover</a></li>
 						<li role="presentation" class="divider"></li>
 					</ul>
 				</li>
 
-				<li data-nav-page="discover"><a href="{{.prefix}}/web/discover">Discover</a></li>
 				<li class="dropdown" data-nav-page="audit">
 					<a href="#" class="dropdown-toggle" data-toggle="dropdown">
                             Audit
@@ -88,20 +88,9 @@
 						<li><a href="{{.prefix}}/web/audit">General</a></li>
 						<li><a href="{{.prefix}}/web/audit-failure-detection">Failure detection</a></li>
 						<li><a href="{{.prefix}}/web/audit-recovery">Recovery</a></li>
-					</ul>
-				</li>
-
-
-				<li class="dropdown" data-nav-page="extra">
-					<a href="#" class="dropdown-toggle" data-toggle="dropdown">
-                            Extra
-                            <b class="caret"></b>
-                        </a>
-					<ul class="dropdown-menu">
+						<li role="presentation" class="divider"></li>
 						<li><a href="{{.prefix}}/web/agents">Agents</a></li>
 						<li><a href="{{.prefix}}/web/seeds">Seeds</a></li>
-						<li role="presentation" class="divider"></li>
-						<li><a href="{{.prefix}}/web/long-queries">Long queries</a></li>
 					</ul>
 				</li>
 
@@ -110,7 +99,7 @@
 						<div class="form-group">
 							<input type="text" name="s" id="searchInput" class="form-control input-sm" placeholder="Search">
 						</div>
-						<button type="submit" class="btn btn-default btn-sm">Search</button>
+						<button type="submit" class="btn btn-default btn-sm"><span class="glyphicon glyphicon-search"></span></button>
 					</form>
 				</li>
 				<li class="dropdown" data-nav-page="context" style="visibility: hidden;">
@@ -155,10 +144,11 @@
 						<h4 class="modal-title"></h4>
 					</div>
 					<div class="modal-body">
-						<div class="panel panel-info">
-							<div class="panel-heading">
-								<div class="" data-panel-type="begin-downtime">
-									<form class="form-inline" role="form">
+
+						<div class="panel panel-default begin-downtime">
+						  <div class="panel-body">
+								<form class="form-inline">
+									<div class="form-group">
 										<input type="text" class="form-control input-sm" id="beginDowntimeOwner" placeholder="owner name" />
 										<input type="text" class="form-control input-sm" id="beginDowntimeReason" placeholder="reason" />
 										<select class="form-control input-sm" id="beginDowntimeDuration">
@@ -170,20 +160,24 @@
 											<option value="2d">2d</option>
 											<option value="7d">7d</option>
 										</select>
-										<button type="button" class="btn btn-info pull-right" data-btn="begin-downtime">
-											<span class="glyphicon glyphicon-volume-off"></span> Begin downtime
-										</button>
-									</form>
-								</div>
-								<div class="" data-panel-type="end-downtime">
-									<div class="pull-left" data-description="downtime-status">
 									</div>
-									<button type="button" class="btn btn-default pull-right" data-btn="end-downtime">
-										<span class="glyphicon glyphicon-volume-up"></span> End downtime
+									<button type="button" class="form-control btn btn-info pull-right" data-btn="begin-downtime">
+										<span class="glyphicon glyphicon-volume-off"></span> Begin downtime
 									</button>
-								</div>
+								</form>
 							</div>
 						</div>
+						<div class="panel panel-warning end-downtime">
+							<div class="panel-heading"></div>
+						  <div class="panel-body">
+							</div>
+							<div class="panel-footer">
+								<button type="button" class="btn btn-default" data-btn="end-downtime">
+									<span class="glyphicon glyphicon-volume-up"></span> End downtime
+								</button>
+							</div>
+						</div>
+
 						<table id="modalDataAttributesTable" class="table">
 							<div class="hidden-zone"></div>
 						</table>
@@ -241,10 +235,6 @@
 	<script>
 		function autoshowProblems() {
 			return "{{.autoshow_problems}}";
-		}
-
-		function activePage() {
-			return "{{.activePage}}";
 		}
 
 		function agentsHttpActive() {

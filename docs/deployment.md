@@ -11,11 +11,12 @@ Follow these deployment guides:
 - Deploying `orchestrator` on [shared backend DB](deployment-shared-backend.md)
 - Deploying `orchestrator` via [raft consensus](deployment-raft.md)
 
-## Deployment hints and tips
+## Next steps
 
-`orchestrator` works well in dynamic environments and adapts to changes in inventory, configuration and topology. Its dynamic nature suggests that the environment should interact with it in dynamic nature, as well. Instead of hard-coded configuration, `orchestrator` is happy to accept dynamic hints and requests that change its perspective on the topologies.
+`orchestrator` works well in dynamic environments and adapts to changes in inventory, configuration and topology. Its dynamic nature suggests that the environment should interact with it in dynamic nature, as well. Instead of hard-coded configuration, `orchestrator` is happy to accept dynamic hints and requests that change its perspective on the topologies. Once the `orchestrator` services and clients are deployed, consider performing the following actions to take full
+advantage of this.
 
-### Discovery
+### Discovering topologies
 
 `orchestrator` auto-discovers boxes joining a topology. If a new replica joins an existing cluster that is monitored by `orchestrator`, it is discovered when `orchestrator` next probes its master.
 
@@ -32,7 +33,7 @@ However, how does `orchestrator` discover completely new topologies?
 
   The above uses [orchestrator-client](orchestrator-client.md), but you may use the [orchestrator cli](executing-via-command-line.md) if running on a shared-backend setup.
 
-### Promotion rule
+### Adding promotion rules
 
 Some servers are better candidate for promotion in the event of failovers. Some servers aren't good picks. Examples:
 
@@ -63,7 +64,7 @@ Promotion rules expire after an hour. That's the dynamic nature of `orchestrator
 
 This setup comes from production environments. The cron entries get updated by `puppet` to reflect the appropriate `promotion_rule`. A server may have `prefer` at this time, and `prefer_not` in 5 minutes from now. Integrate your own service discovery method, your own scripting, to provide with your up-to-date `promotion-rule`.
 
-### Downtime
+### Downtiming
 
 When a server has a problem, it:
 
@@ -96,7 +97,7 @@ $ curl -s "http://my.orchestrator.service:80/api/begin-downtime/my.hostname/3306
 
 The `orchestrator-client` script runs this very API call, wrapping it up and encoding the URL path. It can also automatically detect the leader, in case you don't want to run through a proxy.
 
-### Pseudo-GTID
+### Using Pseudo-GTID
 
 If you're not using GTID, you can inject your own Pseudo-GTID entries, and `orchestrator` will be able to run GTID-like magic such as correlating two unrelated servers and making one replicate from the other.
 
