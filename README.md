@@ -61,6 +61,7 @@ Authored by [Shlomi Noach](https://github.com/shlomi-noach) at [GitHub](http://g
 #### Related projects
 
 - Orchestrator Puppet module: https://github.com/github/puppet-orchestrator-for-mysql
+- Orchestrator Chef Cookbook: https://github.com/silviabotros/chef-orchestrator/
 - Nagios / Icinga check based on Orchestrator API: https://github.com/mcrauwel/go-check-orchestrator
 
 #### License
