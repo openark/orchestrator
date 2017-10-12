@@ -507,6 +507,9 @@ func (this *Configuration) postReadAdjustments() error {
 	if this.RemoteSSHForMasterFailover && this.RemoteSSHCommand == "" {
 		return fmt.Errorf("RemoteSSHCommand is required when RemoteSSHForMasterFailover is set")
 	}
+	if this.RaftAdvertise == "" {
+		this.RaftAdvertise = this.RaftBind
+	}
 	return nil
 }
 

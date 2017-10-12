@@ -52,16 +52,9 @@ func (store *Store) Open(peerNodes []string) error {
 	config := raft.DefaultConfig()
 	config.SnapshotThreshold = 1
 	config.SnapshotInterval = snapshotInterval
-	var advertise net.Addr
-	var err error
 
 	// Setup Raft communication.
-	if store.raftAdvertise != "" {
-		advertise, err = net.ResolveTCPAddr("tcp", store.raftAdvertise)
-	} else {
-		advertise, err = net.ResolveTCPAddr("tcp", store.raftBind)
-	}
-
+	advertise, err = net.ResolveTCPAddr("tcp", store.raftAdvertise)
 	if err != nil {
 		return err
 	}
