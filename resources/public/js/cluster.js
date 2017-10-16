@@ -807,21 +807,28 @@ function Cluster() {
 
 
   function executeMoveOperation(message, apiUrl) {
-    bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
-      if (confirm) {
-        showLoader();
-        getData(apiUrl, function(operationResult) {
-          hideLoader();
-          if (operationResult.Code == "ERROR") {
-            addAlert(operationResult.Message)
-          } else {
-            reloadWithOperationResult(operationResult);
-          }
-        });
-      }
-      $("#cluster_container .accept_drop").removeClass("accept_drop");
-      $("#cluster_container .accept_drop").removeClass("accept_drop_warning");
-    });
+    var moveOperation = function() {
+      showLoader();
+      getData(apiUrl, function(operationResult) {
+        hideLoader();
+        if (operationResult.Code == "ERROR") {
+          addAlert(operationResult.Message)
+        } else {
+          reloadWithOperationResult(operationResult);
+        }
+      });
+    }
+    if (isSilentUI()) {
+      moveOperation()
+    } else {
+      bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
+        if (confirm) {
+          moveOperation();
+        }
+      });
+    }
+    $("#cluster_container .accept_drop").removeClass("accept_drop");
+    $("#cluster_container .accept_drop").removeClass("accept_drop_warning");
     return false;
   }
 
@@ -1305,8 +1312,9 @@ function Cluster() {
         glyph.addClass("text-muted");
         glyph.attr("title", "Color by data center");
       }
-    } {
-      // Compact display
+    }
+    // Compact display
+    {
       var anchor = $("#cluster_sidebar [data-bullet=compact-display] a");
       var glyph = $(anchor).find(".glyphicon")
       if (isCompactDisplay()) {
@@ -1337,6 +1345,17 @@ function Cluster() {
       } else {
         glyph.addClass("text-muted");
         glyph.attr("title", "Anonymize display");
+      }
+    }
+    // Silent UI
+    {
+      var glyph = $("#cluster_sidebar [data-bullet=silent-ui] .glyphicon");
+      if (isSilentUI()) {
+        glyph.addClass("text-info");
+        glyph.attr("title", "Cancel UI silence");
+      } else {
+        glyph.addClass("text-muted");
+        glyph.attr("title", "Silence UI questions");
       }
     }
   }
@@ -1663,6 +1682,21 @@ function Cluster() {
         });
       } else {
         $.cookie("compact-display", "true", {
+          path: '/',
+          expires: 1
+        });
+      }
+      location.reload();
+      return
+    });
+    $("body").on("click", "a[data-command=silent-ui]", function(event) {
+      if ($.cookie("silent-ui") == "true") {
+        $.cookie("silent-ui", "false", {
+          path: '/',
+          expires: 1
+        });
+      } else {
+        $.cookie("silent-ui", "true", {
           path: '/',
           expires: 1
         });
