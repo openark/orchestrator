@@ -54,12 +54,12 @@ func (store *Store) Open(peerNodes []string) error {
 	config.SnapshotInterval = snapshotInterval
 
 	// Setup Raft communication.
-	advertise, err = net.ResolveTCPAddr("tcp", store.raftAdvertise)
+	advertise, err := net.ResolveTCPAddr("tcp", store.raftAdvertise)
 	if err != nil {
 		return err
 	}
-
 	log.Debugf("raft: advertise=%+v", advertise)
+
 	transport, err := raft.NewTCPTransport(store.raftBind, advertise, 3, 10*time.Second, os.Stderr)
 	if err != nil {
 		return err

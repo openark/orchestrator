@@ -47,6 +47,8 @@ as well as this:
   ],
 ```
 
+If your orchestrator/raft nodes need to communicate via NAT gateways, you can additionally set "RaftAdvertise" to IP or hostname which other nodes should contact. Otherwise other nodes would try to talk to the "RaftBind" address and fail.
+
 ### Backend DB
 
 A `raft` setup supports either `MySQL` or `SQLite` backend DB. See [backend](configuration-backend.md) configuration for either. Read [high-availability](high-availability.md) page for scenarios, possibilities and reasons to using either.
