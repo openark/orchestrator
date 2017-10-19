@@ -29,6 +29,7 @@ import (
 
 	"github.com/github/orchestrator/go/attributes"
 	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/consul"
 	"github.com/github/orchestrator/go/inst"
 	ometrics "github.com/github/orchestrator/go/metrics"
 	"github.com/github/orchestrator/go/os"
@@ -771,6 +772,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			inst.ResetSlaveOperation(&promotedReplica.Key)
 			inst.SetReadOnly(&promotedReplica.Key, false)
 		}
+		consul.PutKeyValue(analysisEntry.ClusterDetails.ClusterAlias, promotedReplica.Key.StringCode())
 		if !skipProcesses {
 			// Execute post master-failover processes
 			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
