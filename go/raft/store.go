@@ -42,7 +42,7 @@ func NewStore(raftDir string, raftBind string, raftAdvertise string, applier Com
 		raftDir:                raftDir,
 		raftBind:               raftBind,
 		raftAdvertise:          raftAdvertise,
-  	applier:                applier,
+		applier:                applier,
 		snapshotCreatorApplier: snapshotCreatorApplier,
 	}
 }
