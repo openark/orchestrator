@@ -68,6 +68,11 @@ var apiSynonyms = map[string]string{
 	"reattach-slave":             "reattach-replica",
 	"reattach-slave-master-host": "reattach-replica-master-host",
 	"cluster-osc-slaves":         "cluster-osc-replicas",
+	"start-slave":                "start-replica",
+	"restart-slave":              "restart-replica",
+	"stop-slave":                 "stop-replica",
+	"stop-slave-nice":            "stop-replica-nice",
+	"reset-slave":                "reset-replica",
 }
 
 var registeredPaths = []string{}

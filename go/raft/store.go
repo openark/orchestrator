@@ -20,8 +20,9 @@ const (
 )
 
 type Store struct {
-	raftDir  string
-	raftBind string
+	raftDir       string
+	raftBind      string
+	raftAdvertise string
 
 	raft      *raft.Raft // The consensus mechanism
 	peerStore raft.PeerStore
@@ -36,11 +37,12 @@ type storeCommand struct {
 }
 
 // NewStore inits and returns a new store
-func NewStore(raftDir string, raftBind string, applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier) *Store {
+func NewStore(raftDir string, raftBind string, raftAdvertise string, applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier) *Store {
 	return &Store{
 		raftDir:                raftDir,
 		raftBind:               raftBind,
-		applier:                applier,
+		raftAdvertise:          raftAdvertise,
+  	applier:                applier,
 		snapshotCreatorApplier: snapshotCreatorApplier,
 	}
 }
@@ -54,12 +56,13 @@ func (store *Store) Open(peerNodes []string) error {
 	config.SnapshotInterval = snapshotInterval
 
 	// Setup Raft communication.
-	addr, err := net.ResolveTCPAddr("tcp", store.raftBind)
+	advertise, err := net.ResolveTCPAddr("tcp", store.raftAdvertise)
 	if err != nil {
 		return err
 	}
-	log.Debugf("raft: addr=%+v", addr)
-	transport, err := raft.NewTCPTransport(store.raftBind, addr, 3, 10*time.Second, os.Stderr)
+	log.Debugf("raft: advertise=%+v", advertise)
+
+	transport, err := raft.NewTCPTransport(store.raftBind, advertise, 3, 10*time.Second, os.Stderr)
 	if err != nil {
 		return err
 	}

@@ -62,7 +62,11 @@ func Setup(applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier
 	if err != nil {
 		return err
 	}
-	store = NewStore(config.Config.RaftDataDir, raftBind, applier, snapshotCreatorApplier)
+	raftAdvertise, err := normalizeRaftNode(config.Config.RaftAdvertise)
+	if err != nil {
+		return err
+	}
+	store = NewStore(config.Config.RaftDataDir, raftBind, raftAdvertise, applier, snapshotCreatorApplier)
 	peerNodes := []string{}
 	for _, raftNode := range config.Config.RaftNodes {
 		peerNode, err := normalizeRaftNode(raftNode)
