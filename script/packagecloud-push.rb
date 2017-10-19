@@ -25,9 +25,6 @@ $client = Packagecloud::Client.new(credentials)
 # matches package directories built by docker to one or more packagecloud distros
 # https://packagecloud.io/docs#os_distro_version
 $distro_name_map = {
-  "centos/5" => %w(
-    el/5
-  ),
   "centos/6" => %w(
     el/6
   ),
@@ -102,7 +99,6 @@ package_files.each do |full_path|
   os, distro = case full_path
   when /debian\/7/ then ["Debian 7", "debian/wheezy"]
   when /debian\/8/ then ["Debian 8", "debian/jessie"]
-  when /centos\/5/ then ["RPM RHEL 5/CentOS 5", "el/5"]
   when /centos\/6/ then ["RPM RHEL 6/CentOS 6", "el/6"]
   when /centos\/7/ then ["RPM RHEL 7/CentOS 7", "el/7"]
   end
