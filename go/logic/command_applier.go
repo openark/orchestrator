@@ -68,6 +68,8 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.disableGlobalRecoveries(value)
 	case "enable-global-recoveries":
 		return applier.enableGlobalRecoveries(value)
+	case "note-cluster-master":
+		return applier.noteClusterMaster(value)
 	}
 	return log.Errorf("Unknown command op: %s", op)
 }
@@ -197,5 +199,14 @@ func (applier *CommandApplier) disableGlobalRecoveries(value []byte) interface{}
 
 func (applier *CommandApplier) enableGlobalRecoveries(value []byte) interface{} {
 	err := EnableRecovery()
+	return err
+}
+
+func (applier *CommandApplier) noteClusterMaster(value []byte) interface{} {
+	clusterAliasMaster := inst.ClusterAliasMaster{}
+	if err := json.Unmarshal(value, &clusterAliasMaster); err != nil {
+		return log.Errore(err)
+	}
+	err := NoteClusterMaster(&clusterAliasMaster)
 	return err
 }

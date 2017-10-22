@@ -144,3 +144,15 @@ func (this *ReplicationAnalysis) AnalysisString() string {
 	}
 	return strings.Join(result, ", ")
 }
+
+type ClusterAliasMaster struct {
+	ClusterAlias string
+	Master       InstanceKey
+}
+
+func NewClusterAliasMaster(clusterAlias string, master InstanceKey) *ClusterAliasMaster {
+	return &ClusterAliasMaster{
+		ClusterAlias: clusterAlias,
+		Master:       master,
+	}
+}
