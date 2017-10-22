@@ -145,6 +145,9 @@ func IsLeader() bool {
 
 // GetLeader returns identity of raft leader
 func GetLeader() string {
+	if !isRaftSetupComplete() {
+		return ""
+	}
 	return getRaft().Leader()
 }
 
@@ -158,6 +161,9 @@ func QuorumSize() (int, error) {
 
 // GetState returns current raft state
 func GetState() raft.RaftState {
+	if !isRaftSetupComplete() {
+		return raft.Candidate
+	}
 	return getRaft().State()
 }
 
