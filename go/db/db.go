@@ -1434,6 +1434,16 @@ func registerOrchestratorDeployment(db *sql.DB) error {
 	return nil
 }
 
+func deploySchema(db *sql.DB) error {
+	if config.Config.IsMySQL() {
+		query := fmt.Sprintf("create database if not exists %s", config.Config.MySQLOrchestratorDatabase)
+		if _, err := ExecOrchestrator(query); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // deployStatements will issue given sql queries that are not already known to be deployed.
 // This iterates both lists (to-run and already-deployed) and also verifies no contraditions.
 func deployStatements(db *sql.DB, queries []string) error {
@@ -1509,6 +1519,7 @@ func initOrchestratorDB(db *sql.DB) error {
 		log.Fatalf("PanicIfDifferentDatabaseDeploy is set. Configured version %s is not the version found in the database", config.RuntimeCLIFlags.ConfiguredVersion)
 	}
 	log.Debugf("Migrating database schema")
+	deploySchema(db)
 	deployStatements(db, generateSQLBase)
 	deployStatements(db, generateSQLPatches)
 	registerOrchestratorDeployment(db)
