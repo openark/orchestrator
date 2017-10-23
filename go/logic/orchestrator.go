@@ -347,6 +347,17 @@ func onDiscoveryTick() {
 	}
 }
 
+func publishDiscoverMasters() error {
+	instances, err := inst.ReadWriteableClustersMasters()
+	if err == nil {
+		for _, instance := range instances {
+			key := instance.Key
+			go orcraft.PublishCommand("discover", key)
+		}
+	}
+	return log.Errore(err)
+}
+
 // ContinuousDiscovery starts an asynchronuous infinite discovery process where instances are
 // periodically investigated and their status captured, and long since unseen instances are
 // purged and forgotten.
@@ -362,6 +373,7 @@ func ContinuousDiscovery() {
 	discoveryTick := time.Tick(config.DiscoveryPollSeconds * time.Second)
 	instancePollTick := time.Tick(instancePollSecondsDuration())
 	caretakingTick := time.Tick(time.Minute)
+	raftCaretakingTick := time.Tick(10 * time.Minute)
 	recoveryTick := time.Tick(time.Duration(config.Config.RecoveryPollSeconds) * time.Second)
 	var snapshotTopologiesTick <-chan time.Time
 	if config.Config.SnapshotTopologiesIntervalHours > 0 {
@@ -430,6 +442,10 @@ func ContinuousDiscovery() {
 					go inst.LoadHostnameResolveCache()
 				}
 			}()
+		case <-raftCaretakingTick:
+			if orcraft.IsRaftEnabled() && orcraft.IsLeader() {
+				go publishDiscoverMasters()
+			}
 		case <-recoveryTick:
 			go func() {
 				if IsLeaderOrActive() {
