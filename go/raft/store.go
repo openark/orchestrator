@@ -98,14 +98,14 @@ func (store *Store) Open(peerNodes []string) error {
 	// Create the log store and stable store.
 	logStore := NewRelationalStore()
 	log.Debugf("raft: logStore=%+v", logStore)
-	if firstIndex, _ := logStore.FirstIndex(); firstIndex == 0 {
-		log.Debugf("raft: cannot find raft log history. Since no logs exist I will purge the snapshots. I will try to sync from a remote peer.")
-		if snaps, err := raft.NewFileSnapshotStore(store.raftDir, 0, os.Stderr); err == nil {
-			snaps.ReapSnapshots()
-		} else {
-			log.Errore(err)
-		}
-	}
+	// if firstIndex, _ := logStore.FirstIndex(); firstIndex == 0 {
+	// 	log.Debugf("raft: cannot find raft log history. Since no logs exist I will purge the snapshots. I will try to sync from a remote peer.")
+	// 	if snaps, err := raft.NewFileSnapshotStore(store.raftDir, 0, os.Stderr); err == nil {
+	// 		snaps.ReapSnapshots()
+	// 	} else {
+	// 		log.Errore(err)
+	// 	}
+	// }
 	// if snapshotsList, err := snapshots.List(); err == nil && len(snapshotsList) == 0 {
 	// 	log.Debugf("raft: cannot find any snapshots.")
 	// 	if firstIndex, _ := logStore.FirstIndex(); firstIndex > 1 {
