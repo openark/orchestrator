@@ -34,8 +34,8 @@ type fsm Store
 
 // Apply applies a Raft log entry to the key-value store.
 func (f *fsm) Apply(l *raft.Log) interface{} {
-	if !isRaftSetupComplete() {
-		log.Debugf("......... not applying command on raft startup")
+	if l.Index <= lastIndexOnStartup {
+		log.Debugf("orchestrator/raft: fsm will not apply index %+v: it is already found in log store", l.Index)
 		return nil
 	}
 

@@ -113,6 +113,9 @@ func (store *Store) Open(peerNodes []string) error {
 	// 		logStore.DeleteAll()
 	// 	}
 	// }
+	if lastIndex, err := logStore.LastIndex(); err == nil {
+		lastIndexOnStartup = lastIndex
+	}
 
 	// Instantiate the Raft systems.
 	if store.raft, err = raft.NewRaft(config, (*fsm)(store), logStore, logStore, snapshots, peerStore, transport); err != nil {
