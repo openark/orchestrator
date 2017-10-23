@@ -40,6 +40,7 @@ var store *Store
 var raftSetupComplete int64
 var ThisHostname string
 
+var firstApplyChan = make(chan bool, 1)
 var fatalRaftErrorChan = make(chan error)
 
 func IsRaftEnabled() bool {
@@ -83,6 +84,10 @@ func Setup(applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier
 
 	atomic.StoreInt64(&raftSetupComplete, 1)
 	return nil
+}
+
+func onFirstApply() {
+	go func() { firstApplyChan <- true }()
 }
 
 func isRaftSetupComplete() bool {
@@ -235,6 +240,9 @@ func Monitor() {
 			if IsLeader() {
 				go PublishCommand("heartbeat", "")
 			}
+		case <-firstApplyChan:
+			log.Infof("raft: creating first snapshot")
+			getRaft().Snapshot()
 		case err := <-fatalRaftErrorChan:
 			log.Fatale(err)
 		}
