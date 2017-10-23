@@ -17,6 +17,8 @@
 package logic
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"io"
 
@@ -102,14 +104,31 @@ func NewSnapshotDataCreatorApplier() *SnapshotDataCreatorApplier {
 }
 
 func (this *SnapshotDataCreatorApplier) GetData() (data []byte, err error) {
+	log.Debugf(".............. writing snap")
 	snapshotData := CreateSnapshotData()
-	return json.Marshal(snapshotData)
+	b, err := json.Marshal(snapshotData)
+	if err != nil {
+		return b, err
+	}
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	if _, err := zw.Write(b); err != nil {
+		return b, err
+	}
+	if err := zw.Close(); err != nil {
+		return b, err
+	}
+	return buf.Bytes(), nil
 }
 
 func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
+	log.Debugf(".............. reading snap")
 	snapshotData := NewSnapshotData()
-	// if err := json.Unmarshal(data, &snapshotData); err != nil {
-	if err := json.NewDecoder(rc).Decode(&snapshotData); err != nil {
+	zr, err := gzip.NewReader(rc)
+	if err != nil {
+		return err
+	}
+	if err := json.NewDecoder(zr).Decode(&snapshotData); err != nil {
 		return err
 	}
 
