@@ -819,3 +819,18 @@ func ReadTopologyRecoverySteps(recoveryUID string) ([]TopologyRecoveryStep, erro
 	})
 	return res, log.Errore(err)
 }
+
+// ExpireFailureDetectionHistory removes old rows from the topology_failure_detection table
+func ExpireFailureDetectionHistory() error {
+	return inst.ExpireTableData("topology_failure_detection", "start_active_period")
+}
+
+// ExpireTopologyRecoveryHistory removes old rows from the topology_failure_detection table
+func ExpireTopologyRecoveryHistory() error {
+	return inst.ExpireTableData("topology_recovery", "start_active_period")
+}
+
+// ExpireTopologyRecoveryStepsHistory removes old rows from the topology_failure_detection table
+func ExpireTopologyRecoveryStepsHistory() error {
+	return inst.ExpireTableData("topology_recovery_steps", "audit_at")
+}

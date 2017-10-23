@@ -130,6 +130,15 @@ func ExecDBWriteFunc(f func() error) error {
 	return res
 }
 
+func ExpireTableData(tableName string, timestampColumn string) error {
+	query := fmt.Sprintf("delete from %s where %s < NOW() - INTERVAL ? DAY", tableName, timestampColumn)
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(query, config.AuditPurgeDays)
+		return err
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
 // logReadTopologyInstanceError logs an error, if applicable, for a ReadTopologyInstance operation,
 // providing context and hint as for the source of the error. If there's no hint just provide the
 // original error.
@@ -2579,6 +2588,10 @@ func ResetInstanceRelaylogCoordinatesHistory(instanceKey *InstanceKey) error {
 		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
+}
+
+func ExpireInstanceBinlogFileHistory() error {
+	return ExpireTableData("database_instance_binlog_files_history", "last_seen")
 }
 
 // RecordInstanceBinlogFileHistory snapshots the binlog coordinates of instances

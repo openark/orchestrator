@@ -403,7 +403,6 @@ func ContinuousDiscovery() {
 			// Various periodic internal maintenance tasks
 			go func() {
 				if IsLeaderOrActive() {
-					go inst.RecordInstanceBinlogFileHistory()
 					go inst.ForgetLongUnseenInstances()
 					go inst.ForgetUnseenInstancesDifferentlyResolved()
 					go inst.ForgetExpiredHostnameResolves()
@@ -419,9 +418,13 @@ func ContinuousDiscovery() {
 					go inst.ExpireMasterPositionEquivalence()
 					go inst.ExpirePoolInstances()
 					go inst.FlushNontrivialResolveCacheToDatabase()
+					go inst.ExpireInstanceBinlogFileHistory()
 					go process.ExpireNodesHistory()
 					go process.ExpireAccessTokens()
 					go process.ExpireAvailableNodes()
+					go ExpireFailureDetectionHistory()
+					go ExpireTopologyRecoveryHistory()
+					go ExpireTopologyRecoveryStepsHistory()
 				} else {
 					// Take this opportunity to refresh yourself
 					go inst.LoadHostnameResolveCache()
