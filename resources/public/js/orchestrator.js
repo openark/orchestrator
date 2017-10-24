@@ -917,8 +917,6 @@ function getParameterByName(name) {
 $(document).ready(function() {
   visualizeBrand();
 
-  $('body').css('background-image', 'url(' + appUrl('/images/tile.png') + ')');
-
   $.get(appUrl("/api/clusters-info"), function(clusters) {
     clusters = clusters || [];
 

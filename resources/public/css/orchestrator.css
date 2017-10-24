@@ -7,9 +7,9 @@
 }
 
 body {
-    background-color: #eeeeee;
+    background-color: #f7f7f7;
     background-repeat: repeat;
-    padding-top: 80px;
+    padding-top: 50px;
 }
 
 .orchestrator-brand {
@@ -32,6 +32,10 @@ body {
     max-height: 600px;
     overflow-x: hidden;
     overflow-y: auto;
+}
+
+.navbar {
+  margin-bottom: 0px;
 }
 
 .navbar-nav > li > .dropdown {
@@ -58,6 +62,8 @@ body {
 
 #alerts_container .alert {
     margin-bottom: 4px;
+    padding: 8px;
+    padding-right: 30px;
 }
 
 .node circle {
@@ -744,6 +750,10 @@ body {
 
 #clusters_analysis .popover-content span.glyphicon {
 	font-family: "Glyphicons Halflings";
+}
+
+#main_container {
+  margin-top: 8px;
 }
 
 #main_container.container, #main_container .container {
