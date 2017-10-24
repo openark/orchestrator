@@ -20,14 +20,11 @@ import (
 	"encoding/json"
 	"io"
 	"strings"
-	"sync"
 
 	"github.com/openark/golib/log"
 
 	"github.com/hashicorp/raft"
 )
-
-var firstApplyOnce sync.Once
 
 // fsm is a raft finite state machine
 type fsm Store
@@ -56,9 +53,6 @@ func (f *fsm) Apply(l *raft.Log) interface{} {
 		return f.yieldByHint(hint)
 	}
 	log.Debugf("orchestrator/raft: applying command %+v: %s", l.Index, c.Op)
-	firstApplyOnce.Do(func() {
-		onFirstApply()
-	})
 	return store.applier.ApplyCommand(c.Op, c.Value)
 }
 
