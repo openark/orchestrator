@@ -168,6 +168,11 @@ func GetState() raft.RaftState {
 	return getRaft().State()
 }
 
+func Snapshot() error {
+	future := getRaft().Snapshot()
+	return future.Error()
+}
+
 func StepDown() {
 	getRaft().StepDown()
 }

@@ -2448,6 +2448,20 @@ func (this *HttpAPI) RaftLeader(params martini.Params, r render.Render, req *htt
 	r.JSON(http.StatusOK, state)
 }
 
+// RaftSnapshot instructs raft to take a snapshot
+func (this *HttpAPI) RaftSnapshot(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !orcraft.IsRaftEnabled() {
+		Respond(r, &APIResponse{Code: ERROR, Message: "raft-leader: not running with raft setup"})
+		return
+	}
+	err := orcraft.Snapshot()
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot create snapshot: %+v", err)})
+		return
+	}
+	r.JSON(http.StatusOK, "snapshot created")
+}
+
 // ReloadConfiguration reloads confiug settings (not all of which will apply after change)
 func (this *HttpAPI) ReloadConfiguration(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -3129,6 +3143,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "raft-peers", this.RaftPeers)
 	this.registerRequest(m, "raft-state", this.RaftState)
 	this.registerRequest(m, "raft-leader", this.RaftLeader)
+	this.registerRequest(m, "raft-snapshot", this.RaftSnapshot)
 	this.registerRequest(m, "reelect", this.Reelect)
 	this.registerRequest(m, "reload-configuration", this.ReloadConfiguration)
 	this.registerRequest(m, "reload-cluster-alias", this.ReloadClusterAlias)
