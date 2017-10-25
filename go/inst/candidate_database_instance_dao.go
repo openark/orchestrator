@@ -39,16 +39,20 @@ func BulkReadCandidateDatabaseInstance() ([]CandidateDatabaseInstance, error) {
 
 	// Read all promotion rules from the table
 	query := `
-SELECT	hostname,
-	port,
-	promotion_rule -- no munging done here yet
-FROM	candidate_database_instance
-`
+		SELECT
+			hostname,
+			port,
+			promotion_rule,
+			last_suggested
+		FROM
+			candidate_database_instance
+	`
 	err := db.QueryOrchestrator(query, nil, func(m sqlutils.RowMap) error {
 		cdi := CandidateDatabaseInstance{
 			Hostname:      m.GetString("hostname"),
 			Port:          m.GetInt("port"),
 			PromotionRule: CandidatePromotionRule(m.GetString("promotion_rule")),
+			LastSuggested: m.GetTime("last_suggested"),
 		}
 		// add to end of candidateDatabaseInstances
 		candidateDatabaseInstances = append(candidateDatabaseInstances, cdi)

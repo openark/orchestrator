@@ -149,16 +149,5 @@ func ReadRecentAudit(instanceKey *InstanceKey, page int) ([]Audit, error) {
 
 // ExpireAudit removes old rows from the audit table
 func ExpireAudit() error {
-	writeFunc := func() error {
-		_, err := db.ExecOrchestrator(`
- 		delete from
-				audit
-			where
-				audit_timestamp < NOW() - INTERVAL ? DAY
-			`,
-			config.AuditPurgeDays,
-		)
-		return err
-	}
-	return ExecDBWriteFunc(writeFunc)
+	return ExpireTableData("audit", "audit_timestamp")
 }

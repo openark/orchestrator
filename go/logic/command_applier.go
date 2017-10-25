@@ -34,7 +34,6 @@ func NewCommandApplier() *CommandApplier {
 }
 
 func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{} {
-	log.Debugf("orchestrator/raft: applying command: %s", op)
 	switch op {
 	case "heartbeat":
 		return nil
