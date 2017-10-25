@@ -176,15 +176,15 @@ function apiCommand(uri, hint) {
   showLoader();
   $.get(appUrl(uri), function(operationResult) {
     hideLoader();
-    if (operationResult.Code == "ERROR") {
-      addAlert(operationResult.Message)
-    } else {
-      reloadWithOperationResult(operationResult, hint);
+    reloadWithOperationResult(operationResult, hint);
+  }, "json").fail(function(operationResult) {
+    hideLoader();
+    if (operationResult.responseJSON.Code == "ERROR") {
+      addAlert(operationResult.responseJSON.Message)
     }
-  }, "json");
+  });
   return false;
 }
-
 
 function reloadWithMessage(msg, details, hint) {
   var hostname = "";
@@ -818,7 +818,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.HasReplicationFilters) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-filter" title="Using replication filters"></span> ');
     }
-    if (instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled && !(instance.isMaster && !instance.isCoMaster)) {
+    if (instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-forward" title="Logs slave updates"></span> ');
     }
     if (instance.IsCandidate) {
