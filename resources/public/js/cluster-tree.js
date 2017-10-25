@@ -66,8 +66,8 @@ function visualizeInstances(nodesMap, onSvgInstanceWrapper, clusterControl) {
   var margin = {
     top: 0,
     right: 60,
-    bottom: 00,
-    left: 60
+    bottom: 0,
+    left: 15,
   };
   var horizontalSpacing = 320;
   var verticalSpacing = 100;
