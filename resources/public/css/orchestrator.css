@@ -495,7 +495,7 @@ body {
     float: left;
     position: fixed;
     left: 0px;
-    padding: 0 15px;
+    padding: 8px 15px 0px 15px;
     z-index:100;
     border-right: dotted 1px #bbbbbb;
 }

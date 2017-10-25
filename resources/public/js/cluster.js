@@ -329,7 +329,7 @@ function Cluster() {
           $(duplicate).addClass("draggable-msg");
           $(duplicate).find(".instance-content,.instance-trailer-content").html($(this).attr("data-drop-comment"))
         } else {
-          $(duplicate).find(".instance-content,.instance-trailer-content").html("Cannot drop here")
+          $(duplicate).find(".instance-content,.instance-trailer-content").html('<span class="glyphicon glyphicon-minus-sign text-danger"></span> Cannot drop here')
         }
       },
       out: function(event, ui) {
@@ -398,7 +398,7 @@ function Cluster() {
         }
         return {
           accept: "ok",
-          type: "makeCoMaster with " + droppableTitle
+          type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>MAKE CO MASTER</strong> with ' + droppableTitle,
         };
       }
       if (instanceIsDescendant(droppableNode, node)) {
@@ -416,8 +416,27 @@ function Cluster() {
           type: "relocate [" + node.aggregatedInstances.length + "] < " + droppableTitle
         };
       }
-      if (false && instanceIsChild(node, droppableNode) &&
-        droppableNode.isMaster && droppableNode.SlaveHosts.length == 1 &&
+      if (instanceIsChild(node, droppableNode) && !droppableNode.isMaster) {
+        if (node.hasProblem) {
+          // Typically, when a node has a problem we do not allow moving it up.
+          // But there's a special situation when allowing is desired: when
+          // this replica is completely caught up;
+          if (!node.isSQLThreadCaughtUpWithIOThread) {
+            return {
+              accept: false
+            };
+          }
+        }
+        if (shouldApply) {
+          takeMaster(node, droppableNode);
+        }
+        return {
+          accept: "ok",
+          type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>take master</strong> ' + droppableTitle
+        };
+      }
+      if (instanceIsChild(node, droppableNode) &&
+        droppableNode.isMaster &&
         !node.isCoMaster
       ) {
         if (node.hasProblem) {
@@ -430,7 +449,7 @@ function Cluster() {
         }
         return {
           accept: "ok",
-          type: "graceful takeover " + droppableTitle + " as master"
+          type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>PROMOTE AS MASTER</strong> '
         };
       }
       // the general case
@@ -492,7 +511,7 @@ function Cluster() {
         }
         return {
           accept: "ok",
-          type: "makeCoMaster with " + droppableTitle
+          type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>MAKE CO MASTER</strong> with ' + droppableTitle,
         };
       }
       if (instanceIsDescendant(droppableNode, node)) {
@@ -563,7 +582,7 @@ function Cluster() {
           }
           return {
             accept: "ok",
-            type: "makeCoMaster with " + droppableTitle
+            type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>MAKE CO MASTER</strong> with ' + droppableTitle,
           };
         }
       }
@@ -637,7 +656,7 @@ function Cluster() {
         }
         return {
           accept: "ok",
-          type: "makeCoMaster with " + droppableTitle
+          type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>MAKE CO MASTER</strong> with ' + droppableTitle,
         };
       }
       return {
@@ -934,16 +953,6 @@ function Cluster() {
     return executeMoveOperation(message, apiUrl);
   }
 
-  function makeCoMaster(node, childNode) {
-    var message = "<h4>make-co-master</h4>Are you sure you wish to make <code><strong>" +
-      node.Key.Hostname + ":" + node.Key.Port +
-      "</strong></code> and <code><strong>" +
-      childNode.Key.Hostname + ":" + childNode.Key.Port +
-      "</strong></code> co-masters?";
-    var apiUrl = "/api/make-co-master/" + childNode.Key.Hostname + "/" + childNode.Key.Port;
-    return executeMoveOperation(message, apiUrl);
-  }
-
   function matchBelow(node, otherNode) {
     var message = "<h4>PSEUDO-GTID MODE, match-below</h4>Are you sure you wish to turn <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
@@ -974,6 +983,22 @@ function Cluster() {
     return executeMoveOperation(message, apiUrl);
   }
 
+  function makeCoMaster(node, childNode) {
+    var message = "<h4>make-co-master</h4>Are you sure you wish to make <code><strong>" +
+      node.Key.Hostname + ":" + node.Key.Port +
+      "</strong></code> and <code><strong>" +
+      childNode.Key.Hostname + ":" + childNode.Key.Port +
+      "</strong></code> co-masters?";
+    bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
+      if (confirm) {
+        apiCommand("/api/make-co-master/" + childNode.Key.Hostname + "/" + childNode.Key.Port);
+        return true;
+      }
+    });
+    return false;
+  }
+
+
   function gracefulMasterTakeover(newMasterNode, existingMasterNode) {
     var message = "<h1>DANGER</h1><h4>Graceful-master-takeover</h4>Are you sure you wish to promote <code><strong>" +
       newMasterNode.Key.Hostname + ":" + newMasterNode.Key.Port +
@@ -984,6 +1009,7 @@ function Cluster() {
         return true;
       }
     });
+    return false;
   }
 
   function instancesAreSiblings(node1, node2) {
