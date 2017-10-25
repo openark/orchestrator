@@ -416,6 +416,23 @@ function Cluster() {
           type: "relocate [" + node.aggregatedInstances.length + "] < " + droppableTitle
         };
       }
+      if (false && instanceIsChild(node, droppableNode) &&
+        droppableNode.isMaster && droppableNode.SlaveHosts.length == 1 &&
+        !node.isCoMaster
+      ) {
+        if (node.hasProblem) {
+          return {
+            accept: false
+          };
+        }
+        if (shouldApply) {
+          gracefulMasterTakeover(node, droppableNode);
+        }
+        return {
+          accept: "ok",
+          type: "graceful takeover " + droppableTitle + " as master"
+        };
+      }
       // the general case
       if (shouldApply) {
         relocate(node, droppableNode);
@@ -955,6 +972,18 @@ function Cluster() {
       "</strong></code>?";
     var apiUrl = "/api/move-replicas-gtid/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
     return executeMoveOperation(message, apiUrl);
+  }
+
+  function gracefulMasterTakeover(newMasterNode, existingMasterNode) {
+    var message = "<h1>DANGER</h1><h4>Graceful-master-takeover</h4>Are you sure you wish to promote <code><strong>" +
+      newMasterNode.Key.Hostname + ":" + newMasterNode.Key.Port +
+      "</strong></code> as master?";
+    bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
+      if (confirm) {
+        apiCommand("/api/graceful-master-takeover/" + existingMasterNode.Key.Hostname + "/" + existingMasterNode.Key.Port);
+        return true;
+      }
+    });
   }
 
   function instancesAreSiblings(node1, node2) {
