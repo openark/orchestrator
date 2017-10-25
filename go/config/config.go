@@ -44,8 +44,8 @@ const (
 	BinlogFileHistoryDays                        = 1
 	MaintenanceOwner                             = "orchestrator"
 	AuditPageSize                                = 20
-	AuditPurgeDays                               = 31
-	MaintenancePurgeDays                         = 31
+	AuditPurgeDays                               = 7
+	MaintenancePurgeDays                         = 7
 	MySQLTopologyMaxPoolConnections              = 3
 	MaintenanceExpireMinutes                     = 10
 	AgentHttpTimeoutSeconds                      = 60

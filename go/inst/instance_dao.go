@@ -130,6 +130,15 @@ func ExecDBWriteFunc(f func() error) error {
 	return res
 }
 
+func ExpireTableData(tableName string, timestampColumn string) error {
+	query := fmt.Sprintf("delete from %s where %s < NOW() - INTERVAL ? DAY", tableName, timestampColumn)
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(query, config.AuditPurgeDays)
+		return err
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
 // logReadTopologyInstanceError logs an error, if applicable, for a ReadTopologyInstance operation,
 // providing context and hint as for the source of the error. If there's no hint just provide the
 // original error.
@@ -1882,6 +1891,33 @@ func GetHeuristicClusterDomainInstanceAttribute(clusterName string) (instanceKey
 // resulted in an actual check! This can happen when TCP/IP connections are hung, in which case the "check"
 // never returns. In such case we multiply interval by a factor, so as not to open too many connections on
 // the instance.
+func ReadAllInstanceKeys() ([]InstanceKey, error) {
+	res := []InstanceKey{}
+	query := `
+		select
+			hostname, port
+		from
+			database_instance
+			`
+	err := db.QueryOrchestrator(query, sqlutils.Args(), func(m sqlutils.RowMap) error {
+		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
+		if merr != nil {
+			log.Errore(merr)
+		} else if !InstanceIsForgotten(instanceKey) {
+			// only if not in "forget" cache
+			res = append(res, *instanceKey)
+		}
+		return nil
+	})
+	return res, log.Errore(err)
+}
+
+// ReadOutdatedInstanceKeys reads and returns keys for all instances that are not up to date (i.e.
+// pre-configured time has passed since they were last checked)
+// But we also check for the case where an attempt at instance checking has been made, that hasn't
+// resulted in an actual check! This can happen when TCP/IP connections are hung, in which case the "check"
+// never returns. In such case we multiply interval by a factor, so as not to open too many connections on
+// the instance.
 func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 	res := []InstanceKey{}
 	query := `
@@ -2380,26 +2416,28 @@ func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern str
 
 // RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.
 func RegisterCandidateInstance(candidate *CandidateDatabaseInstance) error {
+	args := sqlutils.Args(candidate.Hostname, candidate.Port, string(candidate.PromotionRule))
+	lastSuggestedHint := "now()"
+	if !candidate.LastSuggested.IsZero() {
+		lastSuggestedHint = "?"
+		args = append(args, candidate.LastSuggested)
+	}
+	query := fmt.Sprintf(`
+			insert into candidate_database_instance (
+					hostname,
+					port,
+					promotion_rule,
+					last_suggested
+				) values (?, ?, ?, %s)
+				on duplicate key update
+					hostname=values(hostname),
+					port=values(port),
+					last_suggested=now(),
+					promotion_rule=values(promotion_rule)
+			`, lastSuggestedHint)
 	writeFunc := func() error {
-		_, err := db.ExecOrchestrator(`
-				insert into candidate_database_instance (
-						hostname,
-						port,
-						last_suggested,
-						promotion_rule)
-					values (?, ?, NOW(), ?)
-					on duplicate key update
-						hostname=values(hostname),
-						port=values(port),
-						last_suggested=now(),
-						promotion_rule=values(promotion_rule)
-				`, candidate.Hostname, candidate.Port, string(candidate.PromotionRule),
-		)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
+		_, err := db.ExecOrchestrator(query, args...)
+		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }
@@ -2550,6 +2588,10 @@ func ResetInstanceRelaylogCoordinatesHistory(instanceKey *InstanceKey) error {
 		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
+}
+
+func ExpireInstanceBinlogFileHistory() error {
+	return ExpireTableData("database_instance_binlog_files_history", "last_seen")
 }
 
 // RecordInstanceBinlogFileHistory snapshots the binlog coordinates of instances

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -44,6 +45,8 @@ const discoveryMetricsName = "DISCOVERY_METRICS"
 // that were requested for discovery.  It can be continuously updated
 // as discovery process progresses.
 var discoveryQueue *discovery.Queue
+var snapshotDiscoveryKeys chan inst.InstanceKey
+var snapshotDiscoveryKeysMutex sync.Mutex
 
 var discoveriesCounter = metrics.NewCounter()
 var failedDiscoveriesCounter = metrics.NewCounter()
@@ -59,6 +62,8 @@ var isElectedNode int64 = 0
 var recentDiscoveryOperationKeys *cache.Cache
 
 func init() {
+	snapshotDiscoveryKeys = make(chan inst.InstanceKey, 10)
+
 	metrics.Register("discoveries.attempt", discoveriesCounter)
 	metrics.Register("discoveries.fail", failedDiscoveriesCounter)
 	metrics.Register("discoveries.instance_poll_seconds_exceeded", instancePollSecondsExceededCounter)
@@ -316,6 +321,17 @@ func onDiscoveryTick() {
 		go inst.ExpireMaintenance()
 	}
 
+	func() {
+		// Normally onDiscoveryTick() shouldn't run concurrently. It is kicked by a ticker.
+		// However it _is_ invoked inside a goroutine. I like to be safe here.
+		snapshotDiscoveryKeysMutex.Lock()
+		defer snapshotDiscoveryKeysMutex.Unlock()
+
+		countSnapshotKeys := len(snapshotDiscoveryKeys)
+		for i := 0; i < countSnapshotKeys; i++ {
+			instanceKeys = append(instanceKeys, <-snapshotDiscoveryKeys)
+		}
+	}()
 	// avoid any logging unless there's something to be done
 	if len(instanceKeys) > 0 {
 		if len(instanceKeys) > config.Config.MaxOutdatedKeysToShow {
@@ -329,6 +345,17 @@ func onDiscoveryTick() {
 			}
 		}
 	}
+}
+
+func publishDiscoverMasters() error {
+	instances, err := inst.ReadWriteableClustersMasters()
+	if err == nil {
+		for _, instance := range instances {
+			key := instance.Key
+			go orcraft.PublishCommand("discover", key)
+		}
+	}
+	return log.Errore(err)
 }
 
 // ContinuousDiscovery starts an asynchronuous infinite discovery process where instances are
@@ -346,6 +373,7 @@ func ContinuousDiscovery() {
 	discoveryTick := time.Tick(config.DiscoveryPollSeconds * time.Second)
 	instancePollTick := time.Tick(instancePollSecondsDuration())
 	caretakingTick := time.Tick(time.Minute)
+	raftCaretakingTick := time.Tick(10 * time.Minute)
 	recoveryTick := time.Tick(time.Duration(config.Config.RecoveryPollSeconds) * time.Second)
 	var snapshotTopologiesTick <-chan time.Time
 	if config.Config.SnapshotTopologiesIntervalHours > 0 {
@@ -357,7 +385,7 @@ func ContinuousDiscovery() {
 	go acceptSignals()
 
 	if config.Config.RaftEnabled {
-		if err := orcraft.Setup(NewCommandApplier(), process.ThisHostname); err != nil {
+		if err := orcraft.Setup(NewCommandApplier(), NewSnapshotDataCreatorApplier(), process.ThisHostname); err != nil {
 			log.Fatale(err)
 		}
 		go orcraft.Monitor()
@@ -387,7 +415,6 @@ func ContinuousDiscovery() {
 			// Various periodic internal maintenance tasks
 			go func() {
 				if IsLeaderOrActive() {
-					go inst.RecordInstanceBinlogFileHistory()
 					go inst.ForgetLongUnseenInstances()
 					go inst.ForgetUnseenInstancesDifferentlyResolved()
 					go inst.ForgetExpiredHostnameResolves()
@@ -403,14 +430,22 @@ func ContinuousDiscovery() {
 					go inst.ExpireMasterPositionEquivalence()
 					go inst.ExpirePoolInstances()
 					go inst.FlushNontrivialResolveCacheToDatabase()
+					go inst.ExpireInstanceBinlogFileHistory()
 					go process.ExpireNodesHistory()
 					go process.ExpireAccessTokens()
 					go process.ExpireAvailableNodes()
+					go ExpireFailureDetectionHistory()
+					go ExpireTopologyRecoveryHistory()
+					go ExpireTopologyRecoveryStepsHistory()
 				} else {
 					// Take this opportunity to refresh yourself
 					go inst.LoadHostnameResolveCache()
 				}
 			}()
+		case <-raftCaretakingTick:
+			if orcraft.IsRaftEnabled() && orcraft.IsLeader() {
+				go publishDiscoverMasters()
+			}
 		case <-recoveryTick:
 			go func() {
 				if IsLeaderOrActive() {
