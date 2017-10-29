@@ -96,7 +96,7 @@ func (store *Store) Open(peerNodes []string) error {
 	}
 
 	// Create the log store and stable store.
-	logStore := NewRelationalStore()
+	logStore := NewRelationalStore(store.raftDir)
 	log.Debugf("raft: logStore=%+v", logStore)
 
 	// Instantiate the Raft systems.

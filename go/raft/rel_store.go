@@ -22,7 +22,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/sqlutils"
 
 	"github.com/hashicorp/raft"
@@ -59,11 +58,14 @@ var dbMutex sync.Mutex
 // - hashicorp/raft.StableStore
 // - hashicorp/log.LogStore
 type RelationalStore struct {
+	dataDir string
 	backend *sql.DB
 }
 
-func NewRelationalStore() *RelationalStore {
-	return &RelationalStore{}
+func NewRelationalStore(dataDir string) *RelationalStore {
+	return &RelationalStore{
+		dataDir: dataDir,
+	}
 }
 
 func (relStore *RelationalStore) openDB() (*sql.DB, error) {
@@ -71,7 +73,7 @@ func (relStore *RelationalStore) openDB() (*sql.DB, error) {
 	defer dbMutex.Unlock()
 
 	if relStore.backend == nil {
-		relStoreFile := filepath.Join(config.Config.RaftDataDir, raftStoreFile)
+		relStoreFile := filepath.Join(relStore.dataDir, raftStoreFile)
 		sqliteDB, _, err := sqlutils.GetSQLiteDB(relStoreFile)
 		if err != nil {
 			return nil, err
