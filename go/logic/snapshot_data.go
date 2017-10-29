@@ -132,21 +132,36 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 
 	// keys
 	{
-		instanceKeyMap := inst.NewInstanceKeyMap()
-		instanceKeyMap.AddKeys(snapshotData.Keys)
+		snapshotInstanceKeyMap := inst.NewInstanceKeyMap()
+		snapshotInstanceKeyMap.AddKeys(snapshotData.Keys)
 
-		allKeys, _ := inst.ReadAllInstanceKeys()
-		for _, key := range allKeys {
-			if !instanceKeyMap.HasKey(key) {
-				inst.ForgetInstance(&key)
+		discardedKeys := 0
+		// Forget instances that were not in snapshot
+		existingKeys, _ := inst.ReadAllInstanceKeys()
+		for _, existingKey := range existingKeys {
+			if !snapshotInstanceKeyMap.HasKey(existingKey) {
+				inst.ForgetInstance(&existingKey)
+				discardedKeys++
 			}
 		}
-		for _, key := range instanceKeyMap.GetInstanceKeys() {
-			key := key
-			go func() {
-				snapshotDiscoveryKeys <- key
-			}()
+		log.Debugf("raft snapshot restore: discarded %+v keys", discardedKeys)
+		existingKeysMap := inst.NewInstanceKeyMap()
+		existingKeysMap.AddKeys(existingKeys)
+
+		// Discover instances that are in snapshot and not in our own database.
+		// Instances that _are_ in our own database will self-discover. No need
+		// to explicitly discover them.
+		discoveredKeys := 0
+		for _, snapshotKey := range snapshotData.Keys {
+			if !existingKeysMap.HasKey(snapshotKey) {
+				snapshotKey := snapshotKey
+				go func() {
+					snapshotDiscoveryKeys <- snapshotKey
+				}()
+				discoveredKeys++
+			}
 		}
+		log.Debugf("raft snapshot restore: discovered %+v keys", discoveredKeys)
 	}
 	writeTableData("cluster_alias", &snapshotData.ClusterAlias)
 	writeTableData("cluster_alias_override", &snapshotData.ClusterAliasOverride)
@@ -166,6 +181,6 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 	{
 		SetRecoveryDisabled(snapshotData.RecoveryDisabled)
 	}
-	log.Debugf("raft restore applied")
+	log.Debugf("raft snapshot restore applied")
 	return nil
 }
