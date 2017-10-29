@@ -937,13 +937,15 @@ function Cluster() {
       showLoader();
       getData(apiUrl, function(operationResult) {
         hideLoader();
-        if (operationResult.Code == "ERROR") {
-          addAlert(operationResult.Message)
-        } else {
-          reloadWithOperationResult(operationResult);
+        reloadWithOperationResult(operationResult);
+      }).fail(function(operationResult) {
+        hideLoader();
+        if (operationResult.responseJSON.Code == "ERROR") {
+          addAlert(operationResult.responseJSON.Message)
         }
       });
     }
+
     if (isSilentUI()) {
       moveOperation()
     } else {
