@@ -133,7 +133,11 @@ body {
     cursor: default;
 }
 
-.instance h3 a .glyphicon {
+.instance h3 .instance-glyphs {
+    cursor: pointer;
+}
+
+.instance h3 .glyphicon {
     cursor: pointer;
 }
 
@@ -498,6 +502,7 @@ body {
     padding: 8px 15px 0px 15px;
     z-index:100;
     border-right: dotted 1px #bbbbbb;
+    background-color: #f7f7f7;
 }
 
 #cluster_sidebar li {
@@ -663,6 +668,35 @@ body {
     margin-bottom: 8px;
 }
 
+.instance .instance-master-section {
+  position: absolute;
+  bottom: 0px;
+  left: 0px;
+  z-index: 20;
+  height: 0%;
+  width: 48%;
+}
+
+.instance.accept_drop_check .instance-master-section {
+  height: 100%;
+}
+
+.instance .instance-normal-section {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  z-index: 20;
+  height: 0%;
+  width: 51%;
+}
+
+.instance.accept_drop_check .instance-normal-section {
+  height: 100%;
+}
+
+.instance h4.popover-footer {
+  z-index: 25;
+}
 
 /*.cluster-graph > .instance[data-duplicate-node] {
     position: absolute;
