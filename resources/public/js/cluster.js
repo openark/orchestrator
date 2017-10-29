@@ -933,25 +933,12 @@ function Cluster() {
 
 
   function executeMoveOperation(message, apiUrl) {
-    var moveOperation = function() {
-      showLoader();
-      getData(apiUrl, function(operationResult) {
-        hideLoader();
-        reloadWithOperationResult(operationResult);
-      }).fail(function(operationResult) {
-        hideLoader();
-        if (operationResult.responseJSON.Code == "ERROR") {
-          addAlert(operationResult.responseJSON.Message)
-        }
-      });
-    }
-
     if (isSilentUI()) {
-      moveOperation()
+      apiCommand(apiUrl);
     } else {
       bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
         if (confirm) {
-          moveOperation();
+          apiCommand(apiUrl);
         }
       });
     }
