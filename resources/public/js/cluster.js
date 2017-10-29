@@ -807,21 +807,28 @@ function Cluster() {
 
 
   function executeMoveOperation(message, apiUrl) {
-    bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
-      if (confirm) {
-        showLoader();
-        getData(apiUrl, function(operationResult) {
-          hideLoader();
-          if (operationResult.Code == "ERROR") {
-            addAlert(operationResult.Message)
-          } else {
-            reloadWithOperationResult(operationResult);
-          }
-        });
-      }
-      $("#cluster_container .accept_drop").removeClass("accept_drop");
-      $("#cluster_container .accept_drop").removeClass("accept_drop_warning");
-    });
+    var moveOperation = function() {
+      showLoader();
+      getData(apiUrl, function(operationResult) {
+        hideLoader();
+        if (operationResult.Code == "ERROR") {
+          addAlert(operationResult.Message)
+        } else {
+          reloadWithOperationResult(operationResult);
+        }
+      });
+    }
+    if (isSilentUI()) {
+      moveOperation()
+    } else {
+      bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
+        if (confirm) {
+          moveOperation();
+        }
+      });
+    }
+    $("#cluster_container .accept_drop").removeClass("accept_drop");
+    $("#cluster_container .accept_drop").removeClass("accept_drop_warning");
     return false;
   }
 
@@ -1305,8 +1312,9 @@ function Cluster() {
         glyph.addClass("text-muted");
         glyph.attr("title", "Color by data center");
       }
-    } {
-      // Compact display
+    }
+    // Compact display
+    {
       var anchor = $("#cluster_sidebar [data-bullet=compact-display] a");
       var glyph = $(anchor).find(".glyphicon")
       if (isCompactDisplay()) {
@@ -1339,14 +1347,32 @@ function Cluster() {
         glyph.attr("title", "Anonymize display");
       }
     }
+    // Silent UI
+    {
+      var glyph = $("#cluster_sidebar [data-bullet=silent-ui] .glyphicon");
+      if (isSilentUI()) {
+        glyph.addClass("text-info");
+        glyph.attr("title", "Cancel UI silence");
+      } else {
+        glyph.addClass("text-muted");
+        glyph.attr("title", "Silence UI questions");
+      }
+    }
   }
 
   function onAnalysisEntry(analysisEntry, instance) {
-    var content = '<span><strong>' + analysisEntry.Analysis + (analysisEntry.IsDowntimed ? '<br/>[<i>downtime till ' + analysisEntry.DowntimeEndTimestamp + '</i>]' : '') + "</strong></span>" + "<br/>" + "<span>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</span>";
+    var extraText = '';
+    if  (analysisEntry.IsDowntimed) {
+      extraText = '<br/>[<i>downtime till ' + analysisEntry.DowntimeEndTimestamp + '</i>]';
+    } else if (analysisEntry.IsReplicasDowntimed) {
+      extraText = '<br/>[<i>replicas downtimed</i>]';
+    }
+    var content = '<span><strong>' + analysisEntry.Analysis + extraText + "</strong></span>" + "<br/>" + "<span>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</span>";
+    var hasDowntime = analysisEntry.IsDowntimed || analysisEntry.IsReplicasDowntimed
     if (analysisEntry.IsStructureAnalysis) {
-      content = '<div class="pull-left glyphicon glyphicon-exclamation-sign text-warning"></div>' + content;
+      content = '<div class="pull-left glyphicon glyphicon-exclamation-sign '+(hasDowntime ? "text-muted" : "text-warning")+'"></div>' + content;
     } else {
-      content = '<div class="pull-left glyphicon glyphicon-exclamation-sign text-danger"></div>' + content;
+      content = '<div class="pull-left glyphicon glyphicon-exclamation-sign '+(hasDowntime ? "text-muted" : "text-danger")+'"></div>' + content;
     }
     addSidebarInfoPopoverContent(content);
 
@@ -1417,10 +1443,15 @@ function Cluster() {
   function reviewReplicationAnalysis(replicationAnalysis) {
     var instancesMap = _instancesMap;
     var clusterHasReplicationAnalysisIssue = false;
+    var allIssuesAreDowntimed = true;
     var clusterHasStructureAnalysisIssue = false;
     replicationAnalysis.Details.forEach(function(analysisEntry) {
       if (analysisEntry.ClusterDetails.ClusterName != currentClusterName()) {
         return;
+      }
+      var hasDowntime = analysisEntry.IsDowntimed || analysisEntry.IsReplicasDowntimed
+      if (!hasDowntime) {
+        allIssuesAreDowntimed = false;
       }
       var instanceId = getInstanceId(analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port);
       var instance = instancesMap[instanceId]
@@ -1437,9 +1468,11 @@ function Cluster() {
       });
     });
     if (clusterHasReplicationAnalysisIssue) {
-      $("#cluster_sidebar [data-bullet=info] div span").addClass("text-danger").addClass("glyphicon-exclamation-sign");;
+      var iconClass = (allIssuesAreDowntimed ? "text-muted" : "text-danger");
+      $("#cluster_sidebar [data-bullet=info] div span").addClass(iconClass).addClass("glyphicon-exclamation-sign");;
     } else if (clusterHasStructureAnalysisIssue) {
-      $("#cluster_sidebar [data-bullet=info] div span").addClass("text-warning").addClass("glyphicon-exclamation-sign");;
+      var iconClass = (allIssuesAreDowntimed ? "text-muted" : "text-warning");
+      $("#cluster_sidebar [data-bullet=info] div span").addClass(iconClass).addClass("glyphicon-exclamation-sign");;
     } else {
       $("#cluster_sidebar [data-bullet=info] div span").addClass("text-info").addClass("glyphicon-info-sign");
     }
@@ -1526,7 +1559,7 @@ function Cluster() {
       document.title = document.title.split(" - ")[0] + " - " + visualAlias;
 
       if (!isAnonymized()) {
-        $("#cluster_container").append('<div class="floating_background">' + visualAlias + '</div>');
+        $("#cluster_name").text(visualAlias);
         $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="' + clusterInfo.ClusterAlias + '">Alias: ' + alias + '</a></li>');
       }
       $("#dropdown-context").append('<li><a href="' + appUrl('/web/cluster-pools/' + currentClusterName()) + '">Pools</a></li>');
@@ -1649,6 +1682,21 @@ function Cluster() {
         });
       } else {
         $.cookie("compact-display", "true", {
+          path: '/',
+          expires: 1
+        });
+      }
+      location.reload();
+      return
+    });
+    $("body").on("click", "a[data-command=silent-ui]", function(event) {
+      if ($.cookie("silent-ui") == "true") {
+        $.cookie("silent-ui", "false", {
+          path: '/',
+          expires: 1
+        });
+      } else {
+        $.cookie("silent-ui", "true", {
           path: '/',
           expires: 1
         });

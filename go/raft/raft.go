@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
@@ -36,6 +37,8 @@ const (
 
 var RaftNotRunning = fmt.Errorf("raft is not configured/running")
 var store *Store
+var raftSetupComplete int64
+var lastIndexOnStartup uint64
 var ThisHostname string
 
 var fatalRaftErrorChan = make(chan error)
@@ -53,14 +56,18 @@ func FatalRaftError(err error) error {
 
 // Setup creates the entire raft shananga. Creates the store, associates with the throttler,
 // contacts peer nodes, and subscribes to leader changes to export them.
-func Setup(applier CommandApplier, thisHostname string) error {
+func Setup(applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier, thisHostname string) error {
 	log.Debugf("Setting up raft")
 	ThisHostname = thisHostname
 	raftBind, err := normalizeRaftNode(config.Config.RaftBind)
 	if err != nil {
 		return err
 	}
-	store = NewStore(config.Config.RaftDataDir, raftBind, applier)
+	raftAdvertise, err := normalizeRaftNode(config.Config.RaftAdvertise)
+	if err != nil {
+		return err
+	}
+	store = NewStore(config.Config.RaftDataDir, raftBind, raftAdvertise, applier, snapshotCreatorApplier)
 	peerNodes := []string{}
 	for _, raftNode := range config.Config.RaftNodes {
 		peerNode, err := normalizeRaftNode(raftNode)
@@ -75,7 +82,12 @@ func Setup(applier CommandApplier, thisHostname string) error {
 
 	setupHttpClient()
 
+	atomic.StoreInt64(&raftSetupComplete, 1)
 	return nil
+}
+
+func isRaftSetupComplete() bool {
+	return atomic.LoadInt64(&raftSetupComplete) == 1
 }
 
 // getRaft is a convenience method
@@ -90,7 +102,9 @@ func normalizeRaftHostnameIP(host string) (string, error) {
 	}
 	ips, err := net.LookupIP(host)
 	if err != nil {
-		return host, err
+		// resolve failed. But we don't want to fail the entire operation for that
+		log.Errore(err)
+		return host, nil
 	}
 	// resolve success!
 	for _, ip := range ips {
@@ -132,6 +146,9 @@ func IsLeader() bool {
 
 // GetLeader returns identity of raft leader
 func GetLeader() string {
+	if !isRaftSetupComplete() {
+		return ""
+	}
 	return getRaft().Leader()
 }
 
@@ -145,7 +162,15 @@ func QuorumSize() (int, error) {
 
 // GetState returns current raft state
 func GetState() raft.RaftState {
+	if !isRaftSetupComplete() {
+		return raft.Candidate
+	}
 	return getRaft().State()
+}
+
+func Snapshot() error {
+	future := getRaft().Snapshot()
+	return future.Error()
 }
 
 func StepDown() {

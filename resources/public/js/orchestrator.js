@@ -82,6 +82,10 @@ function isAnonymized() {
   return ($.cookie("anonymize") == "true");
 }
 
+function isSilentUI() {
+  return ($.cookie("silent-ui") == "true");
+}
+
 function isCompactDisplay() {
   return ($.cookie("compact-display") == "true");
 }
@@ -172,15 +176,15 @@ function apiCommand(uri, hint) {
   showLoader();
   $.get(appUrl(uri), function(operationResult) {
     hideLoader();
-    if (operationResult.Code == "ERROR") {
-      addAlert(operationResult.Message)
-    } else {
-      reloadWithOperationResult(operationResult, hint);
+    reloadWithOperationResult(operationResult, hint);
+  }, "json").fail(function(operationResult) {
+    hideLoader();
+    if (operationResult.responseJSON.Code == "ERROR") {
+      addAlert(operationResult.responseJSON.Message)
     }
-  }, "json");
+  });
   return false;
 }
-
 
 function reloadWithMessage(msg, details, hint) {
   var hostname = "";
@@ -361,8 +365,6 @@ function openNodeModal(node) {
     '<a href="' + appUrl('/web/audit/instance/' + node.Key.Hostname + '/' + node.Key.Port) + '">' + node.title + '</a>');
   addNodeModalDataAttribute("Agent",
     '<a href="' + appUrl('/web/agent/' + node.Key.Hostname) + '">' + node.Key.Hostname + '</a>');
-  addNodeModalDataAttribute("Long queries",
-    '<a href="' + appUrl('/web/long-queries?filter=' + node.Key.Hostname) + '">on ' + node.Key.Hostname + '</a>');
 
   $('#node_modal [data-btn]').unbind("click");
 
@@ -461,17 +463,20 @@ function openNodeModal(node) {
   });
 
   if (node.IsDowntimed) {
-    $('#node_modal [data-panel-type=downtime]').html("Downtimed by <strong>" + node.DowntimeOwner + "</strong> until " + node.DowntimeEndTimestamp);
-    $('#node_modal [data-description=downtime-status]').html(
+    $('#node_modal .end-downtime .panel-heading').html("Downtimed by <strong>" + node.DowntimeOwner + "</strong> until " + node.DowntimeEndTimestamp);
+    $('#node_modal .end-downtime .panel-body').html(
       node.DowntimeReason
     );
-    $('#node_modal [data-panel-type=begin-downtime]').hide();
+    $('#node_modal .begin-downtime').hide();
     $('#node_modal button[data-btn=begin-downtime]').hide();
-    $('#node_modal [data-panel-type=end-downtime]').show();
+
+    $('#node_modal .end-downtime').show();
+    $('#node_modal button[data-btn=end-downtime]').show();
   } else {
-    $('#node_modal [data-panel-type=downtime]').html("Downtime");
-    $('#node_modal [data-panel-type=begin-downtime]').show();
-    $('#node_modal [data-panel-type=end-downtime]').hide();
+    $('#node_modal .begin-downtime').show();
+    $('#node_modal button[data-btn=begin-downtime]').show();
+
+    $('#node_modal .end-downtime').hide();
     $('#node_modal button[data-btn=end-downtime]').hide();
   }
   $('#node_modal button[data-btn=skip-query]').hide();
@@ -813,7 +818,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.HasReplicationFilters) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-filter" title="Using replication filters"></span> ');
     }
-    if (instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled && !(instance.isMaster && !instance.isCoMaster)) {
+    if (instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-forward" title="Logs slave updates"></span> ');
     }
     if (instance.IsCandidate) {
@@ -911,11 +916,6 @@ function getParameterByName(name) {
 
 $(document).ready(function() {
   visualizeBrand();
-
-  $('body').css('background-image', 'url(' + appUrl('/images/tile.png') + ')');
-
-  $(".navbar-nav li").removeClass("active");
-  $(".navbar-nav li[data-nav-page='" + activePage() + "']").addClass("active");
 
   $.get(appUrl("/api/clusters-info"), function(clusters) {
     clusters = clusters || [];

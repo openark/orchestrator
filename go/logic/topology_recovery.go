@@ -826,6 +826,9 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 	if !isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling) {
 		return false
 	}
+	if inst.IsBannedFromBeingCandidateReplica(sibling) {
+		return false
+	}
 	if sibling.HasReplicationFilters != intermediateMasterInstance.HasReplicationFilters {
 		return false
 	}
@@ -959,7 +962,15 @@ func GetCandidateSiblingOfIntermediateMaster(topologyRecovery *TopologyRecovery,
 			return sibling, nil
 		}
 	}
-	// Go for something else in the same DC & ENV
+	// No candidate in same DC & env, let's search for a candidate anywhere
+	for _, sibling := range siblings {
+		sibling := sibling
+		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) && sibling.IsCandidate {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found %+v as a replacement for %+v [candidate sibling]", sibling.Key, intermediateMasterInstance.Key))
+			return sibling, nil
+		}
+	}
+	// Go for some valid in the same DC & ENV
 	for _, sibling := range siblings {
 		sibling := sibling
 		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) &&
@@ -969,15 +980,7 @@ func GetCandidateSiblingOfIntermediateMaster(topologyRecovery *TopologyRecovery,
 			return sibling, nil
 		}
 	}
-	// Nothing in same DC & env, let's just go for some is_candidate
-	for _, sibling := range siblings {
-		sibling := sibling
-		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) && sibling.IsCandidate {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found %+v as a replacement for %+v [candidate sibling]", sibling.Key, intermediateMasterInstance.Key))
-			return sibling, nil
-		}
-	}
-	// Havent found an "is_candidate". Just whatever is valid.
+	// Just whatever is valid.
 	for _, sibling := range siblings {
 		sibling := sibling
 		if isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance, sibling) {
@@ -1045,6 +1048,7 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadIntermediateMaster: regroup failed on: %+v", regroupError))
 		}
 		if regroupPromotedReplica != nil {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadIntermediateMaster: regrouped under %+v, with %d lost replicas", regroupPromotedReplica.Key, len(lostReplicas)))
 			topologyRecovery.ParticipatingInstanceKeys.AddKey(regroupPromotedReplica.Key)
 			if len(lostReplicas) == 0 && regroupError == nil {
 				// Seems like the regroup worked flawlessly. The local replica took over all of its siblings.
@@ -1645,15 +1649,21 @@ func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecov
 		return nil, nil, fmt.Errorf("Cannot deduce cluster master for %+v. Found %+v potential masters", clusterName, len(clusterMasters))
 	}
 	clusterMaster := clusterMasters[0]
-	if len(clusterMaster.SlaveHosts) == 0 {
-		return nil, nil, fmt.Errorf("Master %+v doesn't seem to have replicas", clusterMaster.Key)
-	}
-	if len(clusterMaster.SlaveHosts) > 1 {
-		return nil, nil, fmt.Errorf("GracefulMasterTakeover: master %+v should only have one replica (making the takeover safe and simple), but has %+v. Aborting", clusterMaster.Key, len(clusterMaster.SlaveHosts))
+
+	clusterMasterDirectReplicas, err := inst.ReadReplicaInstances(&clusterMaster.Key)
+	if err != nil {
+		return nil, nil, log.Errore(err)
 	}
 
-	designatedInstanceKey := &(clusterMaster.SlaveHosts.GetInstanceKeys()[0])
-	designatedInstance, err := inst.ReadTopologyInstance(designatedInstanceKey)
+	if len(clusterMasterDirectReplicas) == 0 {
+		return nil, nil, fmt.Errorf("Master %+v doesn't seem to have replicas", clusterMaster.Key)
+	}
+
+	if len(clusterMasterDirectReplicas) > 1 {
+		return nil, nil, fmt.Errorf("GracefulMasterTakeover: master %+v should only have one replica (making the takeover safe and simple), but has %+v. Aborting", clusterMaster.Key, len(clusterMasterDirectReplicas))
+	}
+
+	designatedInstance := clusterMasterDirectReplicas[0]
 	if err != nil {
 		return nil, nil, err
 	}

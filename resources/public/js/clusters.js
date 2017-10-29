@@ -47,6 +47,8 @@ $(document).ready(function() {
   function displayClusters(clusters, replicationAnalysis, problemInstances) {
     hideLoader();
 
+    clusters = clusters || [];
+
     clusters.sort(sortByCountInstances);
     var clustersProblems = {};
     clusters.forEach(function(cluster) {
@@ -115,6 +117,10 @@ $(document).ready(function() {
           var analysisLabel = "text-danger";
           if (analysisEntry.IsStructureAnalysis) {
             analysisLabel = "text-warning";
+          }
+          var hasDowntime = analysisEntry.IsDowntimed || analysisEntry.IsReplicasDowntimed
+          if (hasDowntime) {
+            analysisLabel = "text-muted";
           }
           popoverElement.find("h3 .pull-left").prepend('<span class="glyphicon glyphicon-exclamation-sign ' + analysisLabel + '" title="' + analysisEntry.Analysis + ': ' + getInstanceTitle(analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port) + '"></span>');
         });

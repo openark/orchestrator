@@ -68,6 +68,11 @@ var apiSynonyms = map[string]string{
 	"reattach-slave":             "reattach-replica",
 	"reattach-slave-master-host": "reattach-replica-master-host",
 	"cluster-osc-slaves":         "cluster-osc-replicas",
+	"start-slave":                "start-replica",
+	"restart-slave":              "restart-replica",
+	"stop-slave":                 "stop-replica",
+	"stop-slave-nice":            "stop-replica-nice",
+	"reset-slave":                "reset-replica",
 }
 
 var registeredPaths = []string{}
@@ -1389,6 +1394,7 @@ func (this *HttpAPI) AsciiTopology(params martini.Params, r render.Render, req *
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
+	asciiOutput = strings.Replace(asciiOutput, " ", "\u00a0", -1)
 
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Topology for cluster %s", clusterName), Details: asciiOutput})
 }
@@ -2464,6 +2470,20 @@ func (this *HttpAPI) RaftLeader(params martini.Params, r render.Render, req *htt
 	r.JSON(http.StatusOK, state)
 }
 
+// RaftSnapshot instructs raft to take a snapshot
+func (this *HttpAPI) RaftSnapshot(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !orcraft.IsRaftEnabled() {
+		Respond(r, &APIResponse{Code: ERROR, Message: "raft-leader: not running with raft setup"})
+		return
+	}
+	err := orcraft.Snapshot()
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot create snapshot: %+v", err)})
+		return
+	}
+	r.JSON(http.StatusOK, "snapshot created")
+}
+
 // ReloadConfiguration reloads confiug settings (not all of which will apply after change)
 func (this *HttpAPI) ReloadConfiguration(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -3145,6 +3165,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "raft-peers", this.RaftPeers)
 	this.registerRequest(m, "raft-state", this.RaftState)
 	this.registerRequest(m, "raft-leader", this.RaftLeader)
+	this.registerRequest(m, "raft-snapshot", this.RaftSnapshot)
 	this.registerRequest(m, "reelect", this.Reelect)
 	this.registerRequest(m, "reload-configuration", this.ReloadConfiguration)
 	this.registerRequest(m, "reload-cluster-alias", this.ReloadClusterAlias)

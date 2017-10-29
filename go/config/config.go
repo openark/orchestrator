@@ -44,8 +44,8 @@ const (
 	BinlogFileHistoryDays                        = 1
 	MaintenanceOwner                             = "orchestrator"
 	AuditPageSize                                = 20
-	AuditPurgeDays                               = 31
-	MaintenancePurgeDays                         = 31
+	AuditPurgeDays                               = 7
+	MaintenancePurgeDays                         = 7
 	MySQLTopologyMaxPoolConnections              = 3
 	MaintenanceExpireMinutes                     = 10
 	AgentHttpTimeoutSeconds                      = 60
@@ -97,6 +97,7 @@ type Configuration struct {
 	PanicIfDifferentDatabaseDeploy             bool   // When true, and this process finds the orchestrator backend DB was provisioned by a different version, panic
 	RaftEnabled                                bool   // When true, setup orchestrator in a raft consensus layout. When false (default) all Raft* variables are ignored
 	RaftBind                                   string
+	RaftAdvertise                              string
 	RaftDataDir                                string
 	DefaultRaftPort                            int      // if a RaftNodes entry does not specify port, use this one
 	RaftNodes                                  []string // Raft nodes to make initial connection with
@@ -265,6 +266,7 @@ func newConfiguration() *Configuration {
 		SkipOrchestratorDatabaseUpdate:             false,
 		PanicIfDifferentDatabaseDeploy:             false,
 		RaftBind:                                   "127.0.0.1:10008",
+		RaftAdvertise:                              "",
 		RaftDataDir:                                "",
 		DefaultRaftPort:                            10008,
 		RaftNodes:                                  []string{},
@@ -504,6 +506,9 @@ func (this *Configuration) postReadAdjustments() error {
 	}
 	if this.RemoteSSHForMasterFailover && this.RemoteSSHCommand == "" {
 		return fmt.Errorf("RemoteSSHCommand is required when RemoteSSHForMasterFailover is set")
+	}
+	if this.RaftAdvertise == "" {
+		this.RaftAdvertise = this.RaftBind
 	}
 	return nil
 }

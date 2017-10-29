@@ -174,3 +174,15 @@ func (relStore *RelationalStore) DeleteRange(min, max uint64) error {
 	_, err := db.ExecOrchestrator("delete from raft_log where log_index >= ? and log_index <= ?", min, max)
 	return err
 }
+
+func (relStore *RelationalStore) DeleteAll() error {
+	firstIndex, err := relStore.FirstIndex()
+	if err != nil {
+		return err
+	}
+	lastIndex, err := relStore.LastIndex()
+	if err != nil {
+		return err
+	}
+	return relStore.DeleteRange(firstIndex, lastIndex)
+}

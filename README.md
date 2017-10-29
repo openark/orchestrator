@@ -58,6 +58,12 @@ Read the [Orchestrator documentation](https://github.com/github/orchestrator/tre
 
 Authored by [Shlomi Noach](https://github.com/shlomi-noach) at [GitHub](http://github.com). Previously at [Booking.com](http://booking.com) and [Outbrain](http://outbrain.com)
 
+#### Related projects
+
+- Orchestrator Puppet module: https://github.com/github/puppet-orchestrator-for-mysql
+- Orchestrator Chef Cookbook: https://github.com/silviabotros/chef-orchestrator/
+- Nagios / Icinga check based on Orchestrator API: https://github.com/mcrauwel/go-check-orchestrator
+
 #### License
 
 `orchestrator` is free and open sourced under the [Apache 2.0 license](LICENSE).

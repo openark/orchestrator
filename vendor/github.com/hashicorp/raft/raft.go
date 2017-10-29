@@ -1952,9 +1952,7 @@ func (r *Raft) Yield() error {
 		atomic.StoreInt64(&r.suspendLeadership, 0)
 	})
 	if r.getState() == Leader {
-		if err := r.StepDown(); err != nil {
-			return err
-		}
+		r.StepDown()
 	}
 	return nil
 }

@@ -162,6 +162,20 @@ new-node$    sqlite3 /var/lib/orchestrator/orchestrator.db < /tmp/orchestrator-d
 - Supports `SQLite` (embedded) backend, no need for `MySQL` backend though supported.
 - Little cross-node communication ; fit for high latency cross DC networks
 
+### DC fencing example
+
+Consider this example of three data centers, `DC1`, `DC2` and `DC3`. We run `orchestrator/raft` with three nodes, one in each data center.
+
+![orchestrator/raft, 3 DCs](images/orchestrator-raft-3dc.png)
+
+What happens when `DC2` gets network isolated?
+
+![orchestrator/raft, 3 DCs, DC2 view](images/orchestrator-raft-3dc-dc2.png)
+
+![orchestrator/raft, 3 DCs, quorum view](images/orchestrator-raft-3dc-quorum.png)
+
+![orchestrator/raft, 3 DCs, recovery](images/orchestrator-raft-3dc-recovery.png)
+
 ### Roadmap
 
 Still ongoing and TODO:

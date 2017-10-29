@@ -94,6 +94,7 @@ type ReplicationAnalysis struct {
 	CountValidReplicatingReplicas             uint
 	CountReplicasFailingToConnectToMaster     uint
 	CountStaleReplicas                        uint
+	CountDowntimedReplicas                    uint
 	ReplicationDepth                          uint
 	SlaveHosts                                InstanceKeyMap
 	IsFailingToConnectToMaster                bool
@@ -101,6 +102,7 @@ type ReplicationAnalysis struct {
 	Description                               string
 	StructureAnalysis                         []StructureAnalysisCode
 	IsDowntimed                               bool
+	IsReplicasDowntimed                       bool // as good as downtimed because all replicas are downtimed AND analysis is all about the replicas (e.e. AllMasterSlavesNotReplicating)
 	DowntimeEndTimestamp                      string
 	DowntimeRemainingSeconds                  int
 	IsBinlogServer                            bool
@@ -116,6 +118,7 @@ type ReplicationAnalysis struct {
 	ProcessingNodeHostname                    string
 	ProcessingNodeToken                       string
 	CountAdditionalAgreeingNodes              int
+	StartActivePeriod                         string
 }
 
 type AnalysisMap map[string](*ReplicationAnalysis)
