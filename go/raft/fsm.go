@@ -31,11 +31,6 @@ type fsm Store
 
 // Apply applies a Raft log entry to the key-value store.
 func (f *fsm) Apply(l *raft.Log) interface{} {
-	if l.Index <= lastIndexOnStartup {
-		log.Debugf("orchestrator/raft: fsm will not apply index %+v: it is already found in log store", l.Index)
-		return nil
-	}
-
 	var c storeCommand
 	if err := json.Unmarshal(l.Data, &c); err != nil {
 		log.Errorf("failed to unmarshal command: %s", err.Error())
@@ -93,10 +88,6 @@ func (f *fsm) Snapshot() (raft.FSMSnapshot, error) {
 
 // Restore restores freno state
 func (f *fsm) Restore(rc io.ReadCloser) error {
-	if !isRaftSetupComplete() {
-		log.Debugf("orchestrator/raft: nooping snapshot restore")
-		return nil
-	}
 	defer rc.Close()
 
 	return f.snapshotCreatorApplier.Restore(rc)
