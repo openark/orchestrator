@@ -285,7 +285,7 @@ func onDiscoveryTick() {
 		} else {
 			atomic.StoreInt64(&isElectedNode, 0)
 		}
-		if process.SinceLastGoodHealthCheck() > time.Minute {
+		if process.SinceLastGoodHealthCheck() > time.Minute && process.SinceLastHealthCheck() < 2*config.DiscoveryPollSeconds*time.Second {
 			orcraft.FatalRaftError(fmt.Errorf("Node is unable to register health. Please check database connnectivity."))
 		}
 	}
