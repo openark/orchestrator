@@ -122,6 +122,28 @@ var API HttpAPI = HttpAPI{}
 var discoveryMetrics = collection.CreateOrReturnCollection("DISCOVERY_METRICS")
 var queryMetrics = collection.CreateOrReturnCollection("BACKEND_WRITES")
 
+type APIOperationContext struct {
+	req *http.Request
+}
+
+func (this *APIOperationContext) IsIgnoreSanityChecks() bool {
+	if val := this.req.URL.Query().Get("ignoreSanityChecks"); val == "true" || val == "1" {
+		return true
+	}
+	if val := this.req.Header.Get("X-ORCHESTRATOR-IGNORE-SANITY-CHECKS"); val == "true" || val == "1" {
+		return true
+	}
+	return false
+}
+
+func (this *APIOperationContext) IsNoop() bool {
+	return false
+}
+
+func operationContext(req *http.Request) config.OperationContext {
+	return &APIOperationContext{req: req}
+}
+
 func (this *HttpAPI) getInstanceKey(host string, port string) (inst.InstanceKey, error) {
 	instanceKey, err := inst.NewInstanceKeyFromStrings(host, port)
 	if err != nil {
@@ -443,7 +465,7 @@ func (this *HttpAPI) MoveUp(params martini.Params, r render.Render, req *http.Re
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	instance, err := inst.MoveUp(&instanceKey)
+	instance, err := inst.MoveUp(&instanceKey, operationContext(req))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -491,7 +513,7 @@ func (this *HttpAPI) Repoint(params martini.Params, r render.Render, req *http.R
 		return
 	}
 
-	instance, err := inst.Repoint(&instanceKey, &belowKey, inst.GTIDHintNeutral)
+	instance, err := inst.Repoint(&instanceKey, &belowKey, inst.GTIDHintNeutral, operationContext(req))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -688,7 +710,7 @@ func (this *HttpAPI) MoveBelow(params martini.Params, r render.Render, req *http
 		return
 	}
 
-	instance, err := inst.MoveBelow(&instanceKey, &siblingKey)
+	instance, err := inst.MoveBelow(&instanceKey, &siblingKey, operationContext(req))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -714,7 +736,7 @@ func (this *HttpAPI) MoveBelowGTID(params martini.Params, r render.Render, req *
 		return
 	}
 
-	instance, err := inst.MoveBelowGTID(&instanceKey, &belowKey)
+	instance, err := inst.MoveBelowGTID(&instanceKey, &belowKey, operationContext(req))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -809,7 +831,7 @@ func (this *HttpAPI) RelocateBelow(params martini.Params, r render.Render, req *
 		return
 	}
 
-	instance, err := inst.RelocateBelow(&instanceKey, &belowKey)
+	instance, err := inst.RelocateBelow(&instanceKey, &belowKey, operationContext(req))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -861,7 +883,7 @@ func (this *HttpAPI) MoveEquivalent(params martini.Params, r render.Render, req 
 		return
 	}
 
-	instance, err := inst.MoveEquivalent(&instanceKey, &belowKey)
+	instance, err := inst.MoveEquivalent(&instanceKey, &belowKey, operationContext(req))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -922,7 +944,7 @@ func (this *HttpAPI) MatchBelow(params martini.Params, r render.Render, req *htt
 		return
 	}
 
-	instance, matchedCoordinates, err := inst.MatchBelow(&instanceKey, &belowKey, true)
+	instance, matchedCoordinates, err := inst.MatchBelow(&instanceKey, &belowKey, true, operationContext(req))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -943,7 +965,7 @@ func (this *HttpAPI) MatchUp(params martini.Params, r render.Render, req *http.R
 		return
 	}
 
-	instance, matchedCoordinates, err := inst.MatchUp(&instanceKey, true)
+	instance, matchedCoordinates, err := inst.MatchUp(&instanceKey, true, operationContext(req))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return

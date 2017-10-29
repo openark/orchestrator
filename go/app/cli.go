@@ -218,7 +218,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
-			_, err := inst.RelocateBelow(instanceKey, destinationKey)
+			_, err := inst.RelocateBelow(instanceKey, destinationKey, config.RuntimeCLIFlags)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -268,7 +268,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("move-up", "Classic file:pos relocation", `Move a replica one level up the topology`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			instance, err := inst.MoveUp(instanceKey)
+			instance, err := inst.MoveUp(instanceKey, config.RuntimeCLIFlags)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -299,7 +299,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination/sibling:", destination)
 			}
-			_, err := inst.MoveBelow(instanceKey, destinationKey)
+			_, err := inst.MoveBelow(instanceKey, destinationKey, config.RuntimeCLIFlags)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -311,7 +311,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
-			_, err := inst.MoveEquivalent(instanceKey, destinationKey)
+			_, err := inst.MoveEquivalent(instanceKey, destinationKey, config.RuntimeCLIFlags)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -321,7 +321,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
 			// destinationKey can be null, in which case the instance repoints to its existing master
-			instance, err := inst.Repoint(instanceKey, destinationKey, inst.GTIDHintNeutral)
+			instance, err := inst.Repoint(instanceKey, destinationKey, inst.GTIDHintNeutral, config.RuntimeCLIFlags)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -413,7 +413,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
-			_, err := inst.MoveBelowGTID(instanceKey, destinationKey)
+			_, err := inst.MoveBelowGTID(instanceKey, destinationKey, config.RuntimeCLIFlags)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -464,7 +464,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce destination:", destination)
 			}
-			_, _, err := inst.MatchBelow(instanceKey, destinationKey, true)
+			_, _, err := inst.MatchBelow(instanceKey, destinationKey, true, config.RuntimeCLIFlags)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -473,7 +473,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("match-up", "Pseudo-GTID relocation", `Transport the replica one level up the hierarchy, making it child of its grandparent, using Pseudo-GTID`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			instance, _, err := inst.MatchUp(instanceKey, true)
+			instance, _, err := inst.MatchUp(instanceKey, true, config.RuntimeCLIFlags)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -482,7 +482,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("rematch", "Pseudo-GTID relocation", `Reconnect a replica onto its master, via PSeudo-GTID.`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			instance, _, err := inst.RematchReplica(instanceKey, true)
+			instance, _, err := inst.RematchReplica(instanceKey, true, config.RuntimeCLIFlags)
 			if err != nil {
 				log.Fatale(err)
 			}

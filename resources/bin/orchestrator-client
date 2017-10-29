@@ -50,6 +50,7 @@ promotion_rule=
 pool=
 hostname_flag=
 api_path=
+ignore_sanity_checks=0
 
 instance_hostport=
 destination_hostport=
@@ -72,11 +73,12 @@ for arg in "$@"; do
     "-hostname"|"--hostname")             set -- "$@" "-H" ;;
     "-api"|"--api")                       set -- "$@" "-U" ;;
     "-path"|"--path")                     set -- "$@" "-P" ;;
+    "-ignore-sanity-checks"|"--ignore-sanity-checks") set -- "$@" "-G" ;;
     *)                                    set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:P:h" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:P:hG" OPTION
 do
   case $OPTION in
     h) command="help" ;;
@@ -94,6 +96,7 @@ do
     D) default_port=$OPTARG ;;
     U) [ ! -z "$OPTARG" ] && orchestrator_api=$OPTARG ;;
     P) api_path=$OPTARG ;;
+    G) ignore_sanity_checks=1 ;;
   esac
 done
 
@@ -179,7 +182,7 @@ function api() {
   uri="$leader_api/$path"
   # echo $uri
   set -o pipefail
-  api_response=$(curl -s "$uri" | jq '.')
+  api_response=$(curl --header "X-ORCHESTRATOR-IGNORE-SANITY-CHECKS: ${ignore_sanity_checks}" -s "$uri" | jq '.')
   if [ $? -ne 0 ] ; then
     fail "Cannot access orchestrator at ${leader_api}.  Check ORCHESTRATOR_API is configured correctly and orchestrator is running"
   fi
@@ -648,6 +651,8 @@ function run_command() {
     "raft-leader") raft_leader ;;                   # Get identify of raft leader, assuming raft setup
     "raft-leader-hostname") raft_leader_hostname ;; # Get hostname of raft leader, assuming raft setup
     "raft-elect-leader") raft_elect_leader ;;       # Request raft re-elections, provide hint for new leader's identity
+
+
 
     *) fail "Unsupported command $command" ;;
   esac
