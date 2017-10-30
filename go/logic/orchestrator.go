@@ -362,7 +362,7 @@ func publishDiscoverMasters() error {
 // periodically investigated and their status captured, and long since unseen instances are
 // purged and forgotten.
 func ContinuousDiscovery() {
-	log.Infof("Starting continuous discovery")
+	log.Infof("continuous discovery: setting up")
 	continuousDiscoveryStartTime := time.Now()
 	checkAndRecoverWaitPeriod := 3 * instancePollSecondsDuration()
 	recentDiscoveryOperationKeys = cache.New(instancePollSecondsDuration(), time.Second)
@@ -394,6 +394,8 @@ func ContinuousDiscovery() {
 	if *config.RuntimeCLIFlags.GrabElection {
 		process.GrabElection()
 	}
+
+	log.Infof("continuous discovery: starting")
 	for {
 		select {
 		case <-discoveryTick:
