@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 
 	"github.com/hashicorp/raft"
@@ -86,6 +87,7 @@ func (relStore *RelationalStore) openDB() (*sql.DB, error) {
 			}
 		}
 		relStore.backend = sqliteDB
+		log.Infof("raft: store initialized at %+v", relStoreFile)
 	}
 	return relStore.backend, nil
 }
