@@ -821,11 +821,11 @@ func ReadTopologyRecoverySteps(recoveryUID string) ([]TopologyRecoveryStep, erro
 	return res, log.Errore(err)
 }
 
-
 func NoteClusterMaster(clusterAliasMaster *inst.ClusterAliasMaster) error {
 	key := fmt.Sprintf("master/cluster/%s", clusterAliasMaster.ClusterAlias)
 	err := consul.PutKeyValue(key, clusterAliasMaster.Master.StringCode())
 	return err
+}
 
 // ExpireFailureDetectionHistory removes old rows from the topology_failure_detection table
 func ExpireFailureDetectionHistory() error {
