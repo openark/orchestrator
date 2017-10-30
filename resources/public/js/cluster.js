@@ -1559,7 +1559,7 @@ function Cluster() {
       document.title = document.title.split(" - ")[0] + " - " + visualAlias;
 
       if (!isAnonymized()) {
-        $("#cluster_container").append('<div class="floating_background">' + visualAlias + '</div>');
+        $("#cluster_name").text(visualAlias);
         $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="' + clusterInfo.ClusterAlias + '">Alias: ' + alias + '</a></li>');
       }
       $("#dropdown-context").append('<li><a href="' + appUrl('/web/cluster-pools/' + currentClusterName()) + '">Pools</a></li>');

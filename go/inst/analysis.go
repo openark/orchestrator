@@ -118,6 +118,7 @@ type ReplicationAnalysis struct {
 	ProcessingNodeHostname                    string
 	ProcessingNodeToken                       string
 	CountAdditionalAgreeingNodes              int
+	StartActivePeriod                         string
 }
 
 type AnalysisMap map[string](*ReplicationAnalysis)

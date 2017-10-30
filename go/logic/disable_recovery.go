@@ -76,3 +76,10 @@ func EnableRecovery() error {
 	)
 	return err
 }
+
+func SetRecoveryDisabled(disabled bool) error {
+	if disabled {
+		return DisableRecovery()
+	}
+	return EnableRecovery()
+}

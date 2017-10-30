@@ -321,6 +321,12 @@ function forget() {
   api "forget/$instance_hostport"
 }
 
+function forget_cluster() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "forget-cluster/${alias:-$instance}"
+}
+
+
 function all_instances() {
   api "all-instances"
   print_response | filter_keys | print_key
@@ -562,8 +568,9 @@ function run_command() {
 
     "async-discover") async_discover ;;                         # Lookup an instance, investigate it asynchronously. Useful for bulk loads
                                                                 # of servers into an empty orchestrator cluster.
-    "discover") discover ;;   # Lookup an instance, investigate it
-    "forget") forget ;;       # Forget about an instance's existence
+    "discover") discover ;;                                     # Lookup an instance, investigate it
+    "forget") forget ;;                                         # Forget about an instance's existence
+    "forget-cluster") forget_cluster ;;                         # Forget about a cluster
 
     "topology") ascii_topology ;;                               # Show an ascii-graph of a replication topology, given a member of that topology
     "clusters") clusters ;;                                     # List all clusters known to orchestrator

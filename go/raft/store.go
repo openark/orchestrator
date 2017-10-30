@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	retainSnapshotCount = 2880
-	snapshotInterval    = 30 * time.Second
+	retainSnapshotCount = 10
+	snapshotInterval    = 30 * time.Minute
 	raftTimeout         = 10 * time.Second
 )
 
@@ -27,7 +27,8 @@ type Store struct {
 	raft      *raft.Raft // The consensus mechanism
 	peerStore raft.PeerStore
 
-	applier CommandApplier
+	applier                CommandApplier
+	snapshotCreatorApplier SnapshotCreatorApplier
 }
 
 type storeCommand struct {
@@ -36,12 +37,13 @@ type storeCommand struct {
 }
 
 // NewStore inits and returns a new store
-func NewStore(raftDir string, raftBind string, raftAdvertise string, applier CommandApplier) *Store {
+func NewStore(raftDir string, raftBind string, raftAdvertise string, applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier) *Store {
 	return &Store{
-		raftDir:       raftDir,
-		raftBind:      raftBind,
-		raftAdvertise: raftAdvertise,
-		applier:       applier,
+		raftDir:                raftDir,
+		raftBind:               raftBind,
+		raftAdvertise:          raftAdvertise,
+		applier:                applier,
+		snapshotCreatorApplier: snapshotCreatorApplier,
 	}
 }
 
@@ -88,16 +90,19 @@ func (store *Store) Open(peerNodes []string) error {
 	}
 
 	// Create the snapshot store. This allows the Raft to truncate the log.
-	//snapshots, err := raft.NewFileSnapshotStore(store.raftDir, retainSnapshotCount, os.Stderr)
-	snapshots, err := NewRelSnapshotStore(retainSnapshotCount, os.Stderr)
+	snapshots, err := raft.NewFileSnapshotStore(store.raftDir, retainSnapshotCount, os.Stderr)
 	if err != nil {
 		return log.Errorf("file snapshot store: %s", err)
 	}
-	//	snapshots := raft.NewDiscardSnapshotStore()
 
 	// Create the log store and stable store.
 	logStore := NewRelationalStore()
 	log.Debugf("raft: logStore=%+v", logStore)
+
+	if lastIndex, err := logStore.LastIndex(); err == nil {
+		lastIndexOnStartup = lastIndex
+		log.Infof("orchestrator/raft: last index found in database: %+v", lastIndexOnStartup)
+	}
 
 	// Instantiate the Raft systems.
 	if store.raft, err = raft.NewRaft(config, (*fsm)(store), logStore, logStore, snapshots, peerStore, transport); err != nil {
