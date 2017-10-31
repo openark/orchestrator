@@ -29,6 +29,7 @@ import (
 
 const registrationPollSeconds = 5
 
+var lastHealthCheckUnixNano int64
 var lastGoodHealthCheckUnixNano int64
 var LastContinousCheckHealthy int64
 
@@ -89,6 +90,7 @@ var continuousRegistrationOnce sync.Once
 func RegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
 	nodeHealth.Update()
 	healthy, err = WriteRegisterNode(nodeHealth)
+	atomic.StoreInt64(&lastHealthCheckUnixNano, time.Now().UnixNano())
 	if healthy {
 		atomic.StoreInt64(&lastGoodHealthCheckUnixNano, time.Now().UnixNano())
 	}
@@ -121,12 +123,20 @@ func HealthTest() (*HealthStatus, error) {
 	return &health, nil
 }
 
-func SinceLastGoodHealthCheck() time.Duration {
-	healthyTimeNano := atomic.LoadInt64(&lastGoodHealthCheckUnixNano)
-	if healthyTimeNano == 0 {
+func SinceLastHealthCheck() time.Duration {
+	timeNano := atomic.LoadInt64(&lastHealthCheckUnixNano)
+	if timeNano == 0 {
 		return 0
 	}
-	return time.Since(time.Unix(0, healthyTimeNano))
+	return time.Since(time.Unix(0, timeNano))
+}
+
+func SinceLastGoodHealthCheck() time.Duration {
+	timeNano := atomic.LoadInt64(&lastGoodHealthCheckUnixNano)
+	if timeNano == 0 {
+		return 0
+	}
+	return time.Since(time.Unix(0, timeNano))
 }
 
 // ContinuousRegistration will continuously update the node_health
