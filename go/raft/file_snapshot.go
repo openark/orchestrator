@@ -347,20 +347,22 @@ func (f *FileSnapshotStore) ReapSnapshots(currentSnapshotMeta *fileSnapshotMeta)
 		return err
 	}
 
-	fmt.Println("..........checking whether we need to reap snapshots greater than ", currentSnapshotMeta.Term, " and ", currentSnapshotMeta.Index)
+	deprecatedSnapshotsReaped := false
 	for _, snapshot := range snapshots {
-		fmt.Println("..... looking at snapshot with term ", snapshot.Term, " and ", snapshot.Index)
 		if snapshot.Term > currentSnapshotMeta.Term ||
 			snapshot.Term == currentSnapshotMeta.Term && snapshot.Index > currentSnapshotMeta.Index {
-			fmt.Println("..... YEP! reapign it")
 			reapSnapshot(snapshot)
+			deprecatedSnapshotsReaped = true
 		}
 	}
 
-	snapshots, err = f.getSnapshots()
-	if err != nil {
-		f.logger.Printf("[ERR] snapshot: Failed to get snapshots: %v", err)
-		return err
+	if deprecatedSnapshotsReaped {
+		// re-read list, since we've removed files
+		snapshots, err = f.getSnapshots()
+		if err != nil {
+			f.logger.Printf("[ERR] snapshot: Failed to get snapshots: %v", err)
+			return err
+		}
 	}
 	for i := f.retain; i < len(snapshots); i++ {
 		reapSnapshot(snapshots[i])
