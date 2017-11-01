@@ -39,7 +39,11 @@ import (
 	"github.com/sjmudd/stopwatch"
 )
 
-const discoveryMetricsName = "DISCOVERY_METRICS"
+const (
+	discoveryMetricsName        = "DISCOVERY_METRICS"
+	yieldAfterUnhealthyDuration = 5 * config.HealthPollSeconds * time.Second
+	fatalAfterUnhealthyDuration = 30 * config.HealthPollSeconds * time.Second
+)
 
 // discoveryQueue is a channel of deduplicated instanceKey-s
 // that were requested for discovery.  It can be continuously updated
@@ -275,8 +279,8 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 	}
 }
 
-// onDiscoveryTick handles the actions to take to discover/poll instances
-func onDiscoveryTick() {
+// onHealthTick handles the actions to take to discover/poll instances
+func onHealthTick() {
 	wasAlreadyElected := IsLeader()
 
 	if orcraft.IsRaftEnabled() {
@@ -285,7 +289,11 @@ func onDiscoveryTick() {
 		} else {
 			atomic.StoreInt64(&isElectedNode, 0)
 		}
-		if process.SinceLastGoodHealthCheck() > time.Minute {
+		if process.SinceLastGoodHealthCheck() > yieldAfterUnhealthyDuration {
+			log.Errorf("Unhealthy! raft yielding")
+			orcraft.Yield()
+		}
+		if process.SinceLastGoodHealthCheck() > fatalAfterUnhealthyDuration {
 			orcraft.FatalRaftError(fmt.Errorf("Node is unable to register health. Please check database connnectivity."))
 		}
 	}
@@ -322,7 +330,7 @@ func onDiscoveryTick() {
 	}
 
 	func() {
-		// Normally onDiscoveryTick() shouldn't run concurrently. It is kicked by a ticker.
+		// Normally onHealthTick() shouldn't run concurrently. It is kicked by a ticker.
 		// However it _is_ invoked inside a goroutine. I like to be safe here.
 		snapshotDiscoveryKeysMutex.Lock()
 		defer snapshotDiscoveryKeysMutex.Unlock()
@@ -370,7 +378,7 @@ func ContinuousDiscovery() {
 	inst.LoadHostnameResolveCache()
 	go handleDiscoveryRequests()
 
-	discoveryTick := time.Tick(config.DiscoveryPollSeconds * time.Second)
+	healthTick := time.Tick(config.HealthPollSeconds * time.Second)
 	instancePollTick := time.Tick(instancePollSecondsDuration())
 	caretakingTick := time.Tick(time.Minute)
 	raftCaretakingTick := time.Tick(10 * time.Minute)
@@ -398,9 +406,9 @@ func ContinuousDiscovery() {
 	log.Infof("continuous discovery: starting")
 	for {
 		select {
-		case <-discoveryTick:
+		case <-healthTick:
 			go func() {
-				onDiscoveryTick()
+				onHealthTick()
 			}()
 		case <-instancePollTick:
 			go func() {
@@ -500,7 +508,7 @@ func ContinuousAgentsPoll() {
 
 	go discoverSeededAgents()
 
-	tick := time.Tick(config.DiscoveryPollSeconds * time.Second)
+	tick := time.Tick(config.HealthPollSeconds * time.Second)
 	caretakingTick := time.Tick(time.Hour)
 	for range tick {
 		agentsHosts, _ := agent.ReadOutdatedAgentsHosts()

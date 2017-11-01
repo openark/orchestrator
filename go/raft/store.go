@@ -103,6 +103,7 @@ func (store *Store) Open(peerNodes []string) error {
 	if store.raft, err = raft.NewRaft(config, (*fsm)(store), logStore, logStore, snapshots, peerStore, transport); err != nil {
 		return fmt.Errorf("error creating new raft: %s", err)
 	}
+	store.raft.Yield()
 	store.peerStore = peerStore
 	log.Infof("new raft created")
 

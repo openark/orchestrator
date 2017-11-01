@@ -39,7 +39,7 @@ const (
 var configurationLoaded chan bool = make(chan bool)
 
 const (
-	DiscoveryPollSeconds                         = 1
+	HealthPollSeconds                            = 1
 	ActiveNodeExpireSeconds                      = 5
 	BinlogFileHistoryDays                        = 1
 	MaintenanceOwner                             = "orchestrator"

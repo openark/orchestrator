@@ -62,7 +62,7 @@ func (f *fsm) yield(toPeer string) interface{} {
 		return nil
 	}
 	log.Debugf("Yielding to %s", toPeer)
-	return yield()
+	return Yield()
 }
 
 // yieldByHint yields to a host that contains given hint
@@ -77,7 +77,7 @@ func (f *fsm) yieldByHint(hint string) interface{} {
 		return nil
 	}
 	log.Debugf("Yielding to hinted %s", hint)
-	return yield()
+	return Yield()
 }
 
 // Snapshot returns a snapshot object of freno's state

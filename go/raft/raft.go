@@ -176,7 +176,7 @@ func StepDown() {
 	getRaft().StepDown()
 }
 
-func yield() error {
+func Yield() error {
 	if !IsRaftEnabled() {
 		return RaftNotRunning
 	}
