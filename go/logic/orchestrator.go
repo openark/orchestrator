@@ -290,7 +290,7 @@ func onHealthTick() {
 			atomic.StoreInt64(&isElectedNode, 0)
 		}
 		if process.SinceLastGoodHealthCheck() > yieldAfterUnhealthyDuration {
-			log.Errorf("Unhealthy! raft yielding")
+			log.Errorf("Heath test is failing for over %+v seconds. raft yielding", yieldAfterUnhealthyDuration.Seconds())
 			orcraft.Yield()
 		}
 		if process.SinceLastGoodHealthCheck() > fatalAfterUnhealthyDuration {
