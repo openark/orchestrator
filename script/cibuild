@@ -5,8 +5,15 @@ set -e
 . script/bootstrap
 
 echo "# Validating documentation"
-echo "- docs/toc.md and docs/README.md must be identical"
+echo "## docs/toc.md and docs/README.md must be identical"
 diff docs/toc.md docs/README.md > /dev/null 2> /dev/null
+
+ls *.md | while read f ; do
+  docfile="$(basename $f)"
+  echo "## Checking if doc file $docfile is linked from another doc"
+  grep -c -FR "[(]$docfile[)]" docs -q && echo yes || exit 1
+done
+
 
 echo "# Verifying code is formatted via 'gofmt -s -w  go/'"
 gofmt -s -w  go/
