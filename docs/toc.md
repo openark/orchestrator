@@ -27,6 +27,7 @@
 - [Topology recovery](topology-recovery.md): failure detection and recovery
 
 #### Various
+- [Docker](docker.md)
 - [Security](security.md)
 - [SSL and TLS](ssl-and-tls.md)
 - [Status Checks](status-checks.md)
