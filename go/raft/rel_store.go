@@ -19,24 +19,81 @@ package orcraft
 import (
 	"database/sql"
 	"encoding/binary"
+	"path/filepath"
+	"sync"
 
-	"github.com/github/orchestrator/go/db"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 
 	"github.com/hashicorp/raft"
 )
+
+const raftStoreFile = "raft_store.db"
+
+var createQueries = []string{
+	`
+		CREATE TABLE IF NOT EXISTS raft_log (
+			log_index integer,
+			term bigint not null,
+			log_type int not null,
+			data blob not null,
+			PRIMARY KEY (log_index)
+		)
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS raft_store (
+			store_id integer,
+			store_key varbinary(512) not null,
+			store_value blob not null,
+			PRIMARY KEY (store_id)
+		)
+	`,
+	`
+		CREATE INDEX IF NOT EXISTS store_key_idx_raft_store ON raft_store (store_key)
+	`,
+}
+
+var dbMutex sync.Mutex
 
 // RelationalStoreimplements:
 // - hashicorp/raft.StableStore
 // - hashicorp/log.LogStore
 type RelationalStore struct {
+	dataDir string
+	backend *sql.DB
 }
 
-func NewRelationalStore() *RelationalStore {
-	return &RelationalStore{}
+func NewRelationalStore(dataDir string) *RelationalStore {
+	return &RelationalStore{
+		dataDir: dataDir,
+	}
+}
+
+func (relStore *RelationalStore) openDB() (*sql.DB, error) {
+	dbMutex.Lock()
+	defer dbMutex.Unlock()
+
+	if relStore.backend == nil {
+		relStoreFile := filepath.Join(relStore.dataDir, raftStoreFile)
+		sqliteDB, _, err := sqlutils.GetSQLiteDB(relStoreFile)
+		if err != nil {
+			return nil, err
+		}
+		sqliteDB.SetMaxOpenConns(1)
+		sqliteDB.SetMaxIdleConns(1)
+		for _, query := range createQueries {
+			if _, err := sqliteDB.Exec(sqlutils.ToSqlite3Dialect(query)); err != nil {
+				return nil, err
+			}
+		}
+		relStore.backend = sqliteDB
+		log.Infof("raft: store initialized at %+v", relStoreFile)
+	}
+	return relStore.backend, nil
 }
 
 func (relStore *RelationalStore) Set(key []byte, val []byte) error {
-	db, err := db.OpenOrchestrator()
+	db, err := relStore.openDB()
 	if err != nil {
 		return err
 	}
@@ -70,7 +127,7 @@ func (relStore *RelationalStore) Set(key []byte, val []byte) error {
 
 // Get returns the value for key, or an empty byte slice if key was not found.
 func (relStore *RelationalStore) Get(key []byte) (val []byte, err error) {
-	db, err := db.OpenOrchestrator()
+	db, err := relStore.openDB()
 	if err != nil {
 		return val, err
 	}
@@ -100,7 +157,7 @@ func (relStore *RelationalStore) GetUint64(key []byte) (uint64, error) {
 }
 
 func (relStore *RelationalStore) FirstIndex() (idx uint64, err error) {
-	db, err := db.OpenOrchestrator()
+	db, err := relStore.openDB()
 	if err != nil {
 		return idx, err
 	}
@@ -110,7 +167,7 @@ func (relStore *RelationalStore) FirstIndex() (idx uint64, err error) {
 
 // LastIndex returns the last index written. 0 for no entries.
 func (relStore *RelationalStore) LastIndex() (idx uint64, err error) {
-	db, err := db.OpenOrchestrator()
+	db, err := relStore.openDB()
 	if err != nil {
 		return idx, err
 	}
@@ -120,7 +177,7 @@ func (relStore *RelationalStore) LastIndex() (idx uint64, err error) {
 
 // GetLog gets a log entry at a given index.
 func (relStore *RelationalStore) GetLog(index uint64, log *raft.Log) error {
-	db, err := db.OpenOrchestrator()
+	db, err := relStore.openDB()
 	if err != nil {
 		return err
 	}
@@ -142,7 +199,7 @@ func (relStore *RelationalStore) StoreLog(log *raft.Log) error {
 
 // StoreLogs stores multiple log entries.
 func (relStore *RelationalStore) StoreLogs(logs []*raft.Log) error {
-	db, err := db.OpenOrchestrator()
+	db, err := relStore.openDB()
 	if err != nil {
 		return err
 	}
@@ -171,7 +228,11 @@ func (relStore *RelationalStore) StoreLogs(logs []*raft.Log) error {
 
 // DeleteRange deletes a range of log entries. The range is inclusive.
 func (relStore *RelationalStore) DeleteRange(min, max uint64) error {
-	_, err := db.ExecOrchestrator("delete from raft_log where log_index >= ? and log_index <= ?", min, max)
+	db, err := relStore.openDB()
+	if err != nil {
+		return err
+	}
+	_, err = db.Exec("delete from raft_log where log_index >= ? and log_index <= ?", min, max)
 	return err
 }
 

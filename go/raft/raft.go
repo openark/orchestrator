@@ -38,7 +38,6 @@ const (
 var RaftNotRunning = fmt.Errorf("raft is not configured/running")
 var store *Store
 var raftSetupComplete int64
-var lastIndexOnStartup uint64
 var ThisHostname string
 
 var fatalRaftErrorChan = make(chan error)
@@ -177,7 +176,7 @@ func StepDown() {
 	getRaft().StepDown()
 }
 
-func yield() error {
+func Yield() error {
 	if !IsRaftEnabled() {
 		return RaftNotRunning
 	}

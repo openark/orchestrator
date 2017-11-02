@@ -115,10 +115,18 @@ func openOrchestratorMySQLGeneric() (db *sql.DB, fromCache bool, err error) {
 	return sqlutils.GetDB(uri)
 }
 
+func IsSQLite() bool {
+	return config.Config.IsSQLite()
+}
+
+func isInMemorySQLite() bool {
+	return config.Config.IsSQLite() && strings.Contains(config.Config.SQLite3DataFile, ":memory:")
+}
+
 // OpenTopology returns the DB instance for the orchestrator backed database
 func OpenOrchestrator() (db *sql.DB, err error) {
 	var fromCache bool
-	if config.Config.IsSQLite() {
+	if IsSQLite() {
 		db, fromCache, err = sqlutils.GetSQLiteDB(config.Config.SQLite3DataFile)
 		if err == nil && !fromCache {
 			log.Debugf("Connected to orchestrator backend: sqlite on %v", config.Config.SQLite3DataFile)
@@ -173,7 +181,7 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 }
 
 func translateStatement(statement string) (string, error) {
-	if config.Config.IsSQLite() {
+	if IsSQLite() {
 		statement = sqlutils.ToSqlite3Dialect(statement)
 	}
 	return statement, nil
@@ -291,7 +299,7 @@ func initOrchestratorDB(db *sql.DB) error {
 	deployStatements(db, generateSQLPatches)
 	registerOrchestratorDeployment(db)
 
-	if config.Config.IsSQLite() {
+	if IsSQLite() {
 		ExecOrchestrator(`PRAGMA journal_mode = WAL`)
 		ExecOrchestrator(`PRAGMA synchronous = NORMAL`)
 	}

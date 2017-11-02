@@ -90,24 +90,20 @@ func (store *Store) Open(peerNodes []string) error {
 	}
 
 	// Create the snapshot store. This allows the Raft to truncate the log.
-	snapshots, err := raft.NewFileSnapshotStore(store.raftDir, retainSnapshotCount, os.Stderr)
+	snapshots, err := NewFileSnapshotStore(store.raftDir, retainSnapshotCount, os.Stderr)
 	if err != nil {
 		return log.Errorf("file snapshot store: %s", err)
 	}
 
 	// Create the log store and stable store.
-	logStore := NewRelationalStore()
+	logStore := NewRelationalStore(store.raftDir)
 	log.Debugf("raft: logStore=%+v", logStore)
-
-	if lastIndex, err := logStore.LastIndex(); err == nil {
-		lastIndexOnStartup = lastIndex
-		log.Infof("orchestrator/raft: last index found in database: %+v", lastIndexOnStartup)
-	}
 
 	// Instantiate the Raft systems.
 	if store.raft, err = raft.NewRaft(config, (*fsm)(store), logStore, logStore, snapshots, peerStore, transport); err != nil {
 		return fmt.Errorf("error creating new raft: %s", err)
 	}
+	store.raft.Yield()
 	store.peerStore = peerStore
 	log.Infof("new raft created")
 
