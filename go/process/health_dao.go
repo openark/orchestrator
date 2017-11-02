@@ -52,7 +52,8 @@ func WriteRegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
 			update node_health set
 				last_seen_active = now() - interval ? second,
 				extra_info = case when ? != '' then ? else extra_info end,
-				app_version = ?
+				app_version = ?,
+				incrementing_indicator = incrementing_indicator + 1
 			where
 				hostname = ?
 				and token = ?

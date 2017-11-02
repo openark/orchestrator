@@ -486,4 +486,8 @@ var generateSQLPatches = []string{
 		ALTER TABLE node_health
 			ADD COLUMN db_backend varchar(255) CHARACTER SET ascii NOT NULL DEFAULT ""
 	`,
+	`
+		ALTER TABLE node_health
+			ADD COLUMN incrementing_indicator bigint not null default 0
+	`,
 }
