@@ -31,7 +31,7 @@ func WriteRegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
 	timeNow := time.Now()
 	reportedAgo := timeNow.Sub(nodeHealth.LastReported)
 	reportedSecondsAgo := int64(reportedAgo.Seconds())
-	if reportedSecondsAgo > registrationPollSeconds*2 {
+	if reportedSecondsAgo > config.HealthPollSeconds*2 {
 		// This entry is too old. No reason to persist it; already expired.
 		return false, nil
 	}
@@ -118,7 +118,7 @@ func ExpireAvailableNodes() {
 			where
 				last_seen_active < now() - interval ? second
 			`,
-		registrationPollSeconds*2,
+		config.HealthPollSeconds*5,
 	)
 	if err != nil {
 		log.Errorf("ExpireAvailableNodes: failed to remove old entries: %+v", err)
@@ -156,7 +156,7 @@ func ReadAvailableNodes(onlyHttpNodes bool) (nodes [](*NodeHealth), err error) {
 			hostname
 		`
 
-	err = db.QueryOrchestrator(query, sqlutils.Args(registrationPollSeconds*2, extraInfo), func(m sqlutils.RowMap) error {
+	err = db.QueryOrchestrator(query, sqlutils.Args(config.HealthPollSeconds*2, extraInfo), func(m sqlutils.RowMap) error {
 		nodeHealth := &NodeHealth{
 			Hostname:        m.GetString("hostname"),
 			Token:           m.GetString("token"),

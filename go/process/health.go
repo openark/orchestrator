@@ -27,8 +27,6 @@ import (
 	"github.com/openark/golib/log"
 )
 
-const registrationPollSeconds = 5
-
 var lastHealthCheckUnixNano int64
 var lastGoodHealthCheckUnixNano int64
 var LastContinousCheckHealthy int64
@@ -159,7 +157,7 @@ func ContinuousRegistration(extraInfo string, command string) {
 		// First one is synchronous
 		tickOperation()
 		go func() {
-			registrationTick := time.Tick(time.Duration(registrationPollSeconds) * time.Second)
+			registrationTick := time.Tick(config.HealthPollSeconds * time.Second)
 			for range registrationTick {
 				// We already run inside a go-routine so
 				// do not do this asynchronously.  If we
