@@ -2437,6 +2437,7 @@ func RegisterCandidateInstance(candidate *CandidateDatabaseInstance) error {
 			`, lastSuggestedHint)
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(query, args...)
+		AuditOperation("register-candidate", candidate.Key(), string(candidate.PromotionRule))
 		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
@@ -2467,7 +2468,7 @@ func RecordInstanceCoordinatesHistory() error {
         	delete from database_instance_coordinates_history
 			where
 				recorded_timestamp < NOW() - INTERVAL ? MINUTE
-				`, (config.PseudoGTIDCoordinatesHistoryHeuristicMinutes + 5),
+				`, (config.PseudoGTIDCoordinatesHistoryHeuristicMinutes + 2),
 			)
 			return log.Errore(err)
 		}
@@ -2511,29 +2512,6 @@ func GetHeuristiclyRecentCoordinatesForInstance(instanceKey *InstanceKey) (selfC
 			limit 1
 			`
 	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port, config.PseudoGTIDCoordinatesHistoryHeuristicMinutes), func(m sqlutils.RowMap) error {
-		selfCoordinates = &BinlogCoordinates{LogFile: m.GetString("binary_log_file"), LogPos: m.GetInt64("binary_log_pos")}
-		relayLogCoordinates = &BinlogCoordinates{LogFile: m.GetString("relay_log_file"), LogPos: m.GetInt64("relay_log_pos")}
-
-		return nil
-	})
-	return selfCoordinates, relayLogCoordinates, err
-}
-
-// GetLastKnownCoordinatesForInstance returns the very last known coordinates for an instance
-func GetLastKnownCoordinatesForInstance(instanceKey *InstanceKey) (selfCoordinates *BinlogCoordinates, relayLogCoordinates *BinlogCoordinates, err error) {
-	query := `
-		select
-			binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
-		from
-			database_instance_coordinates_history
-		where
-			hostname = ?
-			and port = ?
-		order by
-			recorded_timestamp desc
-			limit 1
-			`
-	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port), func(m sqlutils.RowMap) error {
 		selfCoordinates = &BinlogCoordinates{LogFile: m.GetString("binary_log_file"), LogPos: m.GetInt64("binary_log_pos")}
 		relayLogCoordinates = &BinlogCoordinates{LogFile: m.GetString("relay_log_file"), LogPos: m.GetInt64("relay_log_pos")}
 
@@ -2592,42 +2570,6 @@ func ResetInstanceRelaylogCoordinatesHistory(instanceKey *InstanceKey) error {
 
 func ExpireInstanceBinlogFileHistory() error {
 	return ExpireTableData("database_instance_binlog_files_history", "last_seen")
-}
-
-// RecordInstanceBinlogFileHistory snapshots the binlog coordinates of instances
-func RecordInstanceBinlogFileHistory() error {
-	{
-		writeFunc := func() error {
-			_, err := db.ExecOrchestrator(`
-        	delete from database_instance_binlog_files_history
-			where
-				last_seen < NOW() - INTERVAL ? DAY
-				`, config.BinlogFileHistoryDays,
-			)
-			return log.Errore(err)
-		}
-		ExecDBWriteFunc(writeFunc)
-	}
-	writeFunc := func() error {
-		_, err := db.ExecOrchestrator(`
-      	insert into
-      		database_instance_binlog_files_history (
-					hostname, port,	first_seen, last_seen, binary_log_file, binary_log_pos
-				)
-      	select
-      		hostname, port, last_seen, last_seen, binary_log_file, binary_log_pos
-				from
-					database_instance
-				where
-					binary_log_file != ''
-				on duplicate key update
-					last_seen = VALUES(last_seen),
-					binary_log_pos = VALUES(binary_log_pos)
-				`,
-		)
-		return log.Errore(err)
-	}
-	return ExecDBWriteFunc(writeFunc)
 }
 
 // FigureClusterName will make a best effort to deduce a cluster name using either a given alias

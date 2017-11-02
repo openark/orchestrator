@@ -25,13 +25,14 @@ import (
 
 	"github.com/github/orchestrator/go/raft"
 	"github.com/openark/golib/log"
+	"github.com/patrickmn/go-cache"
 )
-
-const registrationPollSeconds = 5
 
 var lastHealthCheckUnixNano int64
 var lastGoodHealthCheckUnixNano int64
 var LastContinousCheckHealthy int64
+
+var lastHealthCheckCache = cache.New(config.HealthPollSeconds*time.Second, time.Second)
 
 type NodeHealth struct {
 	Hostname        string
@@ -98,29 +99,35 @@ func RegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
 }
 
 // HealthTest attempts to write to the backend database and get a result
-func HealthTest() (*HealthStatus, error) {
-	health := HealthStatus{Healthy: false, Hostname: ThisHostname, Token: ProcessToken.Hash}
-
-	healthy, err := RegisterNode(ThisNodeHealth)
-	if err != nil {
-		health.Error = err
-		return &health, log.Errore(err)
+func HealthTest() (health *HealthStatus, err error) {
+	cacheKey := ProcessToken.Hash
+	if healthStatus, found := lastHealthCheckCache.Get(cacheKey); found {
+		return healthStatus.(*HealthStatus), nil
 	}
-	health.Healthy = healthy
+
+	health = &HealthStatus{Healthy: false, Hostname: ThisHostname, Token: ProcessToken.Hash}
+	defer lastHealthCheckCache.Set(cacheKey, health, cache.DefaultExpiration)
+
+	if healthy, err := RegisterNode(ThisNodeHealth); err != nil {
+		health.Error = err
+		return health, log.Errore(err)
+	} else {
+		health.Healthy = healthy
+	}
+
 	if orcraft.IsRaftEnabled() {
 		health.ActiveNode.Hostname = orcraft.GetLeader()
 		health.IsActiveNode = orcraft.IsLeader()
 	} else {
-		health.ActiveNode, health.IsActiveNode, err = ElectedNode()
-		if err != nil {
+		if health.ActiveNode, health.IsActiveNode, err = ElectedNode(); err != nil {
 			health.Error = err
-			return &health, log.Errore(err)
+			return health, log.Errore(err)
 		}
 	}
 
 	health.AvailableNodes, err = ReadAvailableNodes(true)
 
-	return &health, nil
+	return health, nil
 }
 
 func SinceLastHealthCheck() time.Duration {
@@ -159,7 +166,7 @@ func ContinuousRegistration(extraInfo string, command string) {
 		// First one is synchronous
 		tickOperation()
 		go func() {
-			registrationTick := time.Tick(time.Duration(registrationPollSeconds) * time.Second)
+			registrationTick := time.Tick(config.HealthPollSeconds * time.Second)
 			for range registrationTick {
 				// We already run inside a go-routine so
 				// do not do this asynchronously.  If we

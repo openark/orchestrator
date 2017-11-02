@@ -416,7 +416,6 @@ func ContinuousDiscovery() {
 				// But rather should invoke such routinely operations that need to be as (or roughly as) frequent
 				// as instance poll
 				if IsLeaderOrActive() {
-					go inst.RecordInstanceCoordinatesHistory()
 					go inst.UpdateClusterAliases()
 					go inst.ExpireDowntime()
 				}
@@ -425,12 +424,14 @@ func ContinuousDiscovery() {
 			// Various periodic internal maintenance tasks
 			go func() {
 				if IsLeaderOrActive() {
+					go inst.RecordInstanceCoordinatesHistory()
+					go inst.ReviewUnseenInstances()
+					go inst.InjectUnseenMasters()
+
 					go inst.ForgetLongUnseenInstances()
 					go inst.ForgetUnseenInstancesDifferentlyResolved()
 					go inst.ForgetExpiredHostnameResolves()
 					go inst.DeleteInvalidHostnameResolves()
-					go inst.ReviewUnseenInstances()
-					go inst.InjectUnseenMasters()
 					go inst.ResolveUnknownMasterHostnameResolves()
 					go inst.ExpireMaintenance()
 					go inst.ExpireCandidateInstances()

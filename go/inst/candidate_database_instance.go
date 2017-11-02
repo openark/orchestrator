@@ -42,3 +42,8 @@ func NewCandidateDatabaseInstance(instanceKey *InstanceKey, promotionRule Candid
 func (cdi *CandidateDatabaseInstance) String() string {
 	return fmt.Sprintf("%s:%d %s", cdi.Hostname, cdi.Port, cdi.PromotionRule)
 }
+
+// Key returns an instance key representing this candidate
+func (cdi *CandidateDatabaseInstance) Key() *InstanceKey {
+	return &InstanceKey{Hostname: cdi.Hostname, Port: cdi.Port}
+}
