@@ -2467,7 +2467,7 @@ func RecordInstanceCoordinatesHistory() error {
         	delete from database_instance_coordinates_history
 			where
 				recorded_timestamp < NOW() - INTERVAL ? MINUTE
-				`, (config.PseudoGTIDCoordinatesHistoryHeuristicMinutes + 5),
+				`, (config.PseudoGTIDCoordinatesHistoryHeuristicMinutes + 2),
 			)
 			return log.Errore(err)
 		}
