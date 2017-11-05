@@ -31,8 +31,6 @@ if [ -z "$(which go)" ] || [ -z "$(go version | grep "$SUPPORTED_GO_VERSIONS")" 
   mkdir -p "$GODIR"
   cd "$GODIR";
 
-https://storage.googleapis.com/golang/go1.9.2.linux-amd64.tar.gz
-
   if [ $(uname -s) = "Darwin" ]; then
     curl -L -O https://storage.googleapis.com/golang/$GO_PKG_DARWIN
     shasum -a256 $GO_PKG_DARWIN | grep $GO_PKG_DARWIN_SHA
