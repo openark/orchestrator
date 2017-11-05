@@ -7,9 +7,9 @@
 }
 
 body {
-    background-color: #eeeeee;
+    background-color: #f7f7f7;
     background-repeat: repeat;
-    padding-top: 80px;
+    padding-top: 50px;
 }
 
 .orchestrator-brand {
@@ -32,6 +32,10 @@ body {
     max-height: 600px;
     overflow-x: hidden;
     overflow-y: auto;
+}
+
+.navbar {
+  margin-bottom: 0px;
 }
 
 .navbar-nav > li > .dropdown {
@@ -58,6 +62,9 @@ body {
 
 #alerts_container .alert {
     margin-bottom: 4px;
+    padding: 8px;
+    padding-right: 30px;
+    border-radius: 0px;
 }
 
 .node circle {
@@ -126,7 +133,11 @@ body {
     cursor: default;
 }
 
-.instance h3 a .glyphicon {
+.instance h3 .instance-glyphs {
+    cursor: pointer;
+}
+
+.instance h3 .glyphicon {
     cursor: pointer;
 }
 
@@ -487,8 +498,11 @@ body {
 #cluster_sidebar {
     float: left;
     position: fixed;
-    left: 15px;
+    left: 0px;
+    padding: 8px 15px 0px 15px;
     z-index:100;
+    border-right: dotted 1px #bbbbbb;
+    background-color: #f7f7f7;
 }
 
 #cluster_sidebar li {
@@ -499,8 +513,9 @@ body {
     cursor: pointer;
 }
 
-#cluster_sidebar li[data-bullet=info] span.glyphicon {
-    font-size: 2em;
+#cluster_sidebar li[data-bullet] span.glyphicon {
+    font-size: 20px;
+    margin-bottom: 15px;
 }
 
 #cluster_sidebar li a .glyphicon {
@@ -538,6 +553,14 @@ body {
 
 #cluster_sidebar .text-indicate {
     color: #e68545;
+}
+
+#cluster_wrapper {
+  padding-left: 64px;
+}
+
+#cluster_name {
+  font-size: 24px;
 }
 
 .arrow_box {
@@ -645,6 +668,35 @@ body {
     margin-bottom: 8px;
 }
 
+.instance .instance-master-section {
+  position: absolute;
+  bottom: 0px;
+  left: 0px;
+  z-index: 20;
+  height: 0%;
+  width: 48%;
+}
+
+.instance.accept_drop_check .instance-master-section {
+  height: 100%;
+}
+
+.instance .instance-normal-section {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  z-index: 20;
+  height: 0%;
+  width: 51%;
+}
+
+.instance.accept_drop_check .instance-normal-section {
+  height: 100%;
+}
+
+.instance h4.popover-footer {
+  z-index: 25;
+}
 
 /*.cluster-graph > .instance[data-duplicate-node] {
     position: absolute;
@@ -746,17 +798,12 @@ body {
 	font-family: "Glyphicons Halflings";
 }
 
-#main_container.container, #main_container .container {
-    width: inherit;
+#main_container {
+  margin-top: 15px;
 }
 
-#main_container .floating_background {
-    float: left;
-    position: fixed;
-    z-index: -1;
-    font-size: 50px;
-    color: #d0d0d0;
-    padding-left: 32px;
+#main_container.container, #main_container .container {
+    width: inherit;
 }
 
 .container.clusters .popover.instance {

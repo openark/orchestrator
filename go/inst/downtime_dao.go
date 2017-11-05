@@ -23,19 +23,43 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 )
 
 // BeginDowntime will make mark an instance as downtimed (or override existing downtime period)
-func BeginDowntime(downtime *Downtime) error {
+func BeginDowntime(downtime *Downtime) (err error) {
 	if downtime.Duration == 0 {
 		downtime.Duration = config.MaintenanceExpireMinutes * time.Minute
 	}
-	if downtime.Ended() {
-		// No point in writing it down; it's expired
-		return nil
-	}
+	if downtime.EndsAtString != "" {
+		_, err = db.ExecOrchestrator(`
+				insert
+					into database_instance_downtime (
+						hostname, port, downtime_active, begin_timestamp, end_timestamp, owner, reason
+					) VALUES (
+						?, ?, 1, ?, ?, ?, ?
+					)
+					on duplicate key update
+						downtime_active=values(downtime_active),
+						begin_timestamp=values(begin_timestamp),
+						end_timestamp=values(end_timestamp),
+						owner=values(owner),
+						reason=values(reason)
+				`,
+			downtime.Key.Hostname,
+			downtime.Key.Port,
+			downtime.BeginsAtString,
+			downtime.EndsAtString,
+			downtime.Owner,
+			downtime.Reason,
+		)
+	} else {
+		if downtime.Ended() {
+			// No point in writing it down; it's expired
+			return nil
+		}
 
-	_, err := db.ExecOrchestrator(`
+		_, err = db.ExecOrchestrator(`
 			insert
 				into database_instance_downtime (
 					hostname, port, downtime_active, begin_timestamp, end_timestamp, owner, reason
@@ -49,16 +73,16 @@ func BeginDowntime(downtime *Downtime) error {
 					owner=values(owner),
 					reason=values(reason)
 			`,
-		downtime.Key.Hostname,
-		downtime.Key.Port,
-		int(downtime.EndsIn().Seconds()),
-		downtime.Owner,
-		downtime.Reason,
-	)
+			downtime.Key.Hostname,
+			downtime.Key.Port,
+			int(downtime.EndsIn().Seconds()),
+			downtime.Owner,
+			downtime.Reason,
+		)
+	}
 	if err != nil {
 		return log.Errore(err)
 	}
-
 	AuditOperation("begin-downtime", downtime.Key, fmt.Sprintf("owner: %s, reason: %s", downtime.Owner, downtime.Reason))
 
 	return nil
@@ -178,4 +202,39 @@ func ExpireDowntime() error {
 	}
 
 	return nil
+}
+
+func ReadDowntime() (result []Downtime, err error) {
+	query := `
+		select
+			hostname,
+			port,
+			begin_timestamp,
+			end_timestamp,
+			owner,
+			reason
+		from
+			database_instance_downtime
+		where
+			end_timestamp > now()
+		`
+	err = db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
+		downtime := Downtime{
+			Key: &InstanceKey{},
+		}
+		downtime.Key.Hostname = m.GetString("hostname")
+		downtime.Key.Port = m.GetInt("port")
+		downtime.BeginsAt = m.GetTime("begin_timestamp")
+		downtime.EndsAt = m.GetTime("end_timestamp")
+		downtime.BeginsAtString = m.GetString("begin_timestamp")
+		downtime.EndsAtString = m.GetString("end_timestamp")
+		downtime.Owner = m.GetString("owner")
+		downtime.Reason = m.GetString("reason")
+
+		downtime.Duration = downtime.EndsAt.Sub(downtime.BeginsAt)
+
+		result = append(result, downtime)
+		return nil
+	})
+	return result, log.Errore(err)
 }

@@ -32,6 +32,7 @@ type PoolInstancesSubmission struct {
 	CreatedAt          time.Time
 	Pool               string
 	DelimitedInstances string
+	RegisteredAt       string
 }
 
 func NewPoolInstancesSubmission(pool string, instances string) *PoolInstancesSubmission {

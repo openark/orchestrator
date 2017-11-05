@@ -47,6 +47,7 @@ func (f *fsm) Apply(l *raft.Log) interface{} {
 		hint := string(c.Value)
 		return f.yieldByHint(hint)
 	}
+	log.Debugf("orchestrator/raft: applying command %+v: %s", l.Index, c.Op)
 	return store.applier.ApplyCommand(c.Op, c.Value)
 }
 
@@ -61,7 +62,7 @@ func (f *fsm) yield(toPeer string) interface{} {
 		return nil
 	}
 	log.Debugf("Yielding to %s", toPeer)
-	return yield()
+	return Yield()
 }
 
 // yieldByHint yields to a host that contains given hint
@@ -76,17 +77,18 @@ func (f *fsm) yieldByHint(hint string) interface{} {
 		return nil
 	}
 	log.Debugf("Yielding to hinted %s", hint)
-	return yield()
+	return Yield()
 }
 
 // Snapshot returns a snapshot object of freno's state
 func (f *fsm) Snapshot() (raft.FSMSnapshot, error) {
-	snapshot := newFsmSnapshot()
+	snapshot := newFsmSnapshot(f.snapshotCreatorApplier)
 	return snapshot, nil
 }
 
 // Restore restores freno state
 func (f *fsm) Restore(rc io.ReadCloser) error {
 	defer rc.Close()
-	return nil
+
+	return f.snapshotCreatorApplier.Restore(rc)
 }

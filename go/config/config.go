@@ -39,13 +39,13 @@ const (
 var configurationLoaded chan bool = make(chan bool)
 
 const (
-	DiscoveryPollSeconds                         = 1
+	HealthPollSeconds                            = 1
 	ActiveNodeExpireSeconds                      = 5
 	BinlogFileHistoryDays                        = 1
 	MaintenanceOwner                             = "orchestrator"
 	AuditPageSize                                = 20
-	AuditPurgeDays                               = 31
-	MaintenancePurgeDays                         = 31
+	AuditPurgeDays                               = 7
+	MaintenancePurgeDays                         = 7
 	MySQLTopologyMaxPoolConnections              = 3
 	MaintenanceExpireMinutes                     = 10
 	AgentHttpTimeoutSeconds                      = 60
