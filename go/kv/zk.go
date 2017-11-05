@@ -15,3 +15,19 @@
 */
 
 package kv
+
+// Internal key-value store, based on relational backend
+type zkStore struct {
+}
+
+func NewZkStore() KVStore {
+	return &zkStore{}
+}
+
+func (this *zkStore) PutKeyValue(key string, value string) (err error) {
+	return
+}
+
+func (this *zkStore) GetKeyValue(key string) (value string, err error) {
+	return
+}

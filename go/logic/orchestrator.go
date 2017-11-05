@@ -30,6 +30,7 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/discovery"
 	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/kv"
 	ometrics "github.com/github/orchestrator/go/metrics"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/raft"
@@ -391,6 +392,7 @@ func ContinuousDiscovery() {
 	go ometrics.InitMetrics()
 	go ometrics.InitGraphiteMetrics()
 	go acceptSignals()
+	go kv.InitKVStores()
 
 	if config.Config.RaftEnabled {
 		if err := orcraft.Setup(NewCommandApplier(), NewSnapshotDataCreatorApplier(), process.ThisHostname); err != nil {

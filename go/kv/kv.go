@@ -16,9 +16,49 @@
 
 package kv
 
+import (
+	"sync"
+)
+
 type KVStore interface {
 	PutKeyValue(key string, value string) (err error)
 	GetKeyValue(key string) (value string, err error)
 }
 
-var kvStores []KVStore
+var kvMutex sync.Mutex
+var kvStores = []KVStore{}
+
+func InitKVStores() {
+	kvMutex.Lock()
+	defer kvMutex.Unlock()
+
+	kvStores = []KVStore{
+		NewInternalKVStore(),
+		NewConsulStore(),
+		NewZkStore(),
+	}
+}
+
+func getKVStores() (stores []KVStore) {
+	kvMutex.Lock()
+	defer kvMutex.Unlock()
+
+	stores = kvStores
+	return stores
+}
+
+func PutValue(key string, value string) (err error) {
+	for _, store := range getKVStores() {
+		if err := store.PutKeyValue(key, value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func GetValue(key string) (value string, err error) {
+	for _, store := range getKVStores() {
+		return store.GetKeyValue(key)
+	}
+	return value, nil
+}
