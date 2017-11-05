@@ -15,3 +15,10 @@
 */
 
 package kv
+
+type KVStore interface {
+	PutKeyValue(key string, value string) (err error)
+	GetKeyValue(key string) (value string, err error)
+}
+
+var kvStores []KVStore

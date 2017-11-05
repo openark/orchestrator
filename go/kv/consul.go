@@ -15,3 +15,21 @@
 */
 
 package kv
+
+import (
+	"github.com/github/orchestrator/go/config"
+	"github.com/openark/golib/log"
+)
+
+type consulStore struct {
+}
+
+func NewConsulStore() KVStore {
+	return &consulStore{}
+}
+
+func (this *consulStore) PutKeyValue(key string, value string) (err error) {
+}
+
+func (this *consulStore) GetKeyValue(key string) (value string, err error) {
+}
