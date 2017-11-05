@@ -3,4 +3,4 @@
 
 set -ex
 
-docker run --env JSON_TEST_FAILURE_OUTPUT=true --rm $DOCKER_IMAGE rake test
+docker run --env JSON_TEST_FAILURE_OUTPUT=true --rm $DOCKER_IMAGE orchestrator -version
