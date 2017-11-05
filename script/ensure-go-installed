@@ -44,6 +44,8 @@ if [ -z "$(which go)" ] || [ -z "$(go version | grep "$SUPPORTED_GO_VERSIONS")" 
 
   # Prove we did something right
   echo "$(go version) installed in $GODIR: Go Binary: $(which go)"
+else
+  echo "$(go version) found in $GODIR: Go Binary: $(which go)"
 fi
 
 cd $ROOTDIR
