@@ -771,6 +771,14 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			inst.ResetSlaveOperation(&promotedReplica.Key)
 			inst.SetReadOnly(&promotedReplica.Key, false)
 		}
+
+		clusterAliasMaster := inst.NewClusterAliasMaster(analysisEntry.ClusterDetails.ClusterAlias, promotedReplica.Key)
+		if orcraft.IsRaftEnabled() {
+			orcraft.PublishCommand("note-cluster-master", clusterAliasMaster)
+		} else {
+			NoteClusterMaster(clusterAliasMaster)
+		}
+
 		if !skipProcesses {
 			// Execute post master-failover processes
 			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)

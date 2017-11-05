@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/consul"
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/process"
@@ -818,6 +819,12 @@ func ReadTopologyRecoverySteps(recoveryUID string) ([]TopologyRecoveryStep, erro
 		return nil
 	})
 	return res, log.Errore(err)
+}
+
+func NoteClusterMaster(clusterAliasMaster *inst.ClusterAliasMaster) error {
+	key := fmt.Sprintf("master/cluster/%s", clusterAliasMaster.ClusterAlias)
+	err := consul.PutKeyValue(key, clusterAliasMaster.Master.StringCode())
+	return err
 }
 
 // ExpireFailureDetectionHistory removes old rows from the topology_failure_detection table
