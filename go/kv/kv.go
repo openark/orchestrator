@@ -20,6 +20,15 @@ import (
 	"sync"
 )
 
+type KVPair struct {
+	Key   string
+	Value string
+}
+
+func NewKVPair(key string, value string) *KVPair {
+	return &KVPair{Key: key, Value: value}
+}
+
 type KVStore interface {
 	PutKeyValue(key string, value string) (err error)
 	GetKeyValue(key string) (value string, err error)
@@ -56,9 +65,17 @@ func PutValue(key string, value string) (err error) {
 	return nil
 }
 
+func PutKVPair(kvPair *KVPair) (err error) {
+	if kvPair == nil {
+		return nil
+	}
+	return PutValue(kvPair.Key, kvPair.Value)
+}
+
 func GetValue(key string) (value string, err error) {
 	for _, store := range getKVStores() {
+		// It's really only the first (internal) that matters here
 		return store.GetKeyValue(key)
 	}
-	return value, nil
+	return value, err
 }

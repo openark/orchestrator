@@ -30,6 +30,7 @@ import (
 	"github.com/github/orchestrator/go/attributes"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/kv"
 	ometrics "github.com/github/orchestrator/go/metrics"
 	"github.com/github/orchestrator/go/os"
 	"github.com/github/orchestrator/go/process"
@@ -771,6 +772,14 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			inst.ResetSlaveOperation(&promotedReplica.Key)
 			inst.SetReadOnly(&promotedReplica.Key, false)
 		}
+
+		kvPair := kv.NewKVPair(analysisEntry.ClusterDetails.ClusterAlias, promotedReplica.Key.StringCode())
+		if orcraft.IsRaftEnabled() {
+			orcraft.PublishCommand("put-key-value", kvPair)
+		} else {
+			kv.PutKVPair(kvPair)
+		}
+
 		if !skipProcesses {
 			// Execute post master-failover processes
 			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
