@@ -350,7 +350,7 @@ function dominant_dc() {
 
 function submit_masters_to_kv_stores() {
   api "submit-masters-to-kv-stores/${alias}"
-  print_details | jq -r .
+  print_details | jq -r '.[] | (.Key + ":" + .Value)'
 }
 
 function submit_pool_instances() {
