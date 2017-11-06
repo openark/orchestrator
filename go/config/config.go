@@ -240,7 +240,7 @@ type Configuration struct {
 	MaxOutdatedKeysToShow                      int               // Maximum number of keys to show in ContinuousDiscovery. If the number of polled hosts grows too far then showing the complete list is not ideal.
 	DiscoveryIgnoreReplicaHostnameFilters      []string          // Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps
 	ConsulAddress                              string            // Address where Consul HTTP api is found. Example: 127.0.0.1:8500
-	KVClusterMasterPrefix                      string            // Prefix to use for clusters' masters entries in KV stores (internal, consul, ZK), default: "orchestrator/master/cluster"
+	KVClusterMasterPrefix                      string            // Prefix to use for clusters' masters entries in KV stores (internal, consul, ZK), default: "mysql/master"
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -394,7 +394,7 @@ func newConfiguration() *Configuration {
 		MaxOutdatedKeysToShow:                      64,
 		DiscoveryIgnoreReplicaHostnameFilters:      []string{},
 		ConsulAddress:                              "",
-		KVClusterMasterPrefix:                      "orchestrator/master/cluster",
+		KVClusterMasterPrefix:                      "mysql/master",
 	}
 }
 
