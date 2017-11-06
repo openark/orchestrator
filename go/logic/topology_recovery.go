@@ -773,7 +773,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			inst.SetReadOnly(&promotedReplica.Key, false)
 		}
 
-		kvPair := kv.NewKVPair(analysisEntry.ClusterDetails.ClusterAlias, promotedReplica.Key.StringCode())
+		kvPair := inst.GetClusterMasterKVPair(analysisEntry.ClusterDetails.ClusterAlias, &promotedReplica.Key)
 		if orcraft.IsRaftEnabled() {
 			orcraft.PublishCommand("put-key-value", kvPair)
 		} else {

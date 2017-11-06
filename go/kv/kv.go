@@ -56,6 +56,14 @@ func getKVStores() (stores []KVStore) {
 	return stores
 }
 
+func GetValue(key string) (value string, err error) {
+	for _, store := range getKVStores() {
+		// It's really only the first (internal) that matters here
+		return store.GetKeyValue(key)
+	}
+	return value, err
+}
+
 func PutValue(key string, value string) (err error) {
 	for _, store := range getKVStores() {
 		if err := store.PutKeyValue(key, value); err != nil {
@@ -70,12 +78,4 @@ func PutKVPair(kvPair *KVPair) (err error) {
 		return nil
 	}
 	return PutValue(kvPair.Key, kvPair.Value)
-}
-
-func GetValue(key string) (value string, err error) {
-	for _, store := range getKVStores() {
-		// It's really only the first (internal) that matters here
-		return store.GetKeyValue(key)
-	}
-	return value, err
 }

@@ -17,8 +17,6 @@
 package kv
 
 import (
-	"fmt"
-
 	consulapi "github.com/armon/consul-api"
 	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
@@ -46,18 +44,11 @@ func NewConsulStore() KVStore {
 	return store
 }
 
-func (this *consulStore) fullKey(key string) string {
-	if config.Config.ConsulKVPrefix != "" {
-		return fmt.Sprintf("%s/%s", config.Config.ConsulKVPrefix, key)
-	}
-	return key
-}
-
 func (this *consulStore) PutKeyValue(key string, value string) (err error) {
 	if this.client == nil {
 		return nil
 	}
-	pair := &consulapi.KVPair{Key: this.fullKey(key), Value: []byte(value)}
+	pair := &consulapi.KVPair{Key: key, Value: []byte(value)}
 	_, err = this.client.KV().Put(pair, nil)
 	return err
 }
@@ -66,7 +57,7 @@ func (this *consulStore) GetKeyValue(key string) (value string, err error) {
 	if this.client == nil {
 		return value, nil
 	}
-	pair, _, err := this.client.KV().Get(this.fullKey(key), nil)
+	pair, _, err := this.client.KV().Get(key, nil)
 	if err != nil {
 		return value, err
 	}
