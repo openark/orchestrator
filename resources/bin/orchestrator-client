@@ -340,7 +340,7 @@ function which_cluster_osc_replicas() {
 
 function submit_masters_to_kv_stores() {
   api "submit-masters-to-kv-stores/${alias}"
-  print_response | jq .
+  print_details | jq -r .
 }
 
 function downtimed() {

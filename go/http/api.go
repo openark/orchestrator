@@ -1537,7 +1537,7 @@ func (this *HttpAPI) SubmitMastersToKvStores(params martini.Params, r render.Ren
 			return
 		}
 	}
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Submitted %d masters", len(kvPairs))})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Submitted %d masters", len(kvPairs)), Details: kvPairs})
 }
 
 // Clusters provides list of known masters
