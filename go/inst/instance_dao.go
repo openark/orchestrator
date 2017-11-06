@@ -40,6 +40,7 @@ import (
 	"github.com/github/orchestrator/go/collection"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
+	"github.com/github/orchestrator/go/kv"
 	"github.com/github/orchestrator/go/metrics/query"
 )
 
@@ -1841,6 +1842,31 @@ func ReadClustersInfo(clusterName string) ([]ClusterInfo, error) {
 	})
 
 	return clusters, err
+}
+
+// Get a listing of KVPair for clusters masters, for all clusters or for a specific cluster.
+func GetMastersKVPairs(clusterName string) (kvPairs [](*kv.KVPair), err error) {
+
+	clusterAliasMap := make(map[string]string)
+	if clustersInfo, err := ReadClustersInfo(clusterName); err != nil {
+		return kvPairs, err
+	} else {
+		for _, clusterInfo := range clustersInfo {
+			clusterAliasMap[clusterInfo.ClusterName] = clusterInfo.ClusterAlias
+		}
+	}
+
+	masters, err := ReadWriteableClustersMasters()
+	if err != nil {
+		return kvPairs, err
+	}
+	for _, master := range masters {
+		if kvPair := GetClusterMasterKVPair(clusterAliasMap[master.ClusterName], &master.Key); kvPair != nil {
+			kvPairs = append(kvPairs, kvPair)
+		}
+	}
+
+	return kvPairs, err
 }
 
 // HeuristicallyApplyClusterDomainInstanceAttribute writes down the cluster-domain
