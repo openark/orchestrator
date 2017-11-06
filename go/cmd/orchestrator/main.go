@@ -20,13 +20,11 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"runtime"
 
 	"github.com/github/orchestrator/go/app"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/inst"
 	"github.com/openark/golib/log"
-	"github.com/openark/golib/math"
 )
 
 var AppVersion, GitCommit string
@@ -106,8 +104,6 @@ func main() {
 		startText += ", git commit: " + GitCommit
 	}
 	log.Info(startText)
-
-	runtime.GOMAXPROCS(math.MinInt(4, runtime.NumCPU()))
 
 	if len(*configFile) > 0 {
 		config.ForceRead(*configFile)
