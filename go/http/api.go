@@ -3081,8 +3081,6 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "set-cluster-alias/:clusterName", this.SetClusterAliasManualOverride)
 	this.registerRequest(m, "clusters", this.Clusters)
 	this.registerRequest(m, "clusters-info", this.ClustersInfo)
-	this.registerRequest(m, "submit-masters-to-kv-stores", this.SubmitMastersToKvStores)
-	this.registerRequest(m, "submit-masters-to-kv-stores/:clusterHint", this.SubmitMastersToKvStores)
 
 	this.registerRequest(m, "masters", this.Masters)
 	this.registerRequest(m, "master/:clusterHint", this.ClusterMaster)
@@ -3092,6 +3090,10 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "downtimed/:clusterHint", this.Downtimed)
 	this.registerRequest(m, "topology/:clusterHint", this.AsciiTopology)
 	this.registerRequest(m, "topology/:host/:port", this.AsciiTopology)
+
+	// Key-value:
+	this.registerRequest(m, "submit-masters-to-kv-stores", this.SubmitMastersToKvStores)
+	this.registerRequest(m, "submit-masters-to-kv-stores/:clusterHint", this.SubmitMastersToKvStores)
 
 	// Instance management:
 	this.registerRequest(m, "instance/:host/:port", this.Instance)

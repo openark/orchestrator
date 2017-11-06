@@ -338,11 +338,6 @@ function which_cluster_osc_replicas() {
   print_response | filter_keys | print_key
 }
 
-function submit_masters_to_kv_stores() {
-  api "submit-masters-to-kv-stores/${alias}"
-  print_details | jq -r .
-}
-
 function downtimed() {
   api "downtimed/${alias:-$instance}"
   print_response | filter_keys | print_key
@@ -351,6 +346,11 @@ function downtimed() {
 function dominant_dc() {
   api "masters"
   print_response | jq -r '.[].DataCenter' | sort | uniq -c | sort -nr | head -n 1 | awk '{print $2}'
+}
+
+function submit_masters_to_kv_stores() {
+  api "submit-masters-to-kv-stores/${alias}"
+  print_details | jq -r .
 }
 
 function submit_pool_instances() {
@@ -592,7 +592,8 @@ function run_command() {
     "which-cluster-osc-replicas") which_cluster_osc_replicas ;; # Output a list of replicas in a cluster, that could serve as a pt-online-schema-change operation control replicas
     "downtimed") downtimed ;;                                   # List all downtimed instances
     "dominant-dc") dominant_dc ;;                               # Name the data center where most masters are found
-    "submit-masters-to-kv-stores") submit_masters_to_kv_stores;;# Submit a cluster's master, or all clusters' masters to KV stores
+
+    "submit-masters-to-kv-stores") submit_masters_to_kv_stores;; # Submit a cluster's master, or all clusters' masters to KV stores
 
     "relocate") general_relocate_command ;;                   # Relocate a replica beneath another instance
     "relocate-replicas") general_relocate_replicas_command ;; # Relocates all or part of the replicas of a given instance under another instance

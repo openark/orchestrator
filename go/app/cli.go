@@ -1247,7 +1247,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(lag)
 		}
-	case registerCliCommand("submit-masters-to-kv-stores", "key-value", `Submit master of a specific cluster, or all masters of all clusters to key-value stores`):
+	case registerCliCommand("submit-masters-to-kv-stores", "Key-value", `Submit master of a specific cluster, or all masters of all clusters to key-value stores`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
 			log.Debugf("cluster name is <%s>", clusterName)
