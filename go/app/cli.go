@@ -29,6 +29,7 @@ import (
 	"github.com/github/orchestrator/go/agent"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/kv"
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/remote"
@@ -1246,6 +1247,25 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(lag)
 		}
+	case registerCliCommand("submit-masters-to-kv-stores", "key-value", `Submit master of a specific cluster, or all masters of all clusters to key-value stores`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			log.Debugf("cluster name is <%s>", clusterName)
+
+			kvPairs, err := inst.GetMastersKVPairs(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, kvPair := range kvPairs {
+				if err := kv.PutKVPair(kvPair); err != nil {
+					log.Fatale(err)
+				}
+			}
+			for _, kvPair := range kvPairs {
+				fmt.Println(fmt.Sprintf("%s:%s", kvPair.Key, kvPair.Value))
+			}
+		}
+
 		// Instance management
 	case registerCliCommand("discover", "Instance management", `Lookup an instance, investigate it`):
 		{
