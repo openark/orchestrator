@@ -44,4 +44,19 @@ Clusters' master entries are populated on:
 
   respectively.
 
-### KV and raft setups
+### KV and orchestrator/raft
+
+On an [orchestrator/raft](raft.md) setup, all KV writes go through the `raft` protocol. Thus, once the leader determines a write needs to be made to KV stores, it publishes the request to all `raft` nodes. Each of the nodes will apply the write independently, based on its own configuration.
+
+#### Implications
+
+By way of example, let's say you are running `orchestrator/raft` in a 3-data-center setup, one node per DC.
+Also, let's assume you have Consul set up on each of these DCs. Consul setups are typically inter-DC, with possibly cross-DC async replication.
+
+Upon master failover, each and every `orchestrator` node will update Consul with new master's identity.
+
+If your Consul runs cross-DC replication, then it is possible that the same KV update runs twice: once by means of Consul replication, once by the local `orchestrator` node. The two updates are identical and consistent, and are therefore safe to run.
+
+If your Consul setups do not replicate from each other, `orchestrator` is the _only_ means by which your master discovery is made consistent across your Consul clusters. You get all the nice traits that come with `raft`: if one DC is network partitioned, the `orchestrator` node in that DC will not receive the KV update event, and for a while, neither will the Consul cluster. However, once network access is regained, `orchestartor` will catch up with event log and apply the KV update to the local Consul cluster. The setup is eventual-consistent.
+
+Shortly following a master failover, `orchestrator` generates a `raft` snapshot. This isn't strictly required but is a useful operation: in the event the `orchestrator` node restarts, the snapshot prevents `orchestrator` from replaying the KV write. This is in particular interesting in an event of failover-and-failback, where a remote KV like consul might get two updates for the same cluster. The snapshot mitigates such incidents.
