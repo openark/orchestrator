@@ -155,6 +155,8 @@ new-node$    sqlite3 /var/lib/orchestrator/orchestrator.db < /tmp/orchestrator-d
 
   - With `MySQL` use your favorite backup/restore method.
 
+See also [Master discovery with Key Value stores](kv.md#kv-and-orchestratorraft) via `orchestrator/raft`.
+
 ### Main advantages of orchestrator/raft
 
 - Highly available
