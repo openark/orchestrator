@@ -20,6 +20,10 @@ package kv
 type zkStore struct {
 }
 
+// TODO: use config.Config.ZkAddress to put/get k/v in ZooKeeper. See
+// - https://github.com/outbrain/zookeepercli
+// - https://github.com/samuel/go-zookeeper/zk
+
 func NewZkStore() KVStore {
 	return &zkStore{}
 }
