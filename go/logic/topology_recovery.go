@@ -776,6 +776,9 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		kvPair := inst.GetClusterMasterKVPair(analysisEntry.ClusterDetails.ClusterAlias, &promotedReplica.Key)
 		if orcraft.IsRaftEnabled() {
 			orcraft.PublishCommand("put-key-value", kvPair)
+			// since we'll be affecting 3rd party tools here, we _prefer_ to mitigate re-applying
+			// of the put-key-value event upon startup. We _recommend_ a snapshot in the near future.
+			go orcraft.PublishCommand("async-snapshot", "")
 		} else {
 			kv.PutKVPair(kvPair)
 		}
@@ -797,7 +800,11 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			before := analysisEntry.AnalyzedInstanceKey.StringCode()
 			after := promotedReplica.Key.StringCode()
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: updating cluster_alias: %v -> %v", before, after))
-			inst.ReplaceAliasClusterName(before, after)
+			if alias := analysisEntry.ClusterDetails.ClusterAlias; alias != "" {
+				inst.SetClusterAlias(promotedReplica.Key.StringCode(), alias)
+			} else {
+				inst.ReplaceAliasClusterName(before, after)
+			}
 			return nil
 		}()
 

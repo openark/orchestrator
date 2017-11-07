@@ -21,6 +21,7 @@ import (
 
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/kv"
+	"github.com/github/orchestrator/go/raft"
 
 	"github.com/openark/golib/log"
 )
@@ -38,6 +39,8 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 	switch op {
 	case "heartbeat":
 		return nil
+	case "async-snapshot":
+		return applier.asyncSnapshot(value)
 	case "register-node":
 		return applier.registerNode(value)
 	case "discover":
@@ -72,6 +75,11 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.putKeyValue(value)
 	}
 	return log.Errorf("Unknown command op: %s", op)
+}
+
+func (applier *CommandApplier) asyncSnapshot(value []byte) interface{} {
+	err := orcraft.AsyncSnapshot()
+	return err
 }
 
 func (applier *CommandApplier) registerNode(value []byte) interface{} {
