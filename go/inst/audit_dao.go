@@ -56,7 +56,9 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 		clusterName, _ = GetClusterName(instanceKey)
 	}
 
+	auditWrittenToFile := false
 	if config.Config.AuditLogFile != "" {
+		auditWrittenToFile = true
 		go func() error {
 			f, err := os.OpenFile(config.Config.AuditLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 			if err != nil {
@@ -92,11 +94,14 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 	}
 	logMessage := fmt.Sprintf("auditType:%s instance:%s cluster:%s message:%s", auditType, instanceKey.DisplayString(), clusterName, message)
 	if syslogWriter != nil {
+		auditWrittenToFile = true
 		go func() {
 			syslogWriter.Info(logMessage)
 		}()
 	}
-	log.Infof(logMessage)
+	if !auditWrittenToFile {
+		log.Infof(logMessage)
+	}
 	auditOperationCounter.Inc(1)
 
 	return nil
