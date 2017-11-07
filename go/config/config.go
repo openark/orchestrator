@@ -525,6 +525,9 @@ func (this *Configuration) postReadAdjustments() error {
 		this.KVClusterMasterPrefix = strings.TrimRight(this.KVClusterMasterPrefix, "/")
 		this.KVClusterMasterPrefix = fmt.Sprintf("%s/", this.KVClusterMasterPrefix)
 	}
+	if this.ZkAddress != "" {
+		return fmt.Errorf("ZkAddress (ZooKeeper) configuration is unsupported yet")
+	}
 	return nil
 }
 
