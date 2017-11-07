@@ -8,7 +8,7 @@ If you would like to build `orchestrator` on your own machine, or eventually sub
 
 - `orchestrator` is built on Linux and OS/X. I have no hint about MS Windows, and the build is incompatible with Windows.
 
-- `Go 1.7` or higher.
+- `Go 1.9` or higher.
 
 ### Clone repo
 
@@ -58,7 +58,15 @@ Why would you want this? Because this will empower you with building `.DEB`, `.r
 
 ### DB setup
 
-`orchestrator` requires a MySQL backend to run. This could be installed anywhere. I usually use [mysqlsandbox](http://mysqlsandbox.net/) for local installations. You may choose to just install mysql-server on your dev machine.
+As per [configuration: backend](configuration-backend.md), you may use either `SQLite` or `MySQL` as `orchestrator`'s backend database.
+
+#### Sqlite
+
+No special setup is required. Make sure to configure database file path.
+
+#### MySQL
+
+`MySQL` can be installed anywhere and you don't necessarily need it to run on your local box. I usually use [mysqlsandbox](http://mysqlsandbox.net/) for local installations. You may choose to just install mysql-server on your dev machine, or run a docker container, a VM, what have you.
 
 Once your backend MySQL setup is complete, issue:
 
