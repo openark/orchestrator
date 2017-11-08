@@ -44,6 +44,7 @@ type SnapshotData struct {
 	DowntimedInstances,
 	Candidates,
 	Detections,
+	KVStore,
 	Recovery,
 	RecoverySteps sqlutils.NamedResultData
 }
@@ -88,6 +89,7 @@ func CreateSnapshotData() *SnapshotData {
 	readTableData("database_instance_downtime", &snapshotData.DowntimedInstances)
 	readTableData("candidate_database_instance", &snapshotData.Candidates)
 	readTableData("topology_failure_detection", &snapshotData.Detections)
+	readTableData("kv_store", &snapshotData.KVStore)
 	readTableData("topology_recovery", &snapshotData.Recovery)
 	readTableData("topology_recovery_steps", &snapshotData.RecoverySteps)
 
@@ -173,6 +175,7 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 	writeTableData("hostname_unresolve", &snapshotData.HostnameUnresolves)
 	writeTableData("database_instance_downtime", &snapshotData.DowntimedInstances)
 	writeTableData("candidate_database_instance", &snapshotData.Candidates)
+	writeTableData("kv_store", &snapshotData.KVStore)
 	writeTableData("topology_recovery", &snapshotData.Recovery)
 	writeTableData("topology_failure_detection", &snapshotData.Detections)
 	writeTableData("topology_recovery_steps", &snapshotData.RecoverySteps)

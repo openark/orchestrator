@@ -161,3 +161,13 @@ func figureClusterName(hint string) (clusterName string, err error) {
 	instanceKey, _ := inst.ParseRawInstanceKeyLoose(hint)
 	return inst.FigureClusterName(hint, instanceKey, nil)
 }
+
+// getClusterNameIfExists returns a cluster name by params hint, or an empty cluster name
+// if no hint is given
+func getClusterNameIfExists(params map[string]string) (clusterName string, err error) {
+	if clusterHint := getClusterHint(params); clusterHint == "" {
+		return "", nil
+	} else {
+		return figureClusterName(clusterHint)
+	}
+}

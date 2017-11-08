@@ -17,10 +17,27 @@
 package inst
 
 import (
-	"github.com/github/orchestrator/go/config"
+	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/kv"
 )
+
+func GetClusterMasterKVKey(clusterAlias string) string {
+	return fmt.Sprintf("%s%s", config.Config.KVClusterMasterPrefix, clusterAlias)
+}
+
+func GetClusterMasterKVPair(clusterAlias string, masterKey *InstanceKey) *kv.KVPair {
+	if clusterAlias == "" {
+		return nil
+	}
+	if masterKey == nil {
+		return nil
+	}
+	return kv.NewKVPair(GetClusterMasterKVKey(clusterAlias), masterKey.StringCode())
+}
 
 // mappedClusterNameToAlias attempts to match a cluster with an alias based on
 // configured ClusterNameToAlias map

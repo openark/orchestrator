@@ -18,12 +18,12 @@ package inst
 
 // SetClusterAlias will write (and override) a single cluster name mapping
 func SetClusterAlias(clusterName string, alias string) error {
-	return WriteClusterAlias(clusterName, alias)
+	return writeClusterAlias(clusterName, alias)
 }
 
 // SetClusterAliasManualOverride will write (and override) a single cluster name mapping
 func SetClusterAliasManualOverride(clusterName string, alias string) error {
-	return WriteClusterAliasManualOverride(clusterName, alias)
+	return writeClusterAliasManualOverride(clusterName, alias)
 }
 
 // GetClusterByAlias returns the cluster name associated with given alias.

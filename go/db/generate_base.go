@@ -801,4 +801,12 @@ var generateSQLBase = []string{
 			PRIMARY KEY (hostname,port)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS kv_store (
+			store_key varchar(255) CHARACTER SET ascii NOT NULL,
+			store_value text CHARACTER SET utf8 not null,
+			last_updated timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (store_key)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }

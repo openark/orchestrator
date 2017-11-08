@@ -25,6 +25,7 @@
 
 #### Failure detection & recovery
 - [Topology recovery](topology-recovery.md): failure detection and recovery
+- [Key-Value stores](kv.md): master discovery for your apps
 
 #### Various
 - [Docker](docker.md)

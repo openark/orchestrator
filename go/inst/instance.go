@@ -453,7 +453,7 @@ func (this *Instance) HumanReadableDescription() string {
 	if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
 		tokens = append(tokens, ">>")
 	}
-	if this.UsingGTID() {
+	if this.UsingGTID() || this.SupportsOracleGTID {
 		tokens = append(tokens, "GTID")
 	}
 	if this.UsingPseudoGTID {

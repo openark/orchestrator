@@ -37,6 +37,7 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/discovery"
 	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/kv"
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/metrics/query"
 	"github.com/github/orchestrator/go/process"
@@ -1511,6 +1512,34 @@ func (this *HttpAPI) ClustersInfo(params martini.Params, r render.Render, req *h
 	r.JSON(http.StatusOK, clustersInfo)
 }
 
+// Write a cluster's master (or all clusters masters) to kv stores.
+// This should generally only happen once in a lifetime of a cluster. Otherwise KV
+// stores are updated via failovers.
+func (this *HttpAPI) SubmitMastersToKvStores(params martini.Params, r render.Render, req *http.Request) {
+	clusterName, err := getClusterNameIfExists(params)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	kvPairs, err := inst.GetMastersKVPairs(clusterName)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	for _, kvPair := range kvPairs {
+		if orcraft.IsRaftEnabled() {
+			_, err = orcraft.PublishCommand("put-key-value", kvPair)
+		} else {
+			err = kv.PutKVPair(kvPair)
+		}
+		if err != nil {
+			Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+			return
+		}
+	}
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Submitted %d masters", len(kvPairs)), Details: kvPairs})
+}
+
 // Clusters provides list of known masters
 func (this *HttpAPI) Masters(params martini.Params, r render.Render, req *http.Request) {
 	instances, err := inst.ReadWriteableClustersMasters()
@@ -1546,18 +1575,13 @@ func (this *HttpAPI) ClusterMaster(params martini.Params, r render.Render, req *
 
 // Downtimed lists downtimed instances, potentially filtered by cluster
 func (this *HttpAPI) Downtimed(params martini.Params, r render.Render, req *http.Request) {
-	clusterName := ""
-	if clusterHint := getClusterHint(params); clusterHint != "" {
-		var err error
-		clusterName, err = figureClusterName(clusterHint)
-		if err != nil {
-			Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
-			return
-		}
+	clusterName, err := getClusterNameIfExists(params)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
 	}
 
 	instances, err := inst.ReadDowntimedInstances(clusterName)
-
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -3057,6 +3081,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "set-cluster-alias/:clusterName", this.SetClusterAliasManualOverride)
 	this.registerRequest(m, "clusters", this.Clusters)
 	this.registerRequest(m, "clusters-info", this.ClustersInfo)
+
 	this.registerRequest(m, "masters", this.Masters)
 	this.registerRequest(m, "master/:clusterHint", this.ClusterMaster)
 	this.registerRequest(m, "instance-replicas/:host/:port", this.InstanceReplicas)
@@ -3065,6 +3090,10 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "downtimed/:clusterHint", this.Downtimed)
 	this.registerRequest(m, "topology/:clusterHint", this.AsciiTopology)
 	this.registerRequest(m, "topology/:host/:port", this.AsciiTopology)
+
+	// Key-value:
+	this.registerRequest(m, "submit-masters-to-kv-stores", this.SubmitMastersToKvStores)
+	this.registerRequest(m, "submit-masters-to-kv-stores/:clusterHint", this.SubmitMastersToKvStores)
 
 	// Instance management:
 	this.registerRequest(m, "instance/:host/:port", this.Instance)

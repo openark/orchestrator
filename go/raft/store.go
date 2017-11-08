@@ -13,12 +13,6 @@ import (
 	"github.com/hashicorp/raft"
 )
 
-const (
-	retainSnapshotCount = 10
-	snapshotInterval    = 30 * time.Minute
-	raftTimeout         = 10 * time.Second
-)
-
 type Store struct {
 	raftDir       string
 	raftBind      string

@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 
 	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/kv"
+	"github.com/github/orchestrator/go/raft"
 
 	"github.com/openark/golib/log"
 )
@@ -37,6 +39,8 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 	switch op {
 	case "heartbeat":
 		return nil
+	case "async-snapshot":
+		return applier.asyncSnapshot(value)
 	case "register-node":
 		return applier.registerNode(value)
 	case "discover":
@@ -67,8 +71,15 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.disableGlobalRecoveries(value)
 	case "enable-global-recoveries":
 		return applier.enableGlobalRecoveries(value)
+	case "put-key-value":
+		return applier.putKeyValue(value)
 	}
 	return log.Errorf("Unknown command op: %s", op)
+}
+
+func (applier *CommandApplier) asyncSnapshot(value []byte) interface{} {
+	err := orcraft.AsyncSnapshot()
+	return err
 }
 
 func (applier *CommandApplier) registerNode(value []byte) interface{} {
@@ -196,5 +207,14 @@ func (applier *CommandApplier) disableGlobalRecoveries(value []byte) interface{}
 
 func (applier *CommandApplier) enableGlobalRecoveries(value []byte) interface{} {
 	err := EnableRecovery()
+	return err
+}
+
+func (applier *CommandApplier) putKeyValue(value []byte) interface{} {
+	kvPair := kv.KVPair{}
+	if err := json.Unmarshal(value, &kvPair); err != nil {
+		return log.Errore(err)
+	}
+	err := kv.PutKVPair(&kvPair)
 	return err
 }
