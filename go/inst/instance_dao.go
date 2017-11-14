@@ -273,6 +273,13 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	slaveStatusFound := false
 	var resolveErr error
 
+	// Ignore boxes we've been told to ignore (quietly)
+	if instanceKey != nil {
+		if RegexpMatchPatterns(instanceKey.Hostname, config.Config.DiscoveryIgnoreHostnameFilters) {
+			return nil, nil
+		}
+	}
+
 	if !instanceKey.IsValid() {
 		latency.Start("backend")
 		if err := UpdateInstanceLastAttemptedCheck(instanceKey); err != nil {
@@ -1929,8 +1936,8 @@ func ReadAllInstanceKeys() ([]InstanceKey, error) {
 		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
 		if merr != nil {
 			log.Errore(merr)
-		} else if !InstanceIsForgotten(instanceKey) {
-			// only if not in "forget" cache
+		} else if !InstanceIsForgotten(instanceKey) && !RegexpMatchPatterns(instanceKey.Hostname, config.Config.DiscoveryIgnoreHostnameFilters) {
+			// exclude instances in "forget" cache or one's we've been told to ignore
 			res = append(res, *instanceKey)
 		}
 		return nil
@@ -1964,11 +1971,13 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
 		if merr != nil {
 			log.Errore(merr)
-		} else if !InstanceIsForgotten(instanceKey) {
-			// only if not in "forget" cache
+		} else if !InstanceIsForgotten(instanceKey) && !RegexpMatchPatterns(instanceKey.Hostname, config.Config.DiscoveryIgnoreHostnameFilters) {
+			// Silently ignore:
+			// - hosts we've been told to ignore
+			// - hosts in "forget" cache
 			res = append(res, *instanceKey)
 		}
-		// We don;t return an error because we want to keep filling the outdated instances list.
+		// We don't return an error because we want to keep filling the outdated instances list.
 		return nil
 	})
 
