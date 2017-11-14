@@ -100,6 +100,7 @@ func RegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
 
 // HealthTest attempts to write to the backend database and get a result
 func HealthTest() (health *HealthStatus, err error) {
+	log.Debugf(".....................0")
 	cacheKey := ProcessToken.Hash
 	if healthStatus, found := lastHealthCheckCache.Get(cacheKey); found {
 		return healthStatus.(*HealthStatus), nil
@@ -124,7 +125,6 @@ func HealthTest() (health *HealthStatus, err error) {
 			return health, log.Errore(err)
 		}
 	}
-
 	health.AvailableNodes, err = ReadAvailableNodes(true)
 
 	return health, nil
