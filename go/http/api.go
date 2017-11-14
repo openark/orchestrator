@@ -2360,14 +2360,7 @@ func (this *HttpAPI) LeaderCheck(params martini.Params, r render.Render, req *ht
 // It might be a good idea to deprecate the current Health() behavior and roll this in at some
 // point
 func (this *HttpAPI) StatusCheck(params martini.Params, r render.Render, req *http.Request) {
-	// SimpleHealthTest just checks to see if we can connect to the database.  Lighter weight if you intend to call it a lot
-	var health *process.HealthStatus
-	var err error
-	if config.Config.StatusSimpleHealth {
-		health, err = process.SimpleHealthTest()
-	} else {
-		health, err = process.HealthTest()
-	}
+	health, err := process.HealthTest()
 	if err != nil {
 		r.JSON(500, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Application node is unhealthy %+v", err), Details: health})
 		return
