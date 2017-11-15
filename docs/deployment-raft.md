@@ -49,7 +49,7 @@ To interact with orchestrator from shell/automation/scripts, you may choose to:
     ```
     ORCHESTRATOR_API="http://your.orchestrator.service.host1:3000/api http://your.orchestrator.service.host2:3000/api http://your.orchestrator.service.host3:3000/api"
     ```
-    In the latter case you will provide the list of all `orchestrator` nodes, and the `orchetsrator-client` script will automatically figure out which is the leader. With this setup your automation will not need a proxy (though you may still wish to use a proxy for web interface users).
+    In the latter case you will provide the list of all `orchestrator` nodes, and the `orchestrator-client` script will automatically figure out which is the leader. With this setup your automation will not need a proxy (though you may still wish to use a proxy for web interface users).
 
     Make sure to chef/puppet/whatever the `ORCHESTRATOR_API` value such that it adapts to changes in your environment.
 
@@ -70,7 +70,7 @@ However all nodes will:
 - Run failure detection
 - Register their own health check
 
-None-leader nodes must _NOT_:
+Non-leader nodes must _NOT_:
 
 - Run arbitrary commands (e.g. `relocate`, `begin-downtime`)
 - Run recoveries per human request.
