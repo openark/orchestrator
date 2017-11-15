@@ -17,3 +17,4 @@ Use the following small steps to configure `orchestrator`:
 - [Recovery](configuration-recovery.md)
 - [Raft](configuration-raft.md): configure a [orchestrator/raft](raft.md) cluster for high availability
 - Security: See [security](#security) section.
+- [Key-Value stores](configuration-kv.md): configure and use key-value stores for master discovery.

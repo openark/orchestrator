@@ -49,7 +49,7 @@ To interact with orchestrator from shell/automation/scripts, you may choose to:
     ```
     ORCHESTRATOR_API="http://your.orchestrator.service.host1:3000/api http://your.orchestrator.service.host2:3000/api http://your.orchestrator.service.host3:3000/api"
     ```
-    In the latter case you will provide the list of all `orchestrator` nodes, and the `orchetsrator-client` script will automatically figure out which is the leader. With this setup your automation will not need a proxy (though you may still wish to use a proxy for web interface users).
+    In the latter case you will provide the list of all `orchestrator` nodes, and the `orchestrator-client` script will automatically figure out which is the leader. With this setup your automation will not need a proxy (though you may still wish to use a proxy for web interface users).
 
     Make sure to chef/puppet/whatever the `ORCHESTRATOR_API` value such that it adapts to changes in your environment.
 
@@ -70,7 +70,7 @@ However all nodes will:
 - Run failure detection
 - Register their own health check
 
-None-leader nodes must _NOT_:
+Non-leader nodes must _NOT_:
 
 - Run arbitrary commands (e.g. `relocate`, `begin-downtime`)
 - Run recoveries per human request.
@@ -92,16 +92,24 @@ All `orchestrator` nodes probe the entire `MySQL` fleet. Each `MySQL` server is 
 
 ##### A node crashes:
 
-Start the node, start the `MySQL` service if applicable, start the `orchestrator` service. The `orchestrator` service should join the `raft` group, catch up with `raft` replication log and continue as normal.
+Start the node, start the `MySQL` service if applicable, start the `orchestrator` service. The `orchestrator` service should join the `raft` group, get a recent snapshot, catch up with `raft` replication log and continue as normal.
 
-##### A node crashes for too long, or a node is re-provisioned:
+##### A new node is provisioned / a node is re-provisioned
 
-The `raft` replication log is only kept for a couple days. If a node goes offline for longer than that, or if it completely loses data, you will need to recreate the data:
+Such that the backend database is completely empty/missing.
 
-- Stop the `orchestrator` service (or it should automatically PANIC after 1 minute).
-- Copy backend DB data:
-  - If `MySQL`, run backup/restore, either logical or physical.
-  - If `SQLite`, run `.dump` + restore, see [10. Converting An Entire Database To An ASCII Text File](https://sqlite.org/cli.html).
+- If `SQLite`, nothing to be done. The node will just join the `raft` group, get a snapshot from one of the active nodes, catch up with `raft` log and run as normal.
+- If `MySQL`, the same will be attempted. However, the `MySQL` server will have to [have the privileges](configuration-backend.md#mysql-backend-db-setup) for `orchestrator` to operate. So if this is a brand new server, those privileges are likely to not be there.
+  As example, our `puppet` setup periodically ensures privileges are set on our MySQL servers. Thus, when a new server is provisioned, next `puppet` run lays the privileges for `orchestrator`. `puppet` also ensures the `orchestrator` service is running, and so, pending some time, `orchestrator` can automatically join the group.
+
+##### Cloning is valid
+
+If you choose to, you may also provision new boxes by cloning your existing backend databases using your favorite backup/restore  or dump/load method.
+
+This is **perfectly valid** though **not required**.
+
+- If `MySQL`, run backup/restore, either logical or physical.
+- If `SQLite`, run `.dump` + restore, see [10. Converting An Entire Database To An ASCII Text File](https://sqlite.org/cli.html).
 
 - Start the `orchestrator` service. It should catch up with `raft` replication log and join the `raft` cluster.
 

@@ -128,6 +128,31 @@ func ReadClusterPoolInstancesMap(clusterName string, pool string) (*PoolInstance
 	return &poolInstancesMap, nil
 }
 
+func ReadAllPoolInstancesSubmissions() ([]PoolInstancesSubmission, error) {
+	result := []PoolInstancesSubmission{}
+	query := `
+		select
+			pool,
+			min(registered_at) as registered_at,
+			GROUP_CONCAT(concat(hostname, ':', port)) as hosts
+		from
+			database_instance_pool
+		group by
+			pool
+	`
+	err := db.QueryOrchestrator(query, sqlutils.Args(), func(m sqlutils.RowMap) error {
+		submission := PoolInstancesSubmission{}
+		submission.Pool = m.GetString("pool")
+		submission.CreatedAt = m.GetTime("registered_at")
+		submission.RegisteredAt = m.GetString("registered_at")
+		submission.DelimitedInstances = m.GetString("hosts")
+		result = append(result, submission)
+		return nil
+	})
+
+	return result, log.Errore(err)
+}
+
 // ExpirePoolInstances cleans up the database_instance_pool table from expired items
 func ExpirePoolInstances() error {
 	_, err := db.ExecOrchestrator(`

@@ -40,6 +40,7 @@ import (
 	"github.com/github/orchestrator/go/collection"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
+	"github.com/github/orchestrator/go/kv"
 	"github.com/github/orchestrator/go/metrics/query"
 )
 
@@ -128,6 +129,15 @@ func ExecDBWriteFunc(f func() error) error {
 	}()
 	res := f()
 	return res
+}
+
+func ExpireTableData(tableName string, timestampColumn string) error {
+	query := fmt.Sprintf("delete from %s where %s < NOW() - INTERVAL ? DAY", tableName, timestampColumn)
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(query, config.AuditPurgeDays)
+		return err
+	}
+	return ExecDBWriteFunc(writeFunc)
 }
 
 // logReadTopologyInstanceError logs an error, if applicable, for a ReadTopologyInstance operation,
@@ -1873,6 +1883,31 @@ func ReadClustersInfo(clusterName string) ([]ClusterInfo, error) {
 	return clusters, err
 }
 
+// Get a listing of KVPair for clusters masters, for all clusters or for a specific cluster.
+func GetMastersKVPairs(clusterName string) (kvPairs [](*kv.KVPair), err error) {
+
+	clusterAliasMap := make(map[string]string)
+	if clustersInfo, err := ReadClustersInfo(clusterName); err != nil {
+		return kvPairs, err
+	} else {
+		for _, clusterInfo := range clustersInfo {
+			clusterAliasMap[clusterInfo.ClusterName] = clusterInfo.ClusterAlias
+		}
+	}
+
+	masters, err := ReadWriteableClustersMasters()
+	if err != nil {
+		return kvPairs, err
+	}
+	for _, master := range masters {
+		if kvPair := GetClusterMasterKVPair(clusterAliasMap[master.ClusterName], &master.Key); kvPair != nil {
+			kvPairs = append(kvPairs, kvPair)
+		}
+	}
+
+	return kvPairs, err
+}
+
 // HeuristicallyApplyClusterDomainInstanceAttribute writes down the cluster-domain
 // to master-hostname as a general attribute, by reading current topology and **trusting** it to be correct
 func HeuristicallyApplyClusterDomainInstanceAttribute(clusterName string) (instanceKey *InstanceKey, err error) {
@@ -1913,6 +1948,33 @@ func GetHeuristicClusterDomainInstanceAttribute(clusterName string) (instanceKey
 		return nil, err
 	}
 	return NewRawInstanceKey(writerInstanceName)
+}
+
+// ReadOutdatedInstanceKeys reads and returns keys for all instances that are not up to date (i.e.
+// pre-configured time has passed since they were last checked)
+// But we also check for the case where an attempt at instance checking has been made, that hasn't
+// resulted in an actual check! This can happen when TCP/IP connections are hung, in which case the "check"
+// never returns. In such case we multiply interval by a factor, so as not to open too many connections on
+// the instance.
+func ReadAllInstanceKeys() ([]InstanceKey, error) {
+	res := []InstanceKey{}
+	query := `
+		select
+			hostname, port
+		from
+			database_instance
+			`
+	err := db.QueryOrchestrator(query, sqlutils.Args(), func(m sqlutils.RowMap) error {
+		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
+		if merr != nil {
+			log.Errore(merr)
+		} else if !InstanceIsForgotten(instanceKey) {
+			// only if not in "forget" cache
+			res = append(res, *instanceKey)
+		}
+		return nil
+	})
+	return res, log.Errore(err)
 }
 
 // ReadOutdatedInstanceKeys reads and returns keys for all instances that are not up to date (i.e.
@@ -2419,26 +2481,29 @@ func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern str
 
 // RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.
 func RegisterCandidateInstance(candidate *CandidateDatabaseInstance) error {
+	args := sqlutils.Args(candidate.Hostname, candidate.Port, string(candidate.PromotionRule))
+	lastSuggestedHint := "now()"
+	if !candidate.LastSuggested.IsZero() {
+		lastSuggestedHint = "?"
+		args = append(args, candidate.LastSuggested)
+	}
+	query := fmt.Sprintf(`
+			insert into candidate_database_instance (
+					hostname,
+					port,
+					promotion_rule,
+					last_suggested
+				) values (?, ?, ?, %s)
+				on duplicate key update
+					hostname=values(hostname),
+					port=values(port),
+					last_suggested=now(),
+					promotion_rule=values(promotion_rule)
+			`, lastSuggestedHint)
 	writeFunc := func() error {
-		_, err := db.ExecOrchestrator(`
-				insert into candidate_database_instance (
-						hostname,
-						port,
-						last_suggested,
-						promotion_rule)
-					values (?, ?, NOW(), ?)
-					on duplicate key update
-						hostname=values(hostname),
-						port=values(port),
-						last_suggested=now(),
-						promotion_rule=values(promotion_rule)
-				`, candidate.Hostname, candidate.Port, string(candidate.PromotionRule),
-		)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
+		_, err := db.ExecOrchestrator(query, args...)
+		AuditOperation("register-candidate", candidate.Key(), string(candidate.PromotionRule))
+		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }
@@ -2468,7 +2533,7 @@ func RecordInstanceCoordinatesHistory() error {
         	delete from database_instance_coordinates_history
 			where
 				recorded_timestamp < NOW() - INTERVAL ? MINUTE
-				`, (config.PseudoGTIDCoordinatesHistoryHeuristicMinutes + 5),
+				`, (config.PseudoGTIDCoordinatesHistoryHeuristicMinutes + 2),
 			)
 			return log.Errore(err)
 		}
@@ -2512,29 +2577,6 @@ func GetHeuristiclyRecentCoordinatesForInstance(instanceKey *InstanceKey) (selfC
 			limit 1
 			`
 	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port, config.PseudoGTIDCoordinatesHistoryHeuristicMinutes), func(m sqlutils.RowMap) error {
-		selfCoordinates = &BinlogCoordinates{LogFile: m.GetString("binary_log_file"), LogPos: m.GetInt64("binary_log_pos")}
-		relayLogCoordinates = &BinlogCoordinates{LogFile: m.GetString("relay_log_file"), LogPos: m.GetInt64("relay_log_pos")}
-
-		return nil
-	})
-	return selfCoordinates, relayLogCoordinates, err
-}
-
-// GetLastKnownCoordinatesForInstance returns the very last known coordinates for an instance
-func GetLastKnownCoordinatesForInstance(instanceKey *InstanceKey) (selfCoordinates *BinlogCoordinates, relayLogCoordinates *BinlogCoordinates, err error) {
-	query := `
-		select
-			binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
-		from
-			database_instance_coordinates_history
-		where
-			hostname = ?
-			and port = ?
-		order by
-			recorded_timestamp desc
-			limit 1
-			`
-	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port), func(m sqlutils.RowMap) error {
 		selfCoordinates = &BinlogCoordinates{LogFile: m.GetString("binary_log_file"), LogPos: m.GetInt64("binary_log_pos")}
 		relayLogCoordinates = &BinlogCoordinates{LogFile: m.GetString("relay_log_file"), LogPos: m.GetInt64("relay_log_pos")}
 
@@ -2591,40 +2633,8 @@ func ResetInstanceRelaylogCoordinatesHistory(instanceKey *InstanceKey) error {
 	return ExecDBWriteFunc(writeFunc)
 }
 
-// RecordInstanceBinlogFileHistory snapshots the binlog coordinates of instances
-func RecordInstanceBinlogFileHistory() error {
-	{
-		writeFunc := func() error {
-			_, err := db.ExecOrchestrator(`
-        	delete from database_instance_binlog_files_history
-			where
-				last_seen < NOW() - INTERVAL ? DAY
-				`, config.BinlogFileHistoryDays,
-			)
-			return log.Errore(err)
-		}
-		ExecDBWriteFunc(writeFunc)
-	}
-	writeFunc := func() error {
-		_, err := db.ExecOrchestrator(`
-      	insert into
-      		database_instance_binlog_files_history (
-					hostname, port,	first_seen, last_seen, binary_log_file, binary_log_pos
-				)
-      	select
-      		hostname, port, last_seen, last_seen, binary_log_file, binary_log_pos
-				from
-					database_instance
-				where
-					binary_log_file != ''
-				on duplicate key update
-					last_seen = VALUES(last_seen),
-					binary_log_pos = VALUES(binary_log_pos)
-				`,
-		)
-		return log.Errore(err)
-	}
-	return ExecDBWriteFunc(writeFunc)
+func ExpireInstanceBinlogFileHistory() error {
+	return ExpireTableData("database_instance_binlog_files_history", "last_seen")
 }
 
 // FigureClusterName will make a best effort to deduce a cluster name using either a given alias

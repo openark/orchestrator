@@ -22,14 +22,24 @@ import (
 
 // fsmSnapshot handles raft persisting of snapshots
 type fsmSnapshot struct {
+	snapshotCreatorApplier SnapshotCreatorApplier
 }
 
-func newFsmSnapshot() *fsmSnapshot {
-	return &fsmSnapshot{}
+func newFsmSnapshot(snapshotCreatorApplier SnapshotCreatorApplier) *fsmSnapshot {
+	return &fsmSnapshot{
+		snapshotCreatorApplier: snapshotCreatorApplier,
+	}
 }
 
 // Persist
 func (f *fsmSnapshot) Persist(sink raft.SnapshotSink) error {
+	data, err := f.snapshotCreatorApplier.GetData()
+	if err != nil {
+		return err
+	}
+	if _, err := sink.Write(data); err != nil {
+		return err
+	}
 	return sink.Close()
 }
 

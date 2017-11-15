@@ -12,7 +12,7 @@ function Cluster() {
   var dcColorsMap = {};
 
   var _instances, _replicationAnalysis, _maintenanceList, _instancesMap, _isDraggingTrailer = false;
-
+  var _countDragOver = 0;
 
   var _instanceCommands = {
     "recover-auto": function(e) {
@@ -133,6 +133,7 @@ function Cluster() {
   function clearDroppable() {
     $(".original-dragged").removeClass("original-dragged");
     resetRefreshTimer();
+    $("#cluster_container .accept_drop_check").removeClass("accept_drop_check");
     $("#cluster_container .accept_drop").removeClass("accept_drop");
     $("#cluster_container .accept_drop_warning").removeClass("accept_drop_warning");
     $(".being-dragged").removeClass("being-dragged");
@@ -230,6 +231,9 @@ function Cluster() {
     $(instanceEl).data("svg-instance-wrapper", svgInstanceWrapper);
 
     renderInstanceElement(instanceEl, node, "cluster");
+
+    var masterSectionEl = $('<div class="instance-master-section" data-nodeid="' + node.id + '"></div>').appendTo(instanceEl);
+    var normalSectionEl = $('<div class="instance-normal-section" data-nodeid="' + node.id + '"></div>').appendTo(instanceEl);
     if (node.children) {
       var trailerEl = $('<div class="instance-trailer" data-nodeid="' + node.id + '"><div><span class="glyphicon glyphicon-chevron-left" title="Drag and drop replicas of this instance"></span></div></div>').appendTo(instanceEl);
       instanceEl.data("instance-trailer", trailerEl);
@@ -259,7 +263,8 @@ function Cluster() {
     }
 
     activateInstanceDraggable(instanceEl);
-    prepareInstanceDroppable(instanceEl);
+    prepareInstanceDroppable(normalSectionEl);
+    prepareInstanceMasterSectionDroppable(masterSectionEl);
   }
 
   function instanceEl_getTrailerEl(instanceEl) {
@@ -269,7 +274,7 @@ function Cluster() {
 
 
   function wireInstanceCommands() {
-    $("body").on("click", ".instance h3 a", function(e) {
+    $("body").on("click", ".instance h3 .instance-glyphs", function(e) {
       var target = $(e.target);
       e.draggedNodeId = target.attr("data-nodeid");
       if (e.draggedNodeId == $(".instance").attr("data-nodeid"))
@@ -309,13 +314,14 @@ function Cluster() {
         var draggedNode = nodesMap[draggedNodeId];
         var targetNode = nodesMap[instanceEl.attr("data-nodeid")];
         var action = _isDraggingTrailer ? moveChildren : moveInstance;
-
         var acceptDrop = action(draggedNode, targetNode, false);
+        var instanceDiv = $(this).closest(".instance");
+        instanceDiv.addClass("accept_drop_check");
         if (acceptDrop.accept == "ok") {
-          $(this).addClass("accept_drop");
+          instanceDiv.addClass("accept_drop");
         }
         if (acceptDrop.accept == "warning") {
-          $(this).addClass("accept_drop_warning");
+          instanceDiv.addClass("accept_drop_warning");
         }
         $(this).attr("data-drop-comment", acceptDrop.accept ? acceptDrop.type : "");
         var accepted = acceptDrop.accept != null;
@@ -323,16 +329,21 @@ function Cluster() {
       },
       hoverClass: "draggable-hovers",
       over: function(event, ui) {
+        _countDragOver++;
         var duplicate = ui.helper;
         // Called once when dragged object is over another object
         if ($(this).attr("data-drop-comment")) {
           $(duplicate).addClass("draggable-msg");
           $(duplicate).find(".instance-content,.instance-trailer-content").html($(this).attr("data-drop-comment"))
         } else {
-          $(duplicate).find(".instance-content,.instance-trailer-content").html("Cannot drop here")
+          $(duplicate).find(".instance-content,.instance-trailer-content").html('<span class="glyphicon glyphicon-minus-sign text-danger"></span> Cannot drop here')
         }
       },
       out: function(event, ui) {
+        _countDragOver--;
+        if (_countDragOver > 0) {
+          return;
+        }
         var duplicate = ui.helper;
         // Called once when dragged object leaves other object
         $(duplicate).removeClass("draggable-msg");
@@ -349,6 +360,65 @@ function Cluster() {
 
   }
 
+  function prepareInstanceMasterSectionDroppable(instanceMasterSectionEl) {
+    var nodesMap = _instancesMap;
+    instanceMasterSectionEl.droppable({
+      accept: function(draggable) {
+        // Find the objects that accept a draggable (i.e. valid droppables)
+        if (!droppableIsActive) {
+          return false
+        }
+        if (instanceMasterSectionEl[0] == draggable[0])
+          return false;
+        var draggedNodeId = draggable.attr("data-nodeid");
+        var draggedNode = nodesMap[draggedNodeId];
+        var targetNode = nodesMap[instanceMasterSectionEl.attr("data-nodeid")];
+        var action = _isDraggingTrailer ? moveChildren : moveInstanceOnMaster;
+        var acceptDrop = action(draggedNode, targetNode, false);
+        var instanceDiv = $(this).closest(".instance");
+        instanceDiv.addClass("accept_drop_check");
+        if (acceptDrop.accept == "ok") {
+          instanceDiv.addClass("accept_drop");
+        }
+        if (acceptDrop.accept == "warning") {
+          instanceDiv.addClass("accept_drop_warning");
+        }
+        $(this).attr("data-drop-comment", acceptDrop.accept ? acceptDrop.type : "");
+        var accepted = acceptDrop.accept != null;
+        return accepted;
+      },
+      hoverClass: "draggable-hovers",
+      over: function(event, ui) {
+        _countDragOver += 1;
+        var duplicate = ui.helper;
+        // Called once when dragged object is over another object
+        if ($(this).attr("data-drop-comment")) {
+          $(duplicate).addClass("draggable-msg");
+          $(duplicate).find(".instance-content,.instance-trailer-content").html($(this).attr("data-drop-comment"))
+        } else {
+          $(duplicate).find(".instance-content,.instance-trailer-content").html('<span class="glyphicon glyphicon-minus-sign text-danger"></span> Cannot drop here')
+        }
+      },
+      out: function(event, ui) {
+        _countDragOver--;
+        if (_countDragOver > 0) {
+          return;
+        }
+        var duplicate = ui.helper;
+        // Called once when dragged object leaves other object
+        $(duplicate).removeClass("draggable-msg");
+        $(duplicate).find(".instance-content,.instance-trailer-content").html("")
+      },
+      drop: function(e, ui) {
+        var draggedNodeId = ui.draggable.attr("data-nodeid");
+        var duplicate = ui.helper;
+        var action = _isDraggingTrailer ? moveChildren : moveInstanceOnMaster;
+        action(nodesMap[draggedNodeId], nodesMap[$(this).attr("data-nodeid")], true);
+        clearDroppable();
+      }
+    });
+
+  }
 
   // moveInstance checks whether an instance (node) can be dropped on another (droppableNode).
   // The function consults with the current moveInstanceMethod; the type of action taken is based on that.
@@ -398,7 +468,7 @@ function Cluster() {
         }
         return {
           accept: "ok",
-          type: "makeCoMaster with " + droppableTitle
+          type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>MAKE CO MASTER</strong> with ' + droppableTitle,
         };
       }
       if (instanceIsDescendant(droppableNode, node)) {
@@ -475,7 +545,7 @@ function Cluster() {
         }
         return {
           accept: "ok",
-          type: "makeCoMaster with " + droppableTitle
+          type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>MAKE CO MASTER</strong> with ' + droppableTitle,
         };
       }
       if (instanceIsDescendant(droppableNode, node)) {
@@ -546,7 +616,7 @@ function Cluster() {
           }
           return {
             accept: "ok",
-            type: "makeCoMaster with " + droppableTitle
+            type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>MAKE CO MASTER</strong> with ' + droppableTitle,
           };
         }
       }
@@ -620,7 +690,7 @@ function Cluster() {
         }
         return {
           accept: "ok",
-          type: "makeCoMaster with " + droppableTitle
+          type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>MAKE CO MASTER</strong> with ' + droppableTitle,
         };
       }
       return {
@@ -642,6 +712,62 @@ function Cluster() {
     };
   }
 
+
+  function moveInstanceOnMaster(node, droppableNode, shouldApply) {
+    var unaccepted = {
+      accept: false
+    };
+    if (!isAuthorizedForAction()) {
+      // Obviously this is also checked on server side, no need to try stupid hacks
+      return unaccepted;
+    }
+    if (moveInstanceMethod != "smart") {
+      return unaccepted;
+    }
+    var droppableTitle = getInstanceDiv(droppableNode.id).find("h3 .pull-left").html();
+
+    if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem || droppableNode.isAggregate) {
+      // Obviously can't handle.
+      return unaccepted;
+    }
+    if (instanceIsChild(node, droppableNode) && !droppableNode.isMaster) {
+      if (node.hasProblem) {
+        // Typically, when a node has a problem we do not allow moving it up.
+        // But there's a special situation when allowing is desired: when
+        // this replica is completely caught up;
+        if (!node.isSQLThreadCaughtUpWithIOThread) {
+          return {
+            accept: false
+          };
+        }
+      }
+      if (shouldApply) {
+        takeMaster(node, droppableNode);
+      }
+      return {
+        accept: "ok",
+        type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>take master</strong> ' + droppableTitle
+      };
+    }
+    if (instanceIsChild(node, droppableNode) &&
+      droppableNode.isMaster &&
+      !node.isCoMaster
+    ) {
+      if (node.hasProblem) {
+        return {
+          accept: false
+        };
+      }
+      if (shouldApply) {
+        gracefulMasterTakeover(node, droppableNode);
+      }
+      return {
+        accept: "ok",
+        type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>PROMOTE AS MASTER</strong> '
+      };
+    }
+    return moveInstance(node, droppableNode, shouldApply);
+  }
 
   // moveChildren checks whether an children of an instance (node) can be dropped on another (droppableNode).
   // The function consults with the current moveInstanceMethod; the type of action taken is based on that.
@@ -807,21 +933,18 @@ function Cluster() {
 
 
   function executeMoveOperation(message, apiUrl) {
-    bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
-      if (confirm) {
-        showLoader();
-        getData(apiUrl, function(operationResult) {
-          hideLoader();
-          if (operationResult.Code == "ERROR") {
-            addAlert(operationResult.Message)
-          } else {
-            reloadWithOperationResult(operationResult);
-          }
-        });
-      }
-      $("#cluster_container .accept_drop").removeClass("accept_drop");
-      $("#cluster_container .accept_drop").removeClass("accept_drop_warning");
-    });
+    if (isSilentUI()) {
+      apiCommand(apiUrl);
+    } else {
+      bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
+        if (confirm) {
+          apiCommand(apiUrl);
+        }
+      });
+    }
+    $("#cluster_container .accept_drop_check").removeClass("accept_drop_check");
+    $("#cluster_container .accept_drop").removeClass("accept_drop");
+    $("#cluster_container .accept_drop").removeClass("accept_drop_warning");
     return false;
   }
 
@@ -910,16 +1033,6 @@ function Cluster() {
     return executeMoveOperation(message, apiUrl);
   }
 
-  function makeCoMaster(node, childNode) {
-    var message = "<h4>make-co-master</h4>Are you sure you wish to make <code><strong>" +
-      node.Key.Hostname + ":" + node.Key.Port +
-      "</strong></code> and <code><strong>" +
-      childNode.Key.Hostname + ":" + childNode.Key.Port +
-      "</strong></code> co-masters?";
-    var apiUrl = "/api/make-co-master/" + childNode.Key.Hostname + "/" + childNode.Key.Port;
-    return executeMoveOperation(message, apiUrl);
-  }
-
   function matchBelow(node, otherNode) {
     var message = "<h4>PSEUDO-GTID MODE, match-below</h4>Are you sure you wish to turn <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
@@ -948,6 +1061,35 @@ function Cluster() {
       "</strong></code>?";
     var apiUrl = "/api/move-replicas-gtid/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
     return executeMoveOperation(message, apiUrl);
+  }
+
+  function makeCoMaster(node, childNode) {
+    var message = "<h4>make-co-master</h4>Are you sure you wish to make <code><strong>" +
+      node.Key.Hostname + ":" + node.Key.Port +
+      "</strong></code> and <code><strong>" +
+      childNode.Key.Hostname + ":" + childNode.Key.Port +
+      "</strong></code> co-masters?";
+    bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
+      if (confirm) {
+        apiCommand("/api/make-co-master/" + childNode.Key.Hostname + "/" + childNode.Key.Port);
+        return true;
+      }
+    });
+    return false;
+  }
+
+
+  function gracefulMasterTakeover(newMasterNode, existingMasterNode) {
+    var message = '<h1><span class="glyphicon glyphicon-exclamation-sign text-warning"></span> DANGER ZONE</h1><h4>Graceful-master-takeover</h4>Are you sure you wish to promote <code><strong>' +
+      newMasterNode.Key.Hostname + ':' + newMasterNode.Key.Port +
+      '</strong></code> as master?';
+    bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
+      if (confirm) {
+        apiCommand("/api/graceful-master-takeover/" + existingMasterNode.Key.Hostname + "/" + existingMasterNode.Key.Port);
+        return true;
+      }
+    });
+    return false;
   }
 
   function instancesAreSiblings(node1, node2) {
@@ -1305,8 +1447,9 @@ function Cluster() {
         glyph.addClass("text-muted");
         glyph.attr("title", "Color by data center");
       }
-    } {
-      // Compact display
+    }
+    // Compact display
+    {
       var anchor = $("#cluster_sidebar [data-bullet=compact-display] a");
       var glyph = $(anchor).find(".glyphicon")
       if (isCompactDisplay()) {
@@ -1337,6 +1480,17 @@ function Cluster() {
       } else {
         glyph.addClass("text-muted");
         glyph.attr("title", "Anonymize display");
+      }
+    }
+    // Silent UI
+    {
+      var glyph = $("#cluster_sidebar [data-bullet=silent-ui] .glyphicon");
+      if (isSilentUI()) {
+        glyph.addClass("text-info");
+        glyph.attr("title", "Cancel UI silence");
+      } else {
+        glyph.addClass("text-muted");
+        glyph.attr("title", "Silence UI questions");
       }
     }
   }
@@ -1540,7 +1694,7 @@ function Cluster() {
       document.title = document.title.split(" - ")[0] + " - " + visualAlias;
 
       if (!isAnonymized()) {
-        $("#cluster_container").append('<div class="floating_background">' + visualAlias + '</div>');
+        $("#cluster_name").text(visualAlias);
         $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="' + clusterInfo.ClusterAlias + '">Alias: ' + alias + '</a></li>');
       }
       $("#dropdown-context").append('<li><a href="' + appUrl('/web/cluster-pools/' + currentClusterName()) + '">Pools</a></li>');
@@ -1663,6 +1817,21 @@ function Cluster() {
         });
       } else {
         $.cookie("compact-display", "true", {
+          path: '/',
+          expires: 1
+        });
+      }
+      location.reload();
+      return
+    });
+    $("body").on("click", "a[data-command=silent-ui]", function(event) {
+      if ($.cookie("silent-ui") == "true") {
+        $.cookie("silent-ui", "false", {
+          path: '/',
+          expires: 1
+        });
+      } else {
+        $.cookie("silent-ui", "true", {
           path: '/',
           expires: 1
         });

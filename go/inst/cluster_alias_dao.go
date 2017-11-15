@@ -80,7 +80,7 @@ func ReadAliasByClusterName(clusterName string) (alias string, err error) {
 }
 
 // WriteClusterAlias will write (and override) a single cluster name mapping
-func WriteClusterAlias(clusterName string, alias string) error {
+func writeClusterAlias(clusterName string, alias string) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
 			replace into
@@ -94,8 +94,8 @@ func WriteClusterAlias(clusterName string, alias string) error {
 	return ExecDBWriteFunc(writeFunc)
 }
 
-// WriteClusterAliasManualOverride will write (and override) a single cluster name mapping
-func WriteClusterAliasManualOverride(clusterName string, alias string) error {
+// writeClusterAliasManualOverride will write (and override) a single cluster name mapping
+func writeClusterAliasManualOverride(clusterName string, alias string) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
 			replace into

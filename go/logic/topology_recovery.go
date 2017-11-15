@@ -30,6 +30,7 @@ import (
 	"github.com/github/orchestrator/go/attributes"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/kv"
 	ometrics "github.com/github/orchestrator/go/metrics"
 	"github.com/github/orchestrator/go/os"
 	"github.com/github/orchestrator/go/process"
@@ -771,6 +772,17 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			inst.ResetSlaveOperation(&promotedReplica.Key)
 			inst.SetReadOnly(&promotedReplica.Key, false)
 		}
+
+		kvPair := inst.GetClusterMasterKVPair(analysisEntry.ClusterDetails.ClusterAlias, &promotedReplica.Key)
+		if orcraft.IsRaftEnabled() {
+			orcraft.PublishCommand("put-key-value", kvPair)
+			// since we'll be affecting 3rd party tools here, we _prefer_ to mitigate re-applying
+			// of the put-key-value event upon startup. We _recommend_ a snapshot in the near future.
+			go orcraft.PublishCommand("async-snapshot", "")
+		} else {
+			kv.PutKVPair(kvPair)
+		}
+
 		if !skipProcesses {
 			// Execute post master-failover processes
 			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
@@ -788,7 +800,11 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			before := analysisEntry.AnalyzedInstanceKey.StringCode()
 			after := promotedReplica.Key.StringCode()
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: updating cluster_alias: %v -> %v", before, after))
-			inst.ReplaceAliasClusterName(before, after)
+			if alias := analysisEntry.ClusterDetails.ClusterAlias; alias != "" {
+				inst.SetClusterAlias(promotedReplica.Key.StringCode(), alias)
+			} else {
+				inst.ReplaceAliasClusterName(before, after)
+			}
 			return nil
 		}()
 
@@ -1048,6 +1064,7 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadIntermediateMaster: regroup failed on: %+v", regroupError))
 		}
 		if regroupPromotedReplica != nil {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadIntermediateMaster: regrouped under %+v, with %d lost replicas", regroupPromotedReplica.Key, len(lostReplicas)))
 			topologyRecovery.ParticipatingInstanceKeys.AddKey(regroupPromotedReplica.Key)
 			if len(lostReplicas) == 0 && regroupError == nil {
 				// Seems like the regroup worked flawlessly. The local replica took over all of its siblings.
@@ -1648,15 +1665,21 @@ func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecov
 		return nil, nil, fmt.Errorf("Cannot deduce cluster master for %+v. Found %+v potential masters", clusterName, len(clusterMasters))
 	}
 	clusterMaster := clusterMasters[0]
-	if len(clusterMaster.SlaveHosts) == 0 {
-		return nil, nil, fmt.Errorf("Master %+v doesn't seem to have replicas", clusterMaster.Key)
-	}
-	if len(clusterMaster.SlaveHosts) > 1 {
-		return nil, nil, fmt.Errorf("GracefulMasterTakeover: master %+v should only have one replica (making the takeover safe and simple), but has %+v. Aborting", clusterMaster.Key, len(clusterMaster.SlaveHosts))
+
+	clusterMasterDirectReplicas, err := inst.ReadReplicaInstances(&clusterMaster.Key)
+	if err != nil {
+		return nil, nil, log.Errore(err)
 	}
 
-	designatedInstanceKey := &(clusterMaster.SlaveHosts.GetInstanceKeys()[0])
-	designatedInstance, err := inst.ReadTopologyInstance(designatedInstanceKey)
+	if len(clusterMasterDirectReplicas) == 0 {
+		return nil, nil, fmt.Errorf("Master %+v doesn't seem to have replicas", clusterMaster.Key)
+	}
+
+	if len(clusterMasterDirectReplicas) > 1 {
+		return nil, nil, fmt.Errorf("GracefulMasterTakeover: master %+v should only have one replica (making the takeover safe and simple), but has %+v. Aborting", clusterMaster.Key, len(clusterMasterDirectReplicas))
+	}
+
+	designatedInstance := clusterMasterDirectReplicas[0]
 	if err != nil {
 		return nil, nil, err
 	}

@@ -39,13 +39,13 @@ const (
 var configurationLoaded chan bool = make(chan bool)
 
 const (
-	DiscoveryPollSeconds                         = 1
+	HealthPollSeconds                            = 1
 	ActiveNodeExpireSeconds                      = 5
 	BinlogFileHistoryDays                        = 1
 	MaintenanceOwner                             = "orchestrator"
 	AuditPageSize                                = 20
-	AuditPurgeDays                               = 31
-	MaintenancePurgeDays                         = 31
+	AuditPurgeDays                               = 7
+	MaintenancePurgeDays                         = 7
 	MySQLTopologyMaxPoolConnections              = 3
 	MaintenanceExpireMinutes                     = 10
 	AgentHttpTimeoutSeconds                      = 60
@@ -97,6 +97,7 @@ type Configuration struct {
 	PanicIfDifferentDatabaseDeploy             bool   // When true, and this process finds the orchestrator backend DB was provisioned by a different version, panic
 	RaftEnabled                                bool   // When true, setup orchestrator in a raft consensus layout. When false (default) all Raft* variables are ignored
 	RaftBind                                   string
+	RaftAdvertise                              string
 	RaftDataDir                                string
 	DefaultRaftPort                            int      // if a RaftNodes entry does not specify port, use this one
 	RaftNodes                                  []string // Raft nodes to make initial connection with
@@ -146,6 +147,7 @@ type Configuration struct {
 	CandidateInstanceExpireMinutes             uint     // Minutes after which a suggestion to use an instance as a candidate replica (to be preferably promoted on master failover) is expired.
 	AuditLogFile                               string   // Name of log file for audit operations. Disabled when empty.
 	AuditToSyslog                              bool     // If true, audit messages are written to syslog
+	AuditToBackendDB                           bool     // If true, audit messages are written to the backend DB's `audit` table (default: true)
 	RemoveTextFromHostnameDisplay              string   // Text to strip off the hostname on cluster/clusters pages
 	ReadOnly                                   bool
 	AuthenticationMethod                       string // Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "multi" for advanced BasicAuth, "proxy" for forwarded credentials via reverse proxy, "token" for token based access
@@ -188,7 +190,6 @@ type Configuration struct {
 	SSLCAFile                                  string            // Name of the Certificate Authority file, applies only when UseSSL = true
 	SSLValidOUs                                []string          // Valid organizational units when using mutual TLS
 	StatusEndpoint                             string            // Override the status endpoint.  Defaults to '/api/status'
-	StatusSimpleHealth                         bool              // If true, calling the status endpoint will use the simplified health check
 	StatusOUVerify                             bool              // If true, try to verify OUs when Mutual TLS is on.  Defaults to false
 	AgentPollMinutes                           uint              // Minutes between agent polling
 	UnseenAgentForgetHours                     uint              // Number of hours after which an unseen agent is forgotten
@@ -238,6 +239,9 @@ type Configuration struct {
 	URLPrefix                                  string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
 	MaxOutdatedKeysToShow                      int               // Maximum number of keys to show in ContinuousDiscovery. If the number of polled hosts grows too far then showing the complete list is not ideal.
 	DiscoveryIgnoreReplicaHostnameFilters      []string          // Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps
+	ConsulAddress                              string            // Address where Consul HTTP api is found. Example: 127.0.0.1:8500
+	ZkAddress                                  string            // UNSUPPERTED YET. Address where (single or multiple) ZooKeeper servers are found, in `srv1[:port1][,srv2[:port2]...]` format. Default port is 2181. Example: srv-a,srv-b:12181,srv-c
+	KVClusterMasterPrefix                      string            // Prefix to use for clusters' masters entries in KV stores (internal, consul, ZK), default: "mysql/master"
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -258,13 +262,13 @@ func newConfiguration() *Configuration {
 		ListenSocket:                               "",
 		AgentsServerPort:                           ":3001",
 		StatusEndpoint:                             "/api/status",
-		StatusSimpleHealth:                         true,
 		StatusOUVerify:                             false,
 		BackendDB:                                  "mysql",
 		SQLite3DataFile:                            "",
 		SkipOrchestratorDatabaseUpdate:             false,
 		PanicIfDifferentDatabaseDeploy:             false,
 		RaftBind:                                   "127.0.0.1:10008",
+		RaftAdvertise:                              "",
 		RaftDataDir:                                "",
 		DefaultRaftPort:                            10008,
 		RaftNodes:                                  []string{},
@@ -306,6 +310,7 @@ func newConfiguration() *Configuration {
 		CandidateInstanceExpireMinutes:             60,
 		AuditLogFile:                               "",
 		AuditToSyslog:                              false,
+		AuditToBackendDB:                           false,
 		RemoveTextFromHostnameDisplay:              "",
 		ReadOnly:                                   false,
 		AuthenticationMethod:                       "",
@@ -389,6 +394,9 @@ func newConfiguration() *Configuration {
 		URLPrefix:                                  "",
 		MaxOutdatedKeysToShow:                      64,
 		DiscoveryIgnoreReplicaHostnameFilters:      []string{},
+		ConsulAddress:                              "",
+		ZkAddress:                                  "",
+		KVClusterMasterPrefix:                      "mysql/master",
 	}
 }
 
@@ -504,6 +512,19 @@ func (this *Configuration) postReadAdjustments() error {
 	}
 	if this.RemoteSSHForMasterFailover && this.RemoteSSHCommand == "" {
 		return fmt.Errorf("RemoteSSHCommand is required when RemoteSSHForMasterFailover is set")
+	}
+	if this.RaftAdvertise == "" {
+		this.RaftAdvertise = this.RaftBind
+	}
+	if this.KVClusterMasterPrefix != "/" {
+		// "/" remains "/"
+		// "prefix" turns to "prefix/"
+		// "some/prefix///" turns to "some/prefix/"
+		this.KVClusterMasterPrefix = strings.TrimRight(this.KVClusterMasterPrefix, "/")
+		this.KVClusterMasterPrefix = fmt.Sprintf("%s/", this.KVClusterMasterPrefix)
+	}
+	if this.ZkAddress != "" {
+		return fmt.Errorf("ZkAddress (ZooKeeper) configuration is unsupported yet")
 	}
 	return nil
 }

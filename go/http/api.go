@@ -37,6 +37,7 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/discovery"
 	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/kv"
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/metrics/query"
 	"github.com/github/orchestrator/go/process"
@@ -68,6 +69,11 @@ var apiSynonyms = map[string]string{
 	"reattach-slave":             "reattach-replica",
 	"reattach-slave-master-host": "reattach-replica-master-host",
 	"cluster-osc-slaves":         "cluster-osc-replicas",
+	"start-slave":                "start-replica",
+	"restart-slave":              "restart-replica",
+	"stop-slave":                 "stop-replica",
+	"stop-slave-nice":            "stop-replica-nice",
+	"reset-slave":                "reset-replica",
 }
 
 var registeredPaths = []string{}
@@ -1506,6 +1512,34 @@ func (this *HttpAPI) ClustersInfo(params martini.Params, r render.Render, req *h
 	r.JSON(http.StatusOK, clustersInfo)
 }
 
+// Write a cluster's master (or all clusters masters) to kv stores.
+// This should generally only happen once in a lifetime of a cluster. Otherwise KV
+// stores are updated via failovers.
+func (this *HttpAPI) SubmitMastersToKvStores(params martini.Params, r render.Render, req *http.Request) {
+	clusterName, err := getClusterNameIfExists(params)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	kvPairs, err := inst.GetMastersKVPairs(clusterName)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	for _, kvPair := range kvPairs {
+		if orcraft.IsRaftEnabled() {
+			_, err = orcraft.PublishCommand("put-key-value", kvPair)
+		} else {
+			err = kv.PutKVPair(kvPair)
+		}
+		if err != nil {
+			Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+			return
+		}
+	}
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Submitted %d masters", len(kvPairs)), Details: kvPairs})
+}
+
 // Clusters provides list of known masters
 func (this *HttpAPI) Masters(params martini.Params, r render.Render, req *http.Request) {
 	instances, err := inst.ReadWriteableClustersMasters()
@@ -1541,18 +1575,13 @@ func (this *HttpAPI) ClusterMaster(params martini.Params, r render.Render, req *
 
 // Downtimed lists downtimed instances, potentially filtered by cluster
 func (this *HttpAPI) Downtimed(params martini.Params, r render.Render, req *http.Request) {
-	clusterName := ""
-	if clusterHint := getClusterHint(params); clusterHint != "" {
-		var err error
-		clusterName, err = figureClusterName(clusterHint)
-		if err != nil {
-			Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
-			return
-		}
+	clusterName, err := getClusterNameIfExists(params)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
 	}
 
 	instances, err := inst.ReadDowntimedInstances(clusterName)
-
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -2331,14 +2360,7 @@ func (this *HttpAPI) LeaderCheck(params martini.Params, r render.Render, req *ht
 // It might be a good idea to deprecate the current Health() behavior and roll this in at some
 // point
 func (this *HttpAPI) StatusCheck(params martini.Params, r render.Render, req *http.Request) {
-	// SimpleHealthTest just checks to see if we can connect to the database.  Lighter weight if you intend to call it a lot
-	var health *process.HealthStatus
-	var err error
-	if config.Config.StatusSimpleHealth {
-		health, err = process.SimpleHealthTest()
-	} else {
-		health, err = process.HealthTest()
-	}
+	health, err := process.HealthTest()
 	if err != nil {
 		r.JSON(500, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Application node is unhealthy %+v", err), Details: health})
 		return
@@ -2441,6 +2463,20 @@ func (this *HttpAPI) RaftLeader(params martini.Params, r render.Render, req *htt
 
 	state := orcraft.GetLeader()
 	r.JSON(http.StatusOK, state)
+}
+
+// RaftSnapshot instructs raft to take a snapshot
+func (this *HttpAPI) RaftSnapshot(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !orcraft.IsRaftEnabled() {
+		Respond(r, &APIResponse{Code: ERROR, Message: "raft-leader: not running with raft setup"})
+		return
+	}
+	err := orcraft.Snapshot()
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot create snapshot: %+v", err)})
+		return
+	}
+	r.JSON(http.StatusOK, "snapshot created")
 }
 
 // ReloadConfiguration reloads confiug settings (not all of which will apply after change)
@@ -3038,6 +3074,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "set-cluster-alias/:clusterName", this.SetClusterAliasManualOverride)
 	this.registerRequest(m, "clusters", this.Clusters)
 	this.registerRequest(m, "clusters-info", this.ClustersInfo)
+
 	this.registerRequest(m, "masters", this.Masters)
 	this.registerRequest(m, "master/:clusterHint", this.ClusterMaster)
 	this.registerRequest(m, "instance-replicas/:host/:port", this.InstanceReplicas)
@@ -3046,6 +3083,10 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "downtimed/:clusterHint", this.Downtimed)
 	this.registerRequest(m, "topology/:clusterHint", this.AsciiTopology)
 	this.registerRequest(m, "topology/:host/:port", this.AsciiTopology)
+
+	// Key-value:
+	this.registerRequest(m, "submit-masters-to-kv-stores", this.SubmitMastersToKvStores)
+	this.registerRequest(m, "submit-masters-to-kv-stores/:clusterHint", this.SubmitMastersToKvStores)
 
 	// Instance management:
 	this.registerRequest(m, "instance/:host/:port", this.Instance)
@@ -3124,6 +3165,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "raft-peers", this.RaftPeers)
 	this.registerRequest(m, "raft-state", this.RaftState)
 	this.registerRequest(m, "raft-leader", this.RaftLeader)
+	this.registerRequest(m, "raft-snapshot", this.RaftSnapshot)
 	this.registerRequest(m, "reelect", this.Reelect)
 	this.registerRequest(m, "reload-configuration", this.ReloadConfiguration)
 	this.registerRequest(m, "reload-cluster-alias", this.ReloadClusterAlias)

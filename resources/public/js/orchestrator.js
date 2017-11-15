@@ -82,6 +82,10 @@ function isAnonymized() {
   return ($.cookie("anonymize") == "true");
 }
 
+function isSilentUI() {
+  return ($.cookie("silent-ui") == "true");
+}
+
 function isCompactDisplay() {
   return ($.cookie("compact-display") == "true");
 }
@@ -172,15 +176,15 @@ function apiCommand(uri, hint) {
   showLoader();
   $.get(appUrl(uri), function(operationResult) {
     hideLoader();
-    if (operationResult.Code == "ERROR") {
-      addAlert(operationResult.Message)
-    } else {
-      reloadWithOperationResult(operationResult, hint);
+    reloadWithOperationResult(operationResult, hint);
+  }, "json").fail(function(operationResult) {
+    hideLoader();
+    if (operationResult.responseJSON.Code == "ERROR") {
+      addAlert(operationResult.responseJSON.Message)
     }
-  }, "json");
+  });
   return false;
 }
-
 
 function reloadWithMessage(msg, details, hint) {
   var hostname = "";
@@ -769,7 +773,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
   popoverElement.attr("data-nodeid", instance.id);
   popoverElement.find("h3").attr('title', (isAnonymized() ? anonymizedInstanceId : instance.title));
   popoverElement.find("h3").html('&nbsp;<div class="pull-left">' +
-    (isAnonymized() ? anonymizedInstanceId : instance.canonicalTitle) + '</div><div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></a></div>');
+    (isAnonymized() ? anonymizedInstanceId : instance.canonicalTitle) + '</div><div class="pull-right instance-glyphs"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></div>');
   var indicateLastSeenInStatus = false;
 
   if (instance.isAggregate) {
@@ -814,7 +818,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.HasReplicationFilters) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-filter" title="Using replication filters"></span> ');
     }
-    if (instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled && !(instance.isMaster && !instance.isCoMaster)) {
+    if (instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-forward" title="Logs slave updates"></span> ');
     }
     if (instance.IsCandidate) {
@@ -889,7 +893,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     popoverElement.find(".instance-content").html(contentHtml);
   }
 
-  popoverElement.find("h3 a").click(function() {
+  popoverElement.find("h3 .instance-glyphs").click(function() {
     openNodeModal(instance);
     return false;
   });
@@ -912,8 +916,6 @@ function getParameterByName(name) {
 
 $(document).ready(function() {
   visualizeBrand();
-
-  $('body').css('background-image', 'url(' + appUrl('/images/tile.png') + ')');
 
   $.get(appUrl("/api/clusters-info"), function(clusters) {
     clusters = clusters || [];

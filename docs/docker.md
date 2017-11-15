@@ -15,7 +15,7 @@ docker run -p 3000:3000 orchestrator
 The folowing environment variables are available and take effect if no config
 file si bind mounted into container at `/etc/orchestrator.conf.json`
 
-* `ORC_TOPOLOGY_USER`: defaults to `orcestrator`
+* `ORC_TOPOLOGY_USER`: defaults to `orchestrator`
 * `ORC_TOPOLOGY_PASSWORD`: defaults to `orchestrator`
 * `ORC_DB_HOST`: defaults to `db`
 * `ORC_DB_PORT`: defaults to `3306`

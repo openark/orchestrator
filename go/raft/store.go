@@ -13,20 +13,16 @@ import (
 	"github.com/hashicorp/raft"
 )
 
-const (
-	retainSnapshotCount = 2880
-	snapshotInterval    = 30 * time.Second
-	raftTimeout         = 10 * time.Second
-)
-
 type Store struct {
-	raftDir  string
-	raftBind string
+	raftDir       string
+	raftBind      string
+	raftAdvertise string
 
 	raft      *raft.Raft // The consensus mechanism
 	peerStore raft.PeerStore
 
-	applier CommandApplier
+	applier                CommandApplier
+	snapshotCreatorApplier SnapshotCreatorApplier
 }
 
 type storeCommand struct {
@@ -35,11 +31,13 @@ type storeCommand struct {
 }
 
 // NewStore inits and returns a new store
-func NewStore(raftDir string, raftBind string, applier CommandApplier) *Store {
+func NewStore(raftDir string, raftBind string, raftAdvertise string, applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier) *Store {
 	return &Store{
-		raftDir:  raftDir,
-		raftBind: raftBind,
-		applier:  applier,
+		raftDir:                raftDir,
+		raftBind:               raftBind,
+		raftAdvertise:          raftAdvertise,
+		applier:                applier,
+		snapshotCreatorApplier: snapshotCreatorApplier,
 	}
 }
 
@@ -52,12 +50,13 @@ func (store *Store) Open(peerNodes []string) error {
 	config.SnapshotInterval = snapshotInterval
 
 	// Setup Raft communication.
-	addr, err := net.ResolveTCPAddr("tcp", store.raftBind)
+	advertise, err := net.ResolveTCPAddr("tcp", store.raftAdvertise)
 	if err != nil {
 		return err
 	}
-	log.Debugf("raft: addr=%+v", addr)
-	transport, err := raft.NewTCPTransport(store.raftBind, addr, 3, 10*time.Second, os.Stderr)
+	log.Debugf("raft: advertise=%+v", advertise)
+
+	transport, err := raft.NewTCPTransport(store.raftBind, advertise, 3, 10*time.Second, os.Stderr)
 	if err != nil {
 		return err
 	}
@@ -85,21 +84,20 @@ func (store *Store) Open(peerNodes []string) error {
 	}
 
 	// Create the snapshot store. This allows the Raft to truncate the log.
-	//snapshots, err := raft.NewFileSnapshotStore(store.raftDir, retainSnapshotCount, os.Stderr)
-	snapshots, err := NewRelSnapshotStore(retainSnapshotCount, os.Stderr)
+	snapshots, err := NewFileSnapshotStore(store.raftDir, retainSnapshotCount, os.Stderr)
 	if err != nil {
 		return log.Errorf("file snapshot store: %s", err)
 	}
-	//	snapshots := raft.NewDiscardSnapshotStore()
 
 	// Create the log store and stable store.
-	logStore := NewRelationalStore()
+	logStore := NewRelationalStore(store.raftDir)
 	log.Debugf("raft: logStore=%+v", logStore)
 
 	// Instantiate the Raft systems.
 	if store.raft, err = raft.NewRaft(config, (*fsm)(store), logStore, logStore, snapshots, peerStore, transport); err != nil {
 		return fmt.Errorf("error creating new raft: %s", err)
 	}
+	store.raft.Yield()
 	store.peerStore = peerStore
 	log.Infof("new raft created")
 
