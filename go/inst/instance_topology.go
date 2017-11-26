@@ -2303,7 +2303,6 @@ func RegroupReplicasPseudoGTID(
 	laterReplicas [](*Instance),
 	cannotReplicateReplicas [](*Instance),
 	candidateReplica *Instance,
-	postponedAll bool,
 	err error,
 ) {
 	candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err = GetCandidateReplica(masterKey, true)
@@ -2311,11 +2310,11 @@ func RegroupReplicasPseudoGTID(
 		if !returnReplicaEvenOnFailureToRegroup {
 			candidateReplica = nil
 		}
-		return aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, candidateReplica, postponedAll, err
+		return aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, candidateReplica, err
 	}
 
 	if config.Config.PseudoGTIDPattern == "" {
-		return aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, candidateReplica, postponedAll, fmt.Errorf("PseudoGTIDPattern not configured; cannot use Pseudo-GTID")
+		return aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, candidateReplica, fmt.Errorf("PseudoGTIDPattern not configured; cannot use Pseudo-GTID")
 	}
 
 	if onCandidateReplicaChosen != nil {
@@ -2364,14 +2363,13 @@ func RegroupReplicasPseudoGTID(
 		return err
 	}
 	if postponeAllMatching != nil && postponeAllMatching(candidateReplica) {
-		postponedAll = true
 		postponedFunctionsContainer.AddPostponedFunction(allMatchingFunc, fmt.Sprintf("regroup-replicas-pseudo-gtid %+v", candidateReplica.Key))
 	} else {
 		err = allMatchingFunc()
 	}
 	log.Debugf("RegroupReplicas: done")
 	// aheadReplicas are lost (they were ahead in replication as compared to promoted replica)
-	return aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, candidateReplica, postponedAll, err
+	return aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, candidateReplica, err
 }
 
 func getMostUpToDateActiveBinlogServer(masterKey *InstanceKey) (mostAdvancedBinlogServer *Instance, binlogServerReplicas [](*Instance), err error) {
@@ -2406,7 +2404,6 @@ func RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(
 	laterReplicas [](*Instance),
 	cannotReplicateReplicas [](*Instance),
 	candidateReplica *Instance,
-	postponedAll bool,
 	err error,
 ) {
 	// First, handle binlog server issues:
@@ -2541,7 +2538,6 @@ func RegroupReplicas(masterKey *InstanceKey, returnReplicaEvenOnFailureToRegroup
 	laterReplicas [](*Instance),
 	cannotReplicateReplicas [](*Instance),
 	instance *Instance,
-	postponedAll bool,
 	err error,
 ) {
 	//
@@ -2549,13 +2545,13 @@ func RegroupReplicas(masterKey *InstanceKey, returnReplicaEvenOnFailureToRegroup
 
 	replicas, err := ReadReplicaInstances(masterKey)
 	if err != nil {
-		return emptyReplicas, emptyReplicas, emptyReplicas, emptyReplicas, instance, postponedAll, err
+		return emptyReplicas, emptyReplicas, emptyReplicas, emptyReplicas, instance, err
 	}
 	if len(replicas) == 0 {
-		return emptyReplicas, emptyReplicas, emptyReplicas, emptyReplicas, instance, postponedAll, err
+		return emptyReplicas, emptyReplicas, emptyReplicas, emptyReplicas, instance, err
 	}
 	if len(replicas) == 1 {
-		return emptyReplicas, emptyReplicas, emptyReplicas, emptyReplicas, replicas[0], postponedAll, err
+		return emptyReplicas, emptyReplicas, emptyReplicas, emptyReplicas, replicas[0], err
 	}
 	allGTID := true
 	allBinlogServers := true
@@ -2574,12 +2570,12 @@ func RegroupReplicas(masterKey *InstanceKey, returnReplicaEvenOnFailureToRegroup
 	if allGTID {
 		log.Debugf("RegroupReplicas: using GTID to regroup replicas of %+v", *masterKey)
 		unmovedReplicas, movedReplicas, cannotReplicateReplicas, candidateReplica, err := RegroupReplicasGTID(masterKey, returnReplicaEvenOnFailureToRegroup, onCandidateReplicaChosen)
-		return unmovedReplicas, emptyReplicas, movedReplicas, cannotReplicateReplicas, candidateReplica, postponedAll, err
+		return unmovedReplicas, emptyReplicas, movedReplicas, cannotReplicateReplicas, candidateReplica, err
 	}
 	if allBinlogServers {
 		log.Debugf("RegroupReplicas: using binlog servers to regroup replicas of %+v", *masterKey)
 		movedReplicas, candidateReplica, err := RegroupReplicasBinlogServers(masterKey, returnReplicaEvenOnFailureToRegroup)
-		return emptyReplicas, emptyReplicas, movedReplicas, cannotReplicateReplicas, candidateReplica, postponedAll, err
+		return emptyReplicas, emptyReplicas, movedReplicas, cannotReplicateReplicas, candidateReplica, err
 	}
 	if allPseudoGTID {
 		log.Debugf("RegroupReplicas: using Pseudo-GTID to regroup replicas of %+v", *masterKey)
