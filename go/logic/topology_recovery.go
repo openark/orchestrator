@@ -547,13 +547,13 @@ func recoverDeadMaster(topologyRecovery *TopologyRecovery, candidateInstanceKey 
 	return promotedReplica, lostReplicas, err
 }
 
-// replacePromotedReplicaWithCandidate is called after a master (or co-master)
-// died and was replaced by some promotedReplica.
-// But, is there an even better replica to promote?
-// if candidateInstanceKey is given, then it is forced to be promoted over the promotedReplica
-// Otherwise, search for the best to promote!
-func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, deadInstanceKey *inst.InstanceKey, promotedReplica *inst.Instance, candidateInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
+func SuggestReplacementForPromotedReplica(topologyRecovery *TopologyRecovery, deadInstanceKey *inst.InstanceKey, promotedReplica *inst.Instance, candidateInstanceKey *inst.InstanceKey) (replacement *inst.Instance, actionRequired bool, err error) {
 	candidateReplicas, _ := inst.ReadClusterCandidateInstances(promotedReplica.ClusterName)
+	candidateReplicas = inst.RemoveInstance(candidateReplicas, deadInstanceKey)
+	deadInstance, _, err := inst.ReadInstance(deadInstanceKey)
+	if err != nil {
+		deadInstance = nil
+	}
 	// So we've already promoted a replica.
 	// However, can we improve on our choice? Are there any replicas marked with "is_candidate"?
 	// Maybe we actually promoted such a replica. Does that mean we should keep it?
@@ -565,14 +565,14 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("checking if should replace promoted replica with a better candidate"))
 	if candidateInstanceKey == nil {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ checking if promoted replica is the ideal candidate"))
-		if deadInstance, _, err := inst.ReadInstance(deadInstanceKey); err == nil && deadInstance != nil {
+		if deadInstance != nil {
 			for _, candidateReplica := range candidateReplicas {
 				if promotedReplica.Key.Equals(&candidateReplica.Key) &&
 					promotedReplica.DataCenter == deadInstance.DataCenter &&
 					promotedReplica.PhysicalEnvironment == deadInstance.PhysicalEnvironment {
 					// Seems like we promoted a candidate in the same DC & ENV as dead IM! Ideal! We're happy!
 					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("promoted replica %+v is the ideal candidate", promotedReplica.Key))
-					return promotedReplica, nil
+					return promotedReplica, false, nil
 				}
 			}
 		}
@@ -581,7 +581,7 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 	if candidateInstanceKey == nil {
 		// Try a candidate replica that is in same DC & env as the dead instance
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ searching for an ideal candidate"))
-		if deadInstance, _, err := inst.ReadInstance(deadInstanceKey); err == nil && deadInstance != nil {
+		if deadInstance != nil {
 			for _, candidateReplica := range candidateReplicas {
 				if canTakeOverPromotedServerAsMaster(candidateReplica, promotedReplica) &&
 					candidateReplica.DataCenter == deadInstance.DataCenter &&
@@ -601,7 +601,7 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 				// Seems like we promoted a candidate replica (though not in same DC and ENV as dead master). Good enough.
 				// No further action required.
 				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("promoted replica %+v is a good candidate", promotedReplica.Key))
-				return promotedReplica, nil
+				return promotedReplica, false, nil
 			}
 		}
 	}
@@ -619,13 +619,38 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 			}
 		}
 	}
+	// Still nothing?
+	if candidateInstanceKey == nil {
+		// Try a candidate replica (our promoted replica is not an "is_candidate")
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ searching for a candidate"))
+		for _, candidateReplica := range candidateReplicas {
+			if canTakeOverPromotedServerAsMaster(candidateReplica, promotedReplica) {
+				// OK, better than nothing
+				candidateInstanceKey = &candidateReplica.Key
+				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement", promotedReplica.Key, candidateReplica.Key))
+			}
+		}
+	}
 
 	if promotedReplica.PromotionRule == inst.PreferNotPromoteRule {
 		neutralReplicas, _ := inst.ReadClusterNeutralPromotionRuleInstances(promotedReplica.ClusterName)
 
 		if candidateInstanceKey == nil {
 			// Still nothing? Then we didn't find a replica marked as "candidate". OK, further down the stream we have:
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ searching for a neutral server to replace a prefer_not, in same DC and env"))
+			// find neutral instance in same dv&env as dead master
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ searching for a neutral server to replace a prefer_not, in same DC and env as dead master"))
+			for _, neutralReplica := range neutralReplicas {
+				if canTakeOverPromotedServerAsMaster(neutralReplica, promotedReplica) &&
+					deadInstance.DataCenter == neutralReplica.DataCenter &&
+					deadInstance.PhysicalEnvironment == neutralReplica.PhysicalEnvironment {
+					candidateInstanceKey = &neutralReplica.Key
+					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as dead master, where promoted instance has prefer_not promotion rule", promotedReplica.Key, neutralReplica.Key))
+				}
+			}
+		}
+		if candidateInstanceKey == nil {
+			// find neutral instance in same dv&env as promoted replica
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ searching for a neutral server to replace a prefer_not, in same DC and env as promoted replica"))
 			for _, neutralReplica := range neutralReplicas {
 				if canTakeOverPromotedServerAsMaster(neutralReplica, promotedReplica) &&
 					promotedReplica.DataCenter == neutralReplica.DataCenter &&
@@ -651,21 +676,34 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 	if candidateInstanceKey == nil {
 		// Found nothing. Stick with promoted replica
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ found no server to promote on top promoted replica"))
-		return promotedReplica, nil
+		return promotedReplica, false, nil
 	}
 	if promotedReplica.Key.Equals(candidateInstanceKey) {
 		// Sanity. It IS the candidate, nothing to promote...
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ sanity check: found our very own server to promote; doing nothing"))
+		return promotedReplica, false, nil
+	}
+	replacement, _, err = inst.ReadInstance(candidateInstanceKey)
+	return replacement, true, err
+}
+
+// replacePromotedReplicaWithCandidate is called after a master (or co-master)
+// died and was replaced by some promotedReplica.
+// But, is there an even better replica to promote?
+// if candidateInstanceKey is given, then it is forced to be promoted over the promotedReplica
+// Otherwise, search for the best to promote!
+func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, deadInstanceKey *inst.InstanceKey, promotedReplica *inst.Instance, candidateInstanceKey *inst.InstanceKey) (*inst.Instance, error) {
+	candidateInstance, actionRequired, err := SuggestReplacementForPromotedReplica(topologyRecovery, deadInstanceKey, promotedReplica, candidateInstanceKey)
+	if err != nil {
+		return promotedReplica, log.Errore(err)
+	}
+	if !actionRequired {
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("promoted instance %+v requires no further action", promotedReplica.Key))
 		return promotedReplica, nil
 	}
 
 	// Try and promote suggested candidate, if applicable and possible
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("promoted instance %+v is not the suggested candidate %+v. Will see what can be done", promotedReplica.Key, *candidateInstanceKey))
-
-	candidateInstance, _, err := inst.ReadInstance(candidateInstanceKey)
-	if err != nil {
-		return promotedReplica, log.Errore(err)
-	}
 
 	if candidateInstance.MasterKey.Equals(&promotedReplica.Key) {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("suggested candidate %+v is replica of promoted instance %+v. Will try and take its master", *candidateInstanceKey, promotedReplica.Key))
@@ -834,65 +872,6 @@ func canTakeOverPromotedServerAsMaster(wantToTakeOver *inst.Instance, toBeTakenO
 		return false
 	}
 	return true
-}
-
-// GetBestMasterReplacementFromAmongItsReplicas is a general purpose information
-// function that tells what would be the best replacement to a master.
-// The function **does not** look at binlgo positions or at replication status.
-// It merely casts opinion based on promotion rules, data center, configuration etc.
-func GetBestMasterReplacementFromAmongItsReplicas(topologyRecovery *TopologyRecovery, master *inst.Instance, replicas [](*inst.Instance), requireLogSlaveUpdates bool) (replacement *inst.Instance, err error) {
-	// Sanity:
-	for _, replica := range replicas {
-		if !replica.MasterKey.Equals(&master.Key) {
-			return nil, log.Errorf("GetBestMasterReplacementFromAmongItsReplicas: %+v is not a replica of %+v", replica.Key, master.Key)
-		}
-	}
-	validReplicas := [](*inst.Instance){}
-	for _, replica := range replicas {
-		if isGenerallyValidAsWouldBeMaster(replica, requireLogSlaveUpdates) {
-			validReplicas = append(validReplicas, replica)
-		}
-	}
-
-	for _, replica := range validReplicas {
-		if replica.IsCandidate &&
-			replica.DataCenter == master.DataCenter &&
-			replica.PhysicalEnvironment == master.PhysicalEnvironment {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("GetBestMasterReplacementFromAmongItsReplicas: found %+v as the ideal candidate", replica.Key))
-			return replica, nil
-		}
-	}
-	for _, replica := range validReplicas {
-		if replica.IsCandidate &&
-			replica.DataCenter == master.DataCenter {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("GetBestMasterReplacementFromAmongItsReplicas: found %+v as candidate in same dc", replica.Key))
-			return replica, nil
-		}
-	}
-	for _, replica := range validReplicas {
-		if replica.IsCandidate {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("GetBestMasterReplacementFromAmongItsReplicas: found %+v as candidate in different dc", replica.Key))
-			return replica, nil
-		}
-	}
-	for _, replica := range validReplicas {
-		if replica.DataCenter == master.DataCenter &&
-			replica.PhysicalEnvironment == master.PhysicalEnvironment {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("GetBestMasterReplacementFromAmongItsReplicas: found %+v as valid replacement in same dc & environment", replica.Key))
-			return replica, nil
-		}
-	}
-	for _, replica := range validReplicas {
-		if replica.DataCenter == master.DataCenter {
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("GetBestMasterReplacementFromAmongItsReplicas: found %+v as valid replacement in same dc", replica.Key))
-			return replica, nil
-		}
-	}
-	for _, replica := range validReplicas {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("GetBestMasterReplacementFromAmongItsReplicas: found %+v as valid replacement in different dc", replica.Key))
-		return replica, nil
-	}
-	return nil, fmt.Errorf("GetBestMasterReplacementFromAmongItsReplicas: cannot find replacement")
 }
 
 // GetCandidateSiblingOfIntermediateMaster chooses the best sibling of a dead intermediate master
