@@ -551,37 +551,6 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 		}
-		// relay-log based synchronization
-	case registerCliCommand("align-via-relay-logs", "Remote relay log relocation", `Align instance's data by comparing and applying another instance's relay logs`):
-		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			if instanceKey == nil {
-				log.Fatalf("Unresolved instance")
-			}
-			instance, err := inst.ReadTopologyInstance(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if instance == nil {
-				log.Fatalf("Instance not found: %+v", *instanceKey)
-			}
-			if destinationKey == nil {
-				log.Fatal("Cannot deduce target instance:", destination)
-			}
-			otherInstance, err := inst.ReadTopologyInstance(destinationKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if otherInstance == nil {
-				log.Fatalf("Instance not found: %+v", *destinationKey)
-			}
-
-			_, err = agent.SyncReplicaRelayLogs(instance, otherInstance)
-			if err != nil {
-				log.Fatale(err)
-			}
-			fmt.Println(instance.Key.DisplayString())
-		}
 		// General replication commands
 	case registerCliCommand("enable-gtid", "Replication, general", `If possible, turn on GTID replication`):
 		{
