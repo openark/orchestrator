@@ -468,6 +468,7 @@ func recoverDeadMaster(topologyRecovery *TopologyRecovery, candidateInstanceKey 
 		if promoted == nil {
 			return false
 		}
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: promotedReplicaIsIdeal(%+v)", promoted.Key))
 		if promoted.Key.Equals(candidateInstanceKey) {
 			return true
 		}
