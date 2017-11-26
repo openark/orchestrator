@@ -703,19 +703,19 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 	}
 
 	// Try and promote suggested candidate, if applicable and possible
-	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("promoted instance %+v is not the suggested candidate %+v. Will see what can be done", promotedReplica.Key, *candidateInstanceKey))
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("promoted instance %+v is not the suggested candidate %+v. Will see what can be done", promotedReplica.Key, candidateInstance.Key))
 
 	if candidateInstance.MasterKey.Equals(&promotedReplica.Key) {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("suggested candidate %+v is replica of promoted instance %+v. Will try and take its master", *candidateInstanceKey, promotedReplica.Key))
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("suggested candidate %+v is replica of promoted instance %+v. Will try and take its master", candidateInstance.Key, promotedReplica.Key))
 		candidateInstance, err = inst.TakeMaster(&candidateInstance.Key)
 		if err != nil {
 			return promotedReplica, log.Errore(err)
 		}
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("success promoting %+v over %+v", *candidateInstanceKey, promotedReplica.Key))
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("success promoting %+v over %+v", candidateInstance.Key, promotedReplica.Key))
 		return candidateInstance, nil
 	}
 
-	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("could not manage to promoted suggested candidate %+v", *candidateInstanceKey))
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("could not manage to promoted suggested candidate %+v", candidateInstance.Key))
 	return promotedReplica, nil
 }
 
