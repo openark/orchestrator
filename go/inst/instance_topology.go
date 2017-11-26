@@ -2362,7 +2362,7 @@ func RegroupReplicasPseudoGTID(
 		AuditOperation("regroup-replicas", masterKey, fmt.Sprintf("regrouped %+v replicas below %+v", len(operatedReplicas), *masterKey))
 		return err
 	}
-	if postponeAllMatching != nil && postponeAllMatching(candidateReplica) {
+	if postponedFunctionsContainer != nil && postponeAllMatching != nil && postponeAllMatching(candidateReplica) {
 		postponedFunctionsContainer.AddPostponedFunction(allMatchingFunc, fmt.Sprintf("regroup-replicas-pseudo-gtid %+v", candidateReplica.Key))
 	} else {
 		err = allMatchingFunc()
