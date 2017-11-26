@@ -89,6 +89,8 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		    SELECT
 		        master_instance.hostname,
 		        master_instance.port,
+						master_instance.data_center,
+						master_instance.physical_environment,
 		        MIN(master_instance.master_host) AS master_host,
 		        MIN(master_instance.master_port) AS master_port,
 		        MIN(master_instance.cluster_name) AS cluster_name,
@@ -234,6 +236,8 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		a.IsCoMaster = m.GetBool("is_co_master")
 		a.AnalyzedInstanceKey = InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
 		a.AnalyzedInstanceMasterKey = InstanceKey{Hostname: m.GetString("master_host"), Port: m.GetInt("master_port")}
+		a.AnalyzedInstanceDataCenter = m.GetString("data_center")
+		a.AnalyzedInstancePhysicalEnvironment = m.GetString("physical_environment")
 		a.ClusterDetails.ClusterName = m.GetString("cluster_name")
 		a.ClusterDetails.ClusterAlias = m.GetString("cluster_alias")
 		a.LastCheckValid = m.GetBool("is_last_check_valid")
