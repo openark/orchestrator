@@ -19,6 +19,8 @@ package inst
 import (
 	"fmt"
 	"strings"
+
+	"github.com/github/orchestrator/go/config"
 )
 
 type AnalysisCode string
@@ -146,4 +148,8 @@ func (this *ReplicationAnalysis) AnalysisString() string {
 		result = append(result, string(structureAnalysis))
 	}
 	return strings.Join(result, ", ")
+}
+
+func ValidSecondsFromSeenToLastAttemptedCheck() uint {
+	return config.Config.InstancePollSeconds
 }

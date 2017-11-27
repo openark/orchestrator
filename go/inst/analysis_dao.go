@@ -54,7 +54,7 @@ func initializeAnalysisDaoPostConfiguration() {
 func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnalysis bool) ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
-	args := sqlutils.Args(2*config.Config.InstancePollSeconds, clusterName)
+	args := sqlutils.Args(ValidSecondsFromSeenToLastAttemptedCheck(), clusterName)
 	analysisQueryReductionClause := ``
 	if config.Config.ReduceReplicationAnalysisCount {
 		analysisQueryReductionClause = `
@@ -81,7 +81,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		          ) /* AS is_failing_to_connect_to_master */)
 				OR (COUNT(slave_instance.server_id) /* AS count_slaves */ > 0)
 			`
-		args = append(args, 2*config.Config.InstancePollSeconds)
+		args = append(args, ValidSecondsFromSeenToLastAttemptedCheck())
 	}
 	// "OR count_slaves > 0" above is a recent addition, which, granted, makes some previous conditions redundant.
 	// It gives more output, and more "NoProblem" messages that I am now interested in for purpose of auditing in database_instance_analysis_changelog

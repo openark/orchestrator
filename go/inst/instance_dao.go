@@ -2280,11 +2280,7 @@ func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
 			instanceKey.Hostname,
 			instanceKey.Port,
 		)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
+		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }
@@ -2310,11 +2306,7 @@ func UpdateInstanceLastAttemptedCheck(instanceKey *InstanceKey) error {
 			instanceKey.Hostname,
 			instanceKey.Port,
 		)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
+		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }
