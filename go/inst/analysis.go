@@ -151,6 +151,8 @@ func (this *ReplicationAnalysis) AnalysisString() string {
 	return strings.Join(result, ", ")
 }
 
+// ValidSecondsFromSeenToLastAttemptedCheck returns the maximum allowed elapsed time
+// between last_attempted_check to last_checked before we consider the instance as invalid.
 func ValidSecondsFromSeenToLastAttemptedCheck() uint {
 	return math.MinUInt(config.Config.InstancePollSeconds, config.ValidSecondsFromSeenToLastAttemptedCheck)
 }
