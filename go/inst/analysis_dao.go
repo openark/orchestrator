@@ -61,7 +61,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			HAVING
 				(MIN(
 					master_instance.last_attempted_check <= master_instance.last_seen
-					OK master_instance.last_attempted_check >= now() - INTERVAL ? SECOND
+					OR master_instance.last_attempted_check >= now() - INTERVAL ? SECOND
        	 ) = 1 /* AS is_last_check_valid */) = 0
 				OR (IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
 		                    AND slave_instance.slave_io_running = 0
@@ -97,7 +97,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
 		        MIN(
 		        		master_instance.last_attempted_check <= master_instance.last_seen
-		        		OK master_instance.last_attempted_check >= now() - INTERVAL ? SECOND
+		        		OR master_instance.last_attempted_check >= now() - INTERVAL ? SECOND
 		        	) = 1 AS is_last_check_valid,
 		        MIN(master_instance.master_host IN ('' , '_')
 		            OR master_instance.master_port = 0
