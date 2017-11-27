@@ -1254,7 +1254,7 @@ func checkAndRecoverGenericProblem(analysisEntry inst.ReplicationAnalysis, candi
 
 // Force a re-read of a topology instance; this is done because we need to substantiate a suspicion
 // that we may have a failover scenario. we want to speed up reading the complete picture.
-func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode, extraPanic bool) {
+func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
 	log.Debugf("emergentlyReadTopologyInstance: %+v, %+v", *instanceKey, analysisCode)
 	if existsInCacheError := emergencyReadTopologyInstanceMap.Add(instanceKey.StringCode(), true, cache.DefaultExpiration); existsInCacheError != nil {
 		log.Debugf("emergentlyReadTopologyInstance: %+v, %+v - existsInCacheError", *instanceKey, analysisCode)
@@ -1263,9 +1263,6 @@ func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode 
 	}
 	log.Debugf("emergentlyReadTopologyInstance: %+v, %+v - proceeding", *instanceKey, analysisCode)
 	go inst.ExecuteOnTopology(func() {
-		if extraPanic {
-			inst.UpdateInstanceLastAttemptedCheck(instanceKey)
-		}
 		log.Debugf("emergentlyReadTopologyInstance: %+v, %+v - ExecuteOnTopology", *instanceKey, analysisCode)
 		inst.ReadTopologyInstance(instanceKey)
 		log.Debugf("emergentlyReadTopologyInstance: %+v, %+v - ExecuteOnTopology done", *instanceKey, analysisCode)
@@ -1281,7 +1278,7 @@ func emergentlyReadTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analy
 		return
 	}
 	for _, replica := range replicas {
-		go emergentlyReadTopologyInstance(&replica.Key, analysisCode, false)
+		go emergentlyReadTopologyInstance(&replica.Key, analysisCode)
 	}
 }
 
@@ -1350,15 +1347,15 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode) (
 func runEmergentOperations(analysisEntry *inst.ReplicationAnalysis) {
 	switch analysisEntry.Analysis {
 	case inst.DeadMasterAndSlaves:
-		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis, false)
+		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
 	case inst.UnreachableMaster:
 		go emergentlyReadTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 	case inst.AllMasterSlavesNotReplicating:
-		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis, true)
+		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 	case inst.AllMasterSlavesNotReplicatingOrDead:
-		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis, true)
+		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 	case inst.FirstTierSlaveFailingToConnectToMaster:
-		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis, false)
+		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceMasterKey, analysisEntry.Analysis)
 	}
 }
 
