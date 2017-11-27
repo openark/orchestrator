@@ -1451,6 +1451,7 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	if topologyRecovery.PostponedFunctionsContainer.Len() > 0 {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Executed postponed functions: %+v", strings.Join(topologyRecovery.PostponedFunctionsContainer.Descriptions(), ", ")))
 	}
+	acknowledgeInstanceFailureDetection(&analysisEntry.AnalyzedInstanceKey)
 	return recoveryAttempted, topologyRecovery, err
 }
 
