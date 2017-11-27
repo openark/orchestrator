@@ -1262,12 +1262,12 @@ func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode 
 		return
 	}
 	log.Debugf("emergentlyReadTopologyInstance: %+v, %+v - proceeding", *instanceKey, analysisCode)
-	go inst.ExecuteOnTopology(func() {
+	go func() {
 		log.Debugf("emergentlyReadTopologyInstance: %+v, %+v - ExecuteOnTopology", *instanceKey, analysisCode)
 		inst.ReadTopologyInstance(instanceKey)
 		log.Debugf("emergentlyReadTopologyInstance: %+v, %+v - ExecuteOnTopology done", *instanceKey, analysisCode)
 		inst.AuditOperation("emergently-read-topology-instance", instanceKey, string(analysisCode))
-	})
+	}()
 }
 
 // Force reading of replicas of given instance. This is because we suspect the instance is dead, and want to speed up
