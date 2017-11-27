@@ -208,7 +208,7 @@ func getCountPendingRecoveries() int64 {
 func initializeTopologyRecoveryPostConfiguration() {
 	config.WaitForConfigurationToBeLoaded()
 
-	emergencyReadTopologyInstanceMap = cache.New(time.Second, time.Second)
+	emergencyReadTopologyInstanceMap = cache.New(time.Second, time.Millisecond*250)
 }
 
 // AuditTopologyRecovery audits a single step in a topology recovery process.
@@ -547,6 +547,8 @@ func recoverDeadMaster(topologyRecovery *TopologyRecovery, candidateInstanceKey 
 	return promotedReplica, lostReplicas, err
 }
 
+// SuggestReplacementForPromotedReplica returns a server to take over the already
+// promoted replica, if such server is found and makes an improvement over the promoted replica.
 func SuggestReplacementForPromotedReplica(topologyRecovery *TopologyRecovery, deadInstanceKey *inst.InstanceKey, promotedReplica *inst.Instance, candidateInstanceKey *inst.InstanceKey) (replacement *inst.Instance, actionRequired bool, err error) {
 	candidateReplicas, _ := inst.ReadClusterCandidateInstances(promotedReplica.ClusterName)
 	candidateReplicas = inst.RemoveInstance(candidateReplicas, deadInstanceKey)
@@ -557,11 +559,10 @@ func SuggestReplacementForPromotedReplica(topologyRecovery *TopologyRecovery, de
 	// So we've already promoted a replica.
 	// However, can we improve on our choice? Are there any replicas marked with "is_candidate"?
 	// Maybe we actually promoted such a replica. Does that mean we should keep it?
-	// The current logic is:
-	// - 1. we prefer to promote a "is_candidate" which is in the same DC & env as the dead intermediate master (or do nothing if the promtoed replica is such one)
-	// - 2. we prefer to promote a "is_candidate" which is in the same DC & env as the promoted replica (or do nothing if the promtoed replica is such one)
-	// - 3. we prefer to promote a "neutral" server over a "prefer_not"
-	// - 4. keep to current choice
+	// Maybe we promoted a "neutral", and some "prefer" server is available.
+	// Maybe we promoted a "prefer_not"
+	// Maybe we promoted a server in a different DC than the master
+	// There's many options. We may wish to replace the server we promoted with a better one.
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("checking if should replace promoted replica with a better candidate"))
 	if candidateInstanceKey == nil {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ checking if promoted replica is the ideal candidate"))
@@ -1254,12 +1255,17 @@ func checkAndRecoverGenericProblem(analysisEntry inst.ReplicationAnalysis, candi
 // Force a re-read of a topology instance; this is done because we need to substantiate a suspicion
 // that we may have a failover scenario. we want to speed up reading the complete picture.
 func emergentlyReadTopologyInstance(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
+	log.Debugf("emergentlyReadTopologyInstance: %+v, %+v", *instanceKey, analysisCode inst.AnalysisCode)
 	if existsInCacheError := emergencyReadTopologyInstanceMap.Add(instanceKey.StringCode(), true, cache.DefaultExpiration); existsInCacheError != nil {
+		log.Debugf("emergentlyReadTopologyInstance: %+v, %+v - existsInCacheError", *instanceKey, analysisCode inst.AnalysisCode)
 		// Just recently attempted
 		return
 	}
+	log.Debugf("emergentlyReadTopologyInstance: %+v, %+v - proceeding", *instanceKey, analysisCode inst.AnalysisCode)
 	go inst.ExecuteOnTopology(func() {
+		log.Debugf("emergentlyReadTopologyInstance: %+v, %+v - ExecuteOnTopology", *instanceKey, analysisCode inst.AnalysisCode)
 		inst.ReadTopologyInstance(instanceKey)
+		log.Debugf("emergentlyReadTopologyInstance: %+v, %+v - ExecuteOnTopology done", *instanceKey, analysisCode inst.AnalysisCode)
 		inst.AuditOperation("emergently-read-topology-instance", instanceKey, string(analysisCode))
 	})
 }
