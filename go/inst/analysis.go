@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/github/orchestrator/go/config"
+	"github.com/openark/golib/math"
 )
 
 type AnalysisCode string
@@ -151,5 +152,5 @@ func (this *ReplicationAnalysis) AnalysisString() string {
 }
 
 func ValidSecondsFromSeenToLastAttemptedCheck() uint {
-	return config.Config.InstancePollSeconds
+	return math.MinUInt(config.Config.InstancePollSeconds, config.ValidSecondsFromSeenToLastAttemptedCheck)
 }

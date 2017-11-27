@@ -51,6 +51,7 @@ const (
 	AgentHttpTimeoutSeconds                      = 60
 	PseudoGTIDCoordinatesHistoryHeuristicMinutes = 2
 	DebugMetricsIntervalSeconds                  = 10
+	ValidSecondsFromSeenToLastAttemptedCheck     = 5
 )
 
 var deprecatedConfigurationVariables = []string{
