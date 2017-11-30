@@ -6,7 +6,9 @@ if [[ -e /etc/redhat-release ]]; then
 
   # All the project dependencies to build plus some utilities
   # No reason not to install this stuff in all the places :)
-  yum -d 0 -y install Percona-Server-server-56 Percona-Server-shared-56 Percona-Server-client-56 Percona-Server-shared-compat percona-toolkit percona-xtrabackup ruby-devel gcc rpm-build git vim-enhanced golang
+  yum -d 0 -y install Percona-Server-server-56 Percona-Server-shared-56 Percona-Server-client-56 Percona-Server-shared-compat percona-toolkit percona-xtrabackup ruby-devel gcc rpm-build git vim-enhanced golang jq
+  # newest versions of java aren't compatable with the installed version of ruby (1.8.7)
+  gem install json --version 1.8.6
   # Pin to 1.4 due to 1.5 no longer working on EL6
   gem install fpm --version 1.4
 
@@ -59,8 +61,8 @@ elif [[ -e /etc/debian_version ]]; then
   sudo apt-get -y install percona-toolkit percona-xtrabackup
 
   # All the project dependencies to build
-  sudo apt-get -y install ruby-dev gcc git rubygems rpm
-  sudo gem install fpm
+  sudo apt-get -y install ruby-dev gcc git rubygems rpm jq
+  gem install fpm
 
   # Go
   sudo apt-get -y install golang-go
