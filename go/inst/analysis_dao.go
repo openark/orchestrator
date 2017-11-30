@@ -60,7 +60,8 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		analysisQueryReductionClause = `
 			HAVING
 				(MIN(
-					master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
+					master_instance.last_checked <= master_instance.last_seen
+					and master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
        	 ) = 1 /* AS is_last_check_valid */) = 0
 				OR (IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
 		                    AND slave_instance.slave_io_running = 0
@@ -95,7 +96,8 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		        MIN(master_instance.cluster_name) AS cluster_name,
 		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
 		        MIN(
-								master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
+							master_instance.last_checked <= master_instance.last_seen
+							and master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
 		        	) = 1 AS is_last_check_valid,
 		        MIN(master_instance.master_host IN ('' , '_')
 		            OR master_instance.master_port = 0
