@@ -76,33 +76,6 @@ cat <<-EOF >> /etc/hosts
   192.168.57.204   db4
 EOF
 
-# Generated a random SSH keypair to be used by the vagrant user for convenience
-mkdir -p /home/vagrant/.ssh
-
-cp /orchestrator/vagrant/vagrant-ssh-key /home/vagrant/.ssh/id_rsa
-cp /orchestrator/vagrant/vagrant-ssh-key.pub /home/vagrant/.ssh/id_rsa.pub
-
-cat <<EOF > /home/vagrant/.ssh/config
-Host admin
-  User vagrant
-  IdentityFile /home/vagrant/.ssh/id_rsa
-Host db1
-  User vagrant
-  IdentityFile /home/vagrant/.ssh/id_rsa
-Host db2
-  User vagrant
-  IdentityFile /home/vagrant/.ssh/id_rsa
-Host db3
-  User vagrant
-  IdentityFile /home/vagrant/.ssh/id_rsa
-Host db4
-  User vagrant
-  IdentityFile /home/vagrant/.ssh/id_rsa
-EOF
-
-chmod go-rwx /home/vagrant/.ssh/*
-chown -R vagrant:vagrant /home/vagrant/.ssh
-
 if [[ -e /etc/redhat-release ]]; then
   sudo service iptables stop
 fi
