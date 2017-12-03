@@ -2296,7 +2296,7 @@ func RegroupReplicasPseudoGTID(
 	returnReplicaEvenOnFailureToRegroup bool,
 	onCandidateReplicaChosen func(*Instance),
 	postponedFunctionsContainer *PostponedFunctionsContainer,
-	postponeAllMatching func(*Instance) bool,
+	postponeAllMatchOperations func(*Instance) bool,
 ) (
 	aheadReplicas [](*Instance),
 	equalReplicas [](*Instance),
@@ -2362,7 +2362,7 @@ func RegroupReplicasPseudoGTID(
 		AuditOperation("regroup-replicas", masterKey, fmt.Sprintf("regrouped %+v replicas below %+v", len(operatedReplicas), *masterKey))
 		return err
 	}
-	if postponedFunctionsContainer != nil && postponeAllMatching != nil && postponeAllMatching(candidateReplica) {
+	if postponedFunctionsContainer != nil && postponeAllMatchOperations != nil && postponeAllMatchOperations(candidateReplica) {
 		postponedFunctionsContainer.AddPostponedFunction(allMatchingFunc, fmt.Sprintf("regroup-replicas-pseudo-gtid %+v", candidateReplica.Key))
 	} else {
 		err = allMatchingFunc()
@@ -2397,7 +2397,7 @@ func RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(
 	returnReplicaEvenOnFailureToRegroup bool,
 	onCandidateReplicaChosen func(*Instance),
 	postponedFunctionsContainer *PostponedFunctionsContainer,
-	postponeAllMatching func(*Instance) bool,
+	postponeAllMatchOperations func(*Instance) bool,
 ) (
 	aheadReplicas [](*Instance),
 	equalReplicas [](*Instance),
@@ -2468,7 +2468,7 @@ func RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(
 		return nil
 	}()
 	// Proceed to normal regroup:
-	return RegroupReplicasPseudoGTID(masterKey, returnReplicaEvenOnFailureToRegroup, onCandidateReplicaChosen, postponedFunctionsContainer, postponeAllMatching)
+	return RegroupReplicasPseudoGTID(masterKey, returnReplicaEvenOnFailureToRegroup, onCandidateReplicaChosen, postponedFunctionsContainer, postponeAllMatchOperations)
 }
 
 // RegroupReplicasGTID will choose a candidate replica of a given instance, and take its siblings using GTID
