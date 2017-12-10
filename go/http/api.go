@@ -1368,7 +1368,7 @@ func (this *HttpAPI) AsciiTopology(params martini.Params, r render.Render, req *
 		return
 	}
 
-	asciiOutput, err := inst.ASCIITopology(clusterName, "")
+	asciiOutput, err := inst.ASCIITopology(clusterName, "", true)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
