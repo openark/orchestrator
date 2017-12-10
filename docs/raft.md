@@ -24,6 +24,7 @@ At this time `orchestrator` nodes to not join dynamically into the cluster. The 
 
 ```json
   "RaftEnabled": true,
+  "RaftDataDir": "/var/lib/orchestrator",
   "RaftBind": "<ip.or.fqdn.of.this.orchestrator.node>",
   "DefaultRaftPort": 10008,
   "RaftNodes": [
