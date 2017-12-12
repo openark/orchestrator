@@ -259,6 +259,12 @@ function ascii_topology() {
   print_details | jq -r '.'
 }
 
+function ascii_topology_tabulated() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "topology-tabulated/${alias:-$instance}"
+  print_details | jq -r '.'
+}
+
 function search() {
   assert_nonempty "instance" "$instance"
   api "search?s=$(urlencode "$instance")"
@@ -578,6 +584,7 @@ function run_command() {
     "forget-cluster") forget_cluster ;;                         # Forget about a cluster
 
     "topology") ascii_topology ;;                               # Show an ascii-graph of a replication topology, given a member of that topology
+    "topology-tabulated") ascii_topology_tabulated ;;           # Show an ascii-graph of a replication topology, given a member of that topology, in tabulated format
     "clusters") clusters ;;                                     # List all clusters known to orchestrator
     "clusters-alias") clusters_alias ;;                         # List all clusters known to orchestrator
     "search") search ;;                                         # Search for instances matching given substring
