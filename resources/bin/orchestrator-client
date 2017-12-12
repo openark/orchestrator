@@ -256,13 +256,13 @@ function discover() {
 function ascii_topology() {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "topology/${alias:-$instance}"
-  print_details | jq -r '.'
+  echo "$api_response" | jq -r '.Details'
 }
 
 function ascii_topology_tabulated() {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "topology-tabulated/${alias:-$instance}"
-  print_details | jq -r '.'
+  echo "$api_response" | jq -r '.Details'
 }
 
 function search() {
