@@ -395,3 +395,35 @@ func TestRemoveInstance(t *testing.T) {
 		test.S(t).ExpectEquals(len(instances), 0)
 	}
 }
+
+func TestHumanReadableDescription(t *testing.T) {
+	i57 := Instance{Version: "5.7.8-log"}
+	{
+		desc := i57.HumanReadableDescription()
+		test.S(t).ExpectEquals(desc, "[unknown,invalid,5.7.8-log,rw,nobinlog]")
+	}
+	{
+		i57.UsingPseudoGTID = true
+		i57.LogBinEnabled = true
+		i57.Binlog_format = "ROW"
+		i57.LogSlaveUpdatesEnabled = true
+		desc := i57.HumanReadableDescription()
+		test.S(t).ExpectEquals(desc, "[unknown,invalid,5.7.8-log,rw,ROW,>>,P-GTID]")
+	}
+}
+
+func TestTabulatedDescription(t *testing.T) {
+	i57 := Instance{Version: "5.7.8-log"}
+	{
+		desc := i57.TabulatedDescription("|")
+		test.S(t).ExpectEquals(desc, "unknown|invalid|5.7.8-log|rw|nobinlog|")
+	}
+	{
+		i57.UsingPseudoGTID = true
+		i57.LogBinEnabled = true
+		i57.Binlog_format = "ROW"
+		i57.LogSlaveUpdatesEnabled = true
+		desc := i57.TabulatedDescription("|")
+		test.S(t).ExpectEquals(desc, "unknown|invalid|5.7.8-log|rw|ROW|>>,P-GTID")
+	}
+}

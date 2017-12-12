@@ -21,6 +21,12 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
+)
+
+const (
+	TabulateLeft  = 0
+	TabulateRight = 1
 )
 
 // ParseSimpleTime parses input in the format 7s, 55m, 3h, 31d, 4w (second, minute, hour, day, week)
@@ -47,4 +53,51 @@ func SimpleTimeToSeconds(simpleTime string) (int, error) {
 		return i * 60 * 60 * 24 * 7, nil
 	}
 	return 0, errors.New(fmt.Sprintf("Cannot parse simple time: %s", simpleTime))
+}
+
+func Tabulate(lines []string, separator string, outputSeparator string, directionFlags ...int) (result []string) {
+	tokens := make([][]string, 0)
+	widths := make([][]int, 0)
+	countColumns := 0
+	for _, line := range lines {
+		lineTokens := strings.Split(line, separator)
+		lineWidths := make([]int, len(lineTokens))
+		for i := range lineTokens {
+			lineWidths[i] = len(lineTokens[i])
+		}
+		tokens = append(tokens, lineTokens)
+		widths = append(widths, lineWidths)
+		if len(lineTokens) > countColumns {
+			countColumns = len(lineTokens)
+		}
+	}
+	columnWidths := make([]int, countColumns)
+	for _, lineTokens := range tokens {
+		for col, token := range lineTokens {
+			if len(token) > columnWidths[col] {
+				columnWidths[col] = len(token)
+			}
+		}
+	}
+	for _, lineTokens := range tokens {
+		resultRow := ""
+		for col := 0; col < countColumns; col++ {
+			token := ""
+			if col < len(lineTokens) {
+				token = lineTokens[col]
+			}
+			format := fmt.Sprintf("%%-%ds", columnWidths[col]) // format left
+			if col < len(directionFlags) && directionFlags[col] == TabulateRight {
+				format = fmt.Sprintf("%%%ds", columnWidths[col])
+			}
+			formattedToken := fmt.Sprintf(format, token)
+			if col == 0 {
+				resultRow = formattedToken
+			} else {
+				resultRow = fmt.Sprintf("%s%s%s", resultRow, outputSeparator, formattedToken)
+			}
+		}
+		result = append(result, resultRow)
+	}
+	return result
 }
