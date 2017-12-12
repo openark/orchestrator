@@ -1373,9 +1373,6 @@ func (this *HttpAPI) asciiTopology(params martini.Params, r render.Render, req *
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
-	if !tabulated {
-		asciiOutput = strings.Replace(asciiOutput, " ", "\u00a0", -1)
-	}
 
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Topology for cluster %s", clusterName), Details: asciiOutput})
 }
