@@ -27,6 +27,7 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/math"
+	"github.com/openark/golib/util"
 )
 
 type StopReplicationMethod string
@@ -38,10 +39,11 @@ const (
 )
 
 var asciiFillerCharacter = " "
+var tabulatorScharacter = "|"
 
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
-func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance), extendedOutput bool, fillerCharacter string) []string {
+func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance), extendedOutput bool, fillerCharacter string, tabulated bool) []string {
 	if instance == nil {
 		return []string{}
 	}
@@ -59,18 +61,22 @@ func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*In
 	}
 	entry := fmt.Sprintf("%s%s", prefix, instance.Key.DisplayString())
 	if extendedOutput {
-		entry = fmt.Sprintf("%s%s%s", entry, fillerCharacter, instance.HumanReadableDescription())
+		if tabulated {
+			entry = fmt.Sprintf("%s%s%s", entry, tabulatorScharacter, instance.TabulatedDescription(tabulatorScharacter))
+		} else {
+			entry = fmt.Sprintf("%s%s%s", entry, fillerCharacter, instance.HumanReadableDescription())
+		}
 	}
 	result := []string{entry}
 	for _, replica := range replicationMap[instance] {
-		replicasResult := getASCIITopologyEntry(depth+1, replica, replicationMap, extendedOutput, fillerCharacter)
+		replicasResult := getASCIITopologyEntry(depth+1, replica, replicationMap, extendedOutput, fillerCharacter, tabulated)
 		result = append(result, replicasResult...)
 	}
 	return result
 }
 
 // ASCIITopology returns a string representation of the topology of given cluster.
-func ASCIITopology(clusterName string, historyTimestampPattern string) (result string, err error) {
+func ASCIITopology(clusterName string, historyTimestampPattern string, tabulated bool) (result string, err error) {
 	fillerCharacter := asciiFillerCharacter
 	var instances [](*Instance)
 	if historyTimestampPattern == "" {
@@ -106,26 +112,29 @@ func ASCIITopology(clusterName string, historyTimestampPattern string) (result s
 	var entries []string
 	if masterInstance != nil {
 		// Single master
-		entries = getASCIITopologyEntry(0, masterInstance, replicationMap, historyTimestampPattern == "", fillerCharacter)
+		entries = getASCIITopologyEntry(0, masterInstance, replicationMap, historyTimestampPattern == "", fillerCharacter, tabulated)
 	} else {
 		// Co-masters? For visualization we put each in its own branch while ignoring its other co-masters.
 		for _, instance := range instances {
 			if instance.IsCoMaster {
-				entries = append(entries, getASCIITopologyEntry(1, instance, replicationMap, historyTimestampPattern == "", fillerCharacter)...)
+				entries = append(entries, getASCIITopologyEntry(1, instance, replicationMap, historyTimestampPattern == "", fillerCharacter, tabulated)...)
 			}
 		}
 	}
 	// Beautify: make sure the "[...]" part is nicely aligned for all instances.
-	{
+	if tabulated {
+		entries = util.Tabulate(entries, "|", "|", util.TabulateLeft, util.TabulateRight)
+	} else {
+		indentationCharacter := "["
 		maxIndent := 0
 		for _, entry := range entries {
-			maxIndent = math.MaxInt(maxIndent, strings.Index(entry, "["))
+			maxIndent = math.MaxInt(maxIndent, strings.Index(entry, indentationCharacter))
 		}
 		for i, entry := range entries {
-			entryIndent := strings.Index(entry, "[")
+			entryIndent := strings.Index(entry, indentationCharacter)
 			if maxIndent > entryIndent {
-				tokens := strings.Split(entry, "[")
-				newEntry := fmt.Sprintf("%s%s[%s", tokens[0], strings.Repeat(fillerCharacter, maxIndent-entryIndent), tokens[1])
+				tokens := strings.SplitN(entry, indentationCharacter, 2)
+				newEntry := fmt.Sprintf("%s%s%s%s", tokens[0], strings.Repeat(fillerCharacter, maxIndent-entryIndent), indentationCharacter, tokens[1])
 				entries[i] = newEntry
 			}
 		}

@@ -83,6 +83,19 @@ func (store *Store) Open(peerNodes []string) error {
 		config.DisableBootstrapAfterElect = false
 	}
 
+	if _, err := os.Stat(store.raftDir); err != nil {
+		if os.IsNotExist(err) {
+			// path does not exist
+			log.Debugf("raft: creating data dir %s", store.raftDir)
+			if err := os.MkdirAll(store.raftDir, os.ModePerm); err != nil {
+				return log.Errorf("RaftDataDir (%s) does not exist and cannot be created: %+v", store.raftDir, err)
+			}
+		} else {
+			// Other error
+			return log.Errorf("RaftDataDir (%s) error: %+v", store.raftDir, err)
+		}
+	}
+
 	// Create the snapshot store. This allows the Raft to truncate the log.
 	snapshots, err := NewFileSnapshotStore(store.raftDir, retainSnapshotCount, os.Stderr)
 	if err != nil {
