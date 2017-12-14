@@ -16,11 +16,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.box = BOX
   config.vm.box_download_insecure = true
   config.vm.box_check_update = false
-#  config.vm.provider 'virtualbox' do |vb|
-#    vb.customize ['modifyvm', :id, '--nictype1', 'virtio']
-#    vb.customize ['modifyvm', :id, '--nictype2', 'virtio']
-#  end
-
   config.vm.synced_folder '.', '/orchestrator', type: 'rsync',
     rsync__auto: true
 
