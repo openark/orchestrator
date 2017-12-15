@@ -19,8 +19,9 @@ package discovery
 // Collect discovery metrics and manage their storage and retrieval for monitoring purposes.
 
 import (
+	"encoding/json"
 	"errors"
-	"fmt"
+	"math"
 	"time"
 
 	"github.com/github/orchestrator/go/collection"
@@ -29,8 +30,8 @@ import (
 // formattedFloat is to force the JSON output to show 3 decimal places
 type formattedFloat float64
 
-func (m formattedFloat) String() string {
-	return fmt.Sprintf("%.3f", m)
+func (m formattedFloat) MarshalJSON() ([]byte, error) {
+	return json.Marshal(math.Floor(float64(m)*1000) / 1000.0)
 }
 
 // MetricJSON holds a structure which represents some discovery latency information
