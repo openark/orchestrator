@@ -1,6 +1,7 @@
 if [[ -e /etc/debian_version ]]; then
-  sudo cp /orchestrator/vagrant/db1-my.cnf /etc/mysql/my.cnf
-  sudo /etc/init.d/mysql restart
+  sudo /usr/sbin/service mysql stop
+  sudo cp /orchestrator/vagrant/db2-my.cnf /etc/mysql/my.cnf
+  sudo /usr/sbin/service mysql start
 fi
 
 /usr/bin/mysql -uroot -ss -e 'GRANT REPLICATION SLAVE ON *.* TO "repl"@"192.168.57.%" IDENTIFIED BY "vagrant_repl"'
