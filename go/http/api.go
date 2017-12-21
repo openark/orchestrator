@@ -1361,21 +1361,30 @@ func (this *HttpAPI) KillQuery(params martini.Params, r render.Render, req *http
 }
 
 // AsciiTopology returns an ascii graph of cluster's instances
-func (this *HttpAPI) AsciiTopology(params martini.Params, r render.Render, req *http.Request) {
+func (this *HttpAPI) asciiTopology(params martini.Params, r render.Render, req *http.Request, tabulated bool) {
 	clusterName, err := figureClusterName(getClusterHint(params))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	asciiOutput, err := inst.ASCIITopology(clusterName, "")
+	asciiOutput, err := inst.ASCIITopology(clusterName, "", tabulated)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
-	asciiOutput = strings.Replace(asciiOutput, " ", "\u00a0", -1)
 
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Topology for cluster %s", clusterName), Details: asciiOutput})
+}
+
+// AsciiTopology returns an ascii graph of cluster's instances
+func (this *HttpAPI) AsciiTopology(params martini.Params, r render.Render, req *http.Request) {
+	this.asciiTopology(params, r, req, false)
+}
+
+// AsciiTopology returns an ascii graph of cluster's instances
+func (this *HttpAPI) AsciiTopologyTabulated(params martini.Params, r render.Render, req *http.Request) {
+	this.asciiTopology(params, r, req, true)
 }
 
 // Cluster provides list of instances in given cluster
@@ -3083,6 +3092,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "downtimed/:clusterHint", this.Downtimed)
 	this.registerRequest(m, "topology/:clusterHint", this.AsciiTopology)
 	this.registerRequest(m, "topology/:host/:port", this.AsciiTopology)
+	this.registerRequest(m, "topology-tabulated/:clusterHint", this.AsciiTopologyTabulated)
+	this.registerRequest(m, "topology-tabulated/:host/:port", this.AsciiTopologyTabulated)
 
 	// Key-value:
 	this.registerRequest(m, "submit-masters-to-kv-stores", this.SubmitMastersToKvStores)
