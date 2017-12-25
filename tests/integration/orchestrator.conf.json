@@ -49,7 +49,7 @@
   "RemoveTextFromHostnameDisplay": ".mydomain.com:3306",
   "ReadOnly": false,
   "AuthenticationMethod": "",
-  "OAuthClientID": "7bcec5c3853caf1c335e",
+  "OAuthClientId": "7bcec5c3853caf1c335e",
   "OAuthClientSecret": "8e089355237f52e118b7f8110e5022caccd4abb0",
   "OAuthScopes": [
     "user:email",
@@ -101,7 +101,6 @@
   "SkipBinlogEventsContaining": [],
   "ReduceReplicationAnalysisCount": true,
   "FailureDetectionPeriodBlockMinutes": 60,
-  "AutoRecoveryGloballyEnabled": false,
   "RecoveryPollSeconds": 10,
   "RecoveryPeriodBlockMinutes": 60,
   "RecoveryPeriodBlockSeconds": 3600,
