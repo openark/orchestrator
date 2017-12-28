@@ -17,7 +17,9 @@ Instead of triaging the error by time, `orchestrator` triages by multiple observ
 
 Detection does not always lead to [recovery](topology-recovery.md). There are scenarios where a recovery is undesired:
 
-- The user has indicated a recovery should not take place.
+- The cluster is not listed for auto-failovers.
+- The admin user has indicated a recovery should not take place on the specific server.
+- The admin user has globally disabled recoveries.
 - A previous recovery on same cluster completed shortly before, and anti-flapping takes place.
 - The failure type is not deemed worthy of recovery.
 

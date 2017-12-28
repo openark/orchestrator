@@ -1,9 +1,8 @@
 # Topology recovery
 
-`orchestrator` is able to recover from a set of [failure scenarios](failure-detection.md). Notably, `orchestrator` may fail over a failed master or an intermediate master.
+`orchestrator` is able to recover from a set of [failure scenarios](failure-detection.md). Notably, it can recover a failed master or a failed intermediate master.
 
-At this time recovery requires either GTID, [Pseudo GTID](#pseudo-gtid) or Binlog Servers.
-
+At this time recovery requires either GTID (Oracle or MariaDB), [Pseudo GTID](#pseudo-gtid) or Binlog Servers.
 
 ### What's in a recovery?
 
