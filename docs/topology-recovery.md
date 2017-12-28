@@ -1,77 +1,9 @@
 # Topology recovery
 
-`orchestrator` detects failure scenarios and optionally recovers in such cases.
+`orchestrator` is able to recover from a set of [failure scenarios](failure-detection.md). Notably, `orchestrator` may fail over a failed master or an intermediate master.
 
 At this time recovery requires either GTID, [Pseudo GTID](#pseudo-gtid) or Binlog Servers.
 
-### Failure/recovery scenarios
-
-
-* DeadMaster
-* DeadMasterAndSlaves
-* DeadMasterAndSomeSlaves
-* DeadMasterWithoutSlaves
-* UnreachableMaster
-* AllMasterSlavesNotReplicating
-* AllMasterSlavesNotReplicatingOrDead
-* DeadCoMaster
-* DeadCoMasterAndSomeSlaves
-* DeadIntermediateMaster
-* DeadIntermediateMasterWithSingleSlaveFailingToConnect
-* DeadIntermediateMasterWithSingleSlave
-* DeadIntermediateMasterAndSomeSlaves
-* DeadIntermediateMasterAndSlaves
-* AllIntermediateMasterSlavesFailingToConnectOrDead
-* AllIntermediateMasterSlavesNotReplicating
-* UnreachableIntermediateMaster
-* BinlogServerFailingToConnectToMaster
-
-Briefly looking at some examples, here is how `orchestrator` reaches failure conclusions:
-
-#### `DeadMaster`:
-
-1. Master MySQL access failure
-2. All of master's replicas are failing replication
-
-This makes for a potential recovery process
-
-#### `DeadMasterAndSomeSlaves`:
-
-1. Master MySQL access failure
-2. Some of its replicas are also unreachable
-3. Rest of the replicas are failing replication
-
-This makes for a potential recovery process
-
-#### `UnreachableMaster`:
-
-1. Master MySQL access failure
-2. But it has replicating replicas.
-
-This does not make for a recovery process. However, to improve analysis, `orchestrator` will
-issue an emergent re-read of the replicas, to figure out whether they are really happy with the master
-(in which case maybe `orchestrator` cannot see it due to a network glitch) or were actually taking
-their time to figure out they were failing replication.
-
-#### `DeadIntermediateMaster`:
-
-1. An intermediate master (replica with replicas) cannot be reached
-2. All of its replicas are failing replication
-
-This makes for a potential recovery process
-
-### What are the current failure/recovery scenarios?
-
-Some of the analysis above lead to recovery processes (depending on configuration) and some do not.
-You may see up to date analysis via:
-
-- Command line: `orchestrator -c replication-analysis`
-- Web API: `/api/replication-analysis`
-- Web: `/web/clusters-analysis/` page (`Clusters`->`Failure analysis`).
-  This presents an incomplete list of problems, only highlighting actionable ones.
-
-Note that recovery is not concerned with the death of a single replica machine, as it implies
-no required changes to topology.
 
 ### What's in a recovery?
 
