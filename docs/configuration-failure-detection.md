@@ -1,6 +1,6 @@
 # Configuration: failure detection
 
-`orchestrator` will detect failures to your topology, always. As a matter of configuration you may set the polling frequency and specific ways for `orchestrator` to notify you on such detection.
+`orchestrator` will [detect failures](topology-recovery.md) to your topology, always. As a matter of configuration you may set the polling frequency and specific ways for `orchestrator` to notify you on such detection.
 
 Recovery is discussed in [configuration: recovery](configuration-recovery.md)
 
