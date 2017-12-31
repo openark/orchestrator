@@ -24,7 +24,8 @@
 - [orchestrator/raft](deployment-raft.md) deployment
 
 #### Failure detection & recovery
-- [Topology recovery](topology-recovery.md): failure detection and recovery
+- [Failure detection](failure-detection.md): how `orchestrator` detects failure, types of failures it can handle
+- [Topology recovery](topology-recovery.md): recovery process, promotion and hooks.
 - [Key-Value stores](kv.md): master discovery for your apps
 
 #### Various

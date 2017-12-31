@@ -19,11 +19,9 @@ Find grained control is achieved by various command line options.
 
 #### Recovery
 
-`Orchestrator` uses a holistic approach to detect master and intermediate master failures. Based on information gained from
-the topology itself, it recognizes a variety of failure scenarios.
+`Orchestrator` uses a holistic approach to detect master and intermediate master failures. Based on information gained from the topology itself, it recognizes a variety of failure scenarios.
 
-Configurable, it may choose to perform automated recovery (or allow the user to choose type of manual recovery). Intermediate master
-recovery achieved internally to `orchestrator`. Master failover supported by pre/post failure hooks.
+Configurable, it may choose to perform automated recovery (or allow the user to choose type of manual recovery). Intermediate master recovery achieved internally to `orchestrator`. Master failover supported by pre/post failure hooks.
 
 Recovery process utilizes _orchestrator's_ understanding of the topology and of its ability to perform refactoring. It is based on _state_ as opposed to _configuration_: `orchestrator` picks the best recovery method by investigating/evaluating the topology at the time of
 recovery itself.
