@@ -72,28 +72,30 @@ for arg in "$@"; do
     "-hostname"|"--hostname")             set -- "$@" "-H" ;;
     "-api"|"--api")                       set -- "$@" "-U" ;;
     "-path"|"--path")                     set -- "$@" "-P" ;;
+    "-query"|"--query")                   set -- "$@" "-q" ;;
     *)                                    set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:P:h" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:P:q:h" OPTION
 do
   case $OPTION in
     h) command="help" ;;
-    c) command=$OPTARG ;;
-    i) instance=$OPTARG ;;
-    d) destination=$OPTARG ;;
-    s) destination=$OPTARG ;;
-    a) alias=$OPTARG ;;
-    o) owner=$OPTARG ;;
-    r) reason=$OPTARG ;;
-    u) duration=$OPTARG ;;
-    R) promotion_rule=$OPTARG ;;
-    l) pool=$OPTARG ;;
-    H) hostname_flag=$OPTARG ;;
-    D) default_port=$OPTARG ;;
-    U) [ ! -z "$OPTARG" ] && orchestrator_api=$OPTARG ;;
-    P) api_path=$OPTARG ;;
+    c) command="$OPTARG" ;;
+    i) instance="$OPTARG" ;;
+    d) destination="$OPTARG" ;;
+    s) destination="$OPTARG" ;;
+    a) alias="$OPTARG" ;;
+    o) owner="$OPTARG" ;;
+    r) reason="$OPTARG" ;;
+    u) duration="$OPTARG" ;;
+    R) promotion_rule="$OPTARG" ;;
+    l) pool="$OPTARG" ;;
+    H) hostname_flag="$OPTARG" ;;
+    D) default_port="$OPTARG" ;;
+    U) [ ! -z "$OPTARG" ] && orchestrator_api="$OPTARG" ;;
+    P) api_path="$OPTARG" ;;
+    q) query="$OPTARG"
   esac
 done
 
@@ -269,6 +271,13 @@ function search() {
   assert_nonempty "instance" "$instance"
   api "search?s=$(urlencode "$instance")"
   print_response | filter_keys | print_key
+}
+
+function restart_replica_statements() {
+  assert_nonempty "instance" "$instance"
+  assert_nonempty "query" "$query"
+  api "restart-replica-statements/${instance_hostport}?q=$(urlencode "$query")"
+  print_response | print_details
 }
 
 function instance() {
@@ -644,6 +653,7 @@ function run_command() {
     "detach-replica-master-host") general_instance_command ;;   # Stops replication and modifies Master_Host into an impossible yet reversible value.
     "reattach-replica-master-host") general_instance_command ;; # Undo a detach-replica-master-host operation
     "skip-query") general_instance_command ;;                   # Skip a single statement on a replica; either when running with GTID or without
+    "restart-replica-statements") restart_replica_statements ;; # Given `-q "<query>"` that requires replication restart to apply, wrap query with stop/start slave statements as required to restore instance to same replication state. Print out set of statements
 
     "set-read-only") general_instance_command ;;     # Turn an instance read-only, via SET GLOBAL read_only := 1
     "set-writeable") general_instance_command ;;     # Turn an instance writeable, via SET GLOBAL read_only := 0

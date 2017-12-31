@@ -74,6 +74,7 @@ var apiSynonyms = map[string]string{
 	"stop-slave":                 "stop-replica",
 	"stop-slave-nice":            "stop-replica-nice",
 	"reset-slave":                "reset-replica",
+	"restart-slave-statements":   "restart-replica-statements",
 }
 
 var registeredPaths = []string{}
@@ -1263,6 +1264,32 @@ func (this *HttpAPI) FlushBinaryLogs(params martini.Params, r render.Render, req
 	}
 
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Binary logs flushed on: %+v", instance.Key), Details: instance})
+}
+
+// RestartSlaveStatements receives a query to execute that requires a replication restart to apply.
+// As an example, this may be `set global rpl_semi_sync_slave_enabled=1`. orchestrator will check
+// replication status on given host and will wrap with appropriate stop/start statements, if need be.
+func (this *HttpAPI) RestartSlaveStatements(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	query := req.URL.Query().Get("q")
+	statements, err := inst.GetSlaveRestartPreserveStatements(&instanceKey, query)
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("statements for: %+v", instanceKey), Details: statements})
 }
 
 // MasterEquivalent provides (possibly empty) list of master coordinates equivalent to the given ones
@@ -3051,6 +3078,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "reattach-slave/:host/:port", this.ReattachReplica)
 	this.registerRequest(m, "reattach-slave-master-host/:host/:port", this.ReattachReplicaMasterHost)
 	this.registerRequest(m, "flush-binary-logs/:host/:port", this.FlushBinaryLogs)
+	this.registerRequest(m, "restart-slave-statements/:host/:port", this.RestartSlaveStatements)
 
 	// Instance:
 	this.registerRequest(m, "set-read-only/:host/:port", this.SetReadOnly)
