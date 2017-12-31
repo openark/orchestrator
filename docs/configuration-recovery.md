@@ -24,7 +24,7 @@ In the above:
 
 - `orchestrator` will auto-recover intermediate master failures for all clusters
 - `orchestrator` will auto-recover master failures for two specified clusters; masters of other clusters will not auto recover. A human will be able to initiate recoveries.
-- Once a cluster experienced a recovery, `orchestrator` will block auto-recoveries for `1` hour following. This is an anti-flapping mechanism.
+- Once a cluster experienced a recovery, `orchestrator` will block auto-recoveries for `3600` seconds (`1` hour) following. This is an anti-flapping mechanism.
 
 Note, again, that automated recovery is _opt in_.
 
@@ -75,3 +75,57 @@ A naive implementation might look like:
   "PostIntermediateMasterFailoverProcesses": [],
 }
 ```
+
+#### Hooks arguments and environment
+
+`orchestrator` provides all hooks with failure/recovery related information, such as the identity of the failed instance, identity of promoted instance, affecetd replicas, type of failure, name of cluster, etc.
+
+This information is passed independently in two ways, and you may choose to use one or both:
+
+1. Environment variables: `orchestrator` will set the following, which can be retrieved by your hooks:
+
+- `ORC_FAILURE_TYPE`
+- `ORC_FAILURE_DESCRIPTION`
+- `ORC_FAILED_HOST`
+- `ORC_FAILED_PORT`
+- `ORC_FAILURE_CLUSTER`
+- `ORC_FAILURE_CLUSTER_ALIAS`
+- `ORC_FAILURE_CLUSTER_DOMAIN`
+- `ORC_COUNT_REPLICAS`
+- `ORC_IS_DOWNTIMED`
+- `ORC_AUTO_MASTER_RECOVERY`
+- `ORC_AUTO_INTERMEDIATE_MASTER_RECOVERY`
+- `ORC_ORCHESTRATOR_HOST`
+- `ORC_IS_SUCCESSFUL`
+- `ORC_LOST_REPLICAS`
+- `ORC_REPLICA_HOSTS`
+
+And, in the event a recovery was successful:
+
+- `ORC_SUCCESSOR_HOST`
+- `ORC_SUCCESSOR_PORT`
+- `ORC_SUCCESSOR_ALIAS`
+
+2. Command line text replacement. `orchestrator` replaces the following magic tokens in your `*Proccesses` commands:
+
+- `{failureType}`
+- `{failureDescription}`
+- `{failedHost}`
+- `{failedPort}`
+- `{failureCluster}`
+- `{failureClusterAlias}`
+- `{failureClusterDomain}`
+- `{countReplicas}` aka `{countSlaves}`
+- `{isDowntimed}`
+- `{autoMasterRecovery}`
+- `{autoIntermediateMasterRecovery}`
+- `{orchestratorHost}`
+- `{lostReplicas}` aka `{lostSlaves}`
+- `{replicaHosts}` aka `{slaveHosts}`
+- `{isSuccessful}`
+
+And, in the event a recovery was successful:
+
+- `{successorHost}`
+- `{successorPort}`
+- `{successorAlias}`
