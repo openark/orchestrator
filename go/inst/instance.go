@@ -433,10 +433,7 @@ func (this *Instance) LagStatusString() string {
 	return fmt.Sprintf("%+vs", this.SlaveLagSeconds.Int64)
 }
 
-// HumanReadableDescription returns a simple readable string describing the status, version,
-// etc. properties of this instance
-func (this *Instance) HumanReadableDescription() string {
-	tokens := []string{}
+func (this *Instance) descriptionTokens() (tokens []string) {
 	tokens = append(tokens, this.LagStatusString())
 	tokens = append(tokens, this.StatusString())
 	tokens = append(tokens, this.Version)
@@ -450,18 +447,42 @@ func (this *Instance) HumanReadableDescription() string {
 	} else {
 		tokens = append(tokens, "nobinlog")
 	}
-	if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
-		tokens = append(tokens, ">>")
+	{
+		extraTokens := []string{}
+		if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
+			extraTokens = append(extraTokens, ">>")
+		}
+		if this.UsingGTID() || this.SupportsOracleGTID {
+			extraTokens = append(extraTokens, "GTID")
+		}
+		if this.UsingPseudoGTID {
+			extraTokens = append(extraTokens, "P-GTID")
+		}
+		if this.IsDowntimed {
+			extraTokens = append(extraTokens, "downtimed")
+		}
+		tokens = append(tokens, strings.Join(extraTokens, ","))
 	}
-	if this.UsingGTID() || this.SupportsOracleGTID {
-		tokens = append(tokens, "GTID")
+	return tokens
+}
+
+// HumanReadableDescription returns a simple readable string describing the status, version,
+// etc. properties of this instance
+func (this *Instance) HumanReadableDescription() string {
+	tokens := this.descriptionTokens()
+	nonEmptyTokens := []string{}
+	for _, token := range tokens {
+		if token != "" {
+			nonEmptyTokens = append(nonEmptyTokens, token)
+		}
 	}
-	if this.UsingPseudoGTID {
-		tokens = append(tokens, "P-GTID")
-	}
-	if this.IsDowntimed {
-		tokens = append(tokens, "downtimed")
-	}
-	description := fmt.Sprintf("[%s]", strings.Join(tokens, ","))
+	description := fmt.Sprintf("[%s]", strings.Join(nonEmptyTokens, ","))
+	return description
+}
+
+// TabulatedDescription returns a simple tabulated string of various properties
+func (this *Instance) TabulatedDescription(separator string) string {
+	tokens := this.descriptionTokens()
+	description := fmt.Sprintf("%s", strings.Join(tokens, separator))
 	return description
 }
