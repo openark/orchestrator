@@ -18,3 +18,7 @@ Use the following small steps to configure `orchestrator`:
 - [Raft](configuration-raft.md): configure a [orchestrator/raft](raft.md) cluster for high availability
 - Security: See [security](#security) section.
 - [Key-Value stores](configuration-kv.md): configure and use key-value stores for master discovery.
+
+### Configuration sample file
+
+For your convenience, this [sample config](configuration-sample.md) is a redacted form of production `orchestrator` config at GitHub.
