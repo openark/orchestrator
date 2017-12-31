@@ -140,24 +140,15 @@ Perhaps `orchestrator` doesn't see that the instance is failed, or you have some
 
 #### Blocking, acknowledgements, anti-flapping
 
-The last bullet is made so as to avoid flapping of recovery processes. Each recovery process is audited and recorded, and
-two recoveries cannot run on the same instance unless a minimal amount of time has passed (indicated by `RecoveryPeriodBlockSeconds`).
+`orchestrator` avoid flapping (cascading failures causing continuous outage and elimination of resources) by introducing a block period, where on any given cluster, `orchesrartor` will not kick in automated recovery on an interval smaller than said period, unless cleared to do so by a human.
 
-Moreover, no two automated recoveries will be executed for the same _cluster_ in an interval shorter than `RecoveryPeriodBlockSeconds` (this of course a stronger condition than the previous one). The first recovery to be detected wins and the others block.
-
-There is nothing to prevent concurrent recoveries running on _different clusters_.
+The block period is indicated by `RecoveryPeriodBlockSeconds`. It only applies to recoveries on _same cluster_. There is nothing to prevent concurrent recoveries running on _different clusters_.
 
 Pending recoveries are unblocked either once `RecoveryPeriodBlockSeconds` has passed or such a recovery has been _acknowledged_.
-Acknowledging a recovery is possible either via web API/interface (see audit/recovery page) or via command line interface (see `-c ack-instance-recoveries` or `-c ack-cluster-recoveries`).
 
-> The observant reader may be confused a little as for the reason for two different commands: `ack-instance-recoveries` and `ack-cluster-recoveries`, or for the different discussion on "same instance" vs "same cluster".
-> A recovery can be unacknowledged. While it is unacknowledged and still _recent_, there will be no automated recovery taking place. However if sufficient time has passed, it is perfectly valid that the recovery remains _unacknowledged_ even as `orchestrator` proceeds to recover a new failure scenario.
-> It is therefore possible to have multiple unacknowledged recoveries on same instance or on same cluster.
-> In the future, it may happen that we will change the behavior (based on configuration) such that constraints on recoveries of same cluster are relaxed. We therefore keep separate code and analysis for "same instance" vs. "same cluster">
+Acknowledging a recovery is possible either via web API/interface (see audit/recovery page) or via command line interface (`orchestrator-client -c ack-cluster-recoveries -alias somealias`).
 
-As with all operations, a recovery process puts "maintenance" locks on instances, and will not be able to refactor an instance
-already under maintenance. Furthermore, it will place a recovery lock on the instance. This protects against multiple clients
-all trying to recover the same failure scenario.
+Note that manual recovery (e.g. `orchestrator-client -c recover` or `orchstrator-client -c force-master-failover`) ignores the blocking period.
 
 ### Downtime
 
