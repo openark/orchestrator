@@ -19,6 +19,8 @@ package inst
 import (
 	"fmt"
 	"strings"
+
+	"github.com/github/orchestrator/go/config"
 )
 
 type AnalysisCode string
@@ -86,6 +88,8 @@ type ReplicationAnalysis struct {
 	AnalyzedInstanceKey                       InstanceKey
 	AnalyzedInstanceMasterKey                 InstanceKey
 	ClusterDetails                            ClusterInfo
+	AnalyzedInstanceDataCenter                string
+	AnalyzedInstancePhysicalEnvironment       string
 	IsMaster                                  bool
 	IsCoMaster                                bool
 	LastCheckValid                            bool
@@ -144,4 +148,10 @@ func (this *ReplicationAnalysis) AnalysisString() string {
 		result = append(result, string(structureAnalysis))
 	}
 	return strings.Join(result, ", ")
+}
+
+// ValidSecondsFromSeenToLastAttemptedCheck returns the maximum allowed elapsed time
+// between last_attempted_check to last_checked before we consider the instance as invalid.
+func ValidSecondsFromSeenToLastAttemptedCheck() uint {
+	return config.Config.InstancePollSeconds + 1
 }

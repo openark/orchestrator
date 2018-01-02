@@ -74,6 +74,7 @@ var apiSynonyms = map[string]string{
 	"stop-slave":                 "stop-replica",
 	"stop-slave-nice":            "stop-replica-nice",
 	"reset-slave":                "reset-replica",
+	"restart-slave-statements":   "restart-replica-statements",
 }
 
 var registeredPaths = []string{}
@@ -1037,7 +1038,7 @@ func (this *HttpAPI) RegroupReplicasPseudoGTID(params martini.Params, r render.R
 		return
 	}
 
-	lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasPseudoGTID(&instanceKey, false, nil, nil)
+	lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasPseudoGTID(&instanceKey, false, nil, nil, nil)
 	lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 
 	if err != nil {
@@ -1265,6 +1266,32 @@ func (this *HttpAPI) FlushBinaryLogs(params martini.Params, r render.Render, req
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Binary logs flushed on: %+v", instance.Key), Details: instance})
 }
 
+// RestartSlaveStatements receives a query to execute that requires a replication restart to apply.
+// As an example, this may be `set global rpl_semi_sync_slave_enabled=1`. orchestrator will check
+// replication status on given host and will wrap with appropriate stop/start statements, if need be.
+func (this *HttpAPI) RestartSlaveStatements(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	query := req.URL.Query().Get("q")
+	statements, err := inst.GetSlaveRestartPreserveStatements(&instanceKey, query)
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("statements for: %+v", instanceKey), Details: statements})
+}
+
 // MasterEquivalent provides (possibly empty) list of master coordinates equivalent to the given ones
 func (this *HttpAPI) MasterEquivalent(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -1361,21 +1388,30 @@ func (this *HttpAPI) KillQuery(params martini.Params, r render.Render, req *http
 }
 
 // AsciiTopology returns an ascii graph of cluster's instances
-func (this *HttpAPI) AsciiTopology(params martini.Params, r render.Render, req *http.Request) {
+func (this *HttpAPI) asciiTopology(params martini.Params, r render.Render, req *http.Request, tabulated bool) {
 	clusterName, err := figureClusterName(getClusterHint(params))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	asciiOutput, err := inst.ASCIITopology(clusterName, "")
+	asciiOutput, err := inst.ASCIITopology(clusterName, "", tabulated)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
-	asciiOutput = strings.Replace(asciiOutput, " ", "\u00a0", -1)
 
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Topology for cluster %s", clusterName), Details: asciiOutput})
+}
+
+// AsciiTopology returns an ascii graph of cluster's instances
+func (this *HttpAPI) AsciiTopology(params martini.Params, r render.Render, req *http.Request) {
+	this.asciiTopology(params, r, req, false)
+}
+
+// AsciiTopology returns an ascii graph of cluster's instances
+func (this *HttpAPI) AsciiTopologyTabulated(params martini.Params, r render.Render, req *http.Request) {
+	this.asciiTopology(params, r, req, true)
 }
 
 // Cluster provides list of instances in given cluster
@@ -3042,6 +3078,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "reattach-slave/:host/:port", this.ReattachReplica)
 	this.registerRequest(m, "reattach-slave-master-host/:host/:port", this.ReattachReplicaMasterHost)
 	this.registerRequest(m, "flush-binary-logs/:host/:port", this.FlushBinaryLogs)
+	this.registerRequest(m, "restart-slave-statements/:host/:port", this.RestartSlaveStatements)
 
 	// Instance:
 	this.registerRequest(m, "set-read-only/:host/:port", this.SetReadOnly)
@@ -3083,6 +3120,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "downtimed/:clusterHint", this.Downtimed)
 	this.registerRequest(m, "topology/:clusterHint", this.AsciiTopology)
 	this.registerRequest(m, "topology/:host/:port", this.AsciiTopology)
+	this.registerRequest(m, "topology-tabulated/:clusterHint", this.AsciiTopologyTabulated)
+	this.registerRequest(m, "topology-tabulated/:host/:port", this.AsciiTopologyTabulated)
 
 	// Key-value:
 	this.registerRequest(m, "submit-masters-to-kv-stores", this.SubmitMastersToKvStores)

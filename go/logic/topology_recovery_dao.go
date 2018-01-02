@@ -124,6 +124,18 @@ func clearAcknowledgedFailureDetections(whereClause string, args []interface{}) 
 	return log.Errore(err)
 }
 
+// AcknowledgeInstanceFailureDetection clears a failure detection for a particular
+// instance. This is automated by recovery process: it makes sense to acknowledge
+// the detection of an instance just recovered.
+func acknowledgeInstanceFailureDetection(instanceKey *inst.InstanceKey) error {
+	whereClause := `
+			hostname = ?
+			and port = ?
+		`
+	args := sqlutils.Args(instanceKey.Hostname, instanceKey.Port)
+	return clearAcknowledgedFailureDetections(whereClause, args)
+}
+
 func writeTopologyRecovery(topologyRecovery *TopologyRecovery) (*TopologyRecovery, error) {
 	analysisEntry := topologyRecovery.AnalysisEntry
 	sqlResult, err := db.ExecOrchestrator(`

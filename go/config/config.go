@@ -519,6 +519,9 @@ func (this *Configuration) postReadAdjustments() error {
 	if this.RaftAdvertise == "" {
 		this.RaftAdvertise = this.RaftBind
 	}
+	if this.RaftEnabled && this.RaftDataDir == "" {
+		return fmt.Errorf("RaftDataDir must be defined since raft is enabled (RaftEnabled)")
+	}
 	if this.KVClusterMasterPrefix != "/" {
 		// "/" remains "/"
 		// "prefix" turns to "prefix/"
