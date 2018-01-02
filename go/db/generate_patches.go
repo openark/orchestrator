@@ -490,4 +490,14 @@ var generateSQLPatches = []string{
 		ALTER TABLE node_health
 			ADD COLUMN incrementing_indicator bigint not null default 0
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN semi_sync_master_enabled TINYINT UNSIGNED NOT NULL
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN semi_sync_replica_enabled TINYINT UNSIGNED NOT NULL
+	`,
 }

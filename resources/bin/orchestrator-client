@@ -653,6 +653,10 @@ function run_command() {
     "detach-replica-master-host") general_instance_command ;;   # Stops replication and modifies Master_Host into an impossible yet reversible value.
     "reattach-replica-master-host") general_instance_command ;; # Undo a detach-replica-master-host operation
     "skip-query") general_instance_command ;;                   # Skip a single statement on a replica; either when running with GTID or without
+    "enable-semi-sync-master") general_instance_command ;;      # Enable semi-sync (master-side)
+    "disable-semi-sync-master") general_instance_command ;;     # Disable semi-sync (master-side)
+    "enable-semi-sync-replica") general_instance_command ;;     # Enable semi-sync (replica-side)
+    "disable-semi-sync-replica") general_instance_command ;;    # Disable semi-sync (replica-side)
     "restart-replica-statements") restart_replica_statements ;; # Given `-q "<query>"` that requires replication restart to apply, wrap query with stop/start slave statements as required to restore instance to same replication state. Print out set of statements
 
     "set-read-only") general_instance_command ;;     # Turn an instance read-only, via SET GLOBAL read_only := 1

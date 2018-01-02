@@ -233,6 +233,47 @@ func PurgeBinaryLogsToCurrent(instanceKey *InstanceKey) (*Instance, error) {
 	return PurgeBinaryLogsTo(instanceKey, instance.SelfBinlogCoordinates.LogFile)
 }
 
+func SetSemiSyncMaster(instanceKey *InstanceKey, enableMaster bool) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, err
+	}
+	if instance.SemiSyncMasterEnabled == enableMaster {
+		log.Debugf("SetSemiSyncMaster: %+v slready in desired state", *instanceKey)
+		return instance, nil
+	}
+	query := fmt.Sprintf("set @@global.rpl_semi_sync_master_enabled=%t", enableMaster)
+	log.Debugf(query) // ----
+	if _, err := ExecInstanceNoPrepare(instanceKey, query); err != nil {
+		return instance, log.Errore(err)
+	}
+	return ReadTopologyInstance(instanceKey)
+}
+
+func SetSemiSyncReplica(instanceKey *InstanceKey, enableReplica bool) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, err
+	}
+	if instance.SemiSyncReplicaEnabled == enableReplica {
+		log.Debugf("SetSemiSyncReplica: %+v slready in desired state", *instanceKey)
+		return instance, nil
+	}
+	query := fmt.Sprintf("set @@global.rpl_semi_sync_slave_enabled=%t", enableReplica)
+	log.Debugf(query) // ----
+	if _, err := ExecInstanceNoPrepare(instanceKey, query); err != nil {
+		return instance, log.Errore(err)
+	}
+	if instance.Slave_IO_Running {
+		ExecInstanceNoPrepare(instanceKey, "stop slave io_thread")
+		if _, err := ExecInstanceNoPrepare(instanceKey, "start slave io_thread"); err != nil {
+			return instance, log.Errore(err)
+		}
+	}
+	return ReadTopologyInstance(instanceKey)
+
+}
+
 // StopSlaveNicely stops a replica such that SQL_thread and IO_thread are aligned (i.e.
 // SQL_thread consumes all relay log entries)
 // It will actually START the sql_thread even if the replica is completely stopped.
