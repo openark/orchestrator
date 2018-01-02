@@ -32,6 +32,18 @@ const (
 	MustNotPromoteRule                          = "must_not"
 )
 
+var promotionRuleOrderMap = map[CandidatePromotionRule]int{
+	MustPromoteRule:      0,
+	PreferPromoteRule:    1,
+	NeutralPromoteRule:   2,
+	PreferNotPromoteRule: 3,
+	MustNotPromoteRule:   4,
+}
+
+func (this *CandidatePromotionRule) SmallerThan(other CandidatePromotionRule) bool {
+	return promotionRuleOrderMap[*this] < promotionRuleOrderMap[other]
+}
+
 // ParseCandidatePromotionRule returns a CandidatePromotionRule by name.
 // It returns an error if there is no known rule by the given name.
 func ParseCandidatePromotionRule(ruleName string) (CandidatePromotionRule, error) {

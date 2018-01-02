@@ -282,6 +282,8 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		return instance, fmt.Errorf("ReadTopologyInstance will not act on invalid instance key: %+v", *instanceKey)
 	}
 
+	go UpdateInstanceLastAttemptedCheck(instanceKey)
+
 	latency.Start("instance")
 	db, err := db.OpenDiscovery(instanceKey.Hostname, instanceKey.Port)
 	latency.Stop("instance")
@@ -724,7 +726,6 @@ Cleanup:
 	// tried to check the instance. last_attempted_check is also
 	// updated on success by writeInstance.
 	latency.Start("backend")
-	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
 	_ = UpdateInstanceLastChecked(&instance.Key)
 	latency.Stop("backend")
 	return nil, err
@@ -2280,11 +2281,7 @@ func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
 			instanceKey.Hostname,
 			instanceKey.Port,
 		)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
+		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }
@@ -2300,21 +2297,17 @@ func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
 func UpdateInstanceLastAttemptedCheck(instanceKey *InstanceKey) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	update
-        		database_instance
-        	set
-        		last_attempted_check = NOW()
+    	update
+    		database_instance
+    	set
+    		last_attempted_check = NOW()
 			where
 				hostname = ?
 				and port = ?`,
 			instanceKey.Hostname,
 			instanceKey.Port,
 		)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
+		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }

@@ -32,7 +32,6 @@ import (
 	"github.com/github/orchestrator/go/kv"
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/process"
-	"github.com/github/orchestrator/go/remote"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/util"
 )
@@ -539,7 +538,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasPseudoGTID(instanceKey, false, func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.DisplayString()) }, postponedFunctionsContainer)
+			onCandidateReplicaChosen := func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.DisplayString()) }
+			lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasPseudoGTID(instanceKey, false, onCandidateReplicaChosen, postponedFunctionsContainer, nil)
 			lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 			postponedFunctionsContainer.Wait()
 			if promotedReplica == nil {
@@ -551,107 +551,6 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 		}
-		// relay-log based synchronization
-	case registerCliCommand("align-via-relay-logs", "Remote relay log relocation", `Align instance's data by comparing and applying another instance's relay logs`):
-		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			if instanceKey == nil {
-				log.Fatalf("Unresolved instance")
-			}
-			instance, err := inst.ReadTopologyInstance(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if instance == nil {
-				log.Fatalf("Instance not found: %+v", *instanceKey)
-			}
-			if destinationKey == nil {
-				log.Fatal("Cannot deduce target instance:", destination)
-			}
-			otherInstance, err := inst.ReadTopologyInstance(destinationKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if otherInstance == nil {
-				log.Fatalf("Instance not found: %+v", *destinationKey)
-			}
-
-			_, err = agent.SyncReplicaRelayLogs(instance, otherInstance)
-			if err != nil {
-				log.Fatale(err)
-			}
-			fmt.Println(instance.Key.DisplayString())
-		}
-		// relay-log based synchronization
-	case registerCliCommand("align-via-relay-logs-ssh", "Remote relay log relocation", `Align instance's data by comparing and applying another instance's relay logs`):
-		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			if instanceKey == nil {
-				log.Fatalf("Unresolved instance")
-			}
-			instance, err := inst.ReadTopologyInstance(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if instance == nil {
-				log.Fatalf("Instance not found: %+v", *instanceKey)
-			}
-			if destinationKey == nil {
-				log.Fatal("Cannot deduce target instance:", destination)
-			}
-			otherInstance, err := inst.ReadTopologyInstance(destinationKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if otherInstance == nil {
-				log.Fatalf("Instance not found: %+v", *destinationKey)
-			}
-
-			_, err = remote.SyncReplicaRelayLogs(instance, otherInstance, remote.SyncRelaylogsChangeMasterToSharedMasterFunc, false)
-			if err != nil {
-				log.Fatale(err)
-			}
-			fmt.Println(instance.Key.DisplayString())
-		}
-	case registerCliCommand("regroup-replicas-ssh", "Remote relay log relocation", `Regroup replicas of a given instance by syncing their relay logs over SSH`):
-		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
-			instance := validateInstanceIsFound(instanceKey)
-
-			_, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instance, remote.SyncRelaylogsChangeMasterToSourceReplicaFunc, nil, true, postponedFunctionsContainer)
-			postponedFunctionsContainer.Wait()
-
-			log.Infof("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
-			for _, replica := range syncedReplicas {
-				fmt.Println(replica.Key.DisplayString())
-			}
-			if err != nil {
-				log.Fatale(err)
-			}
-		}
-	case registerCliCommand("sync-replicas-relaylogs", "Remote relay log relocation", `Given master, sync all of its replicas by remotely copying and applying relaylogs`):
-		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
-			instance := validateInstanceIsFound(instanceKey)
-
-			_, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instance, remote.SyncRelaylogsChangeMasterToSharedMasterFunc, nil, false, postponedFunctionsContainer)
-			postponedFunctionsContainer.Wait()
-
-			log.Infof("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
-			for _, replica := range syncedReplicas {
-				fmt.Println(replica.Key.DisplayString())
-			}
-			if err != nil {
-				log.Fatale(err)
-			}
-		}
-
 		// General replication commands
 	case registerCliCommand("enable-gtid", "Replication, general", `If possible, turn on GTID replication`):
 		{
@@ -1458,24 +1357,10 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(fmt.Sprintf("%d recoveries acknowldged", countRecoveries))
 		}
-	case registerCliCommand("get-best-master-replacement", "Recovery", `Information command suggesting the best would-be replacement to master of given cluster`):
+	case registerCliCommand("suggest-promoted-replacement", "Recovery", `Information command suggesting the best would-be replacement to master of given cluster`):
 		{
-			clusterName := getClusterName(clusterAlias, instanceKey)
-			masters, err := inst.ReadClusterWriteableMaster(clusterName)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if len(masters) == 0 {
-				log.Fatalf("No writeable masters found for cluster %+v", clusterName)
-			}
-			clusterMaster := masters[0]
-
-			replicas, err := inst.ReadReplicaInstances(&clusterMaster.Key)
-			if err != nil {
-				log.Fatale(err)
-			}
-
-			replacement, err := logic.GetBestMasterReplacementFromAmongItsReplicas(nil, clusterMaster, replicas, false)
+			destination := validateInstanceIsFound(destinationKey)
+			replacement, _, err := logic.SuggestReplacementForPromotedReplica(&logic.TopologyRecovery{}, instanceKey, destination, nil)
 			if err != nil {
 				log.Fatale(err)
 			}
