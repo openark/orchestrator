@@ -238,12 +238,7 @@ func SetSemiSyncMaster(instanceKey *InstanceKey, enableMaster bool) (*Instance, 
 	if err != nil {
 		return instance, err
 	}
-	if instance.SemiSyncMasterEnabled == enableMaster {
-		log.Debugf("SetSemiSyncMaster: %+v slready in desired state", *instanceKey)
-		return instance, nil
-	}
 	query := fmt.Sprintf("set @@global.rpl_semi_sync_master_enabled=%t", enableMaster)
-	log.Debugf(query) // ----
 	if _, err := ExecInstanceNoPrepare(instanceKey, query); err != nil {
 		return instance, log.Errore(err)
 	}
@@ -260,11 +255,11 @@ func SetSemiSyncReplica(instanceKey *InstanceKey, enableReplica bool) (*Instance
 		return instance, nil
 	}
 	query := fmt.Sprintf("set @@global.rpl_semi_sync_slave_enabled=%t", enableReplica)
-	log.Debugf(query) // ----
 	if _, err := ExecInstanceNoPrepare(instanceKey, query); err != nil {
 		return instance, log.Errore(err)
 	}
 	if instance.Slave_IO_Running {
+		// Need to apply change by stopping starting IO thread
 		ExecInstanceNoPrepare(instanceKey, "stop slave io_thread")
 		if _, err := ExecInstanceNoPrepare(instanceKey, "start slave io_thread"); err != nil {
 			return instance, log.Errore(err)
