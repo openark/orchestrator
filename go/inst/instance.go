@@ -77,6 +77,8 @@ type Instance struct {
 	HasReplicationCredentials       bool
 	ReplicationCredentialsAvailable bool
 	SemiSyncEnforced                bool
+	SemiSyncMasterEnabled           bool
+	SemiSyncReplicaEnabled          bool
 
 	LastSeenTimestamp    string
 	IsLastCheckValid     bool

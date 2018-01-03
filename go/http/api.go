@@ -1319,6 +1319,62 @@ func (this *HttpAPI) MasterEquivalent(params martini.Params, r render.Render, re
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Found %+v equivalent coordinates", len(equivalentCoordinates)), Details: equivalentCoordinates})
 }
 
+// setSemiSyncMaster
+func (this *HttpAPI) setSemiSyncMaster(params martini.Params, r render.Render, req *http.Request, user auth.User, enable bool) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, err := inst.SetSemiSyncMaster(&instanceKey, enable)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("master semi-sync set to %t", enable), Details: instance})
+}
+
+func (this *HttpAPI) EnableSemiSyncMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	this.setSemiSyncMaster(params, r, req, user, true)
+}
+func (this *HttpAPI) DisableSemiSyncMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	this.setSemiSyncMaster(params, r, req, user, false)
+}
+
+// setSemiSyncMaster
+func (this *HttpAPI) setSemiSyncReplica(params martini.Params, r render.Render, req *http.Request, user auth.User, enable bool) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, err := inst.SetSemiSyncReplica(&instanceKey, enable)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("replica semi-sync set to %t", enable), Details: instance})
+}
+
+func (this *HttpAPI) EnableSemiSyncReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	this.setSemiSyncReplica(params, r, req, user, true)
+}
+func (this *HttpAPI) DisableSemiSyncReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	this.setSemiSyncReplica(params, r, req, user, false)
+}
+
 // SetReadOnly sets the global read_only variable
 func (this *HttpAPI) SetReadOnly(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -3079,6 +3135,10 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "reattach-slave-master-host/:host/:port", this.ReattachReplicaMasterHost)
 	this.registerRequest(m, "flush-binary-logs/:host/:port", this.FlushBinaryLogs)
 	this.registerRequest(m, "restart-slave-statements/:host/:port", this.RestartSlaveStatements)
+	this.registerRequest(m, "enable-semi-sync-master/:host/:port", this.EnableSemiSyncMaster)
+	this.registerRequest(m, "disable-semi-sync-master/:host/:port", this.DisableSemiSyncMaster)
+	this.registerRequest(m, "enable-semi-sync-replica/:host/:port", this.EnableSemiSyncReplica)
+	this.registerRequest(m, "disable-semi-sync-replica/:host/:port", this.DisableSemiSyncReplica)
 
 	// Instance:
 	this.registerRequest(m, "set-read-only/:host/:port", this.SetReadOnly)
