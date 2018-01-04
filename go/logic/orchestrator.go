@@ -462,12 +462,6 @@ func ContinuousDiscovery() {
 			}
 		case <-recoveryTick:
 			go func() {
-				// This function is non re-entrant (it can only be running once at any point in time)
-				if atomic.CompareAndSwapInt64(&recoveryEntrance, 0, 1) {
-					defer atomic.StoreInt64(&recoveryEntrance, 0)
-				} else {
-					return
-				}
 				if IsLeaderOrActive() {
 					go ClearActiveFailureDetections()
 					go ClearActiveRecoveries()
@@ -476,6 +470,12 @@ func ContinuousDiscovery() {
 					go inst.ExpireInstanceAnalysisChangelog()
 
 					go func() {
+						// This function is non re-entrant (it can only be running once at any point in time)
+						if atomic.CompareAndSwapInt64(&recoveryEntrance, 0, 1) {
+							defer atomic.StoreInt64(&recoveryEntrance, 0)
+						} else {
+							return
+						}
 						if time.Since(continuousDiscoveryStartTime) >= checkAndRecoverWaitPeriod {
 							CheckAndRecover(nil, nil, false)
 						} else {
