@@ -6,12 +6,11 @@ Recovery is discussed in [configuration: recovery](configuration-recovery.md)
 
 ```json
 {
-  "RecoveryPollSeconds": 5,
   "FailureDetectionPeriodBlockMinutes": 60,
 }
 ```
 
-In the above `orchestrator` will run detection every `5` seconds.
+`orchestrator` runs detection every second.
 
 `FailureDetectionPeriodBlockMinutes` is an anti-spam mechanism that blocks `orchestrator` from notifying the same detection again and again and again.
 
