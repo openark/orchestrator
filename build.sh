@@ -109,7 +109,7 @@ function package() {
 
       echo "Creating Distro full packages"
       fpm -v "${RELEASE_VERSION}" --epoch 1 -f -s dir -n orchestrator -m shlomi-noach --description "MySQL replication topology management and HA" --url "https://github.com/github/orchestrator" --vendor "GitHub" --license "Apache 2.0" -C $builddir/orchestrator --prefix=/ -t rpm .
-      fpm -v "${RELEASE_VERSION}" --epoch 1 -f -s dir -n orchestrator -m shlomi-noach --description "MySQL replication topology management and HA" --url "https://github.com/github/orchestrator" --vendor "GitHub" --license "Apache 2.0" -C $builddir/orchestrator --prefix=/ -t deb --deb-no-default-config-files .
+      fpm -v "${RELEASE_VERSION}" --epoch 1 -f -s dir -n orchestrator -m shlomi-noach --description "MySQL replication topology management and HA" --url "https://github.com/github/orchestrator" --vendor "GitHub" --license "Apache 2.0" -C $builddir/orchestrator --prefix=/ -t deb .
 
       cd $TOPDIR
       # orchestrator-cli packaging -- executable only
