@@ -105,7 +105,6 @@ The following is a production configuration file, with some details redacted.
   ],
   "ReduceReplicationAnalysisCount": false,
   "FailureDetectionPeriodBlockMinutes": 60,
-  "RecoveryPollSeconds": 2,
   "RecoveryPeriodBlockSeconds": 600,
   "RecoveryIgnoreHostnameFilters": [
 
@@ -264,7 +263,6 @@ The following is a production configuration file, with some details redacted.
   ],
   "ReduceReplicationAnalysisCount": false,
   "FailureDetectionPeriodBlockMinutes": 60,
-  "RecoveryPollSeconds": 2,
   "RecoveryPeriodBlockSeconds": 600,
   "RecoveryIgnoreHostnameFilters": [
 
