@@ -1205,7 +1205,7 @@ func FindInstances(regexpPattern string) (result [](*Instance), err error) {
 // For example, the given `mydb-3:3306` might find `myhosts-mydb301-production.mycompany.com:3306`
 func FindFuzzyInstances(fuzzyInstanceKey *InstanceKey) ([](*Instance), error) {
 	condition := `
-		hostname like concat('%', ?, '%')
+		hostname like concat('%%', ?, '%%')
 		and port = ?
 	`
 	return readInstancesByCondition(condition, sqlutils.Args(fuzzyInstanceKey.Hostname, fuzzyInstanceKey.Port), `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
