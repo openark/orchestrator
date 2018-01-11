@@ -502,8 +502,8 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 	// MariaDB has a bug: a CHANGE MASTER TO statement does not work properly with prepared statement... :P
 	// See https://mariadb.atlassian.net/browse/MDEV-7640
 	// This is the reason for ExecInstance
-	_, err = ExecInstance(instanceKey, fmt.Sprintf("start slave until master_log_file='%s', master_log_pos=%d",
-		masterCoordinates.LogFile, masterCoordinates.LogPos))
+	_, err = ExecInstance(instanceKey, "start slave until master_log_file=?, master_log_pos=?",
+		masterCoordinates.LogFile, masterCoordinates.LogPos)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -560,8 +560,8 @@ func ChangeMasterCredentials(instanceKey *InstanceKey, masterUser string, master
 	if *config.RuntimeCLIFlags.Noop {
 		return instance, fmt.Errorf("noop: aborting CHANGE MASTER TO operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
-	_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_user='%s', master_password='%s'",
-		masterUser, masterPassword))
+	_, err = ExecInstance(instanceKey, "change master to master_user=?, master_password=?",
+		masterUser, masterPassword)
 
 	if err != nil {
 		return instance, log.Errore(err)
@@ -607,36 +607,36 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	changedViaGTID := false
 	if instance.UsingMariaDBGTID && gtidHint != GTIDHintDeny {
 		// Keep on using GTID
-		_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d",
-			changeToMasterKey.Hostname, changeToMasterKey.Port))
+		_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?",
+			changeToMasterKey.Hostname, changeToMasterKey.Port)
 		changedViaGTID = true
 	} else if instance.UsingMariaDBGTID && gtidHint == GTIDHintDeny {
 		// Make sure to not use GTID
-		_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d, master_use_gtid=no",
-			changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
+		_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?, master_log_file=?, master_log_pos=?, master_use_gtid=no",
+			changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos)
 	} else if instance.IsMariaDB() && gtidHint == GTIDHintForce {
 		// Is MariaDB; not using GTID, turn into GTID
-		_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_use_gtid=slave_pos",
-			changeToMasterKey.Hostname, changeToMasterKey.Port))
+		_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?, master_use_gtid=slave_pos",
+			changeToMasterKey.Hostname, changeToMasterKey.Port)
 		changedViaGTID = true
 	} else if instance.UsingOracleGTID && gtidHint != GTIDHintDeny {
 		// Is Oracle; already uses GTID; keep using it.
-		_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d",
-			changeToMasterKey.Hostname, changeToMasterKey.Port))
+		_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?",
+			changeToMasterKey.Hostname, changeToMasterKey.Port)
 		changedViaGTID = true
 	} else if instance.UsingOracleGTID && gtidHint == GTIDHintDeny {
 		// Is Oracle; already uses GTID
-		_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d, master_auto_position=0",
-			changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
+		_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?, master_log_file=?, master_log_pos=?, master_auto_position=0",
+			changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos)
 	} else if instance.SupportsOracleGTID && gtidHint == GTIDHintForce {
 		// Is Oracle; not using GTID right now; turn into GTID
-		_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_auto_position=1",
-			changeToMasterKey.Hostname, changeToMasterKey.Port))
+		_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?, master_auto_position=1",
+			changeToMasterKey.Hostname, changeToMasterKey.Port)
 		changedViaGTID = true
 	} else {
 		// Normal binlog file:pos
-		_, err = ExecInstance(instanceKey, fmt.Sprintf("change master to master_host='%s', master_port=%d, master_log_file='%s', master_log_pos=%d",
-			changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos))
+		_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?, master_log_file=?, master_log_pos=?",
+			changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos)
 	}
 	if err != nil {
 		return instance, log.Errore(err)
@@ -738,7 +738,7 @@ func setGTIDPurged(instance *Instance, gtidPurged string) error {
 		return fmt.Errorf("noop: aborting set-gtid-purged operation on %+v; signalling error but nothing went wrong.", instance.Key)
 	}
 
-	_, err := ExecInstance(&instance.Key, fmt.Sprintf(`set global gtid_purged := '%s'`, gtidPurged))
+	_, err := ExecInstance(&instance.Key, `set global gtid_purged := ?`, gtidPurged)
 	return err
 }
 
@@ -757,7 +757,7 @@ func skipQueryOracleGtid(instance *Instance) error {
 	if nextGtid == "" {
 		return fmt.Errorf("Empty NextGTID() in skipQueryGtid() for %+v", instance.Key)
 	}
-	if _, err := ExecInstance(&instance.Key, fmt.Sprintf(`SET GTID_NEXT='%s'`, nextGtid)); err != nil {
+	if _, err := ExecInstance(&instance.Key, `SET GTID_NEXT=?`, nextGtid); err != nil {
 		return err
 	}
 	if err := EmptyCommitInstance(&instance.Key); err != nil {
@@ -929,7 +929,7 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 		}
 	}
 
-	_, err = ExecInstance(instanceKey, fmt.Sprintf("set global read_only = %t", readOnly))
+	_, err = ExecInstance(instanceKey, "set global read_only = ?", readOnly)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -962,7 +962,7 @@ func KillQuery(instanceKey *InstanceKey, process int64) (*Instance, error) {
 		return instance, fmt.Errorf("noop: aborting kill-query operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
 
-	_, err = ExecInstance(instanceKey, fmt.Sprintf(`kill query %d`, process))
+	_, err = ExecInstance(instanceKey, `kill query ?`, process)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
