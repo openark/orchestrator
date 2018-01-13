@@ -555,6 +555,29 @@ body {
     color: #e68545;
 }
 
+#cluster_info {
+  z-index: 100;
+  border-right: dotted 1px #bbbbbb;
+  background-color: #f7f7f7;
+  padding-right: 24px;
+  font: 12px sans-serif;
+  display: none;
+}
+
+#cluster_info div.prepend {
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+
+#cluster_info span.glyphicon {
+  font-size: 20px;
+}
+
+#cluster_info hr {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
 #cluster_wrapper {
   padding-left: 64px;
 }

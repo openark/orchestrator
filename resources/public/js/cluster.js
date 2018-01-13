@@ -49,8 +49,6 @@ function Cluster() {
     },
   };
 
-
-
   Object.defineProperties(_this, {
     moveInstanceMethod: {
       get: function() {
@@ -1394,14 +1392,11 @@ function Cluster() {
 
   function addSidebarInfoPopoverContent(content, prepend) {
     if (prepend === true) {
-      var wrappedContent = '<div>' + content + '<div style="clear: both;"></div></div>';
-      $("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content",
-        wrappedContent + $("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content"));
-
+      wrappedContent = '<div class="prepend">' + content + '<div style="clear: both;"></div></div>';
+      $("#cluster_info").prepend(wrappedContent)
     } else {
-      var wrappedContent = '<div><hr/>' + content + '</div>';
-      $("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content",
-        $("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content") + wrappedContent);
+      wrappedContent = '<div><hr/>' + content + '</div>';
+      $("#cluster_info").append(wrappedContent)
     }
   }
 
@@ -1415,12 +1410,14 @@ function Cluster() {
       var content = 'Domain: ' + clusterInfo.ClusterDomain + '';
       addSidebarInfoPopoverContent(content, false);
     } {
-      var content = 'Heuristic lag: ' + clusterInfo.HeuristicLag + 's';
-      addSidebarInfoPopoverContent(content, false);
-    } {
       var content = '<a href="' + appUrl('/web/audit-recovery/cluster/' + clusterInfo.ClusterName) + '">Recovery history</a>';
       addSidebarInfoPopoverContent(content, false);
-    } {
+    }
+    {
+      var content = currentClusterName();
+      addSidebarInfoPopoverContent(content, true);
+    }
+    {
       var content = '';
       if (clusterInfo.HasAutomatedMasterRecovery === true) {
         content += '<span class="glyphicon glyphicon-heart text-info" title="Automated master recovery for this cluster ENABLED"></span>';
@@ -1433,9 +1430,13 @@ function Cluster() {
         content += '<span class="glyphicon glyphicon-heart-empty text-muted pull-right" title="Automated intermediate master recovery for this cluster DISABLED"></span>';
       }
       addSidebarInfoPopoverContent(content, true);
-    } {
-      var content = '<strong>' + currentClusterName() + '</strong>';
+    }
+    {
+      var content = '<button type="button" class="close" aria-hidden="true">&times;</button>';
       addSidebarInfoPopoverContent(content, true);
+      $("#cluster_info button.close").click(function() {
+        $("#cluster_info").hide();
+      });
     }
     // Colorize-dc
     {
@@ -1736,16 +1737,6 @@ function Cluster() {
         addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on ' + getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port) + ' is blocked due to a <a href="' + appUrl('/web/audit-recovery/cluster/' + blockedRecovery.ClusterName) + '">previous recovery</a>');
       });
     });
-    getData("/api/cluster-osc-replicas/" + currentClusterName(), function(instances) {
-      var instancesMap = normalizeInstances(instances, Array());
-      var instancesTitles = Array();
-      instances.forEach(function(instance) {
-        instancesTitles.push(instance.title);
-      });
-      var instancesTitlesConcatenates = instancesTitles.join(" ");
-      var content = "Heuristic list of OSC controller replicas: <pre>" + instancesTitlesConcatenates + "</pre>";;
-      addSidebarInfoPopoverContent(content);
-    });
 
     $("#li-move-instance-method").appendTo("ul.navbar-nav").show();
     $("#move-instance-method a").click(function() {
@@ -1793,6 +1784,10 @@ function Cluster() {
         expires: 1
       });
       location.reload();
+    });
+    $("body").on("click", "a[data-command=info]", function(event) {
+      $("#cluster_info").toggle();
+      return false
     });
     $("body").on("click", "a[data-command=colorize-dc]", function(event) {
       if (isColorizeDC()) {
@@ -1850,6 +1845,11 @@ function Cluster() {
     refreshClusterOperationModeButton();
   }
 
+  $(document).keyup(function(e) {
+    if (e.keyCode == 27) {
+      $("#cluster_info").hide();
+    }
+  });
 
   function getData(url, cb) {
     $.get(appUrl(url), cb, "json");
