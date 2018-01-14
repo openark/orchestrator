@@ -473,6 +473,9 @@ body {
 #audit_recovery_details tbody tr ul {
   padding-left: 16px;
 }
+#audit_recovery_details tbody tr code {
+  background-color: inherit;
+}
 
 .table-unbordered > tbody > tr > td {
     border: 0px;
