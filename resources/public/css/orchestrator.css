@@ -448,6 +448,10 @@ body {
 	cursor: pointer;
 }
 
+#audit_recovery_steps tr td:first-child {
+  background-color: #f7f7f7;
+}
+
 .table-unbordered > tbody > tr > td {
     border: 0px;
 }
@@ -565,8 +569,8 @@ body {
 }
 
 #cluster_info > div {
-  margin-top: 16px;
-  margin-bottom: 16px;
+  margin-top: 8px;
+  margin-bottom: 8px;
 }
 
 #cluster_info span.glyphicon {

@@ -39,12 +39,16 @@ $(document).ready(function() {
         ack.attr("data-recovery-id", audit.Id);
         ack.attr("title", "Unacknowledged. Click to acknowledge");
       }
-      var moreInfoElement = $('<span class="more-recovery-info pull-right glyphicon glyphicon-info-sign text-primary" title="More info"></span>');
+      var moreInfoElement = $('<a href="' + appUrl('/web/audit-recovery/uid/' + audit.UID) + '"><span class="pull-right glyphicon glyphicon-info-sign text-primary" title="More info"></span></a>');
       moreInfoElement.attr("data-recovery-id", audit.Id);
 
-      $('<td/>', {
+      var analysisTd = $('<td/>', {
         text: audit.AnalysisEntry.Analysis
-      }).prepend(ack).prepend(moreInfoElement).appendTo(row);
+      }).prepend(ack);
+      if (!singleRecoveryAudit) {
+        analysisTd.prepend(moreInfoElement)
+      }
+      analysisTd.appendTo(row);
       $('<a/>', {
         text: analyzedInstanceDisplay,
         href: appUrl("/web/search/" + analyzedInstanceDisplay)
@@ -118,9 +122,6 @@ $(document).ready(function() {
       }
       moreInfo += '<div><a href="' + appUrl('/web/audit-failure-detection/id/' + audit.LastDetectionId) + '">Related detection</a></div>';
       moreInfo += '<div>Proccessed by <code>' + audit.ProcessingNodeHostname + '</code></div>';
-      if (!singleRecoveryAudit) {
-        moreInfo += '<div><a href="' + appUrl('/web/audit-recovery/uid/' + audit.UID) + '">Expand</a></div>';
-      }
       row.appendTo('#audit_recovery_table tbody');
 
       var row = $('<tr/>');
@@ -133,7 +134,7 @@ $(document).ready(function() {
       row.appendTo('#audit_recovery_table tbody');
 
       if (singleRecoveryAudit) {
-        auditRecoverySteps(audit.UID, $('#audit_recovery_steps tbody'))
+        auditRecoverySteps(audit.UID, $('#audit_recovery_steps'))
         $("#audit_recovery_steps").show();
 
         $("#audit .pager").hide();
@@ -156,10 +157,6 @@ $(document).ready(function() {
     });
     $("#audit .pager .disabled a").click(function() {
       return false;
-    });
-    $("body").on("click", ".more-recovery-info", function(event) {
-      var recoveryId = $(event.target).attr("data-recovery-id");
-      $('[data-recovery-id-more-info=' + recoveryId + ']').slideToggle();
     });
     $("body").on("click", ".acknowledge-indicator.unacknowledged", function(event) {
       var recoveryId = $(event.target).attr("data-recovery-id");
