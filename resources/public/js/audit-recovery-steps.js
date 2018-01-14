@@ -1,18 +1,15 @@
 $(document).ready(function() {
   showLoader();
 
+  auditRecoverySteps(recoveryUID(), $('#audit_recovery_steps tbody'))
   var recoveryUri = "/api/audit-recovery/uid/" + recoveryUID();
-  var uri = "/api/audit-recovery-steps/" + recoveryUID();
 
-  $.get(appUrl(uri), function(steps) {
-    steps = steps || [];
-    $.get(appUrl(recoveryUri), function(recoveryAudits) {
-      recoveryAudits = recoveryAudits || [];
-      displayAudit(steps, recoveryAudits);
-    }, "json");
+  $.get(appUrl(recoveryUri), function(recoveryAudits) {
+    recoveryAudits = recoveryAudits || [];
+    displayRecoveryAudit(recoveryAudits);
   }, "json");
 
-  function displayAudit(steps, recoveryAudits) {
+  function displayRecoveryAudit(recoveryAudits) {
     hideLoader();
 
     recoveryAudits.forEach(function(audit) {
@@ -44,20 +41,6 @@ $(document).ready(function() {
         text: audit.RecoveryStartTimestamp
       }).appendTo(row);
       row.appendTo('#audit_recovery_table tbody');
-    });
-
-    steps.forEach(function(step) {
-      console.log(step);
-
-      var row = $('<tr/>');
-      $('<td/>', {
-        text: step.AuditAt
-      }).appendTo(row);
-      $('<td/>', {
-        text: step.Message
-      }).appendTo(row);
-
-      row.appendTo('#audit_recovery_steps tbody');
     });
   }
 });

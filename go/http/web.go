@@ -235,6 +235,7 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 	if err != nil {
 		recoveryId = 0
 	}
+	recoveryUid := params["uid"]
 	clusterAlias := params["clusterAlias"]
 
 	clusterName, _ := figureClusterName(params["clusterName"])
@@ -248,6 +249,7 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 		"clusterName":         clusterName,
 		"clusterAlias":        clusterAlias,
 		"recoveryId":          recoveryId,
+		"recoveryUid":         recoveryUid,
 		"prefix":              this.URLPrefix,
 	})
 }
@@ -423,6 +425,7 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get(this.URLPrefix+"/web/audit-recovery", this.AuditRecovery)
 	m.Get(this.URLPrefix+"/web/audit-recovery/:page", this.AuditRecovery)
 	m.Get(this.URLPrefix+"/web/audit-recovery/id/:id", this.AuditRecovery)
+	m.Get(this.URLPrefix+"/web/audit-recovery/uid/:uid", this.AuditRecovery)
 	m.Get(this.URLPrefix+"/web/audit-recovery/cluster/:clusterName", this.AuditRecovery)
 	m.Get(this.URLPrefix+"/web/audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
 	m.Get(this.URLPrefix+"/web/audit-recovery/alias/:clusterAlias", this.AuditRecovery)

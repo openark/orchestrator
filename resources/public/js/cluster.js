@@ -1447,7 +1447,7 @@ function Cluster() {
         addSidebarInfoPopoverContent(content, "audit-recovery-title", true);
       }
       recoveries.forEach(function(recovery) {
-        var content = '<a href="/web/audit-recovery/id/'+recovery.Id+'">' + recovery.RecoveryStartTimestamp + '</a>: ' + recovery.AnalysisEntry.Analysis
+        var content = '<a href="/web/audit-recovery/uid/'+recovery.UID+'">' + recovery.RecoveryStartTimestamp + '</a>: ' + recovery.AnalysisEntry.Analysis
         addSidebarInfoPopoverContent(content, "audit-recovery", true);
       });
     });

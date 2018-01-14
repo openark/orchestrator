@@ -1,4 +1,5 @@
 $(document).ready(function() {
+  $("#audit_recovery_steps").hide();
   showLoader();
   var apiUri = "/api/audit-recovery/" + currentPage();
   if (auditCluster()) {
@@ -6,6 +7,10 @@ $(document).ready(function() {
   }
   if (recoveryId() > 0) {
     apiUri = "/api/audit-recovery/id/" + recoveryId();
+  }
+  if (recoveryUid() != "") {
+    console.log("hi")
+    apiUri = "/api/audit-recovery/uid/" + recoveryUid();
   }
   $.get(appUrl(apiUri), function(auditEntries) {
     auditEntries = auditEntries || [];
@@ -17,6 +22,7 @@ $(document).ready(function() {
     if (auditCluster()) {
       baseWebUri += "cluster/" + auditCluster() + "/";
     }
+    var singleRecoveryAudit = (auditEntries.length == 1);
 
     hideLoader();
     auditEntries.forEach(function(audit) {
@@ -112,8 +118,10 @@ $(document).ready(function() {
       }
       moreInfo += '<div><a href="' + appUrl('/web/audit-failure-detection/id/' + audit.LastDetectionId) + '">Related detection</a></div>';
       moreInfo += '<div>Proccessed by <code>' + audit.ProcessingNodeHostname + '</code></div>';
-      moreInfo += '<div><a href="' + appUrl('/web/audit-recovery-steps/' + audit.UID) + '">Recovery steps</a></div>';
-      row.appendTo('#audit tbody');
+      if (!singleRecoveryAudit) {
+        moreInfo += '<div><a href="' + appUrl('/web/audit-recovery-steps/' + audit.UID) + '">Recovery steps</a></div>';
+      }
+      row.appendTo('#audit_recovery_table tbody');
 
       var row = $('<tr/>');
       row.addClass("more-info");
@@ -122,9 +130,14 @@ $(document).ready(function() {
       if (audit.Acknowledged) {
         row.hide()
       }
-      row.appendTo('#audit tbody');
+      row.appendTo('#audit_recovery_table tbody');
+
+      if (singleRecoveryAudit) {
+        auditRecoverySteps(audit.UID, $('#audit_recovery_steps tbody'))
+        $("#audit_recovery_steps").show();
+      }
     });
-    if (auditEntries.length == 1) {
+    if (singleRecoveryAudit) {
       $("[data-recovery-id-more-info]").show();
     }
     if (currentPage() <= 0) {
