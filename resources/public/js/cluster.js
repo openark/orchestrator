@@ -1448,7 +1448,7 @@ function Cluster() {
       }
       recoveries.forEach(function(recovery) {
         var glyph = '<span class="glyphicon text-success glyphicon-ok-sign"></span>';
-        if (!recovery.IsSuccessful) {
+        if (recovery.IsSuccessful === false) {
           glyph = '<span class="glyphicon text-danger glyphicon-remove-sign"></span>';
         }
         var content = '<a href="/web/audit-recovery/uid/'+recovery.UID+'">' + recovery.RecoveryStartTimestamp + '</a>: ' + glyph + ' ' + recovery.AnalysisEntry.Analysis

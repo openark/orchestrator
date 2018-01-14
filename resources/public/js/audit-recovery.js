@@ -76,7 +76,7 @@ $(document).ready(function() {
     }
     appendRow("Failed instance", getInstanceTitle(audit.AnalysisEntry.AnalyzedInstanceKey.Hostname, audit.AnalysisEntry.AnalyzedInstanceKey.Port))
     var successor = getInstanceTitle(audit.SuccessorKey.Hostname, audit.SuccessorKey.Port);
-    if (!audit.IsSuccessful) {
+    if (audit.IsSuccessful === false) {
       successor = '<span class="text-danger"><span class="glyphicon glyphicon-remove-sign"></span> FAIL '+successor+'</span>';
     } else {
       successor = '<span class="text-success"><span class="glyphicon glyphicon-ok-sign"></span> '+successor+'</span>';
