@@ -9,13 +9,96 @@ $(document).ready(function() {
     apiUri = "/api/audit-recovery/id/" + recoveryId();
   }
   if (recoveryUid() != "") {
-    console.log("hi")
     apiUri = "/api/audit-recovery/uid/" + recoveryUid();
   }
   $.get(appUrl(apiUri), function(auditEntries) {
     auditEntries = auditEntries || [];
     displayAudit(auditEntries);
   }, "json");
+
+  function auditInfo(audit) {
+    var moreInfo = "";
+    if (audit.Acknowledged) {
+      moreInfo += '<div>Acknowledged by ' + audit.AcknowledgedBy + ', ' + audit.AcknowledgedAt + '<ul>';
+      moreInfo += "<li>" + audit.AcknowledgedComment + "</li>";
+      moreInfo += '</ul></div>';
+    } else {
+      moreInfo += '<div><strong>Unacknowledged</strong></div>';
+    }
+    if (audit.LostReplicas.length > 0) {
+      moreInfo += "<div>Lost replicas:<ul>";
+      audit.LostReplicas.forEach(function(instanceKey) {
+        moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
+      });
+      moreInfo += "</ul></div>";
+    }
+    if (audit.ParticipatingInstanceKeys.length > 0) {
+      moreInfo += "<div>Participating instances:<ul>";
+      audit.ParticipatingInstanceKeys.forEach(function(instanceKey) {
+        moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
+      });
+      moreInfo += "</ul></div>";
+    }
+    if (audit.AnalysisEntry.SlaveHosts.length > 0) {
+      moreInfo += '<div>' + audit.AnalysisEntry.CountReplicas + ' replicating hosts :<ul>';
+      audit.AnalysisEntry.SlaveHosts.forEach(function(instanceKey) {
+        moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
+      });
+      moreInfo += "</ul></div>";
+    }
+    if (audit.AllErrors.length > 0 && audit.AllErrors[0]) {
+      moreInfo += "All errors:<ul>";
+      audit.AllErrors.forEach(function(err) {
+        moreInfo += "<li>" + err;
+      });
+      moreInfo += "</ul>";
+    }
+    moreInfo += '<div><a href="' + appUrl('/web/audit-failure-detection/id/' + audit.LastDetectionId) + '">Related detection</a></div>';
+    moreInfo += '<div>Proccessed by <code>' + audit.ProcessingNodeHostname + '</code></div>';
+    return moreInfo;
+  }
+  function displaySingleAudit(audit) {
+    $("#audit .pager").hide();
+    $("#audit_recovery_table").hide();
+
+    $("#audit_recovery_details thead h3").text(audit.AnalysisEntry.Analysis)
+
+    var appendRow = function(td1, td2) {
+      var row = $('<tr/>');
+      $('<td/>', {
+        text: td1
+      }).appendTo(row);
+      $('<td/>', {
+        html: td2
+      }).appendTo(row);
+
+      row.appendTo($("#audit_recovery_details tbody"));
+    }
+    var recoveryFail = (audit.RecoveryEndTimestamp && !audit.IsSuccessful && !audit.SuccessorKey.Hostname);
+    appendRow("Failed instance", getInstanceTitle(audit.AnalysisEntry.AnalyzedInstanceKey.Hostname, audit.AnalysisEntry.AnalyzedInstanceKey.Port))
+    var successor = "";
+    if (recoveryFail) {
+      successor = '<span class="text-danger"><span class="glyphicon glyphicon-remove-sign"></span> FAIL</span>';
+    } else {
+      successor = '<span class="text-success"><span class="glyphicon glyphicon-ok-sign"></span> '+getInstanceTitle(audit.SuccessorKey.Hostname, audit.SuccessorKey.Port)+'</span>';
+    }
+    appendRow("Successor", successor)
+    if (audit.AnalysisEntry.ClusterDetails.ClusterAlias != audit.AnalysisEntry.ClusterDetails.ClusterName) {
+      appendRow("Cluster alias", audit.AnalysisEntry.ClusterDetails.ClusterAlias)
+    }
+    appendRow("Cluster name", audit.AnalysisEntry.ClusterDetails.ClusterName)
+    appendRow("Affected replicas", audit.AnalysisEntry.CountReplicas)
+    appendRow("Start time", audit.RecoveryStartTimestamp)
+    appendRow("End time", audit.RecoveryEndTimestamp)
+
+    var numRows = $("#audit_recovery_details tbody tr").length;
+    $('<td/>', {
+      html: auditInfo(audit)
+    }).attr("rowspan", numRows).appendTo($("#audit_recovery_details tbody tr:first-child"));
+
+    auditRecoverySteps(audit.UID, $('#audit_recovery_steps'))
+    $("#audit_recovery_steps").show();
+  }
 
   function displayAudit(auditEntries) {
     var baseWebUri = appUrl("/web/audit-recovery/");
@@ -26,6 +109,11 @@ $(document).ready(function() {
 
     hideLoader();
     auditEntries.forEach(function(audit) {
+      if (singleRecoveryAudit) {
+        displaySingleAudit(audit)
+        return;
+      }
+
       var analyzedInstanceDisplay = getInstanceTitle(audit.AnalysisEntry.AnalyzedInstanceKey.Hostname, audit.AnalysisEntry.AnalyzedInstanceKey.Port);
       var sucessorInstanceDisplay = getInstanceTitle(audit.SuccessorKey.Hostname, audit.SuccessorKey.Port);
       var row = $('<tr/>');
@@ -84,44 +172,7 @@ $(document).ready(function() {
           text: "pending"
         }).appendTo(row);
       }
-      var moreInfo = "";
-      if (audit.Acknowledged) {
-        moreInfo += '<div>Acknowledged by ' + audit.AcknowledgedBy + ', ' + audit.AcknowledgedAt + '<ul>';
-        moreInfo += "<li>" + audit.AcknowledgedComment + "</li>";
-        moreInfo += '</ul></div>';
-      } else {
-        moreInfo += '<div><strong>Unacknowledged</strong></div>';
-      }
-      if (audit.LostReplicas.length > 0) {
-        moreInfo += "<div>Lost replicas:<ul>";
-        audit.LostReplicas.forEach(function(instanceKey) {
-          moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
-        });
-        moreInfo += "</ul></div>";
-      }
-      if (audit.ParticipatingInstanceKeys.length > 0) {
-        moreInfo += "<div>Participating instances:<ul>";
-        audit.ParticipatingInstanceKeys.forEach(function(instanceKey) {
-          moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
-        });
-        moreInfo += "</ul></div>";
-      }
-      if (audit.AnalysisEntry.SlaveHosts.length > 0) {
-        moreInfo += '<div>' + audit.AnalysisEntry.CountReplicas + ' replicating hosts :<ul>';
-        audit.AnalysisEntry.SlaveHosts.forEach(function(instanceKey) {
-          moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
-        });
-        moreInfo += "</ul></div>";
-      }
-      if (audit.AllErrors.length > 0 && audit.AllErrors[0]) {
-        moreInfo += "All errors:<ul>";
-        audit.AllErrors.forEach(function(err) {
-          moreInfo += "<li>" + err;
-        });
-        moreInfo += "</ul>";
-      }
-      moreInfo += '<div><a href="' + appUrl('/web/audit-failure-detection/id/' + audit.LastDetectionId) + '">Related detection</a></div>';
-      moreInfo += '<div>Proccessed by <code>' + audit.ProcessingNodeHostname + '</code></div>';
+      var moreInfo = auditInfo(audit);
       row.appendTo('#audit_recovery_table tbody');
 
       var row = $('<tr/>');
@@ -132,13 +183,6 @@ $(document).ready(function() {
         row.hide()
       }
       row.appendTo('#audit_recovery_table tbody');
-
-      if (singleRecoveryAudit) {
-        auditRecoverySteps(audit.UID, $('#audit_recovery_steps'))
-        $("#audit_recovery_steps").show();
-
-        $("#audit .pager").hide();
-      }
     });
     if (singleRecoveryAudit) {
       $("[data-recovery-id-more-info]").show();

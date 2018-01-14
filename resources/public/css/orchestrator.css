@@ -448,8 +448,30 @@ body {
 	cursor: pointer;
 }
 
-#audit_recovery_steps tr td:first-child {
+#audit_recovery_steps thead tr th {
+  border-bottom: 0px;
+}
+
+#audit_recovery_steps tbody tr td:first-child {
   background-color: #f7f7f7;
+}
+
+#audit_recovery_details thead tr th {
+  border-bottom: 0px;
+}
+
+#audit_recovery_details tbody tr td:first-child {
+  background-color: #f7f7f7;
+}
+#audit_recovery_details tbody tr td:nth-child(2) {
+  white-space: nowrap;
+}
+#audit_recovery_details tbody tr td:nth-child(3) {
+  width: 100%;
+  border: 1px dotted #cccccc;
+}
+#audit_recovery_details tbody tr ul {
+  padding-left: 16px;
 }
 
 .table-unbordered > tbody > tr > td {
