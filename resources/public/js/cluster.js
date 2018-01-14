@@ -1448,7 +1448,7 @@ function Cluster() {
       }
       // Result is an array: either empty (no active recovery) or with multiple entries
       failureDetections.forEach(function(failureDetection) {
-        var content = audit.RecoveryStartTimestamp + ': ' + audit.AnalysisEntry.Analysis
+        var content = failureDetection.RecoveryStartTimestamp + ': ' + failureDetection.AnalysisEntry.Analysis
         addSidebarInfoPopoverContent(content, false);
       });
     });
