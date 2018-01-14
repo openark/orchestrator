@@ -1441,7 +1441,7 @@ function Cluster() {
       recoveries = recoveries || []
       recoveries = recoveries.slice(0, maxItems)
       if (recoveries.length > 0) {
-        var content = '<a href="' + appUrl('/web/audit-recovery/alias/' + clusterInfo.ClusterAlias) + '">Recovery history</a>';
+        var content = '<a href="' + appUrl('/web/audit-recovery/alias/' + clusterInfo.ClusterAlias) + '">Recovery history</a> <span class="glyphicon checvron-down></span>';
         addSidebarInfoPopoverContent(content, false);
       }
       recoveries.forEach(function(recovery) {
@@ -1453,7 +1453,7 @@ function Cluster() {
       failureDetections = failureDetections || []
       failureDetections = failureDetections.slice(0, maxItems)
       if (failureDetections.length > 0) {
-        var content = '<a href="' + appUrl('/web/audit-failure-detection/alias/' + clusterInfo.ClusterAlias) + '">Failure detection</a>';
+        var content = '<a href="' + appUrl('/web/audit-failure-detection/alias/' + clusterInfo.ClusterAlias) + '">Failure detection</a> <span class="glyphicon checvron-down></span>';
         addSidebarInfoPopoverContent(content, false);
       }
       failureDetections.forEach(function(failureDetection) {
