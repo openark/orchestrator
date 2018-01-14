@@ -119,7 +119,7 @@ $(document).ready(function() {
       moreInfo += '<div><a href="' + appUrl('/web/audit-failure-detection/id/' + audit.LastDetectionId) + '">Related detection</a></div>';
       moreInfo += '<div>Proccessed by <code>' + audit.ProcessingNodeHostname + '</code></div>';
       if (!singleRecoveryAudit) {
-        moreInfo += '<div><a href="' + appUrl('/web/audit-recovery-steps/' + audit.UID) + '">Recovery steps</a></div>';
+        moreInfo += '<div><a href="' + appUrl('/web/audit-recovery/uid/' + audit.UID) + '">Expand</a></div>';
       }
       row.appendTo('#audit_recovery_table tbody');
 
