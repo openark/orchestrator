@@ -2777,6 +2777,8 @@ func (this *HttpAPI) AuditFailureDetection(params martini.Params, r render.Rende
 
 	if detectionId, derr := strconv.ParseInt(params["id"], 10, 0); derr == nil && detectionId > 0 {
 		audits, err = logic.ReadFailureDetection(detectionId)
+	} else if clusterAlias := params["clusterAlias"]; clusterAlias != "" {
+		audits, err = logic.ReadFailureDetectionsForClusterAlias(clusterAlias)
 	} else {
 		page, derr := strconv.Atoi(params["page"])
 		if derr != nil || page < 0 {
@@ -2827,6 +2829,8 @@ func (this *HttpAPI) AuditRecovery(params martini.Params, r render.Render, req *
 		audits, err = logic.ReadRecoveryByUID(recoveryUID)
 	} else if recoveryId, derr := strconv.ParseInt(params["id"], 10, 0); derr == nil && recoveryId > 0 {
 		audits, err = logic.ReadRecovery(recoveryId)
+	} else if clusterAlias := params["clusterAlias"]; clusterAlias != "" {
+		audits, err = logic.ReadRecoveriesForClusterAlias(clusterAlias)
 	} else {
 		page, derr := strconv.Atoi(params["page"])
 		if derr != nil || page < 0 {
@@ -3218,6 +3222,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "audit-failure-detection", this.AuditFailureDetection)
 	this.registerRequest(m, "audit-failure-detection/:page", this.AuditFailureDetection)
 	this.registerRequest(m, "audit-failure-detection/id/:id", this.AuditFailureDetection)
+	this.registerRequest(m, "audit-failure-detection/alias/:clusterAlias", this.AuditFailureDetection)
 	this.registerRequest(m, "replication-analysis-changelog", this.ReadReplicationAnalysisChangelog)
 	this.registerRequest(m, "audit-recovery", this.AuditRecovery)
 	this.registerRequest(m, "audit-recovery/:page", this.AuditRecovery)
@@ -3225,6 +3230,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "audit-recovery/uid/:uid", this.AuditRecovery)
 	this.registerRequest(m, "audit-recovery/cluster/:clusterName", this.AuditRecovery)
 	this.registerRequest(m, "audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
+	this.registerRequest(m, "audit-recovery/alias/:clusterAlias", this.AuditRecovery)
 	this.registerRequest(m, "audit-recovery-steps/:uid", this.AuditRecoverySteps)
 	this.registerRequest(m, "active-cluster-recovery/:clusterName", this.ActiveClusterRecovery)
 	this.registerRequest(m, "recently-active-cluster-recovery/:clusterName", this.RecentlyActiveClusterRecovery)
