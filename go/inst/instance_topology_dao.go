@@ -227,8 +227,7 @@ func SetSemiSyncMaster(instanceKey *InstanceKey, enableMaster bool) (*Instance, 
 	if err != nil {
 		return instance, err
 	}
-	query := fmt.Sprintf("set @@global.rpl_semi_sync_master_enabled=%t", enableMaster)
-	if _, err := ExecInstance(instanceKey, query); err != nil {
+	if _, err := ExecInstance(instanceKey, "set @@global.rpl_semi_sync_master_enabled=?", enableMaster); err != nil {
 		return instance, log.Errore(err)
 	}
 	return ReadTopologyInstance(instanceKey)
@@ -243,8 +242,7 @@ func SetSemiSyncReplica(instanceKey *InstanceKey, enableReplica bool) (*Instance
 		log.Debugf("SetSemiSyncReplica: %+v slready in desired state", *instanceKey)
 		return instance, nil
 	}
-	query := fmt.Sprintf("set @@global.rpl_semi_sync_slave_enabled=%t", enableReplica)
-	if _, err := ExecInstance(instanceKey, query); err != nil {
+	if _, err := ExecInstance(instanceKey, "set @@global.rpl_semi_sync_slave_enabled=?", enableReplica); err != nil {
 		return instance, log.Errore(err)
 	}
 	if instance.Slave_IO_Running {
@@ -817,7 +815,7 @@ func DetachReplica(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, fmt.Errorf("Cannot detach slave on: %+v because slave is running", instanceKey)
 	}
 
-	isDetached, _, _ := instance.ExecBinlogCoordinates.DetachedCoordinates()
+	isDetached, _ := instance.ExecBinlogCoordinates.ExtractDetachedCoordinates()
 
 	if isDetached {
 		return instance, fmt.Errorf("Cannot (need not) detach slave on: %+v because slave is already detached", instanceKey)
@@ -827,9 +825,9 @@ func DetachReplica(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, fmt.Errorf("noop: aborting detach-slave operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
 
-	detachedCoordinates := BinlogCoordinates{LogFile: fmt.Sprintf("//%s:%d", instance.ExecBinlogCoordinates.LogFile, instance.ExecBinlogCoordinates.LogPos), LogPos: instance.ExecBinlogCoordinates.LogPos}
+	detachedCoordinates := instance.ExecBinlogCoordinates.Detach()
 	// Encode the current coordinates within the log file name, in such way that replication is broken, but info can still be resurrected
-	_, err = ExecInstance(instanceKey, fmt.Sprintf(`change master to master_log_file='%s', master_log_pos=%d`, detachedCoordinates.LogFile, detachedCoordinates.LogPos))
+	_, err = ExecInstance(instanceKey, `change master to master_log_file=?, master_log_pos=?`, detachedCoordinates.LogFile, detachedCoordinates.LogPos)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
@@ -851,7 +849,7 @@ func ReattachReplica(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, fmt.Errorf("Cannot (need not) reattach slave on: %+v because slave is running", instanceKey)
 	}
 
-	isDetached, detachedLogFile, detachedLogPos := instance.ExecBinlogCoordinates.DetachedCoordinates()
+	isDetached, detachedCoordinates := instance.ExecBinlogCoordinates.ExtractDetachedCoordinates()
 
 	if !isDetached {
 		return instance, fmt.Errorf("Cannot reattach slave on: %+v because slave is not detached", instanceKey)
@@ -861,7 +859,7 @@ func ReattachReplica(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, fmt.Errorf("noop: aborting reattach-slave operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
 
-	_, err = ExecInstance(instanceKey, fmt.Sprintf(`change master to master_log_file='%s', master_log_pos=%s`, detachedLogFile, detachedLogPos))
+	_, err = ExecInstance(instanceKey, `change master to master_log_file=?, master_log_pos=?`, detachedCoordinates.LogFile, detachedCoordinates.LogPos)
 	if err != nil {
 		return instance, log.Errore(err)
 	}
