@@ -11,7 +11,7 @@ function Cluster() {
   var renderColors = ["#ff8c00", "#4682b4", "#9acd32", "#dc143c", "#9932cc", "#ffd700", "#191970", "#7fffd4", "#808080", "#dda0dd"];
   var dcColorsMap = {};
 
-  var _instances, _replicationAnalysis, _maintenanceList, _instancesMap, _isDraggingTrailer, _clusterFailureDetections = false;
+  var _instances, _replicationAnalysis, _maintenanceList, _instancesMap, _isDraggingTrailer = false;
   var _countDragOver = 0;
 
   var _instanceCommands = {
@@ -1443,7 +1443,7 @@ function Cluster() {
       recoveries = recoveries || []
       recoveries = recoveries.slice(0, maxItems)
       if (recoveries.length > 0) {
-        var content = '<a href="' + appUrl('/web/audit-recovery/alias/' + clusterInfo.ClusterAlias) + '">Recovery history</a> <span class="glyphicon checvron-down></span>';
+        var content = '<a href="' + appUrl('/web/audit-recovery/alias/' + clusterInfo.ClusterAlias) + '">Recovery history</a>';
         addSidebarInfoPopoverContent(content, "audit-recovery-title", true);
       }
       recoveries.forEach(function(recovery) {
@@ -1455,7 +1455,7 @@ function Cluster() {
       failureDetections = failureDetections || []
       failureDetections = failureDetections.slice(0, maxItems)
       if (failureDetections.length > 0) {
-        var content = '<a href="' + appUrl('/web/audit-failure-detection/alias/' + clusterInfo.ClusterAlias) + '">Failure detection</a> <span class="glyphicon checvron-down></span>';
+        var content = '<a href="' + appUrl('/web/audit-failure-detection/alias/' + clusterInfo.ClusterAlias) + '">Failure detection</a>';
         addSidebarInfoPopoverContent(content, "audit-detection-title", true);
       }
       failureDetections.forEach(function(failureDetection) {
