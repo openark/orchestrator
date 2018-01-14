@@ -1411,10 +1411,6 @@ function Cluster() {
       addSidebarInfoPopoverContent(content, false);
     }
     {
-      var content = '<a href="' + appUrl('/web/audit-recovery/cluster/' + clusterInfo.ClusterName) + '">Recovery history</a>';
-      addSidebarInfoPopoverContent(content, false);
-    }
-    {
       var content = currentClusterName();
       addSidebarInfoPopoverContent(content, true);
     }
@@ -1440,13 +1436,23 @@ function Cluster() {
       });
     }
 
+    getData("/api/audit-recovery/alias/" + clusterInfo.ClusterAlias, function(recoveries) {
+      recoveries = recoveries || []
+      if (recoveries.length > 0) {
+        var content = '<a href="' + appUrl('/web/audit-recovery/alias/' + clusterInfo.ClusterAlias) + '">Recovery history</a>';
+        addSidebarInfoPopoverContent(content, false);
+      }
+      recoveries.forEach(function(recovery) {
+        var content = '<a href="/web/audit-recovery/id/'+recovery.Id+'">' + recovery.RecoveryStartTimestamp + '</a>: ' + recovery.AnalysisEntry.Analysis
+        addSidebarInfoPopoverContent(content, false);
+      });
+    });
     getData("/api/audit-failure-detection/alias/" + clusterInfo.ClusterAlias, function(failureDetections) {
       failureDetections = failureDetections || []
       if (failureDetections.length > 0) {
         var content = '<a href="' + appUrl('/web/audit-failure-detection/alias/' + clusterInfo.ClusterAlias) + '">Failure detection</a>';
         addSidebarInfoPopoverContent(content, false);
       }
-      // Result is an array: either empty (no active recovery) or with multiple entries
       failureDetections.forEach(function(failureDetection) {
         var content = failureDetection.RecoveryStartTimestamp + ': ' + failureDetection.AnalysisEntry.Analysis
         addSidebarInfoPopoverContent(content, false);

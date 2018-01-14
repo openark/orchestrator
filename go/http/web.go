@@ -235,6 +235,8 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 	if err != nil {
 		recoveryId = 0
 	}
+	clusterAlias := params["clusterAlias"]
+
 	clusterName, _ := figureClusterName(params["clusterName"])
 	r.HTML(200, "templates/audit_recovery", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
@@ -244,6 +246,7 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 		"autoshow_problems":   false,
 		"page":                page,
 		"clusterName":         clusterName,
+		"clusterAlias":        clusterAlias,
 		"recoveryId":          recoveryId,
 		"prefix":              this.URLPrefix,
 	})
@@ -422,6 +425,7 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	m.Get(this.URLPrefix+"/web/audit-recovery/id/:id", this.AuditRecovery)
 	m.Get(this.URLPrefix+"/web/audit-recovery/cluster/:clusterName", this.AuditRecovery)
 	m.Get(this.URLPrefix+"/web/audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
+	m.Get(this.URLPrefix+"/web/audit-recovery/alias/:clusterAlias", this.AuditRecovery)
 	m.Get(this.URLPrefix+"/web/audit-failure-detection", this.AuditFailureDetection)
 	m.Get(this.URLPrefix+"/web/audit-failure-detection/:page", this.AuditFailureDetection)
 	m.Get(this.URLPrefix+"/web/audit-failure-detection/id/:id", this.AuditFailureDetection)

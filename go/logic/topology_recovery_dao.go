@@ -502,33 +502,33 @@ func readRecoveries(whereCondition string, limit string, args []interface{}) ([]
 	res := []TopologyRecovery{}
 	query := fmt.Sprintf(`
 		select
-            recovery_id,
-						uid,
-            hostname,
-            port,
-            (IFNULL(end_active_period_unixtime, 0) = 0) as is_active,
-            start_active_period,
-            IFNULL(end_active_period_unixtime, 0) as end_active_period_unixtime,
-            IFNULL(end_recovery, '') AS end_recovery,
-            is_successful,
-            processing_node_hostname,
-            processcing_node_token,
-            ifnull(successor_hostname, '') as successor_hostname,
-            ifnull(successor_port, 0) as successor_port,
-            ifnull(successor_alias, '') as successor_alias,
-            analysis,
-            cluster_name,
-            cluster_alias,
-            count_affected_slaves,
-            slave_hosts,
-            participating_instances,
-            lost_slaves,
-            all_errors,
-            acknowledged,
-            acknowledged_at,
-            acknowledged_by,
-            acknowledge_comment,
-            last_detection_id
+      recovery_id,
+			uid,
+      hostname,
+      port,
+      (IFNULL(end_active_period_unixtime, 0) = 0) as is_active,
+      start_active_period,
+      IFNULL(end_active_period_unixtime, 0) as end_active_period_unixtime,
+      IFNULL(end_recovery, '') AS end_recovery,
+      is_successful,
+      processing_node_hostname,
+      processcing_node_token,
+      ifnull(successor_hostname, '') as successor_hostname,
+      ifnull(successor_port, 0) as successor_port,
+      ifnull(successor_alias, '') as successor_alias,
+      analysis,
+      cluster_name,
+      cluster_alias,
+      count_affected_slaves,
+      slave_hosts,
+      participating_instances,
+      lost_slaves,
+      all_errors,
+      acknowledged,
+      acknowledged_at,
+      acknowledged_by,
+      acknowledge_comment,
+      last_detection_id
 		from
 			topology_recovery
 		%s
@@ -608,6 +608,14 @@ func ReadRecentlyActiveClusterRecovery(clusterName string) ([]TopologyRecovery, 
 			end_recovery > now() - interval 5 minute
 			and cluster_name=?`
 	return readRecoveries(whereClause, ``, sqlutils.Args(clusterName))
+}
+
+// ReadRecoveriesForClusterAlias reads open/closed recoveries by alias
+func ReadRecoveriesForClusterAlias(clusteAlias string) ([]TopologyRecovery, error) {
+	whereClause := `
+		where
+			cluster_alias=?`
+	return readRecoveries(whereClause, ``, sqlutils.Args(clusteAlias))
 }
 
 // ReadInActivePeriodSuccessorInstanceRecovery reads completed recoveries for a given instance, where said instance
