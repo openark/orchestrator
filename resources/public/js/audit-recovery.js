@@ -74,7 +74,7 @@ $(document).ready(function() {
 
       row.appendTo($("#audit_recovery_details tbody"));
     }
-    var recoveryHasFailed = (audit.RecoveryEndTimestamp && !audit.IsSuccessful && !audit.SuccessorKey.Hostname);
+    var recoveryHasFailed = (!audit.IsSuccessful && !audit.SuccessorKey.Hostname);
     appendRow("Failed instance", getInstanceTitle(audit.AnalysisEntry.AnalyzedInstanceKey.Hostname, audit.AnalysisEntry.AnalyzedInstanceKey.Port))
     var successor = "";
     if (recoveryHasFailed) {
