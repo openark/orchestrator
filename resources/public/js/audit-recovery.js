@@ -83,10 +83,12 @@ $(document).ready(function() {
       successor = '<span class="text-success"><span class="glyphicon glyphicon-ok-sign"></span> '+getInstanceTitle(audit.SuccessorKey.Hostname, audit.SuccessorKey.Port)+'</span>';
     }
     appendRow("Successor", successor)
-    if (audit.AnalysisEntry.ClusterDetails.ClusterAlias != audit.AnalysisEntry.ClusterDetails.ClusterName) {
-      appendRow("Cluster alias", audit.AnalysisEntry.ClusterDetails.ClusterAlias)
+    var clusterAlias = audit.AnalysisEntry.ClusterDetails.ClusterAlias;
+    var clusterName = audit.AnalysisEntry.ClusterDetails.ClusterName;
+    if (clusterAlias != clusterName) {
+      appendRow("Cluster alias", '<a href="/web/cluster/alias/'+clusterAlias+'">' + clusterAlias + '</a>')
     }
-    appendRow("Cluster name", audit.AnalysisEntry.ClusterDetails.ClusterName)
+    appendRow("Cluster name", '<a href="/web/cluster/'+clusterName+'">' + clusterName + '</a>')
     appendRow("Affected replicas", audit.AnalysisEntry.CountReplicas)
     appendRow("Start time", audit.RecoveryStartTimestamp)
     appendRow("End time", audit.RecoveryEndTimestamp)
