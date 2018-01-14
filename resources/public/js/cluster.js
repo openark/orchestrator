@@ -1436,8 +1436,10 @@ function Cluster() {
       });
     }
 
+    var maxItems = 5
     getData("/api/audit-recovery/alias/" + clusterInfo.ClusterAlias, function(recoveries) {
       recoveries = recoveries || []
+      recoveries = recoveries.slice(0, maxItems)
       if (recoveries.length > 0) {
         var content = '<a href="' + appUrl('/web/audit-recovery/alias/' + clusterInfo.ClusterAlias) + '">Recovery history</a>';
         addSidebarInfoPopoverContent(content, false);
@@ -1449,6 +1451,7 @@ function Cluster() {
     });
     getData("/api/audit-failure-detection/alias/" + clusterInfo.ClusterAlias, function(failureDetections) {
       failureDetections = failureDetections || []
+      failureDetections = failureDetections.slice(0, maxItems)
       if (failureDetections.length > 0) {
         var content = '<a href="' + appUrl('/web/audit-failure-detection/alias/' + clusterInfo.ClusterAlias) + '">Failure detection</a>';
         addSidebarInfoPopoverContent(content, false);
