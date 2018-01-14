@@ -1,7 +1,7 @@
 $(document).ready(function() {
   showLoader();
   var uri = "/api/audit-failure-detection/" + currentPage();
-  if (clusterAlias()) {
+  if (clusterAlias() != "") {
     uri = "/api/audit-failure-detection/alias/" + clusterAlias();
   }
   if (detectionId() > 0) {
