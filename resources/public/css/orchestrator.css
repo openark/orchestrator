@@ -595,7 +595,7 @@ body {
   margin-bottom: 8px;
 }
 
-#cluster_info span.glyphicon {
+#cluster_info [data-tag=glyphs] span.glyphicon {
   font-size: 20px;
 }
 
