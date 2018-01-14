@@ -1447,7 +1447,11 @@ function Cluster() {
         addSidebarInfoPopoverContent(content, "audit-recovery-title", true);
       }
       recoveries.forEach(function(recovery) {
-        var content = '<a href="/web/audit-recovery/id/'+recovery.Id+'">' + recovery.RecoveryStartTimestamp + '</a>: ' + recovery.AnalysisEntry.Analysis
+        var glyph = '<span class="glyphicon text-success glyphicon-ok-sign"></span>';
+        if (recovery.IsSuccessful === false) {
+          glyph = '<span class="glyphicon text-danger glyphicon-remove-sign"></span>';
+        }
+        var content = '<a href="/web/audit-recovery/uid/'+recovery.UID+'">' + recovery.RecoveryStartTimestamp + '</a>: ' + glyph + ' ' + recovery.AnalysisEntry.Analysis
         addSidebarInfoPopoverContent(content, "audit-recovery", true);
       });
     });

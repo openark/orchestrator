@@ -448,6 +448,35 @@ body {
 	cursor: pointer;
 }
 
+#audit_recovery_steps thead tr th {
+  border-bottom: 0px;
+}
+
+#audit_recovery_steps tbody tr td:first-child {
+  background-color: #f7f7f7;
+}
+
+#audit_recovery_details thead tr th {
+  border-bottom: 0px;
+}
+
+#audit_recovery_details tbody tr td:first-child {
+  background-color: #f7f7f7;
+}
+#audit_recovery_details tbody tr td:nth-child(2) {
+  white-space: nowrap;
+}
+#audit_recovery_details tbody tr td:nth-child(3) {
+  width: 100%;
+  border: 1px dotted #cccccc;
+}
+#audit_recovery_details tbody tr ul {
+  padding-left: 16px;
+}
+#audit_recovery_details tbody tr code {
+  background-color: inherit;
+}
+
 .table-unbordered > tbody > tr > td {
     border: 0px;
 }
@@ -565,11 +594,11 @@ body {
 }
 
 #cluster_info > div {
-  margin-top: 16px;
-  margin-bottom: 16px;
+  margin-top: 8px;
+  margin-bottom: 8px;
 }
 
-#cluster_info span.glyphicon {
+#cluster_info [data-tag=glyphs] span.glyphicon {
   font-size: 20px;
 }
 
