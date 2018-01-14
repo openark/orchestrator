@@ -687,20 +687,20 @@ func readFailureDetections(whereCondition string, limit string, args []interface
 	res := []TopologyRecovery{}
 	query := fmt.Sprintf(`
 		select
-            detection_id,
-            hostname,
-            port,
-            in_active_period as is_active,
-            start_active_period,
-            end_active_period_unixtime,
-            processing_node_hostname,
-            processcing_node_token,
-            analysis,
-            cluster_name,
-            cluster_alias,
-            count_affected_slaves,
-            slave_hosts,
-            (select max(recovery_id) from topology_recovery where topology_recovery.last_detection_id = detection_id) as related_recovery_id
+      detection_id,
+      hostname,
+      port,
+      in_active_period as is_active,
+      start_active_period,
+      end_active_period_unixtime,
+      processing_node_hostname,
+      processcing_node_token,
+      analysis,
+      cluster_name,
+      cluster_alias,
+      count_affected_slaves,
+      slave_hosts,
+      (select max(recovery_id) from topology_recovery where topology_recovery.last_detection_id = detection_id) as related_recovery_id
 		from
 			topology_failure_detection
 		%s
@@ -749,6 +749,12 @@ func ReadRecentFailureDetections(page int) ([]TopologyRecovery, error) {
 func ReadFailureDetection(detectionId int64) ([]TopologyRecovery, error) {
 	whereClause := `where detection_id = ?`
 	return readFailureDetections(whereClause, ``, sqlutils.Args(detectionId))
+}
+
+// ReadFailureDetectionsForClusterAlias
+func ReadFailureDetectionsForClusterAlias(clusterAlias string) ([]TopologyRecovery, error) {
+	whereClause := `where cluster_alias = ?`
+	return readFailureDetections(whereClause, ``, sqlutils.Args(clusterAlias))
 }
 
 // ReadBlockedRecoveries reads blocked recovery entries, potentially filtered by cluster name (empty to unfilter)

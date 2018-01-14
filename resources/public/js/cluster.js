@@ -11,7 +11,7 @@ function Cluster() {
   var renderColors = ["#ff8c00", "#4682b4", "#9acd32", "#dc143c", "#9932cc", "#ffd700", "#191970", "#7fffd4", "#808080", "#dda0dd"];
   var dcColorsMap = {};
 
-  var _instances, _replicationAnalysis, _maintenanceList, _instancesMap, _isDraggingTrailer = false;
+  var _instances, _replicationAnalysis, _maintenanceList, _instancesMap, _isDraggingTrailer, _clusterFailureDetections = false;
   var _countDragOver = 0;
 
   var _instanceCommands = {
@@ -1409,7 +1409,8 @@ function Cluster() {
     } {
       var content = 'Domain: ' + clusterInfo.ClusterDomain + '';
       addSidebarInfoPopoverContent(content, false);
-    } {
+    }
+    {
       var content = '<a href="' + appUrl('/web/audit-recovery/cluster/' + clusterInfo.ClusterName) + '">Recovery history</a>';
       addSidebarInfoPopoverContent(content, false);
     }
@@ -1438,6 +1439,19 @@ function Cluster() {
         $("#cluster_info").hide();
       });
     }
+
+    getData("/api/audit-failure-detection/alias/" + clusterInfo.ClusterAlias, function(failureDetections) {
+      failureDetections = failureDetections || []
+      if (failureDetections.length > 0) {
+        var content = '<a href="' + appUrl('/web/audit-failure-detection/alias/' + clusterInfo.ClusterAlias) + '">Failure detection</a>';
+        addSidebarInfoPopoverContent(content, false);
+      }
+      // Result is an array: either empty (no active recovery) or with multiple entries
+      failureDetections.forEach(function(failureDetection) {
+        var content = audit.RecoveryStartTimestamp + ': ' + audit.AnalysisEntry.Analysis
+        addSidebarInfoPopoverContent(content, false);
+      });
+    });
     // Colorize-dc
     {
       var glyph = $("#cluster_sidebar [data-bullet=colorize-dc] .glyphicon");
