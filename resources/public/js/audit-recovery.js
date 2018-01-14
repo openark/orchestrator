@@ -75,11 +75,11 @@ $(document).ready(function() {
       row.appendTo($("#audit_recovery_details tbody"));
     }
     appendRow("Failed instance", getInstanceTitle(audit.AnalysisEntry.AnalyzedInstanceKey.Hostname, audit.AnalysisEntry.AnalyzedInstanceKey.Port))
-    var successor = "";
+    var successor = getInstanceTitle(audit.SuccessorKey.Hostname, audit.SuccessorKey.Port);
     if (!audit.IsSuccessful) {
-      successor = '<span class="text-danger"><span class="glyphicon glyphicon-remove-sign"></span> FAIL</span>';
+      successor = '<span class="text-danger"><span class="glyphicon glyphicon-remove-sign"></span> FAIL '+successor+'</span>';
     } else {
-      successor = '<span class="text-success"><span class="glyphicon glyphicon-ok-sign"></span> '+getInstanceTitle(audit.SuccessorKey.Hostname, audit.SuccessorKey.Port)+'</span>';
+      successor = '<span class="text-success"><span class="glyphicon glyphicon-ok-sign"></span> '+successor+'</span>';
     }
     appendRow("Successor", successor)
     var clusterAlias = audit.AnalysisEntry.ClusterDetails.ClusterAlias;

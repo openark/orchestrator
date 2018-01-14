@@ -149,6 +149,9 @@ function canonizeInstanceTitle(title) {
 }
 
 function getInstanceTitle(host, port) {
+  if (host == "") {
+    return "";
+  }
   return canonizeInstanceTitle(host + ":" + port);
 }
 
