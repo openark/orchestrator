@@ -135,6 +135,8 @@ $(document).ready(function() {
       if (singleRecoveryAudit) {
         auditRecoverySteps(audit.UID, $('#audit_recovery_steps tbody'))
         $("#audit_recovery_steps").show();
+
+        $("#audit .pager").hide();
       }
     });
     if (singleRecoveryAudit) {
