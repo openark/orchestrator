@@ -141,6 +141,11 @@ func NewTopologyRecoveryStep(uid string, message string) *TopologyRecoveryStep {
 	}
 }
 
+type TopologyRecoveryResolve struct {
+	Recovery          *TopologyRecovery
+	SuccessorInstance *inst.Instance
+}
+
 type MasterRecoveryType string
 
 const (
@@ -227,6 +232,15 @@ func AuditTopologyRecovery(topologyRecovery *TopologyRecovery, message string) e
 		return err
 	}
 	return nil
+}
+
+func resolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst.Instance) error {
+	if orcraft.IsRaftEnabled() {
+		_, err := orcraft.PublishCommand("resolve-recovery", TopologyRecoveryResolve{topologyRecovery, successorInstance})
+		return err
+	} else {
+		return writeResolveRecovery(topologyRecovery, successorInstance)
+	}
 }
 
 // replaceCommandPlaceholders replaces agreed-upon placeholders with analysis data
@@ -739,7 +753,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 	topologyRecovery.LostReplicas.AddInstances(lostReplicas)
 
 	// And this is the end; whether successful or not, we're done.
-	ResolveRecovery(topologyRecovery, promotedReplica)
+	resolveRecovery(topologyRecovery, promotedReplica)
 	if promotedReplica != nil {
 		if config.Config.FailMasterPromotionIfSQLThreadNotUpToDate && !promotedReplica.SQLThreadUpToDate() {
 			return false, nil, log.Errorf("Promoted replica %+v: sql thread is not up to date (relay logs still unapplied). Aborting promotion", promotedReplica.Key)
@@ -1033,7 +1047,7 @@ func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProce
 	if !recoveryResolved {
 		successorInstance = nil
 	}
-	ResolveRecovery(topologyRecovery, successorInstance)
+	resolveRecovery(topologyRecovery, successorInstance)
 	return successorInstance, err
 }
 
@@ -1200,7 +1214,7 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 	// That's it! We must do recovery!
 	recoverDeadCoMasterCounter.Inc(1)
 	promotedReplica, lostReplicas, err := RecoverDeadCoMaster(topologyRecovery, skipProcesses)
-	ResolveRecovery(topologyRecovery, promotedReplica)
+	resolveRecovery(topologyRecovery, promotedReplica)
 	if promotedReplica == nil {
 		inst.AuditOperation("recover-dead-co-master", failedInstanceKey, "Failure: no replica promoted.")
 	} else {

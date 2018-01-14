@@ -136,7 +136,7 @@ func acknowledgeInstanceFailureDetection(instanceKey *inst.InstanceKey) error {
 	return clearAcknowledgedFailureDetections(whereClause, args)
 }
 
-func writeTopologyRecovery(topologyRecovery *TopologyRecovery, resolve bool) (*TopologyRecovery, error) {
+func writeTopologyRecovery(topologyRecovery *TopologyRecovery) (*TopologyRecovery, error) {
 	analysisEntry := topologyRecovery.AnalysisEntry
 	sqlResult, err := db.ExecOrchestrator(`
 			insert ignore
@@ -199,11 +199,6 @@ func writeTopologyRecovery(topologyRecovery *TopologyRecovery, resolve bool) (*T
 		return nil, err
 	}
 	topologyRecovery.Id = lastInsertId
-	if resolve {
-		if err := ResolveRecovery(topologyRecovery, &inst.Instance{Key: *topologyRecovery.SuccessorKey}); err != nil {
-			return nil, err
-		}
-	}
 	return topologyRecovery, nil
 }
 
@@ -242,7 +237,7 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, failIf
 
 	topologyRecovery := NewTopologyRecovery(*analysisEntry)
 
-	topologyRecovery, err := writeTopologyRecovery(topologyRecovery, false)
+	topologyRecovery, err := writeTopologyRecovery(topologyRecovery)
 	if err != nil {
 		return nil, log.Errore(err)
 	}
@@ -467,7 +462,7 @@ func AcknowledgeCrashedRecoveries() (countAcknowledgedEntries int64, err error) 
 
 // ResolveRecovery is called on completion of a recovery process and updates the recovery status.
 // It does not clear the "active period" as this still takes place in order to avoid flapping.
-func ResolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst.Instance) error {
+func writeResolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst.Instance) error {
 
 	isSuccessful := false
 	var successorKeyToWrite inst.InstanceKey
@@ -489,15 +484,12 @@ func ResolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst
 				all_errors = ?,
 				end_recovery = NOW()
 			where
-				recovery_id = ?
-				AND in_active_period = 1
-				AND processing_node_hostname = ?
-				AND processcing_node_token = ?
+				uid = ?
 			`, isSuccessful, successorKeyToWrite.Hostname, successorKeyToWrite.Port,
 		successorAliasToWrite, topologyRecovery.LostReplicas.ToCommaDelimitedList(),
 		topologyRecovery.ParticipatingInstanceKeys.ToCommaDelimitedList(),
 		strings.Join(topologyRecovery.AllErrors, "\n"),
-		topologyRecovery.Id, process.ThisHostname, process.ProcessToken.Hash,
+		topologyRecovery.UID,
 	)
 	return log.Errore(err)
 }
