@@ -136,7 +136,7 @@ func acknowledgeInstanceFailureDetection(instanceKey *inst.InstanceKey) error {
 	return clearAcknowledgedFailureDetections(whereClause, args)
 }
 
-func writeTopologyRecovery(topologyRecovery *TopologyRecovery) (*TopologyRecovery, error) {
+func writeTopologyRecovery(topologyRecovery *TopologyRecovery, resolve bool) (*TopologyRecovery, error) {
 	analysisEntry := topologyRecovery.AnalysisEntry
 	sqlResult, err := db.ExecOrchestrator(`
 			insert ignore
@@ -199,6 +199,11 @@ func writeTopologyRecovery(topologyRecovery *TopologyRecovery) (*TopologyRecover
 		return nil, err
 	}
 	topologyRecovery.Id = lastInsertId
+	if resolve {
+		if err := ResolveRecovery(topologyRecovery, &inst.Instance{Key: *topologyRecovery.SuccessorKey}); err != nil {
+			return nil, err
+		}
+	}
 	return topologyRecovery, nil
 }
 
@@ -237,7 +242,7 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, failIf
 
 	topologyRecovery := NewTopologyRecovery(*analysisEntry)
 
-	topologyRecovery, err := writeTopologyRecovery(topologyRecovery)
+	topologyRecovery, err := writeTopologyRecovery(topologyRecovery, false)
 	if err != nil {
 		return nil, log.Errore(err)
 	}

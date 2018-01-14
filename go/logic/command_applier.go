@@ -187,8 +187,10 @@ func (applier *CommandApplier) writeRecovery(value []byte) interface{} {
 	if err := json.Unmarshal(value, &topologyRecovery); err != nil {
 		return log.Errore(err)
 	}
-	_, err := writeTopologyRecovery(&topologyRecovery)
-	return err
+	if _, err := writeTopologyRecovery(&topologyRecovery, true); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (applier *CommandApplier) writeRecoveryStep(value []byte) interface{} {
