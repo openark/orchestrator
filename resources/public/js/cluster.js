@@ -1447,9 +1447,8 @@ function Cluster() {
         addSidebarInfoPopoverContent(content, "audit-recovery-title", true);
       }
       recoveries.forEach(function(recovery) {
-        var recoveryHasFailed = (!recovery.IsSuccessful && !recovery.SuccessorKey.Hostname);
         var glyph = '<span class="glyphicon text-success glyphicon-ok-sign"></span>';
-        if (recoveryHasFailed) {
+        if (!recovery.IsSuccessful) {
           glyph = '<span class="glyphicon text-danger glyphicon-remove-sign"></span>';
         }
         var content = '<a href="/web/audit-recovery/uid/'+recovery.UID+'">' + recovery.RecoveryStartTimestamp + '</a>: ' + glyph + ' ' + recovery.AnalysisEntry.Analysis

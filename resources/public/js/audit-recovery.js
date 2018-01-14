@@ -74,10 +74,9 @@ $(document).ready(function() {
 
       row.appendTo($("#audit_recovery_details tbody"));
     }
-    var recoveryHasFailed = (!audit.IsSuccessful && !audit.SuccessorKey.Hostname);
     appendRow("Failed instance", getInstanceTitle(audit.AnalysisEntry.AnalyzedInstanceKey.Hostname, audit.AnalysisEntry.AnalyzedInstanceKey.Port))
     var successor = "";
-    if (recoveryHasFailed) {
+    if (!audit.IsSuccessful) {
       successor = '<span class="text-danger"><span class="glyphicon glyphicon-remove-sign"></span> FAIL</span>';
     } else {
       successor = '<span class="text-success"><span class="glyphicon glyphicon-ok-sign"></span> '+getInstanceTitle(audit.SuccessorKey.Hostname, audit.SuccessorKey.Port)+'</span>';
