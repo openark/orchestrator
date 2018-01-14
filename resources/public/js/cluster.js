@@ -1390,12 +1390,14 @@ function Cluster() {
     return message;
   }
 
-  function addSidebarInfoPopoverContent(content, prepend) {
-    if (prepend === true) {
-      wrappedContent = '<div class="prepend">' + content + '<div style="clear: both;"></div></div>';
-      $("#cluster_info").prepend(wrappedContent)
+  function addSidebarInfoPopoverContent(content, tag, hr) {
+    if (hr === true) {
+      content = '<hr/>' + content
+    }
+    wrappedContent = '<div data-tag="'+tag+'">' + content + '<div style="clear: both;"></div></div>';
+    if (tag === "analysis") {
+      $(wrappedContent).insertAfter("#cluster_info [data-tag=glyphs]")
     } else {
-      wrappedContent = '<div><hr/>' + content + '</div>';
       $("#cluster_info").append(wrappedContent)
     }
   }
@@ -1404,15 +1406,11 @@ function Cluster() {
     var content = '';
 
     {
-      var content = 'Alias: ' + clusterInfo.ClusterAlias + '';
-      addSidebarInfoPopoverContent(content, false);
-    } {
-      var content = 'Domain: ' + clusterInfo.ClusterDomain + '';
-      addSidebarInfoPopoverContent(content, false);
-    }
-    {
-      var content = currentClusterName();
-      addSidebarInfoPopoverContent(content, true);
+      var content = '<button type="button" class="close" aria-hidden="true">&times;</button>';
+      addSidebarInfoPopoverContent(content, "close", false);
+      $("#cluster_info button.close").click(function() {
+        $("#cluster_info").hide();
+      });
     }
     {
       var content = '';
@@ -1426,14 +1424,18 @@ function Cluster() {
       } else {
         content += '<span class="glyphicon glyphicon-heart-empty text-muted pull-right" title="Automated intermediate master recovery for this cluster DISABLED"></span>';
       }
-      addSidebarInfoPopoverContent(content, true);
+      addSidebarInfoPopoverContent(content, "glyphs", false);
     }
     {
-      var content = '<button type="button" class="close" aria-hidden="true">&times;</button>';
-      addSidebarInfoPopoverContent(content, true);
-      $("#cluster_info button.close").click(function() {
-        $("#cluster_info").hide();
-      });
+      var content = currentClusterName();
+      addSidebarInfoPopoverContent(content, "cluster-name", true);
+    }
+    {
+      var content = 'Alias: ' + clusterInfo.ClusterAlias + '';
+      addSidebarInfoPopoverContent(content, "cluster-alias", true);
+    } {
+      var content = 'Domain: ' + clusterInfo.ClusterDomain + '';
+      addSidebarInfoPopoverContent(content, "cluster-domain", true);
     }
 
     var maxItems = 5
@@ -1442,11 +1444,11 @@ function Cluster() {
       recoveries = recoveries.slice(0, maxItems)
       if (recoveries.length > 0) {
         var content = '<a href="' + appUrl('/web/audit-recovery/alias/' + clusterInfo.ClusterAlias) + '">Recovery history</a> <span class="glyphicon checvron-down></span>';
-        addSidebarInfoPopoverContent(content, false);
+        addSidebarInfoPopoverContent(content, "audit-recovery-title", true);
       }
       recoveries.forEach(function(recovery) {
         var content = '<a href="/web/audit-recovery/id/'+recovery.Id+'">' + recovery.RecoveryStartTimestamp + '</a>: ' + recovery.AnalysisEntry.Analysis
-        addSidebarInfoPopoverContent(content, false);
+        addSidebarInfoPopoverContent(content, "audit-recovery", true);
       });
     });
     getData("/api/audit-failure-detection/alias/" + clusterInfo.ClusterAlias, function(failureDetections) {
@@ -1454,11 +1456,11 @@ function Cluster() {
       failureDetections = failureDetections.slice(0, maxItems)
       if (failureDetections.length > 0) {
         var content = '<a href="' + appUrl('/web/audit-failure-detection/alias/' + clusterInfo.ClusterAlias) + '">Failure detection</a> <span class="glyphicon checvron-down></span>';
-        addSidebarInfoPopoverContent(content, false);
+        addSidebarInfoPopoverContent(content, "audit-detection-title", true);
       }
       failureDetections.forEach(function(failureDetection) {
         var content = failureDetection.RecoveryStartTimestamp + ': ' + failureDetection.AnalysisEntry.Analysis
-        addSidebarInfoPopoverContent(content, false);
+        addSidebarInfoPopoverContent(content, "audit-detection", true);
       });
     });
     // Colorize-dc
@@ -1520,20 +1522,26 @@ function Cluster() {
   }
 
   function onAnalysisEntry(analysisEntry, instance) {
-    var extraText = '';
-    if  (analysisEntry.IsDowntimed) {
-      extraText = '<br/>[<i>downtime till ' + analysisEntry.DowntimeEndTimestamp + '</i>]';
-    } else if (analysisEntry.IsReplicasDowntimed) {
-      extraText = '<br/>[<i>replicas downtimed</i>]';
-    }
-    var content = '<span><strong>' + analysisEntry.Analysis + extraText + "</strong></span>" + "<br/>" + "<span>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</span>";
+    var glyph = '';
     var hasDowntime = analysisEntry.IsDowntimed || analysisEntry.IsReplicasDowntimed
     if (analysisEntry.IsStructureAnalysis) {
-      content = '<div class="pull-left glyphicon glyphicon-exclamation-sign '+(hasDowntime ? "text-muted" : "text-warning")+'"></div>' + content;
+      glyph = '<span class="pull-left glyphicon glyphicon-exclamation-sign '+(hasDowntime ? "text-muted" : "text-warning")+'"></span>';
     } else {
-      content = '<div class="pull-left glyphicon glyphicon-exclamation-sign '+(hasDowntime ? "text-muted" : "text-danger")+'"></div>' + content;
+      glyph = '<span class="pull-left glyphicon glyphicon-exclamation-sign '+(hasDowntime ? "text-muted" : "text-danger")+'"></span>';
     }
-    addSidebarInfoPopoverContent(content);
+    var analysisContent = '<div><strong>' + analysisEntry.Analysis + "</strong></div>";
+    var extraText = '';
+    if  (analysisEntry.IsDowntimed) {
+      extraText = '<i>downtime till ' + analysisEntry.DowntimeEndTimestamp + '</i>';
+    } else if (analysisEntry.IsReplicasDowntimed) {
+      extraText = '<i>replicas downtimed</i>';
+    }
+    if (extraText != '') {
+      analysisContent += '<div>' + extraText + '</div>';
+    }
+    analysisContent += "<div>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</div>";
+    var content = '<div><div class="pull-left">'+glyph+'</div><div class="pull-right">'+analysisContent+'</div></div>';
+    addSidebarInfoPopoverContent(content, "analysis", false);
 
     if (analysisEntry.IsStructureAnalysis) {
       return;

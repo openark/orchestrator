@@ -564,7 +564,7 @@ body {
   display: none;
 }
 
-#cluster_info div.prepend {
+#cluster_info > div {
   margin-top: 16px;
   margin-bottom: 16px;
 }
@@ -576,6 +576,16 @@ body {
 #cluster_info hr {
   margin-top: 8px;
   margin-bottom: 8px;
+}
+
+#cluster_info div[data-tag=analysis] {
+  background-color: white;
+  border: 1px dotted #bbbbbb;
+  padding: 8px;
+}
+
+#cluster_info div[data-tag=analysis] div {
+  padding: 4px;
 }
 
 #cluster_wrapper {
