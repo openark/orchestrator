@@ -233,7 +233,7 @@ func resolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst
 	if successorInstance != nil {
 		topologyRecovery.SuccessorKey = &successorInstance.Key
 		topologyRecovery.SuccessorAlias = successorInstance.InstanceAlias
-		topologyRecovery.IsSuccessful = (successorInstance != nil)
+		topologyRecovery.IsSuccessful = true
 	}
 	if orcraft.IsRaftEnabled() {
 		_, err := orcraft.PublishCommand("resolve-recovery", topologyRecovery)
