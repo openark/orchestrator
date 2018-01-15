@@ -119,7 +119,7 @@ $(document).ready(function() {
       var analyzedInstanceDisplay = getInstanceTitle(audit.AnalysisEntry.AnalyzedInstanceKey.Hostname, audit.AnalysisEntry.AnalyzedInstanceKey.Port);
       var sucessorInstanceDisplay = getInstanceTitle(audit.SuccessorKey.Hostname, audit.SuccessorKey.Port);
       var row = $('<tr/>');
-      var ack = $('<span class="pull-left glyphicon acknowledge-indicator" title=""></span>');
+      var ack = $('<span class="glyphicon acknowledge-indicator" title=""></span>');
       if (audit.Acknowledged) {
         ack.addClass("glyphicon-ok-sign").addClass("text-primary");
         var ackTitle = "Acknowledged by " + audit.AcknowledgedBy + " at " + audit.AcknowledgedAt + ": " + audit.AcknowledgedComment;
