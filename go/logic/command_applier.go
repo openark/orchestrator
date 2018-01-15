@@ -205,12 +205,12 @@ func (applier *CommandApplier) writeRecoveryStep(value []byte) interface{} {
 }
 
 func (applier *CommandApplier) resolveRecovery(value []byte) interface{} {
-	recoveryResolve := TopologyRecoveryResolve{}
-	if err := json.Unmarshal(value, &recoveryResolve); err != nil {
+	topologyRecovery := TopologyRecovery{}
+	if err := json.Unmarshal(value, &topologyRecovery); err != nil {
 		return log.Errore(err)
 	}
-	if err := writeResolveRecovery(recoveryResolve.Recovery, recoveryResolve.SuccessorInstance); err != nil {
-		return err
+	if err := writeResolveRecovery(&topologyRecovery); err != nil {
+		return log.Errore(err)
 	}
 	return nil
 }

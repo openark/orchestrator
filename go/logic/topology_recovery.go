@@ -141,11 +141,6 @@ func NewTopologyRecoveryStep(uid string, message string) *TopologyRecoveryStep {
 	}
 }
 
-type TopologyRecoveryResolve struct {
-	Recovery          *TopologyRecovery
-	SuccessorInstance *inst.Instance
-}
-
 type MasterRecoveryType string
 
 const (
@@ -235,11 +230,16 @@ func AuditTopologyRecovery(topologyRecovery *TopologyRecovery, message string) e
 }
 
 func resolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst.Instance) error {
+	if successorInstance != nil {
+		topologyRecovery.SuccessorKey = &successorInstance.Key
+		topologyRecovery.SuccessorAlias = successorInstance.InstanceAlias
+		topologyRecovery.IsSuccessful = (successorInstance != nil)
+	}
 	if orcraft.IsRaftEnabled() {
-		_, err := orcraft.PublishCommand("resolve-recovery", TopologyRecoveryResolve{topologyRecovery, successorInstance})
+		_, err := orcraft.PublishCommand("resolve-recovery", topologyRecovery)
 		return err
 	} else {
-		return writeResolveRecovery(topologyRecovery, successorInstance)
+		return writeResolveRecovery(topologyRecovery)
 	}
 }
 

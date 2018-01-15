@@ -462,16 +462,10 @@ func AcknowledgeCrashedRecoveries() (countAcknowledgedEntries int64, err error) 
 
 // ResolveRecovery is called on completion of a recovery process and updates the recovery status.
 // It does not clear the "active period" as this still takes place in order to avoid flapping.
-func writeResolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst.Instance) error {
-
-	isSuccessful := false
+func writeResolveRecovery(topologyRecovery *TopologyRecovery) error {
 	var successorKeyToWrite inst.InstanceKey
-	var successorAliasToWrite string
-	if successorInstance != nil {
-		topologyRecovery.SuccessorKey = &successorInstance.Key
-		topologyRecovery.SuccessorAlias = successorInstance.InstanceAlias
-		isSuccessful = true
-		successorKeyToWrite = successorInstance.Key
+	if topologyRecovery.IsSuccessful {
+		successorKeyToWrite = *topologyRecovery.SuccessorKey
 	}
 	_, err := db.ExecOrchestrator(`
 			update topology_recovery set
@@ -485,8 +479,8 @@ func writeResolveRecovery(topologyRecovery *TopologyRecovery, successorInstance 
 				end_recovery = NOW()
 			where
 				uid = ?
-			`, isSuccessful, successorKeyToWrite.Hostname, successorKeyToWrite.Port,
-		successorAliasToWrite, topologyRecovery.LostReplicas.ToCommaDelimitedList(),
+			`, topologyRecovery.IsSuccessful, successorKeyToWrite.Hostname, successorKeyToWrite.Port,
+		topologyRecovery.SuccessorAlias, topologyRecovery.LostReplicas.ToCommaDelimitedList(),
 		topologyRecovery.ParticipatingInstanceKeys.ToCommaDelimitedList(),
 		strings.Join(topologyRecovery.AllErrors, "\n"),
 		topologyRecovery.UID,
