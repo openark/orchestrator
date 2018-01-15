@@ -24,13 +24,10 @@ $(document).ready(function() {
     hideLoader();
     auditEntries.forEach(function(audit) {
       var analyzedInstanceDisplay = audit.AnalysisEntry.AnalyzedInstanceKey.Hostname + ":" + audit.AnalysisEntry.AnalyzedInstanceKey.Port;
-      var row = jQuery('<tr/>');
-      var moreInfoElement = $('<span class="more-detection-info pull-right glyphicon glyphicon-info-sign text-primary" title="More info"></span>');
-      moreInfoElement.attr("data-detection-id", audit.Id);
+      var row = $('<tr/>');
+      var analysisElement = $('<a class="more-detection-info"/>').attr("data-detection-id", audit.Id).text(audit.AnalysisEntry.Analysis);
 
-      $('<td/>', {
-        text: audit.AnalysisEntry.Analysis
-      }).prepend(moreInfoElement).appendTo(row);
+      $('<td/>').prepend(analysisElement).appendTo(row);
       $('<a/>', {
         text: analyzedInstanceDisplay,
         href: appUrl("/web/search/" + analyzedInstanceDisplay)
