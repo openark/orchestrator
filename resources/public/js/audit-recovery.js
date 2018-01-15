@@ -61,7 +61,10 @@ $(document).ready(function() {
     $("#audit .pager").hide();
     $("#audit_recovery_table").hide();
 
-    $("#audit_recovery_details thead h3").text(audit.AnalysisEntry.Analysis)
+    var clusterAlias = audit.AnalysisEntry.ClusterDetails.ClusterAlias;
+    var clusterName = audit.AnalysisEntry.ClusterDetails.ClusterName;
+    var failedInstanceTitle = getInstanceTitle(audit.AnalysisEntry.AnalyzedInstanceKey.Hostname, audit.AnalysisEntry.AnalyzedInstanceKey.Port);
+    $("#audit_recovery_details thead h3").text(audit.AnalysisEntry.Analysis + ' on ' + clusterAlias + '/' + failedInstanceTitle)
 
     var appendRow = function(td1, td2) {
       var row = $('<tr/>');
@@ -74,7 +77,7 @@ $(document).ready(function() {
 
       row.appendTo($("#audit_recovery_details tbody"));
     }
-    appendRow("Failed instance", getInstanceTitle(audit.AnalysisEntry.AnalyzedInstanceKey.Hostname, audit.AnalysisEntry.AnalyzedInstanceKey.Port))
+    appendRow("Failed instance", failedInstanceTitle)
     var successor = getInstanceTitle(audit.SuccessorKey.Hostname, audit.SuccessorKey.Port);
     if (audit.IsSuccessful === false) {
       successor = '<span class="text-danger"><span class="glyphicon glyphicon-remove-sign"></span> FAIL '+successor+'</span>';
@@ -82,8 +85,6 @@ $(document).ready(function() {
       successor = '<span class="text-success"><span class="glyphicon glyphicon-ok-sign"></span> '+successor+'</span>';
     }
     appendRow("Successor", successor)
-    var clusterAlias = audit.AnalysisEntry.ClusterDetails.ClusterAlias;
-    var clusterName = audit.AnalysisEntry.ClusterDetails.ClusterName;
     if (clusterAlias != clusterName) {
       appendRow("Cluster alias", '<a href="/web/cluster/alias/'+clusterAlias+'">' + clusterAlias + '</a>')
     }
@@ -128,16 +129,10 @@ $(document).ready(function() {
         ack.attr("data-recovery-id", audit.Id);
         ack.attr("title", "Unacknowledged. Click to acknowledge");
       }
-      var moreInfoElement = $('<a href="' + appUrl('/web/audit-recovery/uid/' + audit.UID) + '"><span class="pull-right glyphicon glyphicon-info-sign text-primary" title="More info"></span></a>');
-      moreInfoElement.attr("data-recovery-id", audit.Id);
 
-      var analysisTd = $('<td/>', {
-        text: audit.AnalysisEntry.Analysis
-      }).prepend(ack);
-      if (!singleRecoveryAudit) {
-        analysisTd.prepend(moreInfoElement)
-      }
-      analysisTd.appendTo(row);
+    $('<td/>', {
+        html: '<a href="' + appUrl('/web/audit-recovery/uid/' + audit.UID) + '">'+audit.AnalysisEntry.Analysis+'</a>'
+      }).prepend(ack).appendTo(row);
       $('<a/>', {
         text: analyzedInstanceDisplay,
         href: appUrl("/web/search/" + analyzedInstanceDisplay)
