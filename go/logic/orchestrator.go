@@ -378,6 +378,7 @@ func ContinuousDiscovery() {
 
 	inst.LoadHostnameResolveCache()
 	go handleDiscoveryRequests()
+	go consumeInstanceAnalysisChan()
 
 	healthTick := time.Tick(config.HealthPollSeconds * time.Second)
 	instancePollTick := time.Tick(instancePollSecondsDuration())
