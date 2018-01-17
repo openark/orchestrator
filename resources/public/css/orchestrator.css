@@ -529,6 +529,7 @@ body {
     position: fixed;
     left: 0px;
     padding: 8px 15px 0px 15px;
+    height: 100%;
     z-index:100;
     border-right: dotted 1px #bbbbbb;
     background-color: #f7f7f7;
