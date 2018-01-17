@@ -586,12 +586,14 @@ body {
 }
 
 #cluster_info {
+  position: absolute;
   z-index: 50;
   border-right: dotted 1px #bbbbbb;
   background-color: #f7f7f7;
   padding-right: 24px;
   font: 12px sans-serif;
   display: none;
+  height: 100%;
 }
 
 #cluster_info > div {
