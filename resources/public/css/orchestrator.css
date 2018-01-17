@@ -585,7 +585,6 @@ body {
 }
 
 #cluster_info {
-  position: absolute;
   z-index: 50;
   border-right: dotted 1px #bbbbbb;
   background-color: #f7f7f7;
@@ -624,8 +623,6 @@ body {
 }
 
 #cluster_name {
-  position:relative;
-  z-index: 51;
   font-size: 24px;
 }
 

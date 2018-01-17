@@ -1403,7 +1403,6 @@ function Cluster() {
   }
 
   function populateSidebar(clusterInfo) {
-    $("#cluster_info").css("margin-top", -$("#cluster_name").height());
     var content = '';
 
     {
