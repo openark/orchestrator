@@ -1305,13 +1305,17 @@ func consumeInstanceAnalysisChan() {
 		select {
 		case analysisEntry := <-notifiedAnalysisChan:
 			{
+				log.Debugf(".................>>>>> transition to %+v on  %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
 				mapKey := analysisEntry.AnalyzedInstanceKey.StringCode()
 				notifiedAnalysisMap[mapKey] = true
 			}
 		case analysisEntry := <-inst.ClearedAnalysisChan:
 			{
+				log.Debugf(".................<<<<< transition to all-clear %+v", analysisEntry.AnalyzedInstanceKey)
 				// An analysis went from some-problem to NoProblem
 				if mapKey := analysisEntry.AnalyzedInstanceKey.StringCode(); notifiedAnalysisMap[mapKey] {
+					log.Debugf(".................<<<<< transition confirmed %+v", analysisEntry.AnalyzedInstanceKey)
+					acknowledgeInstanceFailureDetection(&analysisEntry.AnalyzedInstanceKey)
 					delete(notifiedAnalysisMap, mapKey)
 					// And an "all-clear"
 					executeFailureDetectionProcesses(*analysisEntry)
