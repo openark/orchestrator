@@ -178,11 +178,19 @@ func (this *BinlogCoordinates) NextFileCoordinates() (BinlogCoordinates, error) 
 	return result, nil
 }
 
+// Detach returns a detahced form of coordinates
+func (this *BinlogCoordinates) Detach() (detachedCoordinates BinlogCoordinates) {
+	detachedCoordinates = BinlogCoordinates{LogFile: fmt.Sprintf("//%s:%d", this.LogFile, this.LogPos), LogPos: this.LogPos}
+	return detachedCoordinates
+}
+
 // FileSmallerThan returns true if this coordinate's file is strictly smaller than the other's.
-func (this *BinlogCoordinates) DetachedCoordinates() (isDetached bool, detachedLogFile string, detachedLogPos string) {
+func (this *BinlogCoordinates) ExtractDetachedCoordinates() (isDetached bool, detachedCoordinates BinlogCoordinates) {
 	detachedCoordinatesSubmatch := detachPattern.FindStringSubmatch(this.LogFile)
 	if len(detachedCoordinatesSubmatch) == 0 {
-		return false, "", ""
+		return false, *this
 	}
-	return true, detachedCoordinatesSubmatch[1], detachedCoordinatesSubmatch[2]
+	detachedCoordinates.LogFile = detachedCoordinatesSubmatch[1]
+	detachedCoordinates.LogPos, _ = strconv.ParseInt(detachedCoordinatesSubmatch[2], 10, 0)
+	return true, detachedCoordinates
 }

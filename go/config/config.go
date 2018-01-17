@@ -119,7 +119,6 @@ type Configuration struct {
 	MySQLOrchestratorReadTimeoutSeconds        int      // Number of seconds before backend mysql read operation is aborted (driver-side)
 	MySQLDiscoveryReadTimeoutSeconds           int      // Number of seconds before topology mysql read operation is aborted (driver-side). Used for discovery queries.
 	MySQLTopologyReadTimeoutSeconds            int      // Number of seconds before topology mysql read operation is aborted (driver-side). Used for all but discovery queries.
-	MySQLInterpolateParams                     bool     // Do not use sql prepare statement if true
 	DefaultInstancePort                        int      // In case port was not specified on command line
 	SlaveLagQuery                              string   // Synonym to ReplicationLagQuery
 	ReplicationLagQuery                        string   // custom query to check on replica lg (e.g. heartbeat table)
@@ -282,7 +281,6 @@ func newConfiguration() *Configuration {
 		MySQLOrchestratorReadTimeoutSeconds:        30,
 		MySQLDiscoveryReadTimeoutSeconds:           10,
 		MySQLTopologyReadTimeoutSeconds:            600,
-		MySQLInterpolateParams:                     false,
 		DefaultInstancePort:                        3306,
 		TLSCacheTTLFactor:                          100,
 		InstancePollSeconds:                        5,
