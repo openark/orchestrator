@@ -586,14 +586,19 @@ body {
 }
 
 #cluster_info {
-  position: absolute;
+  position: fixed;
   z-index: 50;
-  border-right: dotted 1px #bbbbbb;
-  background-color: #f7f7f7;
+
+  margin-left: -64px;
+  padding-left: 64px;
   padding-right: 24px;
+
+
+  border-right: dotted 1px #bbbbbb;
   font: 12px sans-serif;
+  background-color: #f7f7f7;
+
   display: none;
-  height: 100%;
 }
 
 #cluster_info > div {
