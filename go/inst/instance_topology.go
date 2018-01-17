@@ -923,6 +923,15 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 			goto Cleanup
 		}
 	}
+
+	if instance.AllowTLS {
+		log.Debugf("Enabling SSL replication")
+		_, err = EnableMasterSSL(&master.Key)
+		if err != nil {
+			goto Cleanup
+		}
+	}
+
 	master, err = ChangeMasterTo(&master.Key, instanceKey, &instance.SelfBinlogCoordinates, false, GTIDHintNeutral)
 	if err != nil {
 		goto Cleanup

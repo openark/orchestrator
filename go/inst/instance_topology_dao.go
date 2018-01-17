@@ -575,6 +575,33 @@ func ChangeMasterCredentials(instanceKey *InstanceKey, masterUser string, master
 	return instance, err
 }
 
+// EnableMasterSSL issues CHANGE MASTER TO MASTER_SSL=1
+func EnableMasterSSL(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	if instance.ReplicaRunning() {
+		return instance, fmt.Errorf("EnableMasterSSL: Cannot enable SSL replication on %+v because slave is running", *instanceKey)
+	}
+	log.Debugf("EnableMasterSSL: Will attempt enabling SSL replication on %+v", *instanceKey)
+
+	if *config.RuntimeCLIFlags.Noop {
+		return instance, fmt.Errorf("noop: aborting CHANGE MASTER TO MASTER_SSL=1 operation on %+v; signaling error but nothing went wrong.", *instanceKey)
+	}
+	_, err = ExecInstance(instanceKey, "change master to master_ssl=1")
+
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	log.Infof("EnableMasterSSL: Enabled SSL replication on %+v", *instanceKey)
+
+	instance, err = ReadTopologyInstance(instanceKey)
+	return instance, err
+}
+
 // ChangeMasterTo changes the given instance's master according to given input.
 func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinlogCoordinates *BinlogCoordinates, skipUnresolve bool, gtidHint OperationGTIDHint) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)

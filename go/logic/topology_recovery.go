@@ -1689,5 +1689,12 @@ func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecov
 		}
 	}
 
+	if designatedInstance.AllowTLS {
+		_, enableSSLErr := inst.EnableMasterSSL(&clusterMaster.Key)
+		if err == nil {
+			err = enableSSLErr
+		}
+	}
+
 	return topologyRecovery, promotedMasterCoordinates, err
 }
