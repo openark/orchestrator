@@ -14,7 +14,7 @@
   "MySQLTopologyUseMutualTLS": false,
   "BackendDB": "backend-db-placeholder",
   "SQLite3DataFile": "sqlite-data-file-placeholder",
-  "MySQLOrchestratorHost": "localhost",
+  "MySQLOrchestratorHost": "127.0.0.1",
   "MySQLOrchestratorPort": 3306,
   "MySQLOrchestratorDatabase": "test",
   "MySQLOrchestratorUser": "mysql-user-placeholder",
