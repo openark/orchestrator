@@ -21,9 +21,9 @@ import (
 	"time"
 )
 
-var randomString = []string{
-	"RANDOM_STRING",
-	"SOME_OTHER_STRING",
+var randomString = []Name{
+	BackendWrites,
+	DiscoveryMetrics,
 }
 
 // some random base timestamp
