@@ -1,18 +1,18 @@
 # First Steps with Orchestrator
 
-You have `Orchestrator` installed, deployed  and configured. What can you do with it?
+You have `Orchestrator` installed, deployed and configured. What can you do with it?
 
-A walk through common commands, mostly on the CLI side
+A walk through of common commands, mostly on the CLI side
 
 #### Must
 
 ##### Discover
 
-You need to discover your MySQL hosts. Either browse to your `http://orchestrator:3000/web/discover` page and submti an instance for discovery, or:
+You need to discover your MySQL hosts. Either browse to your `http://orchestrator:3000/web/discover` page and submit an instance for discovery, or:
 
 	$ orchestrator -c discover -i some.mysql.instance.com:3306
 
-The `:3306` is not required, since the `DefaultInstancePort` configuration is `3306`. You may also
+The `:3306` is not required, since the `DefaultInstancePort` configuration is `3306`. You may also:
 
 	$ orchestrator -c discover -i some.mysql.instance.com
 
@@ -69,7 +69,7 @@ belongs to one topology. `a.replica.3.instance.com` belongs to another. You may 
 #### Move stuff around
 
 You may move servers around using various commands. The generic "figure things out automatically" commands are
-`relocate` and `relocate-replicas`
+`relocate` and `relocate-replicas`:
 
 	# Move a.replica.3.instance.com to replicate from a.replica.4.instance.com
 
@@ -141,7 +141,7 @@ Toggle GTID mode (Oracle & MariaDB):
 
 #### Crash analysis & recovery
 
-Are your clusters healty?
+Are your clusters healthy?
 
 	$ orchestrator -c replication-analysis
 	some.master.instance.com:3306 (cluster some.master.instance.com:3306): DeadMaster
@@ -176,6 +176,6 @@ Ask `orchestrator` to recover the above dead intermediate master:
 
 #### More
 
-The above should get you up and running. For more please consult the [Manual](toc.md). For CLI commands listing just run
+The above should get you up and running. For more please consult the [Manual](toc.md). For CLI commands listing just run:
 
 	orchestrator help
