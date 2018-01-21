@@ -771,6 +771,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		}
 
 		kvPair := inst.GetClusterMasterKVPair(analysisEntry.ClusterDetails.ClusterAlias, &promotedReplica.Key)
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Writing KV %+v", kvPair))
 		if orcraft.IsRaftEnabled() {
 			orcraft.PublishCommand("put-key-value", kvPair)
 			// since we'll be affecting 3rd party tools here, we _prefer_ to mitigate re-applying
