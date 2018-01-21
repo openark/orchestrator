@@ -60,9 +60,16 @@ def distro_names_for(filename)
     if filename.include?(".deb") and pattern .include?("debian")
       result.concat distros
     end
+
     if filename.include?(".rpm") and pattern .include?("centos")
-      result.concat distros
+      if filename.include?("centos6") and pattern.include?("centos/6")
+        result.concat distros
+      end
+      if !filename.include?("centos6") and !pattern.include?("centos/6")
+        result.concat distros
+      end
     end
+
     if filename.include?(pattern)
       result.concat distros
     end
