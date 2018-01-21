@@ -426,7 +426,7 @@ func ContinuousDiscovery() {
 			}()
 		case <-autoPseudoGTIDTick:
 			go func() {
-				if config.Config.AutoPseudoGTID {
+				if config.Config.AutoPseudoGTID && IsLeaderOrActive() {
 					go inst.InjectPseudoGTIDOnWriters()
 				}
 			}()
