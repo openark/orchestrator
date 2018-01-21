@@ -17,6 +17,7 @@
 package kv
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -27,6 +28,10 @@ type KVPair struct {
 
 func NewKVPair(key string, value string) *KVPair {
 	return &KVPair{Key: key, Value: value}
+}
+
+func (this *KVPair) String() string {
+	return fmt.Sprintf("%s:%s", this.Key, this.Value)
 }
 
 type KVStore interface {
