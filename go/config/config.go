@@ -354,6 +354,7 @@ func newConfiguration() *Configuration {
 		UnseenAgentForgetHours:                     6,
 		StaleSeedFailMinutes:                       60,
 		SeedAcceptableBytesDiff:                    8192,
+		AutoPseudoGTID:                             false,
 		PseudoGTIDPattern:                          "",
 		PseudoGTIDPatternIsFixedSubstring:          false,
 		PseudoGTIDMonotonicHint:                    "",
