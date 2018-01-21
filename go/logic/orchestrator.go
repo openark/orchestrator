@@ -384,6 +384,7 @@ func ContinuousDiscovery() {
 	caretakingTick := time.Tick(time.Minute)
 	raftCaretakingTick := time.Tick(10 * time.Minute)
 	recoveryTick := time.Tick(time.Duration(config.RecoveryPollSeconds) * time.Second)
+	autoPseudoGTIDTick := time.Tick(time.Duration(config.PseudoGTIDIntervalSeconds) * time.Second)
 	var recoveryEntrance int64
 	var snapshotTopologiesTick <-chan time.Time
 	if config.Config.SnapshotTopologiesIntervalHours > 0 {
@@ -421,6 +422,12 @@ func ContinuousDiscovery() {
 				if IsLeaderOrActive() {
 					go inst.UpdateClusterAliases()
 					go inst.ExpireDowntime()
+				}
+			}()
+		case <-autoPseudoGTIDTick:
+			go func() {
+				if config.Config.AutoPseudoGTID {
+					go inst.InjectPseudoGTIDOnWriters()
 				}
 			}()
 		case <-caretakingTick:

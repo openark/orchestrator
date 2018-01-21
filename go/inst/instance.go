@@ -232,9 +232,19 @@ func (this *Instance) FlavorNameAndMajorVersion() string {
 	return this.FlavorName + "-" + this.MajorVersionString()
 }
 
-// IsReplica makes simple heuristics to decide whether this insatnce is a replica of another instance
+// IsReplica makes simple heuristics to decide whether this instance is a replica of another instance
 func (this *Instance) IsReplica() bool {
 	return this.MasterKey.Hostname != "" && this.MasterKey.Hostname != "_" && this.MasterKey.Port != 0 && (this.ReadBinlogCoordinates.LogFile != "" || this.UsingGTID())
+}
+
+// IsMaster makes simple heuristics to decide whether this instance is a master (not replicating from any other server)
+func (this *Instance) IsMaster() bool {
+	return !this.IsReplica()
+}
+
+// IsWritableMaster makes simple heuristics to decide whether this instance is a writable master (not replicating from any other server)
+func (this *Instance) IsWritableMaster() bool {
+	return this.IsMaster() && !this.ReadOnly
 }
 
 // ReplicaRunning returns true when this instance's status is of a replicating replica.

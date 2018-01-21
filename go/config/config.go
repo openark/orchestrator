@@ -52,6 +52,8 @@ const (
 	AgentHttpTimeoutSeconds                      = 60
 	PseudoGTIDCoordinatesHistoryHeuristicMinutes = 2
 	DebugMetricsIntervalSeconds                  = 10
+	PseudoGTIDSchema                             = "_pseudo_gtid_"
+	PseudoGTIDIntervalSeconds                    = 5
 )
 
 var deprecatedConfigurationVariables = []string{
@@ -195,6 +197,7 @@ type Configuration struct {
 	UnseenAgentForgetHours                     uint              // Number of hours after which an unseen agent is forgotten
 	StaleSeedFailMinutes                       uint              // Number of minutes after which a stale (no progress) seed is considered failed.
 	SeedAcceptableBytesDiff                    int64             // Difference in bytes between seed source & target data size that is still considered as successful copy
+	AutoPseudoGTID                             bool              // Should orchestrator automatically inject Pseudo-GTID entries to the masters
 	PseudoGTIDPattern                          string            // Pattern to look for in binary logs that makes for a unique entry (pseudo GTID). When empty, Pseudo-GTID based refactoring is disabled.
 	PseudoGTIDPatternIsFixedSubstring          bool              // If true, then PseudoGTIDPattern is not treated as regular expression but as fixed substring, and can boost search time
 	PseudoGTIDMonotonicHint                    string            // subtring in Pseudo-GTID entry which indicates Pseudo-GTID entries are expected to be monotonically increasing
@@ -525,6 +528,13 @@ func (this *Configuration) postReadAdjustments() error {
 	}
 	if this.ZkAddress != "" {
 		return fmt.Errorf("ZkAddress (ZooKeeper) configuration is unsupported yet")
+	}
+	if this.AutoPseudoGTID {
+		this.PseudoGTIDPattern = "drop view if exists `_pseudo_gtid_`"
+		this.PseudoGTIDPatternIsFixedSubstring = true
+		this.PseudoGTIDMonotonicHint = "asc:"
+		this.DetectPseudoGTIDQuery = ""
+		this.PseudoGTIDPreferIndependentMultiMatch = true
 	}
 	return nil
 }

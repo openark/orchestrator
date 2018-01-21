@@ -352,7 +352,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		}
 
 		instance.UsingPseudoGTID = false
-		if config.Config.DetectPseudoGTIDQuery != "" {
+		if config.Config.AutoPseudoGTID {
+			instance.UsingPseudoGTID = true
+		} else if config.Config.DetectPseudoGTIDQuery != "" {
 			waitGroup.Add(1)
 			go func() {
 				defer waitGroup.Done()

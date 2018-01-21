@@ -19,10 +19,12 @@ package inst
 import (
 	"database/sql"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
+	"github.com/github/orchestrator/go/process"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )
@@ -973,4 +975,37 @@ func KillQuery(instanceKey *InstanceKey, process int64) (*Instance, error) {
 	log.Infof("Killed query on %+v", *instanceKey)
 	AuditOperation("kill-query", instanceKey, fmt.Sprintf("Killed query %d", process))
 	return instance, err
+}
+
+// injectPseudoGTID injects a Pseudo-GTID statement on a writable instance
+func injectPseudoGTID(instance *Instance) (hint string, err error) {
+	if *config.RuntimeCLIFlags.Noop {
+		return hint, fmt.Errorf("noop: aborting inject-pseudo-gtid operation on %+v; signalling error but nothing went wrong.", instance.Key)
+	}
+
+	now := time.Now()
+	randomHash := process.NewToken().Hash[0:16]
+	hint = fmt.Sprintf("%.8x:%.8x:%s", now.Unix(), instance.ServerID, randomHash)
+	query := fmt.Sprintf("drop view if exists `%s`.`_asc:%s`", config.PseudoGTIDSchema, hint)
+	_, err = ExecInstance(&instance.Key, query)
+
+	return hint, log.Errore(err)
+}
+
+func InjectPseudoGTIDOnWriters() error {
+	instances, err := ReadWriteableClustersMasters()
+	if err != nil {
+		return log.Errore(err)
+	}
+	for i := range rand.Perm(len(instances)) {
+		instance := instances[i]
+		if !instance.IsWritableMaster() {
+			continue
+		}
+		if !instance.IsLastCheckValid {
+			continue
+		}
+		go injectPseudoGTID(instance)
+	}
+	return nil
 }
