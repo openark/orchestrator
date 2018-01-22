@@ -20,6 +20,7 @@ import (
 	"database/sql"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
@@ -992,6 +993,41 @@ func injectPseudoGTID(instance *Instance) (hint string, err error) {
 	return hint, log.Errore(err)
 }
 
+// canInjectPseudoGTID checks orchestrator's grants to determine whether is has the
+// privilige of auto-injecting pseudo-GTID
+func canInjectPseudoGTID(instanceKey *InstanceKey) (canInject bool, err error) {
+
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return canInject, err
+	}
+
+	foundAll := false
+	foundDropOnAll := false
+	foundAllOnSchema := false
+	foundDropOnSchema := false
+
+	err = sqlutils.QueryRowsMap(db, `show grants for current_user()`, func(m sqlutils.RowMap) error {
+		for _, grantData := range m {
+			grant := grantData.String
+			if strings.Contains(grant, `GRANT ALL PRIVILEGES ON *.*`) {
+				foundAll = true
+			}
+			if strings.Contains(grant, `DROP`) && strings.Contains(grant, ` ON *.*`) {
+				foundDropOnAll = true
+			}
+			if strings.Contains(grant, fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.*", config.PseudoGTIDSchema)) {
+				foundAllOnSchema = true
+			}
+			if strings.Contains(grant, `DROP`) && strings.Contains(grant, fmt.Sprintf(" ON `%s`.*", config.PseudoGTIDSchema)) {
+				foundDropOnSchema = true
+			}
+		}
+		return nil
+	})
+	return foundAll || foundDropOnAll || foundAllOnSchema || foundDropOnSchema, err
+}
+
 func InjectPseudoGTIDOnWriters() error {
 	instances, err := ReadWriteableClustersMasters()
 	if err != nil {
@@ -999,13 +1035,15 @@ func InjectPseudoGTIDOnWriters() error {
 	}
 	for i := range rand.Perm(len(instances)) {
 		instance := instances[i]
-		if !instance.IsWritableMaster() {
-			continue
-		}
-		if !instance.IsLastCheckValid {
-			continue
-		}
-		go injectPseudoGTID(instance)
+		go func() {
+			if !instance.IsWritableMaster() {
+				return
+			}
+			if !instance.IsLastCheckValid {
+				return
+			}
+			injectPseudoGTID(instance)
+		}()
 	}
 	return nil
 }
