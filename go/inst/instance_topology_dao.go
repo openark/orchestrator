@@ -1045,17 +1045,22 @@ func InjectPseudoGTIDOnWriters() error {
 	}
 	for i := range rand.Perm(len(instances)) {
 		instance := instances[i]
-		go func() {
+		go func() error {
 			if !instance.IsWritableMaster() {
-				return
+				return nil
 			}
 			if !instance.IsLastCheckValid {
-				return
+				return nil
 			}
-			if canInject, err := canInjectPseudoGTID(&instance.Key); err != nil || !canInject {
-				return
+			canInject, err := canInjectPseudoGTID(&instance.Key)
+			if err != nil {
+				return log.Errore(err)
 			}
-			injectPseudoGTID(instance)
+			if !canInject {
+				return nil
+			}
+			_, err = injectPseudoGTID(instance)
+			return err
 		}()
 	}
 	return nil
