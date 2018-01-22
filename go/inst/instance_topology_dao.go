@@ -28,12 +28,14 @@ import (
 	"github.com/github/orchestrator/go/process"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/patrickmn/go-cache"
 )
 
 // Max concurrency for bulk topology operations
 const topologyConcurrency = 128
 
 var topologyConcurrencyChan = make(chan bool, topologyConcurrency)
+var supportedAutoPseudoGTIDWriters *cache.Cache = cache.New(config.CheckAutoPseudoGTIDGrantsIntervalSeconds*time.Second, time.Second)
 
 type OperationGTIDHint string
 
@@ -996,7 +998,9 @@ func injectPseudoGTID(instance *Instance) (hint string, err error) {
 // canInjectPseudoGTID checks orchestrator's grants to determine whether is has the
 // privilige of auto-injecting pseudo-GTID
 func canInjectPseudoGTID(instanceKey *InstanceKey) (canInject bool, err error) {
-
+	if canInject, found := supportedAutoPseudoGTIDWriters.Get(instanceKey.StringCode()); found {
+		return canInject.(bool), nil
+	}
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
 		return canInject, err
@@ -1025,7 +1029,13 @@ func canInjectPseudoGTID(instanceKey *InstanceKey) (canInject bool, err error) {
 		}
 		return nil
 	})
-	return foundAll || foundDropOnAll || foundAllOnSchema || foundDropOnSchema, err
+	if err != nil {
+		return canInject, err
+	}
+
+	canInject = foundAll || foundDropOnAll || foundAllOnSchema || foundDropOnSchema
+	supportedAutoPseudoGTIDWriters.Set(instanceKey.StringCode(), canInject, cache.DefaultExpiration)
+	return canInject, nil
 }
 
 func InjectPseudoGTIDOnWriters() error {
@@ -1040,6 +1050,9 @@ func InjectPseudoGTIDOnWriters() error {
 				return
 			}
 			if !instance.IsLastCheckValid {
+				return
+			}
+			if canInject, err := canInjectPseudoGTID(&instance.Key); err != nil || !canInject {
 				return
 			}
 			injectPseudoGTID(instance)

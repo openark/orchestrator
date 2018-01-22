@@ -54,6 +54,7 @@ const (
 	DebugMetricsIntervalSeconds                  = 10
 	PseudoGTIDSchema                             = "_pseudo_gtid_"
 	PseudoGTIDIntervalSeconds                    = 5
+	CheckAutoPseudoGTIDGrantsIntervalSeconds     = 60
 )
 
 var deprecatedConfigurationVariables = []string{
