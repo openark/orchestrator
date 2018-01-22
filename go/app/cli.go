@@ -1393,15 +1393,6 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(fmt.Sprintf("%d recoveries acknowldged", countRecoveries))
 		}
-	case registerCliCommand("suggest-promoted-replacement", "Recovery", `Information command suggesting the best would-be replacement to master of given cluster`):
-		{
-			destination := validateInstanceIsFound(destinationKey)
-			replacement, _, err := logic.SuggestReplacementForPromotedReplica(&logic.TopologyRecovery{}, instanceKey, destination, nil)
-			if err != nil {
-				log.Fatale(err)
-			}
-			fmt.Println(replacement.Key.DisplayString())
-		}
 	// Instance meta
 	case registerCliCommand("register-candidate", "Instance, meta", `Indicate that a specific instance is a preferred candidate for master promotion`):
 		{
@@ -1531,6 +1522,15 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			config.RuntimeCLIFlags.ConfiguredVersion = ""
 			inst.ReadClusters()
 			fmt.Println("Redeployed internal db")
+		}
+	case registerCliCommand("internal-suggest-promoted-replacement", "Internal", `Internal only, used to test promotion logic in CI`):
+		{
+			destination := validateInstanceIsFound(destinationKey)
+			replacement, _, err := logic.SuggestReplacementForPromotedReplica(&logic.TopologyRecovery{}, instanceKey, destination, nil)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(replacement.Key.DisplayString())
 		}
 	case registerCliCommand("custom-command", "Agent", "Execute a custom command on the agent as defined in the agent conf"):
 		{
