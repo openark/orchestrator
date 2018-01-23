@@ -55,6 +55,7 @@ const (
 	PseudoGTIDSchema                             = "_pseudo_gtid_"
 	PseudoGTIDIntervalSeconds                    = 5
 	CheckAutoPseudoGTIDGrantsIntervalSeconds     = 60
+	SelectTrueQuery                              = "select 1"
 )
 
 var deprecatedConfigurationVariables = []string{
@@ -535,7 +536,7 @@ func (this *Configuration) postReadAdjustments() error {
 		this.PseudoGTIDPattern = "drop view if exists `_pseudo_gtid_`"
 		this.PseudoGTIDPatternIsFixedSubstring = true
 		this.PseudoGTIDMonotonicHint = "asc:"
-		this.DetectPseudoGTIDQuery = ""
+		this.DetectPseudoGTIDQuery = SelectTrueQuery
 		this.PseudoGTIDPreferIndependentMultiMatch = true
 	}
 	return nil
