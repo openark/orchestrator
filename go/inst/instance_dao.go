@@ -67,6 +67,7 @@ func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
 var instanceKeyInformativeClusterName *cache.Cache
 var forgetInstanceKeys *cache.Cache
+var pseudoGTIDInjectedClusters *cache.Cache
 
 var accessDeniedCounter = metrics.NewCounter()
 var readTopologyInstanceCounter = metrics.NewCounter()
@@ -88,6 +89,7 @@ func initializeInstanceDao() {
 	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
 	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
 	forgetInstanceKeys = cache.New(time.Duration(config.Config.InstancePollSeconds*3)*time.Second, time.Second)
+	pseudoGTIDInjectedClusters = cache.New(time.Hour, time.Second)
 	// spin off instance write buffer flushing
 	go func() {
 		flushTick := time.Tick(time.Duration(config.Config.InstanceFlushIntervalMilliseconds) * time.Millisecond)
@@ -347,27 +349,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 					// I don't want orchestrator to put even more burden on this. The 'Uptime' variable is not that important
 					// so as to completely fail reading a 5.7 instance.
 					// This is supposed to be fixed in 5.7.9
-				}
-			}()
-		}
-
-		instance.UsingPseudoGTID = false
-		if config.Config.DetectPseudoGTIDQuery == config.SelectTrueQuery {
-			instance.UsingPseudoGTID = true
-		} else if config.Config.DetectPseudoGTIDQuery != "" {
-			waitGroup.Add(1)
-			go func() {
-				defer waitGroup.Done()
-				if resultData, err := sqlutils.QueryResultData(db, config.Config.DetectPseudoGTIDQuery); err == nil {
-					if len(resultData) > 0 {
-						if len(resultData[0]) > 0 {
-							if resultData[0][0].Valid && resultData[0][0].String == "1" {
-								instance.UsingPseudoGTID = true
-							}
-						}
-					}
-				} else {
-					logReadTopologyInstanceError(instanceKey, "DetectPseudoGTIDQuery", err)
 				}
 			}()
 		}
@@ -650,6 +631,34 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		err = ReadInstanceClusterAttributes(instance)
 		latency.Stop("backend")
 		logReadTopologyInstanceError(instanceKey, "ReadInstanceClusterAttributes", err)
+	}
+
+	{
+		// Pseudo GTID
+		// Depends on ReadInstanceClusterAttributes above
+		instance.UsingPseudoGTID = false
+		if config.Config.AutoPseudoGTID {
+			if _, found := pseudoGTIDInjectedClusters.Get(instance.ClusterName); found {
+				// this cluster is known to have been populated by injectPseudoGTID()
+				instance.UsingPseudoGTID = true
+			}
+		} else if config.Config.DetectPseudoGTIDQuery != "" {
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				if resultData, err := sqlutils.QueryResultData(db, config.Config.DetectPseudoGTIDQuery); err == nil {
+					if len(resultData) > 0 {
+						if len(resultData[0]) > 0 {
+							if resultData[0][0].Valid && resultData[0][0].String == "1" {
+								instance.UsingPseudoGTID = true
+							}
+						}
+					}
+				} else {
+					logReadTopologyInstanceError(instanceKey, "DetectPseudoGTIDQuery", err)
+				}
+			}()
+		}
 	}
 
 	// First read the current PromotionRule from candidate_database_instance.
