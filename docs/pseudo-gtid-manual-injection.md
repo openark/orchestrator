@@ -119,8 +119,6 @@ While the statement is visible in the binary logs, it is not visible in the data
 
 The logic above also makes sure injected pseudo-gtid entires are in Ascending lexical order. The `PseudoGTIDMonotonicHint` config relates to the `asc:` hint in the query. Ascending order allows orchestrator to perform further optimizations when searching for a given Pseudo-GTID entry on a server's binary logs.
 
-The author of `orchestrator` uses this last method injection.
-
 `orchestrator` will only enable Pseudo-GTID mode if the `PseudoGTIDPattern` configuration variable is non-empty, but can only validate its correctness during runtime.
 
 If your pattern is incorrect (thus, `orchestrator` in unable to find pattern in the binary logs), you will not be able to move replicas in the topology via Pseudo-GTID, and you will only find this out upon attempting to.
