@@ -20,7 +20,7 @@ Pseudo-GTID is attractive to users not using GTID. Pseudo-GTID has most of GTID'
 
 ### Automated Pseudo-GTID injection
 
-`orchestrator` can inject Pseudo-GTID entries for you.
+`orchestrator` can inject Pseudo-GTID entries for you. See [Automated Pseudo-GTID](configuration-discovery-pseudo-gtid.md#automated-pseudo-gtid-injection)
 
 ### Manual Pseudo-GTID injection
 
