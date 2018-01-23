@@ -3,10 +3,30 @@
 Pseudo GTID is the method of injecting unique entries into the binary logs, such that they can be used to
 match/sync replicas without direct connection, or replicas whose master is corrupted/dead.
 
-`Orchestrator` leverages Pseudo GTID, when applicable, and allows for complex re-matching of replicas, including
-semi-automated fail over onto a replica and the moving of its siblings as its replicas.
+Pseudo-GTID is attractive to users not using GTID. Pseudo-GTID has most of GTID's benefits, but without making the commitment GTID requires. With Pseudo-GTID you can keep your existing topologies, whichever version of MySQL you're running.
 
-To enable Pseudo GTID you need to:
+### Advantages of Pseudo-GTID
+
+- Enable master failovers.
+- Enable intermediate master failovers.
+- Arbitrary refactoring, relocating replicas from one place to another (even those replicas that don't have binary logging).
+- Vendor neutral; works on both Oracle and MariaDB, even both combined.
+- No configuration changes. Your replication setup remains as it is.
+- No commitment. You can choose to move away from Pseudo-GTID at any time; just stop writing P-GTID entries.
+- Pseudo-GTID implies crash-safe replication for replicas running with:
+  - `log-slave-updates`
+  - `sync_binlog=1`
+- As opposed to GTID on MySQL `5.6`, servers don't _have to_ run with `log-slave-updates`, though `log-slave-updates` is recommended.
+
+### Automated Pseudo-GTID injection
+
+`orchestrator` can inject Pseudo-GTID entries for you.
+
+### Manual Pseudo-GTID injection
+
+Automated Pseudo-GTID is a later addition which supersedes the need for manual Pseudo-GTID injection, and is recommended. However, you may still choose to inject your own Pseudo-GTID.
+
+To enable Pseudo GTID manually you need to:
 
 1. Frequently inject a unique entry into the binary logs
 2. Configure orchestrator to recognize such an entry
@@ -26,19 +46,6 @@ Injecting Pseudo GTID can be done via:
   - script to inject pseudo-gtid
   - start-stop script to serve as daemon on `/etc/init.d/pseudo-gtid`
   - a puppet module.
-
-### Advantages of Pseudo-GTID
-
-- Vendor neutral; works on both Oracle and MariaDB, even both combined.
-- No configuration changes. Your replication setup remains as it is.
-- No commitment. You can choose to move away from Pseudo-GTID at any time; just stop writing P-GTID entries.
-- Pseudo-GTID allows **arbitrary refactoring**, relocating replicas from one place to another
-- Pseudo-GTID enables master crash recovery by aligning all replicas and healing the topology
-- Pseudo-GTID enables intermediate master recovery by either aligning or relocating all orphaned replicas.
-- Pseudo-GTID implies crash-safe replication for replicas running with:
-  - `log-slave-updates`
-  - `sync_binlog=1`
-- As opposed to MySQL `5.6`, servers don't _have to_ run with `log-slave-updates`, though `log-slave-updates` is recommended.
 
 ### Limitations
 - Active-Active master-master replication not supported

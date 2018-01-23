@@ -19,7 +19,7 @@ You will further need to grant the following on your MySQL servers:
 GRANT DROP ON _pseudo_gtid_.* to 'orchestrator'@'orch_host';
 ```
 
-**NOTE**: the `_pseudo_gtid_` doesn't need to exist. There is no need to create it. `orchestrator` will run queries of the form:
+**NOTE**: the `_pseudo_gtid_` schema doesn't need to exist. There is no need to create it. `orchestrator` will run queries of the form:
 
 ```sql
 drop view if exists `_pseudo_gtid_`.`_asc:5a64a70e:00000001:c7b8154ff5c3c6d8`
@@ -42,7 +42,10 @@ If you wish to enable auto-Pseudo-GTID injection having run manual Pseudo-GTID i
 
 ### Manual Pseudo-GTID injection
 
+[Automated Pseudo-GTID](#automated-pseudo-gtid-injection) is the recommended method.
+
 If you wish to inject Pseudo-GTID yourself, we suggest you should configure as follows:
+
 ```json
 {
   "PseudoGTIDPattern": "drop view if exists `meta`.`_pseudo_gtid_hint__asc:",
