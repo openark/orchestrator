@@ -19,18 +19,23 @@ package inst
 import (
 	"database/sql"
 	"fmt"
+	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
+	"github.com/github/orchestrator/go/process"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/patrickmn/go-cache"
 )
 
 // Max concurrency for bulk topology operations
 const topologyConcurrency = 128
 
 var topologyConcurrencyChan = make(chan bool, topologyConcurrency)
+var supportedAutoPseudoGTIDWriters *cache.Cache = cache.New(config.CheckAutoPseudoGTIDGrantsIntervalSeconds*time.Second, time.Second)
 
 type OperationGTIDHint string
 
@@ -973,4 +978,96 @@ func KillQuery(instanceKey *InstanceKey, process int64) (*Instance, error) {
 	log.Infof("Killed query on %+v", *instanceKey)
 	AuditOperation("kill-query", instanceKey, fmt.Sprintf("Killed query %d", process))
 	return instance, err
+}
+
+// injectPseudoGTID injects a Pseudo-GTID statement on a writable instance
+func injectPseudoGTID(instance *Instance) (hint string, err error) {
+	if *config.RuntimeCLIFlags.Noop {
+		return hint, fmt.Errorf("noop: aborting inject-pseudo-gtid operation on %+v; signalling error but nothing went wrong.", instance.Key)
+	}
+
+	now := time.Now()
+	randomHash := process.RandomHash()[0:16]
+	hint = fmt.Sprintf("%.8x:%.8x:%s", now.Unix(), instance.ServerID, randomHash)
+	query := fmt.Sprintf("drop view if exists `%s`.`_asc:%s`", config.PseudoGTIDSchema, hint)
+	if _, err = ExecInstance(&instance.Key, query); err == nil {
+		pseudoGTIDInjectedClusters.Set(instance.ClusterName, true, cache.DefaultExpiration)
+	}
+
+	return hint, log.Errore(err)
+}
+
+// canInjectPseudoGTID checks orchestrator's grants to determine whether is has the
+// privilige of auto-injecting pseudo-GTID
+func canInjectPseudoGTID(instanceKey *InstanceKey) (canInject bool, err error) {
+	if canInject, found := supportedAutoPseudoGTIDWriters.Get(instanceKey.StringCode()); found {
+		return canInject.(bool), nil
+	}
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return canInject, err
+	}
+
+	foundAll := false
+	foundDropOnAll := false
+	foundAllOnSchema := false
+	foundDropOnSchema := false
+
+	err = sqlutils.QueryRowsMap(db, `show grants for current_user()`, func(m sqlutils.RowMap) error {
+		for _, grantData := range m {
+			grant := grantData.String
+			if strings.Contains(grant, `GRANT ALL PRIVILEGES ON *.*`) {
+				foundAll = true
+			}
+			if strings.Contains(grant, `DROP`) && strings.Contains(grant, ` ON *.*`) {
+				foundDropOnAll = true
+			}
+			if strings.Contains(grant, fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.*", config.PseudoGTIDSchema)) {
+				foundAllOnSchema = true
+			}
+			if strings.Contains(grant, `DROP`) && strings.Contains(grant, fmt.Sprintf(" ON `%s`.*", config.PseudoGTIDSchema)) {
+				foundDropOnSchema = true
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return canInject, err
+	}
+
+	canInject = foundAll || foundDropOnAll || foundAllOnSchema || foundDropOnSchema
+	supportedAutoPseudoGTIDWriters.Set(instanceKey.StringCode(), canInject, cache.DefaultExpiration)
+	return canInject, nil
+}
+
+// InjectPseudoGTIDOnWriters will inject a PseudoGTID entry on all writable, accessible,
+// supported writers.
+func InjectPseudoGTIDOnWriters() error {
+	instances, err := ReadWriteableClustersMasters()
+	if err != nil {
+		return log.Errore(err)
+	}
+	for i := range rand.Perm(len(instances)) {
+		instance := instances[i]
+		go func() error {
+			if !instance.IsWritableMaster() {
+				return nil
+			}
+			if !instance.IsLastCheckValid {
+				return nil
+			}
+			canInject, err := canInjectPseudoGTID(&instance.Key)
+			if err != nil {
+				return log.Errore(err)
+			}
+			if !canInject {
+				return nil
+			}
+			if _, err := injectPseudoGTID(instance); err != nil {
+				return log.Errore(err)
+			}
+			return nil
+		}()
+	}
+	return nil
 }
