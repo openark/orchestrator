@@ -356,6 +356,9 @@ func onHealthTick() {
 	}
 }
 
+// publishDiscoverMasters will publish to raft a discovery request for all known masters.
+// This makes for a best-effort keep-in-sync between raft nodes, where some may have
+// inconsistent data due to hosts being forgotten, for example.
 func publishDiscoverMasters() error {
 	instances, err := inst.ReadWriteableClustersMasters()
 	if err == nil {
@@ -452,6 +455,7 @@ func ContinuousDiscovery() {
 					go inst.ExpirePoolInstances()
 					go inst.FlushNontrivialResolveCacheToDatabase()
 					go inst.ExpireInstanceBinlogFileHistory()
+					go inst.ExpireRegisteredInjectedPseudoGTID()
 					go process.ExpireNodesHistory()
 					go process.ExpireAccessTokens()
 					go process.ExpireAvailableNodes()

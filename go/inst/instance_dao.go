@@ -2681,3 +2681,37 @@ func FigureInstanceKey(instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (
 	}
 	return figuredKey, nil
 }
+
+// RegisterInjectedPseudoGTID
+func RegisterInjectedPseudoGTID(instanceKey *InstanceKey) error {
+	query := `
+			insert into database_instance_injected_pseudo_gtid (
+					hostname,
+					port,
+					time_injected
+				) values (?, ?, now())
+				on duplicate key update
+					hostname=values(hostname),
+					port=values(port),
+					time_injected=now()
+				`
+	args := sqlutils.Args(instanceKey.Hostname, instanceKey.Port)
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(query, args...)
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
+// ExpireRegisteredInjectedPseudoGTID
+func ExpireRegisteredInjectedPseudoGTID() error {
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+      	delete from database_instance_injected_pseudo_gtid
+				where time_injected < NOW() - INTERVAL ? SECOND
+				`, config.PseudoGTIDIntervalSeconds*10,
+		)
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
+}

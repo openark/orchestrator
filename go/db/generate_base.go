@@ -809,4 +809,12 @@ var generateSQLBase = []string{
 			PRIMARY KEY (store_key)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS database_instance_injected_pseudo_gtid (
+			hostname varchar(128) NOT NULL,
+			port smallint(5) unsigned NOT NULL,
+			time_injected timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (hostname, port)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }

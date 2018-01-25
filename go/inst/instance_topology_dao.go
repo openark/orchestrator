@@ -998,7 +998,7 @@ func injectPseudoGTID(instance *Instance) (hint string, err error) {
 }
 
 // canInjectPseudoGTID checks orchestrator's grants to determine whether is has the
-// privilige of auto-injecting pseudo-GTID
+// privilege of auto-injecting pseudo-GTID
 func canInjectPseudoGTID(instanceKey *InstanceKey) (canInject bool, err error) {
 	if canInject, found := supportedAutoPseudoGTIDWriters.Get(instanceKey.StringCode()); found {
 		return canInject.(bool), nil
@@ -1064,6 +1064,9 @@ func InjectPseudoGTIDOnWriters() error {
 				return nil
 			}
 			if _, err := injectPseudoGTID(instance); err != nil {
+				return log.Errore(err)
+			}
+			if err := RegisterInjectedPseudoGTID(&instance.Key); err != nil {
 				return log.Errore(err)
 			}
 			return nil
