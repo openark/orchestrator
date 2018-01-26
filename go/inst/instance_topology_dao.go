@@ -990,10 +990,7 @@ func injectPseudoGTID(instance *Instance) (hint string, err error) {
 	randomHash := process.RandomHash()[0:16]
 	hint = fmt.Sprintf("%.8x:%.8x:%s", now.Unix(), instance.ServerID, randomHash)
 	query := fmt.Sprintf("drop view if exists `%s`.`_asc:%s`", config.PseudoGTIDSchema, hint)
-	if _, err = ExecInstance(&instance.Key, query); err == nil {
-		pseudoGTIDInjectedClusters.Set(instance.ClusterName, true, cache.DefaultExpiration)
-	}
-
+	_, err = ExecInstance(&instance.Key, query)
 	return hint, log.Errore(err)
 }
 
@@ -1066,7 +1063,7 @@ func InjectPseudoGTIDOnWriters() error {
 			if _, err := injectPseudoGTID(instance); err != nil {
 				return log.Errore(err)
 			}
-			if err := RegisterInjectedPseudoGTID(&instance.Key); err != nil {
+			if err := RegisterInjectedPseudoGTID(instance.ClusterName); err != nil {
 				return log.Errore(err)
 			}
 			return nil

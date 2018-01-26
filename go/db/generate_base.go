@@ -810,11 +810,10 @@ var generateSQLBase = []string{
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
-		CREATE TABLE IF NOT EXISTS database_instance_injected_pseudo_gtid (
-			hostname varchar(128) NOT NULL,
-			port smallint(5) unsigned NOT NULL,
+		CREATE TABLE IF NOT EXISTS cluster_injected_pseudo_gtid (
+			cluster_name varchar(128) NOT NULL,
 			time_injected timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (hostname, port)
+			PRIMARY KEY (cluster_name)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 }

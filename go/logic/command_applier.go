@@ -45,6 +45,8 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.registerNode(value)
 	case "discover":
 		return applier.discover(value)
+	case "injected-pseudo-gtid":
+		return applier.injectedPseudoGTID(value)
 	case "forget":
 		return applier.forget(value)
 	case "forget-cluster":
@@ -94,6 +96,19 @@ func (applier *CommandApplier) discover(value []byte) interface{} {
 		return log.Errore(err)
 	}
 	discoverInstance(instanceKey)
+	return nil
+}
+
+func (applier *CommandApplier) injectedPseudoGTID(value []byte) interface{} {
+	var clusterName string
+	if err := json.Unmarshal(value, &clusterName); err != nil {
+		return log.Errore(err)
+	}
+	log.Infof("................injectedPseudoGTID  %+v", clusterName)
+	if !orcraft.IsLeader() {
+		log.Infof("................injectedPseudoGTID register %+v", clusterName)
+		inst.RegisterInjectedPseudoGTID(clusterName)
+	}
 	return nil
 }
 

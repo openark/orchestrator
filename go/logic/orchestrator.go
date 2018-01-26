@@ -370,6 +370,18 @@ func publishDiscoverMasters() error {
 	return log.Errore(err)
 }
 
+func publishPseudoGTIDInjectedInstances() error {
+	clusterNames, err := inst.ReadInjectedPseudoGTID()
+	if err != nil {
+		return err
+	}
+	for clusterName := range clusterNames {
+		clusterName := clusterName
+		go orcraft.PublishCommand("injected-pseudo-gtid", clusterName)
+	}
+	return nil
+}
+
 // ContinuousDiscovery starts an asynchronuous infinite discovery process where instances are
 // periodically investigated and their status captured, and long since unseen instances are
 // purged and forgotten.
@@ -398,7 +410,10 @@ func ContinuousDiscovery() {
 	go ometrics.InitGraphiteMetrics()
 	go acceptSignals()
 	go kv.InitKVStores()
-
+	go func() {
+		inst.ExpireInjectedPseudoGTID()
+		inst.CacheInjectedPseudoGTID()
+	}()
 	if config.Config.RaftEnabled {
 		if err := orcraft.Setup(NewCommandApplier(), NewSnapshotDataCreatorApplier(), process.ThisHostname); err != nil {
 			log.Fatale(err)
@@ -429,7 +444,7 @@ func ContinuousDiscovery() {
 			}()
 		case <-autoPseudoGTIDTick:
 			go func() {
-				if config.Config.AutoPseudoGTID && IsLeaderOrActive() {
+				if config.Config.AutoPseudoGTID && IsLeader() {
 					go inst.InjectPseudoGTIDOnWriters()
 				}
 			}()
@@ -455,7 +470,7 @@ func ContinuousDiscovery() {
 					go inst.ExpirePoolInstances()
 					go inst.FlushNontrivialResolveCacheToDatabase()
 					go inst.ExpireInstanceBinlogFileHistory()
-					go inst.ExpireRegisteredInjectedPseudoGTID()
+					go inst.ExpireInjectedPseudoGTID()
 					go process.ExpireNodesHistory()
 					go process.ExpireAccessTokens()
 					go process.ExpireAvailableNodes()
@@ -466,10 +481,12 @@ func ContinuousDiscovery() {
 					// Take this opportunity to refresh yourself
 					go inst.LoadHostnameResolveCache()
 				}
+				go inst.CacheInjectedPseudoGTID()
 			}()
 		case <-raftCaretakingTick:
 			if orcraft.IsRaftEnabled() && orcraft.IsLeader() {
 				go publishDiscoverMasters()
+				go publishPseudoGTIDInjectedInstances()
 			}
 		case <-recoveryTick:
 			go func() {

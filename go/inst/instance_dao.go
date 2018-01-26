@@ -2683,35 +2683,58 @@ func FigureInstanceKey(instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (
 }
 
 // RegisterInjectedPseudoGTID
-func RegisterInjectedPseudoGTID(instanceKey *InstanceKey) error {
+func RegisterInjectedPseudoGTID(clusterName string) error {
 	query := `
-			insert into database_instance_injected_pseudo_gtid (
-					hostname,
-					port,
+			insert into cluster_injected_pseudo_gtid (
+					cluster_name,
 					time_injected
-				) values (?, ?, now())
+				) values (?, now())
 				on duplicate key update
-					hostname=values(hostname),
-					port=values(port),
+					cluster_name=values(cluster_name),
 					time_injected=now()
 				`
-	args := sqlutils.Args(instanceKey.Hostname, instanceKey.Port)
+	args := sqlutils.Args(clusterName)
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(query, args...)
+		log.Infof("................cluster_injected_pseudo_gtid written %+v", clusterName)
 		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }
 
-// ExpireRegisteredInjectedPseudoGTID
-func ExpireRegisteredInjectedPseudoGTID() error {
+// ExpireInjectedPseudoGTID
+func ExpireInjectedPseudoGTID() error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-      	delete from database_instance_injected_pseudo_gtid
+      	delete from cluster_injected_pseudo_gtid
 				where time_injected < NOW() - INTERVAL ? SECOND
 				`, config.PseudoGTIDIntervalSeconds*10,
 		)
 		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
+}
+
+// ReadHistoryClusterInstances reads (thin) instances from history
+func ReadInjectedPseudoGTID() (clusterNames []string, err error) {
+	query := `select cluster_name from cluster_injected_pseudo_gtid`
+	err = db.QueryOrchestrator(query, sqlutils.Args(), func(m sqlutils.RowMap) error {
+		clusterName := m.GetString("cluster_name")
+		clusterNames = append(clusterNames, clusterName)
+		return nil
+	})
+	log.Infof("................cluster_injected_pseudo_gtid read %+v", len(clusterNames))
+	return clusterNames, log.Errore(err)
+}
+
+func CacheInjectedPseudoGTID() error {
+	clusterNames, err := ReadInjectedPseudoGTID()
+	if err != nil {
+		return err
+	}
+	for _, clusterName := range clusterNames {
+		pseudoGTIDInjectedClusters.Set(clusterName, true, cache.DefaultExpiration)
+	}
+	log.Infof("................cache updated %+v", pseudoGTIDInjectedClusters.ItemCount())
+	return nil
 }
