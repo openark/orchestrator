@@ -19,7 +19,6 @@ package inst
 import (
 	"database/sql"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
@@ -1037,37 +1036,28 @@ func canInjectPseudoGTID(instanceKey *InstanceKey) (canInject bool, err error) {
 	return canInject, nil
 }
 
-// InjectPseudoGTIDOnWriters will inject a PseudoGTID entry on all writable, accessible,
-// supported writers.
-func InjectPseudoGTIDOnWriters() error {
-	instances, err := ReadWriteableClustersMasters()
+// CheckAndInjectPseudoGTIDOnWriter checks whether pseudo-GTID can and
+// should be injected on given instance, and if so, attempts to inject.
+func CheckAndInjectPseudoGTIDOnWriter(instance *Instance) (injected bool, err error) {
+	if !instance.IsWritableMaster() {
+		return injected, nil
+	}
+	if !instance.IsLastCheckValid {
+		return injected, nil
+	}
+	canInject, err := canInjectPseudoGTID(&instance.Key)
 	if err != nil {
-		return log.Errore(err)
+		return injected, log.Errore(err)
 	}
-	for i := range rand.Perm(len(instances)) {
-		instance := instances[i]
-		go func() error {
-			if !instance.IsWritableMaster() {
-				return nil
-			}
-			if !instance.IsLastCheckValid {
-				return nil
-			}
-			canInject, err := canInjectPseudoGTID(&instance.Key)
-			if err != nil {
-				return log.Errore(err)
-			}
-			if !canInject {
-				return nil
-			}
-			if _, err := injectPseudoGTID(instance); err != nil {
-				return log.Errore(err)
-			}
-			if err := RegisterInjectedPseudoGTID(instance.ClusterName); err != nil {
-				return log.Errore(err)
-			}
-			return nil
-		}()
+	if !canInject {
+		return injected, nil
 	}
-	return nil
+	if _, err := injectPseudoGTID(instance); err != nil {
+		return injected, log.Errore(err)
+	}
+	injected = true
+	if err := RegisterInjectedPseudoGTID(instance.ClusterName); err != nil {
+		return injected, log.Errore(err)
+	}
+	return injected, nil
 }

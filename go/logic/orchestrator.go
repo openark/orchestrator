@@ -18,6 +18,7 @@ package logic
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"os/signal"
 	"sync"
@@ -65,6 +66,7 @@ var discoveryMetrics = collection.CreateOrReturnCollection(discoveryMetricsName)
 var isElectedNode int64 = 0
 
 var recentDiscoveryOperationKeys *cache.Cache
+var pseudoGTIDPublishCache = cache.New(time.Minute, time.Second)
 
 func init() {
 	snapshotDiscoveryKeys = make(chan inst.InstanceKey, 10)
@@ -370,14 +372,33 @@ func publishDiscoverMasters() error {
 	return log.Errore(err)
 }
 
-func publishPseudoGTIDInjectedInstances() error {
-	clusterNames, err := inst.ReadInjectedPseudoGTID()
+// InjectPseudoGTIDOnWriters will inject a PseudoGTID entry on all writable, accessible,
+// supported writers.
+func InjectPseudoGTIDOnWriters() error {
+	instances, err := inst.ReadWriteableClustersMasters()
 	if err != nil {
-		return err
+		return log.Errore(err)
 	}
-	for clusterName := range clusterNames {
-		clusterName := clusterName
-		go orcraft.PublishCommand("injected-pseudo-gtid", clusterName)
+	for i := range rand.Perm(len(instances)) {
+		instance := instances[i]
+		go func() {
+			if injected, _ := inst.CheckAndInjectPseudoGTIDOnWriter(instance); injected {
+				clusterName := instance.ClusterName
+				log.Infof("............. going to publish, hopefully")
+				if orcraft.IsRaftEnabled() {
+					// We prefer not saturating our raft communication. Pseudo-GTID information is
+					// OK to be cached for a while.
+					if _, found := pseudoGTIDPublishCache.Get(clusterName); !found {
+						pseudoGTIDPublishCache.Set(clusterName, true, cache.DefaultExpiration)
+						orcraft.PublishCommand("injected-pseudo-gtid", clusterName)
+						log.Infof(".............published")
+					}
+				} else {
+					log.Infof(".............local")
+					inst.RegisterInjectedPseudoGTID(clusterName)
+				}
+			}
+		}()
 	}
 	return nil
 }
@@ -410,10 +431,6 @@ func ContinuousDiscovery() {
 	go ometrics.InitGraphiteMetrics()
 	go acceptSignals()
 	go kv.InitKVStores()
-	go func() {
-		inst.ExpireInjectedPseudoGTID()
-		inst.CacheInjectedPseudoGTID()
-	}()
 	if config.Config.RaftEnabled {
 		if err := orcraft.Setup(NewCommandApplier(), NewSnapshotDataCreatorApplier(), process.ThisHostname); err != nil {
 			log.Fatale(err)
@@ -445,7 +462,7 @@ func ContinuousDiscovery() {
 		case <-autoPseudoGTIDTick:
 			go func() {
 				if config.Config.AutoPseudoGTID && IsLeader() {
-					go inst.InjectPseudoGTIDOnWriters()
+					go InjectPseudoGTIDOnWriters()
 				}
 			}()
 		case <-caretakingTick:
@@ -481,12 +498,10 @@ func ContinuousDiscovery() {
 					// Take this opportunity to refresh yourself
 					go inst.LoadHostnameResolveCache()
 				}
-				go inst.CacheInjectedPseudoGTID()
 			}()
 		case <-raftCaretakingTick:
 			if orcraft.IsRaftEnabled() && orcraft.IsLeader() {
 				go publishDiscoverMasters()
-				go publishPseudoGTIDInjectedInstances()
 			}
 		case <-recoveryTick:
 			go func() {

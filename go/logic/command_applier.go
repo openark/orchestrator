@@ -105,10 +105,7 @@ func (applier *CommandApplier) injectedPseudoGTID(value []byte) interface{} {
 		return log.Errore(err)
 	}
 	log.Infof("................injectedPseudoGTID  %+v", clusterName)
-	if !orcraft.IsLeader() {
-		log.Infof("................injectedPseudoGTID register %+v", clusterName)
-		inst.RegisterInjectedPseudoGTID(clusterName)
-	}
+	inst.RegisterInjectedPseudoGTID(clusterName)
 	return nil
 }
 
