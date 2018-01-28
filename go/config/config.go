@@ -298,6 +298,7 @@ func newConfiguration() *Configuration {
 		UnseenInstanceForgetHours:                  240,
 		SnapshotTopologiesIntervalHours:            0,
 		DiscoverByShowSlaveHosts:                   false,
+		UseSuperReadOnly:                           false,
 		DiscoveryMaxConcurrency:                    300,
 		DiscoveryQueueCapacity:                     100000,
 		DiscoveryQueueMaxStatisticsSize:            120,
