@@ -54,6 +54,7 @@ const (
 	DebugMetricsIntervalSeconds                  = 10
 	PseudoGTIDSchema                             = "_pseudo_gtid_"
 	PseudoGTIDIntervalSeconds                    = 5
+	PseudoGTIDExpireMinutes                      = 60
 	CheckAutoPseudoGTIDGrantsIntervalSeconds     = 60
 	SelectTrueQuery                              = "select 1"
 )

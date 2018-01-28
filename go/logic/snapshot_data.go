@@ -39,6 +39,7 @@ type SnapshotData struct {
 	HostAttributes,
 	AccessToken,
 	PoolInstances,
+	InjectedPseudoGTIDInstances,
 	HostnameResolves,
 	HostnameUnresolves,
 	DowntimedInstances,
@@ -92,6 +93,7 @@ func CreateSnapshotData() *SnapshotData {
 	readTableData("kv_store", &snapshotData.KVStore)
 	readTableData("topology_recovery", &snapshotData.Recovery)
 	readTableData("topology_recovery_steps", &snapshotData.RecoverySteps)
+	readTableData("database_instance_injected_pseudo_gtid", &snapshotData.InjectedPseudoGTIDInstances)
 
 	log.Debugf("raft snapshot data created")
 	return snapshotData
@@ -179,6 +181,7 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 	writeTableData("topology_recovery", &snapshotData.Recovery)
 	writeTableData("topology_failure_detection", &snapshotData.Detections)
 	writeTableData("topology_recovery_steps", &snapshotData.RecoverySteps)
+	writeTableData("database_instance_injected_pseudo_gtid", &snapshotData.InjectedPseudoGTIDInstances)
 
 	// recovery disable
 	{

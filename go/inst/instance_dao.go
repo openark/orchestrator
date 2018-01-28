@@ -67,7 +67,7 @@ func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
 var instanceKeyInformativeClusterName *cache.Cache
 var forgetInstanceKeys *cache.Cache
-var pseudoGTIDInjectedClusters *cache.Cache
+var clusterInjectedPseudoGTIDCache *cache.Cache
 
 var accessDeniedCounter = metrics.NewCounter()
 var readTopologyInstanceCounter = metrics.NewCounter()
@@ -89,7 +89,7 @@ func initializeInstanceDao() {
 	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
 	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
 	forgetInstanceKeys = cache.New(time.Duration(config.Config.InstancePollSeconds*3)*time.Second, time.Second)
-	pseudoGTIDInjectedClusters = cache.New(time.Hour, time.Second)
+	clusterInjectedPseudoGTIDCache = cache.New(time.Minute, time.Second)
 	// spin off instance write buffer flushing
 	go func() {
 		flushTick := time.Tick(time.Duration(config.Config.InstanceFlushIntervalMilliseconds) * time.Millisecond)
@@ -638,10 +638,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		// Depends on ReadInstanceClusterAttributes above
 		instance.UsingPseudoGTID = false
 		if config.Config.AutoPseudoGTID {
-			if _, found := pseudoGTIDInjectedClusters.Get(instance.ClusterName); found {
-				// this cluster is known to have been populated by injectPseudoGTID()
-				instance.UsingPseudoGTID = true
-			}
+			var err error
+			instance.UsingPseudoGTID, err = isInjectedPseudoGTID(instance.ClusterName)
+			log.Errore(err)
 		} else if config.Config.DetectPseudoGTIDQuery != "" {
 			waitGroup.Add(1)
 			go func() {
@@ -2680,4 +2679,63 @@ func FigureInstanceKey(instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (
 		return nil, log.Errorf("Cannot deduce instance %+v", instanceKey)
 	}
 	return figuredKey, nil
+}
+
+// RegisterInjectedPseudoGTID
+func RegisterInjectedPseudoGTID(clusterName string) error {
+	query := `
+			insert into cluster_injected_pseudo_gtid (
+					cluster_name,
+					time_injected
+				) values (?, now())
+				on duplicate key update
+					cluster_name=values(cluster_name),
+					time_injected=now()
+				`
+	args := sqlutils.Args(clusterName)
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(query, args...)
+		if err == nil {
+			log.Infof("................cluster_injected_pseudo_gtid written %+v", clusterName)
+			clusterInjectedPseudoGTIDCache.Set(clusterName, true, cache.DefaultExpiration)
+		}
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
+// ExpireInjectedPseudoGTID
+func ExpireInjectedPseudoGTID() error {
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+				delete from cluster_injected_pseudo_gtid
+				where time_injected < NOW() - INTERVAL ? MINUTE
+				`, config.PseudoGTIDExpireMinutes,
+		)
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
+// isInjectedPseudoGTID reads from backend DB / cache
+func isInjectedPseudoGTID(clusterName string) (injected bool, err error) {
+	if injectedValue, found := clusterInjectedPseudoGTIDCache.Get(clusterName); found {
+		log.Infof("................isInjectedPseudoGTID returning from cache %+v:%+v", clusterName, injectedValue)
+		return injectedValue.(bool), err
+	}
+	query := `
+			select
+					count(*) as is_injected
+				from
+					cluster_injected_pseudo_gtid
+				where
+					cluster_name = ?
+			`
+	err = db.QueryOrchestrator(query, sqlutils.Args(clusterName), func(m sqlutils.RowMap) error {
+		injected = m.GetBool("is_injected")
+		return nil
+	})
+	log.Infof("................isInjectedPseudoGTID storing in cache: %+v:%+v", clusterName, injected)
+	clusterInjectedPseudoGTIDCache.Set(clusterName, injected, cache.DefaultExpiration)
+	return injected, log.Errore(err)
 }

@@ -19,7 +19,6 @@ package inst
 import (
 	"database/sql"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
@@ -990,15 +989,12 @@ func injectPseudoGTID(instance *Instance) (hint string, err error) {
 	randomHash := process.RandomHash()[0:16]
 	hint = fmt.Sprintf("%.8x:%.8x:%s", now.Unix(), instance.ServerID, randomHash)
 	query := fmt.Sprintf("drop view if exists `%s`.`_asc:%s`", config.PseudoGTIDSchema, hint)
-	if _, err = ExecInstance(&instance.Key, query); err == nil {
-		pseudoGTIDInjectedClusters.Set(instance.ClusterName, true, cache.DefaultExpiration)
-	}
-
+	_, err = ExecInstance(&instance.Key, query)
 	return hint, log.Errore(err)
 }
 
 // canInjectPseudoGTID checks orchestrator's grants to determine whether is has the
-// privilige of auto-injecting pseudo-GTID
+// privilege of auto-injecting pseudo-GTID
 func canInjectPseudoGTID(instanceKey *InstanceKey) (canInject bool, err error) {
 	if canInject, found := supportedAutoPseudoGTIDWriters.Get(instanceKey.StringCode()); found {
 		return canInject.(bool), nil
@@ -1040,34 +1036,28 @@ func canInjectPseudoGTID(instanceKey *InstanceKey) (canInject bool, err error) {
 	return canInject, nil
 }
 
-// InjectPseudoGTIDOnWriters will inject a PseudoGTID entry on all writable, accessible,
-// supported writers.
-func InjectPseudoGTIDOnWriters() error {
-	instances, err := ReadWriteableClustersMasters()
+// CheckAndInjectPseudoGTIDOnWriter checks whether pseudo-GTID can and
+// should be injected on given instance, and if so, attempts to inject.
+func CheckAndInjectPseudoGTIDOnWriter(instance *Instance) (injected bool, err error) {
+	if !instance.IsWritableMaster() {
+		return injected, nil
+	}
+	if !instance.IsLastCheckValid {
+		return injected, nil
+	}
+	canInject, err := canInjectPseudoGTID(&instance.Key)
 	if err != nil {
-		return log.Errore(err)
+		return injected, log.Errore(err)
 	}
-	for i := range rand.Perm(len(instances)) {
-		instance := instances[i]
-		go func() error {
-			if !instance.IsWritableMaster() {
-				return nil
-			}
-			if !instance.IsLastCheckValid {
-				return nil
-			}
-			canInject, err := canInjectPseudoGTID(&instance.Key)
-			if err != nil {
-				return log.Errore(err)
-			}
-			if !canInject {
-				return nil
-			}
-			if _, err := injectPseudoGTID(instance); err != nil {
-				return log.Errore(err)
-			}
-			return nil
-		}()
+	if !canInject {
+		return injected, nil
 	}
-	return nil
+	if _, err := injectPseudoGTID(instance); err != nil {
+		return injected, log.Errore(err)
+	}
+	injected = true
+	if err := RegisterInjectedPseudoGTID(instance.ClusterName); err != nil {
+		return injected, log.Errore(err)
+	}
+	return injected, nil
 }

@@ -18,6 +18,7 @@ package logic
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"os/signal"
 	"sync"
@@ -65,6 +66,7 @@ var discoveryMetrics = collection.CreateOrReturnCollection(discoveryMetricsName)
 var isElectedNode int64 = 0
 
 var recentDiscoveryOperationKeys *cache.Cache
+var pseudoGTIDPublishCache = cache.New(time.Minute, time.Second)
 
 func init() {
 	snapshotDiscoveryKeys = make(chan inst.InstanceKey, 10)
@@ -356,6 +358,9 @@ func onHealthTick() {
 	}
 }
 
+// publishDiscoverMasters will publish to raft a discovery request for all known masters.
+// This makes for a best-effort keep-in-sync between raft nodes, where some may have
+// inconsistent data due to hosts being forgotten, for example.
 func publishDiscoverMasters() error {
 	instances, err := inst.ReadWriteableClustersMasters()
 	if err == nil {
@@ -365,6 +370,37 @@ func publishDiscoverMasters() error {
 		}
 	}
 	return log.Errore(err)
+}
+
+// InjectPseudoGTIDOnWriters will inject a PseudoGTID entry on all writable, accessible,
+// supported writers.
+func InjectPseudoGTIDOnWriters() error {
+	instances, err := inst.ReadWriteableClustersMasters()
+	if err != nil {
+		return log.Errore(err)
+	}
+	for i := range rand.Perm(len(instances)) {
+		instance := instances[i]
+		go func() {
+			if injected, _ := inst.CheckAndInjectPseudoGTIDOnWriter(instance); injected {
+				clusterName := instance.ClusterName
+				log.Infof("............. going to publish, hopefully")
+				if orcraft.IsRaftEnabled() {
+					// We prefer not saturating our raft communication. Pseudo-GTID information is
+					// OK to be cached for a while.
+					if _, found := pseudoGTIDPublishCache.Get(clusterName); !found {
+						pseudoGTIDPublishCache.Set(clusterName, true, cache.DefaultExpiration)
+						orcraft.PublishCommand("injected-pseudo-gtid", clusterName)
+						log.Infof(".............published")
+					}
+				} else {
+					log.Infof(".............local")
+					inst.RegisterInjectedPseudoGTID(clusterName)
+				}
+			}
+		}()
+	}
+	return nil
 }
 
 // ContinuousDiscovery starts an asynchronuous infinite discovery process where instances are
@@ -395,7 +431,6 @@ func ContinuousDiscovery() {
 	go ometrics.InitGraphiteMetrics()
 	go acceptSignals()
 	go kv.InitKVStores()
-
 	if config.Config.RaftEnabled {
 		if err := orcraft.Setup(NewCommandApplier(), NewSnapshotDataCreatorApplier(), process.ThisHostname); err != nil {
 			log.Fatale(err)
@@ -426,8 +461,8 @@ func ContinuousDiscovery() {
 			}()
 		case <-autoPseudoGTIDTick:
 			go func() {
-				if config.Config.AutoPseudoGTID && IsLeaderOrActive() {
-					go inst.InjectPseudoGTIDOnWriters()
+				if config.Config.AutoPseudoGTID && IsLeader() {
+					go InjectPseudoGTIDOnWriters()
 				}
 			}()
 		case <-caretakingTick:
@@ -452,6 +487,7 @@ func ContinuousDiscovery() {
 					go inst.ExpirePoolInstances()
 					go inst.FlushNontrivialResolveCacheToDatabase()
 					go inst.ExpireInstanceBinlogFileHistory()
+					go inst.ExpireInjectedPseudoGTID()
 					go process.ExpireNodesHistory()
 					go process.ExpireAccessTokens()
 					go process.ExpireAvailableNodes()
