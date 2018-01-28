@@ -931,9 +931,17 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 		}
 	}
 
-	_, err = ExecInstance(instanceKey, "set global read_only = ?", readOnly)
-	if err != nil {
+	if _, err := ExecInstance(instanceKey, "set global read_only = ?", readOnly); err != nil {
 		return instance, log.Errore(err)
+	}
+	if config.Config.UseSuperReadOnly {
+		if _, err := ExecInstance(instanceKey, "set global super_read_only = ?", readOnly); err != nil {
+			// We don't bail out here. super_read_only is only available on
+			// MySQL 5.7.8 and Percona Server 5.6.21-70
+			// At this time orchestrator does not verify whether a server supports super_read_only or not.
+			// It makes a best effort to set it.
+			log.Errore(err)
+		}
 	}
 	instance, err = ReadTopologyInstance(instanceKey)
 

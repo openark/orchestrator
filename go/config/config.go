@@ -128,6 +128,7 @@ type Configuration struct {
 	SlaveLagQuery                              string   // Synonym to ReplicationLagQuery
 	ReplicationLagQuery                        string   // custom query to check on replica lg (e.g. heartbeat table)
 	DiscoverByShowSlaveHosts                   bool     // Attempt SHOW SLAVE HOSTS before PROCESSLIST
+	UseSuperReadOnly                           bool     // Should orchestrator super_read_only any time it sets read_only
 	InstancePollSeconds                        uint     // Number of seconds between instance reads
 	InstanceWriteBufferSize                    int      // Instance write buffer size (max number of instances to flush in one INSERT ODKU)
 	BufferInstanceWrites                       bool     // Set to 'true' for write-optimization on backend table (compromise: writes can be stale and overwrite non stale data)
