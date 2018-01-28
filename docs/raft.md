@@ -24,6 +24,7 @@ At this time `orchestrator` nodes to not join dynamically into the cluster. The 
 
 ```json
   "RaftEnabled": true,
+  "RaftDataDir": "/var/lib/orchestrator",
   "RaftBind": "<ip.or.fqdn.of.this.orchestrator.node>",
   "DefaultRaftPort": 10008,
   "RaftNodes": [
@@ -154,6 +155,8 @@ new-node$    sqlite3 /var/lib/orchestrator/orchestrator.db < /tmp/orchestrator-d
 ```
 
   - With `MySQL` use your favorite backup/restore method.
+
+See also [Master discovery with Key Value stores](kv.md#kv-and-orchestratorraft) via `orchestrator/raft`.
 
 ### Main advantages of orchestrator/raft
 

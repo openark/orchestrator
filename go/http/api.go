@@ -37,6 +37,7 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/discovery"
 	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/kv"
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/metrics/query"
 	"github.com/github/orchestrator/go/process"
@@ -73,6 +74,7 @@ var apiSynonyms = map[string]string{
 	"stop-slave":                 "stop-replica",
 	"stop-slave-nice":            "stop-replica-nice",
 	"reset-slave":                "reset-replica",
+	"restart-slave-statements":   "restart-replica-statements",
 }
 
 var registeredPaths = []string{}
@@ -1036,7 +1038,7 @@ func (this *HttpAPI) RegroupReplicasPseudoGTID(params martini.Params, r render.R
 		return
 	}
 
-	lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasPseudoGTID(&instanceKey, false, nil, nil)
+	lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasPseudoGTID(&instanceKey, false, nil, nil, nil)
 	lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 
 	if err != nil {
@@ -1264,6 +1266,32 @@ func (this *HttpAPI) FlushBinaryLogs(params martini.Params, r render.Render, req
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Binary logs flushed on: %+v", instance.Key), Details: instance})
 }
 
+// RestartSlaveStatements receives a query to execute that requires a replication restart to apply.
+// As an example, this may be `set global rpl_semi_sync_slave_enabled=1`. orchestrator will check
+// replication status on given host and will wrap with appropriate stop/start statements, if need be.
+func (this *HttpAPI) RestartSlaveStatements(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	query := req.URL.Query().Get("q")
+	statements, err := inst.GetSlaveRestartPreserveStatements(&instanceKey, query)
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("statements for: %+v", instanceKey), Details: statements})
+}
+
 // MasterEquivalent provides (possibly empty) list of master coordinates equivalent to the given ones
 func (this *HttpAPI) MasterEquivalent(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -1289,6 +1317,62 @@ func (this *HttpAPI) MasterEquivalent(params martini.Params, r render.Render, re
 	}
 
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Found %+v equivalent coordinates", len(equivalentCoordinates)), Details: equivalentCoordinates})
+}
+
+// setSemiSyncMaster
+func (this *HttpAPI) setSemiSyncMaster(params martini.Params, r render.Render, req *http.Request, user auth.User, enable bool) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, err := inst.SetSemiSyncMaster(&instanceKey, enable)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("master semi-sync set to %t", enable), Details: instance})
+}
+
+func (this *HttpAPI) EnableSemiSyncMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	this.setSemiSyncMaster(params, r, req, user, true)
+}
+func (this *HttpAPI) DisableSemiSyncMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	this.setSemiSyncMaster(params, r, req, user, false)
+}
+
+// setSemiSyncMaster
+func (this *HttpAPI) setSemiSyncReplica(params martini.Params, r render.Render, req *http.Request, user auth.User, enable bool) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, err := inst.SetSemiSyncReplica(&instanceKey, enable)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("replica semi-sync set to %t", enable), Details: instance})
+}
+
+func (this *HttpAPI) EnableSemiSyncReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	this.setSemiSyncReplica(params, r, req, user, true)
+}
+func (this *HttpAPI) DisableSemiSyncReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	this.setSemiSyncReplica(params, r, req, user, false)
 }
 
 // SetReadOnly sets the global read_only variable
@@ -1360,21 +1444,30 @@ func (this *HttpAPI) KillQuery(params martini.Params, r render.Render, req *http
 }
 
 // AsciiTopology returns an ascii graph of cluster's instances
-func (this *HttpAPI) AsciiTopology(params martini.Params, r render.Render, req *http.Request) {
+func (this *HttpAPI) asciiTopology(params martini.Params, r render.Render, req *http.Request, tabulated bool) {
 	clusterName, err := figureClusterName(getClusterHint(params))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	asciiOutput, err := inst.ASCIITopology(clusterName, "")
+	asciiOutput, err := inst.ASCIITopology(clusterName, "", tabulated)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
-	asciiOutput = strings.Replace(asciiOutput, " ", "\u00a0", -1)
 
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Topology for cluster %s", clusterName), Details: asciiOutput})
+}
+
+// AsciiTopology returns an ascii graph of cluster's instances
+func (this *HttpAPI) AsciiTopology(params martini.Params, r render.Render, req *http.Request) {
+	this.asciiTopology(params, r, req, false)
+}
+
+// AsciiTopology returns an ascii graph of cluster's instances
+func (this *HttpAPI) AsciiTopologyTabulated(params martini.Params, r render.Render, req *http.Request) {
+	this.asciiTopology(params, r, req, true)
 }
 
 // Cluster provides list of instances in given cluster
@@ -1511,6 +1604,34 @@ func (this *HttpAPI) ClustersInfo(params martini.Params, r render.Render, req *h
 	r.JSON(http.StatusOK, clustersInfo)
 }
 
+// Write a cluster's master (or all clusters masters) to kv stores.
+// This should generally only happen once in a lifetime of a cluster. Otherwise KV
+// stores are updated via failovers.
+func (this *HttpAPI) SubmitMastersToKvStores(params martini.Params, r render.Render, req *http.Request) {
+	clusterName, err := getClusterNameIfExists(params)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	kvPairs, err := inst.GetMastersKVPairs(clusterName)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	for _, kvPair := range kvPairs {
+		if orcraft.IsRaftEnabled() {
+			_, err = orcraft.PublishCommand("put-key-value", kvPair)
+		} else {
+			err = kv.PutKVPair(kvPair)
+		}
+		if err != nil {
+			Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+			return
+		}
+	}
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Submitted %d masters", len(kvPairs)), Details: kvPairs})
+}
+
 // Clusters provides list of known masters
 func (this *HttpAPI) Masters(params martini.Params, r render.Render, req *http.Request) {
 	instances, err := inst.ReadWriteableClustersMasters()
@@ -1546,18 +1667,13 @@ func (this *HttpAPI) ClusterMaster(params martini.Params, r render.Render, req *
 
 // Downtimed lists downtimed instances, potentially filtered by cluster
 func (this *HttpAPI) Downtimed(params martini.Params, r render.Render, req *http.Request) {
-	clusterName := ""
-	if clusterHint := getClusterHint(params); clusterHint != "" {
-		var err error
-		clusterName, err = figureClusterName(clusterHint)
-		if err != nil {
-			Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
-			return
-		}
+	clusterName, err := getClusterNameIfExists(params)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
 	}
 
 	instances, err := inst.ReadDowntimedInstances(clusterName)
-
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -2336,14 +2452,7 @@ func (this *HttpAPI) LeaderCheck(params martini.Params, r render.Render, req *ht
 // It might be a good idea to deprecate the current Health() behavior and roll this in at some
 // point
 func (this *HttpAPI) StatusCheck(params martini.Params, r render.Render, req *http.Request) {
-	// SimpleHealthTest just checks to see if we can connect to the database.  Lighter weight if you intend to call it a lot
-	var health *process.HealthStatus
-	var err error
-	if config.Config.StatusSimpleHealth {
-		health, err = process.SimpleHealthTest()
-	} else {
-		health, err = process.HealthTest()
-	}
+	health, err := process.HealthTest()
 	if err != nil {
 		r.JSON(500, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Application node is unhealthy %+v", err), Details: health})
 		return
@@ -2668,6 +2777,8 @@ func (this *HttpAPI) AuditFailureDetection(params martini.Params, r render.Rende
 
 	if detectionId, derr := strconv.ParseInt(params["id"], 10, 0); derr == nil && detectionId > 0 {
 		audits, err = logic.ReadFailureDetection(detectionId)
+	} else if clusterAlias := params["clusterAlias"]; clusterAlias != "" {
+		audits, err = logic.ReadFailureDetectionsForClusterAlias(clusterAlias)
 	} else {
 		page, derr := strconv.Atoi(params["page"])
 		if derr != nil || page < 0 {
@@ -2718,6 +2829,8 @@ func (this *HttpAPI) AuditRecovery(params martini.Params, r render.Render, req *
 		audits, err = logic.ReadRecoveryByUID(recoveryUID)
 	} else if recoveryId, derr := strconv.ParseInt(params["id"], 10, 0); derr == nil && recoveryId > 0 {
 		audits, err = logic.ReadRecovery(recoveryId)
+	} else if clusterAlias := params["clusterAlias"]; clusterAlias != "" {
+		audits, err = logic.ReadRecoveriesForClusterAlias(clusterAlias)
 	} else {
 		page, derr := strconv.Atoi(params["page"])
 		if derr != nil || page < 0 {
@@ -3025,6 +3138,11 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "reattach-slave/:host/:port", this.ReattachReplica)
 	this.registerRequest(m, "reattach-slave-master-host/:host/:port", this.ReattachReplicaMasterHost)
 	this.registerRequest(m, "flush-binary-logs/:host/:port", this.FlushBinaryLogs)
+	this.registerRequest(m, "restart-slave-statements/:host/:port", this.RestartSlaveStatements)
+	this.registerRequest(m, "enable-semi-sync-master/:host/:port", this.EnableSemiSyncMaster)
+	this.registerRequest(m, "disable-semi-sync-master/:host/:port", this.DisableSemiSyncMaster)
+	this.registerRequest(m, "enable-semi-sync-replica/:host/:port", this.EnableSemiSyncReplica)
+	this.registerRequest(m, "disable-semi-sync-replica/:host/:port", this.DisableSemiSyncReplica)
 
 	// Instance:
 	this.registerRequest(m, "set-read-only/:host/:port", this.SetReadOnly)
@@ -3057,6 +3175,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "set-cluster-alias/:clusterName", this.SetClusterAliasManualOverride)
 	this.registerRequest(m, "clusters", this.Clusters)
 	this.registerRequest(m, "clusters-info", this.ClustersInfo)
+
 	this.registerRequest(m, "masters", this.Masters)
 	this.registerRequest(m, "master/:clusterHint", this.ClusterMaster)
 	this.registerRequest(m, "instance-replicas/:host/:port", this.InstanceReplicas)
@@ -3065,6 +3184,12 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "downtimed/:clusterHint", this.Downtimed)
 	this.registerRequest(m, "topology/:clusterHint", this.AsciiTopology)
 	this.registerRequest(m, "topology/:host/:port", this.AsciiTopology)
+	this.registerRequest(m, "topology-tabulated/:clusterHint", this.AsciiTopologyTabulated)
+	this.registerRequest(m, "topology-tabulated/:host/:port", this.AsciiTopologyTabulated)
+
+	// Key-value:
+	this.registerRequest(m, "submit-masters-to-kv-stores", this.SubmitMastersToKvStores)
+	this.registerRequest(m, "submit-masters-to-kv-stores/:clusterHint", this.SubmitMastersToKvStores)
 
 	// Instance management:
 	this.registerRequest(m, "instance/:host/:port", this.Instance)
@@ -3097,6 +3222,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "audit-failure-detection", this.AuditFailureDetection)
 	this.registerRequest(m, "audit-failure-detection/:page", this.AuditFailureDetection)
 	this.registerRequest(m, "audit-failure-detection/id/:id", this.AuditFailureDetection)
+	this.registerRequest(m, "audit-failure-detection/alias/:clusterAlias", this.AuditFailureDetection)
 	this.registerRequest(m, "replication-analysis-changelog", this.ReadReplicationAnalysisChangelog)
 	this.registerRequest(m, "audit-recovery", this.AuditRecovery)
 	this.registerRequest(m, "audit-recovery/:page", this.AuditRecovery)
@@ -3104,6 +3230,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "audit-recovery/uid/:uid", this.AuditRecovery)
 	this.registerRequest(m, "audit-recovery/cluster/:clusterName", this.AuditRecovery)
 	this.registerRequest(m, "audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
+	this.registerRequest(m, "audit-recovery/alias/:clusterAlias", this.AuditRecovery)
 	this.registerRequest(m, "audit-recovery-steps/:uid", this.AuditRecoverySteps)
 	this.registerRequest(m, "active-cluster-recovery/:clusterName", this.ActiveClusterRecovery)
 	this.registerRequest(m, "recently-active-cluster-recovery/:clusterName", this.RecentlyActiveClusterRecovery)

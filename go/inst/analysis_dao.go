@@ -47,22 +47,22 @@ func init() {
 func initializeAnalysisDaoPostConfiguration() {
 	config.WaitForConfigurationToBeLoaded()
 
-	recentInstantAnalysis = cache.New(time.Duration(config.Config.RecoveryPollSeconds*2)*time.Second, time.Second)
+	recentInstantAnalysis = cache.New(time.Duration(config.RecoveryPollSeconds*2)*time.Second, time.Second)
 }
 
 // GetReplicationAnalysis will check for replication problems (dead master; unreachable master; etc)
 func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnalysis bool) ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
-	args := sqlutils.Args(2*config.Config.InstancePollSeconds, clusterName)
+	args := sqlutils.Args(ValidSecondsFromSeenToLastAttemptedCheck(), clusterName)
 	analysisQueryReductionClause := ``
 	if config.Config.ReduceReplicationAnalysisCount {
 		analysisQueryReductionClause = `
 			HAVING
 				(MIN(
-		        		master_instance.last_checked <= master_instance.last_seen
-		        		AND master_instance.last_attempted_check <= master_instance.last_seen + INTERVAL ? SECOND
-		        	) = 1 /* AS is_last_check_valid */) = 0
+					master_instance.last_checked <= master_instance.last_seen
+					and master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
+       	 ) = 1 /* AS is_last_check_valid */) = 0
 				OR (IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
 		                    AND slave_instance.slave_io_running = 0
 		                    AND slave_instance.last_io_error like '%error %connecting to master%'
@@ -81,7 +81,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		          ) /* AS is_failing_to_connect_to_master */)
 				OR (COUNT(slave_instance.server_id) /* AS count_slaves */ > 0)
 			`
-		args = append(args, 2*config.Config.InstancePollSeconds)
+		args = append(args, ValidSecondsFromSeenToLastAttemptedCheck())
 	}
 	// "OR count_slaves > 0" above is a recent addition, which, granted, makes some previous conditions redundant.
 	// It gives more output, and more "NoProblem" messages that I am now interested in for purpose of auditing in database_instance_analysis_changelog
@@ -89,13 +89,15 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		    SELECT
 		        master_instance.hostname,
 		        master_instance.port,
+						master_instance.data_center,
+						master_instance.physical_environment,
 		        MIN(master_instance.master_host) AS master_host,
 		        MIN(master_instance.master_port) AS master_port,
 		        MIN(master_instance.cluster_name) AS cluster_name,
 		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
 		        MIN(
-		        		master_instance.last_checked <= master_instance.last_seen
-		        		AND master_instance.last_attempted_check <= master_instance.last_seen + INTERVAL ? SECOND
+							master_instance.last_checked <= master_instance.last_seen
+							and master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
 		        	) = 1 AS is_last_check_valid,
 		        MIN(master_instance.master_host IN ('' , '_')
 		            OR master_instance.master_port = 0
@@ -234,6 +236,8 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		a.IsCoMaster = m.GetBool("is_co_master")
 		a.AnalyzedInstanceKey = InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
 		a.AnalyzedInstanceMasterKey = InstanceKey{Hostname: m.GetString("master_host"), Port: m.GetInt("master_port")}
+		a.AnalyzedInstanceDataCenter = m.GetString("data_center")
+		a.AnalyzedInstancePhysicalEnvironment = m.GetString("physical_environment")
 		a.ClusterDetails.ClusterName = m.GetString("cluster_name")
 		a.ClusterDetails.ClusterAlias = m.GetString("cluster_alias")
 		a.LastCheckValid = m.GetBool("is_last_check_valid")

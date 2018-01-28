@@ -40,6 +40,7 @@ var configurationLoaded chan bool = make(chan bool)
 
 const (
 	HealthPollSeconds                            = 1
+	RecoveryPollSeconds                          = 1
 	ActiveNodeExpireSeconds                      = 5
 	BinlogFileHistoryDays                        = 1
 	MaintenanceOwner                             = "orchestrator"
@@ -51,6 +52,10 @@ const (
 	AgentHttpTimeoutSeconds                      = 60
 	PseudoGTIDCoordinatesHistoryHeuristicMinutes = 2
 	DebugMetricsIntervalSeconds                  = 10
+	PseudoGTIDSchema                             = "_pseudo_gtid_"
+	PseudoGTIDIntervalSeconds                    = 5
+	CheckAutoPseudoGTIDGrantsIntervalSeconds     = 60
+	SelectTrueQuery                              = "select 1"
 )
 
 var deprecatedConfigurationVariables = []string{
@@ -118,7 +123,6 @@ type Configuration struct {
 	MySQLOrchestratorReadTimeoutSeconds        int      // Number of seconds before backend mysql read operation is aborted (driver-side)
 	MySQLDiscoveryReadTimeoutSeconds           int      // Number of seconds before topology mysql read operation is aborted (driver-side). Used for discovery queries.
 	MySQLTopologyReadTimeoutSeconds            int      // Number of seconds before topology mysql read operation is aborted (driver-side). Used for all but discovery queries.
-	MySQLInterpolateParams                     bool     // Do not use sql prepare statement if true
 	DefaultInstancePort                        int      // In case port was not specified on command line
 	SlaveLagQuery                              string   // Synonym to ReplicationLagQuery
 	ReplicationLagQuery                        string   // custom query to check on replica lg (e.g. heartbeat table)
@@ -147,6 +151,7 @@ type Configuration struct {
 	CandidateInstanceExpireMinutes             uint     // Minutes after which a suggestion to use an instance as a candidate replica (to be preferably promoted on master failover) is expired.
 	AuditLogFile                               string   // Name of log file for audit operations. Disabled when empty.
 	AuditToSyslog                              bool     // If true, audit messages are written to syslog
+	AuditToBackendDB                           bool     // If true, audit messages are written to the backend DB's `audit` table (default: true)
 	RemoveTextFromHostnameDisplay              string   // Text to strip off the hostname on cluster/clusters pages
 	ReadOnly                                   bool
 	AuthenticationMethod                       string // Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "multi" for advanced BasicAuth, "proxy" for forwarded credentials via reverse proxy, "token" for token based access
@@ -189,12 +194,12 @@ type Configuration struct {
 	SSLCAFile                                  string            // Name of the Certificate Authority file, applies only when UseSSL = true
 	SSLValidOUs                                []string          // Valid organizational units when using mutual TLS
 	StatusEndpoint                             string            // Override the status endpoint.  Defaults to '/api/status'
-	StatusSimpleHealth                         bool              // If true, calling the status endpoint will use the simplified health check
 	StatusOUVerify                             bool              // If true, try to verify OUs when Mutual TLS is on.  Defaults to false
 	AgentPollMinutes                           uint              // Minutes between agent polling
 	UnseenAgentForgetHours                     uint              // Number of hours after which an unseen agent is forgotten
 	StaleSeedFailMinutes                       uint              // Number of minutes after which a stale (no progress) seed is considered failed.
 	SeedAcceptableBytesDiff                    int64             // Difference in bytes between seed source & target data size that is still considered as successful copy
+	AutoPseudoGTID                             bool              // Should orchestrator automatically inject Pseudo-GTID entries to the masters
 	PseudoGTIDPattern                          string            // Pattern to look for in binary logs that makes for a unique entry (pseudo GTID). When empty, Pseudo-GTID based refactoring is disabled.
 	PseudoGTIDPatternIsFixedSubstring          bool              // If true, then PseudoGTIDPattern is not treated as regular expression but as fixed substring, and can boost search time
 	PseudoGTIDMonotonicHint                    string            // subtring in Pseudo-GTID entry which indicates Pseudo-GTID entries are expected to be monotonically increasing
@@ -204,7 +209,6 @@ type Configuration struct {
 	SkipBinlogEventsContaining                 []string          // When scanning/comparing binlogs for Pseudo-GTID, skip entries containing given texts. These are NOT regular expressions (would consume too much CPU while scanning binlogs), just substrings to find.
 	ReduceReplicationAnalysisCount             bool              // When true, replication analysis will only report instances where possibility of handled problems is possible in the first place (e.g. will not report most leaf nodes, that are mostly uninteresting). When false, provides an entry for every known instance
 	FailureDetectionPeriodBlockMinutes         int               // The time for which an instance's failure discovery is kept "active", so as to avoid concurrent "discoveries" of the instance's failure; this preceeds any recovery process, if any.
-	RecoveryPollSeconds                        int               // Interval between checks for a recovery scenario and initiation of a recovery process
 	RecoveryPeriodBlockMinutes                 int               // (supported for backwards compatibility but please use newer `RecoveryPeriodBlockSeconds` instead) The time for which an instance's recovery is kept "active", so as to avoid concurrent recoveries on smae instance as well as flapping
 	RecoveryPeriodBlockSeconds                 int               // (overrides `RecoveryPeriodBlockMinutes`) The time for which an instance's recovery is kept "active", so as to avoid concurrent recoveries on smae instance as well as flapping
 	RecoveryIgnoreHostnameFilters              []string          // Recovery analysis will completely ignore hosts matching given patterns
@@ -239,6 +243,9 @@ type Configuration struct {
 	URLPrefix                                  string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
 	MaxOutdatedKeysToShow                      int               // Maximum number of keys to show in ContinuousDiscovery. If the number of polled hosts grows too far then showing the complete list is not ideal.
 	DiscoveryIgnoreReplicaHostnameFilters      []string          // Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps
+	ConsulAddress                              string            // Address where Consul HTTP api is found. Example: 127.0.0.1:8500
+	ZkAddress                                  string            // UNSUPPERTED YET. Address where (single or multiple) ZooKeeper servers are found, in `srv1[:port1][,srv2[:port2]...]` format. Default port is 2181. Example: srv-a,srv-b:12181,srv-c
+	KVClusterMasterPrefix                      string            // Prefix to use for clusters' masters entries in KV stores (internal, consul, ZK), default: "mysql/master"
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -259,7 +266,6 @@ func newConfiguration() *Configuration {
 		ListenSocket:                               "",
 		AgentsServerPort:                           ":3001",
 		StatusEndpoint:                             "/api/status",
-		StatusSimpleHealth:                         true,
 		StatusOUVerify:                             false,
 		BackendDB:                                  "mysql",
 		SQLite3DataFile:                            "",
@@ -280,7 +286,6 @@ func newConfiguration() *Configuration {
 		MySQLOrchestratorReadTimeoutSeconds:        30,
 		MySQLDiscoveryReadTimeoutSeconds:           10,
 		MySQLTopologyReadTimeoutSeconds:            600,
-		MySQLInterpolateParams:                     false,
 		DefaultInstancePort:                        3306,
 		TLSCacheTTLFactor:                          100,
 		InstancePollSeconds:                        5,
@@ -308,6 +313,7 @@ func newConfiguration() *Configuration {
 		CandidateInstanceExpireMinutes:             60,
 		AuditLogFile:                               "",
 		AuditToSyslog:                              false,
+		AuditToBackendDB:                           false,
 		RemoveTextFromHostnameDisplay:              "",
 		ReadOnly:                                   false,
 		AuthenticationMethod:                       "",
@@ -350,6 +356,7 @@ func newConfiguration() *Configuration {
 		UnseenAgentForgetHours:                     6,
 		StaleSeedFailMinutes:                       60,
 		SeedAcceptableBytesDiff:                    8192,
+		AutoPseudoGTID:                             false,
 		PseudoGTIDPattern:                          "",
 		PseudoGTIDPatternIsFixedSubstring:          false,
 		PseudoGTIDMonotonicHint:                    "",
@@ -359,7 +366,6 @@ func newConfiguration() *Configuration {
 		SkipBinlogEventsContaining:                 []string{},
 		ReduceReplicationAnalysisCount:             true,
 		FailureDetectionPeriodBlockMinutes:         60,
-		RecoveryPollSeconds:                        10,
 		RecoveryPeriodBlockMinutes:                 60,
 		RecoveryPeriodBlockSeconds:                 3600,
 		RecoveryIgnoreHostnameFilters:              []string{},
@@ -391,6 +397,9 @@ func newConfiguration() *Configuration {
 		URLPrefix:                                  "",
 		MaxOutdatedKeysToShow:                      64,
 		DiscoveryIgnoreReplicaHostnameFilters:      []string{},
+		ConsulAddress:                              "",
+		ZkAddress:                                  "",
+		KVClusterMasterPrefix:                      "mysql/master",
 	}
 }
 
@@ -509,6 +518,26 @@ func (this *Configuration) postReadAdjustments() error {
 	}
 	if this.RaftAdvertise == "" {
 		this.RaftAdvertise = this.RaftBind
+	}
+	if this.RaftEnabled && this.RaftDataDir == "" {
+		return fmt.Errorf("RaftDataDir must be defined since raft is enabled (RaftEnabled)")
+	}
+	if this.KVClusterMasterPrefix != "/" {
+		// "/" remains "/"
+		// "prefix" turns to "prefix/"
+		// "some/prefix///" turns to "some/prefix/"
+		this.KVClusterMasterPrefix = strings.TrimRight(this.KVClusterMasterPrefix, "/")
+		this.KVClusterMasterPrefix = fmt.Sprintf("%s/", this.KVClusterMasterPrefix)
+	}
+	if this.ZkAddress != "" {
+		return fmt.Errorf("ZkAddress (ZooKeeper) configuration is unsupported yet")
+	}
+	if this.AutoPseudoGTID {
+		this.PseudoGTIDPattern = "drop view if exists `_pseudo_gtid_`"
+		this.PseudoGTIDPatternIsFixedSubstring = true
+		this.PseudoGTIDMonotonicHint = "asc:"
+		this.DetectPseudoGTIDQuery = SelectTrueQuery
+		this.PseudoGTIDPreferIndependentMultiMatch = true
 	}
 	return nil
 }

@@ -33,27 +33,16 @@ func writePoolInstances(pool string, instanceKeys [](*InstanceKey)) error {
 			return log.Errore(err)
 		}
 		tx, err := dbh.Begin()
-		stmt, err := db.PrepareTransaction(tx, `delete from database_instance_pool where pool = ?`)
-		_, err = stmt.Exec(pool)
-		if err != nil {
+		if _, err := tx.Exec(`delete from database_instance_pool where pool = ?`, pool); err != nil {
 			tx.Rollback()
 			return log.Errore(err)
 		}
-		stmt, err = db.PrepareTransaction(tx, `insert into database_instance_pool (hostname, port, pool, registered_at) values (?, ?, ?, now())`)
-		if err != nil {
-			tx.Rollback()
-			return log.Errore(err)
-		}
+		query := `insert into database_instance_pool (hostname, port, pool, registered_at) values (?, ?, ?, now())`
 		for _, instanceKey := range instanceKeys {
-			_, err := stmt.Exec(instanceKey.Hostname, instanceKey.Port, pool)
-			if err != nil {
+			if _, err := tx.Exec(query, instanceKey.Hostname, instanceKey.Port, pool); err != nil {
 				tx.Rollback()
 				return log.Errore(err)
 			}
-		}
-		if err != nil {
-			tx.Rollback()
-			return log.Errore(err)
 		}
 		tx.Commit()
 

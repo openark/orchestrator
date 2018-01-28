@@ -124,6 +124,18 @@ func clearAcknowledgedFailureDetections(whereClause string, args []interface{}) 
 	return log.Errore(err)
 }
 
+// AcknowledgeInstanceFailureDetection clears a failure detection for a particular
+// instance. This is automated by recovery process: it makes sense to acknowledge
+// the detection of an instance just recovered.
+func acknowledgeInstanceFailureDetection(instanceKey *inst.InstanceKey) error {
+	whereClause := `
+			hostname = ?
+			and port = ?
+		`
+	args := sqlutils.Args(instanceKey.Hostname, instanceKey.Port)
+	return clearAcknowledgedFailureDetections(whereClause, args)
+}
+
 func writeTopologyRecovery(topologyRecovery *TopologyRecovery) (*TopologyRecovery, error) {
 	analysisEntry := topologyRecovery.AnalysisEntry
 	sqlResult, err := db.ExecOrchestrator(`
@@ -342,7 +354,7 @@ func ExpireBlockedRecoveries() error {
 				from blocked_topology_recovery
 				where
 					last_blocked_timestamp < NOW() - interval ? second
-			`, (config.Config.RecoveryPollSeconds * 2),
+			`, (config.RecoveryPollSeconds * 2),
 	)
 	return log.Errore(err)
 }
@@ -450,16 +462,10 @@ func AcknowledgeCrashedRecoveries() (countAcknowledgedEntries int64, err error) 
 
 // ResolveRecovery is called on completion of a recovery process and updates the recovery status.
 // It does not clear the "active period" as this still takes place in order to avoid flapping.
-func ResolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst.Instance) error {
-
-	isSuccessful := false
+func writeResolveRecovery(topologyRecovery *TopologyRecovery) error {
 	var successorKeyToWrite inst.InstanceKey
-	var successorAliasToWrite string
-	if successorInstance != nil {
-		topologyRecovery.SuccessorKey = &successorInstance.Key
-		topologyRecovery.SuccessorAlias = successorInstance.InstanceAlias
-		isSuccessful = true
-		successorKeyToWrite = successorInstance.Key
+	if topologyRecovery.IsSuccessful {
+		successorKeyToWrite = *topologyRecovery.SuccessorKey
 	}
 	_, err := db.ExecOrchestrator(`
 			update topology_recovery set
@@ -472,15 +478,12 @@ func ResolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst
 				all_errors = ?,
 				end_recovery = NOW()
 			where
-				recovery_id = ?
-				AND in_active_period = 1
-				AND processing_node_hostname = ?
-				AND processcing_node_token = ?
-			`, isSuccessful, successorKeyToWrite.Hostname, successorKeyToWrite.Port,
-		successorAliasToWrite, topologyRecovery.LostReplicas.ToCommaDelimitedList(),
+				uid = ?
+			`, topologyRecovery.IsSuccessful, successorKeyToWrite.Hostname, successorKeyToWrite.Port,
+		topologyRecovery.SuccessorAlias, topologyRecovery.LostReplicas.ToCommaDelimitedList(),
 		topologyRecovery.ParticipatingInstanceKeys.ToCommaDelimitedList(),
 		strings.Join(topologyRecovery.AllErrors, "\n"),
-		topologyRecovery.Id, process.ThisHostname, process.ProcessToken.Hash,
+		topologyRecovery.UID,
 	)
 	return log.Errore(err)
 }
@@ -490,33 +493,33 @@ func readRecoveries(whereCondition string, limit string, args []interface{}) ([]
 	res := []TopologyRecovery{}
 	query := fmt.Sprintf(`
 		select
-            recovery_id,
-						uid,
-            hostname,
-            port,
-            (IFNULL(end_active_period_unixtime, 0) = 0) as is_active,
-            start_active_period,
-            IFNULL(end_active_period_unixtime, 0) as end_active_period_unixtime,
-            IFNULL(end_recovery, '') AS end_recovery,
-            is_successful,
-            processing_node_hostname,
-            processcing_node_token,
-            ifnull(successor_hostname, '') as successor_hostname,
-            ifnull(successor_port, 0) as successor_port,
-            ifnull(successor_alias, '') as successor_alias,
-            analysis,
-            cluster_name,
-            cluster_alias,
-            count_affected_slaves,
-            slave_hosts,
-            participating_instances,
-            lost_slaves,
-            all_errors,
-            acknowledged,
-            acknowledged_at,
-            acknowledged_by,
-            acknowledge_comment,
-            last_detection_id
+      recovery_id,
+			uid,
+      hostname,
+      port,
+      (IFNULL(end_active_period_unixtime, 0) = 0) as is_active,
+      start_active_period,
+      IFNULL(end_active_period_unixtime, 0) as end_active_period_unixtime,
+      IFNULL(end_recovery, '') AS end_recovery,
+      is_successful,
+      processing_node_hostname,
+      processcing_node_token,
+      ifnull(successor_hostname, '') as successor_hostname,
+      ifnull(successor_port, 0) as successor_port,
+      ifnull(successor_alias, '') as successor_alias,
+      analysis,
+      cluster_name,
+      cluster_alias,
+      count_affected_slaves,
+      slave_hosts,
+      participating_instances,
+      lost_slaves,
+      all_errors,
+      acknowledged,
+      acknowledged_at,
+      acknowledged_by,
+      acknowledge_comment,
+      last_detection_id
 		from
 			topology_recovery
 		%s
@@ -598,6 +601,14 @@ func ReadRecentlyActiveClusterRecovery(clusterName string) ([]TopologyRecovery, 
 	return readRecoveries(whereClause, ``, sqlutils.Args(clusterName))
 }
 
+// ReadRecoveriesForClusterAlias reads open/closed recoveries by alias
+func ReadRecoveriesForClusterAlias(clusteAlias string) ([]TopologyRecovery, error) {
+	whereClause := `
+		where
+			cluster_alias=?`
+	return readRecoveries(whereClause, ``, sqlutils.Args(clusteAlias))
+}
+
 // ReadInActivePeriodSuccessorInstanceRecovery reads completed recoveries for a given instance, where said instance
 // was promoted as result, still in active period (may be used to block further recoveries should this instance die)
 func ReadInActivePeriodSuccessorInstanceRecovery(instanceKey *inst.InstanceKey) ([]TopologyRecovery, error) {
@@ -675,20 +686,20 @@ func readFailureDetections(whereCondition string, limit string, args []interface
 	res := []TopologyRecovery{}
 	query := fmt.Sprintf(`
 		select
-            detection_id,
-            hostname,
-            port,
-            in_active_period as is_active,
-            start_active_period,
-            end_active_period_unixtime,
-            processing_node_hostname,
-            processcing_node_token,
-            analysis,
-            cluster_name,
-            cluster_alias,
-            count_affected_slaves,
-            slave_hosts,
-            (select max(recovery_id) from topology_recovery where topology_recovery.last_detection_id = detection_id) as related_recovery_id
+      detection_id,
+      hostname,
+      port,
+      in_active_period as is_active,
+      start_active_period,
+      end_active_period_unixtime,
+      processing_node_hostname,
+      processcing_node_token,
+      analysis,
+      cluster_name,
+      cluster_alias,
+      count_affected_slaves,
+      slave_hosts,
+      (select max(recovery_id) from topology_recovery where topology_recovery.last_detection_id = detection_id) as related_recovery_id
 		from
 			topology_failure_detection
 		%s
@@ -737,6 +748,12 @@ func ReadRecentFailureDetections(page int) ([]TopologyRecovery, error) {
 func ReadFailureDetection(detectionId int64) ([]TopologyRecovery, error) {
 	whereClause := `where detection_id = ?`
 	return readFailureDetections(whereClause, ``, sqlutils.Args(detectionId))
+}
+
+// ReadFailureDetectionsForClusterAlias
+func ReadFailureDetectionsForClusterAlias(clusterAlias string) ([]TopologyRecovery, error) {
+	whereClause := `where cluster_alias = ?`
+	return readFailureDetections(whereClause, ``, sqlutils.Args(clusterAlias))
 }
 
 // ReadBlockedRecoveries reads blocked recovery entries, potentially filtered by cluster name (empty to unfilter)

@@ -19,6 +19,7 @@ package orcraft
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net"
 	"strings"
 	"sync/atomic"
@@ -33,6 +34,13 @@ import (
 const (
 	YieldCommand     = "yield"
 	YieldHintCommand = "yield-hint"
+)
+
+const (
+	retainSnapshotCount    = 10
+	snapshotInterval       = 30 * time.Minute
+	asyncSnapshotTimeframe = 1 * time.Minute
+	raftTimeout            = 10 * time.Second
 )
 
 var RaftNotRunning = fmt.Errorf("raft is not configured/running")
@@ -170,6 +178,14 @@ func GetState() raft.RaftState {
 func Snapshot() error {
 	future := getRaft().Snapshot()
 	return future.Error()
+}
+
+func AsyncSnapshot() error {
+	asyncDuration := (time.Duration(rand.Int63()) % asyncSnapshotTimeframe)
+	go time.AfterFunc(asyncDuration, func() {
+		Snapshot()
+	})
+	return nil
 }
 
 func StepDown() {

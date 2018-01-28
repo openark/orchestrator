@@ -40,6 +40,7 @@ import (
 	"github.com/github/orchestrator/go/collection"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
+	"github.com/github/orchestrator/go/kv"
 	"github.com/github/orchestrator/go/metrics/query"
 )
 
@@ -66,6 +67,7 @@ func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
 var instanceKeyInformativeClusterName *cache.Cache
 var forgetInstanceKeys *cache.Cache
+var pseudoGTIDInjectedClusters *cache.Cache
 
 var accessDeniedCounter = metrics.NewCounter()
 var readTopologyInstanceCounter = metrics.NewCounter()
@@ -87,6 +89,7 @@ func initializeInstanceDao() {
 	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
 	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
 	forgetInstanceKeys = cache.New(time.Duration(config.Config.InstancePollSeconds*3)*time.Second, time.Second)
+	pseudoGTIDInjectedClusters = cache.New(time.Hour, time.Second)
 	// spin off instance write buffer flushing
 	go func() {
 		flushTick := time.Tick(time.Duration(config.Config.InstanceFlushIntervalMilliseconds) * time.Millisecond)
@@ -281,6 +284,8 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		return instance, fmt.Errorf("ReadTopologyInstance will not act on invalid instance key: %+v", *instanceKey)
 	}
 
+	go UpdateInstanceLastAttemptedCheck(instanceKey)
+
 	latency.Start("instance")
 	db, err := db.OpenDiscovery(instanceKey.Hostname, instanceKey.Port)
 	latency.Stop("instance")
@@ -348,25 +353,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			}()
 		}
 
-		instance.UsingPseudoGTID = false
-		if config.Config.DetectPseudoGTIDQuery != "" {
-			waitGroup.Add(1)
-			go func() {
-				defer waitGroup.Done()
-				if resultData, err := sqlutils.QueryResultData(db, config.Config.DetectPseudoGTIDQuery); err == nil {
-					if len(resultData) > 0 {
-						if len(resultData[0]) > 0 {
-							if resultData[0][0].Valid && resultData[0][0].String == "1" {
-								instance.UsingPseudoGTID = true
-							}
-						}
-					}
-				} else {
-					logReadTopologyInstanceError(instanceKey, "DetectPseudoGTIDQuery", err)
-				}
-			}()
-		}
-
 		var mysqlHostname, mysqlReportHost string
 		err = db.QueryRow("select @@global.hostname, ifnull(@@global.report_host, ''), @@global.server_id, @@global.version, @@global.version_comment, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
 			&mysqlHostname, &mysqlReportHost, &instance.ServerID, &instance.Version, &instance.VersionComment, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
@@ -401,6 +387,20 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			}()
 		}
 
+		{
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				err = sqlutils.QueryRowsMap(db, "show global status like 'rpl_semi_sync_%_status'", func(m sqlutils.RowMap) error {
+					if m.GetString("Variable_name") == "Rpl_semi_sync_master_status" {
+						instance.SemiSyncMasterEnabled = (m.GetString("Value") == "ON")
+					} else if m.GetString("Variable_name") == "Rpl_semi_sync_slave_status" {
+						instance.SemiSyncReplicaEnabled = (m.GetString("Value") == "ON")
+					}
+					return nil
+				})
+			}()
+		}
 		if (instance.IsOracleMySQL() || instance.IsPercona()) && !instance.IsSmallerMajorVersionByString("5.6") {
 			waitGroup.Add(1)
 			go func() {
@@ -458,7 +458,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		instance.ReadBinlogCoordinates.LogPos = m.GetInt64("Read_Master_Log_Pos")
 		instance.ExecBinlogCoordinates.LogFile = m.GetString("Relay_Master_Log_File")
 		instance.ExecBinlogCoordinates.LogPos = m.GetInt64("Exec_Master_Log_Pos")
-		instance.IsDetached, _, _ = instance.ExecBinlogCoordinates.DetachedCoordinates()
+		instance.IsDetached, _ = instance.ExecBinlogCoordinates.ExtractDetachedCoordinates()
 		instance.RelaylogCoordinates.LogFile = m.GetString("Relay_Log_File")
 		instance.RelaylogCoordinates.LogPos = m.GetInt64("Relay_Log_Pos")
 		instance.RelaylogCoordinates.Type = RelayLog
@@ -633,6 +633,34 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		logReadTopologyInstanceError(instanceKey, "ReadInstanceClusterAttributes", err)
 	}
 
+	{
+		// Pseudo GTID
+		// Depends on ReadInstanceClusterAttributes above
+		instance.UsingPseudoGTID = false
+		if config.Config.AutoPseudoGTID {
+			if _, found := pseudoGTIDInjectedClusters.Get(instance.ClusterName); found {
+				// this cluster is known to have been populated by injectPseudoGTID()
+				instance.UsingPseudoGTID = true
+			}
+		} else if config.Config.DetectPseudoGTIDQuery != "" {
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				if resultData, err := sqlutils.QueryResultData(db, config.Config.DetectPseudoGTIDQuery); err == nil {
+					if len(resultData) > 0 {
+						if len(resultData[0]) > 0 {
+							if resultData[0][0].Valid && resultData[0][0].String == "1" {
+								instance.UsingPseudoGTID = true
+							}
+						}
+					}
+				} else {
+					logReadTopologyInstanceError(instanceKey, "DetectPseudoGTIDQuery", err)
+				}
+			}()
+		}
+	}
+
 	// First read the current PromotionRule from candidate_database_instance.
 	{
 		latency.Start("backend")
@@ -723,7 +751,6 @@ Cleanup:
 	// tried to check the instance. last_attempted_check is also
 	// updated on success by writeInstance.
 	latency.Start("backend")
-	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
 	_ = UpdateInstanceLastChecked(&instance.Key)
 	latency.Stop("backend")
 	return nil, err
@@ -910,7 +937,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.ReadBinlogCoordinates.LogPos = m.GetInt64("read_master_log_pos")
 	instance.ExecBinlogCoordinates.LogFile = m.GetString("relay_master_log_file")
 	instance.ExecBinlogCoordinates.LogPos = m.GetInt64("exec_master_log_pos")
-	instance.IsDetached, _, _ = instance.ExecBinlogCoordinates.DetachedCoordinates()
+	instance.IsDetached, _ = instance.ExecBinlogCoordinates.ExtractDetachedCoordinates()
 	instance.RelaylogCoordinates.LogFile = m.GetString("relay_log_file")
 	instance.RelaylogCoordinates.LogPos = m.GetInt64("relay_log_pos")
 	instance.RelaylogCoordinates.Type = RelayLog
@@ -925,6 +952,8 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.DataCenter = m.GetString("data_center")
 	instance.PhysicalEnvironment = m.GetString("physical_environment")
 	instance.SemiSyncEnforced = m.GetBool("semi_sync_enforced")
+	instance.SemiSyncMasterEnabled = m.GetBool("semi_sync_master_enabled")
+	instance.SemiSyncReplicaEnabled = m.GetBool("semi_sync_replica_enabled")
 	instance.ReplicationDepth = m.GetUint("replication_depth")
 	instance.IsCoMaster = m.GetBool("is_co_master")
 	instance.ReplicationCredentialsAvailable = m.GetBool("replication_credentials_available")
@@ -1187,7 +1216,7 @@ func FindInstances(regexpPattern string) (result [](*Instance), err error) {
 // For example, the given `mydb-3:3306` might find `myhosts-mydb301-production.mycompany.com:3306`
 func FindFuzzyInstances(fuzzyInstanceKey *InstanceKey) ([](*Instance), error) {
 	condition := `
-		hostname like concat('%', ?, '%')
+		hostname like concat('%%', ?, '%%')
 		and port = ?
 	`
 	return readInstancesByCondition(condition, sqlutils.Args(fuzzyInstanceKey.Hostname, fuzzyInstanceKey.Port), `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
@@ -1843,6 +1872,31 @@ func ReadClustersInfo(clusterName string) ([]ClusterInfo, error) {
 	return clusters, err
 }
 
+// Get a listing of KVPair for clusters masters, for all clusters or for a specific cluster.
+func GetMastersKVPairs(clusterName string) (kvPairs [](*kv.KVPair), err error) {
+
+	clusterAliasMap := make(map[string]string)
+	if clustersInfo, err := ReadClustersInfo(clusterName); err != nil {
+		return kvPairs, err
+	} else {
+		for _, clusterInfo := range clustersInfo {
+			clusterAliasMap[clusterInfo.ClusterName] = clusterInfo.ClusterAlias
+		}
+	}
+
+	masters, err := ReadWriteableClustersMasters()
+	if err != nil {
+		return kvPairs, err
+	}
+	for _, master := range masters {
+		if kvPair := GetClusterMasterKVPair(clusterAliasMap[master.ClusterName], &master.Key); kvPair != nil {
+			kvPairs = append(kvPairs, kvPair)
+		}
+	}
+
+	return kvPairs, err
+}
+
 // HeuristicallyApplyClusterDomainInstanceAttribute writes down the cluster-domain
 // to master-hostname as a general attribute, by reading current topology and **trusting** it to be correct
 func HeuristicallyApplyClusterDomainInstanceAttribute(clusterName string) (instanceKey *InstanceKey, err error) {
@@ -2059,6 +2113,8 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"has_replication_credentials",
 		"allow_tls",
 		"semi_sync_enforced",
+		"semi_sync_master_enabled",
+		"semi_sync_replica_enabled",
 		"instance_alias",
 		"last_discovery_latency",
 	}
@@ -2129,6 +2185,8 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.HasReplicationCredentials)
 		args = append(args, instance.AllowTLS)
 		args = append(args, instance.SemiSyncEnforced)
+		args = append(args, instance.SemiSyncMasterEnabled)
+		args = append(args, instance.SemiSyncReplicaEnabled)
 		args = append(args, instance.InstanceAlias)
 		args = append(args, instance.LastDiscoveryLatency.Nanoseconds())
 	}
@@ -2254,11 +2312,7 @@ func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
 			instanceKey.Hostname,
 			instanceKey.Port,
 		)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
+		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }
@@ -2274,21 +2328,17 @@ func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
 func UpdateInstanceLastAttemptedCheck(instanceKey *InstanceKey) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	update
-        		database_instance
-        	set
-        		last_attempted_check = NOW()
+    	update
+    		database_instance
+    	set
+    		last_attempted_check = NOW()
 			where
 				hostname = ?
 				and port = ?`,
 			instanceKey.Hostname,
 			instanceKey.Port,
 		)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
+		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }

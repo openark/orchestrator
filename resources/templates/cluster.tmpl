@@ -2,8 +2,8 @@
 	<div class="navbar" role="navigation">
 		<ul class="nav">
 			<li data-bullet="info">
-				<div data-toggle="popover" data-placement="bottom" data-html="true" title="" data-content="">
-					<span class="glyphicon glyphicon-time"></span>
+				<div>
+					<a data-command="info"><span class="glyphicon glyphicon-time"></span></a>
 				</div>
 			</li>
 			<li data-bullet="colorize-dc">
@@ -35,8 +35,12 @@
 	</div>
 </div>
 
-<div id="cluster_wrapper">
+<div id="cluster_name_info">
 	<div id="cluster_name" class="text-muted"></div>
+	<div id="cluster_info"></div>
+</div>
+
+<div id="cluster_wrapper">
 	<div id="cluster_container" class="cluster-graph">
 	</div>
 </div>

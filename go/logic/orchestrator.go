@@ -30,6 +30,7 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/discovery"
 	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/kv"
 	ometrics "github.com/github/orchestrator/go/metrics"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/raft"
@@ -382,7 +383,9 @@ func ContinuousDiscovery() {
 	instancePollTick := time.Tick(instancePollSecondsDuration())
 	caretakingTick := time.Tick(time.Minute)
 	raftCaretakingTick := time.Tick(10 * time.Minute)
-	recoveryTick := time.Tick(time.Duration(config.Config.RecoveryPollSeconds) * time.Second)
+	recoveryTick := time.Tick(time.Duration(config.RecoveryPollSeconds) * time.Second)
+	autoPseudoGTIDTick := time.Tick(time.Duration(config.PseudoGTIDIntervalSeconds) * time.Second)
+	var recoveryEntrance int64
 	var snapshotTopologiesTick <-chan time.Time
 	if config.Config.SnapshotTopologiesIntervalHours > 0 {
 		snapshotTopologiesTick = time.Tick(time.Duration(config.Config.SnapshotTopologiesIntervalHours) * time.Hour)
@@ -391,6 +394,7 @@ func ContinuousDiscovery() {
 	go ometrics.InitMetrics()
 	go ometrics.InitGraphiteMetrics()
 	go acceptSignals()
+	go kv.InitKVStores()
 
 	if config.Config.RaftEnabled {
 		if err := orcraft.Setup(NewCommandApplier(), NewSnapshotDataCreatorApplier(), process.ThisHostname); err != nil {
@@ -418,6 +422,12 @@ func ContinuousDiscovery() {
 				if IsLeaderOrActive() {
 					go inst.UpdateClusterAliases()
 					go inst.ExpireDowntime()
+				}
+			}()
+		case <-autoPseudoGTIDTick:
+			go func() {
+				if config.Config.AutoPseudoGTID && IsLeaderOrActive() {
+					go inst.InjectPseudoGTIDOnWriters()
 				}
 			}()
 		case <-caretakingTick:
@@ -467,6 +477,12 @@ func ContinuousDiscovery() {
 					go inst.ExpireInstanceAnalysisChangelog()
 
 					go func() {
+						// This function is non re-entrant (it can only be running once at any point in time)
+						if atomic.CompareAndSwapInt64(&recoveryEntrance, 0, 1) {
+							defer atomic.StoreInt64(&recoveryEntrance, 0)
+						} else {
+							return
+						}
 						if time.Since(continuousDiscoveryStartTime) >= checkAndRecoverWaitPeriod {
 							CheckAndRecover(nil, nil, false)
 						} else {

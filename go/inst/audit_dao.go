@@ -48,7 +48,6 @@ func EnableAuditSyslog() (err error) {
 
 // AuditOperation creates and writes a new audit entry by given params
 func AuditOperation(auditType string, instanceKey *InstanceKey, message string) error {
-
 	if instanceKey == nil {
 		instanceKey = &InstanceKey{}
 	}
@@ -57,7 +56,9 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 		clusterName, _ = GetClusterName(instanceKey)
 	}
 
+	auditWrittenToFile := false
 	if config.Config.AuditLogFile != "" {
+		auditWrittenToFile = true
 		go func() error {
 			f, err := os.OpenFile(config.Config.AuditLogFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 			if err != nil {
@@ -72,7 +73,8 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 			return nil
 		}()
 	}
-	_, err := db.ExecOrchestrator(`
+	if config.Config.AuditToBackendDB {
+		_, err := db.ExecOrchestrator(`
 			insert
 				into audit (
 					audit_timestamp, audit_type, hostname, port, cluster_name, message
@@ -80,25 +82,29 @@ func AuditOperation(auditType string, instanceKey *InstanceKey, message string) 
 					NOW(), ?, ?, ?, ?, ?
 				)
 			`,
-		auditType,
-		instanceKey.Hostname,
-		instanceKey.Port,
-		clusterName,
-		message,
-	)
-	if err != nil {
-		return log.Errore(err)
+			auditType,
+			instanceKey.Hostname,
+			instanceKey.Port,
+			clusterName,
+			message,
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
 	}
 	logMessage := fmt.Sprintf("auditType:%s instance:%s cluster:%s message:%s", auditType, instanceKey.DisplayString(), clusterName, message)
 	if syslogWriter != nil {
+		auditWrittenToFile = true
 		go func() {
 			syslogWriter.Info(logMessage)
 		}()
 	}
-	log.Infof(logMessage)
+	if !auditWrittenToFile {
+		log.Infof(logMessage)
+	}
 	auditOperationCounter.Inc(1)
 
-	return err
+	return nil
 }
 
 // ReadRecentAudit returns a list of audit entries order chronologically descending, using page number.

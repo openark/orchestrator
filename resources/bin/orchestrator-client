@@ -72,28 +72,30 @@ for arg in "$@"; do
     "-hostname"|"--hostname")             set -- "$@" "-H" ;;
     "-api"|"--api")                       set -- "$@" "-U" ;;
     "-path"|"--path")                     set -- "$@" "-P" ;;
+    "-query"|"--query")                   set -- "$@" "-q" ;;
     *)                                    set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:P:h" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:P:q:h" OPTION
 do
   case $OPTION in
     h) command="help" ;;
-    c) command=$OPTARG ;;
-    i) instance=$OPTARG ;;
-    d) destination=$OPTARG ;;
-    s) destination=$OPTARG ;;
-    a) alias=$OPTARG ;;
-    o) owner=$OPTARG ;;
-    r) reason=$OPTARG ;;
-    u) duration=$OPTARG ;;
-    R) promotion_rule=$OPTARG ;;
-    l) pool=$OPTARG ;;
-    H) hostname_flag=$OPTARG ;;
-    D) default_port=$OPTARG ;;
-    U) [ ! -z "$OPTARG" ] && orchestrator_api=$OPTARG ;;
-    P) api_path=$OPTARG ;;
+    c) command="$OPTARG" ;;
+    i) instance="$OPTARG" ;;
+    d) destination="$OPTARG" ;;
+    s) destination="$OPTARG" ;;
+    a) alias="$OPTARG" ;;
+    o) owner="$OPTARG" ;;
+    r) reason="$OPTARG" ;;
+    u) duration="$OPTARG" ;;
+    R) promotion_rule="$OPTARG" ;;
+    l) pool="$OPTARG" ;;
+    H) hostname_flag="$OPTARG" ;;
+    D) default_port="$OPTARG" ;;
+    U) [ ! -z "$OPTARG" ] && orchestrator_api="$OPTARG" ;;
+    P) api_path="$OPTARG" ;;
+    q) query="$OPTARG"
   esac
 done
 
@@ -256,13 +258,26 @@ function discover() {
 function ascii_topology() {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "topology/${alias:-$instance}"
-  print_details | jq -r '.'
+  echo "$api_response" | jq -r '.Details'
+}
+
+function ascii_topology_tabulated() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "topology-tabulated/${alias:-$instance}"
+  echo "$api_response" | jq -r '.Details'
 }
 
 function search() {
   assert_nonempty "instance" "$instance"
   api "search?s=$(urlencode "$instance")"
   print_response | filter_keys | print_key
+}
+
+function restart_replica_statements() {
+  assert_nonempty "instance" "$instance"
+  assert_nonempty "query" "$query"
+  api "restart-replica-statements/${instance_hostport}?q=$(urlencode "$query")"
+  print_response | print_details
 }
 
 function instance() {
@@ -346,6 +361,11 @@ function downtimed() {
 function dominant_dc() {
   api "masters"
   print_response | jq -r '.[].DataCenter' | sort | uniq -c | sort -nr | head -n 1 | awk '{print $2}'
+}
+
+function submit_masters_to_kv_stores() {
+  api "submit-masters-to-kv-stores/${alias}"
+  print_details | jq -r '.[] | (.Key + ":" + .Value)'
 }
 
 function submit_pool_instances() {
@@ -573,6 +593,7 @@ function run_command() {
     "forget-cluster") forget_cluster ;;                         # Forget about a cluster
 
     "topology") ascii_topology ;;                               # Show an ascii-graph of a replication topology, given a member of that topology
+    "topology-tabulated") ascii_topology_tabulated ;;           # Show an ascii-graph of a replication topology, given a member of that topology, in tabulated format
     "clusters") clusters ;;                                     # List all clusters known to orchestrator
     "clusters-alias") clusters_alias ;;                         # List all clusters known to orchestrator
     "search") search ;;                                         # Search for instances matching given substring
@@ -587,6 +608,8 @@ function run_command() {
     "which-cluster-osc-replicas") which_cluster_osc_replicas ;; # Output a list of replicas in a cluster, that could serve as a pt-online-schema-change operation control replicas
     "downtimed") downtimed ;;                                   # List all downtimed instances
     "dominant-dc") dominant_dc ;;                               # Name the data center where most masters are found
+
+    "submit-masters-to-kv-stores") submit_masters_to_kv_stores;; # Submit a cluster's master, or all clusters' masters to KV stores
 
     "relocate") general_relocate_command ;;                   # Relocate a replica beneath another instance
     "relocate-replicas") general_relocate_replicas_command ;; # Relocates all or part of the replicas of a given instance under another instance
@@ -630,6 +653,11 @@ function run_command() {
     "detach-replica-master-host") general_instance_command ;;   # Stops replication and modifies Master_Host into an impossible yet reversible value.
     "reattach-replica-master-host") general_instance_command ;; # Undo a detach-replica-master-host operation
     "skip-query") general_instance_command ;;                   # Skip a single statement on a replica; either when running with GTID or without
+    "enable-semi-sync-master") general_instance_command ;;      # Enable semi-sync (master-side)
+    "disable-semi-sync-master") general_instance_command ;;     # Disable semi-sync (master-side)
+    "enable-semi-sync-replica") general_instance_command ;;     # Enable semi-sync (replica-side)
+    "disable-semi-sync-replica") general_instance_command ;;    # Disable semi-sync (replica-side)
+    "restart-replica-statements") restart_replica_statements ;; # Given `-q "<query>"` that requires replication restart to apply, wrap query with stop/start slave statements as required to restore instance to same replication state. Print out set of statements
 
     "set-read-only") general_instance_command ;;     # Turn an instance read-only, via SET GLOBAL read_only := 1
     "set-writeable") general_instance_command ;;     # Turn an instance writeable, via SET GLOBAL read_only := 0
