@@ -2696,7 +2696,6 @@ func RegisterInjectedPseudoGTID(clusterName string) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(query, args...)
 		if err == nil {
-			log.Infof("................cluster_injected_pseudo_gtid written %+v", clusterName)
 			clusterInjectedPseudoGTIDCache.Set(clusterName, true, cache.DefaultExpiration)
 		}
 		return log.Errore(err)
@@ -2720,7 +2719,6 @@ func ExpireInjectedPseudoGTID() error {
 // isInjectedPseudoGTID reads from backend DB / cache
 func isInjectedPseudoGTID(clusterName string) (injected bool, err error) {
 	if injectedValue, found := clusterInjectedPseudoGTIDCache.Get(clusterName); found {
-		log.Infof("................isInjectedPseudoGTID returning from cache %+v:%+v", clusterName, injectedValue)
 		return injectedValue.(bool), err
 	}
 	query := `
@@ -2735,7 +2733,6 @@ func isInjectedPseudoGTID(clusterName string) (injected bool, err error) {
 		injected = m.GetBool("is_injected")
 		return nil
 	})
-	log.Infof("................isInjectedPseudoGTID storing in cache: %+v:%+v", clusterName, injected)
 	clusterInjectedPseudoGTIDCache.Set(clusterName, injected, cache.DefaultExpiration)
 	return injected, log.Errore(err)
 }

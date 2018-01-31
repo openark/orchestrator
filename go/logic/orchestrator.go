@@ -384,17 +384,14 @@ func InjectPseudoGTIDOnWriters() error {
 		go func() {
 			if injected, _ := inst.CheckAndInjectPseudoGTIDOnWriter(instance); injected {
 				clusterName := instance.ClusterName
-				log.Infof("............. going to publish, hopefully")
 				if orcraft.IsRaftEnabled() {
 					// We prefer not saturating our raft communication. Pseudo-GTID information is
 					// OK to be cached for a while.
 					if _, found := pseudoGTIDPublishCache.Get(clusterName); !found {
 						pseudoGTIDPublishCache.Set(clusterName, true, cache.DefaultExpiration)
 						orcraft.PublishCommand("injected-pseudo-gtid", clusterName)
-						log.Infof(".............published")
 					}
 				} else {
-					log.Infof(".............local")
 					inst.RegisterInjectedPseudoGTID(clusterName)
 				}
 			}
