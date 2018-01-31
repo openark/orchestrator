@@ -104,7 +104,6 @@ func (applier *CommandApplier) injectedPseudoGTID(value []byte) interface{} {
 	if err := json.Unmarshal(value, &clusterName); err != nil {
 		return log.Errore(err)
 	}
-	log.Infof("................injectedPseudoGTID  %+v", clusterName)
 	inst.RegisterInjectedPseudoGTID(clusterName)
 	return nil
 }
