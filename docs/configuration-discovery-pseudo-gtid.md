@@ -33,6 +33,18 @@ Those statements will do nothing but will serve as magic markers in the binary l
 REVOKE DROP ON _pseudo_gtid_.* FROM 'orchestrator'@'orch_host';
 ```
 
+#### In versions > 3.0.6:
+
+It is also advisable that you grant:
+```sql
+GRANT SELECT ON `performance_schema`.`events_statements_current` TO 'orchestrator'@'orch_host';
+```
+
+The above will allow `orchestrator` to query and confirm the existence of Pseudo-GTID when probing instances.
+You will be pleased to know that this only allows `orchestrator` to see its own queries,
+
+#### Notes on Auto Pseudo-GTID
+
 Automated Pseudo-GTID injection is a newer development which supersedes the need for you to run your own Pseudo-GTID injection.
 
 If you wish to enable auto-Pseudo-GTID injection having run manual Pseudo-GTID injection, you'll be happy to note that:
