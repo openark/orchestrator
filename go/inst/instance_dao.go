@@ -68,6 +68,7 @@ func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 var instanceKeyInformativeClusterName *cache.Cache
 var forgetInstanceKeys *cache.Cache
 var clusterInjectedPseudoGTIDCache *cache.Cache
+var detectInjectedPseudoGTIDViaPSCache *cache.Cache
 
 var accessDeniedCounter = metrics.NewCounter()
 var readTopologyInstanceCounter = metrics.NewCounter()
@@ -90,6 +91,7 @@ func initializeInstanceDao() {
 	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
 	forgetInstanceKeys = cache.New(time.Duration(config.Config.InstancePollSeconds*3)*time.Second, time.Second)
 	clusterInjectedPseudoGTIDCache = cache.New(time.Minute, time.Second)
+	detectInjectedPseudoGTIDViaPSCache = cache.New(5*time.Minute, time.Second)
 	// spin off instance write buffer flushing
 	go func() {
 		flushTick := time.Tick(time.Duration(config.Config.InstanceFlushIntervalMilliseconds) * time.Millisecond)
@@ -639,7 +641,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		instance.UsingPseudoGTID = false
 		func() {
 			if config.Config.AutoPseudoGTID {
-				if found, _ := isAutoPseudoGTIDFoundInPS(db); found {
+				if found, _ := isAutoPseudoGTIDFoundInPS(db, instanceKey); found {
 					instance.UsingPseudoGTID = true
 					return
 				}
@@ -2748,7 +2750,13 @@ func isInjectedPseudoGTID(clusterName string) (injected bool, err error) {
 	return injected, log.Errore(err)
 }
 
-func isAutoPseudoGTIDFoundInPS(db *sql.DB) (found bool, err error) {
+func isAutoPseudoGTIDFoundInPS(db *sql.DB, instanceKey *InstanceKey) (found bool, err error) {
+	if _, foundInCache := detectInjectedPseudoGTIDViaPSCache.Get(instanceKey.StringCode()); foundInCache {
+		return true, nil
+	}
 	err = db.QueryRow(config.Config.DetectPseudoGTIDQuery).Scan(&found)
+	if found {
+		detectInjectedPseudoGTIDViaPSCache.Set(instanceKey.StringCode(), true, cache.DefaultExpiration)
+	}
 	return found, err
 }

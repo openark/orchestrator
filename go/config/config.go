@@ -87,7 +87,7 @@ var DetectAutoPseudoGTIDInPS = fmt.Sprintf(`
 				0
 			) as pseudo_gtid_is_found
 		from
-			performance_schema.events_statements_history
+			performance_schema.events_statements_current
 		where
 			sql_text like '%s%s'
 	`, AutoPseudoGTIDDetectSeconds, AutoPseudoGTIDPattern, "%%")
