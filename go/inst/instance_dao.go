@@ -637,14 +637,26 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		// Pseudo GTID
 		// Depends on ReadInstanceClusterAttributes above
 		instance.UsingPseudoGTID = false
-		if config.Config.AutoPseudoGTID {
-			var err error
-			instance.UsingPseudoGTID, err = isInjectedPseudoGTID(instance.ClusterName)
-			log.Errore(err)
-		} else if config.Config.DetectPseudoGTIDQuery != "" {
+		func() {
+			if config.Config.AutoPseudoGTID {
+				if found, _ := isAutoPseudoGTIDFoundInPS(db); found {
+					instance.UsingPseudoGTID = true
+					log.Infof(".................... hey hey found it!")
+					return
+				}
+				var err error
+				instance.UsingPseudoGTID, err = isInjectedPseudoGTID(instance.ClusterName)
+				log.Errore(err)
+				return
+			}
+			if config.Config.DetectPseudoGTIDQuery == "" {
+				// Not Auto; no explicit query. Nothing to work with
+				return
+			}
 			waitGroup.Add(1)
 			go func() {
 				defer waitGroup.Done()
+				log.Infof("++++++++++++++ old school query", config.Config.DetectPseudoGTIDQuery)
 				if resultData, err := sqlutils.QueryResultData(db, config.Config.DetectPseudoGTIDQuery); err == nil {
 					if len(resultData) > 0 {
 						if len(resultData[0]) > 0 {
@@ -657,7 +669,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 					logReadTopologyInstanceError(instanceKey, "DetectPseudoGTIDQuery", err)
 				}
 			}()
-		}
+		}()
 	}
 
 	// First read the current PromotionRule from candidate_database_instance.
@@ -2738,4 +2750,9 @@ func isInjectedPseudoGTID(clusterName string) (injected bool, err error) {
 	log.Infof("................isInjectedPseudoGTID storing in cache: %+v:%+v", clusterName, injected)
 	clusterInjectedPseudoGTIDCache.Set(clusterName, injected, cache.DefaultExpiration)
 	return injected, log.Errore(err)
+}
+
+func isAutoPseudoGTIDFoundInPS(db *sql.DB) (found bool, err error) {
+	err = db.QueryRow(config.DetectAutoPseudoGTIDInPS).Scan(&found)
+	return found, err
 }

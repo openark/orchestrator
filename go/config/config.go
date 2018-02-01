@@ -57,7 +57,41 @@ const (
 	PseudoGTIDExpireMinutes                      = 60
 	CheckAutoPseudoGTIDGrantsIntervalSeconds     = 60
 	SelectTrueQuery                              = "select 1"
+	AutoPseudoGTIDPattern                        = "drop view if exists `_pseudo_gtid_`"
+	AutoPseudoGTIDDetectSeconds                  = 14400
 )
+
+// Example:
+// sql_text = 'drop view if exists `_pseudo_gtid_`.`_asc:5a732447:00000001:fd6944da378e643a`'
+// subtring functions extract '5a732447'
+// conv() extracts 1517495367
+// from_unixtime() extracts '2018-02-01 16:29:27'
+// timestampdiff() extracts time since the above
+// min() takes the most recent entry ; compares with AutoPseudoGTIDDetectSeconds
+// ifnull() makes sure to return 'false' when no such entry is found
+var DetectAutoPseudoGTIDInPS = fmt.Sprintf(`
+		select
+			ifnull(
+				min(
+					timestampdiff(
+						second, from_unixtime(
+							conv(
+								substring_index(
+									substring_index(sql_text,':',-3),
+									':',1),
+								16,10
+							)
+						),
+						now()
+					)
+				) <= %d,
+				0
+			) as pseudo_gtid_is_found
+		from
+			performance_schema.events_statements_history
+		where
+			sql_text like '%s%s'
+	`, AutoPseudoGTIDDetectSeconds, AutoPseudoGTIDPattern, "%%")
 
 var deprecatedConfigurationVariables = []string{
 	"DatabaselessMode__experimental",
@@ -534,10 +568,11 @@ func (this *Configuration) postReadAdjustments() error {
 		return fmt.Errorf("ZkAddress (ZooKeeper) configuration is unsupported yet")
 	}
 	if this.AutoPseudoGTID {
-		this.PseudoGTIDPattern = "drop view if exists `_pseudo_gtid_`"
+		this.PseudoGTIDPattern = AutoPseudoGTIDPattern
 		this.PseudoGTIDPatternIsFixedSubstring = true
 		this.PseudoGTIDMonotonicHint = "asc:"
 		this.DetectPseudoGTIDQuery = SelectTrueQuery
+		log.Infof(DetectAutoPseudoGTIDInPS)
 		this.PseudoGTIDPreferIndependentMultiMatch = true
 	}
 	return nil
