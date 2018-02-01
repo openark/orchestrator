@@ -641,7 +641,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			if config.Config.AutoPseudoGTID {
 				if found, _ := isAutoPseudoGTIDFoundInPS(db); found {
 					instance.UsingPseudoGTID = true
-					log.Infof(".................... hey hey found it!")
 					return
 				}
 				var err error
@@ -2750,6 +2749,6 @@ func isInjectedPseudoGTID(clusterName string) (injected bool, err error) {
 }
 
 func isAutoPseudoGTIDFoundInPS(db *sql.DB) (found bool, err error) {
-	err = db.QueryRow(config.DetectAutoPseudoGTIDInPS).Scan(&found)
+	err = db.QueryRow(config.Config.DetectPseudoGTIDQuery).Scan(&found)
 	return found, err
 }

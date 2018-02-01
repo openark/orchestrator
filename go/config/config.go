@@ -56,7 +56,6 @@ const (
 	PseudoGTIDIntervalSeconds                    = 5
 	PseudoGTIDExpireMinutes                      = 60
 	CheckAutoPseudoGTIDGrantsIntervalSeconds     = 60
-	SelectTrueQuery                              = "select 1"
 	AutoPseudoGTIDPattern                        = "drop view if exists `_pseudo_gtid_`"
 	AutoPseudoGTIDDetectSeconds                  = 14400
 )
@@ -573,8 +572,7 @@ func (this *Configuration) postReadAdjustments() error {
 		this.PseudoGTIDPattern = AutoPseudoGTIDPattern
 		this.PseudoGTIDPatternIsFixedSubstring = true
 		this.PseudoGTIDMonotonicHint = "asc:"
-		this.DetectPseudoGTIDQuery = SelectTrueQuery
-		log.Infof(DetectAutoPseudoGTIDInPS)
+		this.DetectPseudoGTIDQuery = DetectAutoPseudoGTIDInPS
 		this.PseudoGTIDPreferIndependentMultiMatch = true
 	}
 	return nil
