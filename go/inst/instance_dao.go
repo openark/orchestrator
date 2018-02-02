@@ -641,9 +641,12 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		instance.UsingPseudoGTID = false
 		func() {
 			if config.Config.AutoPseudoGTID {
-				if found, _ := isAutoPseudoGTIDFoundInPS(db, instanceKey); found {
-					instance.UsingPseudoGTID = true
-					return
+				if !instance.IsSmallerMajorVersionByString("5.6") {
+					// P_S table on exists as of 5.6
+					if found, _ := isAutoPseudoGTIDFoundInPS(db, instanceKey); found {
+						instance.UsingPseudoGTID = true
+						return
+					}
 				}
 				var err error
 				instance.UsingPseudoGTID, err = isInjectedPseudoGTID(instance.ClusterName)
