@@ -31,7 +31,7 @@ import (
 
 type SnapshotData struct {
 	Keys             []inst.InstanceKey // Kept for backwards comapatibility
-	KeysMasterKeys   []inst.InstanceKeyMasterKey
+	MinimalInstances []inst.MinimalInstance
 	RecoveryDisabled bool
 
 	ClusterAlias,
@@ -77,7 +77,7 @@ func CreateSnapshotData() *SnapshotData {
 	snapshotData := NewSnapshotData()
 
 	// keys
-	snapshotData.KeysMasterKeys, _ = inst.ReadAllInstanceKeysMasterKeys()
+	snapshotData.MinimalInstances, _ = inst.ReadAllMinimalInstances()
 	snapshotData.RecoveryDisabled, _ = IsRecoveryDisabled()
 
 	readTableData("cluster_alias", &snapshotData.ClusterAlias)
@@ -139,8 +139,8 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 	{
 		snapshotInstanceKeyMap := inst.NewInstanceKeyMap()
 		snapshotInstanceKeyMap.AddKeys(snapshotData.Keys)
-		for _, instanceKeyMasterKey := range snapshotData.KeysMasterKeys {
-			snapshotInstanceKeyMap.AddKey(instanceKeyMasterKey.Key)
+		for _, minimalInstance := range snapshotData.MinimalInstances {
+			snapshotInstanceKeyMap.AddKey(minimalInstance.Key)
 		}
 
 		discardedKeys := 0
@@ -173,11 +173,10 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 			}
 		}
 		// v2: read keys + master keys
-		for _, snapshotKeyMasterKey := range snapshotData.KeysMasterKeys {
-			if !existingKeysMap.HasKey(snapshotKeyMasterKey.Key) {
-				instance := inst.Instance{Key: snapshotKeyMasterKey.Key, MasterKey: snapshotKeyMasterKey.MasterKey}
-				log.Infof("..............writing snapshotKeyMasterKey: %+v", snapshotKeyMasterKey)
-				if err := inst.WriteInstance(&instance, false, nil); err == nil {
+		for _, minimalInstance := range snapshotData.MinimalInstances {
+			if !existingKeysMap.HasKey(minimalInstance.Key) {
+				log.Infof("..............writing minimalInstance: %+v", minimalInstance)
+				if err := inst.WriteInstance(minimalInstance.ToInstance(), false, nil); err == nil {
 					discoveredKeys++
 				} else {
 					log.Errore(err)

@@ -1961,27 +1961,29 @@ func ReadAllInstanceKeys() ([]InstanceKey, error) {
 }
 
 // ReadAllInstanceKeysMasterKeys
-func ReadAllInstanceKeysMasterKeys() ([]InstanceKeyMasterKey, error) {
-	res := []InstanceKeyMasterKey{}
+func ReadAllMinimalInstances() ([]MinimalInstance, error) {
+	res := []MinimalInstance{}
 	query := `
 		select
-			hostname, port, master_host, master_port
+			hostname, port, master_host, master_port, cluster_name
 		from
 			database_instance
 			`
 	err := db.QueryOrchestrator(query, sqlutils.Args(), func(m sqlutils.RowMap) error {
-		instanceKey := InstanceKey{
+		minimalInstance := MinimalInstance{}
+		minimalInstance.Key = InstanceKey{
 			Hostname: m.GetString("hostname"),
 			Port:     m.GetInt("port"),
 		}
-		masterKey := InstanceKey{
+		minimalInstance.MasterKey = InstanceKey{
 			Hostname: m.GetString("master_host"),
 			Port:     m.GetInt("master_port"),
 		}
+		minimalInstance.ClusterName = m.GetString("cluster_name")
 
-		if !InstanceIsForgotten(&instanceKey) {
+		if !InstanceIsForgotten(&minimalInstance.Key) {
 			// only if not in "forget" cache
-			res = append(res, InstanceKeyMasterKey{Key: instanceKey, MasterKey: masterKey})
+			res = append(res, minimalInstance)
 		}
 		return nil
 	})
