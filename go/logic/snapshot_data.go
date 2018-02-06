@@ -30,7 +30,8 @@ import (
 )
 
 type SnapshotData struct {
-	Keys             []inst.InstanceKey
+	Keys             []inst.InstanceKey // Kept for backwards comapatibility
+	KeysMasterKeys   []inst.InstanceKeyMasterKey
 	RecoveryDisabled bool
 
 	ClusterAlias,
@@ -76,7 +77,7 @@ func CreateSnapshotData() *SnapshotData {
 	snapshotData := NewSnapshotData()
 
 	// keys
-	snapshotData.Keys, _ = inst.ReadAllInstanceKeys()
+	snapshotData.KeysMasterKeys, _ = inst.ReadAllInstanceKeysMasterKeys()
 	snapshotData.RecoveryDisabled, _ = IsRecoveryDisabled()
 
 	readTableData("cluster_alias", &snapshotData.ClusterAlias)
@@ -138,12 +139,16 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 	{
 		snapshotInstanceKeyMap := inst.NewInstanceKeyMap()
 		snapshotInstanceKeyMap.AddKeys(snapshotData.Keys)
+		for _, instanceKeyMasterKey := range snapshotData.KeysMasterKeys {
+			snapshotInstanceKeyMap.AddKey(instanceKeyMasterKey.Key)
+		}
 
 		discardedKeys := 0
 		// Forget instances that were not in snapshot
 		existingKeys, _ := inst.ReadAllInstanceKeys()
 		for _, existingKey := range existingKeys {
 			if !snapshotInstanceKeyMap.HasKey(existingKey) {
+				log.Infof("..............forgetting key: %+v", existingKey)
 				inst.ForgetInstance(&existingKey)
 				discardedKeys++
 			}
@@ -156,13 +161,27 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 		// Instances that _are_ in our own database will self-discover. No need
 		// to explicitly discover them.
 		discoveredKeys := 0
+		// v1: read keys (backwards support)
 		for _, snapshotKey := range snapshotData.Keys {
 			if !existingKeysMap.HasKey(snapshotKey) {
 				snapshotKey := snapshotKey
 				go func() {
+					log.Infof("..............discovering key: %+v", snapshotKey)
 					snapshotDiscoveryKeys <- snapshotKey
 				}()
 				discoveredKeys++
+			}
+		}
+		// v2: read keys + master keys
+		for _, snapshotKeyMasterKey := range snapshotData.KeysMasterKeys {
+			if !existingKeysMap.HasKey(snapshotKeyMasterKey.Key) {
+				instance := inst.Instance{Key: snapshotKeyMasterKey.Key, MasterKey: snapshotKeyMasterKey.MasterKey}
+				log.Infof("..............writing snapshotKeyMasterKey: %+v", snapshotKeyMasterKey)
+				if err := inst.WriteInstance(&instance, false, nil); err == nil {
+					discoveredKeys++
+				} else {
+					log.Errore(err)
+				}
 			}
 		}
 		log.Debugf("raft snapshot restore: discovered %+v keys", discoveredKeys)

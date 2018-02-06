@@ -26,6 +26,11 @@ var (
 	DowntimeLostInRecoveryMessage = "lost-in-recovery"
 )
 
+type InstanceKeyMasterKey struct {
+	Key       InstanceKey
+	MasterKey InstanceKey
+}
+
 type InstancesSorterByExec struct {
 	instances  [](*Instance)
 	dataCenter string

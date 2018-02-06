@@ -739,7 +739,7 @@ Cleanup:
 		if bufferWrites {
 			enqueueInstanceWrite(instance, instanceFound, err)
 		} else {
-			writeInstance(instance, instanceFound, err)
+			WriteInstance(instance, instanceFound, err)
 		}
 		WriteLongRunningProcesses(&instance.Key, longRunningProcesses)
 		latency.Stop("backend")
@@ -1627,7 +1627,7 @@ func InjectUnseenMasters() error {
 		clusterName := masterKey.StringCode()
 		// minimal details:
 		instance := Instance{Key: masterKey, Version: "Unknown", ClusterName: clusterName}
-		if err := writeInstance(&instance, false, nil); err == nil {
+		if err := WriteInstance(&instance, false, nil); err == nil {
 			operations++
 		}
 	}
@@ -1938,12 +1938,7 @@ func GetHeuristicClusterDomainInstanceAttribute(clusterName string) (instanceKey
 	return NewRawInstanceKey(writerInstanceName)
 }
 
-// ReadOutdatedInstanceKeys reads and returns keys for all instances that are not up to date (i.e.
-// pre-configured time has passed since they were last checked)
-// But we also check for the case where an attempt at instance checking has been made, that hasn't
-// resulted in an actual check! This can happen when TCP/IP connections are hung, in which case the "check"
-// never returns. In such case we multiply interval by a factor, so as not to open too many connections on
-// the instance.
+// ReadAllInstanceKeys
 func ReadAllInstanceKeys() ([]InstanceKey, error) {
 	res := []InstanceKey{}
 	query := `
@@ -1959,6 +1954,34 @@ func ReadAllInstanceKeys() ([]InstanceKey, error) {
 		} else if !InstanceIsForgotten(instanceKey) {
 			// only if not in "forget" cache
 			res = append(res, *instanceKey)
+		}
+		return nil
+	})
+	return res, log.Errore(err)
+}
+
+// ReadAllInstanceKeysMasterKeys
+func ReadAllInstanceKeysMasterKeys() ([]InstanceKeyMasterKey, error) {
+	res := []InstanceKeyMasterKey{}
+	query := `
+		select
+			hostname, port, master_host, master_port
+		from
+			database_instance
+			`
+	err := db.QueryOrchestrator(query, sqlutils.Args(), func(m sqlutils.RowMap) error {
+		instanceKey := InstanceKey{
+			Hostname: m.GetString("hostname"),
+			Port:     m.GetInt("port"),
+		}
+		masterKey := InstanceKey{
+			Hostname: m.GetString("master_host"),
+			Port:     m.GetInt("master_port"),
+		}
+
+		if !InstanceIsForgotten(&instanceKey) {
+			// only if not in "forget" cache
+			res = append(res, InstanceKeyMasterKey{Key: instanceKey, MasterKey: masterKey})
 		}
 		return nil
 	})
@@ -2287,8 +2310,8 @@ func flushInstanceWriteBuffer() {
 	}
 }
 
-// writeInstance stores an instance in the orchestrator backend
-func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError error) error {
+// WriteInstance stores an instance in the orchestrator backend
+func WriteInstance(instance *Instance, instanceWasActuallyFound bool, lastError error) error {
 	if lastError != nil {
 		log.Debugf("writeInstance: will not update database_instance due to error: %+v", lastError)
 		return nil
