@@ -1720,7 +1720,9 @@ function Cluster() {
         _replicationAnalysis = replicationAnalysis;
         getData("/api/maintenance", function(maintenanceList) {
           _maintenanceList = maintenanceList;
+          $(document).trigger('orchestrator:preRenderCluster');
           renderCluster();
+          $(document).trigger('orchestrator:postRenderCluster');
         });
       });
     });

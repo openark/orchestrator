@@ -134,6 +134,15 @@ Depending on your configuration (`InstancePollSeconds`) this may take a few seco
 If you've made it this far, you've done 90% of the work. You may consider configuring Pseudo GTID queries, DC awareness etc. See
 "want to have" sub-sections under [configuration](Orchestrator-Manual#configuration).
 
+### Customizations
+
+There are some hooks in the Orchestrator web frontend which can be used to add customizations via CSS and JavaScript.
+
+The corresponding files to edit are `resources/public/css/custom.css` and `resources/public/js/custom.js`.
+
+You can find available hooks via `grep -r 'orchestrator:' resources/public/js`.
+
+Please note that all APIs and structures are bound to change and any customizations are unsupported. Please file issues against uncustomized versions.
 
 ### Forking and Pull-Requesting
 
