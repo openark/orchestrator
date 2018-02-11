@@ -427,6 +427,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		err = fmt.Errorf("ReadTopologyInstance: empty hostname (%+v). Bailing out", *instanceKey)
 		goto Cleanup
 	}
+	go ResolveHostnameIPs(instance.Key.Hostname)
 	if config.Config.DataCenterPattern != "" {
 		if pattern, err := regexp.Compile(config.Config.DataCenterPattern); err == nil {
 			match := pattern.FindStringSubmatch(instance.Key.Hostname)
