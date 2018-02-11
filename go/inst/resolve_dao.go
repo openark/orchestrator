@@ -17,6 +17,8 @@
 package inst
 
 import (
+	"net"
+
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 	"github.com/openark/golib/log"
@@ -323,4 +325,54 @@ func deleteHostnameResolves() error {
 				from hostname_resolve`,
 	)
 	return err
+}
+
+// writeHostnameIPs stroes an ipv4 and ipv6 associated witha hostname, if available
+func writeHostnameIPs(hostname string, ips []net.IP) error {
+	ipv4String := ""
+	ipv6String := ""
+	for _, ip := range ips {
+		if ip4 := ip.To4(); ip4 != nil {
+			ipv4String = ip.String()
+		} else {
+			ipv6String = ip.String()
+		}
+	}
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+			insert into
+					hostname_ips (hostname, ipv4, ipv6, last_updated)
+				values
+					(?, ?, ?, NOW())
+				on duplicate key update
+					ipv4 = VALUES(ipv4),
+					ipv6 = VALUES(ipv6),
+					last_updated = VALUES(last_updated)
+			`,
+			hostname,
+			ipv4String,
+			ipv6String,
+		)
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
+// readUnresolvedHostname reverse-reads hostname resolve. It returns a hostname which matches given pattern and resovles to resolvedHostname,
+// or, in the event no such hostname is found, the given resolvedHostname, unchanged.
+func readHostnameIPs(hostname string) (ipv4 string, ipv6 string, err error) {
+	query := `
+		select
+			ipv4, ipv6
+		from
+			hostname_ips
+		where
+			hostname = ?
+	`
+	err = db.QueryOrchestrator(query, sqlutils.Args(hostname), func(m sqlutils.RowMap) error {
+		ipv4 = m.GetString("ipv4")
+		ipv6 = m.GetString("ipv6")
+		return nil
+	})
+	return ipv4, ipv6, log.Errore(err)
 }
