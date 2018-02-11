@@ -72,7 +72,7 @@ func NewHostnameDeregistration(instanceKey *InstanceKey) *HostnameRegistration {
 var hostnameResolvesLightweightCache *cache.Cache
 var hostnameResolvesLightweightCacheInit = &sync.Mutex{}
 var hostnameResolvesLightweightCacheLoadedOnceFromDB bool = false
-var hostnameIPsCache = cache.New(10*time.Minute, time.Second)
+var hostnameIPsCache = cache.New(10*time.Minute, time.Minute)
 
 func init() {
 	if config.Config.ExpiryHostnameResolvesMinutes < 1 {
