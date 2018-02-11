@@ -39,6 +39,8 @@ func getClusterMasterKVPair(clusterAlias string, masterKey *InstanceKey) *kv.KVP
 	return kv.NewKVPair(GetClusterMasterKVKey(clusterAlias), masterKey.StringCode())
 }
 
+// GetClusterMasterKVPairs returns all KV pairs associated with a master. This includes the
+// full identity of the master as well as a breakdown by hostname, port, ipv4, ipv6
 func GetClusterMasterKVPairs(clusterAlias string, masterKey *InstanceKey) (kvPairs [](*kv.KVPair)) {
 	masterKVPair := getClusterMasterKVPair(clusterAlias, masterKey)
 	if masterKVPair == nil {
