@@ -1,7 +1,5 @@
 package inst
 
-import ()
-
 type MinimalInstance struct {
 	Key         InstanceKey
 	MasterKey   InstanceKey
