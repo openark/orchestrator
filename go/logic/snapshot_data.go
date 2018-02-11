@@ -161,17 +161,6 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 		// Instances that _are_ in our own database will self-discover. No need
 		// to explicitly discover them.
 		discoveredKeys := 0
-		// v1: read keys (backwards support)
-		for _, snapshotKey := range snapshotData.Keys {
-			if !existingKeysMap.HasKey(snapshotKey) {
-				snapshotKey := snapshotKey
-				go func() {
-					log.Infof("..............discovering key: %+v", snapshotKey)
-					snapshotDiscoveryKeys <- snapshotKey
-				}()
-				discoveredKeys++
-			}
-		}
 		// v2: read keys + master keys
 		for _, minimalInstance := range snapshotData.MinimalInstances {
 			if !existingKeysMap.HasKey(minimalInstance.Key) {
@@ -180,6 +169,19 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 					discoveredKeys++
 				} else {
 					log.Errore(err)
+				}
+			}
+		}
+		if len(snapshotData.MinimalInstances) == 0 {
+			// v1: read keys (backwards support)
+			for _, snapshotKey := range snapshotData.Keys {
+				if !existingKeysMap.HasKey(snapshotKey) {
+					snapshotKey := snapshotKey
+					go func() {
+						log.Infof("..............discovering key: %+v", snapshotKey)
+						snapshotDiscoveryKeys <- snapshotKey
+					}()
+					discoveredKeys++
 				}
 			}
 		}
