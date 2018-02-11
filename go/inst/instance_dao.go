@@ -1889,9 +1889,8 @@ func GetMastersKVPairs(clusterName string) (kvPairs [](*kv.KVPair), err error) {
 		return kvPairs, err
 	}
 	for _, master := range masters {
-		if kvPair := GetClusterMasterKVPair(clusterAliasMap[master.ClusterName], &master.Key); kvPair != nil {
-			kvPairs = append(kvPairs, kvPair)
-		}
+		clusterPairs := GetClusterMasterKVPairs(clusterAliasMap[master.ClusterName], &master.Key)
+		kvPairs = append(kvPairs, clusterPairs...)
 	}
 
 	return kvPairs, err

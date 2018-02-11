@@ -17,6 +17,8 @@
 package inst
 
 import (
+	"fmt"
+
 	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
 	test "github.com/openark/golib/tests"
@@ -39,17 +41,43 @@ func TestGetClusterMasterKVKey(t *testing.T) {
 
 func TestGetClusterMasterKVPair(t *testing.T) {
 	{
-		kvPair := GetClusterMasterKVPair("myalias", &masterKey)
+		kvPair := getClusterMasterKVPair("myalias", &masterKey)
 		test.S(t).ExpectNotNil(kvPair)
 		test.S(t).ExpectEquals(kvPair.Key, "test/master/myalias")
 		test.S(t).ExpectEquals(kvPair.Value, masterKey.StringCode())
 	}
 	{
-		kvPair := GetClusterMasterKVPair("", &masterKey)
+		kvPair := getClusterMasterKVPair("", &masterKey)
 		test.S(t).ExpectTrue(kvPair == nil)
 	}
 	{
-		kvPair := GetClusterMasterKVPair("myalias", nil)
+		kvPair := getClusterMasterKVPair("myalias", nil)
 		test.S(t).ExpectTrue(kvPair == nil)
 	}
+}
+
+func TestGetClusterMasterKVPairs(t *testing.T) {
+	kvPairs := GetClusterMasterKVPairs("myalias", &masterKey)
+	test.S(t).ExpectTrue(len(kvPairs) >= 2)
+
+	{
+		kvPair := kvPairs[0]
+		test.S(t).ExpectEquals(kvPair.Key, "test/master/myalias")
+		test.S(t).ExpectEquals(kvPair.Value, masterKey.StringCode())
+	}
+	{
+		kvPair := kvPairs[1]
+		test.S(t).ExpectEquals(kvPair.Key, "test/master/myalias/hostname")
+		test.S(t).ExpectEquals(kvPair.Value, masterKey.Hostname)
+	}
+	{
+		kvPair := kvPairs[2]
+		test.S(t).ExpectEquals(kvPair.Key, "test/master/myalias/port")
+		test.S(t).ExpectEquals(kvPair.Value, fmt.Sprintf("%d", masterKey.Port))
+	}
+}
+
+func TestGetClusterMasterKVPairs2(t *testing.T) {
+	kvPairs := GetClusterMasterKVPairs("", &masterKey)
+	test.S(t).ExpectEquals(len(kvPairs), 0)
 }
