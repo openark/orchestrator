@@ -76,3 +76,8 @@ func TestGetClusterMasterKVPairs(t *testing.T) {
 		test.S(t).ExpectEquals(kvPair.Value, fmt.Sprintf("%d", masterKey.Port))
 	}
 }
+
+func TestGetClusterMasterKVPairs2(t *testing.T) {
+	kvPairs := GetClusterMasterKVPairs("", &masterKey)
+	test.S(t).ExpectEquals(len(kvPairs), 0)
+}
