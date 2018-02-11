@@ -774,15 +774,19 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			go inst.SetReadOnly(&analysisEntry.AnalyzedInstanceKey, true)
 		}
 
-		kvPair := inst.GetClusterMasterKVPair(analysisEntry.ClusterDetails.ClusterAlias, &promotedReplica.Key)
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Writing KV %+v", kvPair))
+		kvPairs := inst.GetClusterMasterKVPairs(analysisEntry.ClusterDetails.ClusterAlias, &promotedReplica.Key)
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Writing KV %+v", kvPairs))
 		if orcraft.IsRaftEnabled() {
-			orcraft.PublishCommand("put-key-value", kvPair)
+			for _, kvPair := range kvPairs {
+				orcraft.PublishCommand("put-key-value", kvPair)
+			}
 			// since we'll be affecting 3rd party tools here, we _prefer_ to mitigate re-applying
 			// of the put-key-value event upon startup. We _recommend_ a snapshot in the near future.
 			go orcraft.PublishCommand("async-snapshot", "")
 		} else {
-			kv.PutKVPair(kvPair)
+			for _, kvPair := range kvPairs {
+				kv.PutKVPair(kvPair)
+			}
 		}
 
 		if !skipProcesses {
