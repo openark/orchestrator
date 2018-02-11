@@ -46,11 +46,16 @@ func GetClusterMasterKVPairs(clusterAlias string, masterKey *InstanceKey) (kvPai
 	}
 	kvPairs = append(kvPairs, masterKVPair)
 
-	kvPairs = append(kvPairs, kv.NewKVPair(fmt.Sprintf("%s/hostname", masterKVPair.Key), masterKey.Hostname))
-	kvPairs = append(kvPairs, kv.NewKVPair(fmt.Sprintf("%s/port", masterKVPair.Key), fmt.Sprintf("%d", masterKey.Port)))
+	addPair := func(keySuffix, value string) {
+		key := fmt.Sprintf("%s/%s", masterKVPair.Key, keySuffix)
+		kvPairs = append(kvPairs, kv.NewKVPair(key, value))
+	}
+
+	addPair("hostname", masterKey.Hostname)
+	addPair("port", fmt.Sprintf("%d", masterKey.Port))
 	if ipv4, ipv6, err := readHostnameIPs(masterKey.Hostname); err == nil {
-		kvPairs = append(kvPairs, kv.NewKVPair(fmt.Sprintf("%s/ipv4", masterKVPair.Key), ipv4))
-		kvPairs = append(kvPairs, kv.NewKVPair(fmt.Sprintf("%s/ipv6", masterKVPair.Key), ipv6))
+		addPair("ipv4", ipv4)
+		addPair("ipv6", ipv6)
 	}
 	return kvPairs
 }

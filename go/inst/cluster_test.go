@@ -17,6 +17,8 @@
 package inst
 
 import (
+	"fmt"
+
 	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
 	test "github.com/openark/golib/tests"
@@ -51,5 +53,26 @@ func TestGetClusterMasterKVPair(t *testing.T) {
 	{
 		kvPair := getClusterMasterKVPair("myalias", nil)
 		test.S(t).ExpectTrue(kvPair == nil)
+	}
+}
+
+func TestGetClusterMasterKVPairs(t *testing.T) {
+	kvPairs := GetClusterMasterKVPairs("myalias", &masterKey)
+	test.S(t).ExpectTrue(len(kvPairs) >= 2)
+
+	{
+		kvPair := kvPairs[0]
+		test.S(t).ExpectEquals(kvPair.Key, "test/master/myalias")
+		test.S(t).ExpectEquals(kvPair.Value, masterKey.StringCode())
+	}
+	{
+		kvPair := kvPairs[1]
+		test.S(t).ExpectEquals(kvPair.Key, "test/master/myalias/hostname")
+		test.S(t).ExpectEquals(kvPair.Value, masterKey.Hostname)
+	}
+	{
+		kvPair := kvPairs[2]
+		test.S(t).ExpectEquals(kvPair.Key, "test/master/myalias/port")
+		test.S(t).ExpectEquals(kvPair.Value, fmt.Sprintf("%d", masterKey.Port))
 	}
 }
