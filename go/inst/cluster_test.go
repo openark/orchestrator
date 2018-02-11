@@ -39,17 +39,17 @@ func TestGetClusterMasterKVKey(t *testing.T) {
 
 func TestGetClusterMasterKVPair(t *testing.T) {
 	{
-		kvPair := GetClusterMasterKVPair("myalias", &masterKey)
+		kvPair := getClusterMasterKVPair("myalias", &masterKey)
 		test.S(t).ExpectNotNil(kvPair)
 		test.S(t).ExpectEquals(kvPair.Key, "test/master/myalias")
 		test.S(t).ExpectEquals(kvPair.Value, masterKey.StringCode())
 	}
 	{
-		kvPair := GetClusterMasterKVPair("", &masterKey)
+		kvPair := getClusterMasterKVPair("", &masterKey)
 		test.S(t).ExpectTrue(kvPair == nil)
 	}
 	{
-		kvPair := GetClusterMasterKVPair("myalias", nil)
+		kvPair := getClusterMasterKVPair("myalias", nil)
 		test.S(t).ExpectTrue(kvPair == nil)
 	}
 }

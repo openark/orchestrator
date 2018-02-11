@@ -29,7 +29,7 @@ func GetClusterMasterKVKey(clusterAlias string) string {
 	return fmt.Sprintf("%s%s", config.Config.KVClusterMasterPrefix, clusterAlias)
 }
 
-func GetClusterMasterKVPair(clusterAlias string, masterKey *InstanceKey) *kv.KVPair {
+func getClusterMasterKVPair(clusterAlias string, masterKey *InstanceKey) *kv.KVPair {
 	if clusterAlias == "" {
 		return nil
 	}
@@ -37,6 +37,22 @@ func GetClusterMasterKVPair(clusterAlias string, masterKey *InstanceKey) *kv.KVP
 		return nil
 	}
 	return kv.NewKVPair(GetClusterMasterKVKey(clusterAlias), masterKey.StringCode())
+}
+
+func GetClusterMasterKVPairs(clusterAlias string, masterKey *InstanceKey) (kvPairs [](*kv.KVPair)) {
+	masterKVPair := getClusterMasterKVPair(clusterAlias, masterKey)
+	if masterKVPair == nil {
+		return kvPairs
+	}
+	kvPairs = append(kvPairs, masterKVPair)
+
+	kvPairs = append(kvPairs, kv.NewKVPair(fmt.Sprintf("%s/hostname", masterKVPair.Key), masterKey.Hostname))
+	kvPairs = append(kvPairs, kv.NewKVPair(fmt.Sprintf("%s/port", masterKVPair.Key), fmt.Sprintf("%d", masterKey.Port)))
+	if ipv4, ipv6, err := readHostnameIPs(masterKey.Hostname); err == nil {
+		kvPairs = append(kvPairs, kv.NewKVPair(fmt.Sprintf("%s/ipv4", masterKVPair.Key), ipv4))
+		kvPairs = append(kvPairs, kv.NewKVPair(fmt.Sprintf("%s/ipv6", masterKVPair.Key), ipv6))
+	}
+	return kvPairs
 }
 
 // mappedClusterNameToAlias attempts to match a cluster with an alias based on
