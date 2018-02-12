@@ -175,6 +175,15 @@ func GetState() raft.RaftState {
 	return getRaft().State()
 }
 
+// IsHealthy checks whether this node is healthy in the raft group
+func IsHealthy() bool {
+	if !isRaftSetupComplete() {
+		return false
+	}
+	state := GetState()
+	return state == raft.Leader || state == raft.Follower
+}
+
 func Snapshot() error {
 	future := getRaft().Snapshot()
 	return future.Error()

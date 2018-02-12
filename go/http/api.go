@@ -2553,8 +2553,21 @@ func (this *HttpAPI) RaftLeader(params martini.Params, r render.Render, req *htt
 		return
 	}
 
-	state := orcraft.GetLeader()
-	r.JSON(http.StatusOK, state)
+	leader := orcraft.GetLeader()
+	r.JSON(http.StatusOK, leader)
+}
+
+// RaftHealth indicates whether this node is part of a healthy raft group
+func (this *HttpAPI) RaftHealth(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !orcraft.IsRaftEnabled() {
+		Respond(r, &APIResponse{Code: ERROR, Message: "raft-state: not running with raft setup"})
+		return
+	}
+	if !orcraft.IsHealthy() {
+		Respond(r, &APIResponse{Code: ERROR, Message: "unhealthy"})
+		return
+	}
+	r.JSON(http.StatusOK, "healthy")
 }
 
 // RaftSnapshot instructs raft to take a snapshot
@@ -2581,7 +2594,6 @@ func (this *HttpAPI) ReloadConfiguration(params martini.Params, r render.Render,
 	inst.AuditOperation("reload-configuration", nil, "Triggered via API")
 
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Config reloaded")})
-
 }
 
 // ReplicationAnalysis retuens list of issues
@@ -3270,6 +3282,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "raft-peers", this.RaftPeers)
 	this.registerRequest(m, "raft-state", this.RaftState)
 	this.registerRequest(m, "raft-leader", this.RaftLeader)
+	this.registerRequest(m, "raft-health", this.RaftHealth)
 	this.registerRequest(m, "raft-snapshot", this.RaftSnapshot)
 	this.registerRequest(m, "reelect", this.Reelect)
 	this.registerRequest(m, "reload-configuration", this.ReloadConfiguration)

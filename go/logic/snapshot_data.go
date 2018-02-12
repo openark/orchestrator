@@ -48,6 +48,8 @@ type SnapshotData struct {
 	KVStore,
 	Recovery,
 	RecoverySteps sqlutils.NamedResultData
+
+	LeaderURI string
 }
 
 func NewSnapshotData() *SnapshotData {

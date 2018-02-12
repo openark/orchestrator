@@ -14,20 +14,11 @@ import (
 	"github.com/go-martini/martini"
 )
 
-var counter = 5
-
 var reverseProxy = func(w http.ResponseWriter, r *http.Request, c martini.Context) {
-	log.Infof("........... HERE!! %d", counter)
 	if !orcraft.IsRaftEnabled() {
 		return
 	}
 	if orcraft.IsLeader() {
-		// nothing to do
-		// return
-	}
-	if counter == 0 {
-		log.Infof("........... done proxy")
-		counter = 3
 		return
 	}
 	leader := orcraft.GetLeader()
@@ -47,7 +38,6 @@ var reverseProxy = func(w http.ResponseWriter, r *http.Request, c martini.Contex
 		return
 	}
 	proxy := httputil.NewSingleHostReverseProxy(url)
-	counter--
 	log.Debugf("................reverse proxy to %s", leaderURI)
 	proxy.ServeHTTP(w, r)
 }
