@@ -1056,7 +1056,13 @@ func canInjectPseudoGTID(instanceKey *InstanceKey) (canInject bool, err error) {
 			if strings.Contains(grant, fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.*", config.PseudoGTIDSchema)) {
 				foundAllOnSchema = true
 			}
+			if strings.Contains(grant, fmt.Sprintf(`GRANT ALL PRIVILEGES ON "%s".*`, config.PseudoGTIDSchema)) {
+				foundAllOnSchema = true
+			}
 			if strings.Contains(grant, `DROP`) && strings.Contains(grant, fmt.Sprintf(" ON `%s`.*", config.PseudoGTIDSchema)) {
+				foundDropOnSchema = true
+			}
+			if strings.Contains(grant, `DROP`) && strings.Contains(grant, fmt.Sprintf(` ON "%s".*`, config.PseudoGTIDSchema)) {
 				foundDropOnSchema = true
 			}
 		}
