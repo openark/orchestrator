@@ -148,7 +148,6 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 		existingKeys, _ := inst.ReadAllInstanceKeys()
 		for _, existingKey := range existingKeys {
 			if !snapshotInstanceKeyMap.HasKey(existingKey) {
-				log.Infof("..............forgetting key: %+v", existingKey)
 				inst.ForgetInstance(&existingKey)
 				discardedKeys++
 			}
@@ -164,7 +163,6 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 		// v2: read keys + master keys
 		for _, minimalInstance := range snapshotData.MinimalInstances {
 			if !existingKeysMap.HasKey(minimalInstance.Key) {
-				log.Infof("..............writing minimalInstance: %+v", minimalInstance)
 				if err := inst.WriteInstance(minimalInstance.ToInstance(), false, nil); err == nil {
 					discoveredKeys++
 				} else {
@@ -178,7 +176,6 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 				if !existingKeysMap.HasKey(snapshotKey) {
 					snapshotKey := snapshotKey
 					go func() {
-						log.Infof("..............discovering key: %+v", snapshotKey)
 						snapshotDiscoveryKeys <- snapshotKey
 					}()
 					discoveredKeys++
