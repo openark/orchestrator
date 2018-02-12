@@ -31,6 +31,10 @@ var reverseProxy = func(w http.ResponseWriter, r *http.Request, c martini.Contex
 		return
 	}
 	leader := orcraft.GetLeader()
+	if leader == "" {
+		log.Errorf("raft reverse-proxy: leader is unknown")
+		return
+	}
 	hostPort := strings.Split(leader, ":")
 	leaderHost := hostPort[0]
 
