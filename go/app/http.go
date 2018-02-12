@@ -105,6 +105,8 @@ func standardHttp(continuousDiscovery bool) {
 			m.Map(auth.User(""))
 		}
 	}
+	log.Infof("........... wil use http.RaftReverseProxy() ")
+	m.Use(http.RaftReverseProxy())
 
 	m.Use(gzip.All())
 	// Render html templates from templates directory
