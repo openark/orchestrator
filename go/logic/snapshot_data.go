@@ -77,6 +77,7 @@ func CreateSnapshotData() *SnapshotData {
 	snapshotData := NewSnapshotData()
 
 	// keys
+	snapshotData.Keys, _ = inst.ReadAllInstanceKeys()
 	snapshotData.MinimalInstances, _ = inst.ReadAllMinimalInstances()
 	snapshotData.RecoveryDisabled, _ = IsRecoveryDisabled()
 
