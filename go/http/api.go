@@ -3083,19 +3083,31 @@ func (this *HttpAPI) getSynonymPath(path string) (synonymPath string) {
 	return synonymPath
 }
 
-func (this *HttpAPI) registerSingleRequest(m *martini.ClassicMartini, path string, handler martini.Handler) {
+func (this *HttpAPI) registerSingleRequest(m *martini.ClassicMartini, path string, handler martini.Handler, allowProxy bool) {
 	registeredPaths = append(registeredPaths, path)
 	fullPath := fmt.Sprintf("%s/api/%s", this.URLPrefix, path)
-	m.Get(fullPath, handler)
 
+	if allowProxy && config.Config.RaftEnabled {
+		m.Get(fullPath, reverseProxy, handler)
+	} else {
+		m.Get(fullPath, handler)
+	}
+}
+
+func (this *HttpAPI) registerRequestInternal(m *martini.ClassicMartini, path string, handler martini.Handler, allowProxy bool) {
+	this.registerSingleRequest(m, path, handler, allowProxy)
+
+	if synonym := this.getSynonymPath(path); synonym != "" {
+		this.registerSingleRequest(m, synonym, handler, allowProxy)
+	}
 }
 
 func (this *HttpAPI) registerRequest(m *martini.ClassicMartini, path string, handler martini.Handler) {
-	this.registerSingleRequest(m, path, handler)
+	this.registerRequestInternal(m, path, handler, true)
+}
 
-	if synonym := this.getSynonymPath(path); synonym != "" {
-		this.registerSingleRequest(m, synonym, handler)
-	}
+func (this *HttpAPI) registerRequestNoProxy(m *martini.ClassicMartini, path string, handler martini.Handler) {
+	this.registerRequestInternal(m, path, handler, false)
 }
 
 // RegisterRequests makes for the de-facto list of known API calls
@@ -3268,29 +3280,31 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerRequest(m, "audit/instance/:host/:port/:page", this.Audit)
 	this.registerRequest(m, "resolve/:host/:port", this.Resolve)
 
+	// Meta, no proxy
+	this.registerRequestNoProxy(m, "maintenance", this.Maintenance)
+	this.registerRequestNoProxy(m, "headers", this.Headers)
+	this.registerRequestNoProxy(m, "health", this.Health)
+	this.registerRequestNoProxy(m, "lb-check", this.LBCheck)
+	this.registerRequestNoProxy(m, "_ping", this.LBCheck)
+	this.registerRequestNoProxy(m, "leader-check", this.LeaderCheck)
+	this.registerRequestNoProxy(m, "leader-check/:errorStatusCode", this.LeaderCheck)
+	this.registerRequestNoProxy(m, "grab-election", this.GrabElection)
+	this.registerRequestNoProxy(m, "raft-yield/:node", this.RaftYield)
+	this.registerRequestNoProxy(m, "raft-yield-hint/:hint", this.RaftYieldHint)
+	this.registerRequestNoProxy(m, "raft-peers", this.RaftPeers)
+	this.registerRequestNoProxy(m, "raft-state", this.RaftState)
+	this.registerRequestNoProxy(m, "raft-leader", this.RaftLeader)
+	this.registerRequestNoProxy(m, "raft-health", this.RaftHealth)
+	this.registerRequestNoProxy(m, "raft-snapshot", this.RaftSnapshot)
+	this.registerRequestNoProxy(m, "reload-configuration", this.ReloadConfiguration)
+	this.registerRequestNoProxy(m, "hostname-resolve-cache", this.HostnameResolveCache)
+	this.registerRequestNoProxy(m, "reset-hostname-resolve-cache", this.ResetHostnameResolveCache)
 	// Meta
-	this.registerRequest(m, "maintenance", this.Maintenance)
-	this.registerRequest(m, "headers", this.Headers)
-	this.registerRequest(m, "health", this.Health)
-	this.registerRequest(m, "lb-check", this.LBCheck)
-	this.registerRequest(m, "_ping", this.LBCheck)
-	this.registerRequest(m, "leader-check", this.LeaderCheck)
-	this.registerRequest(m, "leader-check/:errorStatusCode", this.LeaderCheck)
-	this.registerRequest(m, "grab-election", this.GrabElection)
-	this.registerRequest(m, "raft-yield/:node", this.RaftYield)
-	this.registerRequest(m, "raft-yield-hint/:hint", this.RaftYieldHint)
-	this.registerRequest(m, "raft-peers", this.RaftPeers)
-	this.registerRequest(m, "raft-state", this.RaftState)
-	this.registerRequest(m, "raft-leader", this.RaftLeader)
-	this.registerRequest(m, "raft-health", this.RaftHealth)
-	this.registerRequest(m, "raft-snapshot", this.RaftSnapshot)
 	this.registerRequest(m, "reelect", this.Reelect)
-	this.registerRequest(m, "reload-configuration", this.ReloadConfiguration)
 	this.registerRequest(m, "reload-cluster-alias", this.ReloadClusterAlias)
-	this.registerRequest(m, "hostname-resolve-cache", this.HostnameResolveCache)
-	this.registerRequest(m, "reset-hostname-resolve-cache", this.ResetHostnameResolveCache)
 	this.registerRequest(m, "deregister-hostname-unresolve/:host/:port", this.DeregisterHostnameUnresolve)
 	this.registerRequest(m, "register-hostname-unresolve/:host/:port/:virtualname", this.RegisterHostnameUnresolve)
+
 	// Bulk access to information
 	this.registerRequest(m, "bulk-instances", this.BulkInstances)
 	this.registerRequest(m, "bulk-promotion-rules", this.BulkPromotionRules)
