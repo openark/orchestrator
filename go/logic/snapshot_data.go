@@ -24,6 +24,7 @@ import (
 
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/raft"
 
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
@@ -77,6 +78,7 @@ func writeTableData(tableName string, data *sqlutils.NamedResultData) error {
 func CreateSnapshotData() *SnapshotData {
 	snapshotData := NewSnapshotData()
 
+	snapshotData.LeaderURI = orcraft.LeaderURI.Get()
 	// keys
 	snapshotData.Keys, _ = inst.ReadAllInstanceKeys()
 	snapshotData.RecoveryDisabled, _ = IsRecoveryDisabled()
@@ -136,6 +138,7 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 		return err
 	}
 
+	orcraft.LeaderURI.Set(snapshotData.LeaderURI)
 	// keys
 	{
 		snapshotInstanceKeyMap := inst.NewInstanceKeyMap()
