@@ -17,12 +17,12 @@ func raftReverseProxy(w http.ResponseWriter, r *http.Request, c martini.Context)
 		return
 	}
 	if orcraft.IsLeader() {
-		log.Infof("............. raft: I am the leader")
+		log.Infof("............. raft: I am the leader: %s", r.URL)
 		// I am the leader. I will handle the request directly.
 		return
 	}
 	if orcraft.GetLeader() == "" {
-		log.Errorf("............. raft: no leader to proxy to!")
+		log.Errorf("............. raft: no leader to proxy to, %s", r.URL)
 		return
 	}
 
