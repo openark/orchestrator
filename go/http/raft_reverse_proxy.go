@@ -11,7 +11,7 @@ import (
 	"github.com/go-martini/martini"
 )
 
-func reverseProxy(w http.ResponseWriter, r *http.Request, c martini.Context) {
+func raftReverseProxy(w http.ResponseWriter, r *http.Request, c martini.Context) {
 	if !orcraft.IsRaftEnabled() {
 		// No raft, so no reverse proxy to the leader
 		return

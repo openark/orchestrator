@@ -3088,7 +3088,7 @@ func (this *HttpAPI) registerSingleRequest(m *martini.ClassicMartini, path strin
 	fullPath := fmt.Sprintf("%s/api/%s", this.URLPrefix, path)
 
 	if allowProxy && config.Config.RaftEnabled {
-		m.Get(fullPath, reverseProxy, handler)
+		m.Get(fullPath, raftReverseProxy, handler)
 	} else {
 		m.Get(fullPath, handler)
 	}
