@@ -34,5 +34,4 @@ func raftReverseProxy(w http.ResponseWriter, r *http.Request, c martini.Context)
 	proxy := httputil.NewSingleHostReverseProxy(url)
 	log.Debugf("................raft: reverse proxy %s to %s", r.URL, url)
 	proxy.ServeHTTP(w, r)
-	c.Next()
 }

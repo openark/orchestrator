@@ -106,7 +106,6 @@ func standardHttp(continuousDiscovery bool) {
 		}
 	}
 
-	m.Use(gzip.All())
 	// Render html templates from templates directory
 	m.Use(render.Renderer(render.Options{
 		Directory:       "resources",
