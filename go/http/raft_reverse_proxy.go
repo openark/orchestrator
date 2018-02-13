@@ -32,6 +32,6 @@ func reverseProxy(w http.ResponseWriter, r *http.Request, c martini.Context) {
 		return
 	}
 	proxy := httputil.NewSingleHostReverseProxy(url)
-	log.Debugf("................reverse proxy to %s", url)
+	log.Debugf("................reverse proxy %s to %s", r.URL, url)
 	proxy.ServeHTTP(w, r)
 }
