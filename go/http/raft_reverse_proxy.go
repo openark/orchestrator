@@ -31,6 +31,7 @@ func raftReverseProxy(w http.ResponseWriter, r *http.Request, c martini.Context)
 		log.Errore(err)
 		return
 	}
+	r.Header.Del("Accept-Encoding")
 	proxy := httputil.NewSingleHostReverseProxy(url)
 	log.Debugf("................raft: reverse proxy %s to %s", r.URL, url)
 	proxy.ServeHTTP(w, r)
