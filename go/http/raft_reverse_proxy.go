@@ -17,12 +17,10 @@ func raftReverseProxy(w http.ResponseWriter, r *http.Request, c martini.Context)
 		return
 	}
 	if orcraft.IsLeader() {
-		log.Infof("............. raft: I am the leader: %s", r.URL)
 		// I am the leader. I will handle the request directly.
 		return
 	}
 	if orcraft.GetLeader() == "" {
-		log.Errorf("............. raft: no leader to proxy to, %s", r.URL)
 		return
 	}
 
@@ -33,6 +31,5 @@ func raftReverseProxy(w http.ResponseWriter, r *http.Request, c martini.Context)
 	}
 	r.Header.Del("Accept-Encoding")
 	proxy := httputil.NewSingleHostReverseProxy(url)
-	log.Debugf("................raft: reverse proxy %s to %s", r.URL, url)
 	proxy.ServeHTTP(w, r)
 }
