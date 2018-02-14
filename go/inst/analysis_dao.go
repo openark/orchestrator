@@ -386,31 +386,34 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			if a.Analysis == NoProblem && len(a.StructureAnalysis) == 0 {
 				return
 			}
-			skipThisHost := false
 			for _, filter := range config.Config.RecoveryIgnoreHostnameFilters {
 				if matched, _ := regexp.MatchString(filter, a.AnalyzedInstanceKey.Hostname); matched {
-					skipThisHost = true
+					return
 				}
 			}
-			if a.IsDowntimed && !includeDowntimed {
-				skipThisHost = true
+			if a.IsDowntimed {
+				a.SkippableDueToDowntime = true
 			}
 			if a.CountReplicas == a.CountDowntimedReplicas {
 				switch a.Analysis {
 				case AllMasterSlavesNotReplicating,
 					AllMasterSlavesNotReplicatingOrDead,
+					MasterSingleSlaveDead,
 					AllCoMasterSlavesNotReplicating,
+					DeadIntermediateMasterWithSingleSlave,
+					DeadIntermediateMasterWithSingleSlaveFailingToConnect,
+					DeadIntermediateMasterAndSlaves,
+					DeadIntermediateMasterAndSomeSlaves,
 					AllIntermediateMasterSlavesFailingToConnectOrDead,
 					AllIntermediateMasterSlavesNotReplicating:
 					a.IsReplicasDowntimed = true
+					a.SkippableDueToDowntime = true
 				}
 			}
-			if a.IsReplicasDowntimed && !includeDowntimed {
-				skipThisHost = true
+			if a.SkippableDueToDowntime && !includeDowntimed {
+				return
 			}
-			if !skipThisHost {
-				result = append(result, a)
-			}
+			result = append(result, a)
 		}
 
 		{
