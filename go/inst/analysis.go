@@ -123,6 +123,7 @@ type ReplicationAnalysis struct {
 	ProcessingNodeToken                       string
 	CountAdditionalAgreeingNodes              int
 	StartActivePeriod                         string
+	SkippableDueToDowntime                    bool
 }
 
 type AnalysisMap map[string](*ReplicationAnalysis)
