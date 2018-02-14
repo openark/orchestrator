@@ -108,8 +108,8 @@ function package() {
       tar -C $builddir/orchestrator -czf $TOPDIR/orchestrator-"${RELEASE_VERSION}"-$target-$arch.tar.gz ./
 
       echo "Creating Distro full packages"
-      fpm -v "${RELEASE_VERSION}" --epoch 1 -f -s dir -n orchestrator -m shlomi-noach --description "MySQL replication topology management and HA" --url "https://github.com/github/orchestrator" --vendor "GitHub" --license "Apache 2.0" -C $builddir/orchestrator --prefix=/ --config-files /usr/local/orchestrator/resources/public/js/custom.js --config-files /usr/local/orchestrator/resources/public/js/cluster.js -t rpm .
-      fpm -v "${RELEASE_VERSION}" --epoch 1 -f -s dir -n orchestrator -m shlomi-noach --description "MySQL replication topology management and HA" --url "https://github.com/github/orchestrator" --vendor "GitHub" --license "Apache 2.0" -C $builddir/orchestrator --prefix=/ --config-files /usr/local/orchestrator/resources/public/js/custom.js --config-files /usr/local/orchestrator/resources/public/js/cluster.js -t deb .
+      fpm -v "${RELEASE_VERSION}" --epoch 1 -f -s dir -n orchestrator -m shlomi-noach --description "MySQL replication topology management and HA" --url "https://github.com/github/orchestrator" --vendor "GitHub" --license "Apache 2.0" -C $builddir/orchestrator --prefix=/ --config-files /usr/local/orchestrator/resources/public/js/custom.js --config-files /usr/local/orchestrator/resources/public/js/custom.js -t rpm .
+      fpm -v "${RELEASE_VERSION}" --epoch 1 -f -s dir -n orchestrator -m shlomi-noach --description "MySQL replication topology management and HA" --url "https://github.com/github/orchestrator" --vendor "GitHub" --license "Apache 2.0" -C $builddir/orchestrator --prefix=/ --config-files /usr/local/orchestrator/resources/public/js/custom.js --config-files /usr/local/orchestrator/resources/public/js/custom.js -t deb .
 
       cd $TOPDIR
       # orchestrator-cli packaging -- executable only
