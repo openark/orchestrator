@@ -476,6 +476,9 @@ body {
 #audit_recovery_details tbody tr code {
   background-color: inherit;
 }
+#audit_recovery_details tbody tr:first-child td:nth-child(3) {
+  background-color: #f7f7f7;
+}
 
 .table-unbordered > tbody > tr > td {
     border: 0px;
