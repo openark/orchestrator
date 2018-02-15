@@ -87,7 +87,7 @@ listen orchestrator
   server orchestrator-node-2 orchestrator-node-2.fqdn.com:3000 check
 ```
 
-### Proxy: healthy raft nodes
+#### Proxy: healthy raft nodes
 
 Healthy raft nodes will reverse proxy your requests to the leader. You may choose (and this happens to be desirable for `kubernetes` setups) to talk to any healthy raft member.
 
