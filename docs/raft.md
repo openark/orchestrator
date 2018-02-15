@@ -89,6 +89,8 @@ listen orchestrator
 
 #### Proxy: healthy raft nodes
 
+A relaxation of the above constraint.
+
 Healthy raft nodes will reverse proxy your requests to the leader. You may choose (and this happens to be desirable for `kubernetes` setups) to talk to any healthy raft member.
 
 You _must not access unhealthy raft members, i.e. nodes that are isolated from the quorum_.
