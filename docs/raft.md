@@ -50,11 +50,11 @@ Each `orchestrator` node has its own, dedicated backend database server. This wo
 
 `orchestrator` is bundled with `sqlite`, there is no need to install an external dependency.
 
-#### Proxy
+#### Proxy: leader
 
-You should only send requests to the leader node.
+Only the leader is allowed to make changes.
 
-One way to achieve this is to set up a `HTTP` proxy (e.g HAProxy) on top of the `orchestrator` services.
+Simplest setup it to only route traffic to the leader, by setting up a `HTTP` proxy (e.g HAProxy) on top of the `orchestrator` services.
 
 > See [orchestrator-client](#orchestrator-client) section for an alternate approach
 
@@ -86,6 +86,18 @@ listen orchestrator
   server orchestrator-node-1 orchestrator-node-1.fqdn.com:3000 check
   server orchestrator-node-2 orchestrator-node-2.fqdn.com:3000 check
 ```
+
+### Proxy: healthy raft nodes
+
+Healthy raft nodes will reverse proxy your requests to the leader. You may choose (and this happens to be desirable for `kubernetes` setups) to talk to any healthy raft member.
+
+You _must not access unhealthy raft members, i.e. nodes that are isolated from the quorum_.
+
+- Use `/api/raft-health` to identify that a node is part of a healthy raft group.
+- A `HTTP 200/OK` response identifies the node as part of the healthy group, and you may direct traffic to the node.
+- A `HTTP 500/Internal Server Error` indicates the node is not part of a healthy group.
+  Note that immediately following startup, and until a leader is elected, you may expect some time where all nodes report as unhealthy.
+  Note that upon leader re-election you may observe a brief period where all nodes report as unhealthy.
 
 #### orchestrator-client
 
