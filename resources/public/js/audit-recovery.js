@@ -16,15 +16,22 @@ $(document).ready(function() {
     displayAudit(auditEntries);
   }, "json");
 
+  function ackInfo(audit) {
+    var info = "";
+    if (audit.Acknowledged) {
+      info += '<div><span class="text-success">Acknowledged by ' + audit.AcknowledgedBy + ', ' + audit.AcknowledgedAt + '<span><ul>';
+      info += "<li>" + audit.AcknowledgedComment + "</li>";
+      info += '</ul></div>';
+    } else {
+      info += '<div><button class="btn btn-primary ack-recovery" data-recovery-id="'+audit.Id+'">Acknowlede</button>';
+      info += ' This recovery is unacknowledged.';
+      info += '</div>';
+    }
+    return info;
+  }
+
   function auditInfo(audit) {
     var moreInfo = "";
-    if (audit.Acknowledged) {
-      moreInfo += '<div>Acknowledged by ' + audit.AcknowledgedBy + ', ' + audit.AcknowledgedAt + '<ul>';
-      moreInfo += "<li>" + audit.AcknowledgedComment + "</li>";
-      moreInfo += '</ul></div>';
-    } else {
-      moreInfo += '<div><strong>Unacknowledged</strong></div>';
-    }
     if (audit.LostReplicas.length > 0) {
       moreInfo += "<div>Lost replicas:<ul>";
       audit.LostReplicas.forEach(function(instanceKey) {
@@ -95,8 +102,11 @@ $(document).ready(function() {
 
     var numRows = $("#audit_recovery_details tbody tr").length;
     $('<td/>', {
+      html: ackInfo(audit)
+    }).attr("rowspan", 1).addClass("ack").appendTo($("#audit_recovery_details tbody tr:first-child"));
+    $('<td/>', {
       html: auditInfo(audit)
-    }).attr("rowspan", numRows).appendTo($("#audit_recovery_details tbody tr:first-child"));
+    }).attr("rowspan", numRows-1).appendTo($("#audit_recovery_details tbody tr:nth-child(2)"));
 
     auditRecoverySteps(audit.UID, $('#audit_recovery_steps'))
     $("#audit_recovery_steps").show();
@@ -125,7 +135,7 @@ $(document).ready(function() {
         var ackTitle = "Acknowledged by " + audit.AcknowledgedBy + " at " + audit.AcknowledgedAt + ": " + audit.AcknowledgedComment;
         ack.attr("title", ackTitle);
       } else {
-        ack.addClass("glyphicon-question-sign").addClass("text-danger").addClass("unacknowledged");
+        ack.addClass("glyphicon-question-sign").addClass("text-danger").addClass("ack-recovery");
         ack.attr("data-recovery-id", audit.Id);
         ack.attr("title", "Unacknowledged. Click to acknowledge");
       }
@@ -198,7 +208,7 @@ $(document).ready(function() {
     $("#audit .pager .disabled a").click(function() {
       return false;
     });
-    $("body").on("click", ".acknowledge-indicator.unacknowledged", function(event) {
+    $("body").on("click", ".ack-recovery", function(event) {
       var recoveryId = $(event.target).attr("data-recovery-id");
       bootbox.prompt({
         title: "Acknowledge recovery",
