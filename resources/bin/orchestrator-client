@@ -551,6 +551,11 @@ function raft_leader() {
   fi
 }
 
+function raft_health() {
+  api "raft-health"
+  print_response | jq -r '.'
+}
+
 function raft_leader_hostname() {
   api "raft-state"
   if print_response | jq -r . | grep -q Leader ; then
@@ -674,6 +679,7 @@ function run_command() {
     "replication-analysis") replication_analysis ;;           # Request an analysis of potential crash incidents in all known topologies
 
     "raft-leader") raft_leader ;;                   # Get identify of raft leader, assuming raft setup
+    "raft-health") raft_health ;;                   # Whether node is part of a healthy raft group
     "raft-leader-hostname") raft_leader_hostname ;; # Get hostname of raft leader, assuming raft setup
     "raft-elect-leader") raft_elect_leader ;;       # Request raft re-elections, provide hint for new leader's identity
 

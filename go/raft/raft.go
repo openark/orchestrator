@@ -22,6 +22,7 @@ import (
 	"math/rand"
 	"net"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -50,6 +51,25 @@ var ThisHostname string
 
 var fatalRaftErrorChan = make(chan error)
 
+type leaderURI struct {
+	uri string
+	sync.Mutex
+}
+
+var LeaderURI leaderURI
+
+func (luri *leaderURI) Get() string {
+	luri.Lock()
+	defer luri.Unlock()
+	return luri.uri
+}
+
+func (luri *leaderURI) Set(uri string) {
+	luri.Lock()
+	defer luri.Unlock()
+	luri.uri = uri
+}
+
 func IsRaftEnabled() bool {
 	return store != nil
 }
@@ -59,6 +79,21 @@ func FatalRaftError(err error) error {
 		go func() { fatalRaftErrorChan <- err }()
 	}
 	return err
+}
+
+func computeLeaderURI() (uri string, err error) {
+	protocol := "http"
+	if config.Config.UseSSL {
+		protocol = "https"
+	}
+	hostname := config.Config.RaftAdvertise
+	listenTokens := strings.Split(config.Config.ListenAddress, ":")
+	if len(listenTokens) < 2 {
+		return uri, fmt.Errorf("computeLeaderURI: cannot determine listen port out of config.Config.ListenAddress: %+v", config.Config.ListenAddress)
+	}
+	port := listenTokens[1]
+	uri = fmt.Sprintf("%s://%s:%s", protocol, hostname, port)
+	return uri, nil
 }
 
 // Setup creates the entire raft shananga. Creates the store, associates with the throttler,
@@ -87,6 +122,18 @@ func Setup(applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier
 		return log.Errorf("failed to open raft store: %s", err.Error())
 	}
 
+	if leaderURI, err := computeLeaderURI(); err != nil {
+		return FatalRaftError(err)
+	} else {
+		leaderCh := store.raft.LeaderCh()
+		go func() {
+			for isTurnedLeader := range leaderCh {
+				if isTurnedLeader {
+					PublishCommand("leader-uri", leaderURI)
+				}
+			}
+		}()
+	}
 	setupHttpClient()
 
 	atomic.StoreInt64(&raftSetupComplete, 1)
@@ -173,6 +220,15 @@ func GetState() raft.RaftState {
 		return raft.Candidate
 	}
 	return getRaft().State()
+}
+
+// IsHealthy checks whether this node is healthy in the raft group
+func IsHealthy() bool {
+	if !isRaftSetupComplete() {
+		return false
+	}
+	state := GetState()
+	return state == raft.Leader || state == raft.Follower
 }
 
 func Snapshot() error {

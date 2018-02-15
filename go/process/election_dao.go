@@ -121,7 +121,6 @@ func GrabElection() error {
 // Reelect clears the way for re-elections. Active node is immediately demoted.
 func Reelect() error {
 	if orcraft.IsRaftEnabled() {
-		// return log.Errorf("Cannot Reelect on raft setup")
 		orcraft.StepDown()
 	}
 	_, err := db.ExecOrchestrator(`delete from active_node where anchor = 1`)
