@@ -61,6 +61,8 @@ var discoveryQueueLengthGauge = metrics.NewGauge()
 var discoveryRecentCountGauge = metrics.NewGauge()
 var isElectedGauge = metrics.NewGauge()
 var isHealthyGauge = metrics.NewGauge()
+var isRaftHealthyGauge = metrics.NewGauge()
+var isRaftLeaderGauge = metrics.NewGauge()
 var discoveryMetrics = collection.CreateOrReturnCollection(discoveryMetricsName)
 
 var isElectedNode int64 = 0
@@ -78,6 +80,8 @@ func init() {
 	metrics.Register("discoveries.recent_count", discoveryRecentCountGauge)
 	metrics.Register("elect.is_elected", isElectedGauge)
 	metrics.Register("health.is_healthy", isHealthyGauge)
+	metrics.Register("raft.is_healthy", isRaftHealthyGauge)
+	metrics.Register("raft.is_leader", isRaftLeaderGauge)
 
 	ometrics.OnMetricsTick(func() {
 		discoveryQueueLengthGauge.Update(int64(discoveryQueue.QueueLen()))
@@ -93,6 +97,16 @@ func init() {
 	})
 	ometrics.OnMetricsTick(func() {
 		isHealthyGauge.Update(atomic.LoadInt64(&process.LastContinousCheckHealthy))
+	})
+	ometrics.OnMetricsTick(func() {
+		var healthy int64
+		if orcraft.IsHealthy() {
+			healthy = 1
+		}
+		isRaftHealthyGauge.Update(healthy)
+	})
+	ometrics.OnMetricsTick(func() {
+		isRaftLeaderGauge.Update(atomic.LoadInt64(&isElectedNode))
 	})
 }
 

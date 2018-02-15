@@ -77,6 +77,8 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.enableGlobalRecoveries(value)
 	case "put-key-value":
 		return applier.putKeyValue(value)
+	case "leader-uri":
+		return applier.leaderURI(value)
 	}
 	return log.Errorf("Unknown command op: %s", op)
 }
@@ -243,4 +245,13 @@ func (applier *CommandApplier) putKeyValue(value []byte) interface{} {
 	}
 	err := kv.PutKVPair(&kvPair)
 	return err
+}
+
+func (applier *CommandApplier) leaderURI(value []byte) interface{} {
+	var uri string
+	if err := json.Unmarshal(value, &uri); err != nil {
+		return log.Errore(err)
+	}
+	orcraft.LeaderURI.Set(uri)
+	return nil
 }

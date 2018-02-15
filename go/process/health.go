@@ -77,6 +77,9 @@ type HealthStatus struct {
 	ActiveNode     NodeHealth
 	Error          error
 	AvailableNodes [](*NodeHealth)
+	RaftLeader     string
+	IsRaftLeader   bool
+	RaftLeaderURI  string
 }
 
 type OrchestratorExecutionMode string
@@ -118,6 +121,9 @@ func HealthTest() (health *HealthStatus, err error) {
 	if orcraft.IsRaftEnabled() {
 		health.ActiveNode.Hostname = orcraft.GetLeader()
 		health.IsActiveNode = orcraft.IsLeader()
+		health.RaftLeader = orcraft.GetLeader()
+		health.RaftLeaderURI = orcraft.LeaderURI.Get()
+		health.IsRaftLeader = orcraft.IsLeader()
 	} else {
 		if health.ActiveNode, health.IsActiveNode, err = ElectedNode(); err != nil {
 			health.Error = err
