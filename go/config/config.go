@@ -33,7 +33,7 @@ var (
 )
 
 const (
-	LostInRecoveryDowntimeSeconds = 60 * 60 * 24 * 365
+	LostInRecoveryDowntimeSeconds int = 60 * 60 * 24 * 365
 )
 
 var configurationLoaded chan bool = make(chan bool)
