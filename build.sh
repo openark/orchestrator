@@ -135,8 +135,9 @@ function package() {
 
   echo "---"
   if cat /etc/centos-release | grep 'CentOS release 6' ; then
-    rm ${TOPDIR:-?}/orchestrator-*.deb
-    rm ${TOPDIR:-?}/orchestrator-*.tgz
+    rm ${TOPDIR:-?}/orchestrator*.deb
+    rm ${TOPDIR:-?}/orchestrator*.tar.gz
+    ls ${TOPDIR:-?}/*.rpm | while read f; do centos_file=$(echo $f | sed -r -e "s/^(.*)-${RELEASE_VERSION}(.*)/\1-centos6-${RELEASE_VERSION}\2/g") ; echo $centos_file ; done
   fi
   echo "Done. Find releases in $TOPDIR"
 }
