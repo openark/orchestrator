@@ -397,6 +397,13 @@ func AcknowledgeRecovery(recoveryId int64, owner string, comment string) (countA
 	return acknowledgeRecoveries(owner, comment, false, whereClause, sqlutils.Args(recoveryId))
 }
 
+// AcknowledgeRecovery acknowledges a particular recovery.
+// This also implied clearing their active period, which in turn enables further recoveries on those topologies
+func AcknowledgeRecoveryByUID(recoveryUID string, owner string, comment string) (countAcknowledgedEntries int64, err error) {
+	whereClause := `uid = ?`
+	return acknowledgeRecoveries(owner, comment, false, whereClause, sqlutils.Args(recoveryUID))
+}
+
 // AcknowledgeClusterRecoveries marks active recoveries for given cluster as acknowledged.
 // This also implied clearing their active period, which in turn enables further recoveries on those topologies
 func AcknowledgeClusterRecoveries(clusterName string, owner string, comment string) (countAcknowledgedEntries int64, err error) {
