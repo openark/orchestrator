@@ -2991,11 +2991,17 @@ func (this *HttpAPI) AcknowledgeRecovery(params martini.Params, r render.Render,
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
+	var err error
+	var recoveryId int64
 
-	recoveryId, err := strconv.ParseInt(params["recoveryId"], 10, 0)
-	if err != nil {
-		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
-		return
+	// Ack either via id or uid
+	uid := params["uid"]
+	if uid == "" {
+		recoveryId, err = strconv.ParseInt(params["recoveryId"], 10, 0)
+		if err != nil {
+			Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+			return
+		}
 	}
 	comment := req.URL.Query().Get("comment")
 	if comment == "" {
@@ -3006,7 +3012,20 @@ func (this *HttpAPI) AcknowledgeRecovery(params martini.Params, r render.Render,
 	if userId == "" {
 		userId = inst.GetMaintenanceOwner()
 	}
-	countAcknowledgedRecoveries, err := logic.AcknowledgeRecovery(recoveryId, userId, comment)
+	var countAcknowledgedRecoveries int64
+	if orcraft.IsRaftEnabled() {
+		ack := logic.NewRecoveryAcknowledgement(userId, comment)
+		ack.Id = recoveryId
+		ack.UID = uid
+		orcraft.PublishCommand("ack-recovery", ack)
+	} else {
+		if uid != "" {
+			countAcknowledgedRecoveries, err = logic.AcknowledgeRecoveryByUID(uid, userId, comment)
+		} else {
+			countAcknowledgedRecoveries, err = logic.AcknowledgeRecovery(recoveryId, userId, comment)
+		}
+	}
+
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -3263,6 +3282,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "ack-recovery/cluster/alias/:clusterAlias", this.AcknowledgeClusterRecoveries)
 	this.registerAPIRequest(m, "ack-recovery/instance/:host/:port", this.AcknowledgeInstanceRecoveries)
 	this.registerAPIRequest(m, "ack-recovery/:recoveryId", this.AcknowledgeRecovery)
+	this.registerAPIRequest(m, "ack-recovery/uid/:uid", this.AcknowledgeRecovery)
 	this.registerAPIRequest(m, "blocked-recoveries", this.BlockedRecoveries)
 	this.registerAPIRequest(m, "blocked-recoveries/cluster/:clusterName", this.BlockedRecoveries)
 	this.registerAPIRequest(m, "disable-global-recoveries", this.DisableGlobalRecoveries)

@@ -167,6 +167,12 @@ func (applier *CommandApplier) ackRecovery(value []byte) interface{} {
 	if ack.Key.IsValid() {
 		_, err = AcknowledgeInstanceRecoveries(&ack.Key, ack.Owner, ack.Comment)
 	}
+	if ack.Id > 0 {
+		_, err = AcknowledgeRecovery(ack.Id, ack.Owner, ack.Comment)
+	}
+	if ack.UID != "" {
+		_, err = AcknowledgeRecoveryByUID(ack.UID, ack.Owner, ack.Comment)
+	}
 	return err
 }
 
