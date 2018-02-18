@@ -134,6 +134,10 @@ function package() {
   esac
 
   echo "---"
+  if cat /etc/centos-release | grep 'CentOS release 6' ; then
+    rm ${TOPDIR:-?}/orchestrator-*.deb
+    rm ${TOPDIR:-?}/orchestrator-*.tgz
+  fi
   echo "Done. Find releases in $TOPDIR"
 }
 
