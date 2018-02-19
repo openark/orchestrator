@@ -23,7 +23,7 @@ $(document).ready(function() {
       info += "<li>" + audit.AcknowledgedComment + "</li>";
       info += '</ul></div>';
     } else {
-      info += '<div><button class="btn btn-primary ack-recovery" data-recovery-id="'+audit.Id+'">Acknowlede</button>';
+      info += '<div><button class="btn btn-primary ack-recovery" data-recovery-id="'+audit.Id+'">Acknowledge</button>';
       info += ' This recovery is unacknowledged.';
       info += '</div>';
     }
@@ -215,15 +215,7 @@ $(document).ready(function() {
         placeholder: "comment",
         callback: function(result) {
           if (result !== null) {
-            showLoader();
-            $.get(appUrl("/api/ack-recovery/" + recoveryId + "?comment=" + encodeURIComponent(result)), function(operationResult) {
-              hideLoader();
-              if (operationResult.Code == "ERROR") {
-                addAlert(operationResult.Message)
-              } else {
-                location.reload();
-              }
-            }, "json");
+            apiCommand("/api/ack-recovery/" + recoveryId + "?comment=" + encodeURIComponent(result));
           }
         }
       });
