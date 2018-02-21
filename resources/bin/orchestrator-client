@@ -283,7 +283,7 @@ function restart_replica_statements() {
 function last_pseudo_gtid() {
   assert_nonempty "instance" "$instance_hostport"
   api "last-pseudo-gtid/$instance_hostport"
-  print_response | print_details | jq -r
+  print_response | print_details | jq -r '.'
 }
 
 function instance() {
