@@ -1371,6 +1371,7 @@ func (this *HttpAPI) setSemiSyncReplica(params martini.Params, r render.Render, 
 func (this *HttpAPI) EnableSemiSyncReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	this.setSemiSyncReplica(params, r, req, user, true)
 }
+
 func (this *HttpAPI) DisableSemiSyncReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	this.setSemiSyncReplica(params, r, req, user, false)
 }
