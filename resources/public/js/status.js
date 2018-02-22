@@ -14,10 +14,8 @@ function addStatusActionButton(name, uri) {
 	);
 	var button = $('#orchestratorStatus .panel-footer button:last');
 	button.click(function(){
-    	apiCommand("/api/"+uri);
-    });
-
-	console.log(button)
+		apiCommand("/api/"+uri);
+	});
 }
 
 $(document).ready(function () {

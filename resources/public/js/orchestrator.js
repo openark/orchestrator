@@ -190,6 +190,7 @@ function apiCommand(uri, hint) {
 }
 
 function reloadWithMessage(msg, details, hint) {
+  msg = msg || '';
   var hostname = "";
   var port = "";
   if (details) {

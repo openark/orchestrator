@@ -884,12 +884,12 @@ func (this *HttpAPI) LastPseudoGTID(params martini.Params, r render.Render, req 
 		return
 	}
 
-	instance, err := inst.ReadTopologyInstance(&instanceKey)
+	instance, found, err := inst.ReadInstance(&instanceKey)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	if instance == nil {
+	if instance == nil || !found {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Instance not found: %+v", instanceKey)})
 		return
 	}
@@ -1371,6 +1371,7 @@ func (this *HttpAPI) setSemiSyncReplica(params martini.Params, r render.Render, 
 func (this *HttpAPI) EnableSemiSyncReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	this.setSemiSyncReplica(params, r, req, user, true)
 }
+
 func (this *HttpAPI) DisableSemiSyncReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	this.setSemiSyncReplica(params, r, req, user, false)
 }
