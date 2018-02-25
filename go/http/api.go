@@ -356,16 +356,35 @@ func (this *HttpAPI) EndMaintenanceByInstanceKey(params martini.Params, r render
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Maintenance ended: %+v", instanceKey), Details: instanceKey})
 }
 
+// EndMaintenanceByInstanceKey terminates maintenance mode for given instance
+func (this *HttpAPI) InMaintenance(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	inMaintenance, err := inst.InMaintenance(&instanceKey)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	responseDetails := ""
+	if inMaintenance {
+		responseDetails = instanceKey.StringCode()
+	}
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("%+v", inMaintenance), Details: responseDetails})
+}
+
 // Maintenance provides list of instance under active maintenance
 func (this *HttpAPI) Maintenance(params martini.Params, r render.Render, req *http.Request) {
-	instanceKeys, err := inst.ReadActiveMaintenance()
+	maintenanceList, err := inst.ReadActiveMaintenance()
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, instanceKeys)
+	r.JSON(http.StatusOK, maintenanceList)
 }
 
 // BeginDowntime sets a downtime flag with default duration
@@ -3244,7 +3263,9 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "forget-cluster/:clusterHint", this.ForgetCluster)
 	this.registerAPIRequest(m, "begin-maintenance/:host/:port/:owner/:reason", this.BeginMaintenance)
 	this.registerAPIRequest(m, "end-maintenance/:host/:port", this.EndMaintenanceByInstanceKey)
+	this.registerAPIRequest(m, "in-maintenance/:host/:port", this.InMaintenance)
 	this.registerAPIRequest(m, "end-maintenance/:maintenanceKey", this.EndMaintenance)
+	this.registerAPIRequest(m, "maintenance", this.Maintenance)
 	this.registerAPIRequest(m, "begin-downtime/:host/:port/:owner/:reason", this.BeginDowntime)
 	this.registerAPIRequest(m, "begin-downtime/:host/:port/:owner/:reason/:duration", this.BeginDowntime)
 	this.registerAPIRequest(m, "end-downtime/:host/:port", this.EndDowntime)
@@ -3302,7 +3323,6 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "resolve/:host/:port", this.Resolve)
 
 	// Meta, no proxy
-	this.registerAPIRequestNoProxy(m, "maintenance", this.Maintenance)
 	this.registerAPIRequestNoProxy(m, "headers", this.Headers)
 	this.registerAPIRequestNoProxy(m, "health", this.Health)
 	this.registerAPIRequestNoProxy(m, "lb-check", this.LBCheck)
