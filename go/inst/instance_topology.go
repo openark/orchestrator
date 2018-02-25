@@ -1426,6 +1426,16 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	log.Infof("Will match %+v below %+v", *instanceKey, *otherKey)
 
 	if requireInstanceMaintenance {
+		// We don't require grabbing maintenance lock on otherInstance, but we do request
+		// that it is not already under maintenance.
+		if inMaintenance, merr := InMaintenance(&otherInstance.Key); merr != nil {
+			err = merr
+			goto Cleanup
+		} else if inMaintenance {
+			err = fmt.Errorf("Cannot match below %+v; it is in maintenance", otherInstance.Key)
+			goto Cleanup
+		}
+
 		if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("match below %+v", *otherKey)); merr != nil {
 			err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
 			goto Cleanup
