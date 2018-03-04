@@ -14,10 +14,8 @@ function addStatusActionButton(name, uri) {
 	);
 	var button = $('#orchestratorStatus .panel-footer button:last');
 	button.click(function(){
-    	apiCommand("/api/"+uri);
-    });
-
-	console.log(button)
+		apiCommand("/api/"+uri);
+	});
 }
 
 $(document).ready(function () {
@@ -47,7 +45,7 @@ $(document).ready(function () {
 					message += '<span class="text-success">[Elected at '+health.Details.ActiveNode.FirstSeenActive+']</span>';
 				}
 				if (node.Hostname == health.Details.Hostname) {
-    			message += ' <span class="text-primary">[This node]</span>';
+					message += '<span class="text-primary">[This node]</span>';
     		}
 				message += '</code>';
 
@@ -62,7 +60,26 @@ $(document).ready(function () {
     		userId = "[unknown]"
     	}
     	var userStatus = (isAuthorizedForAction() ? "admin" : "read only");
-        addStatusTableData("You", userId + ", " + userStatus, "", "", "");
+      addStatusTableData("You", userId + ", " + userStatus, "", "", "");
+
+			if (health.Details.RaftLeader != "") {
+				$("#orchestratorStatusTable").append(
+            '<tr><td></td>' +
+            '<td><b>Advertised</b></td>' +
+            '<td><b></b></td>' +
+            '<td><b>URI</b></td>' +
+            '<td><b></b></td></tr>'
+        );
+				var message = '';
+				message += '<code class="text-info"><strong>';
+				message += health.Details.RaftLeader;
+				message += '</strong></code>';
+				message += '</br>';
+				if (health.Details.IsRaftLeader) {
+					message += '<code class="text-info"><span class="text-primary">[This node]</span></code>';
+				}
+				addStatusTableData("Raft leader", message, "", '<a href="'+health.Details.RaftLeaderURI+'">'+health.Details.RaftLeaderURI+'</a>', "");
+			}
 
     	if (isAuthorizedForAction()) {
     		addStatusActionButton("Reload configuration", "reload-configuration");

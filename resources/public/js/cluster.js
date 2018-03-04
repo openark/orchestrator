@@ -1403,7 +1403,6 @@ function Cluster() {
   }
 
   function populateSidebar(clusterInfo) {
-    $("#cluster_info").css("margin-top", -$("#cluster_name").height());
     var content = '';
 
     {
@@ -1721,7 +1720,9 @@ function Cluster() {
         _replicationAnalysis = replicationAnalysis;
         getData("/api/maintenance", function(maintenanceList) {
           _maintenanceList = maintenanceList;
+          $(document).trigger('orchestrator:preRenderCluster');
           renderCluster();
+          $(document).trigger('orchestrator:postRenderCluster');
         });
       });
     });
@@ -1770,7 +1771,7 @@ function Cluster() {
     getData("/api/blocked-recoveries/cluster/" + currentClusterName(), function(blockedRecoveries) {
       // Result is an array: either empty (no active recovery) or with multiple entries
       blockedRecoveries.forEach(function(blockedRecovery) {
-        addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on ' + getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port) + ' is blocked due to a <a href="' + appUrl('/web/audit-recovery/cluster/' + blockedRecovery.ClusterName) + '">previous recovery</a>');
+        addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on ' + getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port) + ' is blocked due to a <a href="' + appUrl('/web/audit-recovery/id/' + blockedRecovery.BlockingRecoveryId) + '">previous recovery</a>');
       });
     });
 

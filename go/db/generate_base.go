@@ -809,4 +809,20 @@ var generateSQLBase = []string{
 			PRIMARY KEY (store_key)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS cluster_injected_pseudo_gtid (
+			cluster_name varchar(128) NOT NULL,
+			time_injected timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (cluster_name)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE TABLE IF NOT EXISTS hostname_ips (
+			hostname varchar(128) CHARACTER SET ascii NOT NULL,
+			ipv4 varchar(128) CHARACTER SET ascii NOT NULL,
+			ipv6 varchar(128) CHARACTER SET ascii NOT NULL,
+			last_updated timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (hostname)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
 }

@@ -280,6 +280,12 @@ function restart_replica_statements() {
   print_response | print_details
 }
 
+function last_pseudo_gtid() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "last-pseudo-gtid/$instance_hostport"
+  print_response | print_details | jq -r '.'
+}
+
 function instance() {
   assert_nonempty "instance" "$instance_hostport"
   api "instance/$instance_hostport"
@@ -551,6 +557,11 @@ function raft_leader() {
   fi
 }
 
+function raft_health() {
+  api "raft-health"
+  print_response | jq -r '.'
+}
+
 function raft_leader_hostname() {
   api "raft-state"
   if print_response | jq -r . | grep -q Leader ; then
@@ -662,6 +673,7 @@ function run_command() {
     "set-read-only") general_instance_command ;;     # Turn an instance read-only, via SET GLOBAL read_only := 1
     "set-writeable") general_instance_command ;;     # Turn an instance writeable, via SET GLOBAL read_only := 0
     "flush-binary-logs") general_instance_command ;; # Flush binary logs on an instance
+    "last-pseudo-gtid") last_pseudo_gtid ;;          # Dump last injected Pseudo-GTID entry on a server
 
     "recover") recover ;;                                     # Do auto-recovery given a dead instance, assuming orchestrator agrees there's a problem. Override blocking.
     "graceful-master-takeover") graceful_master_takeover ;;   # Gracefully discard master and promote another (direct child) instance instead, even if everything is running well
@@ -674,6 +686,7 @@ function run_command() {
     "replication-analysis") replication_analysis ;;           # Request an analysis of potential crash incidents in all known topologies
 
     "raft-leader") raft_leader ;;                   # Get identify of raft leader, assuming raft setup
+    "raft-health") raft_health ;;                   # Whether node is part of a healthy raft group
     "raft-leader-hostname") raft_leader_hostname ;; # Get hostname of raft leader, assuming raft setup
     "raft-elect-leader") raft_elect_leader ;;       # Request raft re-elections, provide hint for new leader's identity
 

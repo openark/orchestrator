@@ -14,7 +14,7 @@ $(document).ready(function() {
     blockedRecoveries = blockedRecoveries || [];
     // Result is an array: either empty (no active recovery) or with multiple entries
     blockedRecoveries.forEach(function(blockedRecovery) {
-      addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on ' + getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port) + ' is blocked due to a <a href="' + appUrl('/web/audit-recovery/cluster/' + blockedRecovery.ClusterName) + '">previous recovery</a>');
+      addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on ' + getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port) + ' is blocked due to a <a href="' + appUrl('/web/audit-recovery/id/' + blockedRecovery.BlockingRecoveryId) + '">previous recovery</a>');
     });
   });
 

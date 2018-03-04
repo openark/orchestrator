@@ -476,6 +476,9 @@ body {
 #audit_recovery_details tbody tr code {
   background-color: inherit;
 }
+#audit_recovery_details tbody tr:first-child td:nth-child(3) {
+  background-color: #f7f7f7;
+}
 
 .table-unbordered > tbody > tr > td {
     border: 0px;
@@ -528,10 +531,11 @@ body {
     float: left;
     position: fixed;
     left: 0px;
-    padding: 8px 15px 0px 15px;
+    padding: 8px 15px 8px 15px;
     z-index:100;
     border-right: dotted 1px #bbbbbb;
     background-color: #f7f7f7;
+    height: 100%;
 }
 
 #cluster_sidebar li {
@@ -585,12 +589,19 @@ body {
 }
 
 #cluster_info {
-  position: absolute;
+  position: fixed;
+  height: 100%;
+  overflow: auto;
   z-index: 50;
+
+  padding-left: 64px;
+  margin-left: -64px;
+  padding-right: 24px;
+
   border-right: dotted 1px #bbbbbb;
   background-color: #f7f7f7;
-  padding-right: 24px;
   font: 12px sans-serif;
+
   display: none;
 }
 
@@ -619,13 +630,19 @@ body {
   padding: 4px;
 }
 
+#cluster_name_info {
+  position: fixed;
+  z-index: 50;
+  padding-left: 64px;
+  background-color: #f7f7f7;
+}
+
 #cluster_wrapper {
   padding-left: 64px;
+  padding-top: 36px;
 }
 
 #cluster_name {
-  position:relative;
-  z-index: 51;
   font-size: 24px;
 }
 

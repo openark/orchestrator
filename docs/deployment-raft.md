@@ -28,8 +28,10 @@ You may choose between using `MySQL` and `SQLite`. See [backend configuration](c
   As suggested, you may want to put `orchestrator` service and `MySQL` service on same box. If using `SQLite` there's nothing else to do.
 
 - Consider adding a proxy on top of the service boxes; the proxy would redirect all traffic to the leader node. There is one and only one leader node, and the status check endpoint is `/api/leader-check`.
-  - Clients must _only iteract with the leader_. Setting up a proxy is one way to ensure that. See [proxy section](raft.md#proxy).
-  - Nothing should directly interact with a backend DB. Only the leader is capable of coordinating changes to the data with the other `raft` nodes.
+  - Clients may only interact with healthy raft nodes.
+    - Simplest is to just interact with the leader. Setting up a proxy is one way to ensure that. See [proxy: leader section](raft.md#proxy-leader).
+    -  Otherwise all healthy raft nodes will reverse proxy your requests to the leader. See [proxy: healthy raft nodes section](raft.md#proxy-healthy-raft-nodes).
+- Nothing should directly interact with a backend DB. Only the leader is capable of coordinating changes to the data with the other `raft` nodes.
 
 - `orchestrator` nodes communicate between themselves on `DefaultRaftPort`. This port should be open to all `orchestrator` nodes, and no one else needs to have access to this port.
 

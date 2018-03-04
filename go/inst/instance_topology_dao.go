@@ -19,18 +19,22 @@ package inst
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
+	"github.com/github/orchestrator/go/process"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
+	"github.com/patrickmn/go-cache"
 )
 
 // Max concurrency for bulk topology operations
 const topologyConcurrency = 128
 
 var topologyConcurrencyChan = make(chan bool, topologyConcurrency)
+var supportedAutoPseudoGTIDWriters *cache.Cache = cache.New(config.CheckAutoPseudoGTIDGrantsIntervalSeconds*time.Second, time.Second)
 
 type OperationGTIDHint string
 
@@ -571,6 +575,33 @@ func ChangeMasterCredentials(instanceKey *InstanceKey, masterUser string, master
 	return instance, err
 }
 
+// EnableMasterSSL issues CHANGE MASTER TO MASTER_SSL=1
+func EnableMasterSSL(instanceKey *InstanceKey) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	if instance.ReplicaRunning() {
+		return instance, fmt.Errorf("EnableMasterSSL: Cannot enable SSL replication on %+v because slave is running", *instanceKey)
+	}
+	log.Debugf("EnableMasterSSL: Will attempt enabling SSL replication on %+v", *instanceKey)
+
+	if *config.RuntimeCLIFlags.Noop {
+		return instance, fmt.Errorf("noop: aborting CHANGE MASTER TO MASTER_SSL=1 operation on %+v; signaling error but nothing went wrong.", *instanceKey)
+	}
+	_, err = ExecInstance(instanceKey, "change master to master_ssl=1")
+
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	log.Infof("EnableMasterSSL: Enabled SSL replication on %+v", *instanceKey)
+
+	instance, err = ReadTopologyInstance(instanceKey)
+	return instance, err
+}
+
 // ChangeMasterTo changes the given instance's master according to given input.
 func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinlogCoordinates *BinlogCoordinates, skipUnresolve bool, gtidHint OperationGTIDHint) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -927,9 +958,17 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 		}
 	}
 
-	_, err = ExecInstance(instanceKey, "set global read_only = ?", readOnly)
-	if err != nil {
+	if _, err := ExecInstance(instanceKey, "set global read_only = ?", readOnly); err != nil {
 		return instance, log.Errore(err)
+	}
+	if config.Config.UseSuperReadOnly {
+		if _, err := ExecInstance(instanceKey, "set global super_read_only = ?", readOnly); err != nil {
+			// We don't bail out here. super_read_only is only available on
+			// MySQL 5.7.8 and Percona Server 5.6.21-70
+			// At this time orchestrator does not verify whether a server supports super_read_only or not.
+			// It makes a best effort to set it.
+			log.Errore(err)
+		}
 	}
 	instance, err = ReadTopologyInstance(instanceKey)
 
@@ -973,4 +1012,93 @@ func KillQuery(instanceKey *InstanceKey, process int64) (*Instance, error) {
 	log.Infof("Killed query on %+v", *instanceKey)
 	AuditOperation("kill-query", instanceKey, fmt.Sprintf("Killed query %d", process))
 	return instance, err
+}
+
+// injectPseudoGTID injects a Pseudo-GTID statement on a writable instance
+func injectPseudoGTID(instance *Instance) (hint string, err error) {
+	if *config.RuntimeCLIFlags.Noop {
+		return hint, fmt.Errorf("noop: aborting inject-pseudo-gtid operation on %+v; signalling error but nothing went wrong.", instance.Key)
+	}
+
+	now := time.Now()
+	randomHash := process.RandomHash()[0:16]
+	hint = fmt.Sprintf("%.8x:%.8x:%s", now.Unix(), instance.ServerID, randomHash)
+	query := fmt.Sprintf("drop view if exists `%s`.`_asc:%s`", config.PseudoGTIDSchema, hint)
+	_, err = ExecInstance(&instance.Key, query)
+	return hint, log.Errore(err)
+}
+
+// canInjectPseudoGTID checks orchestrator's grants to determine whether is has the
+// privilege of auto-injecting pseudo-GTID
+func canInjectPseudoGTID(instanceKey *InstanceKey) (canInject bool, err error) {
+	if canInject, found := supportedAutoPseudoGTIDWriters.Get(instanceKey.StringCode()); found {
+		return canInject.(bool), nil
+	}
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return canInject, err
+	}
+
+	foundAll := false
+	foundDropOnAll := false
+	foundAllOnSchema := false
+	foundDropOnSchema := false
+
+	err = sqlutils.QueryRowsMap(db, `show grants for current_user()`, func(m sqlutils.RowMap) error {
+		for _, grantData := range m {
+			grant := grantData.String
+			if strings.Contains(grant, `GRANT ALL PRIVILEGES ON *.*`) {
+				foundAll = true
+			}
+			if strings.Contains(grant, `DROP`) && strings.Contains(grant, ` ON *.*`) {
+				foundDropOnAll = true
+			}
+			if strings.Contains(grant, fmt.Sprintf("GRANT ALL PRIVILEGES ON `%s`.*", config.PseudoGTIDSchema)) {
+				foundAllOnSchema = true
+			}
+			if strings.Contains(grant, fmt.Sprintf(`GRANT ALL PRIVILEGES ON "%s".*`, config.PseudoGTIDSchema)) {
+				foundAllOnSchema = true
+			}
+			if strings.Contains(grant, `DROP`) && strings.Contains(grant, fmt.Sprintf(" ON `%s`.*", config.PseudoGTIDSchema)) {
+				foundDropOnSchema = true
+			}
+			if strings.Contains(grant, `DROP`) && strings.Contains(grant, fmt.Sprintf(` ON "%s".*`, config.PseudoGTIDSchema)) {
+				foundDropOnSchema = true
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return canInject, err
+	}
+
+	canInject = foundAll || foundDropOnAll || foundAllOnSchema || foundDropOnSchema
+	supportedAutoPseudoGTIDWriters.Set(instanceKey.StringCode(), canInject, cache.DefaultExpiration)
+	return canInject, nil
+}
+
+// CheckAndInjectPseudoGTIDOnWriter checks whether pseudo-GTID can and
+// should be injected on given instance, and if so, attempts to inject.
+func CheckAndInjectPseudoGTIDOnWriter(instance *Instance) (injected bool, err error) {
+	if !instance.IsWritableMaster() {
+		return injected, nil
+	}
+	if !instance.IsLastCheckValid {
+		return injected, nil
+	}
+	canInject, err := canInjectPseudoGTID(&instance.Key)
+	if err != nil {
+		return injected, log.Errore(err)
+	}
+	if !canInject {
+		return injected, nil
+	}
+	if _, err := injectPseudoGTID(instance); err != nil {
+		return injected, log.Errore(err)
+	}
+	injected = true
+	if err := RegisterInjectedPseudoGTID(instance.ClusterName); err != nil {
+		return injected, log.Errore(err)
+	}
+	return injected, nil
 }

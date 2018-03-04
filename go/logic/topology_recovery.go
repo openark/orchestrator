@@ -51,6 +51,8 @@ type RecoveryAcknowledgement struct {
 
 	Key         inst.InstanceKey
 	ClusterName string
+	Id          int64
+	UID         string
 }
 
 func NewRecoveryAcknowledgement(owner string, comment string) *RecoveryAcknowledgement {
@@ -537,11 +539,11 @@ func recoverDeadMaster(topologyRecovery *TopologyRecovery, candidateInstanceKey 
 	}
 
 	func() error {
-		inst.BeginDowntime(inst.NewDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds))
+		inst.BeginDowntime(inst.NewDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, time.Duration(config.LostInRecoveryDowntimeSeconds)*time.Second))
 		acknowledgeInstanceFailureDetection(&analysisEntry.AnalyzedInstanceKey)
 		for _, replica := range lostReplicas {
 			replica := replica
-			inst.BeginDowntime(inst.NewDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds))
+			inst.BeginDowntime(inst.NewDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, time.Duration(config.LostInRecoveryDowntimeSeconds)*time.Second))
 		}
 		return nil
 	}()
@@ -766,21 +768,30 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		// Success!
 		recoverDeadMasterSuccessCounter.Inc(1)
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: successfully promoted %+v", promotedReplica.Key))
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: promoted server coordinates: %+v", promotedReplica.SelfBinlogCoordinates))
 
 		if config.Config.ApplyMySQLPromotionAfterMasterFailover {
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: will apply MySQL changes to promoted master"))
 			inst.ResetSlaveOperation(&promotedReplica.Key)
 			inst.SetReadOnly(&promotedReplica.Key, false)
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: have applied read-only=0, RESET SLAVE ALL on promtoed master"))
+			// Let's attempt, though we won't necessarily succeed, to set old master as read-only
+			go inst.SetReadOnly(&analysisEntry.AnalyzedInstanceKey, true)
 		}
 
-		kvPair := inst.GetClusterMasterKVPair(analysisEntry.ClusterDetails.ClusterAlias, &promotedReplica.Key)
+		kvPairs := inst.GetClusterMasterKVPairs(analysisEntry.ClusterDetails.ClusterAlias, &promotedReplica.Key)
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Writing KV %+v", kvPairs))
 		if orcraft.IsRaftEnabled() {
-			orcraft.PublishCommand("put-key-value", kvPair)
+			for _, kvPair := range kvPairs {
+				orcraft.PublishCommand("put-key-value", kvPair)
+			}
 			// since we'll be affecting 3rd party tools here, we _prefer_ to mitigate re-applying
 			// of the put-key-value event upon startup. We _recommend_ a snapshot in the near future.
 			go orcraft.PublishCommand("async-snapshot", "")
 		} else {
-			kv.PutKVPair(kvPair)
+			for _, kvPair := range kvPairs {
+				kv.PutKVPair(kvPair)
+			}
 		}
 
 		if !skipProcesses {
@@ -1191,11 +1202,11 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 	}
 
 	func() error {
-		inst.BeginDowntime(inst.NewDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds))
+		inst.BeginDowntime(inst.NewDowntime(failedInstanceKey, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, time.Duration(config.LostInRecoveryDowntimeSeconds)*time.Second))
 		acknowledgeInstanceFailureDetection(&analysisEntry.AnalyzedInstanceKey)
 		for _, replica := range lostReplicas {
 			replica := replica
-			inst.BeginDowntime(inst.NewDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, config.LostInRecoveryDowntimeSeconds))
+			inst.BeginDowntime(inst.NewDowntime(&replica.Key, inst.GetMaintenanceOwner(), inst.DowntimeLostInRecoveryMessage, time.Duration(config.LostInRecoveryDowntimeSeconds)*time.Second))
 		}
 		return nil
 	}()
@@ -1503,7 +1514,7 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 
 // CheckAndRecover is the main entry point for the recovery mechanism
 func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *inst.InstanceKey, skipProcesses bool) (recoveryAttempted bool, promotedReplicaKey *inst.InstanceKey, err error) {
-	// Allow the analysis to run evern if we don't want to recover
+	// Allow the analysis to run even if we don't want to recover
 	replicationAnalysis, err := inst.GetReplicationAnalysis("", true, true)
 	if err != nil {
 		return false, nil, log.Errore(err)
@@ -1521,7 +1532,7 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 				continue
 			}
 		}
-		if analysisEntry.IsDowntimed && specificInstance == nil {
+		if analysisEntry.SkippableDueToDowntime && specificInstance == nil {
 			// Only recover a downtimed server if explicitly requested
 			continue
 		}
@@ -1716,6 +1727,13 @@ func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecov
 		_, credentialsErr := inst.ChangeMasterCredentials(&clusterMaster.Key, replicationUser, replicationPassword)
 		if err == nil {
 			err = credentialsErr
+		}
+	}
+
+	if designatedInstance.AllowTLS {
+		_, enableSSLErr := inst.EnableMasterSSL(&clusterMaster.Key)
+		if err == nil {
+			err = enableSSLErr
 		}
 	}
 

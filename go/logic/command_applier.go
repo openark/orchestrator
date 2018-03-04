@@ -45,6 +45,8 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.registerNode(value)
 	case "discover":
 		return applier.discover(value)
+	case "injected-pseudo-gtid":
+		return applier.injectedPseudoGTID(value)
 	case "forget":
 		return applier.forget(value)
 	case "forget-cluster":
@@ -75,6 +77,8 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.enableGlobalRecoveries(value)
 	case "put-key-value":
 		return applier.putKeyValue(value)
+	case "leader-uri":
+		return applier.leaderURI(value)
 	}
 	return log.Errorf("Unknown command op: %s", op)
 }
@@ -94,6 +98,15 @@ func (applier *CommandApplier) discover(value []byte) interface{} {
 		return log.Errore(err)
 	}
 	discoverInstance(instanceKey)
+	return nil
+}
+
+func (applier *CommandApplier) injectedPseudoGTID(value []byte) interface{} {
+	var clusterName string
+	if err := json.Unmarshal(value, &clusterName); err != nil {
+		return log.Errore(err)
+	}
+	inst.RegisterInjectedPseudoGTID(clusterName)
 	return nil
 }
 
@@ -153,6 +166,12 @@ func (applier *CommandApplier) ackRecovery(value []byte) interface{} {
 	}
 	if ack.Key.IsValid() {
 		_, err = AcknowledgeInstanceRecoveries(&ack.Key, ack.Owner, ack.Comment)
+	}
+	if ack.Id > 0 {
+		_, err = AcknowledgeRecovery(ack.Id, ack.Owner, ack.Comment)
+	}
+	if ack.UID != "" {
+		_, err = AcknowledgeRecoveryByUID(ack.UID, ack.Owner, ack.Comment)
 	}
 	return err
 }
@@ -232,4 +251,13 @@ func (applier *CommandApplier) putKeyValue(value []byte) interface{} {
 	}
 	err := kv.PutKVPair(&kvPair)
 	return err
+}
+
+func (applier *CommandApplier) leaderURI(value []byte) interface{} {
+	var uri string
+	if err := json.Unmarshal(value, &uri); err != nil {
+		return log.Errore(err)
+	}
+	orcraft.LeaderURI.Set(uri)
+	return nil
 }

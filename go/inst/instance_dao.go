@@ -67,6 +67,7 @@ func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
 var instanceKeyInformativeClusterName *cache.Cache
 var forgetInstanceKeys *cache.Cache
+var clusterInjectedPseudoGTIDCache *cache.Cache
 
 var accessDeniedCounter = metrics.NewCounter()
 var readTopologyInstanceCounter = metrics.NewCounter()
@@ -88,6 +89,7 @@ func initializeInstanceDao() {
 	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
 	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
 	forgetInstanceKeys = cache.New(time.Duration(config.Config.InstancePollSeconds*3)*time.Second, time.Second)
+	clusterInjectedPseudoGTIDCache = cache.New(time.Minute, time.Second)
 	// spin off instance write buffer flushing
 	go func() {
 		flushTick := time.Tick(time.Duration(config.Config.InstanceFlushIntervalMilliseconds) * time.Millisecond)
@@ -351,25 +353,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			}()
 		}
 
-		instance.UsingPseudoGTID = false
-		if config.Config.DetectPseudoGTIDQuery != "" {
-			waitGroup.Add(1)
-			go func() {
-				defer waitGroup.Done()
-				if resultData, err := sqlutils.QueryResultData(db, config.Config.DetectPseudoGTIDQuery); err == nil {
-					if len(resultData) > 0 {
-						if len(resultData[0]) > 0 {
-							if resultData[0][0].Valid && resultData[0][0].String == "1" {
-								instance.UsingPseudoGTID = true
-							}
-						}
-					}
-				} else {
-					logReadTopologyInstanceError(instanceKey, "DetectPseudoGTIDQuery", err)
-				}
-			}()
-		}
-
 		var mysqlHostname, mysqlReportHost string
 		err = db.QueryRow("select @@global.hostname, ifnull(@@global.report_host, ''), @@global.server_id, @@global.version, @@global.version_comment, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
 			&mysqlHostname, &mysqlReportHost, &instance.ServerID, &instance.Version, &instance.VersionComment, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
@@ -444,6 +427,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		err = fmt.Errorf("ReadTopologyInstance: empty hostname (%+v). Bailing out", *instanceKey)
 		goto Cleanup
 	}
+	go ResolveHostnameIPs(instance.Key.Hostname)
 	if config.Config.DataCenterPattern != "" {
 		if pattern, err := regexp.Compile(config.Config.DataCenterPattern); err == nil {
 			match := pattern.FindStringSubmatch(instance.Key.Hostname)
@@ -650,6 +634,33 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		logReadTopologyInstanceError(instanceKey, "ReadInstanceClusterAttributes", err)
 	}
 
+	{
+		// Pseudo GTID
+		// Depends on ReadInstanceClusterAttributes above
+		instance.UsingPseudoGTID = false
+		if config.Config.AutoPseudoGTID {
+			var err error
+			instance.UsingPseudoGTID, err = isInjectedPseudoGTID(instance.ClusterName)
+			log.Errore(err)
+		} else if config.Config.DetectPseudoGTIDQuery != "" {
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				if resultData, err := sqlutils.QueryResultData(db, config.Config.DetectPseudoGTIDQuery); err == nil {
+					if len(resultData) > 0 {
+						if len(resultData[0]) > 0 {
+							if resultData[0][0].Valid && resultData[0][0].String == "1" {
+								instance.UsingPseudoGTID = true
+							}
+						}
+					}
+				} else {
+					logReadTopologyInstanceError(instanceKey, "DetectPseudoGTIDQuery", err)
+				}
+			}()
+		}
+	}
+
 	// First read the current PromotionRule from candidate_database_instance.
 	{
 		latency.Start("backend")
@@ -729,7 +740,7 @@ Cleanup:
 		if bufferWrites {
 			enqueueInstanceWrite(instance, instanceFound, err)
 		} else {
-			writeInstance(instance, instanceFound, err)
+			WriteInstance(instance, instanceFound, err)
 		}
 		WriteLongRunningProcesses(&instance.Key, longRunningProcesses)
 		latency.Stop("backend")
@@ -1617,7 +1628,7 @@ func InjectUnseenMasters() error {
 		clusterName := masterKey.StringCode()
 		// minimal details:
 		instance := Instance{Key: masterKey, Version: "Unknown", ClusterName: clusterName}
-		if err := writeInstance(&instance, false, nil); err == nil {
+		if err := WriteInstance(&instance, false, nil); err == nil {
 			operations++
 		}
 	}
@@ -1878,9 +1889,8 @@ func GetMastersKVPairs(clusterName string) (kvPairs [](*kv.KVPair), err error) {
 		return kvPairs, err
 	}
 	for _, master := range masters {
-		if kvPair := GetClusterMasterKVPair(clusterAliasMap[master.ClusterName], &master.Key); kvPair != nil {
-			kvPairs = append(kvPairs, kvPair)
-		}
+		clusterPairs := GetClusterMasterKVPairs(clusterAliasMap[master.ClusterName], &master.Key)
+		kvPairs = append(kvPairs, clusterPairs...)
 	}
 
 	return kvPairs, err
@@ -1928,12 +1938,7 @@ func GetHeuristicClusterDomainInstanceAttribute(clusterName string) (instanceKey
 	return NewRawInstanceKey(writerInstanceName)
 }
 
-// ReadOutdatedInstanceKeys reads and returns keys for all instances that are not up to date (i.e.
-// pre-configured time has passed since they were last checked)
-// But we also check for the case where an attempt at instance checking has been made, that hasn't
-// resulted in an actual check! This can happen when TCP/IP connections are hung, in which case the "check"
-// never returns. In such case we multiply interval by a factor, so as not to open too many connections on
-// the instance.
+// ReadAllInstanceKeys
 func ReadAllInstanceKeys() ([]InstanceKey, error) {
 	res := []InstanceKey{}
 	query := `
@@ -1949,6 +1954,36 @@ func ReadAllInstanceKeys() ([]InstanceKey, error) {
 		} else if !InstanceIsForgotten(instanceKey) {
 			// only if not in "forget" cache
 			res = append(res, *instanceKey)
+		}
+		return nil
+	})
+	return res, log.Errore(err)
+}
+
+// ReadAllInstanceKeysMasterKeys
+func ReadAllMinimalInstances() ([]MinimalInstance, error) {
+	res := []MinimalInstance{}
+	query := `
+		select
+			hostname, port, master_host, master_port, cluster_name
+		from
+			database_instance
+			`
+	err := db.QueryOrchestrator(query, sqlutils.Args(), func(m sqlutils.RowMap) error {
+		minimalInstance := MinimalInstance{}
+		minimalInstance.Key = InstanceKey{
+			Hostname: m.GetString("hostname"),
+			Port:     m.GetInt("port"),
+		}
+		minimalInstance.MasterKey = InstanceKey{
+			Hostname: m.GetString("master_host"),
+			Port:     m.GetInt("master_port"),
+		}
+		minimalInstance.ClusterName = m.GetString("cluster_name")
+
+		if !InstanceIsForgotten(&minimalInstance.Key) {
+			// only if not in "forget" cache
+			res = append(res, minimalInstance)
 		}
 		return nil
 	})
@@ -2277,8 +2312,8 @@ func flushInstanceWriteBuffer() {
 	}
 }
 
-// writeInstance stores an instance in the orchestrator backend
-func writeInstance(instance *Instance, instanceWasActuallyFound bool, lastError error) error {
+// WriteInstance stores an instance in the orchestrator backend
+func WriteInstance(instance *Instance, instanceWasActuallyFound bool, lastError error) error {
 	if lastError != nil {
 		log.Debugf("writeInstance: will not update database_instance due to error: %+v", lastError)
 		return nil
@@ -2669,4 +2704,60 @@ func FigureInstanceKey(instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (
 		return nil, log.Errorf("Cannot deduce instance %+v", instanceKey)
 	}
 	return figuredKey, nil
+}
+
+// RegisterInjectedPseudoGTID
+func RegisterInjectedPseudoGTID(clusterName string) error {
+	query := `
+			insert into cluster_injected_pseudo_gtid (
+					cluster_name,
+					time_injected
+				) values (?, now())
+				on duplicate key update
+					cluster_name=values(cluster_name),
+					time_injected=now()
+				`
+	args := sqlutils.Args(clusterName)
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(query, args...)
+		if err == nil {
+			clusterInjectedPseudoGTIDCache.Set(clusterName, true, cache.DefaultExpiration)
+		}
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
+// ExpireInjectedPseudoGTID
+func ExpireInjectedPseudoGTID() error {
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+				delete from cluster_injected_pseudo_gtid
+				where time_injected < NOW() - INTERVAL ? MINUTE
+				`, config.PseudoGTIDExpireMinutes,
+		)
+		return log.Errore(err)
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
+// isInjectedPseudoGTID reads from backend DB / cache
+func isInjectedPseudoGTID(clusterName string) (injected bool, err error) {
+	if injectedValue, found := clusterInjectedPseudoGTIDCache.Get(clusterName); found {
+		return injectedValue.(bool), err
+	}
+	query := `
+			select
+					count(*) as is_injected
+				from
+					cluster_injected_pseudo_gtid
+				where
+					cluster_name = ?
+			`
+	err = db.QueryOrchestrator(query, sqlutils.Args(clusterName), func(m sqlutils.RowMap) error {
+		injected = m.GetBool("is_injected")
+		return nil
+	})
+	clusterInjectedPseudoGTIDCache.Set(clusterName, injected, cache.DefaultExpiration)
+	return injected, log.Errore(err)
 }
