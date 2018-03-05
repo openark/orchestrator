@@ -61,6 +61,7 @@ const (
 	StatementAndRowLoggingSlavesStructureWarning                         = "StatementAndRowLoggingSlavesStructureWarning"
 	MixedAndRowLoggingSlavesStructureWarning                             = "MixedAndRowLoggingSlavesStructureWarning"
 	MultipleMajorVersionsLoggingSlaves                                   = "MultipleMajorVersionsLoggingSlaves"
+	DifferentGTIDModesStructureWarning                                   = "DifferentGTIDModesStructureWarning"
 )
 
 type InstanceAnalysis struct {
@@ -124,6 +125,9 @@ type ReplicationAnalysis struct {
 	CountAdditionalAgreeingNodes              int
 	StartActivePeriod                         string
 	SkippableDueToDowntime                    bool
+	GTIDMode                                  string
+	MinReplicaGTIDMode                        string
+	MaxReplicaGTIDMode                        string
 }
 
 type AnalysisMap map[string](*ReplicationAnalysis)

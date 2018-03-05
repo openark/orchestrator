@@ -51,6 +51,7 @@ type Instance struct {
 	Slave_SQL_Running      bool
 	Slave_IO_Running       bool
 	HasReplicationFilters  bool
+	GTIDMode               string
 	SupportsOracleGTID     bool
 	UsingOracleGTID        bool
 	UsingMariaDBGTID       bool
