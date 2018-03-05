@@ -86,6 +86,7 @@ type Configuration struct {
 	EnableSyslog                               bool   // Should logs be directed (in addition) to syslog daemon?
 	ListenAddress                              string // Where orchestrator HTTP should listen for TCP
 	ListenSocket                               string // Where orchestrator HTTP should listen for unix socket (default: empty; when given, TCP is disabled)
+	HTTPAdvertise                              string // optional, for raft setups, what is the HTTP address this node will advertise to its peers (potentially use where behind NAT or when rerouting ports; example: "http://11.22.33.44:3030")
 	AgentsServerPort                           string // port orchestrator agents talk back to
 	MySQLTopologyUser                          string
 	MySQLTopologyPassword                      string // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
@@ -266,6 +267,7 @@ func newConfiguration() *Configuration {
 		EnableSyslog:                               false,
 		ListenAddress:                              ":3000",
 		ListenSocket:                               "",
+		HTTPAdvertise:                              "",
 		AgentsServerPort:                           ":3001",
 		StatusEndpoint:                             "/api/status",
 		StatusOUVerify:                             false,
