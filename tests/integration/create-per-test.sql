@@ -7,6 +7,7 @@
 -- + 22296
 -- + 22297
 --
+DELETE FROM database_instance_maintenance;
 DELETE FROM database_instance_downtime;
 DELETE FROM database_instance;
 

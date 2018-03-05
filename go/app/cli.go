@@ -1272,6 +1272,17 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
+	case registerCliCommand("in-maintenance", "Instance management", `Check whether instance is under maintenance`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			inMaintenance, err := inst.InMaintenance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if inMaintenance {
+				fmt.Println(instanceKey.DisplayString())
+			}
+		}
 	case registerCliCommand("begin-downtime", "Instance management", `Mark an instance as downtimed`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)

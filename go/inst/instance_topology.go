@@ -1432,6 +1432,16 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 		} else {
 			defer EndMaintenance(maintenanceToken)
 		}
+
+		// We don't require grabbing maintenance lock on otherInstance, but we do request
+		// that it is not already under maintenance.
+		if inMaintenance, merr := InMaintenance(&otherInstance.Key); merr != nil {
+			err = merr
+			goto Cleanup
+		} else if inMaintenance {
+			err = fmt.Errorf("Cannot match below %+v; it is in maintenance", otherInstance.Key)
+			goto Cleanup
+		}
 	}
 
 	log.Debugf("Stopping replica on %+v", *instanceKey)
