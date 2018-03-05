@@ -106,6 +106,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		        MIN(CONCAT(master_instance.hostname,
 		                ':',
 		                master_instance.port) = master_instance.cluster_name) AS is_cluster_master,
+						MIN(master_instance.gtid_mode) AS gtid_mode,
 		        COUNT(slave_instance.server_id) AS count_slaves,
 		        IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen),
 		                0) AS count_valid_slaves,
@@ -177,6 +178,10 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 								AND slave_instance.log_slave_updates
 								AND slave_instance.binlog_format = 'ROW'),
               0) AS count_row_based_loggin_slaves,
+						IFNULL(MIN(slave_instance.gtid_mode), '')
+              AS min_replica_gtid_mode,
+						IFNULL(MAX(slave_instance.gtid_mode), '')
+              AS max_replica_gtid_mode,
 						IFNULL(SUM(
 								replica_downtime.downtime_active is not null
 								and ifnull(replica_downtime.end_timestamp, now()) > now()),
@@ -240,6 +245,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		a.AnalyzedInstancePhysicalEnvironment = m.GetString("physical_environment")
 		a.ClusterDetails.ClusterName = m.GetString("cluster_name")
 		a.ClusterDetails.ClusterAlias = m.GetString("cluster_alias")
+		a.GTIDMode = m.GetString("gtid_mode")
 		a.LastCheckValid = m.GetBool("is_last_check_valid")
 		a.CountReplicas = m.GetUint("count_slaves")
 		a.CountValidReplicas = m.GetUint("count_valid_slaves")
@@ -265,6 +271,9 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		countValidBinlogServerSlaves := m.GetUint("count_valid_binlog_server_slaves")
 		a.BinlogServerImmediateTopology = countValidBinlogServerSlaves == a.CountValidReplicas && a.CountValidReplicas > 0
 		a.PseudoGTIDImmediateTopology = m.GetBool("is_pseudo_gtid")
+
+		a.MinReplicaGTIDMode = m.GetString("min_replica_gtid_mode")
+		a.MaxReplicaGTIDMode = m.GetString("max_replica_gtid_mode")
 
 		a.CountStatementBasedLoggingReplicas = m.GetUint("count_statement_based_loggin_slaves")
 		a.CountMixedBasedLoggingReplicas = m.GetUint("count_mixed_based_loggin_slaves")
@@ -430,6 +439,10 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			}
 			if a.IsMaster && a.CountDistinctMajorVersionsLoggingReplicas > 1 {
 				a.StructureAnalysis = append(a.StructureAnalysis, MultipleMajorVersionsLoggingSlaves)
+			}
+
+			if a.CountReplicas > 0 && (a.GTIDMode != a.MinReplicaGTIDMode || a.GTIDMode != a.MaxReplicaGTIDMode) {
+				a.StructureAnalysis = append(a.StructureAnalysis, DifferentGTIDModesStructureWarning)
 			}
 		}
 		appendAnalysis(&a)

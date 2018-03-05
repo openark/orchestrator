@@ -500,4 +500,9 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN semi_sync_replica_enabled TINYINT UNSIGNED NOT NULL
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN gtid_mode varchar(32) CHARACTER SET ascii NOT NULL
+	`,
 }
