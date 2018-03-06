@@ -83,7 +83,15 @@ $(document).ready(function () {
 			health.Details.RaftHealthyMembers = health.Details.RaftHealthyMembers || []
 			if (health.Details.RaftHealthyMembers) {
 				health.Details.RaftHealthyMembers.forEach(function(node) {
-					addStatusTableData("Healthy raft member", "", "", node, "");
+					var message = '';
+					message += '<code class="text-info"><strong>';
+					message += node;
+					message += '</strong></code>';
+					message += '</br>';
+					if (node == health.Details.RaftAdvertise) {
+						message += '<code class="text-info"><span class="text-primary">[This node]</span></code>';
+					}
+					addStatusTableData("Raft member", message, "", "", "");
 				})
 			}
 

@@ -81,6 +81,7 @@ type HealthStatus struct {
 	RaftLeader         string
 	IsRaftLeader       bool
 	RaftLeaderURI      string
+	RaftAdvertise      string
 	RaftHealthyMembers []string
 }
 
@@ -126,6 +127,7 @@ func HealthTest() (health *HealthStatus, err error) {
 		health.RaftLeader = orcraft.GetLeader()
 		health.RaftLeaderURI = orcraft.LeaderURI.Get()
 		health.IsRaftLeader = orcraft.IsLeader()
+		health.RaftAdvertise = config.Config.RaftAdvertise
 		health.RaftHealthyMembers = orcraft.HealthyMembers()
 	} else {
 		if health.ActiveNode, health.IsActiveNode, err = ElectedNode(); err != nil {
