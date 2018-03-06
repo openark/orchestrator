@@ -325,7 +325,7 @@ func OnHealthReport(authenticationToken, raftBind, raftAdvertise string) (err er
 
 func HealthyMembers() (advertised []string) {
 	items := healthReportsCache.Items()
-	for raftAdvertised, _ := range items {
+	for raftAdvertised := range items {
 		advertised = append(advertised, raftAdvertised)
 	}
 	return advertised
