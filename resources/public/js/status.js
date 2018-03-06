@@ -49,10 +49,10 @@ $(document).ready(function () {
     		}
 				message += '</code>';
 
-                var running_since ='<span class="text-info">'+node.FirstSeenActive+'</span>';
+        var running_since ='<span class="text-info">'+node.FirstSeenActive+'</span>';
 				var address = node.DBBackend;
 
-            addStatusTableData("Available node", message, running_since, address, app_version);
+        addStatusTableData("Available node", message, running_since, address, app_version);
     	})
 
     	var userId = getUserId();
@@ -79,6 +79,12 @@ $(document).ready(function () {
 					message += '<code class="text-info"><span class="text-primary">[This node]</span></code>';
 				}
 				addStatusTableData("Raft leader", message, "", '<a href="'+health.Details.RaftLeaderURI+'">'+health.Details.RaftLeaderURI+'</a>', "");
+			}
+			health.Details.RaftHealthyMembers = health.Details.RaftHealthyMembers || []
+			if (health.Details.RaftHealthyMembers) {
+				health.Details.RaftHealthyMembers.forEach(function(node) {
+					addStatusTableData("Healthy raft member", "", "", node, "");
+				})
 			}
 
     	if (isAuthorizedForAction()) {

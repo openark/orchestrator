@@ -25,6 +25,7 @@ import (
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/raft"
+	"github.com/github/orchestrator/go/util"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )
@@ -35,7 +36,7 @@ func AttemptFailureDetectionRegistration(analysisEntry *inst.ReplicationAnalysis
 		analysisEntry.AnalyzedInstanceKey.Hostname,
 		analysisEntry.AnalyzedInstanceKey.Port,
 		process.ThisHostname,
-		process.ProcessToken.Hash,
+		util.ProcessToken.Hash,
 		string(analysisEntry.Analysis),
 		analysisEntry.ClusterDetails.ClusterName,
 		analysisEntry.ClusterDetails.ClusterAlias,
@@ -177,7 +178,7 @@ func writeTopologyRecovery(topologyRecovery *TopologyRecovery) (*TopologyRecover
 		sqlutils.NilIfZero(topologyRecovery.Id),
 		topologyRecovery.UID,
 		analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port,
-		process.ThisHostname, process.ProcessToken.Hash,
+		process.ThisHostname, util.ProcessToken.Hash,
 		string(analysisEntry.Analysis),
 		analysisEntry.ClusterDetails.ClusterName,
 		analysisEntry.ClusterDetails.ClusterAlias,

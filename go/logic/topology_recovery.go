@@ -34,6 +34,7 @@ import (
 	"github.com/github/orchestrator/go/os"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/raft"
+	"github.com/github/orchestrator/go/util"
 	"github.com/openark/golib/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
@@ -106,7 +107,7 @@ type TopologyRecovery struct {
 
 func NewTopologyRecovery(replicationAnalysis inst.ReplicationAnalysis) *TopologyRecovery {
 	topologyRecovery := &TopologyRecovery{}
-	topologyRecovery.UID = process.PrettyUniqueToken()
+	topologyRecovery.UID = util.PrettyUniqueToken()
 	topologyRecovery.AnalysisEntry = replicationAnalysis
 	topologyRecovery.SuccessorKey = nil
 	topologyRecovery.LostReplicas = *inst.NewInstanceKeyMap()
