@@ -82,7 +82,7 @@ $(document).ready(function () {
 			}
 			health.Details.RaftHealthyMembers = health.Details.RaftHealthyMembers || []
 			if (health.Details.RaftHealthyMembers) {
-				health.Details.RaftHealthyMembers.forEach(function(node) {
+				health.Details.RaftHealthyMembers.sort().forEach(function(node) {
 					var message = '';
 					message += '<code class="text-info"><strong>';
 					message += node;
