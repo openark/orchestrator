@@ -930,13 +930,16 @@ body {
 }
 
 
-#orchestratorStatusTable {
+.status-table {
     font: 12px sans-serif;
 }
 
-#orchestratorStatusTable code {
+.status-table code {
     font-size: 100%;
     background-color: inherit;
+}
+.status-table .long-text {
+  overflow: auto;
 }
 
 .instance.instance-search {
