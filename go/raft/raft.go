@@ -82,9 +82,14 @@ func FatalRaftError(err error) error {
 }
 
 func computeLeaderURI() (uri string, err error) {
-	protocol := "http"
+	if config.Config.HTTPAdvertise != "" {
+		// Explicitly given
+		return config.Config.HTTPAdvertise, nil
+	}
+	// Not explicitly given. Let's heuristically compute using RaftAdvertise
+	scheme := "http"
 	if config.Config.UseSSL {
-		protocol = "https"
+		scheme = "https"
 	}
 	hostname := config.Config.RaftAdvertise
 	listenTokens := strings.Split(config.Config.ListenAddress, ":")
@@ -92,7 +97,7 @@ func computeLeaderURI() (uri string, err error) {
 		return uri, fmt.Errorf("computeLeaderURI: cannot determine listen port out of config.Config.ListenAddress: %+v", config.Config.ListenAddress)
 	}
 	port := listenTokens[1]
-	uri = fmt.Sprintf("%s://%s:%s", protocol, hostname, port)
+	uri = fmt.Sprintf("%s://%s:%s", scheme, hostname, port)
 	return uri, nil
 }
 

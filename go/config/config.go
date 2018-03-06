@@ -19,6 +19,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -521,11 +522,14 @@ func (this *Configuration) postReadAdjustments() error {
 	if this.RemoteSSHForMasterFailover && this.RemoteSSHCommand == "" {
 		return fmt.Errorf("RemoteSSHCommand is required when RemoteSSHForMasterFailover is set")
 	}
-	if this.RaftAdvertise == "" {
-		this.RaftAdvertise = this.RaftBind
-	}
 	if this.RaftEnabled && this.RaftDataDir == "" {
 		return fmt.Errorf("RaftDataDir must be defined since raft is enabled (RaftEnabled)")
+	}
+	if this.RaftEnabled && this.RaftBind == "" {
+		return fmt.Errorf("RaftBind must be defined since raft is enabled (RaftEnabled)")
+	}
+	if this.RaftAdvertise == "" {
+		this.RaftAdvertise = this.RaftBind
 	}
 	if this.KVClusterMasterPrefix != "/" {
 		// "/" remains "/"
@@ -543,6 +547,24 @@ func (this *Configuration) postReadAdjustments() error {
 		this.PseudoGTIDMonotonicHint = "asc:"
 		this.DetectPseudoGTIDQuery = SelectTrueQuery
 		this.PseudoGTIDPreferIndependentMultiMatch = true
+	}
+	if this.HTTPAdvertise != "" {
+		u, err := url.Parse(this.HTTPAdvertise)
+		if err != nil {
+			return fmt.Errorf("Failed parsing HTTPAdvertise %s: %s", this.HTTPAdvertise, err.Error)
+		}
+		if u.Scheme == "" {
+			return fmt.Errorf("If specified, HTTPAdvertise must include scheme (http:// or https://)")
+		}
+		if u.Hostname() == "" {
+			return fmt.Errorf("If specified, HTTPAdvertise must include host name")
+		}
+		if u.Port() == "" {
+			return fmt.Errorf("If specified, HTTPAdvertise must include port number")
+		}
+		if u.Path != "" {
+			return fmt.Errorf("If specified, HTTPAdvertise must not specify a path")
+		}
 	}
 	return nil
 }
