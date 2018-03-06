@@ -91,7 +91,7 @@ $(document).ready(function () {
 					if (node == health.Details.RaftAdvertise) {
 						message += '<code class="text-info"><span class="text-primary">[This node]</span></code>';
 					}
-					addStatusTableData("Raft member", message, "", "", "");
+					addStatusTableData("Healthy raft member", message, "", "", "");
 				})
 			}
 
