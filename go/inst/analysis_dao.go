@@ -25,6 +25,7 @@ import (
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/raft"
+	"github.com/github/orchestrator/go/util"
 
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
@@ -234,7 +235,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		a := ReplicationAnalysis{
 			Analysis:               NoProblem,
 			ProcessingNodeHostname: process.ThisHostname,
-			ProcessingNodeToken:    process.ProcessToken.Hash,
+			ProcessingNodeToken:    util.ProcessToken.Hash,
 		}
 
 		a.IsMaster = m.GetBool("is_master")

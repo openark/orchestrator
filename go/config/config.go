@@ -41,6 +41,7 @@ var configurationLoaded chan bool = make(chan bool)
 
 const (
 	HealthPollSeconds                            = 1
+	RaftHealthPollSeconds                        = 10
 	RecoveryPollSeconds                          = 1
 	ActiveNodeExpireSeconds                      = 5
 	BinlogFileHistoryDays                        = 1

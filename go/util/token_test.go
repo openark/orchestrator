@@ -1,4 +1,4 @@
-package process
+package util
 
 import (
 	test "github.com/openark/golib/tests"

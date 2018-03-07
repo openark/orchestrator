@@ -2590,6 +2590,20 @@ func (this *HttpAPI) RaftHealth(params martini.Params, r render.Render, req *htt
 	r.JSON(http.StatusOK, "healthy")
 }
 
+// RaftFollowerHealthReport is initiated by followers to report their identity and health to the raft leader.
+func (this *HttpAPI) RaftFollowerHealthReport(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !orcraft.IsRaftEnabled() {
+		Respond(r, &APIResponse{Code: ERROR, Message: "raft-state: not running with raft setup"})
+		return
+	}
+	err := orcraft.OnHealthReport(params["authenticationToken"], params["raftBind"], params["raftAdvertise"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("Cannot create snapshot: %+v", err)})
+		return
+	}
+	r.JSON(http.StatusOK, "health reported")
+}
+
 // RaftSnapshot instructs raft to take a snapshot
 func (this *HttpAPI) RaftSnapshot(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !orcraft.IsRaftEnabled() {
@@ -3337,6 +3351,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequestNoProxy(m, "raft-leader", this.RaftLeader)
 	this.registerAPIRequestNoProxy(m, "raft-health", this.RaftHealth)
 	this.registerAPIRequestNoProxy(m, "raft-snapshot", this.RaftSnapshot)
+	this.registerAPIRequestNoProxy(m, "raft-follower-health-report/:authenticationToken/:raftBind/:raftAdvertise", this.RaftFollowerHealthReport)
 	this.registerAPIRequestNoProxy(m, "reload-configuration", this.ReloadConfiguration)
 	this.registerAPIRequestNoProxy(m, "hostname-resolve-cache", this.HostnameResolveCache)
 	this.registerAPIRequestNoProxy(m, "reset-hostname-resolve-cache", this.ResetHostnameResolveCache)

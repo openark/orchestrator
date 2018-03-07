@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package process
+package util
 
 import (
 	"crypto/rand"
@@ -22,6 +22,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"time"
+)
+
+const (
+	shortTokenLength = 8
 )
 
 func toHash(input []byte) string {
@@ -44,6 +48,13 @@ func RandomHash() string {
 // Token is used to identify and validate requests to this service
 type Token struct {
 	Hash string
+}
+
+func (this *Token) Short() string {
+	if len(this.Hash) <= shortTokenLength {
+		return this.Hash
+	}
+	return this.Hash[0:shortTokenLength]
 }
 
 var ProcessToken *Token = NewToken()

@@ -22,6 +22,7 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/process"
+	"github.com/github/orchestrator/go/util"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )
@@ -90,7 +91,7 @@ func BeginBoundedMaintenance(instanceKey *InstanceKey, owner string, reason stri
 		owner,
 		reason,
 		process.ThisHostname,
-		process.ProcessToken.Hash,
+		util.ProcessToken.Hash,
 		explicitlyBounded,
 	)
 	if err != nil {

@@ -79,6 +79,8 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.putKeyValue(value)
 	case "leader-uri":
 		return applier.leaderURI(value)
+	case "request-health-report":
+		return applier.healthReport(value)
 	}
 	return log.Errorf("Unknown command op: %s", op)
 }
@@ -259,5 +261,14 @@ func (applier *CommandApplier) leaderURI(value []byte) interface{} {
 		return log.Errore(err)
 	}
 	orcraft.LeaderURI.Set(uri)
+	return nil
+}
+
+func (applier *CommandApplier) healthReport(value []byte) interface{} {
+	var authenticationToken string
+	if err := json.Unmarshal(value, &authenticationToken); err != nil {
+		return log.Errore(err)
+	}
+	orcraft.ReportToRaftLeader(authenticationToken)
 	return nil
 }

@@ -46,19 +46,18 @@ func setupHttpClient() error {
 	return nil
 }
 
-// PeerAPI generates the API path of a raft peer
-func peerAPI(peer string) string {
-	protocol := "http"
-	if config.Config.UseSSL {
-		protocol = "https"
+func HttpGetLeader(path string) (response []byte, err error) {
+	leaderURI := LeaderURI.Get()
+	if leaderURI == "" {
+		return nil, fmt.Errorf("Raft leader URI unknown")
 	}
-	api := fmt.Sprintf("%s://%s%s/api", protocol, peer, config.Config.ListenAddress)
-	return api
-}
+	leaderAPI := leaderURI
+	if config.Config.URLPrefix != "" {
+		leaderAPI = fmt.Sprintf("%s/%s", leaderAPI, config.Config.URLPrefix)
+	}
+	leaderAPI = fmt.Sprintf("%s/api", leaderAPI)
 
-// readResponse returns the body of an HTTP response
-func HttpGet(peer string, path string) ([]byte, error) {
-	url := fmt.Sprintf("%s/%s", peerAPI(peer), path)
+	url := fmt.Sprintf("%s/%s", leaderAPI, path)
 	res, err := httpClient.Get(url)
 	if err != nil {
 		return nil, err
@@ -71,7 +70,7 @@ func HttpGet(peer string, path string) ([]byte, error) {
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return body, log.Errorf("HttpGet: got %d status on %s", res.StatusCode, url)
+		return body, log.Errorf("HttpGetLeader: got %d status on %s", res.StatusCode, url)
 	}
 
 	return body, nil
