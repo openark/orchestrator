@@ -19,6 +19,7 @@ package process
 import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
+	"github.com/github/orchestrator/go/util"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )
@@ -26,8 +27,8 @@ import (
 // GenerateAccessToken attempts to generate a new access token and returns the public
 // part of the token
 func GenerateAccessToken(owner string) (publicToken string, err error) {
-	publicToken = NewToken().Hash
-	secretToken := NewToken().Hash
+	publicToken = util.NewToken().Hash
+	secretToken := util.NewToken().Hash
 
 	_, err = db.ExecOrchestrator(`
 			insert into access_token (

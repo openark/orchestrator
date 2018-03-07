@@ -1,11 +1,18 @@
 
-function addStatusTableData(name, column1, column2, column3, column4) {
-	$("#orchestratorStatusTable").append(
-	        '<tr><td>' + name + '</td>' +
-                '<td>' + column1 + '</td>' +
-                '<td><code class="text-info">' + column2 + '</code></td>' +
-                '<td><code class="text-info">' + column3 + '</code></td>' +
-                '<td><code class="text-info">' + column4 + '</code></td></tr>'
+function addPrimaryTableData(name, column1, column2, column3, column4) {
+	$(".status-table-primary").append(
+    '<tr><td>' + name + '</td>' +
+    '<td>' + column1 + '</td>' +
+    '<td><code class="text-info">' + column2 + '</code></td>' +
+    '<td><code class="text-info">' + column3 + '</code></td>' +
+    '<td><code class="text-info long-text">' + column4 + '</code></td></tr>'
+	);
+}
+function addRaftTableData(name, column1, column2) {
+	$(".status-table-raft").append(
+    '<tr><td>' + name + '</td>' +
+    '<td>' + column1 + '</td>' +
+    '<td><code class="text-info">' + column2 + '</code></td></tr>'
 	);
 }
 function addStatusActionButton(name, uri) {
@@ -22,7 +29,7 @@ $(document).ready(function () {
 	var statusObject = $("#orchestratorStatus .panel-body");
     $.get(appUrl("/api/health/"), function (health) {
     	statusObject.prepend('<h4>'+health.Message+'</h4>')
-        $("#orchestratorStatusTable").append(
+        $(".status-table-primary").append(
             '<tr><td></td>' +
             '<td><b>Hostname</b></td>' +
             '<td><b>Running Since</b></td>' +
@@ -49,10 +56,10 @@ $(document).ready(function () {
     		}
 				message += '</code>';
 
-                var running_since ='<span class="text-info">'+node.FirstSeenActive+'</span>';
+        var running_since ='<span class="text-info">'+node.FirstSeenActive+'</span>';
 				var address = node.DBBackend;
 
-            addStatusTableData("Available node", message, running_since, address, app_version);
+        addPrimaryTableData("Available node", message, running_since, address, app_version);
     	})
 
     	var userId = getUserId();
@@ -60,15 +67,13 @@ $(document).ready(function () {
     		userId = "[unknown]"
     	}
     	var userStatus = (isAuthorizedForAction() ? "admin" : "read only");
-      addStatusTableData("You", userId + ", " + userStatus, "", "", "");
+      addPrimaryTableData("You", userId + ", " + userStatus, "", "", "");
 
 			if (health.Details.RaftLeader != "") {
-				$("#orchestratorStatusTable").append(
+				$(".status-table-raft").append(
             '<tr><td></td>' +
             '<td><b>Advertised</b></td>' +
-            '<td><b></b></td>' +
-            '<td><b>URI</b></td>' +
-            '<td><b></b></td></tr>'
+            '<td><b>URI</b></td>'
         );
 				var message = '';
 				message += '<code class="text-info"><strong>';
@@ -78,7 +83,21 @@ $(document).ready(function () {
 				if (health.Details.IsRaftLeader) {
 					message += '<code class="text-info"><span class="text-primary">[This node]</span></code>';
 				}
-				addStatusTableData("Raft leader", message, "", '<a href="'+health.Details.RaftLeaderURI+'">'+health.Details.RaftLeaderURI+'</a>', "");
+				addRaftTableData("Raft leader", message, '<a href="'+health.Details.RaftLeaderURI+'">'+health.Details.RaftLeaderURI+'</a>');
+			}
+			health.Details.RaftHealthyMembers = health.Details.RaftHealthyMembers || []
+			if (health.Details.RaftHealthyMembers) {
+				health.Details.RaftHealthyMembers.sort().forEach(function(node) {
+					var message = '';
+					message += '<code class="text-info"><strong>';
+					message += node;
+					message += '</strong></code>';
+					message += '</br>';
+					if (node == health.Details.RaftAdvertise) {
+						message += '<code class="text-info"><span class="text-primary">[This node]</span></code>';
+					}
+					addRaftTableData("Healthy raft member", message, "");
+				})
 			}
 
     	if (isAuthorizedForAction()) {

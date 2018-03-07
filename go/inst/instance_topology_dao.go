@@ -24,7 +24,7 @@ import (
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
-	"github.com/github/orchestrator/go/process"
+	"github.com/github/orchestrator/go/util"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 	"github.com/patrickmn/go-cache"
@@ -1021,7 +1021,7 @@ func injectPseudoGTID(instance *Instance) (hint string, err error) {
 	}
 
 	now := time.Now()
-	randomHash := process.RandomHash()[0:16]
+	randomHash := util.RandomHash()[0:16]
 	hint = fmt.Sprintf("%.8x:%.8x:%s", now.Unix(), instance.ServerID, randomHash)
 	query := fmt.Sprintf("drop view if exists `%s`.`_asc:%s`", config.PseudoGTIDSchema, hint)
 	_, err = ExecInstance(&instance.Key, query)
