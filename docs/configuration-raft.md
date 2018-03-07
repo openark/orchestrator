@@ -51,7 +51,19 @@ as well as this:
   ],
 ```
 
-If your orchestrator/raft nodes need to communicate via NAT gateways, you can additionally set "RaftAdvertise" to IP or hostname which other nodes should contact. Otherwise other nodes would try to talk to the "RaftBind" address and fail.
+### NAT, firewalls, routing
+
+If your orchestrator/raft nodes need to communicate via NAT gateways, you can additionally set:
+
+- `"RaftAdvertise": "<ip.or.fqdn.visible.to.other.nodes>"`
+
+to IP or hostname which other nodes should contact. Otherwise other nodes would try to talk to the "RaftBind" address and fail.
+
+Raft nodes will reverse proxy HTTP requests to the leader. `orchestrator` will attempt to heuristically compute the leader's URL to which redirect requests. If behind NAT, rerouting ports etc., `orchestrator` may not be able to compute that URL. You may configure:
+
+- `"HTTPAdvertise": "scheme://hostname:port"`
+
+to explicitly specify where a node, assuming it were the leader, would be accessed through HTTP API. As example, you would: `"HTTPAdvertise": "http://my.public.hostname:3000"`
 
 ### Backend DB
 
