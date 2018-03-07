@@ -19,6 +19,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"regexp"
 	"strings"
@@ -86,6 +87,7 @@ type Configuration struct {
 	EnableSyslog                               bool   // Should logs be directed (in addition) to syslog daemon?
 	ListenAddress                              string // Where orchestrator HTTP should listen for TCP
 	ListenSocket                               string // Where orchestrator HTTP should listen for unix socket (default: empty; when given, TCP is disabled)
+	HTTPAdvertise                              string // optional, for raft setups, what is the HTTP address this node will advertise to its peers (potentially use where behind NAT or when rerouting ports; example: "http://11.22.33.44:3030")
 	AgentsServerPort                           string // port orchestrator agents talk back to
 	MySQLTopologyUser                          string
 	MySQLTopologyPassword                      string // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
@@ -266,6 +268,7 @@ func newConfiguration() *Configuration {
 		EnableSyslog:                               false,
 		ListenAddress:                              ":3000",
 		ListenSocket:                               "",
+		HTTPAdvertise:                              "",
 		AgentsServerPort:                           ":3001",
 		StatusEndpoint:                             "/api/status",
 		StatusOUVerify:                             false,
@@ -519,11 +522,14 @@ func (this *Configuration) postReadAdjustments() error {
 	if this.RemoteSSHForMasterFailover && this.RemoteSSHCommand == "" {
 		return fmt.Errorf("RemoteSSHCommand is required when RemoteSSHForMasterFailover is set")
 	}
-	if this.RaftAdvertise == "" {
-		this.RaftAdvertise = this.RaftBind
-	}
 	if this.RaftEnabled && this.RaftDataDir == "" {
 		return fmt.Errorf("RaftDataDir must be defined since raft is enabled (RaftEnabled)")
+	}
+	if this.RaftEnabled && this.RaftBind == "" {
+		return fmt.Errorf("RaftBind must be defined since raft is enabled (RaftEnabled)")
+	}
+	if this.RaftAdvertise == "" {
+		this.RaftAdvertise = this.RaftBind
 	}
 	if this.KVClusterMasterPrefix != "/" {
 		// "/" remains "/"
@@ -541,6 +547,24 @@ func (this *Configuration) postReadAdjustments() error {
 		this.PseudoGTIDMonotonicHint = "asc:"
 		this.DetectPseudoGTIDQuery = SelectTrueQuery
 		this.PseudoGTIDPreferIndependentMultiMatch = true
+	}
+	if this.HTTPAdvertise != "" {
+		u, err := url.Parse(this.HTTPAdvertise)
+		if err != nil {
+			return fmt.Errorf("Failed parsing HTTPAdvertise %s: %s", this.HTTPAdvertise, err.Error)
+		}
+		if u.Scheme == "" {
+			return fmt.Errorf("If specified, HTTPAdvertise must include scheme (http:// or https://)")
+		}
+		if u.Hostname() == "" {
+			return fmt.Errorf("If specified, HTTPAdvertise must include host name")
+		}
+		if u.Port() == "" {
+			return fmt.Errorf("If specified, HTTPAdvertise must include port number")
+		}
+		if u.Path != "" {
+			return fmt.Errorf("If specified, HTTPAdvertise must not specify a path")
+		}
 	}
 	return nil
 }
