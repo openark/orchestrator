@@ -284,7 +284,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		return instance, fmt.Errorf("ReadTopologyInstance will not act on invalid instance key: %+v", *instanceKey)
 	}
 
-	go UpdateInstanceLastAttemptedCheck(instanceKey)
+	lastAttemptedCheckTimer := time.AfterFunc(time.Second, func() {
+		go UpdateInstanceLastAttemptedCheck(instanceKey)
+	})
 
 	latency.Start("instance")
 	db, err := db.OpenDiscovery(instanceKey.Hostname, instanceKey.Port)
@@ -746,6 +748,7 @@ Cleanup:
 			WriteInstance(instance, instanceFound, err)
 		}
 		WriteLongRunningProcesses(&instance.Key, longRunningProcesses)
+		lastAttemptedCheckTimer.Stop()
 		latency.Stop("backend")
 		return instance, nil
 	}
