@@ -505,4 +505,9 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN gtid_mode varchar(32) CHARACTER SET ascii NOT NULL
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN last_check_partial_success tinyint unsigned NOT NULL after last_attempted_check
+	`,
 }
