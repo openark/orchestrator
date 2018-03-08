@@ -100,6 +100,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 							master_instance.last_checked <= master_instance.last_seen
 							and master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
 		        	) = 1 AS is_last_check_valid,
+						MIN(master_instance.last_check_partial_success) as last_check_partial_success,
 		        MIN(master_instance.master_host IN ('' , '_')
 		            OR master_instance.master_port = 0
 								OR substr(master_instance.master_host, 1, 2) = '//') AS is_master,
@@ -248,6 +249,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		a.ClusterDetails.ClusterAlias = m.GetString("cluster_alias")
 		a.GTIDMode = m.GetString("gtid_mode")
 		a.LastCheckValid = m.GetBool("is_last_check_valid")
+		a.LastCheckPartialSuccess = m.GetBool("last_check_partial_success")
 		a.CountReplicas = m.GetUint("count_slaves")
 		a.CountValidReplicas = m.GetUint("count_valid_slaves")
 		a.CountValidReplicatingReplicas = m.GetUint("count_valid_replicating_slaves")
@@ -301,7 +303,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			a.Analysis = UnreachableMasterWithStaleSlaves
 			a.Description = "Master cannot be reached by orchestrator and has running yet stale replicas"
 			//
-		} else if a.IsMaster && !a.LastCheckValid && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
+		} else if a.IsMaster && !a.LastCheckValid && !a.LastCheckPartialSuccess && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
 			a.Analysis = UnreachableMaster
 			a.Description = "Master cannot be reached by orchestrator but it has replicating replicas; possibly a network/host issue"
 			//
