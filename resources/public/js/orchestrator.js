@@ -1,5 +1,6 @@
 var refreshIntervalSeconds = 60; // seconds
 var secondsTillRefresh = refreshIntervalSeconds;
+var isReloadingPage = false;
 var nodeModalVisible = false;
 
 reloadPageHint = {
@@ -45,8 +46,12 @@ function startRefreshTimer() {
     if (nodeModalVisible) {
       return;
     }
+    if (isReloadingPage) {
+      return;
+    }
     secondsTillRefresh = Math.max(secondsTillRefresh - 1, 0);
     if (secondsTillRefresh <= 0) {
+      isReloadingPage = true;
       $(".navbar-nav li[data-nav-page=refreshCountdown]").addClass("active");
       showLoader();
       location.reload(true);
