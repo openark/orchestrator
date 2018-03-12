@@ -94,6 +94,7 @@ type ReplicationAnalysis struct {
 	IsMaster                                  bool
 	IsCoMaster                                bool
 	LastCheckValid                            bool
+	LastCheckPartialSuccess                   bool
 	CountReplicas                             uint
 	CountValidReplicas                        uint
 	CountValidReplicatingReplicas             uint

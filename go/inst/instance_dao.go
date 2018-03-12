@@ -266,6 +266,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	readingStartTime := time.Now()
 	instance := NewInstance()
 	instanceFound := false
+	partialSuccess := false
 	foundByShowSlaveHosts := false
 	longRunningProcesses := []Process{}
 	resolvedHostname := ""
@@ -361,6 +362,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		if err != nil {
 			goto Cleanup
 		}
+		partialSuccess = true // We at least managed to read something from the server.
 		switch strings.ToLower(config.Config.MySQLHostnameResolveMethod) {
 		case "none":
 			resolvedHostname = instance.Key.Hostname
@@ -757,7 +759,7 @@ Cleanup:
 	// tried to check the instance. last_attempted_check is also
 	// updated on success by writeInstance.
 	latency.Start("backend")
-	_ = UpdateInstanceLastChecked(&instance.Key)
+	_ = UpdateInstanceLastChecked(&instance.Key, partialSuccess)
 	latency.Stop("backend")
 	return nil, err
 }
@@ -2096,6 +2098,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"port",
 		"last_checked",
 		"last_attempted_check",
+		"last_check_partial_success",
 		"uptime",
 		"server_id",
 		"server_uuid",
@@ -2157,6 +2160,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 	}
 	values[2] = "NOW()" // last_checked
 	values[3] = "NOW()" // last_attempted_check
+	values[4] = "1"     // last_check_partial_success
 
 	if updateLastSeen {
 		columns = append(columns, "last_seen")
@@ -2332,16 +2336,18 @@ func WriteInstance(instance *Instance, instanceWasActuallyFound bool, lastError 
 
 // UpdateInstanceLastChecked updates the last_check timestamp in the orchestrator backed database
 // for a given instance
-func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
+func UpdateInstanceLastChecked(instanceKey *InstanceKey, partialSuccess bool) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
         	update
         		database_instance
         	set
-        		last_checked = NOW()
+						last_checked = NOW(),
+						last_check_partial_success = ?
 			where
 				hostname = ?
 				and port = ?`,
+			partialSuccess,
 			instanceKey.Hostname,
 			instanceKey.Port,
 		)
