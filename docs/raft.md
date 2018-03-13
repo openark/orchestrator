@@ -2,7 +2,7 @@
 
 ![orchestrator HA via raft](images/orchestrator-ha--raft.png)
 
-`orchestratpr/raft` is a deployment setup where several `orchestrator` nodes communicate with each other via `raft` consensus protocol.
+`orchestrator/raft` is a deployment setup where several `orchestrator` nodes communicate with each other via `raft` consensus protocol.
 
 `orchestrator/raft` deployments solve both high-availability for `orchestrator` itself as well as solve issues with network isolation, and in particular cross-data-center network partitioning/fencing.
 
