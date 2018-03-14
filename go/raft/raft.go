@@ -128,6 +128,11 @@ func Setup(applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier
 		}
 		peerNodes = append(peerNodes, peerNode)
 	}
+	if len(peerNodes) == 1 && peerNodes[0] == raftAdvertise {
+		// To run in single node setup we will either specify an empty RaftNodes, or a single
+		// raft node that is exactly RaftAdvertise
+		peerNodes = []string{}
+	}
 	if err := store.Open(peerNodes); err != nil {
 		return log.Errorf("failed to open raft store: %s", err.Error())
 	}

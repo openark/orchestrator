@@ -68,3 +68,26 @@ to explicitly specify where a node, assuming it were the leader, would be access
 ### Backend DB
 
 A `raft` setup supports either `MySQL` or `SQLite` backend DB. See [backend](configuration-backend.md) configuration for either. Read [high-availability](high-availability.md) page for scenarios, possibilities and reasons to using either.
+
+### Single raft node setups
+
+In production, you will want using multiple `raft` nodes, such as `3` or `5`.
+
+In a testing environment you may run a `orchestrator/raft` setup composed of a single node. This node will implicitly be the leader, and will advertise raft messages to itself.
+
+To run a single-node `orchestrator/raft`, configure an empty `RaftNodes`:
+
+```json
+  "RaftNodes": [],
+```
+
+or, alternatively, specify a single node, which is identical to `RaftBind` or `RaftAdvertise`:
+
+```json
+  "RaftEnabled": true,
+  "RaftBind": "127.0.0.1",
+  "DefaultRaftPort": 10008,
+  "RaftNodes": [
+    "127.0.0.1"
+  ],
+```
