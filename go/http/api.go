@@ -2736,7 +2736,9 @@ func (this *HttpAPI) GracefulMasterTakeover(params martini.Params, r render.Rend
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	topologyRecovery, _, err := logic.GracefulMasterTakeover(clusterName)
+	designatedKey, _ := this.getInstanceKey(params["designatedHost"], params["designatedPort"])
+	// designatedKey may be empty/invalid
+	topologyRecovery, _, err := logic.GracefulMasterTakeover(clusterName, &designatedKey)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error(), Details: topologyRecovery})
 		return
@@ -3293,6 +3295,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "recover-lite/:host/:port", this.RecoverLite)
 	this.registerAPIRequest(m, "recover-lite/:host/:port/:candidateHost/:candidatePort", this.RecoverLite)
 	this.registerAPIRequest(m, "graceful-master-takeover/:host/:port", this.GracefulMasterTakeover)
+	this.registerAPIRequest(m, "graceful-master-takeover/:host/:port/:designatedHost/:designatedPort", this.GracefulMasterTakeover)
 	this.registerAPIRequest(m, "graceful-master-takeover/:clusterHint", this.GracefulMasterTakeover)
 	this.registerAPIRequest(m, "force-master-failover/:host/:port", this.ForceMasterFailover)
 	this.registerAPIRequest(m, "force-master-failover/:clusterHint", this.ForceMasterFailover)

@@ -1615,7 +1615,7 @@ func ForceMasterTakeover(clusterName string, destination *inst.Instance) (topolo
 // This function is graceful in that it will first lock down the master, then wait
 // for the designated replica to catch up with last position.
 // It will point old master at the newly promoted master at the correct coordinates, but will not start replication.
-func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecovery, promotedMasterCoordinates *inst.BinlogCoordinates, err error) {
+func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey) (topologyRecovery *TopologyRecovery, promotedMasterCoordinates *inst.BinlogCoordinates, err error) {
 	clusterMasters, err := inst.ReadClusterWriteableMaster(clusterName)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Cannot deduce cluster master for %+v; error: %+v", clusterName, err)
@@ -1634,25 +1634,51 @@ func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecov
 		return nil, nil, fmt.Errorf("Master %+v doesn't seem to have replicas", clusterMaster.Key)
 	}
 
-	if len(clusterMasterDirectReplicas) > 1 {
-		return nil, nil, fmt.Errorf("GracefulMasterTakeover: master %+v should only have one replica (making the takeover safe and simple), but has %+v. Aborting", clusterMaster.Key, len(clusterMasterDirectReplicas))
+	var designatedInstance *inst.Instance
+	if designatedKey != nil && !designatedKey.IsValid() {
+		// An empty or invalid key is as good as no key
+		designatedKey = nil
+	}
+	if designatedKey == nil {
+		// Expect a single replica.
+		if len(clusterMasterDirectReplicas) > 1 {
+			return nil, nil, fmt.Errorf("GracefulMasterTakeover: when no target instance indicated, master %+v should only have one replica (making the takeover safe and simple), but has %+v. Aborting", clusterMaster.Key, len(clusterMasterDirectReplicas))
+		}
+		designatedInstance = clusterMasterDirectReplicas[0]
+	} else {
+		// Verify designated instance is a direct replica of master
+		for _, directReplica := range clusterMasterDirectReplicas {
+			if directReplica.Key.Equals(designatedKey) {
+				designatedInstance = directReplica
+			}
+		}
+		if designatedInstance == nil {
+			return nil, nil, fmt.Errorf("GracefulMasterTakeover: indicated designated instance %+v must be directly replicating from the master %+v", *designatedKey, clusterMaster.Key)
+		}
 	}
 
-	designatedInstance := clusterMasterDirectReplicas[0]
 	if err != nil {
 		return nil, nil, err
 	}
-	masterOfDesigntaedInstance, err := inst.GetInstanceMaster(designatedInstance)
+	masterOfDesignatedInstance, err := inst.GetInstanceMaster(designatedInstance)
 	if err != nil {
 		return nil, nil, err
 	}
-	if !masterOfDesigntaedInstance.Key.Equals(&clusterMaster.Key) {
+	if !masterOfDesignatedInstance.Key.Equals(&clusterMaster.Key) {
 		return nil, nil, fmt.Errorf("Sanity check failure. It seems like the designated instance %+v does not replicate from the master %+v (designated instance's master key is %+v). This error is strange. Panicking", designatedInstance.Key, clusterMaster.Key, designatedInstance.MasterKey)
 	}
 	if !designatedInstance.HasReasonableMaintenanceReplicationLag() {
 		return nil, nil, fmt.Errorf("Desginated instance %+v seems to be lagging to much for thie operation. Aborting.", designatedInstance.Key)
 	}
-	log.Infof("Will demote %+v and promote %+v instead", clusterMaster.Key, designatedInstance.Key)
+	if len(clusterMasterDirectReplicas) > 1 {
+		log.Infof("GracefulMasterTakeover: Will let %+v take over its siblings", designatedInstance.Key)
+		relocatedReplicas, _, err, _ := inst.RelocateReplicas(&clusterMaster.Key, &designatedInstance.Key, "")
+		if len(relocatedReplicas) != len(clusterMasterDirectReplicas)-1 {
+			// We are unable to make designated instance master of all its siblings
+			return nil, nil, fmt.Errorf("GracefulMasterTakeover: desginated instance %+v cannot take over all of its siblings. Error: %+v", designatedInstance.Key, err)
+		}
+	}
+	log.Infof("GracefulMasterTakeover: Will demote %+v and promote %+v instead", clusterMaster.Key, designatedInstance.Key)
 
 	replicationUser, replicationPassword, replicationCredentialsError := inst.ReadReplicationCredentials(&designatedInstance.Key)
 
