@@ -164,7 +164,7 @@ func ReadOutdatedAgentsHosts() ([]string, error) {
 		from
 			host_agent
 		where
-			IFNULL(last_checked < now() - interval ? minute, true)
+			IFNULL(last_checked < now() - interval ? minute, 1)
 			`
 	err := db.QueryOrchestrator(query, sqlutils.Args(config.Config.AgentPollMinutes), func(m sqlutils.RowMap) error {
 		hostname := m.GetString("hostname")

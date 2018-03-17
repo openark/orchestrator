@@ -87,7 +87,7 @@ function oinstall() {
   cd  $mydir
   gofmt -s -w  go/
   rsync -qa ./resources $builddir/orchestrator${prefix}/orchestrator/
-  rsync -qa ./conf/orchestrator-sample.* $builddir/orchestrator${prefix}/orchestrator/
+  rsync -qa ./conf/orchestrator-sample*.conf.json $builddir/orchestrator${prefix}/orchestrator/
   cp etc/init.d/orchestrator.bash $builddir/orchestrator/etc/init.d/orchestrator
   chmod +x $builddir/orchestrator/etc/init.d/orchestrator
 }
@@ -134,12 +134,14 @@ function package() {
   esac
 
   echo "---"
-  if cat /etc/centos-release | grep 'CentOS release 6' ; then
-    rm ${TOPDIR:-?}/orchestrator*.deb
-    rm ${TOPDIR:-?}/orchestrator*.tar.gz
-    # n CentOD 6 box: we only want the rpms for CentOS6
-    # Add "-centos6" to the file name.
-    ls ${TOPDIR:-?}/*.rpm | while read f; do centos_file=$(echo $f | sed -r -e "s/^(.*)-${RELEASE_VERSION}(.*)/\1-centos6-${RELEASE_VERSION}\2/g") ; mv $f $centos_file ; done
+  if [[ -e /etc/centos-release ]]; then
+      if cat /etc/centos-release | grep 'CentOS release 6' ; then
+        rm ${TOPDIR:-?}/orchestrator*.deb
+        rm ${TOPDIR:-?}/orchestrator*.tar.gz
+        # n CentOD 6 box: we only want the rpms for CentOS6
+        # Add "-centos6" to the file name.
+        ls ${TOPDIR:-?}/*.rpm | while read f; do centos_file=$(echo $f | sed -r -e "s/^(.*)-${RELEASE_VERSION}(.*)/\1-centos6-${RELEASE_VERSION}\2/g") ; mv $f $centos_file ; done
+      fi
   fi
   echo "Done. Find releases in $TOPDIR"
 }

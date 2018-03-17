@@ -16,8 +16,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.box = BOX
   config.vm.box_download_insecure = true
   config.vm.box_check_update = false
-  config.vm.synced_folder '.', '/orchestrator', type: 'rsync',
-    rsync__auto: true
+  config.vm.synced_folder '.', '/orchestrator'
+  #, type: 'rsync', rsync__auto: true
 
   (0..4).each do |n|
     name = (n > 0 ? ("db" + n.to_s) : "admin")
