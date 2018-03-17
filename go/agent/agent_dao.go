@@ -461,7 +461,7 @@ func MountLV(hostname string, lv string) (Agent, error) {
 	return executeAgentCommand(hostname, fmt.Sprintf("mountlv?lv=%s", lv), nil)
 }
 
-// RemoveLV requests an agent to remvoe a snapshot
+// RemoveLV requests an agent to remove a snapshot
 func RemoveLV(hostname string, lv string) (Agent, error) {
 	return executeAgentCommand(hostname, fmt.Sprintf("removelv?lv=%s", lv), nil)
 }
@@ -547,8 +547,8 @@ func AbortSeed(seedId int64) error {
 }
 
 // PostCopy will request an agent to invoke post-copy commands
-func PostCopy(hostname string) (Agent, error) {
-	return executeAgentCommand(hostname, "post-copy", nil)
+func PostCopy(hostname, sourceHostname string) (Agent, error) {
+	return executeAgentCommand(hostname, fmt.Sprintf("post-copy/%s", sourceHostname), nil)
 }
 
 // SubmitSeedEntry submits a new seed operation entry, returning its unique ID
@@ -774,7 +774,7 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 
 	// Cleanup:
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Executing post-copy command on %s", targetHostname), "")
-	_, err = PostCopy(targetHostname)
+	_, err = PostCopy(targetHostname, sourceHostname)
 	if err != nil {
 		return updateSeedStateEntry(seedStateId, err)
 	}
