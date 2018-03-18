@@ -693,7 +693,7 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 	}
 
 	seedFromLogicalVolume := sourceAgent.LogicalVolumes[0]
-	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Mounting logical volume: %s", seedFromLogicalVolume.Path), "")
+	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("%s Mounting logical volume: %s", sourceHostname, seedFromLogicalVolume.Path), "")
 	_, err = MountLV(sourceHostname, seedFromLogicalVolume.Path)
 	if err != nil {
 		return updateSeedStateEntry(seedStateId, err)
