@@ -251,6 +251,7 @@ func replaceCommandPlaceholders(command string, topologyRecovery *TopologyRecove
 	analysisEntry := &topologyRecovery.AnalysisEntry
 	command = strings.Replace(command, "{failureType}", string(analysisEntry.Analysis), -1)
 	command = strings.Replace(command, "{failureDescription}", analysisEntry.Description, -1)
+	command = strings.Replace(command, "{command}", analysisEntry.CommandHint, -1)
 	command = strings.Replace(command, "{failedHost}", analysisEntry.AnalyzedInstanceKey.Hostname, -1)
 	command = strings.Replace(command, "{failedPort}", fmt.Sprintf("%d", analysisEntry.AnalyzedInstanceKey.Port), -1)
 	command = strings.Replace(command, "{failureCluster}", analysisEntry.ClusterDetails.ClusterName, -1)
@@ -287,6 +288,7 @@ func applyEnvironmentVariables(topologyRecovery *TopologyRecovery) []string {
 	env := goos.Environ()
 	env = append(env, fmt.Sprintf("ORC_FAILURE_TYPE=%s", string(analysisEntry.Analysis)))
 	env = append(env, fmt.Sprintf("ORC_FAILURE_DESCRIPTION=%s", analysisEntry.Description))
+	env = append(env, fmt.Sprintf("ORC_COMMAND=%s", analysisEntry.CommandHint))
 	env = append(env, fmt.Sprintf("ORC_FAILED_HOST=%s", analysisEntry.AnalyzedInstanceKey.Hostname))
 	env = append(env, fmt.Sprintf("ORC_FAILED_PORT=%d", analysisEntry.AnalyzedInstanceKey.Port))
 	env = append(env, fmt.Sprintf("ORC_FAILURE_CLUSTER=%s", analysisEntry.ClusterDetails.ClusterName))
@@ -1524,7 +1526,7 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 // ForceExecuteRecovery can be called to issue a recovery process even if analysis says there is no recovery case.
 // The caller of this function injects the type of analysis it wishes the function to assume.
 // By calling this function one takes responsibility for one's actions.
-func ForceExecuteRecovery(clusterName string, analysisCode inst.AnalysisCode, failedInstanceKey *inst.InstanceKey, candidateInstanceKey *inst.InstanceKey, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
+func ForceExecuteRecovery(clusterName string, analysisCode inst.AnalysisCode, commandHint string, failedInstanceKey *inst.InstanceKey, candidateInstanceKey *inst.InstanceKey, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
 	clusterInfo, err := inst.ReadClusterInfo(clusterName)
 	if err != nil {
 		return recoveryAttempted, topologyRecovery, err
@@ -1543,6 +1545,7 @@ func ForceExecuteRecovery(clusterName string, analysisCode inst.AnalysisCode, fa
 		}
 	}
 	analysisEntry.Analysis = analysisCode // we force this analysis
+	analysisEntry.CommandHint = commandHint
 	analysisEntry.ClusterDetails = *clusterInfo
 	analysisEntry.AnalyzedInstanceKey = *failedInstanceKey
 
@@ -1560,7 +1563,7 @@ func ForceMasterFailover(clusterName string) (topologyRecovery *TopologyRecovery
 	}
 	clusterMaster := clusterMasters[0]
 
-	recoveryAttempted, topologyRecovery, err := ForceExecuteRecovery(clusterName, inst.DeadMaster, &clusterMaster.Key, nil, false)
+	recoveryAttempted, topologyRecovery, err := ForceExecuteRecovery(clusterName, inst.DeadMaster, "force-master-failover", &clusterMaster.Key, nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1593,7 +1596,7 @@ func ForceMasterTakeover(clusterName string, destination *inst.Instance) (topolo
 	}
 	log.Infof("Will demote %+v and promote %+v instead", clusterMaster.Key, destination.Key)
 
-	recoveryAttempted, topologyRecovery, err := ForceExecuteRecovery(clusterName, inst.DeadMaster, &clusterMaster.Key, &destination.Key, false)
+	recoveryAttempted, topologyRecovery, err := ForceExecuteRecovery(clusterName, inst.DeadMaster, "force-master-takeover", &clusterMaster.Key, &destination.Key, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1670,7 +1673,7 @@ func GracefulMasterTakeover(clusterName string) (topologyRecovery *TopologyRecov
 	}
 	promotedMasterCoordinates = &designatedInstance.SelfBinlogCoordinates
 
-	recoveryAttempted, topologyRecovery, err := ForceExecuteRecovery(clusterName, inst.DeadMaster, &clusterMaster.Key, &designatedInstance.Key, false)
+	recoveryAttempted, topologyRecovery, err := ForceExecuteRecovery(clusterName, inst.DeadMaster, "graceful-master-takeover", &clusterMaster.Key, &designatedInstance.Key, false)
 	if err != nil {
 		return nil, nil, err
 	}
