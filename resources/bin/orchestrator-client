@@ -531,6 +531,12 @@ function ack_cluster_recoveries() {
   print_details
 }
 
+function ack_all_recoveries() {
+  assert_nonempty "reason" "$reason"
+  api "ack-all-recoveries?comment=$(urlencode $reason)"
+  print_details
+}
+
 function disable_global_recoveries() {
   api "disable-global-recoveries"
   print_details | jq -r .
@@ -679,6 +685,7 @@ function run_command() {
     "graceful-master-takeover") graceful_master_takeover ;;   # Gracefully discard master and promote another (direct child) instance instead, even if everything is running well
     "force-master-failover") force_master_failover ;;         # Forcibly discard master and initiate a failover, even if orchestrator doesn't see a problem. This command lets orchestrator choose the replacement master
     "ack-cluster-recoveries") ack_cluster_recoveries ;;       # Acknowledge recoveries for a given cluster; this unblocks pending future recoveries
+    "ack-all-recoveries") ack_all_recoveries ;;               # Acknowledge all recoveries
     "disable-global-recoveries") disable_global_recoveries ;; # Disallow orchestrator from performing recoveries globally
     "enable-global-recoveries") enable_global_recoveries ;;   # Allow orchestrator to perform recoveries globally
     "check-global-recoveries") check_global_recoveries ;;     # Show the global recovery configuration

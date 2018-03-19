@@ -3068,6 +3068,39 @@ func (this *HttpAPI) AcknowledgeRecovery(params martini.Params, r render.Render,
 	r.JSON(http.StatusOK, countAcknowledgedRecoveries)
 }
 
+// ClusterInfo provides details of a given cluster
+func (this *HttpAPI) AcknowledgeAllRecoveries(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+
+	comment := req.URL.Query().Get("comment")
+	if comment == "" {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("No acknowledge comment given")})
+		return
+	}
+	userId := getUserId(req, user)
+	if userId == "" {
+		userId = inst.GetMaintenanceOwner()
+	}
+	var countAcknowledgedRecoveries int64
+	var err error
+	if orcraft.IsRaftEnabled() {
+		ack := logic.NewRecoveryAcknowledgement(userId, comment)
+		ack.AllRecoveries = true
+		orcraft.PublishCommand("ack-recovery", ack)
+	} else {
+		countAcknowledgedRecoveries, err = logic.AcknowledgeAllRecoveries(userId, comment)
+	}
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, countAcknowledgedRecoveries)
+}
+
 // BlockedRecoveries reads list of currently blocked recoveries, optionally filtered by cluster name
 func (this *HttpAPI) BlockedRecoveries(params martini.Params, r render.Render, req *http.Request) {
 	blockedRecoveries, err := logic.ReadBlockedRecoveries(params["clusterName"])
@@ -3319,6 +3352,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "ack-recovery/instance/:host/:port", this.AcknowledgeInstanceRecoveries)
 	this.registerAPIRequest(m, "ack-recovery/:recoveryId", this.AcknowledgeRecovery)
 	this.registerAPIRequest(m, "ack-recovery/uid/:uid", this.AcknowledgeRecovery)
+	this.registerAPIRequest(m, "ack-all-recoveries", this.AcknowledgeAllRecoveries)
 	this.registerAPIRequest(m, "blocked-recoveries", this.BlockedRecoveries)
 	this.registerAPIRequest(m, "blocked-recoveries/cluster/:clusterName", this.BlockedRecoveries)
 	this.registerAPIRequest(m, "disable-global-recoveries", this.DisableGlobalRecoveries)
