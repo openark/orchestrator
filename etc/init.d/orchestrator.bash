@@ -54,8 +54,9 @@ start_daemon () {
 	post_start_daemon_hook 1>&2
 }
 
-# The file /etc/orchestrator_profile can be used to inject pre-service execution
+# This files can be used to inject pre-service execution
 # scripts, such as exporting variables or whatever. It's yours!
+[ -f /etc/default/orchestrator ] && . /etc/default/orchestrator
 [ -f /etc/orchestrator_profile ] && . /etc/orchestrator_profile
 
 case "$1" in
