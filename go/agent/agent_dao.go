@@ -722,8 +722,8 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("%s will now receive data in background", targetHostname), "")
 	ReceiveMySQLSeedData(targetHostname, seedId)
 
-	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Waiting some time for %s to start listening for incoming data", targetHostname), "")
-	time.Sleep(2 * time.Second)
+	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Waiting %d seconds for %s to start listening for incoming data", config.Config.SeedWaitSecondsBeforeSend, targetHostname), "")
+	time.Sleep(time.Duration(config.Config.SeedWaitSecondsBeforeSend) * time.Second)
 
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("%s will now send data to %s in background", sourceHostname, targetHostname), "")
 	SendMySQLSeedData(sourceHostname, targetHostname, seedId)
