@@ -779,7 +779,7 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 		return updateSeedStateEntry(seedStateId, err)
 	}
 
-	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Unmounting logical volume: %s", seedFromLogicalVolume.Path), "")
+	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("%s Unmounting logical volume: %s", sourceHostname, seedFromLogicalVolume.Path), "")
 	_, err = Unmount(sourceHostname)
 	if err != nil {
 		return updateSeedStateEntry(seedStateId, err)
