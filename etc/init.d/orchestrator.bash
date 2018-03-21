@@ -58,6 +58,7 @@ start_daemon () {
 # scripts, such as exporting variables or whatever. It's yours!
 [ -f /etc/default/orchestrator ] && . /etc/default/orchestrator
 [ -f /etc/orchestrator_profile ] && . /etc/orchestrator_profile
+[ -f /etc/profile.d/orchestrator ] && . /etc/profile.d/orchestrator
 
 case "$1" in
   start)
