@@ -548,7 +548,7 @@ func AbortSeed(seedId int64) error {
 
 // PostCopy will request an agent to invoke post-copy commands
 func PostCopy(hostname, sourceHostname string) (Agent, error) {
-	return executeAgentCommand(hostname, fmt.Sprintf("post-copy/%s", sourceHostname), nil)
+	return executeAgentCommand(hostname, fmt.Sprintf("post-copy/?sourceHost=%s", sourceHostname), nil)
 }
 
 // SubmitSeedEntry submits a new seed operation entry, returning its unique ID
