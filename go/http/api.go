@@ -2956,7 +2956,7 @@ func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r rende
 		return
 	}
 
-	comment := req.URL.Query().Get("comment")
+	comment := strings.TrimSpace(req.URL.Query().Get("comment"))
 	if comment == "" {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("No acknowledge comment given")})
 		return
@@ -2965,20 +2965,19 @@ func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r rende
 	if userId == "" {
 		userId = inst.GetMaintenanceOwner()
 	}
-	var countAcknowledgedRecoveries int64
 	if orcraft.IsRaftEnabled() {
 		ack := logic.NewRecoveryAcknowledgement(userId, comment)
 		ack.ClusterName = clusterName
 		orcraft.PublishCommand("ack-recovery", ack)
 	} else {
-		countAcknowledgedRecoveries, err = logic.AcknowledgeClusterRecoveries(clusterName, userId, comment)
+		_, err = logic.AcknowledgeClusterRecoveries(clusterName, userId, comment)
 	}
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Acknowledged %s recoveries on %+v", countAcknowledgedRecoveries, clusterName), Details: countAcknowledgedRecoveries})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Acknodledged cluster recoveries"), Details: clusterName})
 }
 
 // ClusterInfo provides details of a given cluster
@@ -2994,7 +2993,7 @@ func (this *HttpAPI) AcknowledgeInstanceRecoveries(params martini.Params, r rend
 		return
 	}
 
-	comment := req.URL.Query().Get("comment")
+	comment := strings.TrimSpace(req.URL.Query().Get("comment"))
 	if comment == "" {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("No acknowledge comment given")})
 		return
@@ -3003,20 +3002,19 @@ func (this *HttpAPI) AcknowledgeInstanceRecoveries(params martini.Params, r rend
 	if userId == "" {
 		userId = inst.GetMaintenanceOwner()
 	}
-	var countAcknowledgedRecoveries int64
 	if orcraft.IsRaftEnabled() {
 		ack := logic.NewRecoveryAcknowledgement(userId, comment)
 		ack.Key = instanceKey
 		orcraft.PublishCommand("ack-recovery", ack)
 	} else {
-		countAcknowledgedRecoveries, err = logic.AcknowledgeInstanceRecoveries(&instanceKey, userId, comment)
+		_, err = logic.AcknowledgeInstanceRecoveries(&instanceKey, userId, comment)
 	}
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, countAcknowledgedRecoveries)
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Acknodledged instance recoveries"), Details: instanceKey})
 }
 
 // ClusterInfo provides details of a given cluster
@@ -3027,17 +3025,21 @@ func (this *HttpAPI) AcknowledgeRecovery(params martini.Params, r render.Render,
 	}
 	var err error
 	var recoveryId int64
+	var idParam string
 
 	// Ack either via id or uid
-	uid := params["uid"]
-	if uid == "" {
-		recoveryId, err = strconv.ParseInt(params["recoveryId"], 10, 0)
+	recoveryUid := params["uid"]
+	if recoveryUid == "" {
+		idParam = params["recoveryId"]
+		recoveryId, err = strconv.ParseInt(idParam, 10, 0)
 		if err != nil {
 			Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 			return
 		}
+	} else {
+		idParam = recoveryUid
 	}
-	comment := req.URL.Query().Get("comment")
+	comment := strings.TrimSpace(req.URL.Query().Get("comment"))
 	if comment == "" {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("No acknowledge comment given")})
 		return
@@ -3046,17 +3048,16 @@ func (this *HttpAPI) AcknowledgeRecovery(params martini.Params, r render.Render,
 	if userId == "" {
 		userId = inst.GetMaintenanceOwner()
 	}
-	var countAcknowledgedRecoveries int64
 	if orcraft.IsRaftEnabled() {
 		ack := logic.NewRecoveryAcknowledgement(userId, comment)
 		ack.Id = recoveryId
-		ack.UID = uid
-		orcraft.PublishCommand("ack-recovery", ack)
+		ack.UID = recoveryUid
+		_, err = orcraft.PublishCommand("ack-recovery", ack)
 	} else {
-		if uid != "" {
-			countAcknowledgedRecoveries, err = logic.AcknowledgeRecoveryByUID(uid, userId, comment)
+		if recoveryUid != "" {
+			_, err = logic.AcknowledgeRecoveryByUID(recoveryUid, userId, comment)
 		} else {
-			countAcknowledgedRecoveries, err = logic.AcknowledgeRecovery(recoveryId, userId, comment)
+			_, err = logic.AcknowledgeRecovery(recoveryId, userId, comment)
 		}
 	}
 
@@ -3065,7 +3066,7 @@ func (this *HttpAPI) AcknowledgeRecovery(params martini.Params, r render.Render,
 		return
 	}
 
-	r.JSON(http.StatusOK, countAcknowledgedRecoveries)
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Acknodledged recovery"), Details: idParam})
 }
 
 // ClusterInfo provides details of a given cluster
@@ -3075,7 +3076,7 @@ func (this *HttpAPI) AcknowledgeAllRecoveries(params martini.Params, r render.Re
 		return
 	}
 
-	comment := req.URL.Query().Get("comment")
+	comment := strings.TrimSpace(req.URL.Query().Get("comment"))
 	if comment == "" {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("No acknowledge comment given")})
 		return
@@ -3084,21 +3085,20 @@ func (this *HttpAPI) AcknowledgeAllRecoveries(params martini.Params, r render.Re
 	if userId == "" {
 		userId = inst.GetMaintenanceOwner()
 	}
-	var countAcknowledgedRecoveries int64
 	var err error
 	if orcraft.IsRaftEnabled() {
 		ack := logic.NewRecoveryAcknowledgement(userId, comment)
 		ack.AllRecoveries = true
-		orcraft.PublishCommand("ack-recovery", ack)
+		_, err = orcraft.PublishCommand("ack-recovery", ack)
 	} else {
-		countAcknowledgedRecoveries, err = logic.AcknowledgeAllRecoveries(userId, comment)
+		_, err = logic.AcknowledgeAllRecoveries(userId, comment)
 	}
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, countAcknowledgedRecoveries)
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Acknodledged all recoveries"), Details: comment})
 }
 
 // BlockedRecoveries reads list of currently blocked recoveries, optionally filtered by cluster name

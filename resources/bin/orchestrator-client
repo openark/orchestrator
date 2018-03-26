@@ -528,13 +528,13 @@ function ack_cluster_recoveries() {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   assert_nonempty "reason" "$reason"
   api "ack-recovery/cluster/${alias:-$instance}?comment=$(urlencode $reason)"
-  print_details
+  print_details | jq -r .
 }
 
 function ack_all_recoveries() {
   assert_nonempty "reason" "$reason"
   api "ack-all-recoveries?comment=$(urlencode $reason)"
-  print_details
+  print_details | jq -r .
 }
 
 function disable_global_recoveries() {
