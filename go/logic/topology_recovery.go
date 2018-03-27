@@ -47,10 +47,11 @@ type RecoveryAcknowledgement struct {
 	Owner     string
 	Comment   string
 
-	Key         inst.InstanceKey
-	ClusterName string
-	Id          int64
-	UID         string
+	Key           inst.InstanceKey
+	ClusterName   string
+	Id            int64
+	UID           string
+	AllRecoveries bool
 }
 
 func NewRecoveryAcknowledgement(owner string, comment string) *RecoveryAcknowledgement {

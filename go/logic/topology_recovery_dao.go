@@ -391,6 +391,12 @@ func acknowledgeRecoveries(owner string, comment string, markEndRecovery bool, w
 	return rows, log.Errore(err)
 }
 
+// AcknowledgeAllRecoveries acknowledges all unacknowledged recoveries.
+func AcknowledgeAllRecoveries(owner string, comment string) (countAcknowledgedEntries int64, err error) {
+	whereClause := `1 = 1`
+	return acknowledgeRecoveries(owner, comment, false, whereClause, sqlutils.Args())
+}
+
 // AcknowledgeRecovery acknowledges a particular recovery.
 // This also implied clearing their active period, which in turn enables further recoveries on those topologies
 func AcknowledgeRecovery(recoveryId int64, owner string, comment string) (countAcknowledgedEntries int64, err error) {
