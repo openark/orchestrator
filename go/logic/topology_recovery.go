@@ -1521,20 +1521,15 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 	return recoveryAttempted, promotedReplicaKey, err
 }
 
-// ForceExecuteRecovery can be called to issue a recovery process even if analysis says there is no recovery case.
-// The caller of this function injects the type of analysis it wishes the function to assume.
-// By calling this function one takes responsibility for one's actions.
-func ForceExecuteRecovery(clusterName string, analysisCode inst.AnalysisCode, failedInstanceKey *inst.InstanceKey, candidateInstanceKey *inst.InstanceKey, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
+func forceAnalysisEntry(clusterName string, analysisCode inst.AnalysisCode, failedInstanceKey *inst.InstanceKey) (analysisEntry inst.ReplicationAnalysis, err error) {
 	clusterInfo, err := inst.ReadClusterInfo(clusterName)
 	if err != nil {
-		return recoveryAttempted, topologyRecovery, err
+		return analysisEntry, err
 	}
-
-	analysisEntry := inst.ReplicationAnalysis{}
 
 	clusterAnalysisEntries, err := inst.GetReplicationAnalysis(clusterInfo.ClusterName, true, false)
 	if err != nil {
-		return recoveryAttempted, topologyRecovery, err
+		return analysisEntry, err
 	}
 
 	for _, entry := range clusterAnalysisEntries {
@@ -1546,6 +1541,13 @@ func ForceExecuteRecovery(clusterName string, analysisCode inst.AnalysisCode, fa
 	analysisEntry.ClusterDetails = *clusterInfo
 	analysisEntry.AnalyzedInstanceKey = *failedInstanceKey
 
+	return analysisEntry, nil
+}
+
+// ForceExecuteRecovery can be called to issue a recovery process even if analysis says there is no recovery case.
+// The caller of this function injects the type of analysis it wishes the function to assume.
+// By calling this function one takes responsibility for one's actions.
+func ForceExecuteRecovery(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error) {
 	return executeCheckAndRecoverFunction(analysisEntry, candidateInstanceKey, true, skipProcesses)
 }
 
@@ -1560,7 +1562,11 @@ func ForceMasterFailover(clusterName string) (topologyRecovery *TopologyRecovery
 	}
 	clusterMaster := clusterMasters[0]
 
-	recoveryAttempted, topologyRecovery, err := ForceExecuteRecovery(clusterName, inst.DeadMaster, &clusterMaster.Key, nil, false)
+	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, &clusterMaster.Key)
+	if err != nil {
+		return nil, err
+	}
+	recoveryAttempted, topologyRecovery, err := ForceExecuteRecovery(analysisEntry, nil, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1593,7 +1599,11 @@ func ForceMasterTakeover(clusterName string, destination *inst.Instance) (topolo
 	}
 	log.Infof("Will demote %+v and promote %+v instead", clusterMaster.Key, destination.Key)
 
-	recoveryAttempted, topologyRecovery, err := ForceExecuteRecovery(clusterName, inst.DeadMaster, &clusterMaster.Key, &destination.Key, false)
+	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, &clusterMaster.Key)
+	if err != nil {
+		return nil, err
+	}
+	recoveryAttempted, topologyRecovery, err := ForceExecuteRecovery(analysisEntry, &destination.Key, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1682,6 +1692,17 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 
 	replicationUser, replicationPassword, replicationCredentialsError := inst.ReadReplicationCredentials(&designatedInstance.Key)
 
+	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, &clusterMaster.Key)
+	if err != nil {
+		return nil, nil, err
+	}
+	preGracefulTakeoverTopologyRecovery := &TopologyRecovery{
+		AnalysisEntry: analysisEntry,
+	}
+	if err := executeProcesses(config.Config.PreGracefulTakeoverProcesses, "PreGracefulTakeoverProcesses", preGracefulTakeoverTopologyRecovery, true); err != nil {
+		return nil, nil, fmt.Errorf("GracefulMasterTakeover: failed running PreGracefulTakeoverProcesses: %+v", err)
+	}
+
 	if designatedInstance, err = inst.StopSlave(&designatedInstance.Key); err != nil {
 		return nil, nil, err
 	}
@@ -1696,7 +1717,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 	}
 	promotedMasterCoordinates = &designatedInstance.SelfBinlogCoordinates
 
-	recoveryAttempted, topologyRecovery, err := ForceExecuteRecovery(clusterName, inst.DeadMaster, &clusterMaster.Key, &designatedInstance.Key, false)
+	recoveryAttempted, topologyRecovery, err := ForceExecuteRecovery(analysisEntry, &designatedInstance.Key, false)
 	if err != nil {
 		return nil, nil, err
 	}

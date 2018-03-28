@@ -49,6 +49,7 @@ Different environments require different actions taken on recovery/promotion
 
 These hooks are available for recoveries:
 
+- `PreGracefulTakeoverProcesses`: executed on planned, graceful master takeover, immediately before the master goes `read-only`.
 - `PreFailoverProcesses`: executed immediately before `orchestrator` takes recovery action. Failure (nonzero exit code) of any of these processes aborts the recovery.
   Hint: this gives you the opportunity to abort recovery based on some internal state of your system.
 - `PostMasterFailoverProcesses`: executed at the end of a successful master recovery.
@@ -62,6 +63,9 @@ A naive implementation might look like:
 
 ```json
 {
+  "PreGracefulTakeoverProcesses": [
+    "echo 'Planned takeover about to take place on {failureCluster}. Master will switch to read_only' >> /tmp/recovery.log"
+  ],
   "PreFailoverProcesses": [
     "echo 'Will recover from {failureType} on {failureCluster}' >> /tmp/recovery.log"
   ],
