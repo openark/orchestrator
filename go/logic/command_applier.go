@@ -163,6 +163,9 @@ func (applier *CommandApplier) ackRecovery(value []byte) interface{} {
 	if err != nil {
 		return log.Errore(err)
 	}
+	if ack.AllRecoveries {
+		_, err = AcknowledgeAllRecoveries(ack.Owner, ack.Comment)
+	}
 	if ack.ClusterName != "" {
 		_, err = AcknowledgeClusterRecoveries(ack.ClusterName, ack.Owner, ack.Comment)
 	}

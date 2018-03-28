@@ -1379,6 +1379,17 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(fmt.Sprintf("%s (cluster %s): %s", entry.AnalyzedInstanceKey.DisplayString(), entry.ClusterDetails.ClusterName, entry.AnalysisString()))
 			}
 		}
+	case registerCliCommand("ack-all-recoveries", "Recovery", `Acknowledge all recoveries; this unblocks pending future recoveries`):
+		{
+			if reason == "" {
+				log.Fatal("--reason option required (comment your ack)")
+			}
+			countRecoveries, err := logic.AcknowledgeAllRecoveries(inst.GetMaintenanceOwner(), reason)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(fmt.Sprintf("%d recoveries acknowldged", countRecoveries))
+		}
 	case registerCliCommand("ack-cluster-recoveries", "Recovery", `Acknowledge recoveries for a given cluster; this unblocks pending future recoveries`):
 		{
 			if reason == "" {

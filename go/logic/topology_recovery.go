@@ -47,10 +47,11 @@ type RecoveryAcknowledgement struct {
 	Owner     string
 	Comment   string
 
-	Key         inst.InstanceKey
-	ClusterName string
-	Id          int64
-	UID         string
+	Key           inst.InstanceKey
+	ClusterName   string
+	Id            int64
+	UID           string
+	AllRecoveries bool
 }
 
 func NewRecoveryAcknowledgement(owner string, comment string) *RecoveryAcknowledgement {
@@ -251,6 +252,7 @@ func replaceCommandPlaceholders(command string, topologyRecovery *TopologyRecove
 	analysisEntry := &topologyRecovery.AnalysisEntry
 	command = strings.Replace(command, "{failureType}", string(analysisEntry.Analysis), -1)
 	command = strings.Replace(command, "{failureDescription}", analysisEntry.Description, -1)
+	command = strings.Replace(command, "{command}", analysisEntry.CommandHint, -1)
 	command = strings.Replace(command, "{failedHost}", analysisEntry.AnalyzedInstanceKey.Hostname, -1)
 	command = strings.Replace(command, "{failedPort}", fmt.Sprintf("%d", analysisEntry.AnalyzedInstanceKey.Port), -1)
 	command = strings.Replace(command, "{failureCluster}", analysisEntry.ClusterDetails.ClusterName, -1)
@@ -287,6 +289,7 @@ func applyEnvironmentVariables(topologyRecovery *TopologyRecovery) []string {
 	env := goos.Environ()
 	env = append(env, fmt.Sprintf("ORC_FAILURE_TYPE=%s", string(analysisEntry.Analysis)))
 	env = append(env, fmt.Sprintf("ORC_FAILURE_DESCRIPTION=%s", analysisEntry.Description))
+	env = append(env, fmt.Sprintf("ORC_COMMAND=%s", analysisEntry.CommandHint))
 	env = append(env, fmt.Sprintf("ORC_FAILED_HOST=%s", analysisEntry.AnalyzedInstanceKey.Hostname))
 	env = append(env, fmt.Sprintf("ORC_FAILED_PORT=%d", analysisEntry.AnalyzedInstanceKey.Port))
 	env = append(env, fmt.Sprintf("ORC_FAILURE_CLUSTER=%s", analysisEntry.ClusterDetails.ClusterName))
@@ -1521,7 +1524,7 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 	return recoveryAttempted, promotedReplicaKey, err
 }
 
-func forceAnalysisEntry(clusterName string, analysisCode inst.AnalysisCode, failedInstanceKey *inst.InstanceKey) (analysisEntry inst.ReplicationAnalysis, err error) {
+func forceAnalysisEntry(clusterName string, analysisCode inst.AnalysisCode, commandHint string, failedInstanceKey *inst.InstanceKey) (analysisEntry inst.ReplicationAnalysis, err error) {
 	clusterInfo, err := inst.ReadClusterInfo(clusterName)
 	if err != nil {
 		return analysisEntry, err
@@ -1538,6 +1541,7 @@ func forceAnalysisEntry(clusterName string, analysisCode inst.AnalysisCode, fail
 		}
 	}
 	analysisEntry.Analysis = analysisCode // we force this analysis
+	analysisEntry.CommandHint = commandHint
 	analysisEntry.ClusterDetails = *clusterInfo
 	analysisEntry.AnalyzedInstanceKey = *failedInstanceKey
 
@@ -1562,7 +1566,7 @@ func ForceMasterFailover(clusterName string) (topologyRecovery *TopologyRecovery
 	}
 	clusterMaster := clusterMasters[0]
 
-	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, &clusterMaster.Key)
+	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, "force-master-failover", &clusterMaster.Key)
 	if err != nil {
 		return nil, err
 	}
@@ -1599,7 +1603,7 @@ func ForceMasterTakeover(clusterName string, destination *inst.Instance) (topolo
 	}
 	log.Infof("Will demote %+v and promote %+v instead", clusterMaster.Key, destination.Key)
 
-	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, &clusterMaster.Key)
+	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, "force-master-takeover", &clusterMaster.Key)
 	if err != nil {
 		return nil, err
 	}
@@ -1692,7 +1696,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 
 	replicationUser, replicationPassword, replicationCredentialsError := inst.ReadReplicationCredentials(&designatedInstance.Key)
 
-	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, &clusterMaster.Key)
+	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, "graceful-master-takeover", &clusterMaster.Key)
 	if err != nil {
 		return nil, nil, err
 	}

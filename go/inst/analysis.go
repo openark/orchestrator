@@ -129,6 +129,7 @@ type ReplicationAnalysis struct {
 	GTIDMode                                  string
 	MinReplicaGTIDMode                        string
 	MaxReplicaGTIDMode                        string
+	CommandHint                               string
 }
 
 type AnalysisMap map[string](*ReplicationAnalysis)
