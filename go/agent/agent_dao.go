@@ -106,9 +106,9 @@ func SubmitAgent(hostname string, port int, token string) (string, error) {
 	_, err := db.ExecOrchestrator(`
 			replace
 				into host_agent (
-					hostname, port, token, last_submitted
+					hostname, port, token, last_submitted, count_mysql_snapshots
 				) VALUES (
-					?, ?, ?, NOW()
+					?, ?, ?, NOW(), 0
 				)
 			`,
 		hostname,
