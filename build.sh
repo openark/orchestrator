@@ -134,7 +134,7 @@ function package() {
   esac
 
   echo "---"
-  if [[ -e /etc/centos-release ]]; then
+  if [[ -f /etc/centos-release ]]; then
       if cat /etc/centos-release | grep 'CentOS release 6' ; then
         rm ${TOPDIR:-?}/orchestrator*.deb
         rm ${TOPDIR:-?}/orchestrator*.tar.gz

@@ -138,7 +138,7 @@ var generateSQLBase = []string{
 		  last_checked timestamp NULL DEFAULT NULL,
 		  last_seen timestamp NULL DEFAULT NULL,
 		  mysql_port smallint(5) unsigned DEFAULT NULL,
-		  count_mysql_snapshots smallint(5) unsigned NOT NULL DEFAULT 0,
+		  count_mysql_snapshots smallint(5) unsigned NOT NULL,
 		  PRIMARY KEY (hostname)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
