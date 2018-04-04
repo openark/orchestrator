@@ -32,15 +32,19 @@ import (
 	"github.com/github/orchestrator/go/ssl"
 )
 
+// Error3159 is the error given by MySQL if TLS is required for connections
 const Error3159 = "Error 3159:"
 
+// ErrorTLSNotSupported is the error given by MySQL if the client requests TLS and the server does not support it.
+const ErrorTLSNotSupported = "TLS requested but server does not support TLS"
+
 // Track if a TLS has already been configured for topology
-var topologyTLSConfigured bool = false
+var topologyTLSConfigured bool
 
 // Track if a TLS has already been configured for Orchestrator
-var orchestratorTLSConfigured bool = false
+var orchestratorTLSConfigured bool
 
-var requireTLSCache *cache.Cache = cache.New(time.Duration(config.Config.TLSCacheTTLFactor*config.Config.InstancePollSeconds)*time.Second, time.Second)
+var requireTLSCache = cache.New(time.Duration(config.Config.TLSCacheTTLFactor*config.Config.InstancePollSeconds)*time.Second, time.Second)
 
 var readInstanceTLSCounter = metrics.NewCounter()
 var writeInstanceTLSCounter = metrics.NewCounter()
@@ -54,42 +58,100 @@ func init() {
 	metrics.Register("instance_tls.write_cache", writeInstanceTLSCacheCounter)
 }
 
-func requiresTLS(host string, port int, mysql_uri string) bool {
+// Does the host require TLS? return true if it does.
+// - determine this by storing in the database the appropriate value
+// - use a cache to avoid a lot of backend queries
+// - catch TLS requires and TLS not supported errors when connecting
+//   and adjust the settings as appropriate
+// the mysqlURI is the one _without_ TLS configuration settings
+func requiresTLS(host string, port int, mysqlURI string) bool {
+	const (
+		selectQuery = `
+			select
+				required
+			from
+				database_instance_tls
+			where
+				hostname = ?
+				and port = ?
+		`
+		insertOrUpdateQuery = `
+			insert into
+			database_instance_tls (
+				hostname, port, required
+			) values (
+				?, ?, ?
+			)
+			on duplicate key update
+			required=values(required)
+		`
+	)
+
+	var (
+		requiredInBackend      int
+		requiredWhenConnecting int
+		foundInBackend         bool
+		foundInCache           bool
+		value                  interface{}
+	)
 	cacheKey := fmt.Sprintf("%s:%d", host, port)
 
-	if value, found := requireTLSCache.Get(cacheKey); found {
+	// Check the value from the cache and return that if available
+	if value, foundInCache = requireTLSCache.Get(cacheKey); foundInCache {
 		readInstanceTLSCacheCounter.Inc(1)
-		return value.(bool)
+
+		return value.(int) != 0
 	}
 
-	required := false
-	db, _, _ := sqlutils.GetDB(mysql_uri)
-	if err := db.Ping(); err != nil && strings.Contains(err.Error(), Error3159) {
-		required = true
-	}
-
-	query := `
-			insert into
-				database_instance_tls (
-					hostname, port, required
-				) values (
-					?, ?, ?
-				)
-				on duplicate key update
-					required=values(required)
-				`
-	if _, err := ExecOrchestrator(query, host, port, required); err != nil {
+	// Check from the backend the expected value to use
+	// - note: this value may be wrong as the server configuration may have changed.
+	err := QueryOrchestrator(selectQuery, sqlutils.Args(host, port), func(m sqlutils.RowMap) error {
+		foundInBackend = true
+		requiredInBackend = m.GetInt("required")
+		return nil
+	})
+	readInstanceTLSCounter.Inc(1)
+	if err != nil {
 		log.Errore(err)
+		return requiredInBackend != 0 // this value may be wrong!
 	}
-	writeInstanceTLSCounter.Inc(1)
 
-	requireTLSCache.Set(cacheKey, required, cache.DefaultExpiration)
+	// Try to connect to the instance using the normal uri
+	db, _, _ := sqlutils.GetDB(mysqlURI)
+	err = db.Ping()
+	if err != nil {
+		// TLS required message
+		if strings.Contains(err.Error(), Error3159) {
+			requiredWhenConnecting = 1
+		} else if strings.Contains(err.Error(), ErrorTLSNotSupported) {
+			requiredWhenConnecting = 0
+		}
+	}
+
+	// update the cache
+	requireTLSCache.Set(fmt.Sprintf("%s:%d", host, port), requiredWhenConnecting, cache.DefaultExpiration)
 	writeInstanceTLSCacheCounter.Inc(1)
 
-	return required
+	// figure out if we need to update the backend database
+	if !foundInBackend || requiredInBackend != requiredWhenConnecting {
+		_, err = ExecOrchestrator(insertOrUpdateQuery, host, port, requiredWhenConnecting)
+		if err != nil {
+			log.Errore(err)
+			return requiredWhenConnecting != 0
+		}
+
+		writeInstanceTLSCounter.Inc(1)
+	}
+
+	return requiredWhenConnecting != 0
 }
 
-// Create a TLS configuration from the config supplied CA, Certificate, and Private key.
+// ForgetInstanceTLSCache removes the special TLS configuration cache entry
+func ForgetInstanceTLSCache(host string, port int) {
+	requireTLSCache.Delete(fmt.Sprintf("%s:%d", host, port))
+}
+
+// SetupMySQLTopologyTLS creates a TLS configuration from the config supplied CA, Certificate, and Private key.
 // Register the TLS config with the mysql drivers as the "topology" config
 // Modify the supplied URI to call the TLS config
 func SetupMySQLTopologyTLS(uri string) (string, error) {
@@ -117,7 +179,7 @@ func SetupMySQLTopologyTLS(uri string) (string, error) {
 	return fmt.Sprintf("%s&tls=topology", uri), nil
 }
 
-// Create a TLS configuration from the config supplied CA, Certificate, and Private key.
+// SetupMySQLOrchestratorTLS creates a TLS configuration from the config supplied CA, Certificate, and Private key.
 // Register the TLS config with the mysql drivers as the "orchestrator" config
 // Modify the supplied URI to call the TLS config
 func SetupMySQLOrchestratorTLS(uri string) (string, error) {
