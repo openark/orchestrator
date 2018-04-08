@@ -30,5 +30,4 @@ fi
 echo '* * * * * root /usr/bin/orchestrator -c discover -i db1' > /etc/cron.d/orchestrator-discovery
 
 # Discover instances
-/usr/bin/orchestrator --verbose --debug --stack -c redeploy-internal-db
 /usr/bin/orchestrator --verbose --debug --stack -c discover -i localhost
