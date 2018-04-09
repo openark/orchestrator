@@ -119,6 +119,8 @@ $ echo $master_host
 mysql-0246.dc1.domain.net
 ```
 
+We will use the `master_host` variable following.
+
 #### Using the API to show all data of a specific host
 
 ```shell
