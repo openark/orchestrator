@@ -704,12 +704,11 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			// Only need to do on masters
 			if config.Config.DetectClusterAliasQuery != "" {
 				clusterAlias := ""
-				err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
-				if err != nil {
-					clusterAlias = ""
+				if err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias); err != nil {
 					logReadTopologyInstanceError(instanceKey, "DetectClusterAliasQuery", err)
+				} else {
+					instance.SuggestedClusterAlias = clusterAlias
 				}
-				instance.SuggestedClusterAlias = clusterAlias
 			}
 		}
 		if instance.SuggestedClusterAlias == "" {
