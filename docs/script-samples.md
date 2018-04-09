@@ -1,4 +1,6 @@
+# Scripting samples
 
+This document presents scripting usage and ideas around `orchestrator`.
 
 ### show all clusters with aliases
 
