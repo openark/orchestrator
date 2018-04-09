@@ -699,16 +699,18 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	}
 
 	ReadClusterAliasOverride(instance)
-	if instance.SuggestedClusterAlias == "" && instance.ReplicationDepth == 0 && !isMaxScale {
-		// Only need to do on masters
-		if config.Config.DetectClusterAliasQuery != "" {
-			clusterAlias := ""
-			err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
-			if err != nil {
-				clusterAlias = ""
-				logReadTopologyInstanceError(instanceKey, "DetectClusterAliasQuery", err)
+	if !isMaxScale {
+		if instance.SuggestedClusterAlias == "" {
+			// Only need to do on masters
+			if config.Config.DetectClusterAliasQuery != "" {
+				clusterAlias := ""
+				err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
+				if err != nil {
+					clusterAlias = ""
+					logReadTopologyInstanceError(instanceKey, "DetectClusterAliasQuery", err)
+				}
+				instance.SuggestedClusterAlias = clusterAlias
 			}
-			instance.SuggestedClusterAlias = clusterAlias
 		}
 		if instance.SuggestedClusterAlias == "" {
 			// Not found by DetectClusterAliasQuery...
