@@ -794,6 +794,7 @@ func ReadClusterAliasOverride(instance *Instance) (err error) {
 func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 	var masterMasterKey InstanceKey
 	var masterClusterName string
+	var masterSuggestedClusterAlias string
 	var masterReplicationDepth uint
 	masterDataFound := false
 
@@ -801,6 +802,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 	query := `
 			select
 					cluster_name,
+					suggested_cluster_alias,
 					replication_depth,
 					master_host,
 					master_port
@@ -811,6 +813,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 
 	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		masterClusterName = m.GetString("cluster_name")
+		masterSuggestedClusterAlias = m.GetString("suggested_cluster_alias")
 		masterReplicationDepth = m.GetUint("replication_depth")
 		masterMasterKey.Hostname = m.GetString("master_host")
 		masterMasterKey.Port = m.GetInt("master_port")
@@ -849,6 +852,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 		} // While the other stays "1"
 	}
 	instance.ClusterName = clusterName
+	instance.SuggestedClusterAlias = masterSuggestedClusterAlias
 	instance.ReplicationDepth = replicationDepth
 	instance.IsCoMaster = isCoMaster
 	return nil
