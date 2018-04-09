@@ -324,10 +324,10 @@ $ orchestrator-client -c which-cluster-instances -alias mycluster | ccql -C ~/.m
 #### I'd like to apply changes to replication, without changing the replica's state (if it's running, I want it to keep running. If it's not running, I don't want to start replication)
 
 ```shell
-$ orchestrator-client -c restart-replica-statements -i mysql-bb00.dc1.domain.net -query "change master to _auto_position=1" | jq .[] -r
+$ orchestrator-client -c restart-replica-statements -i mysql-bb00.dc1.domain.net -query "change master to auto_position=1" | jq .[] -r
 stop slave io_thread;
 stop slave sql_thread;
-change master to _auto_position=1;
+change master to auto_position=1;
 start slave sql_thread;
 start slave io_thread;
 ```
@@ -337,13 +337,9 @@ Compare with:
 ```shell
 $ orchestrator-client -c stop-slave -i mysql-bb00.dc1.domain.net
 mysql-bb00.dc1.domain.net:3306
-```
 
-Replication now stopped. It's a fact `orchestrator` will consider:
-
-```shell
-$ orchestrator-client -c restart-replica-statements -i mysql-bb00.dc1.domain.net -query "change master to _auto_position=1" | jq .[] -r
-change master to _auto_position=1;
+$ orchestrator-client -c restart-replica-statements -i mysql-bb00.dc1.domain.net -query "change master to auto_position=1" | jq .[] -r
+change master to auto_position=1;
 ```
 
 The above just outputs statements, we need to push them back to the server:
