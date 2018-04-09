@@ -10,7 +10,7 @@ mysql-9766.dc1.domain.net:3306,cl1
 mysql-0909.dc1.domain.net:3306,olap
 mysql-0246.dc1.domain.net:3306,mycluster
 mysql-1111.dc1.domain.net:3306,oltp1
-mysql-2222.dc1.domain.net:3306,oltp2
+mysql-9002.dc1.domain.net:3306,oltp2
 mysql-3972.dc1.domain.net:3306,oltp3
 mysql-0019.dc1.domain.net:3306,oltp4
 ```
