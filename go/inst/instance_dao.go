@@ -699,16 +699,17 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	}
 
 	ReadClusterAliasOverride(instance)
-	if instance.SuggestedClusterAlias == "" && instance.ReplicationDepth == 0 && !isMaxScale {
-		// Only need to do on masters
-		if config.Config.DetectClusterAliasQuery != "" {
-			clusterAlias := ""
-			err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
-			if err != nil {
-				clusterAlias = ""
-				logReadTopologyInstanceError(instanceKey, "DetectClusterAliasQuery", err)
+	if !isMaxScale {
+		if instance.SuggestedClusterAlias == "" {
+			// Only need to do on masters
+			if config.Config.DetectClusterAliasQuery != "" {
+				clusterAlias := ""
+				if err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias); err != nil {
+					logReadTopologyInstanceError(instanceKey, "DetectClusterAliasQuery", err)
+				} else {
+					instance.SuggestedClusterAlias = clusterAlias
+				}
 			}
-			instance.SuggestedClusterAlias = clusterAlias
 		}
 		if instance.SuggestedClusterAlias == "" {
 			// Not found by DetectClusterAliasQuery...
@@ -793,6 +794,7 @@ func ReadClusterAliasOverride(instance *Instance) (err error) {
 func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 	var masterMasterKey InstanceKey
 	var masterClusterName string
+	var masterSuggestedClusterAlias string
 	var masterReplicationDepth uint
 	masterDataFound := false
 
@@ -800,6 +802,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 	query := `
 			select
 					cluster_name,
+					suggested_cluster_alias,
 					replication_depth,
 					master_host,
 					master_port
@@ -810,6 +813,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 
 	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		masterClusterName = m.GetString("cluster_name")
+		masterSuggestedClusterAlias = m.GetString("suggested_cluster_alias")
 		masterReplicationDepth = m.GetUint("replication_depth")
 		masterMasterKey.Hostname = m.GetString("master_host")
 		masterMasterKey.Port = m.GetInt("master_port")
@@ -848,6 +852,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 		} // While the other stays "1"
 	}
 	instance.ClusterName = clusterName
+	instance.SuggestedClusterAlias = masterSuggestedClusterAlias
 	instance.ReplicationDepth = replicationDepth
 	instance.IsCoMaster = isCoMaster
 	return nil
