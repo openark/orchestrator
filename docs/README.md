@@ -16,6 +16,7 @@
 - [Using the web interface](using-the-web-interface.md)
 - [Using the web API](using-the-web-api.md): achieving automation via HTTP GET requests
 - [Using orchestrator-client](orchestrator-client.md): a no binary/config needed script that wraps API calls
+- [Scripting samples](script-samples.md)
 
 #### Deployment
 - [High availability](high-availability.md): making `orchestrator` highly available

@@ -620,6 +620,7 @@ func formatEventCleanly(event BinlogEvent, length *int) string {
 
 // Only do special filtering if instance is MySQL-5.7 and other
 // is MySQL-5.6 and in pseudo-gtid mode.
+// returns applyInstanceSpecialFiltering, applyOtherSpecialFiltering, err
 func special56To57filterProcessing(instance *Instance, other *Instance) (bool, bool, error) {
 	// be paranoid
 	if instance == nil || other == nil {
@@ -633,17 +634,20 @@ func special56To57filterProcessing(instance *Instance, other *Instance) (bool, b
 	// to check the instance's master.  To avoid this do some
 	// preliminary checks first to avoid the "master" access
 	// unless absolutely needed.
-
 	if instance.LogBinEnabled || // instance writes binlogs (not relay logs)
 		instance.FlavorNameAndMajorVersion() != "MySQL-5.7" || // instance NOT 5.7 replica
-		other.FlavorNameAndMajorVersion() != "MySQL-5.7" { // new master is NOT  5.7
+		other.FlavorNameAndMajorVersion() != "MySQL-5.7" { // new master is NOT 5.7
 		return filterInstance, false /* good exit status avoiding checking master */, nil
 	}
 
 	// We need to check if the master is 5.6
-	master, err := GetInstanceMaster(instance)
+	// - Do not call GetInstanceMaster() as that requires the
+	//   master to be available, and this code may be called
+	//   during a master/intermediate master failover when the
+	//   master may not actually be reachable.
+	master, _, err := ReadInstance(&instance.MasterKey)
 	if err != nil {
-		return false, false, log.Errorf("special56To57filterProcessing: can not GetInstanceMaster() for %+v. error=%+v", instance.Key, err)
+		return false, false, log.Errorf("special56To57filterProcessing: ReadInstance(%+v) fails: %+v", instance.MasterKey, err)
 	}
 
 	filterOther := master.FlavorNameAndMajorVersion() == "MySQL-5.6" // master(instance) == 5.6
