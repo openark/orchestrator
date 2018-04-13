@@ -1648,29 +1648,11 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 		return nil, nil, fmt.Errorf("Master %+v doesn't seem to have replicas", clusterMaster.Key)
 	}
 
-	var designatedInstance *inst.Instance
-	if designatedKey != nil && !designatedKey.IsValid() {
-		// An empty or invalid key is as good as no key
-		designatedKey = nil
-	}
-	if designatedKey == nil {
-		// Expect a single replica.
-		if len(clusterMasterDirectReplicas) > 1 {
-			return nil, nil, fmt.Errorf("GracefulMasterTakeover: when no target instance indicated, master %+v should only have one replica (making the takeover safe and simple), but has %+v. Aborting", clusterMaster.Key, len(clusterMasterDirectReplicas))
-		}
-		designatedInstance = clusterMasterDirectReplicas[0]
-	} else {
-		// Verify designated instance is a direct replica of master
-		for _, directReplica := range clusterMasterDirectReplicas {
-			if directReplica.Key.Equals(designatedKey) {
-				designatedInstance = directReplica
-			}
-		}
-		if designatedInstance == nil {
-			return nil, nil, fmt.Errorf("GracefulMasterTakeover: indicated designated instance %+v must be directly replicating from the master %+v", *designatedKey, clusterMaster.Key)
-		}
+	if len(clusterMasterDirectReplicas) > 1 {
+		return nil, nil, fmt.Errorf("GracefulMasterTakeover: master %+v should only have one replica (making the takeover safe and simple), but has %+v. Aborting", clusterMaster.Key, len(clusterMasterDirectReplicas))
 	}
 
+	designatedInstance := clusterMasterDirectReplicas[0]
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1684,15 +1666,8 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 	if !designatedInstance.HasReasonableMaintenanceReplicationLag() {
 		return nil, nil, fmt.Errorf("Desginated instance %+v seems to be lagging to much for thie operation. Aborting.", designatedInstance.Key)
 	}
-	if len(clusterMasterDirectReplicas) > 1 {
-		log.Infof("GracefulMasterTakeover: Will let %+v take over its siblings", designatedInstance.Key)
-		relocatedReplicas, _, err, _ := inst.RelocateReplicas(&clusterMaster.Key, &designatedInstance.Key, "")
-		if len(relocatedReplicas) != len(clusterMasterDirectReplicas)-1 {
-			// We are unable to make designated instance master of all its siblings
-			return nil, nil, fmt.Errorf("GracefulMasterTakeover: desginated instance %+v cannot take over all of its siblings. Error: %+v", designatedInstance.Key, err)
-		}
-	}
-	log.Infof("GracefulMasterTakeover: Will demote %+v and promote %+v instead", clusterMaster.Key, designatedInstance.Key)
+
+	log.Infof("Will demote %+v and promote %+v instead", clusterMaster.Key, designatedInstance.Key)
 
 	replicationUser, replicationPassword, replicationCredentialsError := inst.ReadReplicationCredentials(&designatedInstance.Key)
 
