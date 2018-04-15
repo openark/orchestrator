@@ -164,7 +164,7 @@ Note that manual recovery (e.g. `orchestrator-client -c recover`) overrides down
 `orchestrator` supports hooks -- external scripts invoked through the recovery process. These are arrays of commands invoked via shell, in particular `bash`. See hook configuration details in [recovery configuration](configuration-recovery.md#hooks)
 
 - `OnFailureDetectionProcesses`: described in [failure detection](failure-detection.md).
-- `PreGracefulTakeoverProcesses`
+- `PreGracefulTakeoverProcesses`: invoked on `graceful-master-takeover` command, before master goes `read-only`.
 - `PreFailoverProcesses`
 - `PostMasterFailoverProcesses`
 - `PostIntermediateMasterFailoverProcesses`
