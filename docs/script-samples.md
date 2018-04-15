@@ -349,3 +349,35 @@ The above just outputs statements, we need to push them back to the server:
 ```shell
 orchestrator-client -c restart-replica-statements -i mysql-bb00.dc1.domain.net -query "change master to auto_position=1" | jq .[] -r | mysql -h mysql-bb00.dc1.domain.net
 ```
+
+#### In which DC (data center) is a specific instance?
+
+This and the next questions assume either `DetectDataCenterQuery` or `DataCenterPattern` are configured.
+
+```shell
+$ orchestrator-client -c api -path instance/mysql-bb00.dc1.domain.net/3306 | jq '.DataCenter'
+dc1
+```
+
+#### In which DCs is a cluster deployed, and how many hosts in each DC?
+
+```shell
+$ orchestrator-client -c api -path cluster/mycluster | jq '.[].DataCenter' -r | sort | uniq -c
+  4 dc1
+  3 dc2
+```
+
+#### Which replicas are replicating cross DC?
+
+```shell
+$ orchestrator-client -c api -path cluster/mycluster |
+    jq '.[] | select(.MasterKey.Hostname != "") |
+        (.Key.Hostname + ":" + (.Key.Port | tostring) + " " + .DataCenter + " " + .MasterKey.Hostname + "/" + (.MasterKey.Port | tostring))' -r |
+    while read h dc m ; do
+      orchestrator-client -c api -path "instance/$m" | jq '.DataCenter' -r |
+        { read master_dc ; [ "$master_dc" != "$dc" ] && echo $h ; } ;
+    done
+
+mysql-bb00.dc1.domain.net:3306
+mysql-8181.dc2.domain.net:3306
+```
