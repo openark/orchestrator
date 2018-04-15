@@ -104,6 +104,9 @@
   "OnFailureDetectionProcesses": [
     "echo 'Detected {failureType} on {failureCluster}. Affected replicas: {countSlaves}' >> /tmp/recovery.log"
   ],
+  "PreGracefulTakeoverProcesses": [
+    "echo 'Planned takeover about to take place on {failureCluster}. Master will switch to read_only' >> /tmp/recovery.log"
+  ],
   "PreFailoverProcesses": [
     "echo 'Will recover from {failureType} on {failureCluster}' >> /tmp/recovery.log"
   ],
