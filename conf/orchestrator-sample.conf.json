@@ -120,6 +120,9 @@
   "PostIntermediateMasterFailoverProcesses": [
     "echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
   ],
+  "PostGracefulTakeoverProcesses": [
+    "echo 'Planned takeover complete' >> /tmp/recovery.log"
+  ],
   "CoMasterRecoveryMustPromoteOtherCoMaster": true,
   "DetachLostSlavesAfterMasterFailover": true,
   "ApplyMySQLPromotionAfterMasterFailover": false,

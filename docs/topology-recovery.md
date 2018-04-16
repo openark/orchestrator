@@ -170,3 +170,4 @@ Note that manual recovery (e.g. `orchestrator-client -c recover`) overrides down
 - `PostIntermediateMasterFailoverProcesses`
 - `PostFailoverProcesses`
 - `PostUnsuccessfulFailoverProcesses`
+- `PostGracefulTakeoverProcesses`: executed on planned, graceful master takeover, after the old master is positioned under the newly promoted master.

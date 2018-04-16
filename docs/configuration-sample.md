@@ -134,7 +134,9 @@ The following is a production configuration file, with some details redacted.
     "/redacted/do-something # e.g. kick pt-heartbeat on promoted master"
   ],
   "PostIntermediateMasterFailoverProcesses": [
-
+  ],
+  "PostGracefulTakeoverProcesses": [
+    "echo 'Planned takeover complete' >> /tmp/recovery.log"
   ],
   "CoMasterRecoveryMustPromoteOtherCoMaster": true,
   "DetachLostSlavesAfterMasterFailover": true,

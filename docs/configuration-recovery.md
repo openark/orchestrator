@@ -56,6 +56,7 @@ These hooks are available for recoveries:
 - `PostIntermediateMasterFailoverProcesses`: executed at the end of a successful intermediate master recovery.
 - `PostFailoverProcesses`: executed at the end of any successful recovery (including and adding to the above two).
 - `PostUnsuccessfulFailoverProcesses`: executed at the end of any unsuccessful recovery.
+- `PostGracefulTakeoverProcesses`: executed on planned, graceful master takeover, after the old master is positioned under the newly promoted master.
 
 All of the above are lists of commands which `orchestrator` executes sequentially, in order of definition.
 
@@ -77,6 +78,9 @@ A naive implementation might look like:
     "echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:     {failedPort}; Promoted: {successorHost}:{successorPort}' >> /tmp/recovery.log"
   ],
   "PostIntermediateMasterFailoverProcesses": [],
+  "PostGracefulTakeoverProcesses": [
+    "echo 'Planned takeover complete' >> /tmp/recovery.log"
+  ],
 }
 ```
 
