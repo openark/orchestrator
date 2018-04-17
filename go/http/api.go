@@ -2736,7 +2736,7 @@ func (this *HttpAPI) GracefulMasterTakeover(params martini.Params, r render.Rend
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	topologyRecovery, _, err := logic.GracefulMasterTakeover(clusterName)
+	topologyRecovery, _, err := logic.GracefulMasterTakeover(clusterName, nil)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error(), Details: topologyRecovery})
 		return

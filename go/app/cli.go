@@ -1361,7 +1361,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("graceful-master-takeover", "Recovery", `Gracefully discard master and promote another (direct child) instance instead, even if everything is running well`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
-			topologyRecovery, promotedMasterCoordinates, err := logic.GracefulMasterTakeover(clusterName)
+			topologyRecovery, promotedMasterCoordinates, err := logic.GracefulMasterTakeover(clusterName, nil)
 			if err != nil {
 				log.Fatale(err)
 			}
