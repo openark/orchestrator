@@ -1754,6 +1754,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 			err = enableSSLErr
 		}
 	}
+	executeProcesses(config.Config.PostGracefulTakeoverProcesses, "PostGracefulTakeoverProcesses", topologyRecovery, false)
 
 	return topologyRecovery, promotedMasterCoordinates, err
 }
