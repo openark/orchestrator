@@ -1361,7 +1361,10 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("graceful-master-takeover", "Recovery", `Gracefully promote a new master. Either indicate identity of new master via '-d designated.instance.com' or setup replication tree to have a single direct replica to the master.`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
-			topologyRecovery, promotedMasterCoordinates, err := logic.GracefulMasterTakeover(clusterName, nil)
+			if destinationKey != nil {
+				validateInstanceIsFound(destinationKey)
+			}
+			topologyRecovery, promotedMasterCoordinates, err := logic.GracefulMasterTakeover(clusterName, destinationKey)
 			if err != nil {
 				log.Fatale(err)
 			}
