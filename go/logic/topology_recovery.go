@@ -1659,6 +1659,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 			return nil, nil, fmt.Errorf("GracefulMasterTakeover: when no target instance indicated, master %+v should only have one replica (making the takeover safe and simple), but has %+v. Aborting", clusterMaster.Key, len(clusterMasterDirectReplicas))
 		}
 		designatedInstance = clusterMasterDirectReplicas[0]
+		log.Infof("GracefulMasterTakeover: designated master deduced to be %+v", designatedInstance.Key)
 	} else {
 		// Verify designated instance is a direct replica of master
 		for _, directReplica := range clusterMasterDirectReplicas {
@@ -1669,11 +1670,9 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 		if designatedInstance == nil {
 			return nil, nil, fmt.Errorf("GracefulMasterTakeover: indicated designated instance %+v must be directly replicating from the master %+v", *designatedKey, clusterMaster.Key)
 		}
+		log.Infof("GracefulMasterTakeover: designated master instructed to be %+v", designatedInstance.Key)
 	}
 
-	if err != nil {
-		return nil, nil, err
-	}
 	masterOfDesignatedInstance, err := inst.GetInstanceMaster(designatedInstance)
 	if err != nil {
 		return nil, nil, err
