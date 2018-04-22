@@ -1689,7 +1689,25 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 		relocatedReplicas, _, err, _ := inst.RelocateReplicas(&clusterMaster.Key, &designatedInstance.Key, "")
 		if len(relocatedReplicas) != len(clusterMasterDirectReplicas)-1 {
 			// We are unable to make designated instance master of all its siblings
-			return nil, nil, fmt.Errorf("GracefulMasterTakeover: desginated instance %+v cannot take over all of its siblings. Error: %+v", designatedInstance.Key, err)
+			relocatedReplicasKeyMap := inst.NewInstanceKeyMap()
+			relocatedReplicasKeyMap.AddInstances(relocatedReplicas)
+			// Let's see which replicas have not been relocated
+			for _, directReplica := range clusterMasterDirectReplicas {
+				if relocatedReplicasKeyMap.HasKey(directReplica.Key) {
+					// relocated, good
+					continue
+				}
+				if directReplica.Key.Equals(&designatedInstance.Key) {
+					// obviously we skip this one
+					continue
+				}
+				if directReplica.IsDowntimed {
+					// obviously we skip this one
+					log.Warningf("GracefulMasterTakeover: unable to relocate %+v below designated %+v, but since it is downtimed (downtime reason: %s) I will proceed", directReplica.Key, designatedInstance.Key, directReplica.DowntimeReason)
+					continue
+				}
+				return nil, nil, fmt.Errorf("GracefulMasterTakeover: desginated instance %+v cannot take over all of its siblings. Error: %+v", designatedInstance.Key, err)
+			}
 		}
 	}
 	log.Infof("GracefulMasterTakeover: Will demote %+v and promote %+v instead", clusterMaster.Key, designatedInstance.Key)
