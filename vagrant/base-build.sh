@@ -1,8 +1,8 @@
 #!/bin/bash
-
+set -xeuo pipefail
 if [[ -e /etc/redhat-release ]]; then
   # Percona's Yum Repository
-  yum -d 0 -y install http://www.percona.com/downloads/percona-release/redhat/0.1-3/percona-release-0.1-3.noarch.rpm epel-release
+  yum -d 0 -y install http://www.percona.com/downloads/percona-release/redhat/0.1-4/percona-release-0.1-4.noarch.rpm epel-release
 
   # All the project dependencies to build plus some utilities
   # No reason not to install this stuff in all the places :)
@@ -11,6 +11,10 @@ if [[ -e /etc/redhat-release ]]; then
   gem install json --version 1.8.6
   # Pin to 1.4 due to 1.5 no longer working on EL6
   gem install fpm --version 1.4
+
+  echo "PATH=$PATH:/usr/local/bin" | sudo tee -a /etc/environment
+  export PATH="PATH=$PATH:/usr/local/bin"
+
 
   # Build orchestrator and orchestrator agent
   mkdir -p /home/vagrant/go/{bin,pkg,src} /tmp/orchestrator-release
@@ -26,7 +30,10 @@ if [[ -e /etc/redhat-release ]]; then
   chown -R vagrant.vagrant /home/vagrant /tmp/orchestrator-release
 
   # Setup mysql
+  set +e
   /sbin/chkconfig mysql on
+  /sbin/chkconfig mysqld on
+  set -e
 
   if [[ -e "/orchestrator/vagrant/${HOSTNAME}-my.cnf" ]]; then
     rm -f /etc/my.cnf
@@ -41,13 +48,13 @@ elif [[ -e /etc/debian_version ]]; then
 
 
   # Percona's Apt Repository
-  sudo apt-key adv --keyserver keys.gnupg.net --recv-keys 1C4CBDCDCD2EFD2A
+  sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 1C4CBDCDCD2EFD2A 9334A25F8507EFA5
   echo "deb http://repo.percona.com/apt "$(lsb_release -sc)" main" | sudo tee /etc/apt/sources.list.d/percona.list
   sudo apt-get -y update
   sudo apt-get -y install debconf-utils
   echo "golang-go golang-go/dashboard boolean true" | sudo debconf-set-selections
-  echo "percona-server-server-5.6 percona-server-server/root_password password vagrant" | sudo debconf-set-selections
-  echo "percona-server-server-5.6 percona-server-server/root_password_again password vagrant" | sudo debconf-set-selections
+  echo percona-server-server-5.6 percona-server-server/root_password password "" | sudo debconf-set-selections
+  echo percona-server-server-5.6 percona-server-server/root_password_again password "" | sudo debconf-set-selections
   export DEBIAN_FRONTEND=noninteractive
 
   # No reason not to install this stuff in all the places :)
@@ -56,24 +63,24 @@ elif [[ -e /etc/debian_version ]]; then
 
   # add the mysql community packages
   # from https://dev.mysql.com/doc/mysql-apt-repo-quick-guide/en/
-  sudo apt-key adv --keyserver pgp.mit.edu --recv-keys 5072E1F5
+  sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 5072E1F5 8C718D3B5072E1F5
   export CODENAME=$(/usr/bin/lsb_release -c | cut -f2)
   echo "deb http://repo.mysql.com/apt/ubuntu/ ${CODENAME} mysql-5.7" | sudo tee /etc/apt/sources.list.d/mysql.list
   apt-get -y update
-  echo "mysql-community-server mysql-community-server/root-pass password vagrant" | sudo debconf-set-selections
-  echo "mysql-community-server mysql-community-server/re-root-pass password vagrant" | sudo debconf-set-selections
+  echo mysql-community-server mysql-community-server/root-pass password "" | sudo debconf-set-selections
+  echo mysql-community-server mysql-community-server/re-root-pass password "" | sudo debconf-set-selections
   apt-get -y --force-yes install mysql-server
   chmod a+w /var/log
 
   # All the project dependencies to build
-  sudo apt-get -y install ruby-dev gcc git rubygems rpm jq
+  sudo apt-get -y install ruby-dev gcc git rubygems rpm jq make
   # Jump though some hoops to get a non-decrepit version of golang
-  sudo apt-get remove golang-go
+  sudo apt-get remove -y golang-go
   cd /tmp
-  wget --quiet "https://redirector.gvt1.com/edgedl/go/go1.9.2.linux-amd64.tar.gz"
-  sudo tar -C /usr/local -xzf go1.9.2.linux-amd64.tar.gz
-  echo "PATH=$PATH:/usr/local/go/bin" | sudo tee -a /etc/environment
-  export PATH="PATH=$PATH:/usr/local/go/bin"
+  wget -c --quiet "https://redirector.gvt1.com/edgedl/go/go1.9.4.linux-amd64.tar.gz"
+  sudo tar -C /usr/local -xzf go1.9.4.linux-amd64.tar.gz
+  echo "PATH=$PATH:/usr/local/go/bin:/usr/local/bin" | sudo tee -a /etc/environment
+  export PATH="PATH=$PATH:/usr/local/go/bin:/usr/local/bin"
 
   # newest versions of java aren't compatable with the installed version of ruby (1.8.7)
   gem install json --version 1.8.6
@@ -100,7 +107,7 @@ elif [[ -e /etc/debian_version ]]; then
   /usr/sbin/service mysql start
 fi
 
-mysql -uroot -pvagrant -e "grant all on *.* to 'root'@'localhost' identified by ''"
+sudo mysql -e "grant all on *.* to 'root'@'localhost' identified by ''"
 cat <<-EOF | mysql -u root
 CREATE DATABASE IF NOT EXISTS orchestrator;
 GRANT ALL PRIVILEGES ON orchestrator.* TO 'orc_client_user'@'%' IDENTIFIED BY 'orc_client_password';
@@ -119,7 +126,9 @@ cat <<-EOF >> /etc/hosts
 EOF
 
 if [[ -e /etc/redhat-release ]]; then
+  set +e
   sudo service iptables stop
+  set -e
 fi
 
 if [[ $HOSTNAME == 'admin' ]]; then
