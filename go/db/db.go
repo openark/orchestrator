@@ -172,7 +172,9 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 		if maxIdleConns < 10 {
 			maxIdleConns = 10
 		}
-		log.Infof("Connecting to backend: maxConnections: %d, maxIdleConns: %d",
+		log.Infof("Connecting to backend %s:%d: maxConnections: %d, maxIdleConns: %d",
+			config.Config.MySQLOrchestratorHost,
+			config.Config.MySQLOrchestratorPort,
 			config.Config.MySQLOrchestratorMaxPoolConnections,
 			maxIdleConns)
 		db.SetMaxIdleConns(maxIdleConns)
