@@ -140,7 +140,10 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 				    	) AS downtime_remaining_seconds,
 			    	MIN(
 				    		master_instance.binlog_server
-				    	) AS is_binlog_server,
+							) AS is_binlog_server,
+						MIN (
+								master_instance.event_scheduler_enabled
+							) AS event_scheduler_enabled,
 			    	MIN(
 				    		master_instance.pseudo_gtid
 				    	) AS is_pseudo_gtid,
@@ -262,6 +265,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		a.DowntimeEndTimestamp = m.GetString("downtime_end_timestamp")
 		a.DowntimeRemainingSeconds = m.GetInt("downtime_remaining_seconds")
 		a.IsBinlogServer = m.GetBool("is_binlog_server")
+		a.EventSchedulerEnabled = m.GetBool("event_scheduler_enabled")
 		a.ClusterDetails.ReadRecoveryInfo()
 
 		a.SlaveHosts = *NewInstanceKeyMap()
