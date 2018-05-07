@@ -357,8 +357,8 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		}
 
 		var mysqlHostname, mysqlReportHost string
-		err = db.QueryRow("select @@global.hostname, ifnull(@@global.report_host, ''), @@global.server_id, @@global.version, @@global.version_comment, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
-			&mysqlHostname, &mysqlReportHost, &instance.ServerID, &instance.Version, &instance.VersionComment, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
+		err = db.QueryRow("select @@global.hostname, ifnull(@@global.report_host, ''), @@global.server_id, @@global.version, @@global.version_comment, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates, @@global.event_scheduler = 'ON'").Scan(
+			&mysqlHostname, &mysqlReportHost, &instance.ServerID, &instance.Version, &instance.VersionComment, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled, &instance.EventSchedulerEnabled)
 		if err != nil {
 			goto Cleanup
 		}
@@ -968,6 +968,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.SemiSyncEnforced = m.GetBool("semi_sync_enforced")
 	instance.SemiSyncMasterEnabled = m.GetBool("semi_sync_master_enabled")
 	instance.SemiSyncReplicaEnabled = m.GetBool("semi_sync_replica_enabled")
+	instance.EventSchedulerEnabled = m.GetBool("event_scheduler_enabled")
 	instance.ReplicationDepth = m.GetUint("replication_depth")
 	instance.IsCoMaster = m.GetBool("is_co_master")
 	instance.ReplicationCredentialsAvailable = m.GetBool("replication_credentials_available")
@@ -2155,6 +2156,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"semi_sync_enforced",
 		"semi_sync_master_enabled",
 		"semi_sync_replica_enabled",
+		"event_scheduler_enabled",
 		"instance_alias",
 		"last_discovery_latency",
 	}
@@ -2229,6 +2231,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.SemiSyncEnforced)
 		args = append(args, instance.SemiSyncMasterEnabled)
 		args = append(args, instance.SemiSyncReplicaEnabled)
+		args = append(args, instance.EventSchedulerEnabled)
 		args = append(args, instance.InstanceAlias)
 		args = append(args, instance.LastDiscoveryLatency.Nanoseconds())
 	}
