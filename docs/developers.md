@@ -71,8 +71,8 @@ No special setup is required. Make sure to configure database file path.
 Once your backend MySQL setup is complete, issue:
 
     CREATE DATABASE IF NOT EXISTS orchestrator;
-    GRANT ALL PRIVILEGES ON `orchestrator`.* TO 'orchestrator'@'127.0.0.1'
-    IDENTIFIED BY 'orch_backend_password';
+    CREATE USER 'orchestrator'@'127.0.0.1' IDENTIFIED BY 'orch_backend_password';
+    GRANT ALL PRIVILEGES ON `orchestrator`.* TO 'orchestrator'@'127.0.0.1';
 
 `orchestrator` uses a configuration file whose search path is either `/etc/orchestrator.conf.json`,  `conf/orchestrator.conf.json` or `orchestrator.conf.json`.
 The repository includes a file called `conf/orchestrator-sample.conf.json` with some basic settings. Issue:
@@ -114,8 +114,8 @@ Now to make stuff interesting.
 For `orchestrator` to detect your replication topologies, it must also have an account on each and every topology. At this stage this has to be the
 same account (same user, same password) for all topologies. On each of your masters, issue the following:
 
-    GRANT SUPER, PROCESS, REPLICATION SLAVE, RELOAD ON *.*
-    TO 'orchestrator'@'orch_host' IDENTIFIED BY 'orch_topology_password';
+    CREATE USER 'orchestrator'@'orch_host' IDENTIFIED BY 'orch_topology_password';
+    GRANT SUPER, PROCESS, REPLICATION SLAVE, RELOAD ON *.* TO 'orchestrator'@'orch_host';
 
 > REPLICATION SLAVE is required if you intend to use [Pseudo GTID](#pseudo-gtid)
 
