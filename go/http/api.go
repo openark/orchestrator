@@ -1437,6 +1437,48 @@ func (this *HttpAPI) SetWriteable(params martini.Params, r render.Render, req *h
 	Respond(r, &APIResponse{Code: OK, Message: "Server set as writeable", Details: instance})
 }
 
+// DisableEventScheduler
+func (this *HttpAPI) DisableEventScheduler(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, err := inst.SetEventScheduler(&instanceKey, false)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: "Event scheduler disabled", Details: instance})
+}
+
+// EnableEventScheduler
+func (this *HttpAPI) EnableEventScheduler(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, err := inst.SetEventScheduler(&instanceKey, true)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: "Event scheduler enabled", Details: instance})
+}
+
 // KillQuery kills a query running on a server
 func (this *HttpAPI) KillQuery(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -3258,6 +3300,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "set-read-only/:host/:port", this.SetReadOnly)
 	this.registerAPIRequest(m, "set-writeable/:host/:port", this.SetWriteable)
 	this.registerAPIRequest(m, "kill-query/:host/:port/:process", this.KillQuery)
+	this.registerAPIRequest(m, "disable-event-scheduler/:host/:port", this.DisableEventScheduler)
+	this.registerAPIRequest(m, "enable-event-scheduler/:host/:port", this.EnableEventScheduler)
 
 	// Binary logs:
 	this.registerAPIRequest(m, "last-pseudo-gtid/:host/:port", this.LastPseudoGTID)
