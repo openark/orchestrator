@@ -141,7 +141,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			    	MIN(
 				    		master_instance.binlog_server
 							) AS is_binlog_server,
-						MIN (
+						MIN(
 								master_instance.event_scheduler_enabled
 							) AS event_scheduler_enabled,
 			    	MIN(
