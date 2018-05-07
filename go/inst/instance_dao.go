@@ -598,6 +598,33 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		}()
 	}
 
+	if instance.IsNDB() {
+		// Discover by ndbinfo about MySQL Cluster SQL nodes
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			err := sqlutils.QueryRowsMap(db, `
+      	select
+      		substring(service_URI,9) mysql_host
+      	from
+      		ndbinfo.processes
+      	where
+          process_name='mysqld'
+  		`,
+				func(m sqlutils.RowMap) error {
+					cname, resolveErr := ResolveHostname(m.GetString("mysql_host"))
+					if resolveErr != nil {
+						logReadTopologyInstanceError(instanceKey, "ResolveHostname: ndbinfo", resolveErr)
+					}
+					replicaKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
+					instance.AddReplicaKey(&replicaKey)
+					return err
+				})
+
+			logReadTopologyInstanceError(instanceKey, "ndbinfo", err)
+		}()
+	}
+
 	if config.Config.DetectDataCenterQuery != "" && !isMaxScale {
 		waitGroup.Add(1)
 		go func() {
