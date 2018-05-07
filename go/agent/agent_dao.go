@@ -106,9 +106,9 @@ func SubmitAgent(hostname string, port int, token string) (string, error) {
 	_, err := db.ExecOrchestrator(`
 			replace
 				into host_agent (
-					hostname, port, token, last_submitted
+					hostname, port, token, last_submitted, count_mysql_snapshots
 				) VALUES (
-					?, ?, ?, NOW()
+					?, ?, ?, NOW(), 0
 				)
 			`,
 		hostname,
@@ -164,7 +164,7 @@ func ReadOutdatedAgentsHosts() ([]string, error) {
 		from
 			host_agent
 		where
-			IFNULL(last_checked < now() - interval ? minute, true)
+			IFNULL(last_checked < now() - interval ? minute, 1)
 			`
 	err := db.QueryOrchestrator(query, sqlutils.Args(config.Config.AgentPollMinutes), func(m sqlutils.RowMap) error {
 		hostname := m.GetString("hostname")
@@ -461,7 +461,7 @@ func MountLV(hostname string, lv string) (Agent, error) {
 	return executeAgentCommand(hostname, fmt.Sprintf("mountlv?lv=%s", lv), nil)
 }
 
-// RemoveLV requests an agent to remvoe a snapshot
+// RemoveLV requests an agent to remove a snapshot
 func RemoveLV(hostname string, lv string) (Agent, error) {
 	return executeAgentCommand(hostname, fmt.Sprintf("removelv?lv=%s", lv), nil)
 }
@@ -547,8 +547,8 @@ func AbortSeed(seedId int64) error {
 }
 
 // PostCopy will request an agent to invoke post-copy commands
-func PostCopy(hostname string) (Agent, error) {
-	return executeAgentCommand(hostname, "post-copy", nil)
+func PostCopy(hostname, sourceHostname string) (Agent, error) {
+	return executeAgentCommand(hostname, fmt.Sprintf("post-copy/?sourceHost=%s", sourceHostname), nil)
 }
 
 // SubmitSeedEntry submits a new seed operation entry, returning its unique ID
@@ -693,7 +693,7 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 	}
 
 	seedFromLogicalVolume := sourceAgent.LogicalVolumes[0]
-	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Mounting logical volume: %s", seedFromLogicalVolume.Path), "")
+	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("%s Mounting logical volume: %s", sourceHostname, seedFromLogicalVolume.Path), "")
 	_, err = MountLV(sourceHostname, seedFromLogicalVolume.Path)
 	if err != nil {
 		return updateSeedStateEntry(seedStateId, err)
@@ -722,8 +722,8 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("%s will now receive data in background", targetHostname), "")
 	ReceiveMySQLSeedData(targetHostname, seedId)
 
-	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Waiting some time for %s to start listening for incoming data", targetHostname), "")
-	time.Sleep(2 * time.Second)
+	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Waiting %d seconds for %s to start listening for incoming data", config.Config.SeedWaitSecondsBeforeSend, targetHostname), "")
+	time.Sleep(time.Duration(config.Config.SeedWaitSecondsBeforeSend) * time.Second)
 
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("%s will now send data to %s in background", sourceHostname, targetHostname), "")
 	SendMySQLSeedData(sourceHostname, targetHostname, seedId)
@@ -774,12 +774,12 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 
 	// Cleanup:
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Executing post-copy command on %s", targetHostname), "")
-	_, err = PostCopy(targetHostname)
+	_, err = PostCopy(targetHostname, sourceHostname)
 	if err != nil {
 		return updateSeedStateEntry(seedStateId, err)
 	}
 
-	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Unmounting logical volume: %s", seedFromLogicalVolume.Path), "")
+	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("%s Unmounting logical volume: %s", sourceHostname, seedFromLogicalVolume.Path), "")
 	_, err = Unmount(sourceHostname)
 	if err != nil {
 		return updateSeedStateEntry(seedStateId, err)
