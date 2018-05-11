@@ -39,25 +39,37 @@ type KVStore interface {
 	GetKeyValue(key string) (value string, err error)
 }
 
-var kvMutex sync.Mutex
-var kvStores = []KVStore{}
+type stores struct {
+	sync.Mutex
+	kvStores    []KVStore
+	initialized bool
+}
+
+var kvStores = &stores{initialized: false}
 
 func InitKVStores() {
-	kvMutex.Lock()
-	defer kvMutex.Unlock()
+	kvStores.Lock()
+	defer kvStores.Unlock()
 
-	kvStores = []KVStore{
+	if kvStores.initialized {
+		return
+	}
+
+	kvStores.kvStores = []KVStore{
 		NewInternalKVStore(),
 		NewConsulStore(),
 		NewZkStore(),
 	}
+
+	kvStores.initialized = true
 }
 
 func getKVStores() (stores []KVStore) {
-	kvMutex.Lock()
-	defer kvMutex.Unlock()
+	InitKVStores()
+	kvStores.Lock()
+	defer kvStores.Unlock()
 
-	stores = kvStores
+	stores = kvStores.kvStores
 	return stores
 }
 
