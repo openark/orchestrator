@@ -40,17 +40,25 @@ type KVStore interface {
 }
 
 var kvMutex sync.Mutex
+var kvInitOnce sync.Once
 var kvStores = []KVStore{}
 
+// InitKVStores initializes the KV stores (duh), once in the lifetime of this app.
+// Configuration reload does not affect a running instance.
 func InitKVStores() {
 	kvMutex.Lock()
 	defer kvMutex.Unlock()
 
-	kvStores = []KVStore{
-		NewInternalKVStore(),
-		NewConsulStore(),
-		NewZkStore(),
-	}
+	fmt.Println("............0")
+
+	kvInitOnce.Do(func() {
+		fmt.Println("............1")
+		kvStores = []KVStore{
+			NewInternalKVStore(),
+			NewConsulStore(),
+			NewZkStore(),
+		}
+	})
 }
 
 func getKVStores() (stores []KVStore) {
