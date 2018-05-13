@@ -174,6 +174,7 @@ Recoveries are audited via:
 Nuance auditing and control available via:
 - `/api/blocked-recoveries`: see blocked recoveries
 - `/api/ack-recovery/cluster/:clusterHint`: acknowledge a recovery on a given cluster
+- `/api/ack-all-recoveries`: acknowledge all recoveries
 - `/api/disable-global-recoveries`: global switch to disable `orchestrator` from running any recoveries
 - `/api/enable-global-recoveries`: re-enable recoveries
 - `/api/check-global-recoveries`: check is global recoveries are enabled
@@ -193,6 +194,7 @@ Some corresponding command line invocations:
 - `orchestrator-client -c graceful-master-takeover -alias somecluster`
 - `orchestrator-client -c force-master-takeover -alias somecluster`
 - `orchestrator-client -c ack-cluster-recoveries -alias somecluster`
+- `orchestrator-client -c ack-all-recoveries`
 - `orchestrator-client -c disable-global-recoveries`
 - `orchestrator-client -c enable-global-recoveries`
 - `orchestrator-client -c check-global-recoveries`
