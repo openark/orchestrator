@@ -49,10 +49,7 @@ func InitKVStores() {
 	kvMutex.Lock()
 	defer kvMutex.Unlock()
 
-	fmt.Println("............0")
-
 	kvInitOnce.Do(func() {
-		fmt.Println("............1")
 		kvStores = []KVStore{
 			NewInternalKVStore(),
 			NewConsulStore(),
