@@ -2,7 +2,23 @@
 
 `orchestrator` is able to recover from a set of [failure scenarios](failure-detection.md). Notably, it can recover a failed master or a failed intermediate master.
 
-At this time recovery requires either GTID (Oracle or MariaDB), [Pseudo GTID](#pseudo-gtid) or Binlog Servers.
+## Automated and manual
+
+`orchestrator` supports:
+
+- Automated recoveries (takes action on unexpected failures).
+- Graceful, planned, master promotion.
+- Manual failovers.
+- Manual, panic failovers.
+
+## Requirements 
+
+To run any kind of failovers, your topologies must support either:
+
+- Oracle GTID
+- MariaDB GTID
+- [Pseudo GTID](#pseudo-gtid)
+- Binlog Servers
 
 Automated recovery is _opt in_. Please consider [recovery configuration](configuration-recovery.md).
 
@@ -16,7 +32,9 @@ Based on a [failure detection](failure-detection.md), a sequence of events compo
 
 Where:
 
-- Pre-recovery hooks are configured by the user. Failure of any will abort the failover.
+- Pre-recovery hooks are configured by the user. 
+  - Executed sequentially
+  - Failure of any of these hooks (nonzero exit code) will abort the failover.
 - Topology healing is managed by `orchestrator` and is state-based rather than configuration-based. `orchestrator` tries to make the best out of a bad situation, taking into consideration the existing topology, versions, server configurations, etc.
 - Post-recovery hooks are, again, configured by the user.
 
@@ -61,44 +79,12 @@ Master service discovery is largely the user's responsibility to implement. Comm
 
 `orchestrator` attempts to be a generic solution hence takes no stance on your service discovery method.
 
-### Web, API, command line
-
-Recoveries are audited via:
-
-- `/web/audit-recovery`
-- `/api/audit-recovery`
-- `/api/audit-recovery-steps/:uid`
-
-Nuance auditing and control available via:
-- `/api/blocked-recoveries`: see blocked recoveries
-- `/api/ack-recovery/cluster/:clusterHint`: acknowledge a recovery on a given cluster
-- `/api/disable-global-recoveries`: global switch to disable `orchestrator` from running any recoveries
-- `/api/enable-global-recoveries`: re-enable recoveries
-- `/api/check-global-recoveries`: check is global recoveries are enabled
-
-Running manual recoveries (see next sections):
-
-- `/api/recover/:host/:port`: recover specific host, assuming `orchestrator` agrees there is failure.
-- `/api/recover-lite/:host/:port`: same, do not invoke external hooks (can be useful for testing)
-- `/api/graceful-master-takeover/:clusterHint`: gracefully promote a new master (planned failover)
-- `/api/force-master-failover/:clusterHint`: panic, force master failover for given cluster
-
-Some corresponding command line invocations:
-
-- `orchestrator-client -c recover -i some.instance:3306`
-- `orchestrator-client -c graceful-master-takeover -i some.instance.in.somecluster:3306`
-- `orchestrator-client -c graceful-master-takeover -alias somecluster`
-- `orchestrator-client -c force-master-takeover -alias somecluster`
-- `orchestrator-client -c ack-cluster-recoveries -alias somecluster`
-- `orchestrator-client -c disable-global-recoveries`
-- `orchestrator-client -c enable-global-recoveries`
-- `orchestrator-client -c check-global-recoveries`
 
 ### Automated recovery
 
 Opt-in. Automated recovery may be applied to all (`"*"`) clusters or specific ones.
 
-Recovery follows detection, and assuming nothing block recovery (read further below)
+Recovery follows detection, and assuming nothing blocks recovery (read further below)
 
 For greater resolution, different configuration applies for master recovery and for intermediate-master recovery. Detailed breakdown of recovery-related configuration follows.
 
@@ -137,6 +123,40 @@ Perhaps `orchestrator` doesn't see that the instance is failed, or you have some
 
   or `/api/force-master-failover/instance.in.that.cluster/3306`
 
+
+
+### Web, API, command line
+
+Recoveries are audited via:
+
+- `/web/audit-recovery`
+- `/api/audit-recovery`
+- `/api/audit-recovery-steps/:uid`
+
+Nuance auditing and control available via:
+- `/api/blocked-recoveries`: see blocked recoveries
+- `/api/ack-recovery/cluster/:clusterHint`: acknowledge a recovery on a given cluster
+- `/api/disable-global-recoveries`: global switch to disable `orchestrator` from running any recoveries
+- `/api/enable-global-recoveries`: re-enable recoveries
+- `/api/check-global-recoveries`: check is global recoveries are enabled
+
+Running manual recoveries (see next sections):
+
+- `/api/recover/:host/:port`: recover specific host, assuming `orchestrator` agrees there is failure.
+- `/api/recover-lite/:host/:port`: same, do not invoke external hooks (can be useful for testing)
+- `/api/graceful-master-takeover/:clusterHint`: gracefully promote a new master (planned failover)
+- `/api/force-master-failover/:clusterHint`: panic, force master failover for given cluster
+
+Some corresponding command line invocations:
+
+- `orchestrator-client -c recover -i some.instance:3306`
+- `orchestrator-client -c graceful-master-takeover -i some.instance.in.somecluster:3306`
+- `orchestrator-client -c graceful-master-takeover -alias somecluster`
+- `orchestrator-client -c force-master-takeover -alias somecluster`
+- `orchestrator-client -c ack-cluster-recoveries -alias somecluster`
+- `orchestrator-client -c disable-global-recoveries`
+- `orchestrator-client -c enable-global-recoveries`
+- `orchestrator-client -c check-global-recoveries`
 
 #### Blocking, acknowledgements, anti-flapping
 
