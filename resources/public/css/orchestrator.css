@@ -128,6 +128,11 @@ body {
     color: #606060;
 }
 
+.instance h3 .pull-right > .glyphicon.text-muted {
+    color: #999999;
+}
+
+
 .instance h3 .glyphicon {
     position: inherit;
     cursor: default;

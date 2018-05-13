@@ -356,17 +356,19 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=take-siblings]').appendTo(td.find("div"))
   }
 
-  var td = addNodeModalDataAttribute("GTID based replication", booleanString(node.usingGTID));
-  $('#node_modal button[data-btn=enable-gtid]').appendTo(td.find("div"))
-  $('#node_modal button[data-btn=disable-gtid]').appendTo(td.find("div"))
-  if (node.GTIDMode) {
-    addNodeModalDataAttribute("GTID mode", node.GTIDMode);
+  addNodeModalDataAttribute("GTID supported", booleanString(node.supportsGTID));
+  if (node.supportsGTID) {
+    var td = addNodeModalDataAttribute("GTID based replication", booleanString(node.usingGTID));
+    $('#node_modal button[data-btn=enable-gtid]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=disable-gtid]').appendTo(td.find("div"))
+    if (node.GTIDMode) {
+      addNodeModalDataAttribute("GTID mode", node.GTIDMode);
+    }
+    if (node.UsingOracleGTID) {
+      addNodeModalDataAttribute("Executed GTID set", node.ExecutedGtidSet);
+      addNodeModalDataAttribute("GTID purged", node.GtidPurged);
+    }
   }
-  if (node.usingGTID) {
-    addNodeModalDataAttribute("Executed GTID set", node.ExecutedGtidSet);
-    addNodeModalDataAttribute("GTID purged", node.GtidPurged);
-  }
-
   addNodeModalDataAttribute("Semi-sync enforced", booleanString(node.SemiSyncEnforced));
 
   addNodeModalDataAttribute("Uptime", node.Uptime);
@@ -592,7 +594,8 @@ function normalizeInstance(instance) {
   instance.replicationAttemptingToRun = instance.Slave_SQL_Running || instance.Slave_IO_Running;
   instance.replicationLagReasonable = Math.abs(instance.SlaveLagSeconds.Int64 - instance.SQLDelay) <= 10;
   instance.isSeenRecently = instance.SecondsSinceLastSeen.Valid && instance.SecondsSinceLastSeen.Int64 <= 3600;
-  instance.usingGTID = instance.UsingOracleGTID || instance.SupportsOracleGTID || instance.UsingMariaDBGTID;
+  instance.supportsGTID = instance.SupportsOracleGTID || instance.UsingMariaDBGTID;
+  instance.usingGTID = instance.UsingOracleGTID || instance.UsingMariaDBGTID;
   instance.isMaxScale = (instance.Version.indexOf("maxscale") >= 0);
 
   // used by cluster-tree
@@ -812,8 +815,12 @@ function renderInstanceElement(popoverElement, instance, renderType) {
       popoverElement.addClass("first-child-in-display");
       popoverElement.attr("data-first-child-in-display", "true");
     }
-    if (instance.usingGTID) {
-      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using GTID"></span> ');
+    if (instance.supportsGTID) {
+      if (instance.hasMaster && !instance.usingGTID) {
+        popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon text-muted glyphicon-globe" title="Support GTID but not using it in replication"></span> ');      
+      } else {
+        popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using GTID"></span> ');
+      }
     }
     if (instance.UsingPseudoGTID) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using Pseudo GTID"></span> ');
