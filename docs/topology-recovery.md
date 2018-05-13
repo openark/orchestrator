@@ -6,9 +6,9 @@
 
 `orchestrator` supports:
 
-- [Automated recoveries](#automated-recovery) (takes action on unexpected failures).
-- Graceful, planned, master promotion.
-- [Manual failovers](#manual-recovery).
+- [Automated recovery](#automated-recovery) (takes action on unexpected failures).
+- [Graceful, planned, master promotion](#graceful-master-promotion).
+- [Manual recovery](#manual-recovery).
 - [Manual, forced/panic failovers](#manual-forced-failover).
 
 ## Requirements 
@@ -95,6 +95,8 @@ The analysis mechanism runs at all times, and checks periodically for failure/re
 - For an instance belonging to a cluster for which recovery is explicitly enabled via configuration
 - For an instance in a cluster that has not recently been recovered, unless such recent recoveries were acknowledged
 - Where global recoveries are enabled
+
+### Graceful master promotion
 
 ### Manual recovery
 
