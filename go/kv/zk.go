@@ -16,22 +16,39 @@
 
 package kv
 
+import (
+	"math/rand"
+	"strings"
+	"time"
+
+	"github.com/github/orchestrator/go/config"
+	"github.com/outbrain/zookeepercli/zk"
+)
+
 // Internal key-value store, based on relational backend
 type zkStore struct {
+	servers []string
 }
 
-// TODO: use config.Config.ZkAddress to put/get k/v in ZooKeeper. See
-// - https://github.com/outbrain/zookeepercli
-// - https://github.com/samuel/go-zookeeper/zk
-
 func NewZkStore() KVStore {
-	return &zkStore{}
+	rand.Seed(time.Now().UnixNano())
+	serversArray := strings.Split(config.Config.ZkAddress, ",")
+
+	return &zkStore{
+		servers: serversArray,
+	}
 }
 
 func (this *zkStore) PutKeyValue(key string, value string) (err error) {
-	return
+	aclstr := ""
+	_, err = zk.Create(key, []byte(value), aclstr, true)
+	return err
 }
 
 func (this *zkStore) GetKeyValue(key string) (value string, err error) {
-	return
+	result, err := zk.Get(key)
+	if err != nil {
+		return value, err
+	}
+	return string(result), nil
 }
