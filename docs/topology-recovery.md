@@ -6,10 +6,10 @@
 
 `orchestrator` supports:
 
-- Automated recoveries (takes action on unexpected failures).
+- [Automated recoveries](#automated-recovery) (takes action on unexpected failures).
 - Graceful, planned, master promotion.
-- Manual failovers.
-- Manual, panic failovers.
+- [Manual failovers](#manual-recovery).
+- [Manual, forced/panic failovers](#manual-forced-failover).
 
 ## Requirements 
 
