@@ -124,6 +124,8 @@ In a graceful promotion you must either:
 - Indicate the designated master (must be a direct replica of the existing master)
 - Set your topology such that there is exactly one direct replica under the master (at which case the identity of the designated replica is trivial and needs not be mentioned).
 
+Invoke graceful takeover via:
+
 * Command line: `orchestrator-client -c graceful-master-takeover -alias mycluster -s designated.master.to.promote:3306`
 
 * Web API: 
