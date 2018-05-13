@@ -98,6 +98,41 @@ The analysis mechanism runs at all times, and checks periodically for failure/re
 
 ### Graceful master promotion
 
+TL;DR use this for replacing a master in an orderly, planned operation.
+
+Typically for purposes of upgrade, host maintenance, etc., you may wish to replace an existing master with another one. This is a gracefull promotion (aka _graceful master takeover_).
+
+In a graceful takeover:
+
+- You indicate a server to promote.
+- `orchestrator` turns your master to be `read-only`.
+- `orchestrator` makes sure your designated server is caught up with replication.
+- `orchestrator` promotes your designated server as the new master.
+- `orchestrator` turns promoted server to be writable.
+
+The operation can take a few seconds, during which time your app is expected to complain, seeing that the master is `read-only`.
+
+In addition to standard hooks, `orchestrator` provides you with specialized hooks to run a graceful takeover:
+
+- `PreGracefulTakeoverProcesses`
+- `PostGracefulTakeoverProcesses`
+
+For example, you may want to disable the pager for the duration of a planned failover. Advanced usage may include stalling traffic at proxy layer.
+
+In a graceful promotion you must either:
+
+- Indicate the designated master (must be a direct replica of the existing master)
+- Set your topology such that there is exactly one direct replica under the master (at which case the identity of the designated replica is trivial and needs not be mentioned).
+
+* Command line: `orchestrator-client -c graceful-master-takeover -alias mycluster -s designated.master.to.promote:3306`
+
+* Web API: 
+
+  - `/api/graceful-master-takeover/:clusterHint/:designatedHost/:designatedPort`: gracefully promote a new master (planned failover), indicating the designated master to promote.
+  - `/api/graceful-master-takeover/:clusterHint`: gracefully promote a new master (planned failover). Designated server not indicated, works when the master has exactly one direct replica.
+
+* Web interface: drag a direct master's replica onto the left half of the master's box.
+
 ### Manual recovery
 
 TL;DR use this when an instance is recognized as failed but where auto-recovery is disabled or blocked.
@@ -110,7 +145,7 @@ Recover via:
 * Web API: `/api/recover/dead.instance.com/:3306`
 * Web: instance is colored black; click the `Recover` button
 
-Manual recoveries don't block on `RecoveryPeriodBlockSeconds` (read more in next section). They also override `RecoverMasterClusterFilters` and `RecoverIntermediateMasterClusterFilters`. A manual recovery will only block on an already running (and incomplete) recovery on the very same instance the manual recovery wishes to operate on.
+Manual recoveries don't block on `RecoveryPeriodBlockSeconds` (read more in next section). They also override `RecoverMasterClusterFilters` and `RecoverIntermediateMasterClusterFilters`. Thus, a human can always invoke a recovery by demand. A recovery may only block on yet another recovery running at that time on the same database instance.
 
 ### Manual, forced failover
 
@@ -124,7 +159,6 @@ Perhaps `orchestrator` doesn't see that the instance is failed, or you have some
 * Web API: `/api/force-master-failover/mycluster`
 
   or `/api/force-master-failover/instance.in.that.cluster/3306`
-
 
 
 ### Web, API, command line
@@ -146,7 +180,8 @@ Running manual recoveries (see next sections):
 
 - `/api/recover/:host/:port`: recover specific host, assuming `orchestrator` agrees there is failure.
 - `/api/recover-lite/:host/:port`: same, do not invoke external hooks (can be useful for testing)
-- `/api/graceful-master-takeover/:clusterHint`: gracefully promote a new master (planned failover)
+- `/api/graceful-master-takeover/:clusterHint/:designatedHost/:designatedPort`: gracefully promote a new master (planned failover), indicating the designated master to promote.
+- `/api/graceful-master-takeover/:clusterHint`: gracefully promote a new master (planned failover). Designated server not indicated, works when the master has exactly one direct replica.
 - `/api/force-master-failover/:clusterHint`: panic, force master failover for given cluster
 
 Some corresponding command line invocations:
