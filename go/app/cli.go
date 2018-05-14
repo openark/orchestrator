@@ -209,6 +209,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	if !skipDatabaseCommands && !*config.RuntimeCLIFlags.SkipContinuousRegistration {
 		process.ContinuousRegistration(string(process.OrchestratorExecutionCliMode), command)
 	}
+	kv.InitKVStores()
+
 	// begin commands
 	switch command {
 	// smart mode
