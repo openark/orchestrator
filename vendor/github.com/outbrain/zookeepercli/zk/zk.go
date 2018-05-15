@@ -31,30 +31,39 @@ import (
 	"time"
 )
 
-var servers []string
-var authScheme string
-var authExpression []byte
+type ZooKeeper struct {
+	servers        []string
+	authScheme     string
+	authExpression []byte
 
-// We assume complete access to all
-var flags int32 = int32(0)
-var acl []zk.ACL = zk.WorldACL(zk.PermAll)
+	// We assume complete access to all
+	flags int32
+	acl   []zk.ACL
+}
+
+func NewZooKeeper() *ZooKeeper {
+	return &ZooKeeper{
+		flags: int32(0),
+		acl:   zk.WorldACL(zk.PermAll),
+	}
+}
 
 // SetServers sets the list of servers for the zookeeper client to connect to.
 // Each element in the array should be in either of following forms:
 // - "servername"
 // - "servername:port"
-func SetServers(serversArray []string) {
-	servers = serversArray
+func (zook *ZooKeeper) SetServers(serversArray []string) {
+	zook.servers = serversArray
 }
 
-func SetAuth(scheme string, auth []byte) {
+func (zook *ZooKeeper) SetAuth(scheme string, auth []byte) {
 	log.Debug("Setting Auth ")
-	authScheme = scheme
-	authExpression = auth
+	zook.authScheme = scheme
+	zook.authExpression = auth
 }
 
 // Returns acls
-func BuildACL(authScheme string, user string, pwd string, acls string) (perms []zk.ACL, err error) {
+func (zook *ZooKeeper) BuildACL(authScheme string, user string, pwd string, acls string) (perms []zk.ACL, err error) {
 	aclsList := strings.Split(acls, ",")
 	for _, elem := range aclsList {
 		acl, err := strconv.ParseInt(elem, 10, 32)
@@ -74,20 +83,20 @@ func (_ infoLogger) Printf(format string, a ...interface{}) {
 }
 
 // connect
-func connect() (*zk.Conn, error) {
+func (zook *ZooKeeper) connect() (*zk.Conn, error) {
 	zk.DefaultLogger = &infoLogger{}
-	conn, _, err := zk.Connect(servers, time.Second)
-	if err == nil && authScheme != "" {
-		log.Debugf("Add Auth %s %s", authScheme, authExpression)
-		err = conn.AddAuth(authScheme, authExpression)
+	conn, _, err := zk.Connect(zook.servers, time.Second)
+	if err == nil && zook.authScheme != "" {
+		log.Debugf("Add Auth %s %s", zook.authScheme, zook.authExpression)
+		err = conn.AddAuth(zook.authScheme, zook.authExpression)
 	}
 
 	return conn, err
 }
 
 // Exists returns true when the given path exists
-func Exists(path string) (bool, error) {
-	connection, err := connect()
+func (zook *ZooKeeper) Exists(path string) (bool, error) {
+	connection, err := zook.connect()
 	if err != nil {
 		return false, err
 	}
@@ -98,8 +107,8 @@ func Exists(path string) (bool, error) {
 }
 
 // Get returns value associated with given path, or error if path does not exist
-func Get(path string) ([]byte, error) {
-	connection, err := connect()
+func (zook *ZooKeeper) Get(path string) ([]byte, error) {
+	connection, err := zook.connect()
 	if err != nil {
 		return []byte{}, err
 	}
@@ -109,18 +118,18 @@ func Get(path string) ([]byte, error) {
 	return data, err
 }
 
-func GetACL(path string) (data []string, err error) {
-	connection, err := connect()
+func (zook *ZooKeeper) GetACL(path string) (data []string, err error) {
+	connection, err := zook.connect()
 	if err != nil {
 		return nil, err
 	}
 	defer connection.Close()
 
 	perms, _, err := connection.GetACL(path)
-	return aclsToString(perms), err
+	return zook.aclsToString(perms), err
 }
 
-func aclsToString(acls []zk.ACL) (result []string) {
+func (zook *ZooKeeper) aclsToString(acls []zk.ACL) (result []string) {
 	for _, acl := range acls {
 		var buffer bytes.Buffer
 
@@ -147,8 +156,8 @@ func aclsToString(acls []zk.ACL) (result []string) {
 }
 
 // Children returns sub-paths of given path, optionally empty array, or error if path does not exist
-func Children(path string) ([]string, error) {
-	connection, err := connect()
+func (zook *ZooKeeper) Children(path string) ([]string, error) {
+	connection, err := zook.connect()
 	if err != nil {
 		return []string{}, err
 	}
@@ -159,7 +168,7 @@ func Children(path string) ([]string, error) {
 }
 
 // childrenRecursiveInternal: internal implementation of recursive-children query.
-func childrenRecursiveInternal(connection *zk.Conn, path string, incrementalPath string) ([]string, error) {
+func (zook *ZooKeeper) childrenRecursiveInternal(connection *zk.Conn, path string, incrementalPath string) ([]string, error) {
 	children, _, err := connection.Children(path)
 	if err != nil {
 		return children, err
@@ -170,7 +179,7 @@ func childrenRecursiveInternal(connection *zk.Conn, path string, incrementalPath
 		incrementalChild := gopath.Join(incrementalPath, child)
 		recursiveChildren = append(recursiveChildren, incrementalChild)
 		log.Debugf("incremental child: %+v", incrementalChild)
-		incrementalChildren, err := childrenRecursiveInternal(connection, gopath.Join(path, child), incrementalChild)
+		incrementalChildren, err := zook.childrenRecursiveInternal(connection, gopath.Join(path, child), incrementalChild)
 		if err != nil {
 			return children, err
 		}
@@ -182,19 +191,19 @@ func childrenRecursiveInternal(connection *zk.Conn, path string, incrementalPath
 // ChildrenRecursive returns list of all descendants of given path (optionally empty), or error if the path
 // does not exist.
 // Every element in result list is a relative subpath for the given path.
-func ChildrenRecursive(path string) ([]string, error) {
-	connection, err := connect()
+func (zook *ZooKeeper) ChildrenRecursive(path string) ([]string, error) {
+	connection, err := zook.connect()
 	if err != nil {
 		return []string{}, err
 	}
 	defer connection.Close()
 
-	result, err := childrenRecursiveInternal(connection, path, "")
+	result, err := zook.childrenRecursiveInternal(connection, path, "")
 	return result, err
 }
 
 // createInternal: create a new path
-func createInternal(connection *zk.Conn, path string, data []byte, acl []zk.ACL, force bool) (string, error) {
+func (zook *ZooKeeper) createInternal(connection *zk.Conn, path string, data []byte, acl []zk.ACL, force bool) (string, error) {
 	if path == "/" {
 		return "/", nil
 	}
@@ -203,10 +212,10 @@ func createInternal(connection *zk.Conn, path string, data []byte, acl []zk.ACL,
 	attempts := 0
 	for {
 		attempts += 1
-		returnValue, err := connection.Create(path, data, flags, acl)
+		returnValue, err := connection.Create(path, data, zook.flags, zook.acl)
 		log.Debugf("create status for %s: %s, %+v", path, returnValue, err)
 		if err != nil && force && attempts < 2 {
-			returnValue, err = createInternal(connection, gopath.Dir(path), []byte("zookeepercli auto-generated"), acl, force)
+			returnValue, err = zook.createInternal(connection, gopath.Dir(path), []byte("zookeepercli auto-generated"), acl, force)
 		} else {
 			return returnValue, err
 		}
@@ -215,7 +224,7 @@ func createInternal(connection *zk.Conn, path string, data []byte, acl []zk.ACL,
 }
 
 // createInternalWithACL: create a new path with acl
-func createInternalWithACL(connection *zk.Conn, path string, data []byte, force bool, perms []zk.ACL) (string, error) {
+func (zook *ZooKeeper) createInternalWithACL(connection *zk.Conn, path string, data []byte, force bool, perms []zk.ACL) (string, error) {
 	if path == "/" {
 		return "/", nil
 	}
@@ -223,10 +232,10 @@ func createInternalWithACL(connection *zk.Conn, path string, data []byte, force 
 	attempts := 0
 	for {
 		attempts += 1
-		returnValue, err := connection.Create(path, data, flags, perms)
+		returnValue, err := connection.Create(path, data, zook.flags, perms)
 		log.Debugf("create status for %s: %s, %+v", path, returnValue, err)
 		if err != nil && force && attempts < 2 {
-			returnValue, err = createInternalWithACL(connection, gopath.Dir(path), []byte("zookeepercli auto-generated"), force, perms)
+			returnValue, err = zook.createInternalWithACL(connection, gopath.Dir(path), []byte("zookeepercli auto-generated"), force, perms)
 		} else {
 			return returnValue, err
 		}
@@ -238,36 +247,36 @@ func createInternalWithACL(connection *zk.Conn, path string, data []byte, force 
 // The "force" param controls the behavior when path's parent directory does not exist.
 // When "force" is false, the function returns with error/ When "force" is true, it recursively
 // attempts to create required parent directories.
-func Create(path string, data []byte, aclstr string, force bool) (string, error) {
-	connection, err := connect()
+func (zook *ZooKeeper) Create(path string, data []byte, aclstr string, force bool) (string, error) {
+	connection, err := zook.connect()
 	if err != nil {
 		return "", err
 	}
 	defer connection.Close()
 
 	if len(aclstr) > 0 {
-		acl, err = parseACLString(aclstr)
+		zook.acl, err = zook.parseACLString(aclstr)
 		if err != nil {
 			return "", err
 		}
 	}
 
-	return createInternal(connection, path, data, acl, force)
+	return zook.createInternal(connection, path, data, zook.acl, force)
 }
 
-func CreateWithACL(path string, data []byte, force bool, perms []zk.ACL) (string, error) {
-	connection, err := connect()
+func (zook *ZooKeeper) CreateWithACL(path string, data []byte, force bool, perms []zk.ACL) (string, error) {
+	connection, err := zook.connect()
 	if err != nil {
 		return "", err
 	}
 	defer connection.Close()
 
-	return createInternalWithACL(connection, path, data, force, perms)
+	return zook.createInternalWithACL(connection, path, data, force, perms)
 }
 
 // Set updates a value for a given path, or returns with error if the path does not exist
-func Set(path string, data []byte) (*zk.Stat, error) {
-	connection, err := connect()
+func (zook *ZooKeeper) Set(path string, data []byte) (*zk.Stat, error) {
+	connection, err := zook.connect()
 	if err != nil {
 		return nil, err
 	}
@@ -277,14 +286,14 @@ func Set(path string, data []byte) (*zk.Stat, error) {
 }
 
 // updates the ACL on a given path
-func SetACL(path string, aclstr string, force bool) (string, error) {
-	connection, err := connect()
+func (zook *ZooKeeper) SetACL(path string, aclstr string, force bool) (string, error) {
+	connection, err := zook.connect()
 	if err != nil {
 		return "", err
 	}
 	defer connection.Close()
 
-	acl, err := parseACLString(aclstr)
+	acl, err := zook.parseACLString(aclstr)
 	if err != nil {
 		return "", err
 	}
@@ -296,7 +305,7 @@ func SetACL(path string, aclstr string, force bool) (string, error) {
 		}
 
 		if !exists {
-			return createInternal(connection, path, []byte(""), acl, force)
+			return zook.createInternal(connection, path, []byte(""), acl, force)
 		}
 	}
 
@@ -304,7 +313,7 @@ func SetACL(path string, aclstr string, force bool) (string, error) {
 	return path, err
 }
 
-func parseACLString(aclstr string) (acl []zk.ACL, err error) {
+func (zook *ZooKeeper) parseACLString(aclstr string) (acl []zk.ACL, err error) {
 	aclsList := strings.Split(aclstr, ",")
 	for _, entry := range aclsList {
 		parts := strings.Split(entry, ":")
@@ -313,10 +322,10 @@ func parseACLString(aclstr string) (acl []zk.ACL, err error) {
 		if len(parts) > 3 && parts[0] == "digest" {
 			scheme = parts[0]
 			id = fmt.Sprintf("%s:%s", parts[1], parts[2])
-			perms, err = parsePermsString(parts[3])
+			perms, err = zook.parsePermsString(parts[3])
 		} else {
 			scheme, id = parts[0], parts[1]
-			perms, err = parsePermsString(parts[2])
+			perms, err = zook.parsePermsString(parts[2])
 		}
 
 		if err == nil {
@@ -327,7 +336,7 @@ func parseACLString(aclstr string) (acl []zk.ACL, err error) {
 	return acl, err
 }
 
-func parsePermsString(permstr string) (perms int32, err error) {
+func (zook *ZooKeeper) parsePermsString(permstr string) (perms int32, err error) {
 	if x, e := strconv.ParseFloat(permstr, 64); e == nil {
 		perms = int32(math.Min(x, 31))
 	} else {
@@ -361,8 +370,8 @@ func parsePermsString(permstr string) (perms int32, err error) {
 }
 
 // Delete removes a path entry. It exits with error if the path does not exist, or has subdirectories.
-func Delete(path string) error {
-	connection, err := connect()
+func (zook *ZooKeeper) Delete(path string) error {
+	connection, err := zook.connect()
 	if err != nil {
 		return err
 	}
@@ -372,18 +381,18 @@ func Delete(path string) error {
 }
 
 // Delete recursive if has subdirectories.
-func DeleteRecursive(path string) error {
-	result, err := ChildrenRecursive(path)
+func (zook *ZooKeeper) DeleteRecursive(path string) error {
+	result, err := zook.ChildrenRecursive(path)
 	if err != nil {
 		log.Fatale(err)
 	}
 
 	for i := len(result) - 1; i >= 0; i-- {
 		znode := path + "/" + result[i]
-		if err = Delete(znode); err != nil {
+		if err = zook.Delete(znode); err != nil {
 			log.Fatale(err)
 		}
 	}
 
-	return Delete(path)
+	return zook.Delete(path)
 }

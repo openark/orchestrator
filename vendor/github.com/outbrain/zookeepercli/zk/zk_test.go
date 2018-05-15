@@ -37,7 +37,8 @@ func TestParseACLString(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		got, _ := parseACLString(c.aclstr)
+		zook := NewZooKeeper()
+		got, _ := zook.parseACLString(c.aclstr)
 		if !aclsEqual(got, c.want) {
 			t.Errorf("parseACLString(%q) == %q, want %q", c.aclstr, got, c.want)
 		}
@@ -48,7 +49,8 @@ func TestParseInvalidACLString(t *testing.T) {
 	aclstr := "world:anyone:rwb"
 	want := "invalid ACL string specified"
 
-	_, err := parseACLString(aclstr)
+	zook := NewZooKeeper()
+	_, err := zook.parseACLString(aclstr)
 
 	if err == nil {
 		t.Error("No error returned")
