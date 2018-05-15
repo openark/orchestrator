@@ -21,7 +21,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 	"github.com/samuel/go-zookeeper/zk"
 	"math"
 	gopath "path"
