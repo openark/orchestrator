@@ -28,8 +28,7 @@ import (
 
 // Internal key-value store, based on relational backend
 type zkStore struct {
-	zook    *zk.ZooKeeper
-	servers []string
+	zook *zk.ZooKeeper
 }
 
 func normalizeKey(key string) (normalizedKey string) {
@@ -39,18 +38,23 @@ func normalizeKey(key string) (normalizedKey string) {
 }
 
 func NewZkStore() KVStore {
-	rand.Seed(time.Now().UnixNano())
-	serversArray := strings.Split(config.Config.ZkAddress, ",")
+	store := &zkStore{}
 
-	zook := zk.NewZooKeeper()
-	zook.SetServers(serversArray)
-	return &zkStore{
-		zook:    zook,
-		servers: serversArray,
+	if config.Config.ZkAddress != "" {
+		rand.Seed(time.Now().UnixNano())
+
+		serversArray := strings.Split(config.Config.ZkAddress, ",")
+		zook := zk.NewZooKeeper()
+		zook.SetServers(serversArray)
+		store.zook = zook
 	}
+	return store
 }
 
 func (this *zkStore) PutKeyValue(key string, value string) (err error) {
+	if this.zook == nil {
+		return nil
+	}
 	aclstr := ""
 
 	_, err = this.zook.Create(normalizeKey(key), []byte(value), aclstr, true)
@@ -58,6 +62,9 @@ func (this *zkStore) PutKeyValue(key string, value string) (err error) {
 }
 
 func (this *zkStore) GetKeyValue(key string) (value string, err error) {
+	if this.zook == nil {
+		return value, nil
+	}
 	result, err := this.zook.Get(normalizeKey(key))
 	if err != nil {
 		return value, err
