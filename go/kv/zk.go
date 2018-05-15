@@ -17,6 +17,7 @@
 package kv
 
 import (
+	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -27,26 +28,37 @@ import (
 
 // Internal key-value store, based on relational backend
 type zkStore struct {
+	zook    *zk.ZooKeeper
 	servers []string
+}
+
+func normalizeKey(key string) (normalizedKey string) {
+	normalizedKey = strings.TrimLeft(key, "/")
+	normalizedKey = fmt.Sprintf("/%s", normalizedKey)
+	return normalizedKey
 }
 
 func NewZkStore() KVStore {
 	rand.Seed(time.Now().UnixNano())
 	serversArray := strings.Split(config.Config.ZkAddress, ",")
 
+	zook := zk.NewZooKeeper()
+	zook.SetServers(serversArray)
 	return &zkStore{
+		zook:    zook,
 		servers: serversArray,
 	}
 }
 
 func (this *zkStore) PutKeyValue(key string, value string) (err error) {
 	aclstr := ""
-	_, err = zk.Create(key, []byte(value), aclstr, true)
+
+	_, err = this.zook.Create(normalizeKey(key), []byte(value), aclstr, true)
 	return err
 }
 
 func (this *zkStore) GetKeyValue(key string) (value string, err error) {
-	result, err := zk.Get(key)
+	result, err := this.zook.Get(normalizeKey(key))
 	if err != nil {
 		return value, err
 	}
