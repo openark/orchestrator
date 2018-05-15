@@ -125,7 +125,7 @@ func (this *BinlogEventCursor) nextEvent(numEmptyEventsEvents int) (*BinlogEvent
 		}
 		this.currentEventIndex = -1
 		// While this seems recursive do note that recursion level is at most 1, since we either have
-		// entires in the next binlog (no further recursion) or we don't (immediate termination)
+		// entries in the next binlog (no further recursion) or we don't (immediate termination)
 		return this.nextEvent(numEmptyEventsEvents + 1)
 	}
 	if this.currentEventIndex+1 < len(this.cachedEvents) {
@@ -143,7 +143,7 @@ func (this *BinlogEventCursor) nextEvent(numEmptyEventsEvents int) (*BinlogEvent
 		}
 		this.currentEventIndex = -1
 		// While this seems recursive do note that recursion level is at most 1, since we either have
-		// entires in the next binlog (no further recursion) or we don't (immediate termination)
+		// entries in the next binlog (no further recursion) or we don't (immediate termination)
 		return this.nextEvent(numEmptyEventsEvents + 1)
 	}
 }

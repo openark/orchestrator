@@ -117,7 +117,7 @@ propagates through replication stream. As opposed to previous example, it will n
 
 While the statement is visible in the binary logs, it is not visible in the data itself. A second statement registers the latest update in table data. It is not strictly required, but helps to make sure pseudo-gtid is running. The `DetectPseudoGTIDQuery` config allows `orchestrator` to actually check if Pseudo-GTID was recently injected.
 
-The logic above also makes sure injected pseudo-gtid entires are in Ascending lexical order. The `PseudoGTIDMonotonicHint` config relates to the `asc:` hint in the query. Ascending order allows orchestrator to perform further optimizations when searching for a given Pseudo-GTID entry on a server's binary logs.
+The logic above also makes sure injected pseudo-gtid entries are in Ascending lexical order. The `PseudoGTIDMonotonicHint` config relates to the `asc:` hint in the query. Ascending order allows orchestrator to perform further optimizations when searching for a given Pseudo-GTID entry on a server's binary logs.
 
 `orchestrator` will only enable Pseudo-GTID mode if the `PseudoGTIDPattern` configuration variable is non-empty, but can only validate its correctness during runtime.
 
