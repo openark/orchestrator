@@ -214,8 +214,13 @@ func (zook *ZooKeeper) createInternal(connection *zk.Conn, path string, data []b
 		attempts += 1
 		returnValue, err := connection.Create(path, data, zook.flags, zook.acl)
 		log.Debugf("create status for %s: %s, %+v", path, returnValue, err)
+
 		if err != nil && force && attempts < 2 {
-			returnValue, err = zook.createInternal(connection, gopath.Dir(path), []byte("zookeepercli auto-generated"), acl, force)
+			parentPath := gopath.Dir(path)
+			if parentPath == path {
+				return returnValue, err
+			}
+			returnValue, err = zook.createInternal(connection, parentPath, []byte("zookeepercli auto-generated"), acl, force)
 		} else {
 			return returnValue, err
 		}
