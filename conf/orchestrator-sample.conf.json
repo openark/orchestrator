@@ -132,5 +132,6 @@
   "OSCIgnoreHostnameFilters": [],
   "GraphiteAddr": "",
   "GraphitePath": "",
-  "GraphiteConvertHostnameDotsToUnderscores": true
+  "GraphiteConvertHostnameDotsToUnderscores": true,
+  "ConsulAclToken": ""
 }
