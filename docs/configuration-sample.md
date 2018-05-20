@@ -93,6 +93,7 @@ The following is a production configuration file, with some details redacted.
   "HttpTimeoutSeconds": 60,
   "StaleSeedFailMinutes": 60,
   "SeedAcceptableBytesDiff": 8192,
+  "SeedWaitSecondsBeforeSend": 2,
   "PseudoGTIDPattern": "drop view if exists `meta`.`_pseudo_gtid_hint__asc:",
   "PseudoGTIDPatternIsFixedSubstring": true,
   "PseudoGTIDMonotonicHint": "asc:",

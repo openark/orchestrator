@@ -2736,7 +2736,9 @@ func (this *HttpAPI) GracefulMasterTakeover(params martini.Params, r render.Rend
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	topologyRecovery, _, err := logic.GracefulMasterTakeover(clusterName, nil)
+	designatedKey, _ := this.getInstanceKey(params["designatedHost"], params["designatedPort"])
+	// designatedKey may be empty/invalid
+	topologyRecovery, _, err := logic.GracefulMasterTakeover(clusterName, &designatedKey)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error(), Details: topologyRecovery})
 		return
@@ -2977,7 +2979,7 @@ func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r rende
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Acknodledged cluster recoveries"), Details: clusterName})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Acknowledged cluster recoveries"), Details: clusterName})
 }
 
 // ClusterInfo provides details of a given cluster
@@ -3014,7 +3016,7 @@ func (this *HttpAPI) AcknowledgeInstanceRecoveries(params martini.Params, r rend
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Acknodledged instance recoveries"), Details: instanceKey})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Acknowledged instance recoveries"), Details: instanceKey})
 }
 
 // ClusterInfo provides details of a given cluster
@@ -3066,7 +3068,7 @@ func (this *HttpAPI) AcknowledgeRecovery(params martini.Params, r render.Render,
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Acknodledged recovery"), Details: idParam})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Acknowledged recovery"), Details: idParam})
 }
 
 // ClusterInfo provides details of a given cluster
@@ -3098,7 +3100,7 @@ func (this *HttpAPI) AcknowledgeAllRecoveries(params martini.Params, r render.Re
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Acknodledged all recoveries"), Details: comment})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Acknowledged all recoveries"), Details: comment})
 }
 
 // BlockedRecoveries reads list of currently blocked recoveries, optionally filtered by cluster name
@@ -3326,7 +3328,9 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "recover-lite/:host/:port", this.RecoverLite)
 	this.registerAPIRequest(m, "recover-lite/:host/:port/:candidateHost/:candidatePort", this.RecoverLite)
 	this.registerAPIRequest(m, "graceful-master-takeover/:host/:port", this.GracefulMasterTakeover)
+	this.registerAPIRequest(m, "graceful-master-takeover/:host/:port/:designatedHost/:designatedPort", this.GracefulMasterTakeover)
 	this.registerAPIRequest(m, "graceful-master-takeover/:clusterHint", this.GracefulMasterTakeover)
+	this.registerAPIRequest(m, "graceful-master-takeover/:clusterHint/:designatedHost/:designatedPort", this.GracefulMasterTakeover)
 	this.registerAPIRequest(m, "force-master-failover/:host/:port", this.ForceMasterFailover)
 	this.registerAPIRequest(m, "force-master-failover/:clusterHint", this.ForceMasterFailover)
 	this.registerAPIRequest(m, "register-candidate/:host/:port/:promotionRule", this.RegisterCandidate)
