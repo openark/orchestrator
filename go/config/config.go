@@ -547,9 +547,6 @@ func (this *Configuration) postReadAdjustments() error {
 		this.KVClusterMasterPrefix = strings.TrimRight(this.KVClusterMasterPrefix, "/")
 		this.KVClusterMasterPrefix = fmt.Sprintf("%s/", this.KVClusterMasterPrefix)
 	}
-	if this.ZkAddress != "" {
-		return fmt.Errorf("ZkAddress (ZooKeeper) configuration is unsupported yet")
-	}
 	if this.AutoPseudoGTID {
 		this.PseudoGTIDPattern = "drop view if exists `_pseudo_gtid_`"
 		this.PseudoGTIDPatternIsFixedSubstring = true

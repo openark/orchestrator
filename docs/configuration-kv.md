@@ -4,7 +4,7 @@
 
 - An internal store based on a relational table
 - [Consul](https://github.com/hashicorp/consul)
-- [ZooKeeper](https://zookeeper.apache.org/) - TO BE IMPLEMENTED
+- [ZooKeeper](https://zookeeper.apache.org/)
 
 `orchestrator` supports master discovery by storing clusters' masters in KV.
 
@@ -18,6 +18,8 @@
 
 - The Key is `mysql/master/mycluster`
 - The Value is `some.host-17.com:3306`
+
+Note: on ZooKeeper the key will automatically prefix with a `/` if not already so.
 
 #### Breakdown entries
 
@@ -34,7 +36,7 @@ The `/hostname`, `/port`, `/ipv4` and `/ipv6` extensions are automatically added
 
 If specified, `ConsulAddress` indicates an address where a Consul HTTP service is available. If unspecified, no Consul access is attempted.
 
-**UNIMPLEMENTED YET** If specified, `ZkAddress` indicates one or more ZooKeeper servers to connect to. Default port per server is `2181`. All the following are equivalent:
+If specified, `ZkAddress` indicates one or more ZooKeeper servers to connect to. Default port per server is `2181`. All the following are equivalent:
 
 - `srv-a,srv-b:12181,srv-c`
 - `srv-a,srv-b:12181,srv-c:2181`
