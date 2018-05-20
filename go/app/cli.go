@@ -1376,7 +1376,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("replication-analysis", "Recovery", `Request an analysis of potential crash incidents in all known topologies`):
 		{
-			analysis, err := inst.GetReplicationAnalysis("", false, false)
+			analysis, err := inst.GetReplicationAnalysis("", &inst.ReplicationAnalysisHints{})
 			if err != nil {
 				log.Fatale(err)
 			}
