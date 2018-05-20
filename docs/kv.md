@@ -4,7 +4,7 @@
 
 - An internal store based on a relational table
 - [Consul](https://github.com/hashicorp/consul)
-- [ZooKeeper](https://zookeeper.apache.org/) - **TO BE IMPLEMENTED**
+- [ZooKeeper](https://zookeeper.apache.org/)
 
 See also [Key-Value configuration](configuration-kv.md).
 
