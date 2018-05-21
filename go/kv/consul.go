@@ -35,6 +35,8 @@ func NewConsulStore() KVStore {
 	if config.Config.ConsulAddress != "" {
 		consulConfig := consulapi.DefaultConfig()
 		consulConfig.Address = config.Config.ConsulAddress
+		// ConsulAclToken defaults to ""
+		consulConfig.Token = config.Config.ConsulAclToken
 		if client, err := consulapi.NewClient(consulConfig); err != nil {
 			log.Errore(err)
 		} else {
