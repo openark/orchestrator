@@ -514,7 +514,14 @@ function recover() {
 
 function graceful_master_takeover() {
   assert_nonempty "instance|alias" "${alias:-$instance}"
-  api "graceful-master-takeover/${alias:-$instance}"
+
+  if [ -z "$destination_hostport" ] ; then
+    # No destination given.
+    api "graceful-master-takeover/${alias:-$instance}"
+  else
+    # Explicit destination (designated master) given
+    api "graceful-master-takeover/${alias:-$instance}/${destination_hostport}"
+  fi
   print_details | jq '.SuccessorKey' | print_key
 }
 
@@ -682,7 +689,7 @@ function run_command() {
     "last-pseudo-gtid") last_pseudo_gtid ;;          # Dump last injected Pseudo-GTID entry on a server
 
     "recover") recover ;;                                     # Do auto-recovery given a dead instance, assuming orchestrator agrees there's a problem. Override blocking.
-    "graceful-master-takeover") graceful_master_takeover ;;   # Gracefully discard master and promote another (direct child) instance instead, even if everything is running well
+    "graceful-master-takeover") graceful_master_takeover ;;   # Gracefully promote a new master. Either indicate identity of new master via '-d designated.instance.com' or setup replication tree to have a single direct replica to the master.
     "force-master-failover") force_master_failover ;;         # Forcibly discard master and initiate a failover, even if orchestrator doesn't see a problem. This command lets orchestrator choose the replacement master
     "ack-cluster-recoveries") ack_cluster_recoveries ;;       # Acknowledge recoveries for a given cluster; this unblocks pending future recoveries
     "ack-all-recoveries") ack_all_recoveries ;;               # Acknowledge all recoveries

@@ -103,7 +103,7 @@ If you're not using GTID, you'll be happy to know `orchestrator` can utilize Pse
 
 Read more on the [Pseudo-GTID](pseudo-gtid.md) documentation page.
 
-`orchestrator` can inject Pseudo-GTID entires for you. Your clusters will magically have GTID-like superpowers. Follow [Automated Pseudo-GTID](configuration-discovery-pseudo-gtid.md#automated-pseudo-gtid-injection)
+`orchestrator` can inject Pseudo-GTID entries for you. Your clusters will magically have GTID-like superpowers. Follow [Automated Pseudo-GTID](configuration-discovery-pseudo-gtid.md#automated-pseudo-gtid-injection)
 
 ### Populating meta data
 

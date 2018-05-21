@@ -460,7 +460,7 @@ func init() {
   List all clusters known to orchestrator. A cluster (aka topology, aka chain) is identified by its
   master (or one of its master if more than one exists). Example:
 
-  orchesrtator -c clusters
+  orchestrator -c clusters
       -i not given, implicitly assumed local hostname
 	`
 	CommandHelp["all-clusters-masters"] = `
