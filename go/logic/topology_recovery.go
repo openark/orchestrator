@@ -223,14 +223,12 @@ func AuditTopologyRecovery(topologyRecovery *TopologyRecovery, message string) e
 	}
 
 	recoveryStep := NewTopologyRecoveryStep(topologyRecovery.UID, message)
-	if err := writeTopologyRecoveryStep(recoveryStep); err != nil {
-		return err
-	}
 	if orcraft.IsRaftEnabled() {
 		_, err := orcraft.PublishCommand("write-recovery-step", recoveryStep)
 		return err
+	} else {
+		return writeTopologyRecoveryStep(recoveryStep)
 	}
-	return nil
 }
 
 func resolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst.Instance) error {
