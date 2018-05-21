@@ -235,6 +235,9 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 	if err != nil {
 		recoveryId = 0
 	}
+	recoveryUid := params["uid"]
+	clusterAlias := params["clusterAlias"]
+
 	clusterName, _ := figureClusterName(params["clusterName"])
 	r.HTML(200, "templates/audit_recovery", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
@@ -244,7 +247,9 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 		"autoshow_problems":   false,
 		"page":                page,
 		"clusterName":         clusterName,
+		"clusterAlias":        clusterAlias,
 		"recoveryId":          recoveryId,
+		"recoveryUid":         recoveryUid,
 		"prefix":              this.URLPrefix,
 	})
 }
@@ -258,6 +263,7 @@ func (this *HttpWeb) AuditFailureDetection(params martini.Params, r render.Rende
 	if err != nil {
 		detectionId = 0
 	}
+	clusterAlias := params["clusterAlias"]
 
 	r.HTML(200, "templates/audit_failure_detection", map[string]interface{}{
 		"agentsHttpActive":    config.Config.ServeAgentsHttp,
@@ -267,20 +273,7 @@ func (this *HttpWeb) AuditFailureDetection(params martini.Params, r render.Rende
 		"autoshow_problems":   false,
 		"page":                page,
 		"detectionId":         detectionId,
-		"prefix":              this.URLPrefix,
-	})
-}
-
-func (this *HttpWeb) AuditRecoverySteps(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	recoveryUID := params["uid"]
-
-	r.HTML(200, "templates/audit_recovery_steps", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
-		"title":               "audit-recovery-steps",
-		"authorizedForAction": isAuthorizedForAction(req, user),
-		"userId":              getUserId(req, user),
-		"autoshow_problems":   false,
-		"recoveryUID":         recoveryUID,
+		"clusterAlias":        clusterAlias,
 		"prefix":              this.URLPrefix,
 	})
 }
@@ -391,43 +384,59 @@ func (this *HttpWeb) Status(params martini.Params, r render.Render, req *http.Re
 	})
 }
 
+func (this *HttpWeb) registerWebRequest(m *martini.ClassicMartini, path string, handler martini.Handler) {
+	fullPath := fmt.Sprintf("%s/web/%s", this.URLPrefix, path)
+	if path == "/" {
+		fullPath = fmt.Sprintf("%s/", this.URLPrefix)
+	}
+
+	if config.Config.RaftEnabled {
+		m.Get(fullPath, raftReverseProxy, handler)
+	} else {
+		m.Get(fullPath, handler)
+	}
+}
+
 // RegisterRequests makes for the de-facto list of known Web calls
 func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
-	m.Get(this.URLPrefix+"/web/access-token", this.AccessToken)
-	m.Get(this.URLPrefix+"/", this.Index)
-	m.Get(this.URLPrefix+"/web", this.Index)
-	m.Get(this.URLPrefix+"/web/home", this.About)
-	m.Get(this.URLPrefix+"/web/about", this.About)
-	m.Get(this.URLPrefix+"/web/keep-calm", this.KeepCalm)
-	m.Get(this.URLPrefix+"/web/faq", this.FAQ)
-	m.Get(this.URLPrefix+"/web/status", this.Status)
-	m.Get(this.URLPrefix+"/web/clusters", this.Clusters)
-	m.Get(this.URLPrefix+"/web/clusters-analysis", this.ClustersAnalysis)
-	m.Get(this.URLPrefix+"/web/cluster/:clusterName", this.Cluster)
-	m.Get(this.URLPrefix+"/web/cluster/alias/:clusterAlias", this.ClusterByAlias)
-	m.Get(this.URLPrefix+"/web/cluster/instance/:host/:port", this.ClusterByInstance)
-	m.Get(this.URLPrefix+"/web/cluster-pools/:clusterName", this.ClusterPools)
-	m.Get(this.URLPrefix+"/web/search/:searchString", this.Search)
-	m.Get(this.URLPrefix+"/web/search", this.Search)
-	m.Get(this.URLPrefix+"/web/discover", this.Discover)
-	m.Get(this.URLPrefix+"/web/long-queries", this.LongQueries)
-	m.Get(this.URLPrefix+"/web/audit", this.Audit)
-	m.Get(this.URLPrefix+"/web/audit/:page", this.Audit)
-	m.Get(this.URLPrefix+"/web/audit/instance/:host/:port", this.Audit)
-	m.Get(this.URLPrefix+"/web/audit/instance/:host/:port/:page", this.Audit)
-	m.Get(this.URLPrefix+"/web/audit-recovery", this.AuditRecovery)
-	m.Get(this.URLPrefix+"/web/audit-recovery/:page", this.AuditRecovery)
-	m.Get(this.URLPrefix+"/web/audit-recovery/id/:id", this.AuditRecovery)
-	m.Get(this.URLPrefix+"/web/audit-recovery/cluster/:clusterName", this.AuditRecovery)
-	m.Get(this.URLPrefix+"/web/audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
-	m.Get(this.URLPrefix+"/web/audit-failure-detection", this.AuditFailureDetection)
-	m.Get(this.URLPrefix+"/web/audit-failure-detection/:page", this.AuditFailureDetection)
-	m.Get(this.URLPrefix+"/web/audit-failure-detection/id/:id", this.AuditFailureDetection)
-	m.Get(this.URLPrefix+"/web/audit-recovery-steps/:uid", this.AuditRecoverySteps)
-	m.Get(this.URLPrefix+"/web/agents", this.Agents)
-	m.Get(this.URLPrefix+"/web/agent/:host", this.Agent)
-	m.Get(this.URLPrefix+"/web/seed-details/:seedId", this.AgentSeedDetails)
-	m.Get(this.URLPrefix+"/web/seeds", this.Seeds)
+	this.registerWebRequest(m, "access-token", this.AccessToken)
+	this.registerWebRequest(m, "", this.Index)
+	this.registerWebRequest(m, "/", this.Index)
+	this.registerWebRequest(m, "home", this.About)
+	this.registerWebRequest(m, "about", this.About)
+	this.registerWebRequest(m, "keep-calm", this.KeepCalm)
+	this.registerWebRequest(m, "faq", this.FAQ)
+	this.registerWebRequest(m, "status", this.Status)
+	this.registerWebRequest(m, "clusters", this.Clusters)
+	this.registerWebRequest(m, "clusters-analysis", this.ClustersAnalysis)
+	this.registerWebRequest(m, "cluster/:clusterName", this.Cluster)
+	this.registerWebRequest(m, "cluster/alias/:clusterAlias", this.ClusterByAlias)
+	this.registerWebRequest(m, "cluster/instance/:host/:port", this.ClusterByInstance)
+	this.registerWebRequest(m, "cluster-pools/:clusterName", this.ClusterPools)
+	this.registerWebRequest(m, "search/:searchString", this.Search)
+	this.registerWebRequest(m, "search", this.Search)
+	this.registerWebRequest(m, "discover", this.Discover)
+	this.registerWebRequest(m, "long-queries", this.LongQueries)
+	this.registerWebRequest(m, "audit", this.Audit)
+	this.registerWebRequest(m, "audit/:page", this.Audit)
+	this.registerWebRequest(m, "audit/instance/:host/:port", this.Audit)
+	this.registerWebRequest(m, "audit/instance/:host/:port/:page", this.Audit)
+	this.registerWebRequest(m, "audit-recovery", this.AuditRecovery)
+	this.registerWebRequest(m, "audit-recovery/:page", this.AuditRecovery)
+	this.registerWebRequest(m, "audit-recovery/id/:id", this.AuditRecovery)
+	this.registerWebRequest(m, "audit-recovery/uid/:uid", this.AuditRecovery)
+	this.registerWebRequest(m, "audit-recovery/cluster/:clusterName", this.AuditRecovery)
+	this.registerWebRequest(m, "audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
+	this.registerWebRequest(m, "audit-recovery/alias/:clusterAlias", this.AuditRecovery)
+	this.registerWebRequest(m, "audit-failure-detection", this.AuditFailureDetection)
+	this.registerWebRequest(m, "audit-failure-detection/:page", this.AuditFailureDetection)
+	this.registerWebRequest(m, "audit-failure-detection/id/:id", this.AuditFailureDetection)
+	this.registerWebRequest(m, "audit-failure-detection/alias/:clusterAlias", this.AuditFailureDetection)
+	this.registerWebRequest(m, "audit-recovery-steps/:uid", this.AuditRecovery)
+	this.registerWebRequest(m, "agents", this.Agents)
+	this.registerWebRequest(m, "agent/:host", this.Agent)
+	this.registerWebRequest(m, "seed-details/:seedId", this.AgentSeedDetails)
+	this.registerWebRequest(m, "seeds", this.Seeds)
 
 	this.RegisterDebug(m)
 }

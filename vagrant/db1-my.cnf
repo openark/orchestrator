@@ -1,13 +1,10 @@
 [mysqld]
 datadir=/var/lib/mysql
 user=mysql
+
 # Disabling symbolic-links is recommended to prevent assorted security risks
 symbolic-links=0
 server_id=1
 log_bin
 log-slave-updates
 report-host=db1
-
-[mysqld_safe]
-log-error=/var/log/mysqld.log
-pid-file=/var/run/mysqld/mysqld.pid

@@ -8,7 +8,7 @@ If you would like to build `orchestrator` on your own machine, or eventually sub
 
 - `orchestrator` is built on Linux and OS/X. I have no hint about MS Windows, and the build is incompatible with Windows.
 
-- `Go 1.7` or higher.
+- `Go 1.9` or higher.
 
 ### Clone repo
 
@@ -58,13 +58,21 @@ Why would you want this? Because this will empower you with building `.DEB`, `.r
 
 ### DB setup
 
-`orchestrator` requires a MySQL backend to run. This could be installed anywhere. I usually use [mysqlsandbox](http://mysqlsandbox.net/) for local installations. You may choose to just install mysql-server on your dev machine.
+As per [configuration: backend](configuration-backend.md), you may use either `SQLite` or `MySQL` as `orchestrator`'s backend database.
+
+#### Sqlite
+
+No special setup is required. Make sure to configure database file path.
+
+#### MySQL
+
+`MySQL` can be installed anywhere and you don't necessarily need it to run on your local box. I usually use [mysqlsandbox](http://mysqlsandbox.net/) for local installations. You may choose to just install mysql-server on your dev machine, or run a docker container, a VM, what have you.
 
 Once your backend MySQL setup is complete, issue:
 
     CREATE DATABASE IF NOT EXISTS orchestrator;
-    GRANT ALL PRIVILEGES ON `orchestrator`.* TO 'orchestrator'@'127.0.0.1'
-    IDENTIFIED BY 'orch_backend_password';
+    CREATE USER 'orchestrator'@'127.0.0.1' IDENTIFIED BY 'orch_backend_password';
+    GRANT ALL PRIVILEGES ON `orchestrator`.* TO 'orchestrator'@'127.0.0.1';
 
 `orchestrator` uses a configuration file whose search path is either `/etc/orchestrator.conf.json`,  `conf/orchestrator.conf.json` or `orchestrator.conf.json`.
 The repository includes a file called `conf/orchestrator-sample.conf.json` with some basic settings. Issue:
@@ -106,8 +114,8 @@ Now to make stuff interesting.
 For `orchestrator` to detect your replication topologies, it must also have an account on each and every topology. At this stage this has to be the
 same account (same user, same password) for all topologies. On each of your masters, issue the following:
 
-    GRANT SUPER, PROCESS, REPLICATION SLAVE, RELOAD ON *.*
-    TO 'orchestrator'@'orch_host' IDENTIFIED BY 'orch_topology_password';
+    CREATE USER 'orchestrator'@'orch_host' IDENTIFIED BY 'orch_topology_password';
+    GRANT SUPER, PROCESS, REPLICATION SLAVE, RELOAD ON *.* TO 'orchestrator'@'orch_host';
 
 > REPLICATION SLAVE is required if you intend to use [Pseudo GTID](#pseudo-gtid)
 
@@ -126,6 +134,15 @@ Depending on your configuration (`InstancePollSeconds`) this may take a few seco
 If you've made it this far, you've done 90% of the work. You may consider configuring Pseudo GTID queries, DC awareness etc. See
 "want to have" sub-sections under [configuration](Orchestrator-Manual#configuration).
 
+### Customizations
+
+There are some hooks in the Orchestrator web frontend which can be used to add customizations via CSS and JavaScript.
+
+The corresponding files to edit are `resources/public/css/custom.css` and `resources/public/js/custom.js`.
+
+You can find available hooks via `grep -r 'orchestrator:' resources/public/js`.
+
+Please note that all APIs and structures are bound to change and any customizations are unsupported. Please file issues against uncustomized versions.
 
 ### Forking and Pull-Requesting
 

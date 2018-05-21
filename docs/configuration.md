@@ -13,7 +13,13 @@ Use the following small steps to configure `orchestrator`:
 - [Discovery: resolving names](configuration-discovery-resolve.md)
 - [Discovery: classifying servers](configuration-discovery-classifying.md)
 - [Discovery: Pseudo-GTID](configuration-discovery-pseudo-gtid.md)
+- [Topology control](configuration-topology-control.md)
 - [Failure detection](configuration-failure-detection.md)
 - [Recovery](configuration-recovery.md)
 - [Raft](configuration-raft.md): configure a [orchestrator/raft](raft.md) cluster for high availability
 - Security: See [security](#security) section.
+- [Key-Value stores](configuration-kv.md): configure and use key-value stores for master discovery.
+
+### Configuration sample file
+
+For your convenience, this [sample config](configuration-sample.md) is a redacted form of production `orchestrator` config at GitHub.

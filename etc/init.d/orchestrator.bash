@@ -3,6 +3,16 @@
 # chkconfig: 345 20 80
 # description: orchestrator daemon
 # processname: orchestrator
+#
+### BEGIN INIT INFO
+# Provides:          orchestrator
+# Required-Start:    $local_fs $syslog
+# Required-Stop:     $local_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start orchestrator daemon
+# Description:       Start orchestrator daemon
+### END INIT INFO
 
 
 # Script credit: http://werxltd.com/wp/2012/01/05/simple-init-d-script-template/
@@ -44,9 +54,11 @@ start_daemon () {
 	post_start_daemon_hook 1>&2
 }
 
-# The file /etc/orchestrator_profile can be used to inject pre-service execution
+# This files can be used to inject pre-service execution
 # scripts, such as exporting variables or whatever. It's yours!
+[ -f /etc/default/orchestrator ] && . /etc/default/orchestrator
 [ -f /etc/orchestrator_profile ] && . /etc/orchestrator_profile
+[ -f /etc/profile.d/orchestrator ] && . /etc/profile.d/orchestrator
 
 case "$1" in
   start)

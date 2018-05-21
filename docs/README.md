@@ -16,6 +16,7 @@
 - [Using the web interface](using-the-web-interface.md)
 - [Using the web API](using-the-web-api.md): achieving automation via HTTP GET requests
 - [Using orchestrator-client](orchestrator-client.md): a no binary/config needed script that wraps API calls
+- [Scripting samples](script-samples.md)
 
 #### Deployment
 - [High availability](high-availability.md): making `orchestrator` highly available
@@ -24,7 +25,9 @@
 - [orchestrator/raft](deployment-raft.md) deployment
 
 #### Failure detection & recovery
-- [Topology recovery](topology-recovery.md): failure detection and recovery
+- [Failure detection](failure-detection.md): how `orchestrator` detects failure, types of failures it can handle
+- [Topology recovery](topology-recovery.md): recovery process, promotion and hooks.
+- [Key-Value stores](kv.md): master discovery for your apps
 
 #### Various
 - [Docker](docker.md)

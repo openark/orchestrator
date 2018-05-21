@@ -24,13 +24,15 @@ import (
 
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/raft"
 
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )
 
 type SnapshotData struct {
-	Keys             []inst.InstanceKey
+	Keys             []inst.InstanceKey // Kept for backwards comapatibility
+	MinimalInstances []inst.MinimalInstance
 	RecoveryDisabled bool
 
 	ClusterAlias,
@@ -39,13 +41,17 @@ type SnapshotData struct {
 	HostAttributes,
 	AccessToken,
 	PoolInstances,
+	InjectedPseudoGTIDClusters,
 	HostnameResolves,
 	HostnameUnresolves,
 	DowntimedInstances,
 	Candidates,
 	Detections,
+	KVStore,
 	Recovery,
 	RecoverySteps sqlutils.NamedResultData
+
+	LeaderURI string
 }
 
 func NewSnapshotData() *SnapshotData {
@@ -73,8 +79,10 @@ func writeTableData(tableName string, data *sqlutils.NamedResultData) error {
 func CreateSnapshotData() *SnapshotData {
 	snapshotData := NewSnapshotData()
 
+	snapshotData.LeaderURI = orcraft.LeaderURI.Get()
 	// keys
 	snapshotData.Keys, _ = inst.ReadAllInstanceKeys()
+	snapshotData.MinimalInstances, _ = inst.ReadAllMinimalInstances()
 	snapshotData.RecoveryDisabled, _ = IsRecoveryDisabled()
 
 	readTableData("cluster_alias", &snapshotData.ClusterAlias)
@@ -88,8 +96,10 @@ func CreateSnapshotData() *SnapshotData {
 	readTableData("database_instance_downtime", &snapshotData.DowntimedInstances)
 	readTableData("candidate_database_instance", &snapshotData.Candidates)
 	readTableData("topology_failure_detection", &snapshotData.Detections)
+	readTableData("kv_store", &snapshotData.KVStore)
 	readTableData("topology_recovery", &snapshotData.Recovery)
 	readTableData("topology_recovery_steps", &snapshotData.RecoverySteps)
+	readTableData("cluster_injected_pseudo_gtid", &snapshotData.InjectedPseudoGTIDClusters)
 
 	log.Debugf("raft snapshot data created")
 	return snapshotData
@@ -130,10 +140,14 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 		return err
 	}
 
+	orcraft.LeaderURI.Set(snapshotData.LeaderURI)
 	// keys
 	{
 		snapshotInstanceKeyMap := inst.NewInstanceKeyMap()
 		snapshotInstanceKeyMap.AddKeys(snapshotData.Keys)
+		for _, minimalInstance := range snapshotData.MinimalInstances {
+			snapshotInstanceKeyMap.AddKey(minimalInstance.Key)
+		}
 
 		discardedKeys := 0
 		// Forget instances that were not in snapshot
@@ -152,13 +166,26 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 		// Instances that _are_ in our own database will self-discover. No need
 		// to explicitly discover them.
 		discoveredKeys := 0
-		for _, snapshotKey := range snapshotData.Keys {
-			if !existingKeysMap.HasKey(snapshotKey) {
-				snapshotKey := snapshotKey
-				go func() {
-					snapshotDiscoveryKeys <- snapshotKey
-				}()
-				discoveredKeys++
+		// v2: read keys + master keys
+		for _, minimalInstance := range snapshotData.MinimalInstances {
+			if !existingKeysMap.HasKey(minimalInstance.Key) {
+				if err := inst.WriteInstance(minimalInstance.ToInstance(), false, nil); err == nil {
+					discoveredKeys++
+				} else {
+					log.Errore(err)
+				}
+			}
+		}
+		if len(snapshotData.MinimalInstances) == 0 {
+			// v1: read keys (backwards support)
+			for _, snapshotKey := range snapshotData.Keys {
+				if !existingKeysMap.HasKey(snapshotKey) {
+					snapshotKey := snapshotKey
+					go func() {
+						snapshotDiscoveryKeys <- snapshotKey
+					}()
+					discoveredKeys++
+				}
 			}
 		}
 		log.Debugf("raft snapshot restore: discovered %+v keys", discoveredKeys)
@@ -173,9 +200,11 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 	writeTableData("hostname_unresolve", &snapshotData.HostnameUnresolves)
 	writeTableData("database_instance_downtime", &snapshotData.DowntimedInstances)
 	writeTableData("candidate_database_instance", &snapshotData.Candidates)
+	writeTableData("kv_store", &snapshotData.KVStore)
 	writeTableData("topology_recovery", &snapshotData.Recovery)
 	writeTableData("topology_failure_detection", &snapshotData.Detections)
 	writeTableData("topology_recovery_steps", &snapshotData.RecoverySteps)
+	writeTableData("cluster_injected_pseudo_gtid", &snapshotData.InjectedPseudoGTIDClusters)
 
 	// recovery disable
 	{

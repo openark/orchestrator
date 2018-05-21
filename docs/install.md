@@ -39,7 +39,8 @@ If not, replace `127.0.0.1` with appropriate host name. Replace `orch_backend_pa
 Setup a MySQL server for backend, and invoke the following:
 
     CREATE DATABASE IF NOT EXISTS orchestrator;
-    GRANT ALL PRIVILEGES ON `orchestrator`.* TO 'orchestrator'@'127.0.0.1' IDENTIFIED BY 'orch_backend_password';
+    CREATE USER 'orchestrator'@'127.0.0.1' IDENTIFIED BY 'orch_backend_password';
+    GRANT ALL PRIVILEGES ON `orchestrator`.* TO 'orchestrator'@'127.0.0.1';
 
 `Orchestrator` uses a configuration file, located in either `/etc/orchestrator.conf.json` or relative path to binary `conf/orchestrator.conf.json` or
 `orchestrator.conf.json`.
@@ -59,7 +60,8 @@ Edit `orchestrator.conf.json` to match the above as follows:
 For `orchestrator` to detect your replication topologies, it must also have an account on each and every topology. At this stage this has to be the
 same account (same user, same password) for all topologies. On each of your masters, issue the following:
 
-    GRANT SUPER, PROCESS, REPLICATION SLAVE, RELOAD ON *.* TO 'orchestrator'@'orch_host' IDENTIFIED BY 'orch_topology_password';
+    CREATE USER 'orchestrator'@'orch_host' IDENTIFIED BY 'orch_topology_password';
+    GRANT SUPER, PROCESS, REPLICATION SLAVE, RELOAD ON *.* TO 'orchestrator'@'orch_host';
     GRANT SELECT ON mysql.slave_master_info TO 'orchestrator'@'orch_host';
 
 > `REPLICATION SLAVE` is required for `SHOW SLAVE HOSTS`, and for scanning binary logs in favor of [Pseudo GTID](#pseudo-gtid)

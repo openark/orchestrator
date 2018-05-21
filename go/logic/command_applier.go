@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 
 	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/kv"
+	"github.com/github/orchestrator/go/raft"
 
 	"github.com/openark/golib/log"
 )
@@ -37,10 +39,14 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 	switch op {
 	case "heartbeat":
 		return nil
+	case "async-snapshot":
+		return applier.asyncSnapshot(value)
 	case "register-node":
 		return applier.registerNode(value)
 	case "discover":
 		return applier.discover(value)
+	case "injected-pseudo-gtid":
+		return applier.injectedPseudoGTID(value)
 	case "forget":
 		return applier.forget(value)
 	case "forget-cluster":
@@ -63,12 +69,25 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.writeRecovery(value)
 	case "write-recovery-step":
 		return applier.writeRecoveryStep(value)
+	case "resolve-recovery":
+		return applier.resolveRecovery(value)
 	case "disable-global-recoveries":
 		return applier.disableGlobalRecoveries(value)
 	case "enable-global-recoveries":
 		return applier.enableGlobalRecoveries(value)
+	case "put-key-value":
+		return applier.putKeyValue(value)
+	case "leader-uri":
+		return applier.leaderURI(value)
+	case "request-health-report":
+		return applier.healthReport(value)
 	}
 	return log.Errorf("Unknown command op: %s", op)
+}
+
+func (applier *CommandApplier) asyncSnapshot(value []byte) interface{} {
+	err := orcraft.AsyncSnapshot()
+	return err
 }
 
 func (applier *CommandApplier) registerNode(value []byte) interface{} {
@@ -81,6 +100,15 @@ func (applier *CommandApplier) discover(value []byte) interface{} {
 		return log.Errore(err)
 	}
 	discoverInstance(instanceKey)
+	return nil
+}
+
+func (applier *CommandApplier) injectedPseudoGTID(value []byte) interface{} {
+	var clusterName string
+	if err := json.Unmarshal(value, &clusterName); err != nil {
+		return log.Errore(err)
+	}
+	inst.RegisterInjectedPseudoGTID(clusterName)
 	return nil
 }
 
@@ -135,11 +163,20 @@ func (applier *CommandApplier) ackRecovery(value []byte) interface{} {
 	if err != nil {
 		return log.Errore(err)
 	}
+	if ack.AllRecoveries {
+		_, err = AcknowledgeAllRecoveries(ack.Owner, ack.Comment)
+	}
 	if ack.ClusterName != "" {
 		_, err = AcknowledgeClusterRecoveries(ack.ClusterName, ack.Owner, ack.Comment)
 	}
 	if ack.Key.IsValid() {
 		_, err = AcknowledgeInstanceRecoveries(&ack.Key, ack.Owner, ack.Comment)
+	}
+	if ack.Id > 0 {
+		_, err = AcknowledgeRecovery(ack.Id, ack.Owner, ack.Comment)
+	}
+	if ack.UID != "" {
+		_, err = AcknowledgeRecoveryByUID(ack.UID, ack.Owner, ack.Comment)
 	}
 	return err
 }
@@ -176,8 +213,10 @@ func (applier *CommandApplier) writeRecovery(value []byte) interface{} {
 	if err := json.Unmarshal(value, &topologyRecovery); err != nil {
 		return log.Errore(err)
 	}
-	_, err := writeTopologyRecovery(&topologyRecovery)
-	return err
+	if _, err := writeTopologyRecovery(&topologyRecovery); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (applier *CommandApplier) writeRecoveryStep(value []byte) interface{} {
@@ -189,6 +228,17 @@ func (applier *CommandApplier) writeRecoveryStep(value []byte) interface{} {
 	return err
 }
 
+func (applier *CommandApplier) resolveRecovery(value []byte) interface{} {
+	topologyRecovery := TopologyRecovery{}
+	if err := json.Unmarshal(value, &topologyRecovery); err != nil {
+		return log.Errore(err)
+	}
+	if err := writeResolveRecovery(&topologyRecovery); err != nil {
+		return log.Errore(err)
+	}
+	return nil
+}
+
 func (applier *CommandApplier) disableGlobalRecoveries(value []byte) interface{} {
 	err := DisableRecovery()
 	return err
@@ -197,4 +247,31 @@ func (applier *CommandApplier) disableGlobalRecoveries(value []byte) interface{}
 func (applier *CommandApplier) enableGlobalRecoveries(value []byte) interface{} {
 	err := EnableRecovery()
 	return err
+}
+
+func (applier *CommandApplier) putKeyValue(value []byte) interface{} {
+	kvPair := kv.KVPair{}
+	if err := json.Unmarshal(value, &kvPair); err != nil {
+		return log.Errore(err)
+	}
+	err := kv.PutKVPair(&kvPair)
+	return err
+}
+
+func (applier *CommandApplier) leaderURI(value []byte) interface{} {
+	var uri string
+	if err := json.Unmarshal(value, &uri); err != nil {
+		return log.Errore(err)
+	}
+	orcraft.LeaderURI.Set(uri)
+	return nil
+}
+
+func (applier *CommandApplier) healthReport(value []byte) interface{} {
+	var authenticationToken string
+	if err := json.Unmarshal(value, &authenticationToken); err != nil {
+		return log.Errore(err)
+	}
+	orcraft.ReportToRaftLeader(authenticationToken)
+	return nil
 }

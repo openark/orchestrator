@@ -9,7 +9,9 @@ The following setups are supported by `orchestrator`:
 - Semi-sync replication
 - Single master (aka standard) replication
 - Master-Master (two node in circle) replication
-- 5.7 Parallel replication, when in-order-replication is enabled (see [slave_preserve_commit_order](http://dev.mysql.com/doc/refman/5.7/en/replication-options-slave.html#sysvar_slave_preserve_commit_order)).
+- 5.7 Parallel replication
+  - When using GTID there's no further constraints.
+  - When using Pseudo-GTID in-order-replication must be enabled (see [slave_preserve_commit_order](http://dev.mysql.com/doc/refman/5.7/en/replication-options-slave.html#sysvar_slave_preserve_commit_order)).
 
 The following setups are _unsupported_:
 

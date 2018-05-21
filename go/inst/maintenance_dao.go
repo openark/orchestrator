@@ -22,6 +22,7 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/process"
+	"github.com/github/orchestrator/go/util"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )
@@ -90,7 +91,7 @@ func BeginBoundedMaintenance(instanceKey *InstanceKey, owner string, reason stri
 		owner,
 		reason,
 		process.ThisHostname,
-		process.ProcessToken.Hash,
+		util.ProcessToken.Hash,
 		explicitlyBounded,
 	)
 	if err != nil {
@@ -140,6 +141,28 @@ func EndMaintenanceByInstanceKey(instanceKey *InstanceKey) (wasMaintenance bool,
 	return wasMaintenance, err
 }
 
+// InMaintenance checks whether a given instance is under maintenacne
+func InMaintenance(instanceKey *InstanceKey) (inMaintenance bool, err error) {
+	query := `
+		select
+			count(*) > 0 as in_maintenance
+		from
+			database_instance_maintenance
+		where
+			hostname = ?
+			and port = ?
+			and maintenance_active = 1
+			and end_timestamp > NOW()
+			`
+	args := sqlutils.Args(instanceKey.Hostname, instanceKey.Port)
+	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
+		inMaintenance = m.GetBool("in_maintenance")
+		return nil
+	})
+
+	return inMaintenance, log.Errore(err)
+}
+
 // ReadMaintenanceInstanceKey will return the instanceKey for active maintenance by maintenanceToken
 func ReadMaintenanceInstanceKey(maintenanceToken int64) (*InstanceKey, error) {
 	var res *InstanceKey
@@ -162,10 +185,7 @@ func ReadMaintenanceInstanceKey(maintenanceToken int64) (*InstanceKey, error) {
 		return nil
 	})
 
-	if err != nil {
-		log.Errore(err)
-	}
-	return res, err
+	return res, log.Errore(err)
 }
 
 // EndMaintenance will terminate an active maintenance via maintenanceToken

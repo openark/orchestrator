@@ -158,6 +158,19 @@ func getClusterHint(params map[string]string) string {
 
 // figureClusterName is a convenience function to get a cluster name from hints
 func figureClusterName(hint string) (clusterName string, err error) {
+	if hint == "" {
+		return "", fmt.Errorf("Unable to determine cluster name by empty hint")
+	}
 	instanceKey, _ := inst.ParseRawInstanceKeyLoose(hint)
 	return inst.FigureClusterName(hint, instanceKey, nil)
+}
+
+// getClusterNameIfExists returns a cluster name by params hint, or an empty cluster name
+// if no hint is given
+func getClusterNameIfExists(params map[string]string) (clusterName string, err error) {
+	if clusterHint := getClusterHint(params); clusterHint == "" {
+		return "", nil
+	} else {
+		return figureClusterName(clusterHint)
+	}
 }

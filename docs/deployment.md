@@ -97,21 +97,13 @@ $ curl -s "http://my.orchestrator.service:80/api/begin-downtime/my.hostname/3306
 
 The `orchestrator-client` script runs this very API call, wrapping it up and encoding the URL path. It can also automatically detect the leader, in case you don't want to run through a proxy.
 
-### Using Pseudo-GTID
+### Pseudo-GTID
 
-If you're not using GTID, you can inject your own Pseudo-GTID entries, and `orchestrator` will be able to run GTID-like magic such as correlating two unrelated servers and making one replicate from the other.
+If you're not using GTID, you'll be happy to know `orchestrator` can utilize Pseudo-GTID to achieve similar benefits to GTID, such as correlating two unrelated servers and making one replicate from the other. This implies master and intermediate master failovers.
 
 Read more on the [Pseudo-GTID](pseudo-gtid.md) documentation page.
 
-On your masters, run the [pseudo-gtid](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/bin/pseudo-gtid) script as a service. See `pupept` [example](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/puppet).
-
-The service will inject Pseudo-GTID entries, to be replicated downstream.
-
-The script assumes the existence of a `meta.pseudo_gtid_status` table. Strictly speaking, this table doesn't have to exist, and you can strip away the code from the [pseudo-gtid](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/bin/pseudo-gtid) script that writes to this table. However, the table comes handy in making the pseudo-GTID entries visible via SQL (they're otherwise only visible in the binary log).
-
-Code for this table creation is found in [pseudo-gtid.sql](https://github.com/github/orchestrator/blob/master/resources/pseudo-gtid/pseudo-gtid.sql). This SQL file also suggests an alternative to the `pseudo-gtid` service, in the form of `event_scheduler`. Choose your preferred method.
-
-It should be noted that as part of failovers, you should make sure to disable pseudo-GTID on demoted master and enable it on promoted master.
+`orchestrator` can inject Pseudo-GTID entries for you. Your clusters will magically have GTID-like superpowers. Follow [Automated Pseudo-GTID](configuration-discovery-pseudo-gtid.md#automated-pseudo-gtid-injection)
 
 ### Populating meta data
 

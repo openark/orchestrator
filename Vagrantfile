@@ -16,20 +16,15 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.box = BOX
   config.vm.box_download_insecure = true
   config.vm.box_check_update = false
-  config.vm.provider 'virtualbox' do |vb|
-    vb.customize ['modifyvm', :id, '--nictype1', 'virtio']
-    vb.customize ['modifyvm', :id, '--nictype2', 'virtio']
-  end
-
-  config.vm.synced_folder '.', '/orchestrator', type: 'rsync',
-    rsync__auto: true,
-    rsync__exclude: ".git/"
+  config.vm.synced_folder '.', '/orchestrator', type: 'rsync', rsync__auto: true
 
   (0..4).each do |n|
     name = (n > 0 ? ("db" + n.to_s) : "admin")
     config.vm.define name do |db|
       db.vm.hostname = name
-      db.vm.network "private_network", ip: "192.168.57.20" + n.to_s
+      db.vm.network "private_network", ip: "192.168.57.20" + n.to_s,
+      virtualbox__inet: true
+
       db.vm.provision "shell", path: "vagrant/base-build.sh"
       if name == "admin"
         db.vm.network "forwarded_port", guest:3000, host:3000

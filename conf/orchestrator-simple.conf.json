@@ -51,7 +51,6 @@
   "#": "Recovery related config:",
   "#": "-----",
   "FailureDetectionPeriodBlockMinutes": 60,
-  "RecoveryPollSeconds": 10,
   "RecoveryPeriodBlockSeconds": 3600,
   "RecoveryIgnoreHostnameFilters": [],
   "RecoverMasterClusterFilters": [
@@ -62,6 +61,9 @@
   ],
   "OnFailureDetectionProcesses": [
     "echo 'Detected {failureType} on {failureCluster}. Affected replicas: {countSlaves}' >> /tmp/recovery.log"
+  ],
+  "PreGracefulTakeoverProcesses": [
+    "echo 'Planned takeover about to take place on {failureCluster}. Master will switch to read_only' >> /tmp/recovery.log"
   ],
   "PreFailoverProcesses": [
     "echo 'Will recover from {failureType} on {failureCluster}' >> /tmp/recovery.log"
@@ -75,6 +77,9 @@
   ],
   "PostIntermediateMasterFailoverProcesses": [
     "echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
+  ],
+  "PostGracefulTakeoverProcesses": [
+    "echo 'Planned takeover complete' >> /tmp/recovery.log"
   ],
   "DetachLostSlavesAfterMasterFailover": true,
   "ApplyMySQLPromotionAfterMasterFailover": false,

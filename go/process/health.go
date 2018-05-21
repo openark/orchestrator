@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/util"
 
 	"github.com/github/orchestrator/go/raft"
 	"github.com/openark/golib/log"
@@ -52,7 +53,7 @@ type NodeHealth struct {
 func NewNodeHealth() *NodeHealth {
 	return &NodeHealth{
 		Hostname:   ThisHostname,
-		Token:      ProcessToken.Hash,
+		Token:      util.ProcessToken.Hash,
 		AppVersion: config.RuntimeCLIFlags.ConfiguredVersion,
 	}
 }
@@ -60,7 +61,7 @@ func NewNodeHealth() *NodeHealth {
 func (nodeHealth *NodeHealth) Update() *NodeHealth {
 	nodeHealth.onceUpdate.Do(func() {
 		nodeHealth.Hostname = ThisHostname
-		nodeHealth.Token = ProcessToken.Hash
+		nodeHealth.Token = util.ProcessToken.Hash
 		nodeHealth.AppVersion = config.RuntimeCLIFlags.ConfiguredVersion
 	})
 	nodeHealth.LastReported = time.Now()
@@ -70,13 +71,18 @@ func (nodeHealth *NodeHealth) Update() *NodeHealth {
 var ThisNodeHealth = NewNodeHealth()
 
 type HealthStatus struct {
-	Healthy        bool
-	Hostname       string
-	Token          string
-	IsActiveNode   bool
-	ActiveNode     NodeHealth
-	Error          error
-	AvailableNodes [](*NodeHealth)
+	Healthy            bool
+	Hostname           string
+	Token              string
+	IsActiveNode       bool
+	ActiveNode         NodeHealth
+	Error              error
+	AvailableNodes     [](*NodeHealth)
+	RaftLeader         string
+	IsRaftLeader       bool
+	RaftLeaderURI      string
+	RaftAdvertise      string
+	RaftHealthyMembers []string
 }
 
 type OrchestratorExecutionMode string
@@ -100,12 +106,12 @@ func RegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
 
 // HealthTest attempts to write to the backend database and get a result
 func HealthTest() (health *HealthStatus, err error) {
-	cacheKey := ProcessToken.Hash
+	cacheKey := util.ProcessToken.Hash
 	if healthStatus, found := lastHealthCheckCache.Get(cacheKey); found {
 		return healthStatus.(*HealthStatus), nil
 	}
 
-	health = &HealthStatus{Healthy: false, Hostname: ThisHostname, Token: ProcessToken.Hash}
+	health = &HealthStatus{Healthy: false, Hostname: ThisHostname, Token: util.ProcessToken.Hash}
 	defer lastHealthCheckCache.Set(cacheKey, health, cache.DefaultExpiration)
 
 	if healthy, err := RegisterNode(ThisNodeHealth); err != nil {
@@ -118,13 +124,17 @@ func HealthTest() (health *HealthStatus, err error) {
 	if orcraft.IsRaftEnabled() {
 		health.ActiveNode.Hostname = orcraft.GetLeader()
 		health.IsActiveNode = orcraft.IsLeader()
+		health.RaftLeader = orcraft.GetLeader()
+		health.RaftLeaderURI = orcraft.LeaderURI.Get()
+		health.IsRaftLeader = orcraft.IsLeader()
+		health.RaftAdvertise = config.Config.RaftAdvertise
+		health.RaftHealthyMembers = orcraft.HealthyMembers()
 	} else {
 		if health.ActiveNode, health.IsActiveNode, err = ElectedNode(); err != nil {
 			health.Error = err
 			return health, log.Errore(err)
 		}
 	}
-
 	health.AvailableNodes, err = ReadAvailableNodes(true)
 
 	return health, nil

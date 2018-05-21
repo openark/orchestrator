@@ -128,6 +128,11 @@ body {
     color: #606060;
 }
 
+.instance h3 .pull-right > .glyphicon.text-muted {
+    color: #999999;
+}
+
+
 .instance h3 .glyphicon {
     position: inherit;
     cursor: default;
@@ -448,6 +453,38 @@ body {
 	cursor: pointer;
 }
 
+#audit_recovery_steps thead tr th {
+  border-bottom: 0px;
+}
+
+#audit_recovery_steps tbody tr td:first-child {
+  background-color: #f7f7f7;
+}
+
+#audit_recovery_details thead tr th {
+  border-bottom: 0px;
+}
+
+#audit_recovery_details tbody tr td:first-child {
+  background-color: #f7f7f7;
+}
+#audit_recovery_details tbody tr td:nth-child(2) {
+  white-space: nowrap;
+}
+#audit_recovery_details tbody tr td:nth-child(3) {
+  width: 100%;
+  border: 1px dotted #cccccc;
+}
+#audit_recovery_details tbody tr ul {
+  padding-left: 16px;
+}
+#audit_recovery_details tbody tr code {
+  background-color: inherit;
+}
+#audit_recovery_details tbody tr:first-child td:nth-child(3) {
+  background-color: #f7f7f7;
+}
+
 .table-unbordered > tbody > tr > td {
     border: 0px;
 }
@@ -499,10 +536,11 @@ body {
     float: left;
     position: fixed;
     left: 0px;
-    padding: 8px 15px 0px 15px;
+    padding: 8px 15px 8px 15px;
     z-index:100;
     border-right: dotted 1px #bbbbbb;
     background-color: #f7f7f7;
+    height: 100%;
 }
 
 #cluster_sidebar li {
@@ -555,8 +593,58 @@ body {
     color: #e68545;
 }
 
+#cluster_info {
+  position: fixed;
+  height: 100%;
+  overflow: auto;
+  z-index: 50;
+
+  padding-left: 64px;
+  margin-left: -64px;
+  padding-right: 24px;
+
+  border-right: dotted 1px #bbbbbb;
+  background-color: #f7f7f7;
+  font: 12px sans-serif;
+
+  display: none;
+}
+
+#cluster_info > div {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+#cluster_info [data-tag=glyphs] span.glyphicon {
+  font-size: 20px;
+}
+
+#cluster_info hr {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+
+#cluster_info div[data-tag=analysis] {
+  background-color: white;
+  border: 1px dotted #bbbbbb;
+  padding: 8px;
+}
+
+#cluster_info div[data-tag=analysis] div {
+  padding: 4px;
+}
+
+#cluster_name_info {
+  position: fixed;
+  z-index: 50;
+  padding-left: 64px;
+  background-color: #f7f7f7;
+}
+
 #cluster_wrapper {
   padding-left: 64px;
+  padding-top: 36px;
 }
 
 #cluster_name {
@@ -847,13 +935,16 @@ body {
 }
 
 
-#orchestratorStatusTable {
+.status-table {
     font: 12px sans-serif;
 }
 
-#orchestratorStatusTable code {
+.status-table code {
     font-size: 100%;
     background-color: inherit;
+}
+.status-table .long-text {
+  overflow: auto;
 }
 
 .instance.instance-search {

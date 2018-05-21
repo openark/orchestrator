@@ -29,9 +29,9 @@ import (
 	"github.com/github/orchestrator/go/agent"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/kv"
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/process"
-	"github.com/github/orchestrator/go/remote"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/util"
 )
@@ -209,6 +209,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	if !skipDatabaseCommands && !*config.RuntimeCLIFlags.SkipContinuousRegistration {
 		process.ContinuousRegistration(string(process.OrchestratorExecutionCliMode), command)
 	}
+	kv.InitKVStores()
+
 	// begin commands
 	switch command {
 	// smart mode
@@ -538,7 +540,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasPseudoGTID(instanceKey, false, func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.DisplayString()) }, postponedFunctionsContainer)
+			onCandidateReplicaChosen := func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.DisplayString()) }
+			lostReplicas, equalReplicas, aheadReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasPseudoGTID(instanceKey, false, onCandidateReplicaChosen, postponedFunctionsContainer, nil)
 			lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 			postponedFunctionsContainer.Wait()
 			if promotedReplica == nil {
@@ -550,107 +553,6 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 		}
-		// relay-log based synchronization
-	case registerCliCommand("align-via-relay-logs", "Remote relay log relocation", `Align instance's data by comparing and applying another instance's relay logs`):
-		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			if instanceKey == nil {
-				log.Fatalf("Unresolved instance")
-			}
-			instance, err := inst.ReadTopologyInstance(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if instance == nil {
-				log.Fatalf("Instance not found: %+v", *instanceKey)
-			}
-			if destinationKey == nil {
-				log.Fatal("Cannot deduce target instance:", destination)
-			}
-			otherInstance, err := inst.ReadTopologyInstance(destinationKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if otherInstance == nil {
-				log.Fatalf("Instance not found: %+v", *destinationKey)
-			}
-
-			_, err = agent.SyncReplicaRelayLogs(instance, otherInstance)
-			if err != nil {
-				log.Fatale(err)
-			}
-			fmt.Println(instance.Key.DisplayString())
-		}
-		// relay-log based synchronization
-	case registerCliCommand("align-via-relay-logs-ssh", "Remote relay log relocation", `Align instance's data by comparing and applying another instance's relay logs`):
-		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			if instanceKey == nil {
-				log.Fatalf("Unresolved instance")
-			}
-			instance, err := inst.ReadTopologyInstance(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if instance == nil {
-				log.Fatalf("Instance not found: %+v", *instanceKey)
-			}
-			if destinationKey == nil {
-				log.Fatal("Cannot deduce target instance:", destination)
-			}
-			otherInstance, err := inst.ReadTopologyInstance(destinationKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if otherInstance == nil {
-				log.Fatalf("Instance not found: %+v", *destinationKey)
-			}
-
-			_, err = remote.SyncReplicaRelayLogs(instance, otherInstance, remote.SyncRelaylogsChangeMasterToSharedMasterFunc, false)
-			if err != nil {
-				log.Fatale(err)
-			}
-			fmt.Println(instance.Key.DisplayString())
-		}
-	case registerCliCommand("regroup-replicas-ssh", "Remote relay log relocation", `Regroup replicas of a given instance by syncing their relay logs over SSH`):
-		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
-			instance := validateInstanceIsFound(instanceKey)
-
-			_, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instance, remote.SyncRelaylogsChangeMasterToSourceReplicaFunc, nil, true, postponedFunctionsContainer)
-			postponedFunctionsContainer.Wait()
-
-			log.Infof("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
-			for _, replica := range syncedReplicas {
-				fmt.Println(replica.Key.DisplayString())
-			}
-			if err != nil {
-				log.Fatale(err)
-			}
-		}
-	case registerCliCommand("sync-replicas-relaylogs", "Remote relay log relocation", `Given master, sync all of its replicas by remotely copying and applying relaylogs`):
-		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
-			instance := validateInstanceIsFound(instanceKey)
-
-			_, syncedReplicas, failedReplicas, postponedReplicas, err := remote.SyncReplicasRelayLogs(instance, remote.SyncRelaylogsChangeMasterToSharedMasterFunc, nil, false, postponedFunctionsContainer)
-			postponedFunctionsContainer.Wait()
-
-			log.Infof("synced: %d, failed: %d, postponed: %d", len(syncedReplicas), len(failedReplicas), len(postponedReplicas))
-			for _, replica := range syncedReplicas {
-				fmt.Println(replica.Key.DisplayString())
-			}
-			if err != nil {
-				log.Fatale(err)
-			}
-		}
-
 		// General replication commands
 	case registerCliCommand("enable-gtid", "Replication, general", `If possible, turn on GTID replication`):
 		{
@@ -785,6 +687,42 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatalf("Expecing --binlog argument as file:pos")
 			}
 			_, err = inst.MasterPosWait(instanceKey, binlogCoordinates)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
+	case registerCliCommand("enable-semi-sync-master", "Replication, general", `Enable semi-sync replication (master-side)`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			_, err := inst.SetSemiSyncMaster(instanceKey, true)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
+	case registerCliCommand("disable-semi-sync-master", "Replication, general", `Disable semi-sync replication (master-side)`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			_, err := inst.SetSemiSyncMaster(instanceKey, false)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
+	case registerCliCommand("enable-semi-sync-replica", "Replication, general", `Enable semi-sync replication (replica-side)`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			_, err := inst.SetSemiSyncReplica(instanceKey, true)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
+	case registerCliCommand("disable-semi-sync-replica", "Replication, general", `Disable semi-sync replication (replica-side)`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			_, err := inst.SetSemiSyncReplica(instanceKey, false)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1088,7 +1026,16 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("topology", "Information", `Show an ascii-graph of a replication topology, given a member of that topology`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
-			output, err := inst.ASCIITopology(clusterName, pattern)
+			output, err := inst.ASCIITopology(clusterName, pattern, false)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(output)
+		}
+	case registerCliCommand("topology-tabulated", "Information", `Show an ascii-graph of a replication topology, given a member of that topology`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			output, err := inst.ASCIITopology(clusterName, pattern, true)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1246,6 +1193,25 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(lag)
 		}
+	case registerCliCommand("submit-masters-to-kv-stores", "Key-value", `Submit master of a specific cluster, or all masters of all clusters to key-value stores`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			log.Debugf("cluster name is <%s>", clusterName)
+
+			kvPairs, err := inst.GetMastersKVPairs(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, kvPair := range kvPairs {
+				if err := kv.PutKVPair(kvPair); err != nil {
+					log.Fatale(err)
+				}
+			}
+			for _, kvPair := range kvPairs {
+				fmt.Println(fmt.Sprintf("%s:%s", kvPair.Key, kvPair.Value))
+			}
+		}
+
 		// Instance management
 	case registerCliCommand("discover", "Instance management", `Lookup an instance, investigate it`):
 		{
@@ -1307,6 +1273,17 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			fmt.Println(instanceKey.DisplayString())
+		}
+	case registerCliCommand("in-maintenance", "Instance management", `Check whether instance is under maintenance`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			inMaintenance, err := inst.InMaintenance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if inMaintenance {
+				fmt.Println(instanceKey.DisplayString())
+			}
 		}
 	case registerCliCommand("begin-downtime", "Instance management", `Mark an instance as downtimed`):
 		{
@@ -1383,10 +1360,13 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(topologyRecovery.SuccessorKey.DisplayString())
 		}
-	case registerCliCommand("graceful-master-takeover", "Recovery", `Gracefully discard master and promote another (direct child) instance instead, even if everything is running well`):
+	case registerCliCommand("graceful-master-takeover", "Recovery", `Gracefully promote a new master. Either indicate identity of new master via '-d designated.instance.com' or setup replication tree to have a single direct replica to the master.`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
-			topologyRecovery, promotedMasterCoordinates, err := logic.GracefulMasterTakeover(clusterName)
+			if destinationKey != nil {
+				validateInstanceIsFound(destinationKey)
+			}
+			topologyRecovery, promotedMasterCoordinates, err := logic.GracefulMasterTakeover(clusterName, destinationKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1403,6 +1383,17 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			for _, entry := range analysis {
 				fmt.Println(fmt.Sprintf("%s (cluster %s): %s", entry.AnalyzedInstanceKey.DisplayString(), entry.ClusterDetails.ClusterName, entry.AnalysisString()))
 			}
+		}
+	case registerCliCommand("ack-all-recoveries", "Recovery", `Acknowledge all recoveries; this unblocks pending future recoveries`):
+		{
+			if reason == "" {
+				log.Fatal("--reason option required (comment your ack)")
+			}
+			countRecoveries, err := logic.AcknowledgeAllRecoveries(inst.GetMaintenanceOwner(), reason)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(fmt.Sprintf("%d recoveries acknowldged", countRecoveries))
 		}
 	case registerCliCommand("ack-cluster-recoveries", "Recovery", `Acknowledge recoveries for a given cluster; this unblocks pending future recoveries`):
 		{
@@ -1428,29 +1419,6 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			fmt.Println(fmt.Sprintf("%d recoveries acknowldged", countRecoveries))
-		}
-	case registerCliCommand("get-best-master-replacement", "Recovery", `Information command suggesting the best would-be replacement to master of given cluster`):
-		{
-			clusterName := getClusterName(clusterAlias, instanceKey)
-			masters, err := inst.ReadClusterWriteableMaster(clusterName)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if len(masters) == 0 {
-				log.Fatalf("No writeable masters found for cluster %+v", clusterName)
-			}
-			clusterMaster := masters[0]
-
-			replicas, err := inst.ReadReplicaInstances(&clusterMaster.Key)
-			if err != nil {
-				log.Fatale(err)
-			}
-
-			replacement, err := logic.GetBestMasterReplacementFromAmongItsReplicas(nil, clusterMaster, replicas, false)
-			if err != nil {
-				log.Fatale(err)
-			}
-			fmt.Println(replacement.Key.DisplayString())
 		}
 	// Instance meta
 	case registerCliCommand("register-candidate", "Instance, meta", `Indicate that a specific instance is a preferred candidate for master promotion`):
@@ -1581,6 +1549,15 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			config.RuntimeCLIFlags.ConfiguredVersion = ""
 			inst.ReadClusters()
 			fmt.Println("Redeployed internal db")
+		}
+	case registerCliCommand("internal-suggest-promoted-replacement", "Internal", `Internal only, used to test promotion logic in CI`):
+		{
+			destination := validateInstanceIsFound(destinationKey)
+			replacement, _, err := logic.SuggestReplacementForPromotedReplica(&logic.TopologyRecovery{}, instanceKey, destination, nil)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(replacement.Key.DisplayString())
 		}
 	case registerCliCommand("custom-command", "Agent", "Execute a custom command on the agent as defined in the agent conf"):
 		{

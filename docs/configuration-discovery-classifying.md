@@ -21,7 +21,7 @@ By default, `orchestrator` uses `SHOW SLAVE STATUS` and takes a 1-second granula
 
 ### Cluster alias
 
-At your company the different clusters have common names. "Main", "Analytics", "Shard031" etc. However the MySQL clusters themselves are unaware of such names.  
+At your company the different clusters have common names. "Main", "Analytics", "Shard031" etc. However the MySQL clusters themselves are unaware of such names.
 
 `DetectClusterAliasQuery` is a query by which you will let `orchestrator` know the name of your cluster.
 
@@ -50,7 +50,7 @@ Perhaps your host naming conventions will disclose the cluster name and you only
 
 ### Data center
 
-`oechestrator` is data-center aware. Not only will it color them nicely on the web interface; but it will take DC into consideration when running failovers.
+`orchestrator` is data-center aware. Not only will it color them nicely on the web interface; but it will take DC into consideration when running failovers.
 
 You will configure data center awareness in one of two methods:
 

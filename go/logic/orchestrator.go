@@ -18,6 +18,7 @@ package logic
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"os/signal"
 	"sync"
@@ -30,6 +31,7 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/discovery"
 	"github.com/github/orchestrator/go/inst"
+	"github.com/github/orchestrator/go/kv"
 	ometrics "github.com/github/orchestrator/go/metrics"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/raft"
@@ -59,11 +61,14 @@ var discoveryQueueLengthGauge = metrics.NewGauge()
 var discoveryRecentCountGauge = metrics.NewGauge()
 var isElectedGauge = metrics.NewGauge()
 var isHealthyGauge = metrics.NewGauge()
+var isRaftHealthyGauge = metrics.NewGauge()
+var isRaftLeaderGauge = metrics.NewGauge()
 var discoveryMetrics = collection.CreateOrReturnCollection(discoveryMetricsName)
 
 var isElectedNode int64 = 0
 
 var recentDiscoveryOperationKeys *cache.Cache
+var pseudoGTIDPublishCache = cache.New(time.Minute, time.Second)
 
 func init() {
 	snapshotDiscoveryKeys = make(chan inst.InstanceKey, 10)
@@ -75,6 +80,8 @@ func init() {
 	metrics.Register("discoveries.recent_count", discoveryRecentCountGauge)
 	metrics.Register("elect.is_elected", isElectedGauge)
 	metrics.Register("health.is_healthy", isHealthyGauge)
+	metrics.Register("raft.is_healthy", isRaftHealthyGauge)
+	metrics.Register("raft.is_leader", isRaftLeaderGauge)
 
 	ometrics.OnMetricsTick(func() {
 		discoveryQueueLengthGauge.Update(int64(discoveryQueue.QueueLen()))
@@ -90,6 +97,16 @@ func init() {
 	})
 	ometrics.OnMetricsTick(func() {
 		isHealthyGauge.Update(atomic.LoadInt64(&process.LastContinousCheckHealthy))
+	})
+	ometrics.OnMetricsTick(func() {
+		var healthy int64
+		if orcraft.IsHealthy() {
+			healthy = 1
+		}
+		isRaftHealthyGauge.Update(healthy)
+	})
+	ometrics.OnMetricsTick(func() {
+		isRaftLeaderGauge.Update(atomic.LoadInt64(&isElectedNode))
 	})
 }
 
@@ -355,6 +372,9 @@ func onHealthTick() {
 	}
 }
 
+// publishDiscoverMasters will publish to raft a discovery request for all known masters.
+// This makes for a best-effort keep-in-sync between raft nodes, where some may have
+// inconsistent data due to hosts being forgotten, for example.
 func publishDiscoverMasters() error {
 	instances, err := inst.ReadWriteableClustersMasters()
 	if err == nil {
@@ -364,6 +384,34 @@ func publishDiscoverMasters() error {
 		}
 	}
 	return log.Errore(err)
+}
+
+// InjectPseudoGTIDOnWriters will inject a PseudoGTID entry on all writable, accessible,
+// supported writers.
+func InjectPseudoGTIDOnWriters() error {
+	instances, err := inst.ReadWriteableClustersMasters()
+	if err != nil {
+		return log.Errore(err)
+	}
+	for i := range rand.Perm(len(instances)) {
+		instance := instances[i]
+		go func() {
+			if injected, _ := inst.CheckAndInjectPseudoGTIDOnWriter(instance); injected {
+				clusterName := instance.ClusterName
+				if orcraft.IsRaftEnabled() {
+					// We prefer not saturating our raft communication. Pseudo-GTID information is
+					// OK to be cached for a while.
+					if _, found := pseudoGTIDPublishCache.Get(clusterName); !found {
+						pseudoGTIDPublishCache.Set(clusterName, true, cache.DefaultExpiration)
+						orcraft.PublishCommand("injected-pseudo-gtid", clusterName)
+					}
+				} else {
+					inst.RegisterInjectedPseudoGTID(clusterName)
+				}
+			}
+		}()
+	}
+	return nil
 }
 
 // ContinuousDiscovery starts an asynchronuous infinite discovery process where instances are
@@ -382,7 +430,9 @@ func ContinuousDiscovery() {
 	instancePollTick := time.Tick(instancePollSecondsDuration())
 	caretakingTick := time.Tick(time.Minute)
 	raftCaretakingTick := time.Tick(10 * time.Minute)
-	recoveryTick := time.Tick(time.Duration(config.Config.RecoveryPollSeconds) * time.Second)
+	recoveryTick := time.Tick(time.Duration(config.RecoveryPollSeconds) * time.Second)
+	autoPseudoGTIDTick := time.Tick(time.Duration(config.PseudoGTIDIntervalSeconds) * time.Second)
+	var recoveryEntrance int64
 	var snapshotTopologiesTick <-chan time.Time
 	if config.Config.SnapshotTopologiesIntervalHours > 0 {
 		snapshotTopologiesTick = time.Tick(time.Duration(config.Config.SnapshotTopologiesIntervalHours) * time.Hour)
@@ -391,7 +441,7 @@ func ContinuousDiscovery() {
 	go ometrics.InitMetrics()
 	go ometrics.InitGraphiteMetrics()
 	go acceptSignals()
-
+	go kv.InitKVStores()
 	if config.Config.RaftEnabled {
 		if err := orcraft.Setup(NewCommandApplier(), NewSnapshotDataCreatorApplier(), process.ThisHostname); err != nil {
 			log.Fatale(err)
@@ -420,6 +470,12 @@ func ContinuousDiscovery() {
 					go inst.ExpireDowntime()
 				}
 			}()
+		case <-autoPseudoGTIDTick:
+			go func() {
+				if config.Config.AutoPseudoGTID && IsLeader() {
+					go InjectPseudoGTIDOnWriters()
+				}
+			}()
 		case <-caretakingTick:
 			// Various periodic internal maintenance tasks
 			go func() {
@@ -442,6 +498,7 @@ func ContinuousDiscovery() {
 					go inst.ExpirePoolInstances()
 					go inst.FlushNontrivialResolveCacheToDatabase()
 					go inst.ExpireInstanceBinlogFileHistory()
+					go inst.ExpireInjectedPseudoGTID()
 					go process.ExpireNodesHistory()
 					go process.ExpireAccessTokens()
 					go process.ExpireAvailableNodes()
@@ -467,6 +524,12 @@ func ContinuousDiscovery() {
 					go inst.ExpireInstanceAnalysisChangelog()
 
 					go func() {
+						// This function is non re-entrant (it can only be running once at any point in time)
+						if atomic.CompareAndSwapInt64(&recoveryEntrance, 0, 1) {
+							defer atomic.StoreInt64(&recoveryEntrance, 0)
+						} else {
+							return
+						}
 						if time.Since(continuousDiscoveryStartTime) >= checkAndRecoverWaitPeriod {
 							CheckAndRecover(nil, nil, false)
 						} else {

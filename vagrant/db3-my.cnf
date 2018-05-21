@@ -7,7 +7,3 @@ server_id=3
 log_bin
 log-slave-updates
 report-host=db3
-
-[mysqld_safe]
-log-error=/var/log/mysqld.log
-pid-file=/var/run/mysqld/mysqld.pid

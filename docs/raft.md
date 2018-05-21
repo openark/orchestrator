@@ -2,7 +2,7 @@
 
 ![orchestrator HA via raft](images/orchestrator-ha--raft.png)
 
-`orchestratpr/raft` is a deployment setup where several `orchestrator` nodes communicate with each other via `raft` consensus protocol.
+`orchestrator/raft` is a deployment setup where several `orchestrator` nodes communicate with each other via `raft` consensus protocol.
 
 `orchestrator/raft` deployments solve both high-availability for `orchestrator` itself as well as solve issues with network isolation, and in particular cross-data-center network partitioning/fencing.
 
@@ -24,6 +24,7 @@ At this time `orchestrator` nodes to not join dynamically into the cluster. The 
 
 ```json
   "RaftEnabled": true,
+  "RaftDataDir": "/var/lib/orchestrator",
   "RaftBind": "<ip.or.fqdn.of.this.orchestrator.node>",
   "DefaultRaftPort": 10008,
   "RaftNodes": [
@@ -49,11 +50,11 @@ Each `orchestrator` node has its own, dedicated backend database server. This wo
 
 `orchestrator` is bundled with `sqlite`, there is no need to install an external dependency.
 
-#### Proxy
+#### Proxy: leader
 
-You should only send requests to the leader node.
+Only the leader is allowed to make changes.
 
-One way to achieve this is to set up a `HTTP` proxy (e.g HAProxy) on top of the `orchestrator` services.
+Simplest setup it to only route traffic to the leader, by setting up a `HTTP` proxy (e.g HAProxy) on top of the `orchestrator` services.
 
 > See [orchestrator-client](#orchestrator-client) section for an alternate approach
 
@@ -85,6 +86,20 @@ listen orchestrator
   server orchestrator-node-1 orchestrator-node-1.fqdn.com:3000 check
   server orchestrator-node-2 orchestrator-node-2.fqdn.com:3000 check
 ```
+
+#### Proxy: healthy raft nodes
+
+A relaxation of the above constraint.
+
+Healthy raft nodes will reverse proxy your requests to the leader. You may choose (and this happens to be desirable for `kubernetes` setups) to talk to any healthy raft member.
+
+You _must not access unhealthy raft members, i.e. nodes that are isolated from the quorum_.
+
+- Use `/api/raft-health` to identify that a node is part of a healthy raft group.
+- A `HTTP 200/OK` response identifies the node as part of the healthy group, and you may direct traffic to the node.
+- A `HTTP 500/Internal Server Error` indicates the node is not part of a healthy group.
+  Note that immediately following startup, and until a leader is elected, you may expect some time where all nodes report as unhealthy.
+  Note that upon leader re-election you may observe a brief period where all nodes report as unhealthy.
 
 #### orchestrator-client
 
@@ -154,6 +169,8 @@ new-node$    sqlite3 /var/lib/orchestrator/orchestrator.db < /tmp/orchestrator-d
 ```
 
   - With `MySQL` use your favorite backup/restore method.
+
+See also [Master discovery with Key Value stores](kv.md#kv-and-orchestratorraft) via `orchestrator/raft`.
 
 ### Main advantages of orchestrator/raft
 

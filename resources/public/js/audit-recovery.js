@@ -1,4 +1,5 @@
 $(document).ready(function() {
+  $("#audit_recovery_steps").hide();
   showLoader();
   var apiUri = "/api/audit-recovery/" + currentPage();
   if (auditCluster()) {
@@ -7,38 +8,141 @@ $(document).ready(function() {
   if (recoveryId() > 0) {
     apiUri = "/api/audit-recovery/id/" + recoveryId();
   }
+  if (recoveryUid() != "") {
+    apiUri = "/api/audit-recovery/uid/" + recoveryUid();
+  }
   $.get(appUrl(apiUri), function(auditEntries) {
     auditEntries = auditEntries || [];
     displayAudit(auditEntries);
   }, "json");
+
+  function ackInfo(audit) {
+    var info = "";
+    if (audit.Acknowledged) {
+      info += '<div><span class="text-success">Acknowledged by ' + audit.AcknowledgedBy + ', ' + audit.AcknowledgedAt + '<span><ul>';
+      info += "<li>" + audit.AcknowledgedComment + "</li>";
+      info += '</ul></div>';
+    } else {
+      info += '<div><button class="btn btn-primary ack-recovery" data-recovery-id="'+audit.Id+'">Acknowledge</button>';
+      info += ' This recovery is unacknowledged.';
+      info += '</div>';
+    }
+    return info;
+  }
+
+  function auditInfo(audit) {
+    var moreInfo = "";
+    if (audit.LostReplicas.length > 0) {
+      moreInfo += "<div>Lost replicas:<ul>";
+      audit.LostReplicas.forEach(function(instanceKey) {
+        moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
+      });
+      moreInfo += "</ul></div>";
+    }
+    if (audit.ParticipatingInstanceKeys.length > 0) {
+      moreInfo += "<div>Participating instances:<ul>";
+      audit.ParticipatingInstanceKeys.forEach(function(instanceKey) {
+        moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
+      });
+      moreInfo += "</ul></div>";
+    }
+    if (audit.AnalysisEntry.SlaveHosts.length > 0) {
+      moreInfo += '<div>' + audit.AnalysisEntry.CountReplicas + ' replicating hosts :<ul>';
+      audit.AnalysisEntry.SlaveHosts.forEach(function(instanceKey) {
+        moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
+      });
+      moreInfo += "</ul></div>";
+    }
+    if (audit.AllErrors.length > 0 && audit.AllErrors[0]) {
+      moreInfo += "All errors:<ul>";
+      audit.AllErrors.forEach(function(err) {
+        moreInfo += "<li>" + err;
+      });
+      moreInfo += "</ul>";
+    }
+    moreInfo += '<div><a href="' + appUrl('/web/audit-failure-detection/id/' + audit.LastDetectionId) + '">Related detection</a></div>';
+    moreInfo += '<div>Proccessed by <code>' + audit.ProcessingNodeHostname + '</code></div>';
+    return moreInfo;
+  }
+  function displaySingleAudit(audit) {
+    $("#audit .pager").hide();
+    $("#audit_recovery_table").hide();
+
+    var clusterAlias = audit.AnalysisEntry.ClusterDetails.ClusterAlias;
+    var clusterName = audit.AnalysisEntry.ClusterDetails.ClusterName;
+    var failedInstanceTitle = getInstanceTitle(audit.AnalysisEntry.AnalyzedInstanceKey.Hostname, audit.AnalysisEntry.AnalyzedInstanceKey.Port);
+    $("#audit_recovery_details thead h3").text(audit.AnalysisEntry.Analysis + ' on ' + clusterAlias + '/' + failedInstanceTitle)
+
+    var appendRow = function(td1, td2) {
+      var row = $('<tr/>');
+      $('<td/>', {
+        text: td1
+      }).appendTo(row);
+      $('<td/>', {
+        html: td2
+      }).appendTo(row);
+
+      row.appendTo($("#audit_recovery_details tbody"));
+    }
+    appendRow("Failed instance", failedInstanceTitle)
+    var successor = getInstanceTitle(audit.SuccessorKey.Hostname, audit.SuccessorKey.Port);
+    if (audit.IsSuccessful === false) {
+      successor = '<span class="text-danger"><span class="glyphicon glyphicon-remove-sign"></span> FAIL '+successor+'</span>';
+    } else {
+      successor = '<span class="text-success"><span class="glyphicon glyphicon-ok-sign"></span> '+successor+'</span>';
+    }
+    appendRow("Successor", successor)
+    if (clusterAlias != clusterName) {
+      appendRow("Cluster alias", '<a href="/web/cluster/alias/'+clusterAlias+'">' + clusterAlias + '</a>')
+    }
+    appendRow("Cluster name", '<a href="/web/cluster/'+clusterName+'">' + clusterName + '</a>')
+    appendRow("Affected replicas", audit.AnalysisEntry.CountReplicas)
+    appendRow("Start time", audit.RecoveryStartTimestamp)
+    appendRow("End time", audit.RecoveryEndTimestamp)
+
+    var numRows = $("#audit_recovery_details tbody tr").length;
+    $('<td/>', {
+      html: ackInfo(audit)
+    }).attr("rowspan", 1).addClass("ack").appendTo($("#audit_recovery_details tbody tr:first-child"));
+    $('<td/>', {
+      html: auditInfo(audit)
+    }).attr("rowspan", numRows-1).appendTo($("#audit_recovery_details tbody tr:nth-child(2)"));
+
+    auditRecoverySteps(audit.UID, $('#audit_recovery_steps'))
+    $("#audit_recovery_steps").show();
+  }
 
   function displayAudit(auditEntries) {
     var baseWebUri = appUrl("/web/audit-recovery/");
     if (auditCluster()) {
       baseWebUri += "cluster/" + auditCluster() + "/";
     }
+    var singleRecoveryAudit = (auditEntries.length == 1);
 
     hideLoader();
     auditEntries.forEach(function(audit) {
+      if (singleRecoveryAudit) {
+        displaySingleAudit(audit)
+        return;
+      }
+
       var analyzedInstanceDisplay = getInstanceTitle(audit.AnalysisEntry.AnalyzedInstanceKey.Hostname, audit.AnalysisEntry.AnalyzedInstanceKey.Port);
       var sucessorInstanceDisplay = getInstanceTitle(audit.SuccessorKey.Hostname, audit.SuccessorKey.Port);
       var row = $('<tr/>');
-      var ack = $('<span class="pull-left glyphicon acknowledge-indicator" title=""></span>');
+      var ack = $('<span class="glyphicon acknowledge-indicator" title=""></span>');
       if (audit.Acknowledged) {
         ack.addClass("glyphicon-ok-sign").addClass("text-primary");
         var ackTitle = "Acknowledged by " + audit.AcknowledgedBy + " at " + audit.AcknowledgedAt + ": " + audit.AcknowledgedComment;
         ack.attr("title", ackTitle);
       } else {
-        ack.addClass("glyphicon-question-sign").addClass("text-danger").addClass("unacknowledged");
+        ack.addClass("glyphicon-question-sign").addClass("text-danger").addClass("ack-recovery");
         ack.attr("data-recovery-id", audit.Id);
         ack.attr("title", "Unacknowledged. Click to acknowledge");
       }
-      var moreInfoElement = $('<span class="more-recovery-info pull-right glyphicon glyphicon-info-sign text-primary" title="More info"></span>');
-      moreInfoElement.attr("data-recovery-id", audit.Id);
 
-      $('<td/>', {
-        text: audit.AnalysisEntry.Analysis
-      }).prepend(ack).prepend(moreInfoElement).appendTo(row);
+    $('<td/>', {
+        html: '<a href="' + appUrl('/web/audit-recovery/uid/' + audit.UID) + '">'+audit.AnalysisEntry.Analysis+'</a>'
+      }).prepend(ack).appendTo(row);
       $('<a/>', {
         text: analyzedInstanceDisplay,
         href: appUrl("/web/search/" + analyzedInstanceDisplay)
@@ -74,46 +178,8 @@ $(document).ready(function() {
           text: "pending"
         }).appendTo(row);
       }
-      var moreInfo = "";
-      if (audit.Acknowledged) {
-        moreInfo += '<div>Acknowledged by ' + audit.AcknowledgedBy + ', ' + audit.AcknowledgedAt + '<ul>';
-        moreInfo += "<li>" + audit.AcknowledgedComment + "</li>";
-        moreInfo += '</ul></div>';
-      } else {
-        moreInfo += '<div><strong>Unacknowledged</strong></div>';
-      }
-      if (audit.LostReplicas.length > 0) {
-        moreInfo += "<div>Lost replicas:<ul>";
-        audit.LostReplicas.forEach(function(instanceKey) {
-          moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
-        });
-        moreInfo += "</ul></div>";
-      }
-      if (audit.ParticipatingInstanceKeys.length > 0) {
-        moreInfo += "<div>Participating instances:<ul>";
-        audit.ParticipatingInstanceKeys.forEach(function(instanceKey) {
-          moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
-        });
-        moreInfo += "</ul></div>";
-      }
-      if (audit.AnalysisEntry.SlaveHosts.length > 0) {
-        moreInfo += '<div>' + audit.AnalysisEntry.CountReplicas + ' replicating hosts :<ul>';
-        audit.AnalysisEntry.SlaveHosts.forEach(function(instanceKey) {
-          moreInfo += "<li><code>" + getInstanceTitle(instanceKey.Hostname, instanceKey.Port) + "</code></li>";
-        });
-        moreInfo += "</ul></div>";
-      }
-      if (audit.AllErrors.length > 0 && audit.AllErrors[0]) {
-        moreInfo += "All errors:<ul>";
-        audit.AllErrors.forEach(function(err) {
-          moreInfo += "<li>" + err;
-        });
-        moreInfo += "</ul>";
-      }
-      moreInfo += '<div><a href="' + appUrl('/web/audit-failure-detection/id/' + audit.LastDetectionId) + '">Related detection</a></div>';
-      moreInfo += '<div>Proccessed by <code>' + audit.ProcessingNodeHostname + '</code></div>';
-      moreInfo += '<div><a href="' + appUrl('/web/audit-recovery-steps/' + audit.UID) + '">Recovery steps</a></div>';
-      row.appendTo('#audit tbody');
+      var moreInfo = auditInfo(audit);
+      row.appendTo('#audit_recovery_table tbody');
 
       var row = $('<tr/>');
       row.addClass("more-info");
@@ -122,9 +188,9 @@ $(document).ready(function() {
       if (audit.Acknowledged) {
         row.hide()
       }
-      row.appendTo('#audit tbody');
+      row.appendTo('#audit_recovery_table tbody');
     });
-    if (auditEntries.length == 1) {
+    if (singleRecoveryAudit) {
       $("[data-recovery-id-more-info]").show();
     }
     if (currentPage() <= 0) {
@@ -142,26 +208,14 @@ $(document).ready(function() {
     $("#audit .pager .disabled a").click(function() {
       return false;
     });
-    $("body").on("click", ".more-recovery-info", function(event) {
-      var recoveryId = $(event.target).attr("data-recovery-id");
-      $('[data-recovery-id-more-info=' + recoveryId + ']').slideToggle();
-    });
-    $("body").on("click", ".acknowledge-indicator.unacknowledged", function(event) {
+    $("body").on("click", ".ack-recovery", function(event) {
       var recoveryId = $(event.target).attr("data-recovery-id");
       bootbox.prompt({
         title: "Acknowledge recovery",
         placeholder: "comment",
         callback: function(result) {
           if (result !== null) {
-            showLoader();
-            $.get(appUrl("/api/ack-recovery/" + recoveryId + "?comment=" + encodeURIComponent(result)), function(operationResult) {
-              hideLoader();
-              if (operationResult.Code == "ERROR") {
-                addAlert(operationResult.Message)
-              } else {
-                location.reload();
-              }
-            }, "json");
+            apiCommand("/api/ack-recovery/" + recoveryId + "?comment=" + encodeURIComponent(result));
           }
         }
       });

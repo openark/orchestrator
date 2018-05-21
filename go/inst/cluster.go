@@ -17,10 +17,50 @@
 package inst
 
 import (
-	"github.com/github/orchestrator/go/config"
+	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/kv"
 )
+
+func GetClusterMasterKVKey(clusterAlias string) string {
+	return fmt.Sprintf("%s%s", config.Config.KVClusterMasterPrefix, clusterAlias)
+}
+
+func getClusterMasterKVPair(clusterAlias string, masterKey *InstanceKey) *kv.KVPair {
+	if clusterAlias == "" {
+		return nil
+	}
+	if masterKey == nil {
+		return nil
+	}
+	return kv.NewKVPair(GetClusterMasterKVKey(clusterAlias), masterKey.StringCode())
+}
+
+// GetClusterMasterKVPairs returns all KV pairs associated with a master. This includes the
+// full identity of the master as well as a breakdown by hostname, port, ipv4, ipv6
+func GetClusterMasterKVPairs(clusterAlias string, masterKey *InstanceKey) (kvPairs [](*kv.KVPair)) {
+	masterKVPair := getClusterMasterKVPair(clusterAlias, masterKey)
+	if masterKVPair == nil {
+		return kvPairs
+	}
+	kvPairs = append(kvPairs, masterKVPair)
+
+	addPair := func(keySuffix, value string) {
+		key := fmt.Sprintf("%s/%s", masterKVPair.Key, keySuffix)
+		kvPairs = append(kvPairs, kv.NewKVPair(key, value))
+	}
+
+	addPair("hostname", masterKey.Hostname)
+	addPair("port", fmt.Sprintf("%d", masterKey.Port))
+	if ipv4, ipv6, err := readHostnameIPs(masterKey.Hostname); err == nil {
+		addPair("ipv4", ipv4)
+		addPair("ipv6", ipv6)
+	}
+	return kvPairs
+}
 
 // mappedClusterNameToAlias attempts to match a cluster with an alias based on
 // configured ClusterNameToAlias map

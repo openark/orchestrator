@@ -46,6 +46,21 @@
       <p>
         Developed by Shlomi Noach.
       </p>
+      <p>
+        <span id='customized' style='display: none'>This version has customizations and is unsupported.</span>
+        <script type="text/javascript">
+          $.get('../css/custom.css', function( content ) {
+            if (content.length > 0) {
+              $('#customized').css('display', 'block');
+            }
+          });
+          $.get('../js/custom.js', function( content ) {
+            if (content.length > 0) {
+              $('#customized').css('display', 'block');
+            }
+          });
+        </script>
+      </p>
     </div>
   </div>
 </div>

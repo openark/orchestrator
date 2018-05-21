@@ -25,6 +25,7 @@ import (
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/raft"
+	"github.com/github/orchestrator/go/util"
 
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
@@ -47,22 +48,22 @@ func init() {
 func initializeAnalysisDaoPostConfiguration() {
 	config.WaitForConfigurationToBeLoaded()
 
-	recentInstantAnalysis = cache.New(time.Duration(config.Config.RecoveryPollSeconds*2)*time.Second, time.Second)
+	recentInstantAnalysis = cache.New(time.Duration(config.RecoveryPollSeconds*2)*time.Second, time.Second)
 }
 
 // GetReplicationAnalysis will check for replication problems (dead master; unreachable master; etc)
 func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnalysis bool) ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
-	args := sqlutils.Args(2*config.Config.InstancePollSeconds, clusterName)
+	args := sqlutils.Args(ValidSecondsFromSeenToLastAttemptedCheck(), clusterName)
 	analysisQueryReductionClause := ``
 	if config.Config.ReduceReplicationAnalysisCount {
 		analysisQueryReductionClause = `
 			HAVING
 				(MIN(
-		        		master_instance.last_checked <= master_instance.last_seen
-		        		AND master_instance.last_attempted_check <= master_instance.last_seen + INTERVAL ? SECOND
-		        	) = 1 /* AS is_last_check_valid */) = 0
+					master_instance.last_checked <= master_instance.last_seen
+					and master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
+       	 ) = 1 /* AS is_last_check_valid */) = 0
 				OR (IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
 		                    AND slave_instance.slave_io_running = 0
 		                    AND slave_instance.last_io_error like '%error %connecting to master%'
@@ -81,7 +82,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		          ) /* AS is_failing_to_connect_to_master */)
 				OR (COUNT(slave_instance.server_id) /* AS count_slaves */ > 0)
 			`
-		args = append(args, 2*config.Config.InstancePollSeconds)
+		args = append(args, ValidSecondsFromSeenToLastAttemptedCheck())
 	}
 	// "OR count_slaves > 0" above is a recent addition, which, granted, makes some previous conditions redundant.
 	// It gives more output, and more "NoProblem" messages that I am now interested in for purpose of auditing in database_instance_analysis_changelog
@@ -89,14 +90,17 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		    SELECT
 		        master_instance.hostname,
 		        master_instance.port,
+						master_instance.data_center,
+						master_instance.physical_environment,
 		        MIN(master_instance.master_host) AS master_host,
 		        MIN(master_instance.master_port) AS master_port,
 		        MIN(master_instance.cluster_name) AS cluster_name,
 		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
 		        MIN(
-		        		master_instance.last_checked <= master_instance.last_seen
-		        		AND master_instance.last_attempted_check <= master_instance.last_seen + INTERVAL ? SECOND
+							master_instance.last_checked <= master_instance.last_seen
+							and master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
 		        	) = 1 AS is_last_check_valid,
+						MIN(master_instance.last_check_partial_success) as last_check_partial_success,
 		        MIN(master_instance.master_host IN ('' , '_')
 		            OR master_instance.master_port = 0
 								OR substr(master_instance.master_host, 1, 2) = '//') AS is_master,
@@ -104,6 +108,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		        MIN(CONCAT(master_instance.hostname,
 		                ':',
 		                master_instance.port) = master_instance.cluster_name) AS is_cluster_master,
+						MIN(master_instance.gtid_mode) AS gtid_mode,
 		        COUNT(slave_instance.server_id) AS count_slaves,
 		        IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen),
 		                0) AS count_valid_slaves,
@@ -175,6 +180,10 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 								AND slave_instance.log_slave_updates
 								AND slave_instance.binlog_format = 'ROW'),
               0) AS count_row_based_loggin_slaves,
+						IFNULL(MIN(slave_instance.gtid_mode), '')
+              AS min_replica_gtid_mode,
+						IFNULL(MAX(slave_instance.gtid_mode), '')
+              AS max_replica_gtid_mode,
 						IFNULL(SUM(
 								replica_downtime.downtime_active is not null
 								and ifnull(replica_downtime.end_timestamp, now()) > now()),
@@ -227,16 +236,20 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		a := ReplicationAnalysis{
 			Analysis:               NoProblem,
 			ProcessingNodeHostname: process.ThisHostname,
-			ProcessingNodeToken:    process.ProcessToken.Hash,
+			ProcessingNodeToken:    util.ProcessToken.Hash,
 		}
 
 		a.IsMaster = m.GetBool("is_master")
 		a.IsCoMaster = m.GetBool("is_co_master")
 		a.AnalyzedInstanceKey = InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
 		a.AnalyzedInstanceMasterKey = InstanceKey{Hostname: m.GetString("master_host"), Port: m.GetInt("master_port")}
+		a.AnalyzedInstanceDataCenter = m.GetString("data_center")
+		a.AnalyzedInstancePhysicalEnvironment = m.GetString("physical_environment")
 		a.ClusterDetails.ClusterName = m.GetString("cluster_name")
 		a.ClusterDetails.ClusterAlias = m.GetString("cluster_alias")
+		a.GTIDMode = m.GetString("gtid_mode")
 		a.LastCheckValid = m.GetBool("is_last_check_valid")
+		a.LastCheckPartialSuccess = m.GetBool("last_check_partial_success")
 		a.CountReplicas = m.GetUint("count_slaves")
 		a.CountValidReplicas = m.GetUint("count_valid_slaves")
 		a.CountValidReplicatingReplicas = m.GetUint("count_valid_replicating_slaves")
@@ -261,6 +274,9 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		countValidBinlogServerSlaves := m.GetUint("count_valid_binlog_server_slaves")
 		a.BinlogServerImmediateTopology = countValidBinlogServerSlaves == a.CountValidReplicas && a.CountValidReplicas > 0
 		a.PseudoGTIDImmediateTopology = m.GetBool("is_pseudo_gtid")
+
+		a.MinReplicaGTIDMode = m.GetString("min_replica_gtid_mode")
+		a.MaxReplicaGTIDMode = m.GetString("max_replica_gtid_mode")
 
 		a.CountStatementBasedLoggingReplicas = m.GetUint("count_statement_based_loggin_slaves")
 		a.CountMixedBasedLoggingReplicas = m.GetUint("count_mixed_based_loggin_slaves")
@@ -287,7 +303,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			a.Analysis = UnreachableMasterWithStaleSlaves
 			a.Description = "Master cannot be reached by orchestrator and has running yet stale replicas"
 			//
-		} else if a.IsMaster && !a.LastCheckValid && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
+		} else if a.IsMaster && !a.LastCheckValid && !a.LastCheckPartialSuccess && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
 			a.Analysis = UnreachableMaster
 			a.Description = "Master cannot be reached by orchestrator but it has replicating replicas; possibly a network/host issue"
 			//
@@ -319,7 +335,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			a.Analysis = DeadCoMasterAndSomeSlaves
 			a.Description = "Co-master cannot be reached by orchestrator; some of its replicas are unreachable and none of its reachable replicas is replicating"
 			//
-		} else if a.IsCoMaster && !a.LastCheckValid && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
+		} else if a.IsCoMaster && !a.LastCheckValid && !a.LastCheckPartialSuccess && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
 			a.Analysis = UnreachableCoMaster
 			a.Description = "Co-master cannot be reached by orchestrator but it has replicating replicas; possibly a network/host issue"
 			//
@@ -347,7 +363,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			a.Analysis = DeadIntermediateMasterAndSlaves
 			a.Description = "Intermediate master cannot be reached by orchestrator and all of its replicas are unreachable"
 			//
-		} else if !a.IsMaster && !a.LastCheckValid && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
+		} else if !a.IsMaster && !a.LastCheckValid && !a.LastCheckPartialSuccess && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
 			a.Analysis = UnreachableIntermediateMaster
 			a.Description = "Intermediate master cannot be reached by orchestrator but it has replicating replicas; possibly a network/host issue"
 			//
@@ -382,31 +398,34 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			if a.Analysis == NoProblem && len(a.StructureAnalysis) == 0 {
 				return
 			}
-			skipThisHost := false
 			for _, filter := range config.Config.RecoveryIgnoreHostnameFilters {
 				if matched, _ := regexp.MatchString(filter, a.AnalyzedInstanceKey.Hostname); matched {
-					skipThisHost = true
+					return
 				}
 			}
-			if a.IsDowntimed && !includeDowntimed {
-				skipThisHost = true
+			if a.IsDowntimed {
+				a.SkippableDueToDowntime = true
 			}
 			if a.CountReplicas == a.CountDowntimedReplicas {
 				switch a.Analysis {
 				case AllMasterSlavesNotReplicating,
 					AllMasterSlavesNotReplicatingOrDead,
+					MasterSingleSlaveDead,
 					AllCoMasterSlavesNotReplicating,
+					DeadIntermediateMasterWithSingleSlave,
+					DeadIntermediateMasterWithSingleSlaveFailingToConnect,
+					DeadIntermediateMasterAndSlaves,
+					DeadIntermediateMasterAndSomeSlaves,
 					AllIntermediateMasterSlavesFailingToConnectOrDead,
 					AllIntermediateMasterSlavesNotReplicating:
 					a.IsReplicasDowntimed = true
+					a.SkippableDueToDowntime = true
 				}
 			}
-			if a.IsReplicasDowntimed && !includeDowntimed {
-				skipThisHost = true
+			if a.SkippableDueToDowntime && !includeDowntimed {
+				return
 			}
-			if !skipThisHost {
-				result = append(result, a)
-			}
+			result = append(result, a)
 		}
 
 		{
@@ -423,6 +442,10 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 			}
 			if a.IsMaster && a.CountDistinctMajorVersionsLoggingReplicas > 1 {
 				a.StructureAnalysis = append(a.StructureAnalysis, MultipleMajorVersionsLoggingSlaves)
+			}
+
+			if a.CountReplicas > 0 && (a.GTIDMode != a.MinReplicaGTIDMode || a.GTIDMode != a.MaxReplicaGTIDMode) {
+				a.StructureAnalysis = append(a.StructureAnalysis, DifferentGTIDModesStructureWarning)
 			}
 		}
 		appendAnalysis(&a)

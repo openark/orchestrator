@@ -20,6 +20,7 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/raft"
+	"github.com/github/orchestrator/go/util"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )
@@ -34,7 +35,7 @@ func AttemptElection() (bool, error) {
 				1, ?, ?, now(), now()
 			)
 		`,
-			ThisHostname, ProcessToken.Hash,
+			ThisHostname, util.ProcessToken.Hash,
 		)
 		if err != nil {
 			return false, log.Errore(err)
@@ -60,7 +61,7 @@ func AttemptElection() (bool, error) {
 				anchor = 1
 			  and last_seen_active < (now() - interval ? second)
 		`,
-			ThisHostname, ProcessToken.Hash, config.ActiveNodeExpireSeconds,
+			ThisHostname, util.ProcessToken.Hash, config.ActiveNodeExpireSeconds,
 		)
 		if err != nil {
 			return false, log.Errore(err)
@@ -84,7 +85,7 @@ func AttemptElection() (bool, error) {
 				and hostname = ?
 				and token = ?
 		`,
-			ThisHostname, ProcessToken.Hash,
+			ThisHostname, util.ProcessToken.Hash,
 		)
 		if err != nil {
 			return false, log.Errore(err)
@@ -113,7 +114,7 @@ func GrabElection() error {
 					1, ?, ?, now(), now()
 				)
 			`,
-		ThisHostname, ProcessToken.Hash,
+		ThisHostname, util.ProcessToken.Hash,
 	)
 	return log.Errore(err)
 }
@@ -121,7 +122,6 @@ func GrabElection() error {
 // Reelect clears the way for re-elections. Active node is immediately demoted.
 func Reelect() error {
 	if orcraft.IsRaftEnabled() {
-		// return log.Errorf("Cannot Reelect on raft setup")
 		orcraft.StepDown()
 	}
 	_, err := db.ExecOrchestrator(`delete from active_node where anchor = 1`)
@@ -150,6 +150,6 @@ func ElectedNode() (node NodeHealth, isElected bool, err error) {
 		return nil
 	})
 
-	isElected = (node.Hostname == ThisHostname && node.Token == ProcessToken.Hash)
+	isElected = (node.Hostname == ThisHostname && node.Token == util.ProcessToken.Hash)
 	return node, isElected, log.Errore(err)
 }

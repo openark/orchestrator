@@ -49,8 +49,6 @@ function Cluster() {
     },
   };
 
-
-
   Object.defineProperties(_this, {
     moveInstanceMethod: {
       get: function() {
@@ -1085,7 +1083,7 @@ function Cluster() {
       '</strong></code> as master?';
     bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
       if (confirm) {
-        apiCommand("/api/graceful-master-takeover/" + existingMasterNode.Key.Hostname + "/" + existingMasterNode.Key.Port);
+        apiCommand("/api/graceful-master-takeover/" + existingMasterNode.Key.Hostname + "/" + existingMasterNode.Key.Port + "/" + newMasterNode.Key.Hostname + "/" + newMasterNode.Key.Port);
         return true;
       }
     });
@@ -1392,16 +1390,15 @@ function Cluster() {
     return message;
   }
 
-  function addSidebarInfoPopoverContent(content, prepend) {
-    if (prepend === true) {
-      var wrappedContent = '<div>' + content + '<div style="clear: both;"></div></div>';
-      $("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content",
-        wrappedContent + $("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content"));
-
+  function addSidebarInfoPopoverContent(content, tag, hr) {
+    if (hr === true) {
+      content = '<hr/>' + content
+    }
+    wrappedContent = '<div data-tag="'+tag+'">' + content + '<div style="clear: both;"></div></div>';
+    if (tag === "analysis") {
+      $(wrappedContent).insertAfter("#cluster_info [data-tag=glyphs]")
     } else {
-      var wrappedContent = '<div><hr/>' + content + '</div>';
-      $("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content",
-        $("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content") + wrappedContent);
+      $("#cluster_info").append(wrappedContent)
     }
   }
 
@@ -1409,18 +1406,13 @@ function Cluster() {
     var content = '';
 
     {
-      var content = 'Alias: ' + clusterInfo.ClusterAlias + '';
-      addSidebarInfoPopoverContent(content, false);
-    } {
-      var content = 'Domain: ' + clusterInfo.ClusterDomain + '';
-      addSidebarInfoPopoverContent(content, false);
-    } {
-      var content = 'Heuristic lag: ' + clusterInfo.HeuristicLag + 's';
-      addSidebarInfoPopoverContent(content, false);
-    } {
-      var content = '<a href="' + appUrl('/web/audit-recovery/cluster/' + clusterInfo.ClusterName) + '">Recovery history</a>';
-      addSidebarInfoPopoverContent(content, false);
-    } {
+      var content = '<button type="button" class="close" aria-hidden="true">&times;</button>';
+      addSidebarInfoPopoverContent(content, "close", false);
+      $("#cluster_info button.close").click(function() {
+        $("#cluster_info").hide();
+      });
+    }
+    {
       var content = '';
       if (clusterInfo.HasAutomatedMasterRecovery === true) {
         content += '<span class="glyphicon glyphicon-heart text-info" title="Automated master recovery for this cluster ENABLED"></span>';
@@ -1432,11 +1424,49 @@ function Cluster() {
       } else {
         content += '<span class="glyphicon glyphicon-heart-empty text-muted pull-right" title="Automated intermediate master recovery for this cluster DISABLED"></span>';
       }
-      addSidebarInfoPopoverContent(content, true);
-    } {
-      var content = '<strong>' + currentClusterName() + '</strong>';
-      addSidebarInfoPopoverContent(content, true);
+      addSidebarInfoPopoverContent(content, "glyphs", false);
     }
+    {
+      var content = currentClusterName();
+      addSidebarInfoPopoverContent(content, "cluster-name", true);
+    }
+    {
+      var content = 'Alias: ' + clusterInfo.ClusterAlias + '';
+      addSidebarInfoPopoverContent(content, "cluster-alias", true);
+    } {
+      var content = 'Domain: ' + clusterInfo.ClusterDomain + '';
+      addSidebarInfoPopoverContent(content, "cluster-domain", true);
+    }
+
+    var maxItems = 5
+    getData("/api/audit-recovery/alias/" + clusterInfo.ClusterAlias, function(recoveries) {
+      recoveries = recoveries || []
+      recoveries = recoveries.slice(0, maxItems)
+      if (recoveries.length > 0) {
+        var content = '<a href="' + appUrl('/web/audit-recovery/alias/' + clusterInfo.ClusterAlias) + '">Recovery history</a>';
+        addSidebarInfoPopoverContent(content, "audit-recovery-title", true);
+      }
+      recoveries.forEach(function(recovery) {
+        var glyph = '<span class="glyphicon text-success glyphicon-ok-sign"></span>';
+        if (recovery.IsSuccessful === false) {
+          glyph = '<span class="glyphicon text-danger glyphicon-remove-sign"></span>';
+        }
+        var content = '<a href="/web/audit-recovery/uid/'+recovery.UID+'">' + recovery.RecoveryStartTimestamp + '</a>: ' + glyph + ' ' + recovery.AnalysisEntry.Analysis
+        addSidebarInfoPopoverContent(content, "audit-recovery", true);
+      });
+    });
+    getData("/api/audit-failure-detection/alias/" + clusterInfo.ClusterAlias, function(failureDetections) {
+      failureDetections = failureDetections || []
+      failureDetections = failureDetections.slice(0, maxItems)
+      if (failureDetections.length > 0) {
+        var content = '<a href="' + appUrl('/web/audit-failure-detection/alias/' + clusterInfo.ClusterAlias) + '">Failure detection</a>';
+        addSidebarInfoPopoverContent(content, "audit-detection-title", true);
+      }
+      failureDetections.forEach(function(failureDetection) {
+        var content = failureDetection.RecoveryStartTimestamp + ': ' + failureDetection.AnalysisEntry.Analysis
+        addSidebarInfoPopoverContent(content, "audit-detection", true);
+      });
+    });
     // Colorize-dc
     {
       var glyph = $("#cluster_sidebar [data-bullet=colorize-dc] .glyphicon");
@@ -1496,20 +1526,26 @@ function Cluster() {
   }
 
   function onAnalysisEntry(analysisEntry, instance) {
-    var extraText = '';
-    if  (analysisEntry.IsDowntimed) {
-      extraText = '<br/>[<i>downtime till ' + analysisEntry.DowntimeEndTimestamp + '</i>]';
-    } else if (analysisEntry.IsReplicasDowntimed) {
-      extraText = '<br/>[<i>replicas downtimed</i>]';
-    }
-    var content = '<span><strong>' + analysisEntry.Analysis + extraText + "</strong></span>" + "<br/>" + "<span>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</span>";
+    var glyph = '';
     var hasDowntime = analysisEntry.IsDowntimed || analysisEntry.IsReplicasDowntimed
     if (analysisEntry.IsStructureAnalysis) {
-      content = '<div class="pull-left glyphicon glyphicon-exclamation-sign '+(hasDowntime ? "text-muted" : "text-warning")+'"></div>' + content;
+      glyph = '<span class="pull-left glyphicon glyphicon-exclamation-sign '+(hasDowntime ? "text-muted" : "text-warning")+'"></span>';
     } else {
-      content = '<div class="pull-left glyphicon glyphicon-exclamation-sign '+(hasDowntime ? "text-muted" : "text-danger")+'"></div>' + content;
+      glyph = '<span class="pull-left glyphicon glyphicon-exclamation-sign '+(hasDowntime ? "text-muted" : "text-danger")+'"></span>';
     }
-    addSidebarInfoPopoverContent(content);
+    var analysisContent = '<div><strong>' + analysisEntry.Analysis + "</strong></div>";
+    var extraText = '';
+    if  (analysisEntry.IsDowntimed) {
+      extraText = '<i>downtime till ' + analysisEntry.DowntimeEndTimestamp + '</i>';
+    } else if (analysisEntry.IsReplicasDowntimed) {
+      extraText = '<i>replicas downtimed</i>';
+    }
+    if (extraText != '') {
+      analysisContent += '<div>' + extraText + '</div>';
+    }
+    analysisContent += "<div>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</div>";
+    var content = '<div><div class="pull-left">'+glyph+'</div><div class="pull-right">'+analysisContent+'</div></div>';
+    addSidebarInfoPopoverContent(content, "analysis", false);
 
     if (analysisEntry.IsStructureAnalysis) {
       return;
@@ -1684,7 +1720,9 @@ function Cluster() {
         _replicationAnalysis = replicationAnalysis;
         getData("/api/maintenance", function(maintenanceList) {
           _maintenanceList = maintenanceList;
+          $(document).trigger('orchestrator:preRenderCluster');
           renderCluster();
+          $(document).trigger('orchestrator:postRenderCluster');
         });
       });
     });
@@ -1733,18 +1771,8 @@ function Cluster() {
     getData("/api/blocked-recoveries/cluster/" + currentClusterName(), function(blockedRecoveries) {
       // Result is an array: either empty (no active recovery) or with multiple entries
       blockedRecoveries.forEach(function(blockedRecovery) {
-        addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on ' + getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port) + ' is blocked due to a <a href="' + appUrl('/web/audit-recovery/cluster/' + blockedRecovery.ClusterName) + '">previous recovery</a>');
+        addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on ' + getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port) + ' is blocked due to a <a href="' + appUrl('/web/audit-recovery/id/' + blockedRecovery.BlockingRecoveryId) + '">previous recovery</a>');
       });
-    });
-    getData("/api/cluster-osc-replicas/" + currentClusterName(), function(instances) {
-      var instancesMap = normalizeInstances(instances, Array());
-      var instancesTitles = Array();
-      instances.forEach(function(instance) {
-        instancesTitles.push(instance.title);
-      });
-      var instancesTitlesConcatenates = instancesTitles.join(" ");
-      var content = "Heuristic list of OSC controller replicas: <pre>" + instancesTitlesConcatenates + "</pre>";;
-      addSidebarInfoPopoverContent(content);
     });
 
     $("#li-move-instance-method").appendTo("ul.navbar-nav").show();
@@ -1793,6 +1821,10 @@ function Cluster() {
         expires: 1
       });
       location.reload();
+    });
+    $("body").on("click", "a[data-command=info]", function(event) {
+      $("#cluster_info").toggle();
+      return false
     });
     $("body").on("click", "a[data-command=colorize-dc]", function(event) {
       if (isColorizeDC()) {
@@ -1850,6 +1882,11 @@ function Cluster() {
     refreshClusterOperationModeButton();
   }
 
+  $(document).keyup(function(e) {
+    if (e.keyCode == 27) {
+      $("#cluster_info").hide();
+    }
+  });
 
   function getData(url, cb) {
     $.get(appUrl(url), cb, "json");

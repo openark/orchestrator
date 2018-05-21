@@ -135,12 +135,12 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 		db.SetMaxIdleConns(1)
 	} else {
 		if db, fromCache, err := openOrchestratorMySQLGeneric(); err != nil {
-			return db, err
+			return db, log.Errore(err)
 		} else if !fromCache {
 			// first time ever we talk to MySQL
 			query := fmt.Sprintf("create database if not exists %s", config.Config.MySQLOrchestratorDatabase)
 			if _, err := db.Exec(query); err != nil {
-				return db, err
+				return db, log.Errore(err)
 			}
 		}
 		db, fromCache, err = sqlutils.GetDB(getMySQLURI())
@@ -172,7 +172,9 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 		if maxIdleConns < 10 {
 			maxIdleConns = 10
 		}
-		log.Infof("Connecting to backend: maxConnections: %d, maxIdleConns: %d",
+		log.Infof("Connecting to backend %s:%d: maxConnections: %d, maxIdleConns: %d",
+			config.Config.MySQLOrchestratorHost,
+			config.Config.MySQLOrchestratorPort,
 			config.Config.MySQLOrchestratorMaxPoolConnections,
 			maxIdleConns)
 		db.SetMaxIdleConns(maxIdleConns)
@@ -307,17 +309,6 @@ func initOrchestratorDB(db *sql.DB) error {
 	return nil
 }
 
-// execInternalSilently
-func execInternalSilently(db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
-	var err error
-	query, err = translateStatement(query)
-	if err != nil {
-		return nil, err
-	}
-	res, err := sqlutils.ExecSilently(db, query, args...)
-	return res, err
-}
-
 // execInternal
 func execInternal(db *sql.DB, query string, args ...interface{}) (sql.Result, error) {
 	var err error
@@ -325,17 +316,8 @@ func execInternal(db *sql.DB, query string, args ...interface{}) (sql.Result, er
 	if err != nil {
 		return nil, err
 	}
-	res, err := sqlutils.ExecSilently(db, query, args...)
+	res, err := sqlutils.ExecNoPrepare(db, query, args...)
 	return res, err
-}
-
-// PrepareTransaction is a convenience method for preparing a transaction while manipulating dialect
-func PrepareTransaction(tx *sql.Tx, query string) (stmt *sql.Stmt, err error) {
-	query, err = translateStatement(query)
-	if err != nil {
-		return stmt, err
-	}
-	return tx.Prepare(query)
 }
 
 // ExecOrchestrator will execute given query on the orchestrator backend database.
@@ -349,11 +331,7 @@ func ExecOrchestrator(query string, args ...interface{}) (sql.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	dbexec := sqlutils.Exec
-	if config.Config.MySQLInterpolateParams {
-		dbexec = sqlutils.ExecNoPrepare
-	}
-	res, err := dbexec(db, query, args...)
+	res, err := sqlutils.ExecNoPrepare(db, query, args...)
 	return res, err
 }
 

@@ -12,9 +12,8 @@ If you want to get the most up to date instance status, use the "Refresh" button
 completed. If you choose to click the `Kill query` button, please be advised that you might actually be killing a *different*
 query, executing on same connection following up on the by-now-completed listed long running query.
 
-* It make take a couple minutes for `orchestrator` to full detect a cluster's topology. The time depends on the depth
-of the topology (if you have replicas-of-replicas the time increases). This is due to the fact `orchestrator` polls the instances
-independently, and and insight on the topology must propagate from master to replica on the next polling occasion.
+* It could take a couple of minutes for `orchestrator` to full detect a cluster's topology. The time depends on the depth
+of the topology (if you have replicas-of-replicas the time increases). This is due to the fact that `orchestrator` polls the instances independently, and an insight on the topology must propagate from master to replica on the next polling occasion.
 
 * Specifically, if you fail over to a new master, you may find that for a couple minutes the topologies seem empty.
 This may happen because instances used to identify themselves as belonging to a certain topology that is now being destroyed.
