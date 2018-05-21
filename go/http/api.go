@@ -2970,7 +2970,7 @@ func (this *HttpAPI) AcknowledgeClusterRecoveries(params martini.Params, r rende
 	if orcraft.IsRaftEnabled() {
 		ack := logic.NewRecoveryAcknowledgement(userId, comment)
 		ack.ClusterName = clusterName
-		orcraft.PublishCommand("ack-recovery", ack)
+		_, err = orcraft.PublishCommand("ack-recovery", ack)
 	} else {
 		_, err = logic.AcknowledgeClusterRecoveries(clusterName, userId, comment)
 	}
@@ -3007,7 +3007,7 @@ func (this *HttpAPI) AcknowledgeInstanceRecoveries(params martini.Params, r rend
 	if orcraft.IsRaftEnabled() {
 		ack := logic.NewRecoveryAcknowledgement(userId, comment)
 		ack.Key = instanceKey
-		orcraft.PublishCommand("ack-recovery", ack)
+		_, err = orcraft.PublishCommand("ack-recovery", ack)
 	} else {
 		_, err = logic.AcknowledgeInstanceRecoveries(&instanceKey, userId, comment)
 	}

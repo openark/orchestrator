@@ -784,7 +784,8 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Writing KV %+v", kvPairs))
 		if orcraft.IsRaftEnabled() {
 			for _, kvPair := range kvPairs {
-				orcraft.PublishCommand("put-key-value", kvPair)
+				_, err := orcraft.PublishCommand("put-key-value", kvPair)
+				log.Errore(err)
 			}
 			// since we'll be affecting 3rd party tools here, we _prefer_ to mitigate re-applying
 			// of the put-key-value event upon startup. We _recommend_ a snapshot in the near future.
@@ -1425,7 +1426,8 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	registrationSuccess, _, err := checkAndExecuteFailureDetectionProcesses(analysisEntry, skipProcesses)
 	if registrationSuccess {
 		if orcraft.IsRaftEnabled() {
-			orcraft.PublishCommand("register-failure-detection", analysisEntry)
+			_, err := orcraft.PublishCommand("register-failure-detection", analysisEntry)
+			log.Errore(err)
 		}
 	}
 	if err != nil {
