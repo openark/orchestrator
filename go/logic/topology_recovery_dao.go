@@ -243,8 +243,7 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, failIf
 		return nil, log.Errore(err)
 	}
 	if orcraft.IsRaftEnabled() {
-		_, err := orcraft.PublishCommand("write-recovery", topologyRecovery)
-		if err != nil {
+		if _, err := orcraft.PublishCommand("write-recovery", topologyRecovery); err != nil {
 			return nil, log.Errore(err)
 		}
 	}
