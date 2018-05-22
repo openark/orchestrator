@@ -790,7 +790,8 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			go orcraft.PublishCommand("async-snapshot", "")
 		} else {
 			for _, kvPair := range kvPairs {
-				kv.PutKVPair(kvPair)
+				err := kv.PutKVPair(kvPair)
+				log.Errore(err)
 			}
 		}
 
