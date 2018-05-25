@@ -2405,6 +2405,21 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 		instanceKey.Port,
 	)
 	AuditOperation("forget", instanceKey, "")
+
+	// Remove the special TLS configuration for an instance entry from the
+	// orchestrator backed database.
+	if err == nil {
+		db.ForgetInstanceTLSCache(instanceKey.Hostname, instanceKey.Port)
+		_, err = db.ExecOrchestrator(`
+			DELETE
+				FROM database_instance_tls
+			WHERE
+				hostname = ? and port = ?`,
+			instanceKey.Hostname,
+			instanceKey.Port,
+		)
+		AuditOperation("forget_tls", instanceKey, "")
+	}
 	return err
 }
 
