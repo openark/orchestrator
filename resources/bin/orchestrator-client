@@ -280,6 +280,15 @@ function restart_replica_statements() {
   print_response | print_details
 }
 
+function general_boolean_command() {
+  path="${1:-$command}"
+
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "destination" "$destination_hostport"
+  api "${path}/$instance_hostport/$destination_hostport"
+  print_response | print_details
+}
+
 function last_pseudo_gtid() {
   assert_nonempty "instance" "$instance_hostport"
   api "last-pseudo-gtid/$instance_hostport"
@@ -682,6 +691,8 @@ function run_command() {
     "enable-semi-sync-replica") general_instance_command ;;     # Enable semi-sync (replica-side)
     "disable-semi-sync-replica") general_instance_command ;;    # Disable semi-sync (replica-side)
     "restart-replica-statements") restart_replica_statements ;; # Given `-q "<query>"` that requires replication restart to apply, wrap query with stop/start slave statements as required to restore instance to same replication state. Print out set of statements
+
+    "can-replicate-from") general_boolean_command ;; # Check if an instance can potentially replicate from another, according to replication rules
 
     "set-read-only") general_instance_command ;;     # Turn an instance read-only, via SET GLOBAL read_only := 1
     "set-writeable") general_instance_command ;;     # Turn an instance writeable, via SET GLOBAL read_only := 0

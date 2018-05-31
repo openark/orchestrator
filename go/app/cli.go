@@ -742,6 +742,34 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(statement)
 			}
 		}
+		// Replication, information
+	case registerCliCommand("can-replicate-from", "Replication information", `Can an instance (-i) replicate from another (-d) according to replication rules? Prints 'true|false'`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance, err := inst.ReadTopologyInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce target instance:", destination)
+			}
+			otherInstance, err := inst.ReadTopologyInstance(destinationKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if otherInstance == nil {
+				log.Fatalf("Instance not found: %+v", *destinationKey)
+			}
+
+			canReplicate, _ := instance.CanReplicateFrom(otherInstance)
+			fmt.Println(fmt.Sprintf("%t", canReplicate))
+		}
 		// Instance
 	case registerCliCommand("set-read-only", "Instance", `Turn an instance read-only, via SET GLOBAL read_only := 1`):
 		{
