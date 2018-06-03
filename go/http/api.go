@@ -1367,7 +1367,7 @@ func (this *HttpAPI) CanReplicateFrom(params martini.Params, r render.Render, re
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("%t", canReplicate), Details: canReplicate})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("%t", canReplicate), Details: belowKey})
 }
 
 // setSemiSyncMaster

@@ -767,8 +767,9 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatalf("Instance not found: %+v", *destinationKey)
 			}
 
-			canReplicate, _ := instance.CanReplicateFrom(otherInstance)
-			fmt.Println(fmt.Sprintf("%t", canReplicate))
+			if canReplicate, _ := instance.CanReplicateFrom(otherInstance); canReplicate {
+				fmt.Println(destinationKey.DisplayString())
+			}
 		}
 		// Instance
 	case registerCliCommand("set-read-only", "Instance", `Turn an instance read-only, via SET GLOBAL read_only := 1`):
