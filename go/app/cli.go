@@ -742,6 +742,34 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(statement)
 			}
 		}
+		// Replication, information
+	case registerCliCommand("can-replicate-from", "Replication information", `Can an instance (-i) replicate from another (-d) according to replication rules? Prints 'true|false'`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance := validateInstanceIsFound(instanceKey)
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce target instance:", destination)
+			}
+			otherInstance := validateInstanceIsFound(destinationKey)
+
+			if canReplicate, _ := instance.CanReplicateFrom(otherInstance); canReplicate {
+				fmt.Println(destinationKey.DisplayString())
+			}
+		}
+	case registerCliCommand("is-replicating", "Replication information", `Is an instance (-i) actively replicating right now`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance := validateInstanceIsFound(instanceKey)
+			if instance.ReplicaRunning() {
+				fmt.Println(instance.Key.DisplayString())
+			}
+		}
 		// Instance
 	case registerCliCommand("set-read-only", "Instance", `Turn an instance read-only, via SET GLOBAL read_only := 1`):
 		{
