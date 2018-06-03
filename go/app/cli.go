@@ -749,26 +749,25 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatalf("Unresolved instance")
 			}
-			instance, err := inst.ReadTopologyInstance(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if instance == nil {
-				log.Fatalf("Instance not found: %+v", *instanceKey)
-			}
+			instance := validateInstanceIsFound(instanceKey)
 			if destinationKey == nil {
 				log.Fatal("Cannot deduce target instance:", destination)
 			}
-			otherInstance, err := inst.ReadTopologyInstance(destinationKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			if otherInstance == nil {
-				log.Fatalf("Instance not found: %+v", *destinationKey)
-			}
+			otherInstance := validateInstanceIsFound(destinationKey)
 
 			if canReplicate, _ := instance.CanReplicateFrom(otherInstance); canReplicate {
 				fmt.Println(destinationKey.DisplayString())
+			}
+		}
+	case registerCliCommand("is-replicating", "Replication information", `Is an instance (-i) actively replicating right now`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance := validateInstanceIsFound(instanceKey)
+			if instance.ReplicaRunning() {
+				fmt.Println(instance.Key.DisplayString())
 			}
 		}
 		// Instance
