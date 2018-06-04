@@ -50,6 +50,7 @@ promotion_rule=
 pool=
 hostname_flag=
 api_path=
+basic_auth=
 
 instance_hostport=
 destination_hostport=
@@ -73,11 +74,12 @@ for arg in "$@"; do
     "-api"|"--api")                       set -- "$@" "-U" ;;
     "-path"|"--path")                     set -- "$@" "-P" ;;
     "-query"|"--query")                   set -- "$@" "-q" ;;
+    "-auth"|"--auth")                     set -- "$@" "-b" ;;
     *)                                    set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:P:q:h" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:P:q:b:h" OPTION
 do
   case $OPTION in
     h) command="help" ;;
@@ -95,6 +97,7 @@ do
     D) default_port="$OPTARG" ;;
     U) [ ! -z "$OPTARG" ] && orchestrator_api="$OPTARG" ;;
     P) api_path="$OPTARG" ;;
+    b) basic_auth="$OPTARG" ;;
     q) query="$OPTARG"
   esac
 done
@@ -161,7 +164,7 @@ function detect_leader_api() {
   fi
   for api in ${apis[@]} ; do
     api=$(normalize_orchestrator_api $api)
-    leader_check=$(curl -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
+    leader_check=$(curl -b "${basic_auth}" -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
     if [ "$leader_check" == "200" ] ; then
       leader_api="$api"
       return
@@ -181,7 +184,7 @@ function api() {
   uri="$leader_api/$path"
   # echo $uri
   set -o pipefail
-  api_response=$(curl -s "$uri" | jq '.')
+  api_response=$(curl -b "${basic_auth}" -s "$uri" | jq '.')
   if [ $? -ne 0 ] ; then
     fail "Cannot access orchestrator at ${leader_api}.  Check ORCHESTRATOR_API is configured correctly and orchestrator is running"
   fi
@@ -239,7 +242,37 @@ function api_call() {
 function prompt_help() {
   echo "Usage: orchestrator-client -c <command> [flags...]"
   echo "Example: orchestrator-client -c which-master -i some.replica"
-  echo "Available commands:"
+  echo "Options:"
+  echo "
+  -h, --help
+    print this help
+  -c <command>, --command <command>
+    indicate the operation to perform (see listing below)
+  -a <alias>, --alias <alias>
+    cluster alias
+  -o <owner>, --owner <owner>
+    name of owner for downtime/maintenance commands
+  -r <reason>, --reason <reason>
+    reason for downtime/maintenance operation
+  -u <duration>, --duration <duration>
+    duration for downtime/maintenance operations
+  -R <promotion rule>, --promotion-rule <promotion rule>
+    rule for 'register-candidate' command
+  -U <orchestrator_api>, --api <orchestrator_api>
+    override \$orchestrator_api environemtn variable,
+    indicate where the client should connect to.
+  -P <api path>, --path <api path>
+    With '-c api', indicate the specific API path you wish to call
+  -b <username:password>, --auth <username:password>
+    Specify when orchestrator uses basic HTTP auth.
+  -q <query>, --query <query>
+    Indicate query for 'restart-replica-statements' command
+  -l <pool name>, --pool <pool name>
+    pool name for pool related commands
+  -H <hostname> -h <hostname>
+    indicate host for resolve and raft operations
+"
+
   cat "$0" | sed -n '/run_command/,/esac/p' | egrep '".*"[)].*;;' | sed -r -e 's/"(.*?)".*#(.*)/\1~\2/' | column -t -s "~"
 }
 
