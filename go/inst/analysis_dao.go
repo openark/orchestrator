@@ -52,7 +52,7 @@ func initializeAnalysisDaoPostConfiguration() {
 }
 
 // GetReplicationAnalysis will check for replication problems (dead master; unreachable master; etc)
-func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnalysis bool) ([]ReplicationAnalysis, error) {
+func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints) ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
 	args := sqlutils.Args(ValidSecondsFromSeenToLastAttemptedCheck(), clusterName)
@@ -399,7 +399,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		//		}
 
 		appendAnalysis := func(analysis *ReplicationAnalysis) {
-			if a.Analysis == NoProblem && len(a.StructureAnalysis) == 0 {
+			if a.Analysis == NoProblem && len(a.StructureAnalysis) == 0 && !hints.IncludeNoProblem {
 				return
 			}
 			for _, filter := range config.Config.RecoveryIgnoreHostnameFilters {
@@ -426,7 +426,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 					a.SkippableDueToDowntime = true
 				}
 			}
-			if a.SkippableDueToDowntime && !includeDowntimed {
+			if a.SkippableDueToDowntime && !hints.IncludeDowntimed {
 				return
 			}
 			result = append(result, a)
@@ -454,7 +454,7 @@ func GetReplicationAnalysis(clusterName string, includeDowntimed bool, auditAnal
 		}
 		appendAnalysis(&a)
 
-		if a.CountReplicas > 0 && auditAnalysis {
+		if a.CountReplicas > 0 && hints.AuditAnalysis {
 			// Interesting enough for analysis
 			go auditInstanceAnalysisInChangelog(&a.AnalyzedInstanceKey, a.Analysis)
 		}

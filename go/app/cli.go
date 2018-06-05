@@ -209,6 +209,8 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	if !skipDatabaseCommands && !*config.RuntimeCLIFlags.SkipContinuousRegistration {
 		process.ContinuousRegistration(string(process.OrchestratorExecutionCliMode), command)
 	}
+	kv.InitKVStores()
+
 	// begin commands
 	switch command {
 	// smart mode
@@ -738,6 +740,34 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			for _, statement := range statements {
 				fmt.Println(statement)
+			}
+		}
+		// Replication, information
+	case registerCliCommand("can-replicate-from", "Replication information", `Can an instance (-i) replicate from another (-d) according to replication rules? Prints 'true|false'`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance := validateInstanceIsFound(instanceKey)
+			if destinationKey == nil {
+				log.Fatal("Cannot deduce target instance:", destination)
+			}
+			otherInstance := validateInstanceIsFound(destinationKey)
+
+			if canReplicate, _ := instance.CanReplicateFrom(otherInstance); canReplicate {
+				fmt.Println(destinationKey.DisplayString())
+			}
+		}
+	case registerCliCommand("is-replicating", "Replication information", `Is an instance (-i) actively replicating right now`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance := validateInstanceIsFound(instanceKey)
+			if instance.ReplicaRunning() {
+				fmt.Println(instance.Key.DisplayString())
 			}
 		}
 		// Instance
@@ -1358,10 +1388,13 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(topologyRecovery.SuccessorKey.DisplayString())
 		}
-	case registerCliCommand("graceful-master-takeover", "Recovery", `Gracefully discard master and promote another (direct child) instance instead, even if everything is running well`):
+	case registerCliCommand("graceful-master-takeover", "Recovery", `Gracefully promote a new master. Either indicate identity of new master via '-d designated.instance.com' or setup replication tree to have a single direct replica to the master.`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
-			topologyRecovery, promotedMasterCoordinates, err := logic.GracefulMasterTakeover(clusterName, nil)
+			if destinationKey != nil {
+				validateInstanceIsFound(destinationKey)
+			}
+			topologyRecovery, promotedMasterCoordinates, err := logic.GracefulMasterTakeover(clusterName, destinationKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1371,7 +1404,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("replication-analysis", "Recovery", `Request an analysis of potential crash incidents in all known topologies`):
 		{
-			analysis, err := inst.GetReplicationAnalysis("", false, false)
+			analysis, err := inst.GetReplicationAnalysis("", &inst.ReplicationAnalysisHints{})
 			if err != nil {
 				log.Fatale(err)
 			}

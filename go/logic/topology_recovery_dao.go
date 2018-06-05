@@ -243,8 +243,7 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, failIf
 		return nil, log.Errore(err)
 	}
 	if orcraft.IsRaftEnabled() {
-		_, err := orcraft.PublishCommand("write-recovery", topologyRecovery)
-		if err != nil {
+		if _, err := orcraft.PublishCommand("write-recovery", topologyRecovery); err != nil {
 			return nil, log.Errore(err)
 		}
 	}
@@ -502,7 +501,7 @@ func writeResolveRecovery(topologyRecovery *TopologyRecovery) error {
 	return log.Errore(err)
 }
 
-// readRecoveries reads recovery entry/audit entires from topology_recovery
+// readRecoveries reads recovery entry/audit entries from topology_recovery
 func readRecoveries(whereCondition string, limit string, args []interface{}) ([]TopologyRecovery, error) {
 	res := []TopologyRecovery{}
 	query := fmt.Sprintf(`
@@ -586,7 +585,7 @@ func readRecoveries(whereCondition string, limit string, args []interface{}) ([]
 	return res, log.Errore(err)
 }
 
-// ReadActiveRecoveries reads active recovery entry/audit entires from topology_recovery
+// ReadActiveRecoveries reads active recovery entry/audit entries from topology_recovery
 func ReadActiveClusterRecovery(clusterName string) ([]TopologyRecovery, error) {
 	whereClause := `
 		where
@@ -644,7 +643,7 @@ func ReadRecentlyActiveInstanceRecovery(instanceKey *inst.InstanceKey) ([]Topolo
 	return readRecoveries(whereClause, ``, sqlutils.Args(instanceKey.Hostname, instanceKey.Port))
 }
 
-// ReadActiveRecoveries reads active recovery entry/audit entires from topology_recovery
+// ReadActiveRecoveries reads active recovery entry/audit entries from topology_recovery
 func ReadActiveRecoveries() ([]TopologyRecovery, error) {
 	return readRecoveries(`
 		where
@@ -653,7 +652,7 @@ func ReadActiveRecoveries() ([]TopologyRecovery, error) {
 		``, sqlutils.Args())
 }
 
-// ReadCompletedRecoveries reads completed recovery entry/audit entires from topology_recovery
+// ReadCompletedRecoveries reads completed recovery entry/audit entries from topology_recovery
 func ReadCompletedRecoveries(page int) ([]TopologyRecovery, error) {
 	limit := `
 		limit ?
@@ -661,13 +660,13 @@ func ReadCompletedRecoveries(page int) ([]TopologyRecovery, error) {
 	return readRecoveries(`where end_recovery is not null`, limit, sqlutils.Args(config.AuditPageSize, page*config.AuditPageSize))
 }
 
-// ReadRecovery reads completed recovery entry/audit entires from topology_recovery
+// ReadRecovery reads completed recovery entry/audit entries from topology_recovery
 func ReadRecovery(recoveryId int64) ([]TopologyRecovery, error) {
 	whereClause := `where recovery_id = ?`
 	return readRecoveries(whereClause, ``, sqlutils.Args(recoveryId))
 }
 
-// ReadRecoveryByUID reads completed recovery entry/audit entires from topology_recovery
+// ReadRecoveryByUID reads completed recovery entry/audit entries from topology_recovery
 func ReadRecoveryByUID(recoveryUID string) ([]TopologyRecovery, error) {
 	whereClause := `where uid = ?`
 	return readRecoveries(whereClause, ``, sqlutils.Args(recoveryUID))
@@ -695,7 +694,7 @@ func ReadRecentRecoveries(clusterName string, unacknowledgedOnly bool, page int)
 	return readRecoveries(whereClause, limit, args)
 }
 
-// readRecoveries reads recovery entry/audit entires from topology_recovery
+// readRecoveries reads recovery entry/audit entries from topology_recovery
 func readFailureDetections(whereCondition string, limit string, args []interface{}) ([]TopologyRecovery, error) {
 	res := []TopologyRecovery{}
 	query := fmt.Sprintf(`
