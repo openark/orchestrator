@@ -98,7 +98,6 @@ The following is a production configuration file, with some details redacted.
   "PseudoGTIDPatternIsFixedSubstring": true,
   "PseudoGTIDMonotonicHint": "asc:",
   "DetectPseudoGTIDQuery": "select count(*) as pseudo_gtid_exists from meta.pseudo_gtid_status where anchor = 1 and time_generated > now() - interval 1 day",
-  "PseudoGTIDPreferIndependentMultiMatch": true,
   "BinlogEventsChunkSize": 10000,
   "BufferBinlogEvents": true,
   "SkipBinlogEventsContaining": [
