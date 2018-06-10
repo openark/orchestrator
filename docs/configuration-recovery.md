@@ -41,7 +41,7 @@ Different environments require different actions taken on recovery/promotion
 }
 ```
 
-- `ApplyMySQLPromotionAfterMasterFailover`: when `true`, `orchestrator` will `reset slave all` and `set read_only=0` on promoted master.
+- `ApplyMySQLPromotionAfterMasterFailover`: when `true`, `orchestrator` will `reset slave all` and `set read_only=0` on promoted master. Default: `true`.
 - `FailMasterPromotionIfSQLThreadNotUpToDate`: if all replicas were lagging at time of failure, even the most up-to-date, promoted replica may yet have unapplied relay logs. Issuing `reset slave all` on such a server will lose the relay log data. Your choice.
 - `DetachLostReplicasAfterMasterFailover`: some replicas may get lost during recovery. When `true`, `orchestrator` will forcibly break their replication via `detach-replica` command to make sure no one assumes they're at all functional.
 
@@ -71,7 +71,7 @@ A naive implementation might look like:
     "echo 'Will recover from {failureType} on {failureCluster}' >> /tmp/recovery.log"
   ],
   "PostFailoverProcesses": [
-    "echo '(for all types) Recovered from {failureType} on {failureCluster}. Failed:      {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/     recovery.log"
+    "echo '(for all types) Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
   ],
   "PostUnsuccessfulFailoverProcesses": [],
   "PostMasterFailoverProcesses": [
