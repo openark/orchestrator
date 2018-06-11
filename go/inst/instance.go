@@ -348,6 +348,9 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	if this.ServerID == other.ServerID && !this.IsBinlogServer() {
 		return false, fmt.Errorf("Identical server id: %+v, %+v both have %d", other.Key, this.Key, this.ServerID)
 	}
+	if this.SQLDelay < other.SQLDelay && int64(other.SQLDelay) > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
+		return false, fmt.Errorf("%+v has higher SQL_Delay (%+v seconds) than", other.Key, other.SQLDelay, this.Key)
+	}
 	return true, nil
 }
 
