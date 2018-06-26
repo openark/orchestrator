@@ -326,10 +326,10 @@ $ orchestrator-client -c which-cluster-instances -alias mycluster | ccql -C ~/.m
 #### I'd like to apply changes to replication, without changing the replica's state (if it's running, I want it to keep running. If it's not running, I don't want to start replication)
 
 ```shell
-$ orchestrator-client -c restart-replica-statements -i mysql-bb00.dc1.domain.net -query "change master to auto_position=1" | jq .[] -r
+$ orchestrator-client -c restart-replica-statements -i mysql-bb00.dc1.domain.net -query "change master to maaster_auto_position=1" | jq .[] -r
 stop slave io_thread;
 stop slave sql_thread;
-change master to auto_position=1;
+change master to master_auto_position=1;
 start slave sql_thread;
 start slave io_thread;
 ```
@@ -340,14 +340,14 @@ Compare with:
 $ orchestrator-client -c stop-slave -i mysql-bb00.dc1.domain.net
 mysql-bb00.dc1.domain.net:3306
 
-$ orchestrator-client -c restart-replica-statements -i mysql-bb00.dc1.domain.net -query "change master to auto_position=1" | jq .[] -r
-change master to auto_position=1;
+$ orchestrator-client -c restart-replica-statements -i mysql-bb00.dc1.domain.net -query "change master to master_auto_position=1" | jq .[] -r
+change master to master_auto_position=1;
 ```
 
 The above just outputs statements, we need to push them back to the server:
 
 ```shell
-orchestrator-client -c restart-replica-statements -i mysql-bb00.dc1.domain.net -query "change master to auto_position=1" | jq .[] -r | mysql -h mysql-bb00.dc1.domain.net
+orchestrator-client -c restart-replica-statements -i mysql-bb00.dc1.domain.net -query "change master to master_auto_position=1" | jq .[] -r | mysql -h mysql-bb00.dc1.domain.net
 ```
 
 #### In which DC (data center) is a specific instance?
