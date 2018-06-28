@@ -1888,7 +1888,7 @@ func ReadClustersInfo(clusterName string) ([]ClusterInfo, error) {
 
 // Get a listing of KVPair for clusters masters, for all clusters or for a specific cluster.
 func GetMastersKVPairs(clusterName string) (kvPairs [](*kv.KVPair), err error) {
-
+	kvPairs = [](*kv.KVPair){}
 	clusterAliasMap := make(map[string]string)
 	if clustersInfo, err := ReadClustersInfo(clusterName); err != nil {
 		return kvPairs, err
