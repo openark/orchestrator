@@ -183,13 +183,17 @@ func (this *HttpAPI) Instance(params martini.Params, r render.Render, req *http.
 // useful for bulk loads of a new set of instances and will not block
 // if the instance is slow to respond or not reachable.
 func (this *HttpAPI) AsyncDiscover(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	go this.Discover(params, r, req, user)
-
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
+	go this.Discover(params, r, req, user)
+
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Asynchronous discovery initiated for Instance: %+v", instanceKey)})
 }
 
@@ -200,7 +204,6 @@ func (this *HttpAPI) Discover(params martini.Params, r render.Render, req *http.
 		return
 	}
 	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
-
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -209,6 +212,12 @@ func (this *HttpAPI) Discover(params martini.Params, r render.Render, req *http.
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
+	}
+
+	if orcraft.IsRaftEnabled() {
+		orcraft.PublishCommand("forget", instanceKey)
+	} else {
+		inst.ForgetInstance(&instanceKey)
 	}
 
 	go orcraft.PublishCommand("discover", instanceKey)
@@ -1704,7 +1713,7 @@ func (this *HttpAPI) ClusterMaster(params martini.Params, r render.Render, req *
 		return
 	}
 
-	masters, err := inst.ReadClusterWriteableMaster(clusterName)
+	masters, err := inst.ReadClusterMaster(clusterName)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
