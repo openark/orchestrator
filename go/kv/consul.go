@@ -67,5 +67,6 @@ func (this *consulStore) GetKeyValue(key string) (value string, err error) {
 }
 
 func (this *consulStore) AddKeyValue(key string, value string) (added bool, err error) {
-	return false, AddKeyValueNotImplementedError
+	err = this.PutKeyValue(key, value)
+	return (err != nil), err
 }

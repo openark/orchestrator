@@ -17,12 +17,9 @@
 package kv
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 )
-
-var AddKeyValueNotImplementedError error = errors.New("AddKeyValue not implemented")
 
 type KVPair struct {
 	Key   string
@@ -98,7 +95,7 @@ func PutKVPair(kvPair *KVPair) (err error) {
 func AddValue(key string, value string) (err error) {
 	for _, store := range getKVStores() {
 		added, err := store.AddKeyValue(key, value)
-		if err != nil && err != AddKeyValueNotImplementedError {
+		if err != nil {
 			return err
 		}
 		if !added {
