@@ -1,17 +1,21 @@
+# Requires Docker 17.09 or later (multi stage builds)
+
 FROM alpine
 
 ENV GOPATH=/tmp/go
 
-RUN set -ex \
-    && apk add --update --no-cache bash \
-    && apk add --update --no-cache --virtual .build-deps \
-        rsync \
-        git \
-        go \
-        build-base \
-    && cd /tmp \
-    && { go get -d github.com/github/orchestrator ; : ; } \
-    && cd $GOPATH/src/github.com/github/orchestrator \
+RUN apk update
+RUN apk add --no-cache libcurl ; apk add libcurl
+RUN apk add --no-cache rsync
+RUN apk add --no-cache go
+RUN apk add --no-cache gcc
+RUN apk add --no-cache g++
+#RUN apk add --no-cache build-base
+
+RUN mkdir -p $GOPATH/src/github.com/github/orchestrator
+WORKDIR $GOPATH/src/github.com/github/orchestrator
+COPY . .
+RUN \
     && bash build.sh -b \
     && rsync -av $(find /tmp/orchestrator-release -type d -name orchestrator -maxdepth 2)/ / \
     && rsync -av $(find /tmp/orchestrator-release -type d -name orchestrator-cli -maxdepth 2)/ / \
