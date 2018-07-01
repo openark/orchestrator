@@ -48,6 +48,22 @@ $distro_name_map = {
     ubuntu/vivid
     ubuntu/wily
     ubuntu/xenial
+    ubuntu/yakkety
+    ubuntu/zesty
+    ubuntu/artful
+    ubuntu/bionic
+  ),
+  "debian/9" => %w(
+    debian/stretch
+  ),
+  "debian/10" => %w(
+    debian/buster
+  ),
+  "debian/11" => %w(
+    debian/bullseye
+  ),
+  "debian/12" => %w(
+    debian/bookworm
   ),
 }
 
