@@ -78,7 +78,7 @@ func OpenTopology(host string, port int) (*sql.DB, error) {
 	return openTopology(host, port, config.Config.MySQLTopologyReadTimeoutSeconds)
 }
 
-func openTopology(host string, port int, readTimeout int) (*sql.DB, error) {
+func openTopology(host string, port int, readTimeout int) (db *sql.DB, err error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/?timeout=%ds&readTimeout=%ds&interpolateParams=true",
 		config.Config.MySQLTopologyUser,
 		config.Config.MySQLTopologyPassword,
@@ -89,10 +89,11 @@ func openTopology(host string, port int, readTimeout int) (*sql.DB, error) {
 
 	if config.Config.MySQLTopologyUseMutualTLS ||
 		(config.Config.MySQLTopologyUseMixedTLS && requiresTLS(host, port, mysql_uri)) {
-		mysql_uri, _ = SetupMySQLTopologyTLS(mysql_uri)
+		if mysql_uri, err = SetupMySQLTopologyTLS(mysql_uri); err != nil {
+			return nil, err
+		}
 	}
-	db, _, err := sqlutils.GetDB(mysql_uri)
-	if err != nil {
+	if db, _, err = sqlutils.GetDB(mysql_uri); err != nil {
 		return nil, err
 	}
 	db.SetMaxOpenConns(config.MySQLTopologyMaxPoolConnections)

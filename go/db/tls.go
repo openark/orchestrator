@@ -99,7 +99,7 @@ func SetupMySQLTopologyTLS(uri string) (string, error) {
 		// Drop to TLS 1.0 for talking to MySQL
 		tlsConfig.MinVersion = tls.VersionTLS10
 		if err != nil {
-			return "", log.Fatalf("Can't create TLS configuration for Topology connection %s: %s", uri, err)
+			return "", log.Errorf("Can't create TLS configuration for Topology connection %s: %s", uri, err)
 		}
 		tlsConfig.InsecureSkipVerify = config.Config.MySQLTopologySSLSkipVerify
 
