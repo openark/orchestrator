@@ -71,3 +71,7 @@ func (this *zkStore) GetKeyValue(key string) (value string, err error) {
 	}
 	return string(result), nil
 }
+
+func (this *zkStore) AddKeyValue(key string, value string) (added bool, err error) {
+	return false, AddKeyValueNotImplementedError
+}

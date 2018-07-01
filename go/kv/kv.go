@@ -17,9 +17,12 @@
 package kv
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 )
+
+var AddKeyValueNotImplementedError error = errors.New("AddKeyValue not implemented")
 
 type KVPair struct {
 	Key   string
@@ -37,6 +40,8 @@ func (this *KVPair) String() string {
 type KVStore interface {
 	PutKeyValue(key string, value string) (err error)
 	GetKeyValue(key string) (value string, err error)
+
+	AddKeyValue(key string, value string) (added bool, err error)
 }
 
 var kvMutex sync.Mutex
@@ -88,4 +93,24 @@ func PutKVPair(kvPair *KVPair) (err error) {
 		return nil
 	}
 	return PutValue(kvPair.Key, kvPair.Value)
+}
+
+func AddValue(key string, value string) (err error) {
+	for _, store := range getKVStores() {
+		added, err := store.AddKeyValue(key, value)
+		if err != nil && err != AddKeyValueNotImplementedError {
+			return err
+		}
+		if !added {
+			return nil
+		}
+	}
+	return nil
+}
+
+func AddKVPair(kvPair *KVPair) (err error) {
+	if kvPair == nil {
+		return nil
+	}
+	return AddValue(kvPair.Key, kvPair.Value)
 }

@@ -414,6 +414,34 @@ func InjectPseudoGTIDOnWriters() error {
 	return nil
 }
 
+// Write a cluster's master (or all clusters masters) to kv stores.
+// This should generally only happen once in a lifetime of a cluster. Otherwise KV
+// stores are updated via failovers.
+func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVPair), submittedCount int, err error) {
+	kvPairs, err = inst.GetMastersKVPairs(clusterName)
+	if err != nil {
+		return kvPairs, submittedCount, log.Errore(err)
+	}
+	command := "add-key-value"
+	applyFunc := kv.AddKVPair
+	if force {
+		command = "put-key-value"
+		applyFunc = kv.PutKVPair
+	}
+	for _, kvPair := range kvPairs {
+		if orcraft.IsRaftEnabled() {
+			_, err = orcraft.PublishCommand(command, kvPair)
+		} else {
+			err = applyFunc(kvPair)
+		}
+		if err != nil {
+			return kvPairs, submittedCount, log.Errore(err)
+		}
+		submittedCount++
+	}
+	return kvPairs, submittedCount, nil
+}
+
 // ContinuousDiscovery starts an asynchronuous infinite discovery process where instances are
 // periodically investigated and their status captured, and long since unseen instances are
 // purged and forgotten.
@@ -436,6 +464,10 @@ func ContinuousDiscovery() {
 	var snapshotTopologiesTick <-chan time.Time
 	if config.Config.SnapshotTopologiesIntervalHours > 0 {
 		snapshotTopologiesTick = time.Tick(time.Duration(config.Config.SnapshotTopologiesIntervalHours) * time.Hour)
+	}
+
+	runCheckAndRecoverOperationsTimeRipe := func() bool {
+		return time.Since(continuousDiscoveryStartTime) >= checkAndRecoverWaitPeriod
 	}
 
 	go ometrics.InitMetrics()
@@ -505,6 +537,10 @@ func ContinuousDiscovery() {
 					go ExpireFailureDetectionHistory()
 					go ExpireTopologyRecoveryHistory()
 					go ExpireTopologyRecoveryStepsHistory()
+
+					if runCheckAndRecoverOperationsTimeRipe() {
+						go SubmitMastersToKvStores("", false)
+					}
 				} else {
 					// Take this opportunity to refresh yourself
 					go inst.LoadHostnameResolveCache()
@@ -530,7 +566,7 @@ func ContinuousDiscovery() {
 						} else {
 							return
 						}
-						if time.Since(continuousDiscoveryStartTime) >= checkAndRecoverWaitPeriod {
+						if runCheckAndRecoverOperationsTimeRipe() {
 							CheckAndRecover(nil, nil, false)
 						} else {
 							log.Debugf("Waiting for %+v seconds to pass before running failure detection/recovery", checkAndRecoverWaitPeriod.Seconds())
