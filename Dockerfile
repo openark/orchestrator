@@ -1,7 +1,5 @@
 FROM alpine
 
-EXPOSE 3000
-
 ENV GOPATH=/tmp/go
 
 RUN set -ex \
@@ -20,6 +18,12 @@ RUN set -ex \
     && cd / \
     && apk del .build-deps \
     && rm -rf /tmp/*
+
+FROM alpine
+
+EXPOSE 3000
+
+COPY --from=0 /usr/local/orchestrator /usr/local/orchestrator
 
 WORKDIR /usr/local/orchestrator
 ADD docker/entrypoint.sh /entrypoint.sh
