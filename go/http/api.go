@@ -1285,6 +1285,39 @@ func (this *HttpAPI) FlushBinaryLogs(params martini.Params, r render.Render, req
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Binary logs flushed on: %+v", instance.Key), Details: instance})
 }
 
+// LockBinlog locks an instance's binary log for a predefined duration
+func (this *HttpAPI) LockBinlog(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	var durationSeconds int = 0
+	if params["duration"] != "" {
+		durationSeconds, err = util.SimpleTimeToSeconds(params["duration"])
+		if durationSeconds < 0 {
+			err = fmt.Errorf("Duration value must be non-negative. Given value: %d", durationSeconds)
+		}
+		if err != nil {
+			Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+			return
+		}
+	}
+	duration := time.Duration(durationSeconds) * time.Second
+
+	if err := inst.LockBinlog(&instanceKey, duration); err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Binary logs locked for %+v seconds", durationSeconds), Details: instanceKey})
+}
+
 // RestartSlaveStatements receives a query to execute that requires a replication restart to apply.
 // As an example, this may be `set global rpl_semi_sync_slave_enabled=1`. orchestrator will check
 // replication status on given host and will wrap with appropriate stop/start statements, if need be.
@@ -3282,6 +3315,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "reattach-slave/:host/:port", this.ReattachReplica)
 	this.registerAPIRequest(m, "reattach-slave-master-host/:host/:port", this.ReattachReplicaMasterHost)
 	this.registerAPIRequest(m, "flush-binary-logs/:host/:port", this.FlushBinaryLogs)
+	this.registerAPIRequest(m, "lock-binlog/:host/:port/:duration", this.LockBinlog)
 	this.registerAPIRequest(m, "restart-slave-statements/:host/:port", this.RestartSlaveStatements)
 	this.registerAPIRequest(m, "enable-semi-sync-master/:host/:port", this.EnableSemiSyncMaster)
 	this.registerAPIRequest(m, "disable-semi-sync-master/:host/:port", this.DisableSemiSyncMaster)

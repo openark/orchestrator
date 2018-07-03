@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
@@ -837,4 +838,29 @@ func GetNextBinlogCoordinatesToMatch(
 		}
 	}
 	// Won't get here
+}
+
+func LockBinlog(instanceKey *InstanceKey, duration time.Duration) error {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return log.Errore(err)
+	}
+	db, err := db.OpenTopology(instance.Key.Hostname, instance.Key.Port)
+	if err != nil {
+		return log.Errore(err)
+	}
+
+	query := fmt.Sprintf("show binlog events in ? FROM ? LIMIT 1")
+	log.Debugf(query)
+
+	rows, err := db.Query(query, instance.SelfBinlogCoordinates.LogFile, 4)
+	defer rows.Close()
+	if err != nil {
+		return log.Errore(err)
+	}
+	var once sync.Once
+	for rows.Next() {
+		once.Do(func() { time.Sleep(duration) })
+	}
+	return log.Errore(err)
 }

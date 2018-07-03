@@ -338,6 +338,13 @@ function is_replicating() {
   print_response | jq '. | select(.Slave_SQL_Running==true and .Slave_IO_Running==true)' | filter_key | print_key
 }
 
+function lock_binlog() {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "duration" "$duration"
+  api "lock-binlog/$instance_hostport/$duration"
+  print_details | print_key
+}
+
 function last_pseudo_gtid() {
   assert_nonempty "instance" "$instance_hostport"
   api "last-pseudo-gtid/$instance_hostport"
@@ -747,6 +754,7 @@ function run_command() {
     "set-read-only") general_instance_command ;;     # Turn an instance read-only, via SET GLOBAL read_only := 1
     "set-writeable") general_instance_command ;;     # Turn an instance writeable, via SET GLOBAL read_only := 0
     "flush-binary-logs") general_instance_command ;; # Flush binary logs on an instance
+    "lock-binlog") lock_binlog ;;                    # Lock binary logs on an instance for a defined duration
     "last-pseudo-gtid") last_pseudo_gtid ;;          # Dump last injected Pseudo-GTID entry on a server
 
     "recover") recover ;;                                     # Do auto-recovery given a dead instance, assuming orchestrator agrees there's a problem. Override blocking.
