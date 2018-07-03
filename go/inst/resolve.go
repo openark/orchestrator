@@ -210,7 +210,7 @@ func loadHostnameResolveCacheFromDatabase() error {
 }
 
 func FlushNontrivialResolveCacheToDatabase() error {
-	if !HostnameResolveMethodIsNone() {
+	if HostnameResolveMethodIsNone() {
 		return log.Errorf("FlushNontrivialResolveCacheToDatabase() called, but HostnameResolveMethod is %+v", config.Config.HostnameResolveMethod)
 	}
 	items, _ := HostnameResolveCache()
