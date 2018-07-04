@@ -206,6 +206,7 @@ type Configuration struct {
 	SeedAcceptableBytesDiff                    int64             // Difference in bytes between seed source & target data size that is still considered as successful copy
 	SeedWaitSecondsBeforeSend                  int64             // Number of seconds for waiting before start send data command on agent
 	AutoPseudoGTID                             bool              // Should orchestrator automatically inject Pseudo-GTID entries to the masters
+	AutoPseudoGTIDDisabledOnGTID               bool              // Should orchestrator avoid injecting Pseudo GTID where GTID is enabled (default: false)
 	PseudoGTIDPattern                          string            // Pattern to look for in binary logs that makes for a unique entry (pseudo GTID). When empty, Pseudo-GTID based refactoring is disabled.
 	PseudoGTIDPatternIsFixedSubstring          bool              // If true, then PseudoGTIDPattern is not treated as regular expression but as fixed substring, and can boost search time
 	PseudoGTIDMonotonicHint                    string            // subtring in Pseudo-GTID entry which indicates Pseudo-GTID entries are expected to be monotonically increasing
@@ -369,6 +370,7 @@ func newConfiguration() *Configuration {
 		SeedAcceptableBytesDiff:                    8192,
 		SeedWaitSecondsBeforeSend:                  2,
 		AutoPseudoGTID:                             false,
+		AutoPseudoGTIDDisabledOnGTID:               false,
 		PseudoGTIDPattern:                          "",
 		PseudoGTIDPatternIsFixedSubstring:          false,
 		PseudoGTIDMonotonicHint:                    "",

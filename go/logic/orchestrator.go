@@ -396,6 +396,9 @@ func InjectPseudoGTIDOnWriters() error {
 	for i := range rand.Perm(len(instances)) {
 		instance := instances[i]
 		go func() {
+			if instance.GTIDModeIsOn() && config.Config.AutoPseudoGTIDDisabledOnGTID {
+				return
+			}
 			if injected, _ := inst.CheckAndInjectPseudoGTIDOnWriter(instance); injected {
 				clusterName := instance.ClusterName
 				if orcraft.IsRaftEnabled() {
