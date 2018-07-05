@@ -447,7 +447,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			validateInstanceIsFound(instanceKey)
 
-			lostReplicas, movedReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasGTID(instanceKey, false, func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.DisplayString()) })
+			lostReplicas, movedReplicas, cannotReplicateReplicas, promotedReplica, err := inst.RegroupReplicasGTID(instanceKey, false, func(candidateReplica *inst.Instance) { fmt.Println(candidateReplica.Key.DisplayString()) }, postponedFunctionsContainer, nil)
 			lostReplicas = append(lostReplicas, cannotReplicateReplicas...)
 
 			if promotedReplica == nil {
