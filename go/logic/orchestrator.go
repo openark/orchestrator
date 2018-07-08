@@ -263,13 +263,6 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 		InstanceLatency: instanceLatency,
 		Err:             nil,
 	})
-	log.Debugf("Discovered host: %+v, master: %+v, version: %+v in %.3fs (Backend: %.3fs, Instance: %.3fs)",
-		instance.Key,
-		instance.MasterKey,
-		instance.Version,
-		totalLatency.Seconds(),
-		backendLatency.Seconds(),
-		instanceLatency.Seconds())
 
 	if !IsLeaderOrActive() {
 		// Maybe this node was elected before, but isn't elected anymore.
@@ -359,11 +352,7 @@ func onHealthTick() {
 	}()
 	// avoid any logging unless there's something to be done
 	if len(instanceKeys) > 0 {
-		if len(instanceKeys) > config.Config.MaxOutdatedKeysToShow {
-			log.Debugf("polling %d outdated keys", len(instanceKeys))
-		} else {
-			log.Debugf("outdated keys: %+v", instanceKeys)
-		}
+		log.Debugf("polling %d outdated keys", len(instanceKeys))
 		for _, instanceKey := range instanceKeys {
 			if instanceKey.IsValid() {
 				discoveryQueue.Push(instanceKey)
