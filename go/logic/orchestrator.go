@@ -355,7 +355,6 @@ func onHealthTick() {
 	}()
 	// avoid any logging unless there's something to be done
 	if len(instanceKeys) > 0 {
-		log.Debugf("polling %d outdated keys", len(instanceKeys))
 		for _, instanceKey := range instanceKeys {
 			if instanceKey.IsValid() {
 				discoveryQueue.Push(instanceKey)
