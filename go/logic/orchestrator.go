@@ -35,6 +35,7 @@ import (
 	ometrics "github.com/github/orchestrator/go/metrics"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/raft"
+	"github.com/github/orchestrator/go/util"
 	"github.com/openark/golib/log"
 	"github.com/patrickmn/go-cache"
 	"github.com/rcrowley/go-metrics"
@@ -246,12 +247,14 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 			InstanceLatency: instanceLatency,
 			Err:             err,
 		})
-		log.Warningf("discoverInstance(%+v) instance is nil in %.3fs (Backend: %.3fs, Instance: %.3fs), error=%+v",
-			instanceKey,
-			totalLatency.Seconds(),
-			backendLatency.Seconds(),
-			instanceLatency.Seconds(),
-			err)
+		if util.ClearToLog("discoverInstance", instanceKey.StringCode()) {
+			log.Warningf("discoverInstance(%+v) instance is nil in %.3fs (Backend: %.3fs, Instance: %.3fs), error=%+v",
+				instanceKey,
+				totalLatency.Seconds(),
+				backendLatency.Seconds(),
+				instanceLatency.Seconds(),
+				err)
+		}
 		return
 	}
 
