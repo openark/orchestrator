@@ -336,7 +336,6 @@ func executeProcesses(processes []string, description string, topologyRecovery *
 			info := fmt.Sprintf("Completed %s in %v",
 				fullDescription, time.Since(start))
 			AuditTopologyRecovery(topologyRecovery, info)
-			log.Infof(info)
 		} else {
 			info := fmt.Sprintf("Execution of %s failed in %v with error: %v",
 				fullDescription, time.Since(start), cmdErr)
