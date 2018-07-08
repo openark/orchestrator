@@ -2183,7 +2183,7 @@ func RegroupReplicasPseudoGTID(
 
 		log.Debugf("RegroupReplicas: multi matching %d later replicas", len(laterReplicas))
 		// As for the laterReplicas, we'll have to apply pseudo GTID
-		laterReplicas, candidateReplica, err, _ := MultiMatchBelow(laterReplicas, &candidateReplica.Key, postponedFunctionsContainer)
+		laterReplicas, candidateReplica, err, _ = MultiMatchBelow(laterReplicas, &candidateReplica.Key, postponedFunctionsContainer)
 
 		operatedReplicas := append(equalReplicas, candidateReplica)
 		operatedReplicas = append(operatedReplicas, laterReplicas...)
@@ -2314,8 +2314,21 @@ func RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(
 }
 
 // RegroupReplicasGTID will choose a candidate replica of a given instance, and take its siblings using GTID
-func RegroupReplicasGTID(masterKey *InstanceKey, returnReplicaEvenOnFailureToRegroup bool, onCandidateReplicaChosen func(*Instance)) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
+func RegroupReplicasGTID(
+	masterKey *InstanceKey,
+	returnReplicaEvenOnFailureToRegroup bool,
+	onCandidateReplicaChosen func(*Instance),
+	postponedFunctionsContainer *PostponedFunctionsContainer,
+	postponeAllMatchOperations func(*Instance) bool,
+) (
+	lostReplicas [](*Instance),
+	movedReplicas [](*Instance),
+	cannotReplicateReplicas [](*Instance),
+	candidateReplica *Instance,
+	err error,
+) {
 	var emptyReplicas [](*Instance)
+	var unmovedReplicas [](*Instance)
 	candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err := GetCandidateReplica(masterKey, true)
 	if err != nil {
 		if !returnReplicaEvenOnFailureToRegroup {
@@ -2327,15 +2340,20 @@ func RegroupReplicasGTID(masterKey *InstanceKey, returnReplicaEvenOnFailureToReg
 	if onCandidateReplicaChosen != nil {
 		onCandidateReplicaChosen(candidateReplica)
 	}
+	moveGTIDFunc := func() error {
+		replicasToMove := append(equalReplicas, laterReplicas...)
+		log.Debugf("RegroupReplicasGTID: working on %d replicas", len(replicasToMove))
 
-	replicasToMove := append(equalReplicas, laterReplicas...)
-	log.Debugf("RegroupReplicasGTID: working on %d replicas", len(replicasToMove))
-
-	movedReplicas, unmovedReplicas, err, _ := moveReplicasViaGTID(replicasToMove, candidateReplica)
-	if err != nil {
-		log.Errore(err)
+		movedReplicas, unmovedReplicas, err, _ = moveReplicasViaGTID(replicasToMove, candidateReplica)
+		unmovedReplicas = append(unmovedReplicas, aheadReplicas...)
+		return log.Errore(err)
 	}
-	unmovedReplicas = append(unmovedReplicas, aheadReplicas...)
+	if postponedFunctionsContainer != nil && postponeAllMatchOperations != nil && postponeAllMatchOperations(candidateReplica) {
+		postponedFunctionsContainer.AddPostponedFunction(moveGTIDFunc, fmt.Sprintf("regroup-replicas-gtid %+v", candidateReplica.Key))
+	} else {
+		err = moveGTIDFunc()
+	}
+
 	StartSlave(&candidateReplica.Key)
 
 	log.Debugf("RegroupReplicasGTID: done")
@@ -2411,7 +2429,7 @@ func RegroupReplicas(masterKey *InstanceKey, returnReplicaEvenOnFailureToRegroup
 	}
 	if allGTID {
 		log.Debugf("RegroupReplicas: using GTID to regroup replicas of %+v", *masterKey)
-		unmovedReplicas, movedReplicas, cannotReplicateReplicas, candidateReplica, err := RegroupReplicasGTID(masterKey, returnReplicaEvenOnFailureToRegroup, onCandidateReplicaChosen)
+		unmovedReplicas, movedReplicas, cannotReplicateReplicas, candidateReplica, err := RegroupReplicasGTID(masterKey, returnReplicaEvenOnFailureToRegroup, onCandidateReplicaChosen, nil, nil)
 		return unmovedReplicas, emptyReplicas, movedReplicas, cannotReplicateReplicas, candidateReplica, err
 	}
 	if allBinlogServers {
