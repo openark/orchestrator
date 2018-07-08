@@ -155,6 +155,7 @@ const (
 )
 
 var emergencyReadTopologyInstanceMap *cache.Cache
+var executeCheckAndRecoverFunctionLogCache *cache.Cache
 
 // InstancesByCountReplicas sorts instances by umber of replicas, descending
 type InstancesByCountReplicas [](*inst.Instance)
@@ -213,6 +214,7 @@ func initializeTopologyRecoveryPostConfiguration() {
 	config.WaitForConfigurationToBeLoaded()
 
 	emergencyReadTopologyInstanceMap = cache.New(time.Second, time.Millisecond*250)
+	executeCheckAndRecoverFunctionLogCache = cache.New(time.Minute, time.Second*5)
 }
 
 // AuditTopologyRecovery audits a single step in a topology recovery process.
@@ -1403,8 +1405,10 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	if checkAndRecoverFunction == nil {
 		// Unhandled problem type
 		if analysisEntry.Analysis != inst.NoProblem {
-			log.Warningf("executeCheckAndRecoverFunction: ignoring analysisEntry that has no action plan: %+v; key: %+v",
-				analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
+			if executeCheckAndRecoverFunctionLogCache.Add(analysisEntry.AnalyzedInstanceKey.StringCode(), true, cache.DefaultExpiration) == nil {
+				log.Warningf("executeCheckAndRecoverFunction: ignoring analysisEntry that has no action plan: %+v; key: %+v",
+					analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
+			}
 		}
 
 		return false, nil, nil
