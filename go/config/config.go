@@ -78,6 +78,7 @@ var deprecatedConfigurationVariables = []string{
 	"HttpTimeoutSeconds",
 	"AgentAutoDiscover",
 	"PseudoGTIDCoordinatesHistoryHeuristicMinutes",
+	"DiscoveryIgnoreReplicaHostnameFilters",
 }
 
 // Configuration makes for orchestrator configuration input, which can be provided by user via JSON formatted file.
@@ -250,7 +251,8 @@ type Configuration struct {
 	GraphitePollSeconds                        int               // Graphite writes interval. 0 disables.
 	URLPrefix                                  string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
 	MaxOutdatedKeysToShow                      int               // Maximum number of keys to show in ContinuousDiscovery. If the number of polled hosts grows too far then showing the complete list is not ideal.
-	DiscoveryIgnoreReplicaHostnameFilters      []string          // Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps
+	DiscoveryIgnoreHostnameFilters             []string          // Regexp filters to apply to prevent auto-discovering new hosts. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps
+	DiscoveryIgnoreReplicaHostnameFilters      []string          // Deprecated. Please use DiscoveryIgnoreHostnameFilters. See above but for replicas. If set any values will be added to DiscoveryIgnore
 	ConsulAddress                              string            // Address where Consul HTTP api is found. Example: 127.0.0.1:8500
 	ConsulAclToken                             string            // ACL token used to write to Consul KV
 	ZkAddress                                  string            // UNSUPPERTED YET. Address where (single or multiple) ZooKeeper servers are found, in `srv1[:port1][,srv2[:port2]...]` format. Default port is 2181. Example: srv-a,srv-b:12181,srv-c
@@ -410,6 +412,7 @@ func newConfiguration() *Configuration {
 		GraphitePollSeconds:                        60,
 		URLPrefix:                                  "",
 		MaxOutdatedKeysToShow:                      64,
+		DiscoveryIgnoreHostnameFilters:             []string{},
 		DiscoveryIgnoreReplicaHostnameFilters:      []string{},
 		ConsulAddress:                              "",
 		ConsulAclToken:                             "",
@@ -571,6 +574,11 @@ func (this *Configuration) postReadAdjustments() error {
 		if u.Path != "" {
 			return fmt.Errorf("If specified, HTTPAdvertise must not specify a path")
 		}
+	}
+	// Deprecation warning for DiscoveryIgnoreReplicaHostnameFilters
+	if this.DiscoveryIgnoreReplicaHostnameFilters != nil {
+		log.Warningf("DiscoveryIgnoreReplicaHostnameFilters is deprecated. Please use DiscoveryIgnoreHostnameFilter")
+		this.DiscoveryIgnoreHostnameFilters = append(this.DiscoveryIgnoreHostnameFilters, this.DiscoveryIgnoreReplicaHostnameFilters...)
 	}
 	return nil
 }
