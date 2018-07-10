@@ -80,6 +80,7 @@ type Instance struct {
 	SemiSyncEnforced                bool
 	SemiSyncMasterEnabled           bool
 	SemiSyncReplicaEnabled          bool
+	EventSchedulerEnabled           bool
 
 	LastSeenTimestamp    string
 	IsLastCheckValid     bool

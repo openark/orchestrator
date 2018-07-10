@@ -746,6 +746,8 @@ function run_command() {
 
     "set-read-only") general_instance_command ;;     # Turn an instance read-only, via SET GLOBAL read_only := 1
     "set-writeable") general_instance_command ;;     # Turn an instance writeable, via SET GLOBAL read_only := 0
+    "disable-event-scheduler") general_instance_command ;;    # Disable event scheduler on an instance
+    "enable-event-scheduler") general_instance_command ;;     # Enable event scheduler on an instance
     "flush-binary-logs") general_instance_command ;; # Flush binary logs on an instance
     "last-pseudo-gtid") last_pseudo_gtid ;;          # Dump last injected Pseudo-GTID entry on a server
 

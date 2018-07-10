@@ -510,4 +510,9 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN last_check_partial_success tinyint unsigned NOT NULL after last_attempted_check
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN event_scheduler_enabled tinyint unsigned NOT NULL after semi_sync_replica_enabled
+	`,
 }

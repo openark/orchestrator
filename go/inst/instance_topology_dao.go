@@ -988,6 +988,28 @@ func SetReadOnly(instanceKey *InstanceKey, readOnly bool) (*Instance, error) {
 	return instance, err
 }
 
+// SetEventScheduler enables or disables event scheduler on an instance.
+func SetEventScheduler(instanceKey *InstanceKey, enableEventScheduler bool) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	if *config.RuntimeCLIFlags.Noop {
+		return instance, fmt.Errorf("noop: aborting set-event-scheduler operation on %+v; signalling error but nothing went wrong.", *instanceKey)
+	}
+
+	if _, err := ExecInstance(instanceKey, "set global event_scheduler = ?", enableEventScheduler); err != nil {
+		return instance, log.Errore(err)
+	}
+	instance, err = ReadTopologyInstance(instanceKey)
+
+	log.Infof("instance %+v event_scheduler: %t", instanceKey, enableEventScheduler)
+	AuditOperation("event-scheduler", instanceKey, fmt.Sprintf("set as %t", enableEventScheduler))
+
+	return instance, err
+}
+
 // KillQuery stops replication on a given instance
 func KillQuery(instanceKey *InstanceKey, process int64) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)

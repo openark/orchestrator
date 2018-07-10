@@ -773,6 +773,10 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: will apply MySQL changes to promoted master"))
 			inst.ResetSlaveOperation(&promotedReplica.Key)
 			inst.SetReadOnly(&promotedReplica.Key, false)
+			if analysisEntry.EventSchedulerEnabled {
+				// event_scheduler was enabled on failed master, thus we enable it on promoted server
+				inst.SetEventScheduler(&promotedReplica.Key, true)
+			}
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: have applied read-only=0, RESET SLAVE ALL on promtoed master"))
 			// Let's attempt, though we won't necessarily succeed, to set old master as read-only
 			go inst.SetReadOnly(&analysisEntry.AnalyzedInstanceKey, true)
