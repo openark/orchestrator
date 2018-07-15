@@ -71,7 +71,6 @@ func WriteResolvedHostname(hostname string, resolvedHostname string) error {
 				hostname,
 				resolvedHostname)
 		}
-		log.Debugf("WriteResolvedHostname: resolved %s to %s", hostname, resolvedHostname)
 		writeResolvedHostnameCounter.Inc(1)
 		return nil
 	}
