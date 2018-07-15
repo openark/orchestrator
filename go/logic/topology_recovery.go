@@ -336,7 +336,6 @@ func executeProcesses(processes []string, description string, topologyRecovery *
 			info := fmt.Sprintf("Completed %s in %v",
 				fullDescription, time.Since(start))
 			AuditTopologyRecovery(topologyRecovery, info)
-			log.Infof(info)
 		} else {
 			info := fmt.Sprintf("Execution of %s failed in %v with error: %v",
 				fullDescription, time.Since(start), cmdErr)
@@ -1316,7 +1315,9 @@ func emergentlyReadTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analy
 // failure-detection processes.
 func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (detectionRegistrationSuccess bool, processesExecutionAttempted bool, err error) {
 	if ok, _ := AttemptFailureDetectionRegistration(&analysisEntry); !ok {
-		log.Infof("checkAndExecuteFailureDetectionProcesses: could not register %+v detection on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
+		if util.ClearToLog("checkAndExecuteFailureDetectionProcesses", analysisEntry.AnalyzedInstanceKey.StringCode()) {
+			log.Infof("checkAndExecuteFailureDetectionProcesses: could not register %+v detection on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
+		}
 		return false, false, nil
 	}
 	log.Infof("topology_recovery: detected %+v failure on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
@@ -1403,14 +1404,18 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	if checkAndRecoverFunction == nil {
 		// Unhandled problem type
 		if analysisEntry.Analysis != inst.NoProblem {
-			log.Warningf("executeCheckAndRecoverFunction: ignoring analysisEntry that has no action plan: %+v; key: %+v",
-				analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
+			if util.ClearToLog("executeCheckAndRecoverFunction", analysisEntry.AnalyzedInstanceKey.StringCode()) {
+				log.Warningf("executeCheckAndRecoverFunction: ignoring analysisEntry that has no action plan: %+v; key: %+v",
+					analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
+			}
 		}
 
 		return false, nil, nil
 	}
 	// we have a recovery function; its execution still depends on filters if not disabled.
-	log.Infof("executeCheckAndRecoverFunction: proceeding with %+v detection on %+v; isActionable?: %+v; skipProcesses: %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, isActionableRecovery, skipProcesses)
+	if isActionableRecovery || util.ClearToLog("executeCheckAndRecoverFunction: detection", analysisEntry.AnalyzedInstanceKey.StringCode()) {
+		log.Infof("executeCheckAndRecoverFunction: proceeding with %+v detection on %+v; isActionable?: %+v; skipProcesses: %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, isActionableRecovery, skipProcesses)
+	}
 
 	// At this point we have validated there's a failure scenario for which we have a recovery path.
 
@@ -1439,7 +1444,6 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	}
 	// We don't mind whether detection really executed the processes or not
 	// (it may have been silenced due to previous detection). We only care there's no error.
-	log.Infof("executeCheckAndRecoverFunction: proceeding with %+v recovery on %+v; isRecoverable?: %+v; skipProcesses: %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, isActionableRecovery, skipProcesses)
 
 	// We're about to embark on recovery shortly...
 
@@ -1455,6 +1459,9 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	}
 
 	// Actually attempt recovery:
+	if isActionableRecovery || util.ClearToLog("executeCheckAndRecoverFunction: recovery", analysisEntry.AnalyzedInstanceKey.StringCode()) {
+		log.Infof("executeCheckAndRecoverFunction: proceeding with %+v recovery on %+v; isRecoverable?: %+v; skipProcesses: %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, isActionableRecovery, skipProcesses)
+	}
 	recoveryAttempted, topologyRecovery, err = checkAndRecoverFunction(analysisEntry, candidateInstanceKey, forceInstanceRecovery, skipProcesses)
 	if !recoveryAttempted {
 		return recoveryAttempted, topologyRecovery, err
@@ -1661,7 +1668,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 	if designatedKey == nil {
 		// Expect a single replica.
 		if len(clusterMasterDirectReplicas) > 1 {
-			return nil, nil, fmt.Errorf("GracefulMasterTakeover: when no target instance indicated, master %+v should only have one replica (making the takeover safe and simple), but has %+v. Aborting", clusterMaster.Key, len(clusterMasterDirectReplicas))
+			return nil, nil, fmt.Errorf("When no target instance indicated, master %+v should only have one replica (making the takeover safe and simple), but has %+v. Aborting", clusterMaster.Key, len(clusterMasterDirectReplicas))
 		}
 		designatedInstance = clusterMasterDirectReplicas[0]
 		log.Infof("GracefulMasterTakeover: designated master deduced to be %+v", designatedInstance.Key)
@@ -1711,7 +1718,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 					log.Warningf("GracefulMasterTakeover: unable to relocate %+v below designated %+v, but since it is downtimed (downtime reason: %s) I will proceed", directReplica.Key, designatedInstance.Key, directReplica.DowntimeReason)
 					continue
 				}
-				return nil, nil, fmt.Errorf("GracefulMasterTakeover: desginated instance %+v cannot take over all of its siblings. Error: %+v", designatedInstance.Key, err)
+				return nil, nil, fmt.Errorf("Desginated instance %+v cannot take over all of its siblings. Error: %+v", designatedInstance.Key, err)
 			}
 		}
 	}
@@ -1727,18 +1734,18 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 		AnalysisEntry: analysisEntry,
 	}
 	if err := executeProcesses(config.Config.PreGracefulTakeoverProcesses, "PreGracefulTakeoverProcesses", preGracefulTakeoverTopologyRecovery, true); err != nil {
-		return nil, nil, fmt.Errorf("GracefulMasterTakeover: failed running PreGracefulTakeoverProcesses: %+v", err)
+		return nil, nil, fmt.Errorf("Failed running PreGracefulTakeoverProcesses: %+v", err)
 	}
 
 	if designatedInstance, err = inst.StopSlave(&designatedInstance.Key); err != nil {
 		return nil, nil, err
 	}
-	log.Infof("Will set %+v as read_only", clusterMaster.Key)
+	log.Infof("GracefulMasterTakeover: Will set %+v as read_only", clusterMaster.Key)
 	if clusterMaster, err = inst.SetReadOnly(&clusterMaster.Key, true); err != nil {
 		return nil, nil, err
 	}
-
-	log.Infof("Will advance %+v to master coordinates %+v", designatedInstance.Key, clusterMaster.SelfBinlogCoordinates)
+	demotedMasterSelfBinlogCoordinates := clusterMaster.SelfBinlogCoordinates
+	log.Infof("GracefulMasterTakeover: Will advance %+v to master coordinates %+v", designatedInstance.Key, demotedMasterSelfBinlogCoordinates)
 	if designatedInstance, err = inst.StartSlaveUntilMasterCoordinates(&designatedInstance.Key, &clusterMaster.SelfBinlogCoordinates); err != nil {
 		return nil, nil, err
 	}
@@ -1762,7 +1769,9 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 		gtidHint = inst.GTIDHintForce
 	}
 	clusterMaster, err = inst.ChangeMasterTo(&clusterMaster.Key, &designatedInstance.Key, promotedMasterCoordinates, false, gtidHint)
-
+	if !clusterMaster.SelfBinlogCoordinates.Equals(&demotedMasterSelfBinlogCoordinates) {
+		log.Errorf("GracefulMasterTakeover: sanity problem. Demoted master's coordinates changed from %+v to %+v while supposed to have been frozen", demotedMasterSelfBinlogCoordinates, clusterMaster.SelfBinlogCoordinates)
+	}
 	if designatedInstance.ReplicationCredentialsAvailable && !clusterMaster.HasReplicationCredentials && replicationCredentialsError == nil {
 		_, credentialsErr := inst.ChangeMasterCredentials(&clusterMaster.Key, replicationUser, replicationPassword)
 		if err == nil {
