@@ -243,7 +243,6 @@ func SetSemiSyncReplica(instanceKey *InstanceKey, enableReplica bool) (*Instance
 		return instance, err
 	}
 	if instance.SemiSyncReplicaEnabled == enableReplica {
-		log.Debugf("SetSemiSyncReplica: %+v slready in desired state", *instanceKey)
 		return instance, nil
 	}
 	if _, err := ExecInstance(instanceKey, "set @@global.rpl_semi_sync_slave_enabled=?", enableReplica); err != nil {

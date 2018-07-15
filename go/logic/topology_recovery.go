@@ -336,7 +336,6 @@ func executeProcesses(processes []string, description string, topologyRecovery *
 			info := fmt.Sprintf("Completed %s in %v",
 				fullDescription, time.Since(start))
 			AuditTopologyRecovery(topologyRecovery, info)
-			log.Infof(info)
 		} else {
 			info := fmt.Sprintf("Execution of %s failed in %v with error: %v",
 				fullDescription, time.Since(start), cmdErr)
@@ -1317,7 +1316,9 @@ func emergentlyReadTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analy
 // failure-detection processes.
 func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (detectionRegistrationSuccess bool, processesExecutionAttempted bool, err error) {
 	if ok, _ := AttemptFailureDetectionRegistration(&analysisEntry); !ok {
-		log.Infof("checkAndExecuteFailureDetectionProcesses: could not register %+v detection on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
+		if util.ClearToLog("checkAndExecuteFailureDetectionProcesses", analysisEntry.AnalyzedInstanceKey.StringCode()) {
+			log.Infof("checkAndExecuteFailureDetectionProcesses: could not register %+v detection on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
+		}
 		return false, false, nil
 	}
 	log.Infof("topology_recovery: detected %+v failure on %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
@@ -1404,14 +1405,18 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	if checkAndRecoverFunction == nil {
 		// Unhandled problem type
 		if analysisEntry.Analysis != inst.NoProblem {
-			log.Warningf("executeCheckAndRecoverFunction: ignoring analysisEntry that has no action plan: %+v; key: %+v",
-				analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
+			if util.ClearToLog("executeCheckAndRecoverFunction", analysisEntry.AnalyzedInstanceKey.StringCode()) {
+				log.Warningf("executeCheckAndRecoverFunction: ignoring analysisEntry that has no action plan: %+v; key: %+v",
+					analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
+			}
 		}
 
 		return false, nil, nil
 	}
 	// we have a recovery function; its execution still depends on filters if not disabled.
-	log.Infof("executeCheckAndRecoverFunction: proceeding with %+v detection on %+v; isActionable?: %+v; skipProcesses: %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, isActionableRecovery, skipProcesses)
+	if isActionableRecovery || util.ClearToLog("executeCheckAndRecoverFunction: detection", analysisEntry.AnalyzedInstanceKey.StringCode()) {
+		log.Infof("executeCheckAndRecoverFunction: proceeding with %+v detection on %+v; isActionable?: %+v; skipProcesses: %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, isActionableRecovery, skipProcesses)
+	}
 
 	// At this point we have validated there's a failure scenario for which we have a recovery path.
 
@@ -1440,7 +1445,6 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	}
 	// We don't mind whether detection really executed the processes or not
 	// (it may have been silenced due to previous detection). We only care there's no error.
-	log.Infof("executeCheckAndRecoverFunction: proceeding with %+v recovery on %+v; isRecoverable?: %+v; skipProcesses: %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, isActionableRecovery, skipProcesses)
 
 	// We're about to embark on recovery shortly...
 
@@ -1456,6 +1460,9 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	}
 
 	// Actually attempt recovery:
+	if isActionableRecovery || util.ClearToLog("executeCheckAndRecoverFunction: recovery", analysisEntry.AnalyzedInstanceKey.StringCode()) {
+		log.Infof("executeCheckAndRecoverFunction: proceeding with %+v recovery on %+v; isRecoverable?: %+v; skipProcesses: %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, isActionableRecovery, skipProcesses)
+	}
 	recoveryAttempted, topologyRecovery, err = checkAndRecoverFunction(analysisEntry, candidateInstanceKey, forceInstanceRecovery, skipProcesses)
 	if !recoveryAttempted {
 		return recoveryAttempted, topologyRecovery, err
