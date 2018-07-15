@@ -1662,7 +1662,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 	if designatedKey == nil {
 		// Expect a single replica.
 		if len(clusterMasterDirectReplicas) > 1 {
-			return nil, nil, fmt.Errorf("GracefulMasterTakeover: when no target instance indicated, master %+v should only have one replica (making the takeover safe and simple), but has %+v. Aborting", clusterMaster.Key, len(clusterMasterDirectReplicas))
+			return nil, nil, fmt.Errorf("When no target instance indicated, master %+v should only have one replica (making the takeover safe and simple), but has %+v. Aborting", clusterMaster.Key, len(clusterMasterDirectReplicas))
 		}
 		designatedInstance = clusterMasterDirectReplicas[0]
 		log.Infof("GracefulMasterTakeover: designated master deduced to be %+v", designatedInstance.Key)
@@ -1712,7 +1712,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 					log.Warningf("GracefulMasterTakeover: unable to relocate %+v below designated %+v, but since it is downtimed (downtime reason: %s) I will proceed", directReplica.Key, designatedInstance.Key, directReplica.DowntimeReason)
 					continue
 				}
-				return nil, nil, fmt.Errorf("GracefulMasterTakeover: desginated instance %+v cannot take over all of its siblings. Error: %+v", designatedInstance.Key, err)
+				return nil, nil, fmt.Errorf("Desginated instance %+v cannot take over all of its siblings. Error: %+v", designatedInstance.Key, err)
 			}
 		}
 	}
@@ -1728,18 +1728,18 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 		AnalysisEntry: analysisEntry,
 	}
 	if err := executeProcesses(config.Config.PreGracefulTakeoverProcesses, "PreGracefulTakeoverProcesses", preGracefulTakeoverTopologyRecovery, true); err != nil {
-		return nil, nil, fmt.Errorf("GracefulMasterTakeover: failed running PreGracefulTakeoverProcesses: %+v", err)
+		return nil, nil, fmt.Errorf("Failed running PreGracefulTakeoverProcesses: %+v", err)
 	}
 
 	if designatedInstance, err = inst.StopSlave(&designatedInstance.Key); err != nil {
 		return nil, nil, err
 	}
-	log.Infof("Will set %+v as read_only", clusterMaster.Key)
+	log.Infof("GracefulMasterTakeover: Will set %+v as read_only", clusterMaster.Key)
 	if clusterMaster, err = inst.SetReadOnly(&clusterMaster.Key, true); err != nil {
 		return nil, nil, err
 	}
-
-	log.Infof("Will advance %+v to master coordinates %+v", designatedInstance.Key, clusterMaster.SelfBinlogCoordinates)
+	demotedMasterSelfBinlogCoordinates := clusterMaster.SelfBinlogCoordinates
+	log.Infof("GracefulMasterTakeover: Will advance %+v to master coordinates %+v", designatedInstance.Key, demotedMasterSelfBinlogCoordinates)
 	if designatedInstance, err = inst.StartSlaveUntilMasterCoordinates(&designatedInstance.Key, &clusterMaster.SelfBinlogCoordinates); err != nil {
 		return nil, nil, err
 	}
@@ -1763,7 +1763,9 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 		gtidHint = inst.GTIDHintForce
 	}
 	clusterMaster, err = inst.ChangeMasterTo(&clusterMaster.Key, &designatedInstance.Key, promotedMasterCoordinates, false, gtidHint)
-
+	if !clusterMaster.SelfBinlogCoordinates.Equals(&demotedMasterSelfBinlogCoordinates) {
+		log.Errorf("GracefulMasterTakeover: sanity problem. Demoted master's coordinates changed from %+v to %+v while supposed to have been frozen", demotedMasterSelfBinlogCoordinates, clusterMaster.SelfBinlogCoordinates)
+	}
 	if designatedInstance.ReplicationCredentialsAvailable && !clusterMaster.HasReplicationCredentials && replicationCredentialsError == nil {
 		_, credentialsErr := inst.ChangeMasterCredentials(&clusterMaster.Key, replicationUser, replicationPassword)
 		if err == nil {
