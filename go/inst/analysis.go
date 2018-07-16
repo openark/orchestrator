@@ -90,6 +90,12 @@ type ReplicationAnalysisHints struct {
 	AuditAnalysis    bool
 }
 
+const (
+	ForceMasterFailoverCommandHint    string = "force-master-failover"
+	ForceMasterTakeoverCommandHint    string = "force-master-takeover"
+	GracefulMasterTakeoverCommandHint string = "graceful-master-takeover"
+)
+
 // ReplicationAnalysis notes analysis on replication chain status, per instance
 type ReplicationAnalysis struct {
 	AnalyzedInstanceKey                       InstanceKey
