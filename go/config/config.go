@@ -78,6 +78,7 @@ var deprecatedConfigurationVariables = []string{
 	"HttpTimeoutSeconds",
 	"AgentAutoDiscover",
 	"PseudoGTIDCoordinatesHistoryHeuristicMinutes",
+	"MaxOutdatedKeysToShow",
 }
 
 // Configuration makes for orchestrator configuration input, which can be provided by user via JSON formatted file.
@@ -249,7 +250,6 @@ type Configuration struct {
 	GraphiteConvertHostnameDotsToUnderscores   bool              // If true, then hostname's dots are converted to underscores before being used in graphite path
 	GraphitePollSeconds                        int               // Graphite writes interval. 0 disables.
 	URLPrefix                                  string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
-	MaxOutdatedKeysToShow                      int               // Maximum number of keys to show in ContinuousDiscovery. If the number of polled hosts grows too far then showing the complete list is not ideal.
 	DiscoveryIgnoreReplicaHostnameFilters      []string          // Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps
 	ConsulAddress                              string            // Address where Consul HTTP api is found. Example: 127.0.0.1:8500
 	ConsulAclToken                             string            // ACL token used to write to Consul KV
@@ -409,12 +409,11 @@ func newConfiguration() *Configuration {
 		GraphiteConvertHostnameDotsToUnderscores:   true,
 		GraphitePollSeconds:                        60,
 		URLPrefix:                                  "",
-		MaxOutdatedKeysToShow:                      64,
-		DiscoveryIgnoreReplicaHostnameFilters:      []string{},
-		ConsulAddress:                              "",
-		ConsulAclToken:                             "",
-		ZkAddress:                                  "",
-		KVClusterMasterPrefix:                      "mysql/master",
+		DiscoveryIgnoreReplicaHostnameFilters: []string{},
+		ConsulAddress:                         "",
+		ConsulAclToken:                        "",
+		ZkAddress:                             "",
+		KVClusterMasterPrefix:                 "mysql/master",
 	}
 }
 

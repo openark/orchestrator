@@ -42,6 +42,7 @@ import (
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/kv"
 	"github.com/github/orchestrator/go/metrics/query"
+	"github.com/github/orchestrator/go/util"
 )
 
 const (
@@ -148,6 +149,9 @@ func ExpireTableData(tableName string, timestampColumn string) error {
 func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err error) error {
 	if err == nil {
 		return nil
+	}
+	if !util.ClearToLog("ReadTopologyInstance", instanceKey.StringCode()) {
+		return err
 	}
 	var msg string
 	if hint == "" {
