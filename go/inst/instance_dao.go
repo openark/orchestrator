@@ -2697,7 +2697,7 @@ func FigureClusterName(clusterHint string, instanceKey *InstanceKey, thisInstanc
 		}
 		if instance != nil {
 			if instance.ClusterName == "" {
-				return true, clusterName, log.Errorf("Unable to determine cluster name")
+				return true, clusterName, log.Errorf("Unable to determine cluster name for %+v, empty cluster name. clusterHint=%+v", instance.Key, clusterHint)
 			}
 			return true, instance.ClusterName, nil
 		}
@@ -2715,7 +2715,7 @@ func FigureClusterName(clusterHint string, instanceKey *InstanceKey, thisInstanc
 	if hasResult, clusterName, err := clusterByInstanceKey(thisInstanceKey); hasResult {
 		return clusterName, err
 	}
-	return clusterName, log.Errorf("Unable to determine cluster name")
+	return clusterName, log.Errorf("Unable to determine cluster name. clusterHint=%+v", clusterHint)
 }
 
 // FigureInstanceKey tries to figure out a key
