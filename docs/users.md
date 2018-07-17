@@ -15,5 +15,6 @@ a short description of usage.
 * [Goggle/Vitess](http://vitess.io)
 * [Outbrain](http://www.outbrain.com)
 * [Rentalcars.com](http://www.rentalcars.com) - evaluating in production
+* [SendGrid](https://sendgrid.com)
 * [Square](http://squareup.com)
 * [Wix](http://www.wix.com)
