@@ -82,7 +82,7 @@
     "echo 'Planned takeover complete' >> /tmp/recovery.log"
   ],
   "DetachLostSlavesAfterMasterFailover": true,
-  "ApplyMySQLPromotionAfterMasterFailover": false,
+  "ApplyMySQLPromotionAfterMasterFailover": true,
   "MasterFailoverDetachSlaveMasterHost": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 60,
   "PostponeSlaveRecoveryOnLagMinutes": 10,
