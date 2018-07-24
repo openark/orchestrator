@@ -180,6 +180,11 @@ func (this *Instance) isMaxScale() bool {
 	return strings.Contains(this.Version, "maxscale")
 }
 
+// isNDB check whether this is NDB Cluster (aka MySQL Cluster)
+func (this *Instance) IsNDB() bool {
+	return strings.Contains(this.Version, "-ndb-")
+}
+
 // IsBinlogServer checks whether this is any type of a binlog server (currently only maxscale)
 func (this *Instance) IsBinlogServer() bool {
 	if this.isMaxScale() {
