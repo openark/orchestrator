@@ -4,9 +4,11 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 
 	"github.com/openark/golib/log"
 
+	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/raft"
 	"github.com/go-martini/martini"
 )
@@ -30,6 +32,10 @@ func raftReverseProxy(w http.ResponseWriter, r *http.Request, c martini.Context)
 		return
 	}
 	r.Header.Del("Accept-Encoding")
+	switch strings.ToLower(config.Config.AuthenticationMethod) {
+	case "basic", "multi":
+		r.SetBasicAuth(config.Config.HTTPAuthUser, config.Config.HTTPAuthPassword)
+	}
 	proxy := httputil.NewSingleHostReverseProxy(url)
 	proxy.ServeHTTP(w, r)
 }

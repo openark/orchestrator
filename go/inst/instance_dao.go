@@ -42,6 +42,7 @@ import (
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/kv"
 	"github.com/github/orchestrator/go/metrics/query"
+	"github.com/github/orchestrator/go/util"
 )
 
 const (
@@ -148,6 +149,9 @@ func ExpireTableData(tableName string, timestampColumn string) error {
 func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err error) error {
 	if err == nil {
 		return nil
+	}
+	if !util.ClearToLog("ReadTopologyInstance", instanceKey.StringCode()) {
+		return err
 	}
 	var msg string
 	if hint == "" {
@@ -2720,7 +2724,7 @@ func FigureClusterName(clusterHint string, instanceKey *InstanceKey, thisInstanc
 		}
 		if instance != nil {
 			if instance.ClusterName == "" {
-				return true, clusterName, log.Errorf("Unable to determine cluster name")
+				return true, clusterName, log.Errorf("Unable to determine cluster name for %+v, empty cluster name. clusterHint=%+v", instance.Key, clusterHint)
 			}
 			return true, instance.ClusterName, nil
 		}
@@ -2738,7 +2742,7 @@ func FigureClusterName(clusterHint string, instanceKey *InstanceKey, thisInstanc
 	if hasResult, clusterName, err := clusterByInstanceKey(thisInstanceKey); hasResult {
 		return clusterName, err
 	}
-	return clusterName, log.Errorf("Unable to determine cluster name")
+	return clusterName, log.Errorf("Unable to determine cluster name. clusterHint=%+v", clusterHint)
 }
 
 // FigureInstanceKey tries to figure out a key

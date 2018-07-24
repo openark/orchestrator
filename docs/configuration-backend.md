@@ -1,6 +1,6 @@
 # Configuration: backend
 
-Let orchestrator know where to find backend database. In this setup `orchestrator` will server HTTP on port `:3000`.
+Let orchestrator know where to find backend database. In this setup `orchestrator` will serve HTTP on port `:3000`.
 
 ```json
 {

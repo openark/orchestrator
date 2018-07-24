@@ -78,6 +78,8 @@ var deprecatedConfigurationVariables = []string{
 	"HttpTimeoutSeconds",
 	"AgentAutoDiscover",
 	"PseudoGTIDCoordinatesHistoryHeuristicMinutes",
+	"PseudoGTIDPreferIndependentMultiMatch",
+	"MaxOutdatedKeysToShow",
 }
 
 // Configuration makes for orchestrator configuration input, which can be provided by user via JSON formatted file.
@@ -210,7 +212,6 @@ type Configuration struct {
 	PseudoGTIDPatternIsFixedSubstring          bool              // If true, then PseudoGTIDPattern is not treated as regular expression but as fixed substring, and can boost search time
 	PseudoGTIDMonotonicHint                    string            // subtring in Pseudo-GTID entry which indicates Pseudo-GTID entries are expected to be monotonically increasing
 	DetectPseudoGTIDQuery                      string            // Optional query which is used to authoritatively decide whether pseudo gtid is enabled on instance
-	PseudoGTIDPreferIndependentMultiMatch      bool              // if 'false', a multi-replica Pseudo-GTID operation will attempt grouping replicas via Pseudo-GTID, and make less binlog computations. However it may cause servers in same bucket wait for one another, which could delay some servers from being repointed. There is a tradeoff between total operation time for all servers, and per-server time. When 'true', Pseudo-GTID matching will operate per server, independently. This will cause waste of same calculations, but no two servers will wait on one another.
 	BinlogEventsChunkSize                      int               // Chunk size (X) for SHOW BINLOG|RELAYLOG EVENTS LIMIT ?,X statements. Smaller means less locking and mroe work to be done
 	SkipBinlogEventsContaining                 []string          // When scanning/comparing binlogs for Pseudo-GTID, skip entries containing given texts. These are NOT regular expressions (would consume too much CPU while scanning binlogs), just substrings to find.
 	ReduceReplicationAnalysisCount             bool              // When true, replication analysis will only report instances where possibility of handled problems is possible in the first place (e.g. will not report most leaf nodes, that are mostly uninteresting). When false, provides an entry for every known instance
@@ -249,9 +250,9 @@ type Configuration struct {
 	GraphiteConvertHostnameDotsToUnderscores   bool              // If true, then hostname's dots are converted to underscores before being used in graphite path
 	GraphitePollSeconds                        int               // Graphite writes interval. 0 disables.
 	URLPrefix                                  string            // URL prefix to run orchestrator on non-root web path, e.g. /orchestrator to put it behind nginx.
-	MaxOutdatedKeysToShow                      int               // Maximum number of keys to show in ContinuousDiscovery. If the number of polled hosts grows too far then showing the complete list is not ideal.
 	DiscoveryIgnoreReplicaHostnameFilters      []string          // Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps
 	ConsulAddress                              string            // Address where Consul HTTP api is found. Example: 127.0.0.1:8500
+	ConsulAclToken                             string            // ACL token used to write to Consul KV
 	ZkAddress                                  string            // UNSUPPERTED YET. Address where (single or multiple) ZooKeeper servers are found, in `srv1[:port1][,srv2[:port2]...]` format. Default port is 2181. Example: srv-a,srv-b:12181,srv-c
 	KVClusterMasterPrefix                      string            // Prefix to use for clusters' masters entries in KV stores (internal, consul, ZK), default: "mysql/master"
 }
@@ -372,7 +373,6 @@ func newConfiguration() *Configuration {
 		PseudoGTIDPatternIsFixedSubstring:          false,
 		PseudoGTIDMonotonicHint:                    "",
 		DetectPseudoGTIDQuery:                      "",
-		PseudoGTIDPreferIndependentMultiMatch:      false,
 		BinlogEventsChunkSize:                      10000,
 		SkipBinlogEventsContaining:                 []string{},
 		ReduceReplicationAnalysisCount:             true,
@@ -394,7 +394,7 @@ func newConfiguration() *Configuration {
 		UnreachableMasterWithStaleSlavesProcesses:  []string{},
 		CoMasterRecoveryMustPromoteOtherCoMaster:   true,
 		DetachLostSlavesAfterMasterFailover:        true,
-		ApplyMySQLPromotionAfterMasterFailover:     false,
+		ApplyMySQLPromotionAfterMasterFailover:     true,
 		MasterFailoverLostInstancesDowntimeMinutes: 0,
 		MasterFailoverDetachSlaveMasterHost:        false,
 		FailMasterPromotionIfSQLThreadNotUpToDate:  false,
@@ -408,11 +408,11 @@ func newConfiguration() *Configuration {
 		GraphiteConvertHostnameDotsToUnderscores:   true,
 		GraphitePollSeconds:                        60,
 		URLPrefix:                                  "",
-		MaxOutdatedKeysToShow:                      64,
-		DiscoveryIgnoreReplicaHostnameFilters:      []string{},
-		ConsulAddress:                              "",
-		ZkAddress:                                  "",
-		KVClusterMasterPrefix:                      "mysql/master",
+		DiscoveryIgnoreReplicaHostnameFilters: []string{},
+		ConsulAddress:                         "",
+		ConsulAclToken:                        "",
+		ZkAddress:                             "",
+		KVClusterMasterPrefix:                 "mysql/master",
 	}
 }
 
@@ -545,15 +545,11 @@ func (this *Configuration) postReadAdjustments() error {
 		this.KVClusterMasterPrefix = strings.TrimRight(this.KVClusterMasterPrefix, "/")
 		this.KVClusterMasterPrefix = fmt.Sprintf("%s/", this.KVClusterMasterPrefix)
 	}
-	if this.ZkAddress != "" {
-		return fmt.Errorf("ZkAddress (ZooKeeper) configuration is unsupported yet")
-	}
 	if this.AutoPseudoGTID {
 		this.PseudoGTIDPattern = "drop view if exists `_pseudo_gtid_`"
 		this.PseudoGTIDPatternIsFixedSubstring = true
 		this.PseudoGTIDMonotonicHint = "asc:"
 		this.DetectPseudoGTIDQuery = SelectTrueQuery
-		this.PseudoGTIDPreferIndependentMultiMatch = true
 	}
 	if this.HTTPAdvertise != "" {
 		u, err := url.Parse(this.HTTPAdvertise)

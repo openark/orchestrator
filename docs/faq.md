@@ -49,7 +49,8 @@ There is no expected work on this.
 
 ### Does orchestrator support 5.7 Parallel Replication?
 
-Yes, when in-order-replication is enabled (see [slave_preserve_commit_order](http://dev.mysql.com/doc/refman/5.7/en/replication-options-slave.html#sysvar_slave_preserve_commit_order)). The same applies to MariaDB.
+Yes. When using GTID, you're all good.
+When using Pseudo-GTID you must have in-order-replication is enabled (set [slave_preserve_commit_order](http://dev.mysql.com/doc/refman/5.7/en/replication-options-slave.html#sysvar_slave_preserve_commit_order)). 
 
 ### Does orchestrator support Multi-Master Replication?
 

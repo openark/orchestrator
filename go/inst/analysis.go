@@ -84,6 +84,18 @@ func (instanceAnalysis *InstanceAnalysis) String() string {
 // Key of this map is a InstanceAnalysis.String()
 type PeerAnalysisMap map[string]int
 
+type ReplicationAnalysisHints struct {
+	IncludeDowntimed bool
+	IncludeNoProblem bool
+	AuditAnalysis    bool
+}
+
+const (
+	ForceMasterFailoverCommandHint    string = "force-master-failover"
+	ForceMasterTakeoverCommandHint    string = "force-master-takeover"
+	GracefulMasterTakeoverCommandHint string = "graceful-master-takeover"
+)
+
 // ReplicationAnalysis notes analysis on replication chain status, per instance
 type ReplicationAnalysis struct {
 	AnalyzedInstanceKey                       InstanceKey

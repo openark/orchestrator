@@ -1083,7 +1083,7 @@ function Cluster() {
       '</strong></code> as master?';
     bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
       if (confirm) {
-        apiCommand("/api/graceful-master-takeover/" + existingMasterNode.Key.Hostname + "/" + existingMasterNode.Key.Port);
+        apiCommand("/api/graceful-master-takeover/" + existingMasterNode.Key.Hostname + "/" + existingMasterNode.Key.Port + "/" + newMasterNode.Key.Hostname + "/" + newMasterNode.Key.Port);
         return true;
       }
     });
