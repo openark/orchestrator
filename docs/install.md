@@ -63,6 +63,7 @@ same account (same user, same password) for all topologies. On each of your mast
     CREATE USER 'orchestrator'@'orch_host' IDENTIFIED BY 'orch_topology_password';
     GRANT SUPER, PROCESS, REPLICATION SLAVE, RELOAD ON *.* TO 'orchestrator'@'orch_host';
     GRANT SELECT ON mysql.slave_master_info TO 'orchestrator'@'orch_host';
+    GRANT SELECT ON ndbinfo.processes TO 'orchestrator'@'orch_host'; -- Only for NDB Cluster
 
 > `REPLICATION SLAVE` is required for `SHOW SLAVE HOSTS`, and for scanning binary logs in favor of [Pseudo GTID](#pseudo-gtid)
 > `RELOAD` required for `RESET SLAVE` operation

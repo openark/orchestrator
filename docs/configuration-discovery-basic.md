@@ -27,4 +27,5 @@ On all your MySQL topologies, grant the following:
 CREATE USER 'orchestrator'@'orc_host' IDENTIFIED BY 'orc_topology_password';
 GRANT SUPER, PROCESS, REPLICATION SLAVE, REPLICATION CLIENT, RELOAD ON *.* TO 'orchestrator'@'orc_host';
 GRANT SELECT ON meta.* TO 'orchestrator'@'orc_host';
+GRANT SELECT ON ndbinfo.processes TO 'orchestrator'@'orc_host'; -- Only for NDB Cluster
 ```
