@@ -64,23 +64,23 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 					master_instance.last_checked <= master_instance.last_seen
 					and master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
        	 ) = 1 /* AS is_last_check_valid */) = 0
-				OR (IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
-		                    AND slave_instance.slave_io_running = 0
-		                    AND slave_instance.last_io_error like '%error %connecting to master%'
-		                    AND slave_instance.slave_sql_running = 1),
+				OR (IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen
+		                    AND replica_instance.slave_io_running = 0
+		                    AND replica_instance.last_io_error like '%error %connecting to master%'
+		                    AND replica_instance.slave_sql_running = 1),
 		                0) /* AS count_slaves_failing_to_connect_to_master */ > 0)
-				OR (IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen),
-		                0) /* AS count_valid_slaves */ < COUNT(slave_instance.server_id) /* AS count_slaves */)
-				OR (IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
-		                    AND slave_instance.slave_io_running != 0
-		                    AND slave_instance.slave_sql_running != 0),
-		                0) /* AS count_valid_replicating_slaves */ < COUNT(slave_instance.server_id) /* AS count_slaves */)
+				OR (IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen),
+		                0) /* AS count_valid_slaves */ < COUNT(replica_instance.server_id) /* AS count_slaves */)
+				OR (IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen
+		                    AND replica_instance.slave_io_running != 0
+		                    AND replica_instance.slave_sql_running != 0),
+		                0) /* AS count_valid_replicating_slaves */ < COUNT(replica_instance.server_id) /* AS count_slaves */)
 				OR (MIN(
 		            master_instance.slave_sql_running = 1
 		            AND master_instance.slave_io_running = 0
 		            AND master_instance.last_io_error like '%error %connecting to master%'
 		          ) /* AS is_failing_to_connect_to_master */)
-				OR (COUNT(slave_instance.server_id) /* AS count_slaves */ > 0)
+				OR (COUNT(replica_instance.server_id) /* AS count_slaves */ > 0)
 			`
 		args = append(args, ValidSecondsFromSeenToLastAttemptedCheck())
 	}
@@ -109,20 +109,20 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		                ':',
 		                master_instance.port) = master_instance.cluster_name) AS is_cluster_master,
 						MIN(master_instance.gtid_mode) AS gtid_mode,
-		        COUNT(slave_instance.server_id) AS count_slaves,
-		        IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen),
+		        COUNT(replica_instance.server_id) AS count_slaves,
+		        IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen),
 		                0) AS count_valid_slaves,
-		        IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
-		                    AND slave_instance.slave_io_running != 0
-		                    AND slave_instance.slave_sql_running != 0),
+		        IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen
+		                    AND replica_instance.slave_io_running != 0
+		                    AND replica_instance.slave_sql_running != 0),
 		                0) AS count_valid_replicating_slaves,
-		        IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
-		                    AND slave_instance.slave_io_running = 0
-		                    AND slave_instance.last_io_error like '%%error %%connecting to master%%'
-		                    AND slave_instance.slave_sql_running = 1),
+		        IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen
+		                    AND replica_instance.slave_io_running = 0
+		                    AND replica_instance.last_io_error like '%%error %%connecting to master%%'
+		                    AND replica_instance.slave_sql_running = 1),
 		                0) AS count_slaves_failing_to_connect_to_master,
 		        MIN(master_instance.replication_depth) AS replication_depth,
-		        GROUP_CONCAT(concat(slave_instance.Hostname, ':', slave_instance.Port)) as slave_hosts,
+		        GROUP_CONCAT(concat(replica_instance.Hostname, ':', replica_instance.Port)) as slave_hosts,
 		        MIN(
 		            master_instance.slave_sql_running = 1
 		            AND master_instance.slave_io_running = 0
@@ -148,49 +148,49 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 				    		master_instance.supports_oracle_gtid
 				    	) AS supports_oracle_gtid,
 			    	SUM(
-				    		slave_instance.oracle_gtid
+				    		replica_instance.oracle_gtid
 				    	) AS count_oracle_gtid_slaves,
-			      IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
-	              AND slave_instance.oracle_gtid != 0),
+			      IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen
+	              AND replica_instance.oracle_gtid != 0),
               0) AS count_valid_oracle_gtid_slaves,
 			    	SUM(
-				    		slave_instance.binlog_server
+				    		replica_instance.binlog_server
 				    	) AS count_binlog_server_slaves,
-		        IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
-                  AND slave_instance.binlog_server != 0),
+		        IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen
+                  AND replica_instance.binlog_server != 0),
               0) AS count_valid_binlog_server_slaves,
 			    	MIN(
 				    		master_instance.mariadb_gtid
 				    	) AS is_mariadb_gtid,
 			    	SUM(
-				    		slave_instance.mariadb_gtid
+				    		replica_instance.mariadb_gtid
 				    	) AS count_mariadb_gtid_slaves,
-		        IFNULL(SUM(slave_instance.last_checked <= slave_instance.last_seen
-                  AND slave_instance.mariadb_gtid != 0),
+		        IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen
+                  AND replica_instance.mariadb_gtid != 0),
               0) AS count_valid_mariadb_gtid_slaves,
-						IFNULL(SUM(slave_instance.log_bin
-							  AND slave_instance.log_slave_updates
-								AND slave_instance.binlog_format = 'STATEMENT'),
+						IFNULL(SUM(replica_instance.log_bin
+							  AND replica_instance.log_slave_updates
+								AND replica_instance.binlog_format = 'STATEMENT'),
               0) AS count_statement_based_loggin_slaves,
-						IFNULL(SUM(slave_instance.log_bin
-								AND slave_instance.log_slave_updates
-								AND slave_instance.binlog_format = 'MIXED'),
+						IFNULL(SUM(replica_instance.log_bin
+								AND replica_instance.log_slave_updates
+								AND replica_instance.binlog_format = 'MIXED'),
               0) AS count_mixed_based_loggin_slaves,
-						IFNULL(SUM(slave_instance.log_bin
-								AND slave_instance.log_slave_updates
-								AND slave_instance.binlog_format = 'ROW'),
+						IFNULL(SUM(replica_instance.log_bin
+								AND replica_instance.log_slave_updates
+								AND replica_instance.binlog_format = 'ROW'),
               0) AS count_row_based_loggin_slaves,
-						IFNULL(MIN(slave_instance.gtid_mode), '')
+						IFNULL(MIN(replica_instance.gtid_mode), '')
               AS min_replica_gtid_mode,
-						IFNULL(MAX(slave_instance.gtid_mode), '')
+						IFNULL(MAX(replica_instance.gtid_mode), '')
               AS max_replica_gtid_mode,
 						IFNULL(SUM(
 								replica_downtime.downtime_active is not null
 								and ifnull(replica_downtime.end_timestamp, now()) > now()),
               0) AS count_downtimed_replicas,
 						COUNT(DISTINCT case
-								when slave_instance.log_bin AND slave_instance.log_slave_updates
-								then slave_instance.major_version
+								when replica_instance.log_bin AND replica_instance.log_slave_updates
+								then replica_instance.major_version
 								else NULL
 							end
 						) AS count_distinct_logging_major_versions
@@ -199,9 +199,9 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
           LEFT JOIN
 		        hostname_resolve ON (master_instance.hostname = hostname_resolve.hostname)
           LEFT JOIN
-		        database_instance slave_instance ON (COALESCE(hostname_resolve.resolved_hostname,
-		                master_instance.hostname) = slave_instance.master_host
-		            	AND master_instance.port = slave_instance.master_port)
+		        database_instance replica_instance ON (COALESCE(hostname_resolve.resolved_hostname,
+		                master_instance.hostname) = replica_instance.master_host
+		            	AND master_instance.port = replica_instance.master_port)
           LEFT JOIN
 		        database_instance_maintenance ON (master_instance.hostname = database_instance_maintenance.hostname
 		        		AND master_instance.port = database_instance_maintenance.port
@@ -211,15 +211,15 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		        		AND master_instance.port = master_downtime.port
 		        		AND master_downtime.downtime_active = 1)
 					LEFT JOIN
-		        database_instance_downtime as replica_downtime ON (slave_instance.hostname = replica_downtime.hostname
-		        		AND slave_instance.port = replica_downtime.port
+		        database_instance_downtime as replica_downtime ON (replica_instance.hostname = replica_downtime.hostname
+		        		AND replica_instance.port = replica_downtime.port
 		        		AND replica_downtime.downtime_active = 1)
         	LEFT JOIN
 		        cluster_alias ON (cluster_alias.cluster_name = master_instance.cluster_name)
 				  LEFT JOIN
 						database_instance_recent_relaylog_history ON (
-								slave_instance.hostname = database_instance_recent_relaylog_history.hostname
-		        		AND slave_instance.port = database_instance_recent_relaylog_history.port)
+								replica_instance.hostname = database_instance_recent_relaylog_history.hostname
+		        		AND replica_instance.port = database_instance_recent_relaylog_history.port)
 		    WHERE
 		    	database_instance_maintenance.database_instance_maintenance_id IS NULL
 		    	AND ? IN ('', master_instance.cluster_name)
