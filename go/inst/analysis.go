@@ -132,6 +132,7 @@ type ReplicationAnalysis struct {
 	CountMixedBasedLoggingReplicas            uint
 	CountRowBasedLoggingReplicas              uint
 	CountDistinctMajorVersionsLoggingReplicas uint
+	CountDelayedReplicas                      uint
 	IsActionableRecovery                      bool
 	ProcessingNodeHostname                    string
 	ProcessingNodeToken                       string

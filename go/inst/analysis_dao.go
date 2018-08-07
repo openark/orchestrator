@@ -180,6 +180,8 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 								AND replica_instance.log_slave_updates
 								AND replica_instance.binlog_format = 'ROW'),
               0) AS count_row_based_loggin_slaves,
+						IFNULL(SUM(replica_instance.sql_delay > 0),
+              0) AS count_delayed_replicas,
 						IFNULL(MIN(replica_instance.gtid_mode), '')
               AS min_replica_gtid_mode,
 						IFNULL(MAX(replica_instance.gtid_mode), '')
@@ -282,6 +284,8 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.CountMixedBasedLoggingReplicas = m.GetUint("count_mixed_based_loggin_slaves")
 		a.CountRowBasedLoggingReplicas = m.GetUint("count_row_based_loggin_slaves")
 		a.CountDistinctMajorVersionsLoggingReplicas = m.GetUint("count_distinct_logging_major_versions")
+
+		a.CountDelayedReplicas = m.GetUint("count_delayed_replicas")
 
 		if a.IsMaster && !a.LastCheckValid && a.CountReplicas == 0 {
 			a.Analysis = DeadMasterWithoutSlaves
