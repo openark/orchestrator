@@ -55,7 +55,7 @@ func initializeAnalysisDaoPostConfiguration() {
 func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints) ([]ReplicationAnalysis, error) {
 	result := []ReplicationAnalysis{}
 
-	args := sqlutils.Args(ValidSecondsFromSeenToLastAttemptedCheck(), clusterName)
+	args := sqlutils.Args(ValidSecondsFromSeenToLastAttemptedCheck(), config.Config.ReasonableMaintenanceReplicationLagSeconds, clusterName)
 	analysisQueryReductionClause := ``
 	if config.Config.ReduceReplicationAnalysisCount {
 		analysisQueryReductionClause = `
@@ -182,6 +182,8 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
               0) AS count_row_based_loggin_slaves,
 						IFNULL(SUM(replica_instance.sql_delay > 0),
               0) AS count_delayed_replicas,
+						IFNULL(SUM(replica_instance.slave_lag_seconds > ?),
+              0) AS count_lagging_replicas,
 						IFNULL(MIN(replica_instance.gtid_mode), '')
               AS min_replica_gtid_mode,
 						IFNULL(MAX(replica_instance.gtid_mode), '')
@@ -286,6 +288,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.CountDistinctMajorVersionsLoggingReplicas = m.GetUint("count_distinct_logging_major_versions")
 
 		a.CountDelayedReplicas = m.GetUint("count_delayed_replicas")
+		a.CountLaggingReplicas = m.GetUint("count_lagging_replicas")
 
 		if a.IsMaster && !a.LastCheckValid && a.CountReplicas == 0 {
 			a.Analysis = DeadMasterWithoutSlaves
