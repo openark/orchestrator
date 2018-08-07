@@ -1683,10 +1683,11 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 		if designatedInstance == nil {
 			return nil, nil, fmt.Errorf("GracefulMasterTakeover: indicated designated instance %+v must be directly replicating from the master %+v", *designatedKey, clusterMaster.Key)
 		}
-		if inst.IsBannedFromBeingCandidateReplica(designatedInstance) {
-			return nil, nil, fmt.Errorf("GracefulMasterTakeover: indicated designated instance %+v cannot be promoted due to promotion rule or it is explicitly ignored in PromotionIgnoreHostnameFilters configuration", *designatedKey)
-		}
 		log.Infof("GracefulMasterTakeover: designated master instructed to be %+v", designatedInstance.Key)
+	}
+
+	if inst.IsBannedFromBeingCandidateReplica(designatedInstance) {
+		return nil, nil, fmt.Errorf("GracefulMasterTakeover: designated instance %+v cannot be promoted due to promotion rule or it is explicitly ignored in PromotionIgnoreHostnameFilters configuration", designatedInstance.Key)
 	}
 
 	masterOfDesignatedInstance, err := inst.GetInstanceMaster(designatedInstance)
