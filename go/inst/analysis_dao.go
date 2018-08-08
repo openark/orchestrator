@@ -310,6 +310,10 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			a.Analysis = UnreachableMasterWithStaleSlaves
 			a.Description = "Master cannot be reached by orchestrator and has running yet stale replicas"
 			//
+		} else if a.IsMaster && !a.LastCheckValid && a.CountLaggingReplicas == a.CountReplicas && a.CountDelayedReplicas < a.CountReplicas && a.CountValidReplicatingReplicas > 0 {
+			a.Analysis = UnreachableMasterWithLaggingReplicas
+			a.Description = "Master cannot be reached by orchestrator and all of its replicas are lagging"
+			//
 		} else if a.IsMaster && !a.LastCheckValid && !a.LastCheckPartialSuccess && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
 			a.Analysis = UnreachableMaster
 			a.Description = "Master cannot be reached by orchestrator but it has replicating replicas; possibly a network/host issue"

@@ -33,6 +33,7 @@ const (
 	DeadMasterAndSlaves                                                = "DeadMasterAndSlaves"
 	DeadMasterAndSomeSlaves                                            = "DeadMasterAndSomeSlaves"
 	UnreachableMasterWithStaleSlaves                                   = "UnreachableMasterWithStaleSlaves"
+	UnreachableMasterWithLaggingReplicas                               = "UnreachableMasterWithLaggingReplicas"
 	UnreachableMaster                                                  = "UnreachableMaster"
 	MasterSingleSlaveNotReplicating                                    = "MasterSingleSlaveNotReplicating"
 	MasterSingleSlaveDead                                              = "MasterSingleSlaveDead"
