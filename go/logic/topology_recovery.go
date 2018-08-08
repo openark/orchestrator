@@ -155,6 +155,7 @@ const (
 )
 
 var emergencyReadTopologyInstanceMap *cache.Cache
+var emergencyRestartReplicaTopologyInstanceMap *cache.Cache
 
 // InstancesByCountReplicas sorts instances by umber of replicas, descending
 type InstancesByCountReplicas [](*inst.Instance)
@@ -213,6 +214,7 @@ func initializeTopologyRecoveryPostConfiguration() {
 	config.WaitForConfigurationToBeLoaded()
 
 	emergencyReadTopologyInstanceMap = cache.New(time.Second, time.Millisecond*250)
+	emergencyRestartReplicaTopologyInstanceMap = cache.New(time.Second*30, time.Second)
 }
 
 // AuditTopologyRecovery audits a single step in a topology recovery process.
@@ -1312,6 +1314,38 @@ func emergentlyReadTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analy
 	}
 }
 
+// emergentlyRestartReplicationOnTopologyInstance forces a RestartSlave on a given instance.
+func emergentlyRestartReplicationOnTopologyInstance(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
+	if existsInCacheError := emergencyRestartReplicaTopologyInstanceMap.Add(instanceKey.StringCode(), true, cache.DefaultExpiration); existsInCacheError != nil {
+		// Just recently attempted on this specific replica
+		return
+	}
+	go inst.ExecuteOnTopology(func() {
+		inst.RestartSlave(instanceKey)
+		inst.AuditOperation("emergently-restart-replication-topology-instance", instanceKey, string(analysisCode))
+	})
+}
+
+// emergentlyRestartReplicationOnTopologyInstanceReplicas forces a stop slave + start slave on
+// replicas of a given instance, in an attempt to cause them to re-evaluate their replication state.
+// This can be useful in scenarios where the master has Too Many Connections, but long-time connected
+// replicas are not seeing this; when they stop+start replication, they need to re-authenticate and
+// that's where we hope they realize the master is bad.
+func emergentlyRestartReplicationOnTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analysisCode inst.AnalysisCode) {
+	if existsInCacheError := emergencyRestartReplicaTopologyInstanceMap.Add(instanceKey.StringCode(), true, cache.DefaultExpiration); existsInCacheError != nil {
+		// While each replica's RestartSlave() is throttled on its own, it's also wasteful to
+		// iterate all replicas all the time. This is the reason why we do grand-throttle check.
+		return
+	}
+	replicas, err := inst.ReadReplicaInstancesIncludingBinlogServerSubReplicas(instanceKey)
+	if err != nil {
+		return
+	}
+	for _, replica := range replicas {
+		go emergentlyRestartReplicationOnTopologyInstance(&replica.Key, analysisCode)
+	}
+}
+
 // checkAndExecuteFailureDetectionProcesses tries to register for failure detection and potentially executes
 // failure-detection processes.
 func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (detectionRegistrationSuccess bool, processesExecutionAttempted bool, err error) {
@@ -1363,6 +1397,8 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode) (
 		return checkAndRecoverGenericProblem, false
 	case inst.UnreachableMaster:
 		return checkAndRecoverGenericProblem, false
+	case inst.UnreachableMasterWithLaggingReplicas:
+		return checkAndRecoverGenericProblem, false
 	case inst.AllMasterSlavesNotReplicating:
 		return checkAndRecoverGenericProblem, false
 	case inst.AllMasterSlavesNotReplicatingOrDead:
@@ -1383,6 +1419,8 @@ func runEmergentOperations(analysisEntry *inst.ReplicationAnalysis) {
 	case inst.UnreachableMaster:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 		go emergentlyReadTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
+	case inst.UnreachableMasterWithLaggingReplicas:
+		go emergentlyRestartReplicationOnTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 	case inst.AllMasterSlavesNotReplicating:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 	case inst.AllMasterSlavesNotReplicatingOrDead:
