@@ -259,6 +259,15 @@ func SetSemiSyncReplica(instanceKey *InstanceKey, enableReplica bool) (*Instance
 
 }
 
+func RestartIOThread(instanceKey *InstanceKey) error {
+	for _, cmd := range []string{`stop slave io_thread`, `start slave sql_thread`} {
+		if _, err := ExecInstance(instanceKey, cmd); err != nil {
+			return log.Errorf("%+v: RestartIOThread: '%q' failed: %+v", *instanceKey, cmd, err)
+		}
+	}
+	return nil
+}
+
 // StopSlaveNicely stops a replica such that SQL_thread and IO_thread are aligned (i.e.
 // SQL_thread consumes all relay log entries)
 // It will actually START the sql_thread even if the replica is completely stopped.
@@ -273,10 +282,8 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	}
 
 	// stop io_thread, start sql_thread but catch any errors
-	for _, cmd := range []string{`stop slave io_thread`, `start slave sql_thread`} {
-		if _, err = ExecInstance(instanceKey, cmd); err != nil {
-			return nil, log.Errorf("%+v: StopSlaveNicely: %q failed: %+v", *instanceKey, cmd, err)
-		}
+	if err := RestartIOThread(instanceKey); err != nil {
+		return instance, err
 	}
 
 	if instance.SQLDelay == 0 {
