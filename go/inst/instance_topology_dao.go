@@ -260,7 +260,7 @@ func SetSemiSyncReplica(instanceKey *InstanceKey, enableReplica bool) (*Instance
 }
 
 func RestartIOThread(instanceKey *InstanceKey) error {
-	for _, cmd := range []string{`stop slave io_thread`, `start slave sql_thread`} {
+	for _, cmd := range []string{`stop slave io_thread`, `start slave io_thread`} {
 		if _, err := ExecInstance(instanceKey, cmd); err != nil {
 			return log.Errorf("%+v: RestartIOThread: '%q' failed: %+v", *instanceKey, cmd, err)
 		}
@@ -282,8 +282,10 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	}
 
 	// stop io_thread, start sql_thread but catch any errors
-	if err := RestartIOThread(instanceKey); err != nil {
-		return instance, err
+	for _, cmd := range []string{`stop slave io_thread`, `start slave sql_thread`} {
+		if _, err := ExecInstance(instanceKey, cmd); err != nil {
+			return instance, log.Errorf("%+v: RestartIOThread: '%q' failed: %+v", *instanceKey, cmd, err)
+		}
 	}
 
 	if instance.SQLDelay == 0 {
