@@ -284,7 +284,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	// stop io_thread, start sql_thread but catch any errors
 	for _, cmd := range []string{`stop slave io_thread`, `start slave sql_thread`} {
 		if _, err := ExecInstance(instanceKey, cmd); err != nil {
-			return instance, log.Errorf("%+v: RestartIOThread: '%q' failed: %+v", *instanceKey, cmd, err)
+			return nil, log.Errorf("%+v: StopSlaveNicely: '%q' failed: %+v", *instanceKey, cmd, err)
 		}
 	}
 
