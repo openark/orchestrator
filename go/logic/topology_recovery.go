@@ -156,6 +156,7 @@ const (
 
 var emergencyReadTopologyInstanceMap *cache.Cache
 var emergencyRestartReplicaTopologyInstanceMap *cache.Cache
+var emergencyOperationGracefulPeriodMap *cache.Cache
 
 // InstancesByCountReplicas sorts instances by umber of replicas, descending
 type InstancesByCountReplicas [](*inst.Instance)
@@ -215,6 +216,7 @@ func initializeTopologyRecoveryPostConfiguration() {
 
 	emergencyReadTopologyInstanceMap = cache.New(time.Second, time.Millisecond*250)
 	emergencyRestartReplicaTopologyInstanceMap = cache.New(time.Second*30, time.Second)
+	emergencyOperationGracefulPeriodMap = cache.New(time.Second*5, time.Millisecond*500)
 }
 
 // AuditTopologyRecovery audits a single step in a topology recovery process.
@@ -1326,6 +1328,15 @@ func emergentlyRestartReplicationOnTopologyInstance(instanceKey *inst.InstanceKe
 	})
 }
 
+func beginEmergencyOperationGracefulPeriod(instanceKey *inst.InstanceKey) {
+	emergencyOperationGracefulPeriodMap.Set(instanceKey.StringCode(), true, cache.DefaultExpiration)
+}
+
+func isInEmergencyOperationGracefulPeriod(instanceKey *inst.InstanceKey) bool {
+	_, found := emergencyOperationGracefulPeriodMap.Get(instanceKey.StringCode())
+	return found
+}
+
 // emergentlyRestartReplicationOnTopologyInstanceReplicas forces a stop slave + start slave on
 // replicas of a given instance, in an attempt to cause them to re-evaluate their replication state.
 // This can be useful in scenarios where the master has Too Many Connections, but long-time connected
@@ -1337,6 +1348,8 @@ func emergentlyRestartReplicationOnTopologyInstanceReplicas(instanceKey *inst.In
 		// iterate all replicas all the time. This is the reason why we do grand-throttle check.
 		return
 	}
+	beginEmergencyOperationGracefulPeriod(instanceKey)
+
 	replicas, err := inst.ReadReplicaInstancesIncludingBinlogServerSubReplicas(instanceKey)
 	if err != nil {
 		return
@@ -1364,16 +1377,18 @@ func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnal
 	return true, true, err
 }
 
-func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode) (
+func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstanceKey *inst.InstanceKey) (
 	checkAndRecoverFunction func(analysisEntry inst.ReplicationAnalysis, candidateInstanceKey *inst.InstanceKey, forceInstanceRecovery bool, skipProcesses bool) (recoveryAttempted bool, topologyRecovery *TopologyRecovery, err error),
 	isActionableRecovery bool,
 ) {
 	switch analysisCode {
 	// master
-	case inst.DeadMaster:
-		return checkAndRecoverDeadMaster, true
-	case inst.DeadMasterAndSomeSlaves:
-		return checkAndRecoverDeadMaster, true
+	case inst.DeadMaster, inst.DeadMasterAndSomeSlaves:
+		if isInEmergencyOperationGracefulPeriod(analyzedInstanceKey) {
+			return checkAndRecoverGenericProblem, false
+		} else {
+			return checkAndRecoverDeadMaster, true
+		}
 	case inst.UnreachableMasterWithStaleSlaves:
 		return checkAndRecoverUnreachableMasterWithStaleSlaves, true
 	// intermediate master
@@ -1436,7 +1451,7 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	atomic.AddInt64(&countPendingRecoveries, 1)
 	defer atomic.AddInt64(&countPendingRecoveries, -1)
 
-	checkAndRecoverFunction, isActionableRecovery := getCheckAndRecoverFunction(analysisEntry.Analysis)
+	checkAndRecoverFunction, isActionableRecovery := getCheckAndRecoverFunction(analysisEntry.Analysis, &analysisEntry.AnalyzedInstanceKey)
 	analysisEntry.IsActionableRecovery = isActionableRecovery
 	runEmergentOperations(&analysisEntry)
 
