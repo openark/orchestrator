@@ -42,6 +42,9 @@ import (
 
 var countPendingRecoveries int64
 
+var notifiedAnalysisMap = map[string]bool{}
+var notifiedAnalysisChan = make(chan *inst.ReplicationAnalysis)
+
 type RecoveryAcknowledgement struct {
 	CreatedAt time.Time
 	Owner     string
@@ -1312,6 +1315,35 @@ func emergentlyReadTopologyInstanceReplicas(instanceKey *inst.InstanceKey, analy
 	}
 }
 
+func executeFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis) error {
+	return executeProcesses(config.Config.OnFailureDetectionProcesses, "OnFailureDetectionProcesses", NewTopologyRecovery(analysisEntry), true)
+}
+
+func consumeInstanceAnalysisChan() {
+	for {
+		select {
+		case analysisEntry := <-notifiedAnalysisChan:
+			{
+				log.Debugf(".................>>>>> transition to %+v on  %+v", analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey)
+				mapKey := analysisEntry.AnalyzedInstanceKey.StringCode()
+				notifiedAnalysisMap[mapKey] = true
+			}
+		case analysisEntry := <-inst.ClearedAnalysisChan:
+			{
+				log.Debugf(".................<<<<< transition to all-clear %+v", analysisEntry.AnalyzedInstanceKey)
+				// An analysis went from some-problem to NoProblem
+				if mapKey := analysisEntry.AnalyzedInstanceKey.StringCode(); notifiedAnalysisMap[mapKey] {
+					log.Debugf(".................<<<<< transition confirmed %+v", analysisEntry.AnalyzedInstanceKey)
+					acknowledgeInstanceFailureDetection(&analysisEntry.AnalyzedInstanceKey)
+					delete(notifiedAnalysisMap, mapKey)
+					// And an "all-clear"
+					executeFailureDetectionProcesses(*analysisEntry)
+				}
+			}
+		}
+	}
+}
+
 // checkAndExecuteFailureDetectionProcesses tries to register for failure detection and potentially executes
 // failure-detection processes.
 func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnalysis, skipProcesses bool) (detectionRegistrationSuccess bool, processesExecutionAttempted bool, err error) {
@@ -1326,7 +1358,10 @@ func checkAndExecuteFailureDetectionProcesses(analysisEntry inst.ReplicationAnal
 	if skipProcesses {
 		return true, false, nil
 	}
-	err = executeProcesses(config.Config.OnFailureDetectionProcesses, "OnFailureDetectionProcesses", NewTopologyRecovery(analysisEntry), true)
+	err = executeFailureDetectionProcesses(analysisEntry)
+	go func() {
+		notifiedAnalysisChan <- &analysisEntry
+	}()
 	return true, true, err
 }
 

@@ -37,6 +37,7 @@ var analysisChangeWriteAttemptCounter = metrics.NewCounter()
 var analysisChangeWriteCounter = metrics.NewCounter()
 
 var recentInstantAnalysis *cache.Cache
+var ClearedAnalysisChan = make(chan *ReplicationAnalysis)
 
 func init() {
 	metrics.Register("analysis.change.write.attempt", analysisChangeWriteAttemptCounter)
@@ -452,7 +453,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 
 		if a.CountReplicas > 0 && hints.AuditAnalysis {
 			// Interesting enough for analysis
-			go auditInstanceAnalysisInChangelog(&a.AnalyzedInstanceKey, a.Analysis)
+			go auditInstanceAnalysisInChangelog(&a)
 		}
 		return nil
 	})
@@ -497,12 +498,16 @@ func getConcensusReplicationAnalysis(analysisEntries []ReplicationAnalysis) ([]R
 // auditInstanceAnalysisInChangelog will write down an instance's analysis in the database_instance_analysis_changelog table.
 // To not repeat recurring analysis code, the database_instance_last_analysis table is used, so that only changes to
 // analysis codes are written.
-func auditInstanceAnalysisInChangelog(instanceKey *InstanceKey, analysisCode AnalysisCode) error {
-	if lastWrittenAnalysis, found := recentInstantAnalysis.Get(instanceKey.DisplayString()); found {
+func auditInstanceAnalysisInChangelog(analysisEntry *ReplicationAnalysis) error {
+
+	instanceKey := analysisEntry.AnalyzedInstanceKey
+	analysisCode := analysisEntry.Analysis
+
+	if lastWrittenAnalysis, found := recentInstantAnalysis.Get(instanceKey.StringCode()); found {
 		if lastWrittenAnalysis == analysisCode {
 			// Surely nothing new.
 			// And let's expand the timeout
-			recentInstantAnalysis.Set(instanceKey.DisplayString(), analysisCode, cache.DefaultExpiration)
+			recentInstantAnalysis.Set(instanceKey.StringCode(), analysisCode, cache.DefaultExpiration)
 			return nil
 		}
 	}
@@ -534,7 +539,7 @@ func auditInstanceAnalysisInChangelog(instanceKey *InstanceKey, analysisCode Ana
 		lastAnalysisChanged = (rows > 0)
 	}
 	if !lastAnalysisChanged {
-		_, err := db.ExecOrchestrator(`
+		if _, err := db.ExecOrchestrator(`
 			insert ignore into database_instance_last_analysis (
 					hostname, port, analysis_timestamp, analysis
 				) values (
@@ -542,14 +547,19 @@ func auditInstanceAnalysisInChangelog(instanceKey *InstanceKey, analysisCode Ana
 				)
 			`,
 			instanceKey.Hostname, instanceKey.Port, string(analysisCode),
-		)
-		if err != nil {
+		); err != nil {
 			return log.Errore(err)
 		}
 	}
-	recentInstantAnalysis.Set(instanceKey.DisplayString(), analysisCode, cache.DefaultExpiration)
+	recentInstantAnalysis.Set(instanceKey.StringCode(), analysisCode, cache.DefaultExpiration)
 	if !lastAnalysisChanged {
 		return nil
+	}
+
+	if analysisCode == NoProblem {
+		go func() {
+			ClearedAnalysisChan <- analysisEntry
+		}()
 	}
 
 	_, err := db.ExecOrchestrator(`

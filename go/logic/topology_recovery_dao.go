@@ -113,6 +113,7 @@ func ClearActiveFailureDetections() error {
 // clearAcknowledgedFailureDetections clears the "in_active_period" flag for detections
 // that were acknowledged
 func clearAcknowledgedFailureDetections(whereClause string, args []interface{}) error {
+	log.Debugf("...............................clearAcknowledgedFailureDetections: %+v", whereClause)
 	query := fmt.Sprintf(`
 			update topology_failure_detection set
 				in_active_period = 0,
