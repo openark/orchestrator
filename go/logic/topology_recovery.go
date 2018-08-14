@@ -1739,6 +1739,10 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 		log.Infof("GracefulMasterTakeover: designated master instructed to be %+v", designatedInstance.Key)
 	}
 
+	if inst.IsBannedFromBeingCandidateReplica(designatedInstance) {
+		return nil, nil, fmt.Errorf("GracefulMasterTakeover: designated instance %+v cannot be promoted due to promotion rule or it is explicitly ignored in PromotionIgnoreHostnameFilters configuration", designatedInstance.Key)
+	}
+
 	masterOfDesignatedInstance, err := inst.GetInstanceMaster(designatedInstance)
 	if err != nil {
 		return nil, nil, err
