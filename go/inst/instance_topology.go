@@ -1587,6 +1587,9 @@ func TakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil || !found {
 		return instance, err
 	}
+	if masterInstance.IsCoMaster {
+		return instance, fmt.Errorf("%+v is co-master. Cannot take it.", masterInstance.Key)
+	}
 	log.Debugf("TakeMaster: will attempt making %+v take its master %+v, now resolved as %+v", *instanceKey, instance.MasterKey, masterInstance.Key)
 
 	if canReplicate, err := masterInstance.CanReplicateFrom(instance); canReplicate == false {
