@@ -888,6 +888,7 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	log.Infof("Will make %+v co-master of %+v", instanceKey, master.Key)
 
+	var gitHint OperationGTIDHint = GTIDHintNeutral
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("make co-master of %+v", master.Key)); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
 		goto Cleanup
@@ -932,7 +933,10 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 
-	master, err = ChangeMasterTo(&master.Key, instanceKey, &instance.SelfBinlogCoordinates, false, GTIDHintNeutral)
+	if instance.UsingOracleGTID {
+		gitHint = GTIDHintForce
+	}
+	master, err = ChangeMasterTo(&master.Key, instanceKey, &instance.SelfBinlogCoordinates, false, gitHint)
 	if err != nil {
 		goto Cleanup
 	}
@@ -1582,6 +1586,9 @@ func TakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 	masterInstance, found, err := ReadInstance(&instance.MasterKey)
 	if err != nil || !found {
 		return instance, err
+	}
+	if masterInstance.IsCoMaster {
+		return instance, fmt.Errorf("%+v is co-master. Cannot take it.", masterInstance.Key)
 	}
 	log.Debugf("TakeMaster: will attempt making %+v take its master %+v, now resolved as %+v", *instanceKey, instance.MasterKey, masterInstance.Key)
 

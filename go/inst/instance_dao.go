@@ -602,6 +602,33 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		}()
 	}
 
+	if instance.IsNDB() {
+		// Discover by ndbinfo about MySQL Cluster SQL nodes
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			err := sqlutils.QueryRowsMap(db, `
+      	select
+      		substring(service_URI,9) mysql_host
+      	from
+      		ndbinfo.processes
+      	where
+          process_name='mysqld'
+  		`,
+				func(m sqlutils.RowMap) error {
+					cname, resolveErr := ResolveHostname(m.GetString("mysql_host"))
+					if resolveErr != nil {
+						logReadTopologyInstanceError(instanceKey, "ResolveHostname: ndbinfo", resolveErr)
+					}
+					replicaKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
+					instance.AddReplicaKey(&replicaKey)
+					return err
+				})
+
+			logReadTopologyInstanceError(instanceKey, "ndbinfo", err)
+		}()
+	}
+
 	if config.Config.DetectDataCenterQuery != "" && !isMaxScale {
 		waitGroup.Add(1)
 		go func() {
@@ -2708,7 +2735,7 @@ func FigureClusterName(clusterHint string, instanceKey *InstanceKey, thisInstanc
 		}
 		if instance != nil {
 			if instance.ClusterName == "" {
-				return true, clusterName, log.Errorf("Unable to determine cluster name")
+				return true, clusterName, log.Errorf("Unable to determine cluster name for %+v, empty cluster name. clusterHint=%+v", instance.Key, clusterHint)
 			}
 			return true, instance.ClusterName, nil
 		}
@@ -2726,7 +2753,7 @@ func FigureClusterName(clusterHint string, instanceKey *InstanceKey, thisInstanc
 	if hasResult, clusterName, err := clusterByInstanceKey(thisInstanceKey); hasResult {
 		return clusterName, err
 	}
-	return clusterName, log.Errorf("Unable to determine cluster name")
+	return clusterName, log.Errorf("Unable to determine cluster name. clusterHint=%+v", clusterHint)
 }
 
 // FigureInstanceKey tries to figure out a key
