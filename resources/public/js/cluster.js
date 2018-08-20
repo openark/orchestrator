@@ -728,7 +728,7 @@ function Cluster() {
       // Obviously can't handle.
       return unaccepted;
     }
-    if (instanceIsChild(node, droppableNode) && !droppableNode.isMaster) {
+    if (instanceIsChild(node, droppableNode) && !droppableNode.isMaster && !droppableNode.isCoMaster) {
       if (node.hasProblem) {
         // Typically, when a node has a problem we do not allow moving it up.
         // But there's a special situation when allowing is desired: when
