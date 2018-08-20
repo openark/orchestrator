@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/openark/golib/log"
@@ -213,5 +214,21 @@ func TestHttpAdvertise(t *testing.T) {
 		c.HTTPAdvertise = "http://127.0.0.1:1234/mypath"
 		err := c.postReadAdjustments()
 		test.S(t).ExpectNotNil(err)
+	}
+}
+
+func TestRead(t *testing.T) {
+	s := `
+{
+  "MySQLOrchestratorUser": "some_user",
+  "MySQLOrchestratorPassword": "some_password"
+}
+`
+	{
+		reader := strings.NewReader(s)
+		config, err := read(reader)
+		test.S(t).ExpectNil(err)
+		test.S(t).ExpectEquals(config.MySQLOrchestratorUser, "some_user")
+		test.S(t).ExpectEquals(config.MySQLOrchestratorPassword, "some_password")
 	}
 }

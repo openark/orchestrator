@@ -19,6 +19,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"regexp"
@@ -569,20 +570,26 @@ func (this *Configuration) HasReplicationCredentials() bool {
 	return this.MySQLReplicationUser != ""
 }
 
+func read(reader io.Reader) (*Configuration, error) {
+	decoder := json.NewDecoder(reader)
+	if err := decoder.Decode(Config); err != nil {
+		return nil, err
+	}
+	if err := Config.postReadAdjustments(); err != nil {
+		return nil, err
+	}
+	return Config, nil
+}
+
 // read reads configuration from given file, or silently skips if the file does not exist.
 // If the file does exist, then it is expected to be in valid JSON format or the function bails out.
-func read(fileName string) (*Configuration, error) {
+func readFile(fileName string) (*Configuration, error) {
 	file, err := os.Open(fileName)
 	if err == nil {
-		decoder := json.NewDecoder(file)
-		err := decoder.Decode(Config)
-		if err == nil {
+		if _, err := read(file); err == nil {
 			log.Infof("Read config: %s", fileName)
 		} else {
-			log.Fatal("Cannot read config file:", fileName, err)
-		}
-		if err := Config.postReadAdjustments(); err != nil {
-			log.Fatale(err)
+			log.Fatalf("Error reading config file %s: %+v", fileName, err)
 		}
 	}
 	return Config, err
@@ -592,7 +599,7 @@ func read(fileName string) (*Configuration, error) {
 // A file can override configuration provided in previous file.
 func Read(fileNames ...string) *Configuration {
 	for _, fileName := range fileNames {
-		read(fileName)
+		readFile(fileName)
 	}
 	readFileNames = fileNames
 	return Config
@@ -600,7 +607,7 @@ func Read(fileNames ...string) *Configuration {
 
 // ForceRead reads configuration from given file name or bails out if it fails
 func ForceRead(fileName string) *Configuration {
-	_, err := read(fileName)
+	_, err := readFile(fileName)
 	if err != nil {
 		log.Fatal("Cannot read config file:", fileName, err)
 	}
@@ -611,7 +618,7 @@ func ForceRead(fileName string) *Configuration {
 // Reload re-reads configuration from last used files
 func Reload() *Configuration {
 	for _, fileName := range readFileNames {
-		read(fileName)
+		readFile(fileName)
 	}
 	return Config
 }
