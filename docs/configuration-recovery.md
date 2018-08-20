@@ -86,7 +86,7 @@ A naive implementation might look like:
 
 #### Hooks arguments and environment
 
-`orchestrator` provides all hooks with failure/recovery related information, such as the identity of the failed instance, identity of promoted instance, affecetd replicas, type of failure, name of cluster, etc.
+`orchestrator` provides all hooks with failure/recovery related information, such as the identity of the failed instance, identity of promoted instance, affected replicas, type of failure, name of cluster, etc.
 
 This information is passed independently in two ways, and you may choose to use one or both:
 
@@ -107,6 +107,7 @@ This information is passed independently in two ways, and you may choose to use 
 - `ORC_IS_SUCCESSFUL`
 - `ORC_LOST_REPLICAS`
 - `ORC_REPLICA_HOSTS`
+- `ORC_COMMAND` (`"force-master-failover"`, `"force-master-takeover"`, `"graceful-master-takeover"` if applicable)
 
 And, in the event a recovery was successful:
 
@@ -131,6 +132,7 @@ And, in the event a recovery was successful:
 - `{lostReplicas}` aka `{lostSlaves}`
 - `{replicaHosts}` aka `{slaveHosts}`
 - `{isSuccessful}`
+- `{command}` (`"force-master-failover"`, `"force-master-takeover"`, `"graceful-master-takeover"` if applicable)
 
 And, in the event a recovery was successful:
 
