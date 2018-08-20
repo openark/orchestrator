@@ -220,10 +220,6 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		        		AND replica_downtime.downtime_active = 1)
         	LEFT JOIN
 		        cluster_alias ON (cluster_alias.cluster_name = master_instance.cluster_name)
-				  LEFT JOIN
-						database_instance_recent_relaylog_history ON (
-								replica_instance.hostname = database_instance_recent_relaylog_history.hostname
-		        		AND replica_instance.port = database_instance_recent_relaylog_history.port)
 		    WHERE
 		    	database_instance_maintenance.database_instance_maintenance_id IS NULL
 		    	AND ? IN ('', master_instance.cluster_name)
