@@ -10,6 +10,8 @@
   "MySQLTopologySSLCAFile": "",
   "MySQLTopologySSLSkipVerify": true,
   "MySQLTopologyUseMutualTLS": false,
+  "MySQLReplicationUser": "",
+  "MySQLTopologyPassword": "",
   "BackendDB": "sqlite",
   "SQLite3DataFile": "/usr/local/orchestrator/orchestrator.sqlite3",
   "DefaultInstancePort": 3306,

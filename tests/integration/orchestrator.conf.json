@@ -25,6 +25,8 @@
   "MySQLOrchestratorSSLCAFile": "",
   "MySQLOrchestratorSSLSkipVerify": true,
   "MySQLOrchestratorUseMutualTLS": false,
+  "MySQLReplicationUser": "",
+  "MySQLTopologyPassword": "",
   "MySQLConnectTimeoutSeconds": 1,
   "DefaultInstancePort": 3306,
   "SkipOrchestratorDatabaseUpdate": false,
