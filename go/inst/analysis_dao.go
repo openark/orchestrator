@@ -259,7 +259,6 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.CountValidReplicatingReplicas = m.GetUint("count_valid_replicating_slaves")
 		a.CountReplicasFailingToConnectToMaster = m.GetUint("count_slaves_failing_to_connect_to_master")
 		a.CountDowntimedReplicas = m.GetUint("count_downtimed_replicas")
-		a.CountStaleReplicas = 0
 		a.ReplicationDepth = m.GetUint("replication_depth")
 		a.IsFailingToConnectToMaster = m.GetBool("is_failing_to_connect_to_master")
 		a.IsDowntimed = m.GetBool("is_downtimed")
@@ -311,10 +310,6 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			a.Analysis = DeadMasterAndSomeSlaves
 			a.Description = "Master cannot be reached by orchestrator; some of its replicas are unreachable and none of its reachable replicas is replicating"
 			//
-		} else if a.IsMaster && !a.LastCheckValid && a.CountStaleReplicas == a.CountReplicas && a.CountValidReplicatingReplicas > 0 {
-			a.Analysis = UnreachableMasterWithStaleSlaves
-			a.Description = "Master cannot be reached by orchestrator and has running yet stale replicas"
-			//
 		} else if a.IsMaster && !a.LastCheckValid && a.CountLaggingReplicas == a.CountReplicas && a.CountDelayedReplicas < a.CountReplicas && a.CountValidReplicatingReplicas > 0 {
 			a.Analysis = UnreachableMasterWithLaggingReplicas
 			a.Description = "Master cannot be reached by orchestrator and all of its replicas are lagging"
@@ -338,10 +333,6 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		} else if a.IsMaster && a.LastCheckValid && a.CountReplicas > 1 && a.CountValidReplicas < a.CountReplicas && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas == 0 {
 			a.Analysis = AllMasterSlavesNotReplicatingOrDead
 			a.Description = "Master is reachable but none of its replicas is replicating"
-			//
-		} else if a.IsMaster && a.LastCheckValid && a.CountReplicas > 1 && a.CountStaleReplicas == a.CountReplicas && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
-			a.Analysis = AllMasterSlavesStale
-			a.Description = "Master is reachable but all of its replicas are stale, although attempting to replicate"
 			//
 		} else /* co-master */ if a.IsCoMaster && !a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicas == a.CountReplicas && a.CountValidReplicatingReplicas == 0 {
 			a.Analysis = DeadCoMaster
