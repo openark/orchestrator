@@ -32,4 +32,5 @@ COPY --from=0 /etc/orchestrator.conf.json /etc/orchestrator.conf.json
 
 WORKDIR /usr/local/orchestrator
 ADD docker/entrypoint.sh /entrypoint.sh
+ADD reproduce_promotion_rule_deletion.sh /reproduce_promotion_rule_deletion.sh
 CMD /entrypoint.sh
