@@ -70,6 +70,10 @@ test_single() {
   if [ -f $tests_path/$test_name/extra_args ] ; then
     extra_args=$(cat $tests_path/$test_name/extra_args)
   fi
+
+  if [ -f $tests_path/$test_name/setup.sh ] ; then
+    . $tests_path/$test_name/setup.sh
+  fi
   #
   cmd="$orchestrator_binary \
     --config=${test_config_file}
@@ -124,6 +128,20 @@ test_single() {
       echo "---"
       return 1
     fi
+  fi
+
+  if [ -f $tests_path/$test_name/verify.sh ] ; then
+    . $tests_path/$test_name/verify.sh
+    verify_result=$?
+    if [ $verify_result -ne 0 ] ; then
+      echo
+      echo "ERROR $test_name verify failure."
+      return 1
+    fi
+  fi
+
+  if [ -f $tests_path/$test_name/tear_down.sh ] ; then
+    . $tests_path/$test_name/tear_down.sh
   fi
 
   # all is well

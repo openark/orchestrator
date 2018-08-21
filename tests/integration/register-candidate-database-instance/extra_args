@@ -1,0 +1,1 @@
+-c register-candidate -i testhost:22293 --promotion-rule prefer
