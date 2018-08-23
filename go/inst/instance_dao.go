@@ -1120,6 +1120,17 @@ func ReadClusterWriteableMaster(clusterName string) ([](*Instance), error) {
 	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "replication_depth asc")
 }
 
+// ReadClusterMaster returns the master of this cluster.
+// - if the cluster has co-masters, the/a writable one is returned
+// - if the cluster has a single master, that master is retuened whether it is read-only or writable.
+func ReadClusterMaster(clusterName string) ([](*Instance), error) {
+	condition := `
+		cluster_name = ?
+		and (replication_depth = 0 or is_co_master)
+	`
+	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "read_only asc, replication_depth asc")
+}
+
 // ReadWriteableClustersMasters returns writeable masters of all clusters, but only one
 // per cluster, in similar logic to ReadClusterWriteableMaster
 func ReadWriteableClustersMasters() (instances [](*Instance), err error) {
