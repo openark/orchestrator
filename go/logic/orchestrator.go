@@ -174,17 +174,17 @@ func handleDiscoveryRequests() {
 					continue
 				}
 
-				discoverInstance(instanceKey)
+				DiscoverInstance(instanceKey)
 				discoveryQueue.Release(instanceKey)
 			}
 		}()
 	}
 }
 
-// discoverInstance will attempt to discover (poll) an instance (unless
+// DiscoverInstance will attempt to discover (poll) an instance (unless
 // it is already up to date) and will also ensure that its master and
 // replicas (if any) are also checked.
-func discoverInstance(instanceKey inst.InstanceKey) {
+func DiscoverInstance(instanceKey inst.InstanceKey) {
 	if inst.InstanceIsForgotten(&instanceKey) {
 		log.Debugf("discoverInstance: skipping discovery of %+v because it is set to be forgotten", instanceKey)
 		return
@@ -248,7 +248,7 @@ func discoverInstance(instanceKey inst.InstanceKey) {
 			Err:             err,
 		})
 		if util.ClearToLog("discoverInstance", instanceKey.StringCode()) {
-			log.Warningf("discoverInstance(%+v) instance is nil in %.3fs (Backend: %.3fs, Instance: %.3fs), error=%+v",
+			log.Warningf(" DiscoverInstance(%+v) instance is nil in %.3fs (Backend: %.3fs, Instance: %.3fs), error=%+v",
 				instanceKey,
 				totalLatency.Seconds(),
 				backendLatency.Seconds(),
