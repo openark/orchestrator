@@ -35,6 +35,7 @@ Observe the following list of potential failures:
 * DeadMasterAndSlaves
 * DeadMasterAndSomeSlaves
 * DeadMasterWithoutSlaves
+* UnreachableMasterWithLaggingReplicas
 * UnreachableMaster
 * AllMasterSlavesNotReplicating
 * AllMasterSlavesNotReplicatingOrDead
@@ -83,6 +84,16 @@ their time to figure out they were failing replication.
 2. All of its replicas are failing replication
 
 This makes for a potential recovery process.
+
+#### `UnreachableMasterWithLaggingReplicas`:
+
+1. Master cannot be reached
+2. All of its immediate replicas (excluding SQL delayed) are lagging
+
+This scenario can happen when the master is overloaded. Clients would see a "Too many connections", while the replicas, which have been connected since long ago, claim the master is fine. Similarly, if the master is locked due to some metadata operation, clients would be blocked on connection while replicas _may claim_ everything's fine. However, since apps cannot connect to the master, no actual data gets written, and when using a heartbeat mechanism such as `pt-heartbeat`, we can observe a growing lag on replicas.
+
+`orchestrator` responds to this scenario by restarting replication on all of master's immediate replicas. This will close the old client connections on those replicas and attempt to initiate new ones. These may now fail to connect, leading to a complete replication failure on all replicas. This will next lead `orchestrator` to analyze a `DeadMaster`.
+
 
 ### Failures of no interest
 

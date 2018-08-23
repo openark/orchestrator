@@ -2693,10 +2693,6 @@ func ResetInstanceRelaylogCoordinatesHistory(instanceKey *InstanceKey) error {
 	return ExecDBWriteFunc(writeFunc)
 }
 
-func ExpireInstanceBinlogFileHistory() error {
-	return ExpireTableData("database_instance_binlog_files_history", "last_seen")
-}
-
 // FigureClusterName will make a best effort to deduce a cluster name using either a given alias
 // or an instanceKey. First attempt is at alias, and if that doesn't work, we try instanceKey.
 func FigureClusterName(clusterHint string, instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (clusterName string, err error) {
