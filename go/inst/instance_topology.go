@@ -612,7 +612,7 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance) (movedReplicas
 		return movedReplicas, unmovedReplicas, nil, errs
 	}
 
-	log.Infof("Will move %+v replicas below %+v via GTID", len(replicas), other.Key)
+	log.Infof("moveReplicasViaGTID: Will move %+v replicas below %+v via GTID", len(replicas), other.Key)
 
 	barrier := make(chan *InstanceKey)
 	replicaMutex := make(chan bool, 1)
@@ -627,7 +627,7 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance) (movedReplicas
 				if _, _, canMove := canMoveViaGTID(replica, other); canMove {
 					replica, replicaErr = moveInstanceBelowViaGTID(replica, other)
 				} else {
-					replicaErr = fmt.Errorf("%+v cannot move below %+v via GTID", replica.Key, other.Key)
+					replicaErr = fmt.Errorf("moveReplicasViaGTID: %+v cannot move below %+v via GTID", replica.Key, other.Key)
 				}
 				func() {
 					// Instantaneous mutex.
