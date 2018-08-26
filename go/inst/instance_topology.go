@@ -38,6 +38,8 @@ const (
 	StopReplicationNicely                       = "StopReplicationNicely"
 )
 
+var ReplicationNotRunningError = fmt.Errorf("Replication not running")
+
 var asciiFillerCharacter = " "
 var tabulatorScharacter = "|"
 
