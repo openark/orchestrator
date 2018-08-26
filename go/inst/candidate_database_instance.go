@@ -34,7 +34,7 @@ func NewCandidateDatabaseInstance(instanceKey *InstanceKey, promotionRule Candid
 		Hostname:      instanceKey.Hostname,
 		Port:          instanceKey.Port,
 		PromotionRule: promotionRule,
-		LastSuggested: time.Now(),
+		LastSuggested: time.Now().UTC(),
 	}
 }
 
