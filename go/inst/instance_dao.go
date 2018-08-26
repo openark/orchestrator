@@ -239,8 +239,8 @@ func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStop
 	return isMaxScale, resolvedHostname, err
 }
 
-// AreReplicationThreadsRunning checks if both IO and SQL threads are running
-func AreReplicationThreadsRunning(instanceKey *InstanceKey) (replicationThreadsRunning bool, err error) {
+// areReplicationThreadsRunning checks if both IO and SQL threads are running
+func areReplicationThreadsRunning(instanceKey *InstanceKey) (replicationThreadsRunning bool, err error) {
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
 		return replicationThreadsRunning, err
@@ -1118,6 +1118,17 @@ func ReadClusterWriteableMaster(clusterName string) ([](*Instance), error) {
 		and (replication_depth = 0 or is_co_master)
 	`
 	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "replication_depth asc")
+}
+
+// ReadClusterMaster returns the master of this cluster.
+// - if the cluster has co-masters, the/a writable one is returned
+// - if the cluster has a single master, that master is retuened whether it is read-only or writable.
+func ReadClusterMaster(clusterName string) ([](*Instance), error) {
+	condition := `
+		cluster_name = ?
+		and (replication_depth = 0 or is_co_master)
+	`
+	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "read_only asc, replication_depth asc")
 }
 
 // ReadWriteableClustersMasters returns writeable masters of all clusters, but only one
