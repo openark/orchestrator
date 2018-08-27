@@ -44,8 +44,9 @@ func RegisterCandidateInstance(candidate *CandidateDatabaseInstance) error {
 					port,
 					promotion_rule,
 					last_suggested
-				) values (?, ?, ?, ?)
-				on duplicate key update
+				) values (
+					?, ?, ?, ?
+				) on duplicate key update
 					hostname=values(hostname),
 					port=values(port),
 					last_suggested=now(),
@@ -63,15 +64,11 @@ func RegisterCandidateInstance(candidate *CandidateDatabaseInstance) error {
 func ExpireCandidateInstances() error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	delete from candidate_database_instance
+				delete from candidate_database_instance
 				where last_suggested < NOW() - INTERVAL ? MINUTE
 				`, config.Config.CandidateInstanceExpireMinutes,
 		)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
+		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }
