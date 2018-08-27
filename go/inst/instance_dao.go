@@ -2550,52 +2550,6 @@ func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern str
 	return instances, err
 }
 
-// RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.
-func RegisterCandidateInstance(candidate *CandidateDatabaseInstance) error {
-	args := sqlutils.Args(candidate.Hostname, candidate.Port, string(candidate.PromotionRule))
-	lastSuggestedHint := "now()"
-	if !candidate.LastSuggested.IsZero() {
-		lastSuggestedHint = "?"
-		args = append(args, candidate.LastSuggested)
-	}
-	query := fmt.Sprintf(`
-			insert into candidate_database_instance (
-					hostname,
-					port,
-					promotion_rule,
-					last_suggested
-				) values (?, ?, ?, %s)
-				on duplicate key update
-					hostname=values(hostname),
-					port=values(port),
-					last_suggested=now(),
-					promotion_rule=values(promotion_rule)
-			`, lastSuggestedHint)
-	writeFunc := func() error {
-		_, err := db.ExecOrchestrator(query, args...)
-		AuditOperation("register-candidate", candidate.Key(), string(candidate.PromotionRule))
-		return log.Errore(err)
-	}
-	return ExecDBWriteFunc(writeFunc)
-}
-
-// ExpireCandidateInstances removes stale master candidate suggestions.
-func ExpireCandidateInstances() error {
-	writeFunc := func() error {
-		_, err := db.ExecOrchestrator(`
-        	delete from candidate_database_instance
-				where last_suggested < NOW() - INTERVAL ? MINUTE
-				`, config.Config.CandidateInstanceExpireMinutes,
-		)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
-	}
-	return ExecDBWriteFunc(writeFunc)
-}
-
 // RecordInstanceCoordinatesHistory snapshots the binlog coordinates of instances
 func RecordInstanceCoordinatesHistory() error {
 	{
