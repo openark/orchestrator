@@ -28,16 +28,11 @@ import (
 
 // RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.
 func RegisterCandidateInstance(candidate *CandidateDatabaseInstance) error {
-	args := sqlutils.Args(candidate.Hostname, candidate.Port, string(candidate.PromotionRule))
-	if candidate.LastSuggested.IsZero() {
-		timeNow, err := db.ReadTimeNow()
-		if err != nil {
-			return err
-		}
-		args = append(args, timeNow)
-	} else {
-		args = append(args, candidate.LastSuggested)
+	if candidate.LastSuggestedString == "" {
+		candidate = candidate.WithCurrentTime()
 	}
+	args := sqlutils.Args(candidate.Hostname, candidate.Port, string(candidate.PromotionRule), candidate.LastSuggestedString)
+
 	query := fmt.Sprintf(`
 			insert into candidate_database_instance (
 					hostname,
@@ -47,9 +42,7 @@ func RegisterCandidateInstance(candidate *CandidateDatabaseInstance) error {
 				) values (
 					?, ?, ?, ?
 				) on duplicate key update
-					hostname=values(hostname),
-					port=values(port),
-					last_suggested=now(),
+					last_suggested=values(last_suggested),
 					promotion_rule=values(promotion_rule)
 			`)
 	writeFunc := func() error {
@@ -100,10 +93,10 @@ func BulkReadCandidateDatabaseInstance() ([]CandidateDatabaseInstance, error) {
 	`
 	err := db.QueryOrchestrator(query, nil, func(m sqlutils.RowMap) error {
 		cdi := CandidateDatabaseInstance{
-			Hostname:      m.GetString("hostname"),
-			Port:          m.GetInt("port"),
-			PromotionRule: CandidatePromotionRule(m.GetString("promotion_rule")),
-			LastSuggested: m.GetTime("last_suggested"),
+			Hostname:            m.GetString("hostname"),
+			Port:                m.GetInt("port"),
+			PromotionRule:       CandidatePromotionRule(m.GetString("promotion_rule")),
+			LastSuggestedString: m.GetString("last_suggested"),
 		}
 		// add to end of candidateDatabaseInstances
 		candidateDatabaseInstances = append(candidateDatabaseInstances, cdi)

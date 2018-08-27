@@ -18,15 +18,16 @@ package inst
 
 import (
 	"fmt"
-	"time"
+
+	"github.com/github/orchestrator/go/db"
 )
 
 // CandidateDatabaseInstance contains information about explicit promotion rules for an instance
 type CandidateDatabaseInstance struct {
-	Hostname      string
-	Port          int
-	PromotionRule CandidatePromotionRule
-	LastSuggested time.Time
+	Hostname            string
+	Port                int
+	PromotionRule       CandidatePromotionRule
+	LastSuggestedString string
 }
 
 func NewCandidateDatabaseInstance(instanceKey *InstanceKey, promotionRule CandidatePromotionRule) *CandidateDatabaseInstance {
@@ -35,6 +36,11 @@ func NewCandidateDatabaseInstance(instanceKey *InstanceKey, promotionRule Candid
 		Port:          instanceKey.Port,
 		PromotionRule: promotionRule,
 	}
+}
+
+func (cdi *CandidateDatabaseInstance) WithCurrentTime() *CandidateDatabaseInstance {
+	cdi.LastSuggestedString, _ = db.ReadTimeNow()
+	return cdi
 }
 
 // String returns a string representation of the CandidateDatabaseInstance struct
