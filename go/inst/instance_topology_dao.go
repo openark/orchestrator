@@ -393,25 +393,24 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 // sleep immediately after START SLAVE for a capped duration, until both replication threads are running.
 // This is to give slack to IO thread to connect and begin streaming, and to SQL thread to start applying.
 // Sleep is incremental with ongoing attempt to see whether replication is already up
-func startSlavePostSleep(instanceKey *InstanceKey) error {
+func startSlavePostSleep(instanceKey *InstanceKey) (repliationRunning bool, err error) {
 	waitDuration := time.Second
 	waitInterval := 10 * time.Millisecond
 	startTime := time.Now()
 
-	for time.Since(startTime) < waitDuration {
-		repliationRunning, err := AreReplicationThreadsRunning(instanceKey)
-		if err != nil {
-			return err
+	for {
+		// Since this is an incremental aggressive polling, it's OK if an occasional
+		// error is observed. We don't bail out on a single error.
+		if repliationRunning, _ = areReplicationThreadsRunning(instanceKey); repliationRunning {
+			return repliationRunning, nil
 		}
-		if repliationRunning {
-			return nil
+		if time.Since(startTime)+waitInterval > waitDuration {
+			break
 		}
 		time.Sleep(waitInterval)
-		if waitInterval < waitDuration {
-			waitInterval = 2 * waitInterval
-		}
+		waitInterval = 2 * waitInterval
 	}
-	return nil
+	return repliationRunning, nil
 }
 
 // StartSlave starts replication on a given instance.
@@ -448,7 +447,13 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	startSlavePostSleep(instanceKey)
 
 	instance, err = ReadTopologyInstance(instanceKey)
-	return instance, err
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	if !instance.ReplicaRunning() {
+		return instance, ReplicationNotRunningError
+	}
+	return instance, nil
 }
 
 // RestartSlave stops & starts replication on a given instance
@@ -458,11 +463,7 @@ func RestartSlave(instanceKey *InstanceKey) (instance *Instance, err error) {
 		return instance, log.Errore(err)
 	}
 	instance, err = StartSlave(instanceKey)
-	if err != nil {
-		return instance, log.Errore(err)
-	}
-	return instance, nil
-
+	return instance, log.Errore(err)
 }
 
 // StartSlaves will do concurrent start-slave
