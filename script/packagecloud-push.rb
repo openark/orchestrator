@@ -62,12 +62,6 @@ $distro_name_map = {
   "debian/10" => %w(
     debian/buster
   ),
-  "debian/11" => %w(
-    debian/bullseye
-  ),
-  "debian/12" => %w(
-    debian/bookworm
-  ),
 }
 
 # caches distro id lookups
