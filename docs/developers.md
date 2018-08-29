@@ -71,8 +71,8 @@ No special setup is required. Make sure to configure database file path.
 Once your backend MySQL setup is complete, issue:
 
     CREATE DATABASE IF NOT EXISTS orchestrator;
-    CREATE USER 'orchestrator'@'127.0.0.1' IDENTIFIED BY 'orch_backend_password';
-    GRANT ALL PRIVILEGES ON `orchestrator`.* TO 'orchestrator'@'127.0.0.1';
+    CREATE USER 'orchestrator'@'%' IDENTIFIED BY 'orch_backend_password';
+    GRANT ALL PRIVILEGES ON `orchestrator`.* TO 'orchestrator'@'%';
 
 `orchestrator` uses a configuration file whose search path is either `/etc/orchestrator.conf.json`,  `conf/orchestrator.conf.json` or `orchestrator.conf.json`.
 The repository includes a file called `conf/orchestrator-sample.conf.json` with some basic settings. Issue:
