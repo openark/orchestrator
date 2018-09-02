@@ -104,13 +104,7 @@ func computeLeaderURI() (uri string, err error) {
 	}
 	port := listenTokens[1]
 
-	auth := ""
-	switch strings.ToLower(config.Config.AuthenticationMethod) {
-	case "basic", "multi":
-		auth = fmt.Sprintf("%s:%s@", config.Config.HTTPAuthUser, config.Config.HTTPAuthPassword)
-	}
-
-	uri = fmt.Sprintf("%s://%s%s:%s", scheme, auth, hostname, port)
+	uri = fmt.Sprintf("%s://%s:%s", scheme, hostname, port)
 	return uri, nil
 }
 
