@@ -1089,8 +1089,11 @@ func canInjectPseudoGTID(instanceKey *InstanceKey) (canInject bool, err error) {
 // CheckAndInjectPseudoGTIDOnWriter checks whether pseudo-GTID can and
 // should be injected on given instance, and if so, attempts to inject.
 func CheckAndInjectPseudoGTIDOnWriter(instance *Instance) (injected bool, err error) {
-	if !instance.IsWritableMaster() {
-		return injected, nil
+	if instance == nil {
+		return injected, log.Errorf("CheckAndInjectPseudoGTIDOnWriter: instance is nil")
+	}
+	if instance.ReadOnly {
+		return injected, log.Errorf("CheckAndInjectPseudoGTIDOnWriter: instance is read-only: %+v", instance.Key)
 	}
 	if !instance.IsLastCheckValid {
 		return injected, nil
