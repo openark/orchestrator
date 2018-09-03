@@ -1802,8 +1802,15 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 	if !clusterMaster.SelfBinlogCoordinates.Equals(&demotedMasterSelfBinlogCoordinates) {
 		log.Errorf("GracefulMasterTakeover: sanity problem. Demoted master's coordinates changed from %+v to %+v while supposed to have been frozen", demotedMasterSelfBinlogCoordinates, clusterMaster.SelfBinlogCoordinates)
 	}
-	if designatedInstance.ReplicationCredentialsAvailable && !clusterMaster.HasReplicationCredentials && replicationCredentialsError == nil {
-		_, credentialsErr := inst.ChangeMasterCredentials(&clusterMaster.Key, replicationUser, replicationPassword)
+	if !clusterMaster.HasReplicationCredentials {
+		var credentialsErr error
+		if designatedInstance.ReplicationCredentialsAvailable && replicationCredentialsError == nil {
+			log.Infof("GracefulMasterTakeover: Will set credentials on old master via system tables info")
+			_, credentialsErr = inst.ChangeMasterCredentials(&clusterMaster.Key, replicationUser, replicationPassword)
+		} else if config.Config.HasReplicationCredentials() {
+			log.Infof("GracefulMasterTakeover: Will set credentials on old master via configuration replication redentials")
+			_, credentialsErr = inst.ChangeMasterCredentials(&clusterMaster.Key, config.Config.MySQLReplicationUser, config.Config.MySQLReplicationPassword)
+		}
 		if err == nil {
 			err = credentialsErr
 		}

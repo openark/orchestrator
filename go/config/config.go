@@ -19,6 +19,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
 	"os"
 	"regexp"
@@ -92,9 +93,9 @@ type Configuration struct {
 	ListenSocket                               string // Where orchestrator HTTP should listen for unix socket (default: empty; when given, TCP is disabled)
 	HTTPAdvertise                              string // optional, for raft setups, what is the HTTP address this node will advertise to its peers (potentially use where behind NAT or when rerouting ports; example: "http://11.22.33.44:3030")
 	AgentsServerPort                           string // port orchestrator agents talk back to
-	MySQLTopologyUser                          string
-	MySQLTopologyPassword                      string // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section
-	MySQLTopologyCredentialsConfigFile         string
+	MySQLTopologyUser                          string // Alternative to MySQLTopologyCredentialsConfigFile, specify user for MySQL topology client connections
+	MySQLTopologyPassword                      string // Alternative to MySQLTopologyCredentialsConfigFile, specify password for MySQL topology client connections
+	MySQLTopologyCredentialsConfigFile         string // my.cnf style configuration file from where to pick credentials. Expecting `user`, `password` under `[client]` section ; alternative to MySQLTopologyUser and MySQLTopologyPassword
 	MySQLTopologySSLPrivateKeyFile             string // Private key file used to authenticate with a Topology mysql instance with TLS
 	MySQLTopologySSLCertFile                   string // Certificate PEM file used to authenticate with a Topology mysql instance with TLS
 	MySQLTopologySSLCAFile                     string // Certificate Authority PEM file used to authenticate with a Topology mysql instance with TLS
@@ -102,6 +103,9 @@ type Configuration struct {
 	MySQLTopologyUseMutualTLS                  bool   // Turn on TLS authentication with the Topology MySQL instances
 	MySQLTopologyUseMixedTLS                   bool   // Mixed TLS and non-TLS authentication with the Topology MySQL instances
 	TLSCacheTTLFactor                          uint   // Factor of InstancePollSeconds that we set as TLS info cache expiry
+	MySQLReplicationUser                       string // Optional, specify replication credentials for MySQL topologies, such that orchestrator can CHANGE MASTER TO MASTER_USER=, MASTER_PASSWORD=
+	MySQLReplicationPassword                   string // See MySQLReplicationUser
+	MySQLReplicationCredentialsConfigFile      string // Alternative to MySQLReplicationUser and MySQLReplicationPassword
 	BackendDB                                  string // EXPERIMENTAL: type of backend db; either "mysql" or "sqlite3"
 	SQLite3DataFile                            string // when BackendDB == "sqlite3", full path to sqlite3 datafile
 	SkipOrchestratorDatabaseUpdate             bool   // When true, do not check backend database schema nor attempt to update it. Useful when you may be running multiple versions of orchestrator, and you only wish certain boxes to dictate the db structure (or else any time a different orchestrator version runs it will rebuild database schema)
@@ -414,55 +418,37 @@ func newConfiguration() *Configuration {
 	}
 }
 
+func (this *Configuration) readCredentials(configFile string, user *string, password *string) {
+	if configFile != "" {
+		mySQLConfig := struct {
+			Client struct {
+				User     string
+				Password string
+			}
+		}{}
+		err := gcfg.ReadFileInto(&mySQLConfig, configFile)
+		if err != nil {
+			log.Fatalf("Failed to parse gcfg data from %s: %+v", configFile, err)
+		} else {
+			log.Debugf("Parsed orchestrator credentials from %s", configFile)
+			*user = mySQLConfig.Client.User
+			*password = mySQLConfig.Client.Password
+		}
+	}
+	{
+		// We accept password in the form "${SOME_ENV_VARIABLE}" in which case we pull
+		// the given variable from os env
+		submatch := envVariableRegexp.FindStringSubmatch(*password)
+		if len(submatch) > 1 {
+			*password = os.Getenv(submatch[1])
+		}
+	}
+}
+
 func (this *Configuration) postReadAdjustments() error {
-	if this.MySQLOrchestratorCredentialsConfigFile != "" {
-		mySQLConfig := struct {
-			Client struct {
-				User     string
-				Password string
-			}
-		}{}
-		err := gcfg.ReadFileInto(&mySQLConfig, this.MySQLOrchestratorCredentialsConfigFile)
-		if err != nil {
-			log.Fatalf("Failed to parse gcfg data from file: %+v", err)
-		} else {
-			log.Debugf("Parsed orchestrator credentials from %s", this.MySQLOrchestratorCredentialsConfigFile)
-			this.MySQLOrchestratorUser = mySQLConfig.Client.User
-			this.MySQLOrchestratorPassword = mySQLConfig.Client.Password
-		}
-	}
-	{
-		// We accept password in the form "${SOME_ENV_VARIABLE}" in which case we pull
-		// the given variable from os env
-		submatch := envVariableRegexp.FindStringSubmatch(this.MySQLOrchestratorPassword)
-		if len(submatch) > 1 {
-			this.MySQLOrchestratorPassword = os.Getenv(submatch[1])
-		}
-	}
-	if this.MySQLTopologyCredentialsConfigFile != "" {
-		mySQLConfig := struct {
-			Client struct {
-				User     string
-				Password string
-			}
-		}{}
-		err := gcfg.ReadFileInto(&mySQLConfig, this.MySQLTopologyCredentialsConfigFile)
-		if err != nil {
-			log.Fatalf("Failed to parse gcfg data from file: %+v", err)
-		} else {
-			log.Debugf("Parsed topology credentials from %s", this.MySQLTopologyCredentialsConfigFile)
-			this.MySQLTopologyUser = mySQLConfig.Client.User
-			this.MySQLTopologyPassword = mySQLConfig.Client.Password
-		}
-	}
-	{
-		// We accept password in the form "${SOME_ENV_VARIABLE}" in which case we pull
-		// the given variable from os env
-		submatch := envVariableRegexp.FindStringSubmatch(this.MySQLTopologyPassword)
-		if len(submatch) > 1 {
-			this.MySQLTopologyPassword = os.Getenv(submatch[1])
-		}
-	}
+	this.readCredentials(this.MySQLOrchestratorCredentialsConfigFile, &this.MySQLOrchestratorUser, &this.MySQLOrchestratorPassword)
+	this.readCredentials(this.MySQLTopologyCredentialsConfigFile, &this.MySQLTopologyUser, &this.MySQLTopologyPassword)
+	this.readCredentials(this.MySQLReplicationCredentialsConfigFile, &this.MySQLReplicationUser, &this.MySQLReplicationPassword)
 
 	if this.RecoveryPeriodBlockSeconds == 0 && this.RecoveryPeriodBlockMinutes > 0 {
 		// RecoveryPeriodBlockSeconds is a newer addition that overrides RecoveryPeriodBlockMinutes
@@ -578,20 +564,30 @@ func (this *Configuration) IsMySQL() bool {
 	return this.BackendDB == "mysql" || this.BackendDB == ""
 }
 
+func (this *Configuration) HasReplicationCredentials() bool {
+	return this.MySQLReplicationUser != ""
+}
+
+func read(reader io.Reader) (*Configuration, error) {
+	decoder := json.NewDecoder(reader)
+	if err := decoder.Decode(Config); err != nil {
+		return nil, err
+	}
+	if err := Config.postReadAdjustments(); err != nil {
+		return nil, err
+	}
+	return Config, nil
+}
+
 // read reads configuration from given file, or silently skips if the file does not exist.
 // If the file does exist, then it is expected to be in valid JSON format or the function bails out.
-func read(fileName string) (*Configuration, error) {
+func readFile(fileName string) (*Configuration, error) {
 	file, err := os.Open(fileName)
 	if err == nil {
-		decoder := json.NewDecoder(file)
-		err := decoder.Decode(Config)
-		if err == nil {
+		if _, err := read(file); err == nil {
 			log.Infof("Read config: %s", fileName)
 		} else {
-			log.Fatal("Cannot read config file:", fileName, err)
-		}
-		if err := Config.postReadAdjustments(); err != nil {
-			log.Fatale(err)
+			log.Fatalf("Error reading config file %s: %+v", fileName, err)
 		}
 	}
 	return Config, err
@@ -601,7 +597,7 @@ func read(fileName string) (*Configuration, error) {
 // A file can override configuration provided in previous file.
 func Read(fileNames ...string) *Configuration {
 	for _, fileName := range fileNames {
-		read(fileName)
+		readFile(fileName)
 	}
 	readFileNames = fileNames
 	return Config
@@ -609,7 +605,7 @@ func Read(fileNames ...string) *Configuration {
 
 // ForceRead reads configuration from given file name or bails out if it fails
 func ForceRead(fileName string) *Configuration {
-	_, err := read(fileName)
+	_, err := readFile(fileName)
 	if err != nil {
 		log.Fatal("Cannot read config file:", fileName, err)
 	}
@@ -620,7 +616,7 @@ func ForceRead(fileName string) *Configuration {
 // Reload re-reads configuration from last used files
 func Reload() *Configuration {
 	for _, fileName := range readFileNames {
-		read(fileName)
+		readFile(fileName)
 	}
 	return Config
 }

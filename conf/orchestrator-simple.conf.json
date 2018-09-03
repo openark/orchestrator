@@ -14,6 +14,8 @@
   "#": "-----",
   "#": "The above is all you need for initial setup. Below is more advanced stuff",
   "#": "-----",
+  "MySQLReplicationUser": "",
+  "MySQLTopologyPassword": "",
   "DiscoverByShowSlaveHosts": true,
   "InstancePollSeconds": 5,
   "HostnameResolveMethod": "default",

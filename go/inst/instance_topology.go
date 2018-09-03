@@ -856,7 +856,7 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		return instance, err
 	}
-	log.Debugf("Will check whether %+v's master (%+v) can become its co-master", instance.Key, master.Key)
+	log.Debugf("MakeCoMaster: Will check whether %+v's master (%+v) can become its co-master", instance.Key, master.Key)
 	if canMove, merr := master.CanMoveAsCoMaster(); !canMove {
 		return instance, merr
 	}
@@ -888,7 +888,7 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 	if canReplicate, err := master.CanReplicateFrom(instance); !canReplicate {
 		return instance, err
 	}
-	log.Infof("Will make %+v co-master of %+v", instanceKey, master.Key)
+	log.Infof("MakeCoMaster: Will make %+v co-master of %+v", instanceKey, master.Key)
 
 	var gitHint OperationGTIDHint = GTIDHintNeutral
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("make co-master of %+v", master.Key)); merr != nil {
@@ -914,14 +914,20 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 			goto Cleanup
 		}
 	}
-	if instance.ReplicationCredentialsAvailable && !master.HasReplicationCredentials {
-		// Yay! We can get credentials from the replica!
-		replicationUser, replicationPassword, err := ReadReplicationCredentials(&instance.Key)
-		if err != nil {
-			goto Cleanup
+
+	if !master.HasReplicationCredentials {
+		if instance.ReplicationCredentialsAvailable {
+			replicationUser, replicationPassword, credentialsErr := ReadReplicationCredentials(&instance.Key)
+			if credentialsErr != nil {
+				err = credentialsErr
+				goto Cleanup
+			}
+			log.Debugf("MakeCoMaster: Got credentials from a replica. will now apply")
+			_, err = ChangeMasterCredentials(&master.Key, replicationUser, replicationPassword)
+		} else if config.Config.HasReplicationCredentials() {
+			log.Debugf("MakeCoMaster: Got credentials from config. will now apply")
+			_, err = ChangeMasterCredentials(&master.Key, config.Config.MySQLReplicationUser, config.Config.MySQLReplicationPassword)
 		}
-		log.Debugf("Got credentials from a replica. will now apply")
-		_, err = ChangeMasterCredentials(&master.Key, replicationUser, replicationPassword)
 		if err != nil {
 			goto Cleanup
 		}
