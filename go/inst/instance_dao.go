@@ -422,7 +422,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				if instance.GTIDMode != "" && instance.GTIDMode != "OFF" {
 					instance.SupportsOracleGTID = true
 				}
-				if masterInfoRepositoryOnTable {
+				if config.Config.ReplicationCredentialsQuery != "" {
+					instance.ReplicationCredentialsAvailable = true
+				} else if masterInfoRepositoryOnTable {
 					_ = db.QueryRow("select count(*) > 0 and MAX(User_name) != '' from mysql.slave_master_info").Scan(&instance.ReplicationCredentialsAvailable)
 				}
 			}()
@@ -769,7 +771,7 @@ Cleanup:
 	waitGroup.Wait()
 	latency.Stop("instance")
 	readTopologyInstanceCounter.Inc(1)
-	//	logReadTopologyInstanceError(instanceKey, "ReadTopologyInstanceBufferable", err)	// don't write here and a few lines later.
+
 	if instanceFound {
 		instance.LastDiscoveryLatency = time.Since(readingStartTime)
 		instance.IsLastCheckValid = true

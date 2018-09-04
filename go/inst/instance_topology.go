@@ -914,16 +914,14 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 			goto Cleanup
 		}
 	}
-	if instance.ReplicationCredentialsAvailable && !master.HasReplicationCredentials {
-		// Yay! We can get credentials from the replica!
-		replicationUser, replicationPassword, err := ReadReplicationCredentials(&instance.Key)
-		if err != nil {
-			goto Cleanup
-		}
-		log.Debugf("Got credentials from a replica. will now apply")
-		_, err = ChangeMasterCredentials(&master.Key, replicationUser, replicationPassword)
-		if err != nil {
-			goto Cleanup
+	if !master.HasReplicationCredentials {
+		// Let's try , if possible, to get credentials from replica. Best effort.
+		if replicationUser, replicationPassword, credentialsErr := ReadReplicationCredentials(&instance.Key); credentialsErr == nil {
+			log.Debugf("Got credentials from a replica. will now apply")
+			_, err = ChangeMasterCredentials(&master.Key, replicationUser, replicationPassword)
+			if err != nil {
+				goto Cleanup
+			}
 		}
 	}
 
