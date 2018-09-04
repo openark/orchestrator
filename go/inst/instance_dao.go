@@ -239,8 +239,8 @@ func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStop
 	return isMaxScale, resolvedHostname, err
 }
 
-// AreReplicationThreadsRunning checks if both IO and SQL threads are running
-func AreReplicationThreadsRunning(instanceKey *InstanceKey) (replicationThreadsRunning bool, err error) {
+// areReplicationThreadsRunning checks if both IO and SQL threads are running
+func areReplicationThreadsRunning(instanceKey *InstanceKey) (replicationThreadsRunning bool, err error) {
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
 		return replicationThreadsRunning, err
@@ -723,7 +723,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				// We register the rule even if it hasn't changed,
 				// to bump the last_suggested time.
 				instance.PromotionRule = promotionRule
-				err = RegisterCandidateInstance(NewCandidateDatabaseInstance(instanceKey, promotionRule))
+				err = RegisterCandidateInstance(NewCandidateDatabaseInstance(instanceKey, promotionRule).WithCurrentTime())
 				logReadTopologyInstanceError(instanceKey, "RegisterCandidateInstance", err)
 			}
 		}()
@@ -2548,52 +2548,6 @@ func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern str
 		return instances, log.Errore(err)
 	}
 	return instances, err
-}
-
-// RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.
-func RegisterCandidateInstance(candidate *CandidateDatabaseInstance) error {
-	args := sqlutils.Args(candidate.Hostname, candidate.Port, string(candidate.PromotionRule))
-	lastSuggestedHint := "now()"
-	if !candidate.LastSuggested.IsZero() {
-		lastSuggestedHint = "?"
-		args = append(args, candidate.LastSuggested)
-	}
-	query := fmt.Sprintf(`
-			insert into candidate_database_instance (
-					hostname,
-					port,
-					promotion_rule,
-					last_suggested
-				) values (?, ?, ?, %s)
-				on duplicate key update
-					hostname=values(hostname),
-					port=values(port),
-					last_suggested=now(),
-					promotion_rule=values(promotion_rule)
-			`, lastSuggestedHint)
-	writeFunc := func() error {
-		_, err := db.ExecOrchestrator(query, args...)
-		AuditOperation("register-candidate", candidate.Key(), string(candidate.PromotionRule))
-		return log.Errore(err)
-	}
-	return ExecDBWriteFunc(writeFunc)
-}
-
-// ExpireCandidateInstances removes stale master candidate suggestions.
-func ExpireCandidateInstances() error {
-	writeFunc := func() error {
-		_, err := db.ExecOrchestrator(`
-        	delete from candidate_database_instance
-				where last_suggested < NOW() - INTERVAL ? MINUTE
-				`, config.Config.CandidateInstanceExpireMinutes,
-		)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
-	}
-	return ExecDBWriteFunc(writeFunc)
 }
 
 // RecordInstanceCoordinatesHistory snapshots the binlog coordinates of instances

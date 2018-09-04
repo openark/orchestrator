@@ -248,11 +248,6 @@ func (this *Instance) IsMaster() bool {
 	return !this.IsReplica()
 }
 
-// IsWritableMaster makes simple heuristics to decide whether this instance is a writable master (not replicating from any other server)
-func (this *Instance) IsWritableMaster() bool {
-	return this.IsMaster() && !this.ReadOnly
-}
-
 // ReplicaRunning returns true when this instance's status is of a replicating replica.
 func (this *Instance) ReplicaRunning() bool {
 	return this.IsReplica() && this.Slave_SQL_Running && this.Slave_IO_Running

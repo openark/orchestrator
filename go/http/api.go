@@ -2841,7 +2841,7 @@ func (this *HttpAPI) RegisterCandidate(params martini.Params, r render.Render, r
 		return
 	}
 
-	candidate := inst.NewCandidateDatabaseInstance(&instanceKey, promotionRule)
+	candidate := inst.NewCandidateDatabaseInstance(&instanceKey, promotionRule).WithCurrentTime()
 
 	if orcraft.IsRaftEnabled() {
 		_, err = orcraft.PublishCommand("register-candidate", candidate)
