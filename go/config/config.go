@@ -129,7 +129,7 @@ type Configuration struct {
 	MySQLOrchestratorReadTimeoutSeconds        int      // Number of seconds before backend mysql read operation is aborted (driver-side)
 	MySQLDiscoveryReadTimeoutSeconds           int      // Number of seconds before topology mysql read operation is aborted (driver-side). Used for discovery queries.
 	MySQLTopologyReadTimeoutSeconds            int      // Number of seconds before topology mysql read operation is aborted (driver-side). Used for all but discovery queries.
-	MySQLConnectionLifetime                    int      // Number of seconds the mysql driver will keep database connection alive before recycling it
+	MySQLConnectionLifetimeSeconds             int      // Number of seconds the mysql driver will keep database connection alive before recycling it
 	DefaultInstancePort                        int      // In case port was not specified on command line
 	SlaveLagQuery                              string   // Synonym to ReplicationLagQuery
 	ReplicationLagQuery                        string   // custom query to check on replica lg (e.g. heartbeat table)
