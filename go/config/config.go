@@ -297,7 +297,7 @@ func newConfiguration() *Configuration {
 		MySQLOrchestratorReadTimeoutSeconds:        30,
 		MySQLDiscoveryReadTimeoutSeconds:           10,
 		MySQLTopologyReadTimeoutSeconds:            600,
-		MySQLConnectionLifetime:                    0,
+		MySQLConnectionLifetimeSeconds:             0,
 		DefaultInstancePort:                        3306,
 		TLSCacheTTLFactor:                          100,
 		InstancePollSeconds:                        5,
