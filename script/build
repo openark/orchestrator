@@ -2,6 +2,11 @@
 
 set -e
 
+if [ -n "$DEBUG" ];then
+    set -x
+    PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }' # print line number and function name
+fi
+
 . script/bootstrap
 
 mkdir -p bin
