@@ -515,4 +515,9 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN master_uuid varchar(64) CHARACTER SET ascii NOT NULL AFTER oracle_gtid
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN gtid_errant text CHARACTER SET ascii NOT NULL AFTER gtid_purged
+	`,
 }

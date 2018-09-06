@@ -768,6 +768,19 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 
 Cleanup:
 	waitGroup.Wait()
+
+	if instanceFound {
+		if instance.ExecutedGtidSet != "" && instance.masterExecutedGtidSet != "" {
+			// Compare master & replica GTID sets, but ignore the sets that present the master's UUID.
+			// This is because orchestrator may pool master and replica at an inconvenient timing,
+			// such that the replica may _seems_ to have more entries than the master, when in fact
+			// it's just that the naster's probing is stale.
+			redactedExecutedGtidSet := redactGtidSetUUID(instance.ExecutedGtidSet, instance.MasterUUID)
+			redactedMasterExecutedGtidSet := redactGtidSetUUID(instance.masterExecutedGtidSet, instance.MasterUUID)
+			db.QueryRow("select gtid_subtract(?, ?)", redactedExecutedGtidSet, redactedMasterExecutedGtidSet).Scan(&instance.GtidErrant)
+		}
+	}
+
 	latency.Stop("instance")
 	readTopologyInstanceCounter.Inc(1)
 	//	logReadTopologyInstanceError(instanceKey, "ReadTopologyInstanceBufferable", err)	// don't write here and a few lines later.
@@ -828,6 +841,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 	var masterClusterName string
 	var masterSuggestedClusterAlias string
 	var masterReplicationDepth uint
+	var masterExecutedGtidSet string
 	masterDataFound := false
 
 	// Read the cluster_name of the _master_ of our instance, derive it from there.
@@ -837,7 +851,8 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 					suggested_cluster_alias,
 					replication_depth,
 					master_host,
-					master_port
+					master_port,
+					executed_gtid_set
 				from database_instance
 				where hostname=? and port=?
 	`
@@ -849,6 +864,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 		masterReplicationDepth = m.GetUint("replication_depth")
 		masterMasterKey.Hostname = m.GetString("master_host")
 		masterMasterKey.Port = m.GetInt("master_port")
+		masterExecutedGtidSet = m.GetString("executed_gtid_set")
 		masterDataFound = true
 		return nil
 	})
@@ -887,6 +903,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 	instance.SuggestedClusterAlias = masterSuggestedClusterAlias
 	instance.ReplicationDepth = replicationDepth
 	instance.IsCoMaster = isCoMaster
+	instance.masterExecutedGtidSet = masterExecutedGtidSet
 	return nil
 }
 
@@ -976,6 +993,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.ExecutedGtidSet = m.GetString("executed_gtid_set")
 	instance.GTIDMode = m.GetString("gtid_mode")
 	instance.GtidPurged = m.GetString("gtid_purged")
+	instance.GtidErrant = m.GetString("gtid_errant")
 	instance.UsingMariaDBGTID = m.GetBool("mariadb_gtid")
 	instance.UsingPseudoGTID = m.GetBool("pseudo_gtid")
 	instance.SelfBinlogCoordinates.LogFile = m.GetString("binary_log_file")
@@ -2173,6 +2191,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"executed_gtid_set",
 		"gtid_mode",
 		"gtid_purged",
+		"gtid_errant",
 		"mariadb_gtid",
 		"pseudo_gtid",
 		"master_log_file",
@@ -2248,6 +2267,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.ExecutedGtidSet)
 		args = append(args, instance.GTIDMode)
 		args = append(args, instance.GtidPurged)
+		args = append(args, instance.GtidErrant)
 		args = append(args, instance.UsingMariaDBGTID)
 		args = append(args, instance.UsingPseudoGTID)
 		args = append(args, instance.ReadBinlogCoordinates.LogFile)
