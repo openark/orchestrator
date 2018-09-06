@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
@@ -58,7 +59,14 @@ func HttpGetLeader(path string) (response []byte, err error) {
 	leaderAPI = fmt.Sprintf("%s/api", leaderAPI)
 
 	url := fmt.Sprintf("%s/%s", leaderAPI, path)
-	res, err := httpClient.Get(url)
+
+	req, err := http.NewRequest("GET", url, nil)
+	switch strings.ToLower(config.Config.AuthenticationMethod) {
+	case "basic", "multi":
+		req.SetBasicAuth(config.Config.HTTPAuthUser, config.Config.HTTPAuthPassword)
+	}
+
+	res, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
