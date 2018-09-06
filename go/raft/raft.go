@@ -96,12 +96,14 @@ func computeLeaderURI() (uri string, err error) {
 	if config.Config.UseSSL {
 		scheme = "https"
 	}
+
 	hostname := config.Config.RaftAdvertise
 	listenTokens := strings.Split(config.Config.ListenAddress, ":")
 	if len(listenTokens) < 2 {
 		return uri, fmt.Errorf("computeLeaderURI: cannot determine listen port out of config.Config.ListenAddress: %+v", config.Config.ListenAddress)
 	}
 	port := listenTokens[1]
+
 	uri = fmt.Sprintf("%s://%s:%s", scheme, hostname, port)
 	return uri, nil
 }
