@@ -406,11 +406,11 @@ func newConfiguration() *Configuration {
 		GraphiteConvertHostnameDotsToUnderscores:   true,
 		GraphitePollSeconds:                        60,
 		URLPrefix:                                  "",
-		DiscoveryIgnoreReplicaHostnameFilters: []string{},
-		ConsulAddress:                         "",
-		ConsulAclToken:                        "",
-		ZkAddress:                             "",
-		KVClusterMasterPrefix:                 "mysql/master",
+		DiscoveryIgnoreReplicaHostnameFilters:      []string{},
+		ConsulAddress:                              "",
+		ConsulAclToken:                             "",
+		ZkAddress:                                  "",
+		KVClusterMasterPrefix:                      "mysql/master",
 	}
 }
 
@@ -552,7 +552,7 @@ func (this *Configuration) postReadAdjustments() error {
 	if this.HTTPAdvertise != "" {
 		u, err := url.Parse(this.HTTPAdvertise)
 		if err != nil {
-			return fmt.Errorf("Failed parsing HTTPAdvertise %s: %s", this.HTTPAdvertise, err.Error)
+			return fmt.Errorf("Failed parsing HTTPAdvertise %s: %s", this.HTTPAdvertise, err.Error())
 		}
 		if u.Scheme == "" {
 			return fmt.Errorf("If specified, HTTPAdvertise must include scheme (http:// or https://)")

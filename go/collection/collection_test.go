@@ -36,7 +36,7 @@ func TestCreateOrReturnCollection(t *testing.T) {
 	c1 := CreateOrReturnCollection(name)
 	if c1 == nil {
 		// should not be empty
-		t.Errorf("TestCreateOrReturn: c1 == nil", name)
+		t.Errorf("TestCreateOrReturn: c1 == nil, name=%s", name)
 	}
 	c2 := CreateOrReturnCollection(name)
 	if c2 == nil || c2 != c1 {

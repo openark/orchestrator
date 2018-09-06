@@ -164,8 +164,7 @@ func main() {
 See complete list of commands:
   orchestrator -c help
 Full blown documentation:
-  orchestrator
-`)
+  orchestrator`)
 		os.Exit(1)
 	}
 }

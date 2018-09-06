@@ -47,6 +47,7 @@ type Instance struct {
 	LogSlaveUpdatesEnabled bool
 	SelfBinlogCoordinates  BinlogCoordinates
 	MasterKey              InstanceKey
+	MasterUUID             string
 	IsDetachedMaster       bool
 	Slave_SQL_Running      bool
 	Slave_IO_Running       bool
