@@ -364,14 +364,14 @@ function openNodeModal(node) {
     if (node.GTIDMode) {
       addNodeModalDataAttribute("GTID mode", node.GTIDMode);
     }
-    if (node.UsingOracleGTID) {
+    if (node.ExecutedGtidSet) {
       addNodeModalDataAttribute("Executed GTID set", node.ExecutedGtidSet);
-      if (node.GtidPurged) {
-        addNodeModalDataAttribute("GTID purged", node.GtidPurged);
-      }
-      if (node.GtidErrant) {
-        addNodeModalDataAttribute("GTID errant", node.GtidErrant);
-      }
+    }
+    if (node.GtidPurged) {
+      addNodeModalDataAttribute("GTID purged", node.GtidPurged);
+    }
+    if (node.GtidErrant) {
+      addNodeModalDataAttribute("GTID errant", node.GtidErrant);
     }
   }
   addNodeModalDataAttribute("Semi-sync enforced", booleanString(node.SemiSyncEnforced));
