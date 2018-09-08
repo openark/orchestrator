@@ -639,6 +639,10 @@ body {
   padding: 4px;
 }
 
+#cluster_info div[data-tag=analysis] div .pull-left.glyphicon {
+  font-size: 32px;
+}
+
 #cluster_name_info {
   position: fixed;
   z-index: 50;
