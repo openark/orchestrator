@@ -189,8 +189,8 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 						IFNULL(MAX(replica_instance.gtid_mode), '')
               AS max_replica_gtid_mode,
 						IFNULL(MAX(
-								case replica_candidate.promotion_rule
-									when 'must_not' then ''
+								case
+									when replica_downtime.downtime_active is not null and ifnull(replica_downtime.end_timestamp, now()) > now() then ''
 									else replica_instance.gtid_errant
 								end
 							), '') AS max_replica_gtid_errant,
@@ -226,9 +226,6 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 							AND replica_downtime.downtime_active = 1)
         	LEFT JOIN
 		        cluster_alias ON (cluster_alias.cluster_name = master_instance.cluster_name)
-					LEFT JOIN
-		        candidate_database_instance as replica_candidate ON (replica_instance.hostname = replica_candidate.hostname
-							AND replica_instance.port = replica_candidate.port)
 		    WHERE
 		    	database_instance_maintenance.database_instance_maintenance_id IS NULL
 		    	AND ? IN ('', master_instance.cluster_name)
