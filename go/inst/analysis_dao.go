@@ -188,6 +188,13 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
               AS min_replica_gtid_mode,
 						IFNULL(MAX(replica_instance.gtid_mode), '')
               AS max_replica_gtid_mode,
+						IFNULL(MAX(
+								IF(
+									replica_candidate.promotion_rule = 'must_not',
+									'',
+									replica_instance.gtid_errant
+								)
+							), '') AS max_replica_gtid_errant,
 						IFNULL(SUM(
 								replica_downtime.downtime_active is not null
 								and ifnull(replica_downtime.end_timestamp, now()) > now()),
@@ -204,22 +211,25 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		        hostname_resolve ON (master_instance.hostname = hostname_resolve.hostname)
           LEFT JOIN
 		        database_instance replica_instance ON (COALESCE(hostname_resolve.resolved_hostname,
-		                master_instance.hostname) = replica_instance.master_host
-		            	AND master_instance.port = replica_instance.master_port)
+              master_instance.hostname) = replica_instance.master_host
+							AND master_instance.port = replica_instance.master_port)
           LEFT JOIN
 		        database_instance_maintenance ON (master_instance.hostname = database_instance_maintenance.hostname
-		        		AND master_instance.port = database_instance_maintenance.port
-		        		AND database_instance_maintenance.maintenance_active = 1)
+							AND master_instance.port = database_instance_maintenance.port
+							AND database_instance_maintenance.maintenance_active = 1)
           LEFT JOIN
 		        database_instance_downtime as master_downtime ON (master_instance.hostname = master_downtime.hostname
-		        		AND master_instance.port = master_downtime.port
-		        		AND master_downtime.downtime_active = 1)
+							AND master_instance.port = master_downtime.port
+							AND master_downtime.downtime_active = 1)
 					LEFT JOIN
 		        database_instance_downtime as replica_downtime ON (replica_instance.hostname = replica_downtime.hostname
-		        		AND replica_instance.port = replica_downtime.port
-		        		AND replica_downtime.downtime_active = 1)
+							AND replica_instance.port = replica_downtime.port
+							AND replica_downtime.downtime_active = 1)
         	LEFT JOIN
 		        cluster_alias ON (cluster_alias.cluster_name = master_instance.cluster_name)
+					LEFT JOIN
+		        candidate_database_instance as replica_candidate ON (replica_instance.hostname = replica_candidate.hostname
+							AND replica_instance.port = replica_candidate.port)
 		    WHERE
 		    	database_instance_maintenance.database_instance_maintenance_id IS NULL
 		    	AND ? IN ('', master_instance.cluster_name)
@@ -276,6 +286,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 
 		a.MinReplicaGTIDMode = m.GetString("min_replica_gtid_mode")
 		a.MaxReplicaGTIDMode = m.GetString("max_replica_gtid_mode")
+		a.MaxReplicaGTIDErrant = m.GetString("max_replica_gtid_errant")
 
 		a.CountStatementBasedLoggingReplicas = m.GetUint("count_statement_based_loggin_slaves")
 		a.CountMixedBasedLoggingReplicas = m.GetUint("count_mixed_based_loggin_slaves")
@@ -452,6 +463,9 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 
 			if a.CountReplicas > 0 && (a.GTIDMode != a.MinReplicaGTIDMode || a.GTIDMode != a.MaxReplicaGTIDMode) {
 				a.StructureAnalysis = append(a.StructureAnalysis, DifferentGTIDModesStructureWarning)
+			}
+			if a.MaxReplicaGTIDErrant != "" {
+				a.StructureAnalysis = append(a.StructureAnalysis, ErrantGTIDStructureWarning)
 			}
 		}
 		appendAnalysis(&a)

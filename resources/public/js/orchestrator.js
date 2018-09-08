@@ -647,6 +647,9 @@ function normalizeInstanceProblem(instance) {
   instance.replicationLagProblem = function() {
     return !instance.replicationLagReasonable;
   }
+  instance.errantGTIDProblem = function() {
+    return (instance.GtidErrant != '');
+  }
 
   instance.problem = null;
   instance.problemOrder = 0;
@@ -671,6 +674,10 @@ function normalizeInstanceProblem(instance) {
     instance.problem = "replication_lag";
     instance.problemDescription = "Replica is lagging.\nThis diagnostic is based on either Seconds_behind_master or configured ReplicationLagQuery";
     instance.problemOrder = 5;
+  } else if (instance.errantGTIDProblem()) {
+    instance.problem = "Errant GTID";
+    instance.problemDescription = "Replica has GTID entries not found on its master";
+    instance.problemOrder = 6;
   }
   instance.hasProblem = (instance.problem != null);
   instance.hasConnectivityProblem = (!instance.IsLastCheckValid || !instance.IsRecentlyChecked);

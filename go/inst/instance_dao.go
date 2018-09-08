@@ -1228,6 +1228,7 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 				or (not slave_io_running)
 				or (abs(cast(seconds_behind_master as signed) - cast(sql_delay as signed)) > ?)
 				or (abs(cast(slave_lag_seconds as signed) - cast(sql_delay as signed)) > ?)
+				or (gtid_errant != '')
 			)
 		`
 
