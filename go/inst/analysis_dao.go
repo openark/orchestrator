@@ -189,11 +189,10 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 						IFNULL(MAX(replica_instance.gtid_mode), '')
               AS max_replica_gtid_mode,
 						IFNULL(MAX(
-								IF(
-									replica_candidate.promotion_rule = 'must_not',
-									'',
-									replica_instance.gtid_errant
-								)
+								case replica_candidate.promotion_rule
+									when 'must_not' then ''
+									else replica_instance.gtid_errant
+								end
 							), '') AS max_replica_gtid_errant,
 						IFNULL(SUM(
 								replica_downtime.downtime_active is not null
