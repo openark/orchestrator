@@ -823,6 +823,8 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.supportsGTID) {
       if (instance.hasMaster && !instance.usingGTID) {
         popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon text-muted glyphicon-globe" title="Support GTID but not using it in replication"></span> ');
+      } else if (instance.GtidErrant) {
+        popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon text-danger glyphicon-globe" title="Errant GTID found"></span> ');
       } else {
         popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using GTID"></span> ');
       }

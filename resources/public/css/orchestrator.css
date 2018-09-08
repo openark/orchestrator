@@ -132,6 +132,10 @@ body {
     color: #999999;
 }
 
+.instance h3 .pull-right > .glyphicon.text-danger {
+    color: #a94442;
+}
+
 
 .instance h3 .glyphicon {
     position: inherit;
