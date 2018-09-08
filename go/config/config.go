@@ -406,11 +406,11 @@ func newConfiguration() *Configuration {
 		GraphiteConvertHostnameDotsToUnderscores:   true,
 		GraphitePollSeconds:                        60,
 		URLPrefix:                                  "",
-		DiscoveryIgnoreReplicaHostnameFilters:      []string{},
-		ConsulAddress:                              "",
-		ConsulAclToken:                             "",
-		ZkAddress:                                  "",
-		KVClusterMasterPrefix:                      "mysql/master",
+		DiscoveryIgnoreReplicaHostnameFilters: []string{},
+		ConsulAddress:                         "",
+		ConsulAclToken:                        "",
+		ZkAddress:                             "",
+		KVClusterMasterPrefix:                 "mysql/master",
 	}
 }
 

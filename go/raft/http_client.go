@@ -38,8 +38,8 @@ func setupHttpClient() error {
 		return net.DialTimeout(network, addr, httpTimeout)
 	}
 	httpTransport := &http.Transport{
-		TLSClientConfig:       &tls.Config{InsecureSkipVerify: config.Config.MySQLOrchestratorSSLSkipVerify},
-		Dial:                  dialTimeout,
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config.MySQLOrchestratorSSLSkipVerify},
+		Dial:            dialTimeout,
 		ResponseHeaderTimeout: httpTimeout,
 	}
 	httpClient = &http.Client{Transport: httpTransport}
