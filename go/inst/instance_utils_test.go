@@ -46,6 +46,11 @@ func TestRedactGtidSetUUID(t *testing.T) {
 		test.S(t).ExpectEquals(redacted, gtidSet)
 	}
 	{
+		gtidSet := `00020192-1111-1111-1111-111111111111:1-838,00020194-3333-3333-3333-333333333333:1-5,00020192-1111-1111-1111-111111111111:839-840`
+		redacted := redactGtidSetUUID(gtidSet, "00020192-1111-1111-1111-111111111111")
+		test.S(t).ExpectEquals(redacted, ",00020194-3333-3333-3333-333333333333:1-5,")
+	}
+	{
 		gtidSet := ""
 		redacted := redactGtidSetUUID(gtidSet, "00020193-2222-2222-2222-222222222222")
 		test.S(t).ExpectEquals(redacted, "")
