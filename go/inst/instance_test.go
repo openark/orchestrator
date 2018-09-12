@@ -232,61 +232,6 @@ func TestNextGTID(t *testing.T) {
 	}
 }
 
-func TestOracleGTIDSet(t *testing.T) {
-	{
-		gtidSetString := `230ea8ea-81e3-11e4-972a-e25ec4bd140a:1-10539,
-316d193c-70e5-11e5-adb2-ecf4bb2262ff:1-8935:8984-6124596,
-321f5c0d-70e5-11e5-adb2-ecf4bb2262ff:1-56`
-		gtidSet, err := NewOracleGtidSet(gtidSetString)
-		test.S(t).ExpectNil(err)
-		test.S(t).ExpectEquals(len(gtidSet.GtidEntries), 3)
-		test.S(t).ExpectEquals(gtidSet.String(), `230ea8ea-81e3-11e4-972a-e25ec4bd140a:1-10539,
-316d193c-70e5-11e5-adb2-ecf4bb2262ff:1-8935:8984-6124596,
-321f5c0d-70e5-11e5-adb2-ecf4bb2262ff:1-56`)
-
-		test.S(t).ExpectEquals(gtidSet.GtidEntries[0].UUID, `230ea8ea-81e3-11e4-972a-e25ec4bd140a`)
-		test.S(t).ExpectEquals(gtidSet.GtidEntries[1].UUID, `316d193c-70e5-11e5-adb2-ecf4bb2262ff`)
-		test.S(t).ExpectEquals(gtidSet.GtidEntries[2].UUID, `321f5c0d-70e5-11e5-adb2-ecf4bb2262ff`)
-		test.S(t).ExpectEquals(gtidSet.GtidEntries[1].Ranges, `1-8935:8984-6124596`)
-
-		removed := gtidSet.RemoveUUID(`ffffffff-70e5-11e5-adb2-ecf4bb2262ff`)
-		test.S(t).ExpectFalse(removed)
-		test.S(t).ExpectEquals(len(gtidSet.GtidEntries), 3)
-
-		removed = gtidSet.RemoveUUID(`316d193c-70e5-11e5-adb2-ecf4bb2262ff`)
-		test.S(t).ExpectTrue(removed)
-		test.S(t).ExpectEquals(len(gtidSet.GtidEntries), 2)
-
-		test.S(t).ExpectEquals(gtidSet.String(), `230ea8ea-81e3-11e4-972a-e25ec4bd140a:1-10539,
-321f5c0d-70e5-11e5-adb2-ecf4bb2262ff:1-56`)
-
-		removed = gtidSet.RemoveUUID(`316d193c-70e5-11e5-adb2-ecf4bb2262ff`)
-		test.S(t).ExpectFalse(removed)
-		test.S(t).ExpectEquals(len(gtidSet.GtidEntries), 2)
-
-		removed = gtidSet.RemoveUUID(`321f5c0d-70e5-11e5-adb2-ecf4bb2262ff`)
-		test.S(t).ExpectTrue(removed)
-		test.S(t).ExpectEquals(len(gtidSet.GtidEntries), 1)
-		test.S(t).ExpectEquals(gtidSet.String(), `230ea8ea-81e3-11e4-972a-e25ec4bd140a:1-10539`)
-
-		removed = gtidSet.RemoveUUID(`230ea8ea-81e3-11e4-972a-e25ec4bd140a`)
-		test.S(t).ExpectTrue(removed)
-		test.S(t).ExpectEquals(len(gtidSet.GtidEntries), 0)
-
-		removed = gtidSet.RemoveUUID(`230ea8ea-81e3-11e4-972a-e25ec4bd140a`)
-		test.S(t).ExpectFalse(removed)
-		test.S(t).ExpectEquals(len(gtidSet.GtidEntries), 0)
-		test.S(t).ExpectEquals(gtidSet.String(), ``)
-	}
-	{
-		gtidSetString := `230ea8ea-81e3-11e4-972a-e25ec4bd140a:1-10539,
-:1-8935:8984-6124596,
-321f5c0d-70e5-11e5-adb2-ecf4bb2262ff:1-56`
-		_, err := NewOracleGtidSet(gtidSetString)
-		test.S(t).ExpectNotNil(err)
-	}
-}
-
 func TestRemoveInstance(t *testing.T) {
 	{
 		instances := [](*Instance){&instance1, &instance2}

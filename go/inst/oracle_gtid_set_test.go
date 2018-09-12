@@ -103,6 +103,11 @@ func TestRemoveUUID(t *testing.T) {
 		gtidSet.RemoveUUID("00020194-3333-3333-3333-333333333333")
 		test.S(t).ExpectEquals(len(gtidSet.GtidEntries), 1)
 		test.S(t).ExpectEquals(gtidSet.GtidEntries[0].String(), "00020192-1111-1111-1111-111111111111:20-30")
+
+		removed := gtidSet.RemoveUUID(`230ea8ea-81e3-11e4-972a-e25ec4bd140a`)
+		test.S(t).ExpectFalse(removed)
+		test.S(t).ExpectEquals(len(gtidSet.GtidEntries), 1)
+		test.S(t).ExpectEquals(gtidSet.GtidEntries[0].String(), "00020192-1111-1111-1111-111111111111:20-30")
 	}
 	{
 		gtidSet, err := NewOracleGtidSet(gtidSetVal)

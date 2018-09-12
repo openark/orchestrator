@@ -1222,21 +1222,23 @@ func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
 // It will make sure the gtid_purged set matches the executed set value as read just before the RESET.
 // this will enable new replicas to be attached to given instance without complaints about missing/purged entries.
 // This function requires that the instance does not have replicas.
-func ResetMasterGTIDOperation(instanceKey *InstanceKey, removeSelfUUID bool, uuidToRemove string) (*Instance, error) {
+func ErrantGTIDResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
 	}
+	if instance.GtidErrant == "" {
+		return instance, log.Errorf("gtid-errant-reset-master will not operate on %+v because no errant GTID is found", *instanceKey)
+	}
 	if !instance.SupportsOracleGTID {
-		return instance, log.Errorf("reset-master-gtid requested for %+v but it is not using oracle-gtid", *instanceKey)
+		return instance, log.Errorf("gtid-errant-reset-master requested for %+v but it is not using oracle-gtid", *instanceKey)
 	}
 	if len(instance.SlaveHosts) > 0 {
-		return instance, log.Errorf("reset-master-gtid will not operate on %+v because it has %+v replicas. Expecting no replicas", *instanceKey, len(instance.SlaveHosts))
+		return instance, log.Errorf("gtid-errant-reset-master will not operate on %+v because it has %+v replicas. Expecting no replicas", *instanceKey, len(instance.SlaveHosts))
 	}
 
-	log.Infof("Will reset master on %+v", instanceKey)
+	gtidSubtract := ""
 
-	var oracleGtidSet *OracleGtidSet
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "reset-master-gtid"); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
 		goto Cleanup
@@ -1251,27 +1253,16 @@ func ResetMasterGTIDOperation(instanceKey *InstanceKey, removeSelfUUID bool, uui
 		}
 	}
 
-	oracleGtidSet, err = NewOracleGtidSet(instance.ExecutedGtidSet)
+	gtidSubtract, err = GTIDSubtract(instanceKey, instance.ExecutedGtidSet, instance.GtidErrant)
 	if err != nil {
 		goto Cleanup
-	}
-	if removeSelfUUID {
-		uuidToRemove = instance.ServerUUID
-	}
-	if uuidToRemove != "" {
-		removed := oracleGtidSet.RemoveUUID(uuidToRemove)
-		if removed {
-			log.Debugf("Will remove UUID %s", uuidToRemove)
-		} else {
-			log.Debugf("UUID %s not found", uuidToRemove)
-		}
 	}
 
 	instance, err = ResetMaster(instanceKey)
 	if err != nil {
 		goto Cleanup
 	}
-	err = setGTIDPurged(instance, oracleGtidSet.String())
+	err = setGTIDPurged(instance, gtidSubtract)
 	if err != nil {
 		goto Cleanup
 	}
@@ -1284,7 +1275,7 @@ Cleanup:
 	}
 
 	// and we're done (pending deferred functions)
-	AuditOperation("reset-master-gtid", instanceKey, fmt.Sprintf("%+v master reset", *instanceKey))
+	AuditOperation("gtid-errant-reset-master", instanceKey, fmt.Sprintf("%+v master reset", *instanceKey))
 
 	return instance, err
 }
