@@ -61,6 +61,7 @@ const (
 	MixedAndRowLoggingSlavesStructureWarning                             = "MixedAndRowLoggingSlavesStructureWarning"
 	MultipleMajorVersionsLoggingSlaves                                   = "MultipleMajorVersionsLoggingSlaves"
 	DifferentGTIDModesStructureWarning                                   = "DifferentGTIDModesStructureWarning"
+	ErrantGTIDStructureWarning                                           = "ErrantGTIDStructureWarning"
 )
 
 type InstanceAnalysis struct {
@@ -141,6 +142,7 @@ type ReplicationAnalysis struct {
 	GTIDMode                                  string
 	MinReplicaGTIDMode                        string
 	MaxReplicaGTIDMode                        string
+	MaxReplicaGTIDErrant                      string
 	CommandHint                               string
 }
 
