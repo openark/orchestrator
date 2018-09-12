@@ -141,7 +141,7 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 			// first time ever we talk to MySQL
 			query := fmt.Sprintf("create database if not exists %s", config.Config.MySQLOrchestratorDatabase)
 			if _, err := db.Exec(query); err != nil {
-				return db, log.Errore(err)
+				return db, log.Fatale(err)
 			}
 		}
 		db, fromCache, err = sqlutils.GetDB(getMySQLURI())
