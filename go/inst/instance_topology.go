@@ -1251,7 +1251,7 @@ func ResetMasterGTIDOperation(instanceKey *InstanceKey, removeSelfUUID bool, uui
 		}
 	}
 
-	oracleGtidSet, err = ParseGtidSet(instance.ExecutedGtidSet)
+	oracleGtidSet, err = NewOracleGtidSet(instance.ExecutedGtidSet)
 	if err != nil {
 		goto Cleanup
 	}

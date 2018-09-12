@@ -237,7 +237,7 @@ func TestOracleGTIDSet(t *testing.T) {
 		gtidSetString := `230ea8ea-81e3-11e4-972a-e25ec4bd140a:1-10539,
 316d193c-70e5-11e5-adb2-ecf4bb2262ff:1-8935:8984-6124596,
 321f5c0d-70e5-11e5-adb2-ecf4bb2262ff:1-56`
-		gtidSet, err := ParseGtidSet(gtidSetString)
+		gtidSet, err := NewOracleGtidSet(gtidSetString)
 		test.S(t).ExpectNil(err)
 		test.S(t).ExpectEquals(len(gtidSet.GtidEntries), 3)
 		test.S(t).ExpectEquals(gtidSet.String(), `230ea8ea-81e3-11e4-972a-e25ec4bd140a:1-10539,
@@ -282,7 +282,7 @@ func TestOracleGTIDSet(t *testing.T) {
 		gtidSetString := `230ea8ea-81e3-11e4-972a-e25ec4bd140a:1-10539,
 :1-8935:8984-6124596,
 321f5c0d-70e5-11e5-adb2-ecf4bb2262ff:1-56`
-		_, err := ParseGtidSet(gtidSetString)
+		_, err := NewOracleGtidSet(gtidSetString)
 		test.S(t).ExpectNotNil(err)
 	}
 }

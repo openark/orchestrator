@@ -775,9 +775,17 @@ Cleanup:
 			// This is because orchestrator may pool master and replica at an inconvenient timing,
 			// such that the replica may _seems_ to have more entries than the master, when in fact
 			// it's just that the naster's probing is stale.
-			redactedExecutedGtidSet := redactGtidSetUUID(instance.ExecutedGtidSet, instance.MasterUUID)
-			redactedMasterExecutedGtidSet := redactGtidSetUUID(instance.masterExecutedGtidSet, instance.MasterUUID)
-			db.QueryRow("select gtid_subtract(?, ?)", redactedExecutedGtidSet, redactedMasterExecutedGtidSet).Scan(&instance.GtidErrant)
+			// redactedExecutedGtidSet := redactGtidSetUUID(instance.ExecutedGtidSet, instance.MasterUUID)
+			// redactedMasterExecutedGtidSet := redactGtidSetUUID(instance.masterExecutedGtidSet, instance.MasterUUID)
+			redactedExecutedGtidSet, _ := NewOracleGtidSet(instance.ExecutedGtidSet)
+			redactedExecutedGtidSet.RemoveUUID(instance.MasterUUID)
+			// Avoid querying the database if there's no point:
+			if !redactedExecutedGtidSet.IsEmpty() {
+				redactedMasterExecutedGtidSet, _ := NewOracleGtidSet(instance.masterExecutedGtidSet)
+				redactedMasterExecutedGtidSet.RemoveUUID(instance.MasterUUID)
+
+				db.QueryRow("select gtid_subtract(?, ?)", redactedExecutedGtidSet.String(), redactedMasterExecutedGtidSet.String()).Scan(&instance.GtidErrant)
+			}
 		}
 	}
 
