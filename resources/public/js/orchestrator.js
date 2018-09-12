@@ -364,9 +364,14 @@ function openNodeModal(node) {
     if (node.GTIDMode) {
       addNodeModalDataAttribute("GTID mode", node.GTIDMode);
     }
-    if (node.UsingOracleGTID) {
+    if (node.ExecutedGtidSet) {
       addNodeModalDataAttribute("Executed GTID set", node.ExecutedGtidSet);
+    }
+    if (node.GtidPurged) {
       addNodeModalDataAttribute("GTID purged", node.GtidPurged);
+    }
+    if (node.GtidErrant) {
+      addNodeModalDataAttribute("GTID errant", node.GtidErrant);
     }
   }
   addNodeModalDataAttribute("Semi-sync enforced", booleanString(node.SemiSyncEnforced));
@@ -642,6 +647,9 @@ function normalizeInstanceProblem(instance) {
   instance.replicationLagProblem = function() {
     return !instance.replicationLagReasonable;
   }
+  instance.errantGTIDProblem = function() {
+    return (instance.GtidErrant != '');
+  }
 
   instance.problem = null;
   instance.problemOrder = 0;
@@ -666,6 +674,10 @@ function normalizeInstanceProblem(instance) {
     instance.problem = "replication_lag";
     instance.problemDescription = "Replica is lagging.\nThis diagnostic is based on either Seconds_behind_master or configured ReplicationLagQuery";
     instance.problemOrder = 5;
+  } else if (instance.errantGTIDProblem()) {
+    instance.problem = "Errant GTID";
+    instance.problemDescription = "Replica has GTID entries not found on its master";
+    instance.problemOrder = 6;
   }
   instance.hasProblem = (instance.problem != null);
   instance.hasConnectivityProblem = (!instance.IsLastCheckValid || !instance.IsRecentlyChecked);
@@ -817,7 +829,9 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     }
     if (instance.supportsGTID) {
       if (instance.hasMaster && !instance.usingGTID) {
-        popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon text-muted glyphicon-globe" title="Support GTID but not using it in replication"></span> ');      
+        popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon text-muted glyphicon-globe" title="Support GTID but not using it in replication"></span> ');
+      } else if (instance.GtidErrant) {
+        popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon text-danger glyphicon-globe" title="Errant GTID found"></span> ');
       } else {
         popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using GTID"></span> ');
       }
