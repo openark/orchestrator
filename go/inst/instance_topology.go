@@ -1262,7 +1262,7 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 
 	instance, err = ResetMaster(instanceKey)
 	if err != nil {
-		log.Errorf("gtid-errant-reset-master: error while resetting master on %+v, after which intended to set gtid_purged to: %s", instance.Key, gtidSubtract)
+		err = fmt.Errorf("gtid-errant-reset-master: error while resetting master on %+v, after which intended to set gtid_purged to: %s. Error was: %+v", instance.Key, gtidSubtract, err)
 		goto Cleanup
 	}
 	// We've just made a desgtructive operation. It is non transactional and cannot be rolled back.
@@ -1275,7 +1275,7 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 	if err != nil {
-		log.Errorf("gtid-errant-reset-master: error setting gtid_purged on %+v to: %s", instance.Key, gtidSubtract)
+		err = fmt.Errorf("gtid-errant-reset-master: error setting gtid_purged on %+v to: %s. Error was: %+v", instance.Key, gtidSubtract, err)
 		goto Cleanup
 	}
 
