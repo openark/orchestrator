@@ -56,8 +56,11 @@ func (this *zkStore) PutKeyValue(key string, value string) (err error) {
 		return nil
 	}
 	aclstr := ""
-
-	_, err = this.zook.Create(normalizeKey(key), []byte(value), aclstr, true)
+	if exists, _ := this.zook.Exists(normalizeKey(key)); exists == true {
+		_, err = this.zook.Set(normalizeKey(key), []byte(value))
+	} else {
+		_, err = this.zook.Create(normalizeKey(key), []byte(value), aclstr, true)
+	}
 	return err
 }
 
