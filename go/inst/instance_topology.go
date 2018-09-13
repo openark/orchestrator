@@ -43,6 +43,8 @@ var ReplicationNotRunningError = fmt.Errorf("Replication not running")
 var asciiFillerCharacter = " "
 var tabulatorScharacter = "|"
 
+var countRetries = 5
+
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
 func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance), extendedOutput bool, fillerCharacter string, tabulated bool) []string {
@@ -1260,10 +1262,20 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 
 	instance, err = ResetMaster(instanceKey)
 	if err != nil {
+		log.Errorf("gtid-errant-reset-master: error while resetting master on %+v, after which intended to set gtid_purged to: %s", instance.Key, gtidSubtract)
 		goto Cleanup
 	}
-	err = setGTIDPurged(instance, gtidSubtract)
+	// We've just made a desgtructive operation. It is non transactional and cannot be rolled back.
+	// The replica will be left in a broken state.
+	// This is why we allow multiple attempts at the following:
+	for i := 0; i < countRetries; i++ {
+		err = setGTIDPurged(instance, gtidSubtract)
+		if err == nil {
+			break
+		}
+	}
 	if err != nil {
+		log.Errorf("gtid-errant-reset-master: error setting gtid_purged on %+v to: %s", instance.Key, gtidSubtract)
 		goto Cleanup
 	}
 
