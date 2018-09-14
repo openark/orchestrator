@@ -47,6 +47,7 @@ type Instance struct {
 	LogSlaveUpdatesEnabled bool
 	SelfBinlogCoordinates  BinlogCoordinates
 	MasterKey              InstanceKey
+	MasterUUID             string
 	IsDetachedMaster       bool
 	Slave_SQL_Running      bool
 	Slave_IO_Running       bool
@@ -66,6 +67,9 @@ type Instance struct {
 	SQLDelay               uint
 	ExecutedGtidSet        string
 	GtidPurged             string
+	GtidErrant             string
+
+	masterExecutedGtidSet string // Not exported
 
 	SlaveLagSeconds                 sql.NullInt64
 	SlaveHosts                      InstanceKeyMap
@@ -246,11 +250,6 @@ func (this *Instance) IsReplica() bool {
 // IsMaster makes simple heuristics to decide whether this instance is a master (not replicating from any other server)
 func (this *Instance) IsMaster() bool {
 	return !this.IsReplica()
-}
-
-// IsWritableMaster makes simple heuristics to decide whether this instance is a writable master (not replicating from any other server)
-func (this *Instance) IsWritableMaster() bool {
-	return this.IsMaster() && !this.ReadOnly
 }
 
 // ReplicaRunning returns true when this instance's status is of a replicating replica.

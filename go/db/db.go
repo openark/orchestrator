@@ -401,3 +401,15 @@ func QueryOrchestratorBuffered(query string, argsArray []interface{}, on_row fun
 	}
 	return log.Criticale(sqlutils.QueryRowsMapBuffered(db, query, on_row, argsArray...))
 }
+
+// ReadTimeNow reads and returns the current timestamp as string. This is an unfortunate workaround
+// to support both MySQL and SQLite in all possible timezones. SQLite only speaks UTC where MySQL has
+// timezone support. By reading the time as string we get the database's de-facto notion of the time,
+// which we can then feed back to it.
+func ReadTimeNow() (timeNow string, err error) {
+	err = QueryOrchestrator(`select now() as time_now`, nil, func(m sqlutils.RowMap) error {
+		timeNow = m.GetString("time_now")
+		return nil
+	})
+	return timeNow, err
+}

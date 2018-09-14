@@ -50,7 +50,7 @@ promotion_rule=
 pool=
 hostname_flag=
 api_path=
-basic_auth=
+basic_auth=":"
 
 instance_hostport=
 destination_hostport=
@@ -164,7 +164,7 @@ function detect_leader_api() {
   fi
   for api in ${apis[@]} ; do
     api=$(normalize_orchestrator_api $api)
-    leader_check=$(curl -b "${basic_auth}" -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
+    leader_check=$(curl --basic --user "${basic_auth}" -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
     if [ "$leader_check" == "200" ] ; then
       leader_api="$api"
       return
@@ -186,8 +186,8 @@ function api() {
   set -o pipefail
 
   api_call_result=0
-  for sleep_time in 0.1 0.2 0.5 1 2 5 10 0 ; do
-    api_response=$(curl -b "${basic_auth}" -s "$uri" | jq '.')
+  for sleep_time in 0.1 0.2 0.5 1 2 2.5 5 0 ; do
+    api_response=$(curl --basic --user "${basic_auth}" -s "$uri" | jq '.')
     api_call_result=$?
     [ $api_call_result -eq 0 ] && break
     sleep $sleep_time

@@ -38,6 +38,8 @@ const (
 	StopReplicationNicely                       = "StopReplicationNicely"
 )
 
+var ReplicationNotRunningError = fmt.Errorf("Replication not running")
+
 var asciiFillerCharacter = " "
 var tabulatorScharacter = "|"
 
@@ -612,7 +614,7 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance) (movedReplicas
 		return movedReplicas, unmovedReplicas, nil, errs
 	}
 
-	log.Infof("Will move %+v replicas below %+v via GTID", len(replicas), other.Key)
+	log.Infof("moveReplicasViaGTID: Will move %+v replicas below %+v via GTID", len(replicas), other.Key)
 
 	barrier := make(chan *InstanceKey)
 	replicaMutex := make(chan bool, 1)
@@ -627,7 +629,7 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance) (movedReplicas
 				if _, _, canMove := canMoveViaGTID(replica, other); canMove {
 					replica, replicaErr = moveInstanceBelowViaGTID(replica, other)
 				} else {
-					replicaErr = fmt.Errorf("%+v cannot move below %+v via GTID", replica.Key, other.Key)
+					replicaErr = fmt.Errorf("moveReplicasViaGTID: %+v cannot move below %+v via GTID", replica.Key, other.Key)
 				}
 				func() {
 					// Instantaneous mutex.
@@ -1586,6 +1588,9 @@ func TakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 	masterInstance, found, err := ReadInstance(&instance.MasterKey)
 	if err != nil || !found {
 		return instance, err
+	}
+	if masterInstance.IsCoMaster {
+		return instance, fmt.Errorf("%+v is co-master. Cannot take it.", masterInstance.Key)
 	}
 	log.Debugf("TakeMaster: will attempt making %+v take its master %+v, now resolved as %+v", *instanceKey, instance.MasterKey, masterInstance.Key)
 
