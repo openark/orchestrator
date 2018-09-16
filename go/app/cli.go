@@ -167,16 +167,12 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		skipDatabaseCommands = true
 	}
 
-	if instance != "" && !strings.Contains(instance, ":") {
-		instance = fmt.Sprintf("%s:%d", instance, config.Config.DefaultInstancePort)
-	}
-
-	instanceKey, err := inst.ParseInstanceKey(instance)
+	instanceKey, err := inst.ParseResolveInstanceKey(instance)
 	if err != nil {
 		instanceKey = nil
 	}
 
-	rawInstanceKey, err := inst.NewRawInstanceKey(instance)
+	rawInstanceKey, err := inst.ParseRawInstanceKey(instance)
 	if err != nil {
 		rawInstanceKey = nil
 	}
@@ -184,7 +180,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	if destination != "" && !strings.Contains(destination, ":") {
 		destination = fmt.Sprintf("%s:%d", destination, config.Config.DefaultInstancePort)
 	}
-	destinationKey, err := inst.ParseInstanceKey(destination)
+	destinationKey, err := inst.ParseResolveInstanceKey(destination)
 	if err != nil {
 		destinationKey = nil
 	}

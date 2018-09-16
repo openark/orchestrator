@@ -489,9 +489,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			// Therefore we (currently) take @@hostname (which is masquarading as master host anyhow)
 			masterHostname = maxScaleMasterHostname
 		}
-		masterKey, err := NewInstanceKeyFromStrings(masterHostname, m.GetString("Master_Port"))
+		masterKey, err := NewResolveInstanceKey(masterHostname, m.GetInt("Master_Port"))
 		if err != nil {
-			logReadTopologyInstanceError(instanceKey, "NewInstanceKeyFromStrings", err)
+			logReadTopologyInstanceError(instanceKey, "NewResolveInstanceKey", err)
 		}
 		masterKey.Hostname, resolveErr = ResolveHostname(masterKey.Hostname)
 		if resolveErr != nil {
@@ -553,9 +553,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				// Consequently it's important to validate the values received look
 				// good prior to calling ResolveHostname()
 				host := m.GetString("Host")
-				port := m.GetString("Port")
-				if host == "" || port == "" {
-					if isMaxScale && host == "" && port == "0" {
+				port := m.GetIntD("Port", 0)
+				if host == "" || port == 0 {
+					if isMaxScale && host == "" && port == 0 {
 						// MaxScale reports a bad response sometimes so ignore it.
 						// - seen in 1.1.0 and 1.4.3.4
 						return nil
@@ -564,8 +564,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 					return fmt.Errorf("ReadTopologyInstance(%+v) 'show slave hosts' returned row with <host,port>: <%v,%v>", instanceKey, host, port)
 				}
 
-				// Note: NewInstanceKeyFromStrings calls ResolveHostname() implicitly
-				replicaKey, err := NewInstanceKeyFromStrings(host, port)
+				replicaKey, err := NewResolveInstanceKey(host, port)
 				if err == nil && replicaKey.IsValid() {
 					instance.AddReplicaKey(replicaKey)
 					foundByShowSlaveHosts = true
@@ -1675,7 +1674,7 @@ func readUnseenMasterKeys() ([]InstanceKey, error) {
 			    and slave_instance.master_port > 0
 			    and slave_instance.slave_io_running = 1
 			`, func(m sqlutils.RowMap) error {
-		instanceKey, _ := NewInstanceKeyFromStrings(m.GetString("master_host"), m.GetString("master_port"))
+		instanceKey, _ := NewResolveInstanceKey(m.GetString("master_host"), m.GetInt("master_port"))
 		// we ignore the error. It can be expected that we are unable to resolve the hostname.
 		// Maybe that's how we got here in the first place!
 		res = append(res, *instanceKey)
@@ -2012,7 +2011,7 @@ func GetHeuristicClusterDomainInstanceAttribute(clusterName string) (instanceKey
 	if err != nil {
 		return nil, err
 	}
-	return NewRawInstanceKey(writerInstanceName)
+	return ParseRawInstanceKey(writerInstanceName)
 }
 
 // ReadAllInstanceKeys
@@ -2025,7 +2024,7 @@ func ReadAllInstanceKeys() ([]InstanceKey, error) {
 			database_instance
 			`
 	err := db.QueryOrchestrator(query, sqlutils.Args(), func(m sqlutils.RowMap) error {
-		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
+		instanceKey, merr := NewResolveInstanceKey(m.GetString("hostname"), m.GetInt("port"))
 		if merr != nil {
 			log.Errore(merr)
 		} else if !InstanceIsForgotten(instanceKey) {
@@ -2090,7 +2089,7 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 	args := sqlutils.Args(config.Config.InstancePollSeconds, 2*config.Config.InstancePollSeconds)
 
 	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
-		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
+		instanceKey, merr := NewResolveInstanceKey(m.GetString("hostname"), m.GetInt("port"))
 		if merr != nil {
 			log.Errore(merr)
 		} else if !InstanceIsForgotten(instanceKey) {

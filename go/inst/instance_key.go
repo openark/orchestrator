@@ -19,6 +19,7 @@ package inst
 import (
 	"fmt"
 	"github.com/github/orchestrator/go/config"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -29,78 +30,90 @@ type InstanceKey struct {
 	Port     int
 }
 
+var (
+	ipv4HostPortRegexp = regexp.MustCompile("^([^:]+):([0-9]+)$")
+	ipv4HostRegexp     = regexp.MustCompile("^([^:]+)$")
+	ipv6HostPortRegexp = regexp.MustCompile("^\\[([:0-9a-fA-F]+)\\]:([0-9]+)$") // e.g. [2001:db8:1f70::999:de8:7648:6e8]:3308
+	ipv6HostRegexp     = regexp.MustCompile("^([:0-9a-fA-F]+)$")                // e.g. 2001:db8:1f70::999:de8:7648:6e8
+)
+
 const detachHint = "//"
 
-// ParseInstanceKey will parse an InstanceKey from a string representation such as 127.0.0.1:3306
-func NewRawInstanceKey(hostPort string) (*InstanceKey, error) {
-	tokens := strings.SplitN(hostPort, ":", 2)
-	if len(tokens) != 2 {
-		return nil, fmt.Errorf("Cannot parse InstanceKey from %s. Expected format is host:port", hostPort)
-	}
-	instanceKey := &InstanceKey{Hostname: tokens[0]}
-	var err error
-	if instanceKey.Port, err = strconv.Atoi(tokens[1]); err != nil {
-		return instanceKey, fmt.Errorf("Invalid port: %s", tokens[1])
+func newInstanceKey(hostname string, port int, resolve bool) (instanceKey *InstanceKey, err error) {
+	if hostname == "" {
+		return instanceKey, fmt.Errorf("NewResolveInstanceKey: Empty hostname")
 	}
 
-	return instanceKey, nil
+	instanceKey = &InstanceKey{Hostname: hostname, Port: port}
+	if resolve {
+		instanceKey, err = instanceKey.ResolveHostname()
+	}
+	return instanceKey, err
 }
 
-// ParseRawInstanceKeyLoose will parse an InstanceKey from a string representation such as 127.0.0.1:3306.
-// The port part is optional; there will be no name resolve
-func ParseRawInstanceKeyLoose(hostPort string) (*InstanceKey, error) {
-	if !strings.Contains(hostPort, ":") {
-		return &InstanceKey{Hostname: hostPort, Port: config.Config.DefaultInstancePort}, nil
+// newInstanceKeyStrings
+func newInstanceKeyStrings(hostname string, port string, resolve bool) (*InstanceKey, error) {
+	if portInt, err := strconv.Atoi(port); err != nil {
+		return nil, fmt.Errorf("Invalid port: %s", port)
+	} else {
+		return newInstanceKey(hostname, portInt, resolve)
 	}
-	return NewRawInstanceKey(hostPort)
+}
+func parseRawInstanceKey(hostPort string, resolve bool) (instanceKey *InstanceKey, err error) {
+	hostname := ""
+	port := ""
+	if submatch := ipv4HostPortRegexp.FindStringSubmatch(hostPort); len(submatch) > 0 {
+		hostname = submatch[1]
+		port = submatch[2]
+	} else if submatch := ipv4HostRegexp.FindStringSubmatch(hostPort); len(submatch) > 0 {
+		hostname = submatch[1]
+	} else if submatch := ipv6HostPortRegexp.FindStringSubmatch(hostPort); len(submatch) > 0 {
+		hostname = submatch[1]
+		port = submatch[2]
+	} else if submatch := ipv6HostRegexp.FindStringSubmatch(hostPort); len(submatch) > 0 {
+		hostname = submatch[1]
+	} else {
+		return nil, fmt.Errorf("Cannot parse address: %s", hostPort)
+	}
+	if port == "" {
+		port = fmt.Sprintf("%d", config.Config.DefaultInstancePort)
+	}
+	return newInstanceKeyStrings(hostname, port, resolve)
 }
 
-// NewInstanceKeyFromStrings creates a new InstanceKey by resolving hostname and port.
-// hostname is normalized via ResolveHostname. port is tested to be valid integer.
-func NewInstanceKeyFromStrings(hostname string, port string) (*InstanceKey, error) {
-	instanceKey := &InstanceKey{}
-	var err error
-
-	if hostname == "" || port == "" {
-		return instanceKey, fmt.Errorf("NewInstanceKeyFromString: Empty hostname: %q or port: %q", hostname, port)
-	}
-	if instanceKey.Port, err = strconv.Atoi(port); err != nil {
-		return instanceKey, fmt.Errorf("NewInstanceKeyFromString: Invalid port: %s", port)
-	}
-
-	if instanceKey.Hostname, err = ResolveHostname(hostname); err != nil {
-		return instanceKey, err
-	}
-
-	return instanceKey, nil
+func NewResolveInstanceKey(hostname string, port int) (instanceKey *InstanceKey, err error) {
+	return newInstanceKey(hostname, port, true)
 }
 
-// ParseInstanceKey will parse an InstanceKey from a string representation such as 127.0.0.1:3306
-func ParseInstanceKey(hostPort string) (*InstanceKey, error) {
-	tokens := strings.SplitN(hostPort, ":", 2)
-	if len(tokens) != 2 {
-		return nil, fmt.Errorf("Cannot parse InstanceKey from %s. Expected format is host:port", hostPort)
-	}
-	return NewInstanceKeyFromStrings(tokens[0], tokens[1])
+// NewResolveInstanceKeyStrings creates and resolves a new instance key based on string params
+func NewResolveInstanceKeyStrings(hostname string, port string) (*InstanceKey, error) {
+	return newInstanceKeyStrings(hostname, port, true)
 }
 
-// ParseInstanceKeyLoose will parse an InstanceKey from a string representation such as 127.0.0.1:3306.
-// The port part is optional
-func ParseInstanceKeyLoose(hostPort string) (*InstanceKey, error) {
-	if !strings.Contains(hostPort, ":") {
-		return &InstanceKey{Hostname: hostPort, Port: config.Config.DefaultInstancePort}, nil
-	}
-	return ParseInstanceKey(hostPort)
+func ParseResolveInstanceKey(hostPort string) (instanceKey *InstanceKey, err error) {
+	return parseRawInstanceKey(hostPort, true)
 }
 
-// Formalize this key by getting CNAME for hostname
-func (this *InstanceKey) Formalize() *InstanceKey {
-	if this == nil || this.Hostname == "" {
-		return nil
+func ParseRawInstanceKey(hostPort string) (instanceKey *InstanceKey, err error) {
+	return parseRawInstanceKey(hostPort, false)
+}
+
+// NewResolveInstanceKeyStrings creates and resolves a new instance key based on string params
+func NewRawInstanceKeyStrings(hostname string, port string) (*InstanceKey, error) {
+	return newInstanceKeyStrings(hostname, port, false)
+}
+
+//
+func (this *InstanceKey) ResolveHostname() (*InstanceKey, error) {
+	if !this.IsValid() {
+		return this, nil
 	}
 
-	this.Hostname, _ = ResolveHostname(this.Hostname)
-	return this
+	hostname, err := ResolveHostname(this.Hostname)
+	if err == nil {
+		this.Hostname = hostname
+	}
+	return this, err
 }
 
 // Equals tests equality between this key and another key
