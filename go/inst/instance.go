@@ -48,6 +48,7 @@ type Instance struct {
 	SelfBinlogCoordinates  BinlogCoordinates
 	MasterKey              InstanceKey
 	MasterUUID             string
+	AncestryUUID           string
 	IsDetachedMaster       bool
 	Slave_SQL_Running      bool
 	Slave_IO_Running       bool
