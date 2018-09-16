@@ -520,4 +520,9 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN gtid_errant text CHARACTER SET ascii NOT NULL AFTER gtid_purged
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN ancestry_uuid text CHARACTER SET ascii NOT NULL AFTER master_uuid
+	`,
 }

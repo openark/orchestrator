@@ -356,6 +356,7 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=take-siblings]').appendTo(td.find("div"))
   }
 
+  $('#node_modal [data-btn-group=gtid-errant-fix]').hide();
   addNodeModalDataAttribute("GTID supported", booleanString(node.supportsGTID));
   if (node.supportsGTID) {
     var td = addNodeModalDataAttribute("GTID based replication", booleanString(node.usingGTID));
@@ -371,7 +372,9 @@ function openNodeModal(node) {
       addNodeModalDataAttribute("GTID purged", node.GtidPurged);
     }
     if (node.GtidErrant) {
-      addNodeModalDataAttribute("GTID errant", node.GtidErrant);
+      td = addNodeModalDataAttribute("GTID errant", node.GtidErrant);
+      $('#node_modal [data-btn-group=gtid-errant-fix]').appendTo(td.find("div"))
+      $('#node_modal [data-btn-group=gtid-errant-fix]').show();
     }
   }
   addNodeModalDataAttribute("Semi-sync enforced", booleanString(node.SemiSyncEnforced));
@@ -433,6 +436,17 @@ function openNodeModal(node) {
     bootbox.confirm(message, function(confirm) {
       if (confirm) {
         apiCommand("/api/reset-slave/" + node.Key.Hostname + "/" + node.Key.Port);
+      }
+    });
+    return false;
+  });
+  $('#node_modal [data-btn=gtid-errant-reset-master]').click(function() {
+    var message = "<p>Are you sure you wish to reset master on <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+      "</strong></code>?" +
+      "<p>This will purge binary logs on server.";
+    bootbox.confirm(message, function(confirm) {
+      if (confirm) {
+        apiCommand("/api/gtid-errant-reset-master/" + node.Key.Hostname + "/" + node.Key.Port);
       }
     });
     return false;
