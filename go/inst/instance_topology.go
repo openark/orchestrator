@@ -1260,14 +1260,20 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 		goto Cleanup
 	}
 
-	instance, err = ResetMaster(instanceKey)
+	// We're about to perform a destructive operation. It is non transactional and cannot be rolled back.
+	// The replica will be left in a broken state.
+	// This is why we allow multiple attempts at the following:
+	for i := 0; i < countRetries; i++ {
+		instance, err = ResetMaster(instanceKey)
+		if err == nil {
+			break
+		}
+	}
 	if err != nil {
 		err = fmt.Errorf("gtid-errant-reset-master: error while resetting master on %+v, after which intended to set gtid_purged to: %s. Error was: %+v", instance.Key, gtidSubtract, err)
 		goto Cleanup
 	}
-	// We've just made a desgtructive operation. It is non transactional and cannot be rolled back.
-	// The replica will be left in a broken state.
-	// This is why we allow multiple attempts at the following:
+	// We've just made the destructive operation. Again, allow for retries:
 	for i := 0; i < countRetries; i++ {
 		err = setGTIDPurged(instance, gtidSubtract)
 		if err == nil {
