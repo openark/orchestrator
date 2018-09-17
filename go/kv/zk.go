@@ -24,6 +24,7 @@ import (
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/outbrain/zookeepercli/zk"
+	zkconstants "github.com/samuel/go-zookeeper/zk"
 )
 
 // Internal key-value store, based on relational backend
@@ -55,9 +56,11 @@ func (this *zkStore) PutKeyValue(key string, value string) (err error) {
 	if this.zook == nil {
 		return nil
 	}
-	aclstr := ""
 
-	_, err = this.zook.Create(normalizeKey(key), []byte(value), aclstr, true)
+	if _, err = this.zook.Set(normalizeKey(key), []byte(value)); err == zkconstants.ErrNoNode {
+		aclstr := ""
+		_, err = this.zook.Create(normalizeKey(key), []byte(value), aclstr, true)
+	}
 	return err
 }
 
