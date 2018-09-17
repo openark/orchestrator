@@ -929,21 +929,32 @@ func MasterPosWait(instanceKey *InstanceKey, binlogCoordinates *BinlogCoordinate
 
 // Attempt to read and return replication credentials from the mysql.slave_master_info system table
 func ReadReplicationCredentials(instanceKey *InstanceKey) (replicationUser string, replicationPassword string, err error) {
-	query := `
-		select
-			ifnull(max(User_name), '') as user,
-			ifnull(max(User_password), '') as password
-		from
-			mysql.slave_master_info
-	`
-	err = ScanInstanceRow(instanceKey, query, &replicationUser, &replicationPassword)
-	if err != nil {
-		return replicationUser, replicationPassword, err
+	if config.Config.ReplicationCredentialsQuery != "" {
+		err = ScanInstanceRow(instanceKey, config.Config.ReplicationCredentialsQuery, &replicationUser, &replicationPassword)
+		if err == nil && replicationUser == "" {
+			err = fmt.Errorf("Empty username retrieved by ReplicationCredentialsQuery")
+		}
+		if err == nil {
+			return replicationUser, replicationPassword, nil
+		}
+		log.Errore(err)
 	}
-	if replicationUser == "" {
-		err = fmt.Errorf("Cannot find credentials in mysql.slave_master_info")
+	// Didn't get credentials from ReplicationCredentialsQuery, or ReplicationCredentialsQuery doesn't exist in the first place?
+	// We brute force our way through mysql.slave_master_info
+	{
+		query := `
+			select
+				ifnull(max(User_name), '') as user,
+				ifnull(max(User_password), '') as password
+			from
+				mysql.slave_master_info
+		`
+		err = ScanInstanceRow(instanceKey, query, &replicationUser, &replicationPassword)
+		if err == nil && replicationUser == "" {
+			err = fmt.Errorf("Empty username found in mysql.slave_master_info")
+		}
 	}
-	return replicationUser, replicationPassword, err
+	return replicationUser, replicationPassword, log.Errore(err)
 }
 
 // SetReadOnly sets or clears the instance's global read_only variable
@@ -1113,4 +1124,13 @@ func CheckAndInjectPseudoGTIDOnWriter(instance *Instance) (injected bool, err er
 		return injected, log.Errore(err)
 	}
 	return injected, nil
+}
+
+func GTIDSubtract(instanceKey *InstanceKey, gtidSet string, gtidSubset string) (gtidSubtract string, err error) {
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return gtidSubtract, err
+	}
+	err = db.QueryRow("select gtid_subtract(?, ?)", gtidSet, gtidSubset).Scan(&gtidSubtract)
+	return gtidSubtract, err
 }

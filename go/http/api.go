@@ -721,6 +721,27 @@ func (this *HttpAPI) DisableGTID(params martini.Params, r render.Render, req *ht
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Disabled GTID on %+v", instance.Key), Details: instance})
 }
 
+// ErrantGTIDResetMaster removes errant transactions on a server by way of RESET MASTER
+func (this *HttpAPI) ErrantGTIDResetMaster(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, err := inst.ErrantGTIDResetMaster(&instanceKey)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Removed errant GTID on %+v and issued a RESET MASTER", instance.Key), Details: instance})
+}
+
 // MoveBelow attempts to move an instance below its supposed sibling
 func (this *HttpAPI) MoveBelow(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -3290,6 +3311,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	// Replication, general:
 	this.registerAPIRequest(m, "enable-gtid/:host/:port", this.EnableGTID)
 	this.registerAPIRequest(m, "disable-gtid/:host/:port", this.DisableGTID)
+	this.registerAPIRequest(m, "gtid-errant-reset-master/:host/:port", this.ErrantGTIDResetMaster)
 	this.registerAPIRequest(m, "skip-query/:host/:port", this.SkipQuery)
 	this.registerAPIRequest(m, "start-slave/:host/:port", this.StartSlave)
 	this.registerAPIRequest(m, "restart-slave/:host/:port", this.RestartSlave)

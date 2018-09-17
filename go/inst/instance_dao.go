@@ -390,6 +390,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 					var err error
 					instance.SelfBinlogCoordinates.LogFile = m.GetString("File")
 					instance.SelfBinlogCoordinates.LogPos = m.GetInt64("Position")
+					instance.ExecutedGtidSet = m.GetStringD("Executed_Gtid_Set", "")
 					return err
 				})
 			}()
@@ -422,7 +423,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				if instance.GTIDMode != "" && instance.GTIDMode != "OFF" {
 					instance.SupportsOracleGTID = true
 				}
-				if masterInfoRepositoryOnTable {
+				if config.Config.ReplicationCredentialsQuery != "" {
+					instance.ReplicationCredentialsAvailable = true
+				} else if masterInfoRepositoryOnTable {
 					_ = db.QueryRow("select count(*) > 0 and MAX(User_name) != '' from mysql.slave_master_info").Scan(&instance.ReplicationCredentialsAvailable)
 				}
 			}()
@@ -478,8 +481,8 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		instance.LastIOError = strconv.QuoteToASCII(m.GetString("Last_IO_Error"))
 		instance.SQLDelay = m.GetUintD("SQL_Delay", 0)
 		instance.UsingOracleGTID = (m.GetIntD("Auto_Position", 0) == 1)
-		instance.ExecutedGtidSet = m.GetStringD("Executed_Gtid_Set", "")
 		instance.UsingMariaDBGTID = (m.GetStringD("Using_Gtid", "No") != "No")
+		instance.MasterUUID = m.GetStringD("Master_UUID", "No")
 		instance.HasReplicationFilters = ((m.GetStringD("Replicate_Do_DB", "") != "") || (m.GetStringD("Replicate_Ignore_DB", "") != "") || (m.GetStringD("Replicate_Do_Table", "") != "") || (m.GetStringD("Replicate_Ignore_Table", "") != "") || (m.GetStringD("Replicate_Wild_Do_Table", "") != "") || (m.GetStringD("Replicate_Wild_Ignore_Table", "") != ""))
 
 		masterHostname := m.GetString("Master_Host")
@@ -767,9 +770,35 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 
 Cleanup:
 	waitGroup.Wait()
+
+	if instanceFound {
+		instance.AncestryUUID = strings.Trim(fmt.Sprintf("%s,%s", instance.AncestryUUID, instance.ServerUUID), ",")
+		if instance.ExecutedGtidSet != "" && instance.masterExecutedGtidSet != "" {
+			// Compare master & replica GTID sets, but ignore the sets that present the master's UUID.
+			// This is because orchestrator may pool master and replica at an inconvenient timing,
+			// such that the replica may _seems_ to have more entries than the master, when in fact
+			// it's just that the naster's probing is stale.
+			// redactedExecutedGtidSet := redactGtidSetUUID(instance.ExecutedGtidSet, instance.MasterUUID)
+			// redactedMasterExecutedGtidSet := redactGtidSetUUID(instance.masterExecutedGtidSet, instance.MasterUUID)
+			redactedExecutedGtidSet, _ := NewOracleGtidSet(instance.ExecutedGtidSet)
+			for _, uuid := range strings.Split(instance.AncestryUUID, ",") {
+				if uuid != instance.ServerUUID {
+					redactedExecutedGtidSet.RemoveUUID(uuid)
+				}
+			}
+			// Avoid querying the database if there's no point:
+			if !redactedExecutedGtidSet.IsEmpty() {
+				redactedMasterExecutedGtidSet, _ := NewOracleGtidSet(instance.masterExecutedGtidSet)
+				redactedMasterExecutedGtidSet.RemoveUUID(instance.MasterUUID)
+
+				db.QueryRow("select gtid_subtract(?, ?)", redactedExecutedGtidSet.String(), redactedMasterExecutedGtidSet.String()).Scan(&instance.GtidErrant)
+			}
+		}
+	}
+
 	latency.Stop("instance")
 	readTopologyInstanceCounter.Inc(1)
-	//	logReadTopologyInstanceError(instanceKey, "ReadTopologyInstanceBufferable", err)	// don't write here and a few lines later.
+
 	if instanceFound {
 		instance.LastDiscoveryLatency = time.Since(readingStartTime)
 		instance.IsLastCheckValid = true
@@ -827,6 +856,8 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 	var masterClusterName string
 	var masterSuggestedClusterAlias string
 	var masterReplicationDepth uint
+	var ancestryUUID string
+	var masterExecutedGtidSet string
 	masterDataFound := false
 
 	// Read the cluster_name of the _master_ of our instance, derive it from there.
@@ -836,7 +867,9 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 					suggested_cluster_alias,
 					replication_depth,
 					master_host,
-					master_port
+					master_port,
+					ancestry_uuid,
+					executed_gtid_set
 				from database_instance
 				where hostname=? and port=?
 	`
@@ -848,6 +881,8 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 		masterReplicationDepth = m.GetUint("replication_depth")
 		masterMasterKey.Hostname = m.GetString("master_host")
 		masterMasterKey.Port = m.GetInt("master_port")
+		ancestryUUID = m.GetString("ancestry_uuid")
+		masterExecutedGtidSet = m.GetString("executed_gtid_set")
 		masterDataFound = true
 		return nil
 	})
@@ -886,6 +921,8 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 	instance.SuggestedClusterAlias = masterSuggestedClusterAlias
 	instance.ReplicationDepth = replicationDepth
 	instance.IsCoMaster = isCoMaster
+	instance.AncestryUUID = ancestryUUID
+	instance.masterExecutedGtidSet = masterExecutedGtidSet
 	return nil
 }
 
@@ -971,9 +1008,12 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.HasReplicationFilters = m.GetBool("has_replication_filters")
 	instance.SupportsOracleGTID = m.GetBool("supports_oracle_gtid")
 	instance.UsingOracleGTID = m.GetBool("oracle_gtid")
+	instance.MasterUUID = m.GetString("master_uuid")
+	instance.AncestryUUID = m.GetString("ancestry_uuid")
 	instance.ExecutedGtidSet = m.GetString("executed_gtid_set")
 	instance.GTIDMode = m.GetString("gtid_mode")
 	instance.GtidPurged = m.GetString("gtid_purged")
+	instance.GtidErrant = m.GetString("gtid_errant")
 	instance.UsingMariaDBGTID = m.GetBool("mariadb_gtid")
 	instance.UsingPseudoGTID = m.GetBool("pseudo_gtid")
 	instance.SelfBinlogCoordinates.LogFile = m.GetString("binary_log_file")
@@ -1208,6 +1248,7 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 				or (not slave_io_running)
 				or (abs(cast(seconds_behind_master as signed) - cast(sql_delay as signed)) > ?)
 				or (abs(cast(slave_lag_seconds as signed) - cast(sql_delay as signed)) > ?)
+				or (gtid_errant != '')
 			)
 		`
 
@@ -2167,9 +2208,12 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"has_replication_filters",
 		"supports_oracle_gtid",
 		"oracle_gtid",
+		"master_uuid",
+		"ancestry_uuid",
 		"executed_gtid_set",
 		"gtid_mode",
 		"gtid_purged",
+		"gtid_errant",
 		"mariadb_gtid",
 		"pseudo_gtid",
 		"master_log_file",
@@ -2241,9 +2285,12 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.HasReplicationFilters)
 		args = append(args, instance.SupportsOracleGTID)
 		args = append(args, instance.UsingOracleGTID)
+		args = append(args, instance.MasterUUID)
+		args = append(args, instance.AncestryUUID)
 		args = append(args, instance.ExecutedGtidSet)
 		args = append(args, instance.GTIDMode)
 		args = append(args, instance.GtidPurged)
+		args = append(args, instance.GtidErrant)
 		args = append(args, instance.UsingMariaDBGTID)
 		args = append(args, instance.UsingPseudoGTID)
 		args = append(args, instance.ReadBinlogCoordinates.LogFile)

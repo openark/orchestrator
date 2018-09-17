@@ -47,6 +47,8 @@ type Instance struct {
 	LogSlaveUpdatesEnabled bool
 	SelfBinlogCoordinates  BinlogCoordinates
 	MasterKey              InstanceKey
+	MasterUUID             string
+	AncestryUUID           string
 	IsDetachedMaster       bool
 	Slave_SQL_Running      bool
 	Slave_IO_Running       bool
@@ -66,6 +68,9 @@ type Instance struct {
 	SQLDelay               uint
 	ExecutedGtidSet        string
 	GtidPurged             string
+	GtidErrant             string
+
+	masterExecutedGtidSet string // Not exported
 
 	SlaveLagSeconds                 sql.NullInt64
 	SlaveHosts                      InstanceKeyMap
