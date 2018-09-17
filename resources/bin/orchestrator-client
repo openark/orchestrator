@@ -735,6 +735,7 @@ function run_command() {
     "detach-replica-master-host") general_instance_command ;;   # Stops replication and modifies Master_Host into an impossible yet reversible value.
     "reattach-replica-master-host") general_instance_command ;; # Undo a detach-replica-master-host operation
     "skip-query") general_instance_command ;;                   # Skip a single statement on a replica; either when running with GTID or without
+    "gtid-errant-reset-master") general_instance_command ;;     # Remove errant GTID transactions by way of RESET MASTER
     "enable-semi-sync-master") general_instance_command ;;      # Enable semi-sync (master-side)
     "disable-semi-sync-master") general_instance_command ;;     # Disable semi-sync (master-side)
     "enable-semi-sync-replica") general_instance_command ;;     # Enable semi-sync (replica-side)
