@@ -18,3 +18,5 @@ main
 *.deb
 *.pcap
 *.log
+.vendor/go19
+bin
