@@ -1125,3 +1125,12 @@ func CheckAndInjectPseudoGTIDOnWriter(instance *Instance) (injected bool, err er
 	}
 	return injected, nil
 }
+
+func GTIDSubtract(instanceKey *InstanceKey, gtidSet string, gtidSubset string) (gtidSubtract string, err error) {
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return gtidSubtract, err
+	}
+	err = db.QueryRow("select gtid_subtract(?, ?)", gtidSet, gtidSubset).Scan(&gtidSubtract)
+	return gtidSubtract, err
+}

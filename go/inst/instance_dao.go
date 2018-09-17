@@ -772,14 +772,27 @@ Cleanup:
 	waitGroup.Wait()
 
 	if instanceFound {
+		instance.AncestryUUID = strings.Trim(fmt.Sprintf("%s,%s", instance.AncestryUUID, instance.ServerUUID), ",")
 		if instance.ExecutedGtidSet != "" && instance.masterExecutedGtidSet != "" {
 			// Compare master & replica GTID sets, but ignore the sets that present the master's UUID.
 			// This is because orchestrator may pool master and replica at an inconvenient timing,
 			// such that the replica may _seems_ to have more entries than the master, when in fact
 			// it's just that the naster's probing is stale.
-			redactedExecutedGtidSet := redactGtidSetUUID(instance.ExecutedGtidSet, instance.MasterUUID)
-			redactedMasterExecutedGtidSet := redactGtidSetUUID(instance.masterExecutedGtidSet, instance.MasterUUID)
-			db.QueryRow("select gtid_subtract(?, ?)", redactedExecutedGtidSet, redactedMasterExecutedGtidSet).Scan(&instance.GtidErrant)
+			// redactedExecutedGtidSet := redactGtidSetUUID(instance.ExecutedGtidSet, instance.MasterUUID)
+			// redactedMasterExecutedGtidSet := redactGtidSetUUID(instance.masterExecutedGtidSet, instance.MasterUUID)
+			redactedExecutedGtidSet, _ := NewOracleGtidSet(instance.ExecutedGtidSet)
+			for _, uuid := range strings.Split(instance.AncestryUUID, ",") {
+				if uuid != instance.ServerUUID {
+					redactedExecutedGtidSet.RemoveUUID(uuid)
+				}
+			}
+			// Avoid querying the database if there's no point:
+			if !redactedExecutedGtidSet.IsEmpty() {
+				redactedMasterExecutedGtidSet, _ := NewOracleGtidSet(instance.masterExecutedGtidSet)
+				redactedMasterExecutedGtidSet.RemoveUUID(instance.MasterUUID)
+
+				db.QueryRow("select gtid_subtract(?, ?)", redactedExecutedGtidSet.String(), redactedMasterExecutedGtidSet.String()).Scan(&instance.GtidErrant)
+			}
 		}
 	}
 
@@ -843,6 +856,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 	var masterClusterName string
 	var masterSuggestedClusterAlias string
 	var masterReplicationDepth uint
+	var ancestryUUID string
 	var masterExecutedGtidSet string
 	masterDataFound := false
 
@@ -854,6 +868,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 					replication_depth,
 					master_host,
 					master_port,
+					ancestry_uuid,
 					executed_gtid_set
 				from database_instance
 				where hostname=? and port=?
@@ -866,6 +881,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 		masterReplicationDepth = m.GetUint("replication_depth")
 		masterMasterKey.Hostname = m.GetString("master_host")
 		masterMasterKey.Port = m.GetInt("master_port")
+		ancestryUUID = m.GetString("ancestry_uuid")
 		masterExecutedGtidSet = m.GetString("executed_gtid_set")
 		masterDataFound = true
 		return nil
@@ -905,6 +921,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 	instance.SuggestedClusterAlias = masterSuggestedClusterAlias
 	instance.ReplicationDepth = replicationDepth
 	instance.IsCoMaster = isCoMaster
+	instance.AncestryUUID = ancestryUUID
 	instance.masterExecutedGtidSet = masterExecutedGtidSet
 	return nil
 }
@@ -992,6 +1009,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.SupportsOracleGTID = m.GetBool("supports_oracle_gtid")
 	instance.UsingOracleGTID = m.GetBool("oracle_gtid")
 	instance.MasterUUID = m.GetString("master_uuid")
+	instance.AncestryUUID = m.GetString("ancestry_uuid")
 	instance.ExecutedGtidSet = m.GetString("executed_gtid_set")
 	instance.GTIDMode = m.GetString("gtid_mode")
 	instance.GtidPurged = m.GetString("gtid_purged")
@@ -2191,6 +2209,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"supports_oracle_gtid",
 		"oracle_gtid",
 		"master_uuid",
+		"ancestry_uuid",
 		"executed_gtid_set",
 		"gtid_mode",
 		"gtid_purged",
@@ -2267,6 +2286,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.SupportsOracleGTID)
 		args = append(args, instance.UsingOracleGTID)
 		args = append(args, instance.MasterUUID)
+		args = append(args, instance.AncestryUUID)
 		args = append(args, instance.ExecutedGtidSet)
 		args = append(args, instance.GTIDMode)
 		args = append(args, instance.GtidPurged)
