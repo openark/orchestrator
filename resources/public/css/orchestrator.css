@@ -132,6 +132,10 @@ body {
     color: #999999;
 }
 
+.instance h3 .pull-right > .glyphicon.text-danger {
+    color: #a94442;
+}
+
 
 .instance h3 .glyphicon {
     position: inherit;
@@ -633,6 +637,10 @@ body {
 
 #cluster_info div[data-tag=analysis] div {
   padding: 4px;
+}
+
+#cluster_info div[data-tag=analysis] div .pull-left.glyphicon {
+  font-size: 32px;
 }
 
 #cluster_name_info {

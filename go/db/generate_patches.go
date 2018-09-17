@@ -510,4 +510,19 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN last_check_partial_success tinyint unsigned NOT NULL after last_attempted_check
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN master_uuid varchar(64) CHARACTER SET ascii NOT NULL AFTER oracle_gtid
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN gtid_errant text CHARACTER SET ascii NOT NULL AFTER gtid_purged
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN ancestry_uuid text CHARACTER SET ascii NOT NULL AFTER master_uuid
+	`,
 }
