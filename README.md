@@ -64,6 +64,10 @@ Authored by [Shlomi Noach](https://github.com/shlomi-noach) at [GitHub](http://g
 - Orchestrator Chef Cookbook: https://github.com/silviabotros/chef-orchestrator/
 - Nagios / Icinga check based on Orchestrator API: https://github.com/mcrauwel/go-check-orchestrator
 
+#### Developers
+
+Get started developing Orchestrator by [reading the developer docs](/docs/developers.md). Thanks for your interest!
+
 #### License
 
 `orchestrator` is free and open sourced under the [Apache 2.0 license](LICENSE).

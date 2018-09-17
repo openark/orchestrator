@@ -17,7 +17,6 @@
 package inst
 
 import (
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -187,10 +186,4 @@ func RegexpMatchPatterns(s string, regexpPatterns []string) bool {
 		}
 	}
 	return false
-}
-
-func redactGtidSetUUID(gtidSet string, uuid string) (redactedGtidSet string) {
-	redactRegexp := regexp.MustCompile(fmt.Sprintf("%s:[-0-9]+", uuid))
-	redactedGtidSet = redactRegexp.ReplaceAllString(gtidSet, "")
-	return redactedGtidSet
 }
