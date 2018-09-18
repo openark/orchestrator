@@ -20,3 +20,5 @@ main
 *.log
 .vendor/go19
 bin
+dbdeployer/sandboxes
+dbdeployer/bin

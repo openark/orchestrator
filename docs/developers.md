@@ -4,13 +4,13 @@
 
 If you would like to build `orchestrator` on your own machine, or eventually submit PRs, follow this guide.
 
-### Requirements
+## Requirements
 
 - `orchestrator` is built on Linux and OS/X. I have no hint about MS Windows, and the build is incompatible with Windows.
 
 - `Go 1.9` or higher.
 
-### Clone repo
+## Clone repo
 
 `orchestrator` is built with `Go`. `Go` is picky about where you place your code (tl;dr: in a well structured path under `$GOPATH`). However the good news is we have the scripting to go around that (no pun intended).
 
@@ -55,6 +55,31 @@ Why would you want this? Because this will empower you with building `.DEB`, `.r
 	 - `rpmbuild`
 	 - `go`, `gofmt` in path
 	 - `tar`
+
+## Running Tests
+
+### Unit tests
+Simply run: `go test ./go/...`
+
+### Integration tests
+
+The integration test suite assumes you have `sqlite` and `wget` installed.
+Simply run: `./tests/integration/test.sh`
+
+If you have any trouble with the integration tests, you can get detailed command output by including `DEBUG=1` in the command.
+
+The integration test suite will install [dbdeployer](https://github.com/datacharmer/dbdeployer) to install and run an isolated instance of MySQL.
+Basic stop/start commands for these sandboxed installations are available from the sandbox directory, which is shown during the setup output:
+```
+....
+This dbdeployer sandbox can be controlled from:
+./dbdeployer/sandboxes/integration_tests/msb_5_6_41
+....
+```
+
+All variables which control the MySQL sandbox are configured at the top of [`tests/integration/test.sh`](/tests/integration/test.sh).
+
+## Setting up a local development environment
 
 ### DB setup
 
@@ -134,7 +159,7 @@ Depending on your configuration (`InstancePollSeconds`) this may take a few seco
 If you've made it this far, you've done 90% of the work. You may consider configuring Pseudo GTID queries, DC awareness etc. See
 "want to have" sub-sections under [configuration](Orchestrator-Manual#configuration).
 
-### Customizations
+## Customizations
 
 There are some hooks in the Orchestrator web frontend which can be used to add customizations via CSS and JavaScript.
 
@@ -144,7 +169,7 @@ You can find available hooks via `grep -r 'orchestrator:' resources/public/js`.
 
 Please note that all APIs and structures are bound to change and any customizations are unsupported. Please file issues against uncustomized versions.
 
-### Forking and Pull-Requesting
+## Forking and Pull-Requesting
 
 If you want to submit [pull-requests](https://help.github.com/articles/using-pull-requests/) you should first fork `http://github.com/github/orchestrator`.
 

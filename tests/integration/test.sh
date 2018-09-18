@@ -7,12 +7,26 @@
 # Usage: localtests/test/sh [mysql|sqlite] [filter]
 # By default, runs all tests. Given filter, will only run tests matching given regep
 
+if [ -n "$DEBUG" ]; then
+  set -x
+  export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
+fi
+
+MYSQL_VERSION=5.6.41
+MYSQL_USER=orch_test
+MYSQL_PASS=orch_test_pass
+MYSQL_HOST=127.0.0.1
+MYSQL_PORT=43307
+SANDBOX_DESCRIPTION="integration_tests"
+
 tests_path=$(dirname $0)
+dbd_path=$tests_path/../../dbdeployer
 test_logfile=/tmp/orchestrator-test.log
 test_outfile=/tmp/orchestrator-test.out
 test_diff_file=/tmp/orchestrator-test.diff
 test_query_file=/tmp/orchestrator-test.sql
 test_config_file=/tmp/orchestrator.conf.json
+test_mysql_config_file=/tmp/orchestrator_mysql_test.cnf
 orchestrator_binary=/tmp/orchestrator-test
 exec_command_file=/tmp/orchestrator-test.bash
 db_type=""
@@ -28,7 +42,7 @@ function run_queries() {
       sqlite3 $sqlite_file
   else
     # Assume mysql
-    mysql --default-character-set=utf8mb4 test -ss < $queries_file
+    mysql --defaults-file=${test_mysql_config_file} --default-character-set=utf8mb4 test -ss < $queries_file
   fi
 }
 
@@ -156,9 +170,15 @@ deploy_internal_db() {
 
 generate_config_file() {
   cp ${tests_path}/orchestrator.conf.json ${test_config_file}
+
   sed -i -e "s/backend-db-placeholder/${db_type}/g" ${test_config_file}
   sed -i -e "s^sqlite-data-file-placeholder^${sqlite_file}^g" ${test_config_file}
-  sed -i -e "s^mysql-user-placeholder^${MYSQL_USER:-}^g" ${test_config_file}
+
+  sed -i -e "s^MySQLOrchestratorHost-placeholder^${MYSQL_HOST}^g" ${test_config_file}
+  sed -i -e "s^MySQLOrchestratorPort-placeholder^${MYSQL_PORT}^g" ${test_config_file}
+  sed -i -e "s^MySQLOrchestratorUser-placeholder^${MYSQL_USER}^g" ${test_config_file}
+  sed -i -e "s^MySQLOrchestratorPass-placeholder^${MYSQL_PASS}^g" ${test_config_file}
+
   echo "- generate_config_file OK"
 }
 
@@ -183,9 +203,33 @@ test_all() {
   done
 }
 
+start_db() {
+  if [ "$db_type" == "mysql" ]; then
+    echo "Starting MySQL"
+    MYSQL_VERSION=$MYSQL_VERSION MYSQL_USER=$MYSQL_USER MYSQL_PASS=$MYSQL_PASS MYSQL_HOST=$MYSQL_HOST MYSQL_PORT=$MYSQL_PORT DESCRIPTION=$SANDBOX_DESCRIPTION $dbd_path/setup.sh | tee $dbd_path/setup.log
+    if [ $? -ne 0 ]; then
+      echo "start_db failed"
+      return 1
+    fi
+    sandbox_path=$(tail -n 1 $dbd_path/setup.log) # get last line of output from dbdeployer setup.log
+    cp $sandbox_path/my.sandbox.cnf $test_mysql_config_file
+  fi
+}
+
+stop_db() {
+  if [ "$db_type" == "mysql" ]; then
+    echo "Stopping MySQL"
+    $sandbox_path/stop
+  fi
+}
+
 test_db() {
   db_type="$1"
   echo "### testing via $db_type"
+  start_db
+  if [ $? -ne 0 ] ; then
+    return 1
+  fi
   generate_config_file
   check_db
   test_all ${@:2}
@@ -194,6 +238,7 @@ test_db() {
     return 1
   fi
   echo "- done testing via $db_type"
+  stop_db
 }
 
 main() {

@@ -6,15 +6,13 @@ go: 1.9
 os:
   - linux
 
-env:
-- MYSQL_USER=root
-
-before_install:
-  - mysql -e 'CREATE DATABASE IF NOT EXISTS test;'
-
 install: true
 
 script: script/cibuild
 
 notifications:
   email: false
+
+cache:
+  directories:
+    - dbdeployer/bin
