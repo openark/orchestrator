@@ -618,14 +618,15 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance) (movedReplicas
 
 	log.Infof("moveReplicasViaGTID: Will move %+v replicas below %+v via GTID", len(replicas), other.Key)
 
-	barrier := make(chan *InstanceKey)
-	replicaMutex := make(chan bool, 1)
+	var waitGroup sync.WaitGroup
+	var replicaMutex sync.Mutex
 	for _, replica := range replicas {
 		replica := replica
 
+		waitGroup.Add(1)
 		// Parallelize repoints
 		go func() {
-			defer func() { barrier <- &replica.Key }()
+			defer waitGroup.Done()
 			ExecuteOnTopology(func() {
 				var replicaErr error
 				if _, _, canMove := canMoveViaGTID(replica, other); canMove {
@@ -635,8 +636,8 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance) (movedReplicas
 				}
 				func() {
 					// Instantaneous mutex.
-					replicaMutex <- true
-					defer func() { <-replicaMutex }()
+					replicaMutex.Lock()
+					defer replicaMutex.Unlock()
 					if replicaErr == nil {
 						movedReplicas = append(movedReplicas, replica)
 					} else {
@@ -647,9 +648,8 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance) (movedReplicas
 			})
 		}()
 	}
-	for range replicas {
-		<-barrier
-	}
+	waitGroup.Wait()
+
 	if len(errs) == len(replicas) {
 		// All returned with error
 		return movedReplicas, unmovedReplicas, fmt.Errorf("moveReplicasViaGTID: Error on all %+v operations", len(errs)), errs
