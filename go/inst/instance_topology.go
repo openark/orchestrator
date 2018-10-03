@@ -625,28 +625,25 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance) (movedReplicas
 
 		waitGroup.Add(1)
 		// Parallelize repoints
-		go func() {
+		go ExecuteOnTopology(func() {
 			defer waitGroup.Done()
-			ExecuteOnTopology(func() {
-				var replicaErr error
-				if _, _, canMove := canMoveViaGTID(replica, other); canMove {
-					replica, replicaErr = moveInstanceBelowViaGTID(replica, other)
-				} else {
-					replicaErr = fmt.Errorf("moveReplicasViaGTID: %+v cannot move below %+v via GTID", replica.Key, other.Key)
-				}
-				func() {
-					// Instantaneous mutex.
-					replicaMutex.Lock()
-					defer replicaMutex.Unlock()
-					if replicaErr == nil {
-						movedReplicas = append(movedReplicas, replica)
-					} else {
-						unmovedReplicas = append(unmovedReplicas, replica)
-						errs = append(errs, replicaErr)
-					}
-				}()
-			})
-		}()
+			var replicaErr error
+			if _, _, canMove := canMoveViaGTID(replica, other); canMove {
+				replica, replicaErr = moveInstanceBelowViaGTID(replica, other)
+			} else {
+				replicaErr = fmt.Errorf("moveReplicasViaGTID: %+v cannot move below %+v via GTID", replica.Key, other.Key)
+			}
+
+			// After having moved replicas, update local shared variables:
+			replicaMutex.Lock()
+			defer replicaMutex.Unlock()
+			if replicaErr == nil {
+				movedReplicas = append(movedReplicas, replica)
+			} else {
+				unmovedReplicas = append(unmovedReplicas, replica)
+				errs = append(errs, replicaErr)
+			}
+		})
 	}
 	waitGroup.Wait()
 
