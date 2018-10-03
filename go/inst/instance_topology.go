@@ -628,8 +628,12 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance) (movedReplicas
 		go ExecuteOnTopology(func() {
 			defer waitGroup.Done()
 			var replicaErr error
+			var movedReplica *Instance
 			if _, _, canMove := canMoveViaGTID(replica, other); canMove {
-				replica, replicaErr = moveInstanceBelowViaGTID(replica, other)
+				movedReplica, replicaErr = moveInstanceBelowViaGTID(replica, other)
+				if movedReplica != nil {
+					replica = movedReplica
+				}
 			} else {
 				replicaErr = fmt.Errorf("moveReplicasViaGTID: %+v cannot move below %+v via GTID", replica.Key, other.Key)
 			}
