@@ -149,6 +149,7 @@ deploy_internal_db() {
   bash $exec_command_file 1> $test_outfile 2> $test_logfile
   if [ $? -ne 0 ] ; then
     echo "ERROR deploy internal db failed"
+    cat $test_logfile
     return 1
   fi
   echo "- deploy_internal_db result: $?"
