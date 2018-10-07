@@ -90,8 +90,8 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		    SELECT
 		        master_instance.hostname,
 		        master_instance.port,
-						master_instance.data_center,
-						master_instance.physical_environment,
+						MIN(master_instance.data_center) AS data_center,
+						MIN(master_instance.physical_environment) AS physical_environment,
 		        MIN(master_instance.master_host) AS master_host,
 		        MIN(master_instance.master_port) AS master_port,
 		        MIN(master_instance.cluster_name) AS cluster_name,
