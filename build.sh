@@ -16,10 +16,11 @@ export GO15VENDOREXPERIMENT=1
 
 usage() {
   echo
-  echo "Usage: $0 [-t target ] [-a arch ] [ -p prefix ] [-h] [-d] [-r]"
+  echo "Usage: $0 [-t target ] [-a arch ] [-i init-system] [ -p prefix ] [-h] [-d] [-r]"
   echo "Options:"
   echo "-h Show this screen"
   echo "-t (linux|darwin) Target OS Default:(linux)"
+  echo "-i (sysv|systemd) Target init system Default:(sysv)"
   echo "-a (amd64|386) Arch Default:(amd64)"
   echo "-d debug output"
   echo "-b build only, do not generate packages"
@@ -82,14 +83,20 @@ function setuptree() {
 function oinstall() {
   local builddir prefix
   builddir="$1"
-  prefix="$2"
+  init_system="$2"
+  prefix="$3"
 
   cd  $mydir
   gofmt -s -w  go/
   rsync -qa ./resources $builddir/orchestrator${prefix}/orchestrator/
   rsync -qa ./conf/orchestrator-sample*.conf.json $builddir/orchestrator${prefix}/orchestrator/
-  cp etc/init.d/orchestrator.bash $builddir/orchestrator/etc/init.d/orchestrator
-  chmod +x $builddir/orchestrator/etc/init.d/orchestrator
+
+  if [ "$init_system" == "sysv" ]; then
+    cp etc/init.d/orchestrator.bash $builddir/orchestrator/etc/init.d/orchestrator
+    chmod +x $builddir/orchestrator/etc/init.d/orchestrator
+  elif [ "$init_system" == "systemd" ]; then
+    cp etc/systemd/orchestrator.service $builddir/orchestrator/etc/systemd/system/orchestrator.service
+  fi
 }
 
 function package() {
@@ -171,9 +178,10 @@ function build() {
 
 function main() {
   local target="$1"
-  local arch="$2"
-  local prefix="$3"
-  local build_only=$4
+  local init_system="$2"
+  local arch="$3"
+  local prefix="$4"
+  local build_only=$5
   local builddir
 
   if [ -z "${RELEASE_VERSION}" ] ; then
@@ -183,7 +191,7 @@ function main() {
 
   precheck "$target" "$build_only"
   builddir=$( setuptree "$prefix" )
-  oinstall "$builddir" "$prefix"
+  oinstall "$builddir" "$init_system" "$prefix"
   build "$target" "$arch" "$builddir" "$prefix"
   [[ $? == 0 ]] || return 1
   if [[ $build_only -eq 0 ]]; then
@@ -193,13 +201,16 @@ function main() {
 
 build_only=0
 opt_race=
-while getopts a:t:p:s:v:dbhr flag; do
+while getopts a:t:i:p:s:v:dbhr flag; do
   case $flag in
   a)
     arch="${OPTARG}"
     ;;
   t)
     target="${OPTARG}"
+    ;;
+  i)
+    init_system="${OPTARG}"
     ;;
   h)
     usage
@@ -242,10 +253,12 @@ if [ -z "$target" ]; then
 		exit 1
 	esac
 fi
+
+init_system=${init_system:-"sysv"}
 arch=${arch:-"amd64"} # default for arch is amd64 but should take from environment
 prefix=${prefix:-"/usr/local"}
 
 [[ $debug -eq 1 ]] && set -x
-main "$target" "$arch" "$prefix" "$build_only"
+main "$target" "$init_ssytem" "$arch" "$prefix" "$build_only"
 
 echo "orchestrator build done; exit status is $?"
