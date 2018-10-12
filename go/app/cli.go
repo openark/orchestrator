@@ -1571,7 +1571,10 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("redeploy-internal-db", "Meta, internal", `Force internal schema migration to current backend structure`):
 		{
 			config.RuntimeCLIFlags.ConfiguredVersion = ""
-			inst.ReadClusters()
+			_, err := inst.ReadClusters()
+			if err != nil {
+				log.Fatale(err)
+			}
 			fmt.Println("Redeployed internal db")
 		}
 	case registerCliCommand("internal-suggest-promoted-replacement", "Internal", `Internal only, used to test promotion logic in CI`):
