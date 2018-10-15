@@ -967,6 +967,35 @@ function getParameterByName(name) {
 }
 
 
+function renderGlobalRecoveriesButton(isGlobalRecoveriesEnabled) {
+  var iconContainer = $("#global-recoveries-icon > span");
+  if (isGlobalRecoveriesEnabled) {
+    iconContainer
+      .prop("title", "Global Recoveries Enabled")
+      .addClass("glyphicon-heart")
+      .removeClass("hidden")
+      .click(function(event) {
+        bootbox.confirm("<h3>Global Recoveries</h3>Are you sure you want to <strong>disable</strong> global recoveries?", function(confirm) {
+          if (confirm) {
+            apiCommand("/api/disable-global-recoveries");
+          }
+        })
+      });
+  } else {
+    iconContainer
+      .prop("title", "Global Recoveries Disabled")
+      .addClass("glyphicon-heart-empty")
+      .removeClass("hidden")
+      .click(function(event) {
+        bootbox.confirm("<h3>Global Recoveries</h3>Are you sure you want to enable global recoveries?", function(confirm) {
+          if (confirm) {
+            apiCommand("/api/enable-global-recoveries");
+          }
+        })
+      });
+  }
+}
+
 $(document).ready(function() {
   visualizeBrand();
 
@@ -995,6 +1024,12 @@ $(document).ready(function() {
       func(clusters);
     });
   }, "json");
+
+  $.get(appUrl("/api/check-global-recoveries"), function(response) {
+    var isEnabled = (response.Details == "enabled")
+    renderGlobalRecoveriesButton(isEnabled);
+  }, "json");
+
   $(".ajaxLoader").click(function() {
     return false;
   });
