@@ -1077,5 +1077,13 @@ $(document).ready(function() {
       expires: 1
     });
   }
-  $("#searchInput").focus();
+  $("#searchInput").focusin(function() {
+    $("[data-nav-page=search] button").show();
+    $("#searchInput").css("width", "");
+  });
+  $("#searchInput").focusout(function() {
+    $("[data-nav-page=search] button").hide();
+    $("#searchInput").css("width", $("#searchInput").width()/2);
+  });
+  $("#searchInput").focusout();
 });
