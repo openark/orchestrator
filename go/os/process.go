@@ -17,7 +17,7 @@
 package os
 
 import (
-	"bytes"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -44,16 +44,11 @@ func CommandRun(commandText string, env []string, arguments ...string) error {
 		return log.Errore(err)
 	}
 
-	cmdOutput := &bytes.Buffer{}
-	cmdError := &bytes.Buffer{}
-	cmd.Stdout = cmdOutput
-	cmd.Stderr = cmdError
 	var waitStatus syscall.WaitStatus
 
 	log.Infof("CommandRun/running: %s", strings.Join(cmd.Args, " "))
-	err = cmd.Run()
-	logOutput("stdout", cmdOutput.Bytes())
-	logOutput("stderr", cmdError.Bytes())
+	cmdOutput, err := cmd.CombinedOutput()
+	log.Infof("CommandRun: %s\n", string(cmdOutput))
 	if err != nil {
 		// Did the command fail because of an unsuccessful exit code
 		if exitError, ok := err.(*exec.ExitError); ok {
@@ -61,7 +56,7 @@ func CommandRun(commandText string, env []string, arguments ...string) error {
 			log.Errorf("CommandRun: failed. exit status %d", waitStatus.ExitStatus())
 		}
 
-		return log.Errore(err)
+		return log.Errore(fmt.Errorf("(%s) %s", err.Error(), cmdOutput))
 	}
 
 	// Command was successful
@@ -92,12 +87,4 @@ func generateShellScript(commandText string, env []string, arguments ...string) 
 	cmd.Env = env
 
 	return cmd, tmpFile.Name(), nil
-}
-
-// log the output from the command. Provide an indication of what's being logged (e.g. stdout, stderr) as a name
-func logOutput(name string, output []byte) {
-	if len(output) == 0 {
-		return
-	}
-	log.Infof("CommandRun/%s: %s\n", name, string(output))
 }
