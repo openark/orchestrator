@@ -1118,13 +1118,17 @@ func readInstancesByCondition(condition string, args []interface{}, sort string)
 	return instances, err
 }
 
-// ReadInstance reads an instance from the orchestrator backend database
-func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
+func readInstancesByExactKey(instanceKey *InstanceKey) ([](*Instance), error) {
 	condition := `
 			hostname = ?
 			and port = ?
 		`
-	instances, err := readInstancesByCondition(condition, sqlutils.Args(instanceKey.Hostname, instanceKey.Port), "")
+	return readInstancesByCondition(condition, sqlutils.Args(instanceKey.Hostname, instanceKey.Port), "")
+}
+
+// ReadInstance reads an instance from the orchestrator backend database
+func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
+	instances, err := readInstancesByExactKey(instanceKey)
 	// We know there will be at most one (hostname & port are PK)
 	// And we expect to find one
 	readInstanceCounter.Inc(1)
@@ -1310,7 +1314,7 @@ func FindInstances(regexpPattern string) (result [](*Instance), err error) {
 
 // FindFuzzyInstances return instances whose names are like the one given (host & port substrings)
 // For example, the given `mydb-3:3306` might find `myhosts-mydb301-production.mycompany.com:3306`
-func FindFuzzyInstances(fuzzyInstanceKey *InstanceKey) ([](*Instance), error) {
+func findFuzzyInstances(fuzzyInstanceKey *InstanceKey) ([](*Instance), error) {
 	condition := `
 		hostname like concat('%%', ?, '%%')
 		and port = ?
@@ -1324,9 +1328,13 @@ func ReadFuzzyInstanceKey(fuzzyInstanceKey *InstanceKey) *InstanceKey {
 	if fuzzyInstanceKey == nil {
 		return nil
 	}
+	if fuzzyInstanceKey.IsIPv4() {
+		// avoid fuzziness. When looking for 10.0.0.1 we don't want to match 10.0.0.15!
+		return nil
+	}
 	if fuzzyInstanceKey.Hostname != "" {
 		// Fuzzy instance search
-		if fuzzyInstances, _ := FindFuzzyInstances(fuzzyInstanceKey); len(fuzzyInstances) == 1 {
+		if fuzzyInstances, _ := findFuzzyInstances(fuzzyInstanceKey); len(fuzzyInstances) == 1 {
 			return &(fuzzyInstances[0].Key)
 		}
 	}
@@ -1348,9 +1356,14 @@ func ReadFuzzyInstance(fuzzyInstanceKey *InstanceKey) (*Instance, error) {
 	if fuzzyInstanceKey == nil {
 		return nil, log.Errorf("ReadFuzzyInstance received nil input")
 	}
+	if fuzzyInstanceKey.IsIPv4() {
+		// avoid fuzziness. When looking for 10.0.0.1 we don't want to match 10.0.0.15!
+		instance, _, err := ReadInstance(fuzzyInstanceKey)
+		return instance, err
+	}
 	if fuzzyInstanceKey.Hostname != "" {
 		// Fuzzy instance search
-		if fuzzyInstances, _ := FindFuzzyInstances(fuzzyInstanceKey); len(fuzzyInstances) == 1 {
+		if fuzzyInstances, _ := findFuzzyInstances(fuzzyInstanceKey); len(fuzzyInstances) == 1 {
 			return fuzzyInstances[0], nil
 		}
 	}
