@@ -3187,7 +3187,12 @@ func (this *HttpAPI) BlockedRecoveries(params martini.Params, r render.Render, r
 }
 
 // DisableGlobalRecoveries globally disables recoveries
-func (this *HttpAPI) DisableGlobalRecoveries(params martini.Params, r render.Render, req *http.Request) {
+func (this *HttpAPI) DisableGlobalRecoveries(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+
 	var err error
 	if orcraft.IsRaftEnabled() {
 		_, err = orcraft.PublishCommand("disable-global-recoveries", 0)
@@ -3204,7 +3209,12 @@ func (this *HttpAPI) DisableGlobalRecoveries(params martini.Params, r render.Ren
 }
 
 // EnableGlobalRecoveries globally enables recoveries
-func (this *HttpAPI) EnableGlobalRecoveries(params martini.Params, r render.Render, req *http.Request) {
+func (this *HttpAPI) EnableGlobalRecoveries(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+
 	var err error
 	if orcraft.IsRaftEnabled() {
 		_, err = orcraft.PublishCommand("enable-global-recoveries", 0)
