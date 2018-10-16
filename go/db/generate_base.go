@@ -825,4 +825,17 @@ var generateSQLBase = []string{
 			PRIMARY KEY (hostname)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
+	`
+		CREATE TABLE IF NOT EXISTS database_instance_tags (
+			hostname varchar(128) CHARACTER SET ascii NOT NULL,
+			port smallint(5) unsigned NOT NULL,
+			tag_name varchar(128) CHARACTER SET utf8 NOT NULL,
+			tag_value varchar(128) CHARACTER SET utf8 NOT NULL,
+			last_updated timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (hostname, port)
+		) ENGINE=InnoDB DEFAULT CHARSET=ascii
+	`,
+	`
+		CREATE INDEX tag_name_idx_database_instance_tags ON database_instance_tags (tag_name)
+	`,
 }
