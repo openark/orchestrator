@@ -173,3 +173,39 @@ func TestInstanceKeyDetach(t *testing.T) {
 	test.S(t).ExpectFalse(reattached2.IsDetached())
 	test.S(t).ExpectTrue(reattached1.Equals(reattached2))
 }
+
+func TestIsIPv4(t *testing.T) {
+	test.S(t).ExpectFalse(key1.IsIPv4())
+	{
+		k, _ := ParseRawInstanceKey("mysql-server-1:3306")
+		test.S(t).ExpectFalse(k.IsIPv4())
+	}
+	{
+		k, _ := ParseRawInstanceKey("mysql-server-1")
+		test.S(t).ExpectFalse(k.IsIPv4())
+	}
+	{
+		k, _ := ParseRawInstanceKey("my.sql.server.1")
+		test.S(t).ExpectFalse(k.IsIPv4())
+	}
+	{
+		k, _ := ParseRawInstanceKey("mysql-server-1:3306")
+		test.S(t).ExpectFalse(k.IsIPv4())
+	}
+	{
+		k, _ := ParseRawInstanceKey("127.0.0:3306")
+		test.S(t).ExpectFalse(k.IsIPv4())
+	}
+	{
+		k, _ := ParseRawInstanceKey("127::0::0::1:3306")
+		test.S(t).ExpectFalse(k.IsIPv4())
+	}
+	{
+		k, _ := ParseRawInstanceKey("127.0.0.1:3306")
+		test.S(t).ExpectTrue(k.IsIPv4())
+	}
+	{
+		k, _ := ParseRawInstanceKey("127.0.0.1")
+		test.S(t).ExpectTrue(k.IsIPv4())
+	}
+}

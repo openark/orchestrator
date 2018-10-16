@@ -31,6 +31,7 @@ type InstanceKey struct {
 }
 
 var (
+	ipv4Regexp         = regexp.MustCompile("^([0-9]+)[.]([0-9]+)[.]([0-9]+)[.]([0-9]+)$")
 	ipv4HostPortRegexp = regexp.MustCompile("^([^:]+):([0-9]+)$")
 	ipv4HostRegexp     = regexp.MustCompile("^([^:]+)$")
 	ipv6HostPortRegexp = regexp.MustCompile("^\\[([:0-9a-fA-F]+)\\]:([0-9]+)$") // e.g. [2001:db8:1f70::999:de8:7648:6e8]:3308
@@ -181,4 +182,9 @@ func (this *InstanceKey) DisplayString() string {
 // String returns a user-friendly string representation of this key
 func (this InstanceKey) String() string {
 	return this.StringCode()
+}
+
+// IsValid uses simple heuristics to see whether this key represents an actual instance
+func (this *InstanceKey) IsIPv4() bool {
+	return ipv4Regexp.MatchString(this.Hostname)
 }
