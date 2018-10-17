@@ -832,7 +832,7 @@ var generateSQLBase = []string{
 			tag_name varchar(128) CHARACTER SET utf8 NOT NULL,
 			tag_value varchar(128) CHARACTER SET utf8 NOT NULL,
 			last_updated timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			PRIMARY KEY (hostname, port)
+			PRIMARY KEY (hostname, port, tag_name)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
 	`
