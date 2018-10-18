@@ -206,7 +206,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 		}
 	}()
 
-	instanceKey.Formalize()
+	instanceKey.ResolveHostname()
 	if !instanceKey.IsValid() {
 		return
 	}

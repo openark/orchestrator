@@ -125,7 +125,7 @@ var discoveryMetrics = collection.CreateOrReturnCollection("DISCOVERY_METRICS")
 var queryMetrics = collection.CreateOrReturnCollection("BACKEND_WRITES")
 
 func (this *HttpAPI) getInstanceKey(host string, port string) (inst.InstanceKey, error) {
-	instanceKey, err := inst.NewInstanceKeyFromStrings(host, port)
+	instanceKey, err := inst.NewResolveInstanceKeyStrings(host, port)
 	if err != nil {
 		return emptyInstanceKey, err
 	}
@@ -252,7 +252,7 @@ func (this *HttpAPI) Forget(params martini.Params, r render.Render, req *http.Re
 		return
 	}
 	// We ignore errors: we're looking to do a destructive operation anyhow.
-	rawInstanceKey, _ := inst.NewRawInstanceKey(fmt.Sprintf("%s:%s", params["host"], params["port"]))
+	rawInstanceKey, _ := inst.NewRawInstanceKeyStrings(params["host"], params["port"])
 
 	if orcraft.IsRaftEnabled() {
 		orcraft.PublishCommand("forget", rawInstanceKey)
