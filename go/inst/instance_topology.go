@@ -660,7 +660,7 @@ func MoveBelowGTID(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 }
 
 // moveReplicasViaGTID moves a list of replicas under another instance via GTID, returning those replicas
-// that could not be moved (do not use GTID)
+// that could not be moved (do not use GTID or had GTID errors)
 func moveReplicasViaGTID(replicas [](*Instance), other *Instance, postponedFunctionsContainer *PostponedFunctionsContainer) (movedReplicas [](*Instance), unmovedReplicas [](*Instance), err error, errs []error) {
 	replicas = RemoveNilInstances(replicas)
 	replicas = RemoveInstance(replicas, &other.Key)
@@ -2679,7 +2679,8 @@ func relocateReplicasInternal(replicas [](*Instance), instance, other *Instance)
 		// Which replicas are using Pseudo GTID?
 		var pseudoGTIDReplicas [](*Instance)
 		for _, replica := range replicas {
-			if replica.UsingPseudoGTID {
+			_, _, hasToBeGTID := instancesAreGTIDAndCompatible(replica, other)
+			if replica.UsingPseudoGTID && !hasToBeGTID {
 				pseudoGTIDReplicas = append(pseudoGTIDReplicas, replica)
 			}
 		}
