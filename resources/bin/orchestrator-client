@@ -233,6 +233,10 @@ function filter_keys {
   cat - | jq '.[] | .Key'
 }
 
+function filter_running_replicas {
+  cat - | jq '.[] | select(.Slave_SQL_Running == true and .Slave_IO_Running == true) | [.]'
+}
+
 function print_key {
   cat - | jq -r '. | (.Hostname + ":" + (.Port | tostring))'
 }
@@ -415,6 +419,12 @@ function which_cluster_osc_replicas() {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "cluster-osc-replicas/${alias:-$instance}"
   print_response | filter_keys | print_key
+}
+
+function which_cluster_osc_running_replicas() {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "cluster-osc-replicas/${alias:-$instance}"
+  print_response | filter_running_replicas | filter_keys | print_key
 }
 
 function downtimed() {
@@ -688,6 +698,7 @@ function run_command() {
     "all-clusters-masters") all_clusters_masters ;;             # List of writeable masters, one per cluster
     "all-instances") all_instances ;;                           # The complete list of known instances
     "which-cluster-osc-replicas") which_cluster_osc_replicas ;; # Output a list of replicas in a cluster, that could serve as a pt-online-schema-change operation control replicas
+    "which-cluster-osc-running-replicas") which_cluster_osc_running_replicas ;; # Output a list of healthy, replicating replicas in a cluster, that could serve as a pt-online-schema-change operation control replicas
     "downtimed") downtimed ;;                                   # List all downtimed instances
     "dominant-dc") dominant_dc ;;                               # Name the data center where most masters are found
 
