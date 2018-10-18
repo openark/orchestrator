@@ -233,6 +233,10 @@ function filter_keys {
   cat - | jq '.[] | .Key'
 }
 
+function filter_broken_replicas {
+  cat - | jq '.[] | select((.Slave_SQL_Running == false or .Slave_IO_Running == false) and (.LastSQLError != "" or .LastIOError != "")) | [.]'
+}
+
 function filter_running_replicas {
   cat - | jq '.[] | select(.Slave_SQL_Running == true and .Slave_IO_Running == true) | [.]'
 }
@@ -364,6 +368,12 @@ function which_replicas() {
   assert_nonempty "instance" "$instance_hostport"
   api "instance-replicas/$instance_hostport"
   print_response | filter_keys | print_key
+}
+
+function which_broken_replicas() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "instance-replicas/$instance_hostport"
+  print_response | filter_broken_replicas | filter_keys | print_key
 }
 
 function which_cluster() {
@@ -692,6 +702,7 @@ function run_command() {
     "instance"|"which-instance") instance ;;                    # Output the fully-qualified hostname:port representation of the given instance, or error if unknown
     "which-master") which_master ;;                             # Output the fully-qualified hostname:port representation of a given instance's master
     "which-replicas") which_replicas ;;                         # Output the fully-qualified hostname:port list of replicas of a given instance
+    "which-broken-replicas") which_broken_replicas ;;           # Output the fully-qualified hostname:port list of broken replicas of a given instance
     "which-cluster-instances") which_cluster_instances ;;       # Output the list of instances participating in same cluster as given instance
     "which-cluster") which_cluster ;;                           # Output the name of the cluster an instance belongs to, or error if unknown to orchestrator
     "which-cluster-master") which_cluster_master ;;             # Output the name of a writable master in given cluster
