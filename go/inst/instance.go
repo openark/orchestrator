@@ -263,6 +263,11 @@ func (this *Instance) SQLThreadUpToDate() bool {
 	return this.ReadBinlogCoordinates.Equals(&this.ExecBinlogCoordinates)
 }
 
+// GTIDModeIsOn
+func (this *Instance) GTIDModeIsOn() bool {
+	return this.GTIDMode == "ON"
+}
+
 // UsingGTID returns true when this replica is currently replicating via GTID (either Oracle or MariaDB)
 func (this *Instance) UsingGTID() bool {
 	return this.UsingOracleGTID || this.UsingMariaDBGTID
