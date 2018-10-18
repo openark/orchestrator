@@ -123,7 +123,7 @@ func GetInstanceKeysByTagName(tagName string) (tagged *InstanceKeyMap, err error
 		`
 	args := sqlutils.Args(tagName)
 	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
-		key, _ := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
+		key, _ := NewResolveInstanceKey(m.GetString("hostname"), m.GetInt("port"))
 		tagged.AddKey(*key)
 		return nil
 	})
@@ -144,7 +144,7 @@ func GetInstanceKeysByTagNameAndValue(tagName, tagValue string) (tagged *Instanc
 		`
 	args := sqlutils.Args(tagName, tagValue)
 	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
-		key, _ := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
+		key, _ := NewResolveInstanceKey(m.GetString("hostname"), m.GetInt("port"))
 		tagged.AddKey(*key)
 		return nil
 	})
@@ -170,7 +170,7 @@ func GetInstanceKeysByTag(tag *DatabaseInstanceTag) (tagged *InstanceKeyMap, err
 			%s
 		`, tagValueClause)
 	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
-		key, _ := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
+		key, _ := NewResolveInstanceKey(m.GetString("hostname"), m.GetInt("port"))
 		tagged.AddKey(*key)
 		return nil
 	})
