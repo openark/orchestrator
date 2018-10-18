@@ -602,12 +602,12 @@ func checkMoveViaGTID(instance, otherInstance *Instance) (err error) {
 
 // moveInstanceBelowViaGTID will attempt moving given instance below another instance using either Oracle GTID or MariaDB GTID.
 func moveInstanceBelowViaGTID(instance, otherInstance *Instance) (*Instance, error) {
-	instanceKey := &instance.Key
-	otherInstanceKey := &otherInstance.Key
-
 	if err := checkMoveViaGTID(instance, otherInstance); err != nil {
 		return instance, err
 	}
+
+	instanceKey := &instance.Key
+	otherInstanceKey := &otherInstance.Key
 
 	rinstance, _, _ := ReadInstance(&instance.Key)
 	if canMove, merr := rinstance.CanMoveViaMatch(); !canMove {
@@ -682,15 +682,9 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance, postponedFunct
 		go func() {
 			defer waitGroup.Done()
 			moveFunc := func() error {
-				var movedReplica *Instance
-				var replicaErr error
-				if checkErr := checkMoveViaGTID(replica, other); checkErr == nil {
-					movedReplica, replicaErr = moveInstanceBelowViaGTID(replica, other)
-					if movedReplica != nil {
-						replica = movedReplica
-					}
-				} else {
-					replicaErr = checkErr
+				movedReplica, replicaErr := moveInstanceBelowViaGTID(replica, other)
+				if replicaErr != nil && movedReplica != nil {
+					replica = movedReplica
 				}
 
 				// After having moved replicas, update local shared variables:
@@ -2577,9 +2571,6 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 	}
 	// Next, try GTID
 	if _, _, gtidCompatible := instancesGTIDCompatible(instance, other); gtidCompatible {
-		if err := checkMoveViaGTID(instance, other); err != nil {
-			return nil, log.Errorf("Relocatio is to be using GTID, but got error: %+v", err)
-		}
 		return moveInstanceBelowViaGTID(instance, other)
 	}
 
