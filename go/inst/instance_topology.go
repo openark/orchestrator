@@ -602,13 +602,6 @@ func checkMoveViaGTID(instance, otherInstance *Instance) (err error) {
 
 // moveInstanceBelowViaGTID will attempt moving given instance below another instance using either Oracle GTID or MariaDB GTID.
 func moveInstanceBelowViaGTID(instance, otherInstance *Instance) (*Instance, error) {
-	if err := checkMoveViaGTID(instance, otherInstance); err != nil {
-		return instance, err
-	}
-
-	instanceKey := &instance.Key
-	otherInstanceKey := &otherInstance.Key
-
 	rinstance, _, _ := ReadInstance(&instance.Key)
 	if canMove, merr := rinstance.CanMoveViaMatch(); !canMove {
 		return instance, merr
@@ -617,7 +610,13 @@ func moveInstanceBelowViaGTID(instance, otherInstance *Instance) (*Instance, err
 	if canReplicate, err := instance.CanReplicateFrom(otherInstance); !canReplicate {
 		return instance, err
 	}
-	log.Infof("Will move %+v below %+v via GTID", instanceKey, otherInstanceKey)
+	if err := checkMoveViaGTID(instance, otherInstance); err != nil {
+		return instance, err
+	}
+	log.Infof("Will move %+v below %+v via GTID", instance.Key, otherInstance.Key)
+
+	instanceKey := &instance.Key
+	otherInstanceKey := &otherInstance.Key
 
 	var err error
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("move below %+v", *otherInstanceKey)); merr != nil {
