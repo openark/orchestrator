@@ -47,6 +47,8 @@ type Instance struct {
 	LogSlaveUpdatesEnabled bool
 	SelfBinlogCoordinates  BinlogCoordinates
 	MasterKey              InstanceKey
+	MasterUUID             string
+	AncestryUUID           string
 	IsDetachedMaster       bool
 	Slave_SQL_Running      bool
 	Slave_IO_Running       bool
@@ -66,6 +68,9 @@ type Instance struct {
 	SQLDelay               uint
 	ExecutedGtidSet        string
 	GtidPurged             string
+	GtidErrant             string
+
+	masterExecutedGtidSet string // Not exported
 
 	SlaveLagSeconds                 sql.NullInt64
 	SlaveHosts                      InstanceKeyMap
@@ -180,6 +185,11 @@ func (this *Instance) isMaxScale() bool {
 	return strings.Contains(this.Version, "maxscale")
 }
 
+// isNDB check whether this is NDB Cluster (aka MySQL Cluster)
+func (this *Instance) IsNDB() bool {
+	return strings.Contains(this.Version, "-ndb-")
+}
+
 // IsBinlogServer checks whether this is any type of a binlog server (currently only maxscale)
 func (this *Instance) IsBinlogServer() bool {
 	if this.isMaxScale() {
@@ -241,11 +251,6 @@ func (this *Instance) IsReplica() bool {
 // IsMaster makes simple heuristics to decide whether this instance is a master (not replicating from any other server)
 func (this *Instance) IsMaster() bool {
 	return !this.IsReplica()
-}
-
-// IsWritableMaster makes simple heuristics to decide whether this instance is a writable master (not replicating from any other server)
-func (this *Instance) IsWritableMaster() bool {
-	return this.IsMaster() && !this.ReadOnly
 }
 
 // ReplicaRunning returns true when this instance's status is of a replicating replica.
@@ -347,6 +352,9 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	}
 	if this.ServerID == other.ServerID && !this.IsBinlogServer() {
 		return false, fmt.Errorf("Identical server id: %+v, %+v both have %d", other.Key, this.Key, this.ServerID)
+	}
+	if this.SQLDelay < other.SQLDelay && int64(other.SQLDelay) > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
+		return false, fmt.Errorf("%+v has higher SQL_Delay (%+v seconds) than %+v does (%+v seconds)", other.Key, other.SQLDelay, this.Key, this.SQLDelay)
 	}
 	return true, nil
 }

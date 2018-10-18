@@ -161,7 +161,7 @@ func figureClusterName(hint string) (clusterName string, err error) {
 	if hint == "" {
 		return "", fmt.Errorf("Unable to determine cluster name by empty hint")
 	}
-	instanceKey, _ := inst.ParseRawInstanceKeyLoose(hint)
+	instanceKey, _ := inst.ParseRawInstanceKey(hint)
 	return inst.FigureClusterName(hint, instanceKey, nil)
 }
 

@@ -62,11 +62,10 @@ func ApplyPoolInstances(submission *PoolInstancesSubmission) error {
 		instancesStrings := strings.Split(submission.DelimitedInstances, ",")
 		for _, instanceString := range instancesStrings {
 			instanceString = strings.TrimSpace(instanceString)
-			instanceKey, err := ParseInstanceKeyLoose(instanceString)
+			instanceKey, err := ParseResolveInstanceKey(instanceString)
 			if config.Config.SupportFuzzyPoolHostnames {
 				instanceKey = ReadFuzzyInstanceKeyIfPossible(instanceKey)
 			}
-			log.Debugf("%+v", instanceKey)
 			if err != nil {
 				return log.Errore(err)
 			}
@@ -74,6 +73,7 @@ func ApplyPoolInstances(submission *PoolInstancesSubmission) error {
 			instanceKeys = append(instanceKeys, instanceKey)
 		}
 	}
+	log.Debugf("submitting %d instances in %+v pool", len(instanceKeys), submission.Pool)
 	writePoolInstances(submission.Pool, instanceKeys)
 	return nil
 }

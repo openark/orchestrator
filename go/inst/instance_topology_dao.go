@@ -243,7 +243,6 @@ func SetSemiSyncReplica(instanceKey *InstanceKey, enableReplica bool) (*Instance
 		return instance, err
 	}
 	if instance.SemiSyncReplicaEnabled == enableReplica {
-		log.Debugf("SetSemiSyncReplica: %+v slready in desired state", *instanceKey)
 		return instance, nil
 	}
 	if _, err := ExecInstance(instanceKey, "set @@global.rpl_semi_sync_slave_enabled=?", enableReplica); err != nil {
@@ -258,6 +257,15 @@ func SetSemiSyncReplica(instanceKey *InstanceKey, enableReplica bool) (*Instance
 	}
 	return ReadTopologyInstance(instanceKey)
 
+}
+
+func RestartIOThread(instanceKey *InstanceKey) error {
+	for _, cmd := range []string{`stop slave io_thread`, `start slave io_thread`} {
+		if _, err := ExecInstance(instanceKey, cmd); err != nil {
+			return log.Errorf("%+v: RestartIOThread: '%q' failed: %+v", *instanceKey, cmd, err)
+		}
+	}
+	return nil
 }
 
 // StopSlaveNicely stops a replica such that SQL_thread and IO_thread are aligned (i.e.
@@ -275,8 +283,8 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 
 	// stop io_thread, start sql_thread but catch any errors
 	for _, cmd := range []string{`stop slave io_thread`, `start slave sql_thread`} {
-		if _, err = ExecInstance(instanceKey, cmd); err != nil {
-			return nil, log.Errorf("%+v: StopSlaveNicely: %q failed: %+v", *instanceKey, cmd, err)
+		if _, err := ExecInstance(instanceKey, cmd); err != nil {
+			return nil, log.Errorf("%+v: StopSlaveNicely: '%q' failed: %+v", *instanceKey, cmd, err)
 		}
 	}
 
@@ -385,25 +393,24 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 // sleep immediately after START SLAVE for a capped duration, until both replication threads are running.
 // This is to give slack to IO thread to connect and begin streaming, and to SQL thread to start applying.
 // Sleep is incremental with ongoing attempt to see whether replication is already up
-func startSlavePostSleep(instanceKey *InstanceKey) error {
+func startSlavePostSleep(instanceKey *InstanceKey) (repliationRunning bool, err error) {
 	waitDuration := time.Second
 	waitInterval := 10 * time.Millisecond
 	startTime := time.Now()
 
-	for time.Since(startTime) < waitDuration {
-		repliationRunning, err := AreReplicationThreadsRunning(instanceKey)
-		if err != nil {
-			return err
+	for {
+		// Since this is an incremental aggressive polling, it's OK if an occasional
+		// error is observed. We don't bail out on a single error.
+		if repliationRunning, _ = areReplicationThreadsRunning(instanceKey); repliationRunning {
+			return repliationRunning, nil
 		}
-		if repliationRunning {
-			return nil
+		if time.Since(startTime)+waitInterval > waitDuration {
+			break
 		}
 		time.Sleep(waitInterval)
-		if waitInterval < waitDuration {
-			waitInterval = 2 * waitInterval
-		}
+		waitInterval = 2 * waitInterval
 	}
-	return nil
+	return repliationRunning, nil
 }
 
 // StartSlave starts replication on a given instance.
@@ -440,7 +447,13 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	startSlavePostSleep(instanceKey)
 
 	instance, err = ReadTopologyInstance(instanceKey)
-	return instance, err
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	if !instance.ReplicaRunning() {
+		return instance, ReplicationNotRunningError
+	}
+	return instance, nil
 }
 
 // RestartSlave stops & starts replication on a given instance
@@ -450,11 +463,7 @@ func RestartSlave(instanceKey *InstanceKey) (instance *Instance, err error) {
 		return instance, log.Errore(err)
 	}
 	instance, err = StartSlave(instanceKey)
-	if err != nil {
-		return instance, log.Errore(err)
-	}
-	return instance, nil
-
+	return instance, log.Errore(err)
 }
 
 // StartSlaves will do concurrent start-slave
@@ -920,21 +929,32 @@ func MasterPosWait(instanceKey *InstanceKey, binlogCoordinates *BinlogCoordinate
 
 // Attempt to read and return replication credentials from the mysql.slave_master_info system table
 func ReadReplicationCredentials(instanceKey *InstanceKey) (replicationUser string, replicationPassword string, err error) {
-	query := `
-		select
-			ifnull(max(User_name), '') as user,
-			ifnull(max(User_password), '') as password
-		from
-			mysql.slave_master_info
-	`
-	err = ScanInstanceRow(instanceKey, query, &replicationUser, &replicationPassword)
-	if err != nil {
-		return replicationUser, replicationPassword, err
+	if config.Config.ReplicationCredentialsQuery != "" {
+		err = ScanInstanceRow(instanceKey, config.Config.ReplicationCredentialsQuery, &replicationUser, &replicationPassword)
+		if err == nil && replicationUser == "" {
+			err = fmt.Errorf("Empty username retrieved by ReplicationCredentialsQuery")
+		}
+		if err == nil {
+			return replicationUser, replicationPassword, nil
+		}
+		log.Errore(err)
 	}
-	if replicationUser == "" {
-		err = fmt.Errorf("Cannot find credentials in mysql.slave_master_info")
+	// Didn't get credentials from ReplicationCredentialsQuery, or ReplicationCredentialsQuery doesn't exist in the first place?
+	// We brute force our way through mysql.slave_master_info
+	{
+		query := `
+			select
+				ifnull(max(User_name), '') as user,
+				ifnull(max(User_password), '') as password
+			from
+				mysql.slave_master_info
+		`
+		err = ScanInstanceRow(instanceKey, query, &replicationUser, &replicationPassword)
+		if err == nil && replicationUser == "" {
+			err = fmt.Errorf("Empty username found in mysql.slave_master_info")
+		}
 	}
-	return replicationUser, replicationPassword, err
+	return replicationUser, replicationPassword, log.Errore(err)
 }
 
 // SetReadOnly sets or clears the instance's global read_only variable
@@ -1080,8 +1100,11 @@ func canInjectPseudoGTID(instanceKey *InstanceKey) (canInject bool, err error) {
 // CheckAndInjectPseudoGTIDOnWriter checks whether pseudo-GTID can and
 // should be injected on given instance, and if so, attempts to inject.
 func CheckAndInjectPseudoGTIDOnWriter(instance *Instance) (injected bool, err error) {
-	if !instance.IsWritableMaster() {
-		return injected, nil
+	if instance == nil {
+		return injected, log.Errorf("CheckAndInjectPseudoGTIDOnWriter: instance is nil")
+	}
+	if instance.ReadOnly {
+		return injected, log.Errorf("CheckAndInjectPseudoGTIDOnWriter: instance is read-only: %+v", instance.Key)
 	}
 	if !instance.IsLastCheckValid {
 		return injected, nil
@@ -1101,4 +1124,13 @@ func CheckAndInjectPseudoGTIDOnWriter(instance *Instance) (injected bool, err er
 		return injected, log.Errore(err)
 	}
 	return injected, nil
+}
+
+func GTIDSubtract(instanceKey *InstanceKey, gtidSet string, gtidSubset string) (gtidSubtract string, err error) {
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return gtidSubtract, err
+	}
+	err = db.QueryRow("select gtid_subtract(?, ?)", gtidSet, gtidSubset).Scan(&gtidSubtract)
+	return gtidSubtract, err
 }

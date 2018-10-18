@@ -40,14 +40,26 @@ $distro_name_map = {
   ),
   "debian/8" => %w(
     debian/jessie
-    linuxmint/sarah
     linuxmint/rebecca
     linuxmint/rafaela
     linuxmint/rosa
+    linuxmint/serena
+    linuxmint/sonya
+    linuxmint/sylvia
     ubuntu/trusty
     ubuntu/vivid
     ubuntu/wily
     ubuntu/xenial
+    ubuntu/yakkety
+    ubuntu/zesty
+    ubuntu/artful
+    ubuntu/bionic
+  ),
+  "debian/9" => %w(
+    debian/stretch
+  ),
+  "debian/10" => %w(
+    debian/buster
   ),
 }
 

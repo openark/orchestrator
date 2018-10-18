@@ -32,13 +32,12 @@ const (
 	DeadMaster                                                         = "DeadMaster"
 	DeadMasterAndSlaves                                                = "DeadMasterAndSlaves"
 	DeadMasterAndSomeSlaves                                            = "DeadMasterAndSomeSlaves"
-	UnreachableMasterWithStaleSlaves                                   = "UnreachableMasterWithStaleSlaves"
+	UnreachableMasterWithLaggingReplicas                               = "UnreachableMasterWithLaggingReplicas"
 	UnreachableMaster                                                  = "UnreachableMaster"
 	MasterSingleSlaveNotReplicating                                    = "MasterSingleSlaveNotReplicating"
 	MasterSingleSlaveDead                                              = "MasterSingleSlaveDead"
 	AllMasterSlavesNotReplicating                                      = "AllMasterSlavesNotReplicating"
 	AllMasterSlavesNotReplicatingOrDead                                = "AllMasterSlavesNotReplicatingOrDead"
-	AllMasterSlavesStale                                               = "AllMasterSlavesStale"
 	MasterWithoutSlaves                                                = "MasterWithoutSlaves"
 	DeadCoMaster                                                       = "DeadCoMaster"
 	DeadCoMasterAndSomeSlaves                                          = "DeadCoMasterAndSomeSlaves"
@@ -62,6 +61,7 @@ const (
 	MixedAndRowLoggingSlavesStructureWarning                             = "MixedAndRowLoggingSlavesStructureWarning"
 	MultipleMajorVersionsLoggingSlaves                                   = "MultipleMajorVersionsLoggingSlaves"
 	DifferentGTIDModesStructureWarning                                   = "DifferentGTIDModesStructureWarning"
+	ErrantGTIDStructureWarning                                           = "ErrantGTIDStructureWarning"
 )
 
 type InstanceAnalysis struct {
@@ -84,6 +84,18 @@ func (instanceAnalysis *InstanceAnalysis) String() string {
 // Key of this map is a InstanceAnalysis.String()
 type PeerAnalysisMap map[string]int
 
+type ReplicationAnalysisHints struct {
+	IncludeDowntimed bool
+	IncludeNoProblem bool
+	AuditAnalysis    bool
+}
+
+const (
+	ForceMasterFailoverCommandHint    string = "force-master-failover"
+	ForceMasterTakeoverCommandHint    string = "force-master-takeover"
+	GracefulMasterTakeoverCommandHint string = "graceful-master-takeover"
+)
+
 // ReplicationAnalysis notes analysis on replication chain status, per instance
 type ReplicationAnalysis struct {
 	AnalyzedInstanceKey                       InstanceKey
@@ -99,7 +111,6 @@ type ReplicationAnalysis struct {
 	CountValidReplicas                        uint
 	CountValidReplicatingReplicas             uint
 	CountReplicasFailingToConnectToMaster     uint
-	CountStaleReplicas                        uint
 	CountDowntimedReplicas                    uint
 	ReplicationDepth                          uint
 	SlaveHosts                                InstanceKeyMap
@@ -120,6 +131,8 @@ type ReplicationAnalysis struct {
 	CountMixedBasedLoggingReplicas            uint
 	CountRowBasedLoggingReplicas              uint
 	CountDistinctMajorVersionsLoggingReplicas uint
+	CountDelayedReplicas                      uint
+	CountLaggingReplicas                      uint
 	IsActionableRecovery                      bool
 	ProcessingNodeHostname                    string
 	ProcessingNodeToken                       string
@@ -129,6 +142,7 @@ type ReplicationAnalysis struct {
 	GTIDMode                                  string
 	MinReplicaGTIDMode                        string
 	MaxReplicaGTIDMode                        string
+	MaxReplicaGTIDErrant                      string
 	CommandHint                               string
 }
 

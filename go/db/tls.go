@@ -33,6 +33,7 @@ import (
 )
 
 const Error3159 = "Error 3159:"
+const Error1045 = "Access denied for user"
 
 // Track if a TLS has already been configured for topology
 var topologyTLSConfigured bool = false
@@ -64,7 +65,7 @@ func requiresTLS(host string, port int, mysql_uri string) bool {
 
 	required := false
 	db, _, _ := sqlutils.GetDB(mysql_uri)
-	if err := db.Ping(); err != nil && strings.Contains(err.Error(), Error3159) {
+	if err := db.Ping(); err != nil && (strings.Contains(err.Error(), Error3159) || strings.Contains(err.Error(), Error1045)) {
 		required = true
 	}
 
@@ -98,7 +99,7 @@ func SetupMySQLTopologyTLS(uri string) (string, error) {
 		// Drop to TLS 1.0 for talking to MySQL
 		tlsConfig.MinVersion = tls.VersionTLS10
 		if err != nil {
-			return "", log.Fatalf("Can't create TLS configuration for Topology connection %s: %s", uri, err)
+			return "", log.Errorf("Can't create TLS configuration for Topology connection %s: %s", uri, err)
 		}
 		tlsConfig.InsecureSkipVerify = config.Config.MySQLTopologySSLSkipVerify
 

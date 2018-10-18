@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
@@ -78,7 +79,7 @@ func OpenTopology(host string, port int) (*sql.DB, error) {
 	return openTopology(host, port, config.Config.MySQLTopologyReadTimeoutSeconds)
 }
 
-func openTopology(host string, port int, readTimeout int) (*sql.DB, error) {
+func openTopology(host string, port int, readTimeout int) (db *sql.DB, err error) {
 	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/?timeout=%ds&readTimeout=%ds&interpolateParams=true",
 		config.Config.MySQLTopologyUser,
 		config.Config.MySQLTopologyPassword,
@@ -89,11 +90,15 @@ func openTopology(host string, port int, readTimeout int) (*sql.DB, error) {
 
 	if config.Config.MySQLTopologyUseMutualTLS ||
 		(config.Config.MySQLTopologyUseMixedTLS && requiresTLS(host, port, mysql_uri)) {
-		mysql_uri, _ = SetupMySQLTopologyTLS(mysql_uri)
+		if mysql_uri, err = SetupMySQLTopologyTLS(mysql_uri); err != nil {
+			return nil, err
+		}
 	}
-	db, _, err := sqlutils.GetDB(mysql_uri)
-	if err != nil {
+	if db, _, err = sqlutils.GetDB(mysql_uri); err != nil {
 		return nil, err
+	}
+	if config.Config.MySQLConnectionLifetimeSeconds > 0 {
+		db.SetConnMaxLifetime(time.Duration(config.Config.MySQLConnectionLifetimeSeconds) * time.Second)
 	}
 	db.SetMaxOpenConns(config.MySQLTopologyMaxPoolConnections)
 	db.SetMaxIdleConns(config.MySQLTopologyMaxPoolConnections)
@@ -152,6 +157,9 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 			if config.Config.MySQLOrchestratorMaxPoolConnections > 0 {
 				log.Debugf("Orchestrator pool SetMaxOpenConns: %d", config.Config.MySQLOrchestratorMaxPoolConnections)
 				db.SetMaxOpenConns(config.Config.MySQLOrchestratorMaxPoolConnections)
+			}
+			if config.Config.MySQLConnectionLifetimeSeconds > 0 {
+				db.SetConnMaxLifetime(time.Duration(config.Config.MySQLConnectionLifetimeSeconds) * time.Second)
 			}
 		}
 	}
@@ -392,4 +400,16 @@ func QueryOrchestratorBuffered(query string, argsArray []interface{}, on_row fun
 		argsArray = EmptyArgs
 	}
 	return log.Criticale(sqlutils.QueryRowsMapBuffered(db, query, on_row, argsArray...))
+}
+
+// ReadTimeNow reads and returns the current timestamp as string. This is an unfortunate workaround
+// to support both MySQL and SQLite in all possible timezones. SQLite only speaks UTC where MySQL has
+// timezone support. By reading the time as string we get the database's de-facto notion of the time,
+// which we can then feed back to it.
+func ReadTimeNow() (timeNow string, err error) {
+	err = QueryOrchestrator(`select now() as time_now`, nil, func(m sqlutils.RowMap) error {
+		timeNow = m.GetString("time_now")
+		return nil
+	})
+	return timeNow, err
 }

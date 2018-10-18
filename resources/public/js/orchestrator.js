@@ -356,6 +356,7 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=take-siblings]').appendTo(td.find("div"))
   }
 
+  $('#node_modal [data-btn-group=gtid-errant-fix]').hide();
   addNodeModalDataAttribute("GTID supported", booleanString(node.supportsGTID));
   if (node.supportsGTID) {
     var td = addNodeModalDataAttribute("GTID based replication", booleanString(node.usingGTID));
@@ -364,9 +365,16 @@ function openNodeModal(node) {
     if (node.GTIDMode) {
       addNodeModalDataAttribute("GTID mode", node.GTIDMode);
     }
-    if (node.UsingOracleGTID) {
+    if (node.ExecutedGtidSet) {
       addNodeModalDataAttribute("Executed GTID set", node.ExecutedGtidSet);
+    }
+    if (node.GtidPurged) {
       addNodeModalDataAttribute("GTID purged", node.GtidPurged);
+    }
+    if (node.GtidErrant) {
+      td = addNodeModalDataAttribute("GTID errant", node.GtidErrant);
+      $('#node_modal [data-btn-group=gtid-errant-fix]').appendTo(td.find("div"))
+      $('#node_modal [data-btn-group=gtid-errant-fix]').show();
     }
   }
   addNodeModalDataAttribute("Semi-sync enforced", booleanString(node.SemiSyncEnforced));
@@ -428,6 +436,17 @@ function openNodeModal(node) {
     bootbox.confirm(message, function(confirm) {
       if (confirm) {
         apiCommand("/api/reset-slave/" + node.Key.Hostname + "/" + node.Key.Port);
+      }
+    });
+    return false;
+  });
+  $('#node_modal [data-btn=gtid-errant-reset-master]').click(function() {
+    var message = "<p>Are you sure you wish to reset master on <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+      "</strong></code>?" +
+      "<p>This will purge binary logs on server.";
+    bootbox.confirm(message, function(confirm) {
+      if (confirm) {
+        apiCommand("/api/gtid-errant-reset-master/" + node.Key.Hostname + "/" + node.Key.Port);
       }
     });
     return false;
@@ -642,6 +661,9 @@ function normalizeInstanceProblem(instance) {
   instance.replicationLagProblem = function() {
     return !instance.replicationLagReasonable;
   }
+  instance.errantGTIDProblem = function() {
+    return (instance.GtidErrant != '');
+  }
 
   instance.problem = null;
   instance.problemOrder = 0;
@@ -666,6 +688,10 @@ function normalizeInstanceProblem(instance) {
     instance.problem = "replication_lag";
     instance.problemDescription = "Replica is lagging.\nThis diagnostic is based on either Seconds_behind_master or configured ReplicationLagQuery";
     instance.problemOrder = 5;
+  } else if (instance.errantGTIDProblem()) {
+    instance.problem = "Errant GTID";
+    instance.problemDescription = "Replica has GTID entries not found on its master";
+    instance.problemOrder = 6;
   }
   instance.hasProblem = (instance.problem != null);
   instance.hasConnectivityProblem = (!instance.IsLastCheckValid || !instance.IsRecentlyChecked);
@@ -817,7 +843,9 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     }
     if (instance.supportsGTID) {
       if (instance.hasMaster && !instance.usingGTID) {
-        popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon text-muted glyphicon-globe" title="Support GTID but not using it in replication"></span> ');      
+        popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon text-muted glyphicon-globe" title="Support GTID but not using it in replication"></span> ');
+      } else if (instance.GtidErrant) {
+        popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon text-danger glyphicon-globe" title="Errant GTID found"></span> ');
       } else {
         popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using GTID"></span> ');
       }
@@ -939,6 +967,35 @@ function getParameterByName(name) {
 }
 
 
+function renderGlobalRecoveriesButton(isGlobalRecoveriesEnabled) {
+  var iconContainer = $("#global-recoveries-icon > span");
+  if (isGlobalRecoveriesEnabled) {
+    iconContainer
+      .prop("title", "Global Recoveries Enabled")
+      .addClass("glyphicon-heart")
+      .removeClass("hidden")
+      .click(function(event) {
+        bootbox.confirm("<h3>Global Recoveries</h3>Are you sure you want to <strong>disable</strong> global recoveries?", function(confirm) {
+          if (confirm) {
+            apiCommand("/api/disable-global-recoveries");
+          }
+        })
+      });
+  } else {
+    iconContainer
+      .prop("title", "Global Recoveries Disabled")
+      .addClass("glyphicon-heart-empty")
+      .removeClass("hidden")
+      .click(function(event) {
+        bootbox.confirm("<h3>Global Recoveries</h3>Are you sure you want to enable global recoveries?", function(confirm) {
+          if (confirm) {
+            apiCommand("/api/enable-global-recoveries");
+          }
+        })
+      });
+  }
+}
+
 $(document).ready(function() {
   visualizeBrand();
 
@@ -967,6 +1024,12 @@ $(document).ready(function() {
       func(clusters);
     });
   }, "json");
+
+  $.get(appUrl("/api/check-global-recoveries"), function(response) {
+    var isEnabled = (response.Details == "enabled")
+    renderGlobalRecoveriesButton(isEnabled);
+  }, "json");
+
   $(".ajaxLoader").click(function() {
     return false;
   });
@@ -1014,5 +1077,13 @@ $(document).ready(function() {
       expires: 1
     });
   }
-  $("#searchInput").focus();
+  $("#searchInput").focusin(function() {
+    $("[data-nav-page=search] button").show();
+    $("#searchInput").css("width", "");
+  });
+  $("#searchInput").focusout(function() {
+    $("[data-nav-page=search] button").hide();
+    $("#searchInput").css("width", $("#searchInput").width()/2);
+  });
+  $("#searchInput").focusout();
 });

@@ -110,6 +110,10 @@
 					</a>
 					<ul class="dropdown-menu" id="dropdown-context">
 					</ul>
+				<li data-nav-page="global-recoveries">
+          <a id="global-recoveries-icon" name="global-recoveries" href="#">
+            <span class="glyphicon hidden"></span>
+          </a>
 				</li>
 				<li data-nav-page="read-only" style="display: none;">
 					<a name="read-only" title="read only mode"><span class="glyphicon glyphicon-eye-open"></span></a>
@@ -211,6 +215,15 @@
 						<button type="button" class="btn btn-info" data-btn="take-siblings" title="Take siblings of this replica">Take siblings</button>
 						<button type="button" class="btn btn-success" data-btn="enable-gtid"><span class="glyphicon glyphicon-globe"></span> Enable</button>
 						<button type="button" class="btn btn-danger" data-btn="disable-gtid"><span class="glyphicon glyphicon-remove"></span> Disable</button>
+						<div class="btn-group" data-btn-group="gtid-errant-fix">
+							<button type="button" class="btn btn-danger" data-btn="gtid-errant-fix" data-grouped="true">Fix</button>
+							<button type="button" class="btn btn-danger dropdown-toggle" data-toggle="dropdown">
+								<span class="caret"></span> <span class="sr-only">Toggle Dropdown</span>
+							</button>
+							<ul class="dropdown-menu" role="menu">
+								<li><a href="#" data-btn="gtid-errant-reset-master">Reset master</a></li>
+							</ul>
+						</div>
 						<button type="button" class="btn btn-info" data-btn="regroup-replicas" title="Pick candidate replica and have it take its siblings">Regroup replicas</button>
 						<button type="button" class="btn alert-danger" data-btn="forget-instance" title="Make orchestrator forget this instance. Orchestrator may auto-find it again."><span class="glyphicon glyphicon-remove"></span> Forget</button>
 						<button type="button" class="btn btn-warning" data-btn="end-maintenance" title="End maintenance period now">End maintenance</button>

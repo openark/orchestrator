@@ -125,12 +125,14 @@
   ],
   "CoMasterRecoveryMustPromoteOtherCoMaster": true,
   "DetachLostSlavesAfterMasterFailover": true,
-  "ApplyMySQLPromotionAfterMasterFailover": false,
+  "ApplyMySQLPromotionAfterMasterFailover": true,
   "MasterFailoverDetachSlaveMasterHost": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 0,
   "PostponeSlaveRecoveryOnLagMinutes": 0,
   "OSCIgnoreHostnameFilters": [],
   "GraphiteAddr": "",
   "GraphitePath": "",
-  "GraphiteConvertHostnameDotsToUnderscores": true
+  "GraphiteConvertHostnameDotsToUnderscores": true,
+  "ConsulAddress": "",
+  "ConsulAclToken": ""
 }

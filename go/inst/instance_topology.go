@@ -38,8 +38,12 @@ const (
 	StopReplicationNicely                       = "StopReplicationNicely"
 )
 
+var ReplicationNotRunningError = fmt.Errorf("Replication not running")
+
 var asciiFillerCharacter = " "
 var tabulatorScharacter = "|"
+
+var countRetries = 5
 
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
@@ -142,6 +146,22 @@ func ASCIITopology(clusterName string, historyTimestampPattern string, tabulated
 	// Turn into string
 	result = strings.Join(entries, "\n")
 	return result, nil
+}
+
+func shouldPostponeRelocatingReplica(replica *Instance, postponedFunctionsContainer *PostponedFunctionsContainer) bool {
+	if postponedFunctionsContainer == nil {
+		return false
+	}
+	if config.Config.PostponeReplicaRecoveryOnLagMinutes > 0 &&
+		replica.SQLDelay > config.Config.PostponeReplicaRecoveryOnLagMinutes*60 {
+		// This replica is lagging very much, AND
+		// we're configured to postpone operation on this replica so as not to delay everyone else.
+		return true
+	}
+	if replica.LastDiscoveryLatency > ReasonableDiscoveryLatency {
+		return true
+	}
+	return false
 }
 
 // GetInstanceMaster synchronously reaches into the replication topology
@@ -604,7 +624,7 @@ func MoveBelowGTID(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 
 // moveReplicasViaGTID moves a list of replicas under another instance via GTID, returning those replicas
 // that could not be moved (do not use GTID)
-func moveReplicasViaGTID(replicas [](*Instance), other *Instance) (movedReplicas [](*Instance), unmovedReplicas [](*Instance), err error, errs []error) {
+func moveReplicasViaGTID(replicas [](*Instance), other *Instance, postponedFunctionsContainer *PostponedFunctionsContainer) (movedReplicas [](*Instance), unmovedReplicas [](*Instance), err error, errs []error) {
 	replicas = RemoveNilInstances(replicas)
 	replicas = RemoveInstance(replicas, &other.Key)
 	if len(replicas) == 0 {
@@ -612,40 +632,51 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance) (movedReplicas
 		return movedReplicas, unmovedReplicas, nil, errs
 	}
 
-	log.Infof("Will move %+v replicas below %+v via GTID", len(replicas), other.Key)
+	log.Infof("moveReplicasViaGTID: Will move %+v replicas below %+v via GTID", len(replicas), other.Key)
 
-	barrier := make(chan *InstanceKey)
-	replicaMutex := make(chan bool, 1)
+	var waitGroup sync.WaitGroup
+	var replicaMutex sync.Mutex
 	for _, replica := range replicas {
 		replica := replica
 
+		waitGroup.Add(1)
 		// Parallelize repoints
 		go func() {
-			defer func() { barrier <- &replica.Key }()
-			ExecuteOnTopology(func() {
+			defer waitGroup.Done()
+			moveFunc := func() error {
 				var replicaErr error
+				var movedReplica *Instance
 				if _, _, canMove := canMoveViaGTID(replica, other); canMove {
-					replica, replicaErr = moveInstanceBelowViaGTID(replica, other)
-				} else {
-					replicaErr = fmt.Errorf("%+v cannot move below %+v via GTID", replica.Key, other.Key)
-				}
-				func() {
-					// Instantaneous mutex.
-					replicaMutex <- true
-					defer func() { <-replicaMutex }()
-					if replicaErr == nil {
-						movedReplicas = append(movedReplicas, replica)
-					} else {
-						unmovedReplicas = append(unmovedReplicas, replica)
-						errs = append(errs, replicaErr)
+					movedReplica, replicaErr = moveInstanceBelowViaGTID(replica, other)
+					if movedReplica != nil {
+						replica = movedReplica
 					}
-				}()
-			})
+				} else {
+					replicaErr = fmt.Errorf("moveReplicasViaGTID: %+v cannot move below %+v via GTID", replica.Key, other.Key)
+				}
+
+				// After having moved replicas, update local shared variables:
+				replicaMutex.Lock()
+				defer replicaMutex.Unlock()
+
+				if replicaErr == nil {
+					movedReplicas = append(movedReplicas, replica)
+				} else {
+					unmovedReplicas = append(unmovedReplicas, replica)
+					errs = append(errs, replicaErr)
+				}
+				return replicaErr
+			}
+			if shouldPostponeRelocatingReplica(replica, postponedFunctionsContainer) {
+				postponedFunctionsContainer.AddPostponedFunction(moveFunc, fmt.Sprintf("move-replicas-gtid %+v", replica.Key))
+				// We bail out and trust our invoker to later call upon this postponed function
+			} else {
+				ExecuteOnTopology(func() { moveFunc() })
+			}
 		}()
 	}
-	for range replicas {
-		<-barrier
-	}
+	waitGroup.Wait()
+
 	if len(errs) == len(replicas) {
 		// All returned with error
 		return movedReplicas, unmovedReplicas, fmt.Errorf("moveReplicasViaGTID: Error on all %+v operations", len(errs)), errs
@@ -669,7 +700,7 @@ func MoveReplicasGTID(masterKey *InstanceKey, belowKey *InstanceKey, pattern str
 		return movedReplicas, unmovedReplicas, err, errs
 	}
 	replicas = filterInstancesByPattern(replicas, pattern)
-	movedReplicas, unmovedReplicas, err, errs = moveReplicasViaGTID(replicas, belowInstance)
+	movedReplicas, unmovedReplicas, err, errs = moveReplicasViaGTID(replicas, belowInstance, nil)
 	if err != nil {
 		log.Errore(err)
 	}
@@ -888,6 +919,7 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	log.Infof("Will make %+v co-master of %+v", instanceKey, master.Key)
 
+	var gitHint OperationGTIDHint = GTIDHintNeutral
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("make co-master of %+v", master.Key)); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
 		goto Cleanup
@@ -911,16 +943,14 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 			goto Cleanup
 		}
 	}
-	if instance.ReplicationCredentialsAvailable && !master.HasReplicationCredentials {
-		// Yay! We can get credentials from the replica!
-		replicationUser, replicationPassword, err := ReadReplicationCredentials(&instance.Key)
-		if err != nil {
-			goto Cleanup
-		}
-		log.Debugf("Got credentials from a replica. will now apply")
-		_, err = ChangeMasterCredentials(&master.Key, replicationUser, replicationPassword)
-		if err != nil {
-			goto Cleanup
+	if !master.HasReplicationCredentials {
+		// Let's try , if possible, to get credentials from replica. Best effort.
+		if replicationUser, replicationPassword, credentialsErr := ReadReplicationCredentials(&instance.Key); credentialsErr == nil {
+			log.Debugf("Got credentials from a replica. will now apply")
+			_, err = ChangeMasterCredentials(&master.Key, replicationUser, replicationPassword)
+			if err != nil {
+				goto Cleanup
+			}
 		}
 	}
 
@@ -932,7 +962,10 @@ func MakeCoMaster(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 
-	master, err = ChangeMasterTo(&master.Key, instanceKey, &instance.SelfBinlogCoordinates, false, GTIDHintNeutral)
+	if instance.UsingOracleGTID {
+		gitHint = GTIDHintForce
+	}
+	master, err = ChangeMasterTo(&master.Key, instanceKey, &instance.SelfBinlogCoordinates, false, gitHint)
 	if err != nil {
 		goto Cleanup
 	}
@@ -1216,21 +1249,23 @@ func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
 // It will make sure the gtid_purged set matches the executed set value as read just before the RESET.
 // this will enable new replicas to be attached to given instance without complaints about missing/purged entries.
 // This function requires that the instance does not have replicas.
-func ResetMasterGTIDOperation(instanceKey *InstanceKey, removeSelfUUID bool, uuidToRemove string) (*Instance, error) {
+func ErrantGTIDResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
 	}
+	if instance.GtidErrant == "" {
+		return instance, log.Errorf("gtid-errant-reset-master will not operate on %+v because no errant GTID is found", *instanceKey)
+	}
 	if !instance.SupportsOracleGTID {
-		return instance, log.Errorf("reset-master-gtid requested for %+v but it is not using oracle-gtid", *instanceKey)
+		return instance, log.Errorf("gtid-errant-reset-master requested for %+v but it is not using oracle-gtid", *instanceKey)
 	}
 	if len(instance.SlaveHosts) > 0 {
-		return instance, log.Errorf("reset-master-gtid will not operate on %+v because it has %+v replicas. Expecting no replicas", *instanceKey, len(instance.SlaveHosts))
+		return instance, log.Errorf("gtid-errant-reset-master will not operate on %+v because it has %+v replicas. Expecting no replicas", *instanceKey, len(instance.SlaveHosts))
 	}
 
-	log.Infof("Will reset master on %+v", instanceKey)
+	gtidSubtract := ""
 
-	var oracleGtidSet *OracleGtidSet
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "reset-master-gtid"); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
 		goto Cleanup
@@ -1245,28 +1280,33 @@ func ResetMasterGTIDOperation(instanceKey *InstanceKey, removeSelfUUID bool, uui
 		}
 	}
 
-	oracleGtidSet, err = ParseGtidSet(instance.ExecutedGtidSet)
+	gtidSubtract, err = GTIDSubtract(instanceKey, instance.ExecutedGtidSet, instance.GtidErrant)
 	if err != nil {
 		goto Cleanup
-	}
-	if removeSelfUUID {
-		uuidToRemove = instance.ServerUUID
-	}
-	if uuidToRemove != "" {
-		removed := oracleGtidSet.RemoveUUID(uuidToRemove)
-		if removed {
-			log.Debugf("Will remove UUID %s", uuidToRemove)
-		} else {
-			log.Debugf("UUID %s not found", uuidToRemove)
-		}
 	}
 
-	instance, err = ResetMaster(instanceKey)
+	// We're about to perform a destructive operation. It is non transactional and cannot be rolled back.
+	// The replica will be left in a broken state.
+	// This is why we allow multiple attempts at the following:
+	for i := 0; i < countRetries; i++ {
+		instance, err = ResetMaster(instanceKey)
+		if err == nil {
+			break
+		}
+	}
 	if err != nil {
+		err = fmt.Errorf("gtid-errant-reset-master: error while resetting master on %+v, after which intended to set gtid_purged to: %s. Error was: %+v", instance.Key, gtidSubtract, err)
 		goto Cleanup
 	}
-	err = setGTIDPurged(instance, oracleGtidSet.String())
+	// We've just made the destructive operation. Again, allow for retries:
+	for i := 0; i < countRetries; i++ {
+		err = setGTIDPurged(instance, gtidSubtract)
+		if err == nil {
+			break
+		}
+	}
 	if err != nil {
+		err = fmt.Errorf("gtid-errant-reset-master: error setting gtid_purged on %+v to: %s. Error was: %+v", instance.Key, gtidSubtract, err)
 		goto Cleanup
 	}
 
@@ -1278,7 +1318,7 @@ Cleanup:
 	}
 
 	// and we're done (pending deferred functions)
-	AuditOperation("reset-master-gtid", instanceKey, fmt.Sprintf("%+v master reset", *instanceKey))
+	AuditOperation("gtid-errant-reset-master", instanceKey, fmt.Sprintf("%+v master reset", *instanceKey))
 
 	return instance, err
 }
@@ -1527,7 +1567,7 @@ func MakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 		defer EndMaintenance(maintenanceToken)
 	}
 
-	_, _, err, _ = MultiMatchBelow(siblings, instanceKey, false, nil)
+	_, _, err, _ = MultiMatchBelow(siblings, instanceKey, nil)
 	if err != nil {
 		goto Cleanup
 	}
@@ -1582,6 +1622,9 @@ func TakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 	masterInstance, found, err := ReadInstance(&instance.MasterKey)
 	if err != nil || !found {
 		return instance, err
+	}
+	if masterInstance.IsCoMaster {
+		return instance, fmt.Errorf("%+v is co-master. Cannot take it.", masterInstance.Key)
 	}
 	log.Debugf("TakeMaster: will attempt making %+v take its master %+v, now resolved as %+v", *instanceKey, instance.MasterKey, masterInstance.Key)
 
@@ -1666,7 +1709,7 @@ func MakeLocalMaster(instanceKey *InstanceKey) (*Instance, error) {
 		goto Cleanup
 	}
 
-	_, _, err, _ = MultiMatchBelow(siblings, instanceKey, false, nil)
+	_, _, err, _ = MultiMatchBelow(siblings, instanceKey, nil)
 	if err != nil {
 		goto Cleanup
 	}
@@ -1737,7 +1780,9 @@ func GetSortedReplicas(masterKey *InstanceKey, stopReplicationMethod StopReplica
 	return replicas, err
 }
 
-func MultiMatchBelowIndependently(replicas [](*Instance), belowKey *InstanceKey, postponedFunctionsContainer *PostponedFunctionsContainer) (matchedReplicas [](*Instance), belowInstance *Instance, err error, errs []error) {
+// MultiMatchBelow will efficiently match multiple replicas below a given instance.
+// It is assumed that all given replicas are siblings
+func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, postponedFunctionsContainer *PostponedFunctionsContainer) (matchedReplicas [](*Instance), belowInstance *Instance, err error, errs []error) {
 	belowInstance, found, err := ReadInstance(belowKey)
 	if err != nil || !found {
 		return matchedReplicas, belowInstance, err, errs
@@ -1773,19 +1818,7 @@ func MultiMatchBelowIndependently(replicas [](*Instance), belowKey *InstanceKey,
 				}
 				return replicaErr
 			}
-			postpone := false
-			if postponedFunctionsContainer != nil {
-				if config.Config.PostponeReplicaRecoveryOnLagMinutes > 0 &&
-					replica.SQLDelay > config.Config.PostponeReplicaRecoveryOnLagMinutes*60 {
-					// This replica is lagging very much, AND
-					// we're configured to postpone operation on this replica so as not to delay everyone else.
-					postpone = true
-				}
-				if replica.LastDiscoveryLatency > ReasonableDiscoveryLatency {
-					postpone = true
-				}
-			}
-			if postpone {
+			if shouldPostponeRelocatingReplica(replica, postponedFunctionsContainer) {
 				postponedFunctionsContainer.AddPostponedFunction(matchFunc, fmt.Sprintf("multi-match-below-independent %+v", replica.Key))
 				// We bail out and trust our invoker to later call upon this postponed function
 			} else {
@@ -1803,194 +1836,6 @@ func MultiMatchBelowIndependently(replicas [](*Instance), belowKey *InstanceKey,
 	AuditOperation("multi-match-below-independent", belowKey, fmt.Sprintf("matched %d/%d replicas below %+v via Pseudo-GTID", len(matchedReplicas), len(replicas), belowKey))
 
 	return matchedReplicas, belowInstance, err, errs
-}
-
-// MultiMatchBelow will efficiently match multiple replicas below a given instance.
-// It is assumed that all given replicas are siblings
-func MultiMatchBelow(replicas [](*Instance), belowKey *InstanceKey, replicasAlreadyStopped bool, postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), *Instance, error, []error) {
-	if config.Config.PseudoGTIDPreferIndependentMultiMatch {
-		return MultiMatchBelowIndependently(replicas, belowKey, postponedFunctionsContainer)
-	}
-	res := [](*Instance){}
-	errs := []error{}
-	replicaMutex := make(chan bool, 1)
-
-	if config.Config.PseudoGTIDPattern == "" {
-		return res, nil, fmt.Errorf("PseudoGTIDPattern not configured; cannot use Pseudo-GTID"), errs
-	}
-
-	replicas = RemoveInstance(replicas, belowKey)
-	replicas = RemoveBinlogServerInstances(replicas)
-
-	for _, replica := range replicas {
-		if maintenanceToken, merr := BeginMaintenance(&replica.Key, GetMaintenanceOwner(), fmt.Sprintf("%+v match below %+v as part of MultiMatchBelow", replica.Key, *belowKey)); merr != nil {
-			errs = append(errs, fmt.Errorf("Cannot begin maintenance on %+v", replica.Key))
-			replicas = RemoveInstance(replicas, &replica.Key)
-		} else {
-			defer EndMaintenance(maintenanceToken)
-		}
-	}
-
-	belowInstance, err := ReadTopologyInstance(belowKey)
-	if err != nil {
-		// Can't access the server below which we need to match ==> can't move replicas
-		return res, belowInstance, err, errs
-	}
-	if belowInstance.IsBinlogServer() {
-		// A Binlog Server does not do all the SHOW BINLOG EVENTS stuff
-		err = fmt.Errorf("Cannot use PseudoGTID with Binlog Server %+v", belowInstance.Key)
-		return res, belowInstance, err, errs
-	}
-
-	// replicas involved
-	if len(replicas) == 0 {
-		return res, belowInstance, nil, errs
-	}
-	if !replicasAlreadyStopped {
-		log.Debugf("MultiMatchBelow: stopping %d replicas nicely", len(replicas))
-		// We want the replicas to have SQL thread up to date with IO thread.
-		// We will wait for them (up to a timeout) to do so.
-		replicas = StopSlavesNicely(replicas, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
-	}
-	replicas = RemoveNilInstances(replicas)
-	sort.Sort(sort.Reverse(NewInstancesSorterByExec(replicas, belowInstance.DataCenter)))
-
-	// Optimizations:
-	// replicas which broke on the same Exec-coordinates can be handled in the exact same way:
-	// we only need to figure out one replica of each group/bucket of exec-coordinates; then apply the CHANGE MASTER TO
-	// on all its fellow members using same coordinates.
-	replicaBuckets := make(map[BinlogCoordinates][](*Instance))
-	for _, replica := range replicas {
-		replica := replica
-		replicaBuckets[replica.ExecBinlogCoordinates] = append(replicaBuckets[replica.ExecBinlogCoordinates], replica)
-	}
-	log.Debugf("MultiMatchBelow: %d replicas merged into %d buckets", len(replicas), len(replicaBuckets))
-	for bucket, bucketReplicas := range replicaBuckets {
-		log.Debugf("+- bucket: %+v, %d replicas", bucket, len(bucketReplicas))
-	}
-	matchedReplicas := make(map[InstanceKey]bool)
-	bucketsBarrier := make(chan *BinlogCoordinates)
-	// Now go over the buckets, and try a single replica from each bucket
-	// (though if one results with an error, synchronuously-for-that-bucket continue to the next replica in bucket)
-
-	for execCoordinates, bucketReplicas := range replicaBuckets {
-		execCoordinates := execCoordinates
-		bucketReplicas := bucketReplicas
-		var bucketMatchedCoordinates *BinlogCoordinates
-		// Buckets concurrent
-		go func() {
-			// find coordinates for a single bucket based on a replica in said bucket
-			defer func() { bucketsBarrier <- &execCoordinates }()
-			func() {
-				for _, replica := range bucketReplicas {
-					replica := replica
-					var replicaErr error
-					var matchedCoordinates *BinlogCoordinates
-					log.Debugf("MultiMatchBelow: attempting replica %+v in bucket %+v", replica.Key, execCoordinates)
-					matchFunc := func() error {
-						ExecuteOnTopology(func() {
-							_, matchedCoordinates, replicaErr = MatchBelow(&replica.Key, &belowInstance.Key, false)
-						})
-						return nil
-					}
-					if postponedFunctionsContainer != nil &&
-						config.Config.PostponeReplicaRecoveryOnLagMinutes > 0 &&
-						replica.SQLDelay > config.Config.PostponeReplicaRecoveryOnLagMinutes*60 &&
-						len(bucketReplicas) == 1 {
-						// This replica is the only one in the bucket, AND it's lagging very much, AND
-						// we're configured to postpone operation on this replica so as not to delay everyone else.
-						postponedFunctionsContainer.AddPostponedFunction(matchFunc, fmt.Sprintf("multi-match-below %+v", replica.Key))
-						return
-						// We bail out and trust our invoker to later call upon this postponed function
-					}
-					matchFunc()
-					log.Debugf("MultiMatchBelow: match result: %+v, %+v", matchedCoordinates, replicaErr)
-
-					if replicaErr == nil {
-						// Success! We matched a replica of this bucket
-						func() {
-							// Instantaneous mutex.
-							replicaMutex <- true
-							defer func() { <-replicaMutex }()
-							bucketMatchedCoordinates = matchedCoordinates
-							matchedReplicas[replica.Key] = true
-						}()
-						log.Debugf("MultiMatchBelow: matched replica %+v in bucket %+v", replica.Key, execCoordinates)
-						return
-					}
-
-					// Got here? Error!
-					func() {
-						// Instantaneous mutex.
-						replicaMutex <- true
-						defer func() { <-replicaMutex }()
-						errs = append(errs, replicaErr)
-					}()
-					log.Errore(replicaErr)
-					// Failure: some unknown problem with bucket replica. Let's try the next one (continue loop)
-				}
-			}()
-			if bucketMatchedCoordinates == nil {
-				log.Errorf("MultiMatchBelow: Cannot match up %d replicas since their bucket %+v is failed", len(bucketReplicas), execCoordinates)
-				return
-			}
-			log.Debugf("MultiMatchBelow: bucket %+v coordinates are: %+v. Proceeding to match all bucket replicas", execCoordinates, *bucketMatchedCoordinates)
-			// At this point our bucket has a known salvaged replica.
-			// We don't wait for the other buckets -- we immediately work out all the other replicas in this bucket.
-			// (perhaps another bucket is busy matching a 24h delayed-replica; we definitely don't want to hold on that)
-			func() {
-				barrier := make(chan *InstanceKey)
-				// We point all this bucket's replicas into the same coordinates, concurrently
-				// We are already doing concurrent buckets; but for each bucket we also want to do concurrent replicas,
-				// otherwise one large bucket would make for a sequential work...
-				for _, replica := range bucketReplicas {
-					replica := replica
-					go func() {
-						defer func() { barrier <- &replica.Key }()
-
-						var err error
-						if _, found := matchedReplicas[replica.Key]; found {
-							// Already matched this replica
-							return
-						}
-						log.Debugf("MultiMatchBelow: Will match up %+v to previously matched master coordinates %+v", replica.Key, *bucketMatchedCoordinates)
-						replicaMatchSuccess := false
-						ExecuteOnTopology(func() {
-							if _, err = ChangeMasterTo(&replica.Key, &belowInstance.Key, bucketMatchedCoordinates, false, GTIDHintDeny); err == nil {
-								StartSlave(&replica.Key)
-								replicaMatchSuccess = true
-							}
-						})
-						func() {
-							// Quickly update lists; mutext is instantenous
-							replicaMutex <- true
-							defer func() { <-replicaMutex }()
-							if replicaMatchSuccess {
-								matchedReplicas[replica.Key] = true
-							} else {
-								errs = append(errs, err)
-								log.Errorf("MultiMatchBelow: Cannot match up %+v: error is %+v", replica.Key, err)
-							}
-						}()
-					}()
-				}
-				for range bucketReplicas {
-					<-barrier
-				}
-			}()
-		}()
-	}
-	for range replicaBuckets {
-		<-bucketsBarrier
-	}
-
-	for _, replica := range replicas {
-		replica := replica
-		if _, found := matchedReplicas[replica.Key]; found {
-			res = append(res, replica)
-		}
-	}
-	return res, belowInstance, err, errs
 }
 
 // MultiMatchReplicas will match (via pseudo-gtid) all replicas of given master below given instance.
@@ -2038,7 +1883,7 @@ func MultiMatchReplicas(masterKey *InstanceKey, belowKey *InstanceKey, pattern s
 		return res, belowInstance, err, errs
 	}
 	replicas = filterInstancesByPattern(replicas, pattern)
-	matchedReplicas, belowInstance, err, errs := MultiMatchBelow(replicas, &belowInstance.Key, false, nil)
+	matchedReplicas, belowInstance, err, errs := MultiMatchBelow(replicas, &belowInstance.Key, nil)
 
 	if len(matchedReplicas) != len(replicas) {
 		err = fmt.Errorf("MultiMatchReplicas: only matched %d out of %d replicas of %+v; error is: %+v", len(matchedReplicas), len(replicas), *masterKey, err)
@@ -2369,7 +2214,7 @@ func RegroupReplicasPseudoGTID(
 
 		log.Debugf("RegroupReplicas: multi matching %d later replicas", len(laterReplicas))
 		// As for the laterReplicas, we'll have to apply pseudo GTID
-		laterReplicas, candidateReplica, err, _ := MultiMatchBelow(laterReplicas, &candidateReplica.Key, true, postponedFunctionsContainer)
+		laterReplicas, candidateReplica, err, _ = MultiMatchBelow(laterReplicas, &candidateReplica.Key, postponedFunctionsContainer)
 
 		operatedReplicas := append(equalReplicas, candidateReplica)
 		operatedReplicas = append(operatedReplicas, laterReplicas...)
@@ -2500,8 +2345,21 @@ func RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(
 }
 
 // RegroupReplicasGTID will choose a candidate replica of a given instance, and take its siblings using GTID
-func RegroupReplicasGTID(masterKey *InstanceKey, returnReplicaEvenOnFailureToRegroup bool, onCandidateReplicaChosen func(*Instance)) ([](*Instance), [](*Instance), [](*Instance), *Instance, error) {
+func RegroupReplicasGTID(
+	masterKey *InstanceKey,
+	returnReplicaEvenOnFailureToRegroup bool,
+	onCandidateReplicaChosen func(*Instance),
+	postponedFunctionsContainer *PostponedFunctionsContainer,
+	postponeAllMatchOperations func(*Instance) bool,
+) (
+	lostReplicas [](*Instance),
+	movedReplicas [](*Instance),
+	cannotReplicateReplicas [](*Instance),
+	candidateReplica *Instance,
+	err error,
+) {
 	var emptyReplicas [](*Instance)
+	var unmovedReplicas [](*Instance)
 	candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err := GetCandidateReplica(masterKey, true)
 	if err != nil {
 		if !returnReplicaEvenOnFailureToRegroup {
@@ -2513,15 +2371,20 @@ func RegroupReplicasGTID(masterKey *InstanceKey, returnReplicaEvenOnFailureToReg
 	if onCandidateReplicaChosen != nil {
 		onCandidateReplicaChosen(candidateReplica)
 	}
+	moveGTIDFunc := func() error {
+		replicasToMove := append(equalReplicas, laterReplicas...)
+		log.Debugf("RegroupReplicasGTID: working on %d replicas", len(replicasToMove))
 
-	replicasToMove := append(equalReplicas, laterReplicas...)
-	log.Debugf("RegroupReplicasGTID: working on %d replicas", len(replicasToMove))
-
-	movedReplicas, unmovedReplicas, err, _ := moveReplicasViaGTID(replicasToMove, candidateReplica)
-	if err != nil {
-		log.Errore(err)
+		movedReplicas, unmovedReplicas, err, _ = moveReplicasViaGTID(replicasToMove, candidateReplica, postponedFunctionsContainer)
+		unmovedReplicas = append(unmovedReplicas, aheadReplicas...)
+		return log.Errore(err)
 	}
-	unmovedReplicas = append(unmovedReplicas, aheadReplicas...)
+	if postponedFunctionsContainer != nil && postponeAllMatchOperations != nil && postponeAllMatchOperations(candidateReplica) {
+		postponedFunctionsContainer.AddPostponedFunction(moveGTIDFunc, fmt.Sprintf("regroup-replicas-gtid %+v", candidateReplica.Key))
+	} else {
+		err = moveGTIDFunc()
+	}
+
 	StartSlave(&candidateReplica.Key)
 
 	log.Debugf("RegroupReplicasGTID: done")
@@ -2597,7 +2460,7 @@ func RegroupReplicas(masterKey *InstanceKey, returnReplicaEvenOnFailureToRegroup
 	}
 	if allGTID {
 		log.Debugf("RegroupReplicas: using GTID to regroup replicas of %+v", *masterKey)
-		unmovedReplicas, movedReplicas, cannotReplicateReplicas, candidateReplica, err := RegroupReplicasGTID(masterKey, returnReplicaEvenOnFailureToRegroup, onCandidateReplicaChosen)
+		unmovedReplicas, movedReplicas, cannotReplicateReplicas, candidateReplica, err := RegroupReplicasGTID(masterKey, returnReplicaEvenOnFailureToRegroup, onCandidateReplicaChosen, nil, nil)
 		return unmovedReplicas, emptyReplicas, movedReplicas, cannotReplicateReplicas, candidateReplica, err
 	}
 	if allBinlogServers {
@@ -2768,7 +2631,7 @@ func relocateReplicasInternal(replicas [](*Instance), instance, other *Instance)
 	}
 	// GTID
 	{
-		movedReplicas, unmovedReplicas, err, errs := moveReplicasViaGTID(replicas, other)
+		movedReplicas, unmovedReplicas, err, errs := moveReplicasViaGTID(replicas, other, nil)
 
 		if len(movedReplicas) == len(replicas) {
 			// Moved (or tried moving) everything via GTID
@@ -2789,7 +2652,7 @@ func relocateReplicasInternal(replicas [](*Instance), instance, other *Instance)
 				pseudoGTIDReplicas = append(pseudoGTIDReplicas, replica)
 			}
 		}
-		pseudoGTIDReplicas, _, err, errs = MultiMatchBelow(pseudoGTIDReplicas, &other.Key, false, nil)
+		pseudoGTIDReplicas, _, err, errs = MultiMatchBelow(pseudoGTIDReplicas, &other.Key, nil)
 		return pseudoGTIDReplicas, err, errs
 	}
 

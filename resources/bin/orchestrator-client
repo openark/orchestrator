@@ -50,6 +50,7 @@ promotion_rule=
 pool=
 hostname_flag=
 api_path=
+basic_auth=":"
 
 instance_hostport=
 destination_hostport=
@@ -73,11 +74,12 @@ for arg in "$@"; do
     "-api"|"--api")                       set -- "$@" "-U" ;;
     "-path"|"--path")                     set -- "$@" "-P" ;;
     "-query"|"--query")                   set -- "$@" "-q" ;;
+    "-auth"|"--auth")                     set -- "$@" "-b" ;;
     *)                                    set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:P:q:h" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:P:q:b:h" OPTION
 do
   case $OPTION in
     h) command="help" ;;
@@ -95,6 +97,7 @@ do
     D) default_port="$OPTARG" ;;
     U) [ ! -z "$OPTARG" ] && orchestrator_api="$OPTARG" ;;
     P) api_path="$OPTARG" ;;
+    b) basic_auth="$OPTARG" ;;
     q) query="$OPTARG"
   esac
 done
@@ -161,7 +164,7 @@ function detect_leader_api() {
   fi
   for api in ${apis[@]} ; do
     api=$(normalize_orchestrator_api $api)
-    leader_check=$(curl -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
+    leader_check=$(curl --basic --user "${basic_auth}" -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
     if [ "$leader_check" == "200" ] ; then
       leader_api="$api"
       return
@@ -181,10 +184,18 @@ function api() {
   uri="$leader_api/$path"
   # echo $uri
   set -o pipefail
-  api_response=$(curl -s "$uri" | jq '.')
-  if [ $? -ne 0 ] ; then
+
+  api_call_result=0
+  for sleep_time in 0.1 0.2 0.5 1 2 2.5 5 0 ; do
+    api_response=$(curl --basic --user "${basic_auth}" -s "$uri" | jq '.')
+    api_call_result=$?
+    [ $api_call_result -eq 0 ] && break
+    sleep $sleep_time
+  done
+  if [ $api_call_result -ne 0 ] ; then
     fail "Cannot access orchestrator at ${leader_api}.  Check ORCHESTRATOR_API is configured correctly and orchestrator is running"
   fi
+
   if [ "$(echo $api_response | jq -r 'type')" == "array" ] ; then
     return
   fi
@@ -239,7 +250,37 @@ function api_call() {
 function prompt_help() {
   echo "Usage: orchestrator-client -c <command> [flags...]"
   echo "Example: orchestrator-client -c which-master -i some.replica"
-  echo "Available commands:"
+  echo "Options:"
+  echo "
+  -h, --help
+    print this help
+  -c <command>, --command <command>
+    indicate the operation to perform (see listing below)
+  -a <alias>, --alias <alias>
+    cluster alias
+  -o <owner>, --owner <owner>
+    name of owner for downtime/maintenance commands
+  -r <reason>, --reason <reason>
+    reason for downtime/maintenance operation
+  -u <duration>, --duration <duration>
+    duration for downtime/maintenance operations
+  -R <promotion rule>, --promotion-rule <promotion rule>
+    rule for 'register-candidate' command
+  -U <orchestrator_api>, --api <orchestrator_api>
+    override \$orchestrator_api environemtn variable,
+    indicate where the client should connect to.
+  -P <api path>, --path <api path>
+    With '-c api', indicate the specific API path you wish to call
+  -b <username:password>, --auth <username:password>
+    Specify when orchestrator uses basic HTTP auth.
+  -q <query>, --query <query>
+    Indicate query for 'restart-replica-statements' command
+  -l <pool name>, --pool <pool name>
+    pool name for pool related commands
+  -H <hostname> -h <hostname>
+    indicate host for resolve and raft operations
+"
+
   cat "$0" | sed -n '/run_command/,/esac/p' | egrep '".*"[)].*;;' | sed -r -e 's/"(.*?)".*#(.*)/\1~\2/' | column -t -s "~"
 }
 
@@ -278,6 +319,23 @@ function restart_replica_statements() {
   assert_nonempty "query" "$query"
   api "restart-replica-statements/${instance_hostport}?q=$(urlencode "$query")"
   print_response | print_details
+}
+
+function can_replicate_from() {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "destination" "$destination_hostport"
+  api "can-replicate-from/$instance_hostport/$destination_hostport"
+
+  if print_response | jq -r '.Message' | grep -q "true" ; then
+    print_response | print_details | print_key
+  fi
+}
+
+function is_replicating() {
+  assert_nonempty "instance" "$instance_hostport"
+  api "instance/$instance_hostport"
+
+  print_response | jq '. | select(.Slave_SQL_Running==true and .Slave_IO_Running==true)' | filter_key | print_key
 }
 
 function last_pseudo_gtid() {
@@ -677,11 +735,15 @@ function run_command() {
     "detach-replica-master-host") general_instance_command ;;   # Stops replication and modifies Master_Host into an impossible yet reversible value.
     "reattach-replica-master-host") general_instance_command ;; # Undo a detach-replica-master-host operation
     "skip-query") general_instance_command ;;                   # Skip a single statement on a replica; either when running with GTID or without
+    "gtid-errant-reset-master") general_instance_command ;;     # Remove errant GTID transactions by way of RESET MASTER
     "enable-semi-sync-master") general_instance_command ;;      # Enable semi-sync (master-side)
     "disable-semi-sync-master") general_instance_command ;;     # Disable semi-sync (master-side)
     "enable-semi-sync-replica") general_instance_command ;;     # Enable semi-sync (replica-side)
     "disable-semi-sync-replica") general_instance_command ;;    # Disable semi-sync (replica-side)
     "restart-replica-statements") restart_replica_statements ;; # Given `-q "<query>"` that requires replication restart to apply, wrap query with stop/start slave statements as required to restore instance to same replication state. Print out set of statements
+
+    "can-replicate-from") can_replicate_from ;; # Check if an instance can potentially replicate from another, according to replication rules
+    "is-replicating") is_replicating ;;         # Check if an instance is replicating at this time (both SQL and IO threads running)
 
     "set-read-only") general_instance_command ;;     # Turn an instance read-only, via SET GLOBAL read_only := 1
     "set-writeable") general_instance_command ;;     # Turn an instance writeable, via SET GLOBAL read_only := 0

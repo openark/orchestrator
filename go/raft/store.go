@@ -146,5 +146,10 @@ func (store *Store) genericCommand(op string, bytes []byte) (response interface{
 		return nil, err
 	}
 	r := f.Response()
+	if err, ok := r.(error); ok && err != nil {
+		// This code checks whether the response itself was an error object. If so, it should
+		// indicate failure of the operation.
+		return r, err
+	}
 	return r, nil
 }
