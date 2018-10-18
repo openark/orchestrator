@@ -575,7 +575,7 @@ func canReplicateAssumingOracleGTID(instance, masterInstance *Instance) (canRepl
 	return subtractGtidSet.IsEmpty(), nil
 }
 
-func instancesGTIDCompatible(instance, otherInstance *Instance) (isOracleGTID bool, isMariaDBGTID, compatible bool) {
+func instancesAreGTIDAndCompatible(instance, otherInstance *Instance) (isOracleGTID bool, isMariaDBGTID, compatible bool) {
 	isOracleGTID = (instance.UsingOracleGTID && otherInstance.SupportsOracleGTID)
 	isMariaDBGTID = (instance.UsingMariaDBGTID && otherInstance.IsMariaDB())
 	compatible = isOracleGTID || isMariaDBGTID
@@ -583,7 +583,7 @@ func instancesGTIDCompatible(instance, otherInstance *Instance) (isOracleGTID bo
 }
 
 func checkMoveViaGTID(instance, otherInstance *Instance) (err error) {
-	isOracleGTID, _, moveCompatible := instancesGTIDCompatible(instance, otherInstance)
+	isOracleGTID, _, moveCompatible := instancesAreGTIDAndCompatible(instance, otherInstance)
 	if !moveCompatible {
 		return fmt.Errorf("Instances %+v, %+v not GTID compatible or not using GTID", instance.Key, otherInstance.Key)
 	}
@@ -2569,7 +2569,7 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 		return nil, log.Errorf("Relocating binlog server %+v below %+v turns to be too complex; please do it manually", instance.Key, other.Key)
 	}
 	// Next, try GTID
-	if _, _, gtidCompatible := instancesGTIDCompatible(instance, other); gtidCompatible {
+	if _, _, gtidCompatible := instancesAreGTIDAndCompatible(instance, other); gtidCompatible {
 		return moveInstanceBelowViaGTID(instance, other)
 	}
 
