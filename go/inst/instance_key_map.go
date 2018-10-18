@@ -125,7 +125,7 @@ func (this *InstanceKeyMap) ReadJson(jsonString string) error {
 func (this *InstanceKeyMap) ReadCommaDelimitedList(list string) error {
 	tokens := strings.Split(list, ",")
 	for _, token := range tokens {
-		key, err := ParseInstanceKey(token)
+		key, err := ParseResolveInstanceKey(token)
 		if err != nil {
 			return err
 		}
