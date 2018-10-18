@@ -233,8 +233,8 @@ function filter_keys {
   cat - | jq '.[] | .Key'
 }
 
-function filter_broken {
-  cat - | jq 'reduce .[] as $instance ([]; if $instance.LastSQLError != "\"\"" then . + [$instance] elif $instance.LastIOError != "\"\"" then . + [$instance] else . + [] end)'
+function filter_broken_replicas {
+  cat - | jq '.[] | select((.Slave_SQL_Running == false or .Slave_IO_Running == false) and (.LastSQLError != "" or .LastIOError != "")) | [.]'
 }
 
 function print_key {
@@ -369,7 +369,7 @@ function which_replicas() {
 function which_broken_replicas() {
   assert_nonempty "instance" "$instance_hostport"
   api "instance-replicas/$instance_hostport"
-  print_response | filter_broken | filter_keys | print_key
+  print_response | filter_broken_replicas | filter_keys | print_key
 }
 
 function which_cluster() {
