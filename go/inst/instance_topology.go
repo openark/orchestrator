@@ -553,24 +553,61 @@ Cleanup:
 	return instance, err
 }
 
-func canMoveViaGTID(instance, otherInstance *Instance) (isOracleGTID bool, isMariaDBGTID, canMove bool) {
+func canReplicateAssumingOracleGTID(instance, masterInstance *Instance) (canReplicate bool, err error) {
+	instanceTotalGtid := fmt.Sprintf("%s,%s", instance.GtidPurged, instance.ExecutedGtidSet)
+	instanceGtidSet, err := NewOracleGtidSet(instanceTotalGtid)
+	if err != nil {
+		return false, err
+	}
+	masterPurgedGtidSet, err := NewOracleGtidSet(masterInstance.GtidPurged)
+	if err != nil {
+		return false, err
+	}
+
+	subtract, err := GTIDSubtract(&instance.Key, masterPurgedGtidSet.String(), instanceGtidSet.String())
+	if err != nil {
+		return false, err
+	}
+	subtractGtidSet, err := NewOracleGtidSet(subtract)
+	if err != nil {
+		return false, err
+	}
+	return subtractGtidSet.IsEmpty(), nil
+}
+
+func instancesGTIDCompatible(instance, otherInstance *Instance) (isOracleGTID bool, isMariaDBGTID, compatible bool) {
 	isOracleGTID = (instance.UsingOracleGTID && otherInstance.SupportsOracleGTID)
 	isMariaDBGTID = (instance.UsingMariaDBGTID && otherInstance.IsMariaDB())
+	compatible = isOracleGTID || isMariaDBGTID
+	return isOracleGTID, isMariaDBGTID, compatible
+}
 
-	return isOracleGTID, isMariaDBGTID, isOracleGTID || isMariaDBGTID
+func checkMoveViaGTID(instance, otherInstance *Instance) (err error) {
+	isOracleGTID, _, moveCompatible := instancesGTIDCompatible(instance, otherInstance)
+	if !moveCompatible {
+		return fmt.Errorf("Instances %+v, %+v not GTID compatible or not using GTID", instance.Key, otherInstance.Key)
+	}
+	if isOracleGTID {
+		canReplicate, err := canReplicateAssumingOracleGTID(instance, otherInstance)
+		if err != nil {
+			return err
+		}
+		if !canReplicate {
+			return fmt.Errorf("Instance %+v has purged GTID entries not found on %+v", otherInstance.Key, instance.Key)
+		}
+	}
+
+	return nil
 }
 
 // moveInstanceBelowViaGTID will attempt moving given instance below another instance using either Oracle GTID or MariaDB GTID.
 func moveInstanceBelowViaGTID(instance, otherInstance *Instance) (*Instance, error) {
-	_, _, canMove := canMoveViaGTID(instance, otherInstance)
-
 	instanceKey := &instance.Key
 	otherInstanceKey := &otherInstance.Key
-	if !canMove {
-		return instance, fmt.Errorf("Cannot move via GTID as not both instances use GTID: %+v, %+v", *instanceKey, *otherInstanceKey)
-	}
 
-	var err error
+	if err := checkMoveViaGTID(instance, otherInstance); err != nil {
+		return instance, err
+	}
 
 	rinstance, _, _ := ReadInstance(&instance.Key)
 	if canMove, merr := rinstance.CanMoveViaMatch(); !canMove {
@@ -582,6 +619,7 @@ func moveInstanceBelowViaGTID(instance, otherInstance *Instance) (*Instance, err
 	}
 	log.Infof("Will move %+v below %+v via GTID", instanceKey, otherInstanceKey)
 
+	var err error
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("move below %+v", *otherInstanceKey)); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
 		goto Cleanup
@@ -644,15 +682,15 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance, postponedFunct
 		go func() {
 			defer waitGroup.Done()
 			moveFunc := func() error {
-				var replicaErr error
 				var movedReplica *Instance
-				if _, _, canMove := canMoveViaGTID(replica, other); canMove {
+				var replicaErr error
+				if checkErr := checkMoveViaGTID(replica, other); checkErr == nil {
 					movedReplica, replicaErr = moveInstanceBelowViaGTID(replica, other)
 					if movedReplica != nil {
 						replica = movedReplica
 					}
 				} else {
-					replicaErr = fmt.Errorf("moveReplicasViaGTID: %+v cannot move below %+v via GTID", replica.Key, other.Key)
+					replicaErr = checkErr
 				}
 
 				// After having moved replicas, update local shared variables:
@@ -2538,7 +2576,10 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 		return nil, log.Errorf("Relocating binlog server %+v below %+v turns to be too complex; please do it manually", instance.Key, other.Key)
 	}
 	// Next, try GTID
-	if _, _, canMove := canMoveViaGTID(instance, other); canMove {
+	if _, _, gtidCompatible := instancesGTIDCompatible(instance, other); gtidCompatible {
+		if err := checkMoveViaGTID(instance, other); err != nil {
+			return nil, log.Errorf("Relocatio is to be using GTID, but got error: %+v", err)
+		}
 		return moveInstanceBelowViaGTID(instance, other)
 	}
 
