@@ -554,17 +554,7 @@ Cleanup:
 }
 
 func canReplicateAssumingOracleGTID(instance, masterInstance *Instance) (canReplicate bool, err error) {
-	instanceTotalGtid := fmt.Sprintf("%s,%s", instance.GtidPurged, instance.ExecutedGtidSet)
-	instanceGtidSet, err := NewOracleGtidSet(instanceTotalGtid)
-	if err != nil {
-		return false, err
-	}
-	masterPurgedGtidSet, err := NewOracleGtidSet(masterInstance.GtidPurged)
-	if err != nil {
-		return false, err
-	}
-
-	subtract, err := GTIDSubtract(&instance.Key, masterPurgedGtidSet.String(), instanceGtidSet.String())
+	subtract, err := GTIDSubtract(&instance.Key, masterInstance.GtidPurged, instance.ExecutedGtidSet)
 	if err != nil {
 		return false, err
 	}
