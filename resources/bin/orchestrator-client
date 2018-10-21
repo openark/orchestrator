@@ -339,6 +339,16 @@ function can_replicate_from() {
   fi
 }
 
+function can_replicate_from_gtid() {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "destination" "$destination_hostport"
+  api "can-replicate-from-gtid/$instance_hostport/$destination_hostport"
+
+  if print_response | jq -r '.Message' | grep -q "true" ; then
+    print_response | print_details | print_key
+  fi
+}
+
 function is_replicating() {
   assert_nonempty "instance" "$instance_hostport"
   api "instance/$instance_hostport"
@@ -764,8 +774,9 @@ function run_command() {
     "disable-semi-sync-replica") general_instance_command ;;    # Disable semi-sync (replica-side)
     "restart-replica-statements") restart_replica_statements ;; # Given `-q "<query>"` that requires replication restart to apply, wrap query with stop/start slave statements as required to restore instance to same replication state. Print out set of statements
 
-    "can-replicate-from") can_replicate_from ;; # Check if an instance can potentially replicate from another, according to replication rules
-    "is-replicating") is_replicating ;;         # Check if an instance is replicating at this time (both SQL and IO threads running)
+    "can-replicate-from") can_replicate_from ;;      # Check if an instance can potentially replicate from another, according to replication rules
+    "can-replicate-from-gtid") can_replicate_from ;; # Check if an instance can potentially replicate from another, according to replication rules and assuming Oracle GTID
+    "is-replicating") is_replicating ;;              # Check if an instance is replicating at this time (both SQL and IO threads running)
 
     "set-read-only") general_instance_command ;;     # Turn an instance read-only, via SET GLOBAL read_only := 1
     "set-writeable") general_instance_command ;;     # Turn an instance writeable, via SET GLOBAL read_only := 0

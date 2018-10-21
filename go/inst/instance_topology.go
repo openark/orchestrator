@@ -572,7 +572,7 @@ func instancesAreGTIDAndCompatible(instance, otherInstance *Instance) (isOracleG
 	return isOracleGTID, isMariaDBGTID, compatible
 }
 
-func checkMoveViaGTID(instance, otherInstance *Instance) (err error) {
+func CheckMoveViaGTID(instance, otherInstance *Instance) (err error) {
 	isOracleGTID, _, moveCompatible := instancesAreGTIDAndCompatible(instance, otherInstance)
 	if !moveCompatible {
 		return fmt.Errorf("Instances %+v, %+v not GTID compatible or not using GTID", instance.Key, otherInstance.Key)
@@ -600,7 +600,7 @@ func moveInstanceBelowViaGTID(instance, otherInstance *Instance) (*Instance, err
 	if canReplicate, err := instance.CanReplicateFrom(otherInstance); !canReplicate {
 		return instance, err
 	}
-	if err := checkMoveViaGTID(instance, otherInstance); err != nil {
+	if err := CheckMoveViaGTID(instance, otherInstance); err != nil {
 		return instance, err
 	}
 	log.Infof("Will move %+v below %+v via GTID", instance.Key, otherInstance.Key)
