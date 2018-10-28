@@ -769,11 +769,18 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		if config.Config.ApplyMySQLPromotionAfterMasterFailover || analysisEntry.CommandHint == inst.GracefulMasterTakeoverCommandHint {
 			// on GracefulMasterTakeoverCommandHint it makes utter sense to RESET SLAVE ALL and read_only=0, and there is no sense in not doing so.
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: will apply MySQL changes to promoted master"))
-			inst.ResetSlaveOperation(&promotedReplica.Key)
-			inst.SetReadOnly(&promotedReplica.Key, false)
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: have applied read-only=0, RESET SLAVE ALL on promoted master"))
+			if _, err := inst.ResetSlaveOperation(&promotedReplica.Key); true {
+				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: applying RESET SLAVE ALL on promoted master: success=%t", (err == nil)))
+			}
+			if _, err := inst.SetReadOnly(&promotedReplica.Key, false); true {
+				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: applying read-only=0 on promoted master: success=%t", (err == nil)))
+			}
 			// Let's attempt, though we won't necessarily succeed, to set old master as read-only
-			go inst.SetReadOnly(&analysisEntry.AnalyzedInstanceKey, true)
+			go func() {
+				if _, err := inst.SetReadOnly(&analysisEntry.AnalyzedInstanceKey, true); true {
+					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: applying read-only=1 on demoted master: success=%t", (err == nil)))
+				}
+			}()
 		}
 
 		kvPairs := inst.GetClusterMasterKVPairs(analysisEntry.ClusterDetails.ClusterAlias, &promotedReplica.Key)
