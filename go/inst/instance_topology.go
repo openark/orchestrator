@@ -1605,29 +1605,20 @@ Cleanup:
 	return instance, err
 }
 
-// TakeSiblings is a convenience method for turning sublings of a replica to be its subordinates.
-// This uses normal connected replication (does not utilize Pseudo-GTID)
-func TakeSiblings(instanceKey *InstanceKey) (*Instance, int, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+// TakeSiblings is a convenience method for turning siblings of a replica to be its subordinates.
+// This operation is a syntatctic sugar on top relocate-replicas, which uses any available means to the objective:
+// GTID, Pseudo-GTID, binlog servers, standard replication...
+func TakeSiblings(instanceKey *InstanceKey) (instance *Instance, takenSiblings int, err error) {
+	instance, err = ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, 0, err
 	}
-	masterInstance, found, err := ReadInstance(&instance.MasterKey)
-	if err != nil || !found {
-		return instance, 0, err
+	if !instance.IsReplica() {
+		return instance, takenSiblings, log.Errorf("take-siblings: instance %+v is not a replica.", *instanceKey)
 	}
-	siblings, err := ReadReplicaInstances(&masterInstance.Key)
-	if err != nil {
-		return instance, 0, err
-	}
-	takenSiblings := 0
-	for _, sibling := range siblings {
-		if _, err := MoveBelow(&sibling.Key, &instance.Key); err == nil {
-			takenSiblings++
-		}
-	}
+	relocatedReplicas, _, err, _ := RelocateReplicas(&instance.MasterKey, instanceKey, "")
 
-	return instance, takenSiblings, err
+	return instance, len(relocatedReplicas), err
 }
 
 // TakeMaster will move an instance up the chain and cause its master to become its replica.
