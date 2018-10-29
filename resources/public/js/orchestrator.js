@@ -565,14 +565,18 @@ function openNodeModal(node) {
     $('#node_modal button[data-btn=take-siblings]').show();
   }
   $('#node_modal button[data-btn=take-siblings]').click(function() {
-    var message = "<p>Are you sure you want <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
-      "</strong></code> to take its siblings?" +
-      "<p>This will stop replication on this replica and on its siblings throughout the operation";
-    bootbox.confirm(message, function(confirm) {
-      if (confirm) {
-        apiCommand("/api/take-siblings/" + node.Key.Hostname + "/" + node.Key.Port);
-      }
-    });
+    var apiUrl = "/api/take-siblings/" + node.Key.Hostname + "/" + node.Key.Port;
+    if (isSilentUI()) {
+      apiCommand(apiUrl);
+    } else {
+      var message = "<p>Are you sure you want <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+        "</strong></code> to take its siblings?";
+      bootbox.confirm(message, function(confirm) {
+        if (confirm) {
+          apiCommand(apiUrl);
+        }
+      });
+    }
   });
   $('#node_modal button[data-btn=end-downtime]').click(function() {
     apiCommand("/api/end-downtime/" + node.Key.Hostname + "/" + node.Key.Port);
