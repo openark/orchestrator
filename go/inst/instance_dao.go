@@ -916,6 +916,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 		if clusterName == clusterNameByInstanceKey {
 			// circular replication. Avoid infinite ++ on replicationDepth
 			replicationDepth = 0
+			ancestryUUID = ""
 		} // While the other stays "1"
 	}
 	instance.ClusterName = clusterName
