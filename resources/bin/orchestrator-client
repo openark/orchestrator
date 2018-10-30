@@ -50,7 +50,7 @@ promotion_rule=
 pool=
 hostname_flag=
 api_path=
-basic_auth=":"
+basic_auth="${ORCHESTRATOR_USER}:${ORCHESTRATOR_PASSWORD}"
 
 instance_hostport=
 destination_hostport=
