@@ -75,7 +75,7 @@ var readTopologyInstanceCounter = metrics.NewCounter()
 var readInstanceCounter = metrics.NewCounter()
 var writeInstanceCounter = metrics.NewCounter()
 var backendWrites = collection.CreateOrReturnCollection(collection.BackendWrites)
-var instanceBufferedWriteMetrics = collection.CreateOrReturnCollection(collection.FlushInstanceWrites)
+var instanceWriteBuffer *InstanceWriteBuffer
 
 var emptyQuotesRegexp = regexp.MustCompile(`^""$`)
 
@@ -85,30 +85,17 @@ func init() {
 	metrics.Register("instance.read", readInstanceCounter)
 	metrics.Register("instance.write", writeInstanceCounter)
 
-	InitWriteBufferMetrics()
-
 	go initializeInstanceDao()
 }
 
 func initializeInstanceDao() {
 	config.WaitForConfigurationToBeLoaded()
-	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
+	instanceWriteBuffer = NewInstanceWriteBuffer()
 	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
 	forgetInstanceKeys = cache.New(time.Duration(config.Config.InstancePollSeconds*3)*time.Second, time.Second)
 	clusterInjectedPseudoGTIDCache = cache.New(time.Minute, time.Second)
 	// spin off instance write buffer flushing
-	go func() {
-		flushTick := time.Tick(time.Duration(config.Config.InstanceFlushIntervalMilliseconds) * time.Millisecond)
-		for {
-			// it is time to flush
-			select {
-			case <-flushTick:
-				flushInstanceWriteBuffer()
-			case <-forceFlushInstanceWriteBuffer:
-				flushInstanceWriteBuffer()
-			}
-		}
-	}()
+	go instanceWriteBuffer.FlushBufferLoop(time.Duration(config.Config.InstanceFlushIntervalMilliseconds) * time.Millisecond)
 }
 
 // ExecDBWriteFunc chooses how to execute a write onto the database: whether synchronuously or not
@@ -819,7 +806,7 @@ Cleanup:
 		instance.IsUpToDate = true
 		latency.Start("backend")
 		if bufferWrites {
-			enqueueInstanceWrite(instance, instanceFound, err)
+			instanceWriteBuffer.EnqueueInstanceWrite(instance, instanceFound, err)
 		} else {
 			WriteInstance(instance, instanceFound, err)
 		}
@@ -2381,78 +2368,12 @@ func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, up
 	return nil
 }
 
-type instanceUpdateObject struct {
-	instance                 *Instance
-	instanceWasActuallyFound bool
-	lastError                error
-}
-
 // instances sorter by instanceKey
 type byInstanceKey []*Instance
 
 func (a byInstanceKey) Len() int           { return len(a) }
 func (a byInstanceKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a byInstanceKey) Less(i, j int) bool { return a[i].Key.SmallerThan(&a[j].Key) }
-
-var instanceWriteBuffer chan instanceUpdateObject
-var forceFlushInstanceWriteBuffer = make(chan bool)
-
-func enqueueInstanceWrite(instance *Instance, instanceWasActuallyFound bool, lastError error) {
-	if len(instanceWriteBuffer) == config.Config.InstanceWriteBufferSize {
-		// Signal the "flushing" gorouting that there's work.
-		// We prefer doing all bulk flushes from one goroutine.
-		forceFlushInstanceWriteBuffer <- true
-	}
-	instanceWriteBuffer <- instanceUpdateObject{instance, instanceWasActuallyFound, lastError}
-}
-
-// flushInstanceWriteBuffer saves enqueued instances to Orchestrator Db
-func flushInstanceWriteBuffer() {
-	var instances []*Instance
-	var lastseen []*Instance // instances to update with last_seen field
-
-	if len(instanceWriteBuffer) == 0 {
-		return
-	}
-
-	wbm := NewWriteBufferMetric() // prepare metric
-
-	for i := 0; i < len(instanceWriteBuffer); i++ {
-		upd := <-instanceWriteBuffer
-		if upd.instanceWasActuallyFound && upd.lastError == nil {
-			lastseen = append(lastseen, upd.instance)
-		} else {
-			instances = append(instances, upd.instance)
-			log.Debugf("flushInstanceWriteBuffer: will not update database_instance.last_seen due to error: %+v", upd.lastError)
-		}
-	}
-	// sort instances by instanceKey (table pk) to make locking predictable
-	sort.Sort(byInstanceKey(instances))
-	sort.Sort(byInstanceKey(lastseen))
-
-	writeFunc := func() error {
-		err := writeManyInstances(instances, true, false)
-		if err != nil {
-			return log.Errorf("flushInstanceWriteBuffer writemany: %v", err)
-		}
-		writeInstanceCounter.Inc(int64(len(instances)))
-
-		err = writeManyInstances(lastseen, true, true)
-		if err != nil {
-			return log.Errorf("flushInstanceWriteBuffer last_seen: %v", err)
-		}
-
-		writeInstanceCounter.Inc(int64(len(lastseen)))
-		return nil
-	}
-	err := ExecDBWriteFunc(writeFunc)
-	if err != nil {
-		log.Errorf("flushInstanceWriteBuffer: %v", err)
-	}
-
-	wbm.Update(len(instances)+len(lastseen), err)
-	instanceBufferedWriteMetrics.Append(wbm)
-}
 
 // WriteInstance stores an instance in the orchestrator backend
 func WriteInstance(instance *Instance, instanceWasActuallyFound bool, lastError error) error {
