@@ -773,17 +773,26 @@ Cleanup:
 	waitGroup.Wait()
 
 	if instanceFound {
-		instance.AncestryUUID = strings.Trim(fmt.Sprintf("%s,%s", instance.AncestryUUID, instance.ServerUUID), ",")
+		if instance.IsCoMaster {
+			// Take co-master into account, and avoid infinite loop
+			instance.AncestryUUID = fmt.Sprintf("%s,%s", instance.MasterUUID, instance.ServerUUID)
+		} else {
+			instance.AncestryUUID = fmt.Sprintf("%s,%s", instance.AncestryUUID, instance.ServerUUID)
+		}
+		instance.AncestryUUID = strings.Trim(instance.AncestryUUID, ",")
 		if instance.ExecutedGtidSet != "" && instance.masterExecutedGtidSet != "" {
 			// Compare master & replica GTID sets, but ignore the sets that present the master's UUID.
 			// This is because orchestrator may pool master and replica at an inconvenient timing,
 			// such that the replica may _seems_ to have more entries than the master, when in fact
 			// it's just that the naster's probing is stale.
-			// redactedExecutedGtidSet := redactGtidSetUUID(instance.ExecutedGtidSet, instance.MasterUUID)
-			// redactedMasterExecutedGtidSet := redactGtidSetUUID(instance.masterExecutedGtidSet, instance.MasterUUID)
 			redactedExecutedGtidSet, _ := NewOracleGtidSet(instance.ExecutedGtidSet)
 			for _, uuid := range strings.Split(instance.AncestryUUID, ",") {
 				if uuid != instance.ServerUUID {
+					redactedExecutedGtidSet.RemoveUUID(uuid)
+				}
+				if instance.IsCoMaster && uuid == instance.ServerUUID {
+					// If this is a co-master, then this server is likely to show its own generated GTIDs as errant,
+					// because its co-master has not applied them yet
 					redactedExecutedGtidSet.RemoveUUID(uuid)
 				}
 			}
@@ -916,6 +925,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 		if clusterName == clusterNameByInstanceKey {
 			// circular replication. Avoid infinite ++ on replicationDepth
 			replicationDepth = 0
+			ancestryUUID = ""
 		} // While the other stays "1"
 	}
 	instance.ClusterName = clusterName
