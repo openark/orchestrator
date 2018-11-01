@@ -34,11 +34,11 @@ type WriteBufferMetric struct {
 }
 
 var (
-	writeCount = metrics.NewCounter()
-	errorCount = metrics.NewCounter()
-	instancesErrors = metrics.NewCounter()
-	instancesWritten = metrics.NewHistogram(metrics.NewUniformSample(16384))
-	writeLatency = metrics.NewTimer()
+	writeCount            = metrics.NewCounter()
+	errorCount            = metrics.NewCounter()
+	instancesErrors       = metrics.NewCounter()
+	instancesWritten      = metrics.NewHistogram(metrics.NewUniformSample(16384))
+	writeLatency          = metrics.NewTimer()
 	instanceFlushInterval = metrics.NewFunctionalGauge(func() int64 {
 		return int64(config.Config.InstanceFlushIntervalMilliseconds)
 	})
@@ -80,19 +80,19 @@ func (wbm WriteBufferMetric) When() time.Time {
 
 // WriteBufferAggregate holds the results of a number of buffered write attempts to the backend
 type WriteBufferAggregate struct {
-	InstanceFlushIntervalMilliseconds int64     // config setting
-	InstanceWriteBufferSize           int64     // config setting
-	WriteCount                        int64     // number of writes done
-	ErrorCount                        int64     // number of writes with errors
-	SumInstancesWritten               int64     // total number of rows written
-	SumInstancesErrors                int64     // total number of rows with errors
-	MaxInstancesWritten               int64     // metrics for instances written in each call
+	InstanceFlushIntervalMilliseconds int64 // config setting
+	InstanceWriteBufferSize           int64 // config setting
+	WriteCount                        int64 // number of writes done
+	ErrorCount                        int64 // number of writes with errors
+	SumInstancesWritten               int64 // total number of rows written
+	SumInstancesErrors                int64 // total number of rows with errors
+	MaxInstancesWritten               int64 // metrics for instances written in each call
 	MeanInstancesWritten              float64
 	MedianInstancesWritten            float64
 	P75InstancesWritten               float64
 	P95InstancesWritten               float64
 	P99InstancesWritten               float64
-	MaxWriteLatencySeconds            int64     // metrics for time to write each set of instances
+	MaxWriteLatencySeconds            int64 // metrics for time to write each set of instances
 	MeanWriteLatencySeconds           float64
 	MedianWriteLatencySeconds         float64
 	P75WriteLatencySeconds            float64
