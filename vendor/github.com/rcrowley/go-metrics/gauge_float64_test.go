@@ -10,6 +10,16 @@ func BenchmarkGuageFloat64(b *testing.B) {
 	}
 }
 
+func BenchmarkGuageFloat64Parallel(b *testing.B) {
+	g := NewGaugeFloat64()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			g.Update(float64(1))
+		}
+	})
+}
+
 func TestGaugeFloat64(t *testing.T) {
 	g := NewGaugeFloat64()
 	g.Update(float64(47.0))
@@ -33,6 +43,27 @@ func TestGetOrRegisterGaugeFloat64(t *testing.T) {
 	NewRegisteredGaugeFloat64("foo", r).Update(float64(47.0))
 	t.Logf("registry: %v", r)
 	if g := GetOrRegisterGaugeFloat64("foo", r); float64(47.0) != g.Value() {
+		t.Fatal(g)
+	}
+}
+
+func TestFunctionalGaugeFloat64(t *testing.T) {
+	var counter float64
+	fg := NewFunctionalGaugeFloat64(func() float64 {
+		counter++
+		return counter
+	})
+	fg.Value()
+	fg.Value()
+	if counter != 2 {
+		t.Error("counter != 2")
+	}
+}
+
+func TestGetOrRegisterFunctionalGaugeFloat64(t *testing.T) {
+	r := NewRegistry()
+	NewRegisteredFunctionalGaugeFloat64("foo", r, func() float64 { return 47 })
+	if g := GetOrRegisterGaugeFloat64("foo", r); 47 != g.Value() {
 		t.Fatal(g)
 	}
 }
