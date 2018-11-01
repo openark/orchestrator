@@ -85,6 +85,8 @@ func init() {
 	metrics.Register("instance.read", readInstanceCounter)
 	metrics.Register("instance.write", writeInstanceCounter)
 
+	InitWriteBufferMetrics()
+
 	go initializeInstanceDao()
 }
 
