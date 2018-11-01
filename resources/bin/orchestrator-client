@@ -117,7 +117,7 @@ function get_curl_auth_params {
   local requires_auth=""
 
   if [[ "${basic_auth}" != ":" ]]; then
-    requires_auth="--basic --user '${basic_auth}'"
+    requires_auth="--basic --user "${basic_auth}""
 
     curl --help 2>&1 | fgrep -q 'disallow-username-in-url' && \
       requires_auth+=" --disallow-username-in-url"
