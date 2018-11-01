@@ -19,7 +19,7 @@ package inst
 import (
 	"time"
 
-	"github.com/montanaflynn/stats"
+	"github.com/rcrowley/go-metrics"
 
 	"github.com/github/orchestrator/go/collection"
 	"github.com/github/orchestrator/go/config"
@@ -31,6 +31,30 @@ type WriteBufferMetric struct {
 	WriteLatency time.Duration // time that we had to wait before starting query execution
 	Items        int           // number of rows written
 	Err          error         // any error resulting from the query execution
+}
+
+var (
+	writeCount = metrics.NewCounter()
+	errorCount = metrics.NewCounter()
+	instancesErrors = metrics.NewCounter()
+	instancesWritten = metrics.NewHistogram(metrics.NewUniformSample(16384))
+	writeLatency = metrics.NewTimer()
+	instanceFlushInterval = metrics.NewFunctionalGauge(func() int64 {
+		return int64(config.Config.InstanceFlushIntervalMilliseconds)
+	})
+	instanceWriteBufferSize = metrics.NewFunctionalGauge(func() int64 {
+		return int64(config.Config.InstanceWriteBufferSize)
+	})
+)
+
+func InitWriteBufferMetrics() {
+	metrics.Register("write_buffer.write_count", writeCount)
+	metrics.Register("write_buffer.error_count", errorCount)
+	metrics.Register("write_buffer.instance_errors", instancesErrors)
+	metrics.Register("write_buffer.instance_writes", instancesWritten)
+	metrics.Register("write_buffer.write_latency", writeLatency)
+	metrics.Register("constant.write_buffer.instance_flush_interval", instanceFlushInterval)
+	metrics.Register("constant.write_buffer.instance_write_buffer_size", instanceWriteBufferSize)
 }
 
 // NewWriteBufferMetric returns a new metric with timestamp starting from now
@@ -56,19 +80,19 @@ func (wbm WriteBufferMetric) When() time.Time {
 
 // WriteBufferAggregate holds the results of a number of buffered write attempts to the backend
 type WriteBufferAggregate struct {
-	InstanceFlushIntervalMilliseconds int     // config setting
-	InstanceWriteBufferSize           int     // config setting
-	WriteCount                        int     // number of writes done
-	ErrorCount                        int     // number of writes with errors
-	SumInstancesWritten               int     // total number of rows written
-	SumInstancesErrors                int     // total number of rows with errors
-	MaxInstancesWritten               float64 // metrics for instances written in each call
+	InstanceFlushIntervalMilliseconds int64     // config setting
+	InstanceWriteBufferSize           int64     // config setting
+	WriteCount                        int64     // number of writes done
+	ErrorCount                        int64     // number of writes with errors
+	SumInstancesWritten               int64     // total number of rows written
+	SumInstancesErrors                int64     // total number of rows with errors
+	MaxInstancesWritten               int64     // metrics for instances written in each call
 	MeanInstancesWritten              float64
 	MedianInstancesWritten            float64
 	P75InstancesWritten               float64
 	P95InstancesWritten               float64
 	P99InstancesWritten               float64
-	MaxWriteLatencySeconds            float64 // metrics for time to write each set of instances
+	MaxWriteLatencySeconds            int64     // metrics for time to write each set of instances
 	MeanWriteLatencySeconds           float64
 	MedianWriteLatencySeconds         float64
 	P75WriteLatencySeconds            float64
@@ -78,16 +102,12 @@ type WriteBufferAggregate struct {
 
 // WriteBufferAggregatedSince returns the aggregated for metrics in the collection since the specified time.
 func WriteBufferAggregatedSince(c *collection.Collection, t time.Time) WriteBufferAggregate {
-	var (
-		writeTimings []float64
-		writeItems   []float64
-	)
 
 	// Retrieve values since the time specified
 	values, err := c.Since(t)
 	wba := WriteBufferAggregate{
-		InstanceFlushIntervalMilliseconds: config.Config.InstanceFlushIntervalMilliseconds,
-		InstanceWriteBufferSize:           config.Config.InstanceWriteBufferSize,
+		InstanceFlushIntervalMilliseconds: instanceFlushInterval.Value(),
+		InstanceWriteBufferSize:           instanceWriteBufferSize.Value(),
 	}
 
 	if err != nil {
@@ -96,55 +116,30 @@ func WriteBufferAggregatedSince(c *collection.Collection, t time.Time) WriteBuff
 
 	// generate the metrics
 	for _, v := range values {
-		writeTimings = append(writeTimings, v.(*WriteBufferMetric).WriteLatency.Seconds())
-		writeItems = append(writeItems, float64(v.(*WriteBufferMetric).Items))
-		wba.SumInstancesWritten += v.(*WriteBufferMetric).Items
+		writeLatency.Update(v.(*WriteBufferMetric).WriteLatency)
+		instancesWritten.Update(int64(v.(*WriteBufferMetric).Items))
 		if v.(*WriteBufferMetric).Err != nil {
-			wba.ErrorCount++
-			wba.SumInstancesErrors += v.(*WriteBufferMetric).Items
+			errorCount.Inc(1)
+			instancesErrors.Inc(int64(v.(*WriteBufferMetric).Items))
 		}
 	}
 
-	wba.WriteCount = len(writeTimings)
-
-	// generate aggregate timing metrics
-	if s, err := stats.Max(stats.Float64Data(writeTimings)); err == nil {
-		wba.MaxWriteLatencySeconds = s
-	}
-	if s, err := stats.Mean(stats.Float64Data(writeTimings)); err == nil {
-		wba.MeanWriteLatencySeconds = s
-	}
-	if s, err := stats.Median(stats.Float64Data(writeTimings)); err == nil {
-		wba.MedianWriteLatencySeconds = s
-	}
-	if s, err := stats.Percentile(stats.Float64Data(writeTimings), 75); err == nil {
-		wba.P75WriteLatencySeconds = s
-	}
-	if s, err := stats.Percentile(stats.Float64Data(writeTimings), 95); err == nil {
-		wba.P95WriteLatencySeconds = s
-	}
-	if s, err := stats.Percentile(stats.Float64Data(writeTimings), 99); err == nil {
-		wba.P99WriteLatencySeconds = s
-	}
-	// generate aggregate item size metrics
-	if s, err := stats.Max(stats.Float64Data(writeItems)); err == nil {
-		wba.MaxInstancesWritten = s
-	}
-	if s, err := stats.Mean(stats.Float64Data(writeItems)); err == nil {
-		wba.MeanInstancesWritten = s
-	}
-	if s, err := stats.Median(stats.Float64Data(writeItems)); err == nil {
-		wba.MedianInstancesWritten = s
-	}
-	if s, err := stats.Percentile(stats.Float64Data(writeItems), 75); err == nil {
-		wba.P75InstancesWritten = s
-	}
-	if s, err := stats.Percentile(stats.Float64Data(writeItems), 95); err == nil {
-		wba.P95InstancesWritten = s
-	}
-	if s, err := stats.Percentile(stats.Float64Data(writeItems), 99); err == nil {
-		wba.P99InstancesWritten = s
-	}
+	wba.WriteCount = writeLatency.Count()
+	wba.ErrorCount = errorCount.Count()
+	wba.SumInstancesErrors = instancesErrors.Count()
+	wba.SumInstancesWritten = instancesWritten.Sum()
+	wba.MaxInstancesWritten = instancesWritten.Max()
+	wba.MeanInstancesWritten = instancesWritten.Mean()
+	wba.MedianInstancesWritten = instancesWritten.Percentile(50)
+	wba.P75InstancesWritten = instancesWritten.Percentile(75)
+	wba.P95InstancesWritten = instancesWritten.Percentile(95)
+	wba.P99InstancesWritten = instancesWritten.Percentile(99)
+	wba.MaxWriteLatencySeconds = writeLatency.Max()
+	wba.MeanWriteLatencySeconds = writeLatency.Mean()
+	wba.MedianWriteLatencySeconds = writeLatency.Percentile(50)
+	wba.P75WriteLatencySeconds = writeLatency.Percentile(75)
+	wba.P95WriteLatencySeconds = writeLatency.Percentile(95)
+	wba.P99WriteLatencySeconds = writeLatency.Percentile(99)
 
 	return wba
 }
