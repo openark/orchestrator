@@ -113,17 +113,17 @@ function check_requirements() {
   which jq   > /dev/null 2>&1 || fail "cannot find jq"
 }
 
-function get_curl {
-  local requires_auth=0
+function get_curl_auth_params {
+  local requires_auth=""
 
   if [[ "${basic_auth}" != ":" ]]; then
-    requires_auth="--basic --user '${basic_auth}' "
+    requires_auth="--basic --user '${basic_auth}'"
 
     curl --help 2>&1 | fgrep -q 'disallow-username-in-url' && \
-      requires_auth+="--disallow-username-in-url "
+      requires_auth+=" --disallow-username-in-url"
   fi
 
-  echo "curl ${requires_auth}"
+  echo "${requires_auth}"
 }
 
 function assert_nonempty() {
@@ -169,6 +169,8 @@ function detect_leader_api() {
   # - in which case we just normalize the URL
   # or it may be a space delimited list, such as "http://host1:3000/api http://host2:3000/api http://host3:3000/api "
   # - in which case we figure out which of the URLs is the leader
+  local curl_auth_params="$(get_curl_auth_params)"
+
   leader_api=
   apis=($orchestrator_api)
   if [ ${#apis[@]} -eq 1 ] ; then
@@ -177,7 +179,7 @@ function detect_leader_api() {
   fi
   for api in ${apis[@]} ; do
     api=$(normalize_orchestrator_api $api)
-    leader_check=$($(get_curl) -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
+    leader_check=$(curl ${curl_auth_params} -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
     if [ "$leader_check" == "200" ] ; then
       leader_api="$api"
       return
@@ -192,6 +194,8 @@ function urlencode() {
 }
 
 function api() {
+  local curl_auth_params="$(get_curl_auth_params)"
+
   path="$1"
 
   uri="$leader_api/$path"
@@ -200,7 +204,7 @@ function api() {
 
   api_call_result=0
   for sleep_time in 0.1 0.2 0.5 1 2 2.5 5 0 ; do
-    api_response=$($(get_curl) -s "$uri" | jq '.')
+    api_response=$(curl ${curl_auth_params} -s "$uri" | jq '.')
     api_call_result=$?
     [ $api_call_result -eq 0 ] && break
     sleep $sleep_time
