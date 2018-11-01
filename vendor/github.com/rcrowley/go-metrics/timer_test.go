@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"math"
 	"testing"
 	"time"
@@ -28,6 +29,18 @@ func TestTimerExtremes(t *testing.T) {
 	tm.Update(0)
 	if stdDev := tm.StdDev(); 4.611686018427388e+18 != stdDev {
 		t.Errorf("tm.StdDev(): 4.611686018427388e+18 != %v\n", stdDev)
+	}
+}
+
+func TestTimerStop(t *testing.T) {
+	l := len(arbiter.meters)
+	tm := NewTimer()
+	if len(arbiter.meters) != l+1 {
+		t.Errorf("arbiter.meters: %d != %d\n", l+1, len(arbiter.meters))
+	}
+	tm.Stop()
+	if len(arbiter.meters) != l {
+		t.Errorf("arbiter.meters: %d != %d\n", l, len(arbiter.meters))
 	}
 }
 
@@ -78,4 +91,11 @@ func TestTimerZero(t *testing.T) {
 	if rateMean := tm.RateMean(); 0.0 != rateMean {
 		t.Errorf("tm.RateMean(): 0.0 != %v\n", rateMean)
 	}
+}
+
+func ExampleGetOrRegisterTimer() {
+	m := "account.create.latency"
+	t := GetOrRegisterTimer(m, nil)
+	t.Update(47)
+	fmt.Println(t.Max()) // Output: 47
 }

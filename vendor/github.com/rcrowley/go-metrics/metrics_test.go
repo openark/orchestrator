@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"sync"
@@ -104,4 +105,20 @@ func BenchmarkMetrics(b *testing.B) {
 	wgD.Wait()
 	wgR.Wait()
 	wgW.Wait()
+}
+
+func Example() {
+	c := NewCounter()
+	Register("money", c)
+	c.Inc(17)
+
+	// Threadsafe registration
+	t := GetOrRegisterTimer("db.get.latency", nil)
+	t.Time(func() {})
+	t.Update(1)
+
+	fmt.Println(c.Count())
+	fmt.Println(t.Min())
+	// Output: 17
+	// 1
 }
