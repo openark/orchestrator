@@ -47,6 +47,28 @@ func (this HostnameUnresolve) String() string {
 	return fmt.Sprintf("%s %s", this.hostname, this.unresolvedHostname)
 }
 
+type HostnameRegistration struct {
+	CreatedAt time.Time
+	Key       InstanceKey
+	Hostname  string
+}
+
+func NewHostnameRegistration(instanceKey *InstanceKey, hostname string) *HostnameRegistration {
+	return &HostnameRegistration{
+		CreatedAt: time.Now(),
+		Key:       *instanceKey,
+		Hostname:  hostname,
+	}
+}
+
+func NewHostnameDeregistration(instanceKey *InstanceKey) *HostnameRegistration {
+	return &HostnameRegistration{
+		CreatedAt: time.Now(),
+		Key:       *instanceKey,
+		Hostname:  "",
+	}
+}
+
 var hostnameResolvesLightweightCache *cache.Cache
 var hostnameResolvesLightweightCacheInit = &sync.Mutex{}
 var hostnameResolvesLightweightCacheLoadedOnceFromDB bool = false
@@ -103,7 +125,7 @@ func ResolveHostname(hostname string) (string, error) {
 		return hostname, fmt.Errorf("Will not resolve multi-hostname: %+v", hostname)
 	}
 	if (&InstanceKey{Hostname: hostname}).IsDetached() {
-		// quietly abort. Nothign to do. The hostname is detached for a reason: it
+		// quietly abort. Nothing to do. The hostname is detached for a reason: it
 		// will not be resolved, for sure.
 		return hostname, nil
 	}
@@ -119,10 +141,11 @@ func ResolveHostname(hostname string) (string, error) {
 		// Anyway, it seems like the cache was not loaded from DB. Before doing real resolves,
 		// let's try and get the resolved hostname from database.
 		if !HostnameResolveMethodIsNone() {
-			if resolvedHostname, err := ReadResolvedHostname(hostname); err == nil && resolvedHostname != "" {
-				getHostnameResolvesLightweightCache().Set(hostname, resolvedHostname, 0)
-				return resolvedHostname, nil
-			}
+			go func() {
+				if resolvedHostname, err := ReadResolvedHostname(hostname); err == nil && resolvedHostname != "" {
+					getHostnameResolvesLightweightCache().Set(hostname, resolvedHostname, 0)
+				}
+			}()
 		}
 	}
 
@@ -145,7 +168,7 @@ func ResolveHostname(hostname string) (string, error) {
 	}
 	// Good result! Cache it, also to DB
 	log.Debugf("Cache hostname resolve %s as %s", hostname, resolvedHostname)
-	UpdateResolvedHostname(hostname, resolvedHostname)
+	go UpdateResolvedHostname(hostname, resolvedHostname)
 	return resolvedHostname, nil
 }
 
@@ -241,6 +264,13 @@ func UnresolveHostname(instanceKey *InstanceKey) (InstanceKey, bool, error) {
 	return *unresolvedKey, true, nil
 }
 
-func RegisterHostnameUnresolve(instanceKey *InstanceKey, unresolvedHostname string) (err error) {
-	return WriteHostnameUnresolve(instanceKey, unresolvedHostname)
+func RegisterHostnameUnresolve(registration *HostnameRegistration) (err error) {
+	if registration.Hostname == "" {
+		return DeleteHostnameUnresolve(&registration.Key)
+	}
+	if registration.CreatedAt.Add(time.Duration(config.Config.ExpiryHostnameResolvesMinutes) * time.Minute).Before(time.Now()) {
+		// already expired.
+		return nil
+	}
+	return WriteHostnameUnresolve(&registration.Key, registration.Hostname)
 }

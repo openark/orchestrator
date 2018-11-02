@@ -70,7 +70,12 @@ func (this *InstancesSorterByExec) Less(i, j int) bool {
 		if this.instances[j].IsSmallerBinlogFormat(this.instances[i]) {
 			return true
 		}
+		// Prefer local datacenter:
 		if this.instances[j].DataCenter == this.dataCenter && this.instances[i].DataCenter != this.dataCenter {
+			return true
+		}
+		// Prefer candidates:
+		if this.instances[j].PromotionRule.SmallerThan(this.instances[i].PromotionRule) {
 			return true
 		}
 	}

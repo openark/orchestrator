@@ -72,7 +72,7 @@ func ReadActiveMaintenance() ([]Maintenance, error) {
 func BeginBoundedMaintenance(instanceKey *InstanceKey, owner string, reason string, durationSeconds uint, explicitlyBounded bool) (int64, error) {
 	var maintenanceToken int64 = 0
 	if durationSeconds == 0 {
-		durationSeconds = config.Config.MaintenanceExpireMinutes * 60
+		durationSeconds = config.MaintenanceExpireMinutes * 60
 	}
 	res, err := db.ExecOrchestrator(`
 			insert ignore
@@ -203,7 +203,7 @@ func ExpireMaintenance() error {
 				maintenance_active is null
 				and end_timestamp < NOW() - INTERVAL ? DAY
 			`,
-			config.Config.MaintenancePurgeDays,
+			config.MaintenancePurgeDays,
 		)
 		if err != nil {
 			return log.Errore(err)
@@ -214,10 +214,8 @@ func ExpireMaintenance() error {
 	}
 	{
 		res, err := db.ExecOrchestrator(`
-			update
+			delete from
 				database_instance_maintenance
-			set
-				maintenance_active = NULL
 			where
 				maintenance_active = 1
 				and end_timestamp < NOW()
@@ -232,10 +230,8 @@ func ExpireMaintenance() error {
 	}
 	{
 		res, err := db.ExecOrchestrator(`
-			update
+			delete from
 				database_instance_maintenance
-			set
-				maintenance_active = NULL
 			where
 				explicitly_bounded = 0
 				and concat(processing_node_hostname, ':', processing_node_token) not in (

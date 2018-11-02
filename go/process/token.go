@@ -20,19 +20,25 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
+	"time"
 )
 
-func GetHash(input []byte) string {
+func toHash(input []byte) string {
 	hasher := sha256.New()
 	hasher.Write(input)
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
-func GetRandomData() []byte {
+func getRandomData() []byte {
 	size := 64
 	rb := make([]byte, size)
 	_, _ = rand.Read(rb)
 	return rb
+}
+
+func RandomHash() string {
+	return toHash(getRandomData())
 }
 
 // Token is used to identify and validate requests to this service
@@ -44,6 +50,10 @@ var ProcessToken *Token = NewToken()
 
 func NewToken() *Token {
 	return &Token{
-		Hash: GetHash(GetRandomData()),
+		Hash: RandomHash(),
 	}
+}
+
+func PrettyUniqueToken() string {
+	return fmt.Sprintf("%d:%s", time.Now().UnixNano(), NewToken().Hash)
 }

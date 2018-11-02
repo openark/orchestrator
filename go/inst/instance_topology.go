@@ -27,6 +27,7 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/math"
+	"github.com/openark/golib/util"
 )
 
 type StopReplicationMethod string
@@ -37,9 +38,12 @@ const (
 	StopReplicationNicely                       = "StopReplicationNicely"
 )
 
+var asciiFillerCharacter = " "
+var tabulatorScharacter = "|"
+
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
-func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance), extendedOutput bool) []string {
+func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance), extendedOutput bool, fillerCharacter string, tabulated bool) []string {
 	if instance == nil {
 		return []string{}
 	}
@@ -48,27 +52,32 @@ func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*In
 	}
 	prefix := ""
 	if depth > 0 {
-		prefix = strings.Repeat(" ", (depth-1)*2)
+		prefix = strings.Repeat(fillerCharacter, (depth-1)*2)
 		if instance.ReplicaRunning() && instance.IsLastCheckValid && instance.IsRecentlyChecked {
-			prefix += "+ "
+			prefix += "+" + fillerCharacter
 		} else {
-			prefix += "- "
+			prefix += "-" + fillerCharacter
 		}
 	}
 	entry := fmt.Sprintf("%s%s", prefix, instance.Key.DisplayString())
 	if extendedOutput {
-		entry = fmt.Sprintf("%s %s", entry, instance.HumanReadableDescription())
+		if tabulated {
+			entry = fmt.Sprintf("%s%s%s", entry, tabulatorScharacter, instance.TabulatedDescription(tabulatorScharacter))
+		} else {
+			entry = fmt.Sprintf("%s%s%s", entry, fillerCharacter, instance.HumanReadableDescription())
+		}
 	}
 	result := []string{entry}
 	for _, replica := range replicationMap[instance] {
-		replicasResult := getASCIITopologyEntry(depth+1, replica, replicationMap, extendedOutput)
+		replicasResult := getASCIITopologyEntry(depth+1, replica, replicationMap, extendedOutput, fillerCharacter, tabulated)
 		result = append(result, replicasResult...)
 	}
 	return result
 }
 
 // ASCIITopology returns a string representation of the topology of given cluster.
-func ASCIITopology(clusterName string, historyTimestampPattern string) (result string, err error) {
+func ASCIITopology(clusterName string, historyTimestampPattern string, tabulated bool) (result string, err error) {
+	fillerCharacter := asciiFillerCharacter
 	var instances [](*Instance)
 	if historyTimestampPattern == "" {
 		instances, err = ReadClusterInstances(clusterName)
@@ -103,26 +112,29 @@ func ASCIITopology(clusterName string, historyTimestampPattern string) (result s
 	var entries []string
 	if masterInstance != nil {
 		// Single master
-		entries = getASCIITopologyEntry(0, masterInstance, replicationMap, historyTimestampPattern == "")
+		entries = getASCIITopologyEntry(0, masterInstance, replicationMap, historyTimestampPattern == "", fillerCharacter, tabulated)
 	} else {
 		// Co-masters? For visualization we put each in its own branch while ignoring its other co-masters.
 		for _, instance := range instances {
 			if instance.IsCoMaster {
-				entries = append(entries, getASCIITopologyEntry(1, instance, replicationMap, historyTimestampPattern == "")...)
+				entries = append(entries, getASCIITopologyEntry(1, instance, replicationMap, historyTimestampPattern == "", fillerCharacter, tabulated)...)
 			}
 		}
 	}
 	// Beautify: make sure the "[...]" part is nicely aligned for all instances.
-	{
+	if tabulated {
+		entries = util.Tabulate(entries, "|", "|", util.TabulateLeft, util.TabulateRight)
+	} else {
+		indentationCharacter := "["
 		maxIndent := 0
 		for _, entry := range entries {
-			maxIndent = math.MaxInt(maxIndent, strings.Index(entry, "["))
+			maxIndent = math.MaxInt(maxIndent, strings.Index(entry, indentationCharacter))
 		}
 		for i, entry := range entries {
-			entryIndent := strings.Index(entry, "[")
+			entryIndent := strings.Index(entry, indentationCharacter)
 			if maxIndent > entryIndent {
-				tokens := strings.Split(entry, "[")
-				newEntry := fmt.Sprintf("%s%s[%s", tokens[0], strings.Repeat(" ", maxIndent-entryIndent), tokens[1])
+				tokens := strings.SplitN(entry, indentationCharacter, 2)
+				newEntry := fmt.Sprintf("%s%s%s%s", tokens[0], strings.Repeat(fillerCharacter, maxIndent-entryIndent), indentationCharacter, tokens[1])
 				entries[i] = newEntry
 			}
 		}
@@ -593,6 +605,7 @@ func MoveBelowGTID(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 // moveReplicasViaGTID moves a list of replicas under another instance via GTID, returning those replicas
 // that could not be moved (do not use GTID)
 func moveReplicasViaGTID(replicas [](*Instance), other *Instance) (movedReplicas [](*Instance), unmovedReplicas [](*Instance), err error, errs []error) {
+	replicas = RemoveNilInstances(replicas)
 	replicas = RemoveInstance(replicas, &other.Key)
 	if len(replicas) == 0 {
 		// Nothing to do
@@ -1426,7 +1439,7 @@ func MatchBelow(instanceKey, otherKey *InstanceKey, requireInstanceMaintenance b
 	}
 	log.Debugf("%+v will match below %+v at %+v; validated events: %d", *instanceKey, *otherKey, *nextBinlogCoordinatesToMatch, countMatchedEvents)
 
-	// Drum roll......
+	// Drum roll...
 	instance, err = ChangeMasterTo(instanceKey, otherKey, nextBinlogCoordinatesToMatch, false, GTIDHintDeny)
 	if err != nil {
 		goto Cleanup
@@ -2287,8 +2300,21 @@ func GetCandidateReplicaOfBinlogServerTopology(masterKey *InstanceKey) (candidat
 }
 
 // RegroupReplicasPseudoGTID will choose a candidate replica of a given instance, and take its siblings using pseudo-gtid
-func RegroupReplicasPseudoGTID(masterKey *InstanceKey, returnReplicaEvenOnFailureToRegroup bool, onCandidateReplicaChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), [](*Instance), *Instance, error) {
-	candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err := GetCandidateReplica(masterKey, true)
+func RegroupReplicasPseudoGTID(
+	masterKey *InstanceKey,
+	returnReplicaEvenOnFailureToRegroup bool,
+	onCandidateReplicaChosen func(*Instance),
+	postponedFunctionsContainer *PostponedFunctionsContainer,
+	postponeAllMatchOperations func(*Instance) bool,
+) (
+	aheadReplicas [](*Instance),
+	equalReplicas [](*Instance),
+	laterReplicas [](*Instance),
+	cannotReplicateReplicas [](*Instance),
+	candidateReplica *Instance,
+	err error,
+) {
+	candidateReplica, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err = GetCandidateReplica(masterKey, true)
 	if err != nil {
 		if !returnReplicaEvenOnFailureToRegroup {
 			candidateReplica = nil
@@ -2304,48 +2330,55 @@ func RegroupReplicasPseudoGTID(masterKey *InstanceKey, returnReplicaEvenOnFailur
 		onCandidateReplicaChosen(candidateReplica)
 	}
 
-	log.Debugf("RegroupReplicas: working on %d equals replicas", len(equalReplicas))
-	barrier := make(chan *InstanceKey)
-	for _, replica := range equalReplicas {
-		replica := replica
-		// This replica has the exact same executing coordinates as the candidate replica. This replica
-		// is *extremely* easy to attach below the candidate replica!
-		go func() {
-			defer func() { barrier <- &candidateReplica.Key }()
-			ExecuteOnTopology(func() {
-				ChangeMasterTo(&replica.Key, &candidateReplica.Key, &candidateReplica.SelfBinlogCoordinates, false, GTIDHintDeny)
-			})
-		}()
-	}
-	for range equalReplicas {
-		<-barrier
-	}
+	allMatchingFunc := func() error {
+		log.Debugf("RegroupReplicas: working on %d equals replicas", len(equalReplicas))
+		barrier := make(chan *InstanceKey)
+		for _, replica := range equalReplicas {
+			replica := replica
+			// This replica has the exact same executing coordinates as the candidate replica. This replica
+			// is *extremely* easy to attach below the candidate replica!
+			go func() {
+				defer func() { barrier <- &candidateReplica.Key }()
+				ExecuteOnTopology(func() {
+					ChangeMasterTo(&replica.Key, &candidateReplica.Key, &candidateReplica.SelfBinlogCoordinates, false, GTIDHintDeny)
+				})
+			}()
+		}
+		for range equalReplicas {
+			<-barrier
+		}
 
-	log.Debugf("RegroupReplicas: multi matching %d later replicas", len(laterReplicas))
-	// As for the laterReplicas, we'll have to apply pseudo GTID
-	laterReplicas, instance, err, _ := MultiMatchBelow(laterReplicas, &candidateReplica.Key, true, postponedFunctionsContainer)
+		log.Debugf("RegroupReplicas: multi matching %d later replicas", len(laterReplicas))
+		// As for the laterReplicas, we'll have to apply pseudo GTID
+		laterReplicas, candidateReplica, err, _ := MultiMatchBelow(laterReplicas, &candidateReplica.Key, true, postponedFunctionsContainer)
 
-	operatedReplicas := append(equalReplicas, candidateReplica)
-	operatedReplicas = append(operatedReplicas, laterReplicas...)
-	log.Debugf("RegroupReplicas: starting %d replicas", len(operatedReplicas))
-	barrier = make(chan *InstanceKey)
-	for _, replica := range operatedReplicas {
-		replica := replica
-		go func() {
-			defer func() { barrier <- &candidateReplica.Key }()
-			ExecuteOnTopology(func() {
-				StartSlave(&replica.Key)
-			})
-		}()
+		operatedReplicas := append(equalReplicas, candidateReplica)
+		operatedReplicas = append(operatedReplicas, laterReplicas...)
+		log.Debugf("RegroupReplicas: starting %d replicas", len(operatedReplicas))
+		barrier = make(chan *InstanceKey)
+		for _, replica := range operatedReplicas {
+			replica := replica
+			go func() {
+				defer func() { barrier <- &candidateReplica.Key }()
+				ExecuteOnTopology(func() {
+					StartSlave(&replica.Key)
+				})
+			}()
+		}
+		for range operatedReplicas {
+			<-barrier
+		}
+		AuditOperation("regroup-replicas", masterKey, fmt.Sprintf("regrouped %+v replicas below %+v", len(operatedReplicas), *masterKey))
+		return err
 	}
-	for range operatedReplicas {
-		<-barrier
+	if postponedFunctionsContainer != nil && postponeAllMatchOperations != nil && postponeAllMatchOperations(candidateReplica) {
+		postponedFunctionsContainer.AddPostponedFunction(allMatchingFunc, fmt.Sprintf("regroup-replicas-pseudo-gtid %+v", candidateReplica.Key))
+	} else {
+		err = allMatchingFunc()
 	}
-
 	log.Debugf("RegroupReplicas: done")
-	AuditOperation("regroup-replicas", masterKey, fmt.Sprintf("regrouped %+v replicas below %+v", len(operatedReplicas), *masterKey))
 	// aheadReplicas are lost (they were ahead in replication as compared to promoted replica)
-	return aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, instance, err
+	return aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, candidateReplica, err
 }
 
 func getMostUpToDateActiveBinlogServer(masterKey *InstanceKey) (mostAdvancedBinlogServer *Instance, binlogServerReplicas [](*Instance), err error) {
@@ -2368,7 +2401,20 @@ func getMostUpToDateActiveBinlogServer(masterKey *InstanceKey) (mostAdvancedBinl
 // RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers uses Pseugo-GTID to regroup replicas
 // of given instance. The function also drill in to replicas of binlog servers that are replicating from given instance,
 // and other recursive binlog servers, as long as they're in the same binlog-server-family.
-func RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(masterKey *InstanceKey, returnReplicaEvenOnFailureToRegroup bool, onCandidateReplicaChosen func(*Instance), postponedFunctionsContainer *PostponedFunctionsContainer) ([](*Instance), [](*Instance), [](*Instance), [](*Instance), *Instance, error) {
+func RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(
+	masterKey *InstanceKey,
+	returnReplicaEvenOnFailureToRegroup bool,
+	onCandidateReplicaChosen func(*Instance),
+	postponedFunctionsContainer *PostponedFunctionsContainer,
+	postponeAllMatchOperations func(*Instance) bool,
+) (
+	aheadReplicas [](*Instance),
+	equalReplicas [](*Instance),
+	laterReplicas [](*Instance),
+	cannotReplicateReplicas [](*Instance),
+	candidateReplica *Instance,
+	err error,
+) {
 	// First, handle binlog server issues:
 	func() error {
 		log.Debugf("RegroupReplicasIncludingSubReplicasOfBinlogServers: starting on replicas of %+v", *masterKey)
@@ -2431,7 +2477,7 @@ func RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(masterKey *Ins
 		return nil
 	}()
 	// Proceed to normal regroup:
-	return RegroupReplicasPseudoGTID(masterKey, returnReplicaEvenOnFailureToRegroup, onCandidateReplicaChosen, postponedFunctionsContainer)
+	return RegroupReplicasPseudoGTID(masterKey, returnReplicaEvenOnFailureToRegroup, onCandidateReplicaChosen, postponedFunctionsContainer, postponeAllMatchOperations)
 }
 
 // RegroupReplicasGTID will choose a candidate replica of a given instance, and take its siblings using GTID
@@ -2495,7 +2541,14 @@ func RegroupReplicasBinlogServers(masterKey *InstanceKey, returnReplicaEvenOnFai
 func RegroupReplicas(masterKey *InstanceKey, returnReplicaEvenOnFailureToRegroup bool,
 	onCandidateReplicaChosen func(*Instance),
 	postponedFunctionsContainer *PostponedFunctionsContainer) (
-	aheadReplicas [](*Instance), equalReplicas [](*Instance), laterReplicas [](*Instance), cannotReplicateReplicas [](*Instance), instance *Instance, err error) {
+
+	aheadReplicas [](*Instance),
+	equalReplicas [](*Instance),
+	laterReplicas [](*Instance),
+	cannotReplicateReplicas [](*Instance),
+	instance *Instance,
+	err error,
+) {
 	//
 	var emptyReplicas [](*Instance)
 
@@ -2535,11 +2588,11 @@ func RegroupReplicas(masterKey *InstanceKey, returnReplicaEvenOnFailureToRegroup
 	}
 	if allPseudoGTID {
 		log.Debugf("RegroupReplicas: using Pseudo-GTID to regroup replicas of %+v", *masterKey)
-		return RegroupReplicasPseudoGTID(masterKey, returnReplicaEvenOnFailureToRegroup, onCandidateReplicaChosen, postponedFunctionsContainer)
+		return RegroupReplicasPseudoGTID(masterKey, returnReplicaEvenOnFailureToRegroup, onCandidateReplicaChosen, postponedFunctionsContainer, nil)
 	}
 	// And, as last resort, we do PseudoGTID & binlog servers
 	log.Warningf("RegroupReplicas: unsure what method to invoke for %+v; trying Pseudo-GTID+Binlog Servers", *masterKey)
-	return RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(masterKey, returnReplicaEvenOnFailureToRegroup, onCandidateReplicaChosen, postponedFunctionsContainer)
+	return RegroupReplicasPseudoGTIDIncludingSubReplicasOfBinlogServers(masterKey, returnReplicaEvenOnFailureToRegroup, onCandidateReplicaChosen, postponedFunctionsContainer, nil)
 }
 
 // relocateBelowInternal is a protentially recursive function which chooses how to relocate an instance below another.

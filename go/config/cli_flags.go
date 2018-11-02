@@ -18,17 +18,19 @@ package config
 
 // CLIFlags stores some command line flags that are globally available in the process' lifetime
 type CLIFlags struct {
-	Noop               *bool
-	SkipUnresolve      *bool
-	SkipUnresolveCheck *bool
-	BinlogFile         *string
-	Databaseless       *bool
-	GrabElection       *bool
-	Version            *bool
-	Statement          *string
-	PromotionRule      *string
-	ConfiguredVersion  string
-	SkipBinlogSearch   *bool
+	Noop                       *bool
+	SkipUnresolve              *bool
+	SkipUnresolveCheck         *bool
+	BinlogFile                 *string
+	GrabElection               *bool
+	Version                    *bool
+	Statement                  *string
+	PromotionRule              *string
+	ConfiguredVersion          string
+	SkipBinlogSearch           *bool
+	SkipContinuousRegistration *bool
+	EnableDatabaseUpdate       *bool
+	IgnoreRaftSetup            *bool
 }
 
 var RuntimeCLIFlags CLIFlags

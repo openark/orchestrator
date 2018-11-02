@@ -1,5 +1,5 @@
 # Requirements
 
-`Orchestrator` is a standalone Go application. It requires a MySQL backend to store topologies state, maintenance status and audit history.
-It is built and tested on Linux 64bit, and binaries are availably for this OS type alone. The author has not tested any other operating system.
-However the [build script](https://github.com/github/orchestrator/blob/master/build.sh) is capable of building `orchestrator` for other OS/architectures.
+`orchestrator` is a standalone application. When configured to run with a `MySQL` backend, a MySQL installation is required. When configured to run with a `SQLite` backend, no further dependency is required.
+
+`orchestrator` is built and tested on Linux 64bit and Max OS/X. Official binaries are available for Linux only.

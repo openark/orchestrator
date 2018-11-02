@@ -22,7 +22,10 @@ function run_queries() {
   queries_file="$1"
 
   if [ "$db_type" == "sqlite" ] ; then
-    cat $queries_file | sed -e "s/last_checked - interval 1 minute/datetime('last_checked', '-1 minute')/g" | sqlite3 $sqlite_file
+    cat $queries_file |
+      sed -e "s/last_checked - interval 1 minute/datetime('last_checked', '-1 minute')/g" |
+      sed -e "s/current_timestamp + interval 1 minute/datetime('now', '+1 minute')/g" |
+      sqlite3 $sqlite_file
   else
     # Assume mysql
     mysql --default-character-set=utf8mb4 test -ss < $queries_file
@@ -116,6 +119,9 @@ test_single() {
     if [ $diff_result -ne 0 ] ; then
       echo
       echo "ERROR $test_name diff failure. cat $test_diff_file"
+      echo "---"
+      cat $test_diff_file
+      echo "---"
       return 1
     fi
   fi
@@ -140,7 +146,7 @@ deploy_internal_db() {
   echo_dot
   echo $cmd > $exec_command_file
   echo_dot
-  bash $exec_command_file 1> $test_outfile
+  bash $exec_command_file 1> $test_outfile 2> $test_logfile
   if [ $? -ne 0 ] ; then
     echo "ERROR deploy internal db failed"
     return 1
@@ -205,7 +211,7 @@ main() {
     test_dbs="sqlite"
     shift
   fi
-  test_dbs=${test_dbs:-"mysql"}
+  test_dbs=${test_dbs:-"mysql sqlite"}
   for db in $(echo $test_dbs) ; do
     test_db $db "$@"
     if [ $? -ne 0 ] ; then

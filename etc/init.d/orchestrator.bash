@@ -3,6 +3,16 @@
 # chkconfig: 345 20 80
 # description: orchestrator daemon
 # processname: orchestrator
+#
+### BEGIN INIT INFO
+# Provides:          orchestrator
+# Required-Start:    $local_fs $syslog
+# Required-Stop:     $local_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start orchestrator daemon
+# Description:       Start orchestrator daemon
+### END INIT INFO
 
 
 # Script credit: http://werxltd.com/wp/2012/01/05/simple-init-d-script-template/
@@ -17,7 +27,32 @@ DESC="orchestrator: MySQL replication management and visualization"
 PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
 
+# Limit the number of file descriptors (and sockets) used by
+# orchestrator.  This setting should be fine in most cases but a
+# large busy environment may # reach this limit. If exceeded expect
+# to see errors of the form:
+#   2017-06-12 02:33:09 ERROR dial tcp 10.1.2.3:3306: connect: cannot assign requested address
+# To avoid touching this script you can use /etc/orchestrator_profile
+# to increase this limit.
 ulimit -n 16384
+
+# initially noop but can adjust according by modifying orchestrator_profile
+# - see https://github.com/github/orchestrator/issues/227 for more details.
+post_start_daemon_hook () {
+	# by default do nothing
+	:
+}
+
+# Start the orchestrator daemon in the background
+start_daemon () {
+	# start up daemon in the background
+	$DAEMON_PATH/$DAEMON $DAEMONOPTS >> /var/log/${NAME}.log 2>&1 &
+	# collect and print PID of started process
+	echo $!
+	# space for optional processing after starting orchestrator
+	# - redirect stdout to stderro to prevent this corrupting the pid info
+	post_start_daemon_hook 1>&2
+}
 
 # The file /etc/orchestrator_profile can be used to inject pre-service execution
 # scripts, such as exporting variables or whatever. It's yours!
@@ -27,7 +62,7 @@ case "$1" in
   start)
     printf "%-50s" "Starting $NAME..."
     cd $DAEMON_PATH
-    PID=$(./$DAEMON $DAEMONOPTS >> /var/log/${NAME}.log 2>&1 & echo $!)
+    PID=$(start_daemon)
     #echo "Saving PID" $PID " to " $PIDFILE
     if [ -z $PID ]; then
       printf "%s\n" "Fail"

@@ -48,6 +48,18 @@ func ReadClusterNameByAlias(alias string) (clusterName string, err error) {
 	return clusterName, err
 }
 
+// DeduceClusterName attempts to resolve a cluster name given a name or alias.
+// If unsuccessful to match by alias, the function returns the same given string
+func DeduceClusterName(nameOrAlias string) (clusterName string, err error) {
+	if nameOrAlias == "" {
+		return "", fmt.Errorf("empty cluster name")
+	}
+	if name, err := ReadClusterNameByAlias(nameOrAlias); err == nil {
+		return name, nil
+	}
+	return nameOrAlias, nil
+}
+
 // ReadAliasByClusterName returns the cluster alias for the given cluster name,
 // or the cluster name itself if not explicit alias found
 func ReadAliasByClusterName(clusterName string) (alias string, err error) {
@@ -68,7 +80,7 @@ func ReadAliasByClusterName(clusterName string) (alias string, err error) {
 }
 
 // WriteClusterAlias will write (and override) a single cluster name mapping
-func WriteClusterAlias(clusterName string, alias string) error {
+func writeClusterAlias(clusterName string, alias string) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
 			replace into
@@ -82,8 +94,8 @@ func WriteClusterAlias(clusterName string, alias string) error {
 	return ExecDBWriteFunc(writeFunc)
 }
 
-// WriteClusterAliasManualOverride will write (and override) a single cluster name mapping
-func WriteClusterAliasManualOverride(clusterName string, alias string) error {
+// writeClusterAliasManualOverride will write (and override) a single cluster name mapping
+func writeClusterAliasManualOverride(clusterName string, alias string) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
 			replace into

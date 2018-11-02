@@ -12,7 +12,7 @@ function Cluster() {
   var dcColorsMap = {};
 
   var _instances, _replicationAnalysis, _maintenanceList, _instancesMap, _isDraggingTrailer = false;
-
+  var _countDragOver = 0;
 
   var _instanceCommands = {
     "recover-auto": function(e) {
@@ -23,24 +23,20 @@ function Cluster() {
       apiCommand("/api/recover-lite/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
       return true;
     },
-    "match-up-replicas": function(e) {
-      apiCommand("/api/match-up-replicas/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
-      return true;
-    },
-    "regroup-replicas": function(e) {
-      apiCommand("/api/regroup-replicas/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
+    "force-master-failover": function(e) {
+      apiCommand("/api/force-master-failover/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port);
       return true;
     },
     "recover-suggested-successor": function(e) {
-      var suggestedSuccessorHost = $(e.target).attr("data-suggested-successor-host");
-      var suggestedSuccessorPort = $(e.target).attr("data-suggested-successor-port");
+      var suggestedSuccessorHost = $(e.target).attr("data-successor-host");
+      var suggestedSuccessorPort = $(e.target).attr("data-successor-port");
       apiCommand("/api/recover/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port + "/" + suggestedSuccessorHost + "/" + suggestedSuccessorPort);
       return true;
     },
-    "match-replicas": function(e) {
-      var belowHost = $(e.target).attr("data-below-host");
-      var belowPort = $(e.target).attr("data-below-port");
-      apiCommand("/api/match-replicas/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port + "/" + belowHost + "/" + belowPort);
+    "relocate-replicas": function(e) {
+      var belowHost = $(e.target).attr("data-successor-host");
+      var belowPort = $(e.target).attr("data-successor-port");
+      apiCommand("/api/relocate-replicas/" + _instancesMap[e.draggedNodeId].Key.Hostname + "/" + _instancesMap[e.draggedNodeId].Key.Port + "/" + belowHost + "/" + belowPort);
       return true;
     },
     "make-master": function(e) {
@@ -52,8 +48,6 @@ function Cluster() {
       return false;
     },
   };
-
-
 
   Object.defineProperties(_this, {
     moveInstanceMethod: {
@@ -137,6 +131,7 @@ function Cluster() {
   function clearDroppable() {
     $(".original-dragged").removeClass("original-dragged");
     resetRefreshTimer();
+    $("#cluster_container .accept_drop_check").removeClass("accept_drop_check");
     $("#cluster_container .accept_drop").removeClass("accept_drop");
     $("#cluster_container .accept_drop_warning").removeClass("accept_drop_warning");
     $(".being-dragged").removeClass("being-dragged");
@@ -234,6 +229,9 @@ function Cluster() {
     $(instanceEl).data("svg-instance-wrapper", svgInstanceWrapper);
 
     renderInstanceElement(instanceEl, node, "cluster");
+
+    var masterSectionEl = $('<div class="instance-master-section" data-nodeid="' + node.id + '"></div>').appendTo(instanceEl);
+    var normalSectionEl = $('<div class="instance-normal-section" data-nodeid="' + node.id + '"></div>').appendTo(instanceEl);
     if (node.children) {
       var trailerEl = $('<div class="instance-trailer" data-nodeid="' + node.id + '"><div><span class="glyphicon glyphicon-chevron-left" title="Drag and drop replicas of this instance"></span></div></div>').appendTo(instanceEl);
       instanceEl.data("instance-trailer", trailerEl);
@@ -263,7 +261,8 @@ function Cluster() {
     }
 
     activateInstanceDraggable(instanceEl);
-    prepareInstanceDroppable(instanceEl);
+    prepareInstanceDroppable(normalSectionEl);
+    prepareInstanceMasterSectionDroppable(masterSectionEl);
   }
 
   function instanceEl_getTrailerEl(instanceEl) {
@@ -273,7 +272,7 @@ function Cluster() {
 
 
   function wireInstanceCommands() {
-    $("body").on("click", ".instance h3 a", function(e) {
+    $("body").on("click", ".instance h3 .instance-glyphs", function(e) {
       var target = $(e.target);
       e.draggedNodeId = target.attr("data-nodeid");
       if (e.draggedNodeId == $(".instance").attr("data-nodeid"))
@@ -281,8 +280,9 @@ function Cluster() {
       openNodeModal(_instancesMap[draggedNodeId]);
       return false;
     });
+
     $("body").on("click", ".instance a[data-command], .instance button[data-command]", function(e) {
-      var target = $(e.target);
+      var target = $(e.target).closest("a");
       var instanceEl = target.closest(".instance");
       e.draggedNodeId = instanceEl.attr("data-nodeid");
 
@@ -312,13 +312,14 @@ function Cluster() {
         var draggedNode = nodesMap[draggedNodeId];
         var targetNode = nodesMap[instanceEl.attr("data-nodeid")];
         var action = _isDraggingTrailer ? moveChildren : moveInstance;
-
         var acceptDrop = action(draggedNode, targetNode, false);
+        var instanceDiv = $(this).closest(".instance");
+        instanceDiv.addClass("accept_drop_check");
         if (acceptDrop.accept == "ok") {
-          $(this).addClass("accept_drop");
+          instanceDiv.addClass("accept_drop");
         }
         if (acceptDrop.accept == "warning") {
-          $(this).addClass("accept_drop_warning");
+          instanceDiv.addClass("accept_drop_warning");
         }
         $(this).attr("data-drop-comment", acceptDrop.accept ? acceptDrop.type : "");
         var accepted = acceptDrop.accept != null;
@@ -326,16 +327,21 @@ function Cluster() {
       },
       hoverClass: "draggable-hovers",
       over: function(event, ui) {
+        _countDragOver++;
         var duplicate = ui.helper;
         // Called once when dragged object is over another object
         if ($(this).attr("data-drop-comment")) {
           $(duplicate).addClass("draggable-msg");
           $(duplicate).find(".instance-content,.instance-trailer-content").html($(this).attr("data-drop-comment"))
         } else {
-          $(duplicate).find(".instance-content,.instance-trailer-content").html("Cannot drop here")
+          $(duplicate).find(".instance-content,.instance-trailer-content").html('<span class="glyphicon glyphicon-minus-sign text-danger"></span> Cannot drop here')
         }
       },
       out: function(event, ui) {
+        _countDragOver--;
+        if (_countDragOver > 0) {
+          return;
+        }
         var duplicate = ui.helper;
         // Called once when dragged object leaves other object
         $(duplicate).removeClass("draggable-msg");
@@ -352,6 +358,65 @@ function Cluster() {
 
   }
 
+  function prepareInstanceMasterSectionDroppable(instanceMasterSectionEl) {
+    var nodesMap = _instancesMap;
+    instanceMasterSectionEl.droppable({
+      accept: function(draggable) {
+        // Find the objects that accept a draggable (i.e. valid droppables)
+        if (!droppableIsActive) {
+          return false
+        }
+        if (instanceMasterSectionEl[0] == draggable[0])
+          return false;
+        var draggedNodeId = draggable.attr("data-nodeid");
+        var draggedNode = nodesMap[draggedNodeId];
+        var targetNode = nodesMap[instanceMasterSectionEl.attr("data-nodeid")];
+        var action = _isDraggingTrailer ? moveChildren : moveInstanceOnMaster;
+        var acceptDrop = action(draggedNode, targetNode, false);
+        var instanceDiv = $(this).closest(".instance");
+        instanceDiv.addClass("accept_drop_check");
+        if (acceptDrop.accept == "ok") {
+          instanceDiv.addClass("accept_drop");
+        }
+        if (acceptDrop.accept == "warning") {
+          instanceDiv.addClass("accept_drop_warning");
+        }
+        $(this).attr("data-drop-comment", acceptDrop.accept ? acceptDrop.type : "");
+        var accepted = acceptDrop.accept != null;
+        return accepted;
+      },
+      hoverClass: "draggable-hovers",
+      over: function(event, ui) {
+        _countDragOver += 1;
+        var duplicate = ui.helper;
+        // Called once when dragged object is over another object
+        if ($(this).attr("data-drop-comment")) {
+          $(duplicate).addClass("draggable-msg");
+          $(duplicate).find(".instance-content,.instance-trailer-content").html($(this).attr("data-drop-comment"))
+        } else {
+          $(duplicate).find(".instance-content,.instance-trailer-content").html('<span class="glyphicon glyphicon-minus-sign text-danger"></span> Cannot drop here')
+        }
+      },
+      out: function(event, ui) {
+        _countDragOver--;
+        if (_countDragOver > 0) {
+          return;
+        }
+        var duplicate = ui.helper;
+        // Called once when dragged object leaves other object
+        $(duplicate).removeClass("draggable-msg");
+        $(duplicate).find(".instance-content,.instance-trailer-content").html("")
+      },
+      drop: function(e, ui) {
+        var draggedNodeId = ui.draggable.attr("data-nodeid");
+        var duplicate = ui.helper;
+        var action = _isDraggingTrailer ? moveChildren : moveInstanceOnMaster;
+        action(nodesMap[draggedNodeId], nodesMap[$(this).attr("data-nodeid")], true);
+        clearDroppable();
+      }
+    });
+
+  }
 
   // moveInstance checks whether an instance (node) can be dropped on another (droppableNode).
   // The function consults with the current moveInstanceMethod; the type of action taken is based on that.
@@ -401,7 +466,7 @@ function Cluster() {
         }
         return {
           accept: "ok",
-          type: "makeCoMaster with " + droppableTitle
+          type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>MAKE CO MASTER</strong> with ' + droppableTitle,
         };
       }
       if (instanceIsDescendant(droppableNode, node)) {
@@ -478,7 +543,7 @@ function Cluster() {
         }
         return {
           accept: "ok",
-          type: "makeCoMaster with " + droppableTitle
+          type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>MAKE CO MASTER</strong> with ' + droppableTitle,
         };
       }
       if (instanceIsDescendant(droppableNode, node)) {
@@ -549,7 +614,7 @@ function Cluster() {
           }
           return {
             accept: "ok",
-            type: "makeCoMaster with " + droppableTitle
+            type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>MAKE CO MASTER</strong> with ' + droppableTitle,
           };
         }
       }
@@ -623,7 +688,7 @@ function Cluster() {
         }
         return {
           accept: "ok",
-          type: "makeCoMaster with " + droppableTitle
+          type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>MAKE CO MASTER</strong> with ' + droppableTitle,
         };
       }
       return {
@@ -645,6 +710,62 @@ function Cluster() {
     };
   }
 
+
+  function moveInstanceOnMaster(node, droppableNode, shouldApply) {
+    var unaccepted = {
+      accept: false
+    };
+    if (!isAuthorizedForAction()) {
+      // Obviously this is also checked on server side, no need to try stupid hacks
+      return unaccepted;
+    }
+    if (moveInstanceMethod != "smart") {
+      return unaccepted;
+    }
+    var droppableTitle = getInstanceDiv(droppableNode.id).find("h3 .pull-left").html();
+
+    if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem || droppableNode.isAggregate) {
+      // Obviously can't handle.
+      return unaccepted;
+    }
+    if (instanceIsChild(node, droppableNode) && !droppableNode.isMaster) {
+      if (node.hasProblem) {
+        // Typically, when a node has a problem we do not allow moving it up.
+        // But there's a special situation when allowing is desired: when
+        // this replica is completely caught up;
+        if (!node.isSQLThreadCaughtUpWithIOThread) {
+          return {
+            accept: false
+          };
+        }
+      }
+      if (shouldApply) {
+        takeMaster(node, droppableNode);
+      }
+      return {
+        accept: "ok",
+        type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>take master</strong> ' + droppableTitle
+      };
+    }
+    if (instanceIsChild(node, droppableNode) &&
+      droppableNode.isMaster &&
+      !node.isCoMaster
+    ) {
+      if (node.hasProblem) {
+        return {
+          accept: false
+        };
+      }
+      if (shouldApply) {
+        gracefulMasterTakeover(node, droppableNode);
+      }
+      return {
+        accept: "ok",
+        type: '<span class="glyphicon glyphicon-exclamation-sign text-warning"></span> <strong>PROMOTE AS MASTER</strong> '
+      };
+    }
+    return moveInstance(node, droppableNode, shouldApply);
+  }
 
   // moveChildren checks whether an children of an instance (node) can be dropped on another (droppableNode).
   // The function consults with the current moveInstanceMethod; the type of action taken is based on that.
@@ -810,21 +931,18 @@ function Cluster() {
 
 
   function executeMoveOperation(message, apiUrl) {
-    bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
-      if (confirm) {
-        showLoader();
-        getData(apiUrl, function(operationResult) {
-          hideLoader();
-          if (operationResult.Code == "ERROR") {
-            addAlert(operationResult.Message)
-          } else {
-            reloadWithOperationResult(operationResult);
-          }
-        });
-      }
-      $("#cluster_container .accept_drop").removeClass("accept_drop");
-      $("#cluster_container .accept_drop").removeClass("accept_drop_warning");
-    });
+    if (isSilentUI()) {
+      apiCommand(apiUrl);
+    } else {
+      bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
+        if (confirm) {
+          apiCommand(apiUrl);
+        }
+      });
+    }
+    $("#cluster_container .accept_drop_check").removeClass("accept_drop_check");
+    $("#cluster_container .accept_drop").removeClass("accept_drop");
+    $("#cluster_container .accept_drop").removeClass("accept_drop_warning");
     return false;
   }
 
@@ -913,16 +1031,6 @@ function Cluster() {
     return executeMoveOperation(message, apiUrl);
   }
 
-  function makeCoMaster(node, childNode) {
-    var message = "<h4>make-co-master</h4>Are you sure you wish to make <code><strong>" +
-      node.Key.Hostname + ":" + node.Key.Port +
-      "</strong></code> and <code><strong>" +
-      childNode.Key.Hostname + ":" + childNode.Key.Port +
-      "</strong></code> co-masters?";
-    var apiUrl = "/api/make-co-master/" + childNode.Key.Hostname + "/" + childNode.Key.Port;
-    return executeMoveOperation(message, apiUrl);
-  }
-
   function matchBelow(node, otherNode) {
     var message = "<h4>PSEUDO-GTID MODE, match-below</h4>Are you sure you wish to turn <code><strong>" +
       node.Key.Hostname + ":" + node.Key.Port +
@@ -951,6 +1059,35 @@ function Cluster() {
       "</strong></code>?";
     var apiUrl = "/api/move-replicas-gtid/" + node.Key.Hostname + "/" + node.Key.Port + "/" + otherNode.Key.Hostname + "/" + otherNode.Key.Port;
     return executeMoveOperation(message, apiUrl);
+  }
+
+  function makeCoMaster(node, childNode) {
+    var message = "<h4>make-co-master</h4>Are you sure you wish to make <code><strong>" +
+      node.Key.Hostname + ":" + node.Key.Port +
+      "</strong></code> and <code><strong>" +
+      childNode.Key.Hostname + ":" + childNode.Key.Port +
+      "</strong></code> co-masters?";
+    bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
+      if (confirm) {
+        apiCommand("/api/make-co-master/" + childNode.Key.Hostname + "/" + childNode.Key.Port);
+        return true;
+      }
+    });
+    return false;
+  }
+
+
+  function gracefulMasterTakeover(newMasterNode, existingMasterNode) {
+    var message = '<h1><span class="glyphicon glyphicon-exclamation-sign text-warning"></span> DANGER ZONE</h1><h4>Graceful-master-takeover</h4>Are you sure you wish to promote <code><strong>' +
+      newMasterNode.Key.Hostname + ':' + newMasterNode.Key.Port +
+      '</strong></code> as master?';
+    bootbox.confirm(anonymizeIfNeedBe(message), function(confirm) {
+      if (confirm) {
+        apiCommand("/api/graceful-master-takeover/" + existingMasterNode.Key.Hostname + "/" + existingMasterNode.Key.Port);
+        return true;
+      }
+    });
+    return false;
   }
 
   function instancesAreSiblings(node1, node2) {
@@ -1253,16 +1390,15 @@ function Cluster() {
     return message;
   }
 
-  function addSidebarInfoPopoverContent(content, prepend) {
-    if (prepend === true) {
-      var wrappedContent = '<div>' + content + '<div style="clear: both;"></div></div>';
-      $("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content",
-        wrappedContent + $("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content"));
-
+  function addSidebarInfoPopoverContent(content, tag, hr) {
+    if (hr === true) {
+      content = '<hr/>' + content
+    }
+    wrappedContent = '<div data-tag="'+tag+'">' + content + '<div style="clear: both;"></div></div>';
+    if (tag === "analysis") {
+      $(wrappedContent).insertAfter("#cluster_info [data-tag=glyphs]")
     } else {
-      var wrappedContent = '<div><hr/>' + content + '</div>';
-      $("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content",
-        $("#cluster_sidebar [data-bullet=info] [data-toggle=popover]").attr("data-content") + wrappedContent);
+      $("#cluster_info").append(wrappedContent)
     }
   }
 
@@ -1270,18 +1406,13 @@ function Cluster() {
     var content = '';
 
     {
-      var content = 'Alias: ' + clusterInfo.ClusterAlias + '';
-      addSidebarInfoPopoverContent(content, false);
-    } {
-      var content = 'Domain: ' + clusterInfo.ClusterDomain + '';
-      addSidebarInfoPopoverContent(content, false);
-    } {
-      var content = 'Heuristic lag: ' + clusterInfo.HeuristicLag + 's';
-      addSidebarInfoPopoverContent(content, false);
-    } {
-      var content = '<a href="' + appUrl('/web/audit-recovery/cluster/' + clusterInfo.ClusterName) + '">Recovery history</a>';
-      addSidebarInfoPopoverContent(content, false);
-    } {
+      var content = '<button type="button" class="close" aria-hidden="true">&times;</button>';
+      addSidebarInfoPopoverContent(content, "close", false);
+      $("#cluster_info button.close").click(function() {
+        $("#cluster_info").hide();
+      });
+    }
+    {
       var content = '';
       if (clusterInfo.HasAutomatedMasterRecovery === true) {
         content += '<span class="glyphicon glyphicon-heart text-info" title="Automated master recovery for this cluster ENABLED"></span>';
@@ -1293,11 +1424,49 @@ function Cluster() {
       } else {
         content += '<span class="glyphicon glyphicon-heart-empty text-muted pull-right" title="Automated intermediate master recovery for this cluster DISABLED"></span>';
       }
-      addSidebarInfoPopoverContent(content, true);
-    } {
-      var content = '<strong>' + currentClusterName() + '</strong>';
-      addSidebarInfoPopoverContent(content, true);
+      addSidebarInfoPopoverContent(content, "glyphs", false);
     }
+    {
+      var content = currentClusterName();
+      addSidebarInfoPopoverContent(content, "cluster-name", true);
+    }
+    {
+      var content = 'Alias: ' + clusterInfo.ClusterAlias + '';
+      addSidebarInfoPopoverContent(content, "cluster-alias", true);
+    } {
+      var content = 'Domain: ' + clusterInfo.ClusterDomain + '';
+      addSidebarInfoPopoverContent(content, "cluster-domain", true);
+    }
+
+    var maxItems = 5
+    getData("/api/audit-recovery/alias/" + clusterInfo.ClusterAlias, function(recoveries) {
+      recoveries = recoveries || []
+      recoveries = recoveries.slice(0, maxItems)
+      if (recoveries.length > 0) {
+        var content = '<a href="' + appUrl('/web/audit-recovery/alias/' + clusterInfo.ClusterAlias) + '">Recovery history</a>';
+        addSidebarInfoPopoverContent(content, "audit-recovery-title", true);
+      }
+      recoveries.forEach(function(recovery) {
+        var glyph = '<span class="glyphicon text-success glyphicon-ok-sign"></span>';
+        if (recovery.IsSuccessful === false) {
+          glyph = '<span class="glyphicon text-danger glyphicon-remove-sign"></span>';
+        }
+        var content = '<a href="/web/audit-recovery/uid/'+recovery.UID+'">' + recovery.RecoveryStartTimestamp + '</a>: ' + glyph + ' ' + recovery.AnalysisEntry.Analysis
+        addSidebarInfoPopoverContent(content, "audit-recovery", true);
+      });
+    });
+    getData("/api/audit-failure-detection/alias/" + clusterInfo.ClusterAlias, function(failureDetections) {
+      failureDetections = failureDetections || []
+      failureDetections = failureDetections.slice(0, maxItems)
+      if (failureDetections.length > 0) {
+        var content = '<a href="' + appUrl('/web/audit-failure-detection/alias/' + clusterInfo.ClusterAlias) + '">Failure detection</a>';
+        addSidebarInfoPopoverContent(content, "audit-detection-title", true);
+      }
+      failureDetections.forEach(function(failureDetection) {
+        var content = failureDetection.RecoveryStartTimestamp + ': ' + failureDetection.AnalysisEntry.Analysis
+        addSidebarInfoPopoverContent(content, "audit-detection", true);
+      });
+    });
     // Colorize-dc
     {
       var glyph = $("#cluster_sidebar [data-bullet=colorize-dc] .glyphicon");
@@ -1308,8 +1477,9 @@ function Cluster() {
         glyph.addClass("text-muted");
         glyph.attr("title", "Color by data center");
       }
-    } {
-      // Compact display
+    }
+    // Compact display
+    {
       var anchor = $("#cluster_sidebar [data-bullet=compact-display] a");
       var glyph = $(anchor).find(".glyphicon")
       if (isCompactDisplay()) {
@@ -1342,16 +1512,40 @@ function Cluster() {
         glyph.attr("title", "Anonymize display");
       }
     }
+    // Silent UI
+    {
+      var glyph = $("#cluster_sidebar [data-bullet=silent-ui] .glyphicon");
+      if (isSilentUI()) {
+        glyph.addClass("text-info");
+        glyph.attr("title", "Cancel UI silence");
+      } else {
+        glyph.addClass("text-muted");
+        glyph.attr("title", "Silence UI questions");
+      }
+    }
   }
 
   function onAnalysisEntry(analysisEntry, instance) {
-    var content = '<span><strong>' + analysisEntry.Analysis + (analysisEntry.IsDowntimed ? '<br/>[<i>downtime till ' + analysisEntry.DowntimeEndTimestamp + '</i>]' : '') + "</strong></span>" + "<br/>" + "<span>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</span>";
+    var glyph = '';
+    var hasDowntime = analysisEntry.IsDowntimed || analysisEntry.IsReplicasDowntimed
     if (analysisEntry.IsStructureAnalysis) {
-      content = '<div class="pull-left glyphicon glyphicon-exclamation-sign text-warning"></div>' + content;
+      glyph = '<span class="pull-left glyphicon glyphicon-exclamation-sign '+(hasDowntime ? "text-muted" : "text-warning")+'"></span>';
     } else {
-      content = '<div class="pull-left glyphicon glyphicon-exclamation-sign text-danger"></div>' + content;
+      glyph = '<span class="pull-left glyphicon glyphicon-exclamation-sign '+(hasDowntime ? "text-muted" : "text-danger")+'"></span>';
     }
-    addSidebarInfoPopoverContent(content);
+    var analysisContent = '<div><strong>' + analysisEntry.Analysis + "</strong></div>";
+    var extraText = '';
+    if  (analysisEntry.IsDowntimed) {
+      extraText = '<i>downtime till ' + analysisEntry.DowntimeEndTimestamp + '</i>';
+    } else if (analysisEntry.IsReplicasDowntimed) {
+      extraText = '<i>replicas downtimed</i>';
+    }
+    if (extraText != '') {
+      analysisContent += '<div>' + extraText + '</div>';
+    }
+    analysisContent += "<div>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</div>";
+    var content = '<div><div class="pull-left">'+glyph+'</div><div class="pull-right">'+analysisContent+'</div></div>';
+    addSidebarInfoPopoverContent(content, "analysis", false);
 
     if (analysisEntry.IsStructureAnalysis) {
       return;
@@ -1362,17 +1556,11 @@ function Cluster() {
     popoverElement.find(".popover-footer .dropdown").append('<button type="button" class="btn btn-xs btn-default dropdown-toggle" id="recover_dropdown_' + instance.id + '" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true"><span class="glyphicon glyphicon-heart text-danger"></span> Recover <span class="caret"></span></button><ul class="dropdown-menu" aria-labelledby="recover_dropdown_' + instance.id + '"></ul>');
     popoverElement.find(".popover-footer .dropdown").append('<ul class="dropdown-menu" aria-labelledby="recover_dropdown_' + instance.id + '"></ul>');
     var recoveryListing = popoverElement.find(".dropdown ul");
-    recoveryListing.append('<li><a href="#" data-btn="auto" data-command="recover-auto">Auto (implies running external hooks/processes)</a></li>');
-    recoveryListing.append('<li><a href="#" data-btn="auto-lite" data-command="recover-auto-lite">Auto (do not execute hooks/processes)</a></li>');
-    recoveryListing.append('<li role="separator" class="divider"></li>');
 
-    if (!instance.isMaster) {
-      recoveryListing.append('<li><a href="#" data-btn="match-up-replicas" data-command="match-up-replicas">Match up replicas to <code>' + instance.masterTitle + '</code></a></li>');
-    }
-    if (instance.children && instance.children.length > 1) {
-      recoveryListing.append('<li><a href="#" data-btn="regroup-replicas" data-command="regroup-replicas">Regroup replicas (auto pick best replica, only heals topology, no external processes)</a></li>');
-    }
     if (instance.isMaster) {
+      recoveryListing.append('<li><a href="#" data-btn="force-master-failover" data-command="force-master-failover"><div class="glyphicon glyphicon-exclamation-sign text-danger"></div> <span class="text-danger">Force fail over <strong>now</strong> (even if normal handling would not fail over)</span></a></li>');
+      recoveryListing.append('<li role="separator" class="divider"></li>');
+
       // Suggest successor
       instance.children.forEach(function(replica) {
         if (!replica.LogBinEnabled) {
@@ -1391,8 +1579,13 @@ function Cluster() {
           return
         }
         recoveryListing.append(
-          '<li><a href="#" data-btn="recover-suggested-successor" data-command="recover-suggested-successor" data-suggested-successor-host="' + replica.Key.Hostname + '" data-suggested-successor-port="' + replica.Key.Port + '">Regroup replicas, try to promote <code>' + replica.title + '</code></a></li>');
+          '<li><a href="#" data-btn="recover-suggested-successor" data-command="recover-suggested-successor" data-successor-host="' + replica.Key.Hostname + '" data-successor-port="' + replica.Key.Port + '">Recover, try to promote <code>' + replica.title + '</code></a></li>');
       });
+    }
+    if (!instance.isMaster) {
+      recoveryListing.append('<li><a href="#" data-btn="auto" data-command="recover-auto">Auto (implies running external hooks/processes)</a></li>');
+      recoveryListing.append('<li role="separator" class="divider"></li>');
+      recoveryListing.append('<li><a href="#" data-btn="relocate-replicas" data-command="relocate-replicas" data-successor-host="' + instance.MasterKey.Hostname + '" data-successor-port="' + instance.MasterKey.Port + '">Relocate replicas to <code>' + instance.masterTitle + '</code></a></li>');
     }
     if (instance.masterNode) {
       // Intermediate master; suggest successor
@@ -1413,19 +1606,23 @@ function Cluster() {
           return
         }
         recoveryListing.append(
-          '<li><a href="#" data-btn="match-replicas" data-command="match-replicas" data-below-host="' + sibling.Key.Hostname + '" data-below-port="' + sibling.Key.Port + '">Match all replicas below <code>' + sibling.title + '</code></a></li>');
+          '<li><a href="#" data-btn="relocate-replicas" data-command="relocate-replicas" data-successor-host="' + sibling.Key.Hostname + '" data-successor-port="' + sibling.Key.Port + '">Relocate replicas to <code>' + sibling.title + '</code></a></li>');
       });
     }
   }
 
-
   function reviewReplicationAnalysis(replicationAnalysis) {
     var instancesMap = _instancesMap;
     var clusterHasReplicationAnalysisIssue = false;
+    var allIssuesAreDowntimed = true;
     var clusterHasStructureAnalysisIssue = false;
     replicationAnalysis.Details.forEach(function(analysisEntry) {
       if (analysisEntry.ClusterDetails.ClusterName != currentClusterName()) {
         return;
+      }
+      var hasDowntime = analysisEntry.IsDowntimed || analysisEntry.IsReplicasDowntimed
+      if (!hasDowntime) {
+        allIssuesAreDowntimed = false;
       }
       var instanceId = getInstanceId(analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port);
       var instance = instancesMap[instanceId]
@@ -1442,9 +1639,11 @@ function Cluster() {
       });
     });
     if (clusterHasReplicationAnalysisIssue) {
-      $("#cluster_sidebar [data-bullet=info] div span").addClass("text-danger").addClass("glyphicon-exclamation-sign");;
+      var iconClass = (allIssuesAreDowntimed ? "text-muted" : "text-danger");
+      $("#cluster_sidebar [data-bullet=info] div span").addClass(iconClass).addClass("glyphicon-exclamation-sign");;
     } else if (clusterHasStructureAnalysisIssue) {
-      $("#cluster_sidebar [data-bullet=info] div span").addClass("text-warning").addClass("glyphicon-exclamation-sign");;
+      var iconClass = (allIssuesAreDowntimed ? "text-muted" : "text-warning");
+      $("#cluster_sidebar [data-bullet=info] div span").addClass(iconClass).addClass("glyphicon-exclamation-sign");;
     } else {
       $("#cluster_sidebar [data-bullet=info] div span").addClass("text-info").addClass("glyphicon-info-sign");
     }
@@ -1531,7 +1730,7 @@ function Cluster() {
       document.title = document.title.split(" - ")[0] + " - " + visualAlias;
 
       if (!isAnonymized()) {
-        $("#cluster_container").append('<div class="floating_background">' + visualAlias + '</div>');
+        $("#cluster_name").text(visualAlias);
         $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="' + clusterInfo.ClusterAlias + '">Alias: ' + alias + '</a></li>');
       }
       $("#dropdown-context").append('<li><a href="' + appUrl('/web/cluster-pools/' + currentClusterName()) + '">Pools</a></li>');
@@ -1572,16 +1771,6 @@ function Cluster() {
       blockedRecoveries.forEach(function(blockedRecovery) {
         addAlert('A <strong>' + blockedRecovery.Analysis + '</strong> on ' + getInstanceTitle(blockedRecovery.FailedInstanceKey.Hostname, blockedRecovery.FailedInstanceKey.Port) + ' is blocked due to a <a href="' + appUrl('/web/audit-recovery/cluster/' + blockedRecovery.ClusterName) + '">previous recovery</a>');
       });
-    });
-    getData("/api/cluster-osc-replicas/" + currentClusterName(), function(instances) {
-      var instancesMap = normalizeInstances(instances, Array());
-      var instancesTitles = Array();
-      instances.forEach(function(instance) {
-        instancesTitles.push(instance.title);
-      });
-      var instancesTitlesConcatenates = instancesTitles.join(" ");
-      var content = "Heuristic list of OSC controller replicas: <pre>" + instancesTitlesConcatenates + "</pre>";;
-      addSidebarInfoPopoverContent(content);
     });
 
     $("#li-move-instance-method").appendTo("ul.navbar-nav").show();
@@ -1631,6 +1820,10 @@ function Cluster() {
       });
       location.reload();
     });
+    $("body").on("click", "a[data-command=info]", function(event) {
+      $("#cluster_info").toggle();
+      return false
+    });
     $("body").on("click", "a[data-command=colorize-dc]", function(event) {
       if (isColorizeDC()) {
         $.cookie("colorize-dc", "false", {
@@ -1661,6 +1854,21 @@ function Cluster() {
       location.reload();
       return
     });
+    $("body").on("click", "a[data-command=silent-ui]", function(event) {
+      if ($.cookie("silent-ui") == "true") {
+        $.cookie("silent-ui", "false", {
+          path: '/',
+          expires: 1
+        });
+      } else {
+        $.cookie("silent-ui", "true", {
+          path: '/',
+          expires: 1
+        });
+      }
+      location.reload();
+      return
+    });
 
     $("[data-toggle=popover]").popover();
     $("[data-toggle=popover]").show();
@@ -1672,6 +1880,11 @@ function Cluster() {
     refreshClusterOperationModeButton();
   }
 
+  $(document).keyup(function(e) {
+    if (e.keyCode == 27) {
+      $("#cluster_info").hide();
+    }
+  });
 
   function getData(url, cb) {
     $.get(appUrl(url), cb, "json");

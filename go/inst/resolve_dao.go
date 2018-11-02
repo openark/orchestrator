@@ -144,6 +144,19 @@ func ReadAllHostnameUnresolves() ([]HostnameUnresolve, error) {
 	return unres, log.Errore(err)
 }
 
+// ReadAllHostnameUnresolves returns the content of the hostname_unresolve table
+func ReadAllHostnameUnresolvesRegistrations() (registrations []HostnameRegistration, err error) {
+	unresolves, err := ReadAllHostnameUnresolves()
+	if err != nil {
+		return registrations, err
+	}
+	for _, unresolve := range unresolves {
+		registration := NewHostnameRegistration(&InstanceKey{Hostname: unresolve.hostname}, unresolve.unresolvedHostname)
+		registrations = append(registrations, *registration)
+	}
+	return registrations, nil
+}
+
 // readUnresolvedHostname reverse-reads hostname resolve. It returns a hostname which matches given pattern and resovles to resolvedHostname,
 // or, in the event no such hostname is found, the given resolvedHostname, unchanged.
 func readUnresolvedHostname(hostname string) (string, error) {
@@ -228,8 +241,8 @@ func WriteHostnameUnresolve(instanceKey *InstanceKey, unresolvedHostname string)
 	return ExecDBWriteFunc(writeFunc)
 }
 
-// DeregisterHostnameUnresolve removes an unresovle entry
-func DeregisterHostnameUnresolve(instanceKey *InstanceKey) error {
+// DeleteHostnameUnresolve removes an unresolve entry
+func DeleteHostnameUnresolve(instanceKey *InstanceKey) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
       	delete from hostname_unresolve

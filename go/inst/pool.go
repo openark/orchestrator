@@ -18,6 +18,7 @@ package inst
 
 import (
 	"strings"
+	"time"
 
 	"github.com/github/orchestrator/go/config"
 
@@ -26,6 +27,21 @@ import (
 
 // PoolInstancesMap lists instance keys per pool name
 type PoolInstancesMap map[string]([]*InstanceKey)
+
+type PoolInstancesSubmission struct {
+	CreatedAt          time.Time
+	Pool               string
+	DelimitedInstances string
+	RegisteredAt       string
+}
+
+func NewPoolInstancesSubmission(pool string, instances string) *PoolInstancesSubmission {
+	return &PoolInstancesSubmission{
+		CreatedAt:          time.Now(),
+		Pool:               pool,
+		DelimitedInstances: instances,
+	}
+}
 
 // ClusterPoolInstance is an instance mapping a cluster, pool & instance
 type ClusterPoolInstance struct {
@@ -36,12 +52,16 @@ type ClusterPoolInstance struct {
 	Port         int
 }
 
-func ApplyPoolInstances(pool string, instancesList string) error {
+func ApplyPoolInstances(submission *PoolInstancesSubmission) error {
+	if submission.CreatedAt.Add(time.Duration(config.Config.InstancePoolExpiryMinutes) * time.Minute).Before(time.Now()) {
+		// already expired; no need to persist
+		return nil
+	}
 	var instanceKeys [](*InstanceKey)
-	if instancesList != "" {
-		instancesStrings := strings.Split(instancesList, ",")
+	if submission.DelimitedInstances != "" {
+		instancesStrings := strings.Split(submission.DelimitedInstances, ",")
 		for _, instanceString := range instancesStrings {
-
+			instanceString = strings.TrimSpace(instanceString)
 			instanceKey, err := ParseInstanceKeyLoose(instanceString)
 			if config.Config.SupportFuzzyPoolHostnames {
 				instanceKey = ReadFuzzyInstanceKeyIfPossible(instanceKey)
@@ -54,6 +74,6 @@ func ApplyPoolInstances(pool string, instancesList string) error {
 			instanceKeys = append(instanceKeys, instanceKey)
 		}
 	}
-	writePoolInstances(pool, instanceKeys)
+	writePoolInstances(submission.Pool, instanceKeys)
 	return nil
 }

@@ -1,0 +1,6 @@
+#!/bin/sh
+# Return true if $DOCKER_IMAGE is safe to deploy.
+
+set -ex
+
+docker run --env JSON_TEST_FAILURE_OUTPUT=true --rm $DOCKER_IMAGE orchestrator -version

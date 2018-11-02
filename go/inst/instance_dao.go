@@ -26,6 +26,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/openark/golib/log"
@@ -39,6 +40,7 @@ import (
 	"github.com/github/orchestrator/go/collection"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
+	"github.com/github/orchestrator/go/kv"
 	"github.com/github/orchestrator/go/metrics/query"
 )
 
@@ -64,6 +66,8 @@ func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
 var instanceKeyInformativeClusterName *cache.Cache
+var forgetInstanceKeys *cache.Cache
+var pseudoGTIDInjectedClusters *cache.Cache
 
 var accessDeniedCounter = metrics.NewCounter()
 var readTopologyInstanceCounter = metrics.NewCounter()
@@ -81,10 +85,11 @@ func init() {
 }
 
 func initializeInstanceDao() {
-	<-config.ConfigurationLoaded
+	config.WaitForConfigurationToBeLoaded()
 	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
 	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
-
+	forgetInstanceKeys = cache.New(time.Duration(config.Config.InstancePollSeconds*3)*time.Second, time.Second)
+	pseudoGTIDInjectedClusters = cache.New(time.Hour, time.Second)
 	// spin off instance write buffer flushing
 	go func() {
 		flushTick := time.Tick(time.Duration(config.Config.InstanceFlushIntervalMilliseconds) * time.Millisecond)
@@ -126,6 +131,15 @@ func ExecDBWriteFunc(f func() error) error {
 	}()
 	res := f()
 	return res
+}
+
+func ExpireTableData(tableName string, timestampColumn string) error {
+	query := fmt.Sprintf("delete from %s where %s < NOW() - INTERVAL ? DAY", tableName, timestampColumn)
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(query, config.AuditPurgeDays)
+		return err
+	}
+	return ExecDBWriteFunc(writeFunc)
 }
 
 // logReadTopologyInstanceError logs an error, if applicable, for a ReadTopologyInstance operation,
@@ -248,6 +262,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		}
 	}()
 
+	var waitGroup sync.WaitGroup
 	readingStartTime := time.Now()
 	instance := NewInstance()
 	instanceFound := false
@@ -268,6 +283,8 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		latency.Stop("backend")
 		return instance, fmt.Errorf("ReadTopologyInstance will not act on invalid instance key: %+v", *instanceKey)
 	}
+
+	go UpdateInstanceLastAttemptedCheck(instanceKey)
 
 	latency.Start("instance")
 	db, err := db.OpenDiscovery(instanceKey.Hostname, instanceKey.Port)
@@ -292,20 +309,18 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		}
 	}
 
+	latency.Start("instance")
 	if isMaxScale {
 		if strings.Contains(instance.Version, "1.1.0") {
 			isMaxScale110 = true
 
 			// Buggy buggy maxscale 1.1.0. Reported Master_Host can be corrupted.
 			// Therefore we (currently) take @@hostname (which is masquerading as master host anyhow)
-			latency.Start("instance")
 			err = db.QueryRow("select @@hostname").Scan(&maxScaleMasterHostname)
-			latency.Stop("instance")
 			if err != nil {
 				goto Cleanup
 			}
 		}
-		latency.Start("instance")
 		if isMaxScale110 {
 			// Only this is supported:
 			db.QueryRow("select @@server_id").Scan(&instance.ServerID)
@@ -313,14 +328,34 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			db.QueryRow("select @@global.server_id").Scan(&instance.ServerID)
 			db.QueryRow("select @@global.server_uuid").Scan(&instance.ServerUUID)
 		}
-		latency.Stop("instance")
 	} else {
 		// NOT MaxScale
+
+		// We begin with a few operations we can run concurrently, and which do not depend on anything
+		{
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				var dummy string
+				// show global status works just as well with 5.6 & 5.7 (5.7 moves variables to performance_schema)
+				err = db.QueryRow("show global status like 'Uptime'").Scan(&dummy, &instance.Uptime)
+
+				if err != nil {
+					logReadTopologyInstanceError(instanceKey, "show global status like 'Uptime'", err)
+
+					// We do not "goto Cleanup" here, although it should be the correct flow.
+					// Reason is 5.7's new security feature that requires GRANTs on performance_schema.global_variables.
+					// There is a wrong decisionmaking in this design and the migration path to 5.7 will be difficult.
+					// I don't want orchestrator to put even more burden on this. The 'Uptime' variable is not that important
+					// so as to completely fail reading a 5.7 instance.
+					// This is supposed to be fixed in 5.7.9
+				}
+			}()
+		}
+
 		var mysqlHostname, mysqlReportHost string
-		latency.Start("instance")
 		err = db.QueryRow("select @@global.hostname, ifnull(@@global.report_host, ''), @@global.server_id, @@global.version, @@global.version_comment, @@global.read_only, @@global.binlog_format, @@global.log_bin, @@global.log_slave_updates").Scan(
 			&mysqlHostname, &mysqlReportHost, &instance.ServerID, &instance.Version, &instance.VersionComment, &instance.ReadOnly, &instance.Binlog_format, &instance.LogBinEnabled, &instance.LogSlaveUpdatesEnabled)
-		latency.Stop("instance")
 		if err != nil {
 			goto Cleanup
 		}
@@ -339,36 +374,47 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			resolvedHostname = instance.Key.Hostname
 		}
 
-		if (instance.IsOracleMySQL() || instance.IsPercona()) && !instance.IsSmallerMajorVersionByString("5.6") {
-			var masterInfoRepositoryOnTable bool
-			// Stuff only supported on Oracle MySQL >= 5.6
-			// ...
-			// @@gtid_mode only available in Orcale MySQL >= 5.6
-			// Previous version just issued this query brute-force, but I don't like errors being issued where they shouldn't.
-			latency.Start("instance")
-			_ = db.QueryRow("select @@global.gtid_mode = 'ON', @@global.server_uuid, @@global.gtid_purged, @@global.master_info_repository = 'TABLE', @@global.binlog_row_image").Scan(&instance.SupportsOracleGTID, &instance.ServerUUID, &instance.GtidPurged, &masterInfoRepositoryOnTable, &instance.BinlogRowImage)
-			if masterInfoRepositoryOnTable {
-				_ = db.QueryRow("select count(*) > 0 and MAX(User_name) != '' from mysql.slave_master_info").Scan(&instance.ReplicationCredentialsAvailable)
-			}
-			latency.Stop("instance")
+		if instance.LogBinEnabled {
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				err = sqlutils.QueryRowsMap(db, "show master status", func(m sqlutils.RowMap) error {
+					var err error
+					instance.SelfBinlogCoordinates.LogFile = m.GetString("File")
+					instance.SelfBinlogCoordinates.LogPos = m.GetInt64("Position")
+					return err
+				})
+			}()
 		}
-	}
-	{
-		var dummy string
-		// show global status works just as well with 5.6 & 5.7 (5.7 moves variables to performance_schema)
-		latency.Start("instance")
-		err = db.QueryRow("show global status like 'Uptime'").Scan(&dummy, &instance.Uptime)
-		latency.Stop("instance")
 
-		if err != nil {
-			logReadTopologyInstanceError(instanceKey, "show global status like 'Uptime'", err)
-
-			// We do not "goto Cleanup" here, although it should be the correct flow.
-			// Reason is 5.7's new security feature that requires GRANTs on performance_schema.global_variables.
-			// There is a wrong decisionmaking in this design and the migration path to 5.7 will be difficult.
-			// I don't want orchestrator to put even more burden on this. The 'Uptime' variable is not that important
-			// so as to completely fail reading a 5.7 instance.
-			// This is supposed to be fixed in 5.7.9
+		{
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				err = sqlutils.QueryRowsMap(db, "show global status like 'rpl_semi_sync_%_status'", func(m sqlutils.RowMap) error {
+					if m.GetString("Variable_name") == "Rpl_semi_sync_master_status" {
+						instance.SemiSyncMasterEnabled = (m.GetString("Value") == "ON")
+					} else if m.GetString("Variable_name") == "Rpl_semi_sync_slave_status" {
+						instance.SemiSyncReplicaEnabled = (m.GetString("Value") == "ON")
+					}
+					return nil
+				})
+			}()
+		}
+		if (instance.IsOracleMySQL() || instance.IsPercona()) && !instance.IsSmallerMajorVersionByString("5.6") {
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				var masterInfoRepositoryOnTable bool
+				// Stuff only supported on Oracle MySQL >= 5.6
+				// ...
+				// @@gtid_mode only available in Orcale MySQL >= 5.6
+				// Previous version just issued this query brute-force, but I don't like errors being issued where they shouldn't.
+				_ = db.QueryRow("select @@global.gtid_mode = 'ON', @@global.server_uuid, @@global.gtid_purged, @@global.master_info_repository = 'TABLE', @@global.binlog_row_image").Scan(&instance.SupportsOracleGTID, &instance.ServerUUID, &instance.GtidPurged, &masterInfoRepositoryOnTable, &instance.BinlogRowImage)
+				if masterInfoRepositoryOnTable {
+					_ = db.QueryRow("select count(*) > 0 and MAX(User_name) != '' from mysql.slave_master_info").Scan(&instance.ReplicationCredentialsAvailable)
+				}
+			}()
 		}
 	}
 	if resolvedHostname != instance.Key.Hostname {
@@ -400,7 +446,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		// This can be overriden by later invocation of DetectPhysicalEnvironmentQuery
 	}
 
-	latency.Start("instance")
 	err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
 		instance.HasReplicationCredentials = (m.GetString("Master_User") != "")
 		instance.Slave_IO_Running = (m.GetString("Slave_IO_Running") == "Yes")
@@ -413,7 +458,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		instance.ReadBinlogCoordinates.LogPos = m.GetInt64("Read_Master_Log_Pos")
 		instance.ExecBinlogCoordinates.LogFile = m.GetString("Relay_Master_Log_File")
 		instance.ExecBinlogCoordinates.LogPos = m.GetInt64("Exec_Master_Log_Pos")
-		instance.IsDetached, _, _ = instance.ExecBinlogCoordinates.DetachedCoordinates()
+		instance.IsDetached, _ = instance.ExecBinlogCoordinates.ExtractDetachedCoordinates()
 		instance.RelaylogCoordinates.LogFile = m.GetString("Relay_Log_File")
 		instance.RelaylogCoordinates.LogPos = m.GetInt64("Relay_Log_Pos")
 		instance.RelaylogCoordinates.Type = RelayLog
@@ -454,7 +499,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		slaveStatusFound = true
 		return nil
 	})
-	latency.Stop("instance")
 	if err != nil {
 		goto Cleanup
 	}
@@ -463,18 +507,20 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		goto Cleanup
 	}
 
-	if instance.LogBinEnabled {
-		latency.Start("instance")
-		err = sqlutils.QueryRowsMap(db, "show master status", func(m sqlutils.RowMap) error {
-			var err error
-			instance.SelfBinlogCoordinates.LogFile = m.GetString("File")
-			instance.SelfBinlogCoordinates.LogPos = m.GetInt64("Position")
-			return err
-		})
-		latency.Stop("instance")
-		if err != nil {
-			goto Cleanup
-		}
+	if config.Config.ReplicationLagQuery != "" && !isMaxScale {
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			if err := db.QueryRow(config.Config.ReplicationLagQuery).Scan(&instance.SlaveLagSeconds); err == nil {
+				if instance.SlaveLagSeconds.Valid && instance.SlaveLagSeconds.Int64 < 0 {
+					log.Warningf("Host: %+v, instance.SlaveLagSeconds < 0 [%+v], correcting to 0", instanceKey, instance.SlaveLagSeconds.Int64)
+					instance.SlaveLagSeconds.Int64 = 0
+				}
+			} else {
+				instance.SlaveLagSeconds = instance.SecondsBehindMaster
+				logReadTopologyInstanceError(instanceKey, "ReplicationLagQuery", err)
+			}
+		}()
 	}
 
 	instanceFound = true
@@ -487,7 +533,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	// Get replicas, either by SHOW SLAVE HOSTS or via PROCESSLIST
 	// MaxScale does not support PROCESSLIST, so SHOW SLAVE HOSTS is the only option
 	if config.Config.DiscoverByShowSlaveHosts || isMaxScale {
-		latency.Start("instance")
 		err := sqlutils.QueryRowsMap(db, `show slave hosts`,
 			func(m sqlutils.RowMap) error {
 				// MaxScale 1.1 may trigger an error with this command, but
@@ -514,140 +559,71 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				}
 				return err
 			})
-		latency.Stop("instance")
 
 		logReadTopologyInstanceError(instanceKey, "show slave hosts", err)
 	}
 	if !foundByShowSlaveHosts && !isMaxScale {
 		// Either not configured to read SHOW SLAVE HOSTS or nothing was there.
 		// Discover by information_schema.processlist
-		latency.Start("instance")
-		err := sqlutils.QueryRowsMap(db, `
-        	select
-        		substring_index(host, ':', 1) as slave_hostname
-        	from
-        		information_schema.processlist
-        	where
-                        command IN ('Binlog Dump', 'Binlog Dump GTID')
-        		`,
-			func(m sqlutils.RowMap) error {
-				cname, resolveErr := ResolveHostname(m.GetString("slave_hostname"))
-				if resolveErr != nil {
-					logReadTopologyInstanceError(instanceKey, "ResolveHostname: processlist", resolveErr)
-				}
-				replicaKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
-				instance.AddReplicaKey(&replicaKey)
-				return err
-			})
-		latency.Stop("instance")
-
-		logReadTopologyInstanceError(instanceKey, "processlist", err)
-	}
-
-	if config.Config.ReadLongRunningQueries && !isMaxScale {
-		// Get long running processes
-		latency.Start("instance")
-		err := sqlutils.QueryRowsMap(db, `
-				  select
-				    id,
-				    user,
-				    host,
-				    db,
-				    command,
-				    time,
-				    state,
-				    substr(processlist.info, 1, 1024) as info,
-				    now() - interval time second as started_at
-				  from
-				    information_schema.processlist
-				  where
-				    time > 60
-				    and command != 'Sleep'
-				    and id != connection_id()
-				    and user != 'system user'
-				    and command != 'Binlog dump'
-				    and command != 'Binlog Dump GTID'
-				    and user != 'event_scheduler'
-				  order by
-				    time desc
-        		`,
-			func(m sqlutils.RowMap) error {
-				process := Process{}
-				process.Id = m.GetInt64("id")
-				process.User = m.GetString("user")
-				process.Host = m.GetString("host")
-				process.Db = m.GetString("db")
-				process.Command = m.GetString("command")
-				process.Time = m.GetInt64("time")
-				process.State = m.GetString("state")
-				process.Info = m.GetString("info")
-				process.StartedAt = m.GetString("started_at")
-
-				longRunningProcesses = append(longRunningProcesses, process)
-				return nil
-			})
-		latency.Stop("instance")
-
-		logReadTopologyInstanceError(instanceKey, "processlist, long queries", err)
-	}
-
-	instance.UsingPseudoGTID = false
-	if config.Config.DetectPseudoGTIDQuery != "" && !isMaxScale {
-		latency.Start("instance")
-		if resultData, err := sqlutils.QueryResultData(db, config.Config.DetectPseudoGTIDQuery); err == nil {
-			if len(resultData) > 0 {
-				if len(resultData[0]) > 0 {
-					if resultData[0][0].Valid && resultData[0][0].String == "1" {
-						instance.UsingPseudoGTID = true
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			err := sqlutils.QueryRowsMap(db, `
+      	select
+      		substring_index(host, ':', 1) as slave_hostname
+      	from
+      		information_schema.processlist
+      	where
+          command IN ('Binlog Dump', 'Binlog Dump GTID')
+  		`,
+				func(m sqlutils.RowMap) error {
+					cname, resolveErr := ResolveHostname(m.GetString("slave_hostname"))
+					if resolveErr != nil {
+						logReadTopologyInstanceError(instanceKey, "ResolveHostname: processlist", resolveErr)
 					}
-				}
-			}
-		} else {
-			logReadTopologyInstanceError(instanceKey, "DetectPseudoGTIDQuery", err)
-		}
-		latency.Stop("instance")
-	}
+					replicaKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
+					instance.AddReplicaKey(&replicaKey)
+					return err
+				})
 
-	if config.Config.SlaveLagQuery != "" && !isMaxScale {
-		latency.Start("instance")
-		if err := db.QueryRow(config.Config.SlaveLagQuery).Scan(&instance.SlaveLagSeconds); err == nil {
-			if instance.SlaveLagSeconds.Valid && instance.SlaveLagSeconds.Int64 < 0 {
-				log.Warningf("Host: %+v, instance.SlaveLagSeconds < 0 [%+v], correcting to 0", instanceKey, instance.SlaveLagSeconds.Int64)
-				instance.SlaveLagSeconds.Int64 = 0
-			}
-		} else {
-			instance.SlaveLagSeconds = instance.SecondsBehindMaster
-			logReadTopologyInstanceError(instanceKey, "SlaveLagQuery", err)
-		}
-		latency.Stop("instance")
+			logReadTopologyInstanceError(instanceKey, "processlist", err)
+		}()
 	}
 
 	if config.Config.DetectDataCenterQuery != "" && !isMaxScale {
-		latency.Start("instance")
-		err := db.QueryRow(config.Config.DetectDataCenterQuery).Scan(&instance.DataCenter)
-		latency.Stop("instance")
-		logReadTopologyInstanceError(instanceKey, "DetectDataCenterQuery", err)
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			err := db.QueryRow(config.Config.DetectDataCenterQuery).Scan(&instance.DataCenter)
+			logReadTopologyInstanceError(instanceKey, "DetectDataCenterQuery", err)
+		}()
 	}
 
 	if config.Config.DetectPhysicalEnvironmentQuery != "" && !isMaxScale {
-		latency.Start("instance")
-		err := db.QueryRow(config.Config.DetectPhysicalEnvironmentQuery).Scan(&instance.PhysicalEnvironment)
-		latency.Stop("instance")
-		logReadTopologyInstanceError(instanceKey, "DetectPhysicalEnvironmentQuery", err)
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			err := db.QueryRow(config.Config.DetectPhysicalEnvironmentQuery).Scan(&instance.PhysicalEnvironment)
+			logReadTopologyInstanceError(instanceKey, "DetectPhysicalEnvironmentQuery", err)
+		}()
 	}
 
 	if config.Config.DetectInstanceAliasQuery != "" && !isMaxScale {
-		latency.Start("instance")
-		err := db.QueryRow(config.Config.DetectInstanceAliasQuery).Scan(&instance.InstanceAlias)
-		latency.Stop("instance")
-		logReadTopologyInstanceError(instanceKey, "DetectInstanceAliasQuery", err)
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			err := db.QueryRow(config.Config.DetectInstanceAliasQuery).Scan(&instance.InstanceAlias)
+			logReadTopologyInstanceError(instanceKey, "DetectInstanceAliasQuery", err)
+		}()
 	}
 
 	if config.Config.DetectSemiSyncEnforcedQuery != "" && !isMaxScale {
-		latency.Start("instance")
-		err := db.QueryRow(config.Config.DetectSemiSyncEnforcedQuery).Scan(&instance.SemiSyncEnforced)
-		latency.Stop("instance")
-		logReadTopologyInstanceError(instanceKey, "DetectSemiSyncEnforcedQuery", err)
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			err := db.QueryRow(config.Config.DetectSemiSyncEnforcedQuery).Scan(&instance.SemiSyncEnforced)
+			logReadTopologyInstanceError(instanceKey, "DetectSemiSyncEnforcedQuery", err)
+		}()
 	}
 
 	{
@@ -655,6 +631,34 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		err = ReadInstanceClusterAttributes(instance)
 		latency.Stop("backend")
 		logReadTopologyInstanceError(instanceKey, "ReadInstanceClusterAttributes", err)
+	}
+
+	{
+		// Pseudo GTID
+		// Depends on ReadInstanceClusterAttributes above
+		instance.UsingPseudoGTID = false
+		if config.Config.AutoPseudoGTID {
+			if _, found := pseudoGTIDInjectedClusters.Get(instance.ClusterName); found {
+				// this cluster is known to have been populated by injectPseudoGTID()
+				instance.UsingPseudoGTID = true
+			}
+		} else if config.Config.DetectPseudoGTIDQuery != "" {
+			waitGroup.Add(1)
+			go func() {
+				defer waitGroup.Done()
+				if resultData, err := sqlutils.QueryResultData(db, config.Config.DetectPseudoGTIDQuery); err == nil {
+					if len(resultData) > 0 {
+						if len(resultData[0]) > 0 {
+							if resultData[0][0].Valid && resultData[0][0].String == "1" {
+								instance.UsingPseudoGTID = true
+							}
+						}
+					}
+				} else {
+					logReadTopologyInstanceError(instanceKey, "DetectPseudoGTIDQuery", err)
+				}
+			}()
+		}
 	}
 
 	// First read the current PromotionRule from candidate_database_instance.
@@ -668,45 +672,52 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	// We'll set it here on their behalf so there's no race between the first
 	// time an instance is discovered, and setting a rule like "must_not".
 	if config.Config.DetectPromotionRuleQuery != "" && !isMaxScale {
-		var value string
-		latency.Start("instance")
-		err := db.QueryRow(config.Config.DetectPromotionRuleQuery).Scan(&value)
-		logReadTopologyInstanceError(instanceKey, "DetectPromotionRuleQuery", err)
-		promotionRule, err := ParseCandidatePromotionRule(value)
-		logReadTopologyInstanceError(instanceKey, "ParseCandidatePromotionRule", err)
-		if err == nil {
-			// We need to update candidate_database_instance.
-			// We register the rule even if it hasn't changed,
-			// to bump the last_suggested time.
-			instance.PromotionRule = promotionRule
-			err = RegisterCandidateInstance(instanceKey, promotionRule)
-			logReadTopologyInstanceError(instanceKey, "RegisterCandidateInstance", err)
-		}
-		latency.Stop("instance")
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			var value string
+			err := db.QueryRow(config.Config.DetectPromotionRuleQuery).Scan(&value)
+			logReadTopologyInstanceError(instanceKey, "DetectPromotionRuleQuery", err)
+			promotionRule, err := ParseCandidatePromotionRule(value)
+			logReadTopologyInstanceError(instanceKey, "ParseCandidatePromotionRule", err)
+			if err == nil {
+				// We need to update candidate_database_instance.
+				// We register the rule even if it hasn't changed,
+				// to bump the last_suggested time.
+				instance.PromotionRule = promotionRule
+				err = RegisterCandidateInstance(NewCandidateDatabaseInstance(instanceKey, promotionRule))
+				logReadTopologyInstanceError(instanceKey, "RegisterCandidateInstance", err)
+			}
+		}()
 	}
 
 	ReadClusterAliasOverride(instance)
-	if instance.SuggestedClusterAlias == "" && instance.ReplicationDepth == 0 && config.Config.DetectClusterAliasQuery != "" && !isMaxScale {
+	if instance.SuggestedClusterAlias == "" && instance.ReplicationDepth == 0 && !isMaxScale {
 		// Only need to do on masters
-		clusterAlias := ""
-		latency.Start("instance")
-		err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
-		latency.Stop("instance")
-		if err != nil {
-			clusterAlias = ""
-			logReadTopologyInstanceError(instanceKey, "DetectClusterAliasQuery", err)
+		if config.Config.DetectClusterAliasQuery != "" {
+			clusterAlias := ""
+			err := db.QueryRow(config.Config.DetectClusterAliasQuery).Scan(&clusterAlias)
+			if err != nil {
+				clusterAlias = ""
+				logReadTopologyInstanceError(instanceKey, "DetectClusterAliasQuery", err)
+			}
+			instance.SuggestedClusterAlias = clusterAlias
 		}
-		instance.SuggestedClusterAlias = clusterAlias
+		if instance.SuggestedClusterAlias == "" {
+			// Not found by DetectClusterAliasQuery...
+			// See if a ClusterNameToAlias configuration applies
+			if clusterAlias := mappedClusterNameToAlias(instance.ClusterName); clusterAlias != "" {
+				instance.SuggestedClusterAlias = clusterAlias
+			}
+		}
 	}
 	if instance.ReplicationDepth == 0 && config.Config.DetectClusterDomainQuery != "" && !isMaxScale {
 		// Only need to do on masters
 		domainName := ""
-		latency.Start("instance")
 		if err := db.QueryRow(config.Config.DetectClusterDomainQuery).Scan(&domainName); err != nil {
 			domainName = ""
 			logReadTopologyInstanceError(instanceKey, "DetectClusterDomainQuery", err)
 		}
-		latency.Stop("instance")
 		if domainName != "" {
 			latency.Start("backend")
 			err := WriteClusterDomainName(instance.ClusterName, domainName)
@@ -716,6 +727,8 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	}
 
 Cleanup:
+	waitGroup.Wait()
+	latency.Stop("instance")
 	readTopologyInstanceCounter.Inc(1)
 	//	logReadTopologyInstanceError(instanceKey, "ReadTopologyInstanceBufferable", err)	// don't write here and a few lines later.
 	if instanceFound {
@@ -738,7 +751,6 @@ Cleanup:
 	// tried to check the instance. last_attempted_check is also
 	// updated on success by writeInstance.
 	latency.Start("backend")
-	_ = UpdateInstanceLastAttemptedCheck(instanceKey)
 	_ = UpdateInstanceLastChecked(&instance.Key)
 	latency.Stop("backend")
 	return nil, err
@@ -771,10 +783,6 @@ func ReadClusterAliasOverride(instance *Instance) (err error) {
 // It is a non-recursive function and so-called-recursion is performed upon periodic reading of
 // instances.
 func ReadInstanceClusterAttributes(instance *Instance) (err error) {
-	if config.Config.DatabaselessMode__experimental {
-		return nil
-	}
-
 	var masterMasterKey InstanceKey
 	var masterClusterName string
 	var masterReplicationDepth uint
@@ -878,10 +886,6 @@ func BulkReadInstance() ([](*InstanceKey), error) {
 }
 
 func ReadInstancePromotionRule(instance *Instance) (err error) {
-	if config.Config.DatabaselessMode__experimental {
-		return nil
-	}
-
 	var promotionRule CandidatePromotionRule = NeutralPromoteRule
 	query := `
 			select
@@ -933,7 +937,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.ReadBinlogCoordinates.LogPos = m.GetInt64("read_master_log_pos")
 	instance.ExecBinlogCoordinates.LogFile = m.GetString("relay_master_log_file")
 	instance.ExecBinlogCoordinates.LogPos = m.GetInt64("exec_master_log_pos")
-	instance.IsDetached, _, _ = instance.ExecBinlogCoordinates.DetachedCoordinates()
+	instance.IsDetached, _ = instance.ExecBinlogCoordinates.ExtractDetachedCoordinates()
 	instance.RelaylogCoordinates.LogFile = m.GetString("relay_log_file")
 	instance.RelaylogCoordinates.LogPos = m.GetInt64("relay_log_pos")
 	instance.RelaylogCoordinates.Type = RelayLog
@@ -948,6 +952,8 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.DataCenter = m.GetString("data_center")
 	instance.PhysicalEnvironment = m.GetString("physical_environment")
 	instance.SemiSyncEnforced = m.GetBool("semi_sync_enforced")
+	instance.SemiSyncMasterEnabled = m.GetBool("semi_sync_master_enabled")
+	instance.SemiSyncReplicaEnabled = m.GetBool("semi_sync_replica_enabled")
 	instance.ReplicationDepth = m.GetUint("replication_depth")
 	instance.IsCoMaster = m.GetBool("is_co_master")
 	instance.ReplicationCredentialsAvailable = m.GetBool("replication_credentials_available")
@@ -1030,11 +1036,6 @@ func readInstancesByCondition(condition string, args []interface{}, sort string)
 
 // ReadInstance reads an instance from the orchestrator backend database
 func ReadInstance(instanceKey *InstanceKey) (*Instance, bool, error) {
-	if config.Config.DatabaselessMode__experimental {
-		instance, err := ReadTopologyInstance(instanceKey)
-		return instance, (err == nil), err
-	}
-
 	condition := `
 			hostname = ?
 			and port = ?
@@ -1192,39 +1193,33 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 }
 
 // FindInstances reads all instances whose name matches given pattern
-func FindInstances(regexpPattern string) ([](*Instance), error) {
-	condition := `hostname rlike ?`
-	return readInstancesByCondition(condition, sqlutils.Args(regexpPattern), `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
+func FindInstances(regexpPattern string) (result [](*Instance), err error) {
+	result = [](*Instance){}
+	r, err := regexp.Compile(regexpPattern)
+	if err != nil {
+		return result, err
+	}
+	condition := `1=1`
+	unfiltered, err := readInstancesByCondition(condition, sqlutils.Args(), `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
+	if err != nil {
+		return unfiltered, err
+	}
+	for _, instance := range unfiltered {
+		if r.MatchString(instance.Key.DisplayString()) {
+			result = append(result, instance)
+		}
+	}
+	return result, nil
 }
 
 // FindFuzzyInstances return instances whose names are like the one given (host & port substrings)
 // For example, the given `mydb-3:3306` might find `myhosts-mydb301-production.mycompany.com:3306`
 func FindFuzzyInstances(fuzzyInstanceKey *InstanceKey) ([](*Instance), error) {
 	condition := `
-		hostname like concat('%', ?, '%')
+		hostname like concat('%%', ?, '%%')
 		and port = ?
 	`
 	return readInstancesByCondition(condition, sqlutils.Args(fuzzyInstanceKey.Hostname, fuzzyInstanceKey.Port), `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
-}
-
-// FindClusterNameByFuzzyInstanceKey attempts to find a uniquely identifyable cluster name
-// given a fuzze key. It hopes to find instances matching given fuzzy key such that they all
-// belong to same cluster
-func FindClusterNameByFuzzyInstanceKey(fuzzyInstanceKey *InstanceKey) (string, error) {
-	clusterNames := make(map[string]bool)
-	instances, err := FindFuzzyInstances(fuzzyInstanceKey)
-	if err != nil {
-		return "", err
-	}
-	for _, instance := range instances {
-		clusterNames[instance.ClusterName] = true
-	}
-	if len(clusterNames) == 1 {
-		for clusterName := range clusterNames {
-			return clusterName, nil
-		}
-	}
-	return "", log.Errorf("findClusterNameByFuzzyInstanceKey: cannot uniquely identify cluster name by %+v", *fuzzyInstanceKey)
 }
 
 // ReadFuzzyInstanceKey accepts a fuzzy instance key and expects to return a single, fully qualified,
@@ -1273,23 +1268,49 @@ func ReadLostInRecoveryInstances(clusterName string) ([](*Instance), error) {
 		ifnull(
 			database_instance_downtime.downtime_active = 1
 			and database_instance_downtime.end_timestamp > now()
-			and database_instance_downtime.reason = ?, false)
+			and database_instance_downtime.reason = ?, 0)
 		and ? IN ('', cluster_name)
 	`
 	return readInstancesByCondition(condition, sqlutils.Args(DowntimeLostInRecoveryMessage, clusterName), "cluster_name asc, replication_depth asc")
+}
+
+// ReadDowntimedInstances returns all instances currently downtimed, potentially filtered by cluster
+func ReadDowntimedInstances(clusterName string) ([](*Instance), error) {
+	condition := `
+		ifnull(
+			database_instance_downtime.downtime_active = 1
+			and database_instance_downtime.end_timestamp > now()
+			, 0)
+		and ? IN ('', cluster_name)
+	`
+	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "cluster_name asc, replication_depth asc")
 }
 
 // ReadClusterCandidateInstances reads cluster instances which are also marked as candidates
 func ReadClusterCandidateInstances(clusterName string) ([](*Instance), error) {
 	condition := `
 			cluster_name = ?
-			and (hostname, port) in (
-				select hostname, port
+			and concat(hostname, ':', port) in (
+				select concat(hostname, ':', port)
 					from candidate_database_instance
 					where promotion_rule in ('must', 'prefer')
 			)
 			`
 	return readInstancesByCondition(condition, sqlutils.Args(clusterName), "")
+}
+
+// ReadClusterNeutralPromotionRuleInstances reads cluster instances whose promotion-rule is marked as 'neutral'
+func ReadClusterNeutralPromotionRuleInstances(clusterName string) (neutralInstances [](*Instance), err error) {
+	instances, err := ReadClusterInstances(clusterName)
+	if err != nil {
+		return neutralInstances, err
+	}
+	for _, instance := range instances {
+		if instance.PromotionRule == NeutralPromoteRule {
+			neutralInstances = append(neutralInstances, instance)
+		}
+	}
+	return neutralInstances, nil
 }
 
 // filterOSCInstances will filter the given list such that only replicas fit for OSC control remain.
@@ -1459,6 +1480,7 @@ func GetClusterHeuristicLag(clusterName string) (int64, error) {
 // GetHeuristicClusterPoolInstances returns instances of a cluster which are also pooled. If `pool` argument
 // is empty, all pools are considered, otherwise, only instances of given pool are considered.
 func GetHeuristicClusterPoolInstances(clusterName string, pool string) (result [](*Instance), err error) {
+	result = [](*Instance){}
 	instances, err := ReadClusterInstances(clusterName)
 	if err != nil {
 		return result, err
@@ -1850,6 +1872,31 @@ func ReadClustersInfo(clusterName string) ([]ClusterInfo, error) {
 	return clusters, err
 }
 
+// Get a listing of KVPair for clusters masters, for all clusters or for a specific cluster.
+func GetMastersKVPairs(clusterName string) (kvPairs [](*kv.KVPair), err error) {
+
+	clusterAliasMap := make(map[string]string)
+	if clustersInfo, err := ReadClustersInfo(clusterName); err != nil {
+		return kvPairs, err
+	} else {
+		for _, clusterInfo := range clustersInfo {
+			clusterAliasMap[clusterInfo.ClusterName] = clusterInfo.ClusterAlias
+		}
+	}
+
+	masters, err := ReadWriteableClustersMasters()
+	if err != nil {
+		return kvPairs, err
+	}
+	for _, master := range masters {
+		if kvPair := GetClusterMasterKVPair(clusterAliasMap[master.ClusterName], &master.Key); kvPair != nil {
+			kvPairs = append(kvPairs, kvPair)
+		}
+	}
+
+	return kvPairs, err
+}
+
 // HeuristicallyApplyClusterDomainInstanceAttribute writes down the cluster-domain
 // to master-hostname as a general attribute, by reading current topology and **trusting** it to be correct
 func HeuristicallyApplyClusterDomainInstanceAttribute(clusterName string) (instanceKey *InstanceKey, err error) {
@@ -1898,6 +1945,33 @@ func GetHeuristicClusterDomainInstanceAttribute(clusterName string) (instanceKey
 // resulted in an actual check! This can happen when TCP/IP connections are hung, in which case the "check"
 // never returns. In such case we multiply interval by a factor, so as not to open too many connections on
 // the instance.
+func ReadAllInstanceKeys() ([]InstanceKey, error) {
+	res := []InstanceKey{}
+	query := `
+		select
+			hostname, port
+		from
+			database_instance
+			`
+	err := db.QueryOrchestrator(query, sqlutils.Args(), func(m sqlutils.RowMap) error {
+		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
+		if merr != nil {
+			log.Errore(merr)
+		} else if !InstanceIsForgotten(instanceKey) {
+			// only if not in "forget" cache
+			res = append(res, *instanceKey)
+		}
+		return nil
+	})
+	return res, log.Errore(err)
+}
+
+// ReadOutdatedInstanceKeys reads and returns keys for all instances that are not up to date (i.e.
+// pre-configured time has passed since they were last checked)
+// But we also check for the case where an attempt at instance checking has been made, that hasn't
+// resulted in an actual check! This can happen when TCP/IP connections are hung, in which case the "check"
+// never returns. In such case we multiply interval by a factor, so as not to open too many connections on
+// the instance.
 func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 	res := []InstanceKey{}
 	query := `
@@ -1918,7 +1992,8 @@ func ReadOutdatedInstanceKeys() ([]InstanceKey, error) {
 		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
 		if merr != nil {
 			log.Errore(merr)
-		} else {
+		} else if !InstanceIsForgotten(instanceKey) {
+			// only if not in "forget" cache
 			res = append(res, *instanceKey)
 		}
 		// We don;t return an error because we want to keep filling the outdated instances list.
@@ -1976,9 +2051,9 @@ func mkInsertOdku(table string, columns []string, values []string, nrRows int, i
 	return q.String(), nil
 }
 
-func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bool, updateLastSeen bool) (string, []interface{}) {
+func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bool, updateLastSeen bool) (string, []interface{}, error) {
 	if len(instances) == 0 {
-		return "", nil
+		return "", nil, nil
 	}
 
 	insertIgnore := false
@@ -2038,6 +2113,8 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"has_replication_credentials",
 		"allow_tls",
 		"semi_sync_enforced",
+		"semi_sync_master_enabled",
+		"semi_sync_replica_enabled",
 		"instance_alias",
 		"last_discovery_latency",
 	}
@@ -2108,16 +2185,18 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.HasReplicationCredentials)
 		args = append(args, instance.AllowTLS)
 		args = append(args, instance.SemiSyncEnforced)
+		args = append(args, instance.SemiSyncMasterEnabled)
+		args = append(args, instance.SemiSyncReplicaEnabled)
 		args = append(args, instance.InstanceAlias)
 		args = append(args, instance.LastDiscoveryLatency.Nanoseconds())
 	}
 
 	sql, err := mkInsertOdku("database_instance", columns, values, len(instances), insertIgnore)
 	if err != nil {
-		log.Fatalf("Failed to build query: %v", err)
+		return sql, args, log.Errorf("Failed to build query: %v", err)
 	}
 
-	return sql, args
+	return sql, args, nil
 }
 
 // writeManyInstances stores instances in the orchestrator backend
@@ -2126,7 +2205,16 @@ func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, up
 		return nil // nothing to write
 	}
 
-	sql, args := mkInsertOdkuForInstances(instances, instanceWasActuallyFound, updateLastSeen)
+	writeInstances := [](*Instance){}
+	for _, instance := range instances {
+		if !InstanceIsForgotten(&instance.Key) {
+			writeInstances = append(writeInstances, instance)
+		}
+	}
+	sql, args, err := mkInsertOdkuForInstances(writeInstances, instanceWasActuallyFound, updateLastSeen)
+	if err != nil {
+		return err
+	}
 
 	if _, err := db.ExecOrchestrator(sql, args...); err != nil {
 		return err
@@ -2224,11 +2312,7 @@ func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
 			instanceKey.Hostname,
 			instanceKey.Port,
 		)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
+		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }
@@ -2244,28 +2328,30 @@ func UpdateInstanceLastChecked(instanceKey *InstanceKey) error {
 func UpdateInstanceLastAttemptedCheck(instanceKey *InstanceKey) error {
 	writeFunc := func() error {
 		_, err := db.ExecOrchestrator(`
-        	update
-        		database_instance
-        	set
-        		last_attempted_check = NOW()
+    	update
+    		database_instance
+    	set
+    		last_attempted_check = NOW()
 			where
 				hostname = ?
 				and port = ?`,
 			instanceKey.Hostname,
 			instanceKey.Port,
 		)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
+		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
+}
+
+func InstanceIsForgotten(instanceKey *InstanceKey) bool {
+	_, found := forgetInstanceKeys.Get(instanceKey.StringCode())
+	return found
 }
 
 // ForgetInstance removes an instance entry from the orchestrator backed database.
 // It may be auto-rediscovered through topology or requested for discovery by multiple means.
 func ForgetInstance(instanceKey *InstanceKey) error {
+	forgetInstanceKeys.Set(instanceKey.StringCode(), true, cache.DefaultExpiration)
 	_, err := db.ExecOrchestrator(`
 			delete
 				from database_instance
@@ -2275,6 +2361,30 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 		instanceKey.Port,
 	)
 	AuditOperation("forget", instanceKey, "")
+	return err
+}
+
+// ForgetInstance removes an instance entry from the orchestrator backed database.
+// It may be auto-rediscovered through topology or requested for discovery by multiple means.
+func ForgetCluster(clusterName string) error {
+	clusterInstances, err := ReadClusterInstances(clusterName)
+	if err != nil {
+		return err
+	}
+	if len(clusterInstances) == 0 {
+		return nil
+	}
+	for _, instance := range clusterInstances {
+		forgetInstanceKeys.Set(instance.Key.StringCode(), true, cache.DefaultExpiration)
+		AuditOperation("forget", &instance.Key, "")
+	}
+	_, err = db.ExecOrchestrator(`
+			delete
+				from database_instance
+			where
+				cluster_name = ?`,
+		clusterName,
+	)
 	return err
 }
 
@@ -2355,27 +2465,30 @@ func ReadHistoryClusterInstances(clusterName string, historyTimestampPattern str
 }
 
 // RegisterCandidateInstance markes a given instance as suggested for successoring a master in the event of failover.
-func RegisterCandidateInstance(instanceKey *InstanceKey, promotionRule CandidatePromotionRule) error {
+func RegisterCandidateInstance(candidate *CandidateDatabaseInstance) error {
+	args := sqlutils.Args(candidate.Hostname, candidate.Port, string(candidate.PromotionRule))
+	lastSuggestedHint := "now()"
+	if !candidate.LastSuggested.IsZero() {
+		lastSuggestedHint = "?"
+		args = append(args, candidate.LastSuggested)
+	}
+	query := fmt.Sprintf(`
+			insert into candidate_database_instance (
+					hostname,
+					port,
+					promotion_rule,
+					last_suggested
+				) values (?, ?, ?, %s)
+				on duplicate key update
+					hostname=values(hostname),
+					port=values(port),
+					last_suggested=now(),
+					promotion_rule=values(promotion_rule)
+			`, lastSuggestedHint)
 	writeFunc := func() error {
-		_, err := db.ExecOrchestrator(`
-				insert into candidate_database_instance (
-						hostname,
-						port,
-						last_suggested,
-						promotion_rule)
-					values (?, ?, NOW(), ?)
-					on duplicate key update
-						hostname=values(hostname),
-						port=values(port),
-						last_suggested=now(),
-						promotion_rule=values(promotion_rule)
-				`, instanceKey.Hostname, instanceKey.Port, string(promotionRule),
-		)
-		if err != nil {
-			return log.Errore(err)
-		}
-
-		return nil
+		_, err := db.ExecOrchestrator(query, args...)
+		AuditOperation("register-candidate", candidate.Key(), string(candidate.PromotionRule))
+		return log.Errore(err)
 	}
 	return ExecDBWriteFunc(writeFunc)
 }
@@ -2405,7 +2518,7 @@ func RecordInstanceCoordinatesHistory() error {
         	delete from database_instance_coordinates_history
 			where
 				recorded_timestamp < NOW() - INTERVAL ? MINUTE
-				`, (config.Config.PseudoGTIDCoordinatesHistoryHeuristicMinutes + 5),
+				`, (config.PseudoGTIDCoordinatesHistoryHeuristicMinutes + 2),
 			)
 			return log.Errore(err)
 		}
@@ -2448,30 +2561,7 @@ func GetHeuristiclyRecentCoordinatesForInstance(instanceKey *InstanceKey) (selfC
 			recorded_timestamp desc
 			limit 1
 			`
-	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port, config.Config.PseudoGTIDCoordinatesHistoryHeuristicMinutes), func(m sqlutils.RowMap) error {
-		selfCoordinates = &BinlogCoordinates{LogFile: m.GetString("binary_log_file"), LogPos: m.GetInt64("binary_log_pos")}
-		relayLogCoordinates = &BinlogCoordinates{LogFile: m.GetString("relay_log_file"), LogPos: m.GetInt64("relay_log_pos")}
-
-		return nil
-	})
-	return selfCoordinates, relayLogCoordinates, err
-}
-
-// GetLastKnownCoordinatesForInstance returns the very last known coordinates for an instance
-func GetLastKnownCoordinatesForInstance(instanceKey *InstanceKey) (selfCoordinates *BinlogCoordinates, relayLogCoordinates *BinlogCoordinates, err error) {
-	query := `
-		select
-			binary_log_file, binary_log_pos, relay_log_file, relay_log_pos
-		from
-			database_instance_coordinates_history
-		where
-			hostname = ?
-			and port = ?
-		order by
-			recorded_timestamp desc
-			limit 1
-			`
-	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port), func(m sqlutils.RowMap) error {
+	err = db.QueryOrchestrator(query, sqlutils.Args(instanceKey.Hostname, instanceKey.Port, config.PseudoGTIDCoordinatesHistoryHeuristicMinutes), func(m sqlutils.RowMap) error {
 		selfCoordinates = &BinlogCoordinates{LogFile: m.GetString("binary_log_file"), LogPos: m.GetInt64("binary_log_pos")}
 		relayLogCoordinates = &BinlogCoordinates{LogFile: m.GetString("relay_log_file"), LogPos: m.GetInt64("relay_log_pos")}
 
@@ -2528,41 +2618,66 @@ func ResetInstanceRelaylogCoordinatesHistory(instanceKey *InstanceKey) error {
 	return ExecDBWriteFunc(writeFunc)
 }
 
-// RecordInstanceBinlogFileHistory snapshots the binlog coordinates of instances
-func RecordInstanceBinlogFileHistory() error {
-	{
-		writeFunc := func() error {
-			_, err := db.ExecOrchestrator(`
-        	delete from database_instance_binlog_files_history
-			where
-				last_seen < NOW() - INTERVAL ? DAY
-				`, config.Config.BinlogFileHistoryDays,
-			)
-			return log.Errore(err)
+func ExpireInstanceBinlogFileHistory() error {
+	return ExpireTableData("database_instance_binlog_files_history", "last_seen")
+}
+
+// FigureClusterName will make a best effort to deduce a cluster name using either a given alias
+// or an instanceKey. First attempt is at alias, and if that doesn't work, we try instanceKey.
+func FigureClusterName(clusterHint string, instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (clusterName string, err error) {
+	// Look for exact matches, first.
+
+	// Exact cluster name match:
+	if clusterInfo, err := ReadClusterInfo(clusterHint); err == nil && clusterInfo != nil {
+		return clusterInfo.ClusterName, nil
+	}
+	// Exact cluster alias match:
+	if clustersInfo, err := ReadClustersInfo(""); err == nil {
+		for _, clusterInfo := range clustersInfo {
+			if clusterInfo.ClusterAlias == clusterHint {
+				return clusterInfo.ClusterName, nil
+			}
 		}
-		ExecDBWriteFunc(writeFunc)
 	}
-	if config.Config.BinlogFileHistoryDays == 0 {
-		return nil
+	clusterByInstanceKey := func(instanceKey *InstanceKey) (hasResult bool, clusterName string, err error) {
+		if instanceKey == nil {
+			return false, "", nil
+		}
+		instance, _, err := ReadInstance(instanceKey)
+		if err != nil {
+			return true, clusterName, log.Errore(err)
+		}
+		if instance != nil {
+			if instance.ClusterName == "" {
+				return true, clusterName, log.Errorf("Unable to determine cluster name")
+			}
+			return true, instance.ClusterName, nil
+		}
+		return false, "", nil
 	}
-	writeFunc := func() error {
-		_, err := db.ExecOrchestrator(`
-      	insert into
-      		database_instance_binlog_files_history (
-					hostname, port,	first_seen, last_seen, binary_log_file, binary_log_pos
-				)
-      	select
-      		hostname, port, last_seen, last_seen, binary_log_file, binary_log_pos
-				from
-					database_instance
-				where
-					binary_log_file != ''
-				on duplicate key update
-					last_seen = VALUES(last_seen),
-					binary_log_pos = VALUES(binary_log_pos)
-				`,
-		)
-		return log.Errore(err)
+	// exact instance key:
+	if hasResult, clusterName, err := clusterByInstanceKey(instanceKey); hasResult {
+		return clusterName, err
 	}
-	return ExecDBWriteFunc(writeFunc)
+	// fuzzy instance key:
+	if hasResult, clusterName, err := clusterByInstanceKey(ReadFuzzyInstanceKeyIfPossible(instanceKey)); hasResult {
+		return clusterName, err
+	}
+	//  Let's see about _this_ instance
+	if hasResult, clusterName, err := clusterByInstanceKey(thisInstanceKey); hasResult {
+		return clusterName, err
+	}
+	return clusterName, log.Errorf("Unable to determine cluster name")
+}
+
+// FigureInstanceKey tries to figure out a key
+func FigureInstanceKey(instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (*InstanceKey, error) {
+	if figuredKey := ReadFuzzyInstanceKeyIfPossible(instanceKey); figuredKey != nil {
+		return figuredKey, nil
+	}
+	figuredKey := thisInstanceKey
+	if figuredKey == nil {
+		return nil, log.Errorf("Cannot deduce instance %+v", instanceKey)
+	}
+	return figuredKey, nil
 }

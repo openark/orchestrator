@@ -19,65 +19,49 @@ package process
 import (
 	"time"
 
+	"fmt"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
 )
 
-const registrationPollSeconds = 10
-
-type NodeHealth struct {
-	Hostname        string
-	Token           string
-	AppVersion      string
-	FirstSeenActive string
-	LastSeenActive  string
-}
-
-type HealthStatus struct {
-	Healthy        bool
-	Hostname       string
-	Token          string
-	IsActiveNode   bool
-	ActiveNode     NodeHealth
-	Error          error
-	AvailableNodes [](*NodeHealth)
-}
-
-type OrchestratorExecutionMode string
-
-const (
-	OrchestratorExecutionCliMode  OrchestratorExecutionMode = "CLIMode"
-	OrchestratorExecutionHttpMode                           = "HttpMode"
-)
-
-var continuousRegistrationInitiated bool = false
-
 // RegisterNode writes down this node in the node_health table
-func RegisterNode(extraInfo string, command string, firstTime bool) (healthy bool, err error) {
-	if firstTime {
+func WriteRegisterNode(nodeHealth *NodeHealth) (healthy bool, err error) {
+	timeNow := time.Now()
+	reportedAgo := timeNow.Sub(nodeHealth.LastReported)
+	reportedSecondsAgo := int64(reportedAgo.Seconds())
+	if reportedSecondsAgo > config.HealthPollSeconds*2 {
+		// This entry is too old. No reason to persist it; already expired.
+		return false, nil
+	}
+
+	nodeHealth.onceHistory.Do(func() {
 		db.ExecOrchestrator(`
 			insert ignore into node_health_history
 				(hostname, token, first_seen_active, extra_info, command, app_version)
 			values
 				(?, ?, NOW(), ?, ?, ?)
 			`,
-			ThisHostname, ProcessToken.Hash, extraInfo, command,
-			config.RuntimeCLIFlags.ConfiguredVersion,
+			nodeHealth.Hostname, nodeHealth.Token, nodeHealth.ExtraInfo, nodeHealth.Command,
+			nodeHealth.AppVersion,
 		)
-	}
+	})
 	{
 		sqlResult, err := db.ExecOrchestrator(`
 			update node_health set
-				last_seen_active = now(),
+				last_seen_active = now() - interval ? second,
 				extra_info = case when ? != '' then ? else extra_info end,
-				app_version = ?
+				app_version = ?,
+				incrementing_indicator = incrementing_indicator + 1
 			where
 				hostname = ?
 				and token = ?
 			`,
-			extraInfo, extraInfo, config.RuntimeCLIFlags.ConfiguredVersion, ThisHostname, ProcessToken.Hash,
+			reportedSecondsAgo,
+			nodeHealth.ExtraInfo, nodeHealth.ExtraInfo,
+			nodeHealth.AppVersion,
+			nodeHealth.Hostname, nodeHealth.Token,
 		)
 		if err != nil {
 			return false, log.Errore(err)
@@ -90,15 +74,27 @@ func RegisterNode(extraInfo string, command string, firstTime bool) (healthy boo
 			return true, nil
 		}
 	}
+	// Got here? The UPDATE didn't work. Row isn't there.
 	{
+		dbBackend := ""
+		if config.Config.IsSQLite() {
+			dbBackend = config.Config.SQLite3DataFile
+		} else {
+			dbBackend = fmt.Sprintf("%s:%d", config.Config.MySQLOrchestratorHost,
+				config.Config.MySQLOrchestratorPort)
+		}
 		sqlResult, err := db.ExecOrchestrator(`
 			insert ignore into node_health
-				(hostname, token, first_seen_active, last_seen_active, extra_info, command, app_version)
-			values
-				(?, ?, now(), now(), ?, ?, ?)
+				(hostname, token, first_seen_active, last_seen_active, extra_info, command, app_version, db_backend)
+			values (
+				?, ?,
+				now() - interval ? second, now() - interval ? second,
+				?, ?, ?, ?)
 			`,
-			ThisHostname, ProcessToken.Hash, extraInfo, command,
-			config.RuntimeCLIFlags.ConfiguredVersion,
+			nodeHealth.Hostname, nodeHealth.Token,
+			reportedSecondsAgo, reportedSecondsAgo,
+			nodeHealth.ExtraInfo, nodeHealth.Command,
+			nodeHealth.AppVersion, dbBackend,
 		)
 		if err != nil {
 			return false, log.Errore(err)
@@ -114,58 +110,6 @@ func RegisterNode(extraInfo string, command string, firstTime bool) (healthy boo
 	return false, nil
 }
 
-// HealthTest attempts to write to the backend database and get a result
-func HealthTest() (*HealthStatus, error) {
-	health := HealthStatus{Healthy: false, Hostname: ThisHostname, Token: ProcessToken.Hash}
-
-	healthy, err := RegisterNode("", "", false)
-	if err != nil {
-		health.Error = err
-		return &health, log.Errore(err)
-	}
-	health.Healthy = healthy
-	health.ActiveNode, health.IsActiveNode, err = ElectedNode()
-	if err != nil {
-		health.Error = err
-		return &health, log.Errore(err)
-	}
-
-	health.AvailableNodes, err = ReadAvailableNodes(true)
-
-	return &health, nil
-}
-
-// ContinuousRegistration will continuously update the node_health
-// table showing that the current process is still running.
-func ContinuousRegistration(extraInfo string, command string) {
-	if continuousRegistrationInitiated {
-		// This is a simple mechanism to make sure this function is not being called multiple times in the lifespan of this process.
-		// It is not concurrency-protected.
-		// Original use case: multiple instances as in "-i instance1,instance2,instance3" flag
-		return
-	}
-	continuousRegistrationInitiated = true
-
-	tickOperation := func(firstTime bool) {
-		if _, err := RegisterNode(extraInfo, command, firstTime); err != nil {
-			log.Errorf("ContinuousRegistration: RegisterNode failed: %+v", err)
-		}
-	}
-	// First one is synchronous
-	tickOperation(true)
-	go func() {
-		registrationTick := time.Tick(time.Duration(registrationPollSeconds) * time.Second)
-		for range registrationTick {
-			// We already run inside a go-routine so
-			// do not do this asynchronously.  If we
-			// get stuck then we don't want to fill up
-			// the backend pool with connections running
-			// this maintenance operation.
-			tickOperation(false)
-		}
-	}()
-}
-
 // ExpireAvailableNodes is an aggressive purging method to remove
 // node entries who have skipped their keepalive for two times.
 func ExpireAvailableNodes() {
@@ -175,7 +119,7 @@ func ExpireAvailableNodes() {
 			where
 				last_seen_active < now() - interval ? second
 			`,
-		registrationPollSeconds*2,
+		config.HealthPollSeconds*5,
 	)
 	if err != nil {
 		log.Errorf("ExpireAvailableNodes: failed to remove old entries: %+v", err)
@@ -203,7 +147,7 @@ func ReadAvailableNodes(onlyHttpNodes bool) (nodes [](*NodeHealth), err error) {
 	}
 	query := `
 		select
-			hostname, token, app_version, first_seen_active, last_seen_active
+			hostname, token, app_version, first_seen_active, last_seen_active, db_backend
 		from
 			node_health
 		where
@@ -213,13 +157,14 @@ func ReadAvailableNodes(onlyHttpNodes bool) (nodes [](*NodeHealth), err error) {
 			hostname
 		`
 
-	err = db.QueryOrchestrator(query, sqlutils.Args(registrationPollSeconds*2, extraInfo), func(m sqlutils.RowMap) error {
+	err = db.QueryOrchestrator(query, sqlutils.Args(config.HealthPollSeconds*2, extraInfo), func(m sqlutils.RowMap) error {
 		nodeHealth := &NodeHealth{
 			Hostname:        m.GetString("hostname"),
 			Token:           m.GetString("token"),
 			AppVersion:      m.GetString("app_version"),
 			FirstSeenActive: m.GetString("first_seen_active"),
 			LastSeenActive:  m.GetString("last_seen_active"),
+			DBBackend:       m.GetString("db_backend"),
 		}
 		nodes = append(nodes, nodeHealth)
 		return nil
@@ -246,23 +191,4 @@ func TokenBelongsToHealthyHttpService(token string) (result bool, err error) {
 		return nil
 	})
 	return result, log.Errore(err)
-}
-
-// Just check to make sure we can connect to the database
-func SimpleHealthTest() (*HealthStatus, error) {
-	health := HealthStatus{Healthy: false, Hostname: ThisHostname, Token: ProcessToken.Hash}
-
-	db, err := db.OpenOrchestrator()
-	if err != nil {
-		health.Error = err
-		return &health, log.Errore(err)
-	}
-
-	if err = db.Ping(); err != nil {
-		health.Error = err
-		return &health, log.Errore(err)
-	} else {
-		health.Healthy = true
-		return &health, nil
-	}
 }

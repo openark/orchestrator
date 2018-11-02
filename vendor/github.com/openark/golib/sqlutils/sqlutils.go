@@ -22,11 +22,15 @@ import (
 	"errors"
 	"fmt"
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/openark/golib/log"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
+
+const DateTimeFormat = "2006-01-02 15:04:05.999999"
 
 // RowMap represents one row in a result set. Its objective is to allow
 // for easy, typed getters by column name.
@@ -41,6 +45,18 @@ func (this *CellData) MarshalJSON() ([]byte, error) {
 	} else {
 		return json.Marshal(nil)
 	}
+}
+
+// UnmarshalJSON reds this object from JSON
+func (this *CellData) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	(*this).String = s
+	(*this).Valid = true
+
+	return nil
 }
 
 func (this *CellData) NullString() *sql.NullString {
@@ -60,8 +76,20 @@ func (this *RowData) MarshalJSON() ([]byte, error) {
 	return json.Marshal(cells)
 }
 
+func (this *RowData) Args() []interface{} {
+	result := make([]interface{}, len(*this))
+	for i := range *this {
+		result[i] = (*(*this)[i].NullString())
+	}
+	return result
+}
+
 // ResultData is an ordered row set of RowData
 type ResultData []RowData
+type NamedResultData struct {
+	Columns []string
+	Data    ResultData
+}
 
 var EmptyResultData = ResultData{}
 
@@ -119,6 +147,13 @@ func (this *RowMap) GetUintD(key string, def uint) uint {
 
 func (this *RowMap) GetBool(key string) bool {
 	return this.GetInt(key) != 0
+}
+
+func (this *RowMap) GetTime(key string) time.Time {
+	if t, err := time.Parse(DateTimeFormat, this.GetString(key)); err == nil {
+		return t
+	}
+	return time.Time{}
 }
 
 // knownDBs is a DB cache by uri
@@ -258,8 +293,9 @@ func QueryResultData(db *sql.DB, query string, args ...interface{}) (ResultData,
 }
 
 // QueryResultDataNamed returns a raw array of rows, with column names
-func QueryResultDataNamed(db *sql.DB, query string, args ...interface{}) (ResultData, []string, error) {
-	return queryResultData(db, query, true, args...)
+func QueryNamedResultData(db *sql.DB, query string, args ...interface{}) (NamedResultData, error) {
+	resultData, columns, err := queryResultData(db, query, true, args...)
+	return NamedResultData{Columns: columns, Data: resultData}, err
 }
 
 // QueryRowsMapBuffered reads data from the database into a buffer, and only then applies the given function per row.
@@ -342,4 +378,41 @@ func InClauseStringValues(terms []string) string {
 // Convert variable length arguments into arguments array
 func Args(args ...interface{}) []interface{} {
 	return args
+}
+
+func NilIfZero(i int64) interface{} {
+	if i == 0 {
+		return nil
+	}
+	return i
+}
+
+func ScanTable(db *sql.DB, tableName string) (NamedResultData, error) {
+	query := fmt.Sprintf("select * from %s", tableName)
+	return QueryNamedResultData(db, query)
+}
+
+func WriteTable(db *sql.DB, tableName string, data NamedResultData) (err error) {
+	if len(data.Data) == 0 {
+		return nil
+	}
+	if len(data.Columns) == 0 {
+		return nil
+	}
+	placeholders := make([]string, len(data.Columns))
+	for i := range placeholders {
+		placeholders[i] = "?"
+	}
+	query := fmt.Sprintf(
+		`replace into %s (%s) values (%s)`,
+		tableName,
+		strings.Join(data.Columns, ","),
+		strings.Join(placeholders, ","),
+	)
+	for _, rowData := range data.Data {
+		if _, execErr := db.Exec(query, rowData.Args()...); execErr != nil {
+			err = execErr
+		}
+	}
+	return err
 }

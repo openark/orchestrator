@@ -20,13 +20,11 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"runtime"
 
 	"github.com/github/orchestrator/go/app"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/inst"
 	"github.com/openark/golib/log"
-	"github.com/openark/golib/math"
 )
 
 var AppVersion, GitCommit string
@@ -52,28 +50,30 @@ func main() {
 	debug := flag.Bool("debug", false, "debug mode (very verbose)")
 	stack := flag.Bool("stack", false, "add stack trace upon error")
 	config.RuntimeCLIFlags.SkipBinlogSearch = flag.Bool("skip-binlog-search", false, "when matching via Pseudo-GTID, only use relay logs. This can save the hassle of searching for a non-existend pseudo-GTID entry, for example in servers with replication filters.")
-	config.RuntimeCLIFlags.Databaseless = flag.Bool("databaseless", false, "EXPERIMENTAL! Work without backend database")
 	config.RuntimeCLIFlags.SkipUnresolve = flag.Bool("skip-unresolve", false, "Do not unresolve a host name")
 	config.RuntimeCLIFlags.SkipUnresolveCheck = flag.Bool("skip-unresolve-check", false, "Skip/ignore checking an unresolve mapping (via hostname_unresolve table) resolves back to same hostname")
 	config.RuntimeCLIFlags.Noop = flag.Bool("noop", false, "Dry run; do not perform destructing operations")
 	config.RuntimeCLIFlags.BinlogFile = flag.String("binlog", "", "Binary log file name")
 	config.RuntimeCLIFlags.Statement = flag.String("statement", "", "Statement/hint")
 	config.RuntimeCLIFlags.GrabElection = flag.Bool("grab-election", false, "Grab leadership (only applies to continuous mode)")
-	config.RuntimeCLIFlags.PromotionRule = flag.String("promotion-rule", "prefer", "Promotion rule for register-andidate (prefer|neutral|must_not)")
+	config.RuntimeCLIFlags.PromotionRule = flag.String("promotion-rule", "prefer", "Promotion rule for register-andidate (prefer|neutral|prefer_not|must_not)")
 	config.RuntimeCLIFlags.Version = flag.Bool("version", false, "Print version and exit")
+	config.RuntimeCLIFlags.SkipContinuousRegistration = flag.Bool("skip-continuous-registration", false, "Skip cli commands performaing continuous registration (to reduce orchestratrator backend db load")
+	config.RuntimeCLIFlags.EnableDatabaseUpdate = flag.Bool("enable-database-update", false, "Enable database update, overrides SkipOrchestratorDatabaseUpdate")
+	config.RuntimeCLIFlags.IgnoreRaftSetup = flag.Bool("ignore-raft-setup", false, "Override RaftEnabled for CLI invocation (CLI by default not allowed for raft setups). NOTE: operations by CLI invocation may not reflect in all raft nodes.")
 	flag.Parse()
 
 	if *destination != "" && *sibling != "" {
 		log.Fatalf("-s and -d are synonyms, yet both were specified. You're probably doing the wrong thing.")
 	}
 	switch *config.RuntimeCLIFlags.PromotionRule {
-	case "prefer", "neutral", "must_not":
+	case "prefer", "neutral", "prefer_not", "must_not":
 		{
 			// OK
 		}
 	default:
 		{
-			log.Fatalf("-promotion-rule only supports prefer|neutral|must_not")
+			log.Fatalf("-promotion-rule only supports prefer|neutral|prefer_not|must_not")
 		}
 	}
 	if *destination == "" {
@@ -105,15 +105,13 @@ func main() {
 	}
 	log.Info(startText)
 
-	runtime.GOMAXPROCS(math.MinInt(4, runtime.NumCPU()))
-
 	if len(*configFile) > 0 {
 		config.ForceRead(*configFile)
 	} else {
 		config.Read("/etc/orchestrator.conf.json", "conf/orchestrator.conf.json", "orchestrator.conf.json")
 	}
-	if *config.RuntimeCLIFlags.Databaseless {
-		config.Config.DatabaselessMode__experimental = true
+	if *config.RuntimeCLIFlags.EnableDatabaseUpdate {
+		config.Config.SkipOrchestratorDatabaseUpdate = false
 	}
 	if config.Config.Debug {
 		log.SetLevel(log.DEBUG)
@@ -137,7 +135,25 @@ func main() {
 		fmt.Println(app.AppPrompt)
 		return
 	}
+
+	helpTopic := ""
+	if flag.Arg(0) == "help" {
+		if flag.Arg(1) != "" {
+			helpTopic = flag.Arg(1)
+		}
+		if helpTopic == "" {
+			helpTopic = *command
+		}
+		if helpTopic == "" {
+			// hacky way to make the CLI kick in as if the user typed `orchestrator -c help cli`
+			*command = "help"
+			flag.Args()[0] = "cli"
+		}
+	}
+
 	switch {
+	case helpTopic != "":
+		app.HelpCommand(helpTopic)
 	case len(flag.Args()) == 0 || flag.Arg(0) == "cli":
 		app.CliWrapper(*command, *strict, *instance, *destination, *owner, *reason, *duration, *pattern, *clusterAlias, *pool, *hostnameFlag)
 	case flag.Arg(0) == "http":

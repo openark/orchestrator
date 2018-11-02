@@ -27,32 +27,7 @@ import (
 	"github.com/openark/golib/math"
 )
 
-// CandidatePromotionRule describe the promotion preference/rule for an instance.
-// It maps to promotion_rule column in candidate_database_instance
-type CandidatePromotionRule string
-
-const (
-	MustPromoteRule      CandidatePromotionRule = "must"
-	PreferPromoteRule                           = "prefer"
-	NeutralPromoteRule                          = "neutral"
-	PreferNotPromoteRule                        = "prefer_not"
-	MustNotPromoteRule                          = "must_not"
-)
-
 const ReasonableDiscoveryLatency = 500 * time.Millisecond
-
-// ParseCandidatePromotionRule returns a CandidatePromotionRule by name.
-// It returns an error if there is no known rule by the given name.
-func ParseCandidatePromotionRule(ruleName string) (CandidatePromotionRule, error) {
-	switch ruleName {
-	case "prefer", "neutral", "must_not":
-		return CandidatePromotionRule(ruleName), nil
-	case "must", "prefer_not":
-		return CandidatePromotionRule(""), fmt.Errorf("CandidatePromotionRule: %v not supported yet", ruleName)
-	default:
-		return CandidatePromotionRule(""), fmt.Errorf("Invalid CandidatePromotionRule: %v", ruleName)
-	}
-}
 
 // Instance represents a database instance, including its current configuration & status.
 // It presents important replication configuration and detailed replication status.
@@ -102,6 +77,8 @@ type Instance struct {
 	HasReplicationCredentials       bool
 	ReplicationCredentialsAvailable bool
 	SemiSyncEnforced                bool
+	SemiSyncMasterEnabled           bool
+	SemiSyncReplicaEnabled          bool
 
 	LastSeenTimestamp    string
 	IsLastCheckValid     bool
@@ -255,9 +232,19 @@ func (this *Instance) FlavorNameAndMajorVersion() string {
 	return this.FlavorName + "-" + this.MajorVersionString()
 }
 
-// IsReplica makes simple heuristics to decide whether this insatnce is a replica of another instance
+// IsReplica makes simple heuristics to decide whether this instance is a replica of another instance
 func (this *Instance) IsReplica() bool {
 	return this.MasterKey.Hostname != "" && this.MasterKey.Hostname != "_" && this.MasterKey.Port != 0 && (this.ReadBinlogCoordinates.LogFile != "" || this.UsingGTID())
+}
+
+// IsMaster makes simple heuristics to decide whether this instance is a master (not replicating from any other server)
+func (this *Instance) IsMaster() bool {
+	return !this.IsReplica()
+}
+
+// IsWritableMaster makes simple heuristics to decide whether this instance is a writable master (not replicating from any other server)
+func (this *Instance) IsWritableMaster() bool {
+	return this.IsMaster() && !this.ReadOnly
 }
 
 // ReplicaRunning returns true when this instance's status is of a replicating replica.
@@ -458,10 +445,7 @@ func (this *Instance) LagStatusString() string {
 	return fmt.Sprintf("%+vs", this.SlaveLagSeconds.Int64)
 }
 
-// HumanReadableDescription returns a simple readable string describing the status, version,
-// etc. properties of this instance
-func (this *Instance) HumanReadableDescription() string {
-	tokens := []string{}
+func (this *Instance) descriptionTokens() (tokens []string) {
 	tokens = append(tokens, this.LagStatusString())
 	tokens = append(tokens, this.StatusString())
 	tokens = append(tokens, this.Version)
@@ -475,18 +459,42 @@ func (this *Instance) HumanReadableDescription() string {
 	} else {
 		tokens = append(tokens, "nobinlog")
 	}
-	if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
-		tokens = append(tokens, ">>")
+	{
+		extraTokens := []string{}
+		if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
+			extraTokens = append(extraTokens, ">>")
+		}
+		if this.UsingGTID() || this.SupportsOracleGTID {
+			extraTokens = append(extraTokens, "GTID")
+		}
+		if this.UsingPseudoGTID {
+			extraTokens = append(extraTokens, "P-GTID")
+		}
+		if this.IsDowntimed {
+			extraTokens = append(extraTokens, "downtimed")
+		}
+		tokens = append(tokens, strings.Join(extraTokens, ","))
 	}
-	if this.UsingGTID() {
-		tokens = append(tokens, "GTID")
+	return tokens
+}
+
+// HumanReadableDescription returns a simple readable string describing the status, version,
+// etc. properties of this instance
+func (this *Instance) HumanReadableDescription() string {
+	tokens := this.descriptionTokens()
+	nonEmptyTokens := []string{}
+	for _, token := range tokens {
+		if token != "" {
+			nonEmptyTokens = append(nonEmptyTokens, token)
+		}
 	}
-	if this.UsingPseudoGTID {
-		tokens = append(tokens, "P-GTID")
-	}
-	if this.IsDowntimed {
-		tokens = append(tokens, "downtimed")
-	}
-	description := fmt.Sprintf("[%s]", strings.Join(tokens, ","))
+	description := fmt.Sprintf("[%s]", strings.Join(nonEmptyTokens, ","))
+	return description
+}
+
+// TabulatedDescription returns a simple tabulated string of various properties
+func (this *Instance) TabulatedDescription(separator string) string {
+	tokens := this.descriptionTokens()
+	description := fmt.Sprintf("%s", strings.Join(tokens, separator))
 	return description
 }
