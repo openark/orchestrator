@@ -63,8 +63,21 @@ func (this *InstanceKeyMap) GetInstanceKeys() []InstanceKey {
 }
 
 // MarshalJSON will marshal this map as JSON
-func (this *InstanceKeyMap) MarshalJSON() ([]byte, error) {
+func (this InstanceKeyMap) MarshalJSON() ([]byte, error) {
 	return json.Marshal(this.GetInstanceKeys())
+}
+
+// UnmarshalJSON reds this object from JSON
+func (this *InstanceKeyMap) UnmarshalJSON(b []byte) error {
+	var keys []InstanceKey
+	if err := json.Unmarshal(b, &keys); err != nil {
+		return err
+	}
+	*this = make(InstanceKeyMap)
+	for _, key := range keys {
+		this.AddKey(key)
+	}
+	return nil
 }
 
 // ToJSON will marshal this map as JSON
@@ -103,7 +116,7 @@ func (this *InstanceKeyMap) ReadJson(jsonString string) error {
 func (this *InstanceKeyMap) ReadCommaDelimitedList(list string) error {
 	tokens := strings.Split(list, ",")
 	for _, token := range tokens {
-		key, err := ParseInstanceKey(token)
+		key, err := ParseResolveInstanceKey(token)
 		if err != nil {
 			return err
 		}

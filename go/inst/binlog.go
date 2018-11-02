@@ -44,6 +44,21 @@ type BinlogCoordinates struct {
 	Type    BinlogType
 }
 
+// rpad formats the binlog coordinates to a given size. If the size
+// increases this value is modified so it can be reused later. This
+// is to ensure consistent formatting in debug output.
+func rpad(coordinates BinlogCoordinates, length *int) string {
+	s := fmt.Sprintf("%+v", coordinates)
+	if len(s) > *length {
+		*length = len(s)
+	}
+
+	if len(s) >= *length {
+		return s
+	}
+	return fmt.Sprintf("%s%s", s, strings.Repeat(" ", *length-len(s)))
+}
+
 // ParseInstanceKey will parse an InstanceKey from a string representation such as 127.0.0.1:3306
 func ParseBinlogCoordinates(logFileLogPos string) (*BinlogCoordinates, error) {
 	tokens := strings.SplitN(logFileLogPos, ":", 2)
@@ -163,11 +178,19 @@ func (this *BinlogCoordinates) NextFileCoordinates() (BinlogCoordinates, error) 
 	return result, nil
 }
 
+// Detach returns a detahced form of coordinates
+func (this *BinlogCoordinates) Detach() (detachedCoordinates BinlogCoordinates) {
+	detachedCoordinates = BinlogCoordinates{LogFile: fmt.Sprintf("//%s:%d", this.LogFile, this.LogPos), LogPos: this.LogPos}
+	return detachedCoordinates
+}
+
 // FileSmallerThan returns true if this coordinate's file is strictly smaller than the other's.
-func (this *BinlogCoordinates) DetachedCoordinates() (isDetached bool, detachedLogFile string, detachedLogPos string) {
+func (this *BinlogCoordinates) ExtractDetachedCoordinates() (isDetached bool, detachedCoordinates BinlogCoordinates) {
 	detachedCoordinatesSubmatch := detachPattern.FindStringSubmatch(this.LogFile)
 	if len(detachedCoordinatesSubmatch) == 0 {
-		return false, "", ""
+		return false, *this
 	}
-	return true, detachedCoordinatesSubmatch[1], detachedCoordinatesSubmatch[2]
+	detachedCoordinates.LogFile = detachedCoordinatesSubmatch[1]
+	detachedCoordinates.LogPos, _ = strconv.ParseInt(detachedCoordinatesSubmatch[2], 10, 0)
+	return true, detachedCoordinates
 }

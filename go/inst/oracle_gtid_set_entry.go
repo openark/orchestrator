@@ -18,7 +18,14 @@ package inst
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
+)
+
+var (
+	singleValueInterval = regexp.MustCompile("^([0-9]+)$")
+	multiValueInterval  = regexp.MustCompile("^([0-9]+)[-]([0-9]+)$")
 )
 
 // OracleGtidSetEntry represents an entry in a set of GTID ranges,
@@ -46,6 +53,23 @@ func NewOracleGtidSetEntry(gtidRangeString string) (*OracleGtidSetEntry, error) 
 }
 
 // String returns a user-friendly string representation of this entry
-func (this OracleGtidSetEntry) String() string {
+func (this *OracleGtidSetEntry) String() string {
 	return fmt.Sprintf("%s:%s", this.UUID, this.Ranges)
+}
+
+// String returns a user-friendly string representation of this entry
+func (this *OracleGtidSetEntry) Explode() (result [](*OracleGtidSetEntry)) {
+	intervals := strings.Split(this.Ranges, ":")
+	for _, interval := range intervals {
+		if submatch := multiValueInterval.FindStringSubmatch(interval); submatch != nil {
+			intervalStart, _ := strconv.Atoi(submatch[1])
+			intervalEnd, _ := strconv.Atoi(submatch[2])
+			for i := intervalStart; i <= intervalEnd; i++ {
+				result = append(result, &OracleGtidSetEntry{UUID: this.UUID, Ranges: fmt.Sprintf("%d", i)})
+			}
+		} else if submatch := singleValueInterval.FindStringSubmatch(interval); submatch != nil {
+			result = append(result, &OracleGtidSetEntry{UUID: this.UUID, Ranges: interval})
+		}
+	}
+	return result
 }

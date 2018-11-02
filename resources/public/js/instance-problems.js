@@ -6,10 +6,9 @@ $(document).ready(function() {
     problemsURI += "/" + currentClusterName();
   }
   $.get(appUrl(problemsURI), function(instances) {
-    if (instances == null) {
-      instances = [];
-    }
+    instances = instances || [];
     $.get(appUrl("/api/maintenance"), function(maintenanceList) {
+      maintenanceList = maintenanceList || [];
       normalizeInstances(instances, maintenanceList);
       displayProblemInstances(instances);
     }, "json");
@@ -17,6 +16,11 @@ $(document).ready(function() {
 
   function displayProblemInstances(instances) {
     hideLoader();
+
+    if (isAnonymized()) {
+      $("#instance_problems").remove();
+      return;
+    }
 
     function SortByProblemOrder(instance0, instance1) {
       var orderDiff = instance0.problemOrder - instance1.problemOrder;
@@ -40,7 +44,6 @@ $(document).ready(function() {
         var instanceEl = Instance.createElement(instance).addClass("instance-problem").appendTo(li);
         $("#instance_problems ul").append(li);
 
-        //var popoverElement = $("#instance_problems [data-nodeid='" + instance.id + "'].popover");
         renderInstanceElement(instanceEl, instance, "problems"); //popoverElement
         instanceEl.click(function() {
           openNodeModal(instance);

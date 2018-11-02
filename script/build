@@ -2,6 +2,11 @@
 
 set -e
 
+if [ -n "$DEBUG" ];then
+    set -x
+    PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }' # print line number and function name
+fi
+
 . script/bootstrap
 
 mkdir -p bin
@@ -17,6 +22,6 @@ export GOPATH="$PWD/.gopath"
 cd .gopath/src/github.com/github/orchestrator
 
 # We put the binaries directly into the bindir, because we have no need for shim wrappers
-go build -o "$bindir/orchestrator" -ldflags "-X main.AppVersion=${version} -X main.BuildDescribe=${describe}" ./go/cmd/orchestrator/main.go
+go build -i -o "$bindir/orchestrator" -ldflags "-X main.AppVersion=${version} -X main.BuildDescribe=${describe}" ./go/cmd/orchestrator/main.go
 
 rsync -qa ./resources $bindir/

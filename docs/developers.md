@@ -1,72 +1,107 @@
 # Orchestrator for Developers
 
-`Orchestrator` is open source and accepts pull requests.
+`orchestrator` is open source and accepts pull requests.
 
 If you would like to build `orchestrator` on your own machine, or eventually submit PRs, follow this guide.
 
-#### Requirements
+### Requirements
 
-`Orchestrator` is built on Linux. OS/X should generally follow same guidelines. I have no hint about MS Windows, and the
-build is incompatible with Windows.
+- `orchestrator` is built on Linux and OS/X. I have no hint about MS Windows, and the build is incompatible with Windows.
 
-#### Go setup
+- `Go 1.9` or higher.
 
-You will need to have a *Go 1.5* environment. *1.5* is required as of Dec 2015 due to [vendor directories](https://golang.org/cmd/go/#hdr-Vendor_Directories) - Go's package dependencies solution.
+### Clone repo
 
-You will need to
+`orchestrator` is built with `Go`. `Go` is picky about where you place your code (tl;dr: in a well structured path under `$GOPATH`). However the good news is we have the scripting to go around that (no pun intended).
 
-	export GO15VENDOREXPERIMENT=1
+### Easy clone + builds
 
-This guide assumes you have set your Go environment, along with `GOPATH`.
+Clone the repo anywhere on your filesystem via
 
-To get started, issue
+	git clone git@github.com:github/orchestrator.git
+	cd orchestrator
 
-	go get github.com/github/orchestrator
+Build `orchestrator` via
 
-Change directory into `$GOPATH:/src/github.com/github/orchestrator`
+	script/build
 
-Issue the following to resolve all dependencies:
 
-	go get ./...
+You will find the binary as `bin/orchestrator`
 
-Test that your code builds via
+This is the same script used by CI to build & test `orchestrator`.
 
-	go run go/cmd/orchestrator/main.go
+### Not as easy clone + builds
 
-#### DB setup
+Why would you want this? Because this will empower you with building `.DEB`, `.rpm` packages for both Linux and OS/X.
 
-`Orchestrator` requires a MySQL backend to run. This could be installed anywhere. I usually use [mysqlsandbox](http://mysqlsandbox.net/) for local installations. You may choose to just install mysql-server on your dev machine.
+- Make sure `GOPATH` is set
+- Issue:
+
+	  go get github.com/github/orchestrator/...
+	  cd $GOPATH:/src/github.com/github/orchestrator
+
+- Compile or run via:
+
+	  go build -i go/cmd/orchestrator/main.go
+	  go run go/cmd/orchestrator/main.go
+
+- Create packages via:
+
+	  ./build.sh
+
+	To create packages you will need to have:
+
+	 - [fpm](https://github.com/jordansissel/fpm), which assumes you have `ruby` and `ruby-gems`
+	 - `rpmbuild`
+	 - `go`, `gofmt` in path
+	 - `tar`
+
+### DB setup
+
+As per [configuration: backend](configuration-backend.md), you may use either `SQLite` or `MySQL` as `orchestrator`'s backend database.
+
+#### Sqlite
+
+No special setup is required. Make sure to configure database file path.
+
+#### MySQL
+
+`MySQL` can be installed anywhere and you don't necessarily need it to run on your local box. I usually use [mysqlsandbox](http://mysqlsandbox.net/) for local installations. You may choose to just install mysql-server on your dev machine, or run a docker container, a VM, what have you.
 
 Once your backend MySQL setup is complete, issue:
 
     CREATE DATABASE IF NOT EXISTS orchestrator;
-    GRANT ALL PRIVILEGES ON `orchestrator`.* TO 'orchestrator'@'127.0.0.1'
-    IDENTIFIED BY 'orch_backend_password';
+    CREATE USER 'orc_server_user'@'%' IDENTIFIED BY 'orc_server_password';
+    GRANT ALL PRIVILEGES ON `orchestrator`.* TO 'orc_server_user'@'%';
 
-`Orchestrator` uses a configuration file whose search path is either `/etc/orchestrator.conf.json`,  `conf/orchestrator.conf.json` or `orchestrator.conf.json`.
-The repository includes a file called `conf/orchestrator.conf.json.sample` with some basic settings. Issue:
+`orchestrator` uses a configuration file whose search path is either `/etc/orchestrator.conf.json`,  `conf/orchestrator.conf.json` or `orchestrator.conf.json`.
+The repository includes a file called `conf/orchestrator-sample.conf.json` with some basic settings. Issue:
 
-	cp conf/orchestrator.conf.json.sample conf/orchestrator.conf.json
+	cp conf/orchestrator-sample.conf.json conf/orchestrator.conf.json
 
 The `conf/orchestrator.conf.json` file is not part of the repository and there is in fact a `.gitignore` entry for this file.
 
-Edit `orchestrator.conf.json` to match the above as follows:
+Verify `orchestrator.conf.json` matches the above as follows:
 
     ...
     "MySQLOrchestratorHost": "127.0.0.1",
     "MySQLOrchestratorPort": 3306,
     "MySQLOrchestratorDatabase": "orchestrator",
-    "MySQLOrchestratorUser": "orchestrator",
-    "MySQLOrchestratorPassword": "orch_backend_password",
+    "MySQLOrchestratorUser": "orc_server_user",
+    "MySQLOrchestratorPassword": "orc_server_password",
     ...
 
 Edit the above as as fit for your MySQL backend install.
 
 #### Executing from dev environment
 
-You should now be able to
+You should now be able to:
 
 	go run go/cmd/orchestrator/main.go http
+
+or, if you used the easy clone + build process:
+
+	bin/orchestrator http
 
 This will also invoke initial setup of your database environment (creating necessary tables in the `orchestrator` schema).
 
@@ -74,12 +109,13 @@ Browse into `http://localhost:3000` or replace `localhoast` with your dev hostna
 
 Now to make stuff interesting.
 
-#### Grant access to orchestrator on all your MySQL servers
+### Grant access to orchestrator on all your MySQL servers
+
 For `orchestrator` to detect your replication topologies, it must also have an account on each and every topology. At this stage this has to be the
 same account (same user, same password) for all topologies. On each of your masters, issue the following:
 
-    GRANT SUPER, PROCESS, REPLICATION SLAVE, RELOAD ON *.*
-    TO 'orchestrator'@'orch_host' IDENTIFIED BY 'orch_topology_password';
+    CREATE USER 'orchestrator'@'orch_host' IDENTIFIED BY 'orch_topology_password';
+    GRANT SUPER, PROCESS, REPLICATION SLAVE, RELOAD ON *.* TO 'orchestrator'@'orch_host';
 
 > REPLICATION SLAVE is required if you intend to use [Pseudo GTID](#pseudo-gtid)
 
@@ -88,45 +124,25 @@ Replace `orch_host` with hostname or orchestrator machine (or do your wildcards 
     "MySQLTopologyUser": "orchestrator",
     "MySQLTopologyPassword": "orch_topology_password",
 
-#### Discovering MySQL instances
+### Discovering MySQL instances
 
 Go to the `Discovery` page at `http://localhost:3000/web/discover`. Type in a hostname & port for a known MySQL instance, preferably one that is part of a larger topology (again I like using _MySQLSandbox_ for such test environments). Submit it.
 
-Depending on your configuration (`DiscoveryPollSeconds`, `InstancePollSeconds`) this may take a few seconds to a minute for
+Depending on your configuration (`InstancePollSeconds`) this may take a few seconds to a minute for
 `orchestrator` to fully scan the replication topology this instance belongs to, and present it under the [clusters dashboard](http://localhost:3000/web/clusters/).
 
 If you've made it this far, you've done 90% of the work. You may consider configuring Pseudo GTID queries, DC awareness etc. See
 "want to have" sub-sections under [configuration](Orchestrator-Manual#configuration).
 
+### Customizations
 
-#### Building
+There are some hooks in the Orchestrator web frontend which can be used to add customizations via CSS and JavaScript.
 
-To build an `Orchestrator` package, use the `build.sh` script:
+The corresponding files to edit are `resources/public/css/custom.css` and `resources/public/js/custom.js`.
 
-	bash build.sh
+You can find available hooks via `grep -r 'orchestrator:' resources/public/js`.
 
-You will need:
-
- - [fpm](https://github.com/jordansissel/fpm), which assumes you have `ruby` and `ruby-gems`
- - `rpmbuild`
- - `go`, `gofmt` in path
- - `tar`
-
- Current `build.sh` usage is:
-
- ```
- usage() {
-  echo
-  echo "Usage: $0 [-t target ] [-a arch ] [ -p prefix ] [-h] [-d]"
-  echo "Options:"
-  echo "-h Show this screen"
-  echo "-t (linux|darwin) Target OS Default:(linux)"
-  echo "-a (amd64|386) Arch Default:(amd64)"
-  echo "-d debug output"
-  echo "-p build prefix Default:(/usr/local)"
-  echo
-}
-```
+Please note that all APIs and structures are bound to change and any customizations are unsupported. Please file issues against uncustomized versions.
 
 ### Forking and Pull-Requesting
 
@@ -134,7 +150,7 @@ If you want to submit [pull-requests](https://help.github.com/articles/using-pul
 
 Setting up the environment is basically the same, except you don't want to
 
-	go get github.com/github/orchestrator
+	go get github.com/github/orchestrator/...
 
 But instead clone your own repository.
 
@@ -143,7 +159,7 @@ that coupling.
 
 Very briefly, you will either want to:
 
-	go get github.com/github/orchestrator
+	go get github.com/github/orchestrator/...
 	git remote add awesome-fork https://github.com/you-are-awesome/orchestrator.git
 
 Or you will workaround as follows:
@@ -154,7 +170,6 @@ Or you will workaround as follows:
 	cd src/github.com/github/
 	git clone git@github.com:you-are-awesome/orchestrator.git # OR: git clone https://github.com/you-are-awesome/orchestrator.git
 	cd orchestrator/
-	go get ./...
 
 
 You will have a fork of `orchestrator` to which you can push your changes and from which you can send pull requests.

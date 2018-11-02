@@ -25,26 +25,33 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/inst"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 )
+
+type httpMethodFunc func(uri string) (resp *http.Response, err error)
 
 var SeededAgents chan *Agent = make(chan *Agent)
 
 var httpClient *http.Client
+var httpClientMutex = &sync.Mutex{}
 
 // InitHttpClient gets called once, and initializes httpClient according to config.Config
 func InitHttpClient() {
+	httpClientMutex.Lock()
+	defer httpClientMutex.Unlock()
+
 	if httpClient != nil {
 		return
 	}
 
-	httpTimeout := time.Duration(time.Duration(config.Config.HttpTimeoutSeconds) * time.Second)
+	httpTimeout := time.Duration(time.Duration(config.AgentHttpTimeoutSeconds) * time.Second)
 	dialTimeout := func(network, addr string) (net.Conn, error) {
 		return net.DialTimeout(network, addr, httpTimeout)
 	}
@@ -59,6 +66,11 @@ func InitHttpClient() {
 // httpGet is a convenience method for getting http response from URL, optionaly skipping SSL cert verification
 func httpGet(url string) (resp *http.Response, err error) {
 	return httpClient.Get(url)
+}
+
+// httpPost is a convenience method for posting text data
+func httpPost(url string, bodyType string, content string) (resp *http.Response, err error) {
+	return httpClient.Post(url, bodyType, strings.NewReader(content))
 }
 
 // AuditAgentOperation creates and writes a new audit entry by given agent
@@ -94,9 +106,9 @@ func SubmitAgent(hostname string, port int, token string) (string, error) {
 	_, err := db.ExecOrchestrator(`
 			replace
 				into host_agent (
-					hostname, port, token, last_submitted
+					hostname, port, token, last_submitted, count_mysql_snapshots
 				) VALUES (
-					?, ?, ?, NOW()
+					?, ?, ?, NOW(), 0
 				)
 			`,
 		hostname,
@@ -108,9 +120,7 @@ func SubmitAgent(hostname string, port int, token string) (string, error) {
 	}
 
 	// Try to discover topology instances when an agent submits
-	if config.Config.AgentAutoDiscover {
-		DiscoverAgentInstance(hostname, port)
-	}
+	go DiscoverAgentInstance(hostname, port)
 
 	return hostname, err
 }
@@ -126,6 +136,10 @@ func DiscoverAgentInstance(hostname string, port int) error {
 	instanceKey := agent.GetInstance()
 	instance, err := inst.ReadTopologyInstance(instanceKey)
 	if err != nil {
+		log.Errorf("Failed to read topology for %v. err=%+v", instanceKey, err)
+		return err
+	}
+	if instance == nil {
 		log.Errorf("Failed to read topology for %v", instanceKey)
 		return err
 	}
@@ -154,7 +168,7 @@ func ReadOutdatedAgentsHosts() ([]string, error) {
 		from
 			host_agent
 		where
-			IFNULL(last_checked < now() - interval ? minute, true)
+			IFNULL(last_checked < now() - interval ? minute, 1)
 			`
 	err := db.QueryOrchestrator(query, sqlutils.Args(config.Config.AgentPollMinutes), func(m sqlutils.RowMap) error {
 		hostname := m.GetString("hostname")
@@ -393,8 +407,9 @@ func GetAgent(hostname string) (Agent, error) {
 	return agent, err
 }
 
-// executeAgentCommand requests an agent to execute a command via HTTP api
-func executeAgentCommand(hostname string, command string, onResponse *func([]byte)) (Agent, error) {
+// executeAgentCommandWithMethodFunc requests an agent to execute a command via HTTP api, either GET or POST,
+// with specific http method implementation by the caller
+func executeAgentCommandWithMethodFunc(hostname string, command string, methodFunc httpMethodFunc, onResponse *func([]byte)) (Agent, error) {
 	agent, token, err := readAgentBasicInfo(hostname)
 	if err != nil {
 		return agent, err
@@ -412,7 +427,7 @@ func executeAgentCommand(hostname string, command string, onResponse *func([]byt
 	log.Debugf("orchestrator-agent command: %s", fullCommand)
 	agentCommandUri := fmt.Sprintf("%s/%s", uri, fullCommand)
 
-	body, err := readResponse(httpGet(agentCommandUri))
+	body, err := readResponse(methodFunc(agentCommandUri))
 	if err != nil {
 		return agent, log.Errore(err)
 	}
@@ -422,6 +437,22 @@ func executeAgentCommand(hostname string, command string, onResponse *func([]byt
 	auditAgentOperation("agent-command", &agent, command)
 
 	return agent, err
+}
+
+// executeAgentCommand requests an agent to execute a command via HTTP api
+func executeAgentCommand(hostname string, command string, onResponse *func([]byte)) (Agent, error) {
+	httpFunc := func(uri string) (resp *http.Response, err error) {
+		return httpGet(uri)
+	}
+	return executeAgentCommandWithMethodFunc(hostname, command, httpFunc, onResponse)
+}
+
+// executeAgentPostCommand requests an agent to execute a command via HTTP POST
+func executeAgentPostCommand(hostname string, command string, content string, onResponse *func([]byte)) (Agent, error) {
+	httpFunc := func(uri string) (resp *http.Response, err error) {
+		return httpPost(uri, "text/plain", content)
+	}
+	return executeAgentCommandWithMethodFunc(hostname, command, httpFunc, onResponse)
 }
 
 // Unmount unmounts the designated snapshot mount point
@@ -434,7 +465,7 @@ func MountLV(hostname string, lv string) (Agent, error) {
 	return executeAgentCommand(hostname, fmt.Sprintf("mountlv?lv=%s", lv), nil)
 }
 
-// RemoveLV requests an agent to remvoe a snapshot
+// RemoveLV requests an agent to remove a snapshot
 func RemoveLV(hostname string, lv string) (Agent, error) {
 	return executeAgentCommand(hostname, fmt.Sprintf("removelv?lv=%s", lv), nil)
 }
@@ -520,8 +551,8 @@ func AbortSeed(seedId int64) error {
 }
 
 // PostCopy will request an agent to invoke post-copy commands
-func PostCopy(hostname string) (Agent, error) {
-	return executeAgentCommand(hostname, "post-copy", nil)
+func PostCopy(hostname, sourceHostname string) (Agent, error) {
+	return executeAgentCommand(hostname, fmt.Sprintf("post-copy/?sourceHost=%s", sourceHostname), nil)
 }
 
 // SubmitSeedEntry submits a new seed operation entry, returning its unique ID
@@ -666,7 +697,7 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 	}
 
 	seedFromLogicalVolume := sourceAgent.LogicalVolumes[0]
-	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Mounting logical volume: %s", seedFromLogicalVolume.Path), "")
+	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("%s Mounting logical volume: %s", sourceHostname, seedFromLogicalVolume.Path), "")
 	_, err = MountLV(sourceHostname, seedFromLogicalVolume.Path)
 	if err != nil {
 		return updateSeedStateEntry(seedStateId, err)
@@ -695,8 +726,8 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("%s will now receive data in background", targetHostname), "")
 	ReceiveMySQLSeedData(targetHostname, seedId)
 
-	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Waiting some time for %s to start listening for incoming data", targetHostname), "")
-	time.Sleep(2 * time.Second)
+	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Waiting %d seconds for %s to start listening for incoming data", config.Config.SeedWaitSecondsBeforeSend, targetHostname), "")
+	time.Sleep(time.Duration(config.Config.SeedWaitSecondsBeforeSend) * time.Second)
 
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("%s will now send data to %s in background", sourceHostname, targetHostname), "")
 	SendMySQLSeedData(sourceHostname, targetHostname, seedId)
@@ -747,12 +778,12 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 
 	// Cleanup:
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Executing post-copy command on %s", targetHostname), "")
-	_, err = PostCopy(targetHostname)
+	_, err = PostCopy(targetHostname, sourceHostname)
 	if err != nil {
 		return updateSeedStateEntry(seedStateId, err)
 	}
 
-	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Unmounting logical volume: %s", seedFromLogicalVolume.Path), "")
+	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("%s Unmounting logical volume: %s", sourceHostname, seedFromLogicalVolume.Path), "")
 	_, err = Unmount(sourceHostname)
 	if err != nil {
 		return updateSeedStateEntry(seedStateId, err)
@@ -902,4 +933,12 @@ func ReadSeedStates(seedId int64) ([]SeedOperationState, error) {
 		log.Errore(err)
 	}
 	return res, err
+}
+
+func RelaylogContentsTail(hostname string, startCoordinates *inst.BinlogCoordinates, onResponse *func([]byte)) (Agent, error) {
+	return executeAgentCommand(hostname, fmt.Sprintf("mysql-relaylog-contents-tail/%s/%d", startCoordinates.LogFile, startCoordinates.LogPos), onResponse)
+}
+
+func ApplyRelaylogContents(hostname string, content string) (Agent, error) {
+	return executeAgentPostCommand(hostname, "apply-relaylog-contents", content, nil)
 }

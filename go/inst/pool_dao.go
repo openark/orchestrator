@@ -21,36 +21,28 @@ import (
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 )
 
 // writePoolInstances will write (and override) a single cluster name mapping
 func writePoolInstances(pool string, instanceKeys [](*InstanceKey)) error {
 	writeFunc := func() error {
-		db, err := db.OpenOrchestrator()
+		dbh, err := db.OpenOrchestrator()
 		if err != nil {
 			return log.Errore(err)
 		}
-
-		tx, err := db.Begin()
-		stmt, err := tx.Prepare(`delete from database_instance_pool where pool = ?`)
-		_, err = stmt.Exec(pool)
-		if err != nil {
+		tx, err := dbh.Begin()
+		if _, err := tx.Exec(`delete from database_instance_pool where pool = ?`, pool); err != nil {
 			tx.Rollback()
 			return log.Errore(err)
 		}
-		stmt, err = tx.Prepare(`insert into database_instance_pool (hostname, port, pool, registered_at) values (?, ?, ?, now())`)
+		query := `insert into database_instance_pool (hostname, port, pool, registered_at) values (?, ?, ?, now())`
 		for _, instanceKey := range instanceKeys {
-			_, err := stmt.Exec(instanceKey.Hostname, instanceKey.Port, pool)
-			if err != nil {
+			if _, err := tx.Exec(query, instanceKey.Hostname, instanceKey.Port, pool); err != nil {
 				tx.Rollback()
 				return log.Errore(err)
 			}
-		}
-		if err != nil {
-			tx.Rollback()
-			return log.Errore(err)
 		}
 		tx.Commit()
 
@@ -123,6 +115,31 @@ func ReadClusterPoolInstancesMap(clusterName string, pool string) (*PoolInstance
 	}
 
 	return &poolInstancesMap, nil
+}
+
+func ReadAllPoolInstancesSubmissions() ([]PoolInstancesSubmission, error) {
+	result := []PoolInstancesSubmission{}
+	query := `
+		select
+			pool,
+			min(registered_at) as registered_at,
+			GROUP_CONCAT(concat(hostname, ':', port)) as hosts
+		from
+			database_instance_pool
+		group by
+			pool
+	`
+	err := db.QueryOrchestrator(query, sqlutils.Args(), func(m sqlutils.RowMap) error {
+		submission := PoolInstancesSubmission{}
+		submission.Pool = m.GetString("pool")
+		submission.CreatedAt = m.GetTime("registered_at")
+		submission.RegisteredAt = m.GetString("registered_at")
+		submission.DelimitedInstances = m.GetString("hosts")
+		result = append(result, submission)
+		return nil
+	})
+
+	return result, log.Errore(err)
 }
 
 // ExpirePoolInstances cleans up the database_instance_pool table from expired items

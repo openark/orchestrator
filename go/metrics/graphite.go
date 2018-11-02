@@ -20,14 +20,12 @@ import (
 	"github.com/cyberdelia/go-metrics-graphite"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/process"
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 	"github.com/rcrowley/go-metrics"
 	"net"
 	"strings"
 	"time"
 )
-
-var graphiteTickCallbacks [](func())
 
 // InitGraphiteMetrics is called once in the lifetime of the app, after config has been loaded
 func InitGraphiteMetrics() error {
@@ -53,19 +51,7 @@ func InitGraphiteMetrics() error {
 
 	log.Debugf("Will log to graphite on %+v, %+v", config.Config.GraphiteAddr, graphitePath)
 
-	graphiteCallbackTick := time.Tick(time.Duration(config.Config.GraphitePollSeconds) * time.Second)
-	go func() {
-		go graphite.Graphite(metrics.DefaultRegistry, 1*time.Minute, graphitePath, addr)
-		for range graphiteCallbackTick {
-			for _, f := range graphiteTickCallbacks {
-				go f()
-			}
-		}
-	}()
+	go graphite.Graphite(metrics.DefaultRegistry, 1*time.Minute, graphitePath, addr)
 
 	return nil
-}
-
-func OnGraphiteTick(f func()) {
-	graphiteTickCallbacks = append(graphiteTickCallbacks, f)
 }

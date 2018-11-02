@@ -7,9 +7,9 @@
 }
 
 body {
-    background-color: #eeeeee;
+    background-color: #f7f7f7;
     background-repeat: repeat;
-    padding-top: 80px;
+    padding-top: 50px;
 }
 
 .orchestrator-brand {
@@ -19,7 +19,8 @@ body {
 }
 
 .orchestrator-brand img {
-    padding: 0px 8px;
+  padding: 0px;
+  padding-right: 8px;
 }
 
 .table {
@@ -30,11 +31,29 @@ body {
     height: auto;
     max-height: 600px;
     overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.navbar {
+  margin-bottom: 0px;
 }
 
 .navbar-nav > li > .dropdown {
     padding-bottom: 15px;
     padding-top: 15px;
+}
+
+.navbar-nav #searchInput {
+  height: 30px;
+}
+
+.navbar-nav > li > a {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+#move-instance-method {
+    padding-bottom: 0px;
 }
 
 #move-instance-method button {
@@ -43,6 +62,9 @@ body {
 
 #alerts_container .alert {
     margin-bottom: 4px;
+    padding: 8px;
+    padding-right: 30px;
+    border-radius: 0px;
 }
 
 .node circle {
@@ -106,12 +128,25 @@ body {
     color: #606060;
 }
 
+.instance h3 .pull-right > .glyphicon.text-muted {
+    color: #999999;
+}
+
+.instance h3 .pull-right > .glyphicon.text-danger {
+    color: #a94442;
+}
+
+
 .instance h3 .glyphicon {
     position: inherit;
     cursor: default;
 }
 
-.instance h3 a .glyphicon {
+.instance h3 .instance-glyphs {
+    cursor: pointer;
+}
+
+.instance h3 .glyphicon {
     cursor: pointer;
 }
 
@@ -258,7 +293,7 @@ body {
 
 #instance_problems {
     z-index: 10;
-    position: absolute;
+    position: fixed;
     right: 0px;
     padding-right: 15px;
 }
@@ -318,6 +353,10 @@ body {
     margin-top: 8px;
 }
 
+#node_modal .modal-dialog {
+  width: 800px;
+}
+
 #node_modal .modal-body {
     padding-bottom: 0px;
 }
@@ -346,9 +385,13 @@ body {
     padding: 5px 9px;
 }
 
-#node_modal [data-panel-type=begin-downtime] .btn {
-	width: auto;
-	display: inline-block;
+#node_modal .begin-downtime .panel-body {
+  background-color: #d9edf7;
+}
+
+#modalDataAttributesTable tbody tr td:first-child {
+  white-space: nowrap;
+  background-color: #f7f7f7;
 }
 
 #modalDataAttributesTable tbody tr td {
@@ -358,9 +401,13 @@ body {
 #modalDataAttributesTable td code {
     white-space: normal;
     background-color: inherit;
+    padding: 0px;
 }
 
 #modalDataAttributesTable div.attributes-buttons > button {
+    margin-left: 4px;
+}
+#modalDataAttributesTable div.attributes-buttons > .btn-group {
     margin-left: 4px;
 }
 
@@ -410,6 +457,38 @@ body {
 	cursor: pointer;
 }
 
+#audit_recovery_steps thead tr th {
+  border-bottom: 0px;
+}
+
+#audit_recovery_steps tbody tr td:first-child {
+  background-color: #f7f7f7;
+}
+
+#audit_recovery_details thead tr th {
+  border-bottom: 0px;
+}
+
+#audit_recovery_details tbody tr td:first-child {
+  background-color: #f7f7f7;
+}
+#audit_recovery_details tbody tr td:nth-child(2) {
+  white-space: nowrap;
+}
+#audit_recovery_details tbody tr td:nth-child(3) {
+  width: 100%;
+  border: 1px dotted #cccccc;
+}
+#audit_recovery_details tbody tr ul {
+  padding-left: 16px;
+}
+#audit_recovery_details tbody tr code {
+  background-color: inherit;
+}
+#audit_recovery_details tbody tr:first-child td:nth-child(3) {
+  background-color: #f7f7f7;
+}
+
 .table-unbordered > tbody > tr > td {
     border: 0px;
 }
@@ -423,12 +502,10 @@ body {
     max-height: 240px;
 }
 
-
 #long_queries div.process-query {
     overflow: auto;
     max-height: 240px;
 }
-
 
 #long_queries div.row > div {
     overflow: auto;
@@ -462,8 +539,12 @@ body {
 #cluster_sidebar {
     float: left;
     position: fixed;
-    left: 15px;
+    left: 0px;
+    padding: 8px 15px 8px 15px;
     z-index:100;
+    border-right: dotted 1px #bbbbbb;
+    background-color: #f7f7f7;
+    height: 100%;
 }
 
 #cluster_sidebar li {
@@ -474,8 +555,9 @@ body {
     cursor: pointer;
 }
 
-#cluster_sidebar li[data-bullet=info] span.glyphicon {
-    font-size: 2em;
+#cluster_sidebar li[data-bullet] span.glyphicon {
+    font-size: 20px;
+    margin-bottom: 15px;
 }
 
 #cluster_sidebar li a .glyphicon {
@@ -513,6 +595,68 @@ body {
 
 #cluster_sidebar .text-indicate {
     color: #e68545;
+}
+
+#cluster_info {
+  position: fixed;
+  height: 100%;
+  overflow: auto;
+  z-index: 50;
+
+  padding-left: 64px;
+  margin-left: -64px;
+  padding-right: 24px;
+
+  border-right: dotted 1px #bbbbbb;
+  background-color: #f7f7f7;
+  font: 12px sans-serif;
+
+  display: none;
+}
+
+#cluster_info > div {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+#cluster_info [data-tag=glyphs] span.glyphicon {
+  font-size: 20px;
+}
+
+#cluster_info hr {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+
+#cluster_info div[data-tag=analysis] {
+  background-color: white;
+  border: 1px dotted #bbbbbb;
+  padding: 8px;
+}
+
+#cluster_info div[data-tag=analysis] div {
+  padding: 4px;
+}
+
+#cluster_info div[data-tag=analysis] div .pull-left.glyphicon {
+  font-size: 32px;
+}
+
+#cluster_name_info {
+  position: fixed;
+  z-index: 50;
+  padding-left: 64px;
+  background-color: #f7f7f7;
+}
+
+#cluster_wrapper {
+  padding-left: 64px;
+  padding-top: 36px;
+}
+
+#cluster_name {
+  font-size: 24px;
 }
 
 .arrow_box {
@@ -620,6 +764,35 @@ body {
     margin-bottom: 8px;
 }
 
+.instance .instance-master-section {
+  position: absolute;
+  bottom: 0px;
+  left: 0px;
+  z-index: 20;
+  height: 0%;
+  width: 48%;
+}
+
+.instance.accept_drop_check .instance-master-section {
+  height: 100%;
+}
+
+.instance .instance-normal-section {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  z-index: 20;
+  height: 0%;
+  width: 51%;
+}
+
+.instance.accept_drop_check .instance-normal-section {
+  height: 100%;
+}
+
+.instance h4.popover-footer {
+  z-index: 25;
+}
 
 /*.cluster-graph > .instance[data-duplicate-node] {
     position: absolute;
@@ -721,17 +894,12 @@ body {
 	font-family: "Glyphicons Halflings";
 }
 
-#main_container.container, #main_container .container {
-    width: inherit;
+#main_container {
+  margin-top: 15px;
 }
 
-#main_container .floating_background {
-    float: left;
-    position: fixed;
-    z-index: -1;
-    font-size: 50px;
-    color: #d0d0d0;
-    padding-left: 32px;
+#main_container.container, #main_container .container {
+    width: inherit;
 }
 
 .container.clusters .popover.instance {
@@ -775,13 +943,16 @@ body {
 }
 
 
-#orchestratorStatusTable {
+.status-table {
     font: 12px sans-serif;
 }
 
-#orchestratorStatusTable code {
+.status-table code {
     font-size: 100%;
     background-color: inherit;
+}
+.status-table .long-text {
+  overflow: auto;
 }
 
 .instance.instance-search {

@@ -18,14 +18,30 @@ package inst
 
 import (
 	"strings"
+	"time"
 
 	"github.com/github/orchestrator/go/config"
 
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 )
 
 // PoolInstancesMap lists instance keys per pool name
 type PoolInstancesMap map[string]([]*InstanceKey)
+
+type PoolInstancesSubmission struct {
+	CreatedAt          time.Time
+	Pool               string
+	DelimitedInstances string
+	RegisteredAt       string
+}
+
+func NewPoolInstancesSubmission(pool string, instances string) *PoolInstancesSubmission {
+	return &PoolInstancesSubmission{
+		CreatedAt:          time.Now(),
+		Pool:               pool,
+		DelimitedInstances: instances,
+	}
+}
 
 // ClusterPoolInstance is an instance mapping a cluster, pool & instance
 type ClusterPoolInstance struct {
@@ -36,17 +52,20 @@ type ClusterPoolInstance struct {
 	Port         int
 }
 
-func ApplyPoolInstances(pool string, instancesList string) error {
+func ApplyPoolInstances(submission *PoolInstancesSubmission) error {
+	if submission.CreatedAt.Add(time.Duration(config.Config.InstancePoolExpiryMinutes) * time.Minute).Before(time.Now()) {
+		// already expired; no need to persist
+		return nil
+	}
 	var instanceKeys [](*InstanceKey)
-	if instancesList != "" {
-		instancesStrings := strings.Split(instancesList, ",")
+	if submission.DelimitedInstances != "" {
+		instancesStrings := strings.Split(submission.DelimitedInstances, ",")
 		for _, instanceString := range instancesStrings {
-
-			instanceKey, err := ParseInstanceKeyLoose(instanceString)
+			instanceString = strings.TrimSpace(instanceString)
+			instanceKey, err := ParseResolveInstanceKey(instanceString)
 			if config.Config.SupportFuzzyPoolHostnames {
 				instanceKey = ReadFuzzyInstanceKeyIfPossible(instanceKey)
 			}
-			log.Debugf("%+v", instanceKey)
 			if err != nil {
 				return log.Errore(err)
 			}
@@ -54,6 +73,7 @@ func ApplyPoolInstances(pool string, instancesList string) error {
 			instanceKeys = append(instanceKeys, instanceKey)
 		}
 	}
-	writePoolInstances(pool, instanceKeys)
+	log.Debugf("submitting %d instances in %+v pool", len(instanceKeys), submission.Pool)
+	writePoolInstances(submission.Pool, instanceKeys)
 	return nil
 }

@@ -19,60 +19,36 @@ package inst
 import (
 	"fmt"
 
-	"github.com/outbrain/golib/sqlutils"
-
-	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 )
 
 // CandidateDatabaseInstance contains information about explicit promotion rules for an instance
 type CandidateDatabaseInstance struct {
-	Hostname      string
-	Port          int
-	PromotionRule CandidatePromotionRule
+	Hostname            string
+	Port                int
+	PromotionRule       CandidatePromotionRule
+	LastSuggestedString string
+}
+
+func NewCandidateDatabaseInstance(instanceKey *InstanceKey, promotionRule CandidatePromotionRule) *CandidateDatabaseInstance {
+	return &CandidateDatabaseInstance{
+		Hostname:      instanceKey.Hostname,
+		Port:          instanceKey.Port,
+		PromotionRule: promotionRule,
+	}
+}
+
+func (cdi *CandidateDatabaseInstance) WithCurrentTime() *CandidateDatabaseInstance {
+	cdi.LastSuggestedString, _ = db.ReadTimeNow()
+	return cdi
 }
 
 // String returns a string representation of the CandidateDatabaseInstance struct
-func (cdi CandidateDatabaseInstance) String() string {
+func (cdi *CandidateDatabaseInstance) String() string {
 	return fmt.Sprintf("%s:%d %s", cdi.Hostname, cdi.Port, cdi.PromotionRule)
 }
 
-// BulkReadCandidateDatabaseInstance returns a slice of
-// CandidateDatabaseInstance converted to JSON.
-/*
-root@myorchestrator [orchestrator]> select * from candidate_database_instance;
-+-------------------+------+---------------------+----------+----------------+
-| hostname          | port | last_suggested      | priority | promotion_rule |
-+-------------------+------+---------------------+----------+----------------+
-| host1.example.com | 3306 | 2016-11-22 17:41:06 |        1 | prefer         |
-| host2.example.com | 3306 | 2016-11-22 17:40:24 |        1 | prefer         |
-+-------------------+------+---------------------+----------+----------------+
-2 rows in set (0.00 sec)
-*/
-func BulkReadCandidateDatabaseInstance() ([]CandidateDatabaseInstance, error) {
-	if config.Config.DatabaselessMode__experimental {
-		return nil, nil // no data to return if not using a database
-	}
-
-	var candidateDatabaseInstances []CandidateDatabaseInstance
-
-	// Read all promotion rules from the table
-	query := `
-SELECT	hostname,
-	port,
-	promotion_rule -- no munging done here yet
-FROM	candidate_database_instance
-`
-	err := db.QueryOrchestrator(query, nil, func(m sqlutils.RowMap) error {
-		cdi := CandidateDatabaseInstance{
-			Hostname:      m.GetString("hostname"),
-			Port:          m.GetInt("port"),
-			PromotionRule: CandidatePromotionRule(m.GetString("promotion_rule")),
-		}
-		// add to end of candidateDatabaseInstances
-		candidateDatabaseInstances = append(candidateDatabaseInstances, cdi)
-
-		return nil
-	})
-	return candidateDatabaseInstances, err
+// Key returns an instance key representing this candidate
+func (cdi *CandidateDatabaseInstance) Key() *InstanceKey {
+	return &InstanceKey{Hostname: cdi.Hostname, Port: cdi.Port}
 }

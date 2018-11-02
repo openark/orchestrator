@@ -1,5 +1,6 @@
 var refreshIntervalSeconds = 60; // seconds
 var secondsTillRefresh = refreshIntervalSeconds;
+var isReloadingPage = false;
 var nodeModalVisible = false;
 
 reloadPageHint = {
@@ -45,8 +46,12 @@ function startRefreshTimer() {
     if (nodeModalVisible) {
       return;
     }
+    if (isReloadingPage) {
+      return;
+    }
     secondsTillRefresh = Math.max(secondsTillRefresh - 1, 0);
     if (secondsTillRefresh <= 0) {
+      isReloadingPage = true;
       $(".navbar-nav li[data-nav-page=refreshCountdown]").addClass("active");
       showLoader();
       location.reload(true);
@@ -78,6 +83,23 @@ function hideLoader() {
   $(".ajaxLoader").css('visibility', 'hidden');
 }
 
+function isAnonymized() {
+  return ($.cookie("anonymize") == "true");
+}
+
+function isSilentUI() {
+  return ($.cookie("silent-ui") == "true");
+}
+
+function isCompactDisplay() {
+  return ($.cookie("compact-display") == "true");
+}
+
+function anonymizeInstanceId(instanceId) {
+  var tokens = instanceId.split("__");
+  return "instance-" + md5(tokens[1]).substring(0, 4) + ":" + tokens[2];
+}
+
 function appUrl(url) {
   // Create an absolute URL that respects URL-rewriting proxies,
   // such as the Kubernetes apiserver proxy.
@@ -94,7 +116,7 @@ function appUrl(url) {
 function visualizeBrand() {
   var img = $("<img>");
 
-  img.attr("src", appUrl("/images/octocat-logo-32.png")).attr("alt", "GitHub");
+  img.attr("src", appUrl("/images/orchestrator-logo-32.png")).attr("alt", "GitHub");
 
   if (document.domain && document.domain.indexOf("outbrain.com") >= 0) {
     img.attr("src", appUrl("/images/outbrain-logo-32.png")).attr("alt", "Outbrain");
@@ -132,13 +154,16 @@ function canonizeInstanceTitle(title) {
 }
 
 function getInstanceTitle(host, port) {
+  if (host == "") {
+    return "";
+  }
   return canonizeInstanceTitle(host + ":" + port);
 }
 
 
 
 function addAlert(alertText, alertClass) {
-  if ($.cookie("anonymize") == "true") {
+  if (isAnonymized()) {
     return false;
   }
   if (typeof(alertClass) === 'undefined') {
@@ -159,17 +184,18 @@ function apiCommand(uri, hint) {
   showLoader();
   $.get(appUrl(uri), function(operationResult) {
     hideLoader();
-    if (operationResult.Code == "ERROR") {
-      addAlert(operationResult.Message)
-    } else {
-      reloadWithOperationResult(operationResult, hint);
+    reloadWithOperationResult(operationResult, hint);
+  }, "json").fail(function(operationResult) {
+    hideLoader();
+    if (operationResult.responseJSON.Code == "ERROR") {
+      addAlert(operationResult.responseJSON.Message)
     }
-  }, "json");
+  });
   return false;
 }
 
-
 function reloadWithMessage(msg, details, hint) {
+  msg = msg || '';
   var hostname = "";
   var port = "";
   if (details) {
@@ -321,19 +347,36 @@ function openNodeModal(node) {
 
   addNodeModalDataAttribute("Has binary logs", booleanString(node.LogBinEnabled));
   if (node.LogBinEnabled) {
-    addNodeModalDataAttribute("Binlog format", node.Binlog_format);
+    var format = node.Binlog_format;
+    if (format == 'ROW' && node.BinlogRowImage != '') {
+      format = format + "/" + node.BinlogRowImage;
+    }
+    addNodeModalDataAttribute("Binlog format", format);
     var td = addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
     $('#node_modal button[data-btn=take-siblings]').appendTo(td.find("div"))
   }
 
-  var td = addNodeModalDataAttribute("GTID based replication", booleanString(node.usingGTID));
-  $('#node_modal button[data-btn=enable-gtid]').appendTo(td.find("div"))
-  $('#node_modal button[data-btn=disable-gtid]').appendTo(td.find("div"))
-  if (node.usingGTID) {
-    addNodeModalDataAttribute("Executed GTID set", node.ExecutedGtidSet);
-    addNodeModalDataAttribute("GTID purged", node.GtidPurged);
+  $('#node_modal [data-btn-group=gtid-errant-fix]').hide();
+  addNodeModalDataAttribute("GTID supported", booleanString(node.supportsGTID));
+  if (node.supportsGTID) {
+    var td = addNodeModalDataAttribute("GTID based replication", booleanString(node.usingGTID));
+    $('#node_modal button[data-btn=enable-gtid]').appendTo(td.find("div"))
+    $('#node_modal button[data-btn=disable-gtid]').appendTo(td.find("div"))
+    if (node.GTIDMode) {
+      addNodeModalDataAttribute("GTID mode", node.GTIDMode);
+    }
+    if (node.ExecutedGtidSet) {
+      addNodeModalDataAttribute("Executed GTID set", node.ExecutedGtidSet);
+    }
+    if (node.GtidPurged) {
+      addNodeModalDataAttribute("GTID purged", node.GtidPurged);
+    }
+    if (node.GtidErrant) {
+      td = addNodeModalDataAttribute("GTID errant", node.GtidErrant);
+      $('#node_modal [data-btn-group=gtid-errant-fix]').appendTo(td.find("div"))
+      $('#node_modal [data-btn-group=gtid-errant-fix]').show();
+    }
   }
-
   addNodeModalDataAttribute("Semi-sync enforced", booleanString(node.SemiSyncEnforced));
 
   addNodeModalDataAttribute("Uptime", node.Uptime);
@@ -344,8 +387,6 @@ function openNodeModal(node) {
     '<a href="' + appUrl('/web/audit/instance/' + node.Key.Hostname + '/' + node.Key.Port) + '">' + node.title + '</a>');
   addNodeModalDataAttribute("Agent",
     '<a href="' + appUrl('/web/agent/' + node.Key.Hostname) + '">' + node.Key.Hostname + '</a>');
-  addNodeModalDataAttribute("Long queries",
-    '<a href="' + appUrl('/web/long-queries?filter=' + node.Key.Hostname) + '">on ' + node.Key.Hostname + '</a>');
 
   $('#node_modal [data-btn]').unbind("click");
 
@@ -399,6 +440,17 @@ function openNodeModal(node) {
     });
     return false;
   });
+  $('#node_modal [data-btn=gtid-errant-reset-master]').click(function() {
+    var message = "<p>Are you sure you wish to reset master on <code><strong>" + node.Key.Hostname + ":" + node.Key.Port +
+      "</strong></code>?" +
+      "<p>This will purge binary logs on server.";
+    bootbox.confirm(message, function(confirm) {
+      if (confirm) {
+        apiCommand("/api/gtid-errant-reset-master/" + node.Key.Hostname + "/" + node.Key.Port);
+      }
+    });
+    return false;
+  });
   $('#node_modal button[data-btn=set-read-only]').click(function() {
     apiCommand("/api/set-read-only/" + node.Key.Hostname + "/" + node.Key.Port);
   });
@@ -444,17 +496,20 @@ function openNodeModal(node) {
   });
 
   if (node.IsDowntimed) {
-    $('#node_modal [data-panel-type=downtime]').html("Downtimed by <strong>" + node.DowntimeOwner + "</strong> until " + node.DowntimeEndTimestamp);
-    $('#node_modal [data-description=downtime-status]').html(
+    $('#node_modal .end-downtime .panel-heading').html("Downtimed by <strong>" + node.DowntimeOwner + "</strong> until " + node.DowntimeEndTimestamp);
+    $('#node_modal .end-downtime .panel-body').html(
       node.DowntimeReason
     );
-    $('#node_modal [data-panel-type=begin-downtime]').hide();
+    $('#node_modal .begin-downtime').hide();
     $('#node_modal button[data-btn=begin-downtime]').hide();
-    $('#node_modal [data-panel-type=end-downtime]').show();
+
+    $('#node_modal .end-downtime').show();
+    $('#node_modal button[data-btn=end-downtime]').show();
   } else {
-    $('#node_modal [data-panel-type=downtime]').html("Downtime");
-    $('#node_modal [data-panel-type=begin-downtime]').show();
-    $('#node_modal [data-panel-type=end-downtime]').hide();
+    $('#node_modal .begin-downtime').show();
+    $('#node_modal button[data-btn=begin-downtime]').show();
+
+    $('#node_modal .end-downtime').hide();
     $('#node_modal button[data-btn=end-downtime]').hide();
   }
   $('#node_modal button[data-btn=skip-query]').hide();
@@ -558,6 +613,7 @@ function normalizeInstance(instance) {
   instance.replicationAttemptingToRun = instance.Slave_SQL_Running || instance.Slave_IO_Running;
   instance.replicationLagReasonable = Math.abs(instance.SlaveLagSeconds.Int64 - instance.SQLDelay) <= 10;
   instance.isSeenRecently = instance.SecondsSinceLastSeen.Valid && instance.SecondsSinceLastSeen.Int64 <= 3600;
+  instance.supportsGTID = instance.SupportsOracleGTID || instance.UsingMariaDBGTID;
   instance.usingGTID = instance.UsingOracleGTID || instance.UsingMariaDBGTID;
   instance.isMaxScale = (instance.Version.indexOf("maxscale") >= 0);
 
@@ -605,6 +661,9 @@ function normalizeInstanceProblem(instance) {
   instance.replicationLagProblem = function() {
     return !instance.replicationLagReasonable;
   }
+  instance.errantGTIDProblem = function() {
+    return (instance.GtidErrant != '');
+  }
 
   instance.problem = null;
   instance.problemOrder = 0;
@@ -629,6 +688,10 @@ function normalizeInstanceProblem(instance) {
     instance.problem = "replication_lag";
     instance.problemDescription = "Replica is lagging.\nThis diagnostic is based on either Seconds_behind_master or configured ReplicationLagQuery";
     instance.problemOrder = 5;
+  } else if (instance.errantGTIDProblem()) {
+    instance.problem = "Errant GTID";
+    instance.problemDescription = "Replica has GTID entries not found on its master";
+    instance.problemOrder = 6;
   }
   instance.hasProblem = (instance.problem != null);
   instance.hasConnectivityProblem = (!instance.IsLastCheckValid || !instance.IsRecentlyChecked);
@@ -745,10 +808,13 @@ function normalizeInstances(instances, maintenanceList) {
 
 
 function renderInstanceElement(popoverElement, instance, renderType) {
+  // $(this).find("h3 .pull-left").html(anonymizeInstanceId(instanceId));
+  // $(this).find("h3").attr("title", anonymizeInstanceId(instanceId));
+  var anonymizedInstanceId = anonymizeInstanceId(instance.id);
   popoverElement.attr("data-nodeid", instance.id);
-  popoverElement.find("h3").attr('title', instance.title);
+  popoverElement.find("h3").attr('title', (isAnonymized() ? anonymizedInstanceId : instance.title));
   popoverElement.find("h3").html('&nbsp;<div class="pull-left">' +
-    instance.canonicalTitle + '</div><div class="pull-right"><a href="#"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></a></div>');
+    (isAnonymized() ? anonymizedInstanceId : instance.canonicalTitle) + '</div><div class="pull-right instance-glyphs"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></div>');
   var indicateLastSeenInStatus = false;
 
   if (instance.isAggregate) {
@@ -775,8 +841,14 @@ function renderInstanceElement(popoverElement, instance, renderType) {
       popoverElement.addClass("first-child-in-display");
       popoverElement.attr("data-first-child-in-display", "true");
     }
-    if (instance.usingGTID) {
-      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using GTID"></span> ');
+    if (instance.supportsGTID) {
+      if (instance.hasMaster && !instance.usingGTID) {
+        popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon text-muted glyphicon-globe" title="Support GTID but not using it in replication"></span> ');
+      } else if (instance.GtidErrant) {
+        popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon text-danger glyphicon-globe" title="Errant GTID found"></span> ');
+      } else {
+        popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using GTID"></span> ');
+      }
     }
     if (instance.UsingPseudoGTID) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-globe" title="Using Pseudo GTID"></span> ');
@@ -793,11 +865,23 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.HasReplicationFilters) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-filter" title="Using replication filters"></span> ');
     }
-    if (instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled && !(instance.isMaster && !instance.isCoMaster)) {
+    if (instance.SemiSyncMasterEnabled) {
+      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-check" title="Semi sync enabled (master side)"></span> ');
+    }
+    if (instance.SemiSyncReplicaEnabled) {
+      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-saved" title="Semi sync enabled (replica side)"></span> ');
+    }
+    if (instance.LogBinEnabled && instance.LogSlaveUpdatesEnabled) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-forward" title="Logs slave updates"></span> ');
     }
     if (instance.IsCandidate) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-heart" title="Candidate"></span> ');
+    }
+    if (instance.PromotionRule == "prefer_not") {
+      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-thumbs-down" title="Prefer not promote"></span> ');
+    }
+    if (instance.PromotionRule == "must_not") {
+      popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-ban-circle" title="Must not promote"></span> ');
     }
     if (instance.inMaintenanceProblem()) {
       popoverElement.find("h3 div.pull-right").prepend('<span class="glyphicon glyphicon-wrench" title="In maintenance"></span> ');
@@ -826,15 +910,28 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.renderHint != "") {
       popoverElement.find("h3").addClass("label-" + instance.renderHint);
     }
-    var statusMessage = instance.SlaveLagSeconds.Int64 + ' seconds lag';
+    var statusMessage = instance.SlaveLagSeconds.Int64 + 's lag';
     if (indicateLastSeenInStatus) {
       statusMessage = 'seen ' + instance.SecondsSinceLastSeen.Int64 + ' seconds ago';
     }
-    var contentHtml = '' + instance.Version;
-    if (instance.LogBinEnabled) {
-      contentHtml += " " + instance.Binlog_format;
+    var identityHtml = '';
+    if (isAnonymized()) {
+      identityHtml += instance.Version.match(/[^.]+[.][^.]+/);
+    } else {
+      identityHtml += instance.Version;
     }
-    contentHtml = '' + '<div class="pull-right">' + statusMessage + ' </div>' + '<p class="instance-basic-info">' + contentHtml + '</p>';
+    if (instance.LogBinEnabled) {
+      var format = instance.Binlog_format;
+      if (format == 'ROW' && instance.BinlogRowImage != '') {
+        format = format + "/" + instance.BinlogRowImage.substring(0,1);
+      }
+      identityHtml += " " + format;
+    }
+    if (!isAnonymized()) {
+      identityHtml += ', ' + instance.FlavorName;
+    }
+
+    var contentHtml = '' + '<div class="pull-right">' + statusMessage + ' </div>' + '<p class="instance-basic-info">' + identityHtml + '</p>';
     if (instance.isCoMaster) {
       contentHtml += '<p><strong>Co master</strong></p>';
     } else if (instance.isMaster) {
@@ -848,20 +945,8 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     }
     popoverElement.find(".instance-content").html(contentHtml);
   }
-  // if (instance.isCandidateMaster) {
-  // popoverElement.append('<h4 class="popover-footer"><strong>Master
-  // candidate</strong><div class="pull-right"><button class="btn btn-xs
-  // btn-default" data-command="make-master"><span class="glyphicon
-  // glyphicon-play"></span> Make master</button></div></h4>');
-  // } else if (instance.isMostAdvancedOfSiblings) {
-  // popoverElement.append('<h4
-  // class="popover-footer"><strong>Candidate</strong><div
-  // class="pull-right"><button class="btn btn-xs btn-default"
-  // data-command="make-local-master"><span class="glyphicon
-  // glyphicon-play"></span> Make local master</button></div></h4>');
-  // }
 
-  popoverElement.find("h3 a").click(function() {
+  popoverElement.find("h3 .instance-glyphs").click(function() {
     openNodeModal(instance);
     return false;
   });
@@ -882,15 +967,50 @@ function getParameterByName(name) {
 }
 
 
+function renderGlobalRecoveriesButton(isGlobalRecoveriesEnabled) {
+  var iconContainer = $("#global-recoveries-icon > span");
+  if (isGlobalRecoveriesEnabled) {
+    iconContainer
+      .prop("title", "Global Recoveries Enabled")
+      .addClass("glyphicon-heart")
+      .removeClass("hidden")
+      .click(function(event) {
+        bootbox.confirm("<h3>Global Recoveries</h3>Are you sure you want to <strong>disable</strong> global recoveries?", function(confirm) {
+          if (confirm) {
+            apiCommand("/api/disable-global-recoveries");
+          }
+        })
+      });
+  } else {
+    iconContainer
+      .prop("title", "Global Recoveries Disabled")
+      .addClass("glyphicon-heart-empty")
+      .removeClass("hidden")
+      .click(function(event) {
+        bootbox.confirm("<h3>Global Recoveries</h3>Are you sure you want to enable global recoveries?", function(confirm) {
+          if (confirm) {
+            apiCommand("/api/enable-global-recoveries");
+          }
+        })
+      });
+  }
+}
+
 $(document).ready(function() {
   visualizeBrand();
 
-  $('body').css('background-image', 'url(' + appUrl('/images/tile.png') + ')');
-
-  $(".navbar-nav li").removeClass("active");
-  $(".navbar-nav li[data-nav-page='" + activePage() + "']").addClass("active");
-
   $.get(appUrl("/api/clusters-info"), function(clusters) {
+    clusters = clusters || [];
+
+    function sortAlphabetically(cluster1, cluster2) {
+      var cmp = cluster1.ClusterAlias.localeCompare(cluster2.ClusterAlias);
+      if (cmp == 0) {
+        cmp = cluster1.ClusterName.localeCompare(cluster2.ClusterName);
+      }
+      return cmp;
+    }
+    clusters.sort(sortAlphabetically);
+
     clusters.forEach(function(cluster) {
       var url = appUrl('/web/cluster/' + cluster.ClusterName)
       var title = cluster.ClusterName;
@@ -904,6 +1024,12 @@ $(document).ready(function() {
       func(clusters);
     });
   }, "json");
+
+  $.get(appUrl("/api/check-global-recoveries"), function(response) {
+    var isEnabled = (response.Details == "enabled")
+    renderGlobalRecoveriesButton(isEnabled);
+  }, "json");
+
   $(".ajaxLoader").click(function() {
     return false;
   });
@@ -930,7 +1056,7 @@ $(document).ready(function() {
   if (!isAuthorizedForAction()) {
     $("[data-nav-page=read-only]").css('display', 'inline-block');
   }
-  if (getUserId() != "") {
+  if (getUserId() != "" && !isAnonymized()) {
     $("[data-nav-page=user-id]").css('display', 'inline-block');
     $("[data-nav-page=user-id] a").html(" " + getUserId());
   }
@@ -951,5 +1077,13 @@ $(document).ready(function() {
       expires: 1
     });
   }
-  $("#searchInput").focus();
+  $("#searchInput").focusin(function() {
+    $("[data-nav-page=search] button").show();
+    $("#searchInput").css("width", "");
+  });
+  $("#searchInput").focusout(function() {
+    $("[data-nav-page=search] button").hide();
+    $("#searchInput").css("width", $("#searchInput").width()/2);
+  });
+  $("#searchInput").focusout();
 });

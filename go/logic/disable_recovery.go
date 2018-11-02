@@ -31,16 +31,12 @@ package logic
 
 import (
 	"github.com/github/orchestrator/go/db"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 )
 
 // IsRecoveryDisabled returns true if Recoveries are disabled globally
-func IsRecoveryDisabled() (bool, error) {
-	var (
-		disabled bool // default is false!
-		err      error
-	)
+func IsRecoveryDisabled() (disabled bool, err error) {
 	query := `
 		SELECT
 			COUNT(*) as mycount
@@ -73,9 +69,17 @@ func DisableRecovery() error {
 
 // EnableRecovery ensures recoveries are enabled globally
 func EnableRecovery() error {
+	// The "WHERE" clause is just to avoid full-scan reports by monitoring tools
 	_, err := db.ExecOrchestrator(`
-		DELETE FROM global_recovery_disable
+		DELETE FROM global_recovery_disable WHERE disable_recovery >= 0
 	`,
 	)
 	return err
+}
+
+func SetRecoveryDisabled(disabled bool) error {
+	if disabled {
+		return DisableRecovery()
+	}
+	return EnableRecovery()
 }

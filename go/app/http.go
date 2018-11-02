@@ -20,26 +20,32 @@ import (
 	"net"
 	nethttp "net/http"
 	"strings"
+	"time"
 
 	"github.com/github/orchestrator/go/agent"
+	"github.com/github/orchestrator/go/collection"
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/http"
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/process"
 	"github.com/github/orchestrator/go/ssl"
+
 	"github.com/go-martini/martini"
 	"github.com/martini-contrib/auth"
 	"github.com/martini-contrib/gzip"
 	"github.com/martini-contrib/render"
-	"github.com/outbrain/golib/log"
+	"github.com/openark/golib/log"
 )
+
+const discoveryMetricsName = "DISCOVERY_METRICS"
 
 var sslPEMPassword []byte
 var agentSSLPEMPassword []byte
+var discoveryMetrics *collection.Collection
 
 // Http starts serving
-func Http(discovery bool) {
+func Http(continuousDiscovery bool) {
 	promptForSSLPasswords()
 	process.ContinuousRegistration(process.OrchestratorExecutionHttpMode, "")
 
@@ -47,7 +53,7 @@ func Http(discovery bool) {
 	if config.Config.ServeAgentsHttp {
 		go agentsHttp()
 	}
-	standardHttp(discovery)
+	standardHttp(continuousDiscovery)
 }
 
 // Iterate over the private keys and get passwords for them
@@ -66,7 +72,7 @@ func promptForSSLPasswords() {
 }
 
 // standardHttp starts serving HTTP or HTTPS (api/web) requests, to be used by normal clients
-func standardHttp(discovery bool) {
+func standardHttp(continuousDiscovery bool) {
 	m := martini.Classic()
 
 	switch strings.ToLower(config.Config.AuthenticationMethod) {
@@ -114,10 +120,15 @@ func standardHttp(discovery bool) {
 
 	inst.SetMaintenanceOwner(process.ThisHostname)
 
-	if discovery {
+	if continuousDiscovery {
+		// start to expire metric collection info
+		discoveryMetrics = collection.CreateOrReturnCollection(discoveryMetricsName)
+		discoveryMetrics.SetExpirePeriod(time.Duration(config.Config.DiscoveryCollectionRetentionSeconds) * time.Second)
+
 		log.Info("Starting Discovery")
 		go logic.ContinuousDiscovery()
 	}
+
 	log.Info("Registering endpoints")
 	http.API.URLPrefix = config.Config.URLPrefix
 	http.Web.URLPrefix = config.Config.URLPrefix

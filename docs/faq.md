@@ -15,7 +15,7 @@ No. `Orchestrator` is strictly _not_ a monitoring tool. There is no intention to
 ### What kind of replication does orchestrator support?
 
 `Orchestrator` supports "plain-old-MySQL-replication", the one that uses binary log files and positions.
-If you don't know what you're using, this is probably the one. It is the only type of replication up to and including MySQL 5.5.
+If you don't know what you're using, this is probably the one. 
 
 ### Does orchestrator support Row Based Replication?
 
@@ -49,7 +49,8 @@ There is no expected work on this.
 
 ### Does orchestrator support 5.7 Parallel Replication?
 
-Yes, when in-order-replication is enabled (see [slave_preserve_commit_order](http://dev.mysql.com/doc/refman/5.7/en/replication-options-slave.html#sysvar_slave_preserve_commit_order)). The same applies to MariaDB.
+Yes. When using GTID, you're all good.
+When using Pseudo-GTID you must have in-order-replication is enabled (set [slave_preserve_commit_order](http://dev.mysql.com/doc/refman/5.7/en/replication-options-slave.html#sysvar_slave_preserve_commit_order)). 
 
 ### Does orchestrator support Multi-Master Replication?
 
@@ -58,6 +59,10 @@ No. Multi Master Replication (e.g. as in MariaDB 10.0) is not supported.
 ### Does orchestrator support Tungsten Replication?
 
 No.
+
+### Does orchestrator support MySQL Group Replication?
+
+No. Group replication (as of MySQL 5.7.17) is not supported.
 
 ### Does orchestrator support Yet Another Type of Replication?
 
@@ -69,8 +74,24 @@ No.
 
 ### Is orchestrator open source?
 
-Yes. `Orchestrator` is released as open source under the MIT license and is available at: https://github.com/github/orchestrator
+Yes. `Orchestrator` is released as open source under the Apache License 2.0 and is available at: https://github.com/github/orchestrator
 
 ### Who develops orchestrator and why?
 
 `Orchestrator` is developed by [Shlomi Noach](https://github.com/shlomi-noach) at [GitHub](http://github.com) (previously at [Booking.com](http://booking.com) and [Outbrain](http://outbrain.com)) to assist in managing multiple large replication topologies; time and human errors saved so far are almost priceless.
+
+### Does orchestrator work with a cluster containing multiple major versions of MySQL?
+
+Partially. This often arises when upgrading a cluster which can not
+take downtime. Each replica will be taken offline and upgraded to
+a new major version and added back to the cluster until all replicas
+have been upgraded. Orchestrator is aware of MySQL versions and
+will allow a replica with a higher major version to be moved under
+a master or intermediate master of a lower version but not vice-versa
+as this is generally not supported by the upstream vendors even if
+it may actually work.  In most circumstances orchestrator will do
+the right thing and it will allow for safe movement of such replicas
+within the topology where this is possible. This has been used
+extensively with MySQL 5.5/5.6 and also between with 5.6/5.7 but
+not so much with MariaDB 10.  If you see issues which may be related
+to this please report them.

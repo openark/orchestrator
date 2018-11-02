@@ -28,6 +28,7 @@ $(document).ready(function() {
 
   $.get(appUrl("/api/cluster-pool-instances/" + currentClusterName()), function(clusterPoolInstances) {
     $.get(appUrl("/api/problems"), function(problemInstances) {
+      problemInstances = problemInstances || [];
       var problemInstancesMap = normalizeInstances(problemInstances, []);
       displayClusterPoolInstances(clusterPoolInstances, problemInstances, problemInstancesMap);
     }, "json");

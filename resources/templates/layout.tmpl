@@ -13,10 +13,13 @@
 	<script type="text/javascript" src="{{.prefix}}/js/jquery.cookie-1.4.1.min.js"></script>
 	<script type="text/javascript" src="{{.prefix}}/js/corex.js"></script>
 	<script type="text/javascript" src="{{.prefix}}/js/corex-jquery.js"></script>
+	<script src="{{.prefix}}/js/md5.js"></script>
 	<script src="{{.prefix}}/js/common.js"></script>
 	<script src="{{.prefix}}/js/orchestrator.js"></script>
+	<script src="{{.prefix}}/js/custom.js"></script>
 	<link href="{{.prefix}}/bootstrap/css/bootstrap.min.css" rel="stylesheet">
 	<link href="{{.prefix}}/css/orchestrator.css" rel="stylesheet">
+	<link href="{{.prefix}}/css/custom.css" rel="stylesheet">
 
 	<style type="text/css">
 		.ajaxLoader {
@@ -73,11 +76,11 @@
 					<ul class="dropdown-menu" id="dropdown-clusters">
 						<li><a href="{{.prefix}}/web/clusters/">Dashboard</a></li>
 						<li><a href="{{.prefix}}/web/clusters-analysis/">Failure analysis</a></li>
+						<li><a href="{{.prefix}}/web/discover">Discover</a></li>
 						<li role="presentation" class="divider"></li>
 					</ul>
 				</li>
 
-				<li data-nav-page="discover"><a href="{{.prefix}}/web/discover">Discover</a></li>
 				<li class="dropdown" data-nav-page="audit">
 					<a href="#" class="dropdown-toggle" data-toggle="dropdown">
                             Audit
@@ -87,20 +90,9 @@
 						<li><a href="{{.prefix}}/web/audit">General</a></li>
 						<li><a href="{{.prefix}}/web/audit-failure-detection">Failure detection</a></li>
 						<li><a href="{{.prefix}}/web/audit-recovery">Recovery</a></li>
-					</ul>
-				</li>
-
-
-				<li class="dropdown" data-nav-page="extra">
-					<a href="#" class="dropdown-toggle" data-toggle="dropdown">
-                            Extra
-                            <b class="caret"></b>
-                        </a>
-					<ul class="dropdown-menu">
+						<li role="presentation" class="divider"></li>
 						<li><a href="{{.prefix}}/web/agents">Agents</a></li>
 						<li><a href="{{.prefix}}/web/seeds">Seeds</a></li>
-						<li role="presentation" class="divider"></li>
-						<li><a href="{{.prefix}}/web/long-queries">Long queries</a></li>
 					</ul>
 				</li>
 
@@ -109,7 +101,7 @@
 						<div class="form-group">
 							<input type="text" name="s" id="searchInput" class="form-control input-sm" placeholder="Search">
 						</div>
-						<button type="submit" class="btn btn-default btn-sm">Search</button>
+						<button type="submit" class="btn btn-default btn-sm"><span class="glyphicon glyphicon-search"></span></button>
 					</form>
 				</li>
 				<li class="dropdown" data-nav-page="context" style="visibility: hidden;">
@@ -118,6 +110,10 @@
 					</a>
 					<ul class="dropdown-menu" id="dropdown-context">
 					</ul>
+				<li data-nav-page="global-recoveries">
+          <a id="global-recoveries-icon" name="global-recoveries" href="#">
+            <span class="glyphicon hidden"></span>
+          </a>
 				</li>
 				<li data-nav-page="read-only" style="display: none;">
 					<a name="read-only" title="read only mode"><span class="glyphicon glyphicon-eye-open"></span></a>
@@ -132,8 +128,8 @@
 		</div>
 	</div>
 
+	<div id="alerts_container"></div>
 	<div class="container-fluid" id="main_container">
-		<div id="alerts_container"></div>
 		<div class="pull-right" id="instance_problems">
 			<div class="dropdown pull-right">
 				<button type="button" id="instance_problems_button" class="btn btn-default dropdown-toggle" data-toggle="dropdown" title="Problems">
@@ -154,10 +150,11 @@
 						<h4 class="modal-title"></h4>
 					</div>
 					<div class="modal-body">
-						<div class="panel panel-info">
-							<div class="panel-heading">
-								<div class="" data-panel-type="begin-downtime">
-									<form class="form-inline" role="form">
+
+						<div class="panel panel-default begin-downtime">
+						  <div class="panel-body">
+								<form class="form-inline">
+									<div class="form-group">
 										<input type="text" class="form-control input-sm" id="beginDowntimeOwner" placeholder="owner name" />
 										<input type="text" class="form-control input-sm" id="beginDowntimeReason" placeholder="reason" />
 										<select class="form-control input-sm" id="beginDowntimeDuration">
@@ -169,20 +166,24 @@
 											<option value="2d">2d</option>
 											<option value="7d">7d</option>
 										</select>
-										<button type="button" class="btn btn-info pull-right" data-btn="begin-downtime">
-											<span class="glyphicon glyphicon-volume-off"></span> Begin downtime
-										</button>
-									</form>
-								</div>
-								<div class="" data-panel-type="end-downtime">
-									<div class="pull-left" data-description="downtime-status">
 									</div>
-									<button type="button" class="btn btn-default pull-right" data-btn="end-downtime">
-										<span class="glyphicon glyphicon-volume-up"></span> End downtime
+									<button type="button" class="form-control btn btn-info pull-right" data-btn="begin-downtime">
+										<span class="glyphicon glyphicon-volume-off"></span> Begin downtime
 									</button>
-								</div>
+								</form>
 							</div>
 						</div>
+						<div class="panel panel-warning end-downtime">
+							<div class="panel-heading"></div>
+						  <div class="panel-body">
+							</div>
+							<div class="panel-footer">
+								<button type="button" class="btn btn-default" data-btn="end-downtime">
+									<span class="glyphicon glyphicon-volume-up"></span> End downtime
+								</button>
+							</div>
+						</div>
+
 						<table id="modalDataAttributesTable" class="table">
 							<div class="hidden-zone"></div>
 						</table>
@@ -214,6 +215,15 @@
 						<button type="button" class="btn btn-info" data-btn="take-siblings" title="Take siblings of this replica">Take siblings</button>
 						<button type="button" class="btn btn-success" data-btn="enable-gtid"><span class="glyphicon glyphicon-globe"></span> Enable</button>
 						<button type="button" class="btn btn-danger" data-btn="disable-gtid"><span class="glyphicon glyphicon-remove"></span> Disable</button>
+						<div class="btn-group" data-btn-group="gtid-errant-fix">
+							<button type="button" class="btn btn-danger" data-btn="gtid-errant-fix" data-grouped="true">Fix</button>
+							<button type="button" class="btn btn-danger dropdown-toggle" data-toggle="dropdown">
+								<span class="caret"></span> <span class="sr-only">Toggle Dropdown</span>
+							</button>
+							<ul class="dropdown-menu" role="menu">
+								<li><a href="#" data-btn="gtid-errant-reset-master">Reset master</a></li>
+							</ul>
+						</div>
 						<button type="button" class="btn btn-info" data-btn="regroup-replicas" title="Pick candidate replica and have it take its siblings">Regroup replicas</button>
 						<button type="button" class="btn alert-danger" data-btn="forget-instance" title="Make orchestrator forget this instance. Orchestrator may auto-find it again."><span class="glyphicon glyphicon-remove"></span> Forget</button>
 						<button type="button" class="btn btn-warning" data-btn="end-maintenance" title="End maintenance period now">End maintenance</button>
@@ -240,10 +250,6 @@
 	<script>
 		function autoshowProblems() {
 			return "{{.autoshow_problems}}";
-		}
-
-		function activePage() {
-			return "{{.activePage}}";
 		}
 
 		function agentsHttpActive() {

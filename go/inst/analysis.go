@@ -17,7 +17,10 @@
 package inst
 
 import (
+	"fmt"
 	"strings"
+
+	"github.com/github/orchestrator/go/config"
 )
 
 type AnalysisCode string
@@ -29,13 +32,12 @@ const (
 	DeadMaster                                                         = "DeadMaster"
 	DeadMasterAndSlaves                                                = "DeadMasterAndSlaves"
 	DeadMasterAndSomeSlaves                                            = "DeadMasterAndSomeSlaves"
-	UnreachableMasterWithStaleSlaves                                   = "UnreachableMasterWithStaleSlaves"
+	UnreachableMasterWithLaggingReplicas                               = "UnreachableMasterWithLaggingReplicas"
 	UnreachableMaster                                                  = "UnreachableMaster"
 	MasterSingleSlaveNotReplicating                                    = "MasterSingleSlaveNotReplicating"
 	MasterSingleSlaveDead                                              = "MasterSingleSlaveDead"
 	AllMasterSlavesNotReplicating                                      = "AllMasterSlavesNotReplicating"
 	AllMasterSlavesNotReplicatingOrDead                                = "AllMasterSlavesNotReplicatingOrDead"
-	AllMasterSlavesStale                                               = "AllMasterSlavesStale"
 	MasterWithoutSlaves                                                = "MasterWithoutSlaves"
 	DeadCoMaster                                                       = "DeadCoMaster"
 	DeadCoMasterAndSomeSlaves                                          = "DeadCoMasterAndSomeSlaves"
@@ -45,6 +47,7 @@ const (
 	DeadIntermediateMasterWithSingleSlave                              = "DeadIntermediateMasterWithSingleSlave"
 	DeadIntermediateMasterWithSingleSlaveFailingToConnect              = "DeadIntermediateMasterWithSingleSlaveFailingToConnect"
 	DeadIntermediateMasterAndSomeSlaves                                = "DeadIntermediateMasterAndSomeSlaves"
+	DeadIntermediateMasterAndSlaves                                    = "DeadIntermediateMasterAndSlaves"
 	UnreachableIntermediateMaster                                      = "UnreachableIntermediateMaster"
 	AllIntermediateMasterSlavesFailingToConnectOrDead                  = "AllIntermediateMasterSlavesFailingToConnectOrDead"
 	AllIntermediateMasterSlavesNotReplicating                          = "AllIntermediateMasterSlavesNotReplicating"
@@ -57,6 +60,40 @@ const (
 	StatementAndRowLoggingSlavesStructureWarning                         = "StatementAndRowLoggingSlavesStructureWarning"
 	MixedAndRowLoggingSlavesStructureWarning                             = "MixedAndRowLoggingSlavesStructureWarning"
 	MultipleMajorVersionsLoggingSlaves                                   = "MultipleMajorVersionsLoggingSlaves"
+	DifferentGTIDModesStructureWarning                                   = "DifferentGTIDModesStructureWarning"
+	ErrantGTIDStructureWarning                                           = "ErrantGTIDStructureWarning"
+)
+
+type InstanceAnalysis struct {
+	key      *InstanceKey
+	analysis AnalysisCode
+}
+
+func NewInstanceAnalysis(instanceKey *InstanceKey, analysis AnalysisCode) *InstanceAnalysis {
+	return &InstanceAnalysis{
+		key:      instanceKey,
+		analysis: analysis,
+	}
+}
+
+func (instanceAnalysis *InstanceAnalysis) String() string {
+	return fmt.Sprintf("%s/%s", instanceAnalysis.key.StringCode(), string(instanceAnalysis.analysis))
+}
+
+// PeerAnalysisMap indicates the number of peers agreeing on an analysis.
+// Key of this map is a InstanceAnalysis.String()
+type PeerAnalysisMap map[string]int
+
+type ReplicationAnalysisHints struct {
+	IncludeDowntimed bool
+	IncludeNoProblem bool
+	AuditAnalysis    bool
+}
+
+const (
+	ForceMasterFailoverCommandHint    string = "force-master-failover"
+	ForceMasterTakeoverCommandHint    string = "force-master-takeover"
+	GracefulMasterTakeoverCommandHint string = "graceful-master-takeover"
 )
 
 // ReplicationAnalysis notes analysis on replication chain status, per instance
@@ -64,14 +101,17 @@ type ReplicationAnalysis struct {
 	AnalyzedInstanceKey                       InstanceKey
 	AnalyzedInstanceMasterKey                 InstanceKey
 	ClusterDetails                            ClusterInfo
+	AnalyzedInstanceDataCenter                string
+	AnalyzedInstancePhysicalEnvironment       string
 	IsMaster                                  bool
 	IsCoMaster                                bool
 	LastCheckValid                            bool
+	LastCheckPartialSuccess                   bool
 	CountReplicas                             uint
 	CountValidReplicas                        uint
 	CountValidReplicatingReplicas             uint
 	CountReplicasFailingToConnectToMaster     uint
-	CountStaleReplicas                        uint
+	CountDowntimedReplicas                    uint
 	ReplicationDepth                          uint
 	SlaveHosts                                InstanceKeyMap
 	IsFailingToConnectToMaster                bool
@@ -79,6 +119,7 @@ type ReplicationAnalysis struct {
 	Description                               string
 	StructureAnalysis                         []StructureAnalysisCode
 	IsDowntimed                               bool
+	IsReplicasDowntimed                       bool // as good as downtimed because all replicas are downtimed AND analysis is all about the replicas (e.e. AllMasterSlavesNotReplicating)
 	DowntimeEndTimestamp                      string
 	DowntimeRemainingSeconds                  int
 	IsBinlogServer                            bool
@@ -90,11 +131,26 @@ type ReplicationAnalysis struct {
 	CountMixedBasedLoggingReplicas            uint
 	CountRowBasedLoggingReplicas              uint
 	CountDistinctMajorVersionsLoggingReplicas uint
+	CountDelayedReplicas                      uint
+	CountLaggingReplicas                      uint
+	IsActionableRecovery                      bool
+	ProcessingNodeHostname                    string
+	ProcessingNodeToken                       string
+	CountAdditionalAgreeingNodes              int
+	StartActivePeriod                         string
+	SkippableDueToDowntime                    bool
+	GTIDMode                                  string
+	MinReplicaGTIDMode                        string
+	MaxReplicaGTIDMode                        string
+	MaxReplicaGTIDErrant                      string
+	CommandHint                               string
 }
+
+type AnalysisMap map[string](*ReplicationAnalysis)
 
 type ReplicationAnalysisChangelog struct {
 	AnalyzedInstanceKey InstanceKey
-	Changelog           string
+	Changelog           []string
 }
 
 // ReadReplicaHostsFromString parses and reads replica keys from comma delimited string
@@ -113,4 +169,10 @@ func (this *ReplicationAnalysis) AnalysisString() string {
 		result = append(result, string(structureAnalysis))
 	}
 	return strings.Join(result, ", ")
+}
+
+// ValidSecondsFromSeenToLastAttemptedCheck returns the maximum allowed elapsed time
+// between last_attempted_check to last_checked before we consider the instance as invalid.
+func ValidSecondsFromSeenToLastAttemptedCheck() uint {
+	return config.Config.InstancePollSeconds + 1
 }

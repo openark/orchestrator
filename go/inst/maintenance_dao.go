@@ -22,8 +22,9 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/process"
-	"github.com/outbrain/golib/log"
-	"github.com/outbrain/golib/sqlutils"
+	"github.com/github/orchestrator/go/util"
+	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 )
 
 // ReadActiveMaintenance returns the list of currently active maintenance entries
@@ -35,7 +36,7 @@ func ReadActiveMaintenance() ([]Maintenance, error) {
 			hostname,
 			port,
 			begin_timestamp,
-			timestampdiff(second, begin_timestamp, now()) as seconds_elapsed,
+			unix_timestamp() - unix_timestamp(begin_timestamp) as seconds_elapsed,
 			maintenance_active,
 			owner,
 			reason
@@ -72,7 +73,7 @@ func ReadActiveMaintenance() ([]Maintenance, error) {
 func BeginBoundedMaintenance(instanceKey *InstanceKey, owner string, reason string, durationSeconds uint, explicitlyBounded bool) (int64, error) {
 	var maintenanceToken int64 = 0
 	if durationSeconds == 0 {
-		durationSeconds = config.Config.MaintenanceExpireMinutes * 60
+		durationSeconds = config.MaintenanceExpireMinutes * 60
 	}
 	res, err := db.ExecOrchestrator(`
 			insert ignore
@@ -90,7 +91,7 @@ func BeginBoundedMaintenance(instanceKey *InstanceKey, owner string, reason stri
 		owner,
 		reason,
 		process.ThisHostname,
-		process.ProcessToken.Hash,
+		util.ProcessToken.Hash,
 		explicitlyBounded,
 	)
 	if err != nil {
@@ -113,7 +114,7 @@ func BeginMaintenance(instanceKey *InstanceKey, owner string, reason string) (in
 }
 
 // EndMaintenanceByInstanceKey will terminate an active maintenance using given instanceKey as hint
-func EndMaintenanceByInstanceKey(instanceKey *InstanceKey) error {
+func EndMaintenanceByInstanceKey(instanceKey *InstanceKey) (wasMaintenance bool, err error) {
 	res, err := db.ExecOrchestrator(`
 			update
 				database_instance_maintenance
@@ -129,16 +130,37 @@ func EndMaintenanceByInstanceKey(instanceKey *InstanceKey) error {
 		instanceKey.Port,
 	)
 	if err != nil {
-		return log.Errore(err)
+		return wasMaintenance, log.Errore(err)
 	}
 
-	if affected, _ := res.RowsAffected(); affected == 0 {
-		err = fmt.Errorf("Instance is not in maintenance mode: %+v", instanceKey)
-	} else {
+	if affected, _ := res.RowsAffected(); affected > 0 {
 		// success
+		wasMaintenance = true
 		AuditOperation("end-maintenance", instanceKey, "")
 	}
-	return err
+	return wasMaintenance, err
+}
+
+// InMaintenance checks whether a given instance is under maintenacne
+func InMaintenance(instanceKey *InstanceKey) (inMaintenance bool, err error) {
+	query := `
+		select
+			count(*) > 0 as in_maintenance
+		from
+			database_instance_maintenance
+		where
+			hostname = ?
+			and port = ?
+			and maintenance_active = 1
+			and end_timestamp > NOW()
+			`
+	args := sqlutils.Args(instanceKey.Hostname, instanceKey.Port)
+	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
+		inMaintenance = m.GetBool("in_maintenance")
+		return nil
+	})
+
+	return inMaintenance, log.Errore(err)
 }
 
 // ReadMaintenanceInstanceKey will return the instanceKey for active maintenance by maintenanceToken
@@ -154,7 +176,7 @@ func ReadMaintenanceInstanceKey(maintenanceToken int64) (*InstanceKey, error) {
 			`
 
 	err := db.QueryOrchestrator(query, sqlutils.Args(maintenanceToken), func(m sqlutils.RowMap) error {
-		instanceKey, merr := NewInstanceKeyFromStrings(m.GetString("hostname"), m.GetString("port"))
+		instanceKey, merr := NewResolveInstanceKey(m.GetString("hostname"), m.GetInt("port"))
 		if merr != nil {
 			return merr
 		}
@@ -163,14 +185,11 @@ func ReadMaintenanceInstanceKey(maintenanceToken int64) (*InstanceKey, error) {
 		return nil
 	})
 
-	if err != nil {
-		log.Errore(err)
-	}
-	return res, err
+	return res, log.Errore(err)
 }
 
 // EndMaintenance will terminate an active maintenance via maintenanceToken
-func EndMaintenance(maintenanceToken int64) error {
+func EndMaintenance(maintenanceToken int64) (wasMaintenance bool, err error) {
 	res, err := db.ExecOrchestrator(`
 			update
 				database_instance_maintenance
@@ -183,16 +202,15 @@ func EndMaintenance(maintenanceToken int64) error {
 		maintenanceToken,
 	)
 	if err != nil {
-		return log.Errore(err)
+		return wasMaintenance, log.Errore(err)
 	}
-	if affected, _ := res.RowsAffected(); affected == 0 {
-		err = fmt.Errorf("Instance is not in maintenance mode; token = %+v", maintenanceToken)
-	} else {
+	if affected, _ := res.RowsAffected(); affected > 0 {
 		// success
+		wasMaintenance = true
 		instanceKey, _ := ReadMaintenanceInstanceKey(maintenanceToken)
 		AuditOperation("end-maintenance", instanceKey, fmt.Sprintf("maintenanceToken: %d", maintenanceToken))
 	}
-	return err
+	return wasMaintenance, err
 }
 
 // ExpireMaintenance will remove the maintenance flag on old maintenances and on bounded maintenances
@@ -205,7 +223,7 @@ func ExpireMaintenance() error {
 				maintenance_active is null
 				and end_timestamp < NOW() - INTERVAL ? DAY
 			`,
-			config.Config.MaintenancePurgeDays,
+			config.MaintenancePurgeDays,
 		)
 		if err != nil {
 			return log.Errore(err)
@@ -216,10 +234,8 @@ func ExpireMaintenance() error {
 	}
 	{
 		res, err := db.ExecOrchestrator(`
-			update
+			delete from
 				database_instance_maintenance
-			set
-				maintenance_active = NULL
 			where
 				maintenance_active = 1
 				and end_timestamp < NOW()
@@ -234,14 +250,13 @@ func ExpireMaintenance() error {
 	}
 	{
 		res, err := db.ExecOrchestrator(`
-			update
+			delete from
 				database_instance_maintenance
-				left join node_health on (processing_node_hostname = node_health.hostname AND processing_node_token = node_health.token)
-			set
-				database_instance_maintenance.maintenance_active = NULL
 			where
-				node_health.last_seen_active IS NULL
-				and explicitly_bounded = 0
+				explicitly_bounded = 0
+				and concat(processing_node_hostname, ':', processing_node_token) not in (
+					select concat(hostname, ':', token) from node_health
+				)
 			`,
 		)
 		if err != nil {

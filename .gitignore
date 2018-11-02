@@ -1,6 +1,8 @@
+*~
 conf/orchestrator.conf.json
 .DS_Store
 .vagrant/
+vagrant/.sqlite
 vagrant/admin-post-install.sh
 vagrant/db-post-install.sh
 vagrant/db1-post-install.sh
@@ -10,3 +12,11 @@ vagrant/db4-post-install.sh
 vagrant/vagrant-ssh-key
 vagrant/vagrant-ssh-key.pub
 Godeps/_workspace
+.gopath/
+main
+.idea/
+*.deb
+*.pcap
+*.log
+.vendor/go19
+./bin

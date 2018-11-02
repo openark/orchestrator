@@ -16,7 +16,6 @@
   "#": "-----",
   "DiscoverByShowSlaveHosts": true,
   "InstancePollSeconds": 5,
-  "ReadLongRunningQueries": true,
   "HostnameResolveMethod": "default",
   "MySQLHostnameResolveMethod": "@@hostname",
   "ReasonableReplicationLagSeconds": 10,
@@ -48,12 +47,10 @@
   "PseudoGTIDPatternIsFixedSubstring": false,
   "PseudoGTIDMonotonicHint": "asc:",
   "DetectPseudoGTIDQuery": "",
-  "PseudoGTIDCoordinatesHistoryHeuristicMinutes": 2,
   "#": "-----",
   "#": "Recovery related config:",
   "#": "-----",
   "FailureDetectionPeriodBlockMinutes": 60,
-  "RecoveryPollSeconds": 10,
   "RecoveryPeriodBlockSeconds": 3600,
   "RecoveryIgnoreHostnameFilters": [],
   "RecoverMasterClusterFilters": [
@@ -64,6 +61,9 @@
   ],
   "OnFailureDetectionProcesses": [
     "echo 'Detected {failureType} on {failureCluster}. Affected replicas: {countSlaves}' >> /tmp/recovery.log"
+  ],
+  "PreGracefulTakeoverProcesses": [
+    "echo 'Planned takeover about to take place on {failureCluster}. Master will switch to read_only' >> /tmp/recovery.log"
   ],
   "PreFailoverProcesses": [
     "echo 'Will recover from {failureType} on {failureCluster}' >> /tmp/recovery.log"
@@ -78,8 +78,11 @@
   "PostIntermediateMasterFailoverProcesses": [
     "echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
   ],
+  "PostGracefulTakeoverProcesses": [
+    "echo 'Planned takeover complete' >> /tmp/recovery.log"
+  ],
   "DetachLostSlavesAfterMasterFailover": true,
-  "ApplyMySQLPromotionAfterMasterFailover": false,
+  "ApplyMySQLPromotionAfterMasterFailover": true,
   "MasterFailoverDetachSlaveMasterHost": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 60,
   "PostponeSlaveRecoveryOnLagMinutes": 10,
