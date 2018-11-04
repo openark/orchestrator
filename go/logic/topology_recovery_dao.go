@@ -204,17 +204,17 @@ func writeTopologyRecovery(topologyRecovery *TopologyRecovery) (*TopologyRecover
 }
 
 // AttemptRecoveryRegistration tries to add a recovery entry; if this fails that means recovery is already in place.
-func attemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, forceRecovery bool) (*TopologyRecovery, error) {
+func attemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, forceRecovery bool) (topologyRecovery *TopologyRecovery, rejectReason string, err error) {
 	if !forceRecovery {
 		// Let's check if this instance has just been promoted recently and is still in active period.
 		// If so, we reject recovery registration to avoid flapping.
 		recoveries, err := ReadInActivePeriodSuccessorInstanceRecovery(&analysisEntry.AnalyzedInstanceKey)
 		if err != nil {
-			return nil, log.Errore(err)
+			return nil, "", log.Errore(err)
 		}
 		if len(recoveries) > 0 {
 			RegisterBlockedRecoveries(analysisEntry, recoveries)
-			return nil, log.Errorf("AttemptRecoveryRegistration: instance %+v has recently been promoted (by failover of %+v) and is in active period. It will not be failed over. You may acknowledge the failure on %+v (-c ack-instance-recoveries) to remove this blockage", analysisEntry.AnalyzedInstanceKey, recoveries[0].AnalysisEntry.AnalyzedInstanceKey, recoveries[0].AnalysisEntry.AnalyzedInstanceKey)
+			return nil, "blocked by instance recovery", log.Errorf("AttemptRecoveryRegistration: instance %+v has recently been promoted (by failover of %+v) and is in active period. It will not be failed over. You may acknowledge the failure on %+v (-c ack-instance-recoveries) to remove this blockage", analysisEntry.AnalyzedInstanceKey, recoveries[0].AnalysisEntry.AnalyzedInstanceKey, recoveries[0].AnalysisEntry.AnalyzedInstanceKey)
 		}
 	}
 	if !forceRecovery {
@@ -222,11 +222,11 @@ func attemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, forceR
 		// If so, we reject recovery registration to avoid flapping.
 		recoveries, err := ReadInActivePeriodClusterRecovery(analysisEntry.ClusterDetails.ClusterName)
 		if err != nil {
-			return nil, log.Errore(err)
+			return nil, "", log.Errore(err)
 		}
 		if len(recoveries) > 0 {
 			RegisterBlockedRecoveries(analysisEntry, recoveries)
-			return nil, log.Errorf("AttemptRecoveryRegistration: cluster %+v has recently experienced a failover (of %+v) and is in active period. It will not be failed over again. You may acknowledge the failure on this cluster (-c ack-cluster-recoveries) or on %+v (-c ack-instance-recoveries) to remove this blockage", analysisEntry.ClusterDetails.ClusterName, recoveries[0].AnalysisEntry.AnalyzedInstanceKey, recoveries[0].AnalysisEntry.AnalyzedInstanceKey)
+			return nil, "blocked by cluster recovery", log.Errorf("AttemptRecoveryRegistration: cluster %+v has recently experienced a failover (of %+v) and is in active period. It will not be failed over again. You may acknowledge the failure on this cluster (-c ack-cluster-recoveries) or on %+v (-c ack-instance-recoveries) to remove this blockage", analysisEntry.ClusterDetails.ClusterName, recoveries[0].AnalysisEntry.AnalyzedInstanceKey, recoveries[0].AnalysisEntry.AnalyzedInstanceKey)
 		}
 	}
 	if forceRecovery {
@@ -236,18 +236,18 @@ func attemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, forceR
 		// trying to recover the same instance at the same time
 	}
 
-	topologyRecovery := NewTopologyRecovery(*analysisEntry)
+	topologyRecovery = NewTopologyRecovery(*analysisEntry)
 
-	topologyRecovery, err := writeTopologyRecovery(topologyRecovery)
+	topologyRecovery, err = writeTopologyRecovery(topologyRecovery)
 	if err != nil {
-		return nil, log.Errore(err)
+		return nil, "", log.Errore(err)
 	}
 	if orcraft.IsRaftEnabled() {
 		if _, err := orcraft.PublishCommand("write-recovery", topologyRecovery); err != nil {
-			return nil, log.Errore(err)
+			return nil, "", log.Errore(err)
 		}
 	}
-	return topologyRecovery, nil
+	return topologyRecovery, "", nil
 }
 
 // ClearActiveRecoveries clears the "in_active_period" flag for old-enough recoveries, thereby allowing for

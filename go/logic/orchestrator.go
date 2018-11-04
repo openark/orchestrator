@@ -70,6 +70,7 @@ var isElectedNode int64 = 0
 
 var recentDiscoveryOperationKeys *cache.Cache
 var pseudoGTIDPublishCache = cache.New(time.Minute, time.Second)
+var recoveryDisableHints *cache.Cache
 
 func init() {
 	snapshotDiscoveryKeys = make(chan inst.InstanceKey, 10)
@@ -412,8 +413,8 @@ func ContinuousDiscovery() {
 	log.Infof("continuous discovery: setting up")
 	continuousDiscoveryStartTime := time.Now()
 	checkAndRecoverWaitPeriod := 3 * instancePollSecondsDuration()
+	recoveryDisableHints = cache.New(checkAndRecoverWaitPeriod, time.Second)
 	recentDiscoveryOperationKeys = cache.New(instancePollSecondsDuration(), time.Second)
-
 	inst.LoadHostnameResolveCache()
 	go handleDiscoveryRequests()
 
@@ -438,6 +439,18 @@ func ContinuousDiscovery() {
 			log.Fatale(err)
 		}
 		go orcraft.Monitor()
+		leaderStateListener := make(chan bool)
+		orcraft.AddLeaderStateListener(leaderStateListener)
+		go func() {
+			for isTurnedLeader := range leaderStateListener {
+				if isTurnedLeader {
+					recoveryDisableHints.Add("turned-leader", true, cache.DefaultExpiration)
+					recoveryDisableHints.Delete("turned-follower")
+				} else {
+					recoveryDisableHints.Add("turned-follower", true, cache.NoExpiration)
+				}
+			}
+		}()
 	}
 
 	if *config.RuntimeCLIFlags.GrabElection {
@@ -536,6 +549,14 @@ func ContinuousDiscovery() {
 			}()
 		}
 	}
+}
+
+func recoveryDisabledHint() *string {
+	items := recoveryDisableHints.Items()
+	for k, _ := range items {
+		return &k
+	}
+	return nil
 }
 
 func pollAgent(hostname string) error {

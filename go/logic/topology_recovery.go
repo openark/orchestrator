@@ -367,7 +367,32 @@ func executeProcesses(processes []string, description string, topologyRecovery *
 	return err
 }
 
-func requestAuthorizationToRecover(analysisEntry *inst.ReplicationAnalysis, recoveryType RecoveryType, forceRecovery bool) (*TopologyRecovery, error) {
+func requestAuthorizationToRecover(analysisEntry *inst.ReplicationAnalysis, recoveryType RecoveryType, forceRecovery bool) (topologyRecovery *TopologyRecovery, rejectReason string, err error) {
+	log.Infof("requestAuthorizationToRecover: Analysis: %+v, InstanceKey: %+v, recoveryType: %+v, forceRecovery: %+v",
+		analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, recoveryType, forceRecovery)
+
+	logRecoveryDisabled := func(message string) {
+		if forceRecovery {
+			log.Infof("requestAuthorizationToRecover: %s, ignored due to forced recovery", message)
+		} else {
+			log.Infof("requestAuthorizationToRecover: %s", message)
+		}
+	}
+	if disabledHint := recoveryDisabledHint(); disabledHint != nil {
+		logRecoveryDisabled(fmt.Sprintf("hint to disable recovery: %s", *disabledHint))
+		if !forceRecovery {
+			return nil, *disabledHint, nil
+		}
+	}
+	if recoveryDisabledGlobally, err := IsRecoveryDisabled(); err != nil {
+		// Unexpected. Shouldn't get this
+		return nil, "", err
+	} else if recoveryDisabledGlobally {
+		logRecoveryDisabled("global recoveries disabled")
+		if !forceRecovery {
+			return nil, "global recoveries disabled", nil
+		}
+	}
 	return attemptRecoveryRegistration(analysisEntry, forceRecovery)
 }
 
@@ -754,9 +779,9 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 	if !(forceInstanceRecovery || analysisEntry.ClusterDetails.HasAutomatedMasterRecovery) {
 		return false, nil, nil
 	}
-	topologyRecovery, err := requestAuthorizationToRecover(&analysisEntry, MasterRecovery, forceInstanceRecovery)
+	topologyRecovery, rejectReason, err := requestAuthorizationToRecover(&analysisEntry, MasterRecovery, forceInstanceRecovery)
 	if topologyRecovery == nil {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another RecoverDeadMaster.", analysisEntry.AnalyzedInstanceKey))
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Recovery on %+v rejected: %s", analysisEntry.AnalyzedInstanceKey, rejectReason))
 		return false, nil, err
 	}
 
@@ -1090,9 +1115,9 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 	if !(forceInstanceRecovery || analysisEntry.ClusterDetails.HasAutomatedIntermediateMasterRecovery) {
 		return false, nil, nil
 	}
-	topologyRecovery, err := requestAuthorizationToRecover(&analysisEntry, IntermediateMasterRecovery, forceInstanceRecovery)
+	topologyRecovery, rejectReason, err := requestAuthorizationToRecover(&analysisEntry, IntermediateMasterRecovery, forceInstanceRecovery)
 	if topologyRecovery == nil {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadIntermediateMaster: found an active or recent recovery on %+v. Will not issue another RecoverDeadIntermediateMaster.", analysisEntry.AnalyzedInstanceKey))
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Recovery on %+v rejected: %s", analysisEntry.AnalyzedInstanceKey, rejectReason))
 		return false, nil, err
 	}
 
@@ -1239,9 +1264,9 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 	if !(forceInstanceRecovery || analysisEntry.ClusterDetails.HasAutomatedMasterRecovery) {
 		return false, nil, nil
 	}
-	topologyRecovery, err := requestAuthorizationToRecover(&analysisEntry, CoMasterRecovery, forceInstanceRecovery)
+	topologyRecovery, rejectReason, err := requestAuthorizationToRecover(&analysisEntry, CoMasterRecovery, forceInstanceRecovery)
 	if topologyRecovery == nil {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another RecoverDeadCoMaster.", analysisEntry.AnalyzedInstanceKey))
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Recovery on %+v rejected: %s", analysisEntry.AnalyzedInstanceKey, rejectReason))
 		return false, nil, err
 	}
 
@@ -1491,23 +1516,6 @@ func executeCheckAndRecoverFunction(analysisEntry inst.ReplicationAnalysis, cand
 	// (it may have been silenced due to previous detection). We only care there's no error.
 
 	// We're about to embark on recovery shortly...
-
-	// Check for recovery being disabled globally
-	if recoveryDisabledGlobally, err := IsRecoveryDisabled(); err != nil {
-		// Unexpected. Shouldn't get this
-		log.Errorf("Unable to determine if recovery is disabled globally: %v", err)
-	} else if recoveryDisabledGlobally {
-		if !forceInstanceRecovery {
-			log.Infof("CheckAndRecover: Analysis: %+v, InstanceKey: %+v, candidateInstanceKey: %+v, "+
-				"skipProcesses: %v: NOT Recovering host (disabled globally)",
-				analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, candidateInstanceKey, skipProcesses)
-
-			return false, nil, err
-		}
-		log.Infof("CheckAndRecover: Analysis: %+v, InstanceKey: %+v, candidateInstanceKey: %+v, "+
-			"skipProcesses: %v: recoveries disabled globally but forcing this recovery",
-			analysisEntry.Analysis, analysisEntry.AnalyzedInstanceKey, candidateInstanceKey, skipProcesses)
-	}
 
 	// Actually attempt recovery:
 	if isActionableRecovery || util.ClearToLog("executeCheckAndRecoverFunction: recovery", analysisEntry.AnalyzedInstanceKey.StringCode()) {
