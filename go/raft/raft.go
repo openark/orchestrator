@@ -53,6 +53,8 @@ var ThisHostname string
 var healthRequestAuthenticationTokenCache = cache.New(config.RaftHealthPollSeconds*2*time.Second, time.Second)
 var healthReportsCache = cache.New(config.RaftHealthPollSeconds*2*time.Second, time.Second)
 var healthRequestReportCache = cache.New(time.Second, time.Second)
+var leaderStateListeners = [](chan bool){}
+var leaderStateMutex sync.Mutex
 
 var fatalRaftErrorChan = make(chan error)
 
@@ -139,18 +141,27 @@ func Setup(applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier
 		return log.Errorf("failed to open raft store: %s", err.Error())
 	}
 
-	if leaderURI, err := computeLeaderURI(); err != nil {
+	leaderURI, err := computeLeaderURI()
+	if err != nil {
 		return FatalRaftError(err)
-	} else {
-		leaderCh := store.raft.LeaderCh()
-		go func() {
-			for isTurnedLeader := range leaderCh {
-				if isTurnedLeader {
-					PublishCommand("leader-uri", leaderURI)
-				}
-			}
-		}()
 	}
+	go func() {
+		leaderCh := store.raft.LeaderCh()
+		for isTurnedLeader := range leaderCh {
+			if isTurnedLeader {
+				PublishCommand("leader-uri", leaderURI)
+			}
+			// Distribute to listeners
+			func() {
+				leaderStateMutex.Lock()
+				defer leaderStateMutex.Unlock()
+				for _, l := range leaderStateListeners {
+					go func() { l <- isTurnedLeader }()
+				}
+			}()
+		}
+	}()
+
 	setupHttpClient()
 
 	atomic.StoreInt64(&raftSetupComplete, 1)
@@ -221,6 +232,12 @@ func GetLeader() string {
 		return ""
 	}
 	return getRaft().Leader()
+}
+
+func AddLeaderStateListener(listener chan bool) {
+	leaderStateMutex.Lock()
+	defer leaderStateMutex.Unlock()
+	leaderStateListeners = append(leaderStateListeners, listener)
 }
 
 func QuorumSize() (int, error) {
