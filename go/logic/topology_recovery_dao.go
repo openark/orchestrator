@@ -204,7 +204,7 @@ func writeTopologyRecovery(topologyRecovery *TopologyRecovery) (*TopologyRecover
 }
 
 // AttemptRecoveryRegistration tries to add a recovery entry; if this fails that means recovery is already in place.
-func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, forceRecovery bool) (*TopologyRecovery, error) {
+func attemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, forceRecovery bool) (*TopologyRecovery, error) {
 	if !forceRecovery {
 		// Let's check if this instance has just been promoted recently and is still in active period.
 		// If so, we reject recovery registration to avoid flapping.
