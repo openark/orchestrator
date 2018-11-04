@@ -386,7 +386,7 @@ func requestAuthorizationToRecover(analysisEntry *inst.ReplicationAnalysis, reco
 	}
 	if recoveryDisabledGlobally, err := IsRecoveryDisabled(); err != nil {
 		// Unexpected. Shouldn't get this
-		return nil, "", err
+		return nil, err.Error(), err
 	} else if recoveryDisabledGlobally {
 		logRecoveryDisabled("global recoveries disabled")
 		if !forceRecovery {

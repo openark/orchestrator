@@ -210,7 +210,7 @@ func attemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, forceR
 		// If so, we reject recovery registration to avoid flapping.
 		recoveries, err := ReadInActivePeriodSuccessorInstanceRecovery(&analysisEntry.AnalyzedInstanceKey)
 		if err != nil {
-			return nil, "", log.Errore(err)
+			return nil, err.Error(), log.Errore(err)
 		}
 		if len(recoveries) > 0 {
 			RegisterBlockedRecoveries(analysisEntry, recoveries)
@@ -222,7 +222,7 @@ func attemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, forceR
 		// If so, we reject recovery registration to avoid flapping.
 		recoveries, err := ReadInActivePeriodClusterRecovery(analysisEntry.ClusterDetails.ClusterName)
 		if err != nil {
-			return nil, "", log.Errore(err)
+			return nil, err.Error(), log.Errore(err)
 		}
 		if len(recoveries) > 0 {
 			RegisterBlockedRecoveries(analysisEntry, recoveries)
@@ -237,14 +237,16 @@ func attemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, forceR
 	}
 
 	topologyRecovery = NewTopologyRecovery(*analysisEntry)
-
 	topologyRecovery, err = writeTopologyRecovery(topologyRecovery)
 	if err != nil {
-		return nil, "", log.Errore(err)
+		return nil, err.Error(), log.Errore(err)
+	}
+	if topologyRecovery == nil {
+		return topologyRecovery, "", nil
 	}
 	if orcraft.IsRaftEnabled() {
 		if _, err := orcraft.PublishCommand("write-recovery", topologyRecovery); err != nil {
-			return nil, "", log.Errore(err)
+			return nil, err.Error(), log.Errore(err)
 		}
 	}
 	return topologyRecovery, "", nil
