@@ -204,8 +204,8 @@ func writeTopologyRecovery(topologyRecovery *TopologyRecovery) (*TopologyRecover
 }
 
 // AttemptRecoveryRegistration tries to add a recovery entry; if this fails that means recovery is already in place.
-func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, failIfFailedInstanceInActiveRecovery bool, failIfClusterInActiveRecovery bool) (*TopologyRecovery, error) {
-	if failIfFailedInstanceInActiveRecovery {
+func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, forceRecovery bool) (*TopologyRecovery, error) {
+	if !forceRecovery {
 		// Let's check if this instance has just been promoted recently and is still in active period.
 		// If so, we reject recovery registration to avoid flapping.
 		recoveries, err := ReadInActivePeriodSuccessorInstanceRecovery(&analysisEntry.AnalyzedInstanceKey)
@@ -217,7 +217,7 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, failIf
 			return nil, log.Errorf("AttemptRecoveryRegistration: instance %+v has recently been promoted (by failover of %+v) and is in active period. It will not be failed over. You may acknowledge the failure on %+v (-c ack-instance-recoveries) to remove this blockage", analysisEntry.AnalyzedInstanceKey, recoveries[0].AnalysisEntry.AnalyzedInstanceKey, recoveries[0].AnalysisEntry.AnalyzedInstanceKey)
 		}
 	}
-	if failIfClusterInActiveRecovery {
+	if !forceRecovery {
 		// Let's check if this cluster has just experienced a failover and is still in active period.
 		// If so, we reject recovery registration to avoid flapping.
 		recoveries, err := ReadInActivePeriodClusterRecovery(analysisEntry.ClusterDetails.ClusterName)
@@ -229,7 +229,7 @@ func AttemptRecoveryRegistration(analysisEntry *inst.ReplicationAnalysis, failIf
 			return nil, log.Errorf("AttemptRecoveryRegistration: cluster %+v has recently experienced a failover (of %+v) and is in active period. It will not be failed over again. You may acknowledge the failure on this cluster (-c ack-cluster-recoveries) or on %+v (-c ack-instance-recoveries) to remove this blockage", analysisEntry.ClusterDetails.ClusterName, recoveries[0].AnalysisEntry.AnalyzedInstanceKey, recoveries[0].AnalysisEntry.AnalyzedInstanceKey)
 		}
 	}
-	if !failIfFailedInstanceInActiveRecovery {
+	if forceRecovery {
 		// Implicitly acknowledge this instance's possibly existing active recovery, provided they are completed.
 		AcknowledgeInstanceCompletedRecoveries(&analysisEntry.AnalyzedInstanceKey, "orchestrator", fmt.Sprintf("implicit acknowledge due to user invocation of recovery on same instance: %+v", analysisEntry.AnalyzedInstanceKey))
 		// The fact we only acknowledge a completed recovery solves the possible case of two DBAs simultaneously
