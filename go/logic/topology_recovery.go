@@ -367,7 +367,7 @@ func executeProcesses(processes []string, description string, topologyRecovery *
 	return err
 }
 
-func requestAuthorizationToRecover(analysisEntry *inst.ReplicationAnalysis, forceRecovery bool) (*TopologyRecovery, error) {
+func requestAuthorizationToRecover(analysisEntry *inst.ReplicationAnalysis, recoveryType RecoveryType, forceRecovery bool) (*TopologyRecovery, error) {
 	return attemptRecoveryRegistration(analysisEntry, forceRecovery)
 }
 
@@ -754,7 +754,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 	if !(forceInstanceRecovery || analysisEntry.ClusterDetails.HasAutomatedMasterRecovery) {
 		return false, nil, nil
 	}
-	topologyRecovery, err := requestAuthorizationToRecover(&analysisEntry, forceInstanceRecovery)
+	topologyRecovery, err := requestAuthorizationToRecover(&analysisEntry, MasterRecovery, forceInstanceRecovery)
 	if topologyRecovery == nil {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another RecoverDeadMaster.", analysisEntry.AnalyzedInstanceKey))
 		return false, nil, err
@@ -1090,7 +1090,7 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 	if !(forceInstanceRecovery || analysisEntry.ClusterDetails.HasAutomatedIntermediateMasterRecovery) {
 		return false, nil, nil
 	}
-	topologyRecovery, err := requestAuthorizationToRecover(&analysisEntry, forceInstanceRecovery)
+	topologyRecovery, err := requestAuthorizationToRecover(&analysisEntry, IntermediateMasterRecovery, forceInstanceRecovery)
 	if topologyRecovery == nil {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadIntermediateMaster: found an active or recent recovery on %+v. Will not issue another RecoverDeadIntermediateMaster.", analysisEntry.AnalyzedInstanceKey))
 		return false, nil, err
@@ -1239,7 +1239,7 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 	if !(forceInstanceRecovery || analysisEntry.ClusterDetails.HasAutomatedMasterRecovery) {
 		return false, nil, nil
 	}
-	topologyRecovery, err := requestAuthorizationToRecover(&analysisEntry, forceInstanceRecovery)
+	topologyRecovery, err := requestAuthorizationToRecover(&analysisEntry, CoMasterRecovery, forceInstanceRecovery)
 	if topologyRecovery == nil {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("found an active or recent recovery on %+v. Will not issue another RecoverDeadCoMaster.", analysisEntry.AnalyzedInstanceKey))
 		return false, nil, err
