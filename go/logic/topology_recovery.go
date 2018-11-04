@@ -145,6 +145,14 @@ func NewTopologyRecoveryStep(uid string, message string) *TopologyRecoveryStep {
 	}
 }
 
+type RecoveryType string
+
+const (
+	MasterRecovery             RecoveryType = "MasterRecovery"
+	CoMasterRecovery                        = "CoMasterRecovery"
+	IntermediateMasterRecovery              = "IntermediateMasterRecovery"
+)
+
 type MasterRecoveryType string
 
 const (
