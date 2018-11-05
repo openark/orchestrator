@@ -525,4 +525,11 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN ancestry_uuid text CHARACTER SET ascii NOT NULL AFTER master_uuid
 	`,
+	`
+		ALTER TABLE
+			global_recovery_disable
+			ADD COLUMN disabled_time timestamp not null default current_timestamp,
+			ADD COLUMN expire_time timestamp null,
+			ADD COLUMN disabled_reason text CHARACTER SET utf8 NOT NULL default ''
+	`,
 }
