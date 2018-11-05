@@ -42,6 +42,32 @@ import (
 
 var countPendingRecoveries int64
 
+type RecoveryType string
+
+const (
+	MasterRecovery             RecoveryType = "MasterRecovery"
+	CoMasterRecovery                        = "CoMasterRecovery"
+	IntermediateMasterRecovery              = "IntermediateMasterRecovery"
+)
+
+type MasterRecoveryType string
+
+const (
+	NotMasterRecovery          MasterRecoveryType = "NotMasterRecovery"
+	MasterRecoveryGTID                            = "MasterRecoveryGTID"
+	MasterRecoveryPseudoGTID                      = "MasterRecoveryPseudoGTID"
+	MasterRecoveryBinlogServer                    = "MasterRecoveryBinlogServer"
+)
+
+type InstanceRecoveryType struct {
+	key          *inst.InstanceKey
+	recoveryType RecoveryType
+}
+
+func NewInstanceRecoveryType(key *inst.InstanceKey, recoveryType RecoveryType) *InstanceRecoveryType {
+	return &InstanceRecoveryType{key: key, recoveryType: recoveryType}
+}
+
 type RecoveryAcknowledgement struct {
 	CreatedAt time.Time
 	Owner     string
@@ -144,23 +170,6 @@ func NewTopologyRecoveryStep(uid string, message string) *TopologyRecoveryStep {
 		Message:     message,
 	}
 }
-
-type RecoveryType string
-
-const (
-	MasterRecovery             RecoveryType = "MasterRecovery"
-	CoMasterRecovery                        = "CoMasterRecovery"
-	IntermediateMasterRecovery              = "IntermediateMasterRecovery"
-)
-
-type MasterRecoveryType string
-
-const (
-	NotMasterRecovery          MasterRecoveryType = "NotMasterRecovery"
-	MasterRecoveryGTID                            = "MasterRecoveryGTID"
-	MasterRecoveryPseudoGTID                      = "MasterRecoveryPseudoGTID"
-	MasterRecoveryBinlogServer                    = "MasterRecoveryBinlogServer"
-)
 
 var emergencyReadTopologyInstanceMap *cache.Cache
 var emergencyRestartReplicaTopologyInstanceMap *cache.Cache
