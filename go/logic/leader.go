@@ -23,9 +23,11 @@ import (
 )
 
 var recoveryDisableHints *cache.Cache
+var recentRecoveryAuthorizationRequests *cache.Cache
 
 func SetupLeaderStates(checkAndRecoverWaitPeriod time.Duration) {
 	recoveryDisableHints = cache.New(checkAndRecoverWaitPeriod, time.Second)
+	recentRecoveryAuthorizationRequests = cache.New(time.Minute, time.Second)
 }
 
 func OnLeaderStateChange(isTurnedLeader bool) {
@@ -33,6 +35,9 @@ func OnLeaderStateChange(isTurnedLeader bool) {
 		recoveryDisableHints.Add("turned-leader", true, cache.DefaultExpiration)
 		recoveryDisableHints.Delete("turned-non-leader")
 	} else {
+		for key, _ := range recentRecoveryAuthorizationRequests.Items() {
+			recentRecoveryAuthorizationRequests.Delete(key)
+		}
 		recoveryDisableHints.Add("turned-non-leader", true, cache.NoExpiration)
 	}
 }

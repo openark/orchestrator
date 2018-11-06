@@ -68,6 +68,10 @@ func NewInstanceRecoveryType(key *inst.InstanceKey, recoveryType RecoveryType) *
 	return &InstanceRecoveryType{key: key, recoveryType: recoveryType}
 }
 
+func (this *InstanceRecoveryType) String() string {
+	return fmt.Sprintf("%s:%s", this.recoveryType, this.key.StringCode())
+}
+
 type RecoveryAcknowledgement struct {
 	CreatedAt time.Time
 	Owner     string
@@ -397,12 +401,28 @@ func requestAuthorizationToRecover(analysisEntry *inst.ReplicationAnalysis, reco
 		// Unexpected. Shouldn't get this
 		return nil, err.Error(), err
 	} else if recoveryDisabledGlobally {
-		logRecoveryDisabled("global recoveries disabled")
+		message := "global recoveries disabled"
+		logRecoveryDisabled(message)
 		if !forceRecovery {
-			return nil, "global recoveries disabled", nil
+			return nil, message, nil
 		}
 	}
-	return attemptRecoveryRegistration(analysisEntry, forceRecovery)
+
+	instanceRecoveryType := NewInstanceRecoveryType(&analysisEntry.AnalyzedInstanceKey, recoveryType)
+	if err := recentRecoveryAuthorizationRequests.Add(instanceRecoveryType.String(), time.Now(), time.Duration(config.Config.RecoveryPeriodBlockSeconds)*time.Second); err != nil {
+		// Cannot re-register this recovery
+		message := fmt.Sprintf("blocked due to existing %s on %+v", recoveryType, analysisEntry.AnalyzedInstanceKey)
+		logRecoveryDisabled(message)
+		if !forceRecovery {
+			return nil, message, nil
+		}
+	}
+	for key, value := range recentRecoveryAuthorizationRequests.Items() {
+		log.Debugf("....pending requestAuthorizationToRecover: %+v, %+v", key, value)
+	}
+
+	topologyRecovery, rejectReason, err = attemptRecoveryRegistration(analysisEntry, forceRecovery)
+	return topologyRecovery, rejectReason, err
 }
 
 func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery) (promotedReplica *inst.Instance, err error) {
