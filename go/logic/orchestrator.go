@@ -441,12 +441,12 @@ func ContinuousDiscovery() {
 			log.Fatale(err)
 		}
 		go orcraft.Monitor()
-		go func() {
-			for isTurnedLeader := range leaderStateListener {
-				OnLeaderStateChange(isTurnedLeader)
-			}
-		}()
 	}
+	go func() {
+		for isTurnedLeader := range leaderStateListener {
+			OnLeaderStateChange(isTurnedLeader)
+		}
+	}()
 
 	if *config.RuntimeCLIFlags.GrabElection {
 		process.GrabElection()
