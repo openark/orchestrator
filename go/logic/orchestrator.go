@@ -70,10 +70,8 @@ var isElectedNode int64 = 0
 
 var recentDiscoveryOperationKeys *cache.Cache
 var pseudoGTIDPublishCache = cache.New(time.Minute, time.Second)
-var recoveryDisableHints *cache.Cache
 
-var leaderStateListeners = [](chan bool){}
-var leaderStateMutex sync.Mutex
+var leaderStateListener = make(chan bool)
 
 func init() {
 	snapshotDiscoveryKeys = make(chan inst.InstanceKey, 10)
@@ -113,32 +111,6 @@ func init() {
 	ometrics.OnMetricsTick(func() {
 		isRaftLeaderGauge.Update(atomic.LoadInt64(&isElectedNode))
 	})
-}
-
-func addLeaderStateListener(listener chan bool) {
-	leaderStateMutex.Lock()
-	defer leaderStateMutex.Unlock()
-	leaderStateListeners = append(leaderStateListeners, listener)
-}
-
-func setupLeaderStateListeners() {
-	go func() {
-		leaderCh := store.raft.LeaderCh()
-		for isTurnedLeader := range leaderCh {
-			if isTurnedLeader {
-				PublishCommand("leader-uri", leaderURI)
-			}
-			// Distribute to listeners
-			func() {
-				leaderStateMutex.Lock()
-				defer leaderStateMutex.Unlock()
-				for _, l := range leaderStateListeners {
-					go func() { l <- isTurnedLeader }()
-				}
-			}()
-		}
-	}()
-
 }
 
 func IsLeader() bool {
@@ -357,6 +329,7 @@ func onHealthTick() {
 				log.Infof("Not elected as active node; active node: Unable to determine: %v; polling", err)
 			}
 		}
+		go func() { leaderStateListener <- myIsElectedNode }()
 	}
 	if !IsLeaderOrActive() {
 		return
@@ -442,7 +415,7 @@ func ContinuousDiscovery() {
 	log.Infof("continuous discovery: setting up")
 	continuousDiscoveryStartTime := time.Now()
 	checkAndRecoverWaitPeriod := 3 * instancePollSecondsDuration()
-	recoveryDisableHints = cache.New(checkAndRecoverWaitPeriod, time.Second)
+	SetupLeaderStates(checkAndRecoverWaitPeriod)
 	recentDiscoveryOperationKeys = cache.New(instancePollSecondsDuration(), time.Second)
 	inst.LoadHostnameResolveCache()
 	go handleDiscoveryRequests()
@@ -464,20 +437,13 @@ func ContinuousDiscovery() {
 	go acceptSignals()
 	go kv.InitKVStores()
 	if config.Config.RaftEnabled {
-		if err := orcraft.Setup(NewCommandApplier(), NewSnapshotDataCreatorApplier(), process.ThisHostname); err != nil {
+		if err := orcraft.Setup(NewCommandApplier(), NewSnapshotDataCreatorApplier(), process.ThisHostname, leaderStateListener); err != nil {
 			log.Fatale(err)
 		}
 		go orcraft.Monitor()
-		leaderStateListener := make(chan bool)
-		orcraft.AddLeaderStateListener(leaderStateListener)
 		go func() {
 			for isTurnedLeader := range leaderStateListener {
-				if isTurnedLeader {
-					recoveryDisableHints.Add("turned-leader", true, cache.DefaultExpiration)
-					recoveryDisableHints.Delete("turned-follower")
-				} else {
-					recoveryDisableHints.Add("turned-follower", true, cache.NoExpiration)
-				}
+				OnLeaderStateChange(isTurnedLeader)
 			}
 		}()
 	}
@@ -578,14 +544,6 @@ func ContinuousDiscovery() {
 			}()
 		}
 	}
-}
-
-func recoveryDisabledHint() *string {
-	items := recoveryDisableHints.Items()
-	for k, _ := range items {
-		return &k
-	}
-	return nil
 }
 
 func pollAgent(hostname string) error {
