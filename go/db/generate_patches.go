@@ -528,8 +528,16 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE
 			global_recovery_disable
-			ADD COLUMN disabled_time timestamp not null default current_timestamp,
-			ADD COLUMN expire_time timestamp null,
+			ADD COLUMN disabled_time timestamp not null default current_timestamp
+	`,
+	`
+		ALTER TABLE
+			global_recovery_disable
+			ADD COLUMN expire_time timestamp null
+	`,
+	`
+		ALTER TABLE
+			global_recovery_disable
 			ADD COLUMN disabled_reason text CHARACTER SET utf8 NOT NULL default ''
 	`,
 }
