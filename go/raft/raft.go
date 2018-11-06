@@ -53,8 +53,6 @@ var ThisHostname string
 var healthRequestAuthenticationTokenCache = cache.New(config.RaftHealthPollSeconds*2*time.Second, time.Second)
 var healthReportsCache = cache.New(config.RaftHealthPollSeconds*2*time.Second, time.Second)
 var healthRequestReportCache = cache.New(time.Second, time.Second)
-var leaderStateListeners = [](chan bool){}
-var leaderStateMutex sync.Mutex
 
 var fatalRaftErrorChan = make(chan error)
 
@@ -232,12 +230,6 @@ func GetLeader() string {
 		return ""
 	}
 	return getRaft().Leader()
-}
-
-func AddLeaderStateListener(listener chan bool) {
-	leaderStateMutex.Lock()
-	defer leaderStateMutex.Unlock()
-	leaderStateListeners = append(leaderStateListeners, listener)
 }
 
 func QuorumSize() (int, error) {

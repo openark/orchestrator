@@ -72,6 +72,9 @@ var recentDiscoveryOperationKeys *cache.Cache
 var pseudoGTIDPublishCache = cache.New(time.Minute, time.Second)
 var recoveryDisableHints *cache.Cache
 
+var leaderStateListeners = [](chan bool){}
+var leaderStateMutex sync.Mutex
+
 func init() {
 	snapshotDiscoveryKeys = make(chan inst.InstanceKey, 10)
 
@@ -110,6 +113,32 @@ func init() {
 	ometrics.OnMetricsTick(func() {
 		isRaftLeaderGauge.Update(atomic.LoadInt64(&isElectedNode))
 	})
+}
+
+func addLeaderStateListener(listener chan bool) {
+	leaderStateMutex.Lock()
+	defer leaderStateMutex.Unlock()
+	leaderStateListeners = append(leaderStateListeners, listener)
+}
+
+func setupLeaderStateListeners() {
+	go func() {
+		leaderCh := store.raft.LeaderCh()
+		for isTurnedLeader := range leaderCh {
+			if isTurnedLeader {
+				PublishCommand("leader-uri", leaderURI)
+			}
+			// Distribute to listeners
+			func() {
+				leaderStateMutex.Lock()
+				defer leaderStateMutex.Unlock()
+				for _, l := range leaderStateListeners {
+					go func() { l <- isTurnedLeader }()
+				}
+			}()
+		}
+	}()
+
 }
 
 func IsLeader() bool {
