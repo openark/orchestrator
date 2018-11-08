@@ -1270,8 +1270,8 @@ func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
 // It will make sure the gtid_purged set matches the executed set value as read just before the RESET.
 // this will enable new replicas to be attached to given instance without complaints about missing/purged entries.
 // This function requires that the instance does not have replicas.
-func ErrantGTIDResetMaster(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err error) {
+	instance, err = ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
 	}
