@@ -451,6 +451,15 @@ function openNodeModal(node) {
     });
     return false;
   });
+  $('#node_modal [data-btn=gtid-errant-inject-empty]').click(function() {
+    var message = "<p>Are you sure you wish to inject empty transactions on the master of this cluster?";
+    bootbox.confirm(message, function(confirm) {
+      if (confirm) {
+        apiCommand("/api/gtid-errant-inject-empty/" + node.Key.Hostname + "/" + node.Key.Port);
+      }
+    });
+    return false;
+  });
   $('#node_modal button[data-btn=set-read-only]').click(function() {
     apiCommand("/api/set-read-only/" + node.Key.Hostname + "/" + node.Key.Port);
   });

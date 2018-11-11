@@ -17,6 +17,7 @@
 package inst
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -778,6 +779,35 @@ func setGTIDPurged(instance *Instance, gtidPurged string) error {
 
 	_, err := ExecInstance(&instance.Key, `set global gtid_purged := ?`, gtidPurged)
 	return err
+}
+
+// injectEmptyGTIDTransaction
+func injectEmptyGTIDTransaction(instanceKey *InstanceKey, gtidEntry *OracleGtidSetEntry) error {
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf(`SET GTID_NEXT="%s"`, gtidEntry.String())); err != nil {
+		return err
+	}
+	tx, err := conn.BeginTx(ctx, &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	if _, err := conn.ExecContext(ctx, `SET GTID_NEXT="AUTOMATIC"`); err != nil {
+		return err
+	}
+	return nil
 }
 
 // skipQueryClassic skips a query in normal binlog file:pos replication
