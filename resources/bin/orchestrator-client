@@ -59,6 +59,8 @@ default_port=3306
 api_response=
 api_details=
 
+unauthorized_401="401 Unauthorized"
+
 for arg in "$@"; do
   shift
   case "$arg" in
@@ -124,8 +126,8 @@ function get_curl_auth_params {
   fi
 
   # Test API access
-  curl "${basic_auth}" -s --head "${orchestrator_api}" 2>&1 | fgrep -q "401 Unauthorized" && \
-    echo "401 Unauthorized" && \
+  curl "${basic_auth}" -s --head "${orchestrator_api}" 2>&1 | fgrep -q "$unauthorized_401" && \
+    echo "$unauthorized_401" && \
     return
 
   echo "${requires_auth}"
@@ -175,8 +177,8 @@ function detect_leader_api {
   # or it may be a space delimited list, such as "http://host1:3000/api http://host2:3000/api http://host3:3000/api "
   # - in which case we figure out which of the URLs is the leader
   local curl_auth_params="$(get_curl_auth_params)"
-  
-  if [[ ${curl_auth_params} == "401 Unauthorized" ]]; then
+
+  if [ "${curl_auth_params}" == "$unauthorized_401" ] ; then
     fail "Cannot access orchestrator at ${orchestrator_api}.  Check ORCHESTRATOR_API is configured correctly and orchestrator is running"
   fi
 
