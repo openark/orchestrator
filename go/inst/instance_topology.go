@@ -1270,8 +1270,8 @@ func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
 // It will make sure the gtid_purged set matches the executed set value as read just before the RESET.
 // this will enable new replicas to be attached to given instance without complaints about missing/purged entries.
 // This function requires that the instance does not have replicas.
-func ErrantGTIDResetMaster(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err error) {
+	instance, err = ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
 	}
@@ -1286,6 +1286,9 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	gtidSubtract := ""
+	executedGtidSet := ""
+	masterStatusFound := false
+	waitInterval := time.Millisecond * 250
 
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "reset-master-gtid"); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
@@ -1314,17 +1317,34 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 		if err == nil {
 			break
 		}
+		time.Sleep(waitInterval)
 	}
 	if err != nil {
 		err = fmt.Errorf("gtid-errant-reset-master: error while resetting master on %+v, after which intended to set gtid_purged to: %s. Error was: %+v", instance.Key, gtidSubtract, err)
 		goto Cleanup
 	}
+
+	masterStatusFound, executedGtidSet, err = ShowMasterStatus(instanceKey)
+	if err != nil {
+		err = fmt.Errorf("gtid-errant-reset-master: error getting master status on %+v, after which intended to set gtid_purged to: %s. Error was: %+v", instance.Key, gtidSubtract, err)
+		goto Cleanup
+	}
+	if !masterStatusFound {
+		err = fmt.Errorf("gtid-errant-reset-master: cannot get master status on %+v, after which intended to set gtid_purged to: %s.", instance.Key, gtidSubtract)
+		goto Cleanup
+	}
+	if executedGtidSet != "" {
+		err = fmt.Errorf("gtid-errant-reset-master: Unexpected non-empty Executed_Gtid_Set found on %+v following RESET MASTER, after which intended to set gtid_purged to: %s. Executed_Gtid_Set found to be: %+v", instance.Key, gtidSubtract, executedGtidSet)
+		goto Cleanup
+	}
+
 	// We've just made the destructive operation. Again, allow for retries:
 	for i := 0; i < countRetries; i++ {
 		err = setGTIDPurged(instance, gtidSubtract)
 		if err == nil {
 			break
 		}
+		time.Sleep(waitInterval)
 	}
 	if err != nil {
 		err = fmt.Errorf("gtid-errant-reset-master: error setting gtid_purged on %+v to: %s. Error was: %+v", instance.Key, gtidSubtract, err)
@@ -1332,7 +1352,9 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 Cleanup:
-	instance, _ = StartSlave(instanceKey)
+	var startSlaveErr error
+	instance, startSlaveErr = StartSlave(instanceKey)
+	log.Errore(startSlaveErr)
 
 	if err != nil {
 		return instance, log.Errore(err)
