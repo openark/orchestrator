@@ -1094,6 +1094,7 @@ func canInjectPseudoGTID(instanceKey *InstanceKey) (canInject bool, err error) {
 
 	canInject = foundAll || foundDropOnAll || foundAllOnSchema || foundDropOnSchema
 	supportedAutoPseudoGTIDWriters.Set(instanceKey.StringCode(), canInject, cache.DefaultExpiration)
+
 	return canInject, nil
 }
 
@@ -1114,6 +1115,10 @@ func CheckAndInjectPseudoGTIDOnWriter(instance *Instance) (injected bool, err er
 		return injected, log.Errore(err)
 	}
 	if !canInject {
+		if util.ClearToLog("CheckAndInjectPseudoGTIDOnWriter", instance.Key.StringCode()) {
+			log.Warningf("AutoPseudoGTID enabled, but orchestrator has no priviliges on %+v to inject pseudo-gtid", instance.Key)
+		}
+
 		return injected, nil
 	}
 	if _, err := injectPseudoGTID(instance); err != nil {
