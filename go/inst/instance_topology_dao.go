@@ -1139,3 +1139,16 @@ func GTIDSubtract(instanceKey *InstanceKey, gtidSet string, gtidSubset string) (
 	err = db.QueryRow("select gtid_subtract(?, ?)", gtidSet, gtidSubset).Scan(&gtidSubtract)
 	return gtidSubtract, err
 }
+
+func ShowMasterStatus(instanceKey *InstanceKey) (masterStatusFound bool, executedGtidSet string, err error) {
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return masterStatusFound, executedGtidSet, err
+	}
+	err = sqlutils.QueryRowsMap(db, "show master status", func(m sqlutils.RowMap) error {
+		masterStatusFound = true
+		executedGtidSet = m.GetStringD("Executed_Gtid_Set", "")
+		return nil
+	})
+	return masterStatusFound, executedGtidSet, err
+}
