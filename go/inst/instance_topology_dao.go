@@ -1124,6 +1124,7 @@ func canInjectPseudoGTID(instanceKey *InstanceKey) (canInject bool, err error) {
 
 	canInject = foundAll || foundDropOnAll || foundAllOnSchema || foundDropOnSchema
 	supportedAutoPseudoGTIDWriters.Set(instanceKey.StringCode(), canInject, cache.DefaultExpiration)
+
 	return canInject, nil
 }
 
@@ -1144,6 +1145,10 @@ func CheckAndInjectPseudoGTIDOnWriter(instance *Instance) (injected bool, err er
 		return injected, log.Errore(err)
 	}
 	if !canInject {
+		if util.ClearToLog("CheckAndInjectPseudoGTIDOnWriter", instance.Key.StringCode()) {
+			log.Warningf("AutoPseudoGTID enabled, but orchestrator has no priviliges on %+v to inject pseudo-gtid", instance.Key)
+		}
+
 		return injected, nil
 	}
 	if _, err := injectPseudoGTID(instance); err != nil {
@@ -1163,4 +1168,17 @@ func GTIDSubtract(instanceKey *InstanceKey, gtidSet string, gtidSubset string) (
 	}
 	err = db.QueryRow("select gtid_subtract(?, ?)", gtidSet, gtidSubset).Scan(&gtidSubtract)
 	return gtidSubtract, err
+}
+
+func ShowMasterStatus(instanceKey *InstanceKey) (masterStatusFound bool, executedGtidSet string, err error) {
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return masterStatusFound, executedGtidSet, err
+	}
+	err = sqlutils.QueryRowsMap(db, "show master status", func(m sqlutils.RowMap) error {
+		masterStatusFound = true
+		executedGtidSet = m.GetStringD("Executed_Gtid_Set", "")
+		return nil
+	})
+	return masterStatusFound, executedGtidSet, err
 }
