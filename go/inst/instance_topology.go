@@ -1377,7 +1377,7 @@ func ErrantGTIDInjectEmpty(instanceKey *InstanceKey) (instance *Instance, cluste
 		return instance, clusterMaster, countInjectedTransactions, log.Errorf("gtid-errant-inject-empty will not operate on %+v because no errant GTID is found", *instanceKey)
 	}
 	if !instance.SupportsOracleGTID {
-		return instance, clusterMaster, countInjectedTransactions, log.Errorf("gtid-errant-inject-empty requested for %+v but it is not using oracle-gtid", *instanceKey)
+		return instance, clusterMaster, countInjectedTransactions, log.Errorf("gtid-errant-inject-empty requested for %+v but it does not support oracle-gtid", *instanceKey)
 	}
 
 	masters, err := ReadClusterWriteableMaster(instance.ClusterName)
@@ -1389,12 +1389,16 @@ func ErrantGTIDInjectEmpty(instanceKey *InstanceKey) (instance *Instance, cluste
 	}
 	clusterMaster = masters[0]
 
+	if !clusterMaster.SupportsOracleGTID {
+		return instance, clusterMaster, countInjectedTransactions, log.Errorf("gtid-errant-inject-empty requested for %+v but the cluster's master %+v does not support oracle-gtid", *instanceKey, clusterMaster.Key)
+	}
+
 	gtidSet, err := NewOracleGtidSet(instance.GtidErrant)
 	if err != nil {
 		return instance, clusterMaster, countInjectedTransactions, err
 	}
-	log.Infof("gtid-errant-inject-empty: about to inject empty transactions %+v on cluster master %+v", gtidSet.String(), clusterMaster.Key)
 	explodedEntries := gtidSet.Explode()
+	log.Infof("gtid-errant-inject-empty: about to inject %+v empty transactions %+v on cluster master %+v", len(explodedEntries), gtidSet.String(), clusterMaster.Key)
 	for _, entry := range explodedEntries {
 		if err := injectEmptyGTIDTransaction(&clusterMaster.Key, entry); err != nil {
 			return instance, clusterMaster, countInjectedTransactions, err
