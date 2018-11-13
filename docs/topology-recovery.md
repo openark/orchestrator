@@ -11,11 +11,11 @@
 - [Manual recovery](#manual-recovery).
 - [Manual, forced/panic failovers](#manual-forced-failover).
 
-## Requirements 
+## Requirements
 
 To run any kind of failovers, your topologies must support either:
 
-- Oracle GTID
+- Oracle GTID (with `MASTER_AUTO_POSITION=1`)
 - MariaDB GTID
 - [Pseudo GTID](#pseudo-gtid)
 - Binlog Servers
@@ -32,7 +32,7 @@ Based on a [failure detection](failure-detection.md), a sequence of events compo
 
 Where:
 
-- Pre-recovery hooks are configured by the user. 
+- Pre-recovery hooks are configured by the user.
   - Executed sequentially
   - Failure of any of these hooks (nonzero exit code) will abort the failover.
 - Topology healing is managed by `orchestrator` and is state-based rather than configuration-based. `orchestrator` tries to make the best out of a bad situation, taking into consideration the existing topology, versions, server configurations, etc.
@@ -128,7 +128,7 @@ Invoke graceful takeover via:
 
 * Command line: `orchestrator-client -c graceful-master-takeover -alias mycluster -s designated.master.to.promote:3306`
 
-* Web API: 
+* Web API:
 
   - `/api/graceful-master-takeover/:clusterHint/:designatedHost/:designatedPort`: gracefully promote a new master (planned failover), indicating the designated master to promote.
   - `/api/graceful-master-takeover/:clusterHint`: gracefully promote a new master (planned failover). Designated server not indicated, works when the master has exactly one direct replica.
@@ -210,6 +210,38 @@ Pending recoveries are unblocked either once `RecoveryPeriodBlockSeconds` has pa
 Acknowledging a recovery is possible either via web API/interface (see audit/recovery page) or via command line interface (`orchestrator-client -c ack-cluster-recoveries -alias somealias`).
 
 Note that manual recovery (e.g. `orchestrator-client -c recover` or `orchstrator-client -c force-master-failover`) ignores the blocking period.
+
+
+### Adding promotion rules
+
+Some servers are better candidate for promotion in the event of failovers. Some servers aren't good picks. Examples:
+
+- A server has weaker hardware configuration. You prefer to not promote it.
+- A server is in a remote data center and you don't want to promote it.
+- A server is used as your backup source and has LVM snapshots open at all times. You don't want to promote it.
+- A server has a good setup and is ideal as candidate. You prefer to promote it.
+- A server is OK, and you don't have any particular opinion.
+
+You will announce your preference for a given server to `orchestrator` in the following way:
+
+```
+orchestrator -c register-candidate -i ${::fqdn} --promotion-rule ${promotion_rule}
+```
+
+Supported promotion rules are:
+
+- `prefer`
+- `neutral`
+- `prefer_not`
+- `must_not`
+
+Promotion rules expire after an hour. That's the dynamic nature of `orchestrator`. You will want to setup a cron job that will announce the promotion rule for a server:
+
+```
+*/2 * * * * root "/usr/bin/perl -le 'sleep rand 10' && /usr/bin/orchestrator-client -c register-candidate -i this.hostname.com --promotion-rule prefer"
+```
+
+This setup comes from production environments. The cron entries get updated by `puppet` to reflect the appropriate `promotion_rule`. A server may have `prefer` at this time, and `prefer_not` in 5 minutes from now. Integrate your own service discovery method, your own scripting, to provide with your up-to-date `promotion-rule`.
 
 ### Downtime
 
