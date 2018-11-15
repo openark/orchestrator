@@ -34,6 +34,7 @@ usage() {
 function precheck() {
   local target="$1"
   local build_only="$2"
+  local init_system="$3"
   local ok=0 # return err. so shell exit code
 
   if [[ "$target" == "linux" ]]; then
@@ -62,29 +63,39 @@ function precheck() {
     ok=1
   fi
 
+  if [[ "$init_system" != "sysv" ]] && [[ "$init_system" != "systemd" ]]; then
+    echo "Invalid init_system option: $init_system, valid options are (sysv, systemd)"
+    ok=1
+  fi
+
   return $ok
 }
 
 function setuptree() {
-  local b prefix
+  local b prefix init_system
   prefix="$1"
+  init_system="$2"
 
   mkdir -p $TOPDIR
   rm -rf ${TOPDIR:?}/*
   b=$( mktemp -d $TOPDIR/orchestratorXXXXXX ) || return 1
   mkdir -p $b/orchestrator
   mkdir -p $b/orchestrator${prefix}/orchestrator/
-  mkdir -p $b/orchestrator/etc/init.d
   mkdir -p $b/orchestrator-cli/usr/bin
   mkdir -p $b/orchestrator-client/usr/bin
+  if [[ "$init_system" == "sysv" ]]; then
+    mkdir -p $b/orchestrator/etc/init.d
+  elif [[ "$init_system" == "systemd" ]]; then
+    mkdir -p $b/orchestrator/etc/systemd/system
+  fi
   echo $b
 }
 
 function oinstall() {
-  local builddir prefix
+  local builddir prefix init_system
   builddir="$1"
-  init_system="$2"
-  prefix="$3"
+  prefix="$2"
+  init_system="$3"
 
   cd  $mydir
   gofmt -s -w  go/
@@ -189,9 +200,9 @@ function main() {
   fi
   RELEASE_VERSION="${RELEASE_VERSION}${RELEASE_SUBVERSION}"
 
-  precheck "$target" "$build_only"
-  builddir=$( setuptree "$prefix" )
-  oinstall "$builddir" "$init_system" "$prefix"
+  precheck "$target" "$build_only" "$init_system"
+  builddir=$( setuptree "$prefix" "$init_system")
+  oinstall "$builddir" "$prefix" "$init_system"
   build "$target" "$arch" "$builddir" "$prefix"
   [[ $? == 0 ]] || return 1
   if [[ $build_only -eq 0 ]]; then
@@ -259,6 +270,6 @@ arch=${arch:-"amd64"} # default for arch is amd64 but should take from environme
 prefix=${prefix:-"/usr/local"}
 
 [[ $debug -eq 1 ]] && set -x
-main "$target" "$init_ssytem" "$arch" "$prefix" "$build_only"
+main "$target" "$init_system" "$arch" "$prefix" "$build_only"
 
 echo "orchestrator build done; exit status is $?"
