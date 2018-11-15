@@ -20,7 +20,7 @@ To run any kind of failovers, your topologies must support either:
 - [Pseudo GTID](pseudo-gtid.md)
 - Binlog Servers
 
-See [MySQL Configuration](configuration-recovery.md#mysql-configuration) for mroe details.
+See [MySQL Configuration](configuration-recovery.md#mysql-configuration) for more details.
 
 
 Automated recovery is _opt in_. Please consider [recovery configuration](configuration-recovery.md).
