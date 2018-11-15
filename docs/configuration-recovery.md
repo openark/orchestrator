@@ -6,6 +6,8 @@ Recovery depends on detection, discussed in [configuration: failure detection](c
 
 See [Topology recovery](topology-recovery.md) for all things recoveries.
 
+Also consider that your MySQL topologies themselves need to follow some rules, see [MySQL Configuration](#mysql-configuration)
+
 ```json
 {
   "RecoveryPeriodBlockSeconds": 3600,
@@ -139,3 +141,15 @@ And, in the event a recovery was successful:
 - `{successorHost}`
 - `{successorPort}`
 - `{successorAlias}`
+
+### MySQL Configuration
+
+Your MySQL topologies must fulfill some requirements in order to support failovers. Those requirements largely depends on the types of topologies/configuration you use.
+
+- Oracle/Percona with GTID: promotable servers must have `log_bin` and `log_slave_updates` enabled. Replicas must be using `AUTO_POSITION=1` (via `CHANGE MASTER TO MASTER_AUTO_POSITION=1`).
+- MariaDB GTID: promotable servers must have `log_bin` and `log_slave_updates` enabled.
+- [Pseudo GTID](#pseudo-gtid): promotable servers must have `log_bin` and `log_slave_updates` enabled. If using `5.7/8.0` parallel replication, set `slave_preserve_commit_order=1`.
+- BinlogServers: promotable servers must have `log_bin` enabled.
+
+
+Also consider improving failure detection via [MySQL Configuration](configuration-failure-detection.md#mysql-configuration)

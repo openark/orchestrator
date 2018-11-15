@@ -550,7 +550,7 @@ function openNodeModal(node) {
   $('#node_modal button[data-btn=disable-gtid]').hide();
   if (node.usingGTID) {
     $('#node_modal button[data-btn=disable-gtid]').show();
-  } else {
+  } else if (node.supportsGTID) {
     $('#node_modal button[data-btn=enable-gtid]').show();
   }
 

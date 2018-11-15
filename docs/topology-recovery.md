@@ -17,8 +17,11 @@ To run any kind of failovers, your topologies must support either:
 
 - Oracle GTID (with `MASTER_AUTO_POSITION=1`)
 - MariaDB GTID
-- [Pseudo GTID](#pseudo-gtid)
+- [Pseudo GTID](pseudo-gtid.md)
 - Binlog Servers
+
+See [MySQL Configuration](configuration-recovery.md#mysql-configuration) for more details.
+
 
 Automated recovery is _opt in_. Please consider [recovery configuration](configuration-recovery.md).
 
