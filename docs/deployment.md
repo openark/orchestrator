@@ -138,3 +138,6 @@ and populate this table, with, say `1, my_cluster_name`, coupled with:
   "DetectClusterAliasQuery": "select cluster_name from meta.cluster where anchor=1"
 }
 ```
+
+Please note `orchestrator` does not create such tables nor does it populate them.
+You will need to create the table, populate them, and let `orchestrator` know how to query the data.
