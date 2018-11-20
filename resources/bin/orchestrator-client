@@ -196,7 +196,7 @@ function api {
 
   api_call_result=0
   for sleep_time in 0.1 0.2 0.5 1 2 2.5 5 0 ; do
-    api_response=$(curl --basic --user "${basic_auth}" -s "$uri" | jq '.')
+    api_response=$(curl "${basic_auth}" -s "$uri" | jq '.')
     api_call_result=$?
     [ $api_call_result -eq 0 ] && break
     sleep $sleep_time
