@@ -126,17 +126,6 @@ func RefreshTopologyInstances(instances [](*Instance)) {
 	}
 }
 
-// RefreshInstanceSlaveHosts is a workaround for a bug in MySQL where
-// SHOW SLAVE HOSTS continues to present old, long disconnected replicas.
-// It turns out issuing a couple FLUSH commands mitigates the problem.
-func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
-	_, _ = ExecInstance(instanceKey, `flush error logs`)
-	_, _ = ExecInstance(instanceKey, `flush error logs`)
-
-	instance, err := ReadTopologyInstance(instanceKey)
-	return instance, err
-}
-
 // GetSlaveRestartPreserveStatements returns a sequence of statements that make sure a replica is stopped
 // and then returned to the same state. For example, if the replica was fully running, this will issue
 // a STOP on both io_thread and sql_thread, followed by START on both. If one of them is not running
