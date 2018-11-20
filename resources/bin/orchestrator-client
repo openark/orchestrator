@@ -50,7 +50,11 @@ promotion_rule=
 pool=
 hostname_flag=
 api_path=
-basic_auth="${ORCHESTRATOR_AUTH_USER}:${ORCHESTRATOR_AUTH_PASSWORD}"
+# Credentails may be in the ORCHESTRATOR_API variable so only set this if we provide an explicit user
+if [ -n "${ORCHESTRATOR_AUTH_USER}" ]; then
+  # If we explicitly define a user then expect the password too
+  basic_auth="${ORCHESTRATOR_AUTH_USER}:${ORCHESTRATOR_AUTH_PASSWORD}"
+fi
 
 instance_hostport=
 destination_hostport=
@@ -101,6 +105,11 @@ do
     q) query="$OPTARG"
   esac
 done
+
+# prepend --basic --user if ${basic_auth} is set
+if [ -n "${basic_auth}" ]; then
+  basic_auth="--basic --user ${basic_auth}"
+fi
 
 function fail {
   message="$myname[$$]: $1"
@@ -164,7 +173,7 @@ function detect_leader_api {
   fi
   for api in ${apis[@]} ; do
     api=$(normalize_orchestrator_api $api)
-    leader_check=$(curl --basic --user "${basic_auth}" -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
+    leader_check=$(curl "${basic_auth}" -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
     if [ "$leader_check" == "200" ] ; then
       leader_api="$api"
       return
