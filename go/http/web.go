@@ -190,23 +190,6 @@ func (this *HttpWeb) Discover(params martini.Params, r render.Render, req *http.
 	})
 }
 
-func (this *HttpWeb) LongQueries(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	filter := params["filter"]
-	if filter == "" {
-		filter = template.JSEscapeString(req.URL.Query().Get("filter"))
-	}
-
-	r.HTML(200, "templates/long_queries", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
-		"title":               "long queries",
-		"authorizedForAction": isAuthorizedForAction(req, user),
-		"userId":              getUserId(req, user),
-		"autoshow_problems":   false,
-		"filter":              filter,
-		"prefix":              this.URLPrefix,
-	})
-}
-
 func (this *HttpWeb) Audit(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	page, err := strconv.Atoi(params["page"])
 	if err != nil {
@@ -416,7 +399,6 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerWebRequest(m, "search/:searchString", this.Search)
 	this.registerWebRequest(m, "search", this.Search)
 	this.registerWebRequest(m, "discover", this.Discover)
-	this.registerWebRequest(m, "long-queries", this.LongQueries)
 	this.registerWebRequest(m, "audit", this.Audit)
 	this.registerWebRequest(m, "audit/:page", this.Audit)
 	this.registerWebRequest(m, "audit/instance/:host/:port", this.Audit)
