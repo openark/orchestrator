@@ -274,7 +274,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	instanceFound := false
 	partialSuccess := false
 	foundByShowSlaveHosts := false
-	longRunningProcesses := []Process{}
 	resolvedHostname := ""
 	maxScaleMasterHostname := ""
 	isMaxScale := false
@@ -820,7 +819,6 @@ Cleanup:
 		} else {
 			WriteInstance(instance, instanceFound, err)
 		}
-		WriteLongRunningProcesses(&instance.Key, longRunningProcesses)
 		lastAttemptedCheckTimer.Stop()
 		latency.Stop("backend")
 		return instance, nil

@@ -44,7 +44,9 @@ Setup a MySQL server for backend, and invoke the following:
 
 `Orchestrator` uses a configuration file, located in either `/etc/orchestrator.conf.json` or relative path to binary `conf/orchestrator.conf.json` or
 `orchestrator.conf.json`.
-The installed package includes a file called `orchestrator.conf.json.sample` with some basic settings which you can use as baseline for `orchestrator.conf.json`.
+
+Tip: the installed package includes a file called `orchestrator.conf.json.sample` with some basic settings which you can use as baseline for `orchestrator.conf.json`. It is found in `/usr/local/orchestrator/orchestrator-sample.conf.json` and you may also find `/usr/local/orchestrator/orchestrator-sample-sqlite.conf.json` which has a SQLite-oriented configuration. Those sample files are also available [on the `orchestrator` repository](https://github.com/github/orchestrator/tree/master/conf).
+
 Edit `orchestrator.conf.json` to match the above as follows:
 
     ...
