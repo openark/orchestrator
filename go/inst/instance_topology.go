@@ -1648,7 +1648,7 @@ func TakeSiblings(instanceKey *InstanceKey) (instance *Instance, takenSiblings i
 // (they continue replicate without change)
 // Note that the master must itself be a replica; however the grandparent does not necessarily have to be reachable
 // and can in fact be dead.
-func TakeMaster(instanceKey *InstanceKey) (*Instance, error) {
+func TakeMaster(instanceKey *InstanceKey, allowTakingCoMaster bool) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
@@ -1657,7 +1657,7 @@ func TakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil || !found {
 		return instance, err
 	}
-	if masterInstance.IsCoMaster {
+	if masterInstance.IsCoMaster && !allowTakingCoMaster {
 		return instance, fmt.Errorf("%+v is co-master. Cannot take it.", masterInstance.Key)
 	}
 	log.Debugf("TakeMaster: will attempt making %+v take its master %+v, now resolved as %+v", *instanceKey, instance.MasterKey, masterInstance.Key)
