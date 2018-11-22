@@ -1889,19 +1889,6 @@ func (this *HttpAPI) Audit(params martini.Params, r render.Render, req *http.Req
 	r.JSON(http.StatusOK, audits)
 }
 
-// LongQueries lists queries running for a long time, on all instances, optionally filtered by
-// arbitrary text
-func (this *HttpAPI) LongQueries(params martini.Params, r render.Render, req *http.Request) {
-	longQueries, err := inst.ReadLongRunningProcesses(params["filter"])
-
-	if err != nil {
-		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
-		return
-	}
-
-	r.JSON(http.StatusOK, longQueries)
-}
-
 // HostnameResolveCache shows content of in-memory hostname cache
 func (this *HttpAPI) HostnameResolveCache(params martini.Params, r render.Render, req *http.Request) {
 	content, err := inst.HostnameResolveCache()
@@ -3507,8 +3494,6 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	// General
 	this.registerAPIRequest(m, "problems", this.Problems)
 	this.registerAPIRequest(m, "problems/:clusterName", this.Problems)
-	this.registerAPIRequest(m, "long-queries", this.LongQueries)
-	this.registerAPIRequest(m, "long-queries/:filter", this.LongQueries)
 	this.registerAPIRequest(m, "audit", this.Audit)
 	this.registerAPIRequest(m, "audit/:page", this.Audit)
 	this.registerAPIRequest(m, "audit/instance/:host/:port", this.Audit)

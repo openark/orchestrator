@@ -126,17 +126,6 @@ func RefreshTopologyInstances(instances [](*Instance)) {
 	}
 }
 
-// RefreshInstanceSlaveHosts is a workaround for a bug in MySQL where
-// SHOW SLAVE HOSTS continues to present old, long disconnected replicas.
-// It turns out issuing a couple FLUSH commands mitigates the problem.
-func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
-	_, _ = ExecInstance(instanceKey, `flush error logs`)
-	_, _ = ExecInstance(instanceKey, `flush error logs`)
-
-	instance, err := ReadTopologyInstance(instanceKey)
-	return instance, err
-}
-
 // GetSlaveRestartPreserveStatements returns a sequence of statements that make sure a replica is stopped
 // and then returned to the same state. For example, if the replica was fully running, this will issue
 // a STOP on both io_thread and sql_thread, followed by START on both. If one of them is not running
@@ -1094,6 +1083,7 @@ func canInjectPseudoGTID(instanceKey *InstanceKey) (canInject bool, err error) {
 
 	canInject = foundAll || foundDropOnAll || foundAllOnSchema || foundDropOnSchema
 	supportedAutoPseudoGTIDWriters.Set(instanceKey.StringCode(), canInject, cache.DefaultExpiration)
+
 	return canInject, nil
 }
 
@@ -1114,6 +1104,10 @@ func CheckAndInjectPseudoGTIDOnWriter(instance *Instance) (injected bool, err er
 		return injected, log.Errore(err)
 	}
 	if !canInject {
+		if util.ClearToLog("CheckAndInjectPseudoGTIDOnWriter", instance.Key.StringCode()) {
+			log.Warningf("AutoPseudoGTID enabled, but orchestrator has no priviliges on %+v to inject pseudo-gtid", instance.Key)
+		}
+
 		return injected, nil
 	}
 	if _, err := injectPseudoGTID(instance); err != nil {
@@ -1133,4 +1127,17 @@ func GTIDSubtract(instanceKey *InstanceKey, gtidSet string, gtidSubset string) (
 	}
 	err = db.QueryRow("select gtid_subtract(?, ?)", gtidSet, gtidSubset).Scan(&gtidSubtract)
 	return gtidSubtract, err
+}
+
+func ShowMasterStatus(instanceKey *InstanceKey) (masterStatusFound bool, executedGtidSet string, err error) {
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return masterStatusFound, executedGtidSet, err
+	}
+	err = sqlutils.QueryRowsMap(db, "show master status", func(m sqlutils.RowMap) error {
+		masterStatusFound = true
+		executedGtidSet = m.GetStringD("Executed_Gtid_Set", "")
+		return nil
+	})
+	return masterStatusFound, executedGtidSet, err
 }
