@@ -256,6 +256,7 @@ type Configuration struct {
 	ConsulAclToken                             string            // ACL token used to write to Consul KV
 	ZkAddress                                  string            // UNSUPPERTED YET. Address where (single or multiple) ZooKeeper servers are found, in `srv1[:port1][,srv2[:port2]...]` format. Default port is 2181. Example: srv-a,srv-b:12181,srv-c
 	KVClusterMasterPrefix                      string            // Prefix to use for clusters' masters entries in KV stores (internal, consul, ZK), default: "mysql/master"
+	WebMessage                                 string            // If provided, will be shown on all web pages below the title bar
 }
 
 // ToJSONString will marshal this configuration as JSON
@@ -414,6 +415,7 @@ func newConfiguration() *Configuration {
 		ConsulAclToken:                        "",
 		ZkAddress:                             "",
 		KVClusterMasterPrefix:                 "mysql/master",
+		WebMessage:                            "",
 	}
 }
 
