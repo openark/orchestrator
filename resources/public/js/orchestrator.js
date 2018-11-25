@@ -548,7 +548,7 @@ function openNodeModal(node) {
 
   $('#node_modal button[data-btn=enable-gtid]').hide();
   $('#node_modal button[data-btn=disable-gtid]').hide();
-  if (node.usingGTID) {
+  if (node.supportsGTID && node.usingGTID) {
     $('#node_modal button[data-btn=disable-gtid]').show();
   } else if (node.supportsGTID) {
     $('#node_modal button[data-btn=enable-gtid]').show();
@@ -1011,7 +1011,9 @@ function renderGlobalRecoveriesButton(isGlobalRecoveriesEnabled) {
 
 $(document).ready(function() {
   visualizeBrand();
-
+  if (webMessage()) {
+    addAlert(webMessage(), "warning")
+  }
   $.get(appUrl("/api/clusters-info"), function(clusters) {
     clusters = clusters || [];
 
