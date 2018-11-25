@@ -50,7 +50,7 @@ promotion_rule=
 pool=
 hostname_flag=
 api_path=
-basic_auth="${ORCHESTRATOR_AUTH_USER}:${ORCHESTRATOR_AUTH_PASSWORD}"
+basic_auth="${ORCHESTRATOR_AUTH_USER:-}:${ORCHESTRATOR_AUTH_PASSWORD:-}"
 
 instance_hostport=
 destination_hostport=
@@ -58,6 +58,8 @@ default_port=3306
 
 api_response=
 api_details=
+
+unauthorized_401="401 Unauthorized"
 
 for arg in "$@"; do
   shift
@@ -113,6 +115,24 @@ function check_requirements {
   which jq   > /dev/null 2>&1 || fail "cannot find jq"
 }
 
+function get_curl_auth_params {
+  local requires_auth=""
+
+  if [[ "${basic_auth}" != ":" ]]; then
+    requires_auth="--basic --user "${basic_auth}""
+
+    curl --help 2>&1 | fgrep -q 'disallow-username-in-url' && \
+      requires_auth+=" --disallow-username-in-url"
+  fi
+
+  # Test API access
+  curl "${basic_auth}" -s --head "${orchestrator_api}" 2>&1 | fgrep -q "$unauthorized_401" && \
+    echo "$unauthorized_401" && \
+    return
+
+  echo "${requires_auth}"
+}
+
 function assert_nonempty {
   name="$1"
   value="$2"
@@ -156,6 +176,12 @@ function detect_leader_api {
   # - in which case we just normalize the URL
   # or it may be a space delimited list, such as "http://host1:3000/api http://host2:3000/api http://host3:3000/api "
   # - in which case we figure out which of the URLs is the leader
+  local curl_auth_params="$(get_curl_auth_params)"
+
+  if [ "${curl_auth_params}" == "$unauthorized_401" ] ; then
+    fail "Cannot access orchestrator at ${orchestrator_api}.  Check ORCHESTRATOR_API is configured correctly and orchestrator is running"
+  fi
+
   leader_api=
   apis=($orchestrator_api)
   if [ ${#apis[@]} -eq 1 ] ; then
@@ -164,7 +190,7 @@ function detect_leader_api {
   fi
   for api in ${apis[@]} ; do
     api=$(normalize_orchestrator_api $api)
-    leader_check=$(curl --basic --user "${basic_auth}" -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
+    leader_check=$(curl ${curl_auth_params} -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
     if [ "$leader_check" == "200" ] ; then
       leader_api="$api"
       return
@@ -179,6 +205,8 @@ function urlencode {
 }
 
 function api {
+  local curl_auth_params="$(get_curl_auth_params)"
+
   path="$1"
 
   uri="$leader_api/$path"
@@ -186,12 +214,16 @@ function api {
   set -o pipefail
 
   api_call_result=0
-  for sleep_time in 0.1 0.2 0.5 1 2 2.5 5 0 ; do
-    api_response=$(curl --basic --user "${basic_auth}" -s "$uri" | jq '.')
-    api_call_result=$?
-    [ $api_call_result -eq 0 ] && break
-    sleep $sleep_time
-  done
+  if [[ ${curl_auth_params} != "401 Unauthorized" ]]; then
+    for sleep_time in 0.1 0.2 0.5 1 2 2.5 5 0 ; do
+      api_response=$(curl ${curl_auth_params} -s "$uri" | jq '.')
+      api_call_result=$?
+      [ $api_call_result -eq 0 ] && break
+      sleep $sleep_time
+    done
+  else
+    api_call_result=1
+  fi
   if [ $api_call_result -ne 0 ] ; then
     fail "Cannot access orchestrator at ${leader_api}.  Check ORCHESTRATOR_API is configured correctly and orchestrator is running"
   fi
