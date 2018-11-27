@@ -551,7 +551,7 @@ func ContinuousDiscovery() {
 					go ExpireTopologyRecoveryHistory()
 					go ExpireTopologyRecoveryStepsHistory()
 
-					if runCheckAndRecoverOperationsTimeRipe() {
+					if runCheckAndRecoverOperationsTimeRipe() && IsLeader() {
 						go SubmitMastersToKvStores("", false)
 					}
 				} else {
