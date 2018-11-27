@@ -424,17 +424,22 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 		if !force {
 			// !force: Called periodically to auto-populate KV
 			// We'd like to avoid some overhead.
+			log.Debugf("********* checking %+v in kvFoundCache", kvPair.Key)
 			if _, found := kvFoundCache.Get(kvPair.Key); found {
 				// Let's not overload database with queries. Let's not overload raft with events.
+				log.Debugf("********* found %+v in kvFoundCache", kvPair.Key)
 				continue
 			}
 			if v, err := kv.GetValue(kvPair.Key); err == nil && v == kvPair.Value {
 				// Already has the right value.
 				kvFoundCache.Set(kvPair.Key, true, cache.DefaultExpiration)
+				log.Debugf("********* adding %+v to kvFoundCache", kvPair.String())
 				continue
 			}
+			log.Debugf("********* %+v is good to go; not in kvFoundCache", kvPair.String())
 		}
 		if orcraft.IsRaftEnabled() {
+			log.Debugf("********* raft: publishing %s for %+v", command, kvPair.String())
 			_, err = orcraft.PublishCommand(command, kvPair)
 		} else {
 			err = applyFunc(kvPair)
