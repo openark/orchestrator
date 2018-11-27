@@ -24,7 +24,7 @@ import (
 	"github.com/openark/golib/sqlutils"
 )
 
-func SetInstanceTag(tag *DatabaseInstanceTag) (err error) {
+func SetInstanceTag(instanceKey *InstanceKey, tag *Tag) (err error) {
 	_, err = db.ExecOrchestrator(`
 			insert
 				into database_instance_tags (
@@ -36,8 +36,8 @@ func SetInstanceTag(tag *DatabaseInstanceTag) (err error) {
 					tag_value=values(tag_value),
 					last_updated=values(last_updated)
 			`,
-		tag.Key.Hostname,
-		tag.Key.Port,
+		instanceKey.Hostname,
+		instanceKey.Port,
 		tag.TagName,
 		tag.TagValue,
 	)
@@ -45,7 +45,7 @@ func SetInstanceTag(tag *DatabaseInstanceTag) (err error) {
 }
 
 // EndDowntime will remove downtime flag from an instance
-func DeleteInstanceTag(tag *DatabaseInstanceTag) (tagExisted bool, err error) {
+func DeleteInstanceTag(instanceKey *InstanceKey, tag *Tag) (tagExisted bool, err error) {
 	res, err := db.ExecOrchestrator(`
 			delete from
 				database_instance_tags
@@ -54,8 +54,8 @@ func DeleteInstanceTag(tag *DatabaseInstanceTag) (tagExisted bool, err error) {
 				and port = ?
 				and tag_name = ?
 			`,
-		tag.Key.Hostname,
-		tag.Key.Port,
+		instanceKey.Hostname,
+		instanceKey.Port,
 		tag.TagName,
 	)
 	if err != nil {
@@ -64,32 +64,12 @@ func DeleteInstanceTag(tag *DatabaseInstanceTag) (tagExisted bool, err error) {
 
 	if affected, _ := res.RowsAffected(); affected > 0 {
 		tagExisted = true
-		AuditOperation("delete-instance-tag", tag.Key, "")
+		AuditOperation("delete-instance-tag", instanceKey, "")
 	}
 	return tagExisted, err
 }
 
-func InstanceTagExists(tag *DatabaseInstanceTag) (tagExists bool, err error) {
-	query := `
-		select
-			count(*) > 0 as tag_exists
-		from
-			database_instance_tags
-		where
-			hostname = ?
-			and port = ?
-			and tag_name = ?
-			`
-	args := sqlutils.Args(tag.Key.Hostname, tag.Key.Port, tag.TagName)
-	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
-		tagExists = m.GetBool("tagExists")
-		return nil
-	})
-
-	return tagExists, log.Errore(err)
-}
-
-func ReadInstanceTag(tag *DatabaseInstanceTag) (tagExists bool, err error) {
+func ReadInstanceTag(instanceKey *InstanceKey, tag *Tag) (tagExists bool, err error) {
 	query := `
 		select
 			tag_value
@@ -100,7 +80,7 @@ func ReadInstanceTag(tag *DatabaseInstanceTag) (tagExists bool, err error) {
 			and port = ?
 			and tag_name = ?
 			`
-	args := sqlutils.Args(tag.Key.Hostname, tag.Key.Port, tag.TagName)
+	args := sqlutils.Args(instanceKey.Hostname, instanceKey.Port, tag.TagName)
 	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		tag.TagValue = m.GetString("tag_value")
 		tagExists = true
@@ -110,48 +90,11 @@ func ReadInstanceTag(tag *DatabaseInstanceTag) (tagExists bool, err error) {
 	return tagExists, log.Errore(err)
 }
 
-func GetInstanceKeysByTagName(tagName string) (tagged *InstanceKeyMap, err error) {
-	tagged = NewInstanceKeyMap()
-	query := `
-		select
-			hostname,
-			port
-		from
-			database_instance_tags
-		where
-			tag_name = ?
-		`
-	args := sqlutils.Args(tagName)
-	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
-		key, _ := NewResolveInstanceKey(m.GetString("hostname"), m.GetInt("port"))
-		tagged.AddKey(*key)
-		return nil
-	})
-	return tagged, log.Errore(err)
+func InstanceTagExists(instanceKey *InstanceKey, tag *Tag) (tagExists bool, err error) {
+	return ReadInstanceTag(instanceKey, &Tag{TagName: tag.TagName})
 }
 
-func GetInstanceKeysByTagNameAndValue(tagName, tagValue string) (tagged *InstanceKeyMap, err error) {
-	tagged = NewInstanceKeyMap()
-	query := `
-		select
-			hostname,
-			port
-		from
-			database_instance_tags
-		where
-			tag_name = ?
-			and tag_value = ?
-		`
-	args := sqlutils.Args(tagName, tagValue)
-	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
-		key, _ := NewResolveInstanceKey(m.GetString("hostname"), m.GetInt("port"))
-		tagged.AddKey(*key)
-		return nil
-	})
-	return tagged, log.Errore(err)
-}
-
-func GetInstanceKeysByTag(tag *DatabaseInstanceTag) (tagged *InstanceKeyMap, err error) {
+func GetInstanceKeysByTag(tag *Tag) (tagged *InstanceKeyMap, err error) {
 	args := sqlutils.Args(tag.TagName)
 	tagValueClause := ``
 	if tag.HasValue {

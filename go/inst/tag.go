@@ -16,20 +16,28 @@
 
 package inst
 
-type Tag struct {
-}
+import (
+	"strings"
+)
 
-type DatabaseInstanceTag struct {
-	Key      *InstanceKey
+type Tag struct {
 	TagName  string
 	TagValue string
 	HasValue bool
 }
 
-func NewDatabaseInstanceTag(instanceKey *InstanceKey, tagName, tagValue string) *DatabaseInstanceTag {
-	return &DatabaseInstanceTag{
-		Key:      instanceKey,
-		TagName:  tagName,
-		TagValue: tagValue,
+func ParseTag(tagString string) *Tag {
+	tokens := strings.SplitN(tagString, "=", 2)
+	tagName := tokens[0]
+	if tagName == "" {
+		return nil
 	}
+	tag := &Tag{
+		TagName: tagName,
+	}
+	if len(tokens) == 2 {
+		tag.HasValue = true
+		tag.TagValue = tokens[1]
+	}
+	return tag
 }
