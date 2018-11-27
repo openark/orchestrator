@@ -70,6 +70,7 @@ var isElectedNode int64 = 0
 
 var recentDiscoveryOperationKeys *cache.Cache
 var pseudoGTIDPublishCache = cache.New(time.Minute, time.Second)
+var kvFoundCache = cache.New(10*time.Minute, time.Minute)
 
 func init() {
 	snapshotDiscoveryKeys = make(chan inst.InstanceKey, 10)
@@ -420,6 +421,19 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 		applyFunc = kv.PutKVPair
 	}
 	for _, kvPair := range kvPairs {
+		if !force {
+			// !force: Called periodically to auto-populate KV
+			// We'd like to avoid some overhead.
+			if _, found := kvFoundCache.Get(kvPair.Key); found {
+				// Let's not overload database with queries. Let's not overload raft with events.
+				continue
+			}
+			if v, err := kv.GetValue(kvPair.Key); err == nil && v == kvPair.Value {
+				// Already has the right value.
+				kvFoundCache.Set(kvPair.Key, true, cache.DefaultExpiration)
+				continue
+			}
+		}
 		if orcraft.IsRaftEnabled() {
 			_, err = orcraft.PublishCommand(command, kvPair)
 		} else {
