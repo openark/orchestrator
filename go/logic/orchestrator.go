@@ -420,25 +420,22 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 		command = "put-key-value"
 		applyFunc = kv.PutKVPair
 	}
-	log.Debugf("********* SubmitMastersToKvStores: %+v pairs", len(kvPairs))
 	for _, kvPair := range kvPairs {
-		log.Debugf("********* SubmitMastersToKvStores: kvPair=%+v", kvPair.String())
 		if !force {
 			// !force: Called periodically to auto-populate KV
 			// We'd like to avoid some overhead.
-			log.Debugf("********* SubmitMastersToKvStores: checking %+v in kvFoundCache", kvPair.Key)
 			if _, found := kvFoundCache.Get(kvPair.Key); found {
 				// Let's not overload database with queries. Let's not overload raft with events.
-				log.Debugf("********* SubmitMastersToKvStores: found %+v in kvFoundCache", kvPair.Key)
 				continue
 			}
-			if v, err := kv.GetValue(kvPair.Key); err == nil && v == kvPair.Value {
+			if v, found, err := kv.GetValue(kvPair.Key); err == nil && found && v == kvPair.Value {
 				// Already has the right value.
 				kvFoundCache.Set(kvPair.Key, true, cache.DefaultExpiration)
 				log.Debugf("********* SubmitMastersToKvStores: adding %+v to kvFoundCache", kvPair.String())
 				continue
 			} else {
-				log.Debugf("********* SubmitMastersToKvStores: GetValue(%+v) %+v, %+v", kvPair.Key, v, err)
+				log.Debugf("********* SubmitMastersToKvStores: GetValue(%+v) (%+v), %+v", kvPair.Key, v, err)
+				log.Debugf("********* SubmitMastersToKvStores: expected(%+v) (%+v)", kvPair.Key, kvPair.Value)
 			}
 			log.Debugf("********* SubmitMastersToKvStores: %+v is good to go; not in kvFoundCache", kvPair.String())
 		}
