@@ -437,6 +437,9 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 				kvFoundCache.Set(kvPair.Key, true, cache.DefaultExpiration)
 				log.Debugf("********* SubmitMastersToKvStores: adding %+v to kvFoundCache", kvPair.String())
 				continue
+			} else {
+				log.Debugf("********* SubmitMastersToKvStores: GetValue(%+v) %+v, %+v", v, err)
+
 			}
 			log.Debugf("********* SubmitMastersToKvStores: %+v is good to go; not in kvFoundCache", kvPair.String())
 		}
