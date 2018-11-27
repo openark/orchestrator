@@ -358,7 +358,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if instanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			_, err := inst.TakeMaster(instanceKey)
+			_, err := inst.TakeMaster(instanceKey, false)
 			if err != nil {
 				log.Fatale(err)
 			}
