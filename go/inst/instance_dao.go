@@ -274,7 +274,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	instanceFound := false
 	partialSuccess := false
 	foundByShowSlaveHosts := false
-	longRunningProcesses := []Process{}
 	resolvedHostname := ""
 	maxScaleMasterHostname := ""
 	isMaxScale := false
@@ -820,7 +819,6 @@ Cleanup:
 		} else {
 			WriteInstance(instance, instanceFound, err)
 		}
-		WriteLongRunningProcesses(&instance.Key, longRunningProcesses)
 		lastAttemptedCheckTimer.Stop()
 		latency.Stop("backend")
 		return instance, nil
@@ -2731,21 +2729,25 @@ func ResetInstanceRelaylogCoordinatesHistory(instanceKey *InstanceKey) error {
 
 // FigureClusterName will make a best effort to deduce a cluster name using either a given alias
 // or an instanceKey. First attempt is at alias, and if that doesn't work, we try instanceKey.
+// - clusterHint may be an empty string
 func FigureClusterName(clusterHint string, instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (clusterName string, err error) {
 	// Look for exact matches, first.
 
-	// Exact cluster name match:
-	if clusterInfo, err := ReadClusterInfo(clusterHint); err == nil && clusterInfo != nil {
-		return clusterInfo.ClusterName, nil
-	}
-	// Exact cluster alias match:
-	if clustersInfo, err := ReadClustersInfo(""); err == nil {
-		for _, clusterInfo := range clustersInfo {
-			if clusterInfo.ClusterAlias == clusterHint {
-				return clusterInfo.ClusterName, nil
+	if clusterHint != "" {
+		// Exact cluster name match:
+		if clusterInfo, err := ReadClusterInfo(clusterHint); err == nil && clusterInfo != nil {
+			return clusterInfo.ClusterName, nil
+		}
+		// Exact cluster alias match:
+		if clustersInfo, err := ReadClustersInfo(""); err == nil {
+			for _, clusterInfo := range clustersInfo {
+				if clusterInfo.ClusterAlias == clusterHint {
+					return clusterInfo.ClusterName, nil
+				}
 			}
 		}
 	}
+
 	clusterByInstanceKey := func(instanceKey *InstanceKey) (hasResult bool, clusterName string, err error) {
 		if instanceKey == nil {
 			return false, "", nil

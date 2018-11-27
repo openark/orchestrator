@@ -743,6 +743,27 @@ func (this *HttpAPI) ErrantGTIDResetMaster(params martini.Params, r render.Rende
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Removed errant GTID on %+v and issued a RESET MASTER", instance.Key), Details: instance})
 }
 
+// ErrantGTIDInjectEmpty removes errant transactions by injecting and empty transaction on the cluster's master
+func (this *HttpAPI) ErrantGTIDInjectEmpty(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	instance, clusterMaster, countInjectedTransactions, err := inst.ErrantGTIDInjectEmpty(&instanceKey)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Have injected %+v transactions on cluster master %+v", countInjectedTransactions, clusterMaster.Key), Details: instance})
+}
+
 // MoveBelow attempts to move an instance below its supposed sibling
 func (this *HttpAPI) MoveBelow(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -854,7 +875,7 @@ func (this *HttpAPI) TakeMaster(params martini.Params, r render.Render, req *htt
 		return
 	}
 
-	instance, err := inst.TakeMaster(&instanceKey)
+	instance, err := inst.TakeMaster(&instanceKey, false)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -1887,19 +1908,6 @@ func (this *HttpAPI) Audit(params martini.Params, r render.Render, req *http.Req
 	}
 
 	r.JSON(http.StatusOK, audits)
-}
-
-// LongQueries lists queries running for a long time, on all instances, optionally filtered by
-// arbitrary text
-func (this *HttpAPI) LongQueries(params martini.Params, r render.Render, req *http.Request) {
-	longQueries, err := inst.ReadLongRunningProcesses(params["filter"])
-
-	if err != nil {
-		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
-		return
-	}
-
-	r.JSON(http.StatusOK, longQueries)
 }
 
 // HostnameResolveCache shows content of in-memory hostname cache
@@ -3376,6 +3384,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "enable-gtid/:host/:port", this.EnableGTID)
 	this.registerAPIRequest(m, "disable-gtid/:host/:port", this.DisableGTID)
 	this.registerAPIRequest(m, "gtid-errant-reset-master/:host/:port", this.ErrantGTIDResetMaster)
+	this.registerAPIRequest(m, "gtid-errant-inject-empty/:host/:port", this.ErrantGTIDInjectEmpty)
 	this.registerAPIRequest(m, "skip-query/:host/:port", this.SkipQuery)
 	this.registerAPIRequest(m, "start-slave/:host/:port", this.StartSlave)
 	this.registerAPIRequest(m, "restart-slave/:host/:port", this.RestartSlave)
@@ -3507,8 +3516,6 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	// General
 	this.registerAPIRequest(m, "problems", this.Problems)
 	this.registerAPIRequest(m, "problems/:clusterName", this.Problems)
-	this.registerAPIRequest(m, "long-queries", this.LongQueries)
-	this.registerAPIRequest(m, "long-queries/:filter", this.LongQueries)
 	this.registerAPIRequest(m, "audit", this.Audit)
 	this.registerAPIRequest(m, "audit/:page", this.Audit)
 	this.registerAPIRequest(m, "audit/instance/:host/:port", this.Audit)

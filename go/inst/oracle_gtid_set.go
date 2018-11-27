@@ -107,6 +107,14 @@ func (this *OracleGtidSet) SharedUUIDs(other *OracleGtidSet) (shared []string) {
 	return shared
 }
 
+// String returns a user-friendly string representation of this entry
+func (this *OracleGtidSet) Explode() (result [](*OracleGtidSetEntry)) {
+	for _, entries := range this.GtidEntries {
+		result = append(result, entries.Explode()...)
+	}
+	return result
+}
+
 func (this *OracleGtidSet) String() string {
 	tokens := []string{}
 	for _, entry := range this.GtidEntries {

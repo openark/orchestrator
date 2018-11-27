@@ -17,6 +17,7 @@
 package inst
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -124,17 +125,6 @@ func RefreshTopologyInstances(instances [](*Instance)) {
 	for range instances {
 		<-barrier
 	}
-}
-
-// RefreshInstanceSlaveHosts is a workaround for a bug in MySQL where
-// SHOW SLAVE HOSTS continues to present old, long disconnected replicas.
-// It turns out issuing a couple FLUSH commands mitigates the problem.
-func RefreshInstanceSlaveHosts(instanceKey *InstanceKey) (*Instance, error) {
-	_, _ = ExecInstance(instanceKey, `flush error logs`)
-	_, _ = ExecInstance(instanceKey, `flush error logs`)
-
-	instance, err := ReadTopologyInstance(instanceKey)
-	return instance, err
 }
 
 // GetSlaveRestartPreserveStatements returns a sequence of statements that make sure a replica is stopped
@@ -778,6 +768,35 @@ func setGTIDPurged(instance *Instance, gtidPurged string) error {
 
 	_, err := ExecInstance(&instance.Key, `set global gtid_purged := ?`, gtidPurged)
 	return err
+}
+
+// injectEmptyGTIDTransaction
+func injectEmptyGTIDTransaction(instanceKey *InstanceKey, gtidEntry *OracleGtidSetEntry) error {
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return err
+	}
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf(`SET GTID_NEXT="%s"`, gtidEntry.String())); err != nil {
+		return err
+	}
+	tx, err := conn.BeginTx(ctx, &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	if _, err := conn.ExecContext(ctx, `SET GTID_NEXT="AUTOMATIC"`); err != nil {
+		return err
+	}
+	return nil
 }
 
 // skipQueryClassic skips a query in normal binlog file:pos replication
