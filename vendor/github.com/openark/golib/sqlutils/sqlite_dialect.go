@@ -50,6 +50,7 @@ var sqlite3CreateTableConversions = []regexpMap{
 }
 
 var sqlite3InsertConversions = []regexpMap{
+	rmap(`(?i)insert ignore ([\s\S]+) on duplicate key update [\s\S]+`, `insert or ignore $1`),
 	rmap(`(?i)insert ignore`, `insert or ignore`),
 	rmap(`(?i)now[(][)]`, `datetime('now')`),
 	rmap(`(?i)insert into ([\s\S]+) on duplicate key update [\s\S]+`, `replace into $1`),

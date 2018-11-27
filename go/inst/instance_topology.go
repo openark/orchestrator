@@ -553,25 +553,45 @@ Cleanup:
 	return instance, err
 }
 
-func canMoveViaGTID(instance, otherInstance *Instance) (isOracleGTID bool, isMariaDBGTID, canMove bool) {
+func canReplicateAssumingOracleGTID(instance, masterInstance *Instance) (canReplicate bool, err error) {
+	subtract, err := GTIDSubtract(&instance.Key, masterInstance.GtidPurged, instance.ExecutedGtidSet)
+	if err != nil {
+		return false, err
+	}
+	subtractGtidSet, err := NewOracleGtidSet(subtract)
+	if err != nil {
+		return false, err
+	}
+	return subtractGtidSet.IsEmpty(), nil
+}
+
+func instancesAreGTIDAndCompatible(instance, otherInstance *Instance) (isOracleGTID bool, isMariaDBGTID, compatible bool) {
 	isOracleGTID = (instance.UsingOracleGTID && otherInstance.SupportsOracleGTID)
 	isMariaDBGTID = (instance.UsingMariaDBGTID && otherInstance.IsMariaDB())
+	compatible = isOracleGTID || isMariaDBGTID
+	return isOracleGTID, isMariaDBGTID, compatible
+}
 
-	return isOracleGTID, isMariaDBGTID, isOracleGTID || isMariaDBGTID
+func CheckMoveViaGTID(instance, otherInstance *Instance) (err error) {
+	isOracleGTID, _, moveCompatible := instancesAreGTIDAndCompatible(instance, otherInstance)
+	if !moveCompatible {
+		return fmt.Errorf("Instances %+v, %+v not GTID compatible or not using GTID", instance.Key, otherInstance.Key)
+	}
+	if isOracleGTID {
+		canReplicate, err := canReplicateAssumingOracleGTID(instance, otherInstance)
+		if err != nil {
+			return err
+		}
+		if !canReplicate {
+			return fmt.Errorf("Instance %+v has purged GTID entries not found on %+v", otherInstance.Key, instance.Key)
+		}
+	}
+
+	return nil
 }
 
 // moveInstanceBelowViaGTID will attempt moving given instance below another instance using either Oracle GTID or MariaDB GTID.
 func moveInstanceBelowViaGTID(instance, otherInstance *Instance) (*Instance, error) {
-	_, _, canMove := canMoveViaGTID(instance, otherInstance)
-
-	instanceKey := &instance.Key
-	otherInstanceKey := &otherInstance.Key
-	if !canMove {
-		return instance, fmt.Errorf("Cannot move via GTID as not both instances use GTID: %+v, %+v", *instanceKey, *otherInstanceKey)
-	}
-
-	var err error
-
 	rinstance, _, _ := ReadInstance(&instance.Key)
 	if canMove, merr := rinstance.CanMoveViaMatch(); !canMove {
 		return instance, merr
@@ -580,8 +600,15 @@ func moveInstanceBelowViaGTID(instance, otherInstance *Instance) (*Instance, err
 	if canReplicate, err := instance.CanReplicateFrom(otherInstance); !canReplicate {
 		return instance, err
 	}
-	log.Infof("Will move %+v below %+v via GTID", instanceKey, otherInstanceKey)
+	if err := CheckMoveViaGTID(instance, otherInstance); err != nil {
+		return instance, err
+	}
+	log.Infof("Will move %+v below %+v via GTID", instance.Key, otherInstance.Key)
 
+	instanceKey := &instance.Key
+	otherInstanceKey := &otherInstance.Key
+
+	var err error
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), fmt.Sprintf("move below %+v", *otherInstanceKey)); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
 		goto Cleanup
@@ -623,7 +650,7 @@ func MoveBelowGTID(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 }
 
 // moveReplicasViaGTID moves a list of replicas under another instance via GTID, returning those replicas
-// that could not be moved (do not use GTID)
+// that could not be moved (do not use GTID or had GTID errors)
 func moveReplicasViaGTID(replicas [](*Instance), other *Instance, postponedFunctionsContainer *PostponedFunctionsContainer) (movedReplicas [](*Instance), unmovedReplicas [](*Instance), err error, errs []error) {
 	replicas = RemoveNilInstances(replicas)
 	replicas = RemoveInstance(replicas, &other.Key)
@@ -644,15 +671,9 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance, postponedFunct
 		go func() {
 			defer waitGroup.Done()
 			moveFunc := func() error {
-				var replicaErr error
-				var movedReplica *Instance
-				if _, _, canMove := canMoveViaGTID(replica, other); canMove {
-					movedReplica, replicaErr = moveInstanceBelowViaGTID(replica, other)
-					if movedReplica != nil {
-						replica = movedReplica
-					}
-				} else {
-					replicaErr = fmt.Errorf("moveReplicasViaGTID: %+v cannot move below %+v via GTID", replica.Key, other.Key)
+				movedReplica, replicaErr := moveInstanceBelowViaGTID(replica, other)
+				if replicaErr != nil && movedReplica != nil {
+					replica = movedReplica
 				}
 
 				// After having moved replicas, update local shared variables:
@@ -1249,8 +1270,8 @@ func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
 // It will make sure the gtid_purged set matches the executed set value as read just before the RESET.
 // this will enable new replicas to be attached to given instance without complaints about missing/purged entries.
 // This function requires that the instance does not have replicas.
-func ErrantGTIDResetMaster(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err error) {
+	instance, err = ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
 	}
@@ -1265,6 +1286,9 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	gtidSubtract := ""
+	executedGtidSet := ""
+	masterStatusFound := false
+	waitInterval := time.Millisecond * 250
 
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "reset-master-gtid"); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
@@ -1293,17 +1317,34 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 		if err == nil {
 			break
 		}
+		time.Sleep(waitInterval)
 	}
 	if err != nil {
 		err = fmt.Errorf("gtid-errant-reset-master: error while resetting master on %+v, after which intended to set gtid_purged to: %s. Error was: %+v", instance.Key, gtidSubtract, err)
 		goto Cleanup
 	}
+
+	masterStatusFound, executedGtidSet, err = ShowMasterStatus(instanceKey)
+	if err != nil {
+		err = fmt.Errorf("gtid-errant-reset-master: error getting master status on %+v, after which intended to set gtid_purged to: %s. Error was: %+v", instance.Key, gtidSubtract, err)
+		goto Cleanup
+	}
+	if !masterStatusFound {
+		err = fmt.Errorf("gtid-errant-reset-master: cannot get master status on %+v, after which intended to set gtid_purged to: %s.", instance.Key, gtidSubtract)
+		goto Cleanup
+	}
+	if executedGtidSet != "" {
+		err = fmt.Errorf("gtid-errant-reset-master: Unexpected non-empty Executed_Gtid_Set found on %+v following RESET MASTER, after which intended to set gtid_purged to: %s. Executed_Gtid_Set found to be: %+v", instance.Key, gtidSubtract, executedGtidSet)
+		goto Cleanup
+	}
+
 	// We've just made the destructive operation. Again, allow for retries:
 	for i := 0; i < countRetries; i++ {
 		err = setGTIDPurged(instance, gtidSubtract)
 		if err == nil {
 			break
 		}
+		time.Sleep(waitInterval)
 	}
 	if err != nil {
 		err = fmt.Errorf("gtid-errant-reset-master: error setting gtid_purged on %+v to: %s. Error was: %+v", instance.Key, gtidSubtract, err)
@@ -1311,7 +1352,9 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 Cleanup:
-	instance, _ = StartSlave(instanceKey)
+	var startSlaveErr error
+	instance, startSlaveErr = StartSlave(instanceKey)
+	log.Errore(startSlaveErr)
 
 	if err != nil {
 		return instance, log.Errore(err)
@@ -1584,29 +1627,20 @@ Cleanup:
 	return instance, err
 }
 
-// TakeSiblings is a convenience method for turning sublings of a replica to be its subordinates.
-// This uses normal connected replication (does not utilize Pseudo-GTID)
-func TakeSiblings(instanceKey *InstanceKey) (*Instance, int, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
+// TakeSiblings is a convenience method for turning siblings of a replica to be its subordinates.
+// This operation is a syntatctic sugar on top relocate-replicas, which uses any available means to the objective:
+// GTID, Pseudo-GTID, binlog servers, standard replication...
+func TakeSiblings(instanceKey *InstanceKey) (instance *Instance, takenSiblings int, err error) {
+	instance, err = ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, 0, err
 	}
-	masterInstance, found, err := ReadInstance(&instance.MasterKey)
-	if err != nil || !found {
-		return instance, 0, err
+	if !instance.IsReplica() {
+		return instance, takenSiblings, log.Errorf("take-siblings: instance %+v is not a replica.", *instanceKey)
 	}
-	siblings, err := ReadReplicaInstances(&masterInstance.Key)
-	if err != nil {
-		return instance, 0, err
-	}
-	takenSiblings := 0
-	for _, sibling := range siblings {
-		if _, err := MoveBelow(&sibling.Key, &instance.Key); err == nil {
-			takenSiblings++
-		}
-	}
+	relocatedReplicas, _, err, _ := RelocateReplicas(&instance.MasterKey, instanceKey, "")
 
-	return instance, takenSiblings, err
+	return instance, len(relocatedReplicas), err
 }
 
 // TakeMaster will move an instance up the chain and cause its master to become its replica.
@@ -2538,7 +2572,7 @@ func relocateBelowInternal(instance, other *Instance) (*Instance, error) {
 		return nil, log.Errorf("Relocating binlog server %+v below %+v turns to be too complex; please do it manually", instance.Key, other.Key)
 	}
 	// Next, try GTID
-	if _, _, canMove := canMoveViaGTID(instance, other); canMove {
+	if _, _, gtidCompatible := instancesAreGTIDAndCompatible(instance, other); gtidCompatible {
 		return moveInstanceBelowViaGTID(instance, other)
 	}
 
@@ -2648,7 +2682,8 @@ func relocateReplicasInternal(replicas [](*Instance), instance, other *Instance)
 		// Which replicas are using Pseudo GTID?
 		var pseudoGTIDReplicas [](*Instance)
 		for _, replica := range replicas {
-			if replica.UsingPseudoGTID {
+			_, _, hasToBeGTID := instancesAreGTIDAndCompatible(replica, other)
+			if replica.UsingPseudoGTID && !hasToBeGTID {
 				pseudoGTIDReplicas = append(pseudoGTIDReplicas, replica)
 			}
 		}

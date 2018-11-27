@@ -76,6 +76,8 @@ var readInstanceCounter = metrics.NewCounter()
 var writeInstanceCounter = metrics.NewCounter()
 var backendWrites = collection.CreateOrReturnCollection("BACKEND_WRITES")
 
+var emptyQuotesRegexp = regexp.MustCompile(`^""$`)
+
 func init() {
 	metrics.Register("instance.access_denied", accessDeniedCounter)
 	metrics.Register("instance.read_topology", readTopologyInstanceCounter)
@@ -272,7 +274,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	instanceFound := false
 	partialSuccess := false
 	foundByShowSlaveHosts := false
-	longRunningProcesses := []Process{}
 	resolvedHostname := ""
 	maxScaleMasterHostname := ""
 	isMaxScale := false
@@ -477,8 +478,8 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		instance.RelaylogCoordinates.LogFile = m.GetString("Relay_Log_File")
 		instance.RelaylogCoordinates.LogPos = m.GetInt64("Relay_Log_Pos")
 		instance.RelaylogCoordinates.Type = RelayLog
-		instance.LastSQLError = strconv.QuoteToASCII(m.GetString("Last_SQL_Error"))
-		instance.LastIOError = strconv.QuoteToASCII(m.GetString("Last_IO_Error"))
+		instance.LastSQLError = emptyQuotesRegexp.ReplaceAllString(strconv.QuoteToASCII(m.GetString("Last_SQL_Error")), "")
+		instance.LastIOError = emptyQuotesRegexp.ReplaceAllString(strconv.QuoteToASCII(m.GetString("Last_IO_Error")), "")
 		instance.SQLDelay = m.GetUintD("SQL_Delay", 0)
 		instance.UsingOracleGTID = (m.GetIntD("Auto_Position", 0) == 1)
 		instance.UsingMariaDBGTID = (m.GetStringD("Using_Gtid", "No") != "No")
@@ -771,17 +772,26 @@ Cleanup:
 	waitGroup.Wait()
 
 	if instanceFound {
-		instance.AncestryUUID = strings.Trim(fmt.Sprintf("%s,%s", instance.AncestryUUID, instance.ServerUUID), ",")
+		if instance.IsCoMaster {
+			// Take co-master into account, and avoid infinite loop
+			instance.AncestryUUID = fmt.Sprintf("%s,%s", instance.MasterUUID, instance.ServerUUID)
+		} else {
+			instance.AncestryUUID = fmt.Sprintf("%s,%s", instance.AncestryUUID, instance.ServerUUID)
+		}
+		instance.AncestryUUID = strings.Trim(instance.AncestryUUID, ",")
 		if instance.ExecutedGtidSet != "" && instance.masterExecutedGtidSet != "" {
 			// Compare master & replica GTID sets, but ignore the sets that present the master's UUID.
 			// This is because orchestrator may pool master and replica at an inconvenient timing,
 			// such that the replica may _seems_ to have more entries than the master, when in fact
 			// it's just that the naster's probing is stale.
-			// redactedExecutedGtidSet := redactGtidSetUUID(instance.ExecutedGtidSet, instance.MasterUUID)
-			// redactedMasterExecutedGtidSet := redactGtidSetUUID(instance.masterExecutedGtidSet, instance.MasterUUID)
 			redactedExecutedGtidSet, _ := NewOracleGtidSet(instance.ExecutedGtidSet)
 			for _, uuid := range strings.Split(instance.AncestryUUID, ",") {
 				if uuid != instance.ServerUUID {
+					redactedExecutedGtidSet.RemoveUUID(uuid)
+				}
+				if instance.IsCoMaster && uuid == instance.ServerUUID {
+					// If this is a co-master, then this server is likely to show its own generated GTIDs as errant,
+					// because its co-master has not applied them yet
 					redactedExecutedGtidSet.RemoveUUID(uuid)
 				}
 			}
@@ -809,7 +819,6 @@ Cleanup:
 		} else {
 			WriteInstance(instance, instanceFound, err)
 		}
-		WriteLongRunningProcesses(&instance.Key, longRunningProcesses)
 		lastAttemptedCheckTimer.Stop()
 		latency.Stop("backend")
 		return instance, nil
@@ -914,6 +923,7 @@ func ReadInstanceClusterAttributes(instance *Instance) (err error) {
 		if clusterName == clusterNameByInstanceKey {
 			// circular replication. Avoid infinite ++ on replicationDepth
 			replicationDepth = 0
+			ancestryUUID = ""
 		} // While the other stays "1"
 	}
 	instance.ClusterName = clusterName
@@ -2719,21 +2729,25 @@ func ResetInstanceRelaylogCoordinatesHistory(instanceKey *InstanceKey) error {
 
 // FigureClusterName will make a best effort to deduce a cluster name using either a given alias
 // or an instanceKey. First attempt is at alias, and if that doesn't work, we try instanceKey.
+// - clusterHint may be an empty string
 func FigureClusterName(clusterHint string, instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (clusterName string, err error) {
 	// Look for exact matches, first.
 
-	// Exact cluster name match:
-	if clusterInfo, err := ReadClusterInfo(clusterHint); err == nil && clusterInfo != nil {
-		return clusterInfo.ClusterName, nil
-	}
-	// Exact cluster alias match:
-	if clustersInfo, err := ReadClustersInfo(""); err == nil {
-		for _, clusterInfo := range clustersInfo {
-			if clusterInfo.ClusterAlias == clusterHint {
-				return clusterInfo.ClusterName, nil
+	if clusterHint != "" {
+		// Exact cluster name match:
+		if clusterInfo, err := ReadClusterInfo(clusterHint); err == nil && clusterInfo != nil {
+			return clusterInfo.ClusterName, nil
+		}
+		// Exact cluster alias match:
+		if clustersInfo, err := ReadClustersInfo(""); err == nil {
+			for _, clusterInfo := range clustersInfo {
+				if clusterInfo.ClusterAlias == clusterHint {
+					return clusterInfo.ClusterName, nil
+				}
 			}
 		}
 	}
+
 	clusterByInstanceKey := func(instanceKey *InstanceKey) (hasResult bool, clusterName string, err error) {
 		if instanceKey == nil {
 			return false, "", nil

@@ -50,7 +50,7 @@ promotion_rule=
 pool=
 hostname_flag=
 api_path=
-basic_auth=":"
+basic_auth="${ORCHESTRATOR_AUTH_USER:-}:${ORCHESTRATOR_AUTH_PASSWORD:-}"
 
 instance_hostport=
 destination_hostport=
@@ -58,6 +58,8 @@ default_port=3306
 
 api_response=
 api_details=
+
+unauthorized_401="401 Unauthorized"
 
 for arg in "$@"; do
   shift
@@ -102,18 +104,36 @@ do
   esac
 done
 
-function fail() {
+function fail {
   message="$myname[$$]: $1"
   >&2 echo "$message"
   exit 1
 }
 
-function check_requirements() {
+function check_requirements {
   which curl > /dev/null 2>&1 || fail "cannot find curl"
   which jq   > /dev/null 2>&1 || fail "cannot find jq"
 }
 
-function assert_nonempty() {
+function get_curl_auth_params {
+  local requires_auth=""
+
+  if [[ "${basic_auth}" != ":" ]]; then
+    requires_auth="--basic --user "${basic_auth}""
+
+    curl --help 2>&1 | fgrep -q 'disallow-username-in-url' && \
+      requires_auth+=" --disallow-username-in-url"
+  fi
+
+  # Test API access
+  curl "${basic_auth}" -s --head "${orchestrator_api}" 2>&1 | fgrep -q "$unauthorized_401" && \
+    echo "$unauthorized_401" && \
+    return
+
+  echo "${requires_auth}"
+}
+
+function assert_nonempty {
   name="$1"
   value="$2"
 
@@ -140,7 +160,7 @@ function to_hostport {
   fi
 }
 
-function normalize_orchestrator_api() {
+function normalize_orchestrator_api {
   api="${1:-$orchestrator_api}"
   api=${api%/}
   if [[ ! $api == *"/api" ]]; then
@@ -151,11 +171,17 @@ function normalize_orchestrator_api() {
 }
 
 
-function detect_leader_api() {
+function detect_leader_api {
   # $orchestrator_api may be a single URI (e.g. "http://orchestrator.service/api")
   # - in which case we just normalize the URL
   # or it may be a space delimited list, such as "http://host1:3000/api http://host2:3000/api http://host3:3000/api "
   # - in which case we figure out which of the URLs is the leader
+  local curl_auth_params="$(get_curl_auth_params)"
+
+  if [ "${curl_auth_params}" == "$unauthorized_401" ] ; then
+    fail "Cannot access orchestrator at ${orchestrator_api}.  Check ORCHESTRATOR_API is configured correctly and orchestrator is running"
+  fi
+
   leader_api=
   apis=($orchestrator_api)
   if [ ${#apis[@]} -eq 1 ] ; then
@@ -164,7 +190,7 @@ function detect_leader_api() {
   fi
   for api in ${apis[@]} ; do
     api=$(normalize_orchestrator_api $api)
-    leader_check=$(curl --basic --user "${basic_auth}" -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
+    leader_check=$(curl ${curl_auth_params} -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
     if [ "$leader_check" == "200" ] ; then
       leader_api="$api"
       return
@@ -173,12 +199,14 @@ function detect_leader_api() {
   fail "Cannot determine leader from $orchestrator_api"
 }
 
-function urlencode() {
+function urlencode {
   uri="$1"
   echo "$uri" | jq -s -R -r @uri | tr -d '\n'
 }
 
-function api() {
+function api {
+  local curl_auth_params="$(get_curl_auth_params)"
+
   path="$1"
 
   uri="$leader_api/$path"
@@ -186,12 +214,16 @@ function api() {
   set -o pipefail
 
   api_call_result=0
-  for sleep_time in 0.1 0.2 0.5 1 2 2.5 5 0 ; do
-    api_response=$(curl --basic --user "${basic_auth}" -s "$uri" | jq '.')
-    api_call_result=$?
-    [ $api_call_result -eq 0 ] && break
-    sleep $sleep_time
-  done
+  if [[ ${curl_auth_params} != "401 Unauthorized" ]]; then
+    for sleep_time in 0.1 0.2 0.5 1 2 2.5 5 0 ; do
+      api_response=$(curl ${curl_auth_params} -s "$uri" | jq '.')
+      api_call_result=$?
+      [ $api_call_result -eq 0 ] && break
+      sleep $sleep_time
+    done
+  else
+    api_call_result=1
+  fi
   if [ $api_call_result -ne 0 ] ; then
     fail "Cannot access orchestrator at ${leader_api}.  Check ORCHESTRATOR_API is configured correctly and orchestrator is running"
   fi
@@ -233,21 +265,29 @@ function filter_keys {
   cat - | jq '.[] | .Key'
 }
 
+function filter_broken_replicas {
+  cat - | jq '.[] | select((.Slave_SQL_Running == false or .Slave_IO_Running == false) and (.LastSQLError != "" or .LastIOError != "")) | [.]'
+}
+
+function filter_running_replicas {
+  cat - | jq '.[] | select(.Slave_SQL_Running == true and .Slave_IO_Running == true) | [.]'
+}
+
 function print_key {
   cat - | jq -r '. | (.Hostname + ":" + (.Port | tostring))'
 }
 
-function which_api() {
+function which_api {
   echo "$leader_api"
 }
 
-function api_call() {
+function api_call {
   assert_nonempty "path" "$api_path"
   api "$api_path"
   print_response
 }
 
-function prompt_help() {
+function prompt_help {
   echo "Usage: orchestrator-client -c <command> [flags...]"
   echo "Example: orchestrator-client -c which-master -i some.replica"
   echo "Options:"
@@ -284,44 +324,44 @@ function prompt_help() {
   cat "$0" | sed -n '/run_command/,/esac/p' | egrep '".*"[)].*;;' | sed -r -e 's/"(.*?)".*#(.*)/\1~\2/' | column -t -s "~"
 }
 
-function async_discover() {
+function async_discover {
   assert_nonempty "instance" "$instance_hostport"
   api "async-discover/$instance_hostport"
   print_details | filter_key | print_key
 }
 
-function discover() {
+function discover {
   assert_nonempty "instance" "$instance_hostport"
   api "discover/$instance_hostport"
   print_details | filter_key | print_key
 }
 
-function ascii_topology() {
+function ascii_topology {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "topology/${alias:-$instance}"
   echo "$api_response" | jq -r '.Details'
 }
 
-function ascii_topology_tabulated() {
+function ascii_topology_tabulated {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "topology-tabulated/${alias:-$instance}"
   echo "$api_response" | jq -r '.Details'
 }
 
-function search() {
+function search {
   assert_nonempty "instance" "$instance"
   api "search?s=$(urlencode "$instance")"
   print_response | filter_keys | print_key
 }
 
-function restart_replica_statements() {
+function restart_replica_statements {
   assert_nonempty "instance" "$instance"
   assert_nonempty "query" "$query"
   api "restart-replica-statements/${instance_hostport}?q=$(urlencode "$query")"
   print_response | print_details
 }
 
-function can_replicate_from() {
+function can_replicate_from {
   assert_nonempty "instance" "$instance_hostport"
   assert_nonempty "destination" "$destination_hostport"
   api "can-replicate-from/$instance_hostport/$destination_hostport"
@@ -331,108 +371,130 @@ function can_replicate_from() {
   fi
 }
 
-function is_replicating() {
+function can_replicate_from_gtid {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "destination" "$destination_hostport"
+  api "can-replicate-from-gtid/$instance_hostport/$destination_hostport"
+
+  if print_response | jq -r '.Message' | grep -q "true" ; then
+    print_response | print_details | print_key
+  fi
+}
+
+function is_replicating {
   assert_nonempty "instance" "$instance_hostport"
   api "instance/$instance_hostport"
 
   print_response | jq '. | select(.Slave_SQL_Running==true and .Slave_IO_Running==true)' | filter_key | print_key
 }
 
-function last_pseudo_gtid() {
+function last_pseudo_gtid {
   assert_nonempty "instance" "$instance_hostport"
   api "last-pseudo-gtid/$instance_hostport"
   print_response | print_details | jq -r '.'
 }
 
-function instance() {
+function instance {
   assert_nonempty "instance" "$instance_hostport"
   api "instance/$instance_hostport"
   print_response | filter_key | print_key
 }
 
-function which_master() {
+function which_master {
   assert_nonempty "instance" "$instance_hostport"
   api "instance/$instance_hostport"
   print_response | filter_master_key | print_key
 }
 
-function which_replicas() {
+function which_replicas {
   assert_nonempty "instance" "$instance_hostport"
   api "instance-replicas/$instance_hostport"
   print_response | filter_keys | print_key
 }
 
-function which_cluster() {
+function which_broken_replicas {
+  assert_nonempty "instance" "$instance_hostport"
+  api "instance-replicas/$instance_hostport"
+  print_response | filter_broken_replicas | filter_keys | print_key
+}
+
+function which_cluster {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "cluster-info/${alias:-$instance}"
   print_response | jq -r '.ClusterName'
 }
 
-function which_cluster_master() {
+function which_cluster_master {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "master/${alias:-$instance}"
   print_response | jq -r '.ClusterName'
 }
 
-function which_cluster_instances() {
+function which_cluster_instances {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "cluster/${alias:-$instance}"
   print_response | filter_keys | print_key
 }
 
-function all_clusters_masters() {
+function all_clusters_masters {
   api "masters"
   print_response | filter_keys | print_key
 }
 
-function clusters() {
+function clusters {
   api "clusters-info"
   print_response | jq -r '.[].ClusterName'
 }
 
-function clusters_alias() {
+function clusters_alias {
   api "clusters-info"
   print_response | jq -r '.[] | (.ClusterName + "," + .ClusterAlias)'
 }
 
-function forget() {
+function forget {
   assert_nonempty "instance" "$instance_hostport"
   api "forget/$instance_hostport"
 }
 
-function forget_cluster() {
+function forget_cluster {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "forget-cluster/${alias:-$instance}"
 }
 
 
-function all_instances() {
+function all_instances {
   api "all-instances"
   print_response | filter_keys | print_key
 }
 
-function which_cluster_osc_replicas() {
+function which_cluster_osc_replicas {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "cluster-osc-replicas/${alias:-$instance}"
   print_response | filter_keys | print_key
 }
 
-function downtimed() {
+function which_cluster_osc_running_replicas {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "cluster-osc-replicas/${alias:-$instance}"
+  print_response | filter_running_replicas | filter_keys | print_key
+}
+
+function downtimed {
   api "downtimed/${alias:-$instance}"
   print_response | filter_keys | print_key
 }
 
-function dominant_dc() {
+function dominant_dc {
   api "masters"
   print_response | jq -r '.[].DataCenter' | sort | uniq -c | sort -nr | head -n 1 | awk '{print $2}'
 }
 
-function submit_masters_to_kv_stores() {
+function submit_masters_to_kv_stores {
   api "submit-masters-to-kv-stores/${alias}"
   print_details | jq -r '.[] | (.Key + ":" + .Value)'
 }
 
-function submit_pool_instances() {
+function submit_pool_instances {
   # 'instance' is comma delimited, e.g.
   #   myinstance1.com:3306,myinstance2.com:3306,myinstance3.com:3306
   assert_nonempty "instance" "$instance"
@@ -441,14 +503,14 @@ function submit_pool_instances() {
   print_details | jq -r .
 }
 
-function which_heuristic_cluster_pool_instances() {
+function which_heuristic_cluster_pool_instances {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   # pool is optional
   api "heuristic-cluster-pool-instances/${alias:-$instance}/${pool}"
   print_details | filter_keys | print_key
 }
 
-function begin_downtime() {
+function begin_downtime {
   assert_nonempty "instance" "$instance_hostport"
   assert_nonempty "owner" "$owner"
   assert_nonempty "reason" "$reason"
@@ -457,13 +519,13 @@ function begin_downtime() {
   print_details | print_key
 }
 
-function end_downtime() {
+function end_downtime {
   assert_nonempty "instance" "$instance_hostport"
   api "end-downtime/$instance_hostport"
   print_details | print_key
 }
 
-function begin_maintenance() {
+function begin_maintenance {
   assert_nonempty "instance" "$instance_hostport"
   assert_nonempty "owner" "$owner"
   assert_nonempty "reason" "$reason"
@@ -471,33 +533,33 @@ function begin_maintenance() {
   print_details | print_key
 }
 
-function end_maintenance() {
+function end_maintenance {
   assert_nonempty "instance" "$instance_hostport"
   api "end-maintenance/$instance_hostport"
   print_details | print_key
 }
 
-function register_candidate() {
+function register_candidate {
   assert_nonempty "instance" "$instance_hostport"
   assert_nonempty "promotion-rule" "$promotion_rule"
   api "register-candidate/$instance_hostport/$promotion_rule"
   print_details | print_key
 }
 
-function register_hostname_unresolve() {
+function register_hostname_unresolve {
   assert_nonempty "instance" "$instance_hostport"
   assert_nonempty "hostname" "$hostname_flag"
   api "register-hostname-unresolve/$instance_hostport/$hostname_flag"
   print_details | print_key
 }
 
-function deregister_hostname_unresolve() {
+function deregister_hostname_unresolve {
   assert_nonempty "instance" "$instance_hostport"
   api "deregister-hostname-unresolve/$instance_hostport"
   print_details | print_key
 }
 
-function general_singular_relocate_command() {
+function general_singular_relocate_command {
   path="${1:-$command}"
 
   assert_nonempty "instance" "$instance_hostport"
@@ -505,7 +567,7 @@ function general_singular_relocate_command() {
   echo "$(print_details | filter_key | print_key)<$(print_details | filter_master_key | print_key)"
 }
 
-function general_relocate_command() {
+function general_relocate_command {
   path="${1:-$command}"
 
   assert_nonempty "instance" "$instance_hostport"
@@ -514,7 +576,7 @@ function general_relocate_command() {
   echo "$(print_details | filter_key | print_key)<$(print_details | filter_master_key | print_key)"
 }
 
-function general_singular_relocate_replicas_command() {
+function general_singular_relocate_replicas_command {
   path="${1:-$command}"
 
   assert_nonempty "instance" "$instance_hostport"
@@ -522,7 +584,7 @@ function general_singular_relocate_replicas_command() {
   print_details | filter_keys | print_key
 }
 
-function general_relocate_replicas_command() {
+function general_relocate_replicas_command {
   path="${1:-$command}"
 
   assert_nonempty "instance" $instance_hostport
@@ -531,21 +593,21 @@ function general_relocate_replicas_command() {
   print_details | filter_keys | print_key
 }
 
-function relocate() {
+function relocate {
   assert_nonempty "instance" "$instance_hostport"
   assert_nonempty "destination" "$destination_hostport"
   api "relocate/$instance_hostport/$destination_hostport"
   echo "$(print_details | filter_key | print_key)<$(print_details | filter_master_key | print_key)"
 }
 
-function relocate_replicas() {
+function relocate_replicas {
   assert_nonempty "instance" $instance_hostport
   assert_nonempty "destination" $destination_hostport
   api "relocate-replicas/$instance_hostport/$destination_hostport"
   print_details | filter_keys | print_key
 }
 
-function general_instance_command() {
+function general_instance_command {
   path="${1:-$command}"
 
   assert_nonempty "instance" "$instance_hostport"
@@ -553,7 +615,7 @@ function general_instance_command() {
   print_details | filter_key | print_key
 }
 
-function replication_analysis() {
+function replication_analysis {
   api "replication-analysis"
   print_details | jq -r '.[] |
     if .Analysis == "NoProblem" then
@@ -564,13 +626,13 @@ function replication_analysis() {
     '
 }
 
-function recover() {
+function recover {
   assert_nonempty "instance" "$instance_hostport"
   api "recover/$instance_hostport"
   print_details | print_key
 }
 
-function graceful_master_takeover() {
+function graceful_master_takeover {
   assert_nonempty "instance|alias" "${alias:-$instance}"
 
   if [ -z "$destination_hostport" ] ; then
@@ -583,41 +645,41 @@ function graceful_master_takeover() {
   print_details | jq '.SuccessorKey' | print_key
 }
 
-function force_master_failover() {
+function force_master_failover {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "force-master-failover/${alias:-$instance}"
   print_details | jq '.SuccessorKey' | print_key
 }
 
-function ack_cluster_recoveries() {
+function ack_cluster_recoveries {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   assert_nonempty "reason" "$reason"
   api "ack-recovery/cluster/${alias:-$instance}?comment=$(urlencode $reason)"
   print_details | jq -r .
 }
 
-function ack_all_recoveries() {
+function ack_all_recoveries {
   assert_nonempty "reason" "$reason"
   api "ack-all-recoveries?comment=$(urlencode $reason)"
   print_details | jq -r .
 }
 
-function disable_global_recoveries() {
+function disable_global_recoveries {
   api "disable-global-recoveries"
   print_details | jq -r .
 }
 
-function enable_global_recoveries() {
+function enable_global_recoveries {
   api "enable-global-recoveries"
   print_details | jq -r .
 }
 
-function check_global_recoveries() {
+function check_global_recoveries {
   api "check-global-recoveries"
   print_details | jq -r .
 }
 
-function raft_leader() {
+function raft_leader {
   api "raft-state"
   if print_response | jq -r . | grep -q Leader ; then
     # confirmed raft is running well
@@ -628,12 +690,12 @@ function raft_leader() {
   fi
 }
 
-function raft_health() {
+function raft_health {
   api "raft-health"
   print_response | jq -r '.'
 }
 
-function raft_leader_hostname() {
+function raft_leader_hostname {
   api "raft-state"
   if print_response | jq -r . | grep -q Leader ; then
     # confirmed raft is running well
@@ -645,7 +707,7 @@ function raft_leader_hostname() {
 }
 
 # raft_elect_leader elects the raft leader by using --hostname as hint
-function raft_elect_leader() {
+function raft_elect_leader {
   assert_nonempty "hostname" "$hostname_flag"
   api "raft-state"
   if print_response | jq -r . | grep -q Leader ; then
@@ -657,7 +719,7 @@ function raft_elect_leader() {
   fi
 }
 
-function run_command() {
+function run_command {
   if [ -z "$command" ] ; then
     fail "No command given. Use $myname -c <command> [...] or $myname --command <command> [...] to do something useful"
   fi
@@ -682,12 +744,14 @@ function run_command() {
     "instance"|"which-instance") instance ;;                    # Output the fully-qualified hostname:port representation of the given instance, or error if unknown
     "which-master") which_master ;;                             # Output the fully-qualified hostname:port representation of a given instance's master
     "which-replicas") which_replicas ;;                         # Output the fully-qualified hostname:port list of replicas of a given instance
+    "which-broken-replicas") which_broken_replicas ;;           # Output the fully-qualified hostname:port list of broken replicas of a given instance
     "which-cluster-instances") which_cluster_instances ;;       # Output the list of instances participating in same cluster as given instance
     "which-cluster") which_cluster ;;                           # Output the name of the cluster an instance belongs to, or error if unknown to orchestrator
     "which-cluster-master") which_cluster_master ;;             # Output the name of a writable master in given cluster
     "all-clusters-masters") all_clusters_masters ;;             # List of writeable masters, one per cluster
     "all-instances") all_instances ;;                           # The complete list of known instances
     "which-cluster-osc-replicas") which_cluster_osc_replicas ;; # Output a list of replicas in a cluster, that could serve as a pt-online-schema-change operation control replicas
+    "which-cluster-osc-running-replicas") which_cluster_osc_running_replicas ;; # Output a list of healthy, replicating replicas in a cluster, that could serve as a pt-online-schema-change operation control replicas
     "downtimed") downtimed ;;                                   # List all downtimed instances
     "dominant-dc") dominant_dc ;;                               # Name the data center where most masters are found
 
@@ -706,13 +770,13 @@ function run_command() {
     "move-up-replicas") general_singular_relocate_replicas_command ;;  # Moves replicas of the given instance one level up the topology
     "make-co-master") general_singular_relocate_command ;;             # Create a master-master replication. Given instance is a replica which replicates directly from a master.
     "take-master") general_singular_relocate_command ;;                # Turn an instance into a master of its own master; essentially switch the two.
-    "take-siblings") general_singular_relocate_command ;;              # Turn all siblings of a replica into its sub-replicas.
 
     "move-gtid") general_relocate_command ;;                           # Move a replica beneath another instance via GTID
     "move-replicas-gtid") general_relocate_replicas_command ;;         # Moves all replicas of a given instance under another (destination) instance using GTID
 
     "repoint") general_relocate_command ;;                             # Make the given instance replicate from another instance without changing the binglog coordinates. Use with care
     "repoint-replicas") general_singular_relocate_replicas_command ;;  # Repoint all replicas of given instance to replicate back from the instance. Use with care
+    "take-siblings") general_singular_relocate_command ;;              # Turn all siblings of a replica into its sub-replicas.
 
     "submit-pool-instances") submit_pool_instances ;;                  # Submit a pool name with a list of instances in that pool
     "which-heuristic-cluster-pool-instances") which_heuristic_cluster_pool_instances ;; # List instances of a given cluster which are in either any pool or in a specific pool
@@ -742,8 +806,9 @@ function run_command() {
     "disable-semi-sync-replica") general_instance_command ;;    # Disable semi-sync (replica-side)
     "restart-replica-statements") restart_replica_statements ;; # Given `-q "<query>"` that requires replication restart to apply, wrap query with stop/start slave statements as required to restore instance to same replication state. Print out set of statements
 
-    "can-replicate-from") can_replicate_from ;; # Check if an instance can potentially replicate from another, according to replication rules
-    "is-replicating") is_replicating ;;         # Check if an instance is replicating at this time (both SQL and IO threads running)
+    "can-replicate-from") can_replicate_from ;;           # Check if an instance can potentially replicate from another, according to replication rules
+    "can-replicate-from-gtid") can_replicate_from_gtid ;; # Check if an instance can potentially replicate from another, according to replication rules and assuming Oracle GTID
+    "is-replicating") is_replicating ;;                   # Check if an instance is replicating at this time (both SQL and IO threads running)
 
     "set-read-only") general_instance_command ;;     # Turn an instance read-only, via SET GLOBAL read_only := 1
     "set-writeable") general_instance_command ;;     # Turn an instance writeable, via SET GLOBAL read_only := 0
@@ -770,7 +835,7 @@ function run_command() {
   esac
 }
 
-function main() {
+function main {
   check_requirements
   detect_leader_api
 

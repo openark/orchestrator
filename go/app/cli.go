@@ -240,6 +240,18 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				}
 			}
 		}
+	case registerCliCommand("take-siblings", "Smart relocation", `Turn all siblings of a replica into its sub-replicas.`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			if instanceKey == nil {
+				log.Fatal("Cannot deduce instance:", instance)
+			}
+			_, _, err := inst.TakeSiblings(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(instanceKey.DisplayString())
+		}
 	case registerCliCommand("regroup-replicas", "Smart relocation", `Given an instance, pick one of its replicas and make it local master of its siblings`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
@@ -339,18 +351,6 @@ func Cli(command string, strict bool, instance string, destination string, owner
 					fmt.Println(fmt.Sprintf("%s<%s", replica.Key.DisplayString(), instanceKey.DisplayString()))
 				}
 			}
-		}
-	case registerCliCommand("take-siblings", "Classic file:pos relocation", `Turn all siblings of a replica into its sub-replicas.`):
-		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			if instanceKey == nil {
-				log.Fatal("Cannot deduce instance:", instance)
-			}
-			_, _, err := inst.TakeSiblings(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			fmt.Println(instanceKey.DisplayString())
 		}
 	case registerCliCommand("take-master", "Classic file:pos relocation", `Turn an instance into a master of its own master; essentially switch the two.`):
 		{
