@@ -50,7 +50,7 @@ func (this *internalKVStore) GetKeyValue(key string) (value string, err error) {
 		from
 			kv_store
 		where
-      key = ?
+      store_key = ?
 		`
 
 	err = db.QueryOrchestrator(query, sqlutils.Args(key), func(m sqlutils.RowMap) error {
