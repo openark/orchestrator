@@ -1413,20 +1413,6 @@ function Cluster() {
       });
     }
     {
-      var content = '';
-      if (clusterInfo.HasAutomatedMasterRecovery === true) {
-        content += '<span class="glyphicon glyphicon-heart text-info" title="Automated master recovery for this cluster ENABLED"></span>';
-      } else {
-        content += '<span class="glyphicon glyphicon-heart text-muted pull-right" title="Automated master recovery for this cluster DISABLED"></span>';
-      }
-      if (clusterInfo.HasAutomatedIntermediateMasterRecovery === true) {
-        content += '<span class="glyphicon glyphicon-heart-empty text-info" title="Automated intermediate master recovery for this cluster ENABLED"></span>';
-      } else {
-        content += '<span class="glyphicon glyphicon-heart-empty text-muted pull-right" title="Automated intermediate master recovery for this cluster DISABLED"></span>';
-      }
-      addSidebarInfoPopoverContent(content, "glyphs", false);
-    }
-    {
       var content = currentClusterName();
       addSidebarInfoPopoverContent(content, "cluster-name", true);
     }
@@ -1733,6 +1719,20 @@ function Cluster() {
 
       if (!isAnonymized()) {
         $("#cluster_name").text(visualAlias);
+        var clusterSubtitle = '';
+        if (clusterInfo.HasAutomatedMasterRecovery === true) {
+          clusterSubtitle += '<span class="glyphicon glyphicon-heart text-info" title="Automated master recovery for this cluster ENABLED"></span>';
+        } else {
+          clusterSubtitle += '<span class="glyphicon glyphicon-heart text-muted pull-right" title="Automated master recovery for this cluster DISABLED"></span>';
+        }
+        if (clusterInfo.HasAutomatedIntermediateMasterRecovery === true) {
+          clusterSubtitle += '<span class="glyphicon glyphicon-heart-empty text-info" title="Automated intermediate master recovery for this cluster ENABLED"></span>';
+        } else {
+          clusterSubtitle += '<span class="glyphicon glyphicon-heart-empty text-muted pull-right" title="Automated intermediate master recovery for this cluster DISABLED"></span>';
+        }
+        $("#cluster_subtitle").append(clusterSubtitle)
+
+
         $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="' + clusterInfo.ClusterAlias + '">Alias: ' + alias + '</a></li>');
       }
       $("#dropdown-context").append('<li><a href="' + appUrl('/web/cluster-pools/' + currentClusterName()) + '">Pools</a></li>');
