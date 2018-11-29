@@ -17,6 +17,8 @@
 package inst
 
 import (
+	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -24,20 +26,89 @@ type Tag struct {
 	TagName  string
 	TagValue string
 	HasValue bool
+	Negate   bool
 }
 
-func ParseTag(tagString string) *Tag {
-	tokens := strings.SplitN(tagString, "=", 2)
-	tagName := tokens[0]
+var (
+	negateTagEqualsRegexp = regexp.MustCompile("^~([^=]+)=(.*)$")
+	TagEqualsRegexp       = regexp.MustCompile("^([^=]+)=(.*)$")
+	negateTagExistsRegexp = regexp.MustCompile("^~([^=]+)$")
+	tagExistsRegexp       = regexp.MustCompile("^([^=]+)$")
+)
+
+func NewTag(tagName string, tagValue string) (*Tag, error) {
+	tagName = strings.TrimSpace(tagName)
 	if tagName == "" {
-		return nil
+		return nil, fmt.Errorf("NewTag: empty tag name")
 	}
-	tag := &Tag{
-		TagName: tagName,
+	return &Tag{TagName: tagName, TagValue: tagValue}, nil
+}
+
+func ParseTag(tagString string) (*Tag, error) {
+	tagString = strings.Replace(tagString, "!", "~", -1)
+	tagString = strings.TrimSpace(tagString)
+
+	if submatch := negateTagEqualsRegexp.FindStringSubmatch(tagString); len(submatch) > 0 {
+		return &Tag{
+			TagName:  submatch[1],
+			TagValue: submatch[2],
+			HasValue: true,
+			Negate:   true,
+		}, nil
+	} else if submatch := TagEqualsRegexp.FindStringSubmatch(tagString); len(submatch) > 0 {
+		return &Tag{
+			TagName:  submatch[1],
+			TagValue: submatch[2],
+			HasValue: true,
+		}, nil
+	} else if submatch := negateTagExistsRegexp.FindStringSubmatch(tagString); len(submatch) > 0 {
+		return &Tag{
+			TagName: submatch[1],
+			Negate:  true,
+		}, nil
+	} else if submatch := tagExistsRegexp.FindStringSubmatch(tagString); len(submatch) > 0 {
+		return &Tag{
+			TagName: submatch[1],
+		}, nil
 	}
-	if len(tokens) == 2 {
-		tag.HasValue = true
-		tag.TagValue = tokens[1]
+	return nil, fmt.Errorf("Unable to parse tag: %s", tagString)
+}
+
+func (tag *Tag) String() string {
+	return fmt.Sprintf("%s=%s", tag.TagName, tag.TagValue)
+}
+
+func ParseIntersectTags(tagsString string) (tags [](*Tag), err error) {
+	for _, tagString := range strings.Split(tagsString, ",") {
+		tag, err := ParseTag(tagString)
+		if err != nil {
+			return tags, err
+		}
+		tags = append(tags, tag)
 	}
-	return tag
+	return tags, nil
+}
+
+type InstanceTag struct {
+	Key InstanceKey
+	T   Tag
+}
+
+func GetInstanceKeysByTags(tagsString string) (tagged *InstanceKeyMap, err error) {
+	tags, err := ParseIntersectTags(tagsString)
+	if err != nil {
+		return tagged, err
+	}
+	for i, tag := range tags {
+		taggedByTag, err := GetInstanceKeysByTag(tag)
+		if err != nil {
+			return tagged, err
+		}
+		if i == 0 {
+			tagged = taggedByTag
+		} else {
+			tagged = tagged.Intersect(taggedByTag)
+		}
+	}
+	return tagged, nil
 }

@@ -47,6 +47,7 @@ owner="$(whoami | xargs)"
 reason=
 duration="10m"
 promotion_rule=
+tag=
 pool=
 hostname_flag=
 api_path=
@@ -71,6 +72,7 @@ for arg in "$@"; do
     "-reason"|"--reason")                 set -- "$@" "-r" ;;
     "-promotion-rule"|"--promotion-rule") set -- "$@" "-R" ;;
     "-duration"|"--duration")             set -- "$@" "-u" ;;
+    "-tag"|"--tag")                       set -- "$@" "-t" ;;
     "-pool"|"--pool")                     set -- "$@" "-l" ;;
     "-hostname"|"--hostname")             set -- "$@" "-H" ;;
     "-api"|"--api")                       set -- "$@" "-U" ;;
@@ -81,7 +83,7 @@ for arg in "$@"; do
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:P:q:b:h" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:t:l:H:P:q:b:h" OPTION
 do
   case $OPTION in
     h) command="help" ;;
@@ -94,6 +96,7 @@ do
     r) reason="$OPTARG" ;;
     u) duration="$OPTARG" ;;
     R) promotion_rule="$OPTARG" ;;
+    t) tag="$OPTARG" ;;
     l) pool="$OPTARG" ;;
     H) hostname_flag="$OPTARG" ;;
     D) default_port="$OPTARG" ;;
@@ -275,6 +278,10 @@ function filter_running_replicas {
 
 function print_key {
   cat - | jq -r '. | (.Hostname + ":" + (.Port | tostring))'
+}
+
+function print_keys {
+  cat - | jq -r '.[]' | print_key
 }
 
 function which_api {
@@ -487,6 +494,44 @@ function downtimed {
 function dominant_dc {
   api "masters"
   print_response | jq -r '.[].DataCenter' | sort | uniq -c | sort -nr | head -n 1 | awk '{print $2}'
+}
+
+function tags {
+  assert_nonempty "instance" "$instance_hostport"
+  api "tags/$instance_hostport"
+
+  print_response | jq -r '.[]'
+}
+
+function tag {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "tag" "$tag"
+  api "tag/${instance_hostport}?tag=$(urlencode "$tag")"
+
+  print_details | print_key
+}
+
+function untag {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "tag" "$tag"
+  api "untag/${instance_hostport}/$tag"
+
+  print_details | print_key
+}
+
+function tag {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "tag" "$tag"
+  api "tag/${instance_hostport}?tag=$(urlencode "$tag")"
+
+  print_details | print_key
+}
+
+function tagged {
+  assert_nonempty "tag" "$tag"
+  api "tagged/${instance_hostport}?tag=$(urlencode "$tag")"
+
+  print_response | print_keys
 }
 
 function submit_masters_to_kv_stores {
@@ -777,6 +822,11 @@ function run_command {
     "repoint") general_relocate_command ;;                             # Make the given instance replicate from another instance without changing the binglog coordinates. Use with care
     "repoint-replicas") general_singular_relocate_replicas_command ;;  # Repoint all replicas of given instance to replicate back from the instance. Use with care
     "take-siblings") general_singular_relocate_command ;;              # Turn all siblings of a replica into its sub-replicas.
+
+    "tags") tags ;;                  # Submit a pool name with a list of instances in that pool
+    "tag") tag ;;                  # Submit a pool name with a list of instances in that pool
+    "untag") untag ;;                  # Submit a pool name with a list of instances in that pool
+    "tagged") tagged ;;                  # Submit a pool name with a list of instances in that pool
 
     "submit-pool-instances") submit_pool_instances ;;                  # Submit a pool name with a list of instances in that pool
     "which-heuristic-cluster-pool-instances") which_heuristic_cluster_pool_instances ;; # List instances of a given cluster which are in either any pool or in a specific pool

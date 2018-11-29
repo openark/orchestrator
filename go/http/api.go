@@ -1770,6 +1770,98 @@ func (this *HttpAPI) ClustersInfo(params martini.Params, r render.Render, req *h
 	r.JSON(http.StatusOK, clustersInfo)
 }
 
+// Tags lists existing tags for a given instance
+func (this *HttpAPI) Tags(params martini.Params, r render.Render, req *http.Request) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	tags, err := inst.ReadInstanceTags(&instanceKey)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	tagStrings := []string{}
+	for _, tag := range tags {
+		tagStrings = append(tagStrings, tag.String())
+	}
+	r.JSON(http.StatusOK, tagStrings)
+}
+
+// Tagged return instance keys tagged by "tag" query param
+func (this *HttpAPI) Tagged(params martini.Params, r render.Render, req *http.Request) {
+	tagsString := req.URL.Query().Get("tag")
+	instanceKeyMap, err := inst.GetInstanceKeysByTags(tagsString)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	r.JSON(http.StatusOK, instanceKeyMap.GetInstanceKeys())
+}
+
+// Tags adds a tag to a given instance
+func (this *HttpAPI) Tag(params martini.Params, r render.Render, req *http.Request) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	var tag *inst.Tag
+	tagString := req.URL.Query().Get("tag")
+	if tagString != "" {
+		tag, err = inst.ParseTag(tagString)
+	} else {
+		tag, err = inst.NewTag(params["tagName"], params["tagValue"])
+	}
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	if orcraft.IsRaftEnabled() {
+		_, err = orcraft.PublishCommand("put-instance-tag", inst.InstanceTag{Key: instanceKey, T: *tag})
+	} else {
+		err = inst.PutInstanceTag(&instanceKey, tag)
+	}
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("%+v tagged with %s", instanceKey, tag.String()), Details: instanceKey})
+}
+
+// Untag removes a tag from an instance
+func (this *HttpAPI) Untag(params martini.Params, r render.Render, req *http.Request) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	var tag *inst.Tag
+	tagString := req.URL.Query().Get("tag")
+	if tagString != "" {
+		tag, err = inst.ParseTag(tagString)
+	} else {
+		tag, err = inst.NewTag(params["tagName"], "")
+	}
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	existed, err := inst.DeleteInstanceTag(&instanceKey, tag)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("%s existed on %+v: %+v", tag.TagName, instanceKey, existed), Details: instanceKey})
+}
+
 // Write a cluster's master (or all clusters masters) to kv stores.
 // This should generally only happen once in a lifetime of a cluster. Otherwise KV
 // stores are updated via failovers.
@@ -3452,6 +3544,14 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	// Key-value:
 	this.registerAPIRequest(m, "submit-masters-to-kv-stores", this.SubmitMastersToKvStores)
 	this.registerAPIRequest(m, "submit-masters-to-kv-stores/:clusterHint", this.SubmitMastersToKvStores)
+
+	// Tags:
+	this.registerAPIRequest(m, "tagged", this.Tagged)
+	this.registerAPIRequest(m, "tags/:host/:port", this.Tags)
+	this.registerAPIRequest(m, "tag/:host/:port", this.Tag)
+	this.registerAPIRequest(m, "tag/:host/:port/:tagName/:tagValue", this.Tag)
+	this.registerAPIRequest(m, "untag/:host/:port", this.Untag)
+	this.registerAPIRequest(m, "untag/:host/:port/:tagName", this.Untag)
 
 	// Instance management:
 	this.registerAPIRequest(m, "instance/:host/:port", this.Instance)

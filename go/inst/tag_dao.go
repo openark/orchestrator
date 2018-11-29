@@ -24,11 +24,11 @@ import (
 	"github.com/openark/golib/sqlutils"
 )
 
-func SetInstanceTag(instanceKey *InstanceKey, tag *Tag) (err error) {
+func PutInstanceTag(instanceKey *InstanceKey, tag *Tag) (err error) {
 	_, err = db.ExecOrchestrator(`
 			insert
 				into database_instance_tags (
-					hostname, port, tag_name, tag_value, last_updated,
+					hostname, port, tag_name, tag_value, last_updated
 				) VALUES (
 					?, ?, ?, ?, NOW()
 				)
@@ -90,16 +90,56 @@ func ReadInstanceTag(instanceKey *InstanceKey, tag *Tag) (tagExists bool, err er
 	return tagExists, log.Errore(err)
 }
 
+func ReadInstanceTags(instanceKey *InstanceKey) (tags [](*Tag), err error) {
+	tags = [](*Tag){}
+	query := `
+		select
+			tag_name, tag_value
+		from
+			database_instance_tags
+		where
+			hostname = ?
+			and port = ?
+			`
+	args := sqlutils.Args(instanceKey.Hostname, instanceKey.Port)
+	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
+		tag := &Tag{
+			TagName:  m.GetString("tag_name"),
+			TagValue: m.GetString("tag_value"),
+		}
+		tags = append(tags, tag)
+		return nil
+	})
+
+	return tags, log.Errore(err)
+}
+
 func InstanceTagExists(instanceKey *InstanceKey, tag *Tag) (tagExists bool, err error) {
 	return ReadInstanceTag(instanceKey, &Tag{TagName: tag.TagName})
 }
 
 func GetInstanceKeysByTag(tag *Tag) (tagged *InstanceKeyMap, err error) {
-	args := sqlutils.Args(tag.TagName)
-	tagValueClause := ``
-	if tag.HasValue {
-		tagValueClause = `and tag_value = ?`
-		args = append(args, tag.TagValue)
+	if tag == nil {
+		return nil, log.Errorf("GetInstanceKeysByTag: tag is nil")
+	}
+	clause := ``
+	args := sqlutils.Args()
+	if tag.HasValue && !tag.Negate {
+		// exists and equals
+		clause = `tag_name=? and tag_value=?`
+		args = append(args, tag.TagName, tag.TagValue)
+	} else if !tag.HasValue && !tag.Negate {
+		// exists
+		clause = `tag_name=?`
+		args = append(args, tag.TagName)
+	} else if tag.HasValue && tag.Negate {
+		// exists and not equal
+		clause = `tag_name=? and tag_value!=?`
+		args = append(args, tag.TagName, tag.TagValue)
+	} else if !tag.HasValue && tag.Negate {
+		// does not exist
+		clause = `1=1 group by hostname, port having sum(tag_name=?)=0`
+		args = append(args, tag.TagName)
 	}
 	tagged = NewInstanceKeyMap()
 	query := fmt.Sprintf(`
@@ -109,9 +149,8 @@ func GetInstanceKeysByTag(tag *Tag) (tagged *InstanceKeyMap, err error) {
 		from
 			database_instance_tags
 		where
-			tag_name = ?
 			%s
-		`, tagValueClause)
+		`, clause)
 	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		key, _ := NewResolveInstanceKey(m.GetString("hostname"), m.GetInt("port"))
 		tagged.AddKey(*key)
