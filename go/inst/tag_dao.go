@@ -100,6 +100,7 @@ func ReadInstanceTags(instanceKey *InstanceKey) (tags [](*Tag), err error) {
 		where
 			hostname = ?
 			and port = ?
+		order by tag_name
 			`
 	args := sqlutils.Args(instanceKey.Hostname, instanceKey.Port)
 	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
@@ -150,6 +151,7 @@ func GetInstanceKeysByTag(tag *Tag) (tagged *InstanceKeyMap, err error) {
 			database_instance_tags
 		where
 			%s
+		order by hostname, port
 		`, clause)
 	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		key, _ := NewResolveInstanceKey(m.GetString("hostname"), m.GetInt("port"))

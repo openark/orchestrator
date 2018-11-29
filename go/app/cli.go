@@ -1231,10 +1231,6 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 		}
 
-		// "tags") tags ;;     # List tags for a given instance
-		// "tag") tag ;;       # Add a tag to a given instance. Tag in "tagname" or "tagname=tagvalue" format
-		// "untag") untag ;;   # Remove a tag from an instance
-		// "tagged") tagged ;; # List instances tagged by tag-string. Format: "tagname" or "tagname=tagvalue" or comma separated "tag0,tag1=val1,tag2" for intersection of all.
 	case registerCliCommand("tags", "tags", `List tags for a given instance`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
@@ -1253,8 +1249,13 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
+			keysDisplayStrings := []string{}
 			for _, key := range instanceKeyMap.GetInstanceKeys() {
-				fmt.Println(key.DisplayString())
+				keysDisplayStrings = append(keysDisplayStrings, key.DisplayString())
+			}
+			sort.Strings(keysDisplayStrings)
+			for _, s := range keysDisplayStrings {
+				fmt.Println(s)
 			}
 		}
 	case registerCliCommand("tag", "tags", `Add a tag to a given instance. Tag in "tagname" or "tagname=tagvalue" format`):
