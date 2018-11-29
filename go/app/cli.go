@@ -1231,6 +1231,53 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 		}
 
+		// "tags") tags ;;     # List tags for a given instance
+		// "tag") tag ;;       # Add a tag to a given instance. Tag in "tagname" or "tagname=tagvalue" format
+		// "untag") untag ;;   # Remove a tag from an instance
+		// "tagged") tagged ;; # List instances tagged by tag-string. Format: "tagname" or "tagname=tagvalue" or comma separated "tag0,tag1=val1,tag2" for intersection of all.
+	case registerCliCommand("tags", "tags", `List tags for a given instance`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			tags, err := inst.ReadInstanceTags(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, tag := range tags {
+				fmt.Println(tag.String())
+			}
+		}
+	case registerCliCommand("tagged", "tags", `List instances tagged by tag-string. Format: "tagname" or "tagname=tagvalue" or comma separated "tag0,tag1=val1,tag2" for intersection of all.`):
+		{
+			tagsString := *config.RuntimeCLIFlags.Tag
+			instanceKeyMap, err := inst.GetInstanceKeysByTags(tagsString)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, key := range instanceKeyMap.GetInstanceKeys() {
+				fmt.Println(key.DisplayString())
+			}
+		}
+	case registerCliCommand("tag", "tags", `Add a tag to a given instance. Tag in "tagname" or "tagname=tagvalue" format`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			tag, err := inst.ParseTag(*config.RuntimeCLIFlags.Tag)
+			if err != nil {
+				log.Fatale(err)
+			}
+			inst.PutInstanceTag(instanceKey, tag)
+			fmt.Println(instanceKey.DisplayString())
+		}
+	case registerCliCommand("untag", "tags", `Remove a tag from an instance`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			tag, err := inst.ParseTag(*config.RuntimeCLIFlags.Tag)
+			if err != nil {
+				log.Fatale(err)
+			}
+			inst.DeleteInstanceTag(instanceKey, tag)
+			fmt.Println(instanceKey.DisplayString())
+		}
+
 		// Instance management
 	case registerCliCommand("discover", "Instance management", `Lookup an instance, investigate it`):
 		{
