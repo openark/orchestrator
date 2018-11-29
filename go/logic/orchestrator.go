@@ -420,6 +420,7 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 		command = "put-key-value"
 		applyFunc = kv.PutKVPair
 	}
+	var selectedError error
 	for _, kvPair := range kvPairs {
 		if !force {
 			// !force: Called periodically to auto-populate KV
@@ -439,12 +440,13 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 		} else {
 			err = applyFunc(kvPair)
 		}
-		if err != nil {
-			return kvPairs, submittedCount, log.Errore(err)
+		if err == nil {
+			submittedCount++
+		} else {
+			selectedError = err
 		}
-		submittedCount++
 	}
-	return kvPairs, submittedCount, nil
+	return kvPairs, submittedCount, log.Errore(selectedError)
 }
 
 // ContinuousDiscovery starts an asynchronuous infinite discovery process where instances are
