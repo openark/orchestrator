@@ -55,13 +55,18 @@ func (this *consulStore) PutKeyValue(key string, value string) (err error) {
 	return err
 }
 
-func (this *consulStore) GetKeyValue(key string) (value string, err error) {
+func (this *consulStore) GetKeyValue(key string) (value string, found bool, err error) {
 	if this.client == nil {
-		return value, nil
+		return value, found, nil
 	}
 	pair, _, err := this.client.KV().Get(key, nil)
 	if err != nil {
-		return value, err
+		return value, found, err
 	}
-	return string(pair.Value), nil
+	return string(pair.Value), (pair != nil), nil
+}
+
+func (this *consulStore) AddKeyValue(key string, value string) (added bool, err error) {
+	err = this.PutKeyValue(key, value)
+	return (err != nil), err
 }
