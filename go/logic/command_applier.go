@@ -273,6 +273,7 @@ func (applier *CommandApplier) addKeyValue(value []byte) interface{} {
 
 	return err
 }
+
 func (applier *CommandApplier) putInstanceTag(value []byte) interface{} {
 	instanceTag := inst.InstanceTag{}
 	if err := json.Unmarshal(value, &instanceTag); err != nil {
