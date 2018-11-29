@@ -264,6 +264,15 @@ func (applier *CommandApplier) putKeyValue(value []byte) interface{} {
 	return err
 }
 
+func (applier *CommandApplier) addKeyValue(value []byte) interface{} {
+	kvPair := kv.KVPair{}
+	if err := json.Unmarshal(value, &kvPair); err != nil {
+		return log.Errore(err)
+	}
+	err := kv.AddKVPair(&kvPair)
+
+	return err
+}
 func (applier *CommandApplier) putInstanceTag(value []byte) interface{} {
 	instanceTag := inst.InstanceTag{}
 	if err := json.Unmarshal(value, &instanceTag); err != nil {
@@ -279,16 +288,6 @@ func (applier *CommandApplier) deleteInstanceTag(value []byte) interface{} {
 		return log.Errore(err)
 	}
 	_, err := inst.DeleteInstanceTag(&instanceTag.Key, &instanceTag.T)
-	return err
-}
-
-func (applier *CommandApplier) addKeyValue(value []byte) interface{} {
-	kvPair := kv.KVPair{}
-	if err := json.Unmarshal(value, &kvPair); err != nil {
-		return log.Errore(err)
-	}
-	err := kv.AddKVPair(&kvPair)
-
 	return err
 }
 
