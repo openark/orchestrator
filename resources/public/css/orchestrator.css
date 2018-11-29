@@ -659,6 +659,10 @@ body {
   font-size: 24px;
 }
 
+#cluster_subtitle {
+  font-size: 12px;
+}
+
 .arrow_box {
     position: relative;
     background: #ffffff;

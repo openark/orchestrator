@@ -37,7 +37,6 @@ import (
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/discovery"
 	"github.com/github/orchestrator/go/inst"
-	"github.com/github/orchestrator/go/kv"
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/metrics/query"
 	"github.com/github/orchestrator/go/process"
@@ -1871,23 +1870,12 @@ func (this *HttpAPI) SubmitMastersToKvStores(params martini.Params, r render.Ren
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
-	kvPairs, err := inst.GetMastersKVPairs(clusterName)
+	kvPairs, submittedCount, err := logic.SubmitMastersToKvStores(clusterName, true)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
-	for _, kvPair := range kvPairs {
-		if orcraft.IsRaftEnabled() {
-			_, err = orcraft.PublishCommand("put-key-value", kvPair)
-		} else {
-			err = kv.PutKVPair(kvPair)
-		}
-		if err != nil {
-			Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
-			return
-		}
-	}
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Submitted %d masters", len(kvPairs)), Details: kvPairs})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Submitted %d masters", submittedCount), Details: kvPairs})
 }
 
 // Clusters provides list of known masters
