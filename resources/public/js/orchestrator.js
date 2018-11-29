@@ -985,7 +985,7 @@ function renderGlobalRecoveriesButton(isGlobalRecoveriesEnabled) {
   if (isGlobalRecoveriesEnabled) {
     iconContainer
       .prop("title", "Global Recoveries Enabled")
-      .addClass("glyphicon-heart")
+      .addClass("glyphicon-ok-sign")
       .removeClass("hidden")
       .click(function(event) {
         bootbox.confirm("<h3>Global Recoveries</h3>Are you sure you want to <strong>disable</strong> global recoveries?", function(confirm) {
@@ -997,7 +997,7 @@ function renderGlobalRecoveriesButton(isGlobalRecoveriesEnabled) {
   } else {
     iconContainer
       .prop("title", "Global Recoveries Disabled")
-      .addClass("glyphicon-heart-empty")
+      .addClass("glyphicon-remove-sign")
       .removeClass("hidden")
       .click(function(event) {
         bootbox.confirm("<h3>Global Recoveries</h3>Are you sure you want to enable global recoveries?", function(confirm) {
