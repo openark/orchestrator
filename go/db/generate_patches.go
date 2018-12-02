@@ -527,7 +527,7 @@ var generateSQLPatches = []string{
 	`,
 	`
 		ALTER TABLE
-			database_instance_tags
+			database_instance_tags /* sqlite3-skip */
 			DROP PRIMARY KEY,
 			ADD PRIMARY KEY (hostname, port, tag_name)
 	`,
