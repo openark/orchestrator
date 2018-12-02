@@ -90,6 +90,10 @@ func ReadInstanceTag(instanceKey *InstanceKey, tag *Tag) (tagExists bool, err er
 	return tagExists, log.Errore(err)
 }
 
+func InstanceTagExists(instanceKey *InstanceKey, tag *Tag) (tagExists bool, err error) {
+	return ReadInstanceTag(instanceKey, &Tag{TagName: tag.TagName})
+}
+
 func ReadInstanceTags(instanceKey *InstanceKey) (tags [](*Tag), err error) {
 	tags = [](*Tag){}
 	query := `
@@ -113,10 +117,6 @@ func ReadInstanceTags(instanceKey *InstanceKey) (tags [](*Tag), err error) {
 	})
 
 	return tags, log.Errore(err)
-}
-
-func InstanceTagExists(instanceKey *InstanceKey, tag *Tag) (tagExists bool, err error) {
-	return ReadInstanceTag(instanceKey, &Tag{TagName: tag.TagName})
 }
 
 func GetInstanceKeysByTag(tag *Tag) (tagged *InstanceKeyMap, err error) {

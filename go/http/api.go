@@ -136,6 +136,14 @@ func (this *HttpAPI) getInstanceKey(host string, port string) (inst.InstanceKey,
 	return *instanceKey, nil
 }
 
+func getTag(params martini.Params, req *http.Request) (tag *inst.Tag, err error) {
+	tagString := req.URL.Query().Get("tag")
+	if tagString != "" {
+		return inst.ParseTag(tagString)
+	}
+	return inst.NewTag(params["tagName"], params["tagValue"])
+}
+
 func (this *HttpAPI) getBinlogCoordinates(logFile string, logPos string) (inst.BinlogCoordinates, error) {
 	coordinates := inst.BinlogCoordinates{LogFile: logFile}
 	var err error
@@ -1789,6 +1797,30 @@ func (this *HttpAPI) Tags(params martini.Params, r render.Render, req *http.Requ
 	r.JSON(http.StatusOK, tagStrings)
 }
 
+// TagValue returns a given tag's value for a specific instance
+func (this *HttpAPI) TagValue(params martini.Params, r render.Render, req *http.Request) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	tag, err := getTag(params, req)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	tagExists, err := inst.ReadInstanceTag(&instanceKey, tag)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	if tagExists {
+		r.JSON(http.StatusOK, tag.TagValue)
+	} else {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("tag %s not found for %+v", tag.TagName, instanceKey)})
+	}
+}
+
 // Tagged return instance keys tagged by "tag" query param
 func (this *HttpAPI) Tagged(params martini.Params, r render.Render, req *http.Request) {
 	tagsString := req.URL.Query().Get("tag")
@@ -1809,13 +1841,7 @@ func (this *HttpAPI) Tag(params martini.Params, r render.Render, req *http.Reque
 		return
 	}
 
-	var tag *inst.Tag
-	tagString := req.URL.Query().Get("tag")
-	if tagString != "" {
-		tag, err = inst.ParseTag(tagString)
-	} else {
-		tag, err = inst.NewTag(params["tagName"], params["tagValue"])
-	}
+	tag, err := getTag(params, req)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -1841,13 +1867,7 @@ func (this *HttpAPI) Untag(params martini.Params, r render.Render, req *http.Req
 		return
 	}
 
-	var tag *inst.Tag
-	tagString := req.URL.Query().Get("tag")
-	if tagString != "" {
-		tag, err = inst.ParseTag(tagString)
-	} else {
-		tag, err = inst.NewTag(params["tagName"], "")
-	}
+	tag, err := getTag(params, req)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -3536,6 +3556,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	// Tags:
 	this.registerAPIRequest(m, "tagged", this.Tagged)
 	this.registerAPIRequest(m, "tags/:host/:port", this.Tags)
+	this.registerAPIRequest(m, "tag-value/:host/:port", this.TagValue)
+	this.registerAPIRequest(m, "tag-value/:host/:port/:tagName", this.TagValue)
 	this.registerAPIRequest(m, "tag/:host/:port", this.Tag)
 	this.registerAPIRequest(m, "tag/:host/:port/:tagName/:tagValue", this.Tag)
 	this.registerAPIRequest(m, "untag/:host/:port", this.Untag)

@@ -1242,6 +1242,22 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(tag.String())
 			}
 		}
+	case registerCliCommand("tag-value", "tags", `Get tag value for a specific instance`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			tag, err := inst.ParseTag(*config.RuntimeCLIFlags.Tag)
+			if err != nil {
+				log.Fatale(err)
+			}
+
+			tagExists, err := inst.ReadInstanceTag(instanceKey, tag)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if tagExists {
+				fmt.Println(tag.TagValue)
+			}
+		}
 	case registerCliCommand("tagged", "tags", `List instances tagged by tag-string. Format: "tagname" or "tagname=tagvalue" or comma separated "tag0,tag1=val1,tag2" for intersection of all.`):
 		{
 			tagsString := *config.RuntimeCLIFlags.Tag
