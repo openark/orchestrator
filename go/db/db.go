@@ -103,7 +103,7 @@ func openTopology(host string, port int, readTimeout int) (db *sql.DB, err error
 		if mySQLConnectionLifetimeSeconds == 0 {
 			var waitTimeout int
 			if err = db.QueryRow(`select @@session.wait_timeout`).Scan(&waitTimeout); err == nil {
-				mySQLConnectionLifetimeSeconds = waitTimeout - 10
+				mySQLConnectionLifetimeSeconds = waitTimeout - 5
 			}
 		}
 		if mySQLConnectionLifetimeSeconds > 0 {
