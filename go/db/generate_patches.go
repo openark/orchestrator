@@ -525,4 +525,10 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN ancestry_uuid text CHARACTER SET ascii NOT NULL AFTER master_uuid
 	`,
+	`
+		ALTER TABLE
+			database_instance_tags
+			DROP PRIMARY KEY,
+			ADD PRIMARY KEY (hostname, port, tag_name)
+	`,
 }
