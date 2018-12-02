@@ -503,6 +503,14 @@ function tags {
   print_response | jq -r '.[]'
 }
 
+function tag_value {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "tag" "$tag"
+  api "tag-value/${instance_hostport}?tag=$(urlencode "$tag")"
+
+  print_response | jq -r '.'
+}
+
 function tag {
   assert_nonempty "instance" "$instance_hostport"
   assert_nonempty "tag" "$tag"
@@ -823,10 +831,11 @@ function run_command {
     "repoint-replicas") general_singular_relocate_replicas_command ;;  # Repoint all replicas of given instance to replicate back from the instance. Use with care
     "take-siblings") general_singular_relocate_command ;;              # Turn all siblings of a replica into its sub-replicas.
 
-    "tags") tags ;;     # List tags for a given instance
-    "tag") tag ;;       # Add a tag to a given instance. Tag in "tagname" or "tagname=tagvalue" format
-    "untag") untag ;;   # Remove a tag from an instance
-    "tagged") tagged ;; # List instances tagged by tag-string. Format: "tagname" or "tagname=tagvalue" or comma separated "tag0,tag1=val1,tag2" for intersection of all.
+    "tags")      tags      ;;     # List tags for a given instance
+    "tag-value") tag_value ;;     # List tags for a given instance
+    "tag")       tag       ;;       # Add a tag to a given instance. Tag in "tagname" or "tagname=tagvalue" format
+    "untag")     untag     ;;   # Remove a tag from an instance
+    "tagged")    tagged    ;; # List instances tagged by tag-string. Format: "tagname" or "tagname=tagvalue" or comma separated "tag0,tag1=val1,tag2" for intersection of all.
 
     "submit-pool-instances") submit_pool_instances ;;                  # Submit a pool name with a list of instances in that pool
     "which-heuristic-cluster-pool-instances") which_heuristic_cluster_pool_instances ;; # List instances of a given cluster which are in either any pool or in a specific pool
