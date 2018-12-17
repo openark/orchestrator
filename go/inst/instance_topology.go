@@ -43,8 +43,6 @@ var ReplicationNotRunningError = fmt.Errorf("Replication not running")
 var asciiFillerCharacter = " "
 var tabulatorScharacter = "|"
 
-var countRetries = 5
-
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
 func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance), extendedOutput bool, fillerCharacter string, tabulated bool) []string {
@@ -1288,7 +1286,6 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err er
 	gtidSubtract := ""
 	executedGtidSet := ""
 	masterStatusFound := false
-	waitInterval := time.Millisecond * 250
 
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "reset-master-gtid"); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
@@ -1310,15 +1307,8 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err er
 	}
 
 	// We're about to perform a destructive operation. It is non transactional and cannot be rolled back.
-	// The replica will be left in a broken state.
-	// This is why we allow multiple attempts at the following:
-	for i := 0; i < countRetries; i++ {
-		instance, err = ResetMaster(instanceKey)
-		if err == nil {
-			break
-		}
-		time.Sleep(waitInterval)
-	}
+	// The replica will be left in a broken state.	// This is why we allow multiple attempts at the following:
+	instance, err = ResetMaster(instanceKey)
 	if err != nil {
 		err = fmt.Errorf("gtid-errant-reset-master: error while resetting master on %+v, after which intended to set gtid_purged to: %s. Error was: %+v", instance.Key, gtidSubtract, err)
 		goto Cleanup
@@ -1338,14 +1328,7 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err er
 		goto Cleanup
 	}
 
-	// We've just made the destructive operation. Again, allow for retries:
-	for i := 0; i < countRetries; i++ {
-		err = setGTIDPurged(instance, gtidSubtract)
-		if err == nil {
-			break
-		}
-		time.Sleep(waitInterval)
-	}
+	err = setGTIDPurged(instance, gtidSubtract)
 	if err != nil {
 		err = fmt.Errorf("gtid-errant-reset-master: error setting gtid_purged on %+v to: %s. Error was: %+v", instance.Key, gtidSubtract, err)
 		goto Cleanup
