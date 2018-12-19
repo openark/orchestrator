@@ -1289,7 +1289,7 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err er
 	executedGtidSet := ""
 	masterStatusFound := false
 	replicationStopped := false
-	waitInterval := time.Millisecond * 250
+	waitInterval := time.Second * 2
 
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "reset-master-gtid"); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
