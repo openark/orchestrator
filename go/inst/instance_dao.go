@@ -242,18 +242,17 @@ func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStop
 }
 
 // areReplicationThreadsRunning checks if both IO and SQL threads are running
-func areReplicationThreadsRunning(instanceKey *InstanceKey) (replicationThreadsRunning bool, err error) {
+func areReplicationThreadsRunning(instanceKey *InstanceKey) (ioThreadRunning, sqlThreadRunning bool, err error) {
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
-		return replicationThreadsRunning, err
+		return ioThreadRunning, sqlThreadRunning, err
 	}
 	err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
-		ioThreadRunning := (m.GetString("Slave_IO_Running") == "Yes")
-		sqlThreadRunning := (m.GetString("Slave_SQL_Running") == "Yes")
-		replicationThreadsRunning = ioThreadRunning && sqlThreadRunning
+		ioThreadRunning = (m.GetString("Slave_IO_Running") == "Yes")
+		sqlThreadRunning = (m.GetString("Slave_SQL_Running") == "Yes")
 		return nil
 	})
-	return replicationThreadsRunning, err
+	return ioThreadRunning, sqlThreadRunning, err
 }
 
 // ReadTopologyInstanceBufferable connects to a topology MySQL instance
