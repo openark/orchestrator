@@ -380,9 +380,9 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
-// sleep immediately after START SLAVE for a capped duration, until both replication threads are running.
-// This is to give slack to IO thread to connect and begin streaming, and to SQL thread to start applying.
-// Sleep is incremental with ongoing attempt to see whether replication is already up
+// waitForReplicationState waits for both replication threads to be either running or not running, together.
+// This is useful post- `start slave` operation, ensuring both threads are actually running,
+// or post `stop slave` operation, ensuring both threads are not running.
 func waitForReplicationState(instanceKey *InstanceKey, expectedRunning bool) (expectationMet bool, err error) {
 	waitDuration := time.Second
 	waitInterval := 10 * time.Millisecond
