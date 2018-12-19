@@ -376,7 +376,7 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	instance, err = ReadTopologyInstance(instanceKey)
 
-	log.Infof("Stopped slave on %+v, Self:%+v, Exec:%+v", *instanceKey, instance.SelfBinlogCoordinates, instance.ExecBinlogCoordinates)
+	log.Infof("Stopped replication on %+v, Self:%+v, Exec:%+v", *instanceKey, instance.SelfBinlogCoordinates, instance.ExecBinlogCoordinates)
 	return instance, err
 }
 
@@ -432,7 +432,7 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		return instance, log.Errore(err)
 	}
-	log.Infof("Started slave on %+v", instanceKey)
+	log.Infof("Started replication on %+v", instanceKey)
 
 	waitForReplicationState(instanceKey, true)
 
