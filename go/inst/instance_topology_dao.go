@@ -554,7 +554,7 @@ func ChangeMasterCredentials(instanceKey *InstanceKey, masterUser string, master
 	}
 
 	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("ChangeMasterTo: Cannot change master on: %+v because slave is running", *instanceKey)
+		return instance, fmt.Errorf("ChangeMasterTo: Cannot change master on: %+v because replication is running", *instanceKey)
 	}
 	log.Debugf("ChangeMasterTo: will attempt changing master credentials on %+v", *instanceKey)
 
@@ -582,7 +582,7 @@ func EnableMasterSSL(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("EnableMasterSSL: Cannot enable SSL replication on %+v because slave is running", *instanceKey)
+		return instance, fmt.Errorf("EnableMasterSSL: Cannot enable SSL replication on %+v because replication is running", *instanceKey)
 	}
 	log.Debugf("EnableMasterSSL: Will attempt enabling SSL replication on %+v", *instanceKey)
 
@@ -609,7 +609,7 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	}
 
 	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("ChangeMasterTo: Cannot change master on: %+v because slave is running", *instanceKey)
+		return instance, fmt.Errorf("ChangeMasterTo: Cannot change master on: %+v because replication is running", *instanceKey)
 	}
 	log.Debugf("ChangeMasterTo: will attempt changing master on %+v to %+v, %+v", *instanceKey, *masterKey, *masterBinlogCoordinates)
 	changeToMasterKey := masterKey
@@ -710,7 +710,7 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("Cannot reset slave on: %+v because slave is running", instanceKey)
+		return instance, fmt.Errorf("Cannot reset slave on: %+v because replication is running", instanceKey)
 	}
 
 	if *config.RuntimeCLIFlags.Noop {
@@ -743,7 +743,7 @@ func ResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("Cannot reset master on: %+v because slave is running", instanceKey)
+		return instance, fmt.Errorf("Cannot reset master on: %+v because replication is running", instanceKey)
 	}
 
 	if *config.RuntimeCLIFlags.Noop {
@@ -871,7 +871,7 @@ func DetachReplica(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("Cannot detach slave on: %+v because slave is running", instanceKey)
+		return instance, fmt.Errorf("Cannot detach slave on: %+v because replication is running", instanceKey)
 	}
 
 	isDetached, _ := instance.ExecBinlogCoordinates.ExtractDetachedCoordinates()
@@ -905,7 +905,7 @@ func ReattachReplica(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("Cannot (need not) reattach slave on: %+v because slave is running", instanceKey)
+		return instance, fmt.Errorf("Cannot (need not) reattach slave on: %+v because replication is running", instanceKey)
 	}
 
 	isDetached, detachedCoordinates := instance.ExecBinlogCoordinates.ExtractDetachedCoordinates()
