@@ -242,7 +242,7 @@ func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStop
 }
 
 // areReplicationThreadsRunning checks if both IO and SQL threads are running
-func areReplicationThreadsRunning(instanceKey *InstanceKey) (ioThreadRunning, sqlThreadRunning bool, err error) {
+func areReplicationThreadsRunning(instanceKey *InstanceKey) (ioThreadRunning bool, sqlThreadRunning bool, err error) {
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
 		return ioThreadRunning, sqlThreadRunning, err
