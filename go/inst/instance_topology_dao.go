@@ -383,7 +383,7 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 // waitForReplicationState waits for both replication threads to be either running or not running, together.
 // This is useful post- `start slave` operation, ensuring both threads are actually running,
 // or post `stop slave` operation, ensuring both threads are not running.
-func waitForReplicationState(instanceKey *InstanceKey, expectedRunning bool) (expectationMet bool, err error) {
+func waitForReplicationState(instanceKey *InstanceKey, expectRunning bool) (expectationMet bool, err error) {
 	waitDuration := time.Second
 	waitInterval := 10 * time.Millisecond
 	startTime := time.Now()
@@ -391,7 +391,7 @@ func waitForReplicationState(instanceKey *InstanceKey, expectedRunning bool) (ex
 	for {
 		// Since this is an incremental aggressive polling, it's OK if an occasional
 		// error is observed. We don't bail out on a single error.
-		if ioThreadRunning, sqlThreadRunning, _ := areReplicationThreadsRunning(instanceKey); ioThreadRunning == expectedRunning && sqlThreadRunning == expectedRunning {
+		if expectationMet, _ := expectReplicationThreadsState(instanceKey, expectRunning); expectationMet {
 			return true, nil
 		}
 		if time.Since(startTime)+waitInterval > waitDuration {
