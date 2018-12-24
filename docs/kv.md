@@ -26,11 +26,11 @@ The most common scenario is to update a Proxy to direct cluster's write traffic 
 
 Clusters' master entries are populated on:
 
+- Encountering a new cluster, or encountering a master for which there is no existing KV entry. This check runs automatically and periodically.
+  - The periodic check first consults with `orchestrator`'s internal KV store. It will only attempt to populate external stores (`Consul`, `Zookeeper`) if the internal store does not already have the master entries.
+  It follows that the periodic checks will only inject external KV _once_.
 - An actual failover: `orchestrator` overwrites existing entry with identity of new master
-- A manual request for entry population
-
-  For each cluster, you will want to make one manual request for entry population. KV stores have no initial knowledge of your setup. `orchestrator` does, but does not routinely update the stores. Use:
-
+- A manual request for entry population:
   - `orchestrator-client -c submit-masters-to-kv-stores` to submit all clusters' masters to KV, or
   - `orchestrator-client -c submit-masters-to-kv-stores -alias mycluster` to submit the master of `mycluster` to KV
 
@@ -43,6 +43,8 @@ Clusters' master entries are populated on:
   - `/api/submit-masters-to-kv-stores/:alias`, or
 
   respectively.
+
+Both actual failover and manual request will override any existing KV entries, internal and external.
 
 ### KV and orchestrator/raft
 

@@ -53,6 +53,11 @@ const (
 	errorIOTimeout         = "i/o timeout"
 )
 
+var replicationThreadStatesMapping = map[bool]string{
+	false: "No",
+	true:  "Yes",
+}
+
 var instanceReadChan = make(chan bool, backendDBConcurrency)
 var instanceWriteChan = make(chan bool, backendDBConcurrency)
 
@@ -241,19 +246,24 @@ func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStop
 	return isMaxScale, resolvedHostname, err
 }
 
-// areReplicationThreadsRunning checks if both IO and SQL threads are running
-func areReplicationThreadsRunning(instanceKey *InstanceKey) (replicationThreadsRunning bool, err error) {
+// expectReplicationThreadsState expects both replication threads to be running, or both to be not running.
+// Specifically, it looks for both to be "Yes" or for both to be "No".
+func expectReplicationThreadsState(instanceKey *InstanceKey, expectRunning bool) (expectationMet bool, err error) {
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
-		return replicationThreadsRunning, err
+		return false, err
 	}
 	err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
-		ioThreadRunning := (m.GetString("Slave_IO_Running") == "Yes")
-		sqlThreadRunning := (m.GetString("Slave_SQL_Running") == "Yes")
-		replicationThreadsRunning = ioThreadRunning && sqlThreadRunning
+		ioThreadRunning := m.GetString("Slave_IO_Running")
+		sqlThreadRunning := m.GetString("Slave_SQL_Running")
+
+		if ioThreadRunning == replicationThreadStatesMapping[expectRunning] &&
+			sqlThreadRunning == replicationThreadStatesMapping[expectRunning] {
+			expectationMet = true
+		}
 		return nil
 	})
-	return replicationThreadsRunning, err
+	return expectationMet, err
 }
 
 // ReadTopologyInstanceBufferable connects to a topology MySQL instance
