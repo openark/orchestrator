@@ -40,7 +40,7 @@ A `name` can be of the following formats:
 - `some-other-word`
 - `some_word_word_yet`
 
-though not strictly enforced, avoid using special characters/punctuations.
+Though not strictly enforced, avoid using special characters/punctuations.
 
 ### Tagging
 
@@ -112,7 +112,7 @@ tag no-such-tag not found for db-host-01:3306
 - `-c tagged -tag ~name`: `~` is a synonym to `!`.
 - `-c tagged -tag name,~role`: list instances tagged by `name` (regardless of its value) and are _not_ tagged by `role` (regardless of its value)
 - `-c tagged -tag ~role=backup`: list instances that _are_ tagged with `role`, but with value other than `backup`.
-  Notice how this differs from `c tagged -tag ~role` which will list instances which don't have the `role` tag in the first place.
+  Notice how this differs from `-c tagged -tag ~role` which will list instances which don't have the `role` tag in the first place.
 
 ### Tags, internal
 
