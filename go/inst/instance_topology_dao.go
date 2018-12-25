@@ -376,14 +376,14 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	instance, err = ReadTopologyInstance(instanceKey)
 
-	log.Infof("Stopped slave on %+v, Self:%+v, Exec:%+v", *instanceKey, instance.SelfBinlogCoordinates, instance.ExecBinlogCoordinates)
+	log.Infof("Stopped replication on %+v, Self:%+v, Exec:%+v", *instanceKey, instance.SelfBinlogCoordinates, instance.ExecBinlogCoordinates)
 	return instance, err
 }
 
-// sleep immediately after START SLAVE for a capped duration, until both replication threads are running.
-// This is to give slack to IO thread to connect and begin streaming, and to SQL thread to start applying.
-// Sleep is incremental with ongoing attempt to see whether replication is already up
-func startSlavePostSleep(instanceKey *InstanceKey) (repliationRunning bool, err error) {
+// waitForReplicationState waits for both replication threads to be either running or not running, together.
+// This is useful post- `start slave` operation, ensuring both threads are actually running,
+// or post `stop slave` operation, ensuring both threads are not running.
+func waitForReplicationState(instanceKey *InstanceKey, expectRunning bool) (expectationMet bool, err error) {
 	waitDuration := time.Second
 	waitInterval := 10 * time.Millisecond
 	startTime := time.Now()
@@ -391,8 +391,8 @@ func startSlavePostSleep(instanceKey *InstanceKey) (repliationRunning bool, err 
 	for {
 		// Since this is an incremental aggressive polling, it's OK if an occasional
 		// error is observed. We don't bail out on a single error.
-		if repliationRunning, _ = areReplicationThreadsRunning(instanceKey); repliationRunning {
-			return repliationRunning, nil
+		if expectationMet, _ := expectReplicationThreadsState(instanceKey, expectRunning); expectationMet {
+			return true, nil
 		}
 		if time.Since(startTime)+waitInterval > waitDuration {
 			break
@@ -400,7 +400,7 @@ func startSlavePostSleep(instanceKey *InstanceKey) (repliationRunning bool, err 
 		time.Sleep(waitInterval)
 		waitInterval = 2 * waitInterval
 	}
-	return repliationRunning, nil
+	return false, nil
 }
 
 // StartSlave starts replication on a given instance.
@@ -432,9 +432,9 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil {
 		return instance, log.Errore(err)
 	}
-	log.Infof("Started slave on %+v", instanceKey)
+	log.Infof("Started replication on %+v", instanceKey)
 
-	startSlavePostSleep(instanceKey)
+	waitForReplicationState(instanceKey, true)
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -553,8 +553,8 @@ func ChangeMasterCredentials(instanceKey *InstanceKey, masterUser string, master
 		return instance, log.Errorf("Empty user in ChangeMasterCredentials() for %+v", *instanceKey)
 	}
 
-	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("ChangeMasterTo: Cannot change master on: %+v because slave is running", *instanceKey)
+	if !instance.NoReplicationThreadRunning() {
+		return instance, fmt.Errorf("ChangeMasterTo: Cannot change master on: %+v because replication is running", *instanceKey)
 	}
 	log.Debugf("ChangeMasterTo: will attempt changing master credentials on %+v", *instanceKey)
 
@@ -582,7 +582,7 @@ func EnableMasterSSL(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("EnableMasterSSL: Cannot enable SSL replication on %+v because slave is running", *instanceKey)
+		return instance, fmt.Errorf("EnableMasterSSL: Cannot enable SSL replication on %+v because replication is running", *instanceKey)
 	}
 	log.Debugf("EnableMasterSSL: Will attempt enabling SSL replication on %+v", *instanceKey)
 
@@ -609,7 +609,7 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	}
 
 	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("ChangeMasterTo: Cannot change master on: %+v because slave is running", *instanceKey)
+		return instance, fmt.Errorf("ChangeMasterTo: Cannot change master on: %+v because replication is running", *instanceKey)
 	}
 	log.Debugf("ChangeMasterTo: will attempt changing master on %+v to %+v, %+v", *instanceKey, *masterKey, *masterBinlogCoordinates)
 	changeToMasterKey := masterKey
@@ -710,7 +710,7 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("Cannot reset slave on: %+v because slave is running", instanceKey)
+		return instance, fmt.Errorf("Cannot reset slave on: %+v because replication is running", instanceKey)
 	}
 
 	if *config.RuntimeCLIFlags.Noop {
@@ -743,7 +743,7 @@ func ResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("Cannot reset master on: %+v because slave is running", instanceKey)
+		return instance, fmt.Errorf("Cannot reset master on: %+v because replication is running", instanceKey)
 	}
 
 	if *config.RuntimeCLIFlags.Noop {
@@ -871,7 +871,7 @@ func DetachReplica(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("Cannot detach slave on: %+v because slave is running", instanceKey)
+		return instance, fmt.Errorf("Cannot detach slave on: %+v because replication is running", instanceKey)
 	}
 
 	isDetached, _ := instance.ExecBinlogCoordinates.ExtractDetachedCoordinates()
@@ -905,7 +905,7 @@ func ReattachReplica(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("Cannot (need not) reattach slave on: %+v because slave is running", instanceKey)
+		return instance, fmt.Errorf("Cannot (need not) reattach slave on: %+v because replication is running", instanceKey)
 	}
 
 	isDetached, detachedCoordinates := instance.ExecBinlogCoordinates.ExtractDetachedCoordinates()
