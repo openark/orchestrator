@@ -681,8 +681,7 @@ func SuggestReplacementForPromotedReplica(topologyRecovery *TopologyRecovery, de
 	keepSearchingHint := ""
 	if !CrossDataCenterMasterFailoverConstraintSatisfied(&topologyRecovery.AnalysisEntry, promotedReplica) {
 		keepSearchingHint = fmt.Sprintf("Will keep searching because PreventCrossDataCenterMasterFailover is set and we haven't promoted a server in %s data center", topologyRecovery.AnalysisEntry.AnalyzedInstanceDataCenter)
-	}
-	if promotedReplica.PromotionRule == inst.PreferNotPromoteRule {
+	} else if promotedReplica.PromotionRule == inst.PreferNotPromoteRule {
 		keepSearchingHint = fmt.Sprintf("Will keep searching because we have promoted a server with prefer_not rule: %+v", promotedReplica.Key)
 	}
 	if keepSearchingHint != "" {
