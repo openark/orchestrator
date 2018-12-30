@@ -1288,7 +1288,8 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err er
 	gtidSubtract := ""
 	executedGtidSet := ""
 	masterStatusFound := false
-	waitInterval := time.Millisecond * 250
+	replicationStopped := false
+	waitInterval := time.Second * 5
 
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "reset-master-gtid"); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
@@ -1300,6 +1301,14 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err er
 	if instance.IsReplica() {
 		instance, err = StopSlave(instanceKey)
 		if err != nil {
+			goto Cleanup
+		}
+		replicationStopped, err = waitForReplicationState(instanceKey, false)
+		if err != nil {
+			goto Cleanup
+		}
+		if !replicationStopped {
+			err = fmt.Errorf("gtid-errant-reset-master: timeout while waiting for replication to stop on %+v", instance.Key)
 			goto Cleanup
 		}
 	}
