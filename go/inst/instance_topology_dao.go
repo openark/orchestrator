@@ -383,7 +383,7 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 // waitForReplicationState waits for both replication threads to be either running or not running, together.
 // This is useful post- `start slave` operation, ensuring both threads are actually running,
 // or post `stop slave` operation, ensuring both threads are not running.
-func waitForReplicationState(instanceKey *InstanceKey, expectRunning bool) (expectationMet bool, err error) {
+func waitForReplicationState(instanceKey *InstanceKey, expectedState ReplicationThreadState) (expectationMet bool, err error) {
 	waitDuration := time.Second
 	waitInterval := 10 * time.Millisecond
 	startTime := time.Now()
@@ -391,7 +391,7 @@ func waitForReplicationState(instanceKey *InstanceKey, expectRunning bool) (expe
 	for {
 		// Since this is an incremental aggressive polling, it's OK if an occasional
 		// error is observed. We don't bail out on a single error.
-		if expectationMet, _ := expectReplicationThreadsState(instanceKey, expectRunning); expectationMet {
+		if expectationMet, _ := expectReplicationThreadsState(instanceKey, expectedState); expectationMet {
 			return true, nil
 		}
 		if time.Since(startTime)+waitInterval > waitDuration {
@@ -434,7 +434,7 @@ func StartSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	log.Infof("Started replication on %+v", instanceKey)
 
-	waitForReplicationState(instanceKey, true)
+	waitForReplicationState(instanceKey, ReplicationThreadStateRunning)
 
 	instance, err = ReadTopologyInstance(instanceKey)
 	if err != nil {
@@ -553,7 +553,7 @@ func ChangeMasterCredentials(instanceKey *InstanceKey, masterUser string, master
 		return instance, log.Errorf("Empty user in ChangeMasterCredentials() for %+v", *instanceKey)
 	}
 
-	if !instance.NoReplicationThreadRunning() {
+	if !instance.ReplicationThreadsStopped() {
 		return instance, fmt.Errorf("ChangeMasterTo: Cannot change master on: %+v because replication is running", *instanceKey)
 	}
 	log.Debugf("ChangeMasterTo: will attempt changing master credentials on %+v", *instanceKey)

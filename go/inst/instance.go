@@ -29,46 +29,68 @@ import (
 
 const ReasonableDiscoveryLatency = 500 * time.Millisecond
 
+type ReplicationThreadState int
+
+const (
+	ReplicationThreadStateStopped ReplicationThreadState = 0
+	ReplicationThreadStateRunning                        = 1
+	ReplicationThreadStateOther                          = -1
+)
+
+func ReplicationThreadStateFromStatus(status string) ReplicationThreadState {
+	switch status {
+	case "No":
+		return ReplicationThreadStateStopped
+	case "Yes":
+		return ReplicationThreadStateRunning
+	}
+	return ReplicationThreadStateOther
+}
+func (this *ReplicationThreadState) IsRunning() bool { return *this == 1 }
+func (this *ReplicationThreadState) IsStopped() bool { return *this == 0 }
+
 // Instance represents a database instance, including its current configuration & status.
 // It presents important replication configuration and detailed replication status.
 type Instance struct {
-	Key                    InstanceKey
-	InstanceAlias          string
-	Uptime                 uint
-	ServerID               uint
-	ServerUUID             string
-	Version                string
-	VersionComment         string
-	FlavorName             string
-	ReadOnly               bool
-	Binlog_format          string
-	BinlogRowImage         string
-	LogBinEnabled          bool
-	LogSlaveUpdatesEnabled bool
-	SelfBinlogCoordinates  BinlogCoordinates
-	MasterKey              InstanceKey
-	MasterUUID             string
-	AncestryUUID           string
-	IsDetachedMaster       bool
-	Slave_SQL_Running      bool
-	Slave_IO_Running       bool
-	HasReplicationFilters  bool
-	GTIDMode               string
-	SupportsOracleGTID     bool
-	UsingOracleGTID        bool
-	UsingMariaDBGTID       bool
-	UsingPseudoGTID        bool
-	ReadBinlogCoordinates  BinlogCoordinates
-	ExecBinlogCoordinates  BinlogCoordinates
-	IsDetached             bool
-	RelaylogCoordinates    BinlogCoordinates
-	LastSQLError           string
-	LastIOError            string
-	SecondsBehindMaster    sql.NullInt64
-	SQLDelay               uint
-	ExecutedGtidSet        string
-	GtidPurged             string
-	GtidErrant             string
+	Key                       InstanceKey
+	InstanceAlias             string
+	Uptime                    uint
+	ServerID                  uint
+	ServerUUID                string
+	Version                   string
+	VersionComment            string
+	FlavorName                string
+	ReadOnly                  bool
+	Binlog_format             string
+	BinlogRowImage            string
+	LogBinEnabled             bool
+	LogSlaveUpdatesEnabled    bool
+	SelfBinlogCoordinates     BinlogCoordinates
+	MasterKey                 InstanceKey
+	MasterUUID                string
+	AncestryUUID              string
+	IsDetachedMaster          bool
+	Slave_SQL_Running         bool
+	Slave_IO_Running          bool
+	ReplicationSQLThreadState ReplicationThreadState
+	ReplicationIOThreadState  ReplicationThreadState
+	HasReplicationFilters     bool
+	GTIDMode                  string
+	SupportsOracleGTID        bool
+	UsingOracleGTID           bool
+	UsingMariaDBGTID          bool
+	UsingPseudoGTID           bool
+	ReadBinlogCoordinates     BinlogCoordinates
+	ExecBinlogCoordinates     BinlogCoordinates
+	IsDetached                bool
+	RelaylogCoordinates       BinlogCoordinates
+	LastSQLError              string
+	LastIOError               string
+	SecondsBehindMaster       sql.NullInt64
+	SQLDelay                  uint
+	ExecutedGtidSet           string
+	GtidPurged                string
+	GtidErrant                string
 
 	masterExecutedGtidSet string // Not exported
 
@@ -255,12 +277,12 @@ func (this *Instance) IsMaster() bool {
 
 // ReplicaRunning returns true when this instance's status is of a replicating replica.
 func (this *Instance) ReplicaRunning() bool {
-	return this.IsReplica() && this.Slave_SQL_Running && this.Slave_IO_Running
+	return this.IsReplica() && this.ReplicationSQLThreadState.IsRunning() && this.ReplicationIOThreadState.IsRunning()
 }
 
 // NoReplicationThreadRunning returns true when neither SQL nor IO threads are running (including the case where isn't even a replica)
-func (this *Instance) NoReplicationThreadRunning() bool {
-	return !this.Slave_SQL_Running && !this.Slave_IO_Running
+func (this *Instance) ReplicationThreadsStopped() bool {
+	return this.ReplicationSQLThreadState.IsStopped() && this.ReplicationIOThreadState.IsStopped()
 }
 
 // SQLThreadUpToDate returns true when the instance had consumed all relay logs.
@@ -382,10 +404,10 @@ func (this *Instance) CanMove() (bool, error) {
 	if !this.IsRecentlyChecked {
 		return false, fmt.Errorf("%+v: not recently checked", this.Key)
 	}
-	if !this.Slave_SQL_Running {
+	if !this.ReplicationSQLThreadState.IsRunning() {
 		return false, fmt.Errorf("%+v: instance is not replicating", this.Key)
 	}
-	if !this.Slave_IO_Running {
+	if !this.ReplicationIOThreadState.IsRunning() {
 		return false, fmt.Errorf("%+v: instance is not replicating", this.Key)
 	}
 	if !this.SecondsBehindMaster.Valid {
@@ -427,7 +449,7 @@ func (this *Instance) StatusString() string {
 	if !this.IsRecentlyChecked {
 		return "unchecked"
 	}
-	if this.IsReplica() && !(this.Slave_SQL_Running && this.Slave_IO_Running) {
+	if this.IsReplica() && !this.ReplicaRunning() {
 		return "nonreplicating"
 	}
 	if this.IsReplica() && !this.HasReasonableMaintenanceReplicationLag() {
@@ -447,7 +469,7 @@ func (this *Instance) LagStatusString() string {
 	if !this.IsRecentlyChecked {
 		return "unknown"
 	}
-	if this.IsReplica() && !(this.Slave_SQL_Running && this.Slave_IO_Running) {
+	if this.IsReplica() && !this.ReplicaRunning() {
 		return "null"
 	}
 	if this.IsReplica() && !this.SecondsBehindMaster.Valid {
