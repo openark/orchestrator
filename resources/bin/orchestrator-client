@@ -385,7 +385,14 @@ function is_replicating {
   assert_nonempty "instance" "$instance_hostport"
   api "instance/$instance_hostport"
 
-  print_response | jq '. | select(.Slave_SQL_Running==true and .Slave_IO_Running==true)' | filter_key | print_key
+  print_response | jq '. | select(.ReplicationSQLThreadState==1 and .ReplicationIOThreadState==1)' | filter_key | print_key
+}
+
+function is_replication_stopped {
+  assert_nonempty "instance" "$instance_hostport"
+  api "instance/$instance_hostport"
+
+  print_response | jq '. | select(.ReplicationSQLThreadState==0 and .ReplicationIOThreadState==0)' | filter_key | print_key
 }
 
 function last_pseudo_gtid {
@@ -817,6 +824,7 @@ function run_command {
     "can-replicate-from") can_replicate_from ;;           # Check if an instance can potentially replicate from another, according to replication rules
     "can-replicate-from-gtid") can_replicate_from_gtid ;; # Check if an instance can potentially replicate from another, according to replication rules and assuming Oracle GTID
     "is-replicating") is_replicating ;;                   # Check if an instance is replicating at this time (both SQL and IO threads running)
+    "is-replication-stopped") is_replication_stopped ;;   # Check if both SQL and IO threads state are both strictly stopped.
 
     "set-read-only") general_instance_command ;;     # Turn an instance read-only, via SET GLOBAL read_only := 1
     "set-writeable") general_instance_command ;;     # Turn an instance writeable, via SET GLOBAL read_only := 0
