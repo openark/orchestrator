@@ -141,6 +141,7 @@ The following is a production configuration file, with some details redacted.
   "CoMasterRecoveryMustPromoteOtherCoMaster": true,
   "DetachLostSlavesAfterMasterFailover": true,
   "ApplyMySQLPromotionAfterMasterFailover": true,
+  "PreventCrossDataCenterMasterFailover": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 60,
   "PostponeReplicaRecoveryOnLagMinutes": 10,
   "OSCIgnoreHostnameFilters": [
