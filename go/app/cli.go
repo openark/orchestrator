@@ -766,6 +766,17 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(instance.Key.DisplayString())
 			}
 		}
+	case registerCliCommand("is-replication-stopped", "Replication information", `Is an instance (-i) a replica with both replication threads stopped`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance := validateInstanceIsFound(instanceKey)
+			if instance.ReplicationThreadsStopped() {
+				fmt.Println(instance.Key.DisplayString())
+			}
+		}
 		// Instance
 	case registerCliCommand("set-read-only", "Instance", `Turn an instance read-only, via SET GLOBAL read_only := 1`):
 		{
