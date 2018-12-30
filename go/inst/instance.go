@@ -32,9 +32,10 @@ const ReasonableDiscoveryLatency = 500 * time.Millisecond
 type ReplicationThreadState int
 
 const (
-	ReplicationThreadStateStopped ReplicationThreadState = 0
-	ReplicationThreadStateRunning                        = 1
-	ReplicationThreadStateOther                          = -1
+	ReplicationThreadStateNoThread ReplicationThreadState = -1
+	ReplicationThreadStateStopped                         = 0
+	ReplicationThreadStateRunning                         = 1
+	ReplicationThreadStateOther                           = 2
 )
 
 func ReplicationThreadStateFromStatus(status string) ReplicationThreadState {
