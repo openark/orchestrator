@@ -1222,14 +1222,9 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			clusterName := getClusterName(clusterAlias, instanceKey)
 			log.Debugf("cluster name is <%s>", clusterName)
 
-			kvPairs, err := inst.GetMastersKVPairs(clusterName)
+			kvPairs, _, err := logic.SubmitMastersToKvStores(clusterName, true)
 			if err != nil {
 				log.Fatale(err)
-			}
-			for _, kvPair := range kvPairs {
-				if err := kv.PutKVPair(kvPair); err != nil {
-					log.Fatale(err)
-				}
 			}
 			for _, kvPair := range kvPairs {
 				fmt.Println(fmt.Sprintf("%s:%s", kvPair.Key, kvPair.Value))

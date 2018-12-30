@@ -258,6 +258,11 @@ func (this *Instance) ReplicaRunning() bool {
 	return this.IsReplica() && this.Slave_SQL_Running && this.Slave_IO_Running
 }
 
+// NoReplicationThreadRunning returns true when neither SQL nor IO threads are running (including the case where isn't even a replica)
+func (this *Instance) NoReplicationThreadRunning() bool {
+	return !this.Slave_SQL_Running && !this.Slave_IO_Running
+}
+
 // SQLThreadUpToDate returns true when the instance had consumed all relay logs.
 func (this *Instance) SQLThreadUpToDate() bool {
 	return this.ReadBinlogCoordinates.Equals(&this.ExecBinlogCoordinates)
