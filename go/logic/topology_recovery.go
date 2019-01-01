@@ -741,7 +741,6 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("success promoting %+v over %+v", candidateInstance.Key, promotedReplica.Key))
 
 		// As followup to taking over, let's relocate all the rest of the replicas under the candidate instance
-		postponedFunctionsContainer := &topologyRecovery.PostponedFunctionsContainer
 		relocateReplicasFunc := func() error {
 			log.Debugf("replace-promoted-replica-with-candidate: relocating replicas of %+v below %+v", promotedReplica.Key, candidateInstance.Key)
 
@@ -749,6 +748,7 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 			log.Debugf("replace-promoted-replica-with-candidate: + relocated %+v replicas of %+v below %+v", len(relocatedReplicas), promotedReplica.Key, candidateInstance.Key)
 			return log.Errore(err)
 		}
+		postponedFunctionsContainer := &topologyRecovery.PostponedFunctionsContainer
 		if postponedFunctionsContainer != nil {
 			postponedFunctionsContainer.AddPostponedFunction(relocateReplicasFunc, fmt.Sprintf("replace-promoted-replica-with-candidate: relocate replicas of %+v", promotedReplica.Key))
 		} else {
