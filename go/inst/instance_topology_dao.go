@@ -485,11 +485,11 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 	if !instance.IsReplica() {
 		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
-	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("slave already running: %+v", instanceKey)
+	if !instance.ReplicationThreadsStopped() {
+		return instance, fmt.Errorf("replication threads are not stopped: %+v", instanceKey)
 	}
 
-	log.Infof("Will start slave on %+v until coordinates: %+v", instanceKey, masterCoordinates)
+	log.Infof("Will start replication on %+v until coordinates: %+v", instanceKey, masterCoordinates)
 
 	if instance.SemiSyncEnforced {
 		// Send ACK only from promotable instances.
