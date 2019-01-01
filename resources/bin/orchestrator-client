@@ -50,7 +50,7 @@ promotion_rule=
 pool=
 hostname_flag=
 api_path=
-basic_auth="${ORCHESTRATOR_AUTH_USER}:${ORCHESTRATOR_AUTH_PASSWORD}"
+basic_auth="${ORCHESTRATOR_AUTH_USER:-}:${ORCHESTRATOR_AUTH_PASSWORD:-}"
 
 instance_hostport=
 destination_hostport=
@@ -58,6 +58,8 @@ default_port=3306
 
 api_response=
 api_details=
+
+unauthorized_401="401 Unauthorized"
 
 for arg in "$@"; do
   shift
@@ -113,6 +115,24 @@ function check_requirements {
   which jq   > /dev/null 2>&1 || fail "cannot find jq"
 }
 
+function get_curl_auth_params {
+  local requires_auth=""
+
+  if [[ "${basic_auth}" != ":" ]]; then
+    requires_auth="--basic --user "${basic_auth}""
+
+    curl --help 2>&1 | fgrep -q 'disallow-username-in-url' && \
+      requires_auth+=" --disallow-username-in-url"
+  fi
+
+  # Test API access
+  curl "${basic_auth}" -s --head "${orchestrator_api}" 2>&1 | fgrep -q "$unauthorized_401" && \
+    echo "$unauthorized_401" && \
+    return
+
+  echo "${requires_auth}"
+}
+
 function assert_nonempty {
   name="$1"
   value="$2"
@@ -156,6 +176,12 @@ function detect_leader_api {
   # - in which case we just normalize the URL
   # or it may be a space delimited list, such as "http://host1:3000/api http://host2:3000/api http://host3:3000/api "
   # - in which case we figure out which of the URLs is the leader
+  local curl_auth_params="$(get_curl_auth_params)"
+
+  if [ "${curl_auth_params}" == "$unauthorized_401" ] ; then
+    fail "Cannot access orchestrator at ${orchestrator_api}.  Check ORCHESTRATOR_API is configured correctly and orchestrator is running"
+  fi
+
   leader_api=
   apis=($orchestrator_api)
   if [ ${#apis[@]} -eq 1 ] ; then
@@ -164,7 +190,7 @@ function detect_leader_api {
   fi
   for api in ${apis[@]} ; do
     api=$(normalize_orchestrator_api $api)
-    leader_check=$(curl --basic --user "${basic_auth}" -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
+    leader_check=$(curl ${curl_auth_params} -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
     if [ "$leader_check" == "200" ] ; then
       leader_api="$api"
       return
@@ -179,6 +205,8 @@ function urlencode {
 }
 
 function api {
+  local curl_auth_params="$(get_curl_auth_params)"
+
   path="$1"
 
   uri="$leader_api/$path"
@@ -186,12 +214,16 @@ function api {
   set -o pipefail
 
   api_call_result=0
-  for sleep_time in 0.1 0.2 0.5 1 2 2.5 5 0 ; do
-    api_response=$(curl --basic --user "${basic_auth}" -s "$uri" | jq '.')
-    api_call_result=$?
-    [ $api_call_result -eq 0 ] && break
-    sleep $sleep_time
-  done
+  if [[ ${curl_auth_params} != "401 Unauthorized" ]]; then
+    for sleep_time in 0.1 0.2 0.5 1 2 2.5 5 0 ; do
+      api_response=$(curl ${curl_auth_params} -s "$uri" | jq '.')
+      api_call_result=$?
+      [ $api_call_result -eq 0 ] && break
+      sleep $sleep_time
+    done
+  else
+    api_call_result=1
+  fi
   if [ $api_call_result -ne 0 ] ; then
     fail "Cannot access orchestrator at ${leader_api}.  Check ORCHESTRATOR_API is configured correctly and orchestrator is running"
   fi
@@ -619,6 +651,13 @@ function force_master_failover {
   print_details | jq '.SuccessorKey' | print_key
 }
 
+function force_master_takeover {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  assert_nonempty "destination" $destination_hostport
+  api "force-master-takeover/${alias:-$instance}/${destination_hostport}"
+  print_details | jq '.SuccessorKey' | print_key
+}
+
 function ack_cluster_recoveries {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   assert_nonempty "reason" "$reason"
@@ -768,6 +807,7 @@ function run_command {
     "reattach-replica-master-host") general_instance_command ;; # Undo a detach-replica-master-host operation
     "skip-query") general_instance_command ;;                   # Skip a single statement on a replica; either when running with GTID or without
     "gtid-errant-reset-master") general_instance_command ;;     # Remove errant GTID transactions by way of RESET MASTER
+    "gtid-errant-inject-empty") general_instance_command ;;     # Apply errant GTID as empty transactions on cluster's master
     "enable-semi-sync-master") general_instance_command ;;      # Enable semi-sync (master-side)
     "disable-semi-sync-master") general_instance_command ;;     # Disable semi-sync (master-side)
     "enable-semi-sync-replica") general_instance_command ;;     # Enable semi-sync (replica-side)
@@ -786,6 +826,7 @@ function run_command {
     "recover") recover ;;                                     # Do auto-recovery given a dead instance, assuming orchestrator agrees there's a problem. Override blocking.
     "graceful-master-takeover") graceful_master_takeover ;;   # Gracefully promote a new master. Either indicate identity of new master via '-d designated.instance.com' or setup replication tree to have a single direct replica to the master.
     "force-master-failover") force_master_failover ;;         # Forcibly discard master and initiate a failover, even if orchestrator doesn't see a problem. This command lets orchestrator choose the replacement master
+    "force-master-takeover") force_master_takeover ;;         # Forcibly discard master and promote another (direct child) instance instead, even if everything is running well
     "ack-cluster-recoveries") ack_cluster_recoveries ;;       # Acknowledge recoveries for a given cluster; this unblocks pending future recoveries
     "ack-all-recoveries") ack_all_recoveries ;;               # Acknowledge all recoveries
     "disable-global-recoveries") disable_global_recoveries ;; # Disallow orchestrator from performing recoveries globally

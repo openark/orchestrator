@@ -53,6 +53,11 @@ const (
 	errorIOTimeout         = "i/o timeout"
 )
 
+var replicationThreadStatesMapping = map[bool]string{
+	false: "No",
+	true:  "Yes",
+}
+
 var instanceReadChan = make(chan bool, backendDBConcurrency)
 var instanceWriteChan = make(chan bool, backendDBConcurrency)
 
@@ -241,19 +246,24 @@ func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStop
 	return isMaxScale, resolvedHostname, err
 }
 
-// areReplicationThreadsRunning checks if both IO and SQL threads are running
-func areReplicationThreadsRunning(instanceKey *InstanceKey) (replicationThreadsRunning bool, err error) {
+// expectReplicationThreadsState expects both replication threads to be running, or both to be not running.
+// Specifically, it looks for both to be "Yes" or for both to be "No".
+func expectReplicationThreadsState(instanceKey *InstanceKey, expectRunning bool) (expectationMet bool, err error) {
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
-		return replicationThreadsRunning, err
+		return false, err
 	}
 	err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
-		ioThreadRunning := (m.GetString("Slave_IO_Running") == "Yes")
-		sqlThreadRunning := (m.GetString("Slave_SQL_Running") == "Yes")
-		replicationThreadsRunning = ioThreadRunning && sqlThreadRunning
+		ioThreadRunning := m.GetString("Slave_IO_Running")
+		sqlThreadRunning := m.GetString("Slave_SQL_Running")
+
+		if ioThreadRunning == replicationThreadStatesMapping[expectRunning] &&
+			sqlThreadRunning == replicationThreadStatesMapping[expectRunning] {
+			expectationMet = true
+		}
 		return nil
 	})
-	return replicationThreadsRunning, err
+	return expectationMet, err
 }
 
 // ReadTopologyInstanceBufferable connects to a topology MySQL instance
@@ -274,7 +284,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	instanceFound := false
 	partialSuccess := false
 	foundByShowSlaveHosts := false
-	longRunningProcesses := []Process{}
 	resolvedHostname := ""
 	maxScaleMasterHostname := ""
 	isMaxScale := false
@@ -820,7 +829,6 @@ Cleanup:
 		} else {
 			WriteInstance(instance, instanceFound, err)
 		}
-		WriteLongRunningProcesses(&instance.Key, longRunningProcesses)
 		lastAttemptedCheckTimer.Stop()
 		latency.Stop("backend")
 		return instance, nil
@@ -2731,21 +2739,25 @@ func ResetInstanceRelaylogCoordinatesHistory(instanceKey *InstanceKey) error {
 
 // FigureClusterName will make a best effort to deduce a cluster name using either a given alias
 // or an instanceKey. First attempt is at alias, and if that doesn't work, we try instanceKey.
+// - clusterHint may be an empty string
 func FigureClusterName(clusterHint string, instanceKey *InstanceKey, thisInstanceKey *InstanceKey) (clusterName string, err error) {
 	// Look for exact matches, first.
 
-	// Exact cluster name match:
-	if clusterInfo, err := ReadClusterInfo(clusterHint); err == nil && clusterInfo != nil {
-		return clusterInfo.ClusterName, nil
-	}
-	// Exact cluster alias match:
-	if clustersInfo, err := ReadClustersInfo(""); err == nil {
-		for _, clusterInfo := range clustersInfo {
-			if clusterInfo.ClusterAlias == clusterHint {
-				return clusterInfo.ClusterName, nil
+	if clusterHint != "" {
+		// Exact cluster name match:
+		if clusterInfo, err := ReadClusterInfo(clusterHint); err == nil && clusterInfo != nil {
+			return clusterInfo.ClusterName, nil
+		}
+		// Exact cluster alias match:
+		if clustersInfo, err := ReadClustersInfo(""); err == nil {
+			for _, clusterInfo := range clustersInfo {
+				if clusterInfo.ClusterAlias == clusterHint {
+					return clusterInfo.ClusterName, nil
+				}
 			}
 		}
 	}
+
 	clusterByInstanceKey := func(instanceKey *InstanceKey) (hasResult bool, clusterName string, err error) {
 		if instanceKey == nil {
 			return false, "", nil

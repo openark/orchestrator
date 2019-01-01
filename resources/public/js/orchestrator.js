@@ -451,6 +451,15 @@ function openNodeModal(node) {
     });
     return false;
   });
+  $('#node_modal [data-btn=gtid-errant-inject-empty]').click(function() {
+    var message = "<p>Are you sure you wish to inject empty transactions on the master of this cluster?";
+    bootbox.confirm(message, function(confirm) {
+      if (confirm) {
+        apiCommand("/api/gtid-errant-inject-empty/" + node.Key.Hostname + "/" + node.Key.Port);
+      }
+    });
+    return false;
+  });
   $('#node_modal button[data-btn=set-read-only]').click(function() {
     apiCommand("/api/set-read-only/" + node.Key.Hostname + "/" + node.Key.Port);
   });
@@ -539,7 +548,7 @@ function openNodeModal(node) {
 
   $('#node_modal button[data-btn=enable-gtid]').hide();
   $('#node_modal button[data-btn=disable-gtid]').hide();
-  if (node.usingGTID) {
+  if (node.supportsGTID && node.usingGTID) {
     $('#node_modal button[data-btn=disable-gtid]').show();
   } else if (node.supportsGTID) {
     $('#node_modal button[data-btn=enable-gtid]').show();
@@ -976,7 +985,7 @@ function renderGlobalRecoveriesButton(isGlobalRecoveriesEnabled) {
   if (isGlobalRecoveriesEnabled) {
     iconContainer
       .prop("title", "Global Recoveries Enabled")
-      .addClass("glyphicon-heart")
+      .addClass("glyphicon-ok-sign")
       .removeClass("hidden")
       .click(function(event) {
         bootbox.confirm("<h3>Global Recoveries</h3>Are you sure you want to <strong>disable</strong> global recoveries?", function(confirm) {
@@ -988,7 +997,7 @@ function renderGlobalRecoveriesButton(isGlobalRecoveriesEnabled) {
   } else {
     iconContainer
       .prop("title", "Global Recoveries Disabled")
-      .addClass("glyphicon-heart-empty")
+      .addClass("glyphicon-remove-sign")
       .removeClass("hidden")
       .click(function(event) {
         bootbox.confirm("<h3>Global Recoveries</h3>Are you sure you want to enable global recoveries?", function(confirm) {
@@ -1002,7 +1011,9 @@ function renderGlobalRecoveriesButton(isGlobalRecoveriesEnabled) {
 
 $(document).ready(function() {
   visualizeBrand();
-
+  if (webMessage()) {
+    addAlert(webMessage(), "warning")
+  }
   $.get(appUrl("/api/clusters-info"), function(clusters) {
     clusters = clusters || [];
 

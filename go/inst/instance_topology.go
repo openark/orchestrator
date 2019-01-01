@@ -1266,7 +1266,7 @@ func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
-// ResetMasterGTIDOperation will issue a safe RESET MASTER on a replica that replicates via GTID:
+// ErrantGTIDResetMaster will issue a safe RESET MASTER on a replica that replicates via GTID:
 // It will make sure the gtid_purged set matches the executed set value as read just before the RESET.
 // this will enable new replicas to be attached to given instance without complaints about missing/purged entries.
 // This function requires that the instance does not have replicas.
@@ -1288,7 +1288,8 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err er
 	gtidSubtract := ""
 	executedGtidSet := ""
 	masterStatusFound := false
-	waitInterval := time.Millisecond * 250
+	replicationStopped := false
+	waitInterval := time.Second * 5
 
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "reset-master-gtid"); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
@@ -1300,6 +1301,14 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err er
 	if instance.IsReplica() {
 		instance, err = StopSlave(instanceKey)
 		if err != nil {
+			goto Cleanup
+		}
+		replicationStopped, err = waitForReplicationState(instanceKey, false)
+		if err != nil {
+			goto Cleanup
+		}
+		if !replicationStopped {
+			err = fmt.Errorf("gtid-errant-reset-master: timeout while waiting for replication to stop on %+v", instance.Key)
 			goto Cleanup
 		}
 	}
@@ -1364,6 +1373,52 @@ Cleanup:
 	AuditOperation("gtid-errant-reset-master", instanceKey, fmt.Sprintf("%+v master reset", *instanceKey))
 
 	return instance, err
+}
+
+// ErrantGTIDInjectEmpty will inject an empty transaction on the master of an instance's cluster in order to get rid
+// of an errant transaction observed on the instance.
+func ErrantGTIDInjectEmpty(instanceKey *InstanceKey) (instance *Instance, clusterMaster *Instance, countInjectedTransactions int64, err error) {
+	instance, err = ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, clusterMaster, countInjectedTransactions, err
+	}
+	if instance.GtidErrant == "" {
+		return instance, clusterMaster, countInjectedTransactions, log.Errorf("gtid-errant-inject-empty will not operate on %+v because no errant GTID is found", *instanceKey)
+	}
+	if !instance.SupportsOracleGTID {
+		return instance, clusterMaster, countInjectedTransactions, log.Errorf("gtid-errant-inject-empty requested for %+v but it does not support oracle-gtid", *instanceKey)
+	}
+
+	masters, err := ReadClusterWriteableMaster(instance.ClusterName)
+	if err != nil {
+		return instance, clusterMaster, countInjectedTransactions, err
+	}
+	if len(masters) == 0 {
+		return instance, clusterMaster, countInjectedTransactions, log.Errorf("gtid-errant-inject-empty found no writabel master for %+v cluster", instance.ClusterName)
+	}
+	clusterMaster = masters[0]
+
+	if !clusterMaster.SupportsOracleGTID {
+		return instance, clusterMaster, countInjectedTransactions, log.Errorf("gtid-errant-inject-empty requested for %+v but the cluster's master %+v does not support oracle-gtid", *instanceKey, clusterMaster.Key)
+	}
+
+	gtidSet, err := NewOracleGtidSet(instance.GtidErrant)
+	if err != nil {
+		return instance, clusterMaster, countInjectedTransactions, err
+	}
+	explodedEntries := gtidSet.Explode()
+	log.Infof("gtid-errant-inject-empty: about to inject %+v empty transactions %+v on cluster master %+v", len(explodedEntries), gtidSet.String(), clusterMaster.Key)
+	for _, entry := range explodedEntries {
+		if err := injectEmptyGTIDTransaction(&clusterMaster.Key, entry); err != nil {
+			return instance, clusterMaster, countInjectedTransactions, err
+		}
+		countInjectedTransactions++
+	}
+
+	// and we're done (pending deferred functions)
+	AuditOperation("gtid-errant-inject-empty", instanceKey, fmt.Sprintf("injected %+v empty transactions on %+v", countInjectedTransactions, clusterMaster.Key))
+
+	return instance, clusterMaster, countInjectedTransactions, err
 }
 
 // FindLastPseudoGTIDEntry will search an instance's binary logs or relay logs for the last pseudo-GTID entry,
@@ -1648,7 +1703,7 @@ func TakeSiblings(instanceKey *InstanceKey) (instance *Instance, takenSiblings i
 // (they continue replicate without change)
 // Note that the master must itself be a replica; however the grandparent does not necessarily have to be reachable
 // and can in fact be dead.
-func TakeMaster(instanceKey *InstanceKey) (*Instance, error) {
+func TakeMaster(instanceKey *InstanceKey, allowTakingCoMaster bool) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
@@ -1657,7 +1712,7 @@ func TakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil || !found {
 		return instance, err
 	}
-	if masterInstance.IsCoMaster {
+	if masterInstance.IsCoMaster && !allowTakingCoMaster {
 		return instance, fmt.Errorf("%+v is co-master. Cannot take it.", masterInstance.Key)
 	}
 	log.Debugf("TakeMaster: will attempt making %+v take its master %+v, now resolved as %+v", *instanceKey, instance.MasterKey, masterInstance.Key)

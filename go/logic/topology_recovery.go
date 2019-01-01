@@ -133,6 +133,7 @@ type TopologyRecovery struct {
 	AcknowledgedComment       string
 	LastDetectionId           int64
 	RelatedRecoveryId         int64
+	Type                      RecoveryType
 	RecoveryType              MasterRecoveryType
 }
 
@@ -522,6 +523,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 
 // recoverDeadMaster recovers a dead master, complete logic inside
 func recoverDeadMaster(topologyRecovery *TopologyRecovery, candidateInstanceKey *inst.InstanceKey, skipProcesses bool) (promotedReplica *inst.Instance, lostReplicas [](*inst.Instance), err error) {
+	topologyRecovery.Type = MasterRecovery
 	analysisEntry := &topologyRecovery.AnalysisEntry
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	var cannotReplicateReplicas [](*inst.Instance)
@@ -790,7 +792,7 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 
 	if candidateInstance.MasterKey.Equals(&promotedReplica.Key) {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("suggested candidate %+v is replica of promoted instance %+v. Will try and take its master", candidateInstance.Key, promotedReplica.Key))
-		candidateInstance, err = inst.TakeMaster(&candidateInstance.Key)
+		candidateInstance, err = inst.TakeMaster(&candidateInstance.Key, topologyRecovery.Type == CoMasterRecovery)
 		if err != nil {
 			return promotedReplica, log.Errore(err)
 		}
@@ -1037,6 +1039,7 @@ func GetCandidateSiblingOfIntermediateMaster(topologyRecovery *TopologyRecovery,
 
 // RecoverDeadIntermediateMaster performs intermediate master recovery; complete logic inside
 func RecoverDeadIntermediateMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (successorInstance *inst.Instance, err error) {
+	topologyRecovery.Type = IntermediateMasterRecovery
 	analysisEntry := &topologyRecovery.AnalysisEntry
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	recoveryResolved := false
@@ -1171,6 +1174,7 @@ func checkAndRecoverDeadIntermediateMaster(analysisEntry inst.ReplicationAnalysi
 
 // RecoverDeadCoMaster recovers a dead co-master, complete logic inside
 func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool) (promotedReplica *inst.Instance, lostReplicas [](*inst.Instance), err error) {
+	topologyRecovery.Type = CoMasterRecovery
 	analysisEntry := &topologyRecovery.AnalysisEntry
 	failedInstanceKey := &analysisEntry.AnalyzedInstanceKey
 	otherCoMasterKey := &analysisEntry.AnalyzedInstanceMasterKey
@@ -1223,12 +1227,6 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 		} else {
 			// We are allowed to promote any server
 			promotedReplica, err = replacePromotedReplicaWithCandidate(topologyRecovery, failedInstanceKey, promotedReplica, nil)
-
-			if promotedReplica.DataCenter == otherCoMaster.DataCenter &&
-				promotedReplica.PhysicalEnvironment == otherCoMaster.PhysicalEnvironment && false {
-				// and _still_ we prefer to promote the co-master! They're in same env & DC so no worries about geo issues!
-				promotedReplica, err = replacePromotedReplicaWithCandidate(topologyRecovery, failedInstanceKey, promotedReplica, otherCoMasterKey)
-			}
 		}
 		topologyRecovery.AddError(err)
 	}
