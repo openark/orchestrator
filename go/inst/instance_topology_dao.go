@@ -871,7 +871,7 @@ func DetachReplica(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if !instance.ReplicationThreadsStopped() {
-		return instance, fmt.Errorf("Cannot detach slave on: %+v because replication is running", instanceKey)
+		return instance, fmt.Errorf("Cannot detach slave on: %+v because replication threads are not stopped", instanceKey)
 	}
 
 	isDetached, _ := instance.ExecBinlogCoordinates.ExtractDetachedCoordinates()
@@ -905,7 +905,7 @@ func ReattachReplica(instanceKey *InstanceKey) (*Instance, error) {
 	}
 
 	if !instance.ReplicationThreadsStopped() {
-		return instance, fmt.Errorf("Cannot (need not) reattach slave on: %+v because replication is running", instanceKey)
+		return instance, fmt.Errorf("Cannot (need not) reattach slave on: %+v because replication threads are not stopped", instanceKey)
 	}
 
 	isDetached, detachedCoordinates := instance.ExecBinlogCoordinates.ExtractDetachedCoordinates()
