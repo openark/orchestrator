@@ -581,7 +581,7 @@ func EnableMasterSSL(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 
-	if !instance.ReplicationThreadsStopped() {
+	if instance.ReplicationThreadsExist() && !instance.ReplicationThreadsStopped() {
 		return instance, fmt.Errorf("EnableMasterSSL: Cannot enable SSL replication on %+v because replication threads are not stopped", *instanceKey)
 	}
 	log.Debugf("EnableMasterSSL: Will attempt enabling SSL replication on %+v", *instanceKey)
@@ -608,7 +608,7 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 		return instance, log.Errore(err)
 	}
 
-	if !instance.ReplicationThreadsStopped() {
+	if instance.ReplicationThreadsExist() && !instance.ReplicationThreadsStopped() {
 		return instance, fmt.Errorf("ChangeMasterTo: Cannot change master on: %+v because replication threads are not stopped", *instanceKey)
 	}
 	log.Debugf("ChangeMasterTo: will attempt changing master on %+v to %+v, %+v", *instanceKey, *masterKey, *masterBinlogCoordinates)
@@ -709,7 +709,7 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 
-	if !instance.ReplicationThreadsStopped() {
+	if instance.ReplicationThreadsExist() && !instance.ReplicationThreadsStopped() {
 		return instance, fmt.Errorf("Cannot reset slave on: %+v because replication threads are not stopped", instanceKey)
 	}
 
@@ -742,8 +742,8 @@ func ResetMaster(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 
-	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("Cannot reset master on: %+v because replication is running", instanceKey)
+	if instance.ReplicationThreadsExist() && !instance.ReplicationThreadsStopped() {
+		return instance, fmt.Errorf("Cannot reset master on: %+v because replication threads are not stopped", instanceKey)
 	}
 
 	if *config.RuntimeCLIFlags.Noop {

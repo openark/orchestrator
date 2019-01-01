@@ -47,8 +47,9 @@ func ReplicationThreadStateFromStatus(status string) ReplicationThreadState {
 	}
 	return ReplicationThreadStateOther
 }
-func (this *ReplicationThreadState) IsRunning() bool { return *this == 1 }
-func (this *ReplicationThreadState) IsStopped() bool { return *this == 0 }
+func (this *ReplicationThreadState) IsRunning() bool { return *this == ReplicationThreadStateRunning }
+func (this *ReplicationThreadState) IsStopped() bool { return *this == ReplicationThreadStateStopped }
+func (this *ReplicationThreadState) Exists() bool    { return *this != ReplicationThreadStateNoThread }
 
 // Instance represents a database instance, including its current configuration & status.
 // It presents important replication configuration and detailed replication status.
@@ -284,6 +285,11 @@ func (this *Instance) ReplicaRunning() bool {
 // NoReplicationThreadRunning returns true when neither SQL nor IO threads are running (including the case where isn't even a replica)
 func (this *Instance) ReplicationThreadsStopped() bool {
 	return this.ReplicationSQLThreadState.IsStopped() && this.ReplicationIOThreadState.IsStopped()
+}
+
+// NoReplicationThreadRunning returns true when neither SQL nor IO threads are running (including the case where isn't even a replica)
+func (this *Instance) ReplicationThreadsExist() bool {
+	return this.ReplicationSQLThreadState.Exists() && this.ReplicationIOThreadState.Exists()
 }
 
 // SQLThreadUpToDate returns true when the instance had consumed all relay logs.
