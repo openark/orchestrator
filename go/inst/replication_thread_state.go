@@ -16,8 +16,6 @@
 
 package inst
 
-import ()
-
 type ReplicationThreadState int
 
 const (
