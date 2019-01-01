@@ -870,7 +870,7 @@ func DetachReplica(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 
-	if instance.ReplicaRunning() {
+	if !instance.ReplicationThreadsStopped() {
 		return instance, fmt.Errorf("Cannot detach slave on: %+v because replication is running", instanceKey)
 	}
 
@@ -904,7 +904,7 @@ func ReattachReplica(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 
-	if instance.ReplicaRunning() {
+	if !instance.ReplicationThreadsStopped() {
 		return instance, fmt.Errorf("Cannot (need not) reattach slave on: %+v because replication is running", instanceKey)
 	}
 
