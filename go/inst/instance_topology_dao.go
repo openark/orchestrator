@@ -608,8 +608,8 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 		return instance, log.Errore(err)
 	}
 
-	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("ChangeMasterTo: Cannot change master on: %+v because replication is running", *instanceKey)
+	if !instance.ReplicationThreadsStopped() {
+		return instance, fmt.Errorf("ChangeMasterTo: Cannot change master on: %+v because replication threads are not stopped", *instanceKey)
 	}
 	log.Debugf("ChangeMasterTo: will attempt changing master on %+v to %+v, %+v", *instanceKey, *masterKey, *masterBinlogCoordinates)
 	changeToMasterKey := masterKey
