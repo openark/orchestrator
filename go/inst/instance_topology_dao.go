@@ -709,8 +709,8 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 
-	if instance.ReplicaRunning() {
-		return instance, fmt.Errorf("Cannot reset slave on: %+v because replication is running", instanceKey)
+	if !instance.ReplicationThreadsStopped() {
+		return instance, fmt.Errorf("Cannot reset slave on: %+v because replication threads are not stopped", instanceKey)
 	}
 
 	if *config.RuntimeCLIFlags.Noop {
