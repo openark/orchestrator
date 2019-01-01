@@ -29,28 +29,6 @@ import (
 
 const ReasonableDiscoveryLatency = 500 * time.Millisecond
 
-type ReplicationThreadState int
-
-const (
-	ReplicationThreadStateNoThread ReplicationThreadState = -1
-	ReplicationThreadStateStopped                         = 0
-	ReplicationThreadStateRunning                         = 1
-	ReplicationThreadStateOther                           = 2
-)
-
-func ReplicationThreadStateFromStatus(status string) ReplicationThreadState {
-	switch status {
-	case "No":
-		return ReplicationThreadStateStopped
-	case "Yes":
-		return ReplicationThreadStateRunning
-	}
-	return ReplicationThreadStateOther
-}
-func (this *ReplicationThreadState) IsRunning() bool { return *this == ReplicationThreadStateRunning }
-func (this *ReplicationThreadState) IsStopped() bool { return *this == ReplicationThreadStateStopped }
-func (this *ReplicationThreadState) Exists() bool    { return *this != ReplicationThreadStateNoThread }
-
 // Instance represents a database instance, including its current configuration & status.
 // It presents important replication configuration and detailed replication status.
 type Instance struct {
