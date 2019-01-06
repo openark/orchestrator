@@ -527,8 +527,18 @@ var generateSQLPatches = []string{
 	`,
 	`
 		ALTER TABLE
-			global_recovery_disable
-			ADD COLUMN disabled_time timestamp not null default current_timestamp
+			database_instance
+			ADD COLUMN replication_sql_thread_state tinyint signed not null default 0 AFTER slave_io_running
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN replication_io_thread_state tinyint signed not null default 0 AFTER replication_sql_thread_state
+	`,
+	`
+		ALTER TABLE
+		global_recovery_disable
+		ADD COLUMN disabled_time timestamp not null default current_timestamp
 	`,
 	`
 		ALTER TABLE

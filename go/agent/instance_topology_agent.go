@@ -34,10 +34,10 @@ func SyncReplicaRelayLogs(instance, otherInstance *inst.Instance) (*inst.Instanc
 	}
 	log.Debugf("SyncReplicaRelayLogs: stopping replication")
 
-	if instance.ReplicaRunning() {
+	if !instance.ReplicationThreadsStopped() {
 		return instance, log.Errorf("SyncReplicaRelayLogs: replication on %+v must not run", instance.Key)
 	}
-	if otherInstance.ReplicaRunning() {
+	if !otherInstance.ReplicationThreadsStopped() {
 		return instance, log.Errorf("SyncReplicaRelayLogs: replication on %+v must not run", otherInstance.Key)
 	}
 
