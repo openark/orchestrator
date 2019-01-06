@@ -183,3 +183,19 @@ func TestTabulatedDescription(t *testing.T) {
 		test.S(t).ExpectEquals(desc, "unknown|invalid|5.7.8-log|rw|ROW|>>,P-GTID")
 	}
 }
+
+func TestReplicationThreads(t *testing.T) {
+	{
+		test.S(t).ExpectFalse(instance1.ReplicaRunning())
+	}
+	{
+		test.S(t).ExpectTrue(instance1.ReplicationThreadsExist())
+	}
+	{
+		test.S(t).ExpectTrue(instance1.ReplicationThreadsStopped())
+	}
+	{
+		i := Instance{Key: key1, ReplicationIOThreadState: ReplicationThreadStateNoThread, ReplicationSQLThreadState: ReplicationThreadStateNoThread}
+		test.S(t).ExpectFalse(i.ReplicationThreadsExist())
+	}
+}
