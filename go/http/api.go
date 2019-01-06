@@ -1872,13 +1872,29 @@ func (this *HttpAPI) Untag(params martini.Params, r render.Render, req *http.Req
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	existed, err := inst.DeleteInstanceTag(&instanceKey, tag)
+	untagged, err := inst.Untag(&instanceKey, tag)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("%s existed on %+v: %+v", tag.TagName, instanceKey, existed), Details: instanceKey})
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("%s removed from %+v instances", tag.TagName, len(*untagged)), Details: untagged.GetInstanceKeys()})
+}
+
+// UntagAll removes a tag from all matching instances
+func (this *HttpAPI) UntagAll(params martini.Params, r render.Render, req *http.Request) {
+	tag, err := getTag(params, req)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	untagged, err := inst.Untag(nil, tag)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("%s removed from %+v instances", tag.TagName, len(*untagged)), Details: untagged.GetInstanceKeys()})
 }
 
 // Write a cluster's master (or all clusters masters) to kv stores.
@@ -3596,6 +3612,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "tag/:host/:port/:tagName/:tagValue", this.Tag)
 	this.registerAPIRequest(m, "untag/:host/:port", this.Untag)
 	this.registerAPIRequest(m, "untag/:host/:port/:tagName", this.Untag)
+	this.registerAPIRequest(m, "untag-all", this.UntagAll)
+	this.registerAPIRequest(m, "untag-all/:tagName/:tagValue", this.UntagAll)
 
 	// Instance management:
 	this.registerAPIRequest(m, "instance/:host/:port", this.Instance)

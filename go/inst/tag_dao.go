@@ -44,29 +44,59 @@ func PutInstanceTag(instanceKey *InstanceKey, tag *Tag) (err error) {
 	return err
 }
 
-// EndDowntime will remove downtime flag from an instance
-func DeleteInstanceTag(instanceKey *InstanceKey, tag *Tag) (tagExisted bool, err error) {
-	res, err := db.ExecOrchestrator(`
+func Untag(instanceKey *InstanceKey, tag *Tag) (tagged *InstanceKeyMap, err error) {
+	if tag == nil {
+		return nil, log.Errorf("Untag: tag is nil")
+	}
+	if tag.Negate {
+		return nil, log.Errorf("Untag: does not support negation")
+	}
+	if instanceKey == nil && !tag.HasValue {
+		return nil, log.Errorf("Untag: either indicate an instance or a tag value. Will not delete on-valued tag across instances")
+	}
+	clause := ``
+	args := sqlutils.Args()
+	if tag.HasValue {
+		clause = `tag_name=? and tag_value=?`
+		args = append(args, tag.TagName, tag.TagValue)
+	} else {
+		clause = `tag_name=?`
+		args = append(args, tag.TagName)
+	}
+	if instanceKey != nil {
+		clause = fmt.Sprintf("%s and hostname=? and port=?", clause)
+		args = append(args, instanceKey.Hostname, instanceKey.Port)
+	}
+	tagged = NewInstanceKeyMap()
+	query := fmt.Sprintf(`
+		select
+			hostname,
+			port
+		from
+			database_instance_tags
+		where
+			%s
+		order by hostname, port
+		`, clause,
+	)
+	err = db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
+		key, _ := NewResolveInstanceKey(m.GetString("hostname"), m.GetInt("port"))
+		tagged.AddKey(*key)
+		return nil
+	})
+
+	query = fmt.Sprintf(`
 			delete from
 				database_instance_tags
 			where
-				hostname = ?
-				and port = ?
-				and tag_name = ?
-			`,
-		instanceKey.Hostname,
-		instanceKey.Port,
-		tag.TagName,
+				%s
+			`, clause,
 	)
-	if err != nil {
-		return tagExisted, log.Errore(err)
+	if _, err = db.ExecOrchestrator(query, args...); err != nil {
+		return tagged, log.Errore(err)
 	}
-
-	if affected, _ := res.RowsAffected(); affected > 0 {
-		tagExisted = true
-		AuditOperation("delete-instance-tag", instanceKey, "")
-	}
-	return tagExisted, err
+	AuditOperation("delete-instance-tag", instanceKey, tag.String())
+	return tagged, nil
 }
 
 func ReadInstanceTag(instanceKey *InstanceKey, tag *Tag) (tagExists bool, err error) {

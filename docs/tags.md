@@ -11,6 +11,7 @@ The following commands are supported. A breakdown follows:
 - `orchestrator-client -c tag -i some.instance --tag name=value`
 - `orchestrator-client -c tag -i some.instance --tag name`
 - `orchestrator-client -c untag -i some.instance -t name`
+- `orchestrator-client -c untag-all -t name=value`
 - `orchestrator-client -c tags -i some.instance`
 - `orchestrator-client -c tag-value -i some.instance -t name`
 - `orchestrator-client -c tagged -t name`
@@ -24,6 +25,8 @@ and these API endpoints:
 - `api/tag/:host/:port?tag=name%3Dvalue`
 - `api/untag/:host/:port/:tagName`
 - `api/untag/:host/:port?tag=name`
+- `api/untag-all/:tagName/:tagValue`
+- `api/untag-all?tag=name%3Dvalue`
 - `api/tags/:host/:port`
 - `api/tag-value/:host/:port/:tagName`
 - `api/tag-value/:host/:port?tag=name`
@@ -54,16 +57,28 @@ In the above we chose to create a tag named `vttablet_alias` with a value.
 
 Tagging is per instance. The instance itself is unaffected by this operation. `orchestrator` maintains tags as metadata. The instance needs not be available.
 
-### Untagging
+### Untagging: single instance
 
-`-c untag` or `api/untag` removes a tag, if exists. `orchestrator` will not error nor indicate whether the tag pre-existed.
+`-c untag` or `api/untag` removes a tag, if exists, from a given instance. `orchestrator` outputs the instance name if the tag did in fact exist, or empty output if the tag did not exist.
+
+You may tags:
+
+- Specify tag name and tag value: tag is removed only if it equals that value.
+- Specify tag name only: tag is removed regardless of its value.
 
 Example:
 ```shell
 $ orchestrator-client -c untag -i db-host-01:3306 --tag vttablet_alias
 ```
 
-Do not provide a value to the tag.
+### Untagging: multiple instances
+
+`-c untag-all` or `api/untag-all` removes a tag from all instances where the value matches. Note that tag value must be provided.
+
+Example:
+```shell
+$ orchestrator-client -c untag-all --tag vttablet_alias=dc1-0123456789
+```
 
 ### Listing instance tags
 

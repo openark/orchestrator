@@ -1302,8 +1302,27 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if err != nil {
 				log.Fatale(err)
 			}
-			inst.DeleteInstanceTag(instanceKey, tag)
-			fmt.Println(instanceKey.DisplayString())
+			untagged, err := inst.Untag(instanceKey, tag)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, key := range untagged.GetInstanceKeys() {
+				fmt.Println(key.DisplayString())
+			}
+		}
+	case registerCliCommand("untag-all", "tags", `Remove a tag from all matching instances`):
+		{
+			tag, err := inst.ParseTag(*config.RuntimeCLIFlags.Tag)
+			if err != nil {
+				log.Fatale(err)
+			}
+			untagged, err := inst.Untag(nil, tag)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, key := range untagged.GetInstanceKeys() {
+				fmt.Println(key.DisplayString())
+			}
 		}
 
 		// Instance management
