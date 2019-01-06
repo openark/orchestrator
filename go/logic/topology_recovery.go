@@ -783,20 +783,37 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 		return promotedReplica, log.Errore(err)
 	}
 	if !actionRequired {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("promoted instance %+v requires no further action", promotedReplica.Key))
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("replace-promoted-replica-with-candidate: promoted instance %+v requires no further action", promotedReplica.Key))
 		return promotedReplica, nil
 	}
 
 	// Try and promote suggested candidate, if applicable and possible
-	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("promoted instance %+v is not the suggested candidate %+v. Will see what can be done", promotedReplica.Key, candidateInstance.Key))
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("replace-promoted-replica-with-candidate: promoted instance %+v is not the suggested candidate %+v. Will see what can be done", promotedReplica.Key, candidateInstance.Key))
 
 	if candidateInstance.MasterKey.Equals(&promotedReplica.Key) {
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("suggested candidate %+v is replica of promoted instance %+v. Will try and take its master", candidateInstance.Key, promotedReplica.Key))
+		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("replace-promoted-replica-with-candidate: suggested candidate %+v is replica of promoted instance %+v. Will try and take its master", candidateInstance.Key, promotedReplica.Key))
 		candidateInstance, err = inst.TakeMaster(&candidateInstance.Key, topologyRecovery.Type == CoMasterRecovery)
 		if err != nil {
 			return promotedReplica, log.Errore(err)
 		}
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("success promoting %+v over %+v", candidateInstance.Key, promotedReplica.Key))
+
+		// As followup to taking over, let's relocate all the rest of the replicas under the candidate instance
+		relocateReplicasFunc := func() error {
+			log.Debugf("replace-promoted-replica-with-candidate: relocating replicas of %+v below %+v", promotedReplica.Key, candidateInstance.Key)
+
+			relocatedReplicas, _, err, _ := inst.RelocateReplicas(&promotedReplica.Key, &candidateInstance.Key, "")
+			log.Debugf("replace-promoted-replica-with-candidate: + relocated %+v replicas of %+v below %+v", len(relocatedReplicas), promotedReplica.Key, candidateInstance.Key)
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("relocated %+v replicas of %+v below %+v", len(relocatedReplicas), promotedReplica.Key, candidateInstance.Key))
+			return log.Errore(err)
+		}
+		postponedFunctionsContainer := &topologyRecovery.PostponedFunctionsContainer
+		if postponedFunctionsContainer != nil {
+			postponedFunctionsContainer.AddPostponedFunction(relocateReplicasFunc, fmt.Sprintf("replace-promoted-replica-with-candidate: relocate replicas of %+v", promotedReplica.Key))
+		} else {
+			_ = relocateReplicasFunc()
+			// We do not propagate the error. It is logged, but otherwise should not fail the entire failover operation
+		}
 		return candidateInstance, nil
 	}
 
