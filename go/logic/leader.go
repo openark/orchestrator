@@ -35,7 +35,7 @@ func OnLeaderStateChange(isTurnedLeader bool) {
 		recoveryDisableHints.Add("turned-leader", true, cache.DefaultExpiration)
 		recoveryDisableHints.Delete("turned-non-leader")
 	} else {
-		for key, _ := range recentRecoveryAuthorizationRequests.Items() {
+		for key := range recentRecoveryAuthorizationRequests.Items() {
 			recentRecoveryAuthorizationRequests.Delete(key)
 		}
 		recoveryDisableHints.Add("turned-non-leader", true, cache.NoExpiration)
@@ -44,7 +44,7 @@ func OnLeaderStateChange(isTurnedLeader bool) {
 
 func recoveryDisabledHint() *string {
 	items := recoveryDisableHints.Items()
-	for k, _ := range items {
+	for k := range items {
 		return &k
 	}
 	return nil
