@@ -1303,7 +1303,7 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err er
 		if err != nil {
 			goto Cleanup
 		}
-		replicationStopped, err = waitForReplicationState(instanceKey, false)
+		replicationStopped, err = waitForReplicationState(instanceKey, ReplicationThreadStateStopped)
 		if err != nil {
 			goto Cleanup
 		}
