@@ -2094,15 +2094,9 @@ func getPriorityMajorVersionForCandidate(replicas [](*Instance)) (priorityMajorV
 		// all same version, simple case
 		return replicas[0].MajorVersionString(), nil
 	}
-
-	currentMaxMajorVersionCount := 0
-	for majorVersion, count := range majorVersionsCount {
-		if count > currentMaxMajorVersionCount {
-			currentMaxMajorVersionCount = count
-			priorityMajorVersion = majorVersion
-		}
-	}
-	return priorityMajorVersion, nil
+	sorted := NewMajorVersionsSortedByCount(majorVersionsCount)
+	sort.Sort(sort.Reverse(sorted))
+	return sorted.First(), nil
 }
 
 // getPriorityBinlogFormatForCandidate returns the primary (most common) binlog format found

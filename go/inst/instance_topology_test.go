@@ -1,6 +1,8 @@
 package inst
 
 import (
+	"math/rand"
+
 	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
 	test "github.com/openark/golib/tests"
@@ -101,25 +103,55 @@ func TestSortInstancesDataCenterHint(t *testing.T) {
 }
 
 func TestGetPriorityMajorVersionForCandidate(t *testing.T) {
-	instances, instancesMap := generateTestInstances()
+	{
+		instances, instancesMap := generateTestInstances()
 
-	priorityMajorVersion, err := getPriorityMajorVersionForCandidate(instances)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(priorityMajorVersion, "5.6")
+		priorityMajorVersion, err := getPriorityMajorVersionForCandidate(instances)
+		test.S(t).ExpectNil(err)
+		test.S(t).ExpectEquals(priorityMajorVersion, "5.6")
 
-	instancesMap[i810Key.StringCode()].Version = "5.5.1"
-	instancesMap[i720Key.StringCode()].Version = "5.7.8"
-	priorityMajorVersion, err = getPriorityMajorVersionForCandidate(instances)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(priorityMajorVersion, "5.6")
+		instancesMap[i810Key.StringCode()].Version = "5.5.1"
+		instancesMap[i720Key.StringCode()].Version = "5.7.8"
+		priorityMajorVersion, err = getPriorityMajorVersionForCandidate(instances)
+		test.S(t).ExpectNil(err)
+		test.S(t).ExpectEquals(priorityMajorVersion, "5.6")
 
-	instancesMap[i710Key.StringCode()].Version = "5.7.8"
-	instancesMap[i720Key.StringCode()].Version = "5.7.8"
-	instancesMap[i730Key.StringCode()].Version = "5.7.8"
-	instancesMap[i830Key.StringCode()].Version = "5.7.8"
-	priorityMajorVersion, err = getPriorityMajorVersionForCandidate(instances)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(priorityMajorVersion, "5.7")
+		instancesMap[i710Key.StringCode()].Version = "5.7.8"
+		instancesMap[i720Key.StringCode()].Version = "5.7.8"
+		instancesMap[i730Key.StringCode()].Version = "5.7.8"
+		instancesMap[i830Key.StringCode()].Version = "5.7.8"
+		priorityMajorVersion, err = getPriorityMajorVersionForCandidate(instances)
+		test.S(t).ExpectNil(err)
+		test.S(t).ExpectEquals(priorityMajorVersion, "5.7")
+	}
+	{
+		instances, instancesMap := generateTestInstances()
+
+		instancesMap[i710Key.StringCode()].Version = "5.6.9"
+		instancesMap[i720Key.StringCode()].Version = "5.6.9"
+		instancesMap[i730Key.StringCode()].Version = "5.7.8"
+		instancesMap[i810Key.StringCode()].Version = "5.7.8"
+		instancesMap[i820Key.StringCode()].Version = "5.7.8"
+		instancesMap[i830Key.StringCode()].Version = "5.6.9"
+		priorityMajorVersion, err := getPriorityMajorVersionForCandidate(instances)
+		test.S(t).ExpectNil(err)
+		test.S(t).ExpectEquals(priorityMajorVersion, "5.6")
+	}
+	for range rand.Perm(20) {
+		instances, _ := generateTestInstances()
+		for _, instance := range instances {
+			instance.Version = "5.6.9"
+		}
+		test.S(t).ExpectEquals(len(instances), 6)
+		perm := rand.Perm(len(instances))[0 : len(instances)/2]
+
+		for _, i := range perm {
+			instances[i].Version = "5.7.8"
+		}
+		priorityMajorVersion, err := getPriorityMajorVersionForCandidate(instances)
+		test.S(t).ExpectNil(err)
+		test.S(t).ExpectEquals(priorityMajorVersion, "5.6")
+	}
 }
 
 func TestGetPriorityBinlogFormatForCandidate(t *testing.T) {
