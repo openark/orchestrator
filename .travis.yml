@@ -13,12 +13,13 @@ env:
 - MYSQL_USER=root
 
 before_install:
-  - docker build -t orchestrator-travis-build .
   - mysql -e 'CREATE DATABASE IF NOT EXISTS test;'
 
 install: true
 
-script: script/cibuild
+script:
+  - script/cibuild
+  - docker build -t orchestrator-travis-build .
 
 notifications:
   email: false
