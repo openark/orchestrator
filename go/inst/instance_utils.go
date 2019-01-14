@@ -59,6 +59,39 @@ func (this *majorVersionsSortedByCount) First() string {
 	return this.versions[0]
 }
 
+// majorVersionsSortedByCount sorts (major) versions:
+// - primary sort: by count appearances
+// - secondary sort: by version
+type binlogFormatSortedByCount struct {
+	formatsCount map[string]int
+	formats      []string
+}
+
+func NewBinlogFormatSortedByCount(formatsCount map[string]int) *binlogFormatSortedByCount {
+	formats := []string{}
+	for v := range formatsCount {
+		formats = append(formats, v)
+	}
+	return &binlogFormatSortedByCount{
+		formatsCount: formatsCount,
+		formats:      formats,
+	}
+}
+
+func (this *binlogFormatSortedByCount) Len() int { return len(this.formats) }
+func (this *binlogFormatSortedByCount) Swap(i, j int) {
+	this.formats[i], this.formats[j] = this.formats[j], this.formats[i]
+}
+func (this *binlogFormatSortedByCount) Less(i, j int) bool {
+	if this.formatsCount[this.formats[i]] == this.formatsCount[this.formats[j]] {
+		return IsSmallerBinlogFormat(this.formats[j], this.formats[i])
+	}
+	return this.formatsCount[this.formats[i]] < this.formatsCount[this.formats[j]]
+}
+func (this *binlogFormatSortedByCount) First() string {
+	return this.formats[0]
+}
+
 // InstancesSorterByExec sorts instances by executed binlog coordinates
 type InstancesSorterByExec struct {
 	instances  [](*Instance)

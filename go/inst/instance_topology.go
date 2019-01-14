@@ -2113,15 +2113,9 @@ func getPriorityBinlogFormatForCandidate(replicas [](*Instance)) (priorityBinlog
 		// all same binlog format, simple case
 		return replicas[0].Binlog_format, nil
 	}
-
-	currentMaxBinlogFormatCount := 0
-	for binlogFormat, count := range binlogFormatsCount {
-		if count > currentMaxBinlogFormatCount {
-			currentMaxBinlogFormatCount = count
-			priorityBinlogFormat = binlogFormat
-		}
-	}
-	return priorityBinlogFormat, nil
+	sorted := NewBinlogFormatSortedByCount(binlogFormatsCount)
+	sort.Sort(sort.Reverse(sorted))
+	return sorted.First(), nil
 }
 
 // chooseCandidateReplica
