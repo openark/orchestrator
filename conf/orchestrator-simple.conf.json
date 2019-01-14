@@ -83,6 +83,7 @@
   ],
   "DetachLostSlavesAfterMasterFailover": true,
   "ApplyMySQLPromotionAfterMasterFailover": true,
+  "PreventCrossDataCenterMasterFailover": false,
   "MasterFailoverDetachSlaveMasterHost": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 60,
   "PostponeSlaveRecoveryOnLagMinutes": 10,
