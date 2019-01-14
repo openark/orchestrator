@@ -14,7 +14,7 @@
 # ORC_USER (default: orc_server_user): username used to login to orchestrator backend MySQL server
 # ORC_PASSWORD (default: orc_server_password): password used to login to orchestrator backend MySQL server
 
-FROM alpine:3.6
+FROM alpine:3.8
 
 ENV GOPATH=/tmp/go
 

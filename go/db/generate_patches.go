@@ -525,4 +525,14 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN ancestry_uuid text CHARACTER SET ascii NOT NULL AFTER master_uuid
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN replication_sql_thread_state tinyint signed not null default 0 AFTER slave_io_running
+	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN replication_io_thread_state tinyint signed not null default 0 AFTER replication_sql_thread_state
+	`,
 }
