@@ -236,6 +236,7 @@ type Configuration struct {
 	DetachLostSlavesAfterMasterFailover        bool              // synonym to DetachLostReplicasAfterMasterFailover
 	DetachLostReplicasAfterMasterFailover      bool              // Should replicas that are not to be lost in master recovery (i.e. were more up-to-date than promoted replica) be forcibly detached
 	ApplyMySQLPromotionAfterMasterFailover     bool              // Should orchestrator take upon itself to apply MySQL master promotion: set read_only=0, detach replication, etc.
+	PreventCrossDataCenterMasterFailover       bool              // When true (default: false), cross-DC master failover are not allowed, orchestrator will do all it can to only fail over within same DC, or else not fail over at all.
 	MasterFailoverLostInstancesDowntimeMinutes uint              // Number of minutes to downtime any server that was lost after a master failover (including failed master & lost replicas). 0 to disable
 	MasterFailoverDetachSlaveMasterHost        bool              // synonym to MasterFailoverDetachReplicaMasterHost
 	MasterFailoverDetachReplicaMasterHost      bool              // Should orchestrator issue a detach-replica-master-host on newly promoted master (this makes sure the new master will not attempt to replicate old master if that comes back to life). Defaults 'false'. Meaningless if ApplyMySQLPromotionAfterMasterFailover is 'true'.
@@ -397,6 +398,7 @@ func newConfiguration() *Configuration {
 		CoMasterRecoveryMustPromoteOtherCoMaster:   true,
 		DetachLostSlavesAfterMasterFailover:        true,
 		ApplyMySQLPromotionAfterMasterFailover:     true,
+		PreventCrossDataCenterMasterFailover:       false,
 		MasterFailoverLostInstancesDowntimeMinutes: 0,
 		MasterFailoverDetachSlaveMasterHost:        false,
 		FailMasterPromotionIfSQLThreadNotUpToDate:  false,

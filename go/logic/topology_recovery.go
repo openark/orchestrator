@@ -573,6 +573,17 @@ func recoverDeadMaster(topologyRecovery *TopologyRecovery, candidateInstanceKey 
 	return promotedReplica, lostReplicas, err
 }
 
+func CrossDataCenterMasterFailoverConstraintSatisfied(analysisEntry *inst.ReplicationAnalysis, suggestedInstance *inst.Instance) bool {
+	if !config.Config.PreventCrossDataCenterMasterFailover {
+		// There is no constraint. We are satisfied
+		return true
+	}
+	if suggestedInstance.DataCenter == analysisEntry.AnalyzedInstanceDataCenter {
+		return true
+	}
+	return false
+}
+
 // SuggestReplacementForPromotedReplica returns a server to take over the already
 // promoted replica, if such server is found and makes an improvement over the promoted replica.
 func SuggestReplacementForPromotedReplica(topologyRecovery *TopologyRecovery, deadInstanceKey *inst.InstanceKey, promotedReplica *inst.Instance, candidateInstanceKey *inst.InstanceKey) (replacement *inst.Instance, actionRequired bool, err error) {
@@ -625,10 +636,14 @@ func SuggestReplacementForPromotedReplica(topologyRecovery *TopologyRecovery, de
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ checking if promoted replica is an OK candidate"))
 		for _, candidateReplica := range candidateReplicas {
 			if promotedReplica.Key.Equals(&candidateReplica.Key) {
-				// Seems like we promoted a candidate replica (though not in same DC and ENV as dead master). Good enough.
-				// No further action required.
-				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("promoted replica %+v is a good candidate", promotedReplica.Key))
-				return promotedReplica, false, nil
+				// Seems like we promoted a candidate replica (though not in same DC and ENV as dead master)
+				if CrossDataCenterMasterFailoverConstraintSatisfied(&topologyRecovery.AnalysisEntry, candidateReplica) {
+					// Good enough. No further action required.
+					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("promoted replica %+v is a good candidate", promotedReplica.Key))
+					return promotedReplica, false, nil
+				} else {
+					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("skipping %+v because PreventCrossDataCenterMasterFailover is set", candidateReplica.Key))
+				}
 			}
 		}
 	}
@@ -652,38 +667,49 @@ func SuggestReplacementForPromotedReplica(topologyRecovery *TopologyRecovery, de
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ searching for a candidate"))
 		for _, candidateReplica := range candidateReplicas {
 			if canTakeOverPromotedServerAsMaster(candidateReplica, promotedReplica) {
-				// OK, better than nothing
-				candidateInstanceKey = &candidateReplica.Key
-				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement", promotedReplica.Key, candidateReplica.Key))
+				if CrossDataCenterMasterFailoverConstraintSatisfied(&topologyRecovery.AnalysisEntry, candidateReplica) {
+					// OK, better than nothing
+					candidateInstanceKey = &candidateReplica.Key
+					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement", promotedReplica.Key, candidateReplica.Key))
+				} else {
+					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("skipping %+v because PreventCrossDataCenterMasterFailover is set", candidateReplica.Key))
+				}
 			}
 		}
 	}
 
-	if promotedReplica.PromotionRule == inst.PreferNotPromoteRule {
+	keepSearchingHint := ""
+	if !CrossDataCenterMasterFailoverConstraintSatisfied(&topologyRecovery.AnalysisEntry, promotedReplica) {
+		keepSearchingHint = fmt.Sprintf("Will keep searching because PreventCrossDataCenterMasterFailover is set and we haven't promoted a server in %s data center", topologyRecovery.AnalysisEntry.AnalyzedInstanceDataCenter)
+	} else if promotedReplica.PromotionRule == inst.PreferNotPromoteRule {
+		keepSearchingHint = fmt.Sprintf("Will keep searching because we have promoted a server with prefer_not rule: %+v", promotedReplica.Key)
+	}
+	if keepSearchingHint != "" {
+		AuditTopologyRecovery(topologyRecovery, keepSearchingHint)
 		neutralReplicas, _ := inst.ReadClusterNeutralPromotionRuleInstances(promotedReplica.ClusterName)
 
 		if candidateInstanceKey == nil {
 			// Still nothing? Then we didn't find a replica marked as "candidate". OK, further down the stream we have:
 			// find neutral instance in same dv&env as dead master
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ searching for a neutral server to replace a prefer_not, in same DC and env as dead master"))
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ searching for a neutral server to replace promoted server, in same DC and env as dead master"))
 			for _, neutralReplica := range neutralReplicas {
 				if canTakeOverPromotedServerAsMaster(neutralReplica, promotedReplica) &&
 					deadInstance.DataCenter == neutralReplica.DataCenter &&
 					deadInstance.PhysicalEnvironment == neutralReplica.PhysicalEnvironment {
 					candidateInstanceKey = &neutralReplica.Key
-					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as dead master, where promoted instance has prefer_not promotion rule", promotedReplica.Key, neutralReplica.Key))
+					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as dead master", promotedReplica.Key, neutralReplica.Key))
 				}
 			}
 		}
 		if candidateInstanceKey == nil {
 			// find neutral instance in same dv&env as promoted replica
-			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ searching for a neutral server to replace a prefer_not, in same DC and env as promoted replica"))
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ searching for a neutral server to replace promoted server, in same DC and env as promoted replica"))
 			for _, neutralReplica := range neutralReplicas {
 				if canTakeOverPromotedServerAsMaster(neutralReplica, promotedReplica) &&
 					promotedReplica.DataCenter == neutralReplica.DataCenter &&
 					promotedReplica.PhysicalEnvironment == neutralReplica.PhysicalEnvironment {
 					candidateInstanceKey = &neutralReplica.Key
-					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as promoted instance that has prefer_not promotion rule", promotedReplica.Key, neutralReplica.Key))
+					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on being in same DC & env as promoted instance", promotedReplica.Key, neutralReplica.Key))
 				}
 			}
 		}
@@ -691,9 +717,13 @@ func SuggestReplacementForPromotedReplica(topologyRecovery *TopologyRecovery, de
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ searching for a neutral server to replace a prefer_not"))
 			for _, neutralReplica := range neutralReplicas {
 				if canTakeOverPromotedServerAsMaster(neutralReplica, promotedReplica) {
-					// OK, better than nothing
-					candidateInstanceKey = &neutralReplica.Key
-					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on promoted instance having prefer_not promotion rule", promotedReplica.Key, neutralReplica.Key))
+					if CrossDataCenterMasterFailoverConstraintSatisfied(&topologyRecovery.AnalysisEntry, neutralReplica) {
+						// OK, better than nothing
+						candidateInstanceKey = &neutralReplica.Key
+						AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on promoted instance having prefer_not promotion rule", promotedReplica.Key, neutralReplica.Key))
+					} else {
+						AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("skipping %+v because PreventCrossDataCenterMasterFailover is set", neutralReplica.Key))
+					}
 				}
 			}
 		}
@@ -785,7 +815,14 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 	resolveRecovery(topologyRecovery, promotedReplica)
 	if promotedReplica != nil {
 		if config.Config.FailMasterPromotionIfSQLThreadNotUpToDate && !promotedReplica.SQLThreadUpToDate() {
-			return false, nil, log.Errorf("Promoted replica %+v: sql thread is not up to date (relay logs still unapplied). Aborting promotion", promotedReplica.Key)
+			message := fmt.Sprintf("RecoverDeadMaster: failed promotion. FailMasterPromotionIfSQLThreadNotUpToDate is set and promoted replica %+v 's sql thread is not up to date (relay logs still unapplied). Aborting promotion", promotedReplica.Key)
+			AuditTopologyRecovery(topologyRecovery, message)
+			return false, nil, log.Error(message)
+		}
+		if !CrossDataCenterMasterFailoverConstraintSatisfied(&analysisEntry, promotedReplica) {
+			message := fmt.Sprintf("RecoverDeadMaster: failed promotion. PreventCrossDataCenterMasterFailover is set, and promoted replica %+v is in %s while dead master was in %s.", promotedReplica.Key, promotedReplica.DataCenter, analysisEntry.AnalyzedInstanceDataCenter)
+			AuditTopologyRecovery(topologyRecovery, message)
+			return false, nil, log.Error(message)
 		}
 
 		// Success!
