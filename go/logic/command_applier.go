@@ -87,6 +87,8 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.leaderURI(value)
 	case "request-health-report":
 		return applier.healthReport(value)
+	case "set-cluster-alias-manual-override":
+		return applier.setClusterAliasManualOverride(value)
 	}
 	return log.Errorf("Unknown command op: %s", op)
 }
@@ -308,4 +310,14 @@ func (applier *CommandApplier) healthReport(value []byte) interface{} {
 	}
 	orcraft.ReportToRaftLeader(authenticationToken)
 	return nil
+}
+
+func (applier *CommandApplier) setClusterAliasManualOverride(value []byte) interface{} {
+	var params [2]string
+	if err := json.Unmarshal(value, &params); err != nil {
+		return log.Errore(err)
+	}
+	clusterName, alias := params[0], params[1]
+	err := inst.SetClusterAliasManualOverride(clusterName, alias)
+	return err
 }
