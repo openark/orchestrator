@@ -141,3 +141,7 @@ and populate this table, with, say `1, my_cluster_name`, coupled with:
 
 Please note `orchestrator` does not create such tables nor does it populate them.
 You will need to create the table, populate them, and let `orchestrator` know how to query the data.
+
+### Tagging
+
+`orchestrator` supports tagging of instances, as well as searching for instances by tags. See [Tags](tags.md)
