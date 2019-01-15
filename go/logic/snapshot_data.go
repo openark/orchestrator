@@ -39,6 +39,7 @@ type SnapshotData struct {
 	ClusterAliasOverride,
 	ClusterDomainName,
 	HostAttributes,
+	InstanceTags,
 	AccessToken,
 	PoolInstances,
 	InjectedPseudoGTIDClusters,
@@ -90,6 +91,7 @@ func CreateSnapshotData() *SnapshotData {
 	readTableData("cluster_domain_name", &snapshotData.ClusterDomainName)
 	readTableData("access_token", &snapshotData.AccessToken)
 	readTableData("host_attributes", &snapshotData.HostAttributes)
+	readTableData("database_instance_tags", &snapshotData.InstanceTags)
 	readTableData("database_instance_pool", &snapshotData.PoolInstances)
 	readTableData("hostname_resolve", &snapshotData.HostnameResolves)
 	readTableData("hostname_unresolve", &snapshotData.HostnameUnresolves)
@@ -195,6 +197,7 @@ func (this *SnapshotDataCreatorApplier) Restore(rc io.ReadCloser) error {
 	writeTableData("cluster_domain_name", &snapshotData.ClusterDomainName)
 	writeTableData("access_token", &snapshotData.AccessToken)
 	writeTableData("host_attributes", &snapshotData.HostAttributes)
+	writeTableData("database_instance_tags", &snapshotData.InstanceTags)
 	writeTableData("database_instance_pool", &snapshotData.PoolInstances)
 	writeTableData("hostname_resolve", &snapshotData.HostnameResolves)
 	writeTableData("hostname_unresolve", &snapshotData.HostnameUnresolves)

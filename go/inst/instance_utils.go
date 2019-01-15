@@ -26,6 +26,73 @@ var (
 	DowntimeLostInRecoveryMessage = "lost-in-recovery"
 )
 
+// majorVersionsSortedByCount sorts (major) versions:
+// - primary sort: by count appearances
+// - secondary sort: by version
+type majorVersionsSortedByCount struct {
+	versionsCount map[string]int
+	versions      []string
+}
+
+func NewMajorVersionsSortedByCount(versionsCount map[string]int) *majorVersionsSortedByCount {
+	versions := []string{}
+	for v := range versionsCount {
+		versions = append(versions, v)
+	}
+	return &majorVersionsSortedByCount{
+		versionsCount: versionsCount,
+		versions:      versions,
+	}
+}
+
+func (this *majorVersionsSortedByCount) Len() int { return len(this.versions) }
+func (this *majorVersionsSortedByCount) Swap(i, j int) {
+	this.versions[i], this.versions[j] = this.versions[j], this.versions[i]
+}
+func (this *majorVersionsSortedByCount) Less(i, j int) bool {
+	if this.versionsCount[this.versions[i]] == this.versionsCount[this.versions[j]] {
+		return this.versions[i] > this.versions[j]
+	}
+	return this.versionsCount[this.versions[i]] < this.versionsCount[this.versions[j]]
+}
+func (this *majorVersionsSortedByCount) First() string {
+	return this.versions[0]
+}
+
+// majorVersionsSortedByCount sorts (major) versions:
+// - primary sort: by count appearances
+// - secondary sort: by version
+type binlogFormatSortedByCount struct {
+	formatsCount map[string]int
+	formats      []string
+}
+
+func NewBinlogFormatSortedByCount(formatsCount map[string]int) *binlogFormatSortedByCount {
+	formats := []string{}
+	for v := range formatsCount {
+		formats = append(formats, v)
+	}
+	return &binlogFormatSortedByCount{
+		formatsCount: formatsCount,
+		formats:      formats,
+	}
+}
+
+func (this *binlogFormatSortedByCount) Len() int { return len(this.formats) }
+func (this *binlogFormatSortedByCount) Swap(i, j int) {
+	this.formats[i], this.formats[j] = this.formats[j], this.formats[i]
+}
+func (this *binlogFormatSortedByCount) Less(i, j int) bool {
+	if this.formatsCount[this.formats[i]] == this.formatsCount[this.formats[j]] {
+		return IsSmallerBinlogFormat(this.formats[j], this.formats[i])
+	}
+	return this.formatsCount[this.formats[i]] < this.formatsCount[this.formats[j]]
+}
+func (this *binlogFormatSortedByCount) First() string {
+	return this.formats[0]
+}
+
+// InstancesSorterByExec sorts instances by executed binlog coordinates
 type InstancesSorterByExec struct {
 	instances  [](*Instance)
 	dataCenter string
