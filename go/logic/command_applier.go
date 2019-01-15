@@ -79,6 +79,10 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.putKeyValue(value)
 	case "add-key-value":
 		return applier.addKeyValue(value)
+	case "put-instance-tag":
+		return applier.putInstanceTag(value)
+	case "delete-instance-tag":
+		return applier.deleteInstanceTag(value)
 	case "leader-uri":
 		return applier.leaderURI(value)
 	case "request-health-report":
@@ -266,6 +270,25 @@ func (applier *CommandApplier) addKeyValue(value []byte) interface{} {
 		return log.Errore(err)
 	}
 	err := kv.AddKVPair(&kvPair)
+
+	return err
+}
+
+func (applier *CommandApplier) putInstanceTag(value []byte) interface{} {
+	instanceTag := inst.InstanceTag{}
+	if err := json.Unmarshal(value, &instanceTag); err != nil {
+		return log.Errore(err)
+	}
+	err := inst.PutInstanceTag(&instanceTag.Key, &instanceTag.T)
+	return err
+}
+
+func (applier *CommandApplier) deleteInstanceTag(value []byte) interface{} {
+	instanceTag := inst.InstanceTag{}
+	if err := json.Unmarshal(value, &instanceTag); err != nil {
+		return log.Errore(err)
+	}
+	_, err := inst.Untag(&instanceTag.Key, &instanceTag.T)
 	return err
 }
 

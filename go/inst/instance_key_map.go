@@ -62,6 +62,17 @@ func (this *InstanceKeyMap) GetInstanceKeys() []InstanceKey {
 	return res
 }
 
+// Intersect returns a keymap which is the intersection of this and another map
+func (this *InstanceKeyMap) Intersect(other *InstanceKeyMap) *InstanceKeyMap {
+	intersected := NewInstanceKeyMap()
+	for key := range *other {
+		if this.HasKey(key) {
+			intersected.AddKey(key)
+		}
+	}
+	return intersected
+}
+
 // MarshalJSON will marshal this map as JSON
 func (this InstanceKeyMap) MarshalJSON() ([]byte, error) {
 	return json.Marshal(this.GetInstanceKeys())
