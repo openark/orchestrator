@@ -18,6 +18,7 @@ package http
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -102,7 +103,7 @@ func (this *HttpAgentsAPI) AgentsInstances(params martini.Params, r render.Rende
 	agents, err := agent.ReadAgents()
 	hostnames := []string{}
 	for _, agent := range agents {
-		hostnames = append(hostnames, fmt.Sprintf("%s:%d", agent.Hostname, agent.MySQLPort))
+		hostnames = append(hostnames, net.JoinHostPort(agent.Hostname, strconv.Itoa(int(agent.MySQLPort))))
 	}
 
 	if err != nil {

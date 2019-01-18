@@ -19,6 +19,8 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -52,11 +54,10 @@ func getMySQLURI() string {
 	if mysqlURI != "" {
 		return mysqlURI
 	}
-	mysqlURI := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?timeout=%ds&readTimeout=%ds&interpolateParams=true",
+	mysqlURI := fmt.Sprintf("%s:%s@tcp(%s)/%s?timeout=%ds&readTimeout=%ds&interpolateParams=true",
 		config.Config.MySQLOrchestratorUser,
 		config.Config.MySQLOrchestratorPassword,
-		config.Config.MySQLOrchestratorHost,
-		config.Config.MySQLOrchestratorPort,
+		net.JoinHostPort(config.Config.MySQLOrchestratorHost, strconv.Itoa(int(config.Config.MySQLOrchestratorPort))),
 		config.Config.MySQLOrchestratorDatabase,
 		config.Config.MySQLConnectTimeoutSeconds,
 		config.Config.MySQLOrchestratorReadTimeoutSeconds,
@@ -80,10 +81,10 @@ func OpenTopology(host string, port int) (*sql.DB, error) {
 }
 
 func openTopology(host string, port int, readTimeout int) (db *sql.DB, err error) {
-	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/?timeout=%ds&readTimeout=%ds&interpolateParams=true",
+	mysql_uri := fmt.Sprintf("%s:%s@tcp(%s)/?timeout=%ds&readTimeout=%ds&interpolateParams=true",
 		config.Config.MySQLTopologyUser,
 		config.Config.MySQLTopologyPassword,
-		host, port,
+		net.JoinHostPort(host, strconv.Itoa(port)),
 		config.Config.MySQLConnectTimeoutSeconds,
 		readTimeout,
 	)
@@ -106,11 +107,10 @@ func openTopology(host string, port int, readTimeout int) (db *sql.DB, err error
 }
 
 func openOrchestratorMySQLGeneric() (db *sql.DB, fromCache bool, err error) {
-	uri := fmt.Sprintf("%s:%s@tcp(%s:%d)/?timeout=%ds&readTimeout=%ds&interpolateParams=true",
+	uri := fmt.Sprintf("%s:%s@tcp(%s)/?timeout=%ds&readTimeout=%ds&interpolateParams=true",
 		config.Config.MySQLOrchestratorUser,
 		config.Config.MySQLOrchestratorPassword,
-		config.Config.MySQLOrchestratorHost,
-		config.Config.MySQLOrchestratorPort,
+		net.JoinHostPort(config.Config.MySQLOrchestratorHost, strconv.Itoa(int(config.Config.MySQLOrchestratorPort))),
 		config.Config.MySQLConnectTimeoutSeconds,
 		config.Config.MySQLOrchestratorReadTimeoutSeconds,
 	)
@@ -151,8 +151,9 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 		db, fromCache, err = sqlutils.GetDB(getMySQLURI())
 		if err == nil && !fromCache {
 			// do not show the password but do show what we connect to.
-			safeMySQLURI := fmt.Sprintf("%s:?@tcp(%s:%d)/%s?timeout=%ds", config.Config.MySQLOrchestratorUser,
-				config.Config.MySQLOrchestratorHost, config.Config.MySQLOrchestratorPort, config.Config.MySQLOrchestratorDatabase, config.Config.MySQLConnectTimeoutSeconds)
+			safeMySQLURI := fmt.Sprintf("%s:?@tcp(%s)/%s?timeout=%ds", config.Config.MySQLOrchestratorUser,
+				net.JoinHostPort(config.Config.MySQLOrchestratorHost, strconv.Itoa(int(config.Config.MySQLOrchestratorPort))),
+				config.Config.MySQLOrchestratorDatabase, config.Config.MySQLConnectTimeoutSeconds)
 			log.Debugf("Connected to orchestrator backend: %v", safeMySQLURI)
 			if config.Config.MySQLOrchestratorMaxPoolConnections > 0 {
 				log.Debugf("Orchestrator pool SetMaxOpenConns: %d", config.Config.MySQLOrchestratorMaxPoolConnections)
@@ -180,9 +181,8 @@ func OpenOrchestrator() (db *sql.DB, err error) {
 		if maxIdleConns < 10 {
 			maxIdleConns = 10
 		}
-		log.Infof("Connecting to backend %s:%d: maxConnections: %d, maxIdleConns: %d",
-			config.Config.MySQLOrchestratorHost,
-			config.Config.MySQLOrchestratorPort,
+		log.Infof("Connecting to backend %s: maxConnections: %d, maxIdleConns: %d",
+			net.JoinHostPort(config.Config.MySQLOrchestratorHost, strconv.Itoa(int(config.Config.MySQLOrchestratorPort))),
 			config.Config.MySQLOrchestratorMaxPoolConnections,
 			maxIdleConns)
 		db.SetMaxIdleConns(maxIdleConns)

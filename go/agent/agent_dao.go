@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -298,7 +299,7 @@ func baseAgentUri(agentHostname string, agentPort int) string {
 	if config.Config.AgentsUseSSL {
 		protocol = "https"
 	}
-	uri := fmt.Sprintf("%s://%s:%d/api", protocol, agentHostname, agentPort)
+	uri := fmt.Sprintf("%s://%s/api", protocol, net.JoinHostPort(agentHostname, strconv.Itoa(agentPort)))
 	log.Debugf("orchestrator-agent uri: %s", uri)
 	return uri
 }

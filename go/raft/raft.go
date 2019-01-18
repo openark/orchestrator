@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -187,16 +188,19 @@ func normalizeRaftHostnameIP(host string) (string, error) {
 // normalizeRaftNode attempts to make sure there's a port to the given node.
 // It consults the DefaultRaftPort when there isn't
 func normalizeRaftNode(node string) (string, error) {
-	hostPort := strings.Split(node, ":")
-	host, err := normalizeRaftHostnameIP(hostPort[0])
+	host, port, err := net.SplitHostPort(node)
+	if err != nil {
+		host = node
+	}
+	host, err = normalizeRaftHostnameIP(host)
 	if err != nil {
 		return host, err
 	}
-	if len(hostPort) > 1 {
-		return fmt.Sprintf("%s:%s", host, hostPort[1]), nil
+	if port != "" {
+		return net.JoinHostPort(host, port), nil
 	} else if config.Config.DefaultRaftPort != 0 {
 		// No port specified, add one
-		return fmt.Sprintf("%s:%d", host, config.Config.DefaultRaftPort), nil
+		return net.JoinHostPort(host, strconv.Itoa(config.Config.DefaultRaftPort)), nil
 	} else {
 		return host, nil
 	}

@@ -19,6 +19,7 @@ package inst
 import (
 	"fmt"
 	"github.com/github/orchestrator/go/config"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -171,7 +172,7 @@ func (this *InstanceKey) ReattachedKey() *InstanceKey {
 
 // StringCode returns an official string representation of this key
 func (this *InstanceKey) StringCode() string {
-	return fmt.Sprintf("%s:%d", this.Hostname, this.Port)
+	return net.JoinHostPort(this.Hostname, strconv.Itoa(this.Port))
 }
 
 // DisplayString returns a user-friendly string representation of this key
