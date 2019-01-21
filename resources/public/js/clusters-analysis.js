@@ -33,7 +33,7 @@ $(document).ready(function() {
   }
 
   function getBlockedRecoveryKey(hostname, port, analysis) {
-    return hostname + ":" + port + ":" + analysis;
+    return joinHostPort(hostname, port) + ":" + analysis;
   }
 
   function displayClustersAnalysis(clusters, replicationAnalysis, blockedRecoveries) {
@@ -79,7 +79,7 @@ $(document).ready(function() {
 
     function displayAnalysisEntry(analysisEntry, popoverElement) {
       var blockedKey = getBlockedRecoveryKey(analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port, analysisEntry.Analysis);
-      var displayText = '<hr/><span><strong>' + analysisEntry.Analysis + (analysisEntry.IsDowntimed ? '<br/>[<i>downtime till ' + analysisEntry.DowntimeEndTimestamp + '</i>]' : '') + (blockedrecoveriesMap[blockedKey] ? '<br/><span class="glyphicon glyphicon-exclamation-sign text-danger"></span> Blocked' : '') + "</strong></span>" + "<br/>" + "<span>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</span>";
+      var displayText = '<hr/><span><strong>' + analysisEntry.Analysis + (analysisEntry.IsDowntimed ? '<br/>[<i>downtime till ' + analysisEntry.DowntimeEndTimestamp + '</i>]' : '') + (blockedrecoveriesMap[blockedKey] ? '<br/><span class="glyphicon glyphicon-exclamation-sign text-danger"></span> Blocked' : '') + "</strong></span>" + "<br/>" + "<span>" + joinHostPort(analysisEntry.AnalyzedInstanceKey.Hostname, analysisEntry.AnalyzedInstanceKey.Port) + "</span>";
       if (analysisEntry.IsDowntimed) {
         displayText = '<div class="downtimed">' + displayText + '</div>';
       } else if (blockedrecoveriesMap[blockedKey]) {

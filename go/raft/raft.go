@@ -22,7 +22,6 @@ import (
 	"math/rand"
 	"net"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -99,13 +98,12 @@ func computeLeaderURI() (uri string, err error) {
 	}
 
 	hostname := config.Config.RaftAdvertise
-	listenTokens := strings.Split(config.Config.ListenAddress, ":")
-	if len(listenTokens) < 2 {
+	_, port, err := net.SplitHostPort(config.Config.ListenAddress)
+	if err != nil {
 		return uri, fmt.Errorf("computeLeaderURI: cannot determine listen port out of config.Config.ListenAddress: %+v", config.Config.ListenAddress)
 	}
-	port := listenTokens[1]
 
-	uri = fmt.Sprintf("%s://%s:%s", scheme, hostname, port)
+	uri = fmt.Sprintf("%s://%s", scheme, net.JoinHostPort(hostname, port))
 	return uri, nil
 }
 

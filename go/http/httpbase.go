@@ -18,6 +18,7 @@ package http
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 
@@ -151,7 +152,7 @@ func getClusterHint(params map[string]string) string {
 		return params["clusterName"]
 	}
 	if params["host"] != "" && params["port"] != "" {
-		return fmt.Sprintf("%s:%s", params["host"], params["port"])
+		return net.JoinHostPort(params["host"], params["port"])
 	}
 	return ""
 }

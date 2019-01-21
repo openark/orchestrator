@@ -178,8 +178,10 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		rawInstanceKey = nil
 	}
 
-	if destination != "" && !strings.Contains(destination, ":") {
-		destination = net.JoinHostPort(destination, strconv.Itoa(config.Config.DefaultInstancePort))
+	if destination != "" {
+		if _, _, err := net.SplitHostPort(destination); err != nil {
+			destination = net.JoinHostPort(destination, strconv.Itoa(config.Config.DefaultInstancePort))
+		}
 	}
 	destinationKey, err := inst.ParseResolveInstanceKey(destination)
 	if err != nil {

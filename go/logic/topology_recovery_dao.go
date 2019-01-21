@@ -466,8 +466,8 @@ func AcknowledgeCrashedRecoveries() (countAcknowledgedEntries int64, err error) 
 	whereClause := `
 			in_active_period = 1
 			and end_recovery is null
-			and concat(processing_node_hostname, ':', processcing_node_token) not in (
-				select concat(hostname, ':', token) from node_health
+			and concat(processing_node_hostname, ' ', processcing_node_token) not in (
+				select concat(hostname, ' ', token) from node_health
 			)
 		`
 	return acknowledgeRecoveries("orchestrator", "detected crashed recovery", true, whereClause, sqlutils.Args())
