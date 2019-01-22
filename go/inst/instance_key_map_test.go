@@ -65,3 +65,43 @@ func TestInstanceKeyMapToCommaDelimitedList(t *testing.T) {
 	ok := (res == `host1:3306,host2:3306`) || (res == `host2:3306,host1:3306`)
 	test.S(t).ExpectTrue(ok)
 }
+
+func TestIntersect(t *testing.T) {
+	{
+		m := NewInstanceKeyMap()
+		m.AddKey(key1)
+		m.AddKey(key2)
+
+		other := NewInstanceKeyMap()
+		other.AddKey(key3)
+		other.AddKey(key2)
+
+		intersected := m.Intersect(other)
+		test.S(t).ExpectEquals(len(*intersected), 1)
+	}
+	{
+		m := NewInstanceKeyMap()
+		m.AddKey(key1)
+
+		other := NewInstanceKeyMap()
+		other.AddKey(key3)
+		other.AddKey(key2)
+
+		intersected := m.Intersect(other)
+		test.S(t).ExpectEquals(len(*intersected), 0)
+	}
+	{
+		m := NewInstanceKeyMap()
+		m.AddKey(key1)
+		m.AddKey(key2)
+
+		other := NewInstanceKeyMap()
+		other.AddKey(key1)
+		other.AddKey(key3)
+		other.AddKey(key2)
+
+		intersected := m.Intersect(other)
+		test.S(t).ExpectEquals(len(*intersected), 2)
+	}
+
+}
