@@ -1745,7 +1745,13 @@ func (this *HttpAPI) SetClusterAliasManualOverride(params martini.Params, r rend
 	clusterName := params["clusterName"]
 	alias := req.URL.Query().Get("alias")
 
-	err := inst.SetClusterAliasManualOverride(clusterName, alias)
+	var err error
+	if orcraft.IsRaftEnabled() {
+		_, err = orcraft.PublishCommand("set-cluster-alias-manual-override", []string{clusterName, alias})
+	} else {
+		err = inst.SetClusterAliasManualOverride(clusterName, alias)
+	}
+
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
