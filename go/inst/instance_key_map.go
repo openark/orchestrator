@@ -18,6 +18,7 @@ package inst
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
 )
 
@@ -59,6 +60,9 @@ func (this *InstanceKeyMap) GetInstanceKeys() []InstanceKey {
 	for key := range *this {
 		res = append(res, key)
 	}
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Hostname < res[j].Hostname || res[i].Hostname == res[j].Hostname && res[i].Port < res[j].Port
+	})
 	return res
 }
 
