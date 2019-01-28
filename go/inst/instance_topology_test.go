@@ -2,6 +2,7 @@ package inst
 
 import (
 	"math/rand"
+	"time"
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
@@ -19,6 +20,7 @@ var (
 )
 
 func init() {
+	rand.Seed(time.Now().UTC().UnixNano())
 	config.Config.HostnameResolveMethod = "none"
 	config.MarkConfigurationLoaded()
 	log.SetLevel(log.ERROR)
