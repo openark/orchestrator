@@ -1081,6 +1081,21 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 
 	instance.SlaveHosts.ReadJson(slaveHostsJSON)
 	instance.applyFlavorName()
+
+	// problems
+	if !instance.IsLastCheckValid {
+		instance.Problems = append(instance.Problems, "last_check_invalid")
+	} else if !instance.IsRecentlyChecked {
+		instance.Problems = append(instance.Problems, "not_recently_checked")
+	} else if instance.ReplicationThreadsExist() && !instance.ReplicaRunning() {
+		instance.Problems = append(instance.Problems, "not_replicating")
+	} else if instance.SlaveLagSeconds.Valid && instance.SlaveLagSeconds.Int64 > int64(config.Config.ReasonableReplicationLagSeconds) {
+		instance.Problems = append(instance.Problems, "replication_lag")
+	}
+	if instance.GtidErrant != "" {
+		instance.Problems = append(instance.Problems, "errant_gtid")
+	}
+
 	return instance
 }
 
