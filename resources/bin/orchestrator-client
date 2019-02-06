@@ -122,6 +122,9 @@ function fail {
 }
 
 function check_requirements {
+  if [[ $(uname) == "Darwin" || $(uname) == *"BSD"* ]]; then
+    which gsed > /dev/null 2>&1 || fail "cannot find gsed (required on BSD/Darwin systems)"
+  fi
   which curl > /dev/null 2>&1 || fail "cannot find curl"
   which jq   > /dev/null 2>&1 || fail "cannot find jq"
 }
