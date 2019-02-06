@@ -107,6 +107,14 @@ do
   esac
 done
 
+function sed {
+  if [[ $(uname) == "Darwin" || $(uname) == *"BSD"* ]]; then
+    gsed "$@"
+  else
+    sed "$@"
+  fi
+}
+
 function fail {
   message="$myname[$$]: $1"
   >&2 echo "$message"
