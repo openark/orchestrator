@@ -129,7 +129,7 @@ function get_curl_auth_params {
   fi
 
   # Test API access
-  curl "${basic_auth}" -s --head "${orchestrator_api}" 2>&1 | fgrep -q "$unauthorized_401" && \
+  curl "${requires_auth}" -s --head "${orchestrator_api}" 2>&1 | fgrep -q "$unauthorized_401" && \
     echo "$unauthorized_401" && \
     return
 
