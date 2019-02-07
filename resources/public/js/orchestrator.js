@@ -9,29 +9,6 @@ reloadPageHint = {
   port: ""
 }
 
-var errorMapping = {
-  "inMaintenanceProblem": {
-    "badge": "label-info",
-    "description": "In maintenance"
-  },
-  "lastCheckInvalidProblem": {
-    "badge": "label-fatal",
-    "description": "Last check invalid"
-  },
-  "notRecentlyCheckedProblem": {
-    "badge": "label-stale",
-    "description": "Not recently checked (stale)"
-  },
-  "notReplicatingProblem": {
-    "badge": "label-danger",
-    "description": "Not replicating"
-  },
-  "replicationLagProblem": {
-    "badge": "label-warning",
-    "description": "Replication lag"
-  }
-};
-
 function updateCountdownDisplay() {
   if ($.cookie("auto-refresh") == "true") {
     $("#refreshCountdown").html('<span class="glyphicon glyphicon-repeat" title="Click to pause"></span> ' + secondsTillRefresh + 's');
@@ -659,23 +636,30 @@ function normalizeInstance(instance) {
 }
 
 function normalizeInstanceProblem(instance) {
+
+  function instanceProblemIfExists(problemName) {
+    if (instance.Problems.includes(problemName)) {
+      return problemName
+    }
+    return null;
+  }
   instance.inMaintenanceProblem = function() {
-    return instance.Problems.includes('in_maintenance');
+    return instanceProblemIfExists('in_maintenance');
   }
   instance.lastCheckInvalidProblem = function() {
-    return instance.Problems.includes('last_check_invalid');
+    return instanceProblemIfExists('last_check_invalid');
   }
   instance.notRecentlyCheckedProblem = function() {
-    return instance.Problems.includes('not_recently_checked');
+    return instanceProblemIfExists('not_recently_checked');
   }
   instance.notReplicatingProblem = function() {
-    return instance.Problems.includes('not_replicating');
+    return instanceProblemIfExists('not_replicating');
   }
   instance.replicationLagProblem = function() {
-    return instance.Problems.includes('replication_lag');
+    return instanceProblemIfExists('replication_lag');
   }
   instance.errantGTIDProblem = function() {
-    return instance.Problems.includes('errant_gtid');
+    return instanceProblemIfExists('errant_gtid');
   }
 
   instance.problem = null;
