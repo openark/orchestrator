@@ -1387,7 +1387,7 @@ function Cluster() {
     }
     wrappedContent = '<div data-tag="'+tag+'">' + content + '<div style="clear: both;"></div></div>';
     if (tag === "analysis") {
-      $(wrappedContent).insertAfter("#cluster_info [data-tag=glyphs]")
+      $("#cluster_info").append(wrappedContent)
     } else {
       $("#cluster_info").append(wrappedContent)
     }
@@ -1523,7 +1523,6 @@ function Cluster() {
     analysisContent += "<div>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</div>";
     var content = '<div><div class="pull-left">'+glyph+'</div><div class="pull-right">'+analysisContent+'</div></div>';
     addSidebarInfoPopoverContent(content, "analysis", false);
-
     if (analysisEntry.IsStructureAnalysis) {
       return;
     }
