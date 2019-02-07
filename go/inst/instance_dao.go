@@ -1282,8 +1282,8 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 			and (
 				(last_seen < last_checked)
 				or (unix_timestamp() - unix_timestamp(last_checked) > ?)
-				or (replication_sql_thread_state != 1)
-				or (replication_io_thread_state != 1)
+				or (replication_sql_thread_state not in (-1 ,1))
+				or (replication_io_thread_state not in (-1 ,1))
 				or (abs(cast(seconds_behind_master as signed) - cast(sql_delay as signed)) > ?)
 				or (abs(cast(slave_lag_seconds as signed) - cast(sql_delay as signed)) > ?)
 				or (gtid_errant != '')
