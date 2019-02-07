@@ -1290,7 +1290,7 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 			)
 		`
 
-	args := sqlutils.Args(clusterName, clusterName, config.Config.InstancePollSeconds, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
+	args := sqlutils.Args(clusterName, clusterName, config.Config.InstancePollSeconds*5, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
 	instances, err := readInstancesByCondition(condition, args, "")
 	if err != nil {
 		return instances, err
