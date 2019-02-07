@@ -679,7 +679,7 @@ function normalizeInstanceProblem(instance) {
   }
 
   instance.problem = null;
-  if (length(instance.Problems) > 0) {
+  if (instance.Problems.length > 0) {
     instance.problem = instance.Problems[0]; // highest priority one
   }
   instance.problemOrder = 0;
