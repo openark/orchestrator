@@ -44,6 +44,7 @@ var asciiFillerCharacter = " "
 var tabulatorScharacter = "|"
 
 var countRetries = 5
+var MaxConcurrentReplicaOperations = 5
 
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
@@ -663,6 +664,9 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance, postponedFunct
 
 	var waitGroup sync.WaitGroup
 	var replicaMutex sync.Mutex
+
+	var concurrencyChan = make(chan bool, MaxConcurrentReplicaOperations)
+
 	for _, replica := range replicas {
 		replica := replica
 
@@ -671,6 +675,10 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance, postponedFunct
 		go func() {
 			defer waitGroup.Done()
 			moveFunc := func() error {
+
+				concurrencyChan <- true
+				defer func() { recover(); <-concurrencyChan }()
+
 				movedReplica, replicaErr := moveInstanceBelowViaGTID(replica, other)
 				if replicaErr != nil && movedReplica != nil {
 					replica = movedReplica
