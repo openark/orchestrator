@@ -1053,84 +1053,12 @@ Cleanup:
 
 // DetachReplicaOperation will detach a replica from its master by forcibly corrupting its replication coordinates
 func DetachReplicaOperation(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
-	if err != nil {
-		return instance, err
-	}
-
-	log.Infof("Will detach %+v", instanceKey)
-
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "detach replica"); merr != nil {
-		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
-		goto Cleanup
-	} else {
-		defer EndMaintenance(maintenanceToken)
-	}
-
-	if instance.IsReplica() {
-		instance, err = StopSlave(instanceKey)
-		if err != nil {
-			goto Cleanup
-		}
-	}
-
-	instance, err = DetachReplica(instanceKey)
-	if err != nil {
-		goto Cleanup
-	}
-
-Cleanup:
-	instance, _ = StartSlave(instanceKey)
-
-	if err != nil {
-		return instance, log.Errore(err)
-	}
-
-	// and we're done (pending deferred functions)
-	AuditOperation("detach-replica", instanceKey, fmt.Sprintf("%+v replication detached", *instanceKey))
-
-	return instance, err
+	return DetachReplicaMasterHost(instanceKey)
 }
 
 // ReattachReplicaOperation will detach a replica from its master by forcibly corrupting its replication coordinates
 func ReattachReplicaOperation(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
-	if err != nil {
-		return instance, err
-	}
-
-	log.Infof("Will reattach %+v", instanceKey)
-
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "detach replica"); merr != nil {
-		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
-		goto Cleanup
-	} else {
-		defer EndMaintenance(maintenanceToken)
-	}
-
-	if instance.IsReplica() {
-		instance, err = StopSlave(instanceKey)
-		if err != nil {
-			goto Cleanup
-		}
-	}
-
-	instance, err = ReattachReplica(instanceKey)
-	if err != nil {
-		goto Cleanup
-	}
-
-Cleanup:
-	instance, _ = StartSlave(instanceKey)
-
-	if err != nil {
-		return instance, log.Errore(err)
-	}
-
-	// and we're done (pending deferred functions)
-	AuditOperation("reattach-replica", instanceKey, fmt.Sprintf("%+v replication reattached", *instanceKey))
-
-	return instance, err
+	return ReattachReplicaMasterHost(instanceKey)
 }
 
 // DetachReplicaMasterHost detaches a replica from its master by corrupting the Master_Host (in such way that is reversible)
