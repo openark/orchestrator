@@ -109,6 +109,8 @@ type Instance struct {
 	UnresolvedHostname   string
 	AllowTLS             bool
 
+	Problems []string
+
 	LastDiscoveryLatency time.Duration
 }
 
@@ -116,6 +118,7 @@ type Instance struct {
 func NewInstance() *Instance {
 	return &Instance{
 		SlaveHosts: make(map[InstanceKey]bool),
+		Problems:   []string{},
 	}
 }
 

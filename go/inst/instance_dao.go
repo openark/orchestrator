@@ -1081,6 +1081,21 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 
 	instance.SlaveHosts.ReadJson(slaveHostsJSON)
 	instance.applyFlavorName()
+
+	// problems
+	if !instance.IsLastCheckValid {
+		instance.Problems = append(instance.Problems, "last_check_invalid")
+	} else if !instance.IsRecentlyChecked {
+		instance.Problems = append(instance.Problems, "not_recently_checked")
+	} else if instance.ReplicationThreadsExist() && !instance.ReplicaRunning() {
+		instance.Problems = append(instance.Problems, "not_replicating")
+	} else if instance.SlaveLagSeconds.Valid && instance.SlaveLagSeconds.Int64 > int64(config.Config.ReasonableReplicationLagSeconds) {
+		instance.Problems = append(instance.Problems, "replication_lag")
+	}
+	if instance.GtidErrant != "" {
+		instance.Problems = append(instance.Problems, "errant_gtid")
+	}
+
 	return instance
 }
 
@@ -1267,15 +1282,15 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 			and (
 				(last_seen < last_checked)
 				or (unix_timestamp() - unix_timestamp(last_checked) > ?)
-				or (replication_sql_thread_state != 1)
-				or (replication_io_thread_state != 1)
+				or (replication_sql_thread_state not in (-1 ,1))
+				or (replication_io_thread_state not in (-1 ,1))
 				or (abs(cast(seconds_behind_master as signed) - cast(sql_delay as signed)) > ?)
 				or (abs(cast(slave_lag_seconds as signed) - cast(sql_delay as signed)) > ?)
 				or (gtid_errant != '')
 			)
 		`
 
-	args := sqlutils.Args(clusterName, clusterName, config.Config.InstancePollSeconds, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
+	args := sqlutils.Args(clusterName, clusterName, config.Config.InstancePollSeconds*5, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
 	instances, err := readInstancesByCondition(condition, args, "")
 	if err != nil {
 		return instances, err

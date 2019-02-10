@@ -1210,18 +1210,9 @@ function Cluster() {
         instanceDescription += ", " + instance.SlaveLagSeconds.Int64 + "s lag";
         incrementProblems("", instanceDescription)
         instanceFullNames.push(getInstanceTitle(instance.Key.Hostname, instance.Key.Port));
-        if (instance.inMaintenanceProblem()) {
-          incrementProblems("inMaintenanceProblem", instanceDescription)
-        }
-        if (instance.lastCheckInvalidProblem()) {
-          incrementProblems("lastCheckInvalidProblem", instanceDescription)
-        } else if (instance.notRecentlyCheckedProblem()) {
-          incrementProblems("notRecentlyCheckedProblem", instanceDescription)
-        } else if (instance.notReplicatingProblem()) {
-          incrementProblems("notReplicatingProblem", instanceDescription)
-        } else if (instance.replicationLagProblem()) {
-          incrementProblems("replicationLagProblem", instanceDescription)
-        }
+        instance.Problems.forEach(function(problem) {
+          incrementProblems(problem, instanceDescription)
+        });
       });
       var aggergateInstance = instances[0];
       aggergateInstance.isAggregate = true;
@@ -1396,7 +1387,7 @@ function Cluster() {
     }
     wrappedContent = '<div data-tag="'+tag+'">' + content + '<div style="clear: both;"></div></div>';
     if (tag === "analysis") {
-      $(wrappedContent).insertAfter("#cluster_info [data-tag=glyphs]")
+      $("#cluster_info").append(wrappedContent)
     } else {
       $("#cluster_info").append(wrappedContent)
     }
@@ -1532,7 +1523,6 @@ function Cluster() {
     analysisContent += "<div>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</div>";
     var content = '<div><div class="pull-left">'+glyph+'</div><div class="pull-right">'+analysisContent+'</div></div>';
     addSidebarInfoPopoverContent(content, "analysis", false);
-
     if (analysisEntry.IsStructureAnalysis) {
       return;
     }
