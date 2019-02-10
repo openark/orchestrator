@@ -1051,16 +1051,6 @@ Cleanup:
 	return instance, err
 }
 
-// DetachReplicaOperation will detach a replica from its master by forcibly corrupting its replication coordinates
-func DetachReplicaOperation(instanceKey *InstanceKey) (*Instance, error) {
-	return DetachReplicaMasterHost(instanceKey)
-}
-
-// ReattachReplicaOperation will detach a replica from its master by forcibly corrupting its replication coordinates
-func ReattachReplicaOperation(instanceKey *InstanceKey) (*Instance, error) {
-	return ReattachReplicaMasterHost(instanceKey)
-}
-
 // DetachReplicaMasterHost detaches a replica from its master by corrupting the Master_Host (in such way that is reversible)
 func DetachReplicaMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
