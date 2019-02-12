@@ -764,7 +764,7 @@ func replacePromotedReplicaWithCandidate(topologyRecovery *TopologyRecovery, dea
 
 	if candidateInstance.MasterKey.Equals(&promotedReplica.Key) {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("replace-promoted-replica-with-candidate: suggested candidate %+v is replica of promoted instance %+v. Will try and take its master", candidateInstance.Key, promotedReplica.Key))
-		candidateInstance, err = inst.TakeMaster(&candidateInstance.Key, topologyRecovery.Type == CoMasterRecovery)
+		candidateInstance, err = inst.TakeMaster(&candidateInstance.Key, topologyRecovery.Type == CoMasterRecovery, false)
 		if err != nil {
 			return promotedReplica, log.Errore(err)
 		}

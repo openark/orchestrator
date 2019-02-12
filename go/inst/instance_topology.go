@@ -1711,7 +1711,7 @@ func TakeSiblings(instanceKey *InstanceKey) (instance *Instance, takenSiblings i
 // (they continue replicate without change)
 // Note that the master must itself be a replica; however the grandparent does not necessarily have to be reachable
 // and can in fact be dead.
-func TakeMaster(instanceKey *InstanceKey, allowTakingCoMaster bool) (*Instance, error) {
+func TakeMaster(instanceKey *InstanceKey, allowTakingCoMaster bool, relocateReplicas bool) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
@@ -1729,6 +1729,7 @@ func TakeMaster(instanceKey *InstanceKey, allowTakingCoMaster bool) (*Instance, 
 		return instance, err
 	}
 	// We begin
+	numRelocatedReplicas := 0
 	masterInstance, err = StopSlave(&masterInstance.Key)
 	if err != nil {
 		goto Cleanup
@@ -1757,6 +1758,10 @@ func TakeMaster(instanceKey *InstanceKey, allowTakingCoMaster bool) (*Instance, 
 		goto Cleanup
 	}
 	// swap is done!
+	if relocateReplicas {
+		relocatedReplicas, _, _, _ := RelocateReplicas(&masterInstance.Key, &instance.Key, "")
+		numRelocatedReplicas = len(relocatedReplicas)
+	}
 
 Cleanup:
 	instance, _ = StartSlave(&instance.Key)
@@ -1764,7 +1769,7 @@ Cleanup:
 	if err != nil {
 		return instance, err
 	}
-	AuditOperation("take-master", instanceKey, fmt.Sprintf("took master: %+v", masterInstance.Key))
+	AuditOperation("take-master", instanceKey, fmt.Sprintf("took master: %+v. Num relocated replicas: %d", masterInstance.Key, numRelocatedReplicas))
 
 	return instance, err
 }

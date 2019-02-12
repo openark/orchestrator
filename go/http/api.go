@@ -882,7 +882,7 @@ func (this *HttpAPI) TakeMaster(params martini.Params, r render.Render, req *htt
 		return
 	}
 
-	instance, err := inst.TakeMaster(&instanceKey, false)
+	instance, err := inst.TakeMaster(&instanceKey, false, true)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
