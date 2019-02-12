@@ -1386,11 +1386,7 @@ function Cluster() {
       content = '<hr/>' + content
     }
     wrappedContent = '<div data-tag="'+tag+'">' + content + '<div style="clear: both;"></div></div>';
-    if (tag === "analysis") {
-      $("#cluster_info").append(wrappedContent)
-    } else {
-      $("#cluster_info").append(wrappedContent)
-    }
+    $("#cluster_info").append(wrappedContent)
   }
 
   function populateSidebar(clusterInfo) {

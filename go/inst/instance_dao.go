@@ -1089,7 +1089,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 		instance.Problems = append(instance.Problems, "not_recently_checked")
 	} else if instance.ReplicationThreadsExist() && !instance.ReplicaRunning() {
 		instance.Problems = append(instance.Problems, "not_replicating")
-	} else if instance.SlaveLagSeconds.Valid && instance.SlaveLagSeconds.Int64 > int64(config.Config.ReasonableReplicationLagSeconds) {
+	} else if instance.SlaveLagSeconds.Valid && math.AbsInt64(instance.SlaveLagSeconds.Int64-int64(instance.SQLDelay)) > int64(config.Config.ReasonableReplicationLagSeconds) {
 		instance.Problems = append(instance.Problems, "replication_lag")
 	}
 	if instance.GtidErrant != "" {

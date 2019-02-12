@@ -1604,8 +1604,8 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 		skipProcesses = true
 	}
 	// intentionally iterating entries in random order
-	for i := range rand.Perm(len(replicationAnalysis)) {
-		analysisEntry := replicationAnalysis[i]
+	for _, j := range rand.Perm(len(replicationAnalysis)) {
+		analysisEntry := replicationAnalysis[j]
 		if specificInstance != nil {
 			// We are looking for a specific instance; if this is not the one, skip!
 			if !specificInstance.Equals(&analysisEntry.AnalyzedInstanceKey) {
