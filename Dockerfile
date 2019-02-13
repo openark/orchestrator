@@ -37,7 +37,9 @@ RUN rsync -av $(find /tmp/orchestrator-release -type d -name orchestrator -maxde
 RUN rsync -av $(find /tmp/orchestrator-release -type d -name orchestrator-cli -maxdepth 2)/ /
 RUN cp /usr/local/orchestrator/orchestrator-sample-sqlite.conf.json /etc/orchestrator.conf.json
 
-FROM alpine:3.6
+FROM alpine:3.8
+
+RUN apk add --no-cache bash
 
 EXPOSE 3000
 
