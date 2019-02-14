@@ -31,6 +31,7 @@ type CLIFlags struct {
 	SkipContinuousRegistration *bool
 	EnableDatabaseUpdate       *bool
 	IgnoreRaftSetup            *bool
+	Tag                        *string
 }
 
 var RuntimeCLIFlags CLIFlags

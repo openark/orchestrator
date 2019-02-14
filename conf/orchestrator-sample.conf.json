@@ -126,6 +126,7 @@
   "CoMasterRecoveryMustPromoteOtherCoMaster": true,
   "DetachLostSlavesAfterMasterFailover": true,
   "ApplyMySQLPromotionAfterMasterFailover": true,
+  "PreventCrossDataCenterMasterFailover": false,
   "MasterFailoverDetachSlaveMasterHost": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 0,
   "PostponeSlaveRecoveryOnLagMinutes": 0,

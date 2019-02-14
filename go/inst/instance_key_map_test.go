@@ -17,6 +17,7 @@
 package inst
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/github/orchestrator/go/config"
@@ -28,6 +29,25 @@ func init() {
 	config.Config.HostnameResolveMethod = "none"
 	config.MarkConfigurationLoaded()
 	log.SetLevel(log.ERROR)
+}
+
+func TestGetInstanceKeys(t *testing.T) {
+	for range rand.Perm(10) { // Just running many iterations to cover multiple possible map iteration ordering. Perm() is just used as an array generator here.
+		m := *NewInstanceKeyMap()
+		m.AddKey(key1)
+		m.AddKey(key2)
+		keys := m.GetInstanceKeys()
+		test.S(t).ExpectEquals(keys[0], key1)
+		test.S(t).ExpectEquals(keys[1], key2)
+	}
+	for range rand.Perm(10) { // Just running many iterations to cover multiple possible map iteration ordering. Perm() is just used as an array generator here.
+		m := *NewInstanceKeyMap()
+		m.AddKey(key2)
+		m.AddKey(key1)
+		keys := m.GetInstanceKeys()
+		test.S(t).ExpectEquals(keys[0], key1)
+		test.S(t).ExpectEquals(keys[1], key2)
+	}
 }
 
 func TestInstanceKeyMapToJSON(t *testing.T) {
@@ -64,4 +84,44 @@ func TestInstanceKeyMapToCommaDelimitedList(t *testing.T) {
 
 	ok := (res == `host1:3306,host2:3306`) || (res == `host2:3306,host1:3306`)
 	test.S(t).ExpectTrue(ok)
+}
+
+func TestIntersect(t *testing.T) {
+	{
+		m := NewInstanceKeyMap()
+		m.AddKey(key1)
+		m.AddKey(key2)
+
+		other := NewInstanceKeyMap()
+		other.AddKey(key3)
+		other.AddKey(key2)
+
+		intersected := m.Intersect(other)
+		test.S(t).ExpectEquals(len(*intersected), 1)
+	}
+	{
+		m := NewInstanceKeyMap()
+		m.AddKey(key1)
+
+		other := NewInstanceKeyMap()
+		other.AddKey(key3)
+		other.AddKey(key2)
+
+		intersected := m.Intersect(other)
+		test.S(t).ExpectEquals(len(*intersected), 0)
+	}
+	{
+		m := NewInstanceKeyMap()
+		m.AddKey(key1)
+		m.AddKey(key2)
+
+		other := NewInstanceKeyMap()
+		other.AddKey(key1)
+		other.AddKey(key3)
+		other.AddKey(key2)
+
+		intersected := m.Intersect(other)
+		test.S(t).ExpectEquals(len(*intersected), 2)
+	}
+
 }

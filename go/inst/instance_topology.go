@@ -44,6 +44,7 @@ var asciiFillerCharacter = " "
 var tabulatorScharacter = "|"
 
 var countRetries = 5
+var MaxConcurrentReplicaOperations = 5
 
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
@@ -663,6 +664,9 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance, postponedFunct
 
 	var waitGroup sync.WaitGroup
 	var replicaMutex sync.Mutex
+
+	var concurrencyChan = make(chan bool, MaxConcurrentReplicaOperations)
+
 	for _, replica := range replicas {
 		replica := replica
 
@@ -671,6 +675,10 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance, postponedFunct
 		go func() {
 			defer waitGroup.Done()
 			moveFunc := func() error {
+
+				concurrencyChan <- true
+				defer func() { recover(); <-concurrencyChan }()
+
 				movedReplica, replicaErr := moveInstanceBelowViaGTID(replica, other)
 				if replicaErr != nil && movedReplica != nil {
 					replica = movedReplica
@@ -2094,15 +2102,9 @@ func getPriorityMajorVersionForCandidate(replicas [](*Instance)) (priorityMajorV
 		// all same version, simple case
 		return replicas[0].MajorVersionString(), nil
 	}
-
-	currentMaxMajorVersionCount := 0
-	for majorVersion, count := range majorVersionsCount {
-		if count > currentMaxMajorVersionCount {
-			currentMaxMajorVersionCount = count
-			priorityMajorVersion = majorVersion
-		}
-	}
-	return priorityMajorVersion, nil
+	sorted := NewMajorVersionsSortedByCount(majorVersionsCount)
+	sort.Sort(sort.Reverse(sorted))
+	return sorted.First(), nil
 }
 
 // getPriorityBinlogFormatForCandidate returns the primary (most common) binlog format found
@@ -2119,15 +2121,9 @@ func getPriorityBinlogFormatForCandidate(replicas [](*Instance)) (priorityBinlog
 		// all same binlog format, simple case
 		return replicas[0].Binlog_format, nil
 	}
-
-	currentMaxBinlogFormatCount := 0
-	for binlogFormat, count := range binlogFormatsCount {
-		if count > currentMaxBinlogFormatCount {
-			currentMaxBinlogFormatCount = count
-			priorityBinlogFormat = binlogFormat
-		}
-	}
-	return priorityBinlogFormat, nil
+	sorted := NewBinlogFormatSortedByCount(binlogFormatsCount)
+	sort.Sort(sort.Reverse(sorted))
+	return sorted.First(), nil
 }
 
 // chooseCandidateReplica

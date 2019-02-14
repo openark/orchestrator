@@ -535,4 +535,10 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN replication_io_thread_state tinyint signed not null default 0 AFTER replication_sql_thread_state
 	`,
+	`
+		ALTER TABLE
+		database_instance_tags /* sqlite3-skip */
+		DROP PRIMARY KEY,
+		ADD PRIMARY KEY (hostname, port, tag_name)
+	`,
 }

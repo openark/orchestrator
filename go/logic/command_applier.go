@@ -79,10 +79,16 @@ func (applier *CommandApplier) ApplyCommand(op string, value []byte) interface{}
 		return applier.putKeyValue(value)
 	case "add-key-value":
 		return applier.addKeyValue(value)
+	case "put-instance-tag":
+		return applier.putInstanceTag(value)
+	case "delete-instance-tag":
+		return applier.deleteInstanceTag(value)
 	case "leader-uri":
 		return applier.leaderURI(value)
 	case "request-health-report":
 		return applier.healthReport(value)
+	case "set-cluster-alias-manual-override":
+		return applier.setClusterAliasManualOverride(value)
 	}
 	return log.Errorf("Unknown command op: %s", op)
 }
@@ -266,6 +272,25 @@ func (applier *CommandApplier) addKeyValue(value []byte) interface{} {
 		return log.Errore(err)
 	}
 	err := kv.AddKVPair(&kvPair)
+
+	return err
+}
+
+func (applier *CommandApplier) putInstanceTag(value []byte) interface{} {
+	instanceTag := inst.InstanceTag{}
+	if err := json.Unmarshal(value, &instanceTag); err != nil {
+		return log.Errore(err)
+	}
+	err := inst.PutInstanceTag(&instanceTag.Key, &instanceTag.T)
+	return err
+}
+
+func (applier *CommandApplier) deleteInstanceTag(value []byte) interface{} {
+	instanceTag := inst.InstanceTag{}
+	if err := json.Unmarshal(value, &instanceTag); err != nil {
+		return log.Errore(err)
+	}
+	_, err := inst.Untag(&instanceTag.Key, &instanceTag.T)
 	return err
 }
 
@@ -285,4 +310,14 @@ func (applier *CommandApplier) healthReport(value []byte) interface{} {
 	}
 	orcraft.ReportToRaftLeader(authenticationToken)
 	return nil
+}
+
+func (applier *CommandApplier) setClusterAliasManualOverride(value []byte) interface{} {
+	var params [2]string
+	if err := json.Unmarshal(value, &params); err != nil {
+		return log.Errore(err)
+	}
+	clusterName, alias := params[0], params[1]
+	err := inst.SetClusterAliasManualOverride(clusterName, alias)
+	return err
 }
