@@ -45,8 +45,6 @@ const (
 	GTIDHintForce                     = "GTIDHintForce"
 )
 
-const sqlThreadPollDuration = 400 * time.Millisecond
-
 // ExecInstance executes a given query on the given MySQL topology instance
 func ExecInstance(instanceKey *InstanceKey, query string, args ...interface{}) (sql.Result, error) {
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
@@ -295,7 +293,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 			if instance.SQLThreadUpToDate() {
 				upToDate = true
 			} else {
-				time.Sleep(sqlThreadPollDuration)
+				time.Sleep(retryInterval)
 			}
 		}
 	}
@@ -313,6 +311,47 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	instance, err = ReadTopologyInstance(instanceKey)
 	log.Infof("Stopped slave nicely on %+v, Self:%+v, Exec:%+v", *instanceKey, instance.SelfBinlogCoordinates, instance.ExecBinlogCoordinates)
 	return instance, err
+}
+
+func WaitForSQLThreadUpToDate(instanceKey *InstanceKey, overallTimeout time.Duration, staleCoordinatesTimeout time.Duration) (instance *Instance, upToDate bool, err error) {
+	// Otherwise we don't bother.
+	var startTime time.Time = time.Now()
+	var timeAtStaleCoordinates *time.Time = nil
+	var lastExecBinlogCoordinates BinlogCoordinates
+	for {
+		timeSinceStartTime := time.Since(startTime)
+		if overallTimeout > 0 && timeSinceStartTime >= overallTimeout {
+			// timeout
+			return nil, false, log.Errorf("%+v: WaitForSQLThreadUpToDate timeout after duration %+v", *instanceKey, timeSinceStartTime)
+		}
+		instance, err := RetryInstanceFunction(func() (*Instance, error) {
+			return ReadTopologyInstance(instanceKey)
+		})
+		if err != nil {
+			return instance, false, log.Errore(err)
+		}
+
+		if instance.SQLThreadUpToDate() {
+			return instance, true, nil
+		}
+		if instance.ExecBinlogCoordinates.Equals(&lastExecBinlogCoordinates) {
+			// stale
+			if timeAtStaleCoordinates != nil && staleCoordinatesTimeout > 0 {
+				if time.Since(*timeAtStaleCoordinates) > staleCoordinatesTimeout {
+					return instance, false, log.Errorf("%+v: WaitForSQLThreadUpToDate stale coordinates timeout after duration %+v", *instanceKey, staleCoordinatesTimeout)
+				}
+			}
+			if timeAtStaleCoordinates == nil {
+				now := time.Now()
+				timeAtStaleCoordinates = &now
+			}
+		} else {
+			timeAtStaleCoordinates = nil
+		}
+		lastExecBinlogCoordinates = instance.ExecBinlogCoordinates
+
+		time.Sleep(retryInterval)
+	}
 }
 
 // StopSlaves will stop replication concurrently on given set of replicas.
@@ -517,7 +556,7 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 
 		switch {
 		case instance.ExecBinlogCoordinates.SmallerThan(masterCoordinates):
-			time.Sleep(sqlThreadPollDuration)
+			time.Sleep(retryInterval)
 		case instance.ExecBinlogCoordinates.Equals(masterCoordinates):
 			upToDate = true
 		case masterCoordinates.SmallerThan(&instance.ExecBinlogCoordinates):
