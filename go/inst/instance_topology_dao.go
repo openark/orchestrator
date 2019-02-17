@@ -45,6 +45,10 @@ const (
 	GTIDHintForce                     = "GTIDHintForce"
 )
 
+const (
+	Error1201CouldnotInitializeMasterInfoStructure = "Error 1201:"
+)
+
 const sqlThreadPollDuration = 400 * time.Millisecond
 
 // ExecInstance executes a given query on the given MySQL topology instance
@@ -601,6 +605,14 @@ func EnableMasterSSL(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
+// See https://bugs.mysql.com/bug.php?id=83713
+func workaroundBug83713(instanceKey *InstanceKey) {
+	ExecInstance(instanceKey, `reset slave`)
+	ExecInstance(instanceKey, `start slave IO_THREAD`)
+	ExecInstance(instanceKey, `stop slave IO_THREAD`)
+	ExecInstance(instanceKey, `reset slave`)
+}
+
 // ChangeMasterTo changes the given instance's master according to given input.
 func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinlogCoordinates *BinlogCoordinates, skipUnresolve bool, gtidHint OperationGTIDHint) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -632,39 +644,66 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	originalMasterKey := instance.MasterKey
 	originalExecBinlogCoordinates := instance.ExecBinlogCoordinates
 
+	var changeMasterFunc func() error
 	changedViaGTID := false
 	if instance.UsingMariaDBGTID && gtidHint != GTIDHintDeny {
 		// Keep on using GTID
-		_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?",
-			changeToMasterKey.Hostname, changeToMasterKey.Port)
+		changeMasterFunc = func() error {
+			_, err := ExecInstance(instanceKey, "change master to master_host=?, master_port=?",
+				changeToMasterKey.Hostname, changeToMasterKey.Port)
+			return err
+		}
 		changedViaGTID = true
 	} else if instance.UsingMariaDBGTID && gtidHint == GTIDHintDeny {
 		// Make sure to not use GTID
-		_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?, master_log_file=?, master_log_pos=?, master_use_gtid=no",
-			changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos)
+		changeMasterFunc = func() error {
+			_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?, master_log_file=?, master_log_pos=?, master_use_gtid=no",
+				changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos)
+			return err
+		}
 	} else if instance.IsMariaDB() && gtidHint == GTIDHintForce {
 		// Is MariaDB; not using GTID, turn into GTID
-		_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?, master_use_gtid=slave_pos",
-			changeToMasterKey.Hostname, changeToMasterKey.Port)
+		changeMasterFunc = func() error {
+			_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?, master_use_gtid=slave_pos",
+				changeToMasterKey.Hostname, changeToMasterKey.Port)
+			return err
+		}
 		changedViaGTID = true
 	} else if instance.UsingOracleGTID && gtidHint != GTIDHintDeny {
 		// Is Oracle; already uses GTID; keep using it.
-		_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?",
-			changeToMasterKey.Hostname, changeToMasterKey.Port)
+		changeMasterFunc = func() error {
+			_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?",
+				changeToMasterKey.Hostname, changeToMasterKey.Port)
+			return err
+		}
 		changedViaGTID = true
 	} else if instance.UsingOracleGTID && gtidHint == GTIDHintDeny {
 		// Is Oracle; already uses GTID
-		_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?, master_log_file=?, master_log_pos=?, master_auto_position=0",
-			changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos)
+		changeMasterFunc = func() error {
+			_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?, master_log_file=?, master_log_pos=?, master_auto_position=0",
+				changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos)
+			return err
+		}
 	} else if instance.SupportsOracleGTID && gtidHint == GTIDHintForce {
 		// Is Oracle; not using GTID right now; turn into GTID
-		_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?, master_auto_position=1",
-			changeToMasterKey.Hostname, changeToMasterKey.Port)
+		changeMasterFunc = func() error {
+			_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?, master_auto_position=1",
+				changeToMasterKey.Hostname, changeToMasterKey.Port)
+			return err
+		}
 		changedViaGTID = true
 	} else {
 		// Normal binlog file:pos
-		_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?, master_log_file=?, master_log_pos=?",
-			changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos)
+		changeMasterFunc = func() error {
+			_, err = ExecInstance(instanceKey, "change master to master_host=?, master_port=?, master_log_file=?, master_log_pos=?",
+				changeToMasterKey.Hostname, changeToMasterKey.Port, masterBinlogCoordinates.LogFile, masterBinlogCoordinates.LogPos)
+			return err
+		}
+	}
+	err = changeMasterFunc()
+	if err != nil && instance.UsingOracleGTID && strings.Contains(err.Error(), Error1201CouldnotInitializeMasterInfoStructure) {
+		workaroundBug83713(instanceKey)
+		err = changeMasterFunc()
 	}
 	if err != nil {
 		return instance, log.Errore(err)
@@ -726,6 +765,10 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 		return instance, log.Errore(err)
 	}
 	_, err = ExecInstance(instanceKey, `reset slave /*!50603 all */`)
+	if err != nil && strings.Contains(err.Error(), Error1201CouldnotInitializeMasterInfoStructure) {
+		workaroundBug83713(instanceKey)
+		_, err = ExecInstance(instanceKey, `reset slave /*!50603 all */`)
+	}
 	if err != nil {
 		return instance, log.Errore(err)
 	}
