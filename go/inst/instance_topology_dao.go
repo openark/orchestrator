@@ -703,6 +703,7 @@ func ChangeMasterTo(instanceKey *InstanceKey, masterKey *InstanceKey, masterBinl
 	}
 	err = changeMasterFunc()
 	if err != nil && instance.UsingOracleGTID && strings.Contains(err.Error(), Error1201CouldnotInitializeMasterInfoStructure) {
+		log.Debugf("ChangeMasterTo: got %+v", err)
 		workaroundBug83713(instanceKey)
 		err = changeMasterFunc()
 	}
@@ -767,6 +768,7 @@ func ResetSlave(instanceKey *InstanceKey) (*Instance, error) {
 	}
 	_, err = ExecInstance(instanceKey, `reset slave /*!50603 all */`)
 	if err != nil && strings.Contains(err.Error(), Error1201CouldnotInitializeMasterInfoStructure) {
+		log.Debugf("ResetSlave: got %+v", err)
 		workaroundBug83713(instanceKey)
 		_, err = ExecInstance(instanceKey, `reset slave /*!50603 all */`)
 	}
