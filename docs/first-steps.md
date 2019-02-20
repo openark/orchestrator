@@ -122,7 +122,7 @@ You are easily able to see what the following do:
 	$ orchestrator -c set-read-only -i a.replica.8.instance.com
 	$ orchestrator -c set-writeable -i a.replica.8.instance.com
 
-Break replication by messing with a replica's binlog coordinates:
+Break replication by messing with a replica's master host:
 
 	$ orchestrator -c detach-replica -i a.replica.8.instance.com
 
