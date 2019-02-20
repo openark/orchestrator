@@ -3,29 +3,6 @@ $(document).ready(function() {
 
   showLoader();
 
-  var errorMapping = {
-    "inMaintenanceProblem": {
-      "badge": "label-info",
-      "description": "In maintenance"
-    },
-    "lastCheckInvalidProblem": {
-      "badge": "label-fatal",
-      "description": "Last check invalid"
-    },
-    "notRecentlyCheckedProblem": {
-      "badge": "label-stale",
-      "description": "Not recently checked (stale)"
-    },
-    "notReplicatingProblem": {
-      "badge": "label-danger",
-      "description": "Not replicating"
-    },
-    "replicationLagProblem": {
-      "badge": "label-warning",
-      "description": "Replication lag"
-    }
-  };
-
   $.get(appUrl("/api/cluster-pool-instances/" + currentClusterName()), function(clusterPoolInstances) {
     $.get(appUrl("/api/problems"), function(problemInstances) {
       problemInstances = problemInstances || [];
@@ -71,6 +48,9 @@ $(document).ready(function() {
     }
 
     function incrementPoolsProblems(instance, problemType) {
+      if (!problemType) {
+        return
+      }
       if (typeof instance.problemHint === 'undefined') {
         instance.problemHint = problemType
       }
@@ -83,19 +63,7 @@ $(document).ready(function() {
       });
     }
     problemInstances.forEach(function(instance) {
-      if (instance.inMaintenanceProblem()) {
-        incrementPoolsProblems(instance, "inMaintenanceProblem")
-      }
-      //
-      if (instance.lastCheckInvalidProblem()) {
-        incrementPoolsProblems(instance, "lastCheckInvalidProblem")
-      } else if (instance.notRecentlyCheckedProblem()) {
-        incrementPoolsProblems(instance, "notRecentlyCheckedProblem")
-      } else if (instance.notReplicatingProblem()) {
-        incrementPoolsProblems(instance, "notReplicatingProblem")
-      } else if (instance.replicationLagProblem()) {
-        incrementPoolsProblems(instance, "replicationLagProblem")
-      }
+      incrementPoolsProblems(instance, instance.problem)
     });
 
     pools.forEach(function(pool) {

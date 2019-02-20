@@ -1,29 +1,6 @@
 $(document).ready(function() {
   showLoader();
 
-  var errorMapping = {
-    "inMaintenanceProblem": {
-      "badge": "label-info",
-      "description": "In maintenance"
-    },
-    "lastCheckInvalidProblem": {
-      "badge": "label-fatal",
-      "description": "Last check invalid"
-    },
-    "notRecentlyCheckedProblem": {
-      "badge": "label-stale",
-      "description": "Not recently checked (stale)"
-    },
-    "notReplicatingProblem": {
-      "badge": "label-danger",
-      "description": "Not replicating"
-    },
-    "replicationLagProblem": {
-      "badge": "label-warning",
-      "description": "Replication lag"
-    }
-  };
-
   $.get(appUrl("/api/clusters-info"), function(clusters) {
     $.get(appUrl("/api/replication-analysis"), function(replicationAnalysis) {
       $.get(appUrl("/api/problems"), function(problemInstances) {
@@ -76,6 +53,9 @@ $(document).ready(function() {
     }
 
     function incrementClusterProblems(clusterName, problemType) {
+      if (!problemType) {
+        return
+      }
       if (clustersProblems[clusterName][problemType] > 0) {
         clustersProblems[clusterName][problemType] = clustersProblems[clusterName][problemType] + 1;
       } else {
@@ -83,19 +63,7 @@ $(document).ready(function() {
       }
     }
     problemInstances.forEach(function(instance) {
-      if (instance.inMaintenanceProblem()) {
-        incrementClusterProblems(instance.ClusterName, "inMaintenanceProblem")
-      }
-      //
-      if (instance.lastCheckInvalidProblem()) {
-        incrementClusterProblems(instance.ClusterName, "lastCheckInvalidProblem")
-      } else if (instance.notRecentlyCheckedProblem()) {
-        incrementClusterProblems(instance.ClusterName, "notRecentlyCheckedProblem")
-      } else if (instance.notReplicatingProblem()) {
-        incrementClusterProblems(instance.ClusterName, "notReplicatingProblem")
-      } else if (instance.replicationLagProblem()) {
-        incrementClusterProblems(instance.ClusterName, "replicationLagProblem")
-      }
+      incrementClusterProblems(instance.ClusterName, instance.problem)
     });
 
     clusters.forEach(function(cluster) {

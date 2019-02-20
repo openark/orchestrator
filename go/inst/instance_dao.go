@@ -395,7 +395,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 					var err error
 					instance.SelfBinlogCoordinates.LogFile = m.GetString("File")
 					instance.SelfBinlogCoordinates.LogPos = m.GetInt64("Position")
-					instance.ExecutedGtidSet = m.GetStringD("Executed_Gtid_Set", "")
 					return err
 				})
 			}()
@@ -424,7 +423,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				// ...
 				// @@gtid_mode only available in Orcale MySQL >= 5.6
 				// Previous version just issued this query brute-force, but I don't like errors being issued where they shouldn't.
-				_ = db.QueryRow("select @@global.gtid_mode, @@global.server_uuid, @@global.gtid_purged, @@global.master_info_repository = 'TABLE', @@global.binlog_row_image").Scan(&instance.GTIDMode, &instance.ServerUUID, &instance.GtidPurged, &masterInfoRepositoryOnTable, &instance.BinlogRowImage)
+				_ = db.QueryRow("select @@global.gtid_mode, @@global.server_uuid, @@global.gtid_executed, @@global.gtid_purged, @@global.master_info_repository = 'TABLE', @@global.binlog_row_image").Scan(&instance.GTIDMode, &instance.ServerUUID, &instance.ExecutedGtidSet, &instance.GtidPurged, &masterInfoRepositoryOnTable, &instance.BinlogRowImage)
 				if instance.GTIDMode != "" && instance.GTIDMode != "OFF" {
 					instance.SupportsOracleGTID = true
 				}
@@ -1083,6 +1082,21 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 
 	instance.SlaveHosts.ReadJson(slaveHostsJSON)
 	instance.applyFlavorName()
+
+	// problems
+	if !instance.IsLastCheckValid {
+		instance.Problems = append(instance.Problems, "last_check_invalid")
+	} else if !instance.IsRecentlyChecked {
+		instance.Problems = append(instance.Problems, "not_recently_checked")
+	} else if instance.ReplicationThreadsExist() && !instance.ReplicaRunning() {
+		instance.Problems = append(instance.Problems, "not_replicating")
+	} else if instance.SlaveLagSeconds.Valid && math.AbsInt64(instance.SlaveLagSeconds.Int64-int64(instance.SQLDelay)) > int64(config.Config.ReasonableReplicationLagSeconds) {
+		instance.Problems = append(instance.Problems, "replication_lag")
+	}
+	if instance.GtidErrant != "" {
+		instance.Problems = append(instance.Problems, "errant_gtid")
+	}
+
 	return instance
 }
 
@@ -1269,15 +1283,15 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 			and (
 				(last_seen < last_checked)
 				or (unix_timestamp() - unix_timestamp(last_checked) > ?)
-				or (replication_sql_thread_state != 1)
-				or (replication_io_thread_state != 1)
+				or (replication_sql_thread_state not in (-1 ,1))
+				or (replication_io_thread_state not in (-1 ,1))
 				or (abs(cast(seconds_behind_master as signed) - cast(sql_delay as signed)) > ?)
 				or (abs(cast(slave_lag_seconds as signed) - cast(sql_delay as signed)) > ?)
 				or (gtid_errant != '')
 			)
 		`
 
-	args := sqlutils.Args(clusterName, clusterName, config.Config.InstancePollSeconds, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
+	args := sqlutils.Args(clusterName, clusterName, config.Config.InstancePollSeconds*5, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
 	instances, err := readInstancesByCondition(condition, args, "")
 	if err != nil {
 		return instances, err

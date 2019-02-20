@@ -62,6 +62,7 @@ type leaderURI struct {
 }
 
 var LeaderURI leaderURI
+var thisLeaderURI string // How this node identifies itself assuming it is the leader
 
 func (luri *leaderURI) Get() string {
 	luri.Lock()
@@ -73,6 +74,12 @@ func (luri *leaderURI) Set(uri string) {
 	luri.Lock()
 	defer luri.Unlock()
 	luri.uri = uri
+}
+
+func (luri *leaderURI) IsThisLeaderURI() bool {
+	luri.Lock()
+	defer luri.Unlock()
+	return luri.uri == thisLeaderURI
 }
 
 func IsRaftEnabled() bool {
@@ -138,18 +145,20 @@ func Setup(applier CommandApplier, snapshotCreatorApplier SnapshotCreatorApplier
 		return log.Errorf("failed to open raft store: %s", err.Error())
 	}
 
-	if leaderURI, err := computeLeaderURI(); err != nil {
+	thisLeaderURI, err = computeLeaderURI()
+	if err != nil {
 		return FatalRaftError(err)
-	} else {
-		leaderCh := store.raft.LeaderCh()
-		go func() {
-			for isTurnedLeader := range leaderCh {
-				if isTurnedLeader {
-					PublishCommand("leader-uri", leaderURI)
-				}
-			}
-		}()
 	}
+
+	leaderCh := store.raft.LeaderCh()
+	go func() {
+		for isTurnedLeader := range leaderCh {
+			if isTurnedLeader {
+				PublishCommand("leader-uri", thisLeaderURI)
+			}
+		}
+	}()
+
 	setupHttpClient()
 
 	atomic.StoreInt64(&raftSetupComplete, 1)
