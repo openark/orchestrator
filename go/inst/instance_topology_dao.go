@@ -607,6 +607,7 @@ func EnableMasterSSL(instanceKey *InstanceKey) (*Instance, error) {
 
 // See https://bugs.mysql.com/bug.php?id=83713
 func workaroundBug83713(instanceKey *InstanceKey) {
+	log.Debugf("workaroundBug83713: %+v", *instanceKey)
 	ExecInstance(instanceKey, `reset slave`)
 	ExecInstance(instanceKey, `start slave IO_THREAD`)
 	ExecInstance(instanceKey, `stop slave IO_THREAD`)
