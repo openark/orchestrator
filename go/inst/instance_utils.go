@@ -141,6 +141,10 @@ func (this *InstancesSorterByExec) Less(i, j int) bool {
 		if this.instances[j].DataCenter == this.dataCenter && this.instances[i].DataCenter != this.dataCenter {
 			return true
 		}
+		// Prefer if not having errant GTID
+		if this.instances[j].GtidErrant == "" && this.instances[i].GtidErrant != "" {
+			return true
+		}
 		// Prefer candidates:
 		if this.instances[j].PromotionRule.SmallerThan(this.instances[i].PromotionRule) {
 			return true
