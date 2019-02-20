@@ -608,10 +608,17 @@ func EnableMasterSSL(instanceKey *InstanceKey) (*Instance, error) {
 // See https://bugs.mysql.com/bug.php?id=83713
 func workaroundBug83713(instanceKey *InstanceKey) {
 	log.Debugf("workaroundBug83713: %+v", *instanceKey)
-	ExecInstance(instanceKey, `reset slave`)
-	ExecInstance(instanceKey, `start slave IO_THREAD`)
-	ExecInstance(instanceKey, `stop slave IO_THREAD`)
-	ExecInstance(instanceKey, `reset slave`)
+	queries := []string{
+		`reset slave`,
+		`start slave IO_THREAD`,
+		`stop slave IO_THREAD`,
+		`reset slave`,
+	}
+	for _, query := range queries {
+		if _, err := ExecInstance(instanceKey, query); err != nil {
+			log.Debugf("workaroundBug83713: error on %s: %+v", query, err)
+		}
+	}
 }
 
 // ChangeMasterTo changes the given instance's master according to given input.
