@@ -599,50 +599,6 @@ func (this *HttpAPI) ResetSlave(params martini.Params, r render.Render, req *htt
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica reset on %+v", instance.Key), Details: instance})
 }
 
-// DetachReplica corrupts a replica's binlog corrdinates (though encodes it in such way
-// that is reversible), effectively breaking replication
-func (this *HttpAPI) DetachReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
-	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
-
-	if err != nil {
-		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
-		return
-	}
-	instance, err := inst.DetachReplicaOperation(&instanceKey)
-	if err != nil {
-		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
-		return
-	}
-
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica detached: %+v", instance.Key), Details: instance})
-}
-
-// ReattachReplica reverts a DetachReplica commands by reassigning the correct
-// binlog coordinates to an instance
-func (this *HttpAPI) ReattachReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
-	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
-
-	if err != nil {
-		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
-		return
-	}
-	instance, err := inst.ReattachReplicaOperation(&instanceKey)
-	if err != nil {
-		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
-		return
-	}
-
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica reattached: %+v", instance.Key), Details: instance})
-}
-
 // DetachReplicaMasterHost detaches a replica from its master by setting an invalid
 // (yet revertible) host name
 func (this *HttpAPI) DetachReplicaMasterHost(params martini.Params, r render.Render, req *http.Request, user auth.User) {
@@ -3547,8 +3503,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "stop-slave/:host/:port", this.StopSlave)
 	this.registerAPIRequest(m, "stop-slave-nice/:host/:port", this.StopSlaveNicely)
 	this.registerAPIRequest(m, "reset-slave/:host/:port", this.ResetSlave)
-	this.registerAPIRequest(m, "detach-slave/:host/:port", this.DetachReplica)
-	this.registerAPIRequest(m, "reattach-slave/:host/:port", this.ReattachReplica)
+	this.registerAPIRequest(m, "detach-slave/:host/:port", this.DetachReplicaMasterHost)
+	this.registerAPIRequest(m, "reattach-slave/:host/:port", this.ReattachReplicaMasterHost)
 	this.registerAPIRequest(m, "detach-slave-master-host/:host/:port", this.DetachReplicaMasterHost)
 	this.registerAPIRequest(m, "reattach-slave-master-host/:host/:port", this.ReattachReplicaMasterHost)
 	this.registerAPIRequest(m, "flush-binary-logs/:host/:port", this.FlushBinaryLogs)

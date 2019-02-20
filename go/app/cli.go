@@ -67,9 +67,11 @@ var commandSynonyms = map[string]string{
 	"which-cluster-osc-slaves":    "which-cluster-osc-replicas",
 	"which-cluster-gh-ost-slaves": "which-cluster-gh-ost-replicas",
 	"which-slaves":                "which-replicas",
-	"detach-slave":                "detach-replica",
-	"reattach-slave":              "reattach-replica",
+	"detach-slave":                "detach-replica-master-host",
+	"detach-replica":              "detach-replica-master-host",
 	"detach-slave-master-host":    "detach-replica-master-host",
+	"reattach-slave":              "reattach-replica-master-host",
+	"reattach-replica":            "reattach-replica-master-host",
 	"reattach-slave-master-host":  "reattach-replica-master-host",
 }
 
@@ -617,24 +619,6 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
 			_, err := inst.ResetSlaveOperation(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			fmt.Println(instanceKey.DisplayString())
-		}
-	case registerCliCommand("detach-replica", "Replication, general", `Stops replication and modifies binlog position into an impossible, yet reversible, value.`):
-		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			_, err := inst.DetachReplicaOperation(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			fmt.Println(instanceKey.DisplayString())
-		}
-	case registerCliCommand("reattach-replica", "Replication, general", `Undo a detach-replica operation`):
-		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			_, err := inst.ReattachReplicaOperation(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
