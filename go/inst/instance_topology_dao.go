@@ -265,7 +265,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 		return instance, log.Errore(err)
 	}
 
-	if !instance.IsReplica() {
+	if !instance.ReplicationThreadsExist() {
 		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 
@@ -320,10 +320,16 @@ func WaitForSQLThreadUpToDate(instanceKey *InstanceKey, overallTimeout time.Dura
 		}
 
 		if instance.SQLThreadUpToDate() {
+			// Woohoo
 			return instance, nil
+		}
+		if instance.SQLDelay != 0 {
+			return instance, log.Errorf("WaitForSQLThreadUpToDate: instance %+v has SQL Delay %+v. Operation is irrelevant", *instanceKey, instance.SQLDelay)
 		}
 
 		if !instance.ExecBinlogCoordinates.Equals(&lastExecBinlogCoordinates) {
+			// means we managed to apply binlog events. We made progress...
+			// so we reset the "staleness" timer
 			if !staleTimer.Stop() {
 				<-staleTimer.C
 			}
