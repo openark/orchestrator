@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/github/orchestrator/go/config"
-	"github.com/openark/golib/log"
 	"github.com/openark/golib/math"
 )
 
@@ -276,16 +275,7 @@ func (this *Instance) ReplicationThreadsExist() bool {
 
 // SQLThreadUpToDate returns true when the instance had consumed all relay logs.
 func (this *Instance) SQLThreadUpToDate() bool {
-	instance, err := ReadTopologyInstance(&this.Key)
-	if err != nil {
-		log.Errorf("Could not check sql thread on %+v: %s", instance.Key, err)
-		return false
-	}
-	if !instance.ReadBinlogCoordinates.Equals(&instance.ExecBinlogCoordinates) {
-		log.Infof("SQL thread not caught up on %+v: read position %s:%d, executed position: %s:%d", instance.Key, instance.ReadBinlogCoordinates.LogFile, instance.ReadBinlogCoordinates.LogPos, instance.ExecBinlogCoordinates.LogFile, instance.ExecBinlogCoordinates.LogPos)
-		return false
-	}
-	return true
+	return this.ReadBinlogCoordinates.Equals(&this.ExecBinlogCoordinates)
 }
 
 // UsingGTID returns true when this replica is currently replicating via GTID (either Oracle or MariaDB)
