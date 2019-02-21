@@ -277,7 +277,8 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	}
 
 	if instance.SQLDelay == 0 {
-		if instance, _, err = WaitForSQLThreadUpToDate(instanceKey, timeout, 0); err != nil {
+		// Otherwise we don't bother.
+		if instance, err = WaitForSQLThreadUpToDate(instanceKey, timeout, 0); err != nil {
 			return instance, err
 		}
 	}
@@ -298,7 +299,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	return instance, err
 }
 
-func WaitForSQLThreadUpToDate(instanceKey *InstanceKey, overallTimeout time.Duration, staleCoordinatesTimeout time.Duration) (instance *Instance, upToDate bool, err error) {
+func WaitForSQLThreadUpToDate(instanceKey *InstanceKey, overallTimeout time.Duration, staleCoordinatesTimeout time.Duration) (instance *Instance, err error) {
 	// Otherwise we don't bother.
 	var lastExecBinlogCoordinates BinlogCoordinates
 
@@ -315,11 +316,11 @@ func WaitForSQLThreadUpToDate(instanceKey *InstanceKey, overallTimeout time.Dura
 			return ReadTopologyInstance(instanceKey)
 		})
 		if err != nil {
-			return instance, false, log.Errore(err)
+			return instance, log.Errore(err)
 		}
 
 		if instance.SQLThreadUpToDate() {
-			return instance, true, nil
+			return instance, nil
 		}
 
 		if !instance.ExecBinlogCoordinates.Equals(&lastExecBinlogCoordinates) {
@@ -332,9 +333,9 @@ func WaitForSQLThreadUpToDate(instanceKey *InstanceKey, overallTimeout time.Dura
 
 		select {
 		case <-generalTimer.C:
-			return instance, false, log.Errorf("WaitForSQLThreadUpToDate timeout on %+v after duration %+v", *instanceKey, overallTimeout)
+			return instance, log.Errorf("WaitForSQLThreadUpToDate timeout on %+v after duration %+v", *instanceKey, overallTimeout)
 		case <-staleTimer.C:
-			return instance, false, log.Errorf("WaitForSQLThreadUpToDate stale coordinates timeout on %+v after duration %+v", *instanceKey, staleCoordinatesTimeout)
+			return instance, log.Errorf("WaitForSQLThreadUpToDate stale coordinates timeout on %+v after duration %+v", *instanceKey, staleCoordinatesTimeout)
 		default:
 			log.Debugf("WaitForSQLThreadUpToDate waiting on %+v", *instanceKey)
 			time.Sleep(retryInterval)
