@@ -16,6 +16,10 @@
   "#": "-----",
   "DiscoverByShowSlaveHosts": true,
   "InstancePollSeconds": 5,
+  "DiscoveryIgnoreReplicaHostnameFilters": [
+    "a_host_i_want_to_ignore",
+    "another_host_i_want_to_ignore"
+  ],
   "HostnameResolveMethod": "default",
   "MySQLHostnameResolveMethod": "@@hostname",
   "ReasonableReplicationLagSeconds": 10,
