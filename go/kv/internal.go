@@ -30,7 +30,10 @@ func NewInternalKVStore() KVStore {
 	return &internalKVStore{}
 }
 
-func (this *internalKVStore) PutKeyValue(key string, value string) (err error) {
+func (this *internalKVStore) PutKeyValue(key string, value string, hint KVHint) (err error) {
+	if hint == DCDistributeHint {
+		return nil
+	}
 	_, err = db.ExecOrchestrator(`
 		replace
 			into kv_store (
@@ -62,7 +65,10 @@ func (this *internalKVStore) GetKeyValue(key string) (value string, found bool, 
 	return value, found, log.Errore(err)
 }
 
-func (this *internalKVStore) AddKeyValue(key string, value string) (added bool, err error) {
+func (this *internalKVStore) AddKeyValue(key string, value string, hint KVHint) (added bool, err error) {
+	if hint == DCDistributeHint {
+		return false, nil
+	}
 	sqlResult, err := db.ExecOrchestrator(`
 		insert ignore
 			into kv_store (

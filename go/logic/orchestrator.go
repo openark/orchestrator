@@ -438,13 +438,14 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 		if orcraft.IsRaftEnabled() {
 			_, err = orcraft.PublishCommand(command, kvPair)
 		} else {
-			err = applyFunc(kvPair)
+			err = applyFunc(kvPair, kv.NoHint)
 		}
 		if err == nil {
 			submittedCount++
 		} else {
 			selectedError = err
 		}
+		applyFunc(kvPair, kv.DCDistributeHint)
 	}
 	return kvPairs, submittedCount, log.Errore(selectedError)
 }

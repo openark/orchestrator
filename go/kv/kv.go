@@ -21,6 +21,13 @@ import (
 	"sync"
 )
 
+type KVHint int
+
+const (
+	NoHint KVHint = iota
+	DCDistributeHint
+)
+
 type KVPair struct {
 	Key   string
 	Value string
@@ -35,10 +42,9 @@ func (this *KVPair) String() string {
 }
 
 type KVStore interface {
-	PutKeyValue(key string, value string) (err error)
+	PutKeyValue(key string, value string, hint KVHint) (err error)
 	GetKeyValue(key string) (value string, found bool, err error)
-
-	AddKeyValue(key string, value string) (added bool, err error)
+	AddKeyValue(key string, value string, hint KVHint) (added bool, err error)
 }
 
 var kvMutex sync.Mutex
@@ -76,25 +82,25 @@ func GetValue(key string) (value string, found bool, err error) {
 	return value, found, err
 }
 
-func PutValue(key string, value string) (err error) {
+func PutValue(key string, value string, hint KVHint) (err error) {
 	for _, store := range getKVStores() {
-		if err := store.PutKeyValue(key, value); err != nil {
+		if err := store.PutKeyValue(key, value, hint); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func PutKVPair(kvPair *KVPair) (err error) {
+func PutKVPair(kvPair *KVPair, hint KVHint) (err error) {
 	if kvPair == nil {
 		return nil
 	}
-	return PutValue(kvPair.Key, kvPair.Value)
+	return PutValue(kvPair.Key, kvPair.Value, hint)
 }
 
-func AddValue(key string, value string) (err error) {
+func AddValue(key string, value string, hint KVHint) (err error) {
 	for _, store := range getKVStores() {
-		added, err := store.AddKeyValue(key, value)
+		added, err := store.AddKeyValue(key, value, hint)
 		if err != nil {
 			return err
 		}
@@ -105,9 +111,9 @@ func AddValue(key string, value string) (err error) {
 	return nil
 }
 
-func AddKVPair(kvPair *KVPair) (err error) {
+func AddKVPair(kvPair *KVPair, hint KVHint) (err error) {
 	if kvPair == nil {
 		return nil
 	}
-	return AddValue(kvPair.Key, kvPair.Value)
+	return AddValue(kvPair.Key, kvPair.Value, hint)
 }

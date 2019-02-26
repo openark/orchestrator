@@ -52,8 +52,11 @@ func NewZkStore() KVStore {
 	return store
 }
 
-func (this *zkStore) PutKeyValue(key string, value string) (err error) {
+func (this *zkStore) PutKeyValue(key string, value string, hint KVHint) (err error) {
 	if this.zook == nil {
+		return nil
+	}
+	if hint == DCDistributeHint {
 		return nil
 	}
 
@@ -75,7 +78,10 @@ func (this *zkStore) GetKeyValue(key string) (value string, found bool, err erro
 	return string(result), true, nil
 }
 
-func (this *zkStore) AddKeyValue(key string, value string) (added bool, err error) {
-	err = this.PutKeyValue(key, value)
+func (this *zkStore) AddKeyValue(key string, value string, hint KVHint) (added bool, err error) {
+	if hint == DCDistributeHint {
+		return false, nil
+	}
+	err = this.PutKeyValue(key, value, hint)
 	return (err != nil), err
 }
