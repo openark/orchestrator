@@ -46,25 +46,12 @@ func NewConsulStore() KVStore {
 	return store
 }
 
-func (this *consulStore) PutKeyValue(key string, value string, hint KVHint) (err error) {
+func (this *consulStore) PutKeyValue(key string, value string) (err error) {
 	if this.client == nil {
 		return nil
 	}
 	pair := &consulapi.KVPair{Key: key, Value: []byte(value)}
-	if hint == DCDistributeHint /* && config.Config.ConsulCrossDataCenterDistribution */ {
-		datacenters, err := this.client.Catalog().Datacenters()
-		if err != nil {
-			return err
-		}
-		for _, datacenter := range datacenters {
-			log.Debugf("consulStore.PutKeyValue: %s:%s on %s", key, value, datacenter)
-			if _, e := this.client.KV().Put(pair, &consulapi.WriteOptions{Datacenter: datacenter}); e != nil {
-				err = e
-			}
-		}
-	} else {
-		_, err = this.client.KV().Put(pair, nil)
-	}
+	_, err = this.client.KV().Put(pair, nil)
 	return err
 }
 
@@ -79,7 +66,30 @@ func (this *consulStore) GetKeyValue(key string) (value string, found bool, err 
 	return string(pair.Value), (pair != nil), nil
 }
 
-func (this *consulStore) AddKeyValue(key string, value string, hint KVHint) (added bool, err error) {
-	err = this.PutKeyValue(key, value, hint)
+func (this *consulStore) AddKeyValue(key string, value string) (added bool, err error) {
+	err = this.PutKeyValue(key, value)
 	return (err != nil), err
+}
+
+func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
+	if true /* && config.Config.ConsulCrossDataCenterDistribution */ {
+		datacenters, err := this.client.Catalog().Datacenters()
+		if err != nil {
+			return err
+		}
+		consulPairs := [](*consulapi.KVPair){}
+		for _, kvPair := range kvPairs {
+			consulPairs = append(consulPairs, &consulapi.KVPair{Key: kvPair.Key, Value: []byte(kvPair.Value)})
+		}
+		for _, datacenter := range datacenters {
+			writeOptions := &consulapi.WriteOptions{Datacenter: datacenter}
+			for _, consulPair := range consulPairs {
+				log.Debugf("consulStore.PutKeyValue: %s on %s", consulPair, datacenter)
+				if _, e := this.client.KV().Put(consulPair, writeOptions); e != nil {
+					err = e
+				}
+			}
+		}
+	}
+	return err
 }

@@ -859,15 +859,13 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			go orcraft.PublishCommand("async-snapshot", "")
 		} else {
 			for _, kvPair := range kvPairs {
-				err := kv.PutKVPair(kvPair, kv.NoHint)
+				err := kv.PutKVPair(kvPair)
 				log.Errore(err)
 			}
 		}
 		{
-			for _, kvPair := range kvPairs {
-				err := kv.PutKVPair(kvPair, kv.DCDistributeHint)
-				log.Errore(err)
-			}
+			err := kv.DistributePairs(kvPairs)
+			log.Errore(err)
 		}
 		if !skipProcesses {
 			// Execute post master-failover processes

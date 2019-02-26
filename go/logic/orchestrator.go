@@ -421,6 +421,7 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 		applyFunc = kv.PutKVPair
 	}
 	var selectedError error
+	var submitKvPairs [](*kv.KVPair)
 	for _, kvPair := range kvPairs {
 		if !force {
 			// !force: Called periodically to auto-populate KV
@@ -435,18 +436,21 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 				continue
 			}
 		}
+		submitKvPairs = append(submitKvPairs, kvPair)
+	}
+	for _, kvPair := range submitKvPairs {
 		if orcraft.IsRaftEnabled() {
 			_, err = orcraft.PublishCommand(command, kvPair)
 		} else {
-			err = applyFunc(kvPair, kv.NoHint)
+			err = applyFunc(kvPair)
 		}
 		if err == nil {
 			submittedCount++
 		} else {
 			selectedError = err
 		}
-		applyFunc(kvPair, kv.DCDistributeHint)
 	}
+	kv.DistributePairs(submitKvPairs)
 	return kvPairs, submittedCount, log.Errore(selectedError)
 }
 

@@ -262,7 +262,7 @@ func (applier *CommandApplier) putKeyValue(value []byte) interface{} {
 	if err := json.Unmarshal(value, &kvPair); err != nil {
 		return log.Errore(err)
 	}
-	err := kv.PutKVPair(&kvPair, kv.NoHint)
+	err := kv.PutKVPair(&kvPair)
 	return err
 }
 
@@ -271,7 +271,7 @@ func (applier *CommandApplier) addKeyValue(value []byte) interface{} {
 	if err := json.Unmarshal(value, &kvPair); err != nil {
 		return log.Errore(err)
 	}
-	err := kv.AddKVPair(&kvPair, kv.NoHint)
+	err := kv.AddKVPair(&kvPair)
 
 	return err
 }
