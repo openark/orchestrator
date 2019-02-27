@@ -428,11 +428,17 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 		if !force {
 			// !force: Called periodically to auto-populate KV
 			// We'd like to avoid some overhead.
+			log.Debugf("kv.SubmitMastersToKvStores: searching pair in cache %+v", kvPair)
+
 			if _, found := kvFoundCache.Get(kvPair.Key); found {
 				// Let's not overload database with queries. Let's not overload raft with events.
 				continue
 			}
-			if v, found, err := kv.GetValue(kvPair.Key); err == nil && found && v == kvPair.Value {
+			log.Debugf("kv.SubmitMastersToKvStores: searching pair in cache %+v: not found", kvPair)
+			log.Debugf("kv.SubmitMastersToKvStores: searching pair in kv store %+v", kvPair)
+			v, found, err := kv.GetValue(kvPair.Key)
+			log.Debugf("kv.SubmitMastersToKvStores: searching pair in kv store %+v: v=%+v, found=%+v, err=%+v", kvPair, v, found, err)
+			if err == nil && found && v == kvPair.Value {
 				// Already has the right value.
 				kvFoundCache.Set(kvPair.Key, true, cache.DefaultExpiration)
 				continue
