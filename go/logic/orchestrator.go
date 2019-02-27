@@ -434,7 +434,7 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 		}
 		submitKvPairs = append(submitKvPairs, kvPair)
 	}
-	log.Debugf("kv.SubmitMastersToKvStores: submitKvPairs: %+v", clusterName, len(submitKvPairs))
+	log.Debugf("kv.SubmitMastersToKvStores: submitKvPairs: %+v", len(submitKvPairs))
 	for _, kvPair := range submitKvPairs {
 		if orcraft.IsRaftEnabled() {
 			_, err = orcraft.PublishCommand("put-key-value", kvPair)

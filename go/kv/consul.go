@@ -72,7 +72,7 @@ func (this *consulStore) AddKeyValue(key string, value string) (added bool, err 
 }
 
 func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
-	if true /* && config.Config.ConsulCrossDataCenterDistribution */ {
+	if config.Config.ConsulCrossDataCenterDistribution {
 		datacenters, err := this.client.Catalog().Datacenters()
 		if err != nil {
 			return err
