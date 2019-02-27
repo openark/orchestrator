@@ -416,12 +416,6 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 	if err != nil {
 		return kvPairs, submittedCount, log.Errore(err)
 	}
-	command := "add-key-value"
-	applyFunc := kv.AddKVPair
-	if force {
-		command = "put-key-value"
-		applyFunc = kv.PutKVPair
-	}
 	var selectedError error
 	var submitKvPairs [](*kv.KVPair)
 	for _, kvPair := range kvPairs {
@@ -450,9 +444,9 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 	log.Debugf("kv.SubmitMastersToKvStores: %s, %d submitKvPairs", clusterName, len(submitKvPairs))
 	for _, kvPair := range submitKvPairs {
 		if orcraft.IsRaftEnabled() {
-			_, err = orcraft.PublishCommand(command, kvPair)
+			_, err = orcraft.PublishCommand("put-key-value", kvPair)
 		} else {
-			err = applyFunc(kvPair)
+			err = kv.PutKVPair(kvPair)
 		}
 		if err == nil {
 			submittedCount++
