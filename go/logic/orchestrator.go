@@ -410,9 +410,8 @@ func InjectPseudoGTIDOnWriters() error {
 // This should generally only happen once in a lifetime of a cluster. Otherwise KV
 // stores are updated via failovers.
 func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVPair), submittedCount int, err error) {
-	log.Debugf("kv.SubmitMastersToKvStores: %s, force: %+v", clusterName, force)
 	kvPairs, err = inst.GetMastersKVPairs(clusterName)
-	log.Debugf("kv.SubmitMastersToKvStores: %s, %d pairs", clusterName, len(kvPairs))
+	log.Debugf("kv.SubmitMastersToKvStores, clusterName: %s, force: %+v: numPairs: %+v", clusterName, force, len(kvPairs))
 	if err != nil {
 		return kvPairs, submittedCount, log.Errore(err)
 	}
@@ -422,26 +421,20 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 		if !force {
 			// !force: Called periodically to auto-populate KV
 			// We'd like to avoid some overhead.
-			log.Debugf("kv.SubmitMastersToKvStores: searching pair in cache %+v", kvPair)
-
 			if _, found := kvFoundCache.Get(kvPair.Key); found {
 				// Let's not overload database with queries. Let's not overload raft with events.
 				continue
 			}
-			log.Debugf("kv.SubmitMastersToKvStores: searching pair in cache %+v: not found", kvPair)
-			log.Debugf("kv.SubmitMastersToKvStores: searching pair in kv store %+v", kvPair)
 			v, found, err := kv.GetValue(kvPair.Key)
-			log.Debugf("kv.SubmitMastersToKvStores: searching pair in kv store %+v: v=%+v, found=%+v, err=%+v, isval: %+v", kvPair, v, found, err, v == kvPair.Value)
 			if err == nil && found && v == kvPair.Value {
 				// Already has the right value.
 				kvFoundCache.Set(kvPair.Key, true, cache.DefaultExpiration)
 				continue
 			}
 		}
-		log.Debugf("kv.SubmitMastersToKvStores: adding pair %+v", kvPair)
 		submitKvPairs = append(submitKvPairs, kvPair)
 	}
-	log.Debugf("kv.SubmitMastersToKvStores: %s, %d submitKvPairs", clusterName, len(submitKvPairs))
+	log.Debugf("kv.SubmitMastersToKvStores: submitKvPairs: %+v", clusterName, len(submitKvPairs))
 	for _, kvPair := range submitKvPairs {
 		if orcraft.IsRaftEnabled() {
 			_, err = orcraft.PublishCommand("put-key-value", kvPair)
