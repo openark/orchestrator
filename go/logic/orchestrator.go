@@ -410,9 +410,9 @@ func InjectPseudoGTIDOnWriters() error {
 // This should generally only happen once in a lifetime of a cluster. Otherwise KV
 // stores are updated via failovers.
 func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVPair), submittedCount int, err error) {
-	log.Debugf("kv.SubmitMastersToKvStores: %s", clusterName)
+	log.Debugf("kv.SubmitMastersToKvStores: %s, force: %+v", clusterName, force)
 	kvPairs, err = inst.GetMastersKVPairs(clusterName)
-	log.Debugf("kv.SubmitMastersToKvStores: %s, %d", clusterName, len(kvPairs))
+	log.Debugf("kv.SubmitMastersToKvStores: %s, %d pairs", clusterName, len(kvPairs))
 	if err != nil {
 		return kvPairs, submittedCount, log.Errore(err)
 	}
@@ -438,8 +438,10 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 				continue
 			}
 		}
+		log.Debugf("kv.SubmitMastersToKvStores: adding pair %+v", kvPair)
 		submitKvPairs = append(submitKvPairs, kvPair)
 	}
+	log.Debugf("kv.SubmitMastersToKvStores: %s, %d submitKvPairs", clusterName, len(submitKvPairs))
 	for _, kvPair := range submitKvPairs {
 		if orcraft.IsRaftEnabled() {
 			_, err = orcraft.PublishCommand(command, kvPair)
