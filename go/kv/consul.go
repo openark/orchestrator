@@ -84,7 +84,7 @@ func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 		for _, datacenter := range datacenters {
 			writeOptions := &consulapi.WriteOptions{Datacenter: datacenter}
 			for _, consulPair := range consulPairs {
-				log.Debugf("consulStore.PutKeyValue: %s on %s", consulPair, datacenter)
+				log.Debugf("kv.consulStore.PutKeyValue: %s on %s", consulPair, datacenter)
 				if _, e := this.client.KV().Put(consulPair, writeOptions); e != nil {
 					err = e
 				}

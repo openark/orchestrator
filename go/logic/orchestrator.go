@@ -410,7 +410,9 @@ func InjectPseudoGTIDOnWriters() error {
 // This should generally only happen once in a lifetime of a cluster. Otherwise KV
 // stores are updated via failovers.
 func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVPair), submittedCount int, err error) {
+	log.Debugf("kv.SubmitMastersToKvStores: %s", clusterName)
 	kvPairs, err = inst.GetMastersKVPairs(clusterName)
+	log.Debugf("kv.SubmitMastersToKvStores: %s, %d", clusterName, len(kvPairs))
 	if err != nil {
 		return kvPairs, submittedCount, log.Errore(err)
 	}
