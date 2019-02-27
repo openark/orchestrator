@@ -437,7 +437,7 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 			log.Debugf("kv.SubmitMastersToKvStores: searching pair in cache %+v: not found", kvPair)
 			log.Debugf("kv.SubmitMastersToKvStores: searching pair in kv store %+v", kvPair)
 			v, found, err := kv.GetValue(kvPair.Key)
-			log.Debugf("kv.SubmitMastersToKvStores: searching pair in kv store %+v: v=%+v, found=%+v, err=%+v", kvPair, v, found, err)
+			log.Debugf("kv.SubmitMastersToKvStores: searching pair in kv store %+v: v=%+v, found=%+v, err=%+v, isval: %+v", kvPair, v, found, err, v == kvPair.Value)
 			if err == nil && found && v == kvPair.Value {
 				// Already has the right value.
 				kvFoundCache.Set(kvPair.Key, true, cache.DefaultExpiration)
