@@ -190,8 +190,8 @@ func FlushBinaryLogsTo(instanceKey *InstanceKey, logFile string) (*Instance, err
 	return FlushBinaryLogs(instanceKey, distance)
 }
 
-// FlushBinaryLogsTo attempts to 'PURGE BINARY LOGS' until given binary log is reached
-func PurgeBinaryLogsTo(instanceKey *InstanceKey, logFile string) (*Instance, error) {
+// purgeBinaryLogsTo attempts to 'PURGE BINARY LOGS' until given binary log is reached
+func purgeBinaryLogsTo(instanceKey *InstanceKey, logFile string) (*Instance, error) {
 	if *config.RuntimeCLIFlags.Noop {
 		return nil, fmt.Errorf("noop: aborting purge-binary-logs operation on %+v; signalling error but nothing went wrong.", *instanceKey)
 	}
@@ -205,15 +205,6 @@ func PurgeBinaryLogsTo(instanceKey *InstanceKey, logFile string) (*Instance, err
 	AuditOperation("purge-binary-logs", instanceKey, "success")
 
 	return ReadTopologyInstance(instanceKey)
-}
-
-// FlushBinaryLogsTo attempts to 'PURGE BINARY LOGS' until given binary log is reached
-func PurgeBinaryLogsToCurrent(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
-	if err != nil {
-		return instance, log.Errore(err)
-	}
-	return PurgeBinaryLogsTo(instanceKey, instance.SelfBinlogCoordinates.LogFile)
 }
 
 func SetSemiSyncMaster(instanceKey *InstanceKey, enableMaster bool) (*Instance, error) {
