@@ -803,7 +803,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("expecting --binlog value")
 			}
 
-			_, err = inst.PurgeBinaryLogsTo(instanceKey, *config.RuntimeCLIFlags.BinlogFile)
+			_, err = inst.PurgeBinaryLogsTo(instanceKey, *config.RuntimeCLIFlags.BinlogFile, false)
 			if err != nil {
 				log.Fatale(err)
 			}
