@@ -412,7 +412,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 	if err != nil {
 		return promotedReplica, log.Errore(err)
 	}
-	promotedReplica, err = inst.PurgeBinaryLogsToCurrent(&promotedReplica.Key)
+	promotedReplica, err = inst.PurgeBinaryLogsToLatest(&promotedReplica.Key, false)
 	if err != nil {
 		return promotedReplica, log.Errore(err)
 	}
