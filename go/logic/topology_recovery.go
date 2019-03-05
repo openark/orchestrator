@@ -833,17 +833,25 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		if config.Config.ApplyMySQLPromotionAfterMasterFailover || analysisEntry.CommandHint == inst.GracefulMasterTakeoverCommandHint {
 			// on GracefulMasterTakeoverCommandHint it makes utter sense to RESET SLAVE ALL and read_only=0, and there is no sense in not doing so.
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: will apply MySQL changes to promoted master"))
-			if _, err := inst.ResetSlaveOperation(&promotedReplica.Key); true {
+			{
+				_, err := inst.ResetSlaveOperation(&promotedReplica.Key)
+				if err != nil {
+					// Ugly, but this is important. Let's give it another try
+					_, err = inst.ResetSlaveOperation(&promotedReplica.Key)
+				}
 				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: applying RESET SLAVE ALL on promoted master: success=%t", (err == nil)))
+				if err != nil {
+					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: NOTE that %+v is promoted even though SHOW SLAVE STATUS may still show it has a master", promotedReplica.Key))
+				}
 			}
-			if _, err := inst.SetReadOnly(&promotedReplica.Key, false); true {
+			{
+				_, err := inst.SetReadOnly(&promotedReplica.Key, false)
 				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: applying read-only=0 on promoted master: success=%t", (err == nil)))
 			}
 			// Let's attempt, though we won't necessarily succeed, to set old master as read-only
 			go func() {
-				if _, err := inst.SetReadOnly(&analysisEntry.AnalyzedInstanceKey, true); true {
-					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: applying read-only=1 on demoted master: success=%t", (err == nil)))
-				}
+				_, err := inst.SetReadOnly(&analysisEntry.AnalyzedInstanceKey, true)
+				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: applying read-only=1 on demoted master: success=%t", (err == nil)))
 			}()
 		}
 
