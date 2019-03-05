@@ -2700,3 +2700,29 @@ func RelocateReplicas(instanceKey, otherKey *InstanceKey, pattern string) (repli
 	}
 	return replicas, other, err, errs
 }
+
+// PurgeBinaryLogsTo attempts to 'PURGE BINARY LOGS' until given binary log is reached
+func PurgeBinaryLogsTo(instanceKey *InstanceKey, logFile string, force bool) (*Instance, error) {
+	replicas, err := ReadReplicaInstances(instanceKey)
+	if err != nil {
+		return nil, err
+	}
+	if !force {
+		purgeCoordinates := &BinlogCoordinates{LogFile: logFile, LogPos: 0}
+		for _, replica := range replicas {
+			if !purgeCoordinates.SmallerThan(&replica.ExecBinlogCoordinates) {
+				return nil, log.Errorf("Unsafe to purge binary logs on %+v up to %s because replica %+v has only applied up to %+v", *instanceKey, logFile, replica.Key, replica.ExecBinlogCoordinates)
+			}
+		}
+	}
+	return purgeBinaryLogsTo(instanceKey, logFile)
+}
+
+// PurgeBinaryLogsToLatest attempts to 'PURGE BINARY LOGS' until latest binary log
+func PurgeBinaryLogsToLatest(instanceKey *InstanceKey, force bool) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	return PurgeBinaryLogsTo(instanceKey, instance.SelfBinlogCoordinates.LogFile, force)
+}
