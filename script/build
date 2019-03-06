@@ -7,6 +7,11 @@ if [ -n "$DEBUG" ];then
     PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }' # print line number and function name
 fi
 
+if [ -z "$(which shasum)" ]; then
+    echo "Checksum utility 'shasum' not found."
+    exit 1
+fi
+
 . script/bootstrap
 
 mkdir -p bin
