@@ -2693,6 +2693,11 @@ func RelocateReplicas(instanceKey, otherKey *InstanceKey, pattern string) (repli
 		// Nothing to do
 		return replicas, other, nil, errs
 	}
+	for _, replica := range replicas {
+		if other.IsDescendantOf(replica) {
+			return replicas, other, log.Errorf("relocate-replicas: %+v is a descendant of %+v", *otherKey, replica.Key), errs
+		}
+	}
 	replicas, err, errs = relocateReplicasInternal(replicas, instance, other)
 
 	if err == nil {
