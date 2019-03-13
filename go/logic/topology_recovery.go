@@ -824,6 +824,13 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			AuditTopologyRecovery(topologyRecovery, message)
 			return false, nil, log.Error(message)
 		}
+		if config.Config.DelayMasterPromotionIfSQLThreadNotUpToDate {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Waiting to ensure the SQL thread catches up on %+v", promotedReplica.Key))
+			if _, err = inst.WaitForSQLThreadUpToDate(&promotedReplica.Key, 0, 0); err != nil {
+				return false, nil, err
+			}
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("SQL thread caught up on %+v", promotedReplica.Key))
+		}
 
 		// Success!
 		recoverDeadMasterSuccessCounter.Inc(1)
@@ -1241,6 +1248,13 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 		}
 	}
 	if promotedReplica != nil {
+		if config.Config.DelayMasterPromotionIfSQLThreadNotUpToDate {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Waiting to ensure the SQL thread catches up on %+v", promotedReplica.Key))
+			if _, err := inst.WaitForSQLThreadUpToDate(&promotedReplica.Key, 0, 0); err != nil {
+				return promotedReplica, lostReplicas, err
+			}
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("SQL thread caught up on %+v", promotedReplica.Key))
+		}
 		topologyRecovery.ParticipatingInstanceKeys.AddKey(promotedReplica.Key)
 	}
 
@@ -1315,7 +1329,6 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 		if config.Config.FailMasterPromotionIfSQLThreadNotUpToDate && !promotedReplica.SQLThreadUpToDate() {
 			return false, nil, log.Errorf("Promoted replica %+v: sql thread is not up to date (relay logs still unapplied). Aborting promotion", promotedReplica.Key)
 		}
-
 		// success
 		recoverDeadCoMasterSuccessCounter.Inc(1)
 

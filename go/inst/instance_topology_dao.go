@@ -49,8 +49,6 @@ const (
 	Error1201CouldnotInitializeMasterInfoStructure = "Error 1201:"
 )
 
-const sqlThreadPollDuration = 400 * time.Millisecond
-
 // ExecInstance executes a given query on the given MySQL topology instance
 func ExecInstance(instanceKey *InstanceKey, query string, args ...interface{}) (sql.Result, error) {
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
@@ -262,7 +260,7 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 		return instance, log.Errore(err)
 	}
 
-	if !instance.IsReplica() {
+	if !instance.ReplicationThreadsExist() {
 		return instance, fmt.Errorf("instance is not a replica: %+v", instanceKey)
 	}
 
@@ -275,25 +273,11 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 
 	if instance.SQLDelay == 0 {
 		// Otherwise we don't bother.
-		startTime := time.Now()
-		for upToDate := false; !upToDate; {
-			timeSinceStartTime := time.Since(startTime)
-			if timeout > 0 && timeSinceStartTime >= timeout {
-				// timeout
-				return nil, log.Errorf("%+v: StopSlaveNicely timeout after %+v", *instanceKey, timeSinceStartTime)
-			}
-			instance, err = ReadTopologyInstance(instanceKey)
-			if err != nil {
-				return instance, log.Errore(err)
-			}
-
-			if instance.SQLThreadUpToDate() {
-				upToDate = true
-			} else {
-				time.Sleep(sqlThreadPollDuration)
-			}
+		if instance, err = WaitForSQLThreadUpToDate(instanceKey, timeout, 0); err != nil {
+			return instance, err
 		}
 	}
+
 	_, err = ExecInstance(instanceKey, `stop slave`)
 	if err != nil {
 		// Patch; current MaxScale behavior for STOP SLAVE is to throw an error if replica already stopped.
@@ -308,6 +292,56 @@ func StopSlaveNicely(instanceKey *InstanceKey, timeout time.Duration) (*Instance
 	instance, err = ReadTopologyInstance(instanceKey)
 	log.Infof("Stopped slave nicely on %+v, Self:%+v, Exec:%+v", *instanceKey, instance.SelfBinlogCoordinates, instance.ExecBinlogCoordinates)
 	return instance, err
+}
+
+func WaitForSQLThreadUpToDate(instanceKey *InstanceKey, overallTimeout time.Duration, staleCoordinatesTimeout time.Duration) (instance *Instance, err error) {
+	// Otherwise we don't bother.
+	var lastExecBinlogCoordinates BinlogCoordinates
+
+	if overallTimeout == 0 {
+		overallTimeout = 24 * time.Hour
+	}
+	if staleCoordinatesTimeout == 0 {
+		staleCoordinatesTimeout = time.Duration(config.Config.ReasonableReplicationLagSeconds) * time.Second
+	}
+	generalTimer := time.NewTimer(overallTimeout)
+	staleTimer := time.NewTimer(staleCoordinatesTimeout)
+	for {
+		instance, err := RetryInstanceFunction(func() (*Instance, error) {
+			return ReadTopologyInstance(instanceKey)
+		})
+		if err != nil {
+			return instance, log.Errore(err)
+		}
+
+		if instance.SQLThreadUpToDate() {
+			// Woohoo
+			return instance, nil
+		}
+		if instance.SQLDelay != 0 {
+			return instance, log.Errorf("WaitForSQLThreadUpToDate: instance %+v has SQL Delay %+v. Operation is irrelevant", *instanceKey, instance.SQLDelay)
+		}
+
+		if !instance.ExecBinlogCoordinates.Equals(&lastExecBinlogCoordinates) {
+			// means we managed to apply binlog events. We made progress...
+			// so we reset the "staleness" timer
+			if !staleTimer.Stop() {
+				<-staleTimer.C
+			}
+			staleTimer.Reset(staleCoordinatesTimeout)
+		}
+		lastExecBinlogCoordinates = instance.ExecBinlogCoordinates
+
+		select {
+		case <-generalTimer.C:
+			return instance, log.Errorf("WaitForSQLThreadUpToDate timeout on %+v after duration %+v", *instanceKey, overallTimeout)
+		case <-staleTimer.C:
+			return instance, log.Errorf("WaitForSQLThreadUpToDate stale coordinates timeout on %+v after duration %+v", *instanceKey, staleCoordinatesTimeout)
+		default:
+			log.Debugf("WaitForSQLThreadUpToDate waiting on %+v", *instanceKey)
+			time.Sleep(retryInterval)
+		}
+	}
 }
 
 // StopSlaves will stop replication concurrently on given set of replicas.
@@ -512,7 +546,7 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 
 		switch {
 		case instance.ExecBinlogCoordinates.SmallerThan(masterCoordinates):
-			time.Sleep(sqlThreadPollDuration)
+			time.Sleep(retryInterval)
 		case instance.ExecBinlogCoordinates.Equals(masterCoordinates):
 			upToDate = true
 		case masterCoordinates.SmallerThan(&instance.ExecBinlogCoordinates):

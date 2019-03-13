@@ -46,11 +46,13 @@ import (
 )
 
 const (
-	backendDBConcurrency   = 20
-	error1045AccessDenied  = "Error 1045: Access denied for user"
-	errorConnectionRefused = "getsockopt: connection refused"
-	errorNoSuchHost        = "no such host"
-	errorIOTimeout         = "i/o timeout"
+	backendDBConcurrency       = 20
+	retryInstanceFunctionCount = 5
+	retryInterval              = 500 * time.Millisecond
+	error1045AccessDenied      = "Error 1045: Access denied for user"
+	errorConnectionRefused     = "getsockopt: connection refused"
+	errorNoSuchHost            = "no such host"
+	errorIOTimeout             = "i/o timeout"
 )
 
 var instanceReadChan = make(chan bool, backendDBConcurrency)
@@ -172,6 +174,15 @@ func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err err
 // backend.
 func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	return ReadTopologyInstanceBufferable(instanceKey, false, nil)
+}
+
+func RetryInstanceFunction(f func() (*Instance, error)) (instance *Instance, err error) {
+	for i := 0; i < retryInstanceFunctionCount; i++ {
+		if instance, err = f(); err == nil {
+			return instance, nil
+		}
+	}
+	return instance, err
 }
 
 // Is this an error which means that we shouldn't try going more queries for this discovery attempt?
