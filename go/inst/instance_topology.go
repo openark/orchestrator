@@ -2587,6 +2587,9 @@ func RelocateBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	if err != nil || !found {
 		return instance, log.Errorf("Error reading %+v", *otherKey)
 	}
+	if other.IsDescendantOf(instance) {
+		return instance, log.Errorf("relocate: %+v is a descendant of %+v", *otherKey, instance.Key)
+	}
 	instance, err = relocateBelowInternal(instance, other)
 	if err == nil {
 		AuditOperation("relocate-below", instanceKey, fmt.Sprintf("relocated %+v below %+v", *instanceKey, *otherKey))
@@ -2692,6 +2695,11 @@ func RelocateReplicas(instanceKey, otherKey *InstanceKey, pattern string) (repli
 	if len(replicas) == 0 {
 		// Nothing to do
 		return replicas, other, nil, errs
+	}
+	for _, replica := range replicas {
+		if other.IsDescendantOf(replica) {
+			return replicas, other, log.Errorf("relocate-replicas: %+v is a descendant of %+v", *otherKey, replica.Key), errs
+		}
 	}
 	replicas, err, errs = relocateReplicasInternal(replicas, instance, other)
 
