@@ -2587,6 +2587,9 @@ func RelocateBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	if err != nil || !found {
 		return instance, log.Errorf("Error reading %+v", *otherKey)
 	}
+	if other.IsDescendantOf(instance) {
+		return instance, log.Errorf("relocate: %+v is a descendant of %+v", *otherKey, instance.Key)
+	}
 	instance, err = relocateBelowInternal(instance, other)
 	if err == nil {
 		AuditOperation("relocate-below", instanceKey, fmt.Sprintf("relocated %+v below %+v", *instanceKey, *otherKey))
