@@ -456,12 +456,14 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			if a.IsMaster && a.CountDistinctMajorVersionsLoggingReplicas > 1 {
 				a.StructureAnalysis = append(a.StructureAnalysis, MultipleMajorVersionsLoggingSlaves)
 			}
-
 			if a.CountReplicas > 0 && (a.GTIDMode != a.MinReplicaGTIDMode || a.GTIDMode != a.MaxReplicaGTIDMode) {
 				a.StructureAnalysis = append(a.StructureAnalysis, DifferentGTIDModesStructureWarning)
 			}
 			if a.MaxReplicaGTIDErrant != "" {
 				a.StructureAnalysis = append(a.StructureAnalysis, ErrantGTIDStructureWarning)
+			}
+			if a.IsMaster && a.CountReplicas == 0 {
+				a.StructureAnalysis = append(a.StructureAnalysis, SingleInstanceTopologyStructureWarning)
 			}
 		}
 		appendAnalysis(&a)

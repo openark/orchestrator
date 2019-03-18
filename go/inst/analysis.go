@@ -62,6 +62,7 @@ const (
 	MultipleMajorVersionsLoggingSlaves                                   = "MultipleMajorVersionsLoggingSlaves"
 	DifferentGTIDModesStructureWarning                                   = "DifferentGTIDModesStructureWarning"
 	ErrantGTIDStructureWarning                                           = "ErrantGTIDStructureWarning"
+	SingleInstanceTopologyStructureWarning                               = "SingleInstanceTopologyStructureWarning"
 )
 
 type InstanceAnalysis struct {
