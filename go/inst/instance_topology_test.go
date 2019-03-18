@@ -102,6 +102,17 @@ func TestSortInstancesDataCenterHint(t *testing.T) {
 	test.S(t).ExpectEquals(instances[0].Key, i810Key)
 }
 
+func TestSortInstancesGtidErrant(t *testing.T) {
+	instances, instancesMap := generateTestInstances()
+	for _, instance := range instances {
+		instance.ExecBinlogCoordinates = instances[0].ExecBinlogCoordinates
+		instance.GtidErrant = "00020192-1111-1111-1111-111111111111:1"
+	}
+	instancesMap[i810Key.StringCode()].GtidErrant = ""
+	sortInstances(instances)
+	test.S(t).ExpectEquals(instances[0].Key, i810Key)
+}
+
 func TestGetPriorityMajorVersionForCandidate(t *testing.T) {
 	{
 		instances, instancesMap := generateTestInstances()

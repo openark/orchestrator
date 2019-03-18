@@ -68,23 +68,23 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		                    AND replica_instance.slave_io_running = 0
 		                    AND replica_instance.last_io_error like '%error %connecting to master%'
 		                    AND replica_instance.slave_sql_running = 1),
-		                0) /* AS count_slaves_failing_to_connect_to_master */ > 0)
+		                0) /* AS count_replicas_failing_to_connect_to_master */ > 0)
 				OR (IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen),
-		                0) /* AS count_valid_slaves */ < COUNT(replica_instance.server_id) /* AS count_slaves */)
+		                0) /* AS count_valid_slaves */ < COUNT(replica_instance.server_id) /* AS count_replicas */)
 				OR (IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen
 		                    AND replica_instance.slave_io_running != 0
 		                    AND replica_instance.slave_sql_running != 0),
-		                0) /* AS count_valid_replicating_slaves */ < COUNT(replica_instance.server_id) /* AS count_slaves */)
+		                0) /* AS count_valid_replicating_slaves */ < COUNT(replica_instance.server_id) /* AS count_replicas */)
 				OR (MIN(
 		            master_instance.slave_sql_running = 1
 		            AND master_instance.slave_io_running = 0
 		            AND master_instance.last_io_error like '%error %connecting to master%'
 		          ) /* AS is_failing_to_connect_to_master */)
-				OR (COUNT(replica_instance.server_id) /* AS count_slaves */ > 0)
+				OR (COUNT(replica_instance.server_id) /* AS count_replicas */ > 0)
 			`
 		args = append(args, ValidSecondsFromSeenToLastAttemptedCheck())
 	}
-	// "OR count_slaves > 0" above is a recent addition, which, granted, makes some previous conditions redundant.
+	// "OR count_replicas > 0" above is a recent addition, which, granted, makes some previous conditions redundant.
 	// It gives more output, and more "NoProblem" messages that I am now interested in for purpose of auditing in database_instance_analysis_changelog
 	query := fmt.Sprintf(`
 		    SELECT
@@ -109,7 +109,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		                ':',
 		                master_instance.port) = master_instance.cluster_name) AS is_cluster_master,
 						MIN(master_instance.gtid_mode) AS gtid_mode,
-		        COUNT(replica_instance.server_id) AS count_slaves,
+		        COUNT(replica_instance.server_id) AS count_replicas,
 		        IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen),
 		                0) AS count_valid_slaves,
 		        IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen
@@ -120,7 +120,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		                    AND replica_instance.slave_io_running = 0
 		                    AND replica_instance.last_io_error like '%%error %%connecting to master%%'
 		                    AND replica_instance.slave_sql_running = 1),
-		                0) AS count_slaves_failing_to_connect_to_master,
+		                0) AS count_replicas_failing_to_connect_to_master,
 		        MIN(master_instance.replication_depth) AS replication_depth,
 		        GROUP_CONCAT(concat(replica_instance.Hostname, ':', replica_instance.Port)) as slave_hosts,
 		        MIN(
@@ -236,7 +236,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		    ORDER BY
 			    is_master DESC ,
 			    is_cluster_master DESC,
-			    count_slaves DESC
+			    count_replicas DESC
 	`, analysisQueryReductionClause)
 	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		a := ReplicationAnalysis{
@@ -256,10 +256,10 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.GTIDMode = m.GetString("gtid_mode")
 		a.LastCheckValid = m.GetBool("is_last_check_valid")
 		a.LastCheckPartialSuccess = m.GetBool("last_check_partial_success")
-		a.CountReplicas = m.GetUint("count_slaves")
+		a.CountReplicas = m.GetUint("count_replicas")
 		a.CountValidReplicas = m.GetUint("count_valid_slaves")
 		a.CountValidReplicatingReplicas = m.GetUint("count_valid_replicating_slaves")
-		a.CountReplicasFailingToConnectToMaster = m.GetUint("count_slaves_failing_to_connect_to_master")
+		a.CountReplicasFailingToConnectToMaster = m.GetUint("count_replicas_failing_to_connect_to_master")
 		a.CountDowntimedReplicas = m.GetUint("count_downtimed_replicas")
 		a.ReplicationDepth = m.GetUint("replication_depth")
 		a.IsFailingToConnectToMaster = m.GetBool("is_failing_to_connect_to_master")

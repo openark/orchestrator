@@ -1051,88 +1051,6 @@ Cleanup:
 	return instance, err
 }
 
-// DetachReplicaOperation will detach a replica from its master by forcibly corrupting its replication coordinates
-func DetachReplicaOperation(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
-	if err != nil {
-		return instance, err
-	}
-
-	log.Infof("Will detach %+v", instanceKey)
-
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "detach replica"); merr != nil {
-		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
-		goto Cleanup
-	} else {
-		defer EndMaintenance(maintenanceToken)
-	}
-
-	if instance.IsReplica() {
-		instance, err = StopSlave(instanceKey)
-		if err != nil {
-			goto Cleanup
-		}
-	}
-
-	instance, err = DetachReplica(instanceKey)
-	if err != nil {
-		goto Cleanup
-	}
-
-Cleanup:
-	instance, _ = StartSlave(instanceKey)
-
-	if err != nil {
-		return instance, log.Errore(err)
-	}
-
-	// and we're done (pending deferred functions)
-	AuditOperation("detach-replica", instanceKey, fmt.Sprintf("%+v replication detached", *instanceKey))
-
-	return instance, err
-}
-
-// ReattachReplicaOperation will detach a replica from its master by forcibly corrupting its replication coordinates
-func ReattachReplicaOperation(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
-	if err != nil {
-		return instance, err
-	}
-
-	log.Infof("Will reattach %+v", instanceKey)
-
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "detach replica"); merr != nil {
-		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
-		goto Cleanup
-	} else {
-		defer EndMaintenance(maintenanceToken)
-	}
-
-	if instance.IsReplica() {
-		instance, err = StopSlave(instanceKey)
-		if err != nil {
-			goto Cleanup
-		}
-	}
-
-	instance, err = ReattachReplica(instanceKey)
-	if err != nil {
-		goto Cleanup
-	}
-
-Cleanup:
-	instance, _ = StartSlave(instanceKey)
-
-	if err != nil {
-		return instance, log.Errore(err)
-	}
-
-	// and we're done (pending deferred functions)
-	AuditOperation("reattach-replica", instanceKey, fmt.Sprintf("%+v replication reattached", *instanceKey))
-
-	return instance, err
-}
-
 // DetachReplicaMasterHost detaches a replica from its master by corrupting the Master_Host (in such way that is reversible)
 func DetachReplicaMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -2669,6 +2587,9 @@ func RelocateBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	if err != nil || !found {
 		return instance, log.Errorf("Error reading %+v", *otherKey)
 	}
+	if other.IsDescendantOf(instance) {
+		return instance, log.Errorf("relocate: %+v is a descendant of %+v", *otherKey, instance.Key)
+	}
 	instance, err = relocateBelowInternal(instance, other)
 	if err == nil {
 		AuditOperation("relocate-below", instanceKey, fmt.Sprintf("relocated %+v below %+v", *instanceKey, *otherKey))
@@ -2775,10 +2696,41 @@ func RelocateReplicas(instanceKey, otherKey *InstanceKey, pattern string) (repli
 		// Nothing to do
 		return replicas, other, nil, errs
 	}
+	for _, replica := range replicas {
+		if other.IsDescendantOf(replica) {
+			return replicas, other, log.Errorf("relocate-replicas: %+v is a descendant of %+v", *otherKey, replica.Key), errs
+		}
+	}
 	replicas, err, errs = relocateReplicasInternal(replicas, instance, other)
 
 	if err == nil {
 		AuditOperation("relocate-replicas", instanceKey, fmt.Sprintf("relocated %+v replicas of %+v below %+v", len(replicas), *instanceKey, *otherKey))
 	}
 	return replicas, other, err, errs
+}
+
+// PurgeBinaryLogsTo attempts to 'PURGE BINARY LOGS' until given binary log is reached
+func PurgeBinaryLogsTo(instanceKey *InstanceKey, logFile string, force bool) (*Instance, error) {
+	replicas, err := ReadReplicaInstances(instanceKey)
+	if err != nil {
+		return nil, err
+	}
+	if !force {
+		purgeCoordinates := &BinlogCoordinates{LogFile: logFile, LogPos: 0}
+		for _, replica := range replicas {
+			if !purgeCoordinates.SmallerThan(&replica.ExecBinlogCoordinates) {
+				return nil, log.Errorf("Unsafe to purge binary logs on %+v up to %s because replica %+v has only applied up to %+v", *instanceKey, logFile, replica.Key, replica.ExecBinlogCoordinates)
+			}
+		}
+	}
+	return purgeBinaryLogsTo(instanceKey, logFile)
+}
+
+// PurgeBinaryLogsToLatest attempts to 'PURGE BINARY LOGS' until latest binary log
+func PurgeBinaryLogsToLatest(instanceKey *InstanceKey, force bool) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	return PurgeBinaryLogsTo(instanceKey, instance.SelfBinlogCoordinates.LogFile, force)
 }
