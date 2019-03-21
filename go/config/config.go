@@ -236,10 +236,12 @@ type Configuration struct {
 	DetachLostSlavesAfterMasterFailover        bool              // synonym to DetachLostReplicasAfterMasterFailover
 	DetachLostReplicasAfterMasterFailover      bool              // Should replicas that are not to be lost in master recovery (i.e. were more up-to-date than promoted replica) be forcibly detached
 	ApplyMySQLPromotionAfterMasterFailover     bool              // Should orchestrator take upon itself to apply MySQL master promotion: set read_only=0, detach replication, etc.
+	PreventCrossDataCenterMasterFailover       bool              // When true (default: false), cross-DC master failover are not allowed, orchestrator will do all it can to only fail over within same DC, or else not fail over at all.
 	MasterFailoverLostInstancesDowntimeMinutes uint              // Number of minutes to downtime any server that was lost after a master failover (including failed master & lost replicas). 0 to disable
 	MasterFailoverDetachSlaveMasterHost        bool              // synonym to MasterFailoverDetachReplicaMasterHost
 	MasterFailoverDetachReplicaMasterHost      bool              // Should orchestrator issue a detach-replica-master-host on newly promoted master (this makes sure the new master will not attempt to replicate old master if that comes back to life). Defaults 'false'. Meaningless if ApplyMySQLPromotionAfterMasterFailover is 'true'.
 	FailMasterPromotionIfSQLThreadNotUpToDate  bool              // when true, and a master failover takes place, if candidate master has not consumed all relay logs, promotion is aborted with error
+	DelayMasterPromotionIfSQLThreadNotUpToDate bool              // when true, and a master failover takes place, if candidate master has not consumed all relay logs, delay promotion until the sql thread has caught up
 	PostponeSlaveRecoveryOnLagMinutes          uint              // Synonym to PostponeReplicaRecoveryOnLagMinutes
 	PostponeReplicaRecoveryOnLagMinutes        uint              // On crash recovery, replicas that are lagging more than given minutes are only resurrected late in the recovery process, after master/IM has been elected and processes executed. Value of 0 disables this feature
 	RemoteSSHForMasterFailover                 bool              // Should orchestrator attempt a remote-ssh relaylog-synching upon master failover? Requires RemoteSSHCommand
@@ -397,9 +399,11 @@ func newConfiguration() *Configuration {
 		CoMasterRecoveryMustPromoteOtherCoMaster:   true,
 		DetachLostSlavesAfterMasterFailover:        true,
 		ApplyMySQLPromotionAfterMasterFailover:     true,
+		PreventCrossDataCenterMasterFailover:       false,
 		MasterFailoverLostInstancesDowntimeMinutes: 0,
 		MasterFailoverDetachSlaveMasterHost:        false,
 		FailMasterPromotionIfSQLThreadNotUpToDate:  false,
+		DelayMasterPromotionIfSQLThreadNotUpToDate: false,
 		PostponeSlaveRecoveryOnLagMinutes:          0,
 		RemoteSSHForMasterFailover:                 false,
 		RemoteSSHCommand:                           "",
@@ -499,7 +503,9 @@ func (this *Configuration) postReadAdjustments() error {
 			this.MasterFailoverDetachReplicaMasterHost = true
 		}
 	}
-
+	if this.FailMasterPromotionIfSQLThreadNotUpToDate && this.DelayMasterPromotionIfSQLThreadNotUpToDate {
+		return fmt.Errorf("Cannot have both FailMasterPromotionIfSQLThreadNotUpToDate and DelayMasterPromotionIfSQLThreadNotUpToDate enabled")
+	}
 	{
 		if this.PostponeReplicaRecoveryOnLagMinutes != 0 && this.PostponeSlaveRecoveryOnLagMinutes != 0 &&
 			this.PostponeReplicaRecoveryOnLagMinutes != this.PostponeSlaveRecoveryOnLagMinutes {

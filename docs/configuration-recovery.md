@@ -37,14 +37,18 @@ Different environments require different actions taken on recovery/promotion
 ```json
 {
   "ApplyMySQLPromotionAfterMasterFailover": true,
-  "MasterFailoverLostInstancesDowntimeMinutes": 10,
+  "PreventCrossDataCenterMasterFailover": false,
   "FailMasterPromotionIfSQLThreadNotUpToDate": true,
+  "DelayMasterPromotionIfSQLThreadNotUpToDate": true,
+  "MasterFailoverLostInstancesDowntimeMinutes": 10,
   "DetachLostReplicasAfterMasterFailover": true,
 }
 ```
 
 - `ApplyMySQLPromotionAfterMasterFailover`: when `true`, `orchestrator` will `reset slave all` and `set read_only=0` on promoted master. Default: `true`.
+- `PreventCrossDataCenterMasterFailover`: defaults `false`. When `true`, `orchestrator` will only replace a failed master with a server from the same DC. It will do its best to find a replacement from same DC, and will abort (fail) the failover if it cannot find one.
 - `FailMasterPromotionIfSQLThreadNotUpToDate`: if all replicas were lagging at time of failure, even the most up-to-date, promoted replica may yet have unapplied relay logs. Issuing `reset slave all` on such a server will lose the relay log data. Your choice.
+- `DelayMasterPromotionIfSQLThreadNotUpToDate`: if all replicas were lagging at time of failure, even the most up-to-date, promoted replica may yet have unapplied relay logs. When `true`, 'orchestrator' will wait for the SQL thread to catch up before promoting a new master.
 - `DetachLostReplicasAfterMasterFailover`: some replicas may get lost during recovery. When `true`, `orchestrator` will forcibly break their replication via `detach-replica` command to make sure no one assumes they're at all functional.
 
 ### Hooks

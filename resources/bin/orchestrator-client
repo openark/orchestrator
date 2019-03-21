@@ -47,10 +47,12 @@ owner="$(whoami | xargs)"
 reason=
 duration="10m"
 promotion_rule=
+tag=
 pool=
 hostname_flag=
 api_path=
 basic_auth="${ORCHESTRATOR_AUTH_USER:-}:${ORCHESTRATOR_AUTH_PASSWORD:-}"
+binlog=
 
 instance_hostport=
 destination_hostport=
@@ -71,17 +73,19 @@ for arg in "$@"; do
     "-reason"|"--reason")                 set -- "$@" "-r" ;;
     "-promotion-rule"|"--promotion-rule") set -- "$@" "-R" ;;
     "-duration"|"--duration")             set -- "$@" "-u" ;;
+    "-tag"|"--tag")                       set -- "$@" "-t" ;;
     "-pool"|"--pool")                     set -- "$@" "-l" ;;
     "-hostname"|"--hostname")             set -- "$@" "-H" ;;
     "-api"|"--api")                       set -- "$@" "-U" ;;
     "-path"|"--path")                     set -- "$@" "-P" ;;
     "-query"|"--query")                   set -- "$@" "-q" ;;
     "-auth"|"--auth")                     set -- "$@" "-b" ;;
+    "-binlog"|"--binlog")                 set -- "$@" "-n" ;;
     *)                                    set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:l:H:P:q:b:h" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:t:l:H:P:q:b:n:h" OPTION
 do
   case $OPTION in
     h) command="help" ;;
@@ -94,12 +98,14 @@ do
     r) reason="$OPTARG" ;;
     u) duration="$OPTARG" ;;
     R) promotion_rule="$OPTARG" ;;
+    t) tag="$OPTARG" ;;
     l) pool="$OPTARG" ;;
     H) hostname_flag="$OPTARG" ;;
     D) default_port="$OPTARG" ;;
     U) [ ! -z "$OPTARG" ] && orchestrator_api="$OPTARG" ;;
     P) api_path="$OPTARG" ;;
     b) basic_auth="$OPTARG" ;;
+    n) binlog="$OPTARG" ;;
     q) query="$OPTARG"
   esac
 done
@@ -126,7 +132,7 @@ function get_curl_auth_params {
   fi
 
   # Test API access
-  curl "${basic_auth}" -s --head "${orchestrator_api}" 2>&1 | fgrep -q "$unauthorized_401" && \
+  curl "${requires_auth}" -s --head "${orchestrator_api}" 2>&1 | fgrep -q "$unauthorized_401" && \
     echo "$unauthorized_401" && \
     return
 
@@ -277,6 +283,10 @@ function print_key {
   cat - | jq -r '. | (.Hostname + ":" + (.Port | tostring))'
 }
 
+function print_keys {
+  cat - | jq -r '.[]' | print_key
+}
+
 function which_api {
   echo "$leader_api"
 }
@@ -385,7 +395,21 @@ function is_replicating {
   assert_nonempty "instance" "$instance_hostport"
   api "instance/$instance_hostport"
 
-  print_response | jq '. | select(.Slave_SQL_Running==true and .Slave_IO_Running==true)' | filter_key | print_key
+  print_response | jq '. | select(.ReplicationSQLThreadState==1 and .ReplicationIOThreadState==1)' | filter_key | print_key
+}
+
+function is_replication_stopped {
+  assert_nonempty "instance" "$instance_hostport"
+  api "instance/$instance_hostport"
+
+  print_response | jq '. | select(.ReplicationSQLThreadState==0 and .ReplicationIOThreadState==0)' | filter_key | print_key
+}
+
+function purge_binary_logs {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "binlog" "$binlog"
+  api "purge-binary-logs/$instance_hostport/$binlog"
+  print_details | filter_key | print_key
 }
 
 function last_pseudo_gtid {
@@ -487,6 +511,51 @@ function downtimed {
 function dominant_dc {
   api "masters"
   print_response | jq -r '.[].DataCenter' | sort | uniq -c | sort -nr | head -n 1 | awk '{print $2}'
+}
+
+function tags {
+  assert_nonempty "instance" "$instance_hostport"
+  api "tags/$instance_hostport"
+
+  print_response | jq -r '.[]'
+}
+
+function tag_value {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "tag" "$tag"
+  api "tag-value/${instance_hostport}?tag=$(urlencode "$tag")"
+
+  print_response | jq -r '.'
+}
+
+function tag {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "tag" "$tag"
+  api "tag/${instance_hostport}?tag=$(urlencode "$tag")"
+
+  print_details | print_key
+}
+
+function untag {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "tag" "$tag"
+  api "untag/${instance_hostport}?tag=$tag"
+
+  print_details | print_keys
+}
+
+function untag_all {
+  assert_nonempty "tag" "$tag"
+  api "untag-all?tag=$tag"
+
+  print_details | print_keys
+}
+
+function tagged {
+  assert_nonempty "tag" "$tag"
+  api "tagged/${instance_hostport}?tag=$(urlencode "$tag")"
+
+  print_response | print_keys
 }
 
 function submit_masters_to_kv_stores {
@@ -651,6 +720,13 @@ function force_master_failover {
   print_details | jq '.SuccessorKey' | print_key
 }
 
+function force_master_takeover {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  assert_nonempty "destination" $destination_hostport
+  api "force-master-takeover/${alias:-$instance}/${destination_hostport}"
+  print_details | jq '.SuccessorKey' | print_key
+}
+
 function ack_cluster_recoveries {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   assert_nonempty "reason" "$reason"
@@ -778,6 +854,13 @@ function run_command {
     "repoint-replicas") general_singular_relocate_replicas_command ;;  # Repoint all replicas of given instance to replicate back from the instance. Use with care
     "take-siblings") general_singular_relocate_command ;;              # Turn all siblings of a replica into its sub-replicas.
 
+    "tags")      tags      ;;   # List tags for a given instance
+    "tag-value") tag_value ;;   # List tags for a given instance
+    "tag")       tag       ;;   # Add a tag to a given instance. Tag in "tagname" or "tagname=tagvalue" format
+    "untag")     untag     ;;   # Remove a tag from an instance
+    "untag-all") untag_all ;;   # Remove a tag from all matching instances
+    "tagged")    tagged    ;;   # List instances tagged by tag-string. Format: "tagname" or "tagname=tagvalue" or comma separated "tag0,tag1=val1,tag2" for intersection of all.
+
     "submit-pool-instances") submit_pool_instances ;;                  # Submit a pool name with a list of instances in that pool
     "which-heuristic-cluster-pool-instances") which_heuristic_cluster_pool_instances ;; # List instances of a given cluster which are in either any pool or in a specific pool
 
@@ -794,7 +877,7 @@ function run_command {
     "start-replica") general_instance_command ;;                # Issue a START SLAVE on an instance
     "restart-replica") general_instance_command ;;              # Issue STOP and START SLAVE on an instance
     "reset-replica") general_instance_command ;;                # Issues a RESET SLAVE command; use with care
-    "detach-replica") general_instance_command ;;               # Stops replication and modifies binlog position into an impossible yet reversible value.
+    "detach-replica") general_instance_command ;;               # Stops replication and modifies Master_Host into an impossible yet reversible value.
     "reattach-replica") general_instance_command ;;             # Undo a detach-replica operation
     "detach-replica-master-host") general_instance_command ;;   # Stops replication and modifies Master_Host into an impossible yet reversible value.
     "reattach-replica-master-host") general_instance_command ;; # Undo a detach-replica-master-host operation
@@ -810,15 +893,18 @@ function run_command {
     "can-replicate-from") can_replicate_from ;;           # Check if an instance can potentially replicate from another, according to replication rules
     "can-replicate-from-gtid") can_replicate_from_gtid ;; # Check if an instance can potentially replicate from another, according to replication rules and assuming Oracle GTID
     "is-replicating") is_replicating ;;                   # Check if an instance is replicating at this time (both SQL and IO threads running)
+    "is-replication-stopped") is_replication_stopped ;;   # Check if both SQL and IO threads state are both strictly stopped.
 
     "set-read-only") general_instance_command ;;     # Turn an instance read-only, via SET GLOBAL read_only := 1
     "set-writeable") general_instance_command ;;     # Turn an instance writeable, via SET GLOBAL read_only := 0
     "flush-binary-logs") general_instance_command ;; # Flush binary logs on an instance
+    "purge-binary-logs") purge_binary_logs        ;; # Purge binary logs on an instance
     "last-pseudo-gtid") last_pseudo_gtid ;;          # Dump last injected Pseudo-GTID entry on a server
 
     "recover") recover ;;                                     # Do auto-recovery given a dead instance, assuming orchestrator agrees there's a problem. Override blocking.
     "graceful-master-takeover") graceful_master_takeover ;;   # Gracefully promote a new master. Either indicate identity of new master via '-d designated.instance.com' or setup replication tree to have a single direct replica to the master.
     "force-master-failover") force_master_failover ;;         # Forcibly discard master and initiate a failover, even if orchestrator doesn't see a problem. This command lets orchestrator choose the replacement master
+    "force-master-takeover") force_master_takeover ;;         # Forcibly discard master and promote another (direct child) instance instead, even if everything is running well
     "ack-cluster-recoveries") ack_cluster_recoveries ;;       # Acknowledge recoveries for a given cluster; this unblocks pending future recoveries
     "ack-all-recoveries") ack_all_recoveries ;;               # Acknowledge all recoveries
     "disable-global-recoveries") disable_global_recoveries ;; # Disallow orchestrator from performing recoveries globally

@@ -46,11 +46,13 @@ import (
 )
 
 const (
-	backendDBConcurrency   = 20
-	error1045AccessDenied  = "Error 1045: Access denied for user"
-	errorConnectionRefused = "getsockopt: connection refused"
-	errorNoSuchHost        = "no such host"
-	errorIOTimeout         = "i/o timeout"
+	backendDBConcurrency       = 20
+	retryInstanceFunctionCount = 5
+	retryInterval              = 500 * time.Millisecond
+	error1045AccessDenied      = "Error 1045: Access denied for user"
+	errorConnectionRefused     = "getsockopt: connection refused"
+	errorNoSuchHost            = "no such host"
+	errorIOTimeout             = "i/o timeout"
 )
 
 var instanceReadChan = make(chan bool, backendDBConcurrency)
@@ -174,6 +176,15 @@ func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	return ReadTopologyInstanceBufferable(instanceKey, false, nil)
 }
 
+func RetryInstanceFunction(f func() (*Instance, error)) (instance *Instance, err error) {
+	for i := 0; i < retryInstanceFunctionCount; i++ {
+		if instance, err = f(); err == nil {
+			return instance, nil
+		}
+	}
+	return instance, err
+}
+
 // Is this an error which means that we shouldn't try going more queries for this discovery attempt?
 func unrecoverableError(err error) bool {
 	contains := []string{
@@ -241,19 +252,23 @@ func (instance *Instance) checkMaxScale(db *sql.DB, latency *stopwatch.NamedStop
 	return isMaxScale, resolvedHostname, err
 }
 
-// areReplicationThreadsRunning checks if both IO and SQL threads are running
-func areReplicationThreadsRunning(instanceKey *InstanceKey) (replicationThreadsRunning bool, err error) {
+// expectReplicationThreadsState expects both replication threads to be running, or both to be not running.
+// Specifically, it looks for both to be "Yes" or for both to be "No".
+func expectReplicationThreadsState(instanceKey *InstanceKey, expectedState ReplicationThreadState) (expectationMet bool, err error) {
 	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
 	if err != nil {
-		return replicationThreadsRunning, err
+		return false, err
 	}
 	err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
-		ioThreadRunning := (m.GetString("Slave_IO_Running") == "Yes")
-		sqlThreadRunning := (m.GetString("Slave_SQL_Running") == "Yes")
-		replicationThreadsRunning = ioThreadRunning && sqlThreadRunning
+		ioThreadState := ReplicationThreadStateFromStatus(m.GetString("Slave_IO_Running"))
+		sqlThreadState := ReplicationThreadStateFromStatus(m.GetString("Slave_SQL_Running"))
+
+		if ioThreadState == expectedState && sqlThreadState == expectedState {
+			expectationMet = true
+		}
 		return nil
 	})
-	return replicationThreadsRunning, err
+	return expectationMet, err
 }
 
 // ReadTopologyInstanceBufferable connects to a topology MySQL instance
@@ -391,7 +406,6 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 					var err error
 					instance.SelfBinlogCoordinates.LogFile = m.GetString("File")
 					instance.SelfBinlogCoordinates.LogPos = m.GetInt64("Position")
-					instance.ExecutedGtidSet = m.GetStringD("Executed_Gtid_Set", "")
 					return err
 				})
 			}()
@@ -420,7 +434,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				// ...
 				// @@gtid_mode only available in Orcale MySQL >= 5.6
 				// Previous version just issued this query brute-force, but I don't like errors being issued where they shouldn't.
-				_ = db.QueryRow("select @@global.gtid_mode, @@global.server_uuid, @@global.gtid_purged, @@global.master_info_repository = 'TABLE', @@global.binlog_row_image").Scan(&instance.GTIDMode, &instance.ServerUUID, &instance.GtidPurged, &masterInfoRepositoryOnTable, &instance.BinlogRowImage)
+				_ = db.QueryRow("select @@global.gtid_mode, @@global.server_uuid, @@global.gtid_executed, @@global.gtid_purged, @@global.master_info_repository = 'TABLE', @@global.binlog_row_image").Scan(&instance.GTIDMode, &instance.ServerUUID, &instance.ExecutedGtidSet, &instance.GtidPurged, &masterInfoRepositoryOnTable, &instance.BinlogRowImage)
 				if instance.GTIDMode != "" && instance.GTIDMode != "OFF" {
 					instance.SupportsOracleGTID = true
 				}
@@ -462,14 +476,18 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		// This can be overriden by later invocation of DetectPhysicalEnvironmentQuery
 	}
 
+	instance.ReplicationIOThreadState = ReplicationThreadStateNoThread
+	instance.ReplicationSQLThreadState = ReplicationThreadStateNoThread
 	err = sqlutils.QueryRowsMap(db, "show slave status", func(m sqlutils.RowMap) error {
 		instance.HasReplicationCredentials = (m.GetString("Master_User") != "")
-		instance.Slave_IO_Running = (m.GetString("Slave_IO_Running") == "Yes")
+		instance.ReplicationIOThreadState = ReplicationThreadStateFromStatus(m.GetString("Slave_IO_Running"))
+		instance.ReplicationSQLThreadState = ReplicationThreadStateFromStatus(m.GetString("Slave_SQL_Running"))
+		instance.Slave_IO_Running = instance.ReplicationIOThreadState.IsRunning()
 		if isMaxScale110 {
 			// Covering buggy MaxScale 1.1.0
 			instance.Slave_IO_Running = instance.Slave_IO_Running && (m.GetString("Slave_IO_State") == "Binlog Dump")
 		}
-		instance.Slave_SQL_Running = (m.GetString("Slave_SQL_Running") == "Yes")
+		instance.Slave_SQL_Running = instance.ReplicationSQLThreadState.IsRunning()
 		instance.ReadBinlogCoordinates.LogFile = m.GetString("Master_Log_File")
 		instance.ReadBinlogCoordinates.LogPos = m.GetInt64("Read_Master_Log_Pos")
 		instance.ExecBinlogCoordinates.LogFile = m.GetString("Relay_Master_Log_File")
@@ -1014,6 +1032,8 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.IsDetachedMaster = instance.MasterKey.IsDetached()
 	instance.Slave_SQL_Running = m.GetBool("slave_sql_running")
 	instance.Slave_IO_Running = m.GetBool("slave_io_running")
+	instance.ReplicationSQLThreadState = ReplicationThreadState(m.GetInt("replication_sql_thread_state"))
+	instance.ReplicationIOThreadState = ReplicationThreadState(m.GetInt("replication_io_thread_state"))
 	instance.HasReplicationFilters = m.GetBool("has_replication_filters")
 	instance.SupportsOracleGTID = m.GetBool("supports_oracle_gtid")
 	instance.UsingOracleGTID = m.GetBool("oracle_gtid")
@@ -1071,6 +1091,21 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 
 	instance.SlaveHosts.ReadJson(slaveHostsJSON)
 	instance.applyFlavorName()
+
+	// problems
+	if !instance.IsLastCheckValid {
+		instance.Problems = append(instance.Problems, "last_check_invalid")
+	} else if !instance.IsRecentlyChecked {
+		instance.Problems = append(instance.Problems, "not_recently_checked")
+	} else if instance.ReplicationThreadsExist() && !instance.ReplicaRunning() {
+		instance.Problems = append(instance.Problems, "not_replicating")
+	} else if instance.SlaveLagSeconds.Valid && math.AbsInt64(instance.SlaveLagSeconds.Int64-int64(instance.SQLDelay)) > int64(config.Config.ReasonableReplicationLagSeconds) {
+		instance.Problems = append(instance.Problems, "replication_lag")
+	}
+	if instance.GtidErrant != "" {
+		instance.Problems = append(instance.Problems, "errant_gtid")
+	}
+
 	return instance
 }
 
@@ -1257,15 +1292,15 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 			and (
 				(last_seen < last_checked)
 				or (unix_timestamp() - unix_timestamp(last_checked) > ?)
-				or (not slave_sql_running)
-				or (not slave_io_running)
+				or (replication_sql_thread_state not in (-1 ,1))
+				or (replication_io_thread_state not in (-1 ,1))
 				or (abs(cast(seconds_behind_master as signed) - cast(sql_delay as signed)) > ?)
 				or (abs(cast(slave_lag_seconds as signed) - cast(sql_delay as signed)) > ?)
 				or (gtid_errant != '')
 			)
 		`
 
-	args := sqlutils.Args(clusterName, clusterName, config.Config.InstancePollSeconds, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
+	args := sqlutils.Args(clusterName, clusterName, config.Config.InstancePollSeconds*5, config.Config.ReasonableReplicationLagSeconds, config.Config.ReasonableReplicationLagSeconds)
 	instances, err := readInstancesByCondition(condition, args, "")
 	if err != nil {
 		return instances, err
@@ -2227,6 +2262,8 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"master_port",
 		"slave_sql_running",
 		"slave_io_running",
+		"replication_sql_thread_state",
+		"replication_io_thread_state",
 		"has_replication_filters",
 		"supports_oracle_gtid",
 		"oracle_gtid",
@@ -2304,6 +2341,8 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.MasterKey.Port)
 		args = append(args, instance.Slave_SQL_Running)
 		args = append(args, instance.Slave_IO_Running)
+		args = append(args, instance.ReplicationSQLThreadState)
+		args = append(args, instance.ReplicationIOThreadState)
 		args = append(args, instance.HasReplicationFilters)
 		args = append(args, instance.SupportsOracleGTID)
 		args = append(args, instance.UsingOracleGTID)

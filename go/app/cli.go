@@ -67,9 +67,11 @@ var commandSynonyms = map[string]string{
 	"which-cluster-osc-slaves":    "which-cluster-osc-replicas",
 	"which-cluster-gh-ost-slaves": "which-cluster-gh-ost-replicas",
 	"which-slaves":                "which-replicas",
-	"detach-slave":                "detach-replica",
-	"reattach-slave":              "reattach-replica",
+	"detach-slave":                "detach-replica-master-host",
+	"detach-replica":              "detach-replica-master-host",
 	"detach-slave-master-host":    "detach-replica-master-host",
+	"reattach-slave":              "reattach-replica-master-host",
+	"reattach-replica":            "reattach-replica-master-host",
 	"reattach-slave-master-host":  "reattach-replica-master-host",
 }
 
@@ -622,24 +624,6 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
-	case registerCliCommand("detach-replica", "Replication, general", `Stops replication and modifies binlog position into an impossible, yet reversible, value.`):
-		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			_, err := inst.DetachReplicaOperation(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			fmt.Println(instanceKey.DisplayString())
-		}
-	case registerCliCommand("reattach-replica", "Replication, general", `Undo a detach-replica operation`):
-		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			_, err := inst.ReattachReplicaOperation(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			fmt.Println(instanceKey.DisplayString())
-		}
 	case registerCliCommand("detach-replica-master-host", "Replication, general", `Stops replication and modifies Master_Host into an impossible, yet reversible, value.`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
@@ -766,6 +750,17 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				fmt.Println(instance.Key.DisplayString())
 			}
 		}
+	case registerCliCommand("is-replication-stopped", "Replication information", `Is an instance (-i) a replica with both replication threads stopped`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			instance := validateInstanceIsFound(instanceKey)
+			if instance.ReplicationThreadsStopped() {
+				fmt.Println(instance.Key.DisplayString())
+			}
+		}
 		// Instance
 	case registerCliCommand("set-read-only", "Instance", `Turn an instance read-only, via SET GLOBAL read_only := 1`):
 		{
@@ -808,7 +803,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("expecting --binlog value")
 			}
 
-			_, err = inst.PurgeBinaryLogsTo(instanceKey, *config.RuntimeCLIFlags.BinlogFile)
+			_, err = inst.PurgeBinaryLogsTo(instanceKey, *config.RuntimeCLIFlags.BinlogFile, false)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1228,6 +1223,89 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			for _, kvPair := range kvPairs {
 				fmt.Println(fmt.Sprintf("%s:%s", kvPair.Key, kvPair.Value))
+			}
+		}
+
+	case registerCliCommand("tags", "tags", `List tags for a given instance`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			tags, err := inst.ReadInstanceTags(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, tag := range tags {
+				fmt.Println(tag.String())
+			}
+		}
+	case registerCliCommand("tag-value", "tags", `Get tag value for a specific instance`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			tag, err := inst.ParseTag(*config.RuntimeCLIFlags.Tag)
+			if err != nil {
+				log.Fatale(err)
+			}
+
+			tagExists, err := inst.ReadInstanceTag(instanceKey, tag)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if tagExists {
+				fmt.Println(tag.TagValue)
+			}
+		}
+	case registerCliCommand("tagged", "tags", `List instances tagged by tag-string. Format: "tagname" or "tagname=tagvalue" or comma separated "tag0,tag1=val1,tag2" for intersection of all.`):
+		{
+			tagsString := *config.RuntimeCLIFlags.Tag
+			instanceKeyMap, err := inst.GetInstanceKeysByTags(tagsString)
+			if err != nil {
+				log.Fatale(err)
+			}
+			keysDisplayStrings := []string{}
+			for _, key := range instanceKeyMap.GetInstanceKeys() {
+				keysDisplayStrings = append(keysDisplayStrings, key.DisplayString())
+			}
+			sort.Strings(keysDisplayStrings)
+			for _, s := range keysDisplayStrings {
+				fmt.Println(s)
+			}
+		}
+	case registerCliCommand("tag", "tags", `Add a tag to a given instance. Tag in "tagname" or "tagname=tagvalue" format`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			tag, err := inst.ParseTag(*config.RuntimeCLIFlags.Tag)
+			if err != nil {
+				log.Fatale(err)
+			}
+			inst.PutInstanceTag(instanceKey, tag)
+			fmt.Println(instanceKey.DisplayString())
+		}
+	case registerCliCommand("untag", "tags", `Remove a tag from an instance`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			tag, err := inst.ParseTag(*config.RuntimeCLIFlags.Tag)
+			if err != nil {
+				log.Fatale(err)
+			}
+			untagged, err := inst.Untag(instanceKey, tag)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, key := range untagged.GetInstanceKeys() {
+				fmt.Println(key.DisplayString())
+			}
+		}
+	case registerCliCommand("untag-all", "tags", `Remove a tag from all matching instances`):
+		{
+			tag, err := inst.ParseTag(*config.RuntimeCLIFlags.Tag)
+			if err != nil {
+				log.Fatale(err)
+			}
+			untagged, err := inst.Untag(nil, tag)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, key := range untagged.GetInstanceKeys() {
+				fmt.Println(key.DisplayString())
 			}
 		}
 
