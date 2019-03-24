@@ -70,3 +70,25 @@ func (this *consulStore) AddKeyValue(key string, value string) (added bool, err 
 	err = this.PutKeyValue(key, value)
 	return (err != nil), err
 }
+
+func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
+	if config.Config.ConsulCrossDataCenterDistribution {
+		datacenters, err := this.client.Catalog().Datacenters()
+		if err != nil {
+			return err
+		}
+		consulPairs := [](*consulapi.KVPair){}
+		for _, kvPair := range kvPairs {
+			consulPairs = append(consulPairs, &consulapi.KVPair{Key: kvPair.Key, Value: []byte(kvPair.Value)})
+		}
+		for _, datacenter := range datacenters {
+			writeOptions := &consulapi.WriteOptions{Datacenter: datacenter}
+			for _, consulPair := range consulPairs {
+				if _, e := this.client.KV().Put(consulPair, writeOptions); e != nil {
+					err = e
+				}
+			}
+		}
+	}
+	return err
+}

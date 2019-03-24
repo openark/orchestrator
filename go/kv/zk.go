@@ -79,3 +79,7 @@ func (this *zkStore) AddKeyValue(key string, value string) (added bool, err erro
 	err = this.PutKeyValue(key, value)
 	return (err != nil), err
 }
+
+func (this *zkStore) DistributePairs(pairs [](*KVPair)) (err error) {
+	return nil
+}
