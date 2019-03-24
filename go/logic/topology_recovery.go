@@ -288,7 +288,7 @@ func replaceCommandPlaceholders(command string, topologyRecovery *TopologyRecove
 	return command
 }
 
-// replaceCommandPlaceholders replaces agreed-upon placeholders with analysis data
+// applyEnvironmentVariables sets the relevant environment variables for a recovery
 func applyEnvironmentVariables(topologyRecovery *TopologyRecovery) []string {
 	analysisEntry := &topologyRecovery.AnalysisEntry
 	env := goos.Environ()
