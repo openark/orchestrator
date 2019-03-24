@@ -878,7 +878,10 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 				log.Errore(err)
 			}
 		}
-
+		{
+			err := kv.DistributePairs(kvPairs)
+			log.Errore(err)
+		}
 		if !skipProcesses {
 			// Execute post master-failover processes
 			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
