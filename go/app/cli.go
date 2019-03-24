@@ -828,6 +828,20 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(fmt.Sprintf("%+v:%s", *coordinates, text))
 		}
+	case registerCliCommand("locate-gtid-errant", "Binary logs", `List binary logs containing errant GTIDs`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			errantBinlogs, err := inst.LocateErrantGTID(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, binlog := range errantBinlogs {
+				fmt.Println(binlog)
+			}
+		}
 	case registerCliCommand("last-executed-relay-entry", "Binary logs", `Find coordinates of last executed relay log entry`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
