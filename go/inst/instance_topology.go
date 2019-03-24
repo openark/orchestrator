@@ -1201,11 +1201,11 @@ func LocateErrantGTID(instanceKey *InstanceKey) (errantBinlogs []string, err err
 	if errantSearch == "" {
 		return errantBinlogs, log.Errorf("locate-errant-gtid: no errant-gtid on %+v", *instanceKey)
 	}
-	subtract, err := GTIDSubtract(instanceKey, errantSearch, instance.ExecutedGtidSet)
+	subtract, err := GTIDSubtract(instanceKey, errantSearch, instance.GtidPurged)
 	if err != nil {
 		return errantBinlogs, err
 	}
-	if subtract != "" {
+	if subtract != errantSearch {
 		return errantBinlogs, fmt.Errorf("locate-errant-gtid: %+v is already purged on %+v", subtract, *instanceKey)
 	}
 	binlogs, err := ShowBinaryLogs(instanceKey)
@@ -1221,9 +1221,6 @@ func LocateErrantGTID(instanceKey *InstanceKey) (errantBinlogs []string, err err
 		previousGTIDs[binlog] = oracleGTIDSet
 	}
 	for i, binlog := range binlogs {
-		if i == 0 {
-			continue
-		}
 		if errantSearch == "" {
 			break
 		}
@@ -1233,6 +1230,8 @@ func LocateErrantGTID(instanceKey *InstanceKey) (errantBinlogs []string, err err
 			return errantBinlogs, err
 		}
 		if subtract != errantSearch {
+			// binlogs[i-1] is safe to use when i==0. because that implies GTIDs have been purged,
+			// which covered by an earlier assertion
 			errantBinlogs = append(errantBinlogs, binlogs[i-1])
 			errantSearch = subtract
 		}
