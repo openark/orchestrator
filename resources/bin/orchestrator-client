@@ -110,6 +110,14 @@ do
   esac
 done
 
+function sed {
+  if [[ $(uname) == "Darwin" || $(uname) == *"BSD"* ]]; then
+    gsed "$@"
+  else
+    sed "$@"
+  fi
+}
+
 function fail {
   message="$myname[$$]: $1"
   >&2 echo "$message"
@@ -117,6 +125,9 @@ function fail {
 }
 
 function check_requirements {
+  if [[ $(uname) == "Darwin" || $(uname) == *"BSD"* ]]; then
+    which gsed > /dev/null 2>&1 || fail "cannot find gsed (required on BSD/Darwin systems)"
+  fi
   which curl > /dev/null 2>&1 || fail "cannot find curl"
   which jq   > /dev/null 2>&1 || fail "cannot find jq"
 }
