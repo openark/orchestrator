@@ -570,6 +570,19 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
+	case registerCliCommand("which-gtid-errant", "Replication, general", `Get errant GTID set (empty results if no errant GTID)`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+
+			instance, err := inst.ReadTopologyInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			fmt.Println(instance.GtidErrant)
+		}
 	case registerCliCommand("gtid-errant-reset-master", "Replication, general", `Reset master on instance, remove GTID errant transactions`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)

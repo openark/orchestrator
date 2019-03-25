@@ -423,6 +423,12 @@ function purge_binary_logs {
   print_details | filter_key | print_key
 }
 
+function which_gtid_errant {
+  assert_nonempty "instance" "$instance_hostport"
+  api "instance/$instance_hostport"
+  print_response | jq -r '.GtidErrant'
+}
+
 function locate_gtid_errant {
   assert_nonempty "instance" "$instance_hostport"
   api "locate-gtid-errant/$instance_hostport"
@@ -899,6 +905,7 @@ function run_command {
     "detach-replica-master-host") general_instance_command ;;   # Stops replication and modifies Master_Host into an impossible yet reversible value.
     "reattach-replica-master-host") general_instance_command ;; # Undo a detach-replica-master-host operation
     "skip-query") general_instance_command ;;                   # Skip a single statement on a replica; either when running with GTID or without
+    "which-gtid-errant") which_gtid_errant ;;                   # Get errant GTID set (empty results if no errant GTID)
     "locate-gtid-errant") locate_gtid_errant ;;                 # List binary logs containing errant GTID
     "gtid-errant-reset-master") general_instance_command ;;     # Remove errant GTID transactions by way of RESET MASTER
     "gtid-errant-inject-empty") general_instance_command ;;     # Apply errant GTID as empty transactions on cluster's master
