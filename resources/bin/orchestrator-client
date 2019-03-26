@@ -110,6 +110,14 @@ do
   esac
 done
 
+function universal_sed {
+  if [[ $(uname) == "Darwin" || $(uname) == *"BSD"* ]]; then
+    gsed "$@"
+  else
+    sed "$@"
+  fi
+}
+
 function fail {
   message="$myname[$$]: $1"
   >&2 echo "$message"
@@ -117,6 +125,9 @@ function fail {
 }
 
 function check_requirements {
+  if [[ $(uname) == "Darwin" || $(uname) == *"BSD"* ]]; then
+    which gsed > /dev/null 2>&1 || fail "cannot find gsed (required on BSD/Darwin systems)"
+  fi
   which curl > /dev/null 2>&1 || fail "cannot find curl"
   which jq   > /dev/null 2>&1 || fail "cannot find jq"
 }
@@ -331,7 +342,7 @@ function prompt_help {
     indicate host for resolve and raft operations
 "
 
-  cat "$0" | sed -n '/run_command/,/esac/p' | egrep '".*"[)].*;;' | sed -r -e 's/"(.*?)".*#(.*)/\1~\2/' | column -t -s "~"
+  cat "$0" | universal_sed -n '/run_command/,/esac/p' | egrep '".*"[)].*;;' | universal_sed -r -e 's/"(.*?)".*#(.*)/\1~\2/' | column -t -s "~"
 }
 
 function async_discover {
@@ -799,7 +810,7 @@ function run_command {
   if [ -z "$command" ] ; then
     fail "No command given. Use $myname -c <command> [...] or $myname --command <command> [...] to do something useful"
   fi
-  command=$(echo $command | sed -e 's/slave/replica/')
+  command=$(echo $command | universal_sed -e 's/slave/replica/')
   case $command in
     "help") prompt_help ;; # Show available commands
 

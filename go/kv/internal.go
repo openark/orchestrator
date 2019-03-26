@@ -81,3 +81,7 @@ func (this *internalKVStore) AddKeyValue(key string, value string) (added bool, 
 	}
 	return (rowsAffected > 0), nil
 }
+
+func (this *internalKVStore) DistributePairs(pairs [](*KVPair)) (err error) {
+	return nil
+}

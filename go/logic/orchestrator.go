@@ -411,16 +411,12 @@ func InjectPseudoGTIDOnWriters() error {
 // stores are updated via failovers.
 func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVPair), submittedCount int, err error) {
 	kvPairs, err = inst.GetMastersKVPairs(clusterName)
+	log.Debugf("kv.SubmitMastersToKvStores, clusterName: %s, force: %+v: numPairs: %+v", clusterName, force, len(kvPairs))
 	if err != nil {
 		return kvPairs, submittedCount, log.Errore(err)
 	}
-	command := "add-key-value"
-	applyFunc := kv.AddKVPair
-	if force {
-		command = "put-key-value"
-		applyFunc = kv.PutKVPair
-	}
 	var selectedError error
+	var submitKvPairs [](*kv.KVPair)
 	for _, kvPair := range kvPairs {
 		if !force {
 			// !force: Called periodically to auto-populate KV
@@ -429,16 +425,21 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 				// Let's not overload database with queries. Let's not overload raft with events.
 				continue
 			}
-			if v, found, err := kv.GetValue(kvPair.Key); err == nil && found && v == kvPair.Value {
+			v, found, err := kv.GetValue(kvPair.Key)
+			if err == nil && found && v == kvPair.Value {
 				// Already has the right value.
 				kvFoundCache.Set(kvPair.Key, true, cache.DefaultExpiration)
 				continue
 			}
 		}
+		submitKvPairs = append(submitKvPairs, kvPair)
+	}
+	log.Debugf("kv.SubmitMastersToKvStores: submitKvPairs: %+v", len(submitKvPairs))
+	for _, kvPair := range submitKvPairs {
 		if orcraft.IsRaftEnabled() {
-			_, err = orcraft.PublishCommand(command, kvPair)
+			_, err = orcraft.PublishCommand("put-key-value", kvPair)
 		} else {
-			err = applyFunc(kvPair)
+			err = kv.PutKVPair(kvPair)
 		}
 		if err == nil {
 			submittedCount++
@@ -446,6 +447,7 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 			selectedError = err
 		}
 	}
+	kv.DistributePairs(submitKvPairs)
 	return kvPairs, submittedCount, log.Errore(selectedError)
 }
 
