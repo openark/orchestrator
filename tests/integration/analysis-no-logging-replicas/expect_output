@@ -1,1 +1,1 @@
-testhost:22293 (cluster testhost:22293): NoFailoverSupportStructureWarning
+testhost:22293 (cluster testhost:22293): NoLoggingReplicasStructureWarning
