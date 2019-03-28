@@ -451,7 +451,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			if a.IsMaster && a.CountLoggingReplicas == 0 && a.CountReplicas > 1 {
 				a.StructureAnalysis = append(a.StructureAnalysis, NoLoggingReplicasStructureWarning)
 			}
-			if a.IsMaster &&
+			if a.IsMaster && a.CountReplicas > 1 &&
 				!a.OracleGTIDImmediateTopology &&
 				!a.MariaDBGTIDImmediateTopology &&
 				!a.BinlogServerImmediateTopology &&
