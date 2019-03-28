@@ -169,6 +169,9 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
                   AND replica_instance.mariadb_gtid != 0),
               0) AS count_valid_mariadb_gtid_slaves,
 						IFNULL(SUM(replica_instance.log_bin
+							  AND replica_instance.log_slave_updates),
+              0) AS count_logging_replicas,
+						IFNULL(SUM(replica_instance.log_bin
 							  AND replica_instance.log_slave_updates
 								AND replica_instance.binlog_format = 'STATEMENT'),
               0) AS count_statement_based_loggin_slaves,
@@ -284,6 +287,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.MaxReplicaGTIDMode = m.GetString("max_replica_gtid_mode")
 		a.MaxReplicaGTIDErrant = m.GetString("max_replica_gtid_errant")
 
+		a.CountLoggingReplicas = m.GetUint("count_logging_replicas")
 		a.CountStatementBasedLoggingReplicas = m.GetUint("count_statement_based_loggin_slaves")
 		a.CountMixedBasedLoggingReplicas = m.GetUint("count_mixed_based_loggin_slaves")
 		a.CountRowBasedLoggingReplicas = m.GetUint("count_row_based_loggin_slaves")
@@ -444,6 +448,16 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		{
 			// Moving on to structure analysis
 			// We also do structural checks. See if there's potential danger in promotions
+			if a.IsMaster && a.CountLoggingReplicas == 0 && a.CountReplicas > 1 {
+				a.StructureAnalysis = append(a.StructureAnalysis, NoLoggingReplicasStructureWarning)
+			}
+			if a.IsMaster &&
+				!a.OracleGTIDImmediateTopology &&
+				!a.MariaDBGTIDImmediateTopology &&
+				!a.BinlogServerImmediateTopology &&
+				!a.PseudoGTIDImmediateTopology {
+				a.StructureAnalysis = append(a.StructureAnalysis, NoFailoverSupportStructureWarning)
+			}
 			if a.IsMaster && a.CountStatementBasedLoggingReplicas > 0 && a.CountMixedBasedLoggingReplicas > 0 {
 				a.StructureAnalysis = append(a.StructureAnalysis, StatementAndMixedLoggingSlavesStructureWarning)
 			}
@@ -454,7 +468,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 				a.StructureAnalysis = append(a.StructureAnalysis, MixedAndRowLoggingSlavesStructureWarning)
 			}
 			if a.IsMaster && a.CountDistinctMajorVersionsLoggingReplicas > 1 {
-				a.StructureAnalysis = append(a.StructureAnalysis, MultipleMajorVersionsLoggingSlaves)
+				a.StructureAnalysis = append(a.StructureAnalysis, MultipleMajorVersionsLoggingSlavesStructureWarning)
 			}
 
 			if a.CountReplicas > 0 && (a.GTIDMode != a.MinReplicaGTIDMode || a.GTIDMode != a.MaxReplicaGTIDMode) {
