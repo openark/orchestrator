@@ -1182,3 +1182,15 @@ func ShowMasterStatus(instanceKey *InstanceKey) (masterStatusFound bool, execute
 	})
 	return masterStatusFound, executedGtidSet, err
 }
+
+func ShowBinaryLogs(instanceKey *InstanceKey) (binlogs []string, err error) {
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return binlogs, err
+	}
+	err = sqlutils.QueryRowsMap(db, "show binary logs", func(m sqlutils.RowMap) error {
+		binlogs = append(binlogs, m.GetString("Log_name"))
+		return nil
+	})
+	return binlogs, err
+}
