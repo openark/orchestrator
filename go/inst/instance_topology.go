@@ -1192,6 +1192,57 @@ func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
+func LocateErrantGTID(instanceKey *InstanceKey) (errantBinlogs []string, err error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return errantBinlogs, err
+	}
+	errantSearch := instance.GtidErrant
+	if errantSearch == "" {
+		return errantBinlogs, log.Errorf("locate-errant-gtid: no errant-gtid on %+v", *instanceKey)
+	}
+	subtract, err := GTIDSubtract(instanceKey, errantSearch, instance.GtidPurged)
+	if err != nil {
+		return errantBinlogs, err
+	}
+	if subtract != errantSearch {
+		return errantBinlogs, fmt.Errorf("locate-errant-gtid: %+v is already purged on %+v", subtract, *instanceKey)
+	}
+	binlogs, err := ShowBinaryLogs(instanceKey)
+	if err != nil {
+		return errantBinlogs, err
+	}
+	previousGTIDs := make(map[string]*OracleGtidSet)
+	for _, binlog := range binlogs {
+		oracleGTIDSet, err := GetPreviousGTIDs(instanceKey, binlog)
+		if err != nil {
+			return errantBinlogs, err
+		}
+		previousGTIDs[binlog] = oracleGTIDSet
+	}
+	for i, binlog := range binlogs {
+		if errantSearch == "" {
+			break
+		}
+		previousGTID := previousGTIDs[binlog]
+		subtract, err := GTIDSubtract(instanceKey, errantSearch, previousGTID.String())
+		if err != nil {
+			return errantBinlogs, err
+		}
+		if subtract != errantSearch {
+			// binlogs[i-1] is safe to use when i==0. because that implies GTIDs have been purged,
+			// which covered by an earlier assertion
+			errantBinlogs = append(errantBinlogs, binlogs[i-1])
+			errantSearch = subtract
+		}
+	}
+	if errantSearch != "" {
+		// then it's in the last binary log
+		errantBinlogs = append(errantBinlogs, binlogs[len(binlogs)-1])
+	}
+	return errantBinlogs, err
+}
+
 // ErrantGTIDResetMaster will issue a safe RESET MASTER on a replica that replicates via GTID:
 // It will make sure the gtid_purged set matches the executed set value as read just before the RESET.
 // this will enable new replicas to be attached to given instance without complaints about missing/purged entries.
