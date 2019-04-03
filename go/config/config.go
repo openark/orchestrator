@@ -179,6 +179,7 @@ type Configuration struct {
 	DetectClusterDomainQuery                   string            // Optional query (executed on topology instance) that returns the VIP/CNAME/Alias/whatever domain name for the master of this cluster. Query will only be executed on cluster master (though until the topology's master is resovled it may execute on other/all replicas). If provided, must return one row, one column
 	DetectInstanceAliasQuery                   string            // Optional query (executed on topology instance) that returns the alias of an instance. If provided, must return one row, one column
 	DetectPromotionRuleQuery                   string            // Optional query (executed on topology instance) that returns the promotion rule of an instance. If provided, must return one row, one column.
+	DataCenterLookupValues                     string            // Comma separated list of <key>:<value> pairs to apply to the result of using DataCenterPattern
 	DataCenterPattern                          string            // Regexp pattern with one group, extracting the datacenter name from the hostname
 	PhysicalEnvironmentPattern                 string            // Regexp pattern with one group, extracting physical environment info from hostname (e.g. combination of datacenter & prod/dev env)
 	DetectDataCenterQuery                      string            // Optional query (executed on topology instance) that returns the data center of an instance. If provided, must return one row, one column. Overrides DataCenterPattern and useful for installments where DC cannot be inferred by hostname
@@ -347,6 +348,7 @@ func newConfiguration() *Configuration {
 		DetectInstanceAliasQuery:                   "",
 		DetectPromotionRuleQuery:                   "",
 		DataCenterPattern:                          "",
+		DataCenterLookupValues:                     "",
 		PhysicalEnvironmentPattern:                 "",
 		DetectDataCenterQuery:                      "",
 		DetectPhysicalEnvironmentQuery:             "",
@@ -415,13 +417,13 @@ func newConfiguration() *Configuration {
 		GraphiteConvertHostnameDotsToUnderscores:   true,
 		GraphitePollSeconds:                        60,
 		URLPrefix:                                  "",
-		DiscoveryIgnoreReplicaHostnameFilters: []string{},
-		ConsulAddress:                         "",
-		ConsulAclToken:                        "",
-		ConsulCrossDataCenterDistribution:     false,
-		ZkAddress:                             "",
-		KVClusterMasterPrefix:                 "mysql/master",
-		WebMessage:                            "",
+		DiscoveryIgnoreReplicaHostnameFilters:      []string{},
+		ConsulAddress:                              "",
+		ConsulAclToken:                             "",
+		ConsulCrossDataCenterDistribution:          false,
+		ZkAddress:                                  "",
+		KVClusterMasterPrefix:                      "mysql/master",
+		WebMessage:                                 "",
 	}
 }
 
