@@ -1675,6 +1675,38 @@ func TakeSiblings(instanceKey *InstanceKey) (instance *Instance, takenSiblings i
 	return instance, len(relocatedReplicas), err
 }
 
+// Created this function to allow a hook to be called after a successful TakeMaster event
+func TakeMasterHook(master *Instance, slave *Instance) {
+
+	masterInstance := master.Key
+	slaveInstance := slave.Key
+
+	env := []string{}
+	env = append(env, fmt.Sprintf("ORC_SUCCESSOR_HOST=%s", masterInstance))
+	env = append(env, fmt.Sprintf("ORC_FAILED_HOST=%s", slaveInstance))
+
+	successor := strings.Replace(fmt.Sprintf("%s", masterInstance), ":3306", "", -1)
+	oldmaster := strings.Replace(fmt.Sprintf("%s", slaveInstance), ":3306", "", -1)
+
+	if config.Config.PostTakeMasterProcesses != nil {
+		processCount := len(config.Config.PostTakeMasterProcesses)
+
+		for i, command := range config.Config.PostTakeMasterProcesses {
+			fullDescription := fmt.Sprintf("PostTakeMasterProcesses hook %d of %d", i+1, processCount)
+			log.Debugf("Take-Master: PostTakeMasterProcesses: Calling %+s", fullDescription)
+			start := time.Now()
+			if err := os.CommandRun(command, env, successor, oldmaster); err == nil {
+				info := fmt.Sprintf("Completed %s in %v", fullDescription, time.Since(start))
+				log.Infof("Take-Master: %s", info)
+			} else {
+				info := fmt.Sprintf("Execution of PostTakeMasterProcesses failed in %v with error: %v", time.Since(start), err)
+				log.Infof("Take-Master: %s", info)
+				log.Errorf(info)
+			}
+		}
+	}
+}
+
 // TakeMaster will move an instance up the chain and cause its master to become its replica.
 // It's almost a role change, just that other replicas of either 'instance' or its master are currently unaffected
 // (they continue replicate without change)
@@ -1735,6 +1767,12 @@ Cleanup:
 	}
 	AuditOperation("take-master", instanceKey, fmt.Sprintf("took master: %+v", masterInstance.Key))
 
+	// Created this to enable a custom hook to be called after a TakeMaster success.
+	// This only runs if set to true in orchestrator.conf.json
+	if config.Config.PostTakeMasterProcessesEnabled == true {
+		TakeMasterHook(instance, masterInstance)
+	}
+	
 	return instance, err
 }
 
