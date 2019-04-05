@@ -288,7 +288,7 @@ func replaceCommandPlaceholders(command string, topologyRecovery *TopologyRecove
 	return command
 }
 
-// replaceCommandPlaceholders replaces agreed-upon placeholders with analysis data
+// applyEnvironmentVariables sets the relevant environment variables for a recovery
 func applyEnvironmentVariables(topologyRecovery *TopologyRecovery) []string {
 	analysisEntry := &topologyRecovery.AnalysisEntry
 	env := goos.Environ()
@@ -412,7 +412,7 @@ func recoverDeadMasterInBinlogServerTopology(topologyRecovery *TopologyRecovery)
 	if err != nil {
 		return promotedReplica, log.Errore(err)
 	}
-	promotedReplica, err = inst.PurgeBinaryLogsToCurrent(&promotedReplica.Key)
+	promotedReplica, err = inst.PurgeBinaryLogsToLatest(&promotedReplica.Key, false)
 	if err != nil {
 		return promotedReplica, log.Errore(err)
 	}
@@ -537,7 +537,7 @@ func recoverDeadMaster(topologyRecovery *TopologyRecovery, candidateInstanceKey 
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("RecoverDeadMaster: lost %+v replicas during recovery process; detaching them", len(lostReplicas)))
 			for _, replica := range lostReplicas {
 				replica := replica
-				inst.DetachReplicaOperation(&replica.Key)
+				inst.DetachReplicaMasterHost(&replica.Key)
 			}
 			return nil
 		}
@@ -824,6 +824,13 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			AuditTopologyRecovery(topologyRecovery, message)
 			return false, nil, log.Error(message)
 		}
+		if config.Config.DelayMasterPromotionIfSQLThreadNotUpToDate {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Waiting to ensure the SQL thread catches up on %+v", promotedReplica.Key))
+			if _, err = inst.WaitForSQLThreadUpToDate(&promotedReplica.Key, 0, 0); err != nil {
+				return false, nil, err
+			}
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("SQL thread caught up on %+v", promotedReplica.Key))
+		}
 
 		// Success!
 		recoverDeadMasterSuccessCounter.Inc(1)
@@ -833,17 +840,25 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		if config.Config.ApplyMySQLPromotionAfterMasterFailover || analysisEntry.CommandHint == inst.GracefulMasterTakeoverCommandHint {
 			// on GracefulMasterTakeoverCommandHint it makes utter sense to RESET SLAVE ALL and read_only=0, and there is no sense in not doing so.
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: will apply MySQL changes to promoted master"))
-			if _, err := inst.ResetSlaveOperation(&promotedReplica.Key); true {
+			{
+				_, err := inst.ResetSlaveOperation(&promotedReplica.Key)
+				if err != nil {
+					// Ugly, but this is important. Let's give it another try
+					_, err = inst.ResetSlaveOperation(&promotedReplica.Key)
+				}
 				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: applying RESET SLAVE ALL on promoted master: success=%t", (err == nil)))
+				if err != nil {
+					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: NOTE that %+v is promoted even though SHOW SLAVE STATUS may still show it has a master", promotedReplica.Key))
+				}
 			}
-			if _, err := inst.SetReadOnly(&promotedReplica.Key, false); true {
+			{
+				_, err := inst.SetReadOnly(&promotedReplica.Key, false)
 				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: applying read-only=0 on promoted master: success=%t", (err == nil)))
 			}
 			// Let's attempt, though we won't necessarily succeed, to set old master as read-only
 			go func() {
-				if _, err := inst.SetReadOnly(&analysisEntry.AnalyzedInstanceKey, true); true {
-					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: applying read-only=1 on demoted master: success=%t", (err == nil)))
-				}
+				_, err := inst.SetReadOnly(&analysisEntry.AnalyzedInstanceKey, true)
+				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: applying read-only=1 on demoted master: success=%t", (err == nil)))
 			}()
 		}
 
@@ -863,7 +878,10 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 				log.Errore(err)
 			}
 		}
-
+		{
+			err := kv.DistributePairs(kvPairs)
+			log.Errore(err)
+		}
 		if !skipProcesses {
 			// Execute post master-failover processes
 			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
@@ -1233,6 +1251,13 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 		}
 	}
 	if promotedReplica != nil {
+		if config.Config.DelayMasterPromotionIfSQLThreadNotUpToDate {
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Waiting to ensure the SQL thread catches up on %+v", promotedReplica.Key))
+			if _, err := inst.WaitForSQLThreadUpToDate(&promotedReplica.Key, 0, 0); err != nil {
+				return promotedReplica, lostReplicas, err
+			}
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("SQL thread caught up on %+v", promotedReplica.Key))
+		}
 		topologyRecovery.ParticipatingInstanceKeys.AddKey(promotedReplica.Key)
 	}
 
@@ -1260,7 +1285,7 @@ func RecoverDeadCoMaster(topologyRecovery *TopologyRecovery, skipProcesses bool)
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadCoMaster: lost %+v replicas during recovery process; detaching them", len(lostReplicas)))
 			for _, replica := range lostReplicas {
 				replica := replica
-				inst.DetachReplicaOperation(&replica.Key)
+				inst.DetachReplicaMasterHost(&replica.Key)
 			}
 			return nil
 		}
@@ -1307,7 +1332,6 @@ func checkAndRecoverDeadCoMaster(analysisEntry inst.ReplicationAnalysis, candida
 		if config.Config.FailMasterPromotionIfSQLThreadNotUpToDate && !promotedReplica.SQLThreadUpToDate() {
 			return false, nil, log.Errorf("Promoted replica %+v: sql thread is not up to date (relay logs still unapplied). Aborting promotion", promotedReplica.Key)
 		}
-
 		// success
 		recoverDeadCoMasterSuccessCounter.Inc(1)
 

@@ -56,12 +56,14 @@ const (
 )
 
 const (
-	StatementAndMixedLoggingSlavesStructureWarning StructureAnalysisCode = "StatementAndMixedLoggingSlavesStructureWarning"
-	StatementAndRowLoggingSlavesStructureWarning                         = "StatementAndRowLoggingSlavesStructureWarning"
-	MixedAndRowLoggingSlavesStructureWarning                             = "MixedAndRowLoggingSlavesStructureWarning"
-	MultipleMajorVersionsLoggingSlaves                                   = "MultipleMajorVersionsLoggingSlaves"
-	DifferentGTIDModesStructureWarning                                   = "DifferentGTIDModesStructureWarning"
-	ErrantGTIDStructureWarning                                           = "ErrantGTIDStructureWarning"
+	StatementAndMixedLoggingSlavesStructureWarning     StructureAnalysisCode = "StatementAndMixedLoggingSlavesStructureWarning"
+	StatementAndRowLoggingSlavesStructureWarning                             = "StatementAndRowLoggingSlavesStructureWarning"
+	MixedAndRowLoggingSlavesStructureWarning                                 = "MixedAndRowLoggingSlavesStructureWarning"
+	MultipleMajorVersionsLoggingSlavesStructureWarning                       = "MultipleMajorVersionsLoggingSlavesStructureWarning"
+	NoLoggingReplicasStructureWarning                                        = "NoLoggingReplicasStructureWarning"
+	DifferentGTIDModesStructureWarning                                       = "DifferentGTIDModesStructureWarning"
+	ErrantGTIDStructureWarning                                               = "ErrantGTIDStructureWarning"
+	NoFailoverSupportStructureWarning                                        = "NoFailoverSupportStructureWarning"
 )
 
 type InstanceAnalysis struct {
@@ -127,6 +129,7 @@ type ReplicationAnalysis struct {
 	OracleGTIDImmediateTopology               bool
 	MariaDBGTIDImmediateTopology              bool
 	BinlogServerImmediateTopology             bool
+	CountLoggingReplicas                      uint
 	CountStatementBasedLoggingReplicas        uint
 	CountMixedBasedLoggingReplicas            uint
 	CountRowBasedLoggingReplicas              uint

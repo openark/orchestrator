@@ -52,6 +52,7 @@ pool=
 hostname_flag=
 api_path=
 basic_auth="${ORCHESTRATOR_AUTH_USER:-}:${ORCHESTRATOR_AUTH_PASSWORD:-}"
+binlog=
 
 instance_hostport=
 destination_hostport=
@@ -79,11 +80,12 @@ for arg in "$@"; do
     "-path"|"--path")                     set -- "$@" "-P" ;;
     "-query"|"--query")                   set -- "$@" "-q" ;;
     "-auth"|"--auth")                     set -- "$@" "-b" ;;
+    "-binlog"|"--binlog")                 set -- "$@" "-n" ;;
     *)                                    set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:t:l:H:P:q:b:h" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:t:l:H:P:q:b:n:h" OPTION
 do
   case $OPTION in
     h) command="help" ;;
@@ -103,9 +105,18 @@ do
     U) [ ! -z "$OPTARG" ] && orchestrator_api="$OPTARG" ;;
     P) api_path="$OPTARG" ;;
     b) basic_auth="$OPTARG" ;;
+    n) binlog="$OPTARG" ;;
     q) query="$OPTARG"
   esac
 done
+
+function universal_sed {
+  if [[ $(uname) == "Darwin" || $(uname) == *"BSD"* ]]; then
+    gsed "$@"
+  else
+    sed "$@"
+  fi
+}
 
 function fail {
   message="$myname[$$]: $1"
@@ -114,6 +125,9 @@ function fail {
 }
 
 function check_requirements {
+  if [[ $(uname) == "Darwin" || $(uname) == *"BSD"* ]]; then
+    which gsed > /dev/null 2>&1 || fail "cannot find gsed (required on BSD/Darwin systems)"
+  fi
   which curl > /dev/null 2>&1 || fail "cannot find curl"
   which jq   > /dev/null 2>&1 || fail "cannot find jq"
 }
@@ -328,7 +342,7 @@ function prompt_help {
     indicate host for resolve and raft operations
 "
 
-  cat "$0" | sed -n '/run_command/,/esac/p' | egrep '".*"[)].*;;' | sed -r -e 's/"(.*?)".*#(.*)/\1~\2/' | column -t -s "~"
+  cat "$0" | universal_sed -n '/run_command/,/esac/p' | egrep '".*"[)].*;;' | universal_sed -r -e 's/"(.*?)".*#(.*)/\1~\2/' | column -t -s "~"
 }
 
 function async_discover {
@@ -400,6 +414,25 @@ function is_replication_stopped {
   api "instance/$instance_hostport"
 
   print_response | jq '. | select(.ReplicationSQLThreadState==0 and .ReplicationIOThreadState==0)' | filter_key | print_key
+}
+
+function purge_binary_logs {
+  assert_nonempty "instance" "$instance_hostport"
+  assert_nonempty "binlog" "$binlog"
+  api "purge-binary-logs/$instance_hostport/$binlog"
+  print_details | filter_key | print_key
+}
+
+function which_gtid_errant {
+  assert_nonempty "instance" "$instance_hostport"
+  api "instance/$instance_hostport"
+  print_response | jq -r '.GtidErrant'
+}
+
+function locate_gtid_errant {
+  assert_nonempty "instance" "$instance_hostport"
+  api "locate-gtid-errant/$instance_hostport"
+  print_response | print_details | jq -r '.[]'
 }
 
 function last_pseudo_gtid {
@@ -789,7 +822,7 @@ function run_command {
   if [ -z "$command" ] ; then
     fail "No command given. Use $myname -c <command> [...] or $myname --command <command> [...] to do something useful"
   fi
-  command=$(echo $command | sed -e 's/slave/replica/')
+  command=$(echo $command | universal_sed -e 's/slave/replica/')
   case $command in
     "help") prompt_help ;; # Show available commands
 
@@ -867,11 +900,13 @@ function run_command {
     "start-replica") general_instance_command ;;                # Issue a START SLAVE on an instance
     "restart-replica") general_instance_command ;;              # Issue STOP and START SLAVE on an instance
     "reset-replica") general_instance_command ;;                # Issues a RESET SLAVE command; use with care
-    "detach-replica") general_instance_command ;;               # Stops replication and modifies binlog position into an impossible yet reversible value.
+    "detach-replica") general_instance_command ;;               # Stops replication and modifies Master_Host into an impossible yet reversible value.
     "reattach-replica") general_instance_command ;;             # Undo a detach-replica operation
     "detach-replica-master-host") general_instance_command ;;   # Stops replication and modifies Master_Host into an impossible yet reversible value.
     "reattach-replica-master-host") general_instance_command ;; # Undo a detach-replica-master-host operation
     "skip-query") general_instance_command ;;                   # Skip a single statement on a replica; either when running with GTID or without
+    "which-gtid-errant") which_gtid_errant ;;                   # Get errant GTID set (empty results if no errant GTID)
+    "locate-gtid-errant") locate_gtid_errant ;;                 # List binary logs containing errant GTID
     "gtid-errant-reset-master") general_instance_command ;;     # Remove errant GTID transactions by way of RESET MASTER
     "gtid-errant-inject-empty") general_instance_command ;;     # Apply errant GTID as empty transactions on cluster's master
     "enable-semi-sync-master") general_instance_command ;;      # Enable semi-sync (master-side)
@@ -888,6 +923,7 @@ function run_command {
     "set-read-only") general_instance_command ;;     # Turn an instance read-only, via SET GLOBAL read_only := 1
     "set-writeable") general_instance_command ;;     # Turn an instance writeable, via SET GLOBAL read_only := 0
     "flush-binary-logs") general_instance_command ;; # Flush binary logs on an instance
+    "purge-binary-logs") purge_binary_logs        ;; # Purge binary logs on an instance
     "last-pseudo-gtid") last_pseudo_gtid ;;          # Dump last injected Pseudo-GTID entry on a server
 
     "recover") recover ;;                                     # Do auto-recovery given a dead instance, assuming orchestrator agrees there's a problem. Override blocking.

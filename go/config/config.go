@@ -241,6 +241,7 @@ type Configuration struct {
 	MasterFailoverDetachSlaveMasterHost        bool              // synonym to MasterFailoverDetachReplicaMasterHost
 	MasterFailoverDetachReplicaMasterHost      bool              // Should orchestrator issue a detach-replica-master-host on newly promoted master (this makes sure the new master will not attempt to replicate old master if that comes back to life). Defaults 'false'. Meaningless if ApplyMySQLPromotionAfterMasterFailover is 'true'.
 	FailMasterPromotionIfSQLThreadNotUpToDate  bool              // when true, and a master failover takes place, if candidate master has not consumed all relay logs, promotion is aborted with error
+	DelayMasterPromotionIfSQLThreadNotUpToDate bool              // when true, and a master failover takes place, if candidate master has not consumed all relay logs, delay promotion until the sql thread has caught up
 	PostponeSlaveRecoveryOnLagMinutes          uint              // Synonym to PostponeReplicaRecoveryOnLagMinutes
 	PostponeReplicaRecoveryOnLagMinutes        uint              // On crash recovery, replicas that are lagging more than given minutes are only resurrected late in the recovery process, after master/IM has been elected and processes executed. Value of 0 disables this feature
 	RemoteSSHForMasterFailover                 bool              // Should orchestrator attempt a remote-ssh relaylog-synching upon master failover? Requires RemoteSSHCommand
@@ -255,6 +256,7 @@ type Configuration struct {
 	DiscoveryIgnoreReplicaHostnameFilters      []string          // Regexp filters to apply to prevent auto-discovering new replicas. Usage: unreachable servers due to firewalls, applications which trigger binlog dumps
 	ConsulAddress                              string            // Address where Consul HTTP api is found. Example: 127.0.0.1:8500
 	ConsulAclToken                             string            // ACL token used to write to Consul KV
+	ConsulCrossDataCenterDistribution          bool              // should orchestrator automatically auto-deduce all consul DCs and write KVs in all DCs
 	ZkAddress                                  string            // UNSUPPERTED YET. Address where (single or multiple) ZooKeeper servers are found, in `srv1[:port1][,srv2[:port2]...]` format. Default port is 2181. Example: srv-a,srv-b:12181,srv-c
 	KVClusterMasterPrefix                      string            // Prefix to use for clusters' masters entries in KV stores (internal, consul, ZK), default: "mysql/master"
 	WebMessage                                 string            // If provided, will be shown on all web pages below the title bar
@@ -402,6 +404,7 @@ func newConfiguration() *Configuration {
 		MasterFailoverLostInstancesDowntimeMinutes: 0,
 		MasterFailoverDetachSlaveMasterHost:        false,
 		FailMasterPromotionIfSQLThreadNotUpToDate:  false,
+		DelayMasterPromotionIfSQLThreadNotUpToDate: false,
 		PostponeSlaveRecoveryOnLagMinutes:          0,
 		RemoteSSHForMasterFailover:                 false,
 		RemoteSSHCommand:                           "",
@@ -415,6 +418,7 @@ func newConfiguration() *Configuration {
 		DiscoveryIgnoreReplicaHostnameFilters: []string{},
 		ConsulAddress:                         "",
 		ConsulAclToken:                        "",
+		ConsulCrossDataCenterDistribution:     false,
 		ZkAddress:                             "",
 		KVClusterMasterPrefix:                 "mysql/master",
 		WebMessage:                            "",
@@ -501,7 +505,9 @@ func (this *Configuration) postReadAdjustments() error {
 			this.MasterFailoverDetachReplicaMasterHost = true
 		}
 	}
-
+	if this.FailMasterPromotionIfSQLThreadNotUpToDate && this.DelayMasterPromotionIfSQLThreadNotUpToDate {
+		return fmt.Errorf("Cannot have both FailMasterPromotionIfSQLThreadNotUpToDate and DelayMasterPromotionIfSQLThreadNotUpToDate enabled")
+	}
 	{
 		if this.PostponeReplicaRecoveryOnLagMinutes != 0 && this.PostponeSlaveRecoveryOnLagMinutes != 0 &&
 			this.PostponeReplicaRecoveryOnLagMinutes != this.PostponeSlaveRecoveryOnLagMinutes {

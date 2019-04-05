@@ -87,7 +87,7 @@ Only one `orchestrator` node assumes leadership, and is always a part of a conse
 In this setup there is:
 - No communication between the DB nodes.
 - Minimal communication between the `orchestrator`.
-- `*n` communication to `MySQL` topology nodes. A `3` node setup means each topology `MySQL` servr is probed by `3` different `orchestrator` nodes, independently.
+- `*n` communication to `MySQL` topology nodes. A `3` node setup means each topology `MySQL` server is probed by `3` different `orchestrator` nodes, independently.
 
 It is recommended to run a `3`-node or a `5`-node setup.
 

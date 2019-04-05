@@ -67,9 +67,11 @@ var commandSynonyms = map[string]string{
 	"which-cluster-osc-slaves":    "which-cluster-osc-replicas",
 	"which-cluster-gh-ost-slaves": "which-cluster-gh-ost-replicas",
 	"which-slaves":                "which-replicas",
-	"detach-slave":                "detach-replica",
-	"reattach-slave":              "reattach-replica",
+	"detach-slave":                "detach-replica-master-host",
+	"detach-replica":              "detach-replica-master-host",
 	"detach-slave-master-host":    "detach-replica-master-host",
+	"reattach-slave":              "reattach-replica-master-host",
+	"reattach-replica":            "reattach-replica-master-host",
 	"reattach-slave-master-host":  "reattach-replica-master-host",
 }
 
@@ -568,6 +570,19 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			}
 			fmt.Println(instanceKey.DisplayString())
 		}
+	case registerCliCommand("which-gtid-errant", "Replication, general", `Get errant GTID set (empty results if no errant GTID)`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+
+			instance, err := inst.ReadTopologyInstance(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			if instance == nil {
+				log.Fatalf("Instance not found: %+v", *instanceKey)
+			}
+			fmt.Println(instance.GtidErrant)
+		}
 	case registerCliCommand("gtid-errant-reset-master", "Replication, general", `Reset master on instance, remove GTID errant transactions`):
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
@@ -617,24 +632,6 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		{
 			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
 			_, err := inst.ResetSlaveOperation(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			fmt.Println(instanceKey.DisplayString())
-		}
-	case registerCliCommand("detach-replica", "Replication, general", `Stops replication and modifies binlog position into an impossible, yet reversible, value.`):
-		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			_, err := inst.DetachReplicaOperation(instanceKey)
-			if err != nil {
-				log.Fatale(err)
-			}
-			fmt.Println(instanceKey.DisplayString())
-		}
-	case registerCliCommand("reattach-replica", "Replication, general", `Undo a detach-replica operation`):
-		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
-			_, err := inst.ReattachReplicaOperation(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -819,7 +816,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("expecting --binlog value")
 			}
 
-			_, err = inst.PurgeBinaryLogsTo(instanceKey, *config.RuntimeCLIFlags.BinlogFile)
+			_, err = inst.PurgeBinaryLogsTo(instanceKey, *config.RuntimeCLIFlags.BinlogFile, false)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -843,6 +840,20 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatale(err)
 			}
 			fmt.Println(fmt.Sprintf("%+v:%s", *coordinates, text))
+		}
+	case registerCliCommand("locate-gtid-errant", "Binary logs", `List binary logs containing errant GTIDs`):
+		{
+			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
+			if instanceKey == nil {
+				log.Fatalf("Unresolved instance")
+			}
+			errantBinlogs, err := inst.LocateErrantGTID(instanceKey)
+			if err != nil {
+				log.Fatale(err)
+			}
+			for _, binlog := range errantBinlogs {
+				fmt.Println(binlog)
+			}
 		}
 	case registerCliCommand("last-executed-relay-entry", "Binary logs", `Find coordinates of last executed relay log entry`):
 		{

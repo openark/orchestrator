@@ -599,50 +599,6 @@ func (this *HttpAPI) ResetSlave(params martini.Params, r render.Render, req *htt
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica reset on %+v", instance.Key), Details: instance})
 }
 
-// DetachReplica corrupts a replica's binlog corrdinates (though encodes it in such way
-// that is reversible), effectively breaking replication
-func (this *HttpAPI) DetachReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
-	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
-
-	if err != nil {
-		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
-		return
-	}
-	instance, err := inst.DetachReplicaOperation(&instanceKey)
-	if err != nil {
-		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
-		return
-	}
-
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica detached: %+v", instance.Key), Details: instance})
-}
-
-// ReattachReplica reverts a DetachReplica commands by reassigning the correct
-// binlog coordinates to an instance
-func (this *HttpAPI) ReattachReplica(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	if !isAuthorizedForAction(req, user) {
-		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
-		return
-	}
-	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
-
-	if err != nil {
-		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
-		return
-	}
-	instance, err := inst.ReattachReplicaOperation(&instanceKey)
-	if err != nil {
-		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
-		return
-	}
-
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Replica reattached: %+v", instance.Key), Details: instance})
-}
-
 // DetachReplicaMasterHost detaches a replica from its master by setting an invalid
 // (yet revertible) host name
 func (this *HttpAPI) DetachReplicaMasterHost(params martini.Params, r render.Render, req *http.Request, user auth.User) {
@@ -727,6 +683,22 @@ func (this *HttpAPI) DisableGTID(params martini.Params, r render.Render, req *ht
 	}
 
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Disabled GTID on %+v", instance.Key), Details: instance})
+}
+
+// LocateErrantGTID identifies the binlog positions for errant GTIDs on an instance
+func (this *HttpAPI) LocateErrantGTID(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	errantBinlogs, err := inst.LocateErrantGTID(&instanceKey)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("located errant GTID"), Details: errantBinlogs})
 }
 
 // ErrantGTIDResetMaster removes errant transactions on a server by way of RESET MASTER
@@ -1356,6 +1328,38 @@ func (this *HttpAPI) FlushBinaryLogs(params martini.Params, r render.Render, req
 		return
 	}
 	instance, err := inst.FlushBinaryLogs(&instanceKey, 1)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Binary logs flushed on: %+v", instance.Key), Details: instance})
+}
+
+// PurgeBinaryLogs purges binary logs up to given binlog file
+func (this *HttpAPI) PurgeBinaryLogs(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	if !isAuthorizedForAction(req, user) {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
+		return
+	}
+	instanceKey, err := this.getInstanceKey(params["host"], params["port"])
+
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	logFile := params["logFile"]
+	if logFile == "" {
+		Respond(r, &APIResponse{Code: ERROR, Message: "purge-binary-logs: expected log file name or 'latest'"})
+		return
+	}
+	force := (req.URL.Query().Get("force") == "true") || (params["force"] == "true")
+	var instance *inst.Instance
+	if logFile == "latest" {
+		instance, err = inst.PurgeBinaryLogsToLatest(&instanceKey, force)
+	} else {
+		instance, err = inst.PurgeBinaryLogsTo(&instanceKey, logFile, force)
+	}
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -3539,6 +3543,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	// Replication, general:
 	this.registerAPIRequest(m, "enable-gtid/:host/:port", this.EnableGTID)
 	this.registerAPIRequest(m, "disable-gtid/:host/:port", this.DisableGTID)
+	this.registerAPIRequest(m, "locate-gtid-errant/:host/:port", this.LocateErrantGTID)
 	this.registerAPIRequest(m, "gtid-errant-reset-master/:host/:port", this.ErrantGTIDResetMaster)
 	this.registerAPIRequest(m, "gtid-errant-inject-empty/:host/:port", this.ErrantGTIDInjectEmpty)
 	this.registerAPIRequest(m, "skip-query/:host/:port", this.SkipQuery)
@@ -3547,11 +3552,12 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "stop-slave/:host/:port", this.StopSlave)
 	this.registerAPIRequest(m, "stop-slave-nice/:host/:port", this.StopSlaveNicely)
 	this.registerAPIRequest(m, "reset-slave/:host/:port", this.ResetSlave)
-	this.registerAPIRequest(m, "detach-slave/:host/:port", this.DetachReplica)
-	this.registerAPIRequest(m, "reattach-slave/:host/:port", this.ReattachReplica)
+	this.registerAPIRequest(m, "detach-slave/:host/:port", this.DetachReplicaMasterHost)
+	this.registerAPIRequest(m, "reattach-slave/:host/:port", this.ReattachReplicaMasterHost)
 	this.registerAPIRequest(m, "detach-slave-master-host/:host/:port", this.DetachReplicaMasterHost)
 	this.registerAPIRequest(m, "reattach-slave-master-host/:host/:port", this.ReattachReplicaMasterHost)
 	this.registerAPIRequest(m, "flush-binary-logs/:host/:port", this.FlushBinaryLogs)
+	this.registerAPIRequest(m, "purge-binary-logs/:host/:port/:logFile", this.PurgeBinaryLogs)
 	this.registerAPIRequest(m, "restart-slave-statements/:host/:port", this.RestartSlaveStatements)
 	this.registerAPIRequest(m, "enable-semi-sync-master/:host/:port", this.EnableSemiSyncMaster)
 	this.registerAPIRequest(m, "disable-semi-sync-master/:host/:port", this.DisableSemiSyncMaster)
