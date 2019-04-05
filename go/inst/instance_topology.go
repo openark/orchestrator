@@ -18,6 +18,7 @@ package inst
 
 import (
 	"fmt"
+	goos "os"
 	"regexp"
 	"sort"
 	"strings"
@@ -1679,20 +1680,15 @@ func TakeSiblings(instanceKey *InstanceKey) (instance *Instance, takenSiblings i
 
 // Created this function to allow a hook to be called after a successful TakeMaster event
 func TakeMasterHook(master *Instance, slave *Instance) {
-
 	masterInstance := master.Key
 	slaveInstance := slave.Key
-
-	env := []string{}
+	env := goos.Environ()
 	env = append(env, fmt.Sprintf("ORC_SUCCESSOR_HOST=%s", masterInstance))
 	env = append(env, fmt.Sprintf("ORC_FAILED_HOST=%s", slaveInstance))
-
-	successor := strings.Replace(fmt.Sprintf("%s", masterInstance), ":3306", "", -1)
-	oldmaster := strings.Replace(fmt.Sprintf("%s", slaveInstance), ":3306", "", -1)
-
+	successor := fmt.Sprintf("%s", masterInstance)
+	oldmaster := fmt.Sprintf("%s", slaveInstance)
 	if config.Config.PostTakeMasterProcesses != nil {
 		processCount := len(config.Config.PostTakeMasterProcesses)
-
 		for i, command := range config.Config.PostTakeMasterProcesses {
 			fullDescription := fmt.Sprintf("PostTakeMasterProcesses hook %d of %d", i+1, processCount)
 			log.Debugf("Take-Master: PostTakeMasterProcesses: Calling %+s", fullDescription)
