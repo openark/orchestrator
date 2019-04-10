@@ -1678,30 +1678,31 @@ func TakeSiblings(instanceKey *InstanceKey) (instance *Instance, takenSiblings i
 }
 
 // Created this function to allow a hook to be called after a successful TakeMaster event
-func TakeMasterHook(master *Instance, slave *Instance) {
-	masterInstance := master.Key
-	slaveInstance := slave.Key
+func TakeMasterHook(successor *Instance, demoted *Instance) {
+	successorKey := successor.Key
+	demotedKey := demoted.Key
 	env := goos.Environ()
-	env = append(env, fmt.Sprintf("ORC_SUCCESSOR_HOST=%s", masterInstance))
-	env = append(env, fmt.Sprintf("ORC_FAILED_HOST=%s", slaveInstance))
-	successor := fmt.Sprintf("%s", masterInstance)
-	oldmaster := fmt.Sprintf("%s", slaveInstance)
-	if config.Config.PostTakeMasterProcesses != nil {
-		processCount := len(config.Config.PostTakeMasterProcesses)
-		for i, command := range config.Config.PostTakeMasterProcesses {
-			fullDescription := fmt.Sprintf("PostTakeMasterProcesses hook %d of %d", i+1, processCount)
-			log.Debugf("Take-Master: PostTakeMasterProcesses: Calling %+s", fullDescription)
-			start := time.Now()
-			if err := os.CommandRun(command, env, successor, oldmaster); err == nil {
-				info := fmt.Sprintf("Completed %s in %v", fullDescription, time.Since(start))
-				log.Infof("Take-Master: %s", info)
-			} else {
-				info := fmt.Sprintf("Execution of PostTakeMasterProcesses failed in %v with error: %v", time.Since(start), err)
-				log.Infof("Take-Master: %s", info)
-				log.Errorf(info)
-			}
+
+	env = append(env, fmt.Sprintf("ORC_SUCCESSOR_HOST=%s", successorKey))
+	env = append(env, fmt.Sprintf("ORC_FAILED_HOST=%s", demotedKey))
+
+	successorStr := fmt.Sprintf("%s", successorKey)
+	demotedStr := fmt.Sprintf("%s", demotedKey)
+
+	processCount := len(config.Config.PostTakeMasterProcesses)
+	for i, command := range config.Config.PostTakeMasterProcesses {
+		fullDescription := fmt.Sprintf("PostTakeMasterProcesses hook %d of %d", i+1, processCount)
+		log.Debugf("Take-Master: PostTakeMasterProcesses: Calling %+s", fullDescription)
+		start := time.Now()
+		if err := os.CommandRun(command, env, successorStr, demotedStr); err == nil {
+			info := fmt.Sprintf("Completed %s in %v", fullDescription, time.Since(start))
+			log.Infof("Take-Master: %s", info)
+		} else {
+			info := fmt.Sprintf("Execution of PostTakeMasterProcesses failed in %v with error: %v", time.Since(start), err)
+			log.Errorf("Take-Master: %s", info)
 		}
 	}
+
 }
 
 // TakeMaster will move an instance up the chain and cause its master to become its replica.
@@ -1765,9 +1766,11 @@ Cleanup:
 	AuditOperation("take-master", instanceKey, fmt.Sprintf("took master: %+v", masterInstance.Key))
 
 	// Created this to enable a custom hook to be called after a TakeMaster success.
-	// This only runs if set to true in orchestrator.conf.json
-	if config.Config.PostTakeMasterProcessesEnabled == true {
-		TakeMasterHook(instance, masterInstance)
+	// This only runs if there is a hook configured in orchestrator.conf.json
+	demoted := masterInstance
+	successor := instance
+	if config.Config.PostTakeMasterProcesses != nil {
+		TakeMasterHook(successor, demoted)
 	}
 
 	return instance, err

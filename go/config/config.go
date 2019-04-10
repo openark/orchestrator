@@ -232,7 +232,6 @@ type Configuration struct {
 	PostMasterFailoverProcesses                []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
 	PostIntermediateMasterFailoverProcesses    []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
 	PostGracefulTakeoverProcesses              []string          // Processes to execute after runnign a graceful master takeover. Uses same placeholders as PostFailoverProcesses
-	PostTakeMasterProcessesEnabled             bool              // Set to true to enable PostTakeMasterProcesses. Default false
 	PostTakeMasterProcesses                    []string          // Processes to execute after a successful Take-Master event has taken place
 	CoMasterRecoveryMustPromoteOtherCoMaster   bool              // When 'false', anything can get promoted (and candidates are prefered over others). When 'true', orchestrator will promote the other co-master or else fail
 	DetachLostSlavesAfterMasterFailover        bool              // synonym to DetachLostReplicasAfterMasterFailover
@@ -399,7 +398,6 @@ func newConfiguration() *Configuration {
 		PostFailoverProcesses:                      []string{},
 		PostUnsuccessfulFailoverProcesses:          []string{},
 		PostGracefulTakeoverProcesses:              []string{},
-		PostTakeMasterProcessesEnabled:             false,
 		PostTakeMasterProcesses:                    []string{},
 		CoMasterRecoveryMustPromoteOtherCoMaster:   true,
 		DetachLostSlavesAfterMasterFailover:        true,

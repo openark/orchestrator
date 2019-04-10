@@ -135,7 +135,6 @@
   "ApplyMySQLPromotionAfterMasterFailover": true,
   "PreventCrossDataCenterMasterFailover": false,
   "MasterFailoverDetachSlaveMasterHost": false,
-  "PostTakeMasterProcessesEnabled": true,
   "MasterFailoverLostInstancesDowntimeMinutes": 0,
   "PostponeSlaveRecoveryOnLagMinutes": 0,
   "OSCIgnoreHostnameFilters": [],
