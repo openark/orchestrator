@@ -12,6 +12,7 @@
   "MySQLTopologyUseMutualTLS": false,
   "BackendDB": "sqlite",
   "SQLite3DataFile": "/usr/local/orchestrator/orchestrator.sqlite3",
+  "MySQLConnectTimeoutSeconds": 1,
   "DefaultInstancePort": 3306,
   "DiscoverByShowSlaveHosts": true,
   "InstancePollSeconds": 5,
