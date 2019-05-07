@@ -35,6 +35,12 @@ func NewConsulStore() KVStore {
 	if config.Config.ConsulAddress != "" {
 		consulConfig := consulapi.DefaultConfig()
 		consulConfig.Address = config.Config.ConsulAddress
+		
+		if strings.HasPrefix(config.Config.ConsulAddress,"https://") {
+		  consulConfig.Scheme = "https"
+		  consulConfig.Address = strings.Replace(config.Config.ConsulAddress,"https://","",9)
+		}
+		
 		// ConsulAclToken defaults to ""
 		consulConfig.Token = config.Config.ConsulAclToken
 		if client, err := consulapi.NewClient(consulConfig); err != nil {
