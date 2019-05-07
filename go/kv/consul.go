@@ -17,6 +17,7 @@
 package kv
 
 import (
+	"strings"
 	consulapi "github.com/armon/consul-api"
 	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
