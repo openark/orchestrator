@@ -95,7 +95,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		        MIN(master_instance.master_host) AS master_host,
 		        MIN(master_instance.master_port) AS master_port,
 		        MIN(master_instance.cluster_name) AS cluster_name,
-			    master_instance.read_only AS master_readonly,
+			master_instance.read_only AS master_readonly,
 		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
 		        MIN(
 							master_instance.last_checked <= master_instance.last_seen
