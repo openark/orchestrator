@@ -39,7 +39,7 @@ func NewConsulStore() KVStore {
 		
 		if strings.HasPrefix(config.Config.ConsulAddress,"https://") {
 		  consulConfig.Scheme = "https"
-		  consulConfig.Address = strings.Replace(config.Config.ConsulAddress,"https://","",9)
+		  consulConfig.Address = strings.Replace(consulConfig.Address, "https://", "", -1)
 		}
 		
 		// ConsulAclToken defaults to ""
