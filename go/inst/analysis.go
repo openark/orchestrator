@@ -64,7 +64,7 @@ const (
 	DifferentGTIDModesStructureWarning                                       = "DifferentGTIDModesStructureWarning"
 	ErrantGTIDStructureWarning                                               = "ErrantGTIDStructureWarning"
 	NoFailoverSupportStructureWarning                                        = "NoFailoverSupportStructureWarning"
-	NoWriteableNodesWarning                                                  = "NoWriteableNodesStructureWarning"
+	NonWriteableMasterStructureWarning                                       = "NonWriteableMasterStructureWarning"
 )
 
 type InstanceAnalysis struct {
