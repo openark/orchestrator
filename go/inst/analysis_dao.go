@@ -57,6 +57,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 
 	args := sqlutils.Args(ValidSecondsFromSeenToLastAttemptedCheck(), config.Config.ReasonableReplicationLagSeconds, clusterName)
 	analysisQueryReductionClause := ``
+
 	if config.Config.ReduceReplicationAnalysisCount {
 		analysisQueryReductionClause = `
 			HAVING
@@ -242,8 +243,10 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			    is_cluster_master DESC,
 			    count_replicas DESC
 	`, analysisQueryReductionClause)
+
+	coMasterCount := 0
+	coMasterROCount := 0
 	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
-		fmt.Printf(">>> %+v\n", m)
 		a := ReplicationAnalysis{
 			Analysis:               NoProblem,
 			ProcessingNodeHostname: process.ThisHostname,
@@ -297,6 +300,13 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 
 		a.CountDelayedReplicas = m.GetUint("count_delayed_replicas")
 		a.CountLaggingReplicas = m.GetUint("count_lagging_replicas")
+
+		if a.IsCoMaster {
+			coMasterCount++
+			if m.GetUint("read_only") == 1 {
+				coMasterROCount++
+			}
+		}
 
 		if !a.LastCheckValid {
 			analysisMessage := fmt.Sprintf("analysis: IsMaster: %+v, LastCheckValid: %+v, LastCheckPartialSuccess: %+v, CountReplicas: %+v, CountValidReplicatingReplicas: %+v, CountLaggingReplicas: %+v, CountDelayedReplicas: %+v, ",
@@ -479,8 +489,12 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			if a.MaxReplicaGTIDErrant != "" {
 				a.StructureAnalysis = append(a.StructureAnalysis, ErrantGTIDStructureWarning)
 			}
+
 			if a.IsMaster && m.GetUint("read_only") == 1 && m.GetString("master_host") == "" {
-				a.StructureAnalysis = append(a.StructureAnalysis, NonWriteableMasterStructureWarning)
+				a.StructureAnalysis = append(a.StructureAnalysis, NoWriteableMasterStructureWarning)
+			}
+			if a.IsCoMaster && coMasterCount == coMasterROCount {
+				a.StructureAnalysis = append(a.StructureAnalysis, NoWriteableMasterStructureWarning)
 			}
 
 		}
