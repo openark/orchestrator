@@ -91,16 +91,16 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		    SELECT
 		        master_instance.hostname,
 		        master_instance.port,
-				master_instance.read_only AS read_only,
-						MIN(master_instance.data_center) AS data_center,
-						MIN(master_instance.physical_environment) AS physical_environment,
+			master_instance.read_only AS read_only,
+			MIN(master_instance.data_center) AS data_center,
+			MIN(master_instance.physical_environment) AS physical_environment,
 		        MIN(master_instance.master_host) AS master_host,
 		        MIN(master_instance.master_port) AS master_port,
 		        MIN(master_instance.cluster_name) AS cluster_name,
 		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
 		        MIN(
-							master_instance.last_checked <= master_instance.last_seen
-							and master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
+				master_instance.last_checked <= master_instance.last_seen
+				and master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
 		        	) = 1 AS is_last_check_valid,
 						MIN(master_instance.last_check_partial_success) as last_check_partial_success,
 		        MIN(master_instance.master_host IN ('' , '_')
