@@ -100,8 +100,8 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		        MIN(master_instance.cluster_name) AS cluster_name,
 		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
 		        MIN(
-							master_instance.last_checked <= master_instance.last_seen
-							and master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
+				master_instance.last_checked <= master_instance.last_seen
+				and master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
 		        	) = 1 AS is_last_check_valid,
 						MIN(master_instance.last_check_partial_success) as last_check_partial_success,
 		        MIN(master_instance.master_host IN ('' , '_')
