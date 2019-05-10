@@ -302,7 +302,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.CountLaggingReplicas = m.GetUint("count_lagging_replicas")
 
 		if a.IsCoMaster && m.GetUint("read_only") == 1 {
-				coMasterROCount++
+			coMasterROCount++
 		}
 
 		if !a.LastCheckValid {
