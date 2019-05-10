@@ -12,11 +12,10 @@ Let orchestrator know how to query the MySQL topologies, what information to ext
 
 `MySQLTopologyCredentialsConfigFile` follows similar rules as `MySQLOrchestratorCredentialsConfigFile`. You may choose to use plaintext credentials:
 
-```json
-{
-  "MySQLTopologyUser": "orchestrator",
-  "MySQLTopologyPassword": "orc_topology_password",
-}
+```
+[client]
+user=orchestrator
+password=orc_topology_password
 ```
 
 `orchestrator` will probe each server once per `InstancePollSeconds` seconds.
