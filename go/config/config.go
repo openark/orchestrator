@@ -180,8 +180,10 @@ type Configuration struct {
 	DetectInstanceAliasQuery                   string            // Optional query (executed on topology instance) that returns the alias of an instance. If provided, must return one row, one column
 	DetectPromotionRuleQuery                   string            // Optional query (executed on topology instance) that returns the promotion rule of an instance. If provided, must return one row, one column.
 	DataCenterPattern                          string            // Regexp pattern with one group, extracting the datacenter name from the hostname
+	RegionPattern                              string            // Regexp pattern with one group, extracting the region name from the hostname
 	PhysicalEnvironmentPattern                 string            // Regexp pattern with one group, extracting physical environment info from hostname (e.g. combination of datacenter & prod/dev env)
 	DetectDataCenterQuery                      string            // Optional query (executed on topology instance) that returns the data center of an instance. If provided, must return one row, one column. Overrides DataCenterPattern and useful for installments where DC cannot be inferred by hostname
+	DetectRegionQuery                          string            // Optional query (executed on topology instance) that returns the region of an instance. If provided, must return one row, one column. Overrides RegionPattern and useful for installments where Region cannot be inferred by hostname
 	DetectPhysicalEnvironmentQuery             string            // Optional query (executed on topology instance) that returns the physical environment of an instance. If provided, must return one row, one column. Overrides PhysicalEnvironmentPattern and useful for installments where env cannot be inferred by hostname
 	DetectSemiSyncEnforcedQuery                string            // Optional query (executed on topology instance) to determine whether semi-sync is fully enforced for master writes (async fallback is not allowed under any circumstance). If provided, must return one row, one column, value 0 or 1.
 	SupportFuzzyPoolHostnames                  bool              // Should "submit-pool-instances" command be able to pass list of fuzzy instances (fuzzy means non-fqdn, but unique enough to recognize). Defaults 'true', implies more queries on backend db
@@ -238,6 +240,7 @@ type Configuration struct {
 	DetachLostReplicasAfterMasterFailover      bool              // Should replicas that are not to be lost in master recovery (i.e. were more up-to-date than promoted replica) be forcibly detached
 	ApplyMySQLPromotionAfterMasterFailover     bool              // Should orchestrator take upon itself to apply MySQL master promotion: set read_only=0, detach replication, etc.
 	PreventCrossDataCenterMasterFailover       bool              // When true (default: false), cross-DC master failover are not allowed, orchestrator will do all it can to only fail over within same DC, or else not fail over at all.
+	PreventCrossRegionMasterFailover           bool              // When true (default: false), cross-region master failover are not allowed, orchestrator will do all it can to only fail over within same region, or else not fail over at all.
 	MasterFailoverLostInstancesDowntimeMinutes uint              // Number of minutes to downtime any server that was lost after a master failover (including failed master & lost replicas). 0 to disable
 	MasterFailoverDetachSlaveMasterHost        bool              // synonym to MasterFailoverDetachReplicaMasterHost
 	MasterFailoverDetachReplicaMasterHost      bool              // Should orchestrator issue a detach-replica-master-host on newly promoted master (this makes sure the new master will not attempt to replicate old master if that comes back to life). Defaults 'false'. Meaningless if ApplyMySQLPromotionAfterMasterFailover is 'true'.
@@ -403,6 +406,7 @@ func newConfiguration() *Configuration {
 		DetachLostSlavesAfterMasterFailover:        true,
 		ApplyMySQLPromotionAfterMasterFailover:     true,
 		PreventCrossDataCenterMasterFailover:       false,
+		PreventCrossRegionMasterFailover:           false,
 		MasterFailoverLostInstancesDowntimeMinutes: 0,
 		MasterFailoverDetachSlaveMasterHost:        false,
 		FailMasterPromotionIfSQLThreadNotUpToDate:  false,

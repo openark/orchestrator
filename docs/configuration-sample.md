@@ -146,6 +146,7 @@ The following is a production configuration file, with some details redacted.
   "DetachLostSlavesAfterMasterFailover": true,
   "ApplyMySQLPromotionAfterMasterFailover": true,
   "PreventCrossDataCenterMasterFailover": false,
+  "PreventCrossRegionMasterFailover": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 60,
   "PostponeReplicaRecoveryOnLagMinutes": 10,
   "OSCIgnoreHostnameFilters": [
