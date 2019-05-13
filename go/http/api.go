@@ -124,8 +124,14 @@ var API HttpAPI = HttpAPI{}
 var discoveryMetrics = collection.CreateOrReturnCollection("DISCOVERY_METRICS")
 var queryMetrics = collection.CreateOrReturnCollection("BACKEND_WRITES")
 
-func (this *HttpAPI) getInstanceKey(host string, port string) (inst.InstanceKey, error) {
-	instanceKey, err := inst.NewResolveInstanceKeyStrings(host, port)
+func (this *HttpAPI) getInstanceKeyInternal(host string, port string, resolve bool) (inst.InstanceKey, error) {
+	var instanceKey *inst.InstanceKey
+	var err error
+	if resolve {
+		instanceKey, err = inst.NewResolveInstanceKeyStrings(host, port)
+	} else {
+		instanceKey, err = inst.NewRawInstanceKeyStrings(host, port)
+	}
 	if err != nil {
 		return emptyInstanceKey, err
 	}
@@ -133,7 +139,18 @@ func (this *HttpAPI) getInstanceKey(host string, port string) (inst.InstanceKey,
 	if err != nil {
 		return emptyInstanceKey, err
 	}
+	if instanceKey == nil {
+		return emptyInstanceKey, fmt.Errorf("Unexpected nil instanceKey in getInstanceKeyInternal(%+v, %+v, %+v)", host, port, resolve)
+	}
 	return *instanceKey, nil
+}
+
+func (this *HttpAPI) getInstanceKey(host string, port string) (inst.InstanceKey, error) {
+	return this.getInstanceKeyInternal(host, port, true)
+}
+
+func (this *HttpAPI) getNoResolveInstanceKey(host string, port string) (inst.InstanceKey, error) {
+	return this.getInstanceKeyInternal(host, port, false)
 }
 
 func getTag(params martini.Params, req *http.Request) (tag *inst.Tag, err error) {
@@ -259,15 +276,22 @@ func (this *HttpAPI) Forget(params martini.Params, r render.Render, req *http.Re
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
 		return
 	}
-	// We ignore errors: we're looking to do a destructive operation anyhow.
-	rawInstanceKey, _ := inst.NewRawInstanceKeyStrings(params["host"], params["port"])
+	instanceKey, err := this.getNoResolveInstanceKey(params["host"], params["port"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
 
 	if orcraft.IsRaftEnabled() {
-		orcraft.PublishCommand("forget", rawInstanceKey)
+		_, err = orcraft.PublishCommand("forget", instanceKey)
 	} else {
-		inst.ForgetInstance(rawInstanceKey)
+		err = inst.ForgetInstance(&instanceKey)
 	}
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance forgotten: %+v", *rawInstanceKey)})
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
+	}
+	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance forgotten: %+v", instanceKey), Details: instanceKey})
 }
 
 // ForgetCluster forgets all instacnes of a cluster

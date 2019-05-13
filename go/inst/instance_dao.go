@@ -2566,8 +2566,11 @@ func InstanceIsForgotten(instanceKey *InstanceKey) bool {
 // ForgetInstance removes an instance entry from the orchestrator backed database.
 // It may be auto-rediscovered through topology or requested for discovery by multiple means.
 func ForgetInstance(instanceKey *InstanceKey) error {
+	if instanceKey == nil {
+		return log.Errorf("ForgetInstance(): nil instanceKey")
+	}
 	forgetInstanceKeys.Set(instanceKey.StringCode(), true, cache.DefaultExpiration)
-	_, err := db.ExecOrchestrator(`
+	sqlResult, err := db.ExecOrchestrator(`
 			delete
 				from database_instance
 			where
@@ -2575,8 +2578,18 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 		instanceKey.Hostname,
 		instanceKey.Port,
 	)
+	if err != nil {
+		return log.Errore(err)
+	}
+	rows, err := sqlResult.RowsAffected()
+	if err != nil {
+		return log.Errore(err)
+	}
+	if rows == 0 {
+		return log.Errorf("ForgetInstance(): instance %+v not found", *instanceKey)
+	}
 	AuditOperation("forget", instanceKey, "")
-	return err
+	return nil
 }
 
 // ForgetInstance removes an instance entry from the orchestrator backed database.

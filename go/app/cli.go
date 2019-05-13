@@ -1353,15 +1353,15 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("forget", "Instance management", `Forget about an instance's existence`):
 		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
 			if rawInstanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			err := inst.ForgetInstance(rawInstanceKey)
+			instanceKey, _ = inst.FigureInstanceKey(rawInstanceKey, nil)
+			err := inst.ForgetInstance(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(rawInstanceKey.DisplayString())
+			fmt.Println(instanceKey.DisplayString())
 		}
 	case registerCliCommand("begin-maintenance", "Instance management", `Request a maintenance lock on an instance`):
 		{
