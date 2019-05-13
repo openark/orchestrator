@@ -283,9 +283,13 @@ func (this *HttpAPI) Forget(params martini.Params, r render.Render, req *http.Re
 	}
 
 	if orcraft.IsRaftEnabled() {
-		orcraft.PublishCommand("forget", instanceKey)
+		_, err = orcraft.PublishCommand("forget", instanceKey)
 	} else {
-		inst.ForgetInstance(&instanceKey)
+		err = inst.ForgetInstance(&instanceKey)
+	}
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
+		return
 	}
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Instance forgotten: %+v", instanceKey), Details: instanceKey})
 }
