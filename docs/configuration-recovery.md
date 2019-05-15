@@ -136,6 +136,7 @@ And, in the event a recovery was successful:
 - `{autoIntermediateMasterRecovery}`
 - `{orchestratorHost}`
 - `{lostReplicas}` aka `{lostSlaves}`
+- `{countLostReplicas}`
 - `{replicaHosts}` aka `{slaveHosts}`
 - `{isSuccessful}`
 - `{command}` (`"force-master-failover"`, `"force-master-takeover"`, `"graceful-master-takeover"` if applicable)
