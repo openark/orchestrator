@@ -91,6 +91,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		        master_instance.hostname,
 		        master_instance.port,
 						MIN(master_instance.data_center) AS data_center,
+						MIN(master_instance.region) AS region,
 						MIN(master_instance.physical_environment) AS physical_environment,
 		        MIN(master_instance.master_host) AS master_host,
 		        MIN(master_instance.master_port) AS master_port,
@@ -253,6 +254,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.AnalyzedInstanceKey = InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
 		a.AnalyzedInstanceMasterKey = InstanceKey{Hostname: m.GetString("master_host"), Port: m.GetInt("master_port")}
 		a.AnalyzedInstanceDataCenter = m.GetString("data_center")
+		a.AnalyzedInstanceRegion = m.GetString("region")
 		a.AnalyzedInstancePhysicalEnvironment = m.GetString("physical_environment")
 		a.ClusterDetails.ClusterName = m.GetString("cluster_name")
 		a.ClusterDetails.ClusterAlias = m.GetString("cluster_alias")
