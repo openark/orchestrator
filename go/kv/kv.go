@@ -44,7 +44,8 @@ type KVStoreMap map[string](KVStore)
 
 var kvMutex sync.Mutex
 var kvInitOnce sync.Once
-var kvStores = make(KVStoreMap)
+var kvStores = []KVStore{}
+var kvStoresMap = make(KVStoreMap)
 
 // InitKVStores initializes the KV stores (duh), once in the lifetime of this app.
 // Configuration reload does not affect a running instance.
@@ -53,15 +54,20 @@ func InitKVStores() {
 	defer kvMutex.Unlock()
 
 	kvInitOnce.Do(func() {
-		kvStores = KVStoreMap{
+		kvStoresMap = KVStoreMap{
 			"internal": NewInternalKVStore(),
 			"consul":   NewConsulStore(),
 			"zk":       NewZkStore(),
 		}
+		kvStores = []KVStore{
+			kvStoresMap["internal"],
+			kvStoresMap["consul"],
+			kvStoresMap["zk"],
+		}
 	})
 }
 
-func getKVStores() (stores KVStoreMap) {
+func getKVStores() (stores []KVStore) {
 	kvMutex.Lock()
 	defer kvMutex.Unlock()
 
