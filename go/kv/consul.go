@@ -67,22 +67,23 @@ func (this *consulStore) GetKeyValue(key string) (value string, found bool, err 
 }
 
 func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (failedDistributions []string, err error) {
-	log.Errorf("consulStore.DistributePairs(): %d pairs", len(kvPairs))
+	log.Debugf("consulStore.DistributePairs(): %d pairs", len(kvPairs))
 	if !config.Config.ConsulCrossDataCenterDistribution {
-		log.Errorf("consulStore.DistributePairs(): !config.Config.ConsulCrossDataCenterDistribution")
+		log.Debugf("consulStore.DistributePairs(): !config.Config.ConsulCrossDataCenterDistribution")
 		return failedDistributions, nil
 	}
 	datacenters, err := this.client.Catalog().Datacenters()
 	if err != nil {
 		return failedDistributions, err
 	}
-	log.Errorf("consulStore.DistributePairs(): %d datacenters", len(datacenters))
+	log.Debugf("consulStore.DistributePairs(): %d datacenters", len(datacenters))
 	consulPairs := [](*consulapi.KVPair){}
 	for _, kvPair := range kvPairs {
-		log.Errorf("consulStore.DistributePairs():kvpair: %+v", kvPair)
+		log.Debugf("consulStore.DistributePairs():kvpair: %+v", kvPair)
 		consulPairs = append(consulPairs, &consulapi.KVPair{Key: kvPair.Key, Value: []byte(kvPair.Value)})
 	}
 	for _, datacenter := range datacenters {
+		log.Debugf("consulStore.DistributePairs():datacenter: %+v", datacenter)
 		writeOptions := &consulapi.WriteOptions{Datacenter: datacenter}
 		for _, consulPair := range consulPairs {
 			if _, e := this.client.KV().Put(consulPair, writeOptions); e != nil {
