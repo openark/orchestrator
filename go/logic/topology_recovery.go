@@ -883,12 +883,8 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			}
 		}
 		{
-			if failedDistributions, err := kv.DistributePairs(kvPairs, kvPairs); err != nil {
-				for _, distribution := range failedDistributions {
-					log.Errorf("Failed distributing KV pairs to %s", distribution)
-				}
-				log.Errore(err)
-			}
+			err := kv.DistributePairs(kvPairs, kvPairs)
+			log.Errore(err)
 		}
 		if !skipProcesses {
 			// Execute post master-failover processes

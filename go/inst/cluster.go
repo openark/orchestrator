@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/kv"
