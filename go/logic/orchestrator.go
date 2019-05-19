@@ -447,7 +447,7 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 			selectedError = err
 		}
 	}
-	kv.DistributePairs(submitKvPairs)
+	kv.DistributePairs(submitKvPairs, kvPairs)
 	return kvPairs, submittedCount, log.Errore(selectedError)
 }
 

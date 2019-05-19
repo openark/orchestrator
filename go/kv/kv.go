@@ -37,13 +37,14 @@ func (this *KVPair) String() string {
 type KVStore interface {
 	PutKeyValue(key string, value string) (err error)
 	GetKeyValue(key string) (value string, found bool, err error)
-	AddKeyValue(key string, value string) (added bool, err error)
-	DistributePairs(pairs [](*KVPair)) (err error)
+	DistributePairs(pairs [](*KVPair)) (failedDistributions []string, err error)
 }
+
+type KVStoreMap map[string](KVStore)
 
 var kvMutex sync.Mutex
 var kvInitOnce sync.Once
-var kvStores = []KVStore{}
+var kvStores = make(KVStoreMap)
 
 // InitKVStores initializes the KV stores (duh), once in the lifetime of this app.
 // Configuration reload does not affect a running instance.
@@ -52,15 +53,15 @@ func InitKVStores() {
 	defer kvMutex.Unlock()
 
 	kvInitOnce.Do(func() {
-		kvStores = []KVStore{
-			NewInternalKVStore(),
-			NewConsulStore(),
-			NewZkStore(),
+		kvStores = KVStoreMap{
+			"internal": NewInternalKVStore(),
+			"consul":   NewConsulStore(),
+			"zk":       NewZkStore(),
 		}
 	})
 }
 
-func getKVStores() (stores []KVStore) {
+func getKVStores() (stores KVStoreMap) {
 	kvMutex.Lock()
 	defer kvMutex.Unlock()
 
@@ -92,31 +93,11 @@ func PutKVPair(kvPair *KVPair) (err error) {
 	return PutValue(kvPair.Key, kvPair.Value)
 }
 
-func AddValue(key string, value string) (err error) {
+func DistributePairs(pairs [](*KVPair), fullPairs [](*KVPair)) (failedDistributions []string, err error) {
 	for _, store := range getKVStores() {
-		added, err := store.AddKeyValue(key, value)
-		if err != nil {
-			return err
-		}
-		if !added {
-			return nil
+		if failedDistributions, err := store.DistributePairs(pairs); err != nil {
+			return failedDistributions, err
 		}
 	}
-	return nil
-}
-
-func AddKVPair(kvPair *KVPair) (err error) {
-	if kvPair == nil {
-		return nil
-	}
-	return AddValue(kvPair.Key, kvPair.Value)
-}
-
-func DistributePairs(pairs [](*KVPair)) (err error) {
-	for _, store := range getKVStores() {
-		if err := store.DistributePairs(pairs); err != nil {
-			return err
-		}
-	}
-	return nil
+	return failedDistributions, nil
 }
