@@ -67,13 +67,16 @@ func (this *consulStore) GetKeyValue(key string) (value string, found bool, err 
 }
 
 func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (failedDistributions []string, err error) {
+	log.Errorf("consulStore.DistributePairs(): %d", len(kvPairs))
 	if !config.Config.ConsulCrossDataCenterDistribution {
+		log.Errorf("consulStore.DistributePairs(): !config.Config.ConsulCrossDataCenterDistribution")
 		return failedDistributions, nil
 	}
 	datacenters, err := this.client.Catalog().Datacenters()
 	if err != nil {
 		return failedDistributions, err
 	}
+	log.Errorf("consulStore.DistributePairs(): %d datacenters", len(datacenters))
 	consulPairs := [](*consulapi.KVPair){}
 	for _, kvPair := range kvPairs {
 		consulPairs = append(consulPairs, &consulapi.KVPair{Key: kvPair.Key, Value: []byte(kvPair.Value)})
