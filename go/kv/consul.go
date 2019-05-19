@@ -18,6 +18,8 @@ package kv
 
 import (
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	consulapi "github.com/armon/consul-api"
@@ -27,9 +29,11 @@ import (
 
 // A Consul store based on config's `ConsulAddress` and `ConsulKVPrefix`
 type consulStore struct {
-	client                     *consulapi.Client
-	lastPairsDistributionStart time.Time
-	pairsDistributionSuccess   map[string]time.Time
+	client                        *consulapi.Client
+	lastPairsDistributionStart    time.Time
+	pairsDistributionSuccess      map[string]time.Time
+	pairsDistributionSuccessMutex sync.Mutex
+	distributionReentry           int64
 }
 
 // NewConsulStore creates a new consul store. It is possible that the client for this store is nil,
@@ -74,7 +78,30 @@ func (this *consulStore) GetKeyValue(key string) (value string, found bool, err 
 	return string(pair.Value), (pair != nil), nil
 }
 
+func (this *consulStore) getPairsDistributionSuccessTime(key string) time.Time {
+	this.pairsDistributionSuccessMutex.Lock()
+	defer this.pairsDistributionSuccessMutex.Unlock()
+
+	return this.pairsDistributionSuccess[key]
+}
+
+func (this *consulStore) markPairsDistributionSuccessTime(key string) {
+	this.pairsDistributionSuccessMutex.Lock()
+	defer this.pairsDistributionSuccessMutex.Unlock()
+
+	this.pairsDistributionSuccess[key] = time.Now()
+}
+
 func (this *consulStore) DistributePairs(canonicalPairs [](*KVPair), fullPairs [](*KVPair)) (err error) {
+	// This function is non re-entrant (it can only be running once at any point in time)
+	if atomic.CompareAndSwapInt64(&this.distributionReentry, 0, 1) {
+		log.Debugf("consulStore.DistributePairs(): entry")
+		defer atomic.StoreInt64(&this.distributionReentry, 0)
+	} else {
+		log.Debugf("consulStore.DistributePairs(): non-reentrant")
+		return
+	}
+
 	log.Debugf("consulStore.DistributePairs(): %d pairs canonical, %d pairs full", len(canonicalPairs), len(fullPairs))
 	if !config.Config.ConsulCrossDataCenterDistribution {
 		log.Debugf("consulStore.DistributePairs(): !config.Config.ConsulCrossDataCenterDistribution")
@@ -94,25 +121,32 @@ func (this *consulStore) DistributePairs(canonicalPairs [](*KVPair), fullPairs [
 		log.Debugf("consulStore.DistributePairs():kvpair: %+v", kvPair)
 		consulPairs = append(consulPairs, &consulapi.KVPair{Key: kvPair.Key, Value: []byte(kvPair.Value)})
 	}
+	var wg sync.WaitGroup
 	for _, datacenter := range datacenters {
-		log.Debugf("consulStore.DistributePairs():datacenter: %+v", datacenter)
-		writeOptions := &consulapi.WriteOptions{Datacenter: datacenter}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			log.Debugf("consulStore.DistributePairs():datacenter: %+v", datacenter)
+			writeOptions := &consulapi.WriteOptions{Datacenter: datacenter}
 
-		for _, consulPair := range consulPairs {
-			pairsDistributionKey := fmt.Sprintf("%s;%s:%s", datacenter, consulPair.Key, consulPair.Value)
-			if lastSuccess := this.pairsDistributionSuccess[pairsDistributionKey]; !lastSuccess.Before(previousPairsDistributionStart) {
-				log.Errorf("consulStore.DistributePairs(): skipping %s", pairsDistributionKey)
-				continue
+			for _, consulPair := range consulPairs {
+				pairsDistributionKey := fmt.Sprintf("%s;%s:%s", datacenter, consulPair.Key, consulPair.Value)
+				if lastSuccess := this.getPairsDistributionSuccessTime(pairsDistributionKey); !lastSuccess.Before(previousPairsDistributionStart) {
+					log.Errorf("consulStore.DistributePairs(): skipping %s", pairsDistributionKey)
+					continue
+				}
+				log.Errorf("consulStore.DistributePairs(): writing %s", pairsDistributionKey)
+				if _, e := this.client.KV().Put(consulPair, writeOptions); e != nil {
+					log.Errorf("consulStore.DistributePairs(): failed %s", pairsDistributionKey)
+					err = e
+				} else {
+					log.Errorf("consulStore.DistributePairs(): success %s", pairsDistributionKey)
+					this.markPairsDistributionSuccessTime(pairsDistributionKey)
+				}
 			}
-			if _, e := this.client.KV().Put(consulPair, writeOptions); e != nil {
-				log.Errorf("consulStore.DistributePairs(): failed %s", pairsDistributionKey)
-				err = e
-			} else {
-				log.Errorf("consulStore.DistributePairs(): success %s", pairsDistributionKey)
-				this.pairsDistributionSuccess[pairsDistributionKey] = time.Now()
-			}
-		}
+		}()
 	}
+	wg.Wait()
 	return err
 }
 
