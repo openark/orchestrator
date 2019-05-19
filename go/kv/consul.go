@@ -20,18 +20,19 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"time"
+
+	"github.com/github/orchestrator/go/config"
 
 	consulapi "github.com/armon/consul-api"
-	"github.com/github/orchestrator/go/config"
+	"github.com/patrickmn/go-cache"
+
 	"github.com/openark/golib/log"
 )
 
 // A Consul store based on config's `ConsulAddress` and `ConsulKVPrefix`
 type consulStore struct {
 	client                        *consulapi.Client
-	lastPairsDistributionStart    time.Time
-	pairsDistributionSuccess      map[string]time.Time
+	kvCache                       *cache.Cache
 	pairsDistributionSuccessMutex sync.Mutex
 	distributionReentry           int64
 }
@@ -40,8 +41,7 @@ type consulStore struct {
 // which is the case if no consul config is provided.
 func NewConsulStore() KVStore {
 	store := &consulStore{
-		lastPairsDistributionStart: time.Now(),
-		pairsDistributionSuccess:   make(map[string]time.Time),
+		kvCache: cache.New(cache.NoExpiration, cache.DefaultExpiration),
 	}
 
 	if config.Config.ConsulAddress != "" {
@@ -78,20 +78,6 @@ func (this *consulStore) GetKeyValue(key string) (value string, found bool, err 
 	return string(pair.Value), (pair != nil), nil
 }
 
-func (this *consulStore) getPairsDistributionSuccessTime(key string) time.Time {
-	this.pairsDistributionSuccessMutex.Lock()
-	defer this.pairsDistributionSuccessMutex.Unlock()
-
-	return this.pairsDistributionSuccess[key]
-}
-
-func (this *consulStore) markPairsDistributionSuccessTime(key string) {
-	this.pairsDistributionSuccessMutex.Lock()
-	defer this.pairsDistributionSuccessMutex.Unlock()
-
-	this.pairsDistributionSuccess[key] = time.Now()
-}
-
 func (this *consulStore) DistributePairs(canonicalPairs [](*KVPair), fullPairs [](*KVPair)) (err error) {
 	// This function is non re-entrant (it can only be running once at any point in time)
 	if atomic.CompareAndSwapInt64(&this.distributionReentry, 0, 1) {
@@ -107,9 +93,6 @@ func (this *consulStore) DistributePairs(canonicalPairs [](*KVPair), fullPairs [
 		log.Debugf("consulStore.DistributePairs(): !config.Config.ConsulCrossDataCenterDistribution")
 		return nil
 	}
-
-	previousPairsDistributionStart := this.lastPairsDistributionStart
-	this.lastPairsDistributionStart = time.Now()
 
 	datacenters, err := this.client.Catalog().Datacenters()
 	if err != nil {
@@ -130,18 +113,20 @@ func (this *consulStore) DistributePairs(canonicalPairs [](*KVPair), fullPairs [
 			writeOptions := &consulapi.WriteOptions{Datacenter: datacenter}
 
 			for _, consulPair := range consulPairs {
-				pairsDistributionKey := fmt.Sprintf("%s;%s:%s", datacenter, consulPair.Key, consulPair.Value)
-				if lastSuccess := this.getPairsDistributionSuccessTime(pairsDistributionKey); !lastSuccess.Before(previousPairsDistributionStart) {
-					log.Errorf("consulStore.DistributePairs(): skipping %s", pairsDistributionKey)
+				val := string(consulPair.Value)
+				kcCacheKey := fmt.Sprintf("%s;%s", datacenter, consulPair.Key)
+
+				if value, found := this.kvCache.Get(kcCacheKey); found && val == value {
+					log.Debugf("consulStore.DistributePairs(): skipping %s", kcCacheKey)
 					continue
 				}
-				log.Errorf("consulStore.DistributePairs(): writing %s", pairsDistributionKey)
+				log.Debugf("consulStore.DistributePairs(): writing %s", kcCacheKey)
 				if _, e := this.client.KV().Put(consulPair, writeOptions); e != nil {
-					log.Errorf("consulStore.DistributePairs(): failed %s", pairsDistributionKey)
+					log.Errorf("consulStore.DistributePairs(): failed %s", kcCacheKey)
 					err = e
 				} else {
-					log.Errorf("consulStore.DistributePairs(): success %s", pairsDistributionKey)
-					this.markPairsDistributionSuccessTime(pairsDistributionKey)
+					log.Debugf("consulStore.DistributePairs(): success %s", kcCacheKey)
+					this.kvCache.SetDefault(kcCacheKey, val)
 				}
 			}
 		}()
