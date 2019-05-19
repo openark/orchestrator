@@ -60,7 +60,6 @@ func GetClusterMasterKVPairs(clusterAlias string, masterKey *InstanceKey) (kvPai
 		addPair("ipv4", ipv4)
 		addPair("ipv6", ipv6)
 	}
-	addPair("last_update", time.Now().Format(time.RFC3339Nano))
 	return kvPairs
 }
 

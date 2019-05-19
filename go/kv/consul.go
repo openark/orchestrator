@@ -17,6 +17,8 @@
 package kv
 
 import (
+	"time"
+
 	consulapi "github.com/armon/consul-api"
 	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
@@ -24,13 +26,18 @@ import (
 
 // A Consul store based on config's `ConsulAddress` and `ConsulKVPrefix`
 type consulStore struct {
-	client *consulapi.Client
+	client                     *consulapi.Client
+	lastPairsDistributionStart time.Time
+	pairsDistributionSuccess   map[string]time.Time
 }
 
 // NewConsulStore creates a new consul store. It is possible that the client for this store is nil,
 // which is the case if no consul config is provided.
 func NewConsulStore() KVStore {
-	store := &consulStore{}
+	store := &consulStore{
+		lastPairsDistributionStart: time.Now(),
+		pairsDistributionSuccess:   make(map[string]time.Time),
+	}
 
 	if config.Config.ConsulAddress != "" {
 		consulConfig := consulapi.DefaultConfig()
@@ -66,32 +73,56 @@ func (this *consulStore) GetKeyValue(key string) (value string, found bool, err 
 	return string(pair.Value), (pair != nil), nil
 }
 
-func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (failedDistributions []string, err error) {
-	log.Debugf("consulStore.DistributePairs(): %d pairs", len(kvPairs))
+func (this *consulStore) DistributePairs(canonicalPairs [](*KVPair), fullPairs [](*KVPair)) (err error) {
+	log.Debugf("consulStore.DistributePairs(): %d pairs canonical, %d pairs full", len(canonicalPairs), len(fullPairs))
 	if !config.Config.ConsulCrossDataCenterDistribution {
 		log.Debugf("consulStore.DistributePairs(): !config.Config.ConsulCrossDataCenterDistribution")
-		return failedDistributions, nil
+		return nil
 	}
+
+	previousPairsDistributionStart := this.lastPairsDistributionStart
+	this.lastPairsDistributionStart = time.Now()
+
 	datacenters, err := this.client.Catalog().Datacenters()
 	if err != nil {
-		return failedDistributions, err
+		return err
 	}
 	log.Debugf("consulStore.DistributePairs(): %d datacenters", len(datacenters))
-	consulPairs := [](*consulapi.KVPair){}
-	for _, kvPair := range kvPairs {
+	canonicalConsulPairs := [](*consulapi.KVPair){}
+	for _, kvPair := range canonicalPairs {
 		log.Debugf("consulStore.DistributePairs():kvpair: %+v", kvPair)
-		consulPairs = append(consulPairs, &consulapi.KVPair{Key: kvPair.Key, Value: []byte(kvPair.Value)})
+		canonicalConsulPairs = append(canonicalConsulPairs, &consulapi.KVPair{Key: kvPair.Key, Value: []byte(kvPair.Value)})
+	}
+	fullConsulPairs := [](*consulapi.KVPair){}
+	for _, kvPair := range fullPairs {
+		log.Debugf("consulStore.DistributePairs():kvpair: %+v", kvPair)
+		fullConsulPairs = append(fullConsulPairs, &consulapi.KVPair{Key: kvPair.Key, Value: []byte(kvPair.Value)})
 	}
 	for _, datacenter := range datacenters {
+		consulPairs := canonicalConsulPairs
+		if lastSuccess := this.pairsDistributionSuccess[datacenter]; lastSuccess.Before(previousPairsDistributionStart) {
+			// default value is time.Zero
+			// No sign of success
+			consulPairs = fullConsulPairs
+			log.Debugf("consulStore.DistributePairs(): full pairs for datacenter: %+v", datacenter)
+		} else {
+			log.Debugf("consulStore.DistributePairs(): canonical pairs for datacenter: %+v", datacenter)
+		}
+
+		dataCenterErrorFound := false
 		log.Debugf("consulStore.DistributePairs():datacenter: %+v", datacenter)
 		writeOptions := &consulapi.WriteOptions{Datacenter: datacenter}
 		for _, consulPair := range consulPairs {
 			if _, e := this.client.KV().Put(consulPair, writeOptions); e != nil {
+				dataCenterErrorFound = true
 				log.Errorf("consulStore.DistributePairs(): failed writing %s", datacenter)
-				failedDistributions = append(failedDistributions, datacenter)
 				err = e
 			}
 		}
+		if !dataCenterErrorFound {
+			log.Errorf("consulStore.DistributePairs(): %d keys written successfully on %s", len(consulPairs), datacenter)
+			this.pairsDistributionSuccess[datacenter] = time.Now()
+		}
 	}
-	return failedDistributions, err
+	return err
 }
