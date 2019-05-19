@@ -17,6 +17,7 @@
 package kv
 
 import (
+	"fmt"
 	"time"
 
 	consulapi "github.com/armon/consul-api"
@@ -88,41 +89,84 @@ func (this *consulStore) DistributePairs(canonicalPairs [](*KVPair), fullPairs [
 		return err
 	}
 	log.Debugf("consulStore.DistributePairs(): %d datacenters", len(datacenters))
-	canonicalConsulPairs := [](*consulapi.KVPair){}
-	for _, kvPair := range canonicalPairs {
-		log.Debugf("consulStore.DistributePairs():kvpair: %+v", kvPair)
-		canonicalConsulPairs = append(canonicalConsulPairs, &consulapi.KVPair{Key: kvPair.Key, Value: []byte(kvPair.Value)})
-	}
-	fullConsulPairs := [](*consulapi.KVPair){}
+	consulPairs := [](*consulapi.KVPair){}
 	for _, kvPair := range fullPairs {
 		log.Debugf("consulStore.DistributePairs():kvpair: %+v", kvPair)
-		fullConsulPairs = append(fullConsulPairs, &consulapi.KVPair{Key: kvPair.Key, Value: []byte(kvPair.Value)})
+		consulPairs = append(consulPairs, &consulapi.KVPair{Key: kvPair.Key, Value: []byte(kvPair.Value)})
 	}
 	for _, datacenter := range datacenters {
-		consulPairs := canonicalConsulPairs
-		if lastSuccess := this.pairsDistributionSuccess[datacenter]; lastSuccess.Before(previousPairsDistributionStart) {
-			// default value is time.Zero
-			// No sign of success
-			consulPairs = fullConsulPairs
-			log.Debugf("consulStore.DistributePairs(): full pairs for datacenter: %+v", datacenter)
-		} else {
-			log.Debugf("consulStore.DistributePairs(): canonical pairs for datacenter: %+v", datacenter)
-		}
-
-		dataCenterErrorFound := false
 		log.Debugf("consulStore.DistributePairs():datacenter: %+v", datacenter)
 		writeOptions := &consulapi.WriteOptions{Datacenter: datacenter}
+
 		for _, consulPair := range consulPairs {
-			if _, e := this.client.KV().Put(consulPair, writeOptions); e != nil {
-				dataCenterErrorFound = true
-				log.Errorf("consulStore.DistributePairs(): failed writing %s", datacenter)
-				err = e
+			pairsDistributionKey := fmt.Sprintf("%s;%s:%s", datacenter, consulPair.Key, consulPair.Value)
+			if lastSuccess := this.pairsDistributionSuccess[pairsDistributionKey]; !lastSuccess.Before(previousPairsDistributionStart) {
+				log.Errorf("consulStore.DistributePairs(): skipping %s", pairsDistributionKey)
+				continue
 			}
-		}
-		if !dataCenterErrorFound {
-			log.Errorf("consulStore.DistributePairs(): %d keys written successfully on %s", len(consulPairs), datacenter)
-			this.pairsDistributionSuccess[datacenter] = time.Now()
+			if _, e := this.client.KV().Put(consulPair, writeOptions); e != nil {
+				log.Errorf("consulStore.DistributePairs(): failed %s", pairsDistributionKey)
+				err = e
+			} else {
+				log.Errorf("consulStore.DistributePairs(): success %s", pairsDistributionKey)
+				this.pairsDistributionSuccess[pairsDistributionKey] = time.Now()
+			}
 		}
 	}
 	return err
 }
+
+//
+// func (this *consulStore) DistributePairs(canonicalPairs [](*KVPair), fullPairs [](*KVPair)) (err error) {
+// 	log.Debugf("consulStore.DistributePairs(): %d pairs canonical, %d pairs full", len(canonicalPairs), len(fullPairs))
+// 	if !config.Config.ConsulCrossDataCenterDistribution {
+// 		log.Debugf("consulStore.DistributePairs(): !config.Config.ConsulCrossDataCenterDistribution")
+// 		return nil
+// 	}
+//
+// 	previousPairsDistributionStart := this.lastPairsDistributionStart
+// 	this.lastPairsDistributionStart = time.Now()
+//
+// 	datacenters, err := this.client.Catalog().Datacenters()
+// 	if err != nil {
+// 		return err
+// 	}
+// 	log.Debugf("consulStore.DistributePairs(): %d datacenters", len(datacenters))
+// 	canonicalConsulPairs := [](*consulapi.KVPair){}
+// 	for _, kvPair := range canonicalPairs {
+// 		log.Debugf("consulStore.DistributePairs():kvpair: %+v", kvPair)
+// 		canonicalConsulPairs = append(canonicalConsulPairs, &consulapi.KVPair{Key: kvPair.Key, Value: []byte(kvPair.Value)})
+// 	}
+// 	fullConsulPairs := [](*consulapi.KVPair){}
+// 	for _, kvPair := range fullPairs {
+// 		log.Debugf("consulStore.DistributePairs():kvpair: %+v", kvPair)
+// 		fullConsulPairs = append(fullConsulPairs, &consulapi.KVPair{Key: kvPair.Key, Value: []byte(kvPair.Value)})
+// 	}
+// 	for _, datacenter := range datacenters {
+// 		consulPairs := canonicalConsulPairs
+// 		if lastSuccess := this.pairsDistributionSuccess[datacenter]; lastSuccess.Before(previousPairsDistributionStart) {
+// 			// default value is time.Zero
+// 			// No sign of success
+// 			consulPairs = fullConsulPairs
+// 			log.Debugf("consulStore.DistributePairs(): full pairs for datacenter: %+v", datacenter)
+// 		} else {
+// 			log.Debugf("consulStore.DistributePairs(): canonical pairs for datacenter: %+v", datacenter)
+// 		}
+//
+// 		dataCenterErrorFound := false
+// 		log.Debugf("consulStore.DistributePairs():datacenter: %+v", datacenter)
+// 		writeOptions := &consulapi.WriteOptions{Datacenter: datacenter}
+// 		for _, consulPair := range consulPairs {
+// 			if _, e := this.client.KV().Put(consulPair, writeOptions); e != nil {
+// 				dataCenterErrorFound = true
+// 				log.Errorf("consulStore.DistributePairs(): failed writing %s", datacenter)
+// 				err = e
+// 			}
+// 		}
+// 		if !dataCenterErrorFound {
+// 			log.Errorf("consulStore.DistributePairs(): %d keys written successfully on %s", len(consulPairs), datacenter)
+// 			this.pairsDistributionSuccess[datacenter] = time.Now()
+// 		}
+// 	}
+// 	return err
+// }
