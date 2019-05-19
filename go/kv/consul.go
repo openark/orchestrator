@@ -125,6 +125,7 @@ func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 				if pair, _, err := this.client.KV().Get(consulPair.Key, queryOptions); err == nil {
 					if val == string(pair.Value) {
 						log.Debugf("consulStore.DistributePairs(): existing %s", kcCacheKey)
+						this.kvCache.SetDefault(kcCacheKey, val)
 						continue
 					}
 				}
