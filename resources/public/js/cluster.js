@@ -719,9 +719,6 @@ function Cluster() {
       // Obviously this is also checked on server side, no need to try stupid hacks
       return unaccepted;
     }
-    if (moveInstanceMethod != "smart") {
-      return unaccepted;
-    }
     var droppableTitle = getInstanceDiv(droppableNode.id).find("h3 .pull-left").html();
 
     if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem || droppableNode.isAggregate) {
