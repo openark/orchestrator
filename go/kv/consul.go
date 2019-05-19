@@ -67,7 +67,7 @@ func (this *consulStore) GetKeyValue(key string) (value string, found bool, err 
 }
 
 func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (failedDistributions []string, err error) {
-	log.Errorf("consulStore.DistributePairs(): %d", len(kvPairs))
+	log.Errorf("consulStore.DistributePairs(): %d pairs", len(kvPairs))
 	if !config.Config.ConsulCrossDataCenterDistribution {
 		log.Errorf("consulStore.DistributePairs(): !config.Config.ConsulCrossDataCenterDistribution")
 		return failedDistributions, nil
@@ -79,6 +79,7 @@ func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (failedDistributio
 	log.Errorf("consulStore.DistributePairs(): %d datacenters", len(datacenters))
 	consulPairs := [](*consulapi.KVPair){}
 	for _, kvPair := range kvPairs {
+		log.Errorf("consulStore.DistributePairs():kvpair: %+v", kvPair)
 		consulPairs = append(consulPairs, &consulapi.KVPair{Key: kvPair.Key, Value: []byte(kvPair.Value)})
 	}
 	for _, datacenter := range datacenters {
