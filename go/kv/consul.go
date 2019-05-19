@@ -101,6 +101,7 @@ func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 	}
 	var wg sync.WaitGroup
 	for _, datacenter := range datacenters {
+		datacenter := datacenter
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -137,7 +138,7 @@ func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 					this.kvCache.SetDefault(kcCacheKey, val)
 				}
 			}
-			log.Debugf("consulStore.DistributePairs(): datacenter: %s; skipped: %d, existing: %s, written: %d, failed: %d", datacenter, skipped, existing, written, failed)
+			log.Debugf("consulStore.DistributePairs(): datacenter: %s; skipped: %d, existing: %d, written: %d, failed: %d", datacenter, skipped, existing, written, failed)
 		}()
 	}
 	wg.Wait()
