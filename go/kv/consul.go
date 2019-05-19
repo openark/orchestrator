@@ -134,6 +134,7 @@ func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 					failed++
 					err = e
 				} else {
+					log.Errorf("consulStore.DistributePairs(): written %s=%s", kcCacheKey, val)
 					written++
 					this.kvCache.SetDefault(kcCacheKey, val)
 				}
