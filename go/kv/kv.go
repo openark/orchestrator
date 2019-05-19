@@ -93,9 +93,9 @@ func PutKVPair(kvPair *KVPair) (err error) {
 	return PutValue(kvPair.Key, kvPair.Value)
 }
 
-func DistributePairs(pairs [](*KVPair), fullPairs [](*KVPair)) (failedDistributions []string, err error) {
+func DistributePairs(canonicalPairs [](*KVPair), fullPairs [](*KVPair)) (failedDistributions []string, err error) {
 	for _, store := range getKVStores() {
-		if failedDistributions, err := store.DistributePairs(pairs); err != nil {
+		if failedDistributions, err := store.DistributePairs(canonicalPairs); err != nil {
 			return failedDistributions, err
 		}
 	}
