@@ -78,7 +78,7 @@ func (this *consulStore) GetKeyValue(key string) (value string, found bool, err 
 	return string(pair.Value), (pair != nil), nil
 }
 
-func (this *consulStore) DistributePairs(canonicalPairs [](*KVPair), fullPairs [](*KVPair)) (err error) {
+func (this *consulStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 	// This function is non re-entrant (it can only be running once at any point in time)
 	if atomic.CompareAndSwapInt64(&this.distributionReentry, 0, 1) {
 		log.Debugf("consulStore.DistributePairs(): entry")
@@ -88,7 +88,7 @@ func (this *consulStore) DistributePairs(canonicalPairs [](*KVPair), fullPairs [
 		return
 	}
 
-	log.Debugf("consulStore.DistributePairs(): %d pairs canonical, %d pairs full", len(canonicalPairs), len(fullPairs))
+	log.Debugf("consulStore.DistributePairs(): %d pairs", len(kvPairs))
 	if !config.Config.ConsulCrossDataCenterDistribution {
 		log.Debugf("consulStore.DistributePairs(): !config.Config.ConsulCrossDataCenterDistribution")
 		return nil
@@ -100,7 +100,7 @@ func (this *consulStore) DistributePairs(canonicalPairs [](*KVPair), fullPairs [
 	}
 	log.Debugf("consulStore.DistributePairs(): %d datacenters", len(datacenters))
 	consulPairs := [](*consulapi.KVPair){}
-	for _, kvPair := range fullPairs {
+	for _, kvPair := range kvPairs {
 		log.Debugf("consulStore.DistributePairs():kvpair: %+v", kvPair)
 		consulPairs = append(consulPairs, &consulapi.KVPair{Key: kvPair.Key, Value: []byte(kvPair.Value)})
 	}
@@ -111,6 +111,7 @@ func (this *consulStore) DistributePairs(canonicalPairs [](*KVPair), fullPairs [
 			defer wg.Done()
 			log.Debugf("consulStore.DistributePairs():datacenter: %+v", datacenter)
 			writeOptions := &consulapi.WriteOptions{Datacenter: datacenter}
+			queryOptions := &consulapi.QueryOptions{Datacenter: datacenter}
 
 			for _, consulPair := range consulPairs {
 				val := string(consulPair.Value)
@@ -120,6 +121,14 @@ func (this *consulStore) DistributePairs(canonicalPairs [](*KVPair), fullPairs [
 					log.Debugf("consulStore.DistributePairs(): skipping %s", kcCacheKey)
 					continue
 				}
+				log.Debugf("consulStore.DistributePairs(): checking %s", kcCacheKey)
+				if pair, _, err := this.client.KV().Get(consulPair.Key, queryOptions); err == nil {
+					if val == string(pair.Value) {
+						log.Debugf("consulStore.DistributePairs(): existing %s", kcCacheKey)
+						continue
+					}
+				}
+
 				log.Debugf("consulStore.DistributePairs(): writing %s", kcCacheKey)
 				if _, e := this.client.KV().Put(consulPair, writeOptions); e != nil {
 					log.Errorf("consulStore.DistributePairs(): failed %s", kcCacheKey)

@@ -37,7 +37,7 @@ func (this *KVPair) String() string {
 type KVStore interface {
 	PutKeyValue(key string, value string) (err error)
 	GetKeyValue(key string) (value string, found bool, err error)
-	DistributePairs(canonicalPairs [](*KVPair), fullPairs [](*KVPair)) (err error)
+	DistributePairs(kvPairs [](*KVPair)) (err error)
 }
 
 type KVStoreMap map[string](KVStore)
@@ -99,9 +99,9 @@ func PutKVPair(kvPair *KVPair) (err error) {
 	return PutValue(kvPair.Key, kvPair.Value)
 }
 
-func DistributePairs(canonicalPairs [](*KVPair), fullPairs [](*KVPair)) (err error) {
+func DistributePairs(kvPairs [](*KVPair)) (err error) {
 	for _, store := range getKVStores() {
-		if err := store.DistributePairs(canonicalPairs, fullPairs); err != nil {
+		if err := store.DistributePairs(kvPairs); err != nil {
 			return err
 		}
 	}

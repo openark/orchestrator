@@ -75,6 +75,6 @@ func (this *zkStore) GetKeyValue(key string) (value string, found bool, err erro
 	return string(result), true, nil
 }
 
-func (this *zkStore) DistributePairs(canonicalPairs [](*KVPair), fullPairs [](*KVPair)) (err error) {
+func (this *zkStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 	return nil
 }

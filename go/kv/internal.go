@@ -62,6 +62,6 @@ func (this *internalKVStore) GetKeyValue(key string) (value string, found bool, 
 	return value, found, log.Errore(err)
 }
 
-func (this *internalKVStore) DistributePairs(canonicalPairs [](*KVPair), fullPairs [](*KVPair)) (err error) {
+func (this *internalKVStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 	return nil
 }

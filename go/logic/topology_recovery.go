@@ -883,7 +883,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			}
 		}
 		{
-			err := kv.DistributePairs(kvPairs, kvPairs)
+			err := kv.DistributePairs(kvPairs)
 			log.Errore(err)
 		}
 		if !skipProcesses {
