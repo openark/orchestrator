@@ -15,11 +15,11 @@ With `orchestrator-client`, you:
 - Need to set the `ORCHESTRATOR_API` environment variable.
   - Either provide a single endpoint for a proxy, e.g.
   ```shell
-  export ORCHESTRATOR_API=https://orchestrator.myservice.com:3000/api
+  export ORCHESTRATOR_API=http://orchestrator.myservice.com:3000/api
   ```
   - Or provide all `orchestrator` endpoints, and `orchestrator-client` will auto-pick the leader (no need for proxy), e.g.
   ```shell
-  export ORCHESTRATOR_API="https://orchestrator.host1:3000/api https://orchestrator.host2:3000/api https://orchestrator.host3:3000/api"
+  export ORCHESTRATOR_API="http://orchestrator.host1:3000/api http://orchestrator.host2:3000/api http://orchestrator.host3:3000/api"
   ```
 - You may set up the environment in `/etc/profile.d/orchestrator-client.sh`. If this file exists, it will be inlined by `orchestrator-client`.
 
