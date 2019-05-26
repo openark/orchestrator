@@ -227,8 +227,8 @@ type Configuration struct {
 	RecoverIntermediateMasterClusterFilters    []string          // Only do IM recovery on clusters matching these regexp patterns (of course the ".*" pattern matches everything)
 	ProcessesShellCommand                      string            // Shell that executes command scripts
 	OnFailureDetectionProcesses                []string          // Processes to execute when detecting a failover scenario (before making a decision whether to failover or not). May and should use some of these placeholders: {failureType}, {failureDescription}, {command}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {successorAlias}, {countReplicas}, {replicaHosts}, {isDowntimed}, {autoMasterRecovery}, {autoIntermediateMasterRecovery}
-	PreGracefulTakeoverProcesses               []string          // Processes to execute before doing a failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {command}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {successorAlias}, {countReplicas}, {replicaHosts}, {isDowntimed}
-	PreFailoverProcesses                       []string          // Processes to execute before doing a failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {command}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {successorAlias}, {countReplicas}, {replicaHosts}, {isDowntimed}
+	PreGracefulTakeoverProcesses               []string          // Processes to execute before doing a failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {command}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {countReplicas}, {replicaHosts}, {isDowntimed}
+	PreFailoverProcesses                       []string          // Processes to execute before doing a failover (aborting operation should any once of them exits with non-zero code; order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {command}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {countReplicas}, {replicaHosts}, {isDowntimed}
 	PostFailoverProcesses                      []string          // Processes to execute after doing a failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {command}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {successorAlias}, {countReplicas}, {replicaHosts}, {isDowntimed}, {isSuccessful}, {lostReplicas}, {countLostReplicas}
 	PostUnsuccessfulFailoverProcesses          []string          // Processes to execute after a not-completely-successful failover (order of execution undefined). May and should use some of these placeholders: {failureType}, {failureDescription}, {command}, {failedHost}, {failureCluster}, {failureClusterAlias}, {failureClusterDomain}, {failedPort}, {successorHost}, {successorPort}, {successorAlias}, {countReplicas}, {replicaHosts}, {isDowntimed}, {isSuccessful}, {lostReplicas}, {countLostReplicas}
 	PostMasterFailoverProcesses                []string          // Processes to execute after doing a master failover (order of execution undefined). Uses same placeholders as PostFailoverProcesses
@@ -248,9 +248,6 @@ type Configuration struct {
 	DelayMasterPromotionIfSQLThreadNotUpToDate bool              // when true, and a master failover takes place, if candidate master has not consumed all relay logs, delay promotion until the sql thread has caught up
 	PostponeSlaveRecoveryOnLagMinutes          uint              // Synonym to PostponeReplicaRecoveryOnLagMinutes
 	PostponeReplicaRecoveryOnLagMinutes        uint              // On crash recovery, replicas that are lagging more than given minutes are only resurrected late in the recovery process, after master/IM has been elected and processes executed. Value of 0 disables this feature
-	RemoteSSHForMasterFailover                 bool              // Should orchestrator attempt a remote-ssh relaylog-synching upon master failover? Requires RemoteSSHCommand
-	RemoteSSHCommand                           string            // A `ssh` command to be used by recovery process to read/apply relaylogs. If provided, this variable must contain the text "{hostname}". The remote SSH login must have the privileges to read/write relay logs. Example: "setuidgid remoteuser ssh {hostname}"
-	RemoteSSHCommandUseSudo                    bool              // Should orchestrator apply 'sudo' on the remote host upon SSH command
 	OSCIgnoreHostnameFilters                   []string          // OSC replicas recommendation will ignore replica hostnames matching given patterns
 	GraphiteAddr                               string            // Optional; address of graphite port. If supplied, metrics will be written here
 	GraphitePath                               string            // Prefix for graphite path. May include {hostname} magic placeholder
@@ -412,9 +409,6 @@ func newConfiguration() *Configuration {
 		FailMasterPromotionIfSQLThreadNotUpToDate:  false,
 		DelayMasterPromotionIfSQLThreadNotUpToDate: false,
 		PostponeSlaveRecoveryOnLagMinutes:          0,
-		RemoteSSHForMasterFailover:                 false,
-		RemoteSSHCommand:                           "",
-		RemoteSSHCommandUseSudo:                    true,
 		OSCIgnoreHostnameFilters:                   []string{},
 		GraphiteAddr:                               "",
 		GraphitePath:                               "",
@@ -531,20 +525,11 @@ func (this *Configuration) postReadAdjustments() error {
 		this.URLPrefix = "/" + this.URLPrefix
 	}
 
-	if this.RemoteSSHCommand != "" {
-		if !strings.Contains(this.RemoteSSHCommand, "{hostname}") {
-			return fmt.Errorf("config's RemoteSSHCommand must either be empty, or contain a '{hostname}' placeholder")
-		}
-	}
-
 	if this.IsSQLite() && this.SQLite3DataFile == "" {
 		return fmt.Errorf("SQLite3DataFile must be set when BackendDB is sqlite3")
 	}
 	if this.IsSQLite() {
 		//		this.HostnameResolveMethod = "none"
-	}
-	if this.RemoteSSHForMasterFailover && this.RemoteSSHCommand == "" {
-		return fmt.Errorf("RemoteSSHCommand is required when RemoteSSHForMasterFailover is set")
 	}
 	if this.RaftEnabled && this.RaftDataDir == "" {
 		return fmt.Errorf("RaftDataDir must be defined since raft is enabled (RaftEnabled)")

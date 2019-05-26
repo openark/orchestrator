@@ -62,3 +62,19 @@ If your Consul runs cross-DC replication, then it is possible that the same KV u
 If your Consul setups do not replicate from each other, `orchestrator` is the _only_ means by which your master discovery is made consistent across your Consul clusters. You get all the nice traits that come with `raft`: if one DC is network partitioned, the `orchestrator` node in that DC will not receive the KV update event, and for a while, neither will the Consul cluster. However, once network access is regained, `orchestartor` will catch up with event log and apply the KV update to the local Consul cluster. The setup is eventual-consistent.
 
 Shortly following a master failover, `orchestrator` generates a `raft` snapshot. This isn't strictly required but is a useful operation: in the event the `orchestrator` node restarts, the snapshot prevents `orchestrator` from replaying the KV write. This is in particular interesting in an event of failover-and-failback, where a remote KV like consul might get two updates for the same cluster. The snapshot mitigates such incidents.
+
+### Consul specific
+
+Optionally, you may configure:
+
+```json
+  "ConsulCrossDataCenterDistribution": true,
+```
+
+...which can (and will) take place in addition to the flow illustrated above.
+
+With `ConsulCrossDataCenterDistribution`, `orchestrator` runs an additional, periodic update to an extended list of Consul clusters.
+
+Once per minute, `orchestrator` leader node queries its configured Consul server for the list of [known datacenters](https://www.consul.io/api/catalog.html#list-datacenters). It then iterates throught those data center clusters, and updates each and every one with the current identities of masters.
+
+This functionality is required in case one has more Consul datacenters than just one-local-consul-per-orchestrator-node. We illustrated above how in a `orchestrator/raft` setup, each node updates its local Consul cluster. However, Consul clusters that are not local to any `orchestrator` node are unaffected by that approach. `ConsulCrossDataCenterDistribution` is the way to include all those other DCs.
