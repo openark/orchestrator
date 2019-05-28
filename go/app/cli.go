@@ -1112,6 +1112,15 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			clusterName := getClusterName(clusterAlias, instanceKey)
 			fmt.Println(clusterName)
 		}
+	case registerCliCommand("which-cluster-alias", "Information", `Output the alias of the cluster an instance belongs to, or error if unknown to orchestrator`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			clusterInfo, err := inst.ReadClusterInfo(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(clusterInfo.ClusterAlias)
+		}
 	case registerCliCommand("which-cluster-domain", "Information", `Output the domain name of the cluster an instance belongs to, or error if unknown to orchestrator`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
