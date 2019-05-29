@@ -21,6 +21,15 @@
 #   with all service nodes and let it figure out by itself identify of leader, no need for proxy. Example:
 #     export ORCHESTRATOR_API="http://service1:3000/api http://service2:3000/api http://service3:3000/api"
 #
+#   Optionally set ORCHESTRATOR_INSTANCE to the local instance where mysql is running.
+#   This is most likely to be used on bare metal or VM systems where you have a single
+#   MySQL instance running on a known port, in which case you would ensure that
+#   /etc/profile.d/orchestrator-client.sh contains code that does:
+#       export ORCHESTRATOR_INSTANCE=`hostname` or
+#       export ORCHESTRATOR_INSTANCE=`hostname`:12345 if using a port other than 3306.
+#   If you do this orchestrator-client will behave the same as the orchestrator binary
+#   and there will be no need to explicitly provide the parameter -i <hostname>:<port>.
+#
 # Usage:
 #   orchestrator-client -c <command> [flags...]
 # Examples:
@@ -40,7 +49,7 @@ orchestrator_api="${ORCHESTRATOR_API:-http://localhost:3000}"
 leader_api=
 
 command=
-instance=
+instance="${ORCHESTRATOR_INSTANCE:-}"
 destination=
 alias=
 owner="$(whoami | xargs)"
