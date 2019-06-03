@@ -148,6 +148,7 @@ type ReplicationAnalysis struct {
 	MaxReplicaGTIDMode                        string
 	MaxReplicaGTIDErrant                      string
 	CommandHint                               string
+	IsReadOnly                                bool
 }
 
 type AnalysisMap map[string](*ReplicationAnalysis)

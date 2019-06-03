@@ -92,7 +92,6 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		        master_instance.hostname,
 		        master_instance.port,
 			master_instance.read_only AS read_only,
-			SUM(master_instance.is_co_master) AS co_master_count,
 			MIN(master_instance.data_center) AS data_center,
 			MIN(master_instance.physical_environment) AS physical_environment,
 		        MIN(master_instance.master_host) AS master_host,
@@ -245,7 +244,6 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			    count_replicas DESC
 	`, analysisQueryReductionClause)
 
-	coMasterROCount := 0
 	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		a := ReplicationAnalysis{
 			Analysis:               NoProblem,
@@ -301,9 +299,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.CountDelayedReplicas = m.GetUint("count_delayed_replicas")
 		a.CountLaggingReplicas = m.GetUint("count_lagging_replicas")
 
-		if a.IsCoMaster && m.GetUint("read_only") == 1 {
-			coMasterROCount++
-		}
+		a.IsReadOnly = m.GetUint("read_only") == 1
 
 		if !a.LastCheckValid {
 			analysisMessage := fmt.Sprintf("analysis: IsMaster: %+v, LastCheckValid: %+v, LastCheckPartialSuccess: %+v, CountReplicas: %+v, CountValidReplicatingReplicas: %+v, CountLaggingReplicas: %+v, CountDelayedReplicas: %+v, ",
@@ -487,10 +483,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 				a.StructureAnalysis = append(a.StructureAnalysis, ErrantGTIDStructureWarning)
 			}
 
-			if a.IsMaster && m.GetUint("read_only") == 1 && m.GetString("master_host") == "" {
-				a.StructureAnalysis = append(a.StructureAnalysis, NoWriteableMasterStructureWarning)
-			}
-			if a.IsCoMaster && coMasterROCount == m.GetInt("co_master_count") {
+			if a.IsMaster && a.IsReadOnly {
 				a.StructureAnalysis = append(a.StructureAnalysis, NoWriteableMasterStructureWarning)
 			}
 
