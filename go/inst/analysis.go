@@ -104,6 +104,7 @@ type ReplicationAnalysis struct {
 	AnalyzedInstanceMasterKey                 InstanceKey
 	ClusterDetails                            ClusterInfo
 	AnalyzedInstanceDataCenter                string
+	AnalyzedInstanceRegion                    string
 	AnalyzedInstancePhysicalEnvironment       string
 	IsMaster                                  bool
 	IsCoMaster                                bool

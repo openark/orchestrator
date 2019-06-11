@@ -466,6 +466,15 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		}
 		// This can be overriden by later invocation of DetectDataCenterQuery
 	}
+	if config.Config.RegionPattern != "" {
+		if pattern, err := regexp.Compile(config.Config.RegionPattern); err == nil {
+			match := pattern.FindStringSubmatch(instance.Key.Hostname)
+			if len(match) != 0 {
+				instance.Region = match[1]
+			}
+		}
+		// This can be overriden by later invocation of DetectRegionQuery
+	}
 	if config.Config.PhysicalEnvironmentPattern != "" {
 		if pattern, err := regexp.Compile(config.Config.PhysicalEnvironmentPattern); err == nil {
 			match := pattern.FindStringSubmatch(instance.Key.Hostname)
@@ -656,6 +665,15 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			defer waitGroup.Done()
 			err := db.QueryRow(config.Config.DetectDataCenterQuery).Scan(&instance.DataCenter)
 			logReadTopologyInstanceError(instanceKey, "DetectDataCenterQuery", err)
+		}()
+	}
+
+	if config.Config.DetectRegionQuery != "" && !isMaxScale {
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			err := db.QueryRow(config.Config.DetectRegionQuery).Scan(&instance.Region)
+			logReadTopologyInstanceError(instanceKey, "DetectRegionQuery", err)
 		}()
 	}
 
@@ -1064,6 +1082,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.ClusterName = m.GetString("cluster_name")
 	instance.SuggestedClusterAlias = m.GetString("suggested_cluster_alias")
 	instance.DataCenter = m.GetString("data_center")
+	instance.Region = m.GetString("region")
 	instance.PhysicalEnvironment = m.GetString("physical_environment")
 	instance.SemiSyncEnforced = m.GetBool("semi_sync_enforced")
 	instance.SemiSyncMasterEnabled = m.GetBool("semi_sync_master_enabled")
@@ -1357,7 +1376,7 @@ func FindInstances(regexpPattern string) (result [](*Instance), err error) {
 	return result, nil
 }
 
-// FindFuzzyInstances return instances whose names are like the one given (host & port substrings)
+// findFuzzyInstances return instances whose names are like the one given (host & port substrings)
 // For example, the given `mydb-3:3306` might find `myhosts-mydb301-production.mycompany.com:3306`
 func findFuzzyInstances(fuzzyInstanceKey *InstanceKey) ([](*Instance), error) {
 	condition := `
@@ -2291,6 +2310,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"cluster_name",
 		"suggested_cluster_alias",
 		"data_center",
+		"region",
 		"physical_environment",
 		"replication_depth",
 		"is_co_master",
@@ -2370,6 +2390,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.ClusterName)
 		args = append(args, instance.SuggestedClusterAlias)
 		args = append(args, instance.DataCenter)
+		args = append(args, instance.Region)
 		args = append(args, instance.PhysicalEnvironment)
 		args = append(args, instance.ReplicationDepth)
 		args = append(args, instance.IsCoMaster)
@@ -2545,8 +2566,11 @@ func InstanceIsForgotten(instanceKey *InstanceKey) bool {
 // ForgetInstance removes an instance entry from the orchestrator backed database.
 // It may be auto-rediscovered through topology or requested for discovery by multiple means.
 func ForgetInstance(instanceKey *InstanceKey) error {
+	if instanceKey == nil {
+		return log.Errorf("ForgetInstance(): nil instanceKey")
+	}
 	forgetInstanceKeys.Set(instanceKey.StringCode(), true, cache.DefaultExpiration)
-	_, err := db.ExecOrchestrator(`
+	sqlResult, err := db.ExecOrchestrator(`
 			delete
 				from database_instance
 			where
@@ -2554,8 +2578,18 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 		instanceKey.Hostname,
 		instanceKey.Port,
 	)
+	if err != nil {
+		return log.Errore(err)
+	}
+	rows, err := sqlResult.RowsAffected()
+	if err != nil {
+		return log.Errore(err)
+	}
+	if rows == 0 {
+		return log.Errorf("ForgetInstance(): instance %+v not found", *instanceKey)
+	}
 	AuditOperation("forget", instanceKey, "")
-	return err
+	return nil
 }
 
 // ForgetInstance removes an instance entry from the orchestrator backed database.
