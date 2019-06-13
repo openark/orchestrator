@@ -1376,7 +1376,7 @@ func FindInstances(regexpPattern string) (result [](*Instance), err error) {
 	return result, nil
 }
 
-// FindFuzzyInstances return instances whose names are like the one given (host & port substrings)
+// findFuzzyInstances return instances whose names are like the one given (host & port substrings)
 // For example, the given `mydb-3:3306` might find `myhosts-mydb301-production.mycompany.com:3306`
 func findFuzzyInstances(fuzzyInstanceKey *InstanceKey) ([](*Instance), error) {
 	condition := `
