@@ -1661,6 +1661,16 @@ func (this *HttpAPI) asciiTopology(params martini.Params, r render.Render, req *
 	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Topology for cluster %s", clusterName), Details: asciiOutput})
 }
 
+// SnapshotTopologies triggers orchestrator to record a snapshot of host/master for all known hosts.
+func (this *HttpAPI) SnapshotTopologies(params martini.Params, r render.Render, req *http.Request, tabulated bool) {
+	if err := inst.SnapshotTopologies(); err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	Respond(r, &APIResponse{Code: OK, Message: "Topology Snapshot Completed", Details: ""})
+}
+
 // AsciiTopology returns an ascii graph of cluster's instances
 func (this *HttpAPI) AsciiTopology(params martini.Params, r render.Render, req *http.Request) {
 	this.asciiTopology(params, r, req, false)
@@ -3634,6 +3644,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "topology/:host/:port", this.AsciiTopology)
 	this.registerAPIRequest(m, "topology-tabulated/:clusterHint", this.AsciiTopologyTabulated)
 	this.registerAPIRequest(m, "topology-tabulated/:host/:port", this.AsciiTopologyTabulated)
+	this.regsiterAPIRequest(m, "snapshot-topologies", this.SnapshotTopologies)
 
 	// Key-value:
 	this.registerAPIRequest(m, "submit-masters-to-kv-stores", this.SubmitMastersToKvStores)
