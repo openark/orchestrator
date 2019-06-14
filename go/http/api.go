@@ -3644,7 +3644,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "topology/:host/:port", this.AsciiTopology)
 	this.registerAPIRequest(m, "topology-tabulated/:clusterHint", this.AsciiTopologyTabulated)
 	this.registerAPIRequest(m, "topology-tabulated/:host/:port", this.AsciiTopologyTabulated)
-	this.regsiterAPIRequest(m, "snapshot-topologies", this.SnapshotTopologies)
+	this.registerAPIRequest(m, "snapshot-topologies", this.SnapshotTopologies)
 
 	// Key-value:
 	this.registerAPIRequest(m, "submit-masters-to-kv-stores", this.SubmitMastersToKvStores)
