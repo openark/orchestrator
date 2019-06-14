@@ -1665,11 +1665,11 @@ func (this *HttpAPI) asciiTopology(params martini.Params, r render.Render, req *
 func (this *HttpAPI) SnapshotTopologies(params martini.Params, r render.Render, req *http.Request) {
 	start := time.Now()
 	if err := inst.SnapshotTopologies(); err != nil {
-		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err), Details: fmt.Sprintf("Took %v", time.Since(start))})
 		return
 	}
 
-	Respond(r, &APIResponse{Code: OK, Message: fmt.Sprintf("Topology Snapshot completed in %v", time.Since(start))})
+	Respond(r, &APIResponse{Code: OK, Message: "Topology Snapshot completed", Details: fmt.Sprintf("Took %v", time.Since(start))})
 }
 
 // AsciiTopology returns an ascii graph of cluster's instances
