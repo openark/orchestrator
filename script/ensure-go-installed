@@ -14,7 +14,7 @@ cd $ROOTDIR
 
 # If Go isn't installed globally, setup environment variables for local install.
 if [ -z "$(which go)" ] || [ -z "$(go version | grep "$SUPPORTED_GO_VERSIONS")" ]; then
-  GODIR="$ROOTDIR/.vendor/go19"
+  GODIR="$ROOTDIR/.vendor/golocal"
 
   if [ $(uname -s) = "Darwin" ]; then
     export GOROOT="$GODIR/usr/local/go"
