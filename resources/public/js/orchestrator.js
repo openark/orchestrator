@@ -663,6 +663,7 @@ function normalizeInstanceProblem(instance) {
   }
 
   instance.problem = null;
+  instance.Problems = instance.Problems || [];
   if (instance.Problems.length > 0) {
     instance.problem = instance.Problems[0]; // highest priority one
   }
