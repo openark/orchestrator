@@ -10,7 +10,7 @@
 
 `orchestrator` actively crawls through your topologies and maps them. It reads basic MySQL info such as replication status and configuration.
 
-It provides with slick visualization of your topologies, including replication problems, even in the face of failures.
+It provides you with slick visualization of your topologies, including replication problems, even in the face of failures.
 
 #### Refactoring
 

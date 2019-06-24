@@ -1,6 +1,8 @@
 package inst
 
 import (
+	"math/rand"
+
 	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
 	test "github.com/openark/golib/tests"
@@ -100,48 +102,112 @@ func TestSortInstancesDataCenterHint(t *testing.T) {
 	test.S(t).ExpectEquals(instances[0].Key, i810Key)
 }
 
-func TestGetPriorityMajorVersionForCandidate(t *testing.T) {
+func TestSortInstancesGtidErrant(t *testing.T) {
 	instances, instancesMap := generateTestInstances()
+	for _, instance := range instances {
+		instance.ExecBinlogCoordinates = instances[0].ExecBinlogCoordinates
+		instance.GtidErrant = "00020192-1111-1111-1111-111111111111:1"
+	}
+	instancesMap[i810Key.StringCode()].GtidErrant = ""
+	sortInstances(instances)
+	test.S(t).ExpectEquals(instances[0].Key, i810Key)
+}
 
-	priorityMajorVersion, err := getPriorityMajorVersionForCandidate(instances)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(priorityMajorVersion, "5.6")
+func TestGetPriorityMajorVersionForCandidate(t *testing.T) {
+	{
+		instances, instancesMap := generateTestInstances()
 
-	instancesMap[i810Key.StringCode()].Version = "5.5.1"
-	instancesMap[i720Key.StringCode()].Version = "5.7.8"
-	priorityMajorVersion, err = getPriorityMajorVersionForCandidate(instances)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(priorityMajorVersion, "5.6")
+		priorityMajorVersion, err := getPriorityMajorVersionForCandidate(instances)
+		test.S(t).ExpectNil(err)
+		test.S(t).ExpectEquals(priorityMajorVersion, "5.6")
 
-	instancesMap[i710Key.StringCode()].Version = "5.7.8"
-	instancesMap[i720Key.StringCode()].Version = "5.7.8"
-	instancesMap[i730Key.StringCode()].Version = "5.7.8"
-	instancesMap[i830Key.StringCode()].Version = "5.7.8"
-	priorityMajorVersion, err = getPriorityMajorVersionForCandidate(instances)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(priorityMajorVersion, "5.7")
+		instancesMap[i810Key.StringCode()].Version = "5.5.1"
+		instancesMap[i720Key.StringCode()].Version = "5.7.8"
+		priorityMajorVersion, err = getPriorityMajorVersionForCandidate(instances)
+		test.S(t).ExpectNil(err)
+		test.S(t).ExpectEquals(priorityMajorVersion, "5.6")
+
+		instancesMap[i710Key.StringCode()].Version = "5.7.8"
+		instancesMap[i720Key.StringCode()].Version = "5.7.8"
+		instancesMap[i730Key.StringCode()].Version = "5.7.8"
+		instancesMap[i830Key.StringCode()].Version = "5.7.8"
+		priorityMajorVersion, err = getPriorityMajorVersionForCandidate(instances)
+		test.S(t).ExpectNil(err)
+		test.S(t).ExpectEquals(priorityMajorVersion, "5.7")
+	}
+	{
+		instances, instancesMap := generateTestInstances()
+
+		instancesMap[i710Key.StringCode()].Version = "5.6.9"
+		instancesMap[i720Key.StringCode()].Version = "5.6.9"
+		instancesMap[i730Key.StringCode()].Version = "5.7.8"
+		instancesMap[i810Key.StringCode()].Version = "5.7.8"
+		instancesMap[i820Key.StringCode()].Version = "5.7.8"
+		instancesMap[i830Key.StringCode()].Version = "5.6.9"
+		priorityMajorVersion, err := getPriorityMajorVersionForCandidate(instances)
+		test.S(t).ExpectNil(err)
+		test.S(t).ExpectEquals(priorityMajorVersion, "5.6")
+	}
+	// We will be testing under conditions that map iteration is in random order.
+	for range rand.Perm(20) { // Just running many iterations to cover multiple possible map iteration ordering. Perm() is just used as an array generator here.
+		instances, _ := generateTestInstances()
+		for _, instance := range instances {
+			instance.Version = "5.6.9"
+		}
+		test.S(t).ExpectEquals(len(instances), 6)
+		// Randomly populating different elements of the array/map
+		perm := rand.Perm(len(instances))[0 : len(instances)/2]
+		for _, i := range perm {
+			instances[i].Version = "5.7.8"
+		}
+		// getPriorityMajorVersionForCandidate uses map iteration
+		priorityMajorVersion, err := getPriorityMajorVersionForCandidate(instances)
+		test.S(t).ExpectNil(err)
+		test.S(t).ExpectEquals(priorityMajorVersion, "5.6")
+	}
 }
 
 func TestGetPriorityBinlogFormatForCandidate(t *testing.T) {
-	instances, instancesMap := generateTestInstances()
+	{
+		instances, instancesMap := generateTestInstances()
 
-	priorityBinlogFormat, err := getPriorityBinlogFormatForCandidate(instances)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(priorityBinlogFormat, "STATEMENT")
+		priorityBinlogFormat, err := getPriorityBinlogFormatForCandidate(instances)
+		test.S(t).ExpectNil(err)
+		test.S(t).ExpectEquals(priorityBinlogFormat, "STATEMENT")
 
-	instancesMap[i810Key.StringCode()].Binlog_format = "MIXED"
-	instancesMap[i720Key.StringCode()].Binlog_format = "ROW"
-	priorityBinlogFormat, err = getPriorityBinlogFormatForCandidate(instances)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(priorityBinlogFormat, "STATEMENT")
+		instancesMap[i810Key.StringCode()].Binlog_format = "MIXED"
+		instancesMap[i720Key.StringCode()].Binlog_format = "ROW"
+		priorityBinlogFormat, err = getPriorityBinlogFormatForCandidate(instances)
+		test.S(t).ExpectNil(err)
+		test.S(t).ExpectEquals(priorityBinlogFormat, "STATEMENT")
 
-	instancesMap[i710Key.StringCode()].Binlog_format = "ROW"
-	instancesMap[i720Key.StringCode()].Binlog_format = "ROW"
-	instancesMap[i730Key.StringCode()].Binlog_format = "ROW"
-	instancesMap[i830Key.StringCode()].Binlog_format = "ROW"
-	priorityBinlogFormat, err = getPriorityBinlogFormatForCandidate(instances)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(priorityBinlogFormat, "ROW")
+		instancesMap[i710Key.StringCode()].Binlog_format = "ROW"
+		instancesMap[i720Key.StringCode()].Binlog_format = "ROW"
+		instancesMap[i730Key.StringCode()].Binlog_format = "ROW"
+		instancesMap[i830Key.StringCode()].Binlog_format = "ROW"
+		priorityBinlogFormat, err = getPriorityBinlogFormatForCandidate(instances)
+		test.S(t).ExpectNil(err)
+		test.S(t).ExpectEquals(priorityBinlogFormat, "ROW")
+	}
+	for _, lowBinlogFormat := range []string{"STATEMENT", "MIXED"} {
+		// We will be testing under conditions that map iteration is in random order.
+		for range rand.Perm(20) { // Just running many iterations to cover multiple possible map iteration ordering. Perm() is just used as an array generator here.
+			instances, _ := generateTestInstances()
+			for _, instance := range instances {
+				instance.Binlog_format = lowBinlogFormat
+			}
+			test.S(t).ExpectEquals(len(instances), 6)
+			// Randomly populating different elements of the array/map
+			perm := rand.Perm(len(instances))[0 : len(instances)/2]
+			for _, i := range perm {
+				instances[i].Binlog_format = "ROW"
+			}
+			// getPriorityBinlogFormatForCandidate uses map iteration
+			priorityBinlogFormat, err := getPriorityBinlogFormatForCandidate(instances)
+			test.S(t).ExpectNil(err)
+			test.S(t).ExpectEquals(priorityBinlogFormat, lowBinlogFormat)
+		}
+	}
 }
 
 func TestIsGenerallyValidAsBinlogSource(t *testing.T) {
@@ -189,6 +255,17 @@ func TestIsBannedFromBeingCandidateReplica(t *testing.T) {
 		for _, instance := range instances {
 			test.S(t).ExpectTrue(IsBannedFromBeingCandidateReplica(instance))
 		}
+	}
+	{
+		instances, _ := generateTestInstances()
+		config.Config.PromotionIgnoreHostnameFilters = []string{
+			"i7",
+			"i8[0-9]0",
+		}
+		for _, instance := range instances {
+			test.S(t).ExpectTrue(IsBannedFromBeingCandidateReplica(instance))
+		}
+		config.Config.PromotionIgnoreHostnameFilters = []string{}
 	}
 }
 

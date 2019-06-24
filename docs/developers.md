@@ -21,10 +21,13 @@ Clone the repo anywhere on your filesystem via
 	git clone git@github.com:github/orchestrator.git
 	cd orchestrator
 
-Build `orchestrator` via
+Ensure you have proper build tools installed (CentOS referenced below)
+
+    yum install gcc make perl-Digest-SHA
+
+Then you can build `orchestrator` via
 
 	script/build
-
 
 You will find the binary as `bin/orchestrator`
 

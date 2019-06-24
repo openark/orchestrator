@@ -29,11 +29,14 @@
 - [Topology recovery](topology-recovery.md): recovery process, promotion and hooks.
 - [Key-Value stores](kv.md): master discovery for your apps
 
+#### Operation
+- [Status Checks](status-checks.md)
+- [Tags](tags.md)
+
 #### Various
 - [Docker](docker.md)
 - [Security](security.md)
 - [SSL and TLS](ssl-and-tls.md)
-- [Status Checks](status-checks.md)
 - [Pseudo GTID](pseudo-gtid.md): refactoring and high availability without using GTID.
 - [Agents](agents.md)
 

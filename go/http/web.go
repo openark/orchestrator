@@ -77,6 +77,7 @@ func (this *HttpWeb) Clusters(params martini.Params, r render.Render, req *http.
 		"userId":                        getUserId(req, user),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
 		"prefix":                        this.URLPrefix,
+		"webMessage":                    config.Config.WebMessage,
 	})
 }
 
@@ -89,6 +90,7 @@ func (this *HttpWeb) ClustersAnalysis(params martini.Params, r render.Render, re
 		"userId":                        getUserId(req, user),
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
 		"prefix":                        this.URLPrefix,
+		"webMessage":                    config.Config.WebMessage,
 	})
 }
 
@@ -107,6 +109,7 @@ func (this *HttpWeb) Cluster(params martini.Params, r render.Render, req *http.R
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
 		"compactDisplay":                template.JSEscapeString(req.URL.Query().Get("compact")),
 		"prefix":                        this.URLPrefix,
+		"webMessage":                    config.Config.WebMessage,
 	})
 }
 
@@ -158,6 +161,7 @@ func (this *HttpWeb) ClusterPools(params martini.Params, r render.Render, req *h
 		"removeTextFromHostnameDisplay": config.Config.RemoveTextFromHostnameDisplay,
 		"compactDisplay":                template.JSEscapeString(req.URL.Query().Get("compact")),
 		"prefix":                        this.URLPrefix,
+		"webMessage":                    config.Config.WebMessage,
 	})
 }
 
@@ -175,6 +179,7 @@ func (this *HttpWeb) Search(params martini.Params, r render.Render, req *http.Re
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
+		"webMessage":          config.Config.WebMessage,
 	})
 }
 
@@ -187,23 +192,7 @@ func (this *HttpWeb) Discover(params martini.Params, r render.Render, req *http.
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
-	})
-}
-
-func (this *HttpWeb) LongQueries(params martini.Params, r render.Render, req *http.Request, user auth.User) {
-	filter := params["filter"]
-	if filter == "" {
-		filter = template.JSEscapeString(req.URL.Query().Get("filter"))
-	}
-
-	r.HTML(200, "templates/long_queries", map[string]interface{}{
-		"agentsHttpActive":    config.Config.ServeAgentsHttp,
-		"title":               "long queries",
-		"authorizedForAction": isAuthorizedForAction(req, user),
-		"userId":              getUserId(req, user),
-		"autoshow_problems":   false,
-		"filter":              filter,
-		"prefix":              this.URLPrefix,
+		"webMessage":          config.Config.WebMessage,
 	})
 }
 
@@ -223,6 +212,7 @@ func (this *HttpWeb) Audit(params martini.Params, r render.Render, req *http.Req
 		"auditHostname":       params["host"],
 		"auditPort":           params["port"],
 		"prefix":              this.URLPrefix,
+		"webMessage":          config.Config.WebMessage,
 	})
 }
 
@@ -251,6 +241,7 @@ func (this *HttpWeb) AuditRecovery(params martini.Params, r render.Render, req *
 		"recoveryId":          recoveryId,
 		"recoveryUid":         recoveryUid,
 		"prefix":              this.URLPrefix,
+		"webMessage":          config.Config.WebMessage,
 	})
 }
 
@@ -275,6 +266,7 @@ func (this *HttpWeb) AuditFailureDetection(params martini.Params, r render.Rende
 		"detectionId":         detectionId,
 		"clusterAlias":        clusterAlias,
 		"prefix":              this.URLPrefix,
+		"webMessage":          config.Config.WebMessage,
 	})
 }
 
@@ -286,6 +278,7 @@ func (this *HttpWeb) Agents(params martini.Params, r render.Render, req *http.Re
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
+		"webMessage":          config.Config.WebMessage,
 	})
 }
 
@@ -298,6 +291,7 @@ func (this *HttpWeb) Agent(params martini.Params, r render.Render, req *http.Req
 		"autoshow_problems":   false,
 		"agentHost":           params["host"],
 		"prefix":              this.URLPrefix,
+		"webMessage":          config.Config.WebMessage,
 	})
 }
 
@@ -310,6 +304,7 @@ func (this *HttpWeb) AgentSeedDetails(params martini.Params, r render.Render, re
 		"autoshow_problems":   false,
 		"seedId":              params["seedId"],
 		"prefix":              this.URLPrefix,
+		"webMessage":          config.Config.WebMessage,
 	})
 }
 
@@ -321,6 +316,7 @@ func (this *HttpWeb) Seeds(params martini.Params, r render.Render, req *http.Req
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
+		"webMessage":          config.Config.WebMessage,
 	})
 }
 
@@ -333,6 +329,7 @@ func (this *HttpWeb) Home(params martini.Params, r render.Render, req *http.Requ
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
+		"webMessage":          config.Config.WebMessage,
 	})
 }
 
@@ -345,6 +342,7 @@ func (this *HttpWeb) About(params martini.Params, r render.Render, req *http.Req
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
+		"webMessage":          config.Config.WebMessage,
 	})
 }
 
@@ -357,6 +355,7 @@ func (this *HttpWeb) KeepCalm(params martini.Params, r render.Render, req *http.
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
+		"webMessage":          config.Config.WebMessage,
 	})
 }
 
@@ -369,6 +368,7 @@ func (this *HttpWeb) FAQ(params martini.Params, r render.Render, req *http.Reque
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
+		"webMessage":          config.Config.WebMessage,
 	})
 }
 
@@ -381,6 +381,7 @@ func (this *HttpWeb) Status(params martini.Params, r render.Render, req *http.Re
 		"userId":              getUserId(req, user),
 		"autoshow_problems":   false,
 		"prefix":              this.URLPrefix,
+		"webMessage":          config.Config.WebMessage,
 	})
 }
 
@@ -416,7 +417,6 @@ func (this *HttpWeb) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerWebRequest(m, "search/:searchString", this.Search)
 	this.registerWebRequest(m, "search", this.Search)
 	this.registerWebRequest(m, "discover", this.Discover)
-	this.registerWebRequest(m, "long-queries", this.LongQueries)
 	this.registerWebRequest(m, "audit", this.Audit)
 	this.registerWebRequest(m, "audit/:page", this.Audit)
 	this.registerWebRequest(m, "audit/instance/:host/:port", this.Audit)

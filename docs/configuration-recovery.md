@@ -6,6 +6,8 @@ Recovery depends on detection, discussed in [configuration: failure detection](c
 
 See [Topology recovery](topology-recovery.md) for all things recoveries.
 
+Also consider that your MySQL topologies themselves need to follow some rules, see [MySQL Configuration](#mysql-configuration)
+
 ```json
 {
   "RecoveryPeriodBlockSeconds": 3600,
@@ -35,14 +37,20 @@ Different environments require different actions taken on recovery/promotion
 ```json
 {
   "ApplyMySQLPromotionAfterMasterFailover": true,
-  "MasterFailoverLostInstancesDowntimeMinutes": 10,
+  "PreventCrossDataCenterMasterFailover": false,
+  "PreventCrossRegionMasterFailover": false,
   "FailMasterPromotionIfSQLThreadNotUpToDate": true,
+  "DelayMasterPromotionIfSQLThreadNotUpToDate": true,
+  "MasterFailoverLostInstancesDowntimeMinutes": 10,
   "DetachLostReplicasAfterMasterFailover": true,
 }
 ```
 
 - `ApplyMySQLPromotionAfterMasterFailover`: when `true`, `orchestrator` will `reset slave all` and `set read_only=0` on promoted master. Default: `true`.
+- `PreventCrossDataCenterMasterFailover`: defaults `false`. When `true`, `orchestrator` will only replace a failed master with a server from the same DC. It will do its best to find a replacement from same DC, and will abort (fail) the failover if it cannot find one. See also `DetectDataCenterQuery` and `DataCenterPattern` configuration variables.
+- `PreventCrossRegionMasterFailover`: defaults `false`. When `true`, `orchestrator` will only replace a failed master with a server from the same region. It will do its best to find a replacement from same region, and will abort (fail) the failover if it cannot find one. See also `DetectRegionQuery` and `RegionPattern` configuration variables.
 - `FailMasterPromotionIfSQLThreadNotUpToDate`: if all replicas were lagging at time of failure, even the most up-to-date, promoted replica may yet have unapplied relay logs. Issuing `reset slave all` on such a server will lose the relay log data. Your choice.
+- `DelayMasterPromotionIfSQLThreadNotUpToDate`: if all replicas were lagging at time of failure, even the most up-to-date, promoted replica may yet have unapplied relay logs. When `true`, 'orchestrator' will wait for the SQL thread to catch up before promoting a new master.
 - `DetachLostReplicasAfterMasterFailover`: some replicas may get lost during recovery. When `true`, `orchestrator` will forcibly break their replication via `detach-replica` command to make sure no one assumes they're at all functional.
 
 ### Hooks
@@ -130,6 +138,7 @@ And, in the event a recovery was successful:
 - `{autoIntermediateMasterRecovery}`
 - `{orchestratorHost}`
 - `{lostReplicas}` aka `{lostSlaves}`
+- `{countLostReplicas}`
 - `{replicaHosts}` aka `{slaveHosts}`
 - `{isSuccessful}`
 - `{command}` (`"force-master-failover"`, `"force-master-takeover"`, `"graceful-master-takeover"` if applicable)
@@ -139,3 +148,15 @@ And, in the event a recovery was successful:
 - `{successorHost}`
 - `{successorPort}`
 - `{successorAlias}`
+
+### MySQL Configuration
+
+Your MySQL topologies must fulfill some requirements in order to support failovers. Those requirements largely depends on the types of topologies/configuration you use.
+
+- Oracle/Percona with GTID: promotable servers must have `log_bin` and `log_slave_updates` enabled. Replicas must be using `AUTO_POSITION=1` (via `CHANGE MASTER TO MASTER_AUTO_POSITION=1`).
+- MariaDB GTID: promotable servers must have `log_bin` and `log_slave_updates` enabled.
+- [Pseudo GTID](#pseudo-gtid): promotable servers must have `log_bin` and `log_slave_updates` enabled. If using `5.7/8.0` parallel replication, set `slave_preserve_commit_order=1`.
+- BinlogServers: promotable servers must have `log_bin` enabled.
+
+
+Also consider improving failure detection via [MySQL Configuration](configuration-failure-detection.md#mysql-configuration)
