@@ -259,6 +259,6 @@ arch=${arch:-"amd64"} # default for arch is amd64 but should take from environme
 prefix=${prefix:-"/usr/local"}
 
 [[ $debug -eq 1 ]] && set -x
-main "$target" "$init_ssytem" "$arch" "$prefix" "$build_only"
+main "$target" "$init_system" "$arch" "$prefix" "$build_only"
 
 echo "orchestrator build done; exit status is $?"
