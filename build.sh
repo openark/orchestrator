@@ -56,8 +56,8 @@ function precheck() {
     ok=1
   fi
 
-  if ! go version | egrep -q 'go(1\.(8|9|1[012]))' ; then
-    echo "go version must be between 1.8 and 1.12"
+  if ! go version | egrep -q 'go(1\.1[234])' ; then
+    echo "go version must be 1.12 or above"
     ok=1
   fi
 
