@@ -12,9 +12,14 @@
   "MySQLTopologyUseMutualTLS": false,
   "BackendDB": "sqlite",
   "SQLite3DataFile": "/usr/local/orchestrator/orchestrator.sqlite3",
+  "MySQLConnectTimeoutSeconds": 1,
   "DefaultInstancePort": 3306,
   "DiscoverByShowSlaveHosts": true,
   "InstancePollSeconds": 5,
+  "DiscoveryIgnoreReplicaHostnameFilters": [
+    "a_host_i_want_to_ignore[.]example[.]com",
+    ".*[.]ignore_all_hosts_from_this_domain[.]example[.]com"
+  ],
   "UnseenInstanceForgetHours": 240,
   "SnapshotTopologiesIntervalHours": 0,
   "InstanceBulkOperationsWaitTimeoutSeconds": 10,
@@ -110,6 +115,8 @@
   "CoMasterRecoveryMustPromoteOtherCoMaster": true,
   "DetachLostSlavesAfterMasterFailover": true,
   "ApplyMySQLPromotionAfterMasterFailover": true,
+  "PreventCrossDataCenterMasterFailover": false,
+  "PreventCrossRegionMasterFailover": false,
   "MasterFailoverDetachSlaveMasterHost": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 0,
   "PostponeSlaveRecoveryOnLagMinutes": 0,

@@ -1,7 +1,10 @@
 # http://docs.travis-ci.com/user/languages/go/
 language: go
 
-go: 1.9
+go: 1.12
+
+services:
+  - docker
 
 os:
   - linux
@@ -14,7 +17,9 @@ before_install:
 
 install: true
 
-script: script/cibuild
+script:
+  - script/cibuild
+  - docker build -t orchestrator-travis-build .
 
 notifications:
   email: false

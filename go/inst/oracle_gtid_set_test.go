@@ -62,6 +62,18 @@ func TestExplode(t *testing.T) {
 		test.S(t).ExpectEquals(exploded[3].String(), "00020194-3333-3333-3333-333333333333:6")
 		test.S(t).ExpectEquals(exploded[4].String(), "00020194-3333-3333-3333-333333333333:7")
 	}
+	{
+		gtidSetVal := "00020192-1111-1111-1111-111111111111:29-30, 00020194-3333-3333-3333-333333333333:7-8"
+		gtidSet, err := NewOracleGtidSet(gtidSetVal)
+		test.S(t).ExpectNil(err)
+
+		exploded := gtidSet.Explode()
+		test.S(t).ExpectEquals(len(exploded), 4)
+		test.S(t).ExpectEquals(exploded[0].String(), "00020192-1111-1111-1111-111111111111:29")
+		test.S(t).ExpectEquals(exploded[1].String(), "00020192-1111-1111-1111-111111111111:30")
+		test.S(t).ExpectEquals(exploded[2].String(), "00020194-3333-3333-3333-333333333333:7")
+		test.S(t).ExpectEquals(exploded[3].String(), "00020194-3333-3333-3333-333333333333:8")
+	}
 }
 
 func TestNewOracleGtidSet(t *testing.T) {

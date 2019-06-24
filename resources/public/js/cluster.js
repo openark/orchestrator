@@ -719,9 +719,6 @@ function Cluster() {
       // Obviously this is also checked on server side, no need to try stupid hacks
       return unaccepted;
     }
-    if (moveInstanceMethod != "smart") {
-      return unaccepted;
-    }
     var droppableTitle = getInstanceDiv(droppableNode.id).find("h3 .pull-left").html();
 
     if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem || droppableNode.isAggregate) {
@@ -1210,18 +1207,9 @@ function Cluster() {
         instanceDescription += ", " + instance.SlaveLagSeconds.Int64 + "s lag";
         incrementProblems("", instanceDescription)
         instanceFullNames.push(getInstanceTitle(instance.Key.Hostname, instance.Key.Port));
-        if (instance.inMaintenanceProblem()) {
-          incrementProblems("inMaintenanceProblem", instanceDescription)
-        }
-        if (instance.lastCheckInvalidProblem()) {
-          incrementProblems("lastCheckInvalidProblem", instanceDescription)
-        } else if (instance.notRecentlyCheckedProblem()) {
-          incrementProblems("notRecentlyCheckedProblem", instanceDescription)
-        } else if (instance.notReplicatingProblem()) {
-          incrementProblems("notReplicatingProblem", instanceDescription)
-        } else if (instance.replicationLagProblem()) {
-          incrementProblems("replicationLagProblem", instanceDescription)
-        }
+        instance.Problems.forEach(function(problem) {
+          incrementProblems(problem, instanceDescription)
+        });
       });
       var aggergateInstance = instances[0];
       aggergateInstance.isAggregate = true;
@@ -1395,11 +1383,7 @@ function Cluster() {
       content = '<hr/>' + content
     }
     wrappedContent = '<div data-tag="'+tag+'">' + content + '<div style="clear: both;"></div></div>';
-    if (tag === "analysis") {
-      $(wrappedContent).insertAfter("#cluster_info [data-tag=glyphs]")
-    } else {
-      $("#cluster_info").append(wrappedContent)
-    }
+    $("#cluster_info").append(wrappedContent)
   }
 
   function populateSidebar(clusterInfo) {
@@ -1411,20 +1395,6 @@ function Cluster() {
       $("#cluster_info button.close").click(function() {
         $("#cluster_info").hide();
       });
-    }
-    {
-      var content = '';
-      if (clusterInfo.HasAutomatedMasterRecovery === true) {
-        content += '<span class="glyphicon glyphicon-heart text-info" title="Automated master recovery for this cluster ENABLED"></span>';
-      } else {
-        content += '<span class="glyphicon glyphicon-heart text-muted pull-right" title="Automated master recovery for this cluster DISABLED"></span>';
-      }
-      if (clusterInfo.HasAutomatedIntermediateMasterRecovery === true) {
-        content += '<span class="glyphicon glyphicon-heart-empty text-info" title="Automated intermediate master recovery for this cluster ENABLED"></span>';
-      } else {
-        content += '<span class="glyphicon glyphicon-heart-empty text-muted pull-right" title="Automated intermediate master recovery for this cluster DISABLED"></span>';
-      }
-      addSidebarInfoPopoverContent(content, "glyphs", false);
     }
     {
       var content = currentClusterName();
@@ -1546,7 +1516,6 @@ function Cluster() {
     analysisContent += "<div>" + analysisEntry.AnalyzedInstanceKey.Hostname + ":" + analysisEntry.AnalyzedInstanceKey.Port + "</div>";
     var content = '<div><div class="pull-left">'+glyph+'</div><div class="pull-right">'+analysisContent+'</div></div>';
     addSidebarInfoPopoverContent(content, "analysis", false);
-
     if (analysisEntry.IsStructureAnalysis) {
       return;
     }
@@ -1733,6 +1702,20 @@ function Cluster() {
 
       if (!isAnonymized()) {
         $("#cluster_name").text(visualAlias);
+        var clusterSubtitle = '';
+        if (clusterInfo.HasAutomatedMasterRecovery === true) {
+          clusterSubtitle += '<span class="glyphicon glyphicon-heart text-info" title="Automated master recovery for this cluster ENABLED"></span>';
+        } else {
+          clusterSubtitle += '<span class="glyphicon glyphicon-heart text-muted pull-right" title="Automated master recovery for this cluster DISABLED"></span>';
+        }
+        if (clusterInfo.HasAutomatedIntermediateMasterRecovery === true) {
+          clusterSubtitle += '<span class="glyphicon glyphicon-heart-empty text-info" title="Automated intermediate master recovery for this cluster ENABLED"></span>';
+        } else {
+          clusterSubtitle += '<span class="glyphicon glyphicon-heart-empty text-muted pull-right" title="Automated intermediate master recovery for this cluster DISABLED"></span>';
+        }
+        $("#cluster_subtitle").append(clusterSubtitle)
+
+
         $("#dropdown-context").append('<li><a data-command="change-cluster-alias" data-alias="' + clusterInfo.ClusterAlias + '">Alias: ' + alias + '</a></li>');
       }
       $("#dropdown-context").append('<li><a href="' + appUrl('/web/cluster-pools/' + currentClusterName()) + '">Pools</a></li>');

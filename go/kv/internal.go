@@ -43,20 +43,25 @@ func (this *internalKVStore) PutKeyValue(key string, value string) (err error) {
 	return log.Errore(err)
 }
 
-func (this *internalKVStore) GetKeyValue(key string) (value string, err error) {
+func (this *internalKVStore) GetKeyValue(key string) (value string, found bool, err error) {
 	query := `
 		select
 			store_value
 		from
 			kv_store
 		where
-      key = ?
+      store_key = ?
 		`
 
 	err = db.QueryOrchestrator(query, sqlutils.Args(key), func(m sqlutils.RowMap) error {
 		value = m.GetString("store_value")
+		found = true
 		return nil
 	})
 
-	return value, log.Errore(err)
+	return value, found, log.Errore(err)
+}
+
+func (this *internalKVStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
+	return nil
 }

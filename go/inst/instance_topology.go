@@ -18,6 +18,7 @@ package inst
 
 import (
 	"fmt"
+	goos "os"
 	"regexp"
 	"sort"
 	"strings"
@@ -25,6 +26,7 @@ import (
 	"time"
 
 	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/os"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/math"
 	"github.com/openark/golib/util"
@@ -44,6 +46,7 @@ var asciiFillerCharacter = " "
 var tabulatorScharacter = "|"
 
 var countRetries = 5
+var MaxConcurrentReplicaOperations = 5
 
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
@@ -663,6 +666,9 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance, postponedFunct
 
 	var waitGroup sync.WaitGroup
 	var replicaMutex sync.Mutex
+
+	var concurrencyChan = make(chan bool, MaxConcurrentReplicaOperations)
+
 	for _, replica := range replicas {
 		replica := replica
 
@@ -671,6 +677,10 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance, postponedFunct
 		go func() {
 			defer waitGroup.Done()
 			moveFunc := func() error {
+
+				concurrencyChan <- true
+				defer func() { recover(); <-concurrencyChan }()
+
 				movedReplica, replicaErr := moveInstanceBelowViaGTID(replica, other)
 				if replicaErr != nil && movedReplica != nil {
 					replica = movedReplica
@@ -1043,88 +1053,6 @@ Cleanup:
 	return instance, err
 }
 
-// DetachReplicaOperation will detach a replica from its master by forcibly corrupting its replication coordinates
-func DetachReplicaOperation(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
-	if err != nil {
-		return instance, err
-	}
-
-	log.Infof("Will detach %+v", instanceKey)
-
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "detach replica"); merr != nil {
-		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
-		goto Cleanup
-	} else {
-		defer EndMaintenance(maintenanceToken)
-	}
-
-	if instance.IsReplica() {
-		instance, err = StopSlave(instanceKey)
-		if err != nil {
-			goto Cleanup
-		}
-	}
-
-	instance, err = DetachReplica(instanceKey)
-	if err != nil {
-		goto Cleanup
-	}
-
-Cleanup:
-	instance, _ = StartSlave(instanceKey)
-
-	if err != nil {
-		return instance, log.Errore(err)
-	}
-
-	// and we're done (pending deferred functions)
-	AuditOperation("detach-replica", instanceKey, fmt.Sprintf("%+v replication detached", *instanceKey))
-
-	return instance, err
-}
-
-// ReattachReplicaOperation will detach a replica from its master by forcibly corrupting its replication coordinates
-func ReattachReplicaOperation(instanceKey *InstanceKey) (*Instance, error) {
-	instance, err := ReadTopologyInstance(instanceKey)
-	if err != nil {
-		return instance, err
-	}
-
-	log.Infof("Will reattach %+v", instanceKey)
-
-	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "detach replica"); merr != nil {
-		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
-		goto Cleanup
-	} else {
-		defer EndMaintenance(maintenanceToken)
-	}
-
-	if instance.IsReplica() {
-		instance, err = StopSlave(instanceKey)
-		if err != nil {
-			goto Cleanup
-		}
-	}
-
-	instance, err = ReattachReplica(instanceKey)
-	if err != nil {
-		goto Cleanup
-	}
-
-Cleanup:
-	instance, _ = StartSlave(instanceKey)
-
-	if err != nil {
-		return instance, log.Errore(err)
-	}
-
-	// and we're done (pending deferred functions)
-	AuditOperation("reattach-replica", instanceKey, fmt.Sprintf("%+v replication reattached", *instanceKey))
-
-	return instance, err
-}
-
 // DetachReplicaMasterHost detaches a replica from its master by corrupting the Master_Host (in such way that is reversible)
 func DetachReplicaMasterHost(instanceKey *InstanceKey) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -1266,7 +1194,58 @@ func DisableGTID(instanceKey *InstanceKey) (*Instance, error) {
 	return instance, err
 }
 
-// ResetMasterGTIDOperation will issue a safe RESET MASTER on a replica that replicates via GTID:
+func LocateErrantGTID(instanceKey *InstanceKey) (errantBinlogs []string, err error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return errantBinlogs, err
+	}
+	errantSearch := instance.GtidErrant
+	if errantSearch == "" {
+		return errantBinlogs, log.Errorf("locate-errant-gtid: no errant-gtid on %+v", *instanceKey)
+	}
+	subtract, err := GTIDSubtract(instanceKey, errantSearch, instance.GtidPurged)
+	if err != nil {
+		return errantBinlogs, err
+	}
+	if subtract != errantSearch {
+		return errantBinlogs, fmt.Errorf("locate-errant-gtid: %+v is already purged on %+v", subtract, *instanceKey)
+	}
+	binlogs, err := ShowBinaryLogs(instanceKey)
+	if err != nil {
+		return errantBinlogs, err
+	}
+	previousGTIDs := make(map[string]*OracleGtidSet)
+	for _, binlog := range binlogs {
+		oracleGTIDSet, err := GetPreviousGTIDs(instanceKey, binlog)
+		if err != nil {
+			return errantBinlogs, err
+		}
+		previousGTIDs[binlog] = oracleGTIDSet
+	}
+	for i, binlog := range binlogs {
+		if errantSearch == "" {
+			break
+		}
+		previousGTID := previousGTIDs[binlog]
+		subtract, err := GTIDSubtract(instanceKey, errantSearch, previousGTID.String())
+		if err != nil {
+			return errantBinlogs, err
+		}
+		if subtract != errantSearch {
+			// binlogs[i-1] is safe to use when i==0. because that implies GTIDs have been purged,
+			// which covered by an earlier assertion
+			errantBinlogs = append(errantBinlogs, binlogs[i-1])
+			errantSearch = subtract
+		}
+	}
+	if errantSearch != "" {
+		// then it's in the last binary log
+		errantBinlogs = append(errantBinlogs, binlogs[len(binlogs)-1])
+	}
+	return errantBinlogs, err
+}
+
+// ErrantGTIDResetMaster will issue a safe RESET MASTER on a replica that replicates via GTID:
 // It will make sure the gtid_purged set matches the executed set value as read just before the RESET.
 // this will enable new replicas to be attached to given instance without complaints about missing/purged entries.
 // This function requires that the instance does not have replicas.
@@ -1288,7 +1267,8 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err er
 	gtidSubtract := ""
 	executedGtidSet := ""
 	masterStatusFound := false
-	waitInterval := time.Millisecond * 250
+	replicationStopped := false
+	waitInterval := time.Second * 5
 
 	if maintenanceToken, merr := BeginMaintenance(instanceKey, GetMaintenanceOwner(), "reset-master-gtid"); merr != nil {
 		err = fmt.Errorf("Cannot begin maintenance on %+v", *instanceKey)
@@ -1300,6 +1280,14 @@ func ErrantGTIDResetMaster(instanceKey *InstanceKey) (instance *Instance, err er
 	if instance.IsReplica() {
 		instance, err = StopSlave(instanceKey)
 		if err != nil {
+			goto Cleanup
+		}
+		replicationStopped, err = waitForReplicationState(instanceKey, ReplicationThreadStateStopped)
+		if err != nil {
+			goto Cleanup
+		}
+		if !replicationStopped {
+			err = fmt.Errorf("gtid-errant-reset-master: timeout while waiting for replication to stop on %+v", instance.Key)
 			goto Cleanup
 		}
 	}
@@ -1364,6 +1352,52 @@ Cleanup:
 	AuditOperation("gtid-errant-reset-master", instanceKey, fmt.Sprintf("%+v master reset", *instanceKey))
 
 	return instance, err
+}
+
+// ErrantGTIDInjectEmpty will inject an empty transaction on the master of an instance's cluster in order to get rid
+// of an errant transaction observed on the instance.
+func ErrantGTIDInjectEmpty(instanceKey *InstanceKey) (instance *Instance, clusterMaster *Instance, countInjectedTransactions int64, err error) {
+	instance, err = ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, clusterMaster, countInjectedTransactions, err
+	}
+	if instance.GtidErrant == "" {
+		return instance, clusterMaster, countInjectedTransactions, log.Errorf("gtid-errant-inject-empty will not operate on %+v because no errant GTID is found", *instanceKey)
+	}
+	if !instance.SupportsOracleGTID {
+		return instance, clusterMaster, countInjectedTransactions, log.Errorf("gtid-errant-inject-empty requested for %+v but it does not support oracle-gtid", *instanceKey)
+	}
+
+	masters, err := ReadClusterWriteableMaster(instance.ClusterName)
+	if err != nil {
+		return instance, clusterMaster, countInjectedTransactions, err
+	}
+	if len(masters) == 0 {
+		return instance, clusterMaster, countInjectedTransactions, log.Errorf("gtid-errant-inject-empty found no writabel master for %+v cluster", instance.ClusterName)
+	}
+	clusterMaster = masters[0]
+
+	if !clusterMaster.SupportsOracleGTID {
+		return instance, clusterMaster, countInjectedTransactions, log.Errorf("gtid-errant-inject-empty requested for %+v but the cluster's master %+v does not support oracle-gtid", *instanceKey, clusterMaster.Key)
+	}
+
+	gtidSet, err := NewOracleGtidSet(instance.GtidErrant)
+	if err != nil {
+		return instance, clusterMaster, countInjectedTransactions, err
+	}
+	explodedEntries := gtidSet.Explode()
+	log.Infof("gtid-errant-inject-empty: about to inject %+v empty transactions %+v on cluster master %+v", len(explodedEntries), gtidSet.String(), clusterMaster.Key)
+	for _, entry := range explodedEntries {
+		if err := injectEmptyGTIDTransaction(&clusterMaster.Key, entry); err != nil {
+			return instance, clusterMaster, countInjectedTransactions, err
+		}
+		countInjectedTransactions++
+	}
+
+	// and we're done (pending deferred functions)
+	AuditOperation("gtid-errant-inject-empty", instanceKey, fmt.Sprintf("injected %+v empty transactions on %+v", countInjectedTransactions, clusterMaster.Key))
+
+	return instance, clusterMaster, countInjectedTransactions, err
 }
 
 // FindLastPseudoGTIDEntry will search an instance's binary logs or relay logs for the last pseudo-GTID entry,
@@ -1643,12 +1677,40 @@ func TakeSiblings(instanceKey *InstanceKey) (instance *Instance, takenSiblings i
 	return instance, len(relocatedReplicas), err
 }
 
+// Created this function to allow a hook to be called after a successful TakeMaster event
+func TakeMasterHook(successor *Instance, demoted *Instance) {
+	successorKey := successor.Key
+	demotedKey := demoted.Key
+	env := goos.Environ()
+
+	env = append(env, fmt.Sprintf("ORC_SUCCESSOR_HOST=%s", successorKey))
+	env = append(env, fmt.Sprintf("ORC_FAILED_HOST=%s", demotedKey))
+
+	successorStr := fmt.Sprintf("%s", successorKey)
+	demotedStr := fmt.Sprintf("%s", demotedKey)
+
+	processCount := len(config.Config.PostTakeMasterProcesses)
+	for i, command := range config.Config.PostTakeMasterProcesses {
+		fullDescription := fmt.Sprintf("PostTakeMasterProcesses hook %d of %d", i+1, processCount)
+		log.Debugf("Take-Master: PostTakeMasterProcesses: Calling %+s", fullDescription)
+		start := time.Now()
+		if err := os.CommandRun(command, env, successorStr, demotedStr); err == nil {
+			info := fmt.Sprintf("Completed %s in %v", fullDescription, time.Since(start))
+			log.Infof("Take-Master: %s", info)
+		} else {
+			info := fmt.Sprintf("Execution of PostTakeMasterProcesses failed in %v with error: %v", time.Since(start), err)
+			log.Errorf("Take-Master: %s", info)
+		}
+	}
+
+}
+
 // TakeMaster will move an instance up the chain and cause its master to become its replica.
 // It's almost a role change, just that other replicas of either 'instance' or its master are currently unaffected
 // (they continue replicate without change)
 // Note that the master must itself be a replica; however the grandparent does not necessarily have to be reachable
 // and can in fact be dead.
-func TakeMaster(instanceKey *InstanceKey) (*Instance, error) {
+func TakeMaster(instanceKey *InstanceKey, allowTakingCoMaster bool) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
 	if err != nil {
 		return instance, err
@@ -1657,7 +1719,7 @@ func TakeMaster(instanceKey *InstanceKey) (*Instance, error) {
 	if err != nil || !found {
 		return instance, err
 	}
-	if masterInstance.IsCoMaster {
+	if masterInstance.IsCoMaster && !allowTakingCoMaster {
 		return instance, fmt.Errorf("%+v is co-master. Cannot take it.", masterInstance.Key)
 	}
 	log.Debugf("TakeMaster: will attempt making %+v take its master %+v, now resolved as %+v", *instanceKey, instance.MasterKey, masterInstance.Key)
@@ -1702,6 +1764,14 @@ Cleanup:
 		return instance, err
 	}
 	AuditOperation("take-master", instanceKey, fmt.Sprintf("took master: %+v", masterInstance.Key))
+
+	// Created this to enable a custom hook to be called after a TakeMaster success.
+	// This only runs if there is a hook configured in orchestrator.conf.json
+	demoted := masterInstance
+	successor := instance
+	if config.Config.PostTakeMasterProcesses != nil {
+		TakeMasterHook(successor, demoted)
+	}
 
 	return instance, err
 }
@@ -2039,15 +2109,9 @@ func getPriorityMajorVersionForCandidate(replicas [](*Instance)) (priorityMajorV
 		// all same version, simple case
 		return replicas[0].MajorVersionString(), nil
 	}
-
-	currentMaxMajorVersionCount := 0
-	for majorVersion, count := range majorVersionsCount {
-		if count > currentMaxMajorVersionCount {
-			currentMaxMajorVersionCount = count
-			priorityMajorVersion = majorVersion
-		}
-	}
-	return priorityMajorVersion, nil
+	sorted := NewMajorVersionsSortedByCount(majorVersionsCount)
+	sort.Sort(sort.Reverse(sorted))
+	return sorted.First(), nil
 }
 
 // getPriorityBinlogFormatForCandidate returns the primary (most common) binlog format found
@@ -2064,15 +2128,9 @@ func getPriorityBinlogFormatForCandidate(replicas [](*Instance)) (priorityBinlog
 		// all same binlog format, simple case
 		return replicas[0].Binlog_format, nil
 	}
-
-	currentMaxBinlogFormatCount := 0
-	for binlogFormat, count := range binlogFormatsCount {
-		if count > currentMaxBinlogFormatCount {
-			currentMaxBinlogFormatCount = count
-			priorityBinlogFormat = binlogFormat
-		}
-	}
-	return priorityBinlogFormat, nil
+	sorted := NewBinlogFormatSortedByCount(binlogFormatsCount)
+	sort.Sort(sort.Reverse(sorted))
+	return sorted.First(), nil
 }
 
 // chooseCandidateReplica
@@ -2618,6 +2676,9 @@ func RelocateBelow(instanceKey, otherKey *InstanceKey) (*Instance, error) {
 	if err != nil || !found {
 		return instance, log.Errorf("Error reading %+v", *otherKey)
 	}
+	if other.IsDescendantOf(instance) {
+		return instance, log.Errorf("relocate: %+v is a descendant of %+v", *otherKey, instance.Key)
+	}
 	instance, err = relocateBelowInternal(instance, other)
 	if err == nil {
 		AuditOperation("relocate-below", instanceKey, fmt.Sprintf("relocated %+v below %+v", *instanceKey, *otherKey))
@@ -2724,10 +2785,41 @@ func RelocateReplicas(instanceKey, otherKey *InstanceKey, pattern string) (repli
 		// Nothing to do
 		return replicas, other, nil, errs
 	}
+	for _, replica := range replicas {
+		if other.IsDescendantOf(replica) {
+			return replicas, other, log.Errorf("relocate-replicas: %+v is a descendant of %+v", *otherKey, replica.Key), errs
+		}
+	}
 	replicas, err, errs = relocateReplicasInternal(replicas, instance, other)
 
 	if err == nil {
 		AuditOperation("relocate-replicas", instanceKey, fmt.Sprintf("relocated %+v replicas of %+v below %+v", len(replicas), *instanceKey, *otherKey))
 	}
 	return replicas, other, err, errs
+}
+
+// PurgeBinaryLogsTo attempts to 'PURGE BINARY LOGS' until given binary log is reached
+func PurgeBinaryLogsTo(instanceKey *InstanceKey, logFile string, force bool) (*Instance, error) {
+	replicas, err := ReadReplicaInstances(instanceKey)
+	if err != nil {
+		return nil, err
+	}
+	if !force {
+		purgeCoordinates := &BinlogCoordinates{LogFile: logFile, LogPos: 0}
+		for _, replica := range replicas {
+			if !purgeCoordinates.SmallerThan(&replica.ExecBinlogCoordinates) {
+				return nil, log.Errorf("Unsafe to purge binary logs on %+v up to %s because replica %+v has only applied up to %+v", *instanceKey, logFile, replica.Key, replica.ExecBinlogCoordinates)
+			}
+		}
+	}
+	return purgeBinaryLogsTo(instanceKey, logFile)
+}
+
+// PurgeBinaryLogsToLatest attempts to 'PURGE BINARY LOGS' until latest binary log
+func PurgeBinaryLogsToLatest(instanceKey *InstanceKey, force bool) (*Instance, error) {
+	instance, err := ReadTopologyInstance(instanceKey)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	return PurgeBinaryLogsTo(instanceKey, instance.SelfBinlogCoordinates.LogFile, force)
 }

@@ -29,6 +29,10 @@ The following is a production configuration file, with some details redacted.
   "SlaveStartPostWaitMilliseconds": 1000,
   "DiscoverByShowSlaveHosts": false,
   "InstancePollSeconds": 5,
+  "DiscoveryIgnoreReplicaHostnameFilters": [
+    "a_host_i_want_to_ignore[.]example[.]com",
+    ".*[.]ignore_all_hosts_from_this_domain[.]example[.]com"
+  ],
   "ReadLongRunningQueries": false,
   "SkipMaxScaleCheck": true,
   "BinlogFileHistoryDays": 10,
@@ -141,6 +145,8 @@ The following is a production configuration file, with some details redacted.
   "CoMasterRecoveryMustPromoteOtherCoMaster": true,
   "DetachLostSlavesAfterMasterFailover": true,
   "ApplyMySQLPromotionAfterMasterFailover": true,
+  "PreventCrossDataCenterMasterFailover": false,
+  "PreventCrossRegionMasterFailover": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 60,
   "PostponeReplicaRecoveryOnLagMinutes": 10,
   "OSCIgnoreHostnameFilters": [

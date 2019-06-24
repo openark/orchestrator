@@ -56,12 +56,15 @@ const (
 )
 
 const (
-	StatementAndMixedLoggingSlavesStructureWarning StructureAnalysisCode = "StatementAndMixedLoggingSlavesStructureWarning"
-	StatementAndRowLoggingSlavesStructureWarning                         = "StatementAndRowLoggingSlavesStructureWarning"
-	MixedAndRowLoggingSlavesStructureWarning                             = "MixedAndRowLoggingSlavesStructureWarning"
-	MultipleMajorVersionsLoggingSlaves                                   = "MultipleMajorVersionsLoggingSlaves"
-	DifferentGTIDModesStructureWarning                                   = "DifferentGTIDModesStructureWarning"
-	ErrantGTIDStructureWarning                                           = "ErrantGTIDStructureWarning"
+	StatementAndMixedLoggingSlavesStructureWarning     StructureAnalysisCode = "StatementAndMixedLoggingSlavesStructureWarning"
+	StatementAndRowLoggingSlavesStructureWarning                             = "StatementAndRowLoggingSlavesStructureWarning"
+	MixedAndRowLoggingSlavesStructureWarning                                 = "MixedAndRowLoggingSlavesStructureWarning"
+	MultipleMajorVersionsLoggingSlavesStructureWarning                       = "MultipleMajorVersionsLoggingSlavesStructureWarning"
+	NoLoggingReplicasStructureWarning                                        = "NoLoggingReplicasStructureWarning"
+	DifferentGTIDModesStructureWarning                                       = "DifferentGTIDModesStructureWarning"
+	ErrantGTIDStructureWarning                                               = "ErrantGTIDStructureWarning"
+	NoFailoverSupportStructureWarning                                        = "NoFailoverSupportStructureWarning"
+	NoWriteableMasterStructureWarning                                        = "NoWriteableMasterStructureWarning"
 )
 
 type InstanceAnalysis struct {
@@ -102,6 +105,7 @@ type ReplicationAnalysis struct {
 	AnalyzedInstanceMasterKey                 InstanceKey
 	ClusterDetails                            ClusterInfo
 	AnalyzedInstanceDataCenter                string
+	AnalyzedInstanceRegion                    string
 	AnalyzedInstancePhysicalEnvironment       string
 	IsMaster                                  bool
 	IsCoMaster                                bool
@@ -127,6 +131,7 @@ type ReplicationAnalysis struct {
 	OracleGTIDImmediateTopology               bool
 	MariaDBGTIDImmediateTopology              bool
 	BinlogServerImmediateTopology             bool
+	CountLoggingReplicas                      uint
 	CountStatementBasedLoggingReplicas        uint
 	CountMixedBasedLoggingReplicas            uint
 	CountRowBasedLoggingReplicas              uint
@@ -144,6 +149,7 @@ type ReplicationAnalysis struct {
 	MaxReplicaGTIDMode                        string
 	MaxReplicaGTIDErrant                      string
 	CommandHint                               string
+	IsReadOnly                                bool
 }
 
 type AnalysisMap map[string](*ReplicationAnalysis)
