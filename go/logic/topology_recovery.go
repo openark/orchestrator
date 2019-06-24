@@ -902,6 +902,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		func() error {
 			before := analysisEntry.AnalyzedInstanceKey.StringCode()
 			after := promotedReplica.Key.StringCode()
+			inst.ReplaceClusterName(before, after)
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: updating cluster_alias: %v -> %v", before, after))
 			if alias := analysisEntry.ClusterDetails.ClusterAlias; alias != "" {
 				inst.SetClusterAlias(promotedReplica.Key.StringCode(), alias)

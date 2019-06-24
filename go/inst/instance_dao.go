@@ -1718,6 +1718,34 @@ func updateInstanceClusterName(instance *Instance) error {
 	return ExecDBWriteFunc(writeFunc)
 }
 
+// ReplaceClusterName replaces all occurances of oldClusterName with newClusterName
+// It is called after a master failover
+func ReplaceClusterName(oldClusterName string, newClusterName string) error {
+	if oldClusterName == "" {
+		return log.Errorf("replaceClusterName: skipping empty oldClusterName")
+	}
+	if newClusterName == "" {
+		return log.Errorf("replaceClusterName: skipping empty newClusterName")
+	}
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+			update
+				database_instance
+			set
+				cluster_name=?
+			where
+				and cluster_name=?
+				`, newClusterName, oldClusterName,
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
+		AuditOperation("replace-cluster-name", nil, fmt.Sprintf("replaxced %s with %s", oldClusterName, newClusterName))
+		return nil
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
 // ReviewUnseenInstances reviews instances that have not been seen (suposedly dead) and updates some of their data
 func ReviewUnseenInstances() error {
 	instances, err := ReadUnseenInstances()
