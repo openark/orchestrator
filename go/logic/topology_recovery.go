@@ -1698,7 +1698,7 @@ func ForceExecuteRecovery(analysisEntry inst.ReplicationAnalysis, candidateInsta
 
 // ForceMasterFailover *trusts* master of given cluster is dead and initiates a failover
 func ForceMasterFailover(clusterName string) (topologyRecovery *TopologyRecovery, err error) {
-	clusterMasters, err := inst.ReadClusterWriteableMaster(clusterName)
+	clusterMasters, err := inst.ReadClusterMaster(clusterName)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot deduce cluster master for %+v", clusterName)
 	}
