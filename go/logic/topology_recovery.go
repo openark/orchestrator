@@ -883,14 +883,10 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			}
 		}
 		{
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Distributing KV %+v", kvPairs))
 			err := kv.DistributePairs(kvPairs)
 			log.Errore(err)
 		}
-		if !skipProcesses {
-			// Execute post master-failover processes
-			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
-		}
-
 		if config.Config.MasterFailoverDetachReplicaMasterHost {
 			postponedFunction := func() error {
 				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: detaching master host on promoted master"))
@@ -903,6 +899,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			before := analysisEntry.AnalyzedInstanceKey.StringCode()
 			after := promotedReplica.Key.StringCode()
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: updating cluster_alias: %v -> %v", before, after))
+			inst.ReplaceClusterName(before, after)
 			if alias := analysisEntry.ClusterDetails.ClusterAlias; alias != "" {
 				inst.SetClusterAlias(promotedReplica.Key.StringCode(), alias)
 			} else {
@@ -912,6 +909,11 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		}()
 
 		attributes.SetGeneralAttribute(analysisEntry.ClusterDetails.ClusterDomain, promotedReplica.Key.StringCode())
+
+		if !skipProcesses {
+			// Execute post master-failover processes
+			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
+		}
 	} else {
 		recoverDeadMasterFailureCounter.Inc(1)
 	}
