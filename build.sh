@@ -31,6 +31,15 @@ usage() {
   echo
 }
 
+
+function fail() {
+  local message="${1}"
+
+  export message
+  (>&2 echo "$message")
+  exit 1
+}
+
 function precheck() {
   local target="$1"
   local build_only="$2"
@@ -74,9 +83,11 @@ function setuptree() {
   b=$( mktemp -d $TOPDIR/orchestratorXXXXXX ) || return 1
   mkdir -p $b/orchestrator
   mkdir -p $b/orchestrator${prefix}/orchestrator/
-  mkdir -p $b/orchestrator/etc/init.d
   mkdir -p $b/orchestrator-cli/usr/bin
   mkdir -p $b/orchestrator-client/usr/bin
+  [ "$init_system" == "sysv" ] && mkdir -p $b/orchestrator/etc/init.d
+  [ "$init_system" == "systemd" ] && mkdir -p $b/orchestrator/etc/systemd/system
+
   echo $b
 }
 
@@ -91,12 +102,18 @@ function oinstall() {
   rsync -qa ./resources $builddir/orchestrator${prefix}/orchestrator/
   rsync -qa ./conf/orchestrator-sample*.conf.json $builddir/orchestrator${prefix}/orchestrator/
 
-  if [ "$init_system" == "sysv" ]; then
-    cp etc/init.d/orchestrator.bash $builddir/orchestrator/etc/init.d/orchestrator
-    chmod +x $builddir/orchestrator/etc/init.d/orchestrator
-  elif [ "$init_system" == "systemd" ]; then
-    cp etc/systemd/orchestrator.service $builddir/orchestrator/etc/systemd/system/orchestrator.service
-  fi
+  case $init_system in
+    "sysv")
+      cp etc/init.d/orchestrator.bash $builddir/orchestrator/etc/init.d/orchestrator
+      chmod +x $builddir/orchestrator/etc/init.d/orchestrator
+      ;;
+    "systemd")
+      cp etc/systemd/orchestrator.service $builddir/orchestrator/etc/systemd/system/orchestrator.service
+      ;;
+    *)
+      fail "Unsupported init system '$init_system'."
+      ;;
+  esac
 }
 
 function package() {
@@ -171,9 +188,9 @@ function build() {
       echo "GOOS=darwin GOARCH=amd64 $gobuild" | bash
     ;;
   esac
-  [[ $(find $builddir/orchestrator${prefix}/orchestrator/ -type f -name orchestrator) ]] &&  echo "orchestrator binary created" || (echo "Failed to generate orchestrator binary" ; exit 1)
-  cp $builddir/orchestrator${prefix}/orchestrator/orchestrator $builddir/orchestrator-cli/usr/bin && echo "binary copied to orchestrator-cli" || (echo "Failed to copy orchestrator binary to orchestrator-cli" ; exit 1)
-  cp $builddir/orchestrator${prefix}/orchestrator/resources/bin/orchestrator-client $builddir/orchestrator-client/usr/bin && echo "orchestrator-client copied to orchestrator-client/" || (echo "Failed to copy orchestrator-client to orchestrator-client/" ; exit 1)
+  [[ $(find $builddir/orchestrator${prefix}/orchestrator/ -type f -name orchestrator) ]] &&  echo "orchestrator binary created" || fail "Failed to generate orchestrator binary"
+  cp $builddir/orchestrator${prefix}/orchestrator/orchestrator $builddir/orchestrator-cli/usr/bin && echo "binary copied to orchestrator-cli" || fail "Failed to copy orchestrator binary to orchestrator-cli"
+  cp $builddir/orchestrator${prefix}/orchestrator/resources/bin/orchestrator-client $builddir/orchestrator-client/usr/bin && echo "orchestrator-client copied to orchestrator-client/" || fail "Failed to copy orchestrator-client to orchestrator-client/"
 }
 
 function main() {
@@ -247,10 +264,9 @@ shift $(( OPTIND - 1 ));
 if [ -z "$target" ]; then
 	uname=$(uname)
 	case $uname in
-	Linux)	target=linux;;
-	Darwin)	target=darwin;;
-	*)	echo "Unexpected OS from uname: $uname. Exiting"
-		exit 1
+    Linux)	target=linux ;;
+    Darwin)	target=darwin ;;
+    *)      fail "Unexpected OS from uname: $uname. Exiting" ;;
 	esac
 fi
 
