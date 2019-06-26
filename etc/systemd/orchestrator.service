@@ -1,0 +1,11 @@
+[Unit]
+Description=orchestrator: MySQL replication management and visualization
+Documentation=https://github.com/github/orchestrator
+After=syslog.target network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/usr/local/orchestrator
+ExecStart=/usr/local/orchestrator/orchestrator http
+EnvironmentFile=-/etc/sysconfig/orchestrator
+ExecReload=/bin/kill -HUP $MAINPID

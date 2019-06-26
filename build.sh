@@ -16,10 +16,11 @@ export GO15VENDOREXPERIMENT=1
 
 usage() {
   echo
-  echo "Usage: $0 [-t target ] [-a arch ] [ -p prefix ] [-h] [-d] [-r]"
+  echo "Usage: $0 [-t target ] [-a arch ] [-i init-system] [ -p prefix ] [-h] [-d] [-r]"
   echo "Options:"
   echo "-h Show this screen"
   echo "-t (linux|darwin) Target OS Default:(linux)"
+  echo "-i (sysv|systemd) Target init system Default:(sysv)"
   echo "-a (amd64|386) Arch Default:(amd64)"
   echo "-d debug output"
   echo "-b build only, do not generate packages"
@@ -28,6 +29,15 @@ usage() {
   echo "-v release version (optional; default: content of RELEASE_VERSION file)"
   echo "-s release subversion (optional; default: empty)"
   echo
+}
+
+
+function fail() {
+  local message="${1}"
+
+  export message
+  (>&2 echo "$message")
+  exit 1
 }
 
 function precheck() {
@@ -73,23 +83,37 @@ function setuptree() {
   b=$( mktemp -d $TOPDIR/orchestratorXXXXXX ) || return 1
   mkdir -p $b/orchestrator
   mkdir -p $b/orchestrator${prefix}/orchestrator/
-  mkdir -p $b/orchestrator/etc/init.d
   mkdir -p $b/orchestrator-cli/usr/bin
   mkdir -p $b/orchestrator-client/usr/bin
+  [ "$init_system" == "sysv" ] && mkdir -p $b/orchestrator/etc/init.d
+  [ "$init_system" == "systemd" ] && mkdir -p $b/orchestrator/etc/systemd/system
+
   echo $b
 }
 
 function oinstall() {
   local builddir prefix
   builddir="$1"
-  prefix="$2"
+  init_system="$2"
+  prefix="$3"
 
   cd  $mydir
   gofmt -s -w  go/
   rsync -qa ./resources $builddir/orchestrator${prefix}/orchestrator/
   rsync -qa ./conf/orchestrator-sample*.conf.json $builddir/orchestrator${prefix}/orchestrator/
-  cp etc/init.d/orchestrator.bash $builddir/orchestrator/etc/init.d/orchestrator
-  chmod +x $builddir/orchestrator/etc/init.d/orchestrator
+
+  case $init_system in
+    "sysv")
+      cp etc/init.d/orchestrator.bash $builddir/orchestrator/etc/init.d/orchestrator
+      chmod +x $builddir/orchestrator/etc/init.d/orchestrator
+      ;;
+    "systemd")
+      cp etc/systemd/orchestrator.service $builddir/orchestrator/etc/systemd/system/orchestrator.service
+      ;;
+    *)
+      fail "Unsupported init system '$init_system'."
+      ;;
+  esac
 }
 
 function package() {
@@ -164,16 +188,17 @@ function build() {
       echo "GOOS=darwin GOARCH=amd64 $gobuild" | bash
     ;;
   esac
-  [[ $(find $builddir/orchestrator${prefix}/orchestrator/ -type f -name orchestrator) ]] &&  echo "orchestrator binary created" || (echo "Failed to generate orchestrator binary" ; exit 1)
-  cp $builddir/orchestrator${prefix}/orchestrator/orchestrator $builddir/orchestrator-cli/usr/bin && echo "binary copied to orchestrator-cli" || (echo "Failed to copy orchestrator binary to orchestrator-cli" ; exit 1)
-  cp $builddir/orchestrator${prefix}/orchestrator/resources/bin/orchestrator-client $builddir/orchestrator-client/usr/bin && echo "orchestrator-client copied to orchestrator-client/" || (echo "Failed to copy orchestrator-client to orchestrator-client/" ; exit 1)
+  [[ $(find $builddir/orchestrator${prefix}/orchestrator/ -type f -name orchestrator) ]] &&  echo "orchestrator binary created" || fail "Failed to generate orchestrator binary"
+  cp $builddir/orchestrator${prefix}/orchestrator/orchestrator $builddir/orchestrator-cli/usr/bin && echo "binary copied to orchestrator-cli" || fail "Failed to copy orchestrator binary to orchestrator-cli"
+  cp $builddir/orchestrator${prefix}/orchestrator/resources/bin/orchestrator-client $builddir/orchestrator-client/usr/bin && echo "orchestrator-client copied to orchestrator-client/" || fail "Failed to copy orchestrator-client to orchestrator-client/"
 }
 
 function main() {
   local target="$1"
-  local arch="$2"
-  local prefix="$3"
-  local build_only=$4
+  local init_system="$2"
+  local arch="$3"
+  local prefix="$4"
+  local build_only=$5
   local builddir
 
   if [ -z "${RELEASE_VERSION}" ] ; then
@@ -183,7 +208,7 @@ function main() {
 
   precheck "$target" "$build_only"
   builddir=$( setuptree "$prefix" )
-  oinstall "$builddir" "$prefix"
+  oinstall "$builddir" "$init_system" "$prefix"
   build "$target" "$arch" "$builddir" "$prefix"
   [[ $? == 0 ]] || return 1
   if [[ $build_only -eq 0 ]]; then
@@ -193,13 +218,16 @@ function main() {
 
 build_only=0
 opt_race=
-while getopts a:t:p:s:v:dbhr flag; do
+while getopts a:t:i:p:s:v:dbhr flag; do
   case $flag in
   a)
     arch="${OPTARG}"
     ;;
   t)
     target="${OPTARG}"
+    ;;
+  i)
+    init_system="${OPTARG}"
     ;;
   h)
     usage
@@ -236,16 +264,17 @@ shift $(( OPTIND - 1 ));
 if [ -z "$target" ]; then
 	uname=$(uname)
 	case $uname in
-	Linux)	target=linux;;
-	Darwin)	target=darwin;;
-	*)	echo "Unexpected OS from uname: $uname. Exiting"
-		exit 1
+    Linux)	target=linux ;;
+    Darwin)	target=darwin ;;
+    *)      fail "Unexpected OS from uname: $uname. Exiting" ;;
 	esac
 fi
+
+init_system=${init_system:-"sysv"}
 arch=${arch:-"amd64"} # default for arch is amd64 but should take from environment
 prefix=${prefix:-"/usr/local"}
 
 [[ $debug -eq 1 ]] && set -x
-main "$target" "$arch" "$prefix" "$build_only"
+main "$target" "$init_system" "$arch" "$prefix" "$build_only"
 
 echo "orchestrator build done; exit status is $?"
