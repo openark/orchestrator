@@ -1806,6 +1806,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 		for _, directReplica := range clusterMasterDirectReplicas {
 			if directReplica.Key.Equals(designatedKey) {
 				designatedInstance = directReplica
+				break
 			}
 		}
 		if designatedInstance == nil {
