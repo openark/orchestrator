@@ -14,6 +14,7 @@
   "#": "-----",
   "#": "The above is all you need for initial setup. Below is more advanced stuff",
   "#": "-----",
+  "MySQLConnectTimeoutSeconds": 1,
   "DiscoverByShowSlaveHosts": true,
   "InstancePollSeconds": 5,
   "DiscoveryIgnoreReplicaHostnameFilters": [
@@ -88,6 +89,7 @@
   "DetachLostSlavesAfterMasterFailover": true,
   "ApplyMySQLPromotionAfterMasterFailover": true,
   "PreventCrossDataCenterMasterFailover": false,
+  "PreventCrossRegionMasterFailover": false,
   "MasterFailoverDetachSlaveMasterHost": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 60,
   "PostponeSlaveRecoveryOnLagMinutes": 10,

@@ -79,6 +79,7 @@ type Instance struct {
 	ClusterName                     string
 	SuggestedClusterAlias           string
 	DataCenter                      string
+	Region                          string
 	PhysicalEnvironment             string
 	ReplicationDepth                uint
 	IsCoMaster                      bool

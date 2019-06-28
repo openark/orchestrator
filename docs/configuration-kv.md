@@ -12,6 +12,7 @@
   "KVClusterMasterPrefix": "mysql/master",
   "ConsulAddress": "127.0.0.1:8500",
   "ZkAddress": "srv-a,srv-b:12181,srv-c",
+  "ConsulCrossDataCenterDistribution": true,
 ```
 
 `KVClusterMasterPrefix` is the prefix to use for master discovery entries. As example, your cluster alias is `mycluster` and the master host is `some.host-17.com` then you will expect an entry where:
@@ -41,3 +42,7 @@ If specified, `ZkAddress` indicates one or more ZooKeeper servers to connect to.
 - `srv-a,srv-b:12181,srv-c`
 - `srv-a,srv-b:12181,srv-c:2181`
 - `srv-a:2181,srv-b:12181,srv-c:2181`
+
+### Consul specific
+
+See [kv](kv.md) documentation for Consul specific settings.

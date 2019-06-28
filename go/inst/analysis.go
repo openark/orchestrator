@@ -64,6 +64,7 @@ const (
 	DifferentGTIDModesStructureWarning                                       = "DifferentGTIDModesStructureWarning"
 	ErrantGTIDStructureWarning                                               = "ErrantGTIDStructureWarning"
 	NoFailoverSupportStructureWarning                                        = "NoFailoverSupportStructureWarning"
+	NoWriteableMasterStructureWarning                                        = "NoWriteableMasterStructureWarning"
 )
 
 type InstanceAnalysis struct {
@@ -104,6 +105,7 @@ type ReplicationAnalysis struct {
 	AnalyzedInstanceMasterKey                 InstanceKey
 	ClusterDetails                            ClusterInfo
 	AnalyzedInstanceDataCenter                string
+	AnalyzedInstanceRegion                    string
 	AnalyzedInstancePhysicalEnvironment       string
 	IsMaster                                  bool
 	IsCoMaster                                bool
@@ -147,6 +149,7 @@ type ReplicationAnalysis struct {
 	MaxReplicaGTIDMode                        string
 	MaxReplicaGTIDErrant                      string
 	CommandHint                               string
+	IsReadOnly                                bool
 }
 
 type AnalysisMap map[string](*ReplicationAnalysis)

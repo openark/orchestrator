@@ -282,6 +282,7 @@ func replaceCommandPlaceholders(command string, topologyRecovery *TopologyRecove
 
 	command = strings.Replace(command, "{lostSlaves}", topologyRecovery.LostReplicas.ToCommaDelimitedList(), -1)
 	command = strings.Replace(command, "{lostReplicas}", topologyRecovery.LostReplicas.ToCommaDelimitedList(), -1)
+	command = strings.Replace(command, "{countLostReplicas}", fmt.Sprintf("%d", len(topologyRecovery.LostReplicas)), -1)
 	command = strings.Replace(command, "{slaveHosts}", analysisEntry.SlaveHosts.ToCommaDelimitedList(), -1)
 	command = strings.Replace(command, "{replicaHosts}", analysisEntry.SlaveHosts.ToCommaDelimitedList(), -1)
 
@@ -573,15 +574,18 @@ func recoverDeadMaster(topologyRecovery *TopologyRecovery, candidateInstanceKey 
 	return promotedReplica, lostReplicas, err
 }
 
-func CrossDataCenterMasterFailoverConstraintSatisfied(analysisEntry *inst.ReplicationAnalysis, suggestedInstance *inst.Instance) bool {
-	if !config.Config.PreventCrossDataCenterMasterFailover {
-		// There is no constraint. We are satisfied
-		return true
+func MasterFailoverGeographicConstraintSatisfied(analysisEntry *inst.ReplicationAnalysis, suggestedInstance *inst.Instance) (satisfied bool, dissatisfiedReason string) {
+	if config.Config.PreventCrossDataCenterMasterFailover {
+		if suggestedInstance.DataCenter != analysisEntry.AnalyzedInstanceDataCenter {
+			return false, fmt.Sprintf("PreventCrossDataCenterMasterFailover: will not promote server in %s when failed server in %s", suggestedInstance.DataCenter, analysisEntry.AnalyzedInstanceDataCenter)
+		}
 	}
-	if suggestedInstance.DataCenter == analysisEntry.AnalyzedInstanceDataCenter {
-		return true
+	if config.Config.PreventCrossRegionMasterFailover {
+		if suggestedInstance.Region != analysisEntry.AnalyzedInstanceRegion {
+			return false, fmt.Sprintf("PreventCrossRegionMasterFailover: will not promote server in %s when failed server in %s", suggestedInstance.Region, analysisEntry.AnalyzedInstanceRegion)
+		}
 	}
-	return false
+	return true, ""
 }
 
 // SuggestReplacementForPromotedReplica returns a server to take over the already
@@ -637,12 +641,12 @@ func SuggestReplacementForPromotedReplica(topologyRecovery *TopologyRecovery, de
 		for _, candidateReplica := range candidateReplicas {
 			if promotedReplica.Key.Equals(&candidateReplica.Key) {
 				// Seems like we promoted a candidate replica (though not in same DC and ENV as dead master)
-				if CrossDataCenterMasterFailoverConstraintSatisfied(&topologyRecovery.AnalysisEntry, candidateReplica) {
+				if satisfied, reason := MasterFailoverGeographicConstraintSatisfied(&topologyRecovery.AnalysisEntry, candidateReplica); satisfied {
 					// Good enough. No further action required.
 					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("promoted replica %+v is a good candidate", promotedReplica.Key))
 					return promotedReplica, false, nil
 				} else {
-					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("skipping %+v because PreventCrossDataCenterMasterFailover is set", candidateReplica.Key))
+					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("skipping %+v; %s", candidateReplica.Key, reason))
 				}
 			}
 		}
@@ -667,20 +671,20 @@ func SuggestReplacementForPromotedReplica(topologyRecovery *TopologyRecovery, de
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ searching for a candidate"))
 		for _, candidateReplica := range candidateReplicas {
 			if canTakeOverPromotedServerAsMaster(candidateReplica, promotedReplica) {
-				if CrossDataCenterMasterFailoverConstraintSatisfied(&topologyRecovery.AnalysisEntry, candidateReplica) {
+				if satisfied, reason := MasterFailoverGeographicConstraintSatisfied(&topologyRecovery.AnalysisEntry, candidateReplica); satisfied {
 					// OK, better than nothing
 					candidateInstanceKey = &candidateReplica.Key
 					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement", promotedReplica.Key, candidateReplica.Key))
 				} else {
-					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("skipping %+v because PreventCrossDataCenterMasterFailover is set", candidateReplica.Key))
+					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("skipping %+v; %s", candidateReplica.Key, reason))
 				}
 			}
 		}
 	}
 
 	keepSearchingHint := ""
-	if !CrossDataCenterMasterFailoverConstraintSatisfied(&topologyRecovery.AnalysisEntry, promotedReplica) {
-		keepSearchingHint = fmt.Sprintf("Will keep searching because PreventCrossDataCenterMasterFailover is set and we haven't promoted a server in %s data center", topologyRecovery.AnalysisEntry.AnalyzedInstanceDataCenter)
+	if satisfied, reason := MasterFailoverGeographicConstraintSatisfied(&topologyRecovery.AnalysisEntry, promotedReplica); !satisfied {
+		keepSearchingHint = fmt.Sprintf("Will keep searching; %s", reason)
 	} else if promotedReplica.PromotionRule == inst.PreferNotPromoteRule {
 		keepSearchingHint = fmt.Sprintf("Will keep searching because we have promoted a server with prefer_not rule: %+v", promotedReplica.Key)
 	}
@@ -717,12 +721,12 @@ func SuggestReplacementForPromotedReplica(topologyRecovery *TopologyRecovery, de
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("+ searching for a neutral server to replace a prefer_not"))
 			for _, neutralReplica := range neutralReplicas {
 				if canTakeOverPromotedServerAsMaster(neutralReplica, promotedReplica) {
-					if CrossDataCenterMasterFailoverConstraintSatisfied(&topologyRecovery.AnalysisEntry, neutralReplica) {
+					if satisfied, reason := MasterFailoverGeographicConstraintSatisfied(&topologyRecovery.AnalysisEntry, neutralReplica); satisfied {
 						// OK, better than nothing
 						candidateInstanceKey = &neutralReplica.Key
 						AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("no candidate was offered for %+v but orchestrator picks %+v as candidate replacement, based on promoted instance having prefer_not promotion rule", promotedReplica.Key, neutralReplica.Key))
 					} else {
-						AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("skipping %+v because PreventCrossDataCenterMasterFailover is set", neutralReplica.Key))
+						AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("skipping %+v; %s", neutralReplica.Key, reason))
 					}
 				}
 			}
@@ -819,8 +823,8 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			AuditTopologyRecovery(topologyRecovery, message)
 			return false, nil, log.Error(message)
 		}
-		if !CrossDataCenterMasterFailoverConstraintSatisfied(&analysisEntry, promotedReplica) {
-			message := fmt.Sprintf("RecoverDeadMaster: failed promotion. PreventCrossDataCenterMasterFailover is set, and promoted replica %+v is in %s while dead master was in %s.", promotedReplica.Key, promotedReplica.DataCenter, analysisEntry.AnalyzedInstanceDataCenter)
+		if satisfied, reason := MasterFailoverGeographicConstraintSatisfied(&analysisEntry, promotedReplica); !satisfied {
+			message := fmt.Sprintf("RecoverDeadMaster: failed %+v promotion; %s", promotedReplica.Key, reason)
 			AuditTopologyRecovery(topologyRecovery, message)
 			return false, nil, log.Error(message)
 		}
@@ -879,14 +883,10 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			}
 		}
 		{
+			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Distributing KV %+v", kvPairs))
 			err := kv.DistributePairs(kvPairs)
 			log.Errore(err)
 		}
-		if !skipProcesses {
-			// Execute post master-failover processes
-			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
-		}
-
 		if config.Config.MasterFailoverDetachReplicaMasterHost {
 			postponedFunction := func() error {
 				AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: detaching master host on promoted master"))
@@ -899,6 +899,7 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 			before := analysisEntry.AnalyzedInstanceKey.StringCode()
 			after := promotedReplica.Key.StringCode()
 			AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("- RecoverDeadMaster: updating cluster_alias: %v -> %v", before, after))
+			inst.ReplaceClusterName(before, after)
 			if alias := analysisEntry.ClusterDetails.ClusterAlias; alias != "" {
 				inst.SetClusterAlias(promotedReplica.Key.StringCode(), alias)
 			} else {
@@ -908,6 +909,11 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 		}()
 
 		attributes.SetGeneralAttribute(analysisEntry.ClusterDetails.ClusterDomain, promotedReplica.Key.StringCode())
+
+		if !skipProcesses {
+			// Execute post master-failover processes
+			executeProcesses(config.Config.PostMasterFailoverProcesses, "PostMasterFailoverProcesses", topologyRecovery, false)
+		}
 	} else {
 		recoverDeadMasterFailureCounter.Inc(1)
 	}
@@ -1692,7 +1698,7 @@ func ForceExecuteRecovery(analysisEntry inst.ReplicationAnalysis, candidateInsta
 
 // ForceMasterFailover *trusts* master of given cluster is dead and initiates a failover
 func ForceMasterFailover(clusterName string) (topologyRecovery *TopologyRecovery, err error) {
-	clusterMasters, err := inst.ReadClusterWriteableMaster(clusterName)
+	clusterMasters, err := inst.ReadClusterMaster(clusterName)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot deduce cluster master for %+v", clusterName)
 	}
