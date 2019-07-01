@@ -378,6 +378,11 @@ function ascii_topology_tabulated {
   echo "$api_response" | jq -r '.Details'
 }
 
+function snapshot_topologies {
+  api "snapshot-topologies"
+  echo "$api_response" | jq -r '.Details'
+}
+
 function search {
   assert_nonempty "instance" "$instance"
   api "search?s=$(urlencode "$instance")"
@@ -852,6 +857,7 @@ function run_command {
 
     "topology") ascii_topology ;;                               # Show an ascii-graph of a replication topology, given a member of that topology
     "topology-tabulated") ascii_topology_tabulated ;;           # Show an ascii-graph of a replication topology, given a member of that topology, in tabulated format
+    "snapshot-topologies") snapshot_topologies ;;               # Trigger topology snapshot (recording host/master settings for all hosts)
     "clusters") clusters ;;                                     # List all clusters known to orchestrator
     "clusters-alias") clusters_alias ;;                         # List all clusters known to orchestrator
     "search") search ;;                                         # Search for instances matching given substring
@@ -958,7 +964,6 @@ function run_command {
     "raft-health") raft_health ;;                   # Whether node is part of a healthy raft group
     "raft-leader-hostname") raft_leader_hostname ;; # Get hostname of raft leader, assuming raft setup
     "raft-elect-leader") raft_elect_leader ;;       # Request raft re-elections, provide hint for new leader's identity
-
     *) fail "Unsupported command $command" ;;
   esac
 }
