@@ -19,4 +19,5 @@ main
 *.pcap
 *.log
 .vendor/go19
-./bin
+/bin
+/build
