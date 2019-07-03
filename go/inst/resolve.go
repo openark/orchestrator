@@ -276,6 +276,17 @@ func RegisterHostnameUnresolve(registration *HostnameRegistration) (err error) {
 	return WriteHostnameUnresolve(&registration.Key, registration.Hostname)
 }
 
+func extractIPs(ips []net.IP) (ipv4String string, ipv6String string) {
+	for _, ip := range ips {
+		if ip4 := ip.To4(); ip4 != nil {
+			ipv4String = ip.String()
+		} else {
+			ipv6String = ip.String()
+		}
+	}
+	return ipv4String, ipv6String
+}
+
 func ResolveHostnameIPs(hostname string) error {
 	if _, found := hostnameIPsCache.Get(hostname); found {
 		return nil
@@ -285,5 +296,6 @@ func ResolveHostnameIPs(hostname string) error {
 		return log.Errore(err)
 	}
 	hostnameIPsCache.Set(hostname, true, cache.DefaultExpiration)
-	return writeHostnameIPs(hostname, ips)
+	ipv4String, ipv6String := extractIPs(ips)
+	return writeHostnameIPs(hostname, ipv4String, ipv6String)
 }
