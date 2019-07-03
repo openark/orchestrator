@@ -111,6 +111,8 @@ func resolveHostname(hostname string) (string, error) {
 		return hostname, nil
 	case "cname":
 		return GetCNAME(hostname)
+	case "ip":
+		return getHostnameIP(hostname)
 	}
 	return hostname, nil
 }
@@ -287,15 +289,38 @@ func extractIPs(ips []net.IP) (ipv4String string, ipv6String string) {
 	return ipv4String, ipv6String
 }
 
+func getHostnameIPs(hostname string) (ips []net.IP, fromCache bool, err error) {
+	if ips, found := hostnameIPsCache.Get(hostname); found {
+		return ips.([]net.IP), true, nil
+	}
+	ips, err = net.LookupIP(hostname)
+	if err != nil {
+		return ips, false, log.Errore(err)
+	}
+	hostnameIPsCache.Set(hostname, ips, cache.DefaultExpiration)
+	return ips, false, nil
+}
+
+func getHostnameIP(hostname string) (ipString string, err error) {
+	ips, _, err := getHostnameIPs(hostname)
+	if err != nil {
+		return ipString, err
+	}
+	ipv4String, ipv6String := extractIPs(ips)
+	if ipv4String != "" {
+		return ipv4String, nil
+	}
+	return ipv6String, nil
+}
+
 func ResolveHostnameIPs(hostname string) error {
-	if _, found := hostnameIPsCache.Get(hostname); found {
+	ips, fromCache, err := getHostnameIPs(hostname)
+	if err != nil {
+		return err
+	}
+	if fromCache {
 		return nil
 	}
-	ips, err := net.LookupIP(hostname)
-	if err != nil {
-		return log.Errore(err)
-	}
-	hostnameIPsCache.Set(hostname, true, cache.DefaultExpiration)
 	ipv4String, ipv6String := extractIPs(ips)
 	return writeHostnameIPs(hostname, ipv4String, ipv6String)
 }
