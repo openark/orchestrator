@@ -14,31 +14,21 @@
 # ORC_USER (default: orc_server_user): username used to login to orchestrator backend MySQL server
 # ORC_PASSWORD (default: orc_server_password): password used to login to orchestrator backend MySQL server
 
-FROM alpine:3.10
+FROM golang:1.12.6
 
-RUN apk update
-RUN apk upgrade
-RUN apk add --update ruby
-RUN apk add --update ruby-dev
-RUN apk add --update gcc
-RUN apk add --update libffi-dev
-RUN apk add --update make
-RUN apk add --update libc-dev
-RUN apk add --update rpm
+RUN apt-get update
+RUN apt-get install -y ruby ruby-dev rubygems build-essential
 RUN gem install --no-ri --no-rdoc fpm
-
 ENV GOPATH=/tmp/go
 
-RUN apk add --update libcurl
-RUN apk add --update rsync
-RUN apk add --update gcc
-RUN apk add --update g++
-RUN apk add --update build-base
-RUN apk add --update bash
-RUN apk add --update git
-RUN apk add --update go
-RUN apk add --update ruby-etc
-RUN apk add --update tar
+RUN apt-get install -y curl
+RUN apt-get install -y rsync
+RUN apt-get install -y gcc
+RUN apt-get install -y g++
+RUN apt-get install -y bash
+RUN apt-get install -y git
+RUN apt-get install -y tar
+RUN apt-get install -y rpm
 
 RUN mkdir -p $GOPATH/src/github.com/github/orchestrator
 WORKDIR $GOPATH/src/github.com/github/orchestrator
