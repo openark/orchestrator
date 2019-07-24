@@ -72,19 +72,19 @@ func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*In
 			entry = fmt.Sprintf("%s%s%s", entry, tabulatorScharacter, instance.TabulatedDescription(tabulatorScharacter))
 		} else {
 			entry = fmt.Sprintf("%s%s%s", entry, fillerCharacter, instance.HumanReadableDescription())
-                }
-                if printTags {
-                        tags, _ := ReadInstanceTags(&instance.Key)
-                        tagsString := make([]string, len(tags))
-                        for idx, tag := range tags {
-                                tagsString[idx] = tag.Display()
-                        }
+		}
+		if printTags {
+			tags, _ := ReadInstanceTags(&instance.Key)
+			tagsString := make([]string, len(tags))
+			for idx, tag := range tags {
+				tagsString[idx] = tag.Display()
+			}
 			entry = fmt.Sprintf("%s [%s]", entry, strings.Join(tagsString, ","))
-                }
-        }
+		}
+	}
 	result := []string{entry}
 	for _, replica := range replicationMap[instance] {
-	        replicasResult := getASCIITopologyEntry(depth+1, replica, replicationMap, extendedOutput, fillerCharacter, tabulated, printTags)
+		replicasResult := getASCIITopologyEntry(depth+1, replica, replicationMap, extendedOutput, fillerCharacter, tabulated, printTags)
 		result = append(result, replicasResult...)
 	}
 	return result
