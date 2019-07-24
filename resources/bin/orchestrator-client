@@ -378,6 +378,12 @@ function ascii_topology_tabulated {
   echo "$api_response" | jq -r '.Details'
 }
 
+function ascii_topology_tags {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "topology-tags/${alias:-$instance}"
+  echo "$api_response" | jq -r '.Details'
+}
+
 function snapshot_topologies {
   api "snapshot-topologies"
   echo "$api_response" | jq -r '.Details'
@@ -857,6 +863,7 @@ function run_command {
 
     "topology") ascii_topology ;;                               # Show an ascii-graph of a replication topology, given a member of that topology
     "topology-tabulated") ascii_topology_tabulated ;;           # Show an ascii-graph of a replication topology, given a member of that topology, in tabulated format
+    "topology-tags") ascii_topology_tags ;;                     # Show an ascii-graph of a replication topology and instance tags, given a member of that topology
     "snapshot-topologies") snapshot_topologies ;;               # Trigger topology snapshot (recording host/master settings for all hosts)
     "clusters") clusters ;;                                     # List all clusters known to orchestrator
     "clusters-alias") clusters_alias ;;                         # List all clusters known to orchestrator
