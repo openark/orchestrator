@@ -40,7 +40,7 @@ import (
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/metrics/query"
 	"github.com/github/orchestrator/go/process"
-	"github.com/github/orchestrator/go/raft"
+	orcraft "github.com/github/orchestrator/go/raft"
 )
 
 // APIResponseCode is an OK/ERROR response code
@@ -123,6 +123,7 @@ type HttpAPI struct {
 var API HttpAPI = HttpAPI{}
 var discoveryMetrics = collection.CreateOrReturnCollection("DISCOVERY_METRICS")
 var queryMetrics = collection.CreateOrReturnCollection("BACKEND_WRITES")
+var writeBufferMetrics = collection.CreateOrReturnCollection("WRITE_BUFFER")
 
 func (this *HttpAPI) getInstanceKeyInternal(host string, port string, resolve bool) (inst.InstanceKey, error) {
 	var instanceKey *inst.InstanceKey
@@ -2385,6 +2386,43 @@ func (this *HttpAPI) BackendQueryMetricsAggregated(params martini.Params, r rend
 	r.JSON(http.StatusOK, aggregated)
 }
 
+// WriteBufferMetricsRaw returns the raw instance write buffer metrics
+func (this *HttpAPI) WriteBufferMetricsRaw(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+	log.Debugf("WriteBufferMetricsRaw: seconds: %d", seconds)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unable to generate raw instance write buffer metrics"})
+		return
+	}
+
+	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
+	m, err := writeBufferMetrics.Since(refTime)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unable to return instance write buffermetrics"})
+		return
+	}
+
+	log.Debugf("WriteBufferMetricsRaw data: %+v", m)
+
+	r.JSON(http.StatusOK, m)
+}
+
+// WriteBufferMetricsAggregated provides aggregate metrics of instance write buffer metrics
+func (this *HttpAPI) WriteBufferMetricsAggregated(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+	log.Debugf("WriteBufferMetricsAggregated: seconds: %d", seconds)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unable to aggregated instance write buffer metrics"})
+		return
+	}
+
+	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
+	aggregated := inst.AggregatedSince(writeBufferMetrics, refTime)
+	log.Debugf("WriteBufferMetricsAggregated data: %+v", aggregated)
+
+	r.JSON(http.StatusOK, aggregated)
+}
+
 // Agents provides complete list of registered agents (See https://github.com/github/orchestrator-agent)
 func (this *HttpAPI) Agents(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
@@ -3770,6 +3808,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "discovery-queue-metrics-aggregated/:seconds", this.DiscoveryQueueMetricsAggregated)
 	this.registerAPIRequest(m, "backend-query-metrics-raw/:seconds", this.BackendQueryMetricsRaw)
 	this.registerAPIRequest(m, "backend-query-metrics-aggregated/:seconds", this.BackendQueryMetricsAggregated)
+	this.registerAPIRequest(m, "write-buffer-metrics-raw/:seconds", this.WriteBufferMetricsRaw)
+	this.registerAPIRequest(m, "write-buffer-metrics-aggregated/:seconds", this.WriteBufferMetricsAggregated)
 
 	// Agents
 	this.registerAPIRequest(m, "agents", this.Agents)

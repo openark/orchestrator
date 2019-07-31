@@ -77,6 +77,7 @@ var readTopologyInstanceCounter = metrics.NewCounter()
 var readInstanceCounter = metrics.NewCounter()
 var writeInstanceCounter = metrics.NewCounter()
 var backendWrites = collection.CreateOrReturnCollection("BACKEND_WRITES")
+var writeBufferMetrics = collection.CreateOrReturnCollection("WRITE_BUFFER")
 
 var emptyQuotesRegexp = regexp.MustCompile(`^""$`)
 
@@ -95,19 +96,22 @@ func initializeInstanceDao() {
 	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
 	forgetInstanceKeys = cache.New(time.Duration(config.Config.InstancePollSeconds*3)*time.Second, time.Second)
 	clusterInjectedPseudoGTIDCache = cache.New(time.Minute, time.Second)
-	// spin off instance write buffer flushing
-	go func() {
-		flushTick := time.Tick(time.Duration(config.Config.InstanceFlushIntervalMilliseconds) * time.Millisecond)
-		for {
-			// it is time to flush
-			select {
-			case <-flushTick:
-				flushInstanceWriteBuffer()
-			case <-forceFlushInstanceWriteBuffer:
-				flushInstanceWriteBuffer()
+	if config.Config.BufferInstanceWrites {
+		wbm = NewWriteBufferMetric() // initialize firt metric
+		// spin off instance write buffer flushing
+		go func() {
+			flushTick := time.Tick(time.Duration(config.Config.InstanceFlushIntervalMilliseconds) * time.Millisecond)
+			for {
+				// it is time to flush
+				select {
+				case <-flushTick:
+					flushInstanceWriteBuffer()
+				case <-forceFlushInstanceWriteBuffer:
+					flushInstanceWriteBuffer()
+				}
 			}
-		}
-	}()
+		}()
+	}
 }
 
 // ExecDBWriteFunc chooses how to execute a write onto the database: whether synchronuously or not
@@ -2478,6 +2482,7 @@ func (a byInstanceKey) Less(i, j int) bool { return a[i].Key.SmallerThan(&a[j].K
 
 var instanceWriteBuffer chan instanceUpdateObject
 var forceFlushInstanceWriteBuffer = make(chan bool)
+var wbm *WriteBufferMetric
 
 func enqueueInstanceWrite(instance *Instance, instanceWasActuallyFound bool, lastError error) {
 	if len(instanceWriteBuffer) == config.Config.InstanceWriteBufferSize {
@@ -2493,6 +2498,11 @@ func flushInstanceWriteBuffer() {
 	var instances []*Instance
 	var lastseen []*Instance // instances to update with last_seen field
 
+	defer func() {
+		// create a new metric after flushing the buffer
+		wbm = NewWriteBufferMetric()
+	}()
+
 	if len(instanceWriteBuffer) == 0 {
 		return
 	}
@@ -2506,6 +2516,10 @@ func flushInstanceWriteBuffer() {
 			log.Debugf("flushInstanceWriteBuffer: will not update database_instance.last_seen due to error: %+v", upd.lastError)
 		}
 	}
+
+	wbm.Update(len(lastseen) + len(instances))
+	writeBufferMetrics.Append(wbm)
+
 	// sort instances by instanceKey (table pk) to make locking predictable
 	sort.Sort(byInstanceKey(instances))
 	sort.Sort(byInstanceKey(lastseen))
