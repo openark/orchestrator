@@ -24,6 +24,8 @@ import (
 	"time"
 
 	"github.com/github/orchestrator/go/collection"
+	"github.com/github/orchestrator/go/config"
+
 	"github.com/montanaflynn/stats"
 )
 
@@ -45,17 +47,17 @@ func (m WriteBufferMetric) When() time.Time {
 }
 
 type AggregatedWriteBufferMetric struct {
-	// InstanceFlushIntervalMilliseconds int // config setting
-	// InstanceWriteBufferSize           int // config setting
-	Count              int
-	MaxWaitSeconds     float64
-	MeanWaitSeconds    float64
-	MedianWaitSeconds  float64
-	P95WaitSeconds     float64
-	MaxFlushSeconds    float64
-	MeanFlushSeconds   float64
-	MedianFlushSeconds float64
-	P95FlushSeconds    float64
+	InstanceWriteBufferSize           int // config setting
+	InstanceFlushIntervalMilliseconds int // config setting
+	Count                             int
+	MaxWaitSeconds                    float64
+	MeanWaitSeconds                   float64
+	MedianWaitSeconds                 float64
+	P95WaitSeconds                    float64
+	MaxFlushSeconds                   float64
+	MeanFlushSeconds                  float64
+	MedianFlushSeconds                float64
+	P95FlushSeconds                   float64
 }
 
 // AggregatedSince returns the aggregated query metrics for the period
@@ -68,7 +70,10 @@ func AggregatedSince(c *collection.Collection, t time.Time) AggregatedWriteBuffe
 
 	// Retrieve values since the time specified
 	values, err := c.Since(t)
-	a := AggregatedWriteBufferMetric{}
+	a := AggregatedWriteBufferMetric{
+		InstanceWriteBufferSize:           config.Config.InstanceWriteBufferSize,
+		InstanceFlushIntervalMilliseconds: config.Config.InstanceFlushIntervalMilliseconds,
+	}
 	if err != nil {
 		return a // empty data
 	}
