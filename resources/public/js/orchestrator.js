@@ -934,7 +934,7 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     }
     if (renderType == "search") {
       if (instance.SuggestedClusterAlias) {
-        contentHtml += '<p>' + 'Cluster: <a href="' + appUrl('/web/cluster/' + instance.SuggestedClusterAlias) + '">' + instance.SuggestedClusterAlias + '</a>' + '</p>';
+        contentHtml += '<p>' + 'Cluster: <a href="' + appUrl('/web/cluster/alias/' + instance.SuggestedClusterAlias) + '">' + instance.SuggestedClusterAlias + '</a>' + '</p>';
       } else {
         contentHtml += '<p>' + 'Cluster: <a href="' + appUrl('/web/cluster/' + instance.ClusterName) + '">' + instance.ClusterName + '</a>' + '</p>';
       }
