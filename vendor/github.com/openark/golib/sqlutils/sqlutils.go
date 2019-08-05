@@ -260,7 +260,7 @@ func QueryRowsMap(db *sql.DB, query string, on_row func(RowMap) error, args ...i
 }
 
 // queryResultData returns a raw array of rows for a given query, optionally reading and returning column names
-func queryResultData(db *sql.DB, query string, retrieveColumns bool, args ...interface{}) (resultData ResultData, columns []string,err error) {
+func queryResultData(db *sql.DB, query string, retrieveColumns bool, args ...interface{}) (resultData ResultData, columns []string, err error) {
 	defer func() {
 		if derr := recover(); derr != nil {
 			err = errors.New(fmt.Sprintf("QueryRowsMap unexpected error: %+v", derr))
@@ -316,7 +316,7 @@ func QueryRowsMapBuffered(db *sql.DB, query string, on_row func(RowMap) error, a
 }
 
 // ExecNoPrepare executes given query using given args on given DB, without using prepared statements.
-func ExecNoPrepare(db *sql.DB, query string, args ...interface{}) (res sql.Result,err error) {
+func ExecNoPrepare(db *sql.DB, query string, args ...interface{}) (res sql.Result, err error) {
 	defer func() {
 		if derr := recover(); derr != nil {
 			err = errors.New(fmt.Sprintf("ExecNoPrepare unexpected error: %+v", derr))
@@ -332,13 +332,13 @@ func ExecNoPrepare(db *sql.DB, query string, args ...interface{}) (res sql.Resul
 
 // ExecQuery executes given query using given args on given DB. It will safele prepare, execute and close
 // the statement.
-func execInternal(silent bool, db *sql.DB, query string, args ...interface{}) (res sql.Result,err error) {
+func execInternal(silent bool, db *sql.DB, query string, args ...interface{}) (res sql.Result, err error) {
 	defer func() {
 		if derr := recover(); derr != nil {
 			err = errors.New(fmt.Sprintf("execInternal unexpected error: %+v", derr))
 		}
 	}()
-var stmt *sql.Stmt
+	var stmt *sql.Stmt
 	stmt, err = db.Prepare(query)
 	if err != nil {
 		return nil, err
