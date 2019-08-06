@@ -17,16 +17,18 @@
 package inst
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
-	"github.com/github/orchestrator/go/config"
-	"github.com/openark/golib/log"
-	"github.com/patrickmn/go-cache"
 	"net"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/github/orchestrator/go/config"
+	"github.com/openark/golib/log"
+	"github.com/patrickmn/go-cache"
 )
 
 type HostnameResolve struct {
@@ -103,6 +105,25 @@ func GetCNAME(hostname string) (string, error) {
 	return res, nil
 }
 
+// GetIP resolves an IP address, Return to the first discovered address.
+func GetIP(hostname, typ string) (string, error) {
+	ips, err := net.LookupIP(hostname)
+	if err != nil {
+		return "", err
+	}
+
+	for _, ip := range ips {
+		if typ == "ipv4" && ip.To4() != nil {
+			return ip.String(), nil
+		} else if typ == "ipv6" && bytes.IndexByte(ip, ':') != -1 {
+			return ip.String(), nil
+		}
+	}
+
+	errStr := fmt.Sprintf("LookupIP %s: no such %s", hostname, typ)
+	return "", errors.New(errStr)
+}
+
 func resolveHostname(hostname string) (string, error) {
 	switch strings.ToLower(config.Config.HostnameResolveMethod) {
 	case "none":
@@ -111,6 +132,10 @@ func resolveHostname(hostname string) (string, error) {
 		return hostname, nil
 	case "cname":
 		return GetCNAME(hostname)
+	case "ipv4":
+		return GetIP(hostname, "ipv4")
+	case "ipv6":
+		return GetIP(hostname, "ipv6")
 	}
 	return hostname, nil
 }

@@ -148,7 +148,7 @@ type Configuration struct {
 	DiscoveryQueueMaxStatisticsSize            int      // The maximum number of individual secondly statistics taken of the discovery queue
 	DiscoveryCollectionRetentionSeconds        uint     // Number of seconds to retain the discovery collection information
 	InstanceBulkOperationsWaitTimeoutSeconds   uint     // Time to wait on a single instance when doing bulk (many instances) operation
-	HostnameResolveMethod                      string   // Method by which to "normalize" hostname ("none"/"default"/"cname")
+	HostnameResolveMethod                      string   // Method by which to "normalize" hostname ("none"/"default"/"cname"/"ipv4"/"ipv6")
 	MySQLHostnameResolveMethod                 string   // Method by which to "normalize" hostname via MySQL server. ("none"/"@@hostname"/"@@report_host"; default "@@hostname")
 	SkipBinlogServerUnresolveCheck             bool     // Skip the double-check that an unresolved hostname resolves back to same hostname for binlog servers
 	ExpiryHostnameResolvesMinutes              int      // Number of minutes after which to expire hostname-resolves
