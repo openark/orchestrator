@@ -1,0 +1,5 @@
+[client]
+host=127.0.0.1
+user=test_user
+password=test_pass
+port=63306

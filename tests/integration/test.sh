@@ -18,6 +18,25 @@ exec_command_file=/tmp/orchestrator-test.bash
 db_type=""
 sqlite_file="/tmp/orchestrator.db"
 
+usage () {
+	local rc=${1:-0}
+	local myname=$(basename $0)
+
+	cat <<-EOF | sed -e 's/^#//'
+	#$myname (C) 2017 The Orchestrator developers
+	#
+	#Usage: $myname <options> [mysql|sqlite] [filter]
+	#
+	#By default, runs all tests. Given filter, will only run tests matching given regep
+	#
+	#Flags:
+	#	-d <defaults_file>    (mysql only) Allow you to specify a defaults file to use to access mysql
+	#	-h                    this help message
+	EOF
+
+	exit $rc
+}
+
 function run_queries() {
   queries_file="$1"
 
@@ -28,7 +47,7 @@ function run_queries() {
       sqlite3 $sqlite_file
   else
     # Assume mysql
-    mysql --default-character-set=utf8mb4 test -ss < $queries_file
+    $mysql --default-character-set=utf8mb4 test -ss < $queries_file
   fi
 }
 
@@ -221,5 +240,16 @@ main() {
     fi
   done
 }
+
+mysql=mysql
+while getopts d:h flag; do
+	case $flag in
+	d)	mysql="mysql --defaults-file=$OPTARG"
+		echo "Using defaults file: $OPTARG";;
+	h)	usage 0;;
+	*)	usage 1
+	esac
+done
+shift $(($OPTIND - 1))
 
 main "$@"
