@@ -205,8 +205,8 @@ test_all() {
 test_db() {
   db_type="$1"
   echo "### testing via $db_type"
-  generate_config_file
   check_db
+  generate_config_file
   test_all ${@:2}
   if [ $? -ne 0 ] ; then
     echo "test_db failed"
