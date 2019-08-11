@@ -36,7 +36,7 @@ check_db() {
   echo "----1"
   mysql --default-character-set=utf8mb4 test -ss -e "select current_user()" -u root -proot
   echo "----2"
-  mysql --default-character-set=utf8mb4 test -ss -e "select current_user()" --u runner -prunner
+  mysql --default-character-set=utf8mb4 test -ss -e "select current_user()" -u runner -prunner
   echo "----3"
 
 
