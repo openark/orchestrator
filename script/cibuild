@@ -4,6 +4,8 @@ set -e
 
 . script/bootstrap
 
+./tests/integration/test.sh
+
 echo "# Validating documentation"
 echo "## docs/toc.md and docs/README.md must be identical"
 diff docs/toc.md docs/README.md > /dev/null 2> /dev/null
