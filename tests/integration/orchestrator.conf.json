@@ -18,7 +18,7 @@
   "MySQLOrchestratorPort": 3306,
   "MySQLOrchestratorDatabase": "test",
   "MySQLOrchestratorUser": "mysql-user-placeholder",
-  "MySQLOrchestratorPassword": "",
+  "MySQLOrchestratorPassword": "mysql-password-placeholder",
   "MySQLOrchestratorCredentialsConfigFile": "",
   "MySQLOrchestratorSSLPrivateKeyFile": "",
   "MySQLOrchestratorSSLCertFile": "",
