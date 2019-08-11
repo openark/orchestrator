@@ -34,9 +34,11 @@ function run_queries() {
 }
 
 setup_mysql() {
-  if mysql --default-character-set=utf8mb4 -ss -e "select 16 + 1" -u root -proot 2> /dev/null | grep 17 ; then
+  echo "one time setup of mysql"
+  if mysql --default-character-set=utf8mb4 -ss -e "select 16 + 1" -u root -proot 2> /dev/null | grep -q 17 ; then
     mysql_args="$mysql_args -u root -proot"
   fi
+  echo "mysql args: $mysql_args"
   mysql $mysql_args -e "create database if not exists test"
 }
 
