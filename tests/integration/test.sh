@@ -38,6 +38,9 @@ setup_mysql() {
   local mysql_user=""
   local mysql_password=""
   echo "one time setup of mysql"
+  if mysql --default-character-set=utf8mb4 -ss -e "select 16 + 1" -u "$(whoami)" 2> /dev/null | grep -q 17 ; then
+    mysql_user="$(whoami)"
+  fi
   if mysql --default-character-set=utf8mb4 -ss -e "select 16 + 1" -u root -proot 2> /dev/null | grep -q 17 ; then
     mysql_user="root"
     mysql_password="root"
