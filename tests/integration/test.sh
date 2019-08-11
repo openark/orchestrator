@@ -18,7 +18,7 @@ exec_command_file=/tmp/orchestrator-test.bash
 test_mysql_defaults_file=/tmp/orchestrator-test-my.cnf
 db_type=""
 sqlite_file="/tmp/orchestrator.db"
-mysql_args="--default-character-set=utf8mb4 -s -s --defaults-file=${test_mysql_defaults_file}"
+mysql_args="--defaults-extra-file=${test_mysql_defaults_file} --default-character-set=utf8mb4 -s -s"
 
 function run_queries() {
   queries_file="$1"
