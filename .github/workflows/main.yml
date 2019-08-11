@@ -15,7 +15,8 @@ jobs:
       with:
         version: 1.12
       id: go
-    - run: sudo apt-get install sqlite3
+    - name: Set up SQLite
+      run:  sudo apt-get install sqlite3
 
     - name: Build
-      run: script/cibuild
+      run:  script/cibuild
