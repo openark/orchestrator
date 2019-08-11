@@ -17,6 +17,7 @@ orchestrator_binary=/tmp/orchestrator-test
 exec_command_file=/tmp/orchestrator-test.bash
 db_type=""
 sqlite_file="/tmp/orchestrator.db"
+mysql_args="--default-character-set=utf8mb4 -s -s"
 
 function run_queries() {
   queries_file="$1"
@@ -28,18 +29,21 @@ function run_queries() {
       sqlite3 $sqlite_file
   else
     # Assume mysql
-    mysql --default-character-set=utf8mb4 test -ss -uroot < $queries_file
+    mysql $mysql_args test < $queries_file
   fi
 }
 
+setup_mysql() {
+  if mysql --default-character-set=utf8mb4 -ss -e "select 16 + 1" -u root -proot 2> /dev/null | grep 17 ; then
+    mysql_args="$mysql_args -u root -proot"
+  fi
+  mysql $mysql_args -e "create database if not exists test"
+}
+
 check_db() {
-  echo "----1"
-  mysql --default-character-set=utf8mb4 test -ss -e "select current_user()" -u root -proot
-  echo "----2"
-  mysql --default-character-set=utf8mb4 test -ss -e "select current_user()" -u runner -prunner
-  echo "----3"
-
-
+  if [ "$db_type" == "mysql" ] ; then
+    setup_mysql
+  fi
   echo "select 1;" > $test_query_file
   query_result="$(run_queries $test_query_file)"
   if [ "$query_result" != "1" ] ; then
