@@ -15,11 +15,10 @@ test_query_file=/tmp/orchestrator-test.sql
 test_config_file=/tmp/orchestrator.conf.json
 orchestrator_binary=/tmp/orchestrator-test
 exec_command_file=/tmp/orchestrator-test.bash
+test_mysql_defaults_file=/tmp/orchestrator-test-my.cnf
 db_type=""
 sqlite_file="/tmp/orchestrator.db"
-mysql_args="--default-character-set=utf8mb4 -s -s"
-mysql_user=""
-mysql_password=""
+mysql_args="--default-character-set=utf8mb4 -s -s --defaults-file=${test_mysql_defaults_file}"
 
 function run_queries() {
   queries_file="$1"
@@ -36,13 +35,20 @@ function run_queries() {
 }
 
 setup_mysql() {
+  local mysql_user=""
+  local mysql_password=""
   echo "one time setup of mysql"
   if mysql --default-character-set=utf8mb4 -ss -e "select 16 + 1" -u root -proot 2> /dev/null | grep -q 17 ; then
-    mysql_args="$mysql_args -u root -proot"
     mysql_user="root"
     mysql_password="root"
   fi
+  echo "[client]"                   >  $test_mysql_defaults_file
+  echo "user=${mysql_user}"         >> $test_mysql_defaults_file
+  echo "password=${mysql_password}" >> $test_mysql_defaults_file
+
   echo "mysql args: $mysql_args"
+  echo "mysql config (${test_mysql_defaults_file})"
+  cat $test_mysql_defaults_file
   mysql $mysql_args -e "create database if not exists test"
 }
 
@@ -176,8 +182,6 @@ generate_config_file() {
   cp ${tests_path}/orchestrator.conf.json ${test_config_file}
   sed -i -e "s/backend-db-placeholder/${db_type}/g" ${test_config_file}
   sed -i -e "s^sqlite-data-file-placeholder^${sqlite_file}^g" ${test_config_file}
-  sed -i -e "s^mysql-user-placeholder^${mysql_user:-}^g" ${test_config_file}
-  sed -i -e "s^mysql-password-placeholder^${mysql_password:-}^g" ${test_config_file}
   echo "- generate_config_file OK"
 }
 
