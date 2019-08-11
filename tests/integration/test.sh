@@ -34,8 +34,10 @@ function run_queries() {
 
 check_db() {
   echo "----1"
-  mysql --default-character-set=utf8mb4 test -ss -e "select current_user()" -uroot -proot
+  mysql --default-character-set=utf8mb4 test -ss -e "select current_user()" -u root -proot
   echo "----2"
+  mysql --default-character-set=utf8mb4 test -ss -e "select current_user()" --u runner -prunner
+  echo "----3"
 
 
   echo "select 1;" > $test_query_file
