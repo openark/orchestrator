@@ -28,11 +28,16 @@ function run_queries() {
       sqlite3 $sqlite_file
   else
     # Assume mysql
-    mysql --default-character-set=utf8mb4 test -ss < $queries_file
+    mysql --default-character-set=utf8mb4 test -ss -uroot < $queries_file
   fi
 }
 
 check_db() {
+  echo "----1"
+  mysql --default-character-set=utf8mb4 test -ss -e "select current_user()" -uroot
+  echo "----2"
+
+
   echo "select 1;" > $test_query_file
   query_result="$(run_queries $test_query_file)"
   if [ "$query_result" != "1" ] ; then
