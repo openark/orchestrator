@@ -26,6 +26,7 @@ type CLIFlags struct {
 	Version                    *bool
 	Statement                  *string
 	PromotionRule              *string
+	CommandPayload             *string
 	ConfiguredVersion          string
 	SkipBinlogSearch           *bool
 	SkipContinuousRegistration *bool

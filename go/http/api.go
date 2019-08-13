@@ -3032,7 +3032,8 @@ func (this *HttpAPI) GracefulMasterTakeover(params martini.Params, r render.Rend
 	}
 	designatedKey, _ := this.getInstanceKey(params["designatedHost"], params["designatedPort"])
 	// designatedKey may be empty/invalid
-	topologyRecovery, _, err := logic.GracefulMasterTakeover(clusterName, &designatedKey)
+	commandPayload := req.URL.Query().Get("commandPayload")
+	topologyRecovery, _, err := logic.GracefulMasterTakeover(clusterName, &designatedKey, commandPayload)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error(), Details: topologyRecovery})
 		return
@@ -3056,7 +3057,8 @@ func (this *HttpAPI) ForceMasterFailover(params martini.Params, r render.Render,
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
-	topologyRecovery, err := logic.ForceMasterFailover(clusterName)
+	commandPayload := req.URL.Query().Get("commandPayload")
+	topologyRecovery, err := logic.ForceMasterFailover(clusterName, commandPayload)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -3090,7 +3092,8 @@ func (this *HttpAPI) ForceMasterTakeover(params martini.Params, r render.Render,
 		return
 	}
 
-	topologyRecovery, err := logic.ForceMasterTakeover(clusterName, designatedInstance)
+	commandPayload := req.URL.Query().Get("commandPayload")
+	topologyRecovery, err := logic.ForceMasterTakeover(clusterName, designatedInstance, commandPayload)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
