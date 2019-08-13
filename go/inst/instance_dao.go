@@ -1330,7 +1330,7 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 		if instance.IsDowntimed {
 			skip = true
 		}
-		if RegexpMatchPatterns(instance.Key.Hostname, config.Config.ProblemIgnoreHostnameFilters) {
+		if RegexpMatchPatterns(instance.Key.StringCode(), config.Config.ProblemIgnoreHostnameFilters) {
 			skip = true
 		}
 		if !skip {
@@ -1349,10 +1349,11 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 			or instr(version, ?) > 0
 			or instr(version_comment, ?) > 0
 			or instr(concat(hostname, ':', port), ?) > 0
+			or instr(suggested_cluster_alias, ?) > 0
 			or concat(server_id, '') = ?
 			or concat(port, '') = ?
 		`
-	args := sqlutils.Args(searchString, searchString, searchString, searchString, searchString, searchString, searchString)
+	args := sqlutils.Args(searchString, searchString, searchString, searchString, searchString, searchString, searchString, searchString)
 	return readInstancesByCondition(condition, args, `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
 }
 
@@ -1490,7 +1491,7 @@ func ReadClusterNeutralPromotionRuleInstances(clusterName string) (neutralInstan
 func filterOSCInstances(instances [](*Instance)) [](*Instance) {
 	result := [](*Instance){}
 	for _, instance := range instances {
-		if RegexpMatchPatterns(instance.Key.Hostname, config.Config.OSCIgnoreHostnameFilters) {
+		if RegexpMatchPatterns(instance.Key.StringCode(), config.Config.OSCIgnoreHostnameFilters) {
 			continue
 		}
 		if instance.IsBinlogServer() {
@@ -1713,6 +1714,34 @@ func updateInstanceClusterName(instance *Instance) error {
 			return log.Errore(err)
 		}
 		AuditOperation("update-cluster-name", &instance.Key, fmt.Sprintf("set to %s", instance.ClusterName))
+		return nil
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
+// ReplaceClusterName replaces all occurances of oldClusterName with newClusterName
+// It is called after a master failover
+func ReplaceClusterName(oldClusterName string, newClusterName string) error {
+	if oldClusterName == "" {
+		return log.Errorf("replaceClusterName: skipping empty oldClusterName")
+	}
+	if newClusterName == "" {
+		return log.Errorf("replaceClusterName: skipping empty newClusterName")
+	}
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+			update
+				database_instance
+			set
+				cluster_name=?
+			where
+				and cluster_name=?
+				`, newClusterName, oldClusterName,
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
+		AuditOperation("replace-cluster-name", nil, fmt.Sprintf("replaxced %s with %s", oldClusterName, newClusterName))
 		return nil
 	}
 	return ExecDBWriteFunc(writeFunc)

@@ -415,13 +415,13 @@ func newConfiguration() *Configuration {
 		GraphiteConvertHostnameDotsToUnderscores:   true,
 		GraphitePollSeconds:                        60,
 		URLPrefix:                                  "",
-		DiscoveryIgnoreReplicaHostnameFilters: []string{},
-		ConsulAddress:                         "",
-		ConsulAclToken:                        "",
-		ConsulCrossDataCenterDistribution:     false,
-		ZkAddress:                             "",
-		KVClusterMasterPrefix:                 "mysql/master",
-		WebMessage:                            "",
+		DiscoveryIgnoreReplicaHostnameFilters:      []string{},
+		ConsulAddress:                              "",
+		ConsulAclToken:                             "",
+		ConsulCrossDataCenterDistribution:          false,
+		ZkAddress:                                  "",
+		KVClusterMasterPrefix:                      "mysql/master",
+		WebMessage:                                 "",
 	}
 }
 
