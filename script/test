@@ -23,7 +23,7 @@ done
 
 echo "# Verifying code is formatted via 'gofmt -s -w  go/'"
 gofmt -s -w  go/
-git diff --exit-code --quiet
+git diff 
 
 echo "# Building"
 script/build
