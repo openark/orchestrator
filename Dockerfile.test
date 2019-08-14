@@ -4,7 +4,7 @@ LABEL maintainer="github@github.com"
 RUN apt-get update
 RUN apt-get install -y lsb-release
 RUN apt-get install -y rsync
-RUN apt-get install -y mysql-community-server mysql-community-client
+RUN apt-get install -y mysql-community-server
 RUN rm -rf /var/lib/apt/lists/*
 
 COPY . /go/src/github.com/github/orchestrator
