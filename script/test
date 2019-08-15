@@ -2,7 +2,7 @@
 
 set -e
 
-ls -l /var/lib/mysql
+curl localhost:3306
 mysql
 
 . script/bootstrap
