@@ -1,5 +1,7 @@
 #!/bin/bash
 
+docker_compose="docker-compose --file docker-compose.yml"
+
 output_fold() {
   # Exit early if no label provided
   if [ -z "$1" ]; then
@@ -33,7 +35,7 @@ output_fold() {
 function cleanup() {
   echo
   echo "%%%FOLD {Shutting down services...}%%%"
-  docker-compose down
+  $docker_compose down
   echo "%%%END FOLD%%%"
 }
 
@@ -41,7 +43,7 @@ trap cleanup EXIT
 
 export CI_MODE=true
 
-output_fold "Bootstrapping container..." docker-compose build
-output_fold "Running tests..." docker-compose run --rm app
+output_fold "Bootstrapping container..." $docker_compose build
+output_fold "Running tests..." $docker_compose run --rm app
 
-docker-compose run -e BUILD_ARTIFACT_DIR=$BUILD_ARTIFACT_DIR -v $BUILD_ARTIFACT_DIR:$BUILD_ARTIFACT_DIR app script/build-deploy-tarball
+$docker_compose run -e BUILD_ARTIFACT_DIR=$BUILD_ARTIFACT_DIR -v $BUILD_ARTIFACT_DIR:$BUILD_ARTIFACT_DIR app script/build-deploy-tarball
