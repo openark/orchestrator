@@ -14,3 +14,5 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.test
+volumes:
+  db-data:
