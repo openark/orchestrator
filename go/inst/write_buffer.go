@@ -36,8 +36,9 @@ import (
 // measure.
 type WriteBufferMetric struct {
 	Timestamp         time.Time     // time the metric was started
-	WaitLatency       time.Duration // time that we had to wait before flushing the buffer
-	FlushLatency      time.Duration // time that it took to flush all instances from buffer
+	WaitLatency       time.Duration // waiting before flush
+	FlushLatency      time.Duration // time flushing instance buffer
+	WriteLatency      time.Duration // time writing to backend
 	EnqueuedInstances int
 }
 
@@ -58,6 +59,10 @@ type AggregatedWriteBufferMetric struct {
 	MeanFlushSeconds                  float64
 	MedianFlushSeconds                float64
 	P95FlushSeconds                   float64
+	MaxWriteSeconds                   float64
+	MeanWriteSeconds                  float64
+	MedianWriteSeconds                float64
+	P95WriteSeconds                   float64
 }
 
 // AggregatedSince returns the aggregated query metrics for the period
@@ -67,6 +72,7 @@ func AggregatedSince(c *collection.Collection, t time.Time) AggregatedWriteBuffe
 	// Initialise timing metrics
 	var waitTimings []float64
 	var flushTimings []float64
+	var writeTimings []float64
 
 	// Retrieve values since the time specified
 	values, err := c.Since(t)
@@ -82,6 +88,7 @@ func AggregatedSince(c *collection.Collection, t time.Time) AggregatedWriteBuffe
 	for _, v := range values {
 		waitTimings = append(waitTimings, v.(*WriteBufferMetric).WaitLatency.Seconds())
 		flushTimings = append(flushTimings, v.(*WriteBufferMetric).FlushLatency.Seconds())
+		writeTimings = append(writeTimings, v.(*WriteBufferMetric).WriteLatency.Seconds())
 		a.Count += v.(*WriteBufferMetric).EnqueuedInstances
 	}
 
@@ -109,6 +116,18 @@ func AggregatedSince(c *collection.Collection, t time.Time) AggregatedWriteBuffe
 	}
 	if s, err := stats.Percentile(stats.Float64Data(flushTimings), 95); err == nil {
 		a.P95WaitSeconds = s
+	}
+	if s, err := stats.Max(stats.Float64Data(writeTimings)); err == nil {
+		a.MaxWriteSeconds = s
+	}
+	if s, err := stats.Mean(stats.Float64Data(writeTimings)); err == nil {
+		a.MeanWriteSeconds = s
+	}
+	if s, err := stats.Median(stats.Float64Data(writeTimings)); err == nil {
+		a.MedianWriteSeconds = s
+	}
+	if s, err := stats.Percentile(stats.Float64Data(writeTimings), 95); err == nil {
+		a.P95WriteSeconds = s
 	}
 
 	return a

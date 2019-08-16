@@ -87,7 +87,7 @@ func init() {
 	metrics.Register("instance.read_topology", readTopologyInstanceCounter)
 	metrics.Register("instance.read", readInstanceCounter)
 	metrics.Register("instance.write", writeInstanceCounter)
-	writeBufferLatency.AddMany([]string{"wait", "flush"})
+	writeBufferLatency.AddMany([]string{"wait", "flush", "write"})
 	writeBufferLatency.Start("wait")
 
 	go initializeInstanceDao()
@@ -2501,6 +2501,7 @@ func flushInstanceWriteBuffer() {
 		// reset stopwatches (TODO: .ResetAll())
 		writeBufferLatency.Reset("wait")
 		writeBufferLatency.Reset("flush")
+		writeBufferLatency.Reset("write")
 		writeBufferLatency.Start("wait") // waiting for next flush
 	}()
 
@@ -2511,7 +2512,7 @@ func flushInstanceWriteBuffer() {
 	writeBufferLatency.Stop("wait")
 	writeBufferLatency.Start("flush")
 
-	for i := 0; i < len(instanceWriteBuffer); i++ {
+	for i := 0; len(instanceWriteBuffer) > 0; i++ {
 		upd := <-instanceWriteBuffer
 		if upd.instanceWasActuallyFound && upd.lastError == nil {
 			lastseen = append(lastseen, upd.instance)
@@ -2522,13 +2523,7 @@ func flushInstanceWriteBuffer() {
 	}
 
 	writeBufferLatency.Stop("flush")
-
-	writeBufferMetrics.Append(&WriteBufferMetric{
-		Timestamp:         time.Now(),
-		WaitLatency:       writeBufferLatency.Elapsed("wait"),
-		FlushLatency:      writeBufferLatency.Elapsed("flush"),
-		EnqueuedInstances: len(lastseen) + len(instances),
-	})
+	writeBufferLatency.Start("write")
 
 	// sort instances by instanceKey (table pk) to make locking predictable
 	sort.Sort(byInstanceKey(instances))
@@ -2551,6 +2546,16 @@ func flushInstanceWriteBuffer() {
 	if err != nil {
 		log.Errorf("flushInstanceWriteBuffer: %v", err)
 	}
+
+	writeBufferLatency.Stop("write")
+
+	writeBufferMetrics.Append(&WriteBufferMetric{
+		Timestamp:         time.Now(),
+		WaitLatency:       writeBufferLatency.Elapsed("wait"),
+		FlushLatency:      writeBufferLatency.Elapsed("flush"),
+		WriteLatency:      writeBufferLatency.Elapsed("write"),
+		EnqueuedInstances: len(lastseen) + len(instances),
+	})
 }
 
 // WriteInstance stores an instance in the orchestrator backend
