@@ -10,10 +10,10 @@ RUN apt-get install -y g++
 RUN rm -rf /var/lib/apt/lists/*
 RUN curl -L -O https://dl.google.com/go/go1.12.6.linux-amd64.tar.gz
 RUN tar -C /usr/local -xzf go1.12.6.linux-amd64.tar.gz
-RUN ln -s /usr/local/go/bin/go /usr/bin/go
 
 WORKDIR /go/src/github.com/github/orchestrator
 
 COPY . .
 
+ENV PATH="/usr/local/go/bin:${PATH}"
 CMD ["script/test"]
