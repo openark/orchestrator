@@ -31,8 +31,6 @@ cd .gopath/src/github.com/github/orchestrator
 echo "# Running unit tests"
 go test ./go/...
 
-curl "127.0.0.1:3306"
-
 echo "# Running integration tests"
 ./tests/integration/test.sh || exit 1
 

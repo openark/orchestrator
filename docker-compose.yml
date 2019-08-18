@@ -1,26 +1,7 @@
 version: "3.5"
 services:
-  db:
-    image: mysql:5.7
-    command: --sql_mode="NO_ENGINE_SUBSTITUTION"
-    environment:
-      MYSQL_ALLOW_EMPTY_PASSWORD: 1
-    ports:
-      - '3306:3306'
-    expose:
-      - 3306
-    volumes:
-       - "db-data:/var/lib/mysql"
-    healthcheck:
-      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
-      timeout: 20s
-      retries: 10
   app:
     image: app
     build:
       context: .
       dockerfile: Dockerfile.test
-    depends_on:
-      - "db"
-volumes:
-  db-data:
