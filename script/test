@@ -2,7 +2,6 @@
 
 . script/bootstrap
 
-curl "127.0.0.1:3306"
 echo "# Validating documentation"
 echo "## docs/toc.md and docs/README.md must be identical"
 diff docs/toc.md docs/README.md > /dev/null 2> /dev/null
@@ -31,6 +30,8 @@ cd .gopath/src/github.com/github/orchestrator
 
 echo "# Running unit tests"
 go test ./go/...
+
+curl "127.0.0.1:3306"
 
 echo "# Running integration tests"
 ./tests/integration/test.sh || exit 1
