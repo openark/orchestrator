@@ -22,6 +22,6 @@ services:
       dockerfile: Dockerfile.test
     depends_on:
       - db:
-          condition: service_healthy
+        condition: service_healthy
 volumes:
   db-data:
