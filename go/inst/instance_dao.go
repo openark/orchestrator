@@ -2485,9 +2485,14 @@ var forceFlushInstanceWriteBuffer = make(chan bool)
 
 func enqueueInstanceWrite(instance *Instance, instanceWasActuallyFound bool, lastError error) {
 	if len(instanceWriteBuffer) == config.Config.InstanceWriteBufferSize {
-		// Signal the "flushing" gorouting that there's work.
+		// Signal the "flushing" goroutine that there's work.
 		// We prefer doing all bulk flushes from one goroutine.
-		forceFlushInstanceWriteBuffer <- true
+		// Non blocking send to avoid blocking goroutines on sending a flush,
+		// if the "flushing" goroutine is not able read is because a flushing is ongoing.
+		select {
+		case forceFlushInstanceWriteBuffer <- true:
+		default:
+		}
 	}
 	instanceWriteBuffer <- instanceUpdateObject{instance, instanceWasActuallyFound, lastError}
 }
@@ -2512,7 +2517,11 @@ func flushInstanceWriteBuffer() {
 	writeBufferLatency.Stop("wait")
 	writeBufferLatency.Start("flush")
 
-	for i := 0; len(instanceWriteBuffer) > 0; i++ {
+	// There are `DiscoveryMaxConcurrency` many goroutines trying to enqueue an instance into the buffer
+	// when one instance is flushed from the buffer then one discovery goroutine is ready to enqueue a new instance
+	// this is why we want to flush all instances in the buffer till a max of `InstanceWriteBufferSize`.
+	// Otherwise we can flush way more instances than what's expected.
+	for i := 0; i < config.Config.InstanceWriteBufferSize && len(instanceWriteBuffer) > 0; i++ {
 		upd := <-instanceWriteBuffer
 		if upd.instanceWasActuallyFound && upd.lastError == nil {
 			lastseen = append(lastseen, upd.instance)
