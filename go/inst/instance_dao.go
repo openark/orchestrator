@@ -1334,7 +1334,7 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 		if instance.IsDowntimed {
 			skip = true
 		}
-		if RegexpMatchPatterns(instance.Key.Hostname, config.Config.ProblemIgnoreHostnameFilters) {
+		if RegexpMatchPatterns(instance.Key.StringCode(), config.Config.ProblemIgnoreHostnameFilters) {
 			skip = true
 		}
 		if !skip {
@@ -1353,10 +1353,11 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 			or instr(version, ?) > 0
 			or instr(version_comment, ?) > 0
 			or instr(concat(hostname, ':', port), ?) > 0
+			or instr(suggested_cluster_alias, ?) > 0
 			or concat(server_id, '') = ?
 			or concat(port, '') = ?
 		`
-	args := sqlutils.Args(searchString, searchString, searchString, searchString, searchString, searchString, searchString)
+	args := sqlutils.Args(searchString, searchString, searchString, searchString, searchString, searchString, searchString, searchString)
 	return readInstancesByCondition(condition, args, `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
 }
 
@@ -1494,7 +1495,7 @@ func ReadClusterNeutralPromotionRuleInstances(clusterName string) (neutralInstan
 func filterOSCInstances(instances [](*Instance)) [](*Instance) {
 	result := [](*Instance){}
 	for _, instance := range instances {
-		if RegexpMatchPatterns(instance.Key.Hostname, config.Config.OSCIgnoreHostnameFilters) {
+		if RegexpMatchPatterns(instance.Key.StringCode(), config.Config.OSCIgnoreHostnameFilters) {
 			continue
 		}
 		if instance.IsBinlogServer() {
