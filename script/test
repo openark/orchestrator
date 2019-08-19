@@ -2,6 +2,19 @@
 
 . script/bootstrap
 
+setup_mysql() {
+  if [ ! -f "dbdeployer" ] ; then
+    return
+  fi
+  ./dbdeployer deploy single "5.7.21" --sandbox-binary $PWD/sandbox/binary --sandbox-home $PWD/sandboxes --sandbox-directory orc-sandbox --port=3306
+  mkdir -p bin
+  ln -s /go/src/github.com/github/orchestrator/sandboxes/orc-sandbox/use bin/mysql
+  chmod +x bin/mysql
+  PATH=bin:$PATH
+}
+
+setup_mysql
+
 echo "# Validating documentation"
 echo "## docs/toc.md and docs/README.md must be identical"
 diff docs/toc.md docs/README.md > /dev/null 2> /dev/null
