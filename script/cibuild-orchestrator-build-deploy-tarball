@@ -44,6 +44,6 @@ trap cleanup EXIT
 export CI_MODE=true
 
 output_fold "Bootstrapping container..." $docker_compose build
-output_fold "Running tests..." $docker_compose run --rm app
+output_fold "Running tests..." $docker_compose run --rm app || exit 1
 
 $docker_compose run -e BUILD_ARTIFACT_DIR=$BUILD_ARTIFACT_DIR -v $BUILD_ARTIFACT_DIR:$BUILD_ARTIFACT_DIR app script/build-deploy-tarball
