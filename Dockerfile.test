@@ -5,6 +5,8 @@ RUN apt-get update
 RUN apt-get install -y lsb-release
 RUN apt-get install -y rsync
 RUN rm -rf /var/lib/apt/lists/*
+RUN curl -L -O "https://github.com/github/gh-ost-ci-env/raw/master/bin/linux/dbdeployer"
+RUN curl -L -O "https://github.com/github/gh-ost-ci-env/raw/master/mysql-tarballs/5.7.21.tar.gz"
 
 WORKDIR /go/src/github.com/github/orchestrator
 
