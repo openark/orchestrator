@@ -2511,11 +2511,12 @@ func flushInstanceWriteBuffer() {
 		writeBufferLatency.Start("wait") // waiting for next flush
 	}()
 
+	writeBufferLatency.Stop("wait")
+
 	if len(instanceWriteBuffer) == 0 {
 		return
 	}
 
-	writeBufferLatency.Stop("wait")
 	writeBufferLatency.Start("flush")
 
 	// There are `DiscoveryMaxConcurrency` many goroutines trying to enqueue an instance into the buffer
