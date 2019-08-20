@@ -106,16 +106,16 @@ func AggregatedSince(c *collection.Collection, t time.Time) AggregatedWriteBuffe
 		a.P95WaitSeconds = s
 	}
 	if s, err := stats.Max(stats.Float64Data(flushTimings)); err == nil {
-		a.MaxWaitSeconds = s
+		a.MaxFlushSeconds = s
 	}
 	if s, err := stats.Mean(stats.Float64Data(flushTimings)); err == nil {
-		a.MeanWaitSeconds = s
+		a.MeanFlushSeconds = s
 	}
 	if s, err := stats.Median(stats.Float64Data(flushTimings)); err == nil {
-		a.MedianWaitSeconds = s
+		a.MedianFlushSeconds = s
 	}
 	if s, err := stats.Percentile(stats.Float64Data(flushTimings), 95); err == nil {
-		a.P95WaitSeconds = s
+		a.P95FlushSeconds = s
 	}
 	if s, err := stats.Max(stats.Float64Data(writeTimings)); err == nil {
 		a.MaxWriteSeconds = s
