@@ -35,11 +35,10 @@ import (
 // "sized channel" the wait time may be significant and is good to
 // measure.
 type WriteBufferMetric struct {
-	Timestamp         time.Time     // time the metric was started
-	WaitLatency       time.Duration // waiting before flush
-	FlushLatency      time.Duration // time flushing instance buffer
-	WriteLatency      time.Duration // time writing to backend
-	EnqueuedInstances int
+	Timestamp    time.Time     // time the metric was started
+	Instances    int           // number of flushed instances
+	WaitLatency  time.Duration // waiting before flush
+	WriteLatency time.Duration // time writing to backend
 }
 
 // When records the timestamp of the start of the recording
@@ -50,15 +49,15 @@ func (m WriteBufferMetric) When() time.Time {
 type AggregatedWriteBufferMetric struct {
 	InstanceWriteBufferSize           int // config setting
 	InstanceFlushIntervalMilliseconds int // config setting
-	Count                             int
+	CountInstances                    int
+	MaxInstances                      float64
+	MeanInstances                     float64
+	MedianInstances                   float64
+	P95Instances                      float64
 	MaxWaitSeconds                    float64
 	MeanWaitSeconds                   float64
 	MedianWaitSeconds                 float64
 	P95WaitSeconds                    float64
-	MaxFlushSeconds                   float64
-	MeanFlushSeconds                  float64
-	MedianFlushSeconds                float64
-	P95FlushSeconds                   float64
 	MaxWriteSeconds                   float64
 	MeanWriteSeconds                  float64
 	MedianWriteSeconds                float64
@@ -70,8 +69,8 @@ type AggregatedWriteBufferMetric struct {
 func AggregatedSince(c *collection.Collection, t time.Time) AggregatedWriteBufferMetric {
 
 	// Initialise timing metrics
+	var instancesCounter []float64
 	var waitTimings []float64
-	var flushTimings []float64
 	var writeTimings []float64
 
 	// Retrieve values since the time specified
@@ -86,13 +85,25 @@ func AggregatedSince(c *collection.Collection, t time.Time) AggregatedWriteBuffe
 
 	// generate the metrics
 	for _, v := range values {
+		instancesCounter = append(instancesCounter, float64(v.(*WriteBufferMetric).Instances))
 		waitTimings = append(waitTimings, v.(*WriteBufferMetric).WaitLatency.Seconds())
-		flushTimings = append(flushTimings, v.(*WriteBufferMetric).FlushLatency.Seconds())
 		writeTimings = append(writeTimings, v.(*WriteBufferMetric).WriteLatency.Seconds())
-		a.Count += v.(*WriteBufferMetric).EnqueuedInstances
+		a.CountInstances += v.(*WriteBufferMetric).Instances
 	}
 
 	// generate aggregate values
+	if s, err := stats.Max(stats.Float64Data(instancesCounter)); err == nil {
+		a.MaxInstances = s
+	}
+	if s, err := stats.Mean(stats.Float64Data(instancesCounter)); err == nil {
+		a.MeanInstances = s
+	}
+	if s, err := stats.Median(stats.Float64Data(instancesCounter)); err == nil {
+		a.MedianInstances = s
+	}
+	if s, err := stats.Percentile(stats.Float64Data(instancesCounter), 95); err == nil {
+		a.P95Instances = s
+	}
 	if s, err := stats.Max(stats.Float64Data(waitTimings)); err == nil {
 		a.MaxWaitSeconds = s
 	}
@@ -104,18 +115,6 @@ func AggregatedSince(c *collection.Collection, t time.Time) AggregatedWriteBuffe
 	}
 	if s, err := stats.Percentile(stats.Float64Data(waitTimings), 95); err == nil {
 		a.P95WaitSeconds = s
-	}
-	if s, err := stats.Max(stats.Float64Data(flushTimings)); err == nil {
-		a.MaxFlushSeconds = s
-	}
-	if s, err := stats.Mean(stats.Float64Data(flushTimings)); err == nil {
-		a.MeanFlushSeconds = s
-	}
-	if s, err := stats.Median(stats.Float64Data(flushTimings)); err == nil {
-		a.MedianFlushSeconds = s
-	}
-	if s, err := stats.Percentile(stats.Float64Data(flushTimings), 95); err == nil {
-		a.P95FlushSeconds = s
 	}
 	if s, err := stats.Max(stats.Float64Data(writeTimings)); err == nil {
 		a.MaxWriteSeconds = s

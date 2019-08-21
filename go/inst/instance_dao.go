@@ -87,7 +87,7 @@ func init() {
 	metrics.Register("instance.read_topology", readTopologyInstanceCounter)
 	metrics.Register("instance.read", readInstanceCounter)
 	metrics.Register("instance.write", writeInstanceCounter)
-	writeBufferLatency.AddMany([]string{"wait", "flush", "write"})
+	writeBufferLatency.AddMany([]string{"wait", "write"})
 	writeBufferLatency.Start("wait")
 
 	go initializeInstanceDao()
@@ -2506,7 +2506,6 @@ func flushInstanceWriteBuffer() {
 	defer func() {
 		// reset stopwatches (TODO: .ResetAll())
 		writeBufferLatency.Reset("wait")
-		writeBufferLatency.Reset("flush")
 		writeBufferLatency.Reset("write")
 		writeBufferLatency.Start("wait") // waiting for next flush
 	}()
@@ -2516,8 +2515,6 @@ func flushInstanceWriteBuffer() {
 	if len(instanceWriteBuffer) == 0 {
 		return
 	}
-
-	writeBufferLatency.Start("flush")
 
 	// There are `DiscoveryMaxConcurrency` many goroutines trying to enqueue an instance into the buffer
 	// when one instance is flushed from the buffer then one discovery goroutine is ready to enqueue a new instance
@@ -2533,7 +2530,6 @@ func flushInstanceWriteBuffer() {
 		}
 	}
 
-	writeBufferLatency.Stop("flush")
 	writeBufferLatency.Start("write")
 
 	// sort instances by instanceKey (table pk) to make locking predictable
@@ -2561,11 +2557,10 @@ func flushInstanceWriteBuffer() {
 	writeBufferLatency.Stop("write")
 
 	writeBufferMetrics.Append(&WriteBufferMetric{
-		Timestamp:         time.Now(),
-		WaitLatency:       writeBufferLatency.Elapsed("wait"),
-		FlushLatency:      writeBufferLatency.Elapsed("flush"),
-		WriteLatency:      writeBufferLatency.Elapsed("write"),
-		EnqueuedInstances: len(lastseen) + len(instances),
+		Timestamp:    time.Now(),
+		WaitLatency:  writeBufferLatency.Elapsed("wait"),
+		WriteLatency: writeBufferLatency.Elapsed("write"),
+		Instances:    len(lastseen) + len(instances),
 	})
 }
 
