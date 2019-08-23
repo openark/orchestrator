@@ -75,6 +75,13 @@ func (this *zkStore) GetKeyValue(key string) (value string, found bool, err erro
 	return string(result), true, nil
 }
 
+func (this *zkStore) DeleteRecursive(key string) (err error) {
+	if this.zook == nil {
+		return nil
+	}
+	return this.zook.DeleteRecursive(normalizeKey(key))
+}
+
 func (this *zkStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 	return nil
 }

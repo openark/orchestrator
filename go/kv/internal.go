@@ -65,3 +65,14 @@ func (this *internalKVStore) GetKeyValue(key string) (value string, found bool, 
 func (this *internalKVStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 	return nil
 }
+
+func (this *internalKVStore) DeleteRecursive(key string) (err error) {
+	_, err = db.ExecOrchestrator(`
+		delete
+			from kv_store 
+		where
+		store_key rlike ?
+		`, key,
+	)
+	return log.Errore(err)
+}
