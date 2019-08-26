@@ -351,11 +351,13 @@ func executeProcesses(processes []string, description string, topologyRecovery *
 
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Running %d %s hooks", len(processes), description))
 	for i, command := range processes {
-		fullDescription := fmt.Sprintf("%s hook %d of %d", description, i+1, len(processes))
-
 		command, async := prepareCommand(command, topologyRecovery)
 		env := applyEnvironmentVariables(topologyRecovery)
 
+		fullDescription := fmt.Sprintf("%s hook %d of %d", description, i+1, len(processes))
+		if async {
+			fullDescription = fmt.Sprintf("%s (async)", fullDescription)
+		}
 		if async {
 			// Ignore errors
 			go executeProcess(command, env, topologyRecovery, fullDescription)
