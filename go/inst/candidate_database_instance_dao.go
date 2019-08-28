@@ -87,16 +87,18 @@ func BulkReadCandidateDatabaseInstance() ([]CandidateDatabaseInstance, error) {
 			hostname,
 			port,
 			promotion_rule,
-			last_suggested
+			last_suggested,
+			last_suggested + INTERVAL ? MINUTE AS promotion_rule_expiry
 		FROM
 			candidate_database_instance
 	`
-	err := db.QueryOrchestrator(query, nil, func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestrator(query, sqlutils.Args(config.Config.CandidateInstanceExpireMinutes), func(m sqlutils.RowMap) error {
 		cdi := CandidateDatabaseInstance{
 			Hostname:            m.GetString("hostname"),
 			Port:                m.GetInt("port"),
 			PromotionRule:       CandidatePromotionRule(m.GetString("promotion_rule")),
 			LastSuggestedString: m.GetString("last_suggested"),
+			PromotionRuleExpiry: m.GetString("promotion_rule_expiry"),
 		}
 		// add to end of candidateDatabaseInstances
 		candidateDatabaseInstances = append(candidateDatabaseInstances, cdi)

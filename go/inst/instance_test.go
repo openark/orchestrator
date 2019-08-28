@@ -71,6 +71,45 @@ func TestIsSmallerBinlogFormat(t *testing.T) {
 	test.S(t).ExpectFalse(iRow.IsSmallerBinlogFormat(iMixed))
 }
 
+func TestIsDescendant(t *testing.T) {
+	{
+		i57 := Instance{Key: key1, Version: "5.7"}
+		i56 := Instance{Key: key2, Version: "5.6"}
+		isDescendant := i57.IsDescendantOf(&i56)
+		test.S(t).ExpectEquals(isDescendant, false)
+	}
+	{
+		i57 := Instance{Key: key1, Version: "5.7", AncestryUUID: "00020192-1111-1111-1111-111111111111"}
+		i56 := Instance{Key: key2, Version: "5.6", ServerUUID: ""}
+		isDescendant := i57.IsDescendantOf(&i56)
+		test.S(t).ExpectEquals(isDescendant, false)
+	}
+	{
+		i57 := Instance{Key: key1, Version: "5.7", AncestryUUID: ""}
+		i56 := Instance{Key: key2, Version: "5.6", ServerUUID: "00020192-1111-1111-1111-111111111111"}
+		isDescendant := i57.IsDescendantOf(&i56)
+		test.S(t).ExpectEquals(isDescendant, false)
+	}
+	{
+		i57 := Instance{Key: key1, Version: "5.7", AncestryUUID: "00020193-2222-2222-2222-222222222222"}
+		i56 := Instance{Key: key2, Version: "5.6", ServerUUID: "00020192-1111-1111-1111-111111111111"}
+		isDescendant := i57.IsDescendantOf(&i56)
+		test.S(t).ExpectEquals(isDescendant, false)
+	}
+	{
+		i57 := Instance{Key: key1, Version: "5.7", AncestryUUID: "00020193-2222-2222-2222-222222222222,00020193-3333-3333-3333-222222222222"}
+		i56 := Instance{Key: key2, Version: "5.6", ServerUUID: "00020192-1111-1111-1111-111111111111"}
+		isDescendant := i57.IsDescendantOf(&i56)
+		test.S(t).ExpectEquals(isDescendant, false)
+	}
+	{
+		i57 := Instance{Key: key1, Version: "5.7", AncestryUUID: "00020193-2222-2222-2222-222222222222,00020192-1111-1111-1111-111111111111"}
+		i56 := Instance{Key: key2, Version: "5.6", ServerUUID: "00020192-1111-1111-1111-111111111111"}
+		isDescendant := i57.IsDescendantOf(&i56)
+		test.S(t).ExpectEquals(isDescendant, true)
+	}
+}
+
 func TestCanReplicateFrom(t *testing.T) {
 	i55 := Instance{Key: key1, Version: "5.5"}
 	i56 := Instance{Key: key2, Version: "5.6"}

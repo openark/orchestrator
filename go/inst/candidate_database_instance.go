@@ -30,6 +30,7 @@ type CandidateDatabaseInstance struct {
 	Port                int
 	PromotionRule       CandidatePromotionRule
 	LastSuggestedString string
+	PromotionRuleExpiry string // generated when retrieved from database for consistency reasons
 }
 
 func NewCandidateDatabaseInstance(instanceKey *InstanceKey, promotionRule CandidatePromotionRule) *CandidateDatabaseInstance {

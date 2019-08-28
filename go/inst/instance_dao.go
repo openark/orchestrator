@@ -46,11 +46,13 @@ import (
 )
 
 const (
-	backendDBConcurrency   = 20
-	error1045AccessDenied  = "Error 1045: Access denied for user"
-	errorConnectionRefused = "getsockopt: connection refused"
-	errorNoSuchHost        = "no such host"
-	errorIOTimeout         = "i/o timeout"
+	backendDBConcurrency       = 20
+	retryInstanceFunctionCount = 5
+	retryInterval              = 500 * time.Millisecond
+	error1045AccessDenied      = "Error 1045: Access denied for user"
+	errorConnectionRefused     = "getsockopt: connection refused"
+	errorNoSuchHost            = "no such host"
+	errorIOTimeout             = "i/o timeout"
 )
 
 var instanceReadChan = make(chan bool, backendDBConcurrency)
@@ -172,6 +174,15 @@ func logReadTopologyInstanceError(instanceKey *InstanceKey, hint string, err err
 // backend.
 func ReadTopologyInstance(instanceKey *InstanceKey) (*Instance, error) {
 	return ReadTopologyInstanceBufferable(instanceKey, false, nil)
+}
+
+func RetryInstanceFunction(f func() (*Instance, error)) (instance *Instance, err error) {
+	for i := 0; i < retryInstanceFunctionCount; i++ {
+		if instance, err = f(); err == nil {
+			return instance, nil
+		}
+	}
+	return instance, err
 }
 
 // Is this an error which means that we shouldn't try going more queries for this discovery attempt?
@@ -455,6 +466,15 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		}
 		// This can be overriden by later invocation of DetectDataCenterQuery
 	}
+	if config.Config.RegionPattern != "" {
+		if pattern, err := regexp.Compile(config.Config.RegionPattern); err == nil {
+			match := pattern.FindStringSubmatch(instance.Key.Hostname)
+			if len(match) != 0 {
+				instance.Region = match[1]
+			}
+		}
+		// This can be overriden by later invocation of DetectRegionQuery
+	}
 	if config.Config.PhysicalEnvironmentPattern != "" {
 		if pattern, err := regexp.Compile(config.Config.PhysicalEnvironmentPattern); err == nil {
 			match := pattern.FindStringSubmatch(instance.Key.Hostname)
@@ -647,6 +667,15 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			defer waitGroup.Done()
 			err := db.QueryRow(config.Config.DetectDataCenterQuery).Scan(&instance.DataCenter)
 			logReadTopologyInstanceError(instanceKey, "DetectDataCenterQuery", err)
+		}()
+	}
+
+	if config.Config.DetectRegionQuery != "" && !isMaxScale {
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			err := db.QueryRow(config.Config.DetectRegionQuery).Scan(&instance.Region)
+			logReadTopologyInstanceError(instanceKey, "DetectRegionQuery", err)
 		}()
 	}
 
@@ -1055,6 +1084,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.ClusterName = m.GetString("cluster_name")
 	instance.SuggestedClusterAlias = m.GetString("suggested_cluster_alias")
 	instance.DataCenter = m.GetString("data_center")
+	instance.Region = m.GetString("region")
 	instance.PhysicalEnvironment = m.GetString("physical_environment")
 	instance.SemiSyncEnforced = m.GetBool("semi_sync_enforced")
 	instance.SemiSyncMasterEnabled = m.GetBool("semi_sync_master_enabled")
@@ -1302,7 +1332,7 @@ func ReadProblemInstances(clusterName string) ([](*Instance), error) {
 		if instance.IsDowntimed {
 			skip = true
 		}
-		if RegexpMatchPatterns(instance.Key.Hostname, config.Config.ProblemIgnoreHostnameFilters) {
+		if RegexpMatchPatterns(instance.Key.StringCode(), config.Config.ProblemIgnoreHostnameFilters) {
 			skip = true
 		}
 		if !skip {
@@ -1325,10 +1355,11 @@ func SearchInstances(searchString string) ([](*Instance), error) {
 				 	 ELSE concat(hostname, ':', port)
 				END,
 				?) > 0
+			or instr(suggested_cluster_alias, ?) > 0
 			or concat(server_id, '') = ?
 			or concat(port, '') = ?
 		`
-	args := sqlutils.Args(searchString, searchString, searchString, searchString, searchString, searchString, searchString)
+	args := sqlutils.Args(searchString, searchString, searchString, searchString, searchString, searchString, searchString, searchString)
 	return readInstancesByCondition(condition, args, `replication_depth asc, num_slave_hosts desc, cluster_name, hostname, port`)
 }
 
@@ -1352,7 +1383,7 @@ func FindInstances(regexpPattern string) (result [](*Instance), err error) {
 	return result, nil
 }
 
-// FindFuzzyInstances return instances whose names are like the one given (host & port substrings)
+// findFuzzyInstances return instances whose names are like the one given (host & port substrings)
 // For example, the given `mydb-3:3306` might find `myhosts-mydb301-production.mycompany.com:3306`
 func findFuzzyInstances(fuzzyInstanceKey *InstanceKey) ([](*Instance), error) {
 	condition := `
@@ -1466,7 +1497,7 @@ func ReadClusterNeutralPromotionRuleInstances(clusterName string) (neutralInstan
 func filterOSCInstances(instances [](*Instance)) [](*Instance) {
 	result := [](*Instance){}
 	for _, instance := range instances {
-		if RegexpMatchPatterns(instance.Key.Hostname, config.Config.OSCIgnoreHostnameFilters) {
+		if RegexpMatchPatterns(instance.Key.StringCode(), config.Config.OSCIgnoreHostnameFilters) {
 			continue
 		}
 		if instance.IsBinlogServer() {
@@ -1689,6 +1720,34 @@ func updateInstanceClusterName(instance *Instance) error {
 			return log.Errore(err)
 		}
 		AuditOperation("update-cluster-name", &instance.Key, fmt.Sprintf("set to %s", instance.ClusterName))
+		return nil
+	}
+	return ExecDBWriteFunc(writeFunc)
+}
+
+// ReplaceClusterName replaces all occurances of oldClusterName with newClusterName
+// It is called after a master failover
+func ReplaceClusterName(oldClusterName string, newClusterName string) error {
+	if oldClusterName == "" {
+		return log.Errorf("replaceClusterName: skipping empty oldClusterName")
+	}
+	if newClusterName == "" {
+		return log.Errorf("replaceClusterName: skipping empty newClusterName")
+	}
+	writeFunc := func() error {
+		_, err := db.ExecOrchestrator(`
+			update
+				database_instance
+			set
+				cluster_name=?
+			where
+				and cluster_name=?
+				`, newClusterName, oldClusterName,
+		)
+		if err != nil {
+			return log.Errore(err)
+		}
+		AuditOperation("replace-cluster-name", nil, fmt.Sprintf("replaxced %s with %s", oldClusterName, newClusterName))
 		return nil
 	}
 	return ExecDBWriteFunc(writeFunc)
@@ -2286,6 +2345,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"cluster_name",
 		"suggested_cluster_alias",
 		"data_center",
+		"region",
 		"physical_environment",
 		"replication_depth",
 		"is_co_master",
@@ -2365,6 +2425,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.ClusterName)
 		args = append(args, instance.SuggestedClusterAlias)
 		args = append(args, instance.DataCenter)
+		args = append(args, instance.Region)
 		args = append(args, instance.PhysicalEnvironment)
 		args = append(args, instance.ReplicationDepth)
 		args = append(args, instance.IsCoMaster)
@@ -2540,8 +2601,11 @@ func InstanceIsForgotten(instanceKey *InstanceKey) bool {
 // ForgetInstance removes an instance entry from the orchestrator backed database.
 // It may be auto-rediscovered through topology or requested for discovery by multiple means.
 func ForgetInstance(instanceKey *InstanceKey) error {
+	if instanceKey == nil {
+		return log.Errorf("ForgetInstance(): nil instanceKey")
+	}
 	forgetInstanceKeys.Set(instanceKey.StringCode(), true, cache.DefaultExpiration)
-	_, err := db.ExecOrchestrator(`
+	sqlResult, err := db.ExecOrchestrator(`
 			delete
 				from database_instance
 			where
@@ -2549,8 +2613,18 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 		instanceKey.Hostname,
 		instanceKey.Port,
 	)
+	if err != nil {
+		return log.Errore(err)
+	}
+	rows, err := sqlResult.RowsAffected()
+	if err != nil {
+		return log.Errore(err)
+	}
+	if rows == 0 {
+		return log.Errorf("ForgetInstance(): instance %+v not found", *instanceKey)
+	}
 	AuditOperation("forget", instanceKey, "")
-	return err
+	return nil
 }
 
 // ForgetInstance removes an instance entry from the orchestrator backed database.
