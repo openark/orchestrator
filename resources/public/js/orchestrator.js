@@ -933,7 +933,11 @@ function renderInstanceElement(popoverElement, instance, renderType) {
       contentHtml += '<p><strong>Master</strong></p>';
     }
     if (renderType == "search") {
-      contentHtml += '<p>' + 'Cluster: <a href="' + appUrl('/web/cluster/' + instance.ClusterName) + '">' + instance.ClusterName + '</a>' + '</p>';
+      if (instance.SuggestedClusterAlias) {
+        contentHtml += '<p>' + 'Cluster: <a href="' + appUrl('/web/cluster/alias/' + instance.SuggestedClusterAlias) + '">' + instance.SuggestedClusterAlias + '</a>' + '</p>';
+      } else {
+        contentHtml += '<p>' + 'Cluster: <a href="' + appUrl('/web/cluster/' + instance.ClusterName) + '">' + instance.ClusterName + '</a>' + '</p>';
+      }
     }
     if (renderType == "problems") {
       contentHtml += '<p>' + 'Problem: <strong title="' + instance.problemDescription + '">' + instance.problem.replace(/_/g, ' ') + '</strong>' + '</p>';
