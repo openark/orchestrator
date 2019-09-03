@@ -15,8 +15,10 @@ test_query_file=/tmp/orchestrator-test.sql
 test_config_file=/tmp/orchestrator.conf.json
 orchestrator_binary=/tmp/orchestrator-test
 exec_command_file=/tmp/orchestrator-test.bash
+test_mysql_defaults_file=/tmp/orchestrator-test-my.cnf
 db_type=""
 sqlite_file="/tmp/orchestrator.db"
+mysql_args="--defaults-extra-file=${test_mysql_defaults_file} --default-character-set=utf8mb4 -s -s"
 
 function run_queries() {
   queries_file="$1"
@@ -28,11 +30,39 @@ function run_queries() {
       sqlite3 $sqlite_file
   else
     # Assume mysql
-    mysql --default-character-set=utf8mb4 test -ss < $queries_file
+    mysql $mysql_args test < $queries_file
   fi
 }
 
+setup_mysql() {
+  local mysql_user=""
+  local mysql_password=""
+  echo "one time setup of mysql"
+  if mysql --default-character-set=utf8mb4 -ss -e "select 16 + 1" -u root -proot 2> /dev/null | grep -q 17 ; then
+    mysql_user="root"
+    mysql_password="root"
+  fi
+  if mysql --default-character-set=utf8mb4 -ss -e "select 16 + 1" -u root -pmsandbox 2> /dev/null | grep -q 17 ; then
+    mysql_user="root"
+    mysql_password="msandbox"
+  fi
+  if mysql --default-character-set=utf8mb4 -ss -e "select 16 + 1" -u "$(whoami)" 2> /dev/null | grep -q 17 ; then
+    mysql_user="$(whoami)"
+  fi
+  echo "[client]"                   >  $test_mysql_defaults_file
+  echo "user=${mysql_user}"         >> $test_mysql_defaults_file
+  echo "password=${mysql_password}" >> $test_mysql_defaults_file
+
+  echo "mysql args: $mysql_args"
+  echo "mysql config (${test_mysql_defaults_file})"
+  cat $test_mysql_defaults_file
+  mysql $mysql_args -e "create database if not exists test"
+}
+
 check_db() {
+  if [ "$db_type" == "mysql" ] ; then
+    setup_mysql
+  fi
   echo "select 1;" > $test_query_file
   query_result="$(run_queries $test_query_file)"
   if [ "$query_result" != "1" ] ; then
@@ -159,7 +189,6 @@ generate_config_file() {
   cp ${tests_path}/orchestrator.conf.json ${test_config_file}
   sed -i -e "s/backend-db-placeholder/${db_type}/g" ${test_config_file}
   sed -i -e "s^sqlite-data-file-placeholder^${sqlite_file}^g" ${test_config_file}
-  sed -i -e "s^mysql-user-placeholder^${MYSQL_USER:-}^g" ${test_config_file}
   echo "- generate_config_file OK"
 }
 
@@ -187,8 +216,8 @@ test_all() {
 test_db() {
   db_type="$1"
   echo "### testing via $db_type"
-  generate_config_file
   check_db
+  generate_config_file
   test_all ${@:2}
   if [ $? -ne 0 ] ; then
     echo "test_db failed"
