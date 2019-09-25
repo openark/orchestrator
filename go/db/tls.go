@@ -130,8 +130,10 @@ func SetupMySQLOrchestratorTLS(uri string) (string, error) {
 			return "", log.Fatalf("Can't create TLS configuration for Orchestrator connection %s: %s", uri, err)
 		}
 		tlsConfig.InsecureSkipVerify = config.Config.MySQLOrchestratorSSLSkipVerify
-		if err = ssl.AppendKeyPair(tlsConfig, config.Config.MySQLOrchestratorSSLCertFile, config.Config.MySQLOrchestratorSSLPrivateKeyFile); err != nil {
-			return "", log.Fatalf("Can't setup TLS key pairs for %s: %s", uri, err)
+		if config.Config.MySQLOrchestratorSSLCertFile != "" {
+			if err = ssl.AppendKeyPair(tlsConfig, config.Config.MySQLOrchestratorSSLCertFile, config.Config.MySQLOrchestratorSSLPrivateKeyFile); err != nil {
+				return "", log.Fatalf("Can't setup TLS key pairs for %s: %s", uri, err)
+			}
 		}
 		if err = mysql.RegisterTLSConfig("orchestrator", tlsConfig); err != nil {
 			return "", log.Fatalf("Can't register mysql TLS config for orchestrator: %s", err)
