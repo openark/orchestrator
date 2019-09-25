@@ -123,7 +123,7 @@ func SetupMySQLTopologyTLS(uri string) (string, error) {
 // Modify the supplied URI to call the TLS config
 func SetupMySQLOrchestratorTLS(uri string) (string, error) {
 	if !orchestratorTLSConfigured {
-		tlsConfig, err := ssl.NewTLSConfig(config.Config.MySQLOrchestratorSSLCAFile, true)
+		tlsConfig, err := ssl.NewTLSConfig(config.Config.MySQLOrchestratorSSLCAFile, !config.Config.MySQLOrchestratorSSLSkipVerify)
 		// Drop to TLS 1.0 for talking to MySQL
 		tlsConfig.MinVersion = tls.VersionTLS10
 		if err != nil {
