@@ -103,7 +103,7 @@ func SetupMySQLTopologyTLS(uri string) (string, error) {
 		}
 		tlsConfig.InsecureSkipVerify = config.Config.MySQLTopologySSLSkipVerify
 
-		if config.Config.MySQLTopologyUseMutualTLS &&
+		if (config.Config.MySQLTopologyUseMutualTLS && !config.Config.MySQLTopologySSLSkipVerify) &&
 			config.Config.MySQLTopologySSLCertFile != "" &&
 			config.Config.MySQLTopologySSLPrivateKeyFile != "" {
 			if err = ssl.AppendKeyPair(tlsConfig, config.Config.MySQLTopologySSLCertFile, config.Config.MySQLTopologySSLPrivateKeyFile); err != nil {
