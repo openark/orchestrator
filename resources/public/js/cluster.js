@@ -1482,6 +1482,13 @@ function Cluster() {
         glyph.attr("title", "Anonymize display");
       }
     }
+    // Aliasize
+    {
+      var glyph = $("#cluster_sidebar [data-bullet=aliasize] .glyphicon");
+      var is = isAliasized();
+      glyph.addClass(is ? "text-info" : "text-muted");
+      glyph.attr("title", is ? "Cancel aliasize" : "Aliasize display");
+    }
     // Silent UI
     {
       var glyph = $("#cluster_sidebar [data-bullet=silent-ui] .glyphicon");
@@ -1727,11 +1734,15 @@ function Cluster() {
       $("#dropdown-context").append('<li><a data-command="pool-indicator">Pool indicator</a></li>');
       $("#dropdown-context").append('<li><a data-command="colorize-dc">Colorize DC</a></li>');
       $("#dropdown-context").append('<li><a data-command="anonymize">Anonymize</a></li>');
+      $("#dropdown-context").append('<li><a data-command="aliasize">Aliasize</a></li>');
       if ($.cookie("pool-indicator") == "true") {
         $("#dropdown-context a[data-command=pool-indicator]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
       }
       if (isAnonymized()) {
         $("#dropdown-context a[data-command=anonymize]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
+      }
+      if (isAliasized()) {
+        $("#dropdown-context a[data-command=aliasize]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
       }
       if (isColorizeDC()) {
         $("#dropdown-context a[data-command=colorize-dc]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
@@ -1800,6 +1811,13 @@ function Cluster() {
         return
       }
       $.cookie("anonymize", "true", {
+        path: '/',
+        expires: 1
+      });
+      location.reload();
+    });
+    $("body").on("click", "a[data-command=aliasize]", function(event) {
+      $.cookie("aliasize", isAliasized() ? "false" : "true", {
         path: '/',
         expires: 1
       });

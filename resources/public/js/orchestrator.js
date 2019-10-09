@@ -64,6 +64,10 @@ function isAnonymized() {
   return ($.cookie("anonymize") == "true");
 }
 
+function isAliasized() {
+  return ($.cookie("aliasize") == "true");
+}
+
 function isSilentUI() {
   return ($.cookie("silent-ui") == "true");
 }
@@ -807,9 +811,10 @@ function renderInstanceElement(popoverElement, instance, renderType) {
   // $(this).find("h3").attr("title", anonymizeInstanceId(instanceId));
   var anonymizedInstanceId = anonymizeInstanceId(instance.id);
   popoverElement.attr("data-nodeid", instance.id);
-  popoverElement.find("h3").attr('title', (isAnonymized() ? anonymizedInstanceId : instance.title));
+  popoverElement.find("h3").attr('title', (isAnonymized() ? anonymizedInstanceId : isAliasized() ? instance.InstanceAlias : instance.title));
   popoverElement.find("h3").html('&nbsp;<div class="pull-left">' +
-    (isAnonymized() ? anonymizedInstanceId : instance.canonicalTitle) + '</div><div class="pull-right instance-glyphs"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></div>');
+    (isAnonymized() ? anonymizedInstanceId : isAliasized() ? instance.InstanceAlias : instance.canonicalTitle) +
+    '</div><div class="pull-right instance-glyphs"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></div>');
   var indicateLastSeenInStatus = false;
 
   if (instance.isAggregate) {
