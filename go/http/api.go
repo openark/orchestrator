@@ -3757,6 +3757,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequestNoProxy(m, "hostname-resolve-cache", this.HostnameResolveCache)
 	this.registerAPIRequestNoProxy(m, "reset-hostname-resolve-cache", this.ResetHostnameResolveCache)
 	// Meta
+	this.registerAPIRequest(m, "routed-leader-check", this.LeaderCheck)
 	this.registerAPIRequest(m, "reelect", this.Reelect)
 	this.registerAPIRequest(m, "reload-cluster-alias", this.ReloadClusterAlias)
 	this.registerAPIRequest(m, "deregister-hostname-unresolve/:host/:port", this.DeregisterHostnameUnresolve)
