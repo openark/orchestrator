@@ -252,9 +252,14 @@ func resolveRecovery(topologyRecovery *TopologyRecovery, successorInstance *inst
 	}
 }
 
-// replaceCommandPlaceholders replaces agreed-upon placeholders with analysis data
-func replaceCommandPlaceholders(command string, topologyRecovery *TopologyRecovery) string {
+// prepareCommand replaces agreed-upon placeholders with analysis data
+func prepareCommand(command string, topologyRecovery *TopologyRecovery) (result string, async bool) {
 	analysisEntry := &topologyRecovery.AnalysisEntry
+	command = strings.TrimSpace(command)
+	if strings.HasSuffix(command, "&") {
+		command = strings.TrimRight(command, "&")
+		async = true
+	}
 	command = strings.Replace(command, "{failureType}", string(analysisEntry.Analysis), -1)
 	command = strings.Replace(command, "{failureDescription}", analysisEntry.Description, -1)
 	command = strings.Replace(command, "{command}", analysisEntry.CommandHint, -1)
@@ -286,7 +291,7 @@ func replaceCommandPlaceholders(command string, topologyRecovery *TopologyRecove
 	command = strings.Replace(command, "{slaveHosts}", analysisEntry.SlaveHosts.ToCommaDelimitedList(), -1)
 	command = strings.Replace(command, "{replicaHosts}", analysisEntry.SlaveHosts.ToCommaDelimitedList(), -1)
 
-	return command
+	return command, async
 }
 
 // applyEnvironmentVariables sets the relevant environment variables for a recovery
@@ -322,50 +327,54 @@ func applyEnvironmentVariables(topologyRecovery *TopologyRecovery) []string {
 	return env
 }
 
+func executeProcess(command string, env []string, topologyRecovery *TopologyRecovery, fullDescription string) (err error) {
+	// Log the command to be run and record how long it takes as this may be useful
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Running %s: %s", fullDescription, command))
+	start := time.Now()
+	var info string
+	if err = os.CommandRun(command, env); err == nil {
+		info = fmt.Sprintf("Completed %s in %v", fullDescription, time.Since(start))
+	} else {
+		info = fmt.Sprintf("Execution of %s failed in %v with error: %v", fullDescription, time.Since(start), err)
+		log.Errorf(info)
+	}
+	AuditTopologyRecovery(topologyRecovery, info)
+	return err
+}
+
 // executeProcesses executes a list of processes
-func executeProcesses(processes []string, description string, topologyRecovery *TopologyRecovery, failOnError bool) error {
+func executeProcesses(processes []string, description string, topologyRecovery *TopologyRecovery, failOnError bool) (err error) {
 	if len(processes) == 0 {
 		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("No %s hooks to run", description))
 		return nil
 	}
 
-	var err error
 	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Running %d %s hooks", len(processes), description))
 	for i, command := range processes {
-		fullDescription := fmt.Sprintf("%s hook %d of %d", description, i+1, len(processes))
-
-		command := replaceCommandPlaceholders(command, topologyRecovery)
+		command, async := prepareCommand(command, topologyRecovery)
 		env := applyEnvironmentVariables(topologyRecovery)
 
-		// Log the command to be run and record how long it takes as this may be useful
-		AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Running %s: %s", fullDescription, command))
-		start := time.Now()
-		if cmdErr := os.CommandRun(command, env); cmdErr == nil {
-			info := fmt.Sprintf("Completed %s in %v",
-				fullDescription, time.Since(start))
-			AuditTopologyRecovery(topologyRecovery, info)
+		fullDescription := fmt.Sprintf("%s hook %d of %d", description, i+1, len(processes))
+		if async {
+			fullDescription = fmt.Sprintf("%s (async)", fullDescription)
+		}
+		if async {
+			// Ignore errors
+			go executeProcess(command, env, topologyRecovery, fullDescription)
 		} else {
-			info := fmt.Sprintf("Execution of %s failed in %v with error: %v",
-				fullDescription, time.Since(start), cmdErr)
-			AuditTopologyRecovery(topologyRecovery, info)
-			log.Errorf(info)
-			// FIXME: It would be good to additionally include command execution output to the auditing
-
-			if err == nil {
-				// Note first error
-				err = cmdErr
-			}
-			if failOnError {
-				AuditTopologyRecovery(
-					topologyRecovery,
-					fmt.Sprintf("Not running further %s hooks", description))
-				return err
+			if cmdErr := executeProcess(command, env, topologyRecovery, fullDescription); cmdErr != nil {
+				if failOnError {
+					AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("Not running further %s hooks", description))
+					return cmdErr
+				}
+				if err == nil {
+					// Keep first error encountered
+					err = cmdErr
+				}
 			}
 		}
 	}
-	AuditTopologyRecovery(
-		topologyRecovery,
-		fmt.Sprintf("done running %s hooks", description))
+	AuditTopologyRecovery(topologyRecovery, fmt.Sprintf("done running %s hooks", description))
 	return err
 }
 
@@ -1873,6 +1882,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 		return nil, nil, err
 	}
 	preGracefulTakeoverTopologyRecovery := &TopologyRecovery{
+		SuccessorKey:  &designatedInstance.Key,
 		AnalysisEntry: analysisEntry,
 	}
 	if err := executeProcesses(config.Config.PreGracefulTakeoverProcesses, "PreGracefulTakeoverProcesses", preGracefulTakeoverTopologyRecovery, true); err != nil {
