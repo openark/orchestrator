@@ -103,6 +103,9 @@ This information is passed independently in two ways, and you may choose to use 
 1. Environment variables: `orchestrator` will set the following, which can be retrieved by your hooks:
 
 - `ORC_FAILURE_TYPE`
+- `ORC_INSTANCE_TYPE` ("master", "co-master", "intermediate-master")
+- `ORC_IS_MASTER` (true/false)
+- `ORC_IS_CO_MASTER` (true/false)
 - `ORC_FAILURE_DESCRIPTION`
 - `ORC_FAILED_HOST`
 - `ORC_FAILED_PORT`
@@ -128,6 +131,9 @@ And, in the event a recovery was successful:
 2. Command line text replacement. `orchestrator` replaces the following magic tokens in your `*Proccesses` commands:
 
 - `{failureType}`
+- `{instanceType}` ("master", "co-master", "intermediate-master")
+- `{isMaster}` (true/false)
+- `{isCoMaster}` (true/false)
 - `{failureDescription}`
 - `{failedHost}`
 - `{failedPort}`
