@@ -14,19 +14,11 @@
 # ORC_USER (default: orc_server_user): username used to login to orchestrator backend MySQL server
 # ORC_PASSWORD (default: orc_server_password): password used to login to orchestrator backend MySQL server
 
-FROM golang:1.12.6-alpine3.9
+FROM golang:1.12.10-alpine3.10 as build
 
 ENV GOPATH=/tmp/go
 
-RUN apk update
-RUN apk upgrade
-RUN apk add --update libcurl
-RUN apk add --update rsync
-RUN apk add --update gcc
-RUN apk add --update g++
-RUN apk add --update build-base
-RUN apk add --update bash
-RUN apk add --update git
+RUN apk --no-cache add libcurl rsync gcc g++ build-base bash git
 
 RUN mkdir -p $GOPATH/src/github.com/github/orchestrator
 WORKDIR $GOPATH/src/github.com/github/orchestrator
@@ -38,15 +30,13 @@ RUN cp conf/orchestrator-sample-sqlite.conf.json /etc/orchestrator.conf.json
 
 FROM alpine:3.8
 
-RUN apk add --no-cache bash
-RUN apk add --no-cache curl
-RUN apk add --no-cache jq
+RUN apk --no-cache add bash curl jq
 
 EXPOSE 3000
 
-COPY --from=0 /usr/local/orchestrator /usr/local/orchestrator
-COPY --from=0 /usr/bin/orchestrator-client /usr/bin/orchestrator-client
-COPY --from=0 /etc/orchestrator.conf.json /etc/orchestrator.conf.json
+COPY --from=build /usr/local/orchestrator /usr/local/orchestrator
+COPY --from=build /usr/bin/orchestrator-client /usr/bin/orchestrator-client
+COPY --from=build /etc/orchestrator.conf.json /etc/orchestrator.conf.json
 
 WORKDIR /usr/local/orchestrator
 ADD docker/entrypoint.sh /entrypoint.sh
