@@ -1482,12 +1482,12 @@ function Cluster() {
         glyph.attr("title", "Anonymize display");
       }
     }
-    // Aliasize
+    // Alias
     {
-      var glyph = $("#cluster_sidebar [data-bullet=aliasize] .glyphicon");
-      var is = isAliasized();
+      var glyph = $("#cluster_sidebar [data-bullet=alias] .glyphicon");
+      var is = isAliased();
       glyph.addClass(is ? "text-info" : "text-muted");
-      glyph.attr("title", is ? "Cancel aliasize" : "Aliasize display");
+      glyph.attr("title", is ? "Cancel alias" : "Instance alias display");
     }
     // Silent UI
     {
@@ -1734,15 +1734,15 @@ function Cluster() {
       $("#dropdown-context").append('<li><a data-command="pool-indicator">Pool indicator</a></li>');
       $("#dropdown-context").append('<li><a data-command="colorize-dc">Colorize DC</a></li>');
       $("#dropdown-context").append('<li><a data-command="anonymize">Anonymize</a></li>');
-      $("#dropdown-context").append('<li><a data-command="aliasize">Aliasize</a></li>');
+      $("#dropdown-context").append('<li><a data-command="alias">Alias</a></li>');
       if ($.cookie("pool-indicator") == "true") {
         $("#dropdown-context a[data-command=pool-indicator]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
       }
       if (isAnonymized()) {
         $("#dropdown-context a[data-command=anonymize]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
       }
-      if (isAliasized()) {
-        $("#dropdown-context a[data-command=aliasize]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
+      if (isAliased()) {
+        $("#dropdown-context a[data-command=alias]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
       }
       if (isColorizeDC()) {
         $("#dropdown-context a[data-command=colorize-dc]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
@@ -1816,8 +1816,8 @@ function Cluster() {
       });
       location.reload();
     });
-    $("body").on("click", "a[data-command=aliasize]", function(event) {
-      $.cookie("aliasize", isAliasized() ? "false" : "true", {
+    $("body").on("click", "a[data-command=alias]", function(event) {
+      $.cookie("alias", isAliased() ? "false" : "true", {
         path: '/',
         expires: 1
       });
