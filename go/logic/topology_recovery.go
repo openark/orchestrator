@@ -1505,6 +1505,8 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 		return checkAndRecoverGenericProblem, false
 	case inst.AllMasterSlavesNotReplicatingOrDead:
 		return checkAndRecoverGenericProblem, false
+	case inst.UnreachableIntermediateMasterWithLaggingReplicas:
+		return checkAndRecoverGenericProblem, false
 	}
 	// Right now this is mostly causing noise with no clear action.
 	// Will revisit this in the future.
@@ -1522,6 +1524,8 @@ func runEmergentOperations(analysisEntry *inst.ReplicationAnalysis) {
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 		go emergentlyReadTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 	case inst.UnreachableMasterWithLaggingReplicas:
+		go emergentlyRestartReplicationOnTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
+	case inst.UnreachableIntermediateMasterWithLaggingReplicas:
 		go emergentlyRestartReplicationOnTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 	case inst.AllMasterSlavesNotReplicating:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
