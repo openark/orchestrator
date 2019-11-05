@@ -66,6 +66,8 @@ These hooks are available for recoveries:
 - `PostUnsuccessfulFailoverProcesses`: executed at the end of any unsuccessful recovery.
 - `PostGracefulTakeoverProcesses`: executed on planned, graceful master takeover, after the old master is positioned under the newly promoted master.
 
+Any process command that ends with `"&"` will be executed asynchronously, and a failure for such process is ignored.
+
 All of the above are lists of commands which `orchestrator` executes sequentially, in order of definition.
 
 A naive implementation might look like:

@@ -1857,7 +1857,7 @@ func sortedReplicas(replicas [](*Instance), stopReplicationMethod StopReplicatio
 // This function assumes given `replicas` argument is indeed a list of instances all replicating
 // from the same master (the result of `getReplicasForSorting()` is appropriate)
 func sortedReplicasDataCenterHint(replicas [](*Instance), stopReplicationMethod StopReplicationMethod, dataCenterHint string) [](*Instance) {
-	if len(replicas) == 0 {
+	if len(replicas) <= 1 {
 		return replicas
 	}
 	replicas = StopSlaves(replicas, stopReplicationMethod, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)
