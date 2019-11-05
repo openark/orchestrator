@@ -1474,7 +1474,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("force-master-failover", "Recovery", `Forcibly discard master and initiate a failover, even if orchestrator doesn't see a problem. This command lets orchestrator choose the replacement master`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
-			topologyRecovery, err := logic.ForceMasterFailover(clusterName)
+			topologyRecovery, err := logic.ForceMasterFailover(clusterName, *config.RuntimeCLIFlags.CommandPayload)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1487,7 +1487,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 				log.Fatal("Cannot deduce destination, the instance to promote in place of the master. Please provide with -d")
 			}
 			destination := validateInstanceIsFound(destinationKey)
-			topologyRecovery, err := logic.ForceMasterTakeover(clusterName, destination)
+			topologyRecovery, err := logic.ForceMasterTakeover(clusterName, destination, *config.RuntimeCLIFlags.CommandPayload)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1499,7 +1499,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 			if destinationKey != nil {
 				validateInstanceIsFound(destinationKey)
 			}
-			topologyRecovery, promotedMasterCoordinates, err := logic.GracefulMasterTakeover(clusterName, destinationKey)
+			topologyRecovery, promotedMasterCoordinates, err := logic.GracefulMasterTakeover(clusterName, destinationKey, *config.RuntimeCLIFlags.CommandPayload)
 			if err != nil {
 				log.Fatale(err)
 			}

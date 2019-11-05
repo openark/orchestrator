@@ -149,6 +149,7 @@ type ReplicationAnalysis struct {
 	MaxReplicaGTIDMode                        string
 	MaxReplicaGTIDErrant                      string
 	CommandHint                               string
+	CommandPayload                            string
 	IsReadOnly                                bool
 }
 

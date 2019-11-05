@@ -263,6 +263,7 @@ func prepareCommand(command string, topologyRecovery *TopologyRecovery) (result 
 	command = strings.Replace(command, "{failureType}", string(analysisEntry.Analysis), -1)
 	command = strings.Replace(command, "{failureDescription}", analysisEntry.Description, -1)
 	command = strings.Replace(command, "{command}", analysisEntry.CommandHint, -1)
+	command = strings.Replace(command, "{commandPayload}", analysisEntry.CommandPayload, -1)
 	command = strings.Replace(command, "{failedHost}", analysisEntry.AnalyzedInstanceKey.Hostname, -1)
 	command = strings.Replace(command, "{failedPort}", fmt.Sprintf("%d", analysisEntry.AnalyzedInstanceKey.Port), -1)
 	command = strings.Replace(command, "{failureCluster}", analysisEntry.ClusterDetails.ClusterName, -1)
@@ -301,6 +302,7 @@ func applyEnvironmentVariables(topologyRecovery *TopologyRecovery) []string {
 	env = append(env, fmt.Sprintf("ORC_FAILURE_TYPE=%s", string(analysisEntry.Analysis)))
 	env = append(env, fmt.Sprintf("ORC_FAILURE_DESCRIPTION=%s", analysisEntry.Description))
 	env = append(env, fmt.Sprintf("ORC_COMMAND=%s", analysisEntry.CommandHint))
+	env = append(env, fmt.Sprintf("ORC_COMMAND_PAYLOAD=%s", analysisEntry.CommandPayload))
 	env = append(env, fmt.Sprintf("ORC_FAILED_HOST=%s", analysisEntry.AnalyzedInstanceKey.Hostname))
 	env = append(env, fmt.Sprintf("ORC_FAILED_PORT=%d", analysisEntry.AnalyzedInstanceKey.Port))
 	env = append(env, fmt.Sprintf("ORC_FAILURE_CLUSTER=%s", analysisEntry.ClusterDetails.ClusterName))
@@ -1683,7 +1685,7 @@ func CheckAndRecover(specificInstance *inst.InstanceKey, candidateInstanceKey *i
 	return recoveryAttempted, promotedReplicaKey, err
 }
 
-func forceAnalysisEntry(clusterName string, analysisCode inst.AnalysisCode, commandHint string, failedInstanceKey *inst.InstanceKey) (analysisEntry inst.ReplicationAnalysis, err error) {
+func forceAnalysisEntry(clusterName string, analysisCode inst.AnalysisCode, commandHint string, commandPayload string, failedInstanceKey *inst.InstanceKey) (analysisEntry inst.ReplicationAnalysis, err error) {
 	clusterInfo, err := inst.ReadClusterInfo(clusterName)
 	if err != nil {
 		return analysisEntry, err
@@ -1701,6 +1703,7 @@ func forceAnalysisEntry(clusterName string, analysisCode inst.AnalysisCode, comm
 	}
 	analysisEntry.Analysis = analysisCode // we force this analysis
 	analysisEntry.CommandHint = commandHint
+	analysisEntry.CommandPayload = commandPayload
 	analysisEntry.ClusterDetails = *clusterInfo
 	analysisEntry.AnalyzedInstanceKey = *failedInstanceKey
 
@@ -1715,7 +1718,7 @@ func ForceExecuteRecovery(analysisEntry inst.ReplicationAnalysis, candidateInsta
 }
 
 // ForceMasterFailover *trusts* master of given cluster is dead and initiates a failover
-func ForceMasterFailover(clusterName string) (topologyRecovery *TopologyRecovery, err error) {
+func ForceMasterFailover(clusterName string, commandPayload string) (topologyRecovery *TopologyRecovery, err error) {
 	clusterMasters, err := inst.ReadClusterMaster(clusterName)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot deduce cluster master for %+v", clusterName)
@@ -1725,7 +1728,7 @@ func ForceMasterFailover(clusterName string) (topologyRecovery *TopologyRecovery
 	}
 	clusterMaster := clusterMasters[0]
 
-	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, inst.ForceMasterFailoverCommandHint, &clusterMaster.Key)
+	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, inst.ForceMasterFailoverCommandHint, commandPayload, &clusterMaster.Key)
 	if err != nil {
 		return nil, err
 	}
@@ -1747,7 +1750,7 @@ func ForceMasterFailover(clusterName string) (topologyRecovery *TopologyRecovery
 
 // ForceMasterTakeover *trusts* master of given cluster is dead and fails over to designated instance,
 // which has to be its direct child.
-func ForceMasterTakeover(clusterName string, destination *inst.Instance) (topologyRecovery *TopologyRecovery, err error) {
+func ForceMasterTakeover(clusterName string, destination *inst.Instance, commandPayload string) (topologyRecovery *TopologyRecovery, err error) {
 	clusterMasters, err := inst.ReadClusterWriteableMaster(clusterName)
 	if err != nil {
 		return nil, fmt.Errorf("Cannot deduce cluster master for %+v", clusterName)
@@ -1762,7 +1765,7 @@ func ForceMasterTakeover(clusterName string, destination *inst.Instance) (topolo
 	}
 	log.Infof("Will demote %+v and promote %+v instead", clusterMaster.Key, destination.Key)
 
-	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, inst.ForceMasterTakeoverCommandHint, &clusterMaster.Key)
+	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, inst.ForceMasterTakeoverCommandHint, commandPayload, &clusterMaster.Key)
 	if err != nil {
 		return nil, err
 	}
@@ -1788,7 +1791,7 @@ func ForceMasterTakeover(clusterName string, destination *inst.Instance) (topolo
 // This function is graceful in that it will first lock down the master, then wait
 // for the designated replica to catch up with last position.
 // It will point old master at the newly promoted master at the correct coordinates, but will not start replication.
-func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey) (topologyRecovery *TopologyRecovery, promotedMasterCoordinates *inst.BinlogCoordinates, err error) {
+func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey, commandPayload string) (topologyRecovery *TopologyRecovery, promotedMasterCoordinates *inst.BinlogCoordinates, err error) {
 	clusterMasters, err := inst.ReadClusterMaster(clusterName)
 	if err != nil {
 		return nil, nil, fmt.Errorf("Cannot deduce cluster master for %+v; error: %+v", clusterName, err)
@@ -1877,7 +1880,7 @@ func GracefulMasterTakeover(clusterName string, designatedKey *inst.InstanceKey)
 
 	replicationUser, replicationPassword, replicationCredentialsError := inst.ReadReplicationCredentials(&designatedInstance.Key)
 
-	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, inst.GracefulMasterTakeoverCommandHint, &clusterMaster.Key)
+	analysisEntry, err := forceAnalysisEntry(clusterName, inst.DeadMaster, inst.GracefulMasterTakeoverCommandHint, commandPayload, &clusterMaster.Key)
 	if err != nil {
 		return nil, nil, err
 	}

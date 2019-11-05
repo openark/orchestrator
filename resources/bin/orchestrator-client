@@ -49,6 +49,7 @@ orchestrator_api="${ORCHESTRATOR_API:-http://localhost:3000}"
 leader_api=
 
 command=
+command_payload=
 instance="${ORCHESTRATOR_INSTANCE:-}"
 destination=
 alias=
@@ -75,30 +76,32 @@ unauthorized_401="401 Unauthorized"
 for arg in "$@"; do
   shift
   case "$arg" in
-    "-help"|"--help")                     set -- "$@" "-h" ;;
-    "-command"|"--command")               set -- "$@" "-c" ;;
-    "-alias"|"--alias")                   set -- "$@" "-a" ;;
-    "-owner"|"--owner")                   set -- "$@" "-o" ;;
-    "-reason"|"--reason")                 set -- "$@" "-r" ;;
-    "-promotion-rule"|"--promotion-rule") set -- "$@" "-R" ;;
-    "-duration"|"--duration")             set -- "$@" "-u" ;;
-    "-tag"|"--tag")                       set -- "$@" "-t" ;;
-    "-pool"|"--pool")                     set -- "$@" "-l" ;;
-    "-hostname"|"--hostname")             set -- "$@" "-H" ;;
-    "-api"|"--api")                       set -- "$@" "-U" ;;
-    "-path"|"--path")                     set -- "$@" "-P" ;;
-    "-query"|"--query")                   set -- "$@" "-q" ;;
-    "-auth"|"--auth")                     set -- "$@" "-b" ;;
-    "-binlog"|"--binlog")                 set -- "$@" "-n" ;;
-    *)                                    set -- "$@" "$arg"
+    "-help"|"--help")                       set -- "$@" "-h" ;;
+    "-command"|"--command")                 set -- "$@" "-c" ;;
+    "-command-payload"|"--command-payload") set -- "$@" "-C" ;;
+    "-alias"|"--alias")                     set -- "$@" "-a" ;;
+    "-owner"|"--owner")                     set -- "$@" "-o" ;;
+    "-reason"|"--reason")                   set -- "$@" "-r" ;;
+    "-promotion-rule"|"--promotion-rule")   set -- "$@" "-R" ;;
+    "-duration"|"--duration")               set -- "$@" "-u" ;;
+    "-tag"|"--tag")                         set -- "$@" "-t" ;;
+    "-pool"|"--pool")                       set -- "$@" "-l" ;;
+    "-hostname"|"--hostname")               set -- "$@" "-H" ;;
+    "-api"|"--api")                         set -- "$@" "-U" ;;
+    "-path"|"--path")                       set -- "$@" "-P" ;;
+    "-query"|"--query")                     set -- "$@" "-q" ;;
+    "-auth"|"--auth")                       set -- "$@" "-b" ;;
+    "-binlog"|"--binlog")                   set -- "$@" "-n" ;;
+    *)                                      set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:t:l:H:P:q:b:n:h" OPTION
+while getopts "c:C:i:d:s:a:D:U:o:r:u:R:t:l:H:P:q:b:n:h" OPTION
 do
   case $OPTION in
     h) command="help" ;;
     c) command="$OPTARG" ;;
+    C) command_payload="$OPTARG" ;;
     i) instance="$OPTARG" ;;
     d) destination="$OPTARG" ;;
     s) destination="$OPTARG" ;;
@@ -335,6 +338,8 @@ function prompt_help {
     print this help
   -c <command>, --command <command>
     indicate the operation to perform (see listing below)
+  -C <command-payload>, --command-payload <command-payload>
+    extra data for command
   -a <alias>, --alias <alias>
     cluster alias
   -o <owner>, --owner <owner>
@@ -758,24 +763,24 @@ function graceful_master_takeover {
 
   if [ -z "$destination_hostport" ] ; then
     # No destination given.
-    api "graceful-master-takeover/${alias:-$instance}"
+    api "graceful-master-takeover/${alias:-$instance}?commandPayload=$(urlencode $command_payload)"
   else
     # Explicit destination (designated master) given
-    api "graceful-master-takeover/${alias:-$instance}/${destination_hostport}"
+    api "graceful-master-takeover/${alias:-$instance}/${destination_hostport}?commandPayload=$(urlencode $command_payload)"
   fi
   print_details | jq '.SuccessorKey' | print_key
 }
 
 function force_master_failover {
   assert_nonempty "instance|alias" "${alias:-$instance}"
-  api "force-master-failover/${alias:-$instance}"
+  api "force-master-failover/${alias:-$instance}?commandPayload=$(urlencode $command_payload)"
   print_details | jq '.SuccessorKey' | print_key
 }
 
 function force_master_takeover {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   assert_nonempty "destination" $destination_hostport
-  api "force-master-takeover/${alias:-$instance}/${destination_hostport}"
+  api "force-master-takeover/${alias:-$instance}/${destination_hostport}?commandPayload=$(urlencode $command_payload)"
   print_details | jq '.SuccessorKey' | print_key
 }
 
