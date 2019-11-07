@@ -9,6 +9,7 @@
  - what did you do?
  - what did you expect to happen?
  - what happened?
+ - orchestrator logs; please use `--debug --stack` for maximum verbosity
 
  Please use markdown to format code or SQL: https://guides.github.com/features/mastering-markdown/
 
