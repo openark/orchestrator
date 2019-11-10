@@ -228,7 +228,7 @@ Some servers are better candidate for promotion in the event of failovers. Some 
 You will announce your preference for a given server to `orchestrator` in the following way:
 
 ```
-orchestrator -c register-candidate -i ${::fqdn} --promotion-rule ${promotion_rule}
+orchestrator-client -c register-candidate -i ${::fqdn} --promotion-rule ${promotion_rule}
 ```
 
 Supported promotion rules are:
