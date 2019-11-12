@@ -115,12 +115,16 @@ In a graceful takeover:
 
 The operation can take a few seconds, during which time your app is expected to complain, seeing that the master is `read-only`.
 
-In addition to standard hooks, `orchestrator` provides you with specialized hooks to run a graceful takeover:
+`orchestrator` provides you with specialized hooks to run a graceful takeover:
 
 - `PreGracefulTakeoverProcesses`
 - `PostGracefulTakeoverProcesses`
 
-For example, you may want to disable the pager for the duration of a planned failover. Advanced usage may include stalling traffic at proxy layer.
+These hooks run _in addition_ to the standard hooks. `orchestrator` will run `PreGracefulTakeoverProcesses`, then go through a `DeadMaster` flow, running the normal pre-, post- hooks for `DeadMaster`, and at last follows up with `PostGracefulTakeoverProcesses`.
+
+We find that some operations are similar between graceful-takeover and real failover, and some are different. The `PreGracefulTakeoverProcesses` and `PostGracefulTakeoverProcesses` hooks can be used, for example, to silence down alerts.You may want to disable the pager for the duration of a planned failover. Advanced usage may include stalling traffic at proxy layer.
+
+From within the normal pre-, post- failover processes, you may use the `{command}` placeholder, or `ORC_COMMAND` environment variable to check whether this is a graceful takeover. You will see the value `graceful-master-takeover`.
 
 In a graceful promotion you must either:
 
