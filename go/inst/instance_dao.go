@@ -804,6 +804,28 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 		}
 	}
 
+	// PseudoGTID allows for measurement of IO thread lag
+	if instance.UsingPseudoGTID {
+		waitGroup.Add(1)
+		go func() {
+			defer waitGroup.Done()
+			_, pseudoGtidText, err := FindLastPseudoGTIDEntry(instance, instance.RelaylogCoordinates, nil, false, &instance.Binlog_format)
+			if err != nil {
+				logReadTopologyInstanceError(instanceKey, "FindLastPseudoGTIDEntry", err)
+				return
+			}
+			entryTime, err := extractPseudoGTIDTime(pseudoGtidText)
+			if err != nil {
+				logReadTopologyInstanceError(instanceKey, "extractPseudoGTIDTime", err)
+				return
+			}
+			secondsBehind := int64(time.Now().Sub(entryTime).Seconds())
+			// Round the lag time to nearest PseudoGTIDIntervalSeconds to avoid sawtooth metric pattern
+			secondsBehind = (secondsBehind / config.PseudoGTIDIntervalSeconds) * config.PseudoGTIDIntervalSeconds
+			instance.IOThreadLagSeconds = sql.NullInt64{Int64: secondsBehind, Valid: true}
+		}()
+	}
+
 Cleanup:
 	waitGroup.Wait()
 
@@ -1107,6 +1129,7 @@ func readInstanceRow(m sqlutils.RowMap) *Instance {
 	instance.AllowTLS = m.GetBool("allow_tls")
 	instance.InstanceAlias = m.GetString("instance_alias")
 	instance.LastDiscoveryLatency = time.Duration(m.GetInt64("last_discovery_latency")) * time.Nanosecond
+	instance.IOThreadLagSeconds = m.GetNullInt64("io_thread_lag_seconds")
 
 	instance.SlaveHosts.ReadJson(slaveHostsJSON)
 	instance.applyFlavorName()
@@ -2351,6 +2374,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		"semi_sync_replica_enabled",
 		"instance_alias",
 		"last_discovery_latency",
+		"io_thread_lag_seconds",
 	}
 
 	var values []string = make([]string, len(columns), len(columns))
@@ -2431,6 +2455,7 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 		args = append(args, instance.SemiSyncReplicaEnabled)
 		args = append(args, instance.InstanceAlias)
 		args = append(args, instance.LastDiscoveryLatency.Nanoseconds())
+		args = append(args, instance.IOThreadLagSeconds)
 	}
 
 	sql, err := mkInsertOdku("database_instance", columns, values, len(instances), insertIgnore)

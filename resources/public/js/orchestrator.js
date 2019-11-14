@@ -335,6 +335,10 @@ function openNodeModal(node) {
     addNodeModalDataAttribute("Binlog format", format);
     var td = addNodeModalDataAttribute("Logs slave updates", booleanString(node.LogSlaveUpdatesEnabled));
     $('#node_modal button[data-btn=take-siblings]').appendTo(td.find("div"))
+
+    if (node.IOThreadLagSeconds.Valid) {
+      addNodeModalDataAttribute("IO Thread Lag Seconds", node.IOThreadLagSeconds.Int64);
+    }
   }
 
   $('#node_modal [data-btn-group=gtid-errant-fix]').hide();

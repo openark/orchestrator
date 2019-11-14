@@ -546,4 +546,8 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN region varchar(32) CHARACTER SET ascii NOT NULL AFTER data_center
 	`,
-}
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN io_thread_lag_seconds bigint(20) UNSIGNED DEFAULT NULL AFTER last_discovery_latency
+	`}

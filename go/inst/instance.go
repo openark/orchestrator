@@ -75,6 +75,7 @@ type Instance struct {
 	masterExecutedGtidSet string // Not exported
 
 	SlaveLagSeconds                 sql.NullInt64
+	IOThreadLagSeconds              sql.NullInt64
 	SlaveHosts                      InstanceKeyMap
 	ClusterName                     string
 	SuggestedClusterAlias           string

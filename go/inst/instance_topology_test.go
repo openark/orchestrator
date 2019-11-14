@@ -2,6 +2,7 @@ package inst
 
 import (
 	"math/rand"
+	"time"
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
@@ -567,4 +568,11 @@ func TestChooseCandidateReplicaPromoteRuleOrdering3(t *testing.T) {
 	test.S(t).ExpectEquals(len(equalReplicas), 5)
 	test.S(t).ExpectEquals(len(laterReplicas), 0)
 	test.S(t).ExpectEquals(len(cannotReplicateReplicas), 0)
+}
+
+func TestExtractPseudoGTIDTime(t *testing.T) {
+	gtidText := "drop view if exists `_pseudo_gtid_`.`_asc:5dcc60bc:01cf8718:0f1e4130686bc1bc`"
+	entryTime, err := extractPseudoGTIDTime(gtidText)
+	test.S(t).ExpectNil(err)
+	test.S(t).ExpectEquals(entryTime, time.Unix(1573675196, 0))
 }

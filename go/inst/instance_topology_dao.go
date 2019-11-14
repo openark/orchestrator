@@ -20,6 +20,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1091,6 +1093,17 @@ func injectPseudoGTID(instance *Instance) (hint string, err error) {
 	query := fmt.Sprintf("drop view if exists `%s`.`_asc:%s`", config.PseudoGTIDSchema, hint)
 	_, err = ExecInstance(&instance.Key, query)
 	return hint, log.Errore(err)
+}
+
+func extractPseudoGTIDTime(pseudoGTIDText string) (entryTime time.Time, err error) {
+	queryExp, err := regexp.Compile(`drop view if exists (.+)._asc:(.+)`)
+	if err != nil {
+		return
+	}
+	hint := queryExp.FindAllStringSubmatch(pseudoGTIDText, -1)[0][2]
+	hexTime := strings.Split(hint, ":")[0]
+	seconds, err := strconv.ParseInt("0x"+hexTime, 0, 64)
+	return time.Unix(seconds, 0), err
 }
 
 // canInjectPseudoGTID checks orchestrator's grants to determine whether is has the
