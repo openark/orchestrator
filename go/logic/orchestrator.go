@@ -289,7 +289,9 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	}
 	// Investigate master:
 	if instance.MasterKey.IsValid() {
-		discoveryQueue.Push(instance.MasterKey)
+		if !inst.RegexpMatchPatterns(instance.MasterKey.StringCode(), config.Config.DiscoveryIgnoreMasterHostnameFilters) {
+			discoveryQueue.Push(instance.MasterKey)
+		}
 	}
 }
 
