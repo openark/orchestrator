@@ -1829,11 +1829,11 @@ func InjectUnseenMasters() error {
 		masterKey := masterKey
 
 		if RegexpMatchPatterns(masterKey.StringCode(), config.Config.DiscoveryIgnoreMasterHostnameFilters) {
-			log.Debugf("discoverInstance: skipping discovery of %+v because it matches DiscoveryIgnoreMasterHostnameFilters", masterKey)
+			log.Debugf("InjectUnseenMasters: skipping discovery of %+v because it matches DiscoveryIgnoreMasterHostnameFilters", masterKey)
 			continue
 		}
 		if RegexpMatchPatterns(masterKey.StringCode(), config.Config.DiscoveryIgnoreHostnameFilters) {
-			log.Debugf("discoverInstance: skipping discovery of %+v because it matches DiscoveryIgnoreHostnameFilters", masterKey)
+			log.Debugf("InjectUnseenMasters: skipping discovery of %+v because it matches DiscoveryIgnoreHostnameFilters", masterKey)
 			continue
 		}
 
