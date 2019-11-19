@@ -1827,6 +1827,16 @@ func InjectUnseenMasters() error {
 	operations := 0
 	for _, masterKey := range unseenMasterKeys {
 		masterKey := masterKey
+
+		if RegexpMatchPatterns(masterKey.StringCode(), config.Config.DiscoveryIgnoreMasterHostnameFilters) {
+			log.Debugf("discoverInstance: skipping discovery of %+v because it matches DiscoveryIgnoreMasterHostnameFilters", masterKey)
+			continue
+		}
+		if RegexpMatchPatterns(masterKey.StringCode(), config.Config.DiscoveryIgnoreHostnameFilters) {
+			log.Debugf("discoverInstance: skipping discovery of %+v because it matches DiscoveryIgnoreHostnameFilters", masterKey)
+			continue
+		}
+
 		clusterName := masterKey.StringCode()
 		// minimal details:
 		instance := Instance{Key: masterKey, Version: "Unknown", ClusterName: clusterName}
