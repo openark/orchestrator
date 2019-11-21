@@ -40,7 +40,7 @@ Different environments require different actions taken on recovery/promotion
   "PreventCrossDataCenterMasterFailover": false,
   "PreventCrossRegionMasterFailover": false,
   "FailMasterPromotionIfSQLThreadNotUpToDate": true,
-  "DelayMasterPromotionIfSQLThreadNotUpToDate": true,
+  "DelayMasterPromotionIfSQLThreadNotUpToDate": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 10,
   "DetachLostReplicasAfterMasterFailover": true,
 }
@@ -51,6 +51,7 @@ Different environments require different actions taken on recovery/promotion
 - `PreventCrossRegionMasterFailover`: defaults `false`. When `true`, `orchestrator` will only replace a failed master with a server from the same region. It will do its best to find a replacement from same region, and will abort (fail) the failover if it cannot find one. See also `DetectRegionQuery` and `RegionPattern` configuration variables.
 - `FailMasterPromotionIfSQLThreadNotUpToDate`: if all replicas were lagging at time of failure, even the most up-to-date, promoted replica may yet have unapplied relay logs. Issuing `reset slave all` on such a server will lose the relay log data. Your choice.
 - `DelayMasterPromotionIfSQLThreadNotUpToDate`: if all replicas were lagging at time of failure, even the most up-to-date, promoted replica may yet have unapplied relay logs. When `true`, 'orchestrator' will wait for the SQL thread to catch up before promoting a new master.
+  `FailMasterPromotionIfSQLThreadNotUpToDate` and `DelayMasterPromotionIfSQLThreadNotUpToDate` are mutually exclusive.
 - `DetachLostReplicasAfterMasterFailover`: some replicas may get lost during recovery. When `true`, `orchestrator` will forcibly break their replication via `detach-replica` command to make sure no one assumes they're at all functional.
 
 ### Hooks
@@ -65,6 +66,8 @@ These hooks are available for recoveries:
 - `PostFailoverProcesses`: executed at the end of any successful recovery (including and adding to the above two).
 - `PostUnsuccessfulFailoverProcesses`: executed at the end of any unsuccessful recovery.
 - `PostGracefulTakeoverProcesses`: executed on planned, graceful master takeover, after the old master is positioned under the newly promoted master.
+
+Any process command that ends with `"&"` will be executed asynchronously, and a failure for such process is ignored.
 
 All of the above are lists of commands which `orchestrator` executes sequentially, in order of definition.
 
