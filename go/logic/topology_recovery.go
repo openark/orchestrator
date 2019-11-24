@@ -1412,7 +1412,7 @@ func emergentlyRestartReplicationOnTopologyInstance(instanceKey *inst.InstanceKe
 		return
 	}
 	go inst.ExecuteOnTopology(func() {
-		inst.RestartIOThread(instanceKey)
+		inst.RestartReplicationQuick(instanceKey)
 		inst.AuditOperation("emergently-restart-replication-topology-instance", instanceKey, string(analysisCode))
 	})
 }
@@ -1444,7 +1444,8 @@ func emergentlyRestartReplicationOnTopologyInstanceReplicas(instanceKey *inst.In
 		return
 	}
 	for _, replica := range replicas {
-		go emergentlyRestartReplicationOnTopologyInstance(&replica.Key, analysisCode)
+		replicaKey := &replica.Key
+		go emergentlyRestartReplicationOnTopologyInstance(replicaKey, analysisCode)
 	}
 }
 
