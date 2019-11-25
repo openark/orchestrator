@@ -1418,7 +1418,7 @@ func emergentlyRestartReplicationOnTopologyInstance(instanceKey *inst.InstanceKe
 		return
 	}
 	go inst.ExecuteOnTopology(func() {
-		inst.RestartIOThread(instanceKey)
+		inst.RestartReplicationQuick(instanceKey)
 		inst.AuditOperation("emergently-restart-replication-topology-instance", instanceKey, string(analysisCode))
 	})
 }
@@ -1450,7 +1450,8 @@ func emergentlyRestartReplicationOnTopologyInstanceReplicas(instanceKey *inst.In
 		return
 	}
 	for _, replica := range replicas {
-		go emergentlyRestartReplicationOnTopologyInstance(&replica.Key, analysisCode)
+		replicaKey := &replica.Key
+		go emergentlyRestartReplicationOnTopologyInstance(replicaKey, analysisCode)
 	}
 }
 
@@ -1511,6 +1512,8 @@ func getCheckAndRecoverFunction(analysisCode inst.AnalysisCode, analyzedInstance
 		return checkAndRecoverGenericProblem, false
 	case inst.AllMasterSlavesNotReplicatingOrDead:
 		return checkAndRecoverGenericProblem, false
+	case inst.UnreachableIntermediateMasterWithLaggingReplicas:
+		return checkAndRecoverGenericProblem, false
 	}
 	// Right now this is mostly causing noise with no clear action.
 	// Will revisit this in the future.
@@ -1528,6 +1531,8 @@ func runEmergentOperations(analysisEntry *inst.ReplicationAnalysis) {
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 		go emergentlyReadTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 	case inst.UnreachableMasterWithLaggingReplicas:
+		go emergentlyRestartReplicationOnTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
+	case inst.UnreachableIntermediateMasterWithLaggingReplicas:
 		go emergentlyRestartReplicationOnTopologyInstanceReplicas(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)
 	case inst.AllMasterSlavesNotReplicating:
 		go emergentlyReadTopologyInstance(&analysisEntry.AnalyzedInstanceKey, analysisEntry.Analysis)

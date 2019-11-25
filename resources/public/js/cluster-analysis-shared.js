@@ -18,6 +18,7 @@ var interestingAnalysis = {
 	"DeadIntermediateMasterAndSlaves" : true,
 	"AllIntermediateMasterSlavesFailingToConnectOrDead" : true,
 	"AllIntermediateMasterSlavesNotReplicating" : true,
+	"UnreachableIntermediateMasterWithLaggingReplicas": true,
 	"UnreachableIntermediateMaster" : true,
 	"BinlogServerFailingToConnectToMaster" : true,
 };

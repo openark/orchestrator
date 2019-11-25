@@ -48,6 +48,7 @@ Observe the following list of potential failures:
 * DeadIntermediateMasterAndSlaves
 * AllIntermediateMasterSlavesFailingToConnectOrDead
 * AllIntermediateMasterSlavesNotReplicating
+* UnreachableIntermediateMasterWithLaggingReplicas
 * UnreachableIntermediateMaster
 * BinlogServerFailingToConnectToMaster
 

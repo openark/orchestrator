@@ -17,10 +17,12 @@
 package inst
 
 import (
-	"github.com/github/orchestrator/go/config"
-	"github.com/openark/golib/log"
-	test "github.com/openark/golib/tests"
 	"testing"
+
+  "github.com/github/orchestrator/go/config"
+	"github.com/openark/golib/log"
+
+  test "github.com/openark/golib/tests"
 )
 
 func init() {
