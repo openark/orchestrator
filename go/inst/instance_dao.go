@@ -1827,6 +1827,16 @@ func InjectUnseenMasters() error {
 	operations := 0
 	for _, masterKey := range unseenMasterKeys {
 		masterKey := masterKey
+
+		if RegexpMatchPatterns(masterKey.StringCode(), config.Config.DiscoveryIgnoreMasterHostnameFilters) {
+			log.Debugf("InjectUnseenMasters: skipping discovery of %+v because it matches DiscoveryIgnoreMasterHostnameFilters", masterKey)
+			continue
+		}
+		if RegexpMatchPatterns(masterKey.StringCode(), config.Config.DiscoveryIgnoreHostnameFilters) {
+			log.Debugf("InjectUnseenMasters: skipping discovery of %+v because it matches DiscoveryIgnoreHostnameFilters", masterKey)
+			continue
+		}
+
 		clusterName := masterKey.StringCode()
 		// minimal details:
 		instance := Instance{Key: masterKey, Version: "Unknown", ClusterName: clusterName}
@@ -1869,7 +1879,7 @@ func ForgetUnseenInstancesDifferentlyResolved() error {
 				database_instance
 			where
 		    hostname = ? and port = ?
-			`, sqlutils.Args(key.Hostname, key.Port),
+			`, key.Hostname, key.Port,
 		)
 		if err != nil {
 			return log.Errore(err)
