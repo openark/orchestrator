@@ -17,10 +17,11 @@
 package inst
 
 import (
+	"testing"
+
 	"github.com/github/orchestrator/go/config"
 	"github.com/openark/golib/log"
-	// test "github.com/openark/golib/tests"
-	"testing"
+	test "github.com/openark/golib/tests"
 )
 
 func init() {
@@ -30,20 +31,20 @@ func init() {
 }
 
 func TestGetAnalysisInstanceType(t *testing.T) {
-	// {
-	// 	analysis := &ReplicationAnalysis{}
-	// 	test.S(t).ExpectEquals(string(analysis.GetAnalysisInstanceType()), "intermediate-master")
-	// }
-	// {
-	// 	analysis := &ReplicationAnalysis{IsMaster: true}
-	// 	test.S(t).ExpectEquals(string(analysis.GetAnalysisInstanceType()), "master")
-	// }
-	// {
-	// 	analysis := &ReplicationAnalysis{IsCoMaster: true}
-	// 	test.S(t).ExpectEquals(string(analysis.GetAnalysisInstanceType()), "co-master")
-	// }
-	// {
-	// 	analysis := &ReplicationAnalysis{IsMaster: true, IsCoMaster: true}
-	// 	test.S(t).ExpectEquals(string(analysis.GetAnalysisInstanceType()), "co-master")
-	// }
+	{
+		analysis := &ReplicationAnalysis{}
+		test.S(t).ExpectEquals(string(analysis.GetAnalysisInstanceType()), "intermediate-master")
+	}
+	{
+		analysis := &ReplicationAnalysis{IsMaster: true}
+		test.S(t).ExpectEquals(string(analysis.GetAnalysisInstanceType()), "master")
+	}
+	{
+		analysis := &ReplicationAnalysis{IsCoMaster: true}
+		test.S(t).ExpectEquals(string(analysis.GetAnalysisInstanceType()), "co-master")
+	}
+	{
+		analysis := &ReplicationAnalysis{IsMaster: true, IsCoMaster: true}
+		test.S(t).ExpectEquals(string(analysis.GetAnalysisInstanceType()), "co-master")
+	}
 }
