@@ -190,6 +190,11 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 		log.Debugf("discoverInstance: skipping discovery of %+v because it is set to be forgotten", instanceKey)
 		return
 	}
+	if inst.RegexpMatchPatterns(instanceKey.StringCode(), config.Config.DiscoveryIgnoreHostnameFilters) {
+		log.Debugf("discoverInstance: skipping discovery of %+v because it matches DiscoveryIgnoreHostnameFilters", instanceKey)
+		return
+	}
+
 	// create stopwatch entries
 	latency := stopwatch.NewNamedStopwatch()
 	latency.AddMany([]string{
@@ -279,7 +284,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 		replicaKey := replicaKey // not needed? no concurrency here?
 
 		// Avoid noticing some hosts we would otherwise discover
-		if inst.RegexpMatchPatterns(replicaKey.Hostname, config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
+		if inst.RegexpMatchPatterns(replicaKey.StringCode(), config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
 			continue
 		}
 
@@ -289,7 +294,9 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	}
 	// Investigate master:
 	if instance.MasterKey.IsValid() {
-		discoveryQueue.Push(instance.MasterKey)
+		if !inst.RegexpMatchPatterns(instance.MasterKey.StringCode(), config.Config.DiscoveryIgnoreMasterHostnameFilters) {
+			discoveryQueue.Push(instance.MasterKey)
+		}
 	}
 }
 
