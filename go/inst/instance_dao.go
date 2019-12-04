@@ -1879,7 +1879,7 @@ func ForgetUnseenInstancesDifferentlyResolved() error {
 				database_instance
 			where
 		    hostname = ? and port = ?
-			`, sqlutils.Args(key.Hostname, key.Port),
+			`, key.Hostname, key.Port,
 		)
 		if err != nil {
 			return log.Errore(err)
