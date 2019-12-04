@@ -48,6 +48,7 @@ const (
 	DeadIntermediateMasterWithSingleSlaveFailingToConnect              = "DeadIntermediateMasterWithSingleSlaveFailingToConnect"
 	DeadIntermediateMasterAndSomeSlaves                                = "DeadIntermediateMasterAndSomeSlaves"
 	DeadIntermediateMasterAndSlaves                                    = "DeadIntermediateMasterAndSlaves"
+	UnreachableIntermediateMasterWithLaggingReplicas                   = "UnreachableIntermediateMasterWithLaggingReplicas"
 	UnreachableIntermediateMaster                                      = "UnreachableIntermediateMaster"
 	AllIntermediateMasterSlavesFailingToConnectOrDead                  = "AllIntermediateMasterSlavesFailingToConnectOrDead"
 	AllIntermediateMasterSlavesNotReplicating                          = "AllIntermediateMasterSlavesNotReplicating"
@@ -97,6 +98,14 @@ const (
 	ForceMasterFailoverCommandHint    string = "force-master-failover"
 	ForceMasterTakeoverCommandHint    string = "force-master-takeover"
 	GracefulMasterTakeoverCommandHint string = "graceful-master-takeover"
+)
+
+type AnalysisInstanceType string
+
+const (
+	AnalysisInstanceTypeMaster             AnalysisInstanceType = "master"
+	AnalysisInstanceTypeCoMaster           AnalysisInstanceType = "co-master"
+	AnalysisInstanceTypeIntermediateMaster AnalysisInstanceType = "intermediate-master"
 )
 
 // ReplicationAnalysis notes analysis on replication chain status, per instance
@@ -175,6 +184,17 @@ func (this *ReplicationAnalysis) AnalysisString() string {
 		result = append(result, string(structureAnalysis))
 	}
 	return strings.Join(result, ", ")
+}
+
+// Get a string description of the analyzed instance type (master? co-master? intermediate-master?)
+func (this *ReplicationAnalysis) GetAnalysisInstanceType() AnalysisInstanceType {
+	if this.IsCoMaster {
+		return AnalysisInstanceTypeCoMaster
+	}
+	if this.IsMaster {
+		return AnalysisInstanceTypeMaster
+	}
+	return AnalysisInstanceTypeIntermediateMaster
 }
 
 // ValidSecondsFromSeenToLastAttemptedCheck returns the maximum allowed elapsed time
