@@ -1735,7 +1735,7 @@ func ReplaceClusterName(oldClusterName string, newClusterName string) error {
 			set
 				cluster_name=?
 			where
-				and cluster_name=?
+				cluster_name=?
 				`, newClusterName, oldClusterName,
 		)
 		if err != nil {
