@@ -129,9 +129,11 @@ func logFormattedEntry(logLevel LogLevel, message string, args ...interface{}) s
 	// if TZ env variable is set, update the timestamp timezone
 	localizedTime := time.Now()
 	tzLocation := os.Getenv("TZ")
-	location, err := time.LoadLocation(tzLocation)
-	if err == nil { // if invalid tz location was provided, just leave it as the default
-		localizedTime = time.Now().In(location)
+	if tzLocation != "" {
+		location, err := time.LoadLocation(tzLocation)
+		if err == nil { // if invalid tz location was provided, just leave it as the default
+			localizedTime = time.Now().In(location)
+		}
 	}
 
 	msgArgs := fmt.Sprintf(message, args...)
