@@ -1645,14 +1645,14 @@ func (this *HttpAPI) KillQuery(params martini.Params, r render.Render, req *http
 }
 
 // AsciiTopology returns an ascii graph of cluster's instances
-func (this *HttpAPI) asciiTopology(params martini.Params, r render.Render, req *http.Request, tabulated bool) {
+func (this *HttpAPI) asciiTopology(params martini.Params, r render.Render, req *http.Request, tabulated bool, printTags bool) {
 	clusterName, err := figureClusterName(getClusterHint(params))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	asciiOutput, err := inst.ASCIITopology(clusterName, "", tabulated)
+	asciiOutput, err := inst.ASCIITopology(clusterName, "", tabulated, printTags)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -1674,12 +1674,17 @@ func (this *HttpAPI) SnapshotTopologies(params martini.Params, r render.Render, 
 
 // AsciiTopology returns an ascii graph of cluster's instances
 func (this *HttpAPI) AsciiTopology(params martini.Params, r render.Render, req *http.Request) {
-	this.asciiTopology(params, r, req, false)
+	this.asciiTopology(params, r, req, false, false)
 }
 
 // AsciiTopology returns an ascii graph of cluster's instances
 func (this *HttpAPI) AsciiTopologyTabulated(params martini.Params, r render.Render, req *http.Request) {
-	this.asciiTopology(params, r, req, true)
+	this.asciiTopology(params, r, req, true, false)
+}
+
+// AsciiTopologyTags returns an ascii graph of cluster's instances and instance tags
+func (this *HttpAPI) AsciiTopologyTags(params martini.Params, r render.Render, req *http.Request) {
+	this.asciiTopology(params, r, req, false, true)
 }
 
 // Cluster provides list of instances in given cluster
@@ -3645,6 +3650,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "topology/:host/:port", this.AsciiTopology)
 	this.registerAPIRequest(m, "topology-tabulated/:clusterHint", this.AsciiTopologyTabulated)
 	this.registerAPIRequest(m, "topology-tabulated/:host/:port", this.AsciiTopologyTabulated)
+	this.registerAPIRequest(m, "topology-tags/:clusterHint", this.AsciiTopologyTags)
+	this.registerAPIRequest(m, "topology-tags/:host/:port", this.AsciiTopologyTags)
 	this.registerAPIRequest(m, "snapshot-topologies", this.SnapshotTopologies)
 
 	// Key-value:
