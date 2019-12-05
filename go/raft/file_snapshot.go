@@ -142,7 +142,7 @@ func (f *FileSnapshotStore) Create(index, term uint64, peers []byte) (raft.Snaps
 
 	// Make the directory
 	if err := os.MkdirAll(path, 0755); err != nil {
-		_ = log.Error("[ERR] snapshot: Failed to make snapshot directory: %v", err)
+		_ = log.Error("snapshot: Failed to make snapshot directory: %v", err)
 		return nil, err
 	}
 
