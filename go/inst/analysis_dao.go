@@ -391,6 +391,10 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			a.Analysis = DeadIntermediateMasterAndSlaves
 			a.Description = "Intermediate master cannot be reached by orchestrator and all of its replicas are unreachable"
 			//
+		} else if !a.IsMaster && !a.LastCheckValid && a.CountLaggingReplicas == a.CountReplicas && a.CountDelayedReplicas < a.CountReplicas && a.CountValidReplicatingReplicas > 0 {
+			a.Analysis = UnreachableIntermediateMasterWithLaggingReplicas
+			a.Description = "Intermediate master cannot be reached by orchestrator and all of its replicas are lagging"
+			//
 		} else if !a.IsMaster && !a.LastCheckValid && !a.LastCheckPartialSuccess && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
 			a.Analysis = UnreachableIntermediateMaster
 			a.Description = "Intermediate master cannot be reached by orchestrator but it has replicating replicas; possibly a network/host issue"
