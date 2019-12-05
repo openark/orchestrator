@@ -57,7 +57,7 @@ Edit `orchestrator.conf.json` to match the above as follows:
     "MySQLOrchestratorPassword": "orch_backend_password",
     ...
 
-On systemd, ensure that Orchestrator starts after your backend is loaded. Edit `/etc/systemd/system/orchestrator.service` and add `mysqld.service` in the [Unit] section:
+On systemd, and assuming your `orchestrator` config uses a MySQL backend (as opposed to SQLite), ensure that Orchestrator starts after your backend is loaded. Edit `/etc/systemd/system/orchestrator.service` and add `mysqld.service` in the [Unit] section:
 
     [Unit]
     After=syslog.target network.target mysqld.service
