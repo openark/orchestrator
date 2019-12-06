@@ -1216,6 +1216,7 @@ function Cluster() {
       aggergateInstance.title = "[aggregation]";
       if (dataCenter) {
         aggergateInstance.title = "[aggregation in " + dataCenter + "]";
+        aggergateInstance.InstanceAlias = aggergateInstance.title;
       }
       aggergateInstance.canonicalTitle = aggergateInstance.title;
       aggergateInstance.aggregatedInstances = instances; // includes itself
