@@ -79,6 +79,7 @@ type Instance struct {
 	ClusterName                     string
 	SuggestedClusterAlias           string
 	DataCenter                      string
+	Region                          string
 	PhysicalEnvironment             string
 	ReplicationDepth                uint
 	IsCoMaster                      bool
@@ -109,6 +110,8 @@ type Instance struct {
 	UnresolvedHostname   string
 	AllowTLS             bool
 
+	Problems []string
+
 	LastDiscoveryLatency time.Duration
 }
 
@@ -116,6 +119,7 @@ type Instance struct {
 func NewInstance() *Instance {
 	return &Instance{
 		SlaveHosts: make(map[InstanceKey]bool),
+		Problems:   []string{},
 	}
 }
 
@@ -333,6 +337,16 @@ func (this *Instance) IsMasterOf(replica *Instance) bool {
 	return replica.IsReplicaOf(this)
 }
 
+// IsDescendantOf returns true if this is replication directly or indirectly from other
+func (this *Instance) IsDescendantOf(other *Instance) bool {
+	for _, uuid := range strings.Split(this.AncestryUUID, ",") {
+		if uuid == other.ServerUUID && uuid != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // CanReplicateFrom uses heursitics to decide whether this instacne can practically replicate from other instance.
 // Checks are made to binlog format, version number, binary logs etc.
 func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
@@ -364,6 +378,9 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 	}
 	if this.ServerID == other.ServerID && !this.IsBinlogServer() {
 		return false, fmt.Errorf("Identical server id: %+v, %+v both have %d", other.Key, this.Key, this.ServerID)
+	}
+	if this.ServerUUID == other.ServerUUID && this.ServerUUID != "" && !this.IsBinlogServer() {
+		return false, fmt.Errorf("Identical server UUID: %+v, %+v both have %s", other.Key, this.Key, this.ServerUUID)
 	}
 	if this.SQLDelay < other.SQLDelay && int64(other.SQLDelay) > int64(config.Config.ReasonableMaintenanceReplicationLagSeconds) {
 		return false, fmt.Errorf("%+v has higher SQL_Delay (%+v seconds) than %+v does (%+v seconds)", other.Key, other.SQLDelay, this.Key, this.SQLDelay)

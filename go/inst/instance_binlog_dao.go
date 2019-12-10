@@ -838,3 +838,27 @@ func GetNextBinlogCoordinatesToMatch(
 	}
 	// Won't get here
 }
+
+func GetPreviousGTIDs(instanceKey *InstanceKey, binlog string) (previousGTIDs *OracleGtidSet, err error) {
+	if binlog == "" {
+		return nil, log.Errorf("GetPreviousGTIDs: empty binlog file name for %+v", *instanceKey)
+	}
+	db, err := db.OpenTopology(instanceKey.Hostname, instanceKey.Port)
+	if err != nil {
+		return nil, err
+	}
+
+	query := fmt.Sprintf("show binlog events in '%s' LIMIT 5", binlog)
+
+	err = sqlutils.QueryRowsMapBuffered(db, query, func(m sqlutils.RowMap) error {
+		eventType := m.GetString("Event_type")
+		if eventType == "Previous_gtids" {
+			var e error
+			if previousGTIDs, e = NewOracleGtidSet(m.GetString("Info")); e != nil {
+				return e
+			}
+		}
+		return nil
+	})
+	return previousGTIDs, err
+}

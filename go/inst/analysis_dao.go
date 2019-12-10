@@ -57,6 +57,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 
 	args := sqlutils.Args(ValidSecondsFromSeenToLastAttemptedCheck(), config.Config.ReasonableReplicationLagSeconds, clusterName)
 	analysisQueryReductionClause := ``
+
 	if config.Config.ReduceReplicationAnalysisCount {
 		analysisQueryReductionClause = `
 			HAVING
@@ -68,37 +69,40 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		                    AND replica_instance.slave_io_running = 0
 		                    AND replica_instance.last_io_error like '%error %connecting to master%'
 		                    AND replica_instance.slave_sql_running = 1),
-		                0) /* AS count_slaves_failing_to_connect_to_master */ > 0)
+		                0) /* AS count_replicas_failing_to_connect_to_master */ > 0)
 				OR (IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen),
-		                0) /* AS count_valid_slaves */ < COUNT(replica_instance.server_id) /* AS count_slaves */)
+		                0) /* AS count_valid_slaves */ < COUNT(replica_instance.server_id) /* AS count_replicas */)
 				OR (IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen
 		                    AND replica_instance.slave_io_running != 0
 		                    AND replica_instance.slave_sql_running != 0),
-		                0) /* AS count_valid_replicating_slaves */ < COUNT(replica_instance.server_id) /* AS count_slaves */)
+		                0) /* AS count_valid_replicating_slaves */ < COUNT(replica_instance.server_id) /* AS count_replicas */)
 				OR (MIN(
 		            master_instance.slave_sql_running = 1
 		            AND master_instance.slave_io_running = 0
 		            AND master_instance.last_io_error like '%error %connecting to master%'
 		          ) /* AS is_failing_to_connect_to_master */)
-				OR (COUNT(replica_instance.server_id) /* AS count_slaves */ > 0)
+				OR (COUNT(replica_instance.server_id) /* AS count_replicas */ > 0)
 			`
 		args = append(args, ValidSecondsFromSeenToLastAttemptedCheck())
 	}
-	// "OR count_slaves > 0" above is a recent addition, which, granted, makes some previous conditions redundant.
+	// "OR count_replicas > 0" above is a recent addition, which, granted, makes some previous conditions redundant.
 	// It gives more output, and more "NoProblem" messages that I am now interested in for purpose of auditing in database_instance_analysis_changelog
 	query := fmt.Sprintf(`
 		    SELECT
 		        master_instance.hostname,
 		        master_instance.port,
-						MIN(master_instance.data_center) AS data_center,
-						MIN(master_instance.physical_environment) AS physical_environment,
+                        master_instance.read_only AS read_only,
+			MIN(master_instance.data_center) AS data_center,
+			MIN(master_instance.region) AS region,
+			MIN(master_instance.physical_environment) AS physical_environment,
 		        MIN(master_instance.master_host) AS master_host,
 		        MIN(master_instance.master_port) AS master_port,
 		        MIN(master_instance.cluster_name) AS cluster_name,
 		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
+		        MIN(IFNULL(cluster_domain_name.domain_name, master_instance.cluster_name)) AS cluster_domain,
 		        MIN(
-							master_instance.last_checked <= master_instance.last_seen
-							and master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
+				master_instance.last_checked <= master_instance.last_seen
+				and master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
 		        	) = 1 AS is_last_check_valid,
 						MIN(master_instance.last_check_partial_success) as last_check_partial_success,
 		        MIN(master_instance.master_host IN ('' , '_')
@@ -109,7 +113,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		                ':',
 		                master_instance.port) = master_instance.cluster_name) AS is_cluster_master,
 						MIN(master_instance.gtid_mode) AS gtid_mode,
-		        COUNT(replica_instance.server_id) AS count_slaves,
+		        COUNT(replica_instance.server_id) AS count_replicas,
 		        IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen),
 		                0) AS count_valid_slaves,
 		        IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen
@@ -120,7 +124,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		                    AND replica_instance.slave_io_running = 0
 		                    AND replica_instance.last_io_error like '%%error %%connecting to master%%'
 		                    AND replica_instance.slave_sql_running = 1),
-		                0) AS count_slaves_failing_to_connect_to_master,
+		                0) AS count_replicas_failing_to_connect_to_master,
 		        MIN(master_instance.replication_depth) AS replication_depth,
 		        GROUP_CONCAT(concat(replica_instance.Hostname, ':', replica_instance.Port)) as slave_hosts,
 		        MIN(
@@ -168,6 +172,9 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		        IFNULL(SUM(replica_instance.last_checked <= replica_instance.last_seen
                   AND replica_instance.mariadb_gtid != 0),
               0) AS count_valid_mariadb_gtid_slaves,
+						IFNULL(SUM(replica_instance.log_bin
+							  AND replica_instance.log_slave_updates),
+              0) AS count_logging_replicas,
 						IFNULL(SUM(replica_instance.log_bin
 							  AND replica_instance.log_slave_updates
 								AND replica_instance.binlog_format = 'STATEMENT'),
@@ -226,6 +233,8 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 							AND replica_downtime.downtime_active = 1)
         	LEFT JOIN
 		        cluster_alias ON (cluster_alias.cluster_name = master_instance.cluster_name)
+        	LEFT JOIN
+		        cluster_domain_name ON (cluster_domain_name.cluster_name = master_instance.cluster_name)
 		    WHERE
 		    	database_instance_maintenance.database_instance_maintenance_id IS NULL
 		    	AND ? IN ('', master_instance.cluster_name)
@@ -236,8 +245,9 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		    ORDER BY
 			    is_master DESC ,
 			    is_cluster_master DESC,
-			    count_slaves DESC
+			    count_replicas DESC
 	`, analysisQueryReductionClause)
+
 	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		a := ReplicationAnalysis{
 			Analysis:               NoProblem,
@@ -250,16 +260,18 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.AnalyzedInstanceKey = InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
 		a.AnalyzedInstanceMasterKey = InstanceKey{Hostname: m.GetString("master_host"), Port: m.GetInt("master_port")}
 		a.AnalyzedInstanceDataCenter = m.GetString("data_center")
+		a.AnalyzedInstanceRegion = m.GetString("region")
 		a.AnalyzedInstancePhysicalEnvironment = m.GetString("physical_environment")
 		a.ClusterDetails.ClusterName = m.GetString("cluster_name")
 		a.ClusterDetails.ClusterAlias = m.GetString("cluster_alias")
+		a.ClusterDetails.ClusterDomain = m.GetString("cluster_domain")
 		a.GTIDMode = m.GetString("gtid_mode")
 		a.LastCheckValid = m.GetBool("is_last_check_valid")
 		a.LastCheckPartialSuccess = m.GetBool("last_check_partial_success")
-		a.CountReplicas = m.GetUint("count_slaves")
+		a.CountReplicas = m.GetUint("count_replicas")
 		a.CountValidReplicas = m.GetUint("count_valid_slaves")
 		a.CountValidReplicatingReplicas = m.GetUint("count_valid_replicating_slaves")
-		a.CountReplicasFailingToConnectToMaster = m.GetUint("count_slaves_failing_to_connect_to_master")
+		a.CountReplicasFailingToConnectToMaster = m.GetUint("count_replicas_failing_to_connect_to_master")
 		a.CountDowntimedReplicas = m.GetUint("count_downtimed_replicas")
 		a.ReplicationDepth = m.GetUint("replication_depth")
 		a.IsFailingToConnectToMaster = m.GetBool("is_failing_to_connect_to_master")
@@ -284,6 +296,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.MaxReplicaGTIDMode = m.GetString("max_replica_gtid_mode")
 		a.MaxReplicaGTIDErrant = m.GetString("max_replica_gtid_errant")
 
+		a.CountLoggingReplicas = m.GetUint("count_logging_replicas")
 		a.CountStatementBasedLoggingReplicas = m.GetUint("count_statement_based_loggin_slaves")
 		a.CountMixedBasedLoggingReplicas = m.GetUint("count_mixed_based_loggin_slaves")
 		a.CountRowBasedLoggingReplicas = m.GetUint("count_row_based_loggin_slaves")
@@ -291,6 +304,8 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 
 		a.CountDelayedReplicas = m.GetUint("count_delayed_replicas")
 		a.CountLaggingReplicas = m.GetUint("count_lagging_replicas")
+
+		a.IsReadOnly = m.GetUint("read_only") == 1
 
 		if !a.LastCheckValid {
 			analysisMessage := fmt.Sprintf("analysis: IsMaster: %+v, LastCheckValid: %+v, LastCheckPartialSuccess: %+v, CountReplicas: %+v, CountValidReplicatingReplicas: %+v, CountLaggingReplicas: %+v, CountDelayedReplicas: %+v, ",
@@ -376,6 +391,10 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			a.Analysis = DeadIntermediateMasterAndSlaves
 			a.Description = "Intermediate master cannot be reached by orchestrator and all of its replicas are unreachable"
 			//
+		} else if !a.IsMaster && !a.LastCheckValid && a.CountLaggingReplicas == a.CountReplicas && a.CountDelayedReplicas < a.CountReplicas && a.CountValidReplicatingReplicas > 0 {
+			a.Analysis = UnreachableIntermediateMasterWithLaggingReplicas
+			a.Description = "Intermediate master cannot be reached by orchestrator and all of its replicas are lagging"
+			//
 		} else if !a.IsMaster && !a.LastCheckValid && !a.LastCheckPartialSuccess && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
 			a.Analysis = UnreachableIntermediateMaster
 			a.Description = "Intermediate master cannot be reached by orchestrator but it has replicating replicas; possibly a network/host issue"
@@ -444,6 +463,16 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		{
 			// Moving on to structure analysis
 			// We also do structural checks. See if there's potential danger in promotions
+			if a.IsMaster && a.CountLoggingReplicas == 0 && a.CountReplicas > 1 {
+				a.StructureAnalysis = append(a.StructureAnalysis, NoLoggingReplicasStructureWarning)
+			}
+			if a.IsMaster && a.CountReplicas > 1 &&
+				!a.OracleGTIDImmediateTopology &&
+				!a.MariaDBGTIDImmediateTopology &&
+				!a.BinlogServerImmediateTopology &&
+				!a.PseudoGTIDImmediateTopology {
+				a.StructureAnalysis = append(a.StructureAnalysis, NoFailoverSupportStructureWarning)
+			}
 			if a.IsMaster && a.CountStatementBasedLoggingReplicas > 0 && a.CountMixedBasedLoggingReplicas > 0 {
 				a.StructureAnalysis = append(a.StructureAnalysis, StatementAndMixedLoggingSlavesStructureWarning)
 			}
@@ -454,7 +483,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 				a.StructureAnalysis = append(a.StructureAnalysis, MixedAndRowLoggingSlavesStructureWarning)
 			}
 			if a.IsMaster && a.CountDistinctMajorVersionsLoggingReplicas > 1 {
-				a.StructureAnalysis = append(a.StructureAnalysis, MultipleMajorVersionsLoggingSlaves)
+				a.StructureAnalysis = append(a.StructureAnalysis, MultipleMajorVersionsLoggingSlavesStructureWarning)
 			}
 
 			if a.CountReplicas > 0 && (a.GTIDMode != a.MinReplicaGTIDMode || a.GTIDMode != a.MaxReplicaGTIDMode) {
@@ -463,6 +492,11 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			if a.MaxReplicaGTIDErrant != "" {
 				a.StructureAnalysis = append(a.StructureAnalysis, ErrantGTIDStructureWarning)
 			}
+
+			if a.IsMaster && a.IsReadOnly {
+				a.StructureAnalysis = append(a.StructureAnalysis, NoWriteableMasterStructureWarning)
+			}
+
 		}
 		appendAnalysis(&a)
 

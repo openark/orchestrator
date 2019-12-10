@@ -9,29 +9,6 @@ reloadPageHint = {
   port: ""
 }
 
-var errorMapping = {
-  "inMaintenanceProblem": {
-    "badge": "label-info",
-    "description": "In maintenance"
-  },
-  "lastCheckInvalidProblem": {
-    "badge": "label-fatal",
-    "description": "Last check invalid"
-  },
-  "notRecentlyCheckedProblem": {
-    "badge": "label-stale",
-    "description": "Not recently checked (stale)"
-  },
-  "notReplicatingProblem": {
-    "badge": "label-danger",
-    "description": "Not replicating"
-  },
-  "replicationLagProblem": {
-    "badge": "label-warning",
-    "description": "Replication lag"
-  }
-};
-
 function updateCountdownDisplay() {
   if ($.cookie("auto-refresh") == "true") {
     $("#refreshCountdown").html('<span class="glyphicon glyphicon-repeat" title="Click to pause"></span> ' + secondsTillRefresh + 's');
@@ -85,6 +62,10 @@ function hideLoader() {
 
 function isAnonymized() {
   return ($.cookie("anonymize") == "true");
+}
+
+function isAliased() {
+  return ($.cookie("alias") == "true");
 }
 
 function isSilentUI() {
@@ -659,50 +640,55 @@ function normalizeInstance(instance) {
 }
 
 function normalizeInstanceProblem(instance) {
+
+  function instanceProblemIfExists(problemName) {
+    if (instance.Problems.includes(problemName)) {
+      return problemName
+    }
+    return null;
+  }
   instance.inMaintenanceProblem = function() {
-    return instance.inMaintenance;
+    return instanceProblemIfExists('in_maintenance');
   }
   instance.lastCheckInvalidProblem = function() {
-    return !instance.IsLastCheckValid;
+    return instanceProblemIfExists('last_check_invalid');
   }
   instance.notRecentlyCheckedProblem = function() {
-    return !instance.IsRecentlyChecked;
+    return instanceProblemIfExists('not_recently_checked');
   }
   instance.notReplicatingProblem = function() {
-    return !instance.replicationRunning && !(instance.isMaster && !instance.isCoMaster);
+    return instanceProblemIfExists('not_replicating');
   }
   instance.replicationLagProblem = function() {
-    return !instance.replicationLagReasonable;
+    return instanceProblemIfExists('replication_lag');
   }
   instance.errantGTIDProblem = function() {
-    return (instance.GtidErrant != '');
+    return instanceProblemIfExists('errant_gtid');
   }
 
   instance.problem = null;
+  instance.Problems = instance.Problems || [];
+  if (instance.Problems.length > 0) {
+    instance.problem = instance.Problems[0]; // highest priority one
+  }
   instance.problemOrder = 0;
   if (instance.inMaintenanceProblem()) {
-    instance.problem = "in_maintenance";
     instance.problemDescription = "This instance is now under maintenance due to some pending operation.\nSee audit page";
     instance.problemOrder = 1;
   } else if (instance.lastCheckInvalidProblem()) {
-    instance.problem = "last_check_invalid";
     instance.problemDescription = "Instance cannot be reached by orchestrator.\nIt might be dead or there may be a network problem";
     instance.problemOrder = 2;
   } else if (instance.notRecentlyCheckedProblem()) {
-    instance.problem = "not_recently_checked";
     instance.problemDescription = "Orchestrator has not made an attempt to reach this instance for a while now.\nThis should generally not happen; consider refreshing or re-discovering this instance";
     instance.problemOrder = 3;
   } else if (instance.notReplicatingProblem()) {
     // check replicas only; where not replicating
-    instance.problem = "not_replicating";
     instance.problemDescription = "Replication is not running.\nEither stopped manually or is failing on I/O or SQL error.";
     instance.problemOrder = 4;
   } else if (instance.replicationLagProblem()) {
-    instance.problem = "replication_lag";
     instance.problemDescription = "Replica is lagging.\nThis diagnostic is based on either Seconds_behind_master or configured ReplicationLagQuery";
     instance.problemOrder = 5;
   } else if (instance.errantGTIDProblem()) {
-    instance.problem = "Errant GTID";
     instance.problemDescription = "Replica has GTID entries not found on its master";
     instance.problemOrder = 6;
   }
@@ -825,9 +811,10 @@ function renderInstanceElement(popoverElement, instance, renderType) {
   // $(this).find("h3").attr("title", anonymizeInstanceId(instanceId));
   var anonymizedInstanceId = anonymizeInstanceId(instance.id);
   popoverElement.attr("data-nodeid", instance.id);
-  popoverElement.find("h3").attr('title', (isAnonymized() ? anonymizedInstanceId : instance.title));
+  popoverElement.find("h3").attr('title', (isAnonymized() ? anonymizedInstanceId : isAliased() ? instance.InstanceAlias : instance.title));
   popoverElement.find("h3").html('&nbsp;<div class="pull-left">' +
-    (isAnonymized() ? anonymizedInstanceId : instance.canonicalTitle) + '</div><div class="pull-right instance-glyphs"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></div>');
+    (isAnonymized() ? anonymizedInstanceId : isAliased() ? instance.InstanceAlias : instance.canonicalTitle) +
+    '</div><div class="pull-right instance-glyphs"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></div>');
   var indicateLastSeenInStatus = false;
 
   if (instance.isAggregate) {
@@ -951,7 +938,11 @@ function renderInstanceElement(popoverElement, instance, renderType) {
       contentHtml += '<p><strong>Master</strong></p>';
     }
     if (renderType == "search") {
-      contentHtml += '<p>' + 'Cluster: <a href="' + appUrl('/web/cluster/' + instance.ClusterName) + '">' + instance.ClusterName + '</a>' + '</p>';
+      if (instance.SuggestedClusterAlias) {
+        contentHtml += '<p>' + 'Cluster: <a href="' + appUrl('/web/cluster/alias/' + instance.SuggestedClusterAlias) + '">' + instance.SuggestedClusterAlias + '</a>' + '</p>';
+      } else {
+        contentHtml += '<p>' + 'Cluster: <a href="' + appUrl('/web/cluster/' + instance.ClusterName) + '">' + instance.ClusterName + '</a>' + '</p>';
+      }
     }
     if (renderType == "problems") {
       contentHtml += '<p>' + 'Problem: <strong title="' + instance.problemDescription + '">' + instance.problem.replace(/_/g, ' ') + '</strong>' + '</p>';

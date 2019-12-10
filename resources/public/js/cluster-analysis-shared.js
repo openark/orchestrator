@@ -18,6 +18,34 @@ var interestingAnalysis = {
 	"DeadIntermediateMasterAndSlaves" : true,
 	"AllIntermediateMasterSlavesFailingToConnectOrDead" : true,
 	"AllIntermediateMasterSlavesNotReplicating" : true,
+	"UnreachableIntermediateMasterWithLaggingReplicas": true,
 	"UnreachableIntermediateMaster" : true,
 	"BinlogServerFailingToConnectToMaster" : true,
+};
+
+var errorMapping = {
+	"in_maintenance": {
+		"badge": "label-info",
+		"description": "In maintenance"
+	},
+	"last_check_invalid": {
+		"badge": "label-fatal",
+		"description": "Last check invalid"
+	},
+	"not_recently_checked": {
+		"badge": "label-stale",
+		"description": "Not recently checked (stale)"
+	},
+	"not_replicating": {
+		"badge": "label-danger",
+		"description": "Not replicating"
+	},
+	"replication_lag": {
+		"badge": "label-warning",
+		"description": "Replication lag"
+	},
+	"errant_gtid": {
+		"badge": "label-errant",
+		"description": "Errant GTID"
+	}
 };
