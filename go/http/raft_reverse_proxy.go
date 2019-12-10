@@ -25,7 +25,14 @@ func raftReverseProxy(w http.ResponseWriter, r *http.Request, c martini.Context)
 	if orcraft.GetLeader() == "" {
 		return
 	}
-
+	if orcraft.LeaderURI.IsThisLeaderURI() {
+		// Although I'm not the leader, the value I see for LeaderURI is my own.
+		// I'm probably not up-to-date with my raft transaction log and don't have the latest information.
+		// But anyway, obviously not going to redirect to myself.
+		// Gonna return: this isn't ideal, because I'm not really the leader. If the user tries to
+		// run an operation they'll fail.
+		return
+	}
 	url, err := url.Parse(orcraft.LeaderURI.Get())
 	if err != nil {
 		log.Errore(err)
