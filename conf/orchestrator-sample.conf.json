@@ -57,7 +57,7 @@
   "ClusterNameToAlias": {
     "127.0.0.1": "test suite"
   },
-  "SlaveLagQuery": "",
+  "ReplicationLagQuery": "",
   "DetectClusterAliasQuery": "SELECT SUBSTRING_INDEX(@@hostname, '.', 1)",
   "DetectClusterDomainQuery": "",
   "DetectInstanceAliasQuery": "",
@@ -136,9 +136,9 @@
   "ApplyMySQLPromotionAfterMasterFailover": true,
   "PreventCrossDataCenterMasterFailover": false,
   "PreventCrossRegionMasterFailover": false,
-  "MasterFailoverDetachSlaveMasterHost": false,
+  "MasterFailoverDetachReplicaMasterHost": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 0,
-  "PostponeSlaveRecoveryOnLagMinutes": 0,
+  "PostponeReplicaRecoveryOnLagMinutes": 0,
   "OSCIgnoreHostnameFilters": [],
   "GraphiteAddr": "",
   "GraphitePath": "",
