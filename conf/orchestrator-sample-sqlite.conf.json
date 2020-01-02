@@ -100,6 +100,9 @@
   "OnFailureDetectionProcesses": [
     "echo 'Detected {failureType} on {failureCluster}. Affected replicas: {countSlaves}' >> /tmp/recovery.log"
   ],
+  "PreGracefulTakeoverProcesses": [
+    "echo 'Planned takeover about to take place on {failureCluster}. Master will switch to read_only' >> /tmp/recovery.log"
+  ],
   "PreFailoverProcesses": [
     "echo 'Will recover from {failureType} on {failureCluster}' >> /tmp/recovery.log"
   ],
@@ -113,6 +116,9 @@
   "PostIntermediateMasterFailoverProcesses": [
     "echo 'Recovered from {failureType} on {failureCluster}. Failed: {failedHost}:{failedPort}; Successor: {successorHost}:{successorPort}' >> /tmp/recovery.log"
   ],
+  "PostGracefulTakeoverProcesses": [
+    "echo 'Planned takeover complete' >> /tmp/recovery.log"
+  ],
   "CoMasterRecoveryMustPromoteOtherCoMaster": true,
   "DetachLostSlavesAfterMasterFailover": true,
   "ApplyMySQLPromotionAfterMasterFailover": true,
@@ -124,5 +130,7 @@
   "OSCIgnoreHostnameFilters": [],
   "GraphiteAddr": "",
   "GraphitePath": "",
-  "GraphiteConvertHostnameDotsToUnderscores": true
+  "GraphiteConvertHostnameDotsToUnderscores": true,
+  "ConsulAddress": "",
+  "ConsulAclToken": ""
 }
