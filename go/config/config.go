@@ -572,6 +572,9 @@ func (this *Configuration) postReadAdjustments() error {
 		if u.Path != "" {
 			return fmt.Errorf("If specified, HTTPAdvertise must not specify a path")
 		}
+		if this.InstanceWriteBufferSize <= 0 {
+			this.BufferInstanceWrites = false
+		}
 	}
 	return nil
 }
