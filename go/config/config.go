@@ -147,6 +147,7 @@ type Configuration struct {
 	DiscoveryQueueCapacity                     uint     // Buffer size of the discovery queue. Should be greater than the number of DB instances being discovered
 	DiscoveryQueueMaxStatisticsSize            int      // The maximum number of individual secondly statistics taken of the discovery queue
 	DiscoveryCollectionRetentionSeconds        uint     // Number of seconds to retain the discovery collection information
+	DiscoverySeeds                             []string // Hard coded array of hostname:port, ensuring orchestrator discovers these hosts upon startup, assuming not already known to orchestrator
 	InstanceBulkOperationsWaitTimeoutSeconds   uint     // Time to wait on a single instance when doing bulk (many instances) operation
 	HostnameResolveMethod                      string   // Method by which to "normalize" hostname ("none"/"default"/"cname")
 	MySQLHostnameResolveMethod                 string   // Method by which to "normalize" hostname via MySQL server. ("none"/"@@hostname"/"@@report_host"; default "@@hostname")
@@ -320,6 +321,7 @@ func newConfiguration() *Configuration {
 		DiscoveryQueueCapacity:                     100000,
 		DiscoveryQueueMaxStatisticsSize:            120,
 		DiscoveryCollectionRetentionSeconds:        120,
+		DiscoverySeeds:                             []string{},
 		InstanceBulkOperationsWaitTimeoutSeconds:   10,
 		HostnameResolveMethod:                      "default",
 		MySQLHostnameResolveMethod:                 "@@hostname",

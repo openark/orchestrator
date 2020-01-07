@@ -298,6 +298,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 	isMaxScale := false
 	isMaxScale110 := false
 	slaveStatusFound := false
+	errorChan := make(chan error, 32)
 	var resolveErr error
 
 	if !instanceKey.IsValid() {
@@ -365,7 +366,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 				defer waitGroup.Done()
 				var dummy string
 				// show global status works just as well with 5.6 & 5.7 (5.7 moves variables to performance_schema)
-				err = db.QueryRow("show global status like 'Uptime'").Scan(&dummy, &instance.Uptime)
+				err := db.QueryRow("show global status like 'Uptime'").Scan(&dummy, &instance.Uptime)
 
 				if err != nil {
 					logReadTopologyInstanceError(instanceKey, "show global status like 'Uptime'", err)
@@ -377,6 +378,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 					// so as to completely fail reading a 5.7 instance.
 					// This is supposed to be fixed in 5.7.9
 				}
+				errorChan <- err
 			}()
 		}
 
@@ -406,12 +408,13 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			waitGroup.Add(1)
 			go func() {
 				defer waitGroup.Done()
-				err = sqlutils.QueryRowsMap(db, "show master status", func(m sqlutils.RowMap) error {
+				err := sqlutils.QueryRowsMap(db, "show master status", func(m sqlutils.RowMap) error {
 					var err error
 					instance.SelfBinlogCoordinates.LogFile = m.GetString("File")
 					instance.SelfBinlogCoordinates.LogPos = m.GetInt64("Position")
 					return err
 				})
+				errorChan <- err
 			}()
 		}
 
@@ -419,7 +422,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 			waitGroup.Add(1)
 			go func() {
 				defer waitGroup.Done()
-				err = sqlutils.QueryRowsMap(db, "show global status like 'rpl_semi_sync_%_status'", func(m sqlutils.RowMap) error {
+				err := sqlutils.QueryRowsMap(db, "show global status like 'rpl_semi_sync_%_status'", func(m sqlutils.RowMap) error {
 					if m.GetString("Variable_name") == "Rpl_semi_sync_master_status" {
 						instance.SemiSyncMasterEnabled = (m.GetString("Value") == "ON")
 					} else if m.GetString("Variable_name") == "Rpl_semi_sync_slave_status" {
@@ -427,6 +430,7 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 					}
 					return nil
 				})
+				errorChan <- err
 			}()
 		}
 		if (instance.IsOracleMySQL() || instance.IsPercona()) && !instance.IsSmallerMajorVersionByString("5.6") {
@@ -810,6 +814,19 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 
 Cleanup:
 	waitGroup.Wait()
+	close(errorChan)
+	err = func() error {
+		if err != nil {
+			return err
+		}
+
+		for err := range errorChan {
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}()
 
 	if instanceFound {
 		if instance.IsCoMaster {
@@ -1739,7 +1756,7 @@ func ReplaceClusterName(oldClusterName string, newClusterName string) error {
 			set
 				cluster_name=?
 			where
-				and cluster_name=?
+				cluster_name=?
 				`, newClusterName, oldClusterName,
 		)
 		if err != nil {
@@ -1816,6 +1833,21 @@ func readUnseenMasterKeys() ([]InstanceKey, error) {
 	}
 
 	return res, nil
+}
+
+// InjectSeed: intented to be used to inject an instance upon startup, assuming it's not already known to orchestrator.
+func InjectSeed(instanceKey *InstanceKey) error {
+	if instanceKey == nil {
+		return fmt.Errorf("InjectSeed: nil instanceKey")
+	}
+	clusterName := instanceKey.StringCode()
+	// minimal details:
+	instance := &Instance{Key: *instanceKey, Version: "Unknown", ClusterName: clusterName}
+	instance.SetSeed()
+	err := WriteInstance(instance, false, nil)
+	log.Debugf("InjectSeed: %+v, %+v", *instanceKey, err)
+	AuditOperation("inject-seed", instanceKey, "injected")
+	return err
 }
 
 // InjectUnseenMasters will review masters of instances that are known to be replicating, yet which are not listed
@@ -2457,21 +2489,20 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 
 // writeManyInstances stores instances in the orchestrator backend
 func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, updateLastSeen bool) error {
-	if len(instances) == 0 {
-		return nil // nothing to write
-	}
-
 	writeInstances := [](*Instance){}
 	for _, instance := range instances {
-		if !InstanceIsForgotten(&instance.Key) {
-			writeInstances = append(writeInstances, instance)
+		if InstanceIsForgotten(&instance.Key) && !instance.IsSeed() {
+			continue
 		}
+		writeInstances = append(writeInstances, instance)
+	}
+	if len(writeInstances) == 0 {
+		return nil // nothing to write
 	}
 	sql, args, err := mkInsertOdkuForInstances(writeInstances, instanceWasActuallyFound, updateLastSeen)
 	if err != nil {
 		return err
 	}
-
 	if _, err := db.ExecOrchestrator(sql, args...); err != nil {
 		return err
 	}

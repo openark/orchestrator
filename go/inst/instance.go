@@ -113,6 +113,8 @@ type Instance struct {
 	Problems []string
 
 	LastDiscoveryLatency time.Duration
+
+	seed bool // Means we force this instance to be written to backend, even if it's invalid, empty or forgotten
 }
 
 // NewInstance creates a new, empty instance
@@ -219,6 +221,13 @@ func (this *Instance) IsOracleMySQL() bool {
 		return false
 	}
 	return true
+}
+
+func (this *Instance) SetSeed() {
+	this.seed = true
+}
+func (this *Instance) IsSeed() bool {
+	return this.seed
 }
 
 // applyFlavorName
