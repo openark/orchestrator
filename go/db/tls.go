@@ -35,12 +35,9 @@ import (
 const Error3159 = "Error 3159:"
 const Error1045 = "Access denied for user"
 
-// Track if a TLS has already been configured for topology
-var topologyTLSConfigured bool = false
-
-// Track if a TLS has already been configured for Orchestrator
-var orchestratorTLSConfigured bool = false
-
+// This cache exists to prevent re-registering tls.Conf instances while also
+// allowing them to be interrogated in tests.
+var tlsConfigCache *cache.Cache = cache.New(cache.NoExpiration, time.Second)
 var requireTLSCache *cache.Cache = cache.New(time.Duration(config.Config.TLSCacheTTLFactor*config.Config.InstancePollSeconds)*time.Second, time.Second)
 
 var readInstanceTLSCounter = metrics.NewCounter()
@@ -94,53 +91,65 @@ func requiresTLS(host string, port int, mysql_uri string) bool {
 // Register the TLS config with the mysql drivers as the "topology" config
 // Modify the supplied URI to call the TLS config
 func SetupMySQLTopologyTLS(uri string) (string, error) {
-	if !topologyTLSConfigured {
-		tlsConfig, err := ssl.NewTLSConfig(config.Config.MySQLTopologySSLCAFile, !config.Config.MySQLTopologySSLSkipVerify)
-		// Drop to TLS 1.0 for talking to MySQL
-		tlsConfig.MinVersion = tls.VersionTLS10
-		if err != nil {
-			return "", log.Errorf("Can't create TLS configuration for Topology connection %s: %s", uri, err)
-		}
-		tlsConfig.InsecureSkipVerify = config.Config.MySQLTopologySSLSkipVerify
-
-		if (config.Config.MySQLTopologyUseMutualTLS && !config.Config.MySQLTopologySSLSkipVerify) &&
-			config.Config.MySQLTopologySSLCertFile != "" &&
-			config.Config.MySQLTopologySSLPrivateKeyFile != "" {
-			if err = ssl.AppendKeyPair(tlsConfig, config.Config.MySQLTopologySSLCertFile, config.Config.MySQLTopologySSLPrivateKeyFile); err != nil {
-				return "", log.Errorf("Can't setup TLS key pairs for %s: %s", uri, err)
-			}
-		}
-		if err = mysql.RegisterTLSConfig("topology", tlsConfig); err != nil {
-			return "", log.Errorf("Can't register mysql TLS config for topology: %s", err)
-		}
-		topologyTLSConfigured = true
+	c := connectionConfig{
+		uri:              uri,
+		caCertFile:       config.Config.MySQLTopologySSLCAFile,
+		useClientAuth:    config.Config.MySQLTopologyUseMutualTLS,
+		clientCertFile:   config.Config.MySQLTopologySSLCertFile,
+		clientKeyFile:    config.Config.MySQLTopologySSLPrivateKeyFile,
+		verifyClientCert: !config.Config.MySQLTopologySSLSkipVerify,
+		verifyServerCert: !config.Config.MySQLTopologySSLSkipVerify,
 	}
-	return fmt.Sprintf("%s&tls=topology", uri), nil
+
+	return setupTls("topology", c)
 }
 
 // Create a TLS configuration from the config supplied CA, Certificate, and Private key.
 // Register the TLS config with the mysql drivers as the "orchestrator" config
 // Modify the supplied URI to call the TLS config
 func SetupMySQLOrchestratorTLS(uri string) (string, error) {
-	if !orchestratorTLSConfigured {
-		tlsConfig, err := ssl.NewTLSConfig(config.Config.MySQLOrchestratorSSLCAFile, !config.Config.MySQLOrchestratorSSLSkipVerify)
+	c := connectionConfig{
+		uri:              uri,
+		caCertFile:       config.Config.MySQLOrchestratorSSLCAFile,
+		useClientAuth:    config.Config.MySQLOrchestratorUseMutualTLS,
+		clientCertFile:   config.Config.MySQLOrchestratorSSLCertFile,
+		clientKeyFile:    config.Config.MySQLOrchestratorSSLPrivateKeyFile,
+		verifyClientCert: !config.Config.MySQLOrchestratorSSLSkipVerify,
+		verifyServerCert: !config.Config.MySQLOrchestratorSSLSkipVerify,
+	}
+	return setupTls("orchestrator", c)
+}
+
+func setupTls(name string, c connectionConfig) (string, error) {
+	if _, found := tlsConfigCache.Get(c.uri); !found {
+		tlsConfig, err := ssl.NewTLSConfig(c.caCertFile, c.verifyClientCert)
 		// Drop to TLS 1.0 for talking to MySQL
 		tlsConfig.MinVersion = tls.VersionTLS10
 		if err != nil {
-			return "", log.Fatalf("Can't create TLS configuration for Orchestrator connection %s: %s", uri, err)
+			return "", log.Fatalf("Can't create TLS configuration for %s connection %s: %s", name, c.uri, err)
 		}
-		tlsConfig.InsecureSkipVerify = config.Config.MySQLOrchestratorSSLSkipVerify
-		if (!config.Config.MySQLOrchestratorSSLSkipVerify) &&
-			config.Config.MySQLOrchestratorSSLCertFile != "" &&
-			config.Config.MySQLOrchestratorSSLPrivateKeyFile != "" {
-			if err = ssl.AppendKeyPair(tlsConfig, config.Config.MySQLOrchestratorSSLCertFile, config.Config.MySQLOrchestratorSSLPrivateKeyFile); err != nil {
-				return "", log.Fatalf("Can't setup TLS key pairs for %s: %s", uri, err)
+		tlsConfig.InsecureSkipVerify = !c.verifyServerCert
+
+		if c.useClientAuth && c.verifyServerCert && c.clientCertFile != "" && c.clientKeyFile != "" {
+			if err = ssl.AppendKeyPair(tlsConfig, c.clientCertFile, c.clientKeyFile); err != nil {
+				return "", log.Fatalf("Can't setup TLS key pairs for %s: %s", c.uri, err)
 			}
 		}
-		if err = mysql.RegisterTLSConfig("orchestrator", tlsConfig); err != nil {
-			return "", log.Fatalf("Can't register mysql TLS config for orchestrator: %s", err)
+
+		if err = mysql.RegisterTLSConfig(name, tlsConfig); err != nil {
+			return "", log.Fatalf("Can't register mysql TLS config for %s: %s", name, err)
 		}
-		orchestratorTLSConfigured = true
+		tlsConfigCache.Set(c.uri, tlsConfig, cache.NoExpiration)
 	}
-	return fmt.Sprintf("%s&tls=orchestrator", uri), nil
+	return fmt.Sprintf("%s&tls=%s", c.uri, name), nil
+}
+
+type connectionConfig struct {
+	uri              string
+	caCertFile       string
+	useClientAuth    bool
+	clientCertFile   string
+	clientKeyFile    string
+	verifyClientCert bool
+	verifyServerCert bool
 }

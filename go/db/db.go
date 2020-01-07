@@ -61,7 +61,7 @@ func getMySQLURI() string {
 		config.Config.MySQLConnectTimeoutSeconds,
 		config.Config.MySQLOrchestratorReadTimeoutSeconds,
 	)
-	if config.Config.MySQLOrchestratorUseMutualTLS {
+	if config.Config.MySQLOrchestratorUseMutualTLS || config.Config.MySQLOrchestratorSSLCAFile != "" {
 		mysqlURI, _ = SetupMySQLOrchestratorTLS(mysqlURI)
 	}
 	return mysqlURI
@@ -114,7 +114,7 @@ func openOrchestratorMySQLGeneric() (db *sql.DB, fromCache bool, err error) {
 		config.Config.MySQLConnectTimeoutSeconds,
 		config.Config.MySQLOrchestratorReadTimeoutSeconds,
 	)
-	if config.Config.MySQLOrchestratorUseMutualTLS {
+	if config.Config.MySQLOrchestratorUseMutualTLS || config.Config.MySQLOrchestratorSSLCAFile != "" {
 		uri, _ = SetupMySQLOrchestratorTLS(uri)
 	}
 	return sqlutils.GetDB(uri)
