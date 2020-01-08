@@ -20,3 +20,23 @@ jobs:
 
     - name: Build
       run:  script/cibuild
+
+    - name: Set up FPM
+      run:  |
+        sudo apt-get install ruby ruby-dev rubygems build-essential
+        sudo gem install --no-document fpm
+
+    - name: Build artifacts
+      run:  |
+        export GOPATH="$PWD/.gopath"
+        cd .gopath/src/github.com/github/orchestrator
+        ./build.sh
+
+        mkdir -p /tmp/packages
+        mv /tmp/orchestrator-release/*.deb /tmp/packages
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v1
+      with:
+        name: packages
+        path: /tmp/packages
