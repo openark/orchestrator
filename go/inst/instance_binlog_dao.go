@@ -618,39 +618,39 @@ func formatEventCleanly(event BinlogEvent, length *int) string {
 	return fmt.Sprintf("%+v %+v; %+v", rpad(event.Coordinates, length), event.EventType, strings.Split(strings.TrimSpace(event.Info), "\n")[0])
 }
 
-// Only do special filtering if instance is MySQL-5.7 and other
-// is MySQL-5.6 and in pseudo-gtid mode.
+// Only do special filtering if instance is 5.7 and other
+// is 5.6 or 5.5 and in pseudo-gtid mode.
 // returns applyInstanceSpecialFiltering, applyOtherSpecialFiltering, err
-func special56To57filterProcessing(instance *Instance, other *Instance) (bool, bool, error) {
+func special57filterProcessing(instance *Instance, other *Instance) (bool, bool, error) {
 	// be paranoid
 	if instance == nil || other == nil {
-		return false, false, fmt.Errorf("special56To57filterProcessing: instance or other is nil. Should not happen")
+		return false, false, fmt.Errorf("special57filterProcessing: instance or other is nil. Should not happen")
 	}
 
-	filterInstance := instance.FlavorNameAndMajorVersion() == "MySQL-5.7" && // 5.7 replica
-		other.FlavorNameAndMajorVersion() == "MySQL-5.6" // replicating under 5.6 master
+	filterInstance := instance.IsMySQL57() && // 5.7 replica
+		(other.IsMySQL56() || other.IsMySQL55()) // replicating under 5.6/5.5 master
 
 	// The logic for other is a bit weird and may require us
 	// to check the instance's master.  To avoid this do some
 	// preliminary checks first to avoid the "master" access
 	// unless absolutely needed.
 	if instance.LogBinEnabled || // instance writes binlogs (not relay logs)
-		instance.FlavorNameAndMajorVersion() != "MySQL-5.7" || // instance NOT 5.7 replica
-		other.FlavorNameAndMajorVersion() != "MySQL-5.7" { // new master is NOT 5.7
+		!instance.IsMySQL57() || // instance NOT 5.7 replica
+		!other.IsMySQL57() { // new master is NOT 5.7
 		return filterInstance, false /* good exit status avoiding checking master */, nil
 	}
 
-	// We need to check if the master is 5.6
+	// We need to check if the master is 5.6/5.5
 	// - Do not call GetInstanceMaster() as that requires the
 	//   master to be available, and this code may be called
 	//   during a master/intermediate master failover when the
 	//   master may not actually be reachable.
 	master, _, err := ReadInstance(&instance.MasterKey)
 	if err != nil {
-		return false, false, log.Errorf("special56To57filterProcessing: ReadInstance(%+v) fails: %+v", instance.MasterKey, err)
+		return false, false, log.Errorf("special57filterProcessing: ReadInstance(%+v) fails: %+v", instance.MasterKey, err)
 	}
 
-	filterOther := master.FlavorNameAndMajorVersion() == "MySQL-5.6" // master(instance) == 5.6
+	filterOther := master.IsMySQL56() || master.IsMySQL55() // master(instance) == 5.6/5.5
 
 	return filterInstance, filterOther, nil
 }
@@ -696,7 +696,7 @@ func GetNextBinlogCoordinatesToMatch(
 	otherCursor := NewBinlogEventCursor(otherCoordinates, fetchOtherNextEvents)
 
 	// for 5.6 to 5.7 replication special processing may be needed.
-	applyInstanceSpecialFiltering, applyOtherSpecialFiltering, err := special56To57filterProcessing(instance, other)
+	applyInstanceSpecialFiltering, applyOtherSpecialFiltering, err := special57filterProcessing(instance, other)
 	if err != nil {
 		return nil, noMatchedEvents, log.Errore(err)
 	}
