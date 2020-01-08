@@ -1831,6 +1831,21 @@ func readUnseenMasterKeys() ([]InstanceKey, error) {
 	return res, nil
 }
 
+// InjectSeed: intented to be used to inject an instance upon startup, assuming it's not already known to orchestrator.
+func InjectSeed(instanceKey *InstanceKey) error {
+	if instanceKey == nil {
+		return fmt.Errorf("InjectSeed: nil instanceKey")
+	}
+	clusterName := instanceKey.StringCode()
+	// minimal details:
+	instance := &Instance{Key: *instanceKey, Version: "Unknown", ClusterName: clusterName}
+	instance.SetSeed()
+	err := WriteInstance(instance, false, nil)
+	log.Debugf("InjectSeed: %+v, %+v", *instanceKey, err)
+	AuditOperation("inject-seed", instanceKey, "injected")
+	return err
+}
+
 // InjectUnseenMasters will review masters of instances that are known to be replicating, yet which are not listed
 // in database_instance. Since their replicas are listed as replicating, we can assume that such masters actually do
 // exist: we shall therefore inject them with minimal details into the database_instance table.
@@ -2470,21 +2485,20 @@ func mkInsertOdkuForInstances(instances []*Instance, instanceWasActuallyFound bo
 
 // writeManyInstances stores instances in the orchestrator backend
 func writeManyInstances(instances []*Instance, instanceWasActuallyFound bool, updateLastSeen bool) error {
-	if len(instances) == 0 {
-		return nil // nothing to write
-	}
-
 	writeInstances := [](*Instance){}
 	for _, instance := range instances {
-		if !InstanceIsForgotten(&instance.Key) {
-			writeInstances = append(writeInstances, instance)
+		if InstanceIsForgotten(&instance.Key) && !instance.IsSeed() {
+			continue
 		}
+		writeInstances = append(writeInstances, instance)
+	}
+	if len(writeInstances) == 0 {
+		return nil // nothing to write
 	}
 	sql, args, err := mkInsertOdkuForInstances(writeInstances, instanceWasActuallyFound, updateLastSeen)
 	if err != nil {
 		return err
 	}
-
 	if _, err := db.ExecOrchestrator(sql, args...); err != nil {
 		return err
 	}
