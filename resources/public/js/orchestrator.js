@@ -64,6 +64,10 @@ function isAnonymized() {
   return ($.cookie("anonymize") == "true");
 }
 
+function isAliased() {
+  return ($.cookie("alias") == "true");
+}
+
 function isSilentUI() {
   return ($.cookie("silent-ui") == "true");
 }
@@ -663,6 +667,7 @@ function normalizeInstanceProblem(instance) {
   }
 
   instance.problem = null;
+  instance.Problems = instance.Problems || [];
   if (instance.Problems.length > 0) {
     instance.problem = instance.Problems[0]; // highest priority one
   }
@@ -806,9 +811,10 @@ function renderInstanceElement(popoverElement, instance, renderType) {
   // $(this).find("h3").attr("title", anonymizeInstanceId(instanceId));
   var anonymizedInstanceId = anonymizeInstanceId(instance.id);
   popoverElement.attr("data-nodeid", instance.id);
-  popoverElement.find("h3").attr('title', (isAnonymized() ? anonymizedInstanceId : instance.title));
+  popoverElement.find("h3").attr('title', (isAnonymized() ? anonymizedInstanceId : isAliased() ? instance.InstanceAlias : instance.title));
   popoverElement.find("h3").html('&nbsp;<div class="pull-left">' +
-    (isAnonymized() ? anonymizedInstanceId : instance.canonicalTitle) + '</div><div class="pull-right instance-glyphs"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></div>');
+    (isAnonymized() ? anonymizedInstanceId : isAliased() ? instance.InstanceAlias : instance.canonicalTitle) +
+    '</div><div class="pull-right instance-glyphs"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></div>');
   var indicateLastSeenInStatus = false;
 
   if (instance.isAggregate) {
@@ -932,7 +938,11 @@ function renderInstanceElement(popoverElement, instance, renderType) {
       contentHtml += '<p><strong>Master</strong></p>';
     }
     if (renderType == "search") {
-      contentHtml += '<p>' + 'Cluster: <a href="' + appUrl('/web/cluster/' + instance.ClusterName) + '">' + instance.ClusterName + '</a>' + '</p>';
+      if (instance.SuggestedClusterAlias) {
+        contentHtml += '<p>' + 'Cluster: <a href="' + appUrl('/web/cluster/alias/' + instance.SuggestedClusterAlias) + '">' + instance.SuggestedClusterAlias + '</a>' + '</p>';
+      } else {
+        contentHtml += '<p>' + 'Cluster: <a href="' + appUrl('/web/cluster/' + instance.ClusterName) + '">' + instance.ClusterName + '</a>' + '</p>';
+      }
     }
     if (renderType == "problems") {
       contentHtml += '<p>' + 'Problem: <strong title="' + instance.problemDescription + '">' + instance.problem.replace(/_/g, ' ') + '</strong>' + '</p>';

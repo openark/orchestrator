@@ -242,10 +242,12 @@ func SetSemiSyncReplica(instanceKey *InstanceKey, enableReplica bool) (*Instance
 
 }
 
-func RestartIOThread(instanceKey *InstanceKey) error {
-	for _, cmd := range []string{`stop slave io_thread`, `start slave io_thread`} {
+func RestartReplicationQuick(instanceKey *InstanceKey) error {
+	for _, cmd := range []string{`stop slave sql_thread`, `stop slave io_thread`, `start slave io_thread`, `start slave sql_thread`} {
 		if _, err := ExecInstance(instanceKey, cmd); err != nil {
-			return log.Errorf("%+v: RestartIOThread: '%q' failed: %+v", *instanceKey, cmd, err)
+			return log.Errorf("%+v: RestartReplicationQuick: '%q' failed: %+v", *instanceKey, cmd, err)
+		} else {
+			log.Infof("%s on %+v as part of RestartReplicationQuick", cmd, *instanceKey)
 		}
 	}
 	return nil
@@ -400,7 +402,6 @@ func StopSlave(instanceKey *InstanceKey) (*Instance, error) {
 		}
 	}
 	if err != nil {
-
 		return instance, log.Errore(err)
 	}
 	instance, err = ReadTopologyInstance(instanceKey)
@@ -504,6 +505,29 @@ func StartSlaves(replicas [](*Instance)) {
 	}
 }
 
+func WaitForExecBinlogCoordinatesToReach(instanceKey *InstanceKey, coordinates *BinlogCoordinates, maxWait time.Duration) (instance *Instance, exactMatch bool, err error) {
+	startTime := time.Now()
+	for {
+		if maxWait != 0 && time.Since(startTime) > maxWait {
+			return nil, exactMatch, fmt.Errorf("WaitForExecBinlogCoordinatesToReach: reached maxWait %+v on %+v", maxWait, *instanceKey)
+		}
+		instance, err = ReadTopologyInstance(instanceKey)
+		if err != nil {
+			return instance, exactMatch, log.Errore(err)
+		}
+
+		switch {
+		case instance.ExecBinlogCoordinates.SmallerThan(coordinates):
+			time.Sleep(retryInterval)
+		case instance.ExecBinlogCoordinates.Equals(coordinates):
+			return instance, true, nil
+		case coordinates.SmallerThan(&instance.ExecBinlogCoordinates):
+			return instance, false, nil
+		}
+	}
+	return instance, exactMatch, err
+}
+
 // StartSlaveUntilMasterCoordinates issuesa START SLAVE UNTIL... statement on given instance
 func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinates *BinlogCoordinates) (*Instance, error) {
 	instance, err := ReadTopologyInstance(instanceKey)
@@ -538,20 +562,12 @@ func StartSlaveUntilMasterCoordinates(instanceKey *InstanceKey, masterCoordinate
 		return instance, log.Errore(err)
 	}
 
-	for upToDate := false; !upToDate; {
-		instance, err = ReadTopologyInstance(instanceKey)
-		if err != nil {
-			return instance, log.Errore(err)
-		}
-
-		switch {
-		case instance.ExecBinlogCoordinates.SmallerThan(masterCoordinates):
-			time.Sleep(retryInterval)
-		case instance.ExecBinlogCoordinates.Equals(masterCoordinates):
-			upToDate = true
-		case masterCoordinates.SmallerThan(&instance.ExecBinlogCoordinates):
-			return instance, fmt.Errorf("Start SLAVE UNTIL is past coordinates: %+v", instanceKey)
-		}
+	instance, exactMatch, err := WaitForExecBinlogCoordinatesToReach(instanceKey, masterCoordinates, 0)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+	if !exactMatch {
+		return instance, fmt.Errorf("Start SLAVE UNTIL is past coordinates: %+v", instanceKey)
 	}
 
 	instance, err = StopSlave(instanceKey)

@@ -190,6 +190,11 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 		log.Debugf("discoverInstance: skipping discovery of %+v because it is set to be forgotten", instanceKey)
 		return
 	}
+	if inst.RegexpMatchPatterns(instanceKey.StringCode(), config.Config.DiscoveryIgnoreHostnameFilters) {
+		log.Debugf("discoverInstance: skipping discovery of %+v because it matches DiscoveryIgnoreHostnameFilters", instanceKey)
+		return
+	}
+
 	// create stopwatch entries
 	latency := stopwatch.NewNamedStopwatch()
 	latency.AddMany([]string{
@@ -279,7 +284,7 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 		replicaKey := replicaKey // not needed? no concurrency here?
 
 		// Avoid noticing some hosts we would otherwise discover
-		if inst.RegexpMatchPatterns(replicaKey.Hostname, config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
+		if inst.RegexpMatchPatterns(replicaKey.StringCode(), config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
 			continue
 		}
 
@@ -289,7 +294,9 @@ func DiscoverInstance(instanceKey inst.InstanceKey) {
 	}
 	// Investigate master:
 	if instance.MasterKey.IsValid() {
-		discoveryQueue.Push(instance.MasterKey)
+		if !inst.RegexpMatchPatterns(instance.MasterKey.StringCode(), config.Config.DiscoveryIgnoreMasterHostnameFilters) {
+			discoveryQueue.Push(instance.MasterKey)
+		}
 	}
 }
 
@@ -447,8 +454,23 @@ func SubmitMastersToKvStores(clusterName string, force bool) (kvPairs [](*kv.KVP
 			selectedError = err
 		}
 	}
-	kv.DistributePairs(submitKvPairs)
+	if err := kv.DistributePairs(kvPairs); err != nil {
+		log.Errore(err)
+	}
 	return kvPairs, submittedCount, log.Errore(selectedError)
+}
+
+func injectSeeds(seedOnce *sync.Once) {
+	seedOnce.Do(func() {
+		for _, seed := range config.Config.DiscoverySeeds {
+			instanceKey, err := inst.ParseRawInstanceKey(seed)
+			if err == nil {
+				inst.InjectSeed(instanceKey)
+			} else {
+				log.Errorf("Error parsing seed %s: %+v", seed, err)
+			}
+		}
+	})
 }
 
 // ContinuousDiscovery starts an asynchronuous infinite discovery process where instances are
@@ -478,6 +500,8 @@ func ContinuousDiscovery() {
 	runCheckAndRecoverOperationsTimeRipe := func() bool {
 		return time.Since(continuousDiscoveryStartTime) >= checkAndRecoverWaitPeriod
 	}
+
+	var seedOnce sync.Once
 
 	go ometrics.InitMetrics()
 	go ometrics.InitGraphiteMetrics()
@@ -509,6 +533,7 @@ func ContinuousDiscovery() {
 				if IsLeaderOrActive() {
 					go inst.UpdateClusterAliases()
 					go inst.ExpireDowntime()
+					go injectSeeds(&seedOnce)
 				}
 			}()
 		case <-autoPseudoGTIDTick:

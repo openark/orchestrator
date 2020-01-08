@@ -31,7 +31,8 @@ The following is a production configuration file, with some details redacted.
   "InstancePollSeconds": 5,
   "DiscoveryIgnoreReplicaHostnameFilters": [
     "a_host_i_want_to_ignore[.]example[.]com",
-    ".*[.]ignore_all_hosts_from_this_domain[.]example[.]com"
+    ".*[.]ignore_all_hosts_from_this_domain[.]example[.]com",
+    "a_host_with_extra_port_i_want_to_ignore[.]example[.]com:3307"
   ],
   "ReadLongRunningQueries": false,
   "SkipMaxScaleCheck": true,
@@ -146,6 +147,7 @@ The following is a production configuration file, with some details redacted.
   "DetachLostSlavesAfterMasterFailover": true,
   "ApplyMySQLPromotionAfterMasterFailover": true,
   "PreventCrossDataCenterMasterFailover": false,
+  "PreventCrossRegionMasterFailover": false,
   "MasterFailoverLostInstancesDowntimeMinutes": 60,
   "PostponeReplicaRecoveryOnLagMinutes": 10,
   "OSCIgnoreHostnameFilters": [
