@@ -280,10 +280,10 @@ func expectReplicationThreadsState(instanceKey *InstanceKey, expectedState Repli
 // It writes the information retrieved into orchestrator's backend.
 // - writes are optionally buffered.
 // - timing information can be collected for the stages performed.
-func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool, latency *stopwatch.NamedStopwatch) (*Instance, error) {
+func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool, latency *stopwatch.NamedStopwatch) (inst *Instance, err error) {
 	defer func() {
-		if err := recover(); err != nil {
-			logReadTopologyInstanceError(instanceKey, "Unexpected, aborting", fmt.Errorf("%+v", err))
+		if r := recover(); r != nil {
+			err = logReadTopologyInstanceError(instanceKey, "Unexpected, aborting", fmt.Errorf("%+v", r))
 		}
 	}()
 
