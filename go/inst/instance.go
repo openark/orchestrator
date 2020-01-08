@@ -363,9 +363,9 @@ func (this *Instance) CanReplicateFrom(other *Instance) (bool, error) {
 		// OK for a master to not have log_slave_updates
 		// Not OK for a replica, for it has to relay the logs.
 	}
-	if this.IsSmallerMajorVersion(other) && !this.IsBinlogServer() {
-		return false, fmt.Errorf("instance %+v has version %s, which is lower than %s on %+v ", this.Key, this.Version, other.Version, other.Key)
-	}
+	//if this.IsSmallerMajorVersion(other) && !this.IsBinlogServer() {
+	//	return false, fmt.Errorf("instance %+v has version %s, which is lower than %s on %+v ", this.Key, this.Version, other.Version, other.Key)
+	//}
 	if this.LogBinEnabled && this.LogSlaveUpdatesEnabled {
 		if this.IsSmallerBinlogFormat(other) {
 			return false, fmt.Errorf("Cannot replicate from %+v binlog format on %+v to %+v on %+v", other.Binlog_format, other.Key, this.Binlog_format, this.Key)

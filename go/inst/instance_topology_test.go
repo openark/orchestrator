@@ -369,22 +369,22 @@ func TestChooseCandidateReplicaPriorityVersionLosesTwo(t *testing.T) {
 	test.S(t).ExpectEquals(len(cannotReplicateReplicas), 0)
 }
 
-func TestChooseCandidateReplicaPriorityVersionHigherVersionOverrides(t *testing.T) {
-	instances, instancesMap := generateTestInstances()
-	applyGeneralGoodToGoReplicationParams(instances)
-	instancesMap[i830Key.StringCode()].Version = "5.7.8"
-	instancesMap[i820Key.StringCode()].Version = "5.7.18"
-	instancesMap[i810Key.StringCode()].Version = "5.7.5"
-	instancesMap[i730Key.StringCode()].Version = "5.7.30"
-	instances = sortedReplicas(instances, NoStopReplication)
-	candidate, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err := chooseCandidateReplica(instances)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(candidate.Key, i830Key)
-	test.S(t).ExpectEquals(len(aheadReplicas), 0)
-	test.S(t).ExpectEquals(len(equalReplicas), 0)
-	test.S(t).ExpectEquals(len(laterReplicas), 3)
-	test.S(t).ExpectEquals(len(cannotReplicateReplicas), 2)
-}
+//func TestChooseCandidateReplicaPriorityVersionHigherVersionOverrides(t *testing.T) {
+//	instances, instancesMap := generateTestInstances()
+//	applyGeneralGoodToGoReplicationParams(instances)
+//	instancesMap[i830Key.StringCode()].Version = "5.7.8"
+//	instancesMap[i820Key.StringCode()].Version = "5.7.18"
+//	instancesMap[i810Key.StringCode()].Version = "5.7.5"
+//	instancesMap[i730Key.StringCode()].Version = "5.7.30"
+//	instances = sortedReplicas(instances, NoStopReplication)
+//	candidate, aheadReplicas, equalReplicas, laterReplicas, cannotReplicateReplicas, err := chooseCandidateReplica(instances)
+//	test.S(t).ExpectNil(err)
+//	test.S(t).ExpectEquals(candidate.Key, i830Key)
+//	test.S(t).ExpectEquals(len(aheadReplicas), 0)
+//	test.S(t).ExpectEquals(len(equalReplicas), 0)
+//	test.S(t).ExpectEquals(len(laterReplicas), 3)
+//	test.S(t).ExpectEquals(len(cannotReplicateReplicas), 2)
+//}
 
 func TestChooseCandidateReplicaLosesOneDueToBinlogFormat(t *testing.T) {
 	instances, instancesMap := generateTestInstances()

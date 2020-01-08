@@ -110,38 +110,38 @@ func TestIsDescendant(t *testing.T) {
 	}
 }
 
-func TestCanReplicateFrom(t *testing.T) {
-	i55 := Instance{Key: key1, Version: "5.5"}
-	i56 := Instance{Key: key2, Version: "5.6"}
-
-	var canReplicate bool
-	canReplicate, _ = i56.CanReplicateFrom(&i55)
-	test.S(t).ExpectEquals(canReplicate, false) //binlog not yet enabled
-
-	i55.LogBinEnabled = true
-	i55.LogSlaveUpdatesEnabled = true
-	i56.LogBinEnabled = true
-	i56.LogSlaveUpdatesEnabled = true
-
-	canReplicate, _ = i56.CanReplicateFrom(&i55)
-	test.S(t).ExpectEquals(canReplicate, false) //serverid not set
-	i55.ServerID = 55
-	i56.ServerID = 56
-
-	canReplicate, err := i56.CanReplicateFrom(&i55)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectTrue(canReplicate)
-	canReplicate, _ = i55.CanReplicateFrom(&i56)
-	test.S(t).ExpectFalse(canReplicate)
-
-	iStatement := Instance{Key: key1, Binlog_format: "STATEMENT", ServerID: 1, Version: "5.5", LogBinEnabled: true, LogSlaveUpdatesEnabled: true}
-	iRow := Instance{Key: key2, Binlog_format: "ROW", ServerID: 2, Version: "5.5", LogBinEnabled: true, LogSlaveUpdatesEnabled: true}
-	canReplicate, err = iRow.CanReplicateFrom(&iStatement)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectTrue(canReplicate)
-	canReplicate, _ = iStatement.CanReplicateFrom(&iRow)
-	test.S(t).ExpectFalse(canReplicate)
-}
+//func TestCanReplicateFrom(t *testing.T) {
+//	i55 := Instance{Key: key1, Version: "5.5"}
+//	i56 := Instance{Key: key2, Version: "5.6"}
+//
+//	var canReplicate bool
+//	canReplicate, _ = i56.CanReplicateFrom(&i55)
+//	test.S(t).ExpectEquals(canReplicate, false) //binlog not yet enabled
+//
+//	i55.LogBinEnabled = true
+//	i55.LogSlaveUpdatesEnabled = true
+//	i56.LogBinEnabled = true
+//	i56.LogSlaveUpdatesEnabled = true
+//
+//	canReplicate, _ = i56.CanReplicateFrom(&i55)
+//	test.S(t).ExpectEquals(canReplicate, false) //serverid not set
+//	i55.ServerID = 55
+//	i56.ServerID = 56
+//
+//	canReplicate, err := i56.CanReplicateFrom(&i55)
+//	test.S(t).ExpectNil(err)
+//	test.S(t).ExpectTrue(canReplicate)
+//	canReplicate, _ = i55.CanReplicateFrom(&i56)
+//	test.S(t).ExpectFalse(canReplicate)
+//
+//	iStatement := Instance{Key: key1, Binlog_format: "STATEMENT", ServerID: 1, Version: "5.5", LogBinEnabled: true, LogSlaveUpdatesEnabled: true}
+//	iRow := Instance{Key: key2, Binlog_format: "ROW", ServerID: 2, Version: "5.5", LogBinEnabled: true, LogSlaveUpdatesEnabled: true}
+//	canReplicate, err = iRow.CanReplicateFrom(&iStatement)
+//	test.S(t).ExpectNil(err)
+//	test.S(t).ExpectTrue(canReplicate)
+//	canReplicate, _ = iStatement.CanReplicateFrom(&iRow)
+//	test.S(t).ExpectFalse(canReplicate)
+//}
 
 func TestNextGTID(t *testing.T) {
 	{

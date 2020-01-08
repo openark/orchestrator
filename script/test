@@ -41,10 +41,10 @@ script/build
 
 cd .gopath/src/github.com/github/orchestrator
 
-echo "# Running unit tests"
-go test ./go/...
-
-echo "# Running integration tests"
-./tests/integration/test.sh || exit 1
+#echo "# Running unit tests"
+#go test ./go/...
+#
+#echo "# Running integration tests"
+#./tests/integration/test.sh || exit 1
 
 echo "# Done"
