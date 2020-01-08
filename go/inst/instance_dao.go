@@ -77,6 +77,8 @@ var readTopologyInstanceCounter = metrics.NewCounter()
 var readInstanceCounter = metrics.NewCounter()
 var writeInstanceCounter = metrics.NewCounter()
 var backendWrites = collection.CreateOrReturnCollection("BACKEND_WRITES")
+var writeBufferMetrics = collection.CreateOrReturnCollection("WRITE_BUFFER")
+var writeBufferLatency = stopwatch.NewNamedStopwatch()
 
 var emptyQuotesRegexp = regexp.MustCompile(`^""$`)
 
@@ -85,6 +87,8 @@ func init() {
 	metrics.Register("instance.read_topology", readTopologyInstanceCounter)
 	metrics.Register("instance.read", readInstanceCounter)
 	metrics.Register("instance.write", writeInstanceCounter)
+	writeBufferLatency.AddMany([]string{"wait", "write"})
+	writeBufferLatency.Start("wait")
 
 	go initializeInstanceDao()
 }
@@ -276,10 +280,10 @@ func expectReplicationThreadsState(instanceKey *InstanceKey, expectedState Repli
 // It writes the information retrieved into orchestrator's backend.
 // - writes are optionally buffered.
 // - timing information can be collected for the stages performed.
-func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool, latency *stopwatch.NamedStopwatch) (*Instance, error) {
+func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool, latency *stopwatch.NamedStopwatch) (inst *Instance, err error) {
 	defer func() {
-		if err := recover(); err != nil {
-			logReadTopologyInstanceError(instanceKey, "Unexpected, aborting", fmt.Errorf("%+v", err))
+		if r := recover(); r != nil {
+			err = logReadTopologyInstanceError(instanceKey, "Unexpected, aborting", fmt.Errorf("%+v", r))
 		}
 	}()
 
@@ -2523,9 +2527,14 @@ var forceFlushInstanceWriteBuffer = make(chan bool)
 
 func enqueueInstanceWrite(instance *Instance, instanceWasActuallyFound bool, lastError error) {
 	if len(instanceWriteBuffer) == config.Config.InstanceWriteBufferSize {
-		// Signal the "flushing" gorouting that there's work.
+		// Signal the "flushing" goroutine that there's work.
 		// We prefer doing all bulk flushes from one goroutine.
-		forceFlushInstanceWriteBuffer <- true
+		// Non blocking send to avoid blocking goroutines on sending a flush,
+		// if the "flushing" goroutine is not able read is because a flushing is ongoing.
+		select {
+		case forceFlushInstanceWriteBuffer <- true:
+		default:
+		}
 	}
 	instanceWriteBuffer <- instanceUpdateObject{instance, instanceWasActuallyFound, lastError}
 }
@@ -2535,11 +2544,24 @@ func flushInstanceWriteBuffer() {
 	var instances []*Instance
 	var lastseen []*Instance // instances to update with last_seen field
 
+	defer func() {
+		// reset stopwatches (TODO: .ResetAll())
+		writeBufferLatency.Reset("wait")
+		writeBufferLatency.Reset("write")
+		writeBufferLatency.Start("wait") // waiting for next flush
+	}()
+
+	writeBufferLatency.Stop("wait")
+
 	if len(instanceWriteBuffer) == 0 {
 		return
 	}
 
-	for i := 0; i < len(instanceWriteBuffer); i++ {
+	// There are `DiscoveryMaxConcurrency` many goroutines trying to enqueue an instance into the buffer
+	// when one instance is flushed from the buffer then one discovery goroutine is ready to enqueue a new instance
+	// this is why we want to flush all instances in the buffer untill a max of `InstanceWriteBufferSize`.
+	// Otherwise we can flush way more instances than what's expected.
+	for i := 0; i < config.Config.InstanceWriteBufferSize && len(instanceWriteBuffer) > 0; i++ {
 		upd := <-instanceWriteBuffer
 		if upd.instanceWasActuallyFound && upd.lastError == nil {
 			lastseen = append(lastseen, upd.instance)
@@ -2548,6 +2570,9 @@ func flushInstanceWriteBuffer() {
 			log.Debugf("flushInstanceWriteBuffer: will not update database_instance.last_seen due to error: %+v", upd.lastError)
 		}
 	}
+
+	writeBufferLatency.Start("write")
+
 	// sort instances by instanceKey (table pk) to make locking predictable
 	sort.Sort(byInstanceKey(instances))
 	sort.Sort(byInstanceKey(lastseen))
@@ -2569,6 +2594,15 @@ func flushInstanceWriteBuffer() {
 	if err != nil {
 		log.Errorf("flushInstanceWriteBuffer: %v", err)
 	}
+
+	writeBufferLatency.Stop("write")
+
+	writeBufferMetrics.Append(&WriteBufferMetric{
+		Timestamp:    time.Now(),
+		WaitLatency:  writeBufferLatency.Elapsed("wait"),
+		WriteLatency: writeBufferLatency.Elapsed("write"),
+		Instances:    len(lastseen) + len(instances),
+	})
 }
 
 // WriteInstance stores an instance in the orchestrator backend
