@@ -17,6 +17,8 @@
 package kv
 
 import (
+	"fmt"
+
 	"github.com/github/orchestrator/go/db"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
@@ -67,12 +69,7 @@ func (this *internalKVStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 }
 
 func (this *internalKVStore) DeleteRecursive(key string) (err error) {
-	_, err = db.ExecOrchestrator(`
-		delete
-			from kv_store 
-		where
-		store_key rlike ?
-		`, key,
-	)
+	query := fmt.Sprintf("DELETE FROM kv_store WHERE store_key LIKE '%s%%'", key)
+	_, err = db.ExecOrchestrator(query)
 	return log.Errore(err)
 }

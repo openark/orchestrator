@@ -1931,7 +1931,7 @@ func ForgetUnseenInstancesDifferentlyResolved() error {
 			return log.Errore(err)
 		}
 		rowsAffected = rowsAffected + rows
-		if clusterInfo.CountInstances == 1 {
+		if clusterInfo.CountInstances == 1 && config.Config.RemoveForgottenClustersFromKV {
 			err := kv.DeleteRecursive(GetClusterMasterKVKey(clusterInfo.ClusterAlias))
 			if err != nil {
 				return log.Errore(err)
@@ -2713,7 +2713,7 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 	if rows == 0 {
 		return log.Errorf("ForgetInstance(): instance %+v not found", *instanceKey)
 	}
-	if clusterInfo.CountInstances == 1 {
+	if clusterInfo.CountInstances == 1 && config.Config.RemoveForgottenClustersFromKV {
 		err = kv.DeleteRecursive(GetClusterMasterKVKey(clusterInfo.ClusterAlias))
 		if err != nil {
 			return log.Errore(err)
@@ -2723,7 +2723,7 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 	return nil
 }
 
-// ForgetInstance removes an instance entry from the orchestrator backed database and removes all data about cluster from kv.
+// ForgetInstance removes an instance entry from the orchestrator backed database and removes all data about cluster from kv if RemoveForgottenClustersFromKV is set to true in config.
 // It may be auto-rediscovered through topology or requested for discovery by multiple means.
 func ForgetCluster(clusterName string) error {
 	clusterInstances, err := ReadClusterInstances(clusterName)
@@ -2748,7 +2748,9 @@ func ForgetCluster(clusterName string) error {
 				cluster_name = ?`,
 		clusterName,
 	)
-	err = kv.DeleteRecursive(GetClusterMasterKVKey(clusterInfo.ClusterAlias))
+	if config.Config.RemoveForgottenClustersFromKV {
+		err = kv.DeleteRecursive(GetClusterMasterKVKey(clusterInfo.ClusterAlias))
+	}
 	return err
 }
 
@@ -2795,7 +2797,7 @@ func ForgetLongUnseenInstances() error {
 			return log.Errore(err)
 		}
 		rowsAffected = rowsAffected + rows
-		if clusterInfo.CountInstances == 1 {
+		if clusterInfo.CountInstances == 1 && config.Config.RemoveForgottenClustersFromKV {
 			err := kv.DeleteRecursive(GetClusterMasterKVKey(clusterInfo.ClusterAlias))
 			if err != nil {
 				return log.Errore(err)
