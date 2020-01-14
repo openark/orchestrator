@@ -16,7 +16,11 @@
 
 package agent
 
-import "github.com/github/orchestrator/go/inst"
+import (
+	"sync"
+
+	"github.com/github/orchestrator/go/inst"
+)
 
 // LogicalVolume describes an LVM volume
 type LogicalVolume struct {
@@ -29,17 +33,52 @@ type LogicalVolume struct {
 
 // Mount describes a file system mount point
 type Mount struct {
-	Path           string
-	Device         string
-	LVPath         string
-	FileSystem     string
-	IsMounted      bool
-	DiskUsage      int64
-	MySQLDataPath  string
-	MySQLDiskUsage int64
+	Path       string
+	Device     string
+	LVPath     string
+	FileSystem string
+	IsMounted  bool
+	DiskUsage  int64
+}
+
+// MySQLDatabase describes a MySQL database
+type MySQLDatabase struct {
+	Engines []string
+	Size    int64
+}
+
+type AgentInfo struct {
+	LocalSnapshotsHosts  []string         // AvailableLocalSnapshots in Orchestrator
+	SnaphostHosts        []string         // AvailableSnapshots in Orchestrator
+	LogicalVolumes       []*LogicalVolume // pass by reference ??
+	MountPoint           *Mount           // pass by reference ??
+	BackupDir            string
+	BackupDirDiskFree    int64
+	MySQLRunning         bool
+	MySQLPort            int
+	MySQLDatadir         string
+	MySQLDatadirDiskUsed int64
+	MySQLDatadirDiskFree int64
+	MySQLVersion         string
+	MySQLDatabases       map[string]*MySQLDatabase
+	MySQLErrorLogTail    []string
+}
+
+type AgentParams struct {
+	Hostname string
+	Port     int
+	Token    string
+}
+
+type Agent struct {
+	Params        *AgentParams
+	Info          *AgentInfo
+	LastSubmitted string
+	sync.RWMutex
 }
 
 // Agent presents the data of an agent
+/*
 type Agent struct {
 	Hostname                string
 	Port                    int
@@ -55,6 +94,7 @@ type Agent struct {
 	MySQLDatadirDiskFree    int64
 	MySQLErrorLogTail       []string
 }
+*/
 
 // SeedOperation makes for the high level data & state of a seed operation
 type SeedOperation struct {
