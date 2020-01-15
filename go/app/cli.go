@@ -1075,7 +1075,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("topology", "Information", `Show an ascii-graph of a replication topology, given a member of that topology`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
-			output, err := inst.ASCIITopology(clusterName, pattern, false)
+			output, err := inst.ASCIITopology(clusterName, pattern, false, false)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1084,7 +1084,16 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("topology-tabulated", "Information", `Show an ascii-graph of a replication topology, given a member of that topology`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
-			output, err := inst.ASCIITopology(clusterName, pattern, true)
+			output, err := inst.ASCIITopology(clusterName, pattern, true, false)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(output)
+		}
+	case registerCliCommand("topology-tags", "Information", `Show an ascii-graph of a replication topology and instance tags, given a member of that topology`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			output, err := inst.ASCIITopology(clusterName, pattern, false, true)
 			if err != nil {
 				log.Fatale(err)
 			}

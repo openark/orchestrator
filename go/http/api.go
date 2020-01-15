@@ -40,7 +40,7 @@ import (
 	"github.com/github/orchestrator/go/logic"
 	"github.com/github/orchestrator/go/metrics/query"
 	"github.com/github/orchestrator/go/process"
-	"github.com/github/orchestrator/go/raft"
+	orcraft "github.com/github/orchestrator/go/raft"
 )
 
 // APIResponseCode is an OK/ERROR response code
@@ -123,6 +123,7 @@ type HttpAPI struct {
 var API HttpAPI = HttpAPI{}
 var discoveryMetrics = collection.CreateOrReturnCollection("DISCOVERY_METRICS")
 var queryMetrics = collection.CreateOrReturnCollection("BACKEND_WRITES")
+var writeBufferMetrics = collection.CreateOrReturnCollection("WRITE_BUFFER")
 
 func (this *HttpAPI) getInstanceKeyInternal(host string, port string, resolve bool) (inst.InstanceKey, error) {
 	var instanceKey *inst.InstanceKey
@@ -1645,14 +1646,14 @@ func (this *HttpAPI) KillQuery(params martini.Params, r render.Render, req *http
 }
 
 // AsciiTopology returns an ascii graph of cluster's instances
-func (this *HttpAPI) asciiTopology(params martini.Params, r render.Render, req *http.Request, tabulated bool) {
+func (this *HttpAPI) asciiTopology(params martini.Params, r render.Render, req *http.Request, tabulated bool, printTags bool) {
 	clusterName, err := figureClusterName(getClusterHint(params))
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	asciiOutput, err := inst.ASCIITopology(clusterName, "", tabulated)
+	asciiOutput, err := inst.ASCIITopology(clusterName, "", tabulated, printTags)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -1674,12 +1675,17 @@ func (this *HttpAPI) SnapshotTopologies(params martini.Params, r render.Render, 
 
 // AsciiTopology returns an ascii graph of cluster's instances
 func (this *HttpAPI) AsciiTopology(params martini.Params, r render.Render, req *http.Request) {
-	this.asciiTopology(params, r, req, false)
+	this.asciiTopology(params, r, req, false, false)
 }
 
 // AsciiTopology returns an ascii graph of cluster's instances
 func (this *HttpAPI) AsciiTopologyTabulated(params martini.Params, r render.Render, req *http.Request) {
-	this.asciiTopology(params, r, req, true)
+	this.asciiTopology(params, r, req, true, false)
+}
+
+// AsciiTopologyTags returns an ascii graph of cluster's instances and instance tags
+func (this *HttpAPI) AsciiTopologyTags(params martini.Params, r render.Render, req *http.Request) {
+	this.asciiTopology(params, r, req, false, true)
 }
 
 // Cluster provides list of instances in given cluster
@@ -2381,6 +2387,43 @@ func (this *HttpAPI) BackendQueryMetricsAggregated(params martini.Params, r rend
 	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
 	aggregated := query.AggregatedSince(queryMetrics, refTime)
 	log.Debugf("BackendQueryMetricsAggregated data: %+v", aggregated)
+
+	r.JSON(http.StatusOK, aggregated)
+}
+
+// WriteBufferMetricsRaw returns the raw instance write buffer metrics
+func (this *HttpAPI) WriteBufferMetricsRaw(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+	log.Debugf("WriteBufferMetricsRaw: seconds: %d", seconds)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unable to generate raw instance write buffer metrics"})
+		return
+	}
+
+	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
+	m, err := writeBufferMetrics.Since(refTime)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unable to return instance write buffermetrics"})
+		return
+	}
+
+	log.Debugf("WriteBufferMetricsRaw data: %+v", m)
+
+	r.JSON(http.StatusOK, m)
+}
+
+// WriteBufferMetricsAggregated provides aggregate metrics of instance write buffer metrics
+func (this *HttpAPI) WriteBufferMetricsAggregated(params martini.Params, r render.Render, req *http.Request, user auth.User) {
+	seconds, err := strconv.Atoi(params["seconds"])
+	log.Debugf("WriteBufferMetricsAggregated: seconds: %d", seconds)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: "Unable to aggregated instance write buffer metrics"})
+		return
+	}
+
+	refTime := time.Now().Add(-time.Duration(seconds) * time.Second)
+	aggregated := inst.AggregatedSince(writeBufferMetrics, refTime)
+	log.Debugf("WriteBufferMetricsAggregated data: %+v", aggregated)
 
 	r.JSON(http.StatusOK, aggregated)
 }
@@ -3645,6 +3688,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "topology/:host/:port", this.AsciiTopology)
 	this.registerAPIRequest(m, "topology-tabulated/:clusterHint", this.AsciiTopologyTabulated)
 	this.registerAPIRequest(m, "topology-tabulated/:host/:port", this.AsciiTopologyTabulated)
+	this.registerAPIRequest(m, "topology-tags/:clusterHint", this.AsciiTopologyTags)
+	this.registerAPIRequest(m, "topology-tags/:host/:port", this.AsciiTopologyTags)
 	this.registerAPIRequest(m, "snapshot-topologies", this.SnapshotTopologies)
 
 	// Key-value:
@@ -3754,6 +3799,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequestNoProxy(m, "hostname-resolve-cache", this.HostnameResolveCache)
 	this.registerAPIRequestNoProxy(m, "reset-hostname-resolve-cache", this.ResetHostnameResolveCache)
 	// Meta
+	this.registerAPIRequest(m, "routed-leader-check", this.LeaderCheck)
 	this.registerAPIRequest(m, "reelect", this.Reelect)
 	this.registerAPIRequest(m, "reload-cluster-alias", this.ReloadClusterAlias)
 	this.registerAPIRequest(m, "deregister-hostname-unresolve/:host/:port", this.DeregisterHostnameUnresolve)
@@ -3770,6 +3816,8 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "discovery-queue-metrics-aggregated/:seconds", this.DiscoveryQueueMetricsAggregated)
 	this.registerAPIRequest(m, "backend-query-metrics-raw/:seconds", this.BackendQueryMetricsRaw)
 	this.registerAPIRequest(m, "backend-query-metrics-aggregated/:seconds", this.BackendQueryMetricsAggregated)
+	this.registerAPIRequest(m, "write-buffer-metrics-raw/:seconds", this.WriteBufferMetricsRaw)
+	this.registerAPIRequest(m, "write-buffer-metrics-aggregated/:seconds", this.WriteBufferMetricsAggregated)
 
 	// Agents
 	this.registerAPIRequest(m, "agents", this.Agents)

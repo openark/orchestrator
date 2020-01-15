@@ -61,6 +61,7 @@ pool=
 hostname_flag=
 api_path=
 basic_auth="${ORCHESTRATOR_AUTH_USER:-}:${ORCHESTRATOR_AUTH_PASSWORD:-}"
+headers_auth="${ORCHESTRATOR_AUTH_USER_HEADER}"
 binlog=
 
 instance_hostport=
@@ -89,12 +90,13 @@ for arg in "$@"; do
     "-path"|"--path")                     set -- "$@" "-P" ;;
     "-query"|"--query")                   set -- "$@" "-q" ;;
     "-auth"|"--auth")                     set -- "$@" "-b" ;;
+    "-headers-auth"|"--headers-auth")     set -- "$@" "-e" ;;
     "-binlog"|"--binlog")                 set -- "$@" "-n" ;;
     *)                                    set -- "$@" "$arg"
   esac
 done
 
-while getopts "c:i:d:s:a:D:U:o:r:u:R:t:l:H:P:q:b:n:h" OPTION
+while getopts "c:i:d:s:a:D:U:o:r:u:R:t:l:H:P:q:b:e:n:h" OPTION
 do
   case $OPTION in
     h) command="help" ;;
@@ -114,6 +116,7 @@ do
     U) [ ! -z "$OPTARG" ] && orchestrator_api="$OPTARG" ;;
     P) api_path="$OPTARG" ;;
     b) basic_auth="$OPTARG" ;;
+    e) headers_auth="$OPTARG" ;;
     n) binlog="$OPTARG" ;;
     q) query="$OPTARG"
   esac
@@ -149,6 +152,10 @@ function get_curl_auth_params {
 
     curl --help 2>&1 | fgrep -q 'disallow-username-in-url' && \
       requires_auth+=" --disallow-username-in-url"
+  fi
+
+  if [[ -n "${headers_auth}" ]]; then
+    requires_auth="-H "${headers_auth}""
   fi
 
   # Test API access
@@ -217,6 +224,15 @@ function detect_leader_api {
   for api in ${apis[@]} ; do
     api=$(normalize_orchestrator_api $api)
     leader_check=$(curl ${curl_auth_params} -m 1 -s -o /dev/null -w "%{http_code}" "${api}/leader-check")
+    if [ "$leader_check" == "200" ] ; then
+      leader_api="$api"
+      return
+    fi
+  done
+  # Cannot find leader directly. Maybe our config is wrong. But, perhaps one of the nodes can route us?
+  for api in ${apis[@]} ; do
+    api=$(normalize_orchestrator_api $api)
+    leader_check=$(curl ${curl_auth_params} -m 1 -s -o /dev/null -w "%{http_code}" "${api}/routed-leader-check")
     if [ "$leader_check" == "200" ] ; then
       leader_api="$api"
       return
@@ -343,6 +359,8 @@ function prompt_help {
     With '-c api', indicate the specific API path you wish to call
   -b <username:password>, --auth <username:password>
     Specify when orchestrator uses basic HTTP auth.
+  -e <header:user>, --headers-auth <header:user>
+    Specify when orchestrator uses headers auth.
   -q <query>, --query <query>
     Indicate query for 'restart-replica-statements' command
   -l <pool name>, --pool <pool name>
@@ -375,6 +393,12 @@ function ascii_topology {
 function ascii_topology_tabulated {
   assert_nonempty "instance|alias" "${alias:-$instance}"
   api "topology-tabulated/${alias:-$instance}"
+  echo "$api_response" | jq -r '.Details'
+}
+
+function ascii_topology_tags {
+  assert_nonempty "instance|alias" "${alias:-$instance}"
+  api "topology-tags/${alias:-$instance}"
   echo "$api_response" | jq -r '.Details'
 }
 
@@ -857,6 +881,7 @@ function run_command {
 
     "topology") ascii_topology ;;                               # Show an ascii-graph of a replication topology, given a member of that topology
     "topology-tabulated") ascii_topology_tabulated ;;           # Show an ascii-graph of a replication topology, given a member of that topology, in tabulated format
+    "topology-tags") ascii_topology_tags ;;                     # Show an ascii-graph of a replication topology and instance tags, given a member of that topology
     "snapshot-topologies") snapshot_topologies ;;               # Trigger topology snapshot (recording host/master settings for all hosts)
     "clusters") clusters ;;                                     # List all clusters known to orchestrator
     "clusters-alias") clusters_alias ;;                         # List all clusters known to orchestrator
