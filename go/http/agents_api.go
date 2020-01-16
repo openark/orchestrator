@@ -17,9 +17,9 @@
 package http
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/go-martini/martini"
@@ -36,14 +36,22 @@ type HttpAgentsAPI struct {
 var AgentsAPI HttpAgentsAPI = HttpAgentsAPI{}
 
 // SubmitAgent registeres an agent. It is initiated by an agent to register itself.
-func (this *HttpAgentsAPI) SubmitAgent(params martini.Params, r render.Render) {
-	port, err := strconv.Atoi(params["port"])
+func (this *HttpAgentsAPI) SubmitAgent(params martini.Params, r render.Render, req *http.Request) {
+	var agentParams agent.AgentParams
+	//port, err := strconv.Atoi(params["port"])
+	//if err != nil {
+	//	r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
+	//	return
+	//}
+	decoder := json.NewDecoder(req.Body)
+	//seedMethods := make(map[agent.SeedMethod]agent.SeedMethodOpts)
+	err := decoder.Decode(&agentParams)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
 	}
 
-	output, err := agent.SubmitAgent(params["host"], port, params["token"])
+	output, err := agent.SubmitAgent(&agentParams)
 	if err != nil {
 		r.JSON(200, &APIResponse{Code: ERROR, Message: err.Error()})
 		return
@@ -81,7 +89,7 @@ func (this *HttpAgentsAPI) AgentsHosts(params martini.Params, r render.Render, r
 	agents, err := agent.ReadAgents()
 	hostnames := []string{}
 	for _, agent := range agents {
-		hostnames = append(hostnames, agent.Hostname)
+		hostnames = append(hostnames, agent.Params.Hostname)
 	}
 
 	if err != nil {
@@ -102,7 +110,7 @@ func (this *HttpAgentsAPI) AgentsInstances(params martini.Params, r render.Rende
 	agents, err := agent.ReadAgents()
 	hostnames := []string{}
 	for _, agent := range agents {
-		hostnames = append(hostnames, fmt.Sprintf("%s:%d", agent.Hostname, agent.MySQLPort))
+		hostnames = append(hostnames, fmt.Sprintf("%s:%d", agent.Params.Hostname, agent.Params.MySQLPort))
 	}
 
 	if err != nil {
@@ -124,7 +132,7 @@ func (this *HttpAgentsAPI) AgentPing(params martini.Params, r render.Render, req
 
 // RegisterRequests makes for the de-facto list of known API calls
 func (this *HttpAgentsAPI) RegisterRequests(m *martini.ClassicMartini) {
-	m.Get(this.URLPrefix+"/api/submit-agent/:host/:port/:token", this.SubmitAgent)
+	m.Post(this.URLPrefix+"/api/submit-agent", this.SubmitAgent)
 	m.Get(this.URLPrefix+"/api/host-attribute/:host/:attrVame/:attrValue", this.SetHostAttribute)
 	m.Get(this.URLPrefix+"/api/host-attribute/attr/:attr/", this.GetHostAttributeByAttributeName)
 	m.Get(this.URLPrefix+"/api/agents-hosts", this.AgentsHosts)

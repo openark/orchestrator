@@ -34,7 +34,7 @@ import (
 	"github.com/github/orchestrator/go/kv"
 	ometrics "github.com/github/orchestrator/go/metrics"
 	"github.com/github/orchestrator/go/process"
-	"github.com/github/orchestrator/go/raft"
+	orcraft "github.com/github/orchestrator/go/raft"
 	"github.com/github/orchestrator/go/util"
 	"github.com/openark/golib/log"
 	"github.com/patrickmn/go-cache"
@@ -661,7 +661,7 @@ func ContinuousAgentsPoll() {
 
 func discoverSeededAgents() {
 	for seededAgent := range agent.SeededAgents {
-		instanceKey := &inst.InstanceKey{Hostname: seededAgent.Hostname, Port: int(seededAgent.MySQLPort)}
+		instanceKey := &inst.InstanceKey{Hostname: seededAgent.Params.Hostname, Port: int(seededAgent.Params.MySQLPort)}
 		go inst.ReadTopologyInstance(instanceKey)
 	}
 }

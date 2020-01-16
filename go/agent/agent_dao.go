@@ -77,7 +77,7 @@ func httpPost(url string, bodyType string, content string) (resp *http.Response,
 func auditAgentOperation(auditType string, agent *Agent, message string) error {
 	instanceKey := &inst.InstanceKey{}
 	if agent != nil {
-		instanceKey = &inst.InstanceKey{Hostname: agent.Hostname, Port: int(agent.MySQLPort)}
+		instanceKey = &inst.InstanceKey{Hostname: agent.Params.Hostname, Port: agent.Params.MySQLPort}
 	}
 	return inst.AuditOperation(auditType, instanceKey, message)
 }
@@ -102,27 +102,33 @@ func readResponse(res *http.Response, err error) ([]byte, error) {
 }
 
 // SubmitAgent submits a new agent for listing
-func SubmitAgent(hostname string, port int, token string) (string, error) {
-	_, err := db.ExecOrchestrator(`
+func SubmitAgent(agentParams *AgentParams) (string, error) {
+	seedMethods, err := json.Marshal(agentParams.AvailiableSeedMethods)
+	if err != nil {
+		return "", log.Errore(err)
+	}
+	_, err = db.ExecOrchestrator(`
 			replace
 				into host_agent (
-					hostname, port, token, last_submitted, count_mysql_snapshots
+					hostname, port, token, last_submitted, mysql_port, count_mysql_snapshots, seed_methods
 				) VALUES (
-					?, ?, ?, NOW(), 0
+					?, ?, ?, NOW(), ?, 0, ?
 				)
 			`,
-		hostname,
-		port,
-		token,
+		agentParams.Hostname,
+		agentParams.Port,
+		agentParams.Token,
+		agentParams.MySQLPort,
+		seedMethods,
 	)
 	if err != nil {
 		return "", log.Errore(err)
 	}
 
 	// Try to discover topology instances when an agent submits
-	go DiscoverAgentInstance(hostname, port)
+	go DiscoverAgentInstance(agentParams.Hostname, agentParams.Port)
 
-	return hostname, err
+	return agentParams.Hostname, err
 }
 
 // If a mysql port is available, try to discover against it
@@ -199,10 +205,10 @@ func ReadAgents() ([]Agent, error) {
 		`
 	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
 		agent := Agent{}
-		agent.Hostname = m.GetString("hostname")
-		agent.Port = m.GetInt("port")
-		agent.MySQLPort = m.GetInt64("mysql_port")
-		agent.Token = ""
+		agent.Params.Hostname = m.GetString("hostname")
+		agent.Params.Port = m.GetInt("port")
+		agent.Params.MySQLPort = m.GetInt("mysql_port")
+		agent.Params.Token = ""
 		agent.LastSubmitted = m.GetString("last_submitted")
 
 		res = append(res, agent)
@@ -218,7 +224,7 @@ func ReadAgents() ([]Agent, error) {
 
 // readAgentBasicInfo returns the basic data for an agent directly from backend table (no agent access)
 func readAgentBasicInfo(hostname string) (Agent, string, error) {
-	agent := Agent{}
+	agent := Agent{Params: &AgentParams{}}
 	token := ""
 	query := `
 		select
@@ -233,10 +239,10 @@ func readAgentBasicInfo(hostname string) (Agent, string, error) {
 			hostname = ?
 		`
 	err := db.QueryOrchestrator(query, sqlutils.Args(hostname), func(m sqlutils.RowMap) error {
-		agent.Hostname = m.GetString("hostname")
-		agent.Port = m.GetInt("port")
+		agent.Params.Hostname = m.GetString("hostname")
+		agent.Params.Port = m.GetInt("port")
 		agent.LastSubmitted = m.GetString("last_submitted")
-		agent.MySQLPort = m.GetInt64("mysql_port")
+		agent.Params.MySQLPort = m.GetInt("mysql_port")
 		token = m.GetString("token")
 
 		return nil
@@ -281,8 +287,8 @@ func UpdateAgentInfo(hostname string, agent Agent) error {
         		count_mysql_snapshots = ?
 			where
 				hostname = ?`,
-		agent.MySQLPort,
-		len(agent.LogicalVolumes),
+		agent.Params.MySQLPort,
+		len(agent.Info.LogicalVolumes),
 		hostname,
 	)
 	if err != nil {
@@ -309,100 +315,14 @@ func GetAgent(hostname string) (Agent, error) {
 	if err != nil {
 		return agent, log.Errore(err)
 	}
-
-	// All seems to be in order. Now make some inquiries from orchestrator-agent service:
-	{
-		uri := baseAgentUri(agent.Hostname, agent.Port)
-		log.Debugf("orchestrator-agent uri: %s", uri)
-
-		{
-			availableLocalSnapshotsUri := fmt.Sprintf("%s/available-snapshots-local?token=%s", uri, token)
-			body, err := readResponse(httpGet(availableLocalSnapshotsUri))
-			if err == nil {
-				err = json.Unmarshal(body, &agent.AvailableLocalSnapshots)
-			}
-			if err != nil {
-				log.Errore(err)
-			}
-		}
-		{
-			availableSnapshotsUri := fmt.Sprintf("%s/available-snapshots?token=%s", uri, token)
-			body, err := readResponse(httpGet(availableSnapshotsUri))
-			if err == nil {
-				err = json.Unmarshal(body, &agent.AvailableSnapshots)
-			}
-			if err != nil {
-				log.Errore(err)
-			}
-		}
-		{
-			lvSnapshotsUri := fmt.Sprintf("%s/lvs-snapshots?token=%s", uri, token)
-			body, err := readResponse(httpGet(lvSnapshotsUri))
-			if err == nil {
-				err = json.Unmarshal(body, &agent.LogicalVolumes)
-			}
-			if err != nil {
-				log.Errore(err)
-			}
-		}
-		{
-			mountUri := fmt.Sprintf("%s/mount?token=%s", uri, token)
-			body, err := readResponse(httpGet(mountUri))
-			if err == nil {
-				err = json.Unmarshal(body, &agent.MountPoint)
-			}
-			if err != nil {
-				log.Errore(err)
-			}
-		}
-		{
-			mySQLRunningUri := fmt.Sprintf("%s/mysql-status?token=%s", uri, token)
-			body, err := readResponse(httpGet(mySQLRunningUri))
-			if err == nil {
-				err = json.Unmarshal(body, &agent.MySQLRunning)
-			}
-			// Actually an error is OK here since "status" returns with non-zero exit code when MySQL not running
-		}
-		{
-			mySQLRunningUri := fmt.Sprintf("%s/mysql-port?token=%s", uri, token)
-			body, err := readResponse(httpGet(mySQLRunningUri))
-			if err == nil {
-				err = json.Unmarshal(body, &agent.MySQLPort)
-			}
-			if err != nil {
-				log.Errore(err)
-			}
-		}
-		{
-			mySQLDiskUsageUri := fmt.Sprintf("%s/mysql-du?token=%s", uri, token)
-			body, err := readResponse(httpGet(mySQLDiskUsageUri))
-			if err == nil {
-				err = json.Unmarshal(body, &agent.MySQLDiskUsage)
-			}
-			if err != nil {
-				log.Errore(err)
-			}
-		}
-		{
-			mySQLDatadirDiskFreeUri := fmt.Sprintf("%s/mysql-datadir-available-space?token=%s", uri, token)
-			body, err := readResponse(httpGet(mySQLDatadirDiskFreeUri))
-			if err == nil {
-				err = json.Unmarshal(body, &agent.MySQLDatadirDiskFree)
-			}
-			if err != nil {
-				log.Errore(err)
-			}
-		}
-		{
-			errorLogTailUri := fmt.Sprintf("%s/mysql-error-log-tail?token=%s", uri, token)
-			body, err := readResponse(httpGet(errorLogTailUri))
-			if err == nil {
-				err = json.Unmarshal(body, &agent.MySQLErrorLogTail)
-			}
-			if err != nil {
-				log.Errore(err)
-			}
-		}
+	uri := fmt.Sprintf("%s/get-agent?token=%s", baseAgentUri(agent.Params.Hostname, agent.Params.Port), token)
+	log.Debugf("orchestrator-agent uri: %s", uri)
+	body, err := readResponse(httpGet(uri))
+	if err == nil {
+		err = json.Unmarshal(body, &agent.Info)
+	}
+	if err != nil {
+		log.Errore(err)
 	}
 	return agent, err
 }
@@ -416,7 +336,7 @@ func executeAgentCommandWithMethodFunc(hostname string, command string, methodFu
 	}
 
 	// All seems to be in order. Now make some inquiries from orchestrator-agent service:
-	uri := baseAgentUri(agent.Hostname, agent.Port)
+	uri := baseAgentUri(agent.Params.Hostname, agent.Params.Port)
 
 	var fullCommand string
 	if strings.Contains(command, "?") {
@@ -682,28 +602,28 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 	}
 
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Checking MySQL status on target %s", targetHostname), "")
-	if targetAgent.MySQLRunning {
+	if targetAgent.Info.MySQLRunning {
 		return updateSeedStateEntry(seedStateId, errors.New("MySQL is running on target host. Cowardly refusing to proceeed. Please stop the MySQL service"))
 	}
 
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Looking up available snapshots on source %s", sourceHostname), "")
-	if len(sourceAgent.LogicalVolumes) == 0 {
+	if len(sourceAgent.Info.LogicalVolumes) == 0 {
 		return updateSeedStateEntry(seedStateId, errors.New("No logical volumes found on source host"))
 	}
 
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Checking mount point on source %s", sourceHostname), "")
-	if sourceAgent.MountPoint.IsMounted {
+	if sourceAgent.Info.MountPoint.IsMounted {
 		return updateSeedStateEntry(seedStateId, errors.New("Volume already mounted on source host; please unmount"))
 	}
 
-	seedFromLogicalVolume := sourceAgent.LogicalVolumes[0]
+	seedFromLogicalVolume := sourceAgent.Info.LogicalVolumes[0]
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("%s Mounting logical volume: %s", sourceHostname, seedFromLogicalVolume.Path), "")
 	_, err = MountLV(sourceHostname, seedFromLogicalVolume.Path)
 	if err != nil {
 		return updateSeedStateEntry(seedStateId, err)
 	}
 	sourceAgent, err = GetAgent(sourceHostname)
-	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("MySQL data volume on source host %s is %d bytes", sourceHostname, sourceAgent.MountPoint.MySQLDiskUsage), "")
+	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("MySQL data volume on source host %s is %d bytes", sourceHostname, sourceAgent.Info.MySQLDatadirDiskUsed), "")
 
 	seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Erasing MySQL data on %s", targetHostname), "")
 	_, err = deleteMySQLDatadir(targetHostname)
@@ -717,9 +637,9 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 		return updateSeedStateEntry(seedStateId, err)
 	}
 
-	if sourceAgent.MountPoint.MySQLDiskUsage > targetAgent.MySQLDatadirDiskFree {
+	if sourceAgent.Info.MySQLDatadirDiskUsed > targetAgent.Info.MySQLDatadirDiskFree {
 		Unmount(sourceHostname)
-		return updateSeedStateEntry(seedStateId, fmt.Errorf("Not enough disk space on target host %s. Required: %d, available: %d. Bailing out.", targetHostname, sourceAgent.MountPoint.MySQLDiskUsage, targetAgent.MySQLDatadirDiskFree))
+		return updateSeedStateEntry(seedStateId, fmt.Errorf("Not enough disk space on target host %s. Required: %d, available: %d. Bailing out.", targetHostname, sourceAgent.Info.MySQLDatadirDiskUsed, targetAgent.Info.MySQLDatadirDiskFree))
 	}
 
 	// ...
@@ -742,10 +662,10 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 			return log.Errore(err)
 		}
 
-		if targetAgentPoll.MySQLDiskUsage == bytesCopied {
+		if targetAgentPoll.Info.MySQLDatadirDiskUsed == bytesCopied {
 			numStaleIterations++
 		}
-		bytesCopied = targetAgentPoll.MySQLDiskUsage
+		bytesCopied = targetAgentPoll.Info.MySQLDatadirDiskUsed
 
 		copyFailed := false
 		if _, commandCompleted, _ := seedCommandCompleted(targetHostname, seedId); commandCompleted {
@@ -766,10 +686,10 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 		}
 
 		var copyPct int64 = 0
-		if sourceAgent.MountPoint.MySQLDiskUsage > 0 {
-			copyPct = 100 * bytesCopied / sourceAgent.MountPoint.MySQLDiskUsage
+		if sourceAgent.Info.MySQLDatadirDiskUsed > 0 {
+			copyPct = 100 * bytesCopied / sourceAgent.Info.MySQLDatadirDiskUsed
 		}
-		seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Copied %d/%d bytes (%d%%)", bytesCopied, sourceAgent.MountPoint.MySQLDiskUsage, copyPct), "")
+		seedStateId, _ = submitSeedStateEntry(seedId, fmt.Sprintf("Copied %d/%d bytes (%d%%)", bytesCopied, sourceAgent.Info.MySQLDatadirDiskUsed, copyPct), "")
 
 		if !copyComplete {
 			time.Sleep(30 * time.Second)

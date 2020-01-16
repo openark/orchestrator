@@ -546,4 +546,9 @@ var generateSQLPatches = []string{
 			database_instance
 			ADD COLUMN region varchar(32) CHARACTER SET ascii NOT NULL AFTER data_center
 	`,
+	`
+		ALTER TABLE
+			host_agent
+			ADD COLUMN seed_methods TEXT CHARACTER SET ascii NOT NULL AFTER count_mysql_snapshots
+	`,
 }

@@ -55,7 +55,6 @@ type AgentInfo struct {
 	BackupDir            string
 	BackupDirDiskFree    int64
 	MySQLRunning         bool
-	MySQLPort            int
 	MySQLDatadir         string
 	MySQLDatadirDiskUsed int64
 	MySQLDatadirDiskFree int64
@@ -65,9 +64,11 @@ type AgentInfo struct {
 }
 
 type AgentParams struct {
-	Hostname string
-	Port     int
-	Token    string
+	Hostname              string
+	Port                  int
+	Token                 string
+	MySQLPort             int
+	AvailiableSeedMethods map[SeedMethod]SeedMethodOpts
 }
 
 type Agent struct {
@@ -76,25 +77,6 @@ type Agent struct {
 	LastSubmitted string
 	sync.RWMutex
 }
-
-// Agent presents the data of an agent
-/*
-type Agent struct {
-	Hostname                string
-	Port                    int
-	Token                   string
-	LastSubmitted           string
-	AvailableLocalSnapshots []string
-	AvailableSnapshots      []string
-	LogicalVolumes          []LogicalVolume
-	MountPoint              Mount
-	MySQLRunning            bool
-	MySQLDiskUsage          int64
-	MySQLPort               int64
-	MySQLDatadirDiskFree    int64
-	MySQLErrorLogTail       []string
-}
-*/
 
 // SeedOperation makes for the high level data & state of a seed operation
 type SeedOperation struct {
@@ -117,6 +99,6 @@ type SeedOperationState struct {
 }
 
 // Build an instance key for a given agent
-func (this *Agent) GetInstance() *inst.InstanceKey {
-	return &inst.InstanceKey{Hostname: this.Hostname, Port: int(this.MySQLPort)}
+func (a *Agent) GetInstance() *inst.InstanceKey {
+	return &inst.InstanceKey{Hostname: a.Params.Hostname, Port: a.Params.Port}
 }
