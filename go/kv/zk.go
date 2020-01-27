@@ -64,13 +64,17 @@ func (this *zkStore) PutKeyValue(key string, value string) (err error) {
 	return err
 }
 
-func (this *zkStore) GetKeyValue(key string) (value string, err error) {
+func (this *zkStore) GetKeyValue(key string) (value string, found bool, err error) {
 	if this.zook == nil {
-		return value, nil
+		return value, false, nil
 	}
 	result, err := this.zook.Get(normalizeKey(key))
 	if err != nil {
-		return value, err
+		return value, false, err
 	}
-	return string(result), nil
+	return string(result), true, nil
+}
+
+func (this *zkStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
+	return nil
 }

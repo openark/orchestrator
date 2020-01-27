@@ -38,8 +38,8 @@ func setupHttpClient() error {
 		return net.DialTimeout(network, addr, httpTimeout)
 	}
 	httpTransport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Config.MySQLOrchestratorSSLSkipVerify},
-		Dial:            dialTimeout,
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: config.Config.MySQLOrchestratorSSLSkipVerify},
+		Dial:                  dialTimeout,
 		ResponseHeaderTimeout: httpTimeout,
 	}
 	httpClient = &http.Client{Transport: httpTransport}
@@ -54,7 +54,8 @@ func HttpGetLeader(path string) (response []byte, err error) {
 	}
 	leaderAPI := leaderURI
 	if config.Config.URLPrefix != "" {
-		leaderAPI = fmt.Sprintf("%s/%s", leaderAPI, config.Config.URLPrefix)
+		// We know URLPrefix begind with "/"
+		leaderAPI = fmt.Sprintf("%s%s", leaderAPI, config.Config.URLPrefix)
 	}
 	leaderAPI = fmt.Sprintf("%s/api", leaderAPI)
 

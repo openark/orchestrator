@@ -29,35 +29,9 @@ func init() {
 	log.SetLevel(log.ERROR)
 }
 
-var key1 = InstanceKey{Hostname: "host1", Port: 3306}
-var key2 = InstanceKey{Hostname: "host2", Port: 3306}
-var key3 = InstanceKey{Hostname: "host3", Port: 3306}
-
 var instance1 = Instance{Key: key1}
 var instance2 = Instance{Key: key2}
 var instance3 = Instance{Key: key3}
-
-func TestInstanceKeyEquals(t *testing.T) {
-	i1 := Instance{
-		Key: InstanceKey{
-			Hostname: "sql00.db",
-			Port:     3306,
-		},
-		Version: "5.6",
-	}
-	i2 := Instance{
-		Key: InstanceKey{
-			Hostname: "sql00.db",
-			Port:     3306,
-		},
-		Version: "5.5",
-	}
-
-	test.S(t).ExpectEquals(i1.Key, i2.Key)
-
-	i2.Key.Port = 3307
-	test.S(t).ExpectNotEquals(i1.Key, i2.Key)
-}
 
 func TestIsSmallerMajorVersion(t *testing.T) {
 	i55 := Instance{Version: "5.5"}
@@ -97,6 +71,45 @@ func TestIsSmallerBinlogFormat(t *testing.T) {
 	test.S(t).ExpectFalse(iRow.IsSmallerBinlogFormat(iMixed))
 }
 
+func TestIsDescendant(t *testing.T) {
+	{
+		i57 := Instance{Key: key1, Version: "5.7"}
+		i56 := Instance{Key: key2, Version: "5.6"}
+		isDescendant := i57.IsDescendantOf(&i56)
+		test.S(t).ExpectEquals(isDescendant, false)
+	}
+	{
+		i57 := Instance{Key: key1, Version: "5.7", AncestryUUID: "00020192-1111-1111-1111-111111111111"}
+		i56 := Instance{Key: key2, Version: "5.6", ServerUUID: ""}
+		isDescendant := i57.IsDescendantOf(&i56)
+		test.S(t).ExpectEquals(isDescendant, false)
+	}
+	{
+		i57 := Instance{Key: key1, Version: "5.7", AncestryUUID: ""}
+		i56 := Instance{Key: key2, Version: "5.6", ServerUUID: "00020192-1111-1111-1111-111111111111"}
+		isDescendant := i57.IsDescendantOf(&i56)
+		test.S(t).ExpectEquals(isDescendant, false)
+	}
+	{
+		i57 := Instance{Key: key1, Version: "5.7", AncestryUUID: "00020193-2222-2222-2222-222222222222"}
+		i56 := Instance{Key: key2, Version: "5.6", ServerUUID: "00020192-1111-1111-1111-111111111111"}
+		isDescendant := i57.IsDescendantOf(&i56)
+		test.S(t).ExpectEquals(isDescendant, false)
+	}
+	{
+		i57 := Instance{Key: key1, Version: "5.7", AncestryUUID: "00020193-2222-2222-2222-222222222222,00020193-3333-3333-3333-222222222222"}
+		i56 := Instance{Key: key2, Version: "5.6", ServerUUID: "00020192-1111-1111-1111-111111111111"}
+		isDescendant := i57.IsDescendantOf(&i56)
+		test.S(t).ExpectEquals(isDescendant, false)
+	}
+	{
+		i57 := Instance{Key: key1, Version: "5.7", AncestryUUID: "00020193-2222-2222-2222-222222222222,00020192-1111-1111-1111-111111111111"}
+		i56 := Instance{Key: key2, Version: "5.6", ServerUUID: "00020192-1111-1111-1111-111111111111"}
+		isDescendant := i57.IsDescendantOf(&i56)
+		test.S(t).ExpectEquals(isDescendant, true)
+	}
+}
+
 func TestCanReplicateFrom(t *testing.T) {
 	i55 := Instance{Key: key1, Version: "5.5"}
 	i56 := Instance{Key: key2, Version: "5.6"}
@@ -128,87 +141,6 @@ func TestCanReplicateFrom(t *testing.T) {
 	test.S(t).ExpectTrue(canReplicate)
 	canReplicate, _ = iStatement.CanReplicateFrom(&iRow)
 	test.S(t).ExpectFalse(canReplicate)
-}
-
-func TestNewInstanceKeyFromStrings(t *testing.T) {
-	i, err := NewInstanceKeyFromStrings("127.0.0.1", "3306")
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(i.Hostname, "127.0.0.1")
-	test.S(t).ExpectEquals(i.Port, 3306)
-}
-
-func TestNewInstanceKeyFromStringsFail(t *testing.T) {
-	_, err := NewInstanceKeyFromStrings("127.0.0.1", "3306x")
-	test.S(t).ExpectNotNil(err)
-}
-
-func TestParseInstanceKey(t *testing.T) {
-	i, err := ParseInstanceKey("127.0.0.1:3306")
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(i.Hostname, "127.0.0.1")
-	test.S(t).ExpectEquals(i.Port, 3306)
-}
-
-func TestInstanceKeyValid(t *testing.T) {
-	test.S(t).ExpectTrue(key1.IsValid())
-	i, err := ParseInstanceKey("_:3306")
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectFalse(i.IsValid())
-	i, err = ParseInstanceKey("//myhost:3306")
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectFalse(i.IsValid())
-}
-
-func TestInstanceKeyDetach(t *testing.T) {
-	test.S(t).ExpectFalse(key1.IsDetached())
-	detached1 := key1.DetachedKey()
-	test.S(t).ExpectTrue(detached1.IsDetached())
-	detached2 := key1.DetachedKey()
-	test.S(t).ExpectTrue(detached2.IsDetached())
-	test.S(t).ExpectTrue(detached1.Equals(detached2))
-
-	reattached1 := detached1.ReattachedKey()
-	test.S(t).ExpectFalse(reattached1.IsDetached())
-	test.S(t).ExpectTrue(reattached1.Equals(&key1))
-	reattached2 := reattached1.ReattachedKey()
-	test.S(t).ExpectFalse(reattached2.IsDetached())
-	test.S(t).ExpectTrue(reattached1.Equals(reattached2))
-}
-
-func TestInstanceKeyMapToJSON(t *testing.T) {
-	m := *NewInstanceKeyMap()
-	m.AddKey(key1)
-	m.AddKey(key2)
-	json, err := m.ToJSON()
-	test.S(t).ExpectNil(err)
-	ok := (json == `[{"Hostname":"host1","Port":3306},{"Hostname":"host2","Port":3306}]`) || (json == `[{"Hostname":"host2","Port":3306},{"Hostname":"host1","Port":3306}]`)
-	test.S(t).ExpectTrue(ok)
-}
-
-func TestInstanceKeyMapReadJSON(t *testing.T) {
-	json := `[{"Hostname":"host1","Port":3306},{"Hostname":"host2","Port":3306}]`
-	m := *NewInstanceKeyMap()
-	m.ReadJson(json)
-	test.S(t).ExpectEquals(len(m), 2)
-	test.S(t).ExpectTrue(m[key1])
-	test.S(t).ExpectTrue(m[key2])
-}
-
-func TestEmptyInstanceKeyMapToCommaDelimitedList(t *testing.T) {
-	m := *NewInstanceKeyMap()
-	res := m.ToCommaDelimitedList()
-
-	test.S(t).ExpectEquals(res, "")
-}
-
-func TestInstanceKeyMapToCommaDelimitedList(t *testing.T) {
-	m := *NewInstanceKeyMap()
-	m.AddKey(key1)
-	m.AddKey(key2)
-	res := m.ToCommaDelimitedList()
-
-	ok := (res == `host1:3306,host2:3306`) || (res == `host2:3306,host1:3306`)
-	test.S(t).ExpectTrue(ok)
 }
 
 func TestNextGTID(t *testing.T) {
@@ -288,5 +220,21 @@ func TestTabulatedDescription(t *testing.T) {
 		i57.LogSlaveUpdatesEnabled = true
 		desc := i57.TabulatedDescription("|")
 		test.S(t).ExpectEquals(desc, "unknown|invalid|5.7.8-log|rw|ROW|>>,P-GTID")
+	}
+}
+
+func TestReplicationThreads(t *testing.T) {
+	{
+		test.S(t).ExpectFalse(instance1.ReplicaRunning())
+	}
+	{
+		test.S(t).ExpectTrue(instance1.ReplicationThreadsExist())
+	}
+	{
+		test.S(t).ExpectTrue(instance1.ReplicationThreadsStopped())
+	}
+	{
+		i := Instance{Key: key1, ReplicationIOThreadState: ReplicationThreadStateNoThread, ReplicationSQLThreadState: ReplicationThreadStateNoThread}
+		test.S(t).ExpectFalse(i.ReplicationThreadsExist())
 	}
 }

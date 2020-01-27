@@ -36,7 +36,8 @@ func (this *KVPair) String() string {
 
 type KVStore interface {
 	PutKeyValue(key string, value string) (err error)
-	GetKeyValue(key string) (value string, err error)
+	GetKeyValue(key string) (value string, found bool, err error)
+	DistributePairs(kvPairs [](*KVPair)) (err error)
 }
 
 var kvMutex sync.Mutex
@@ -66,12 +67,12 @@ func getKVStores() (stores []KVStore) {
 	return stores
 }
 
-func GetValue(key string) (value string, err error) {
+func GetValue(key string) (value string, found bool, err error) {
 	for _, store := range getKVStores() {
 		// It's really only the first (internal) that matters here
 		return store.GetKeyValue(key)
 	}
-	return value, err
+	return value, found, err
 }
 
 func PutValue(key string, value string) (err error) {
@@ -88,4 +89,13 @@ func PutKVPair(kvPair *KVPair) (err error) {
 		return nil
 	}
 	return PutValue(kvPair.Key, kvPair.Value)
+}
+
+func DistributePairs(kvPairs [](*KVPair)) (err error) {
+	for _, store := range getKVStores() {
+		if err := store.DistributePairs(kvPairs); err != nil {
+			return err
+		}
+	}
+	return nil
 }

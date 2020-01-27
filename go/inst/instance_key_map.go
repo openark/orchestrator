@@ -18,6 +18,7 @@ package inst
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
 )
 
@@ -59,7 +60,21 @@ func (this *InstanceKeyMap) GetInstanceKeys() []InstanceKey {
 	for key := range *this {
 		res = append(res, key)
 	}
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Hostname < res[j].Hostname || res[i].Hostname == res[j].Hostname && res[i].Port < res[j].Port
+	})
 	return res
+}
+
+// Intersect returns a keymap which is the intersection of this and another map
+func (this *InstanceKeyMap) Intersect(other *InstanceKeyMap) *InstanceKeyMap {
+	intersected := NewInstanceKeyMap()
+	for key := range *other {
+		if this.HasKey(key) {
+			intersected.AddKey(key)
+		}
+	}
+	return intersected
 }
 
 // MarshalJSON will marshal this map as JSON
@@ -116,7 +131,7 @@ func (this *InstanceKeyMap) ReadJson(jsonString string) error {
 func (this *InstanceKeyMap) ReadCommaDelimitedList(list string) error {
 	tokens := strings.Split(list, ",")
 	for _, token := range tokens {
-		key, err := ParseInstanceKey(token)
+		key, err := ParseResolveInstanceKey(token)
 		if err != nil {
 			return err
 		}

@@ -190,6 +190,15 @@ body {
     color: #ffffff;
 }
 
+.instance h3.label-errant {
+    background-color: #b0b0b0;
+    color: #ffffff;
+}
+
+.instance h3.label-errant .glyphicon {
+    color: #ffffff;
+}
+
 .instance h3.label-fatal {
     background-color: #000000;
     color: #ffffff;
@@ -233,6 +242,9 @@ body {
     background-color: #000000;
 }
 
+.instance .badge.label-errant {
+    background-color: #b0b0b0;
+}
 
 .instance .badge.label-primary {
     background-color: #428BCA;
@@ -657,6 +669,10 @@ body {
 
 #cluster_name {
   font-size: 24px;
+}
+
+#cluster_subtitle {
+  font-size: 12px;
 }
 
 .arrow_box {

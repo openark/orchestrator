@@ -10,7 +10,7 @@
 
 `orchestrator` actively crawls through your topologies and maps them. It reads basic MySQL info such as replication status and configuration.
 
-It provides with slick visualization of your topologies, including replication problems, even in the face of failures.
+It provides you with slick visualization of your topologies, including replication problems, even in the face of failures.
 
 #### Refactoring
 
@@ -61,7 +61,8 @@ Authored by [Shlomi Noach](https://github.com/shlomi-noach) at [GitHub](http://g
 #### Related projects
 
 - Orchestrator Puppet module: https://github.com/github/puppet-orchestrator-for-mysql
-- Orchestrator Chef Cookbook: https://github.com/silviabotros/chef-orchestrator/
+- Orchestrator Chef Cookbook (1): https://github.com/silviabotros/chef-orchestrator
+- Orchestrator Chef Cookbook (2): https://supermarket.chef.io/cookbooks/orchestrator
 - Nagios / Icinga check based on Orchestrator API: https://github.com/mcrauwel/go-check-orchestrator
 
 #### Developers
