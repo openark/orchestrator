@@ -18,6 +18,7 @@ package kv
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -25,7 +26,6 @@ import (
 
 	consulapi "github.com/armon/consul-api"
 	"github.com/patrickmn/go-cache"
-
 	"github.com/openark/golib/log"
 )
 
@@ -47,6 +47,12 @@ func NewConsulStore() KVStore {
 	if config.Config.ConsulAddress != "" {
 		consulConfig := consulapi.DefaultConfig()
 		consulConfig.Address = config.Config.ConsulAddress
+		
+		if strings.HasPrefix(config.Config.ConsulAddress,"https://") {
+		  consulConfig.Scheme = "https"
+		  consulConfig.Address = strings.Replace(consulConfig.Address, "https://", "", -1)
+		}
+		
 		// ConsulAclToken defaults to ""
 		consulConfig.Token = config.Config.ConsulAclToken
 		if client, err := consulapi.NewClient(consulConfig); err != nil {
