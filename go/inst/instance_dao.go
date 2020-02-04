@@ -1892,7 +1892,7 @@ func ForgetUnseenInstancesDifferentlyResolved() error {
 	unseenInstances := [](*Instance){}
 	query := `
 			select
-				database_instance.hostname, 
+				database_instance.hostname,
 				database_instance.port,
 				database_instance.cluster_name
 			from
@@ -1932,8 +1932,7 @@ func ForgetUnseenInstancesDifferentlyResolved() error {
 		}
 		rowsAffected = rowsAffected + rows
 		if clusterInfo.CountInstances == 1 && config.Config.RemoveForgottenClustersFromKV {
-			err := kv.DeleteRecursive(GetClusterMasterKVKey(clusterInfo.ClusterAlias))
-			if err != nil {
+			if err := kv.DeleteRecursive(GetClusterMasterKVKey(clusterInfo.ClusterAlias)); err != nil {
 				return log.Errore(err)
 			}
 		}
@@ -2714,8 +2713,7 @@ func ForgetInstance(instanceKey *InstanceKey) error {
 		return log.Errorf("ForgetInstance(): instance %+v not found", *instanceKey)
 	}
 	if clusterInfo.CountInstances == 1 && config.Config.RemoveForgottenClustersFromKV {
-		err = kv.DeleteRecursive(GetClusterMasterKVKey(clusterInfo.ClusterAlias))
-		if err != nil {
+		if err := kv.DeleteRecursive(GetClusterMasterKVKey(clusterInfo.ClusterAlias)); err != nil {
 			return log.Errore(err)
 		}
 	}
@@ -2741,17 +2739,22 @@ func ForgetCluster(clusterName string) error {
 		forgetInstanceKeys.Set(instance.Key.StringCode(), true, cache.DefaultExpiration)
 		AuditOperation("forget", &instance.Key, "")
 	}
-	_, err = db.ExecOrchestrator(`
+	if _, err = db.ExecOrchestrator(`
 			delete
 				from database_instance
 			where
 				cluster_name = ?`,
 		clusterName,
-	)
-	if config.Config.RemoveForgottenClustersFromKV {
-		err = kv.DeleteRecursive(GetClusterMasterKVKey(clusterInfo.ClusterAlias))
+	); err != nil {
+		return err
 	}
-	return err
+
+	if config.Config.RemoveForgottenClustersFromKV {
+		if err := kv.DeleteRecursive(GetClusterMasterKVKey(clusterInfo.ClusterAlias)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ForgetLongUnseenInstances will remove entries of all instacnes that have long since been last seen.
@@ -2798,8 +2801,7 @@ func ForgetLongUnseenInstances() error {
 		}
 		rowsAffected = rowsAffected + rows
 		if clusterInfo.CountInstances == 1 && config.Config.RemoveForgottenClustersFromKV {
-			err := kv.DeleteRecursive(GetClusterMasterKVKey(clusterInfo.ClusterAlias))
-			if err != nil {
+			if err := kv.DeleteRecursive(GetClusterMasterKVKey(clusterInfo.ClusterAlias)); err != nil {
 				return log.Errore(err)
 			}
 		}
