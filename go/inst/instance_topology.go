@@ -2183,7 +2183,7 @@ func chooseCandidateReplica(replicas [](*Instance)) (candidateReplica *Instance,
 			// lost due to inability to replicate
 			cannotReplicateReplicas = append(cannotReplicateReplicas, replica)
 			if err != nil {
-				_ = log.Errorf("This replica cannot replicate.\nreplica: %s\nerror: %v", replica, err)
+				_ = log.Errorf("This replica cannot replicate.\nreplica: %v\nerror: %v", replica, err)
 			}
 		} else if replica.ExecBinlogCoordinates.SmallerThan(&candidateReplica.ExecBinlogCoordinates) {
 			laterReplicas = append(laterReplicas, replica)
