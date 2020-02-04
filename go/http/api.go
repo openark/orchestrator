@@ -2628,7 +2628,7 @@ func (this *HttpAPI) AgentSeed(params martini.Params, r render.Render, req *http
 		return
 	}
 
-	output, err := agent.Seed(params["targetHost"], params["sourceHost"])
+	output, err := agent.Seed(params["seedMethod"], params["targetHost"], params["sourceHost"])
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -3828,7 +3828,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "agent-removelv/:host", this.AgentRemoveLV)
 	this.registerAPIRequest(m, "agent-mysql-stop/:host", this.AgentMySQLStop)
 	this.registerAPIRequest(m, "agent-mysql-start/:host", this.AgentMySQLStart)
-	this.registerAPIRequest(m, "agent-seed/:targetHost/:sourceHost", this.AgentSeed)
+	this.registerAPIRequest(m, "agent-seed/:seedMethod/:targetHost/:sourceHost", this.AgentSeed)
 	this.registerAPIRequest(m, "agent-active-seeds/:host", this.AgentActiveSeeds)
 	this.registerAPIRequest(m, "agent-recent-seeds/:host", this.AgentRecentSeeds)
 	this.registerAPIRequest(m, "agent-seed-details/:seedId", this.AgentSeedDetails)

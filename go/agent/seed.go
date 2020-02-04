@@ -70,8 +70,7 @@ func (m SeedMethod) MarshalText() ([]byte, error) {
 }
 
 type SeedMethodOpts struct {
-	DatabaseSelection bool
-	BackupSide        SeedSide
+	BackupSide SeedSide
 }
 
 type BackupMetadata struct {

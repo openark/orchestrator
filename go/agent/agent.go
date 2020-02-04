@@ -75,7 +75,7 @@ type Agent struct {
 	Params        *AgentParams
 	Info          *AgentInfo
 	LastSubmitted string
-	sync.RWMutex
+	sync.RWMutex  //do we need it?
 }
 
 // SeedOperation makes for the high level data & state of a seed operation

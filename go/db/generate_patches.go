@@ -551,4 +551,9 @@ var generateSQLPatches = []string{
 			host_agent
 			ADD COLUMN seed_methods TEXT CHARACTER SET ascii NOT NULL AFTER count_mysql_snapshots
 	`,
+	`
+		ALTER TABLE
+			agent_seed
+			ADD COLUMN seed_method varchar(32) CHARACTER SET ascii NOT NULL AFTER agent_seed_id
+	`,
 }

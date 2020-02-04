@@ -309,7 +309,7 @@ func baseAgentUri(agentHostname string, agentPort int) string {
 	return uri
 }
 
-// GetAgent gets a single agent status from the agent service. This involves multiple HTTP requests.
+// GetAgent gets a single agent status from the agent service
 func GetAgent(hostname string) (Agent, error) {
 	agent, token, err := readAgentBasicInfo(hostname)
 	if err != nil {
@@ -476,15 +476,16 @@ func PostCopy(hostname, sourceHostname string) (Agent, error) {
 }
 
 // SubmitSeedEntry submits a new seed operation entry, returning its unique ID
-func SubmitSeedEntry(targetHostname string, sourceHostname string) (int64, error) {
+func SubmitSeedEntry(seedMethod SeedMethod, targetHostname string, sourceHostname string) (int64, error) {
 	res, err := db.ExecOrchestrator(`
 			insert
 				into agent_seed (
-					target_hostname, source_hostname, start_timestamp
+					seed_method, target_hostname, source_hostname, start_timestamp
 				) VALUES (
-					?, ?, NOW()
+					?, ?, ?, NOW()
 				)
 			`,
+		seedMethod.String(),
 		targetHostname,
 		sourceHostname,
 	)
@@ -583,7 +584,7 @@ func FailStaleSeeds() error {
 
 // executeSeed is *the* function for taking a seed. It is a complex operation of testing, preparing, re-testing
 // agents on both sides, initiating data transfer, following up, awaiting completion, diagnosing errors, claning up.
-func executeSeed(seedId int64, targetHostname string, sourceHostname string) error {
+func executeSeed(seedId int64, seedMethod SeedMethod, targetHostname string, sourceHostname string) error {
 
 	var err error
 	var seedStateId int64
@@ -724,17 +725,22 @@ func executeSeed(seedId int64, targetHostname string, sourceHostname string) err
 }
 
 // Seed is the entry point for making a seed
-func Seed(targetHostname string, sourceHostname string) (int64, error) {
+func Seed(seedMethodName string, targetHostname string, sourceHostname string) (int64, error) {
+	var seedMethod SeedMethod
+	var ok bool
+	if seedMethod, ok = toSeedMethod["seedMethodName"]; !ok {
+		return 0, log.Errorf("SeedMethod %s undefined", seedMethodName)
+	}
 	if targetHostname == sourceHostname {
 		return 0, log.Errorf("Cannot seed %s onto itself", targetHostname)
 	}
-	seedId, err := SubmitSeedEntry(targetHostname, sourceHostname)
+	seedId, err := SubmitSeedEntry(seedMethod, targetHostname, sourceHostname)
 	if err != nil {
 		return 0, log.Errore(err)
 	}
 
 	go func() {
-		err := executeSeed(seedId, targetHostname, sourceHostname)
+		err := executeSeed(seedId, seedMethod, targetHostname, sourceHostname)
 		updateSeedComplete(seedId, err)
 	}()
 
