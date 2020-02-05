@@ -556,4 +556,17 @@ var generateSQLPatches = []string{
 			agent_seed
 			ADD COLUMN seed_method varchar(32) CHARACTER SET ascii NOT NULL AFTER agent_seed_id
 	`,
+	`
+		ALTER TABLE
+			agent_seed
+			DROP COLUMN is_complete, DROP COLUMN is_successful, DROP KEY is_complete_idx_agent_seed, DROP KEY is_successful_idx_agent_seed
+	`,
+	`
+		ALTER TABLE
+			agent_seed
+			ADD COLUMN status ENUM('Started','Running','Completed','Error') NOT NULL, ADD COLUMN seed_method varchar(32) CHARACTER SET ascii NOT NULL AFTER agent_seed_id
+	`,
+	`
+		CREATE INDEX status ON agent_seed (status)
+	`,
 }

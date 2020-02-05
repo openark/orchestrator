@@ -625,7 +625,7 @@ func pollAgent(hostname string) error {
 		return log.Errore(err)
 	}
 
-	err = agent.UpdateAgentInfo(hostname, polledAgent)
+	err = agent.UpdateAgentInfo(polledAgent)
 	if err != nil {
 		return log.Errore(err)
 	}

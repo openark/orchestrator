@@ -17,15 +17,9 @@
 package agent
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
-	"net"
-	"net/http"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
@@ -35,42 +29,88 @@ import (
 	"github.com/openark/golib/sqlutils"
 )
 
-type httpMethodFunc func(uri string) (resp *http.Response, err error)
+/***************************************************************************************************************************************/
+/***************************************************************************************************************************************/
+/************************************************************** NEW FUNCS **************************************************************/
+/***************************************************************************************************************************************/
+/***************************************************************************************************************************************/
+
+/** TO DO **/
+/** add ReadFailedSeedsForHost **/
 
 var SeededAgents chan *Agent = make(chan *Agent)
 
-var httpClient *http.Client
-var httpClientMutex = &sync.Mutex{}
-
-// InitHttpClient gets called once, and initializes httpClient according to config.Config
-func InitHttpClient() {
-	httpClientMutex.Lock()
-	defer httpClientMutex.Unlock()
-
-	if httpClient != nil {
-		return
+// RegisterSeed is the entry point for making a seed. It's registers seed in db, so it can be later processed asynchronously
+func RegisterSeed(seedMethodName string, targetHostname string, sourceHostname string) (int64, error) {
+	var seedMethod SeedMethod
+	var ok bool
+	if seedMethod, ok = toSeedMethod["seedMethodName"]; !ok {
+		return 0, log.Errorf("SeedMethod %s not found", seedMethodName)
 	}
+	if targetHostname == sourceHostname {
+		return 0, log.Errorf("Cannot seed %s onto itself", targetHostname)
+	}
+	targetAgent, err := GetAgent(targetHostname)
+	if err != nil {
+		return 0, log.Errorf("Unable to get information from agent on taget host %s", targetHostname)
+	}
+	sourceAgent, err := GetAgent(sourceHostname)
+	if err != nil {
+		return 0, log.Errorf("Unable to get information from agent on source host %s", sourceHostname)
+	}
+	if _, ok = targetAgent.Params.AvailiableSeedMethods[seedMethod]; !ok {
+		return 0, log.Errorf("Seed method %s not supported on target host %s", seedMethod.String(), targetHostname)
+	}
+	if _, ok = sourceAgent.Params.AvailiableSeedMethods[seedMethod]; !ok {
+		return 0, log.Errorf("Seed method %s not supported on source host %s", seedMethod.String(), sourceHostname)
+	}
+	for db, opts := range sourceAgent.Info.MySQLDatabases {
+		if !enginesSupported(opts.Engines, sourceAgent.Params.AvailiableSeedMethods[seedMethod].SupportedEngines) {
+			return 0, log.Errorf("Database %s had a table with engine unsupported by seed method %s", db, seedMethod.String())
+		}
+	}
+	if sourceAgent.Info.MySQLDatadirDiskUsed > targetAgent.Info.MySQLDatadirDiskFree {
+		return 0, log.Errorf("Not enough disk space on target host %s. Required: %d, available: %d", targetHostname, sourceAgent.Info.MySQLDatadirDiskUsed, targetAgent.Info.MySQLDatadirDiskFree)
+	}
+	// do we need to check this? logical backup usually less than actual data size, so let's use 0.6 multiplier
+	if !sourceAgent.Params.AvailiableSeedMethods[seedMethod].BackupToDatadir {
+		if int64(float64(sourceAgent.Info.MySQLDatadirDiskUsed)*0.6) > targetAgent.Info.BackupDirDiskFree {
+			return 0, log.Errorf("Not enough disk space on target host backup directory %s. Database size: %d, available: %d", targetHostname, sourceAgent.Info.MySQLDatadirDiskUsed, targetAgent.Info.BackupDirDiskFree)
+		}
+	}
+	seedID, err := registerSeedEntry(seedMethod, targetHostname, sourceHostname)
+	if err != nil {
+		return 0, log.Errore(err)
+	}
+	SeededAgents <- &targetAgent
 
-	httpTimeout := time.Duration(time.Duration(config.AgentHttpTimeoutSeconds) * time.Second)
-	dialTimeout := func(network, addr string) (net.Conn, error) {
-		return net.DialTimeout(network, addr, httpTimeout)
-	}
-	httpTransport := &http.Transport{
-		TLSClientConfig:       &tls.Config{InsecureSkipVerify: config.Config.AgentSSLSkipVerify},
-		Dial:                  dialTimeout,
-		ResponseHeaderTimeout: httpTimeout,
-	}
-	httpClient = &http.Client{Transport: httpTransport}
+	log.Infof("Registered new seed with seedID %d. Target host: %s, source host: %s, seed method: %s", seedID, targetHostname, sourceHostname, seedMethod.String())
+	auditAgentOperation("agent-seed", &sourceAgent, fmt.Sprintf("starting seed to host %s using seed method %s", targetHostname, seedMethod.String()))
+	auditAgentOperation("agent-seed", &targetAgent, fmt.Sprintf("starting seed from host %s using seed method %s", sourceHostname, seedMethod.String()))
+	return seedID, nil
 }
 
-// httpGet is a convenience method for getting http response from URL, optionaly skipping SSL cert verification
-func httpGet(url string) (resp *http.Response, err error) {
-	return httpClient.Get(url)
-}
+// registerSeedEntry register a new seed operation entry, returning its unique ID
+func registerSeedEntry(seedMethod SeedMethod, targetHostname string, sourceHostname string) (int64, error) {
+	res, err := db.ExecOrchestrator(`
+			insert
+				into agent_seed (
+					seed_method, target_hostname, source_hostname, start_timestamp, status
+				) VALUES (
+					?, ?, ?, NOW(), ?
+				)
+			`,
+		seedMethod.String(),
+		targetHostname,
+		sourceHostname,
+		Started.String(),
+	)
+	if err != nil {
+		return 0, log.Errore(err)
+	}
+	id, err := res.LastInsertId()
 
-// httpPost is a convenience method for posting text data
-func httpPost(url string, bodyType string, content string) (resp *http.Response, err error) {
-	return httpClient.Post(url, bodyType, strings.NewReader(content))
+	return id, err
 }
 
 // AuditAgentOperation creates and writes a new audit entry by given agent
@@ -80,25 +120,6 @@ func auditAgentOperation(auditType string, agent *Agent, message string) error {
 		instanceKey = &inst.InstanceKey{Hostname: agent.Params.Hostname, Port: agent.Params.MySQLPort}
 	}
 	return inst.AuditOperation(auditType, instanceKey, message)
-}
-
-// readResponse returns the body of an HTTP response
-func readResponse(res *http.Response, err error) ([]byte, error) {
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if res.Status == "500" {
-		return body, errors.New("Response Status 500")
-	}
-
-	return body, nil
 }
 
 // SubmitAgent submits a new agent for listing
@@ -126,13 +147,13 @@ func SubmitAgent(agentParams *AgentParams) (string, error) {
 	}
 
 	// Try to discover topology instances when an agent submits
-	go DiscoverAgentInstance(agentParams.Hostname, agentParams.Port)
+	go discoverAgentInstance(agentParams.Hostname, agentParams.Port)
 
 	return agentParams.Hostname, err
 }
 
 // If a mysql port is available, try to discover against it
-func DiscoverAgentInstance(hostname string, port int) error {
+func discoverAgentInstance(hostname string, port int) error {
 	agent, err := GetAgent(hostname)
 	if err != nil {
 		log.Errorf("Couldn't get agent for %s: %v", hostname, err)
@@ -153,6 +174,83 @@ func DiscoverAgentInstance(hostname string, port int) error {
 	return nil
 }
 
+// readSeeds reads seed from the backend table
+func readSeeds(whereCondition string, args []interface{}, limit string) ([]SeedOperation, error) {
+	res := []SeedOperation{}
+	query := fmt.Sprintf(`
+		select
+			agent_seed_id,
+			target_hostname,
+			source_hostname,
+			start_timestamp,
+			end_timestamp,
+			status
+		from
+			agent_seed
+		%s
+		order by
+			agent_seed_id desc
+		%s
+		`, whereCondition, limit)
+	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
+		seedOperation := SeedOperation{}
+		seedOperation.SeedId = m.GetInt64("agent_seed_id")
+		seedOperation.TargetHostname = m.GetString("target_hostname")
+		seedOperation.SourceHostname = m.GetString("source_hostname")
+		seedOperation.StartTimestamp = m.GetTime("start_timestamp")
+		seedOperation.EndTimestamp = m.GetTime("end_timestamp")
+		seedOperation.Status = toStatus[m.GetString("status")]
+
+		res = append(res, seedOperation)
+		return nil
+	})
+
+	if err != nil {
+		log.Errore(err)
+	}
+	return res, err
+}
+
+// ReadActiveSeedsForHost reads active seeds where host participates either as source or target
+func ReadActiveSeedsForHost(hostname string) ([]SeedOperation, error) {
+	whereCondition := `
+		where
+			status in ("Started", "Running")
+			and (
+				target_hostname = ?
+				or source_hostname = ?
+			)
+		`
+	return readSeeds(whereCondition, sqlutils.Args(hostname, hostname), "")
+}
+
+// ReadRecentCompletedSeedsForHost reads active seeds where host participates either as source or target
+func ReadRecentCompletedSeedsForHost(hostname string) ([]SeedOperation, error) {
+	whereCondition := `
+		where
+			status = "Completed"
+			and (
+				target_hostname = ?
+				or source_hostname = ?
+			)
+		`
+	return readSeeds(whereCondition, sqlutils.Args(hostname, hostname), "limit 10")
+}
+
+// AgentSeedDetails reads details from backend table
+func AgentSeedDetails(seedId int64) ([]SeedOperation, error) {
+	whereCondition := `
+		where
+			agent_seed_id = ?
+		`
+	return readSeeds(whereCondition, sqlutils.Args(seedId), "")
+}
+
+// ReadRecentSeeds reads seeds from backend table.
+func ReadRecentSeeds() ([]SeedOperation, error) {
+	return readSeeds(``, sqlutils.Args(), "limit 100")
+}
+
 // ForgetLongUnseenAgents will remove entries of all agents that have long since been last seen.
 func ForgetLongUnseenAgents() error {
 	_, err := db.ExecOrchestrator(`
@@ -163,6 +261,82 @@ func ForgetLongUnseenAgents() error {
 		config.Config.UnseenAgentForgetHours,
 	)
 	return err
+}
+
+// UpdateAgentLastChecked updates the last_check timestamp in the orchestrator backed database
+// for a given agent
+func UpdateAgentLastChecked(hostname string) error {
+	_, err := db.ExecOrchestrator(`
+        	update
+        		host_agent
+        	set
+        		last_checked = NOW()
+			where
+				hostname = ?`,
+		hostname,
+	)
+	if err != nil {
+		return log.Errore(err)
+	}
+
+	return nil
+}
+
+// UpdateAgentInfo  updates some agent state in backend table
+func UpdateAgentInfo(agent Agent) error {
+	_, err := db.ExecOrchestrator(`
+        	update
+        		host_agent
+        	set
+        		last_seen = NOW(),
+        		mysql_port = ?,
+        		count_mysql_snapshots = ?
+			where
+				hostname = ?`,
+		agent.Params.MySQLPort,
+		len(agent.Info.LogicalVolumes),
+		agent.Params.Hostname,
+	)
+	if err != nil {
+		return log.Errore(err)
+	}
+
+	return nil
+}
+
+// readAgentBasicInfo returns the basic data for an agent directly from backend table (no agent access)
+func readAgentBasicInfo(hostname string) (Agent, string, error) {
+	agent := Agent{Params: &AgentParams{}, Info: &AgentInfo{}}
+	token := ""
+	query := `
+		select
+			hostname,
+			port,
+			token,
+			last_submitted,
+			mysql_port
+		from
+			host_agent
+		where
+			hostname = ?
+		`
+	err := db.QueryOrchestrator(query, sqlutils.Args(hostname), func(m sqlutils.RowMap) error {
+		agent.Params.Hostname = m.GetString("hostname")
+		agent.Params.Port = m.GetInt("port")
+		agent.LastSubmitted = m.GetString("last_submitted")
+		agent.Params.MySQLPort = m.GetInt("mysql_port")
+		token = m.GetString("token")
+
+		return nil
+	})
+	if err != nil {
+		return agent, "", err
+	}
+
+	if token == "" {
+		return agent, "", log.Errorf("Cannot get agent/token: %s", hostname)
+	}
+	return agent, token, nil
 }
 
 // ReadOutdatedAgentsHosts returns agents that need to be updated
@@ -204,7 +378,7 @@ func ReadAgents() ([]Agent, error) {
 			hostname
 		`
 	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
-		agent := Agent{}
+		agent := Agent{Params: &AgentParams{}}
 		agent.Params.Hostname = m.GetString("hostname")
 		agent.Params.Port = m.GetInt("port")
 		agent.Params.MySQLPort = m.GetInt("mysql_port")
@@ -219,283 +393,13 @@ func ReadAgents() ([]Agent, error) {
 		log.Errore(err)
 	}
 	return res, err
-
 }
 
-// readAgentBasicInfo returns the basic data for an agent directly from backend table (no agent access)
-func readAgentBasicInfo(hostname string) (Agent, string, error) {
-	agent := Agent{Params: &AgentParams{}}
-	token := ""
-	query := `
-		select
-			hostname,
-			port,
-			token,
-			last_submitted,
-			mysql_port
-		from
-			host_agent
-		where
-			hostname = ?
-		`
-	err := db.QueryOrchestrator(query, sqlutils.Args(hostname), func(m sqlutils.RowMap) error {
-		agent.Params.Hostname = m.GetString("hostname")
-		agent.Params.Port = m.GetInt("port")
-		agent.LastSubmitted = m.GetString("last_submitted")
-		agent.Params.MySQLPort = m.GetInt("mysql_port")
-		token = m.GetString("token")
-
-		return nil
-	})
-	if err != nil {
-		return agent, "", err
-	}
-
-	if token == "" {
-		return agent, "", log.Errorf("Cannot get agent/token: %s", hostname)
-	}
-	return agent, token, nil
-}
-
-// UpdateAgentLastChecked updates the last_check timestamp in the orchestrator backed database
-// for a given agent
-func UpdateAgentLastChecked(hostname string) error {
-	_, err := db.ExecOrchestrator(`
-        	update
-        		host_agent
-        	set
-        		last_checked = NOW()
-			where
-				hostname = ?`,
-		hostname,
-	)
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	return nil
-}
-
-// UpdateAgentInfo  updates some agent state in backend table
-func UpdateAgentInfo(hostname string, agent Agent) error {
-	_, err := db.ExecOrchestrator(`
-        	update
-        		host_agent
-        	set
-        		last_seen = NOW(),
-        		mysql_port = ?,
-        		count_mysql_snapshots = ?
-			where
-				hostname = ?`,
-		agent.Params.MySQLPort,
-		len(agent.Info.LogicalVolumes),
-		hostname,
-	)
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	return nil
-}
-
-// baseAgentUri returns the base URI for accessing an agent
-func baseAgentUri(agentHostname string, agentPort int) string {
-	protocol := "http"
-	if config.Config.AgentsUseSSL {
-		protocol = "https"
-	}
-	uri := fmt.Sprintf("%s://%s:%d/api", protocol, agentHostname, agentPort)
-	log.Debugf("orchestrator-agent uri: %s", uri)
-	return uri
-}
-
-// GetAgent gets a single agent status from the agent service
-func GetAgent(hostname string) (Agent, error) {
-	agent, token, err := readAgentBasicInfo(hostname)
-	if err != nil {
-		return agent, log.Errore(err)
-	}
-	uri := fmt.Sprintf("%s/get-agent?token=%s", baseAgentUri(agent.Params.Hostname, agent.Params.Port), token)
-	log.Debugf("orchestrator-agent uri: %s", uri)
-	body, err := readResponse(httpGet(uri))
-	if err == nil {
-		err = json.Unmarshal(body, &agent.Info)
-	}
-	if err != nil {
-		log.Errore(err)
-	}
-	return agent, err
-}
-
-// executeAgentCommandWithMethodFunc requests an agent to execute a command via HTTP api, either GET or POST,
-// with specific http method implementation by the caller
-func executeAgentCommandWithMethodFunc(hostname string, command string, methodFunc httpMethodFunc, onResponse *func([]byte)) (Agent, error) {
-	agent, token, err := readAgentBasicInfo(hostname)
-	if err != nil {
-		return agent, err
-	}
-
-	// All seems to be in order. Now make some inquiries from orchestrator-agent service:
-	uri := baseAgentUri(agent.Params.Hostname, agent.Params.Port)
-
-	var fullCommand string
-	if strings.Contains(command, "?") {
-		fullCommand = fmt.Sprintf("%s&token=%s", command, token)
-	} else {
-		fullCommand = fmt.Sprintf("%s?token=%s", command, token)
-	}
-	log.Debugf("orchestrator-agent command: %s", fullCommand)
-	agentCommandUri := fmt.Sprintf("%s/%s", uri, fullCommand)
-
-	body, err := readResponse(methodFunc(agentCommandUri))
-	if err != nil {
-		return agent, log.Errore(err)
-	}
-	if onResponse != nil {
-		(*onResponse)(body)
-	}
-	auditAgentOperation("agent-command", &agent, command)
-
-	return agent, err
-}
-
-// executeAgentCommand requests an agent to execute a command via HTTP api
-func executeAgentCommand(hostname string, command string, onResponse *func([]byte)) (Agent, error) {
-	httpFunc := func(uri string) (resp *http.Response, err error) {
-		return httpGet(uri)
-	}
-	return executeAgentCommandWithMethodFunc(hostname, command, httpFunc, onResponse)
-}
-
-// executeAgentPostCommand requests an agent to execute a command via HTTP POST
-func executeAgentPostCommand(hostname string, command string, content string, onResponse *func([]byte)) (Agent, error) {
-	httpFunc := func(uri string) (resp *http.Response, err error) {
-		return httpPost(uri, "text/plain", content)
-	}
-	return executeAgentCommandWithMethodFunc(hostname, command, httpFunc, onResponse)
-}
-
-// Unmount unmounts the designated snapshot mount point
-func Unmount(hostname string) (Agent, error) {
-	return executeAgentCommand(hostname, "umount", nil)
-}
-
-// MountLV requests an agent to mount the given volume on the designated mount point
-func MountLV(hostname string, lv string) (Agent, error) {
-	return executeAgentCommand(hostname, fmt.Sprintf("mountlv?lv=%s", lv), nil)
-}
-
-// RemoveLV requests an agent to remove a snapshot
-func RemoveLV(hostname string, lv string) (Agent, error) {
-	return executeAgentCommand(hostname, fmt.Sprintf("removelv?lv=%s", lv), nil)
-}
-
-// CreateSnapshot requests an agent to create a new snapshot -- a DIY implementation
-func CreateSnapshot(hostname string) (Agent, error) {
-	return executeAgentCommand(hostname, "create-snapshot", nil)
-}
-
-// deleteMySQLDatadir requests an agent to purge the MySQL data directory (step before seed)
-func deleteMySQLDatadir(hostname string) (Agent, error) {
-	return executeAgentCommand(hostname, "delete-mysql-datadir", nil)
-}
-
-// MySQLStop requests an agent to stop MySQL service
-func MySQLStop(hostname string) (Agent, error) {
-	return executeAgentCommand(hostname, "mysql-stop", nil)
-}
-
-// MySQLStart requests an agent to start the MySQL service
-func MySQLStart(hostname string) (Agent, error) {
-	return executeAgentCommand(hostname, "mysql-start", nil)
-}
-
-// ReceiveMySQLSeedData requests an agent to start listening for incoming seed data
-func ReceiveMySQLSeedData(hostname string, seedId int64) (Agent, error) {
-	return executeAgentCommand(hostname, fmt.Sprintf("receive-mysql-seed-data/%d", seedId), nil)
-}
-
-// ReceiveMySQLSeedData requests an agent to start sending seed data
-func SendMySQLSeedData(hostname string, targetHostname string, seedId int64) (Agent, error) {
-	return executeAgentCommand(hostname, fmt.Sprintf("send-mysql-seed-data/%s/%d", targetHostname, seedId), nil)
-}
-
-// ReceiveMySQLSeedData requests an agent to abort seed send/receive (depending on the agent's role)
-func AbortSeedCommand(hostname string, seedId int64) (Agent, error) {
-	return executeAgentCommand(hostname, fmt.Sprintf("abort-seed/%d", seedId), nil)
-}
-
-func CustomCommand(hostname string, cmd string) (output string, err error) {
-	onResponse := func(body []byte) {
-		output = string(body)
-		log.Debugf("output: %v", output)
-	}
-
-	_, err = executeAgentCommand(hostname, fmt.Sprintf("custom-commands/%s", cmd), &onResponse)
-	return output, err
-}
-
-// seedCommandCompleted checks an agent to see if it thinks a seed was completed.
-func seedCommandCompleted(hostname string, seedId int64) (Agent, bool, error) {
-	result := false
-	onResponse := func(body []byte) {
-		json.Unmarshal(body, &result)
-	}
-	agent, err := executeAgentCommand(hostname, fmt.Sprintf("seed-command-completed/%d", seedId), &onResponse)
-	return agent, result, err
-}
-
-// seedCommandCompleted checks an agent to see if it thinks a seed was successful.
-func seedCommandSucceeded(hostname string, seedId int64) (Agent, bool, error) {
-	result := false
-	onResponse := func(body []byte) {
-		json.Unmarshal(body, &result)
-	}
-	agent, err := executeAgentCommand(hostname, fmt.Sprintf("seed-command-succeeded/%d", seedId), &onResponse)
-	return agent, result, err
-}
-
-// AbortSeed will contact agents associated with a seed and request abort.
-func AbortSeed(seedId int64) error {
-	seedOperations, err := AgentSeedDetails(seedId)
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	for _, seedOperation := range seedOperations {
-		AbortSeedCommand(seedOperation.TargetHostname, seedId)
-		AbortSeedCommand(seedOperation.SourceHostname, seedId)
-	}
-	updateSeedComplete(seedId, errors.New("Aborted"))
-	return nil
-}
-
-// PostCopy will request an agent to invoke post-copy commands
-func PostCopy(hostname, sourceHostname string) (Agent, error) {
-	return executeAgentCommand(hostname, fmt.Sprintf("post-copy/?sourceHost=%s", sourceHostname), nil)
-}
-
-// SubmitSeedEntry submits a new seed operation entry, returning its unique ID
-func SubmitSeedEntry(seedMethod SeedMethod, targetHostname string, sourceHostname string) (int64, error) {
-	res, err := db.ExecOrchestrator(`
-			insert
-				into agent_seed (
-					seed_method, target_hostname, source_hostname, start_timestamp
-				) VALUES (
-					?, ?, ?, NOW()
-				)
-			`,
-		seedMethod.String(),
-		targetHostname,
-		sourceHostname,
-	)
-	if err != nil {
-		return 0, log.Errore(err)
-	}
-	id, err := res.LastInsertId()
-
-	return id, err
-}
+/***************************************************************************************************************************************/
+/***************************************************************************************************************************************/
+/************************************************************** OLD FUNCS **************************************************************/
+/***************************************************************************************************************************************/
+/***************************************************************************************************************************************/
 
 // updateSeedComplete updates the seed entry, signing for completion
 func updateSeedComplete(seedId int64, seedError error) error {
@@ -516,6 +420,41 @@ func updateSeedComplete(seedId int64, seedError error) error {
 	}
 
 	return nil
+}
+
+// SeedOperationState reads states for a given seed operation
+func ReadSeedStates(seedId int64) ([]SeedOperationState, error) {
+	res := []SeedOperationState{}
+	query := `
+		select
+			agent_seed_state_id,
+			agent_seed_id,
+			state_timestamp,
+			state_action,
+			error_message
+		from
+			agent_seed_state
+		where
+			agent_seed_id = ?
+		order by
+			agent_seed_state_id desc
+		`
+	err := db.QueryOrchestrator(query, sqlutils.Args(seedId), func(m sqlutils.RowMap) error {
+		seedState := SeedOperationState{}
+		seedState.SeedStateId = m.GetInt64("agent_seed_state_id")
+		seedState.SeedId = m.GetInt64("agent_seed_id")
+		seedState.StateTimestamp = m.GetString("state_timestamp")
+		seedState.Action = m.GetString("state_action")
+		seedState.ErrorMessage = m.GetString("error_message")
+
+		res = append(res, seedState)
+		return nil
+	})
+
+	if err != nil {
+		log.Errore(err)
+	}
+	return res, err
 }
 
 // submitSeedStateEntry submits a seed state: a single step in the overall seed process
@@ -722,149 +661,4 @@ func executeSeed(seedId int64, seedMethod SeedMethod, targetHostname string, sou
 	seedStateId, _ = submitSeedStateEntry(seedId, "Done", "")
 
 	return nil
-}
-
-// Seed is the entry point for making a seed
-func Seed(seedMethodName string, targetHostname string, sourceHostname string) (int64, error) {
-	var seedMethod SeedMethod
-	var ok bool
-	if seedMethod, ok = toSeedMethod["seedMethodName"]; !ok {
-		return 0, log.Errorf("SeedMethod %s undefined", seedMethodName)
-	}
-	if targetHostname == sourceHostname {
-		return 0, log.Errorf("Cannot seed %s onto itself", targetHostname)
-	}
-	seedId, err := SubmitSeedEntry(seedMethod, targetHostname, sourceHostname)
-	if err != nil {
-		return 0, log.Errore(err)
-	}
-
-	go func() {
-		err := executeSeed(seedId, seedMethod, targetHostname, sourceHostname)
-		updateSeedComplete(seedId, err)
-	}()
-
-	return seedId, nil
-}
-
-// readSeeds reads seed from the backend table
-func readSeeds(whereCondition string, args []interface{}, limit string) ([]SeedOperation, error) {
-	res := []SeedOperation{}
-	query := fmt.Sprintf(`
-		select
-			agent_seed_id,
-			target_hostname,
-			source_hostname,
-			start_timestamp,
-			end_timestamp,
-			is_complete,
-			is_successful
-		from
-			agent_seed
-		%s
-		order by
-			agent_seed_id desc
-		%s
-		`, whereCondition, limit)
-	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
-		seedOperation := SeedOperation{}
-		seedOperation.SeedId = m.GetInt64("agent_seed_id")
-		seedOperation.TargetHostname = m.GetString("target_hostname")
-		seedOperation.SourceHostname = m.GetString("source_hostname")
-		seedOperation.StartTimestamp = m.GetString("start_timestamp")
-		seedOperation.EndTimestamp = m.GetString("end_timestamp")
-		seedOperation.IsComplete = m.GetBool("is_complete")
-		seedOperation.IsSuccessful = m.GetBool("is_successful")
-
-		res = append(res, seedOperation)
-		return nil
-	})
-
-	if err != nil {
-		log.Errore(err)
-	}
-	return res, err
-}
-
-// ReadActiveSeedsForHost reads active seeds where host participates either as source or target
-func ReadActiveSeedsForHost(hostname string) ([]SeedOperation, error) {
-	whereCondition := `
-		where
-			is_complete = 0
-			and (
-				target_hostname = ?
-				or source_hostname = ?
-			)
-		`
-	return readSeeds(whereCondition, sqlutils.Args(hostname, hostname), "")
-}
-
-// ReadRecentCompletedSeedsForHost reads active seeds where host participates either as source or target
-func ReadRecentCompletedSeedsForHost(hostname string) ([]SeedOperation, error) {
-	whereCondition := `
-		where
-			is_complete = 1
-			and (
-				target_hostname = ?
-				or source_hostname = ?
-			)
-		`
-	return readSeeds(whereCondition, sqlutils.Args(hostname, hostname), "limit 10")
-}
-
-// AgentSeedDetails reads details from backend table
-func AgentSeedDetails(seedId int64) ([]SeedOperation, error) {
-	whereCondition := `
-		where
-			agent_seed_id = ?
-		`
-	return readSeeds(whereCondition, sqlutils.Args(seedId), "")
-}
-
-// ReadRecentSeeds reads seeds from backend table.
-func ReadRecentSeeds() ([]SeedOperation, error) {
-	return readSeeds(``, sqlutils.Args(), "limit 100")
-}
-
-// SeedOperationState reads states for a given seed operation
-func ReadSeedStates(seedId int64) ([]SeedOperationState, error) {
-	res := []SeedOperationState{}
-	query := `
-		select
-			agent_seed_state_id,
-			agent_seed_id,
-			state_timestamp,
-			state_action,
-			error_message
-		from
-			agent_seed_state
-		where
-			agent_seed_id = ?
-		order by
-			agent_seed_state_id desc
-		`
-	err := db.QueryOrchestrator(query, sqlutils.Args(seedId), func(m sqlutils.RowMap) error {
-		seedState := SeedOperationState{}
-		seedState.SeedStateId = m.GetInt64("agent_seed_state_id")
-		seedState.SeedId = m.GetInt64("agent_seed_id")
-		seedState.StateTimestamp = m.GetString("state_timestamp")
-		seedState.Action = m.GetString("state_action")
-		seedState.ErrorMessage = m.GetString("error_message")
-
-		res = append(res, seedState)
-		return nil
-	})
-
-	if err != nil {
-		log.Errore(err)
-	}
-	return res, err
-}
-
-func RelaylogContentsTail(hostname string, startCoordinates *inst.BinlogCoordinates, onResponse *func([]byte)) (Agent, error) {
-	return executeAgentCommand(hostname, fmt.Sprintf("mysql-relaylog-contents-tail/%s/%d", startCoordinates.LogFile, startCoordinates.LogPos), onResponse)
-}
-
-func ApplyRelaylogContents(hostname string, content string) (Agent, error) {
-	return executeAgentPostCommand(hostname, "apply-relaylog-contents", content, nil)
 }

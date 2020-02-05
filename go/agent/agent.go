@@ -17,8 +17,6 @@
 package agent
 
 import (
-	"sync"
-
 	"github.com/github/orchestrator/go/inst"
 )
 
@@ -43,7 +41,7 @@ type Mount struct {
 
 // MySQLDatabase describes a MySQL database
 type MySQLDatabase struct {
-	Engines []string
+	Engines []Engine
 	Size    int64
 }
 
@@ -75,18 +73,6 @@ type Agent struct {
 	Params        *AgentParams
 	Info          *AgentInfo
 	LastSubmitted string
-	sync.RWMutex  //do we need it?
-}
-
-// SeedOperation makes for the high level data & state of a seed operation
-type SeedOperation struct {
-	SeedId         int64
-	TargetHostname string
-	SourceHostname string
-	StartTimestamp string
-	EndTimestamp   string
-	IsComplete     bool
-	IsSuccessful   bool
 }
 
 // SeedOperationState represents a single state (step) in a seed operation
