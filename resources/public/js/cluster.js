@@ -719,9 +719,6 @@ function Cluster() {
       // Obviously this is also checked on server side, no need to try stupid hacks
       return unaccepted;
     }
-    if (moveInstanceMethod != "smart") {
-      return unaccepted;
-    }
     var droppableTitle = getInstanceDiv(droppableNode.id).find("h3 .pull-left").html();
 
     if (node.hasConnectivityProblem || droppableNode.hasConnectivityProblem || droppableNode.isAggregate) {
@@ -1219,6 +1216,7 @@ function Cluster() {
       aggergateInstance.title = "[aggregation]";
       if (dataCenter) {
         aggergateInstance.title = "[aggregation in " + dataCenter + "]";
+        aggergateInstance.InstanceAlias = aggergateInstance.title;
       }
       aggergateInstance.canonicalTitle = aggergateInstance.title;
       aggergateInstance.aggregatedInstances = instances; // includes itself
@@ -1485,6 +1483,13 @@ function Cluster() {
         glyph.attr("title", "Anonymize display");
       }
     }
+    // Alias
+    {
+      var glyph = $("#cluster_sidebar [data-bullet=alias] .glyphicon");
+      var is = isAliased();
+      glyph.addClass(is ? "text-info" : "text-muted");
+      glyph.attr("title", is ? "Cancel alias" : "Instance alias display");
+    }
     // Silent UI
     {
       var glyph = $("#cluster_sidebar [data-bullet=silent-ui] .glyphicon");
@@ -1730,11 +1735,15 @@ function Cluster() {
       $("#dropdown-context").append('<li><a data-command="pool-indicator">Pool indicator</a></li>');
       $("#dropdown-context").append('<li><a data-command="colorize-dc">Colorize DC</a></li>');
       $("#dropdown-context").append('<li><a data-command="anonymize">Anonymize</a></li>');
+      $("#dropdown-context").append('<li><a data-command="alias">Alias</a></li>');
       if ($.cookie("pool-indicator") == "true") {
         $("#dropdown-context a[data-command=pool-indicator]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
       }
       if (isAnonymized()) {
         $("#dropdown-context a[data-command=anonymize]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
+      }
+      if (isAliased()) {
+        $("#dropdown-context a[data-command=alias]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
       }
       if (isColorizeDC()) {
         $("#dropdown-context a[data-command=colorize-dc]").prepend('<span class="glyphicon glyphicon-ok small"></span> ');
@@ -1803,6 +1812,13 @@ function Cluster() {
         return
       }
       $.cookie("anonymize", "true", {
+        path: '/',
+        expires: 1
+      });
+      location.reload();
+    });
+    $("body").on("click", "a[data-command=alias]", function(event) {
+      $.cookie("alias", isAliased() ? "false" : "true", {
         path: '/',
         expires: 1
       });

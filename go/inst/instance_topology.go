@@ -50,7 +50,7 @@ var MaxConcurrentReplicaOperations = 5
 
 // getASCIITopologyEntry will get an ascii topology tree rooted at given instance. Ir recursively
 // draws the tree
-func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance), extendedOutput bool, fillerCharacter string, tabulated bool) []string {
+func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*Instance]([]*Instance), extendedOutput bool, fillerCharacter string, tabulated bool, printTags bool) []string {
 	if instance == nil {
 		return []string{}
 	}
@@ -73,17 +73,25 @@ func getASCIITopologyEntry(depth int, instance *Instance, replicationMap map[*In
 		} else {
 			entry = fmt.Sprintf("%s%s%s", entry, fillerCharacter, instance.HumanReadableDescription())
 		}
+		if printTags {
+			tags, _ := ReadInstanceTags(&instance.Key)
+			tagsString := make([]string, len(tags))
+			for idx, tag := range tags {
+				tagsString[idx] = tag.Display()
+			}
+			entry = fmt.Sprintf("%s [%s]", entry, strings.Join(tagsString, ","))
+		}
 	}
 	result := []string{entry}
 	for _, replica := range replicationMap[instance] {
-		replicasResult := getASCIITopologyEntry(depth+1, replica, replicationMap, extendedOutput, fillerCharacter, tabulated)
+		replicasResult := getASCIITopologyEntry(depth+1, replica, replicationMap, extendedOutput, fillerCharacter, tabulated, printTags)
 		result = append(result, replicasResult...)
 	}
 	return result
 }
 
 // ASCIITopology returns a string representation of the topology of given cluster.
-func ASCIITopology(clusterName string, historyTimestampPattern string, tabulated bool) (result string, err error) {
+func ASCIITopology(clusterName string, historyTimestampPattern string, tabulated bool, printTags bool) (result string, err error) {
 	fillerCharacter := asciiFillerCharacter
 	var instances [](*Instance)
 	if historyTimestampPattern == "" {
@@ -119,12 +127,12 @@ func ASCIITopology(clusterName string, historyTimestampPattern string, tabulated
 	var entries []string
 	if masterInstance != nil {
 		// Single master
-		entries = getASCIITopologyEntry(0, masterInstance, replicationMap, historyTimestampPattern == "", fillerCharacter, tabulated)
+		entries = getASCIITopologyEntry(0, masterInstance, replicationMap, historyTimestampPattern == "", fillerCharacter, tabulated, printTags)
 	} else {
 		// Co-masters? For visualization we put each in its own branch while ignoring its other co-masters.
 		for _, instance := range instances {
 			if instance.IsCoMaster {
-				entries = append(entries, getASCIITopologyEntry(1, instance, replicationMap, historyTimestampPattern == "", fillerCharacter, tabulated)...)
+				entries = append(entries, getASCIITopologyEntry(1, instance, replicationMap, historyTimestampPattern == "", fillerCharacter, tabulated, printTags)...)
 			}
 		}
 	}
@@ -1857,7 +1865,7 @@ func sortedReplicas(replicas [](*Instance), stopReplicationMethod StopReplicatio
 // This function assumes given `replicas` argument is indeed a list of instances all replicating
 // from the same master (the result of `getReplicasForSorting()` is appropriate)
 func sortedReplicasDataCenterHint(replicas [](*Instance), stopReplicationMethod StopReplicationMethod, dataCenterHint string) [](*Instance) {
-	if len(replicas) == 0 {
+	if len(replicas) <= 1 {
 		return replicas
 	}
 	replicas = StopSlaves(replicas, stopReplicationMethod, time.Duration(config.Config.InstanceBulkOperationsWaitTimeoutSeconds)*time.Second)

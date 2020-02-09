@@ -1072,7 +1072,7 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("topology", "Information", `Show an ascii-graph of a replication topology, given a member of that topology`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
-			output, err := inst.ASCIITopology(clusterName, pattern, false)
+			output, err := inst.ASCIITopology(clusterName, pattern, false, false)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1081,7 +1081,16 @@ func Cli(command string, strict bool, instance string, destination string, owner
 	case registerCliCommand("topology-tabulated", "Information", `Show an ascii-graph of a replication topology, given a member of that topology`):
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
-			output, err := inst.ASCIITopology(clusterName, pattern, true)
+			output, err := inst.ASCIITopology(clusterName, pattern, true, false)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(output)
+		}
+	case registerCliCommand("topology-tags", "Information", `Show an ascii-graph of a replication topology and instance tags, given a member of that topology`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			output, err := inst.ASCIITopology(clusterName, pattern, false, true)
 			if err != nil {
 				log.Fatale(err)
 			}
@@ -1111,6 +1120,15 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		{
 			clusterName := getClusterName(clusterAlias, instanceKey)
 			fmt.Println(clusterName)
+		}
+	case registerCliCommand("which-cluster-alias", "Information", `Output the alias of the cluster an instance belongs to, or error if unknown to orchestrator`):
+		{
+			clusterName := getClusterName(clusterAlias, instanceKey)
+			clusterInfo, err := inst.ReadClusterInfo(clusterName)
+			if err != nil {
+				log.Fatale(err)
+			}
+			fmt.Println(clusterInfo.ClusterAlias)
 		}
 	case registerCliCommand("which-cluster-domain", "Information", `Output the domain name of the cluster an instance belongs to, or error if unknown to orchestrator`):
 		{
@@ -1353,15 +1371,15 @@ func Cli(command string, strict bool, instance string, destination string, owner
 		}
 	case registerCliCommand("forget", "Instance management", `Forget about an instance's existence`):
 		{
-			instanceKey, _ = inst.FigureInstanceKey(instanceKey, thisInstanceKey)
 			if rawInstanceKey == nil {
 				log.Fatal("Cannot deduce instance:", instance)
 			}
-			err := inst.ForgetInstance(rawInstanceKey)
+			instanceKey, _ = inst.FigureInstanceKey(rawInstanceKey, nil)
+			err := inst.ForgetInstance(instanceKey)
 			if err != nil {
 				log.Fatale(err)
 			}
-			fmt.Println(rawInstanceKey.DisplayString())
+			fmt.Println(instanceKey.DisplayString())
 		}
 	case registerCliCommand("begin-maintenance", "Instance management", `Request a maintenance lock on an instance`):
 		{

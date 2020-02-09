@@ -541,4 +541,9 @@ var generateSQLPatches = []string{
 		DROP PRIMARY KEY,
 		ADD PRIMARY KEY (hostname, port, tag_name)
 	`,
+	`
+		ALTER TABLE
+			database_instance
+			ADD COLUMN region varchar(32) CHARACTER SET ascii NOT NULL AFTER data_center
+	`,
 }

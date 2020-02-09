@@ -57,6 +57,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 
 	args := sqlutils.Args(ValidSecondsFromSeenToLastAttemptedCheck(), config.Config.ReasonableReplicationLagSeconds, clusterName)
 	analysisQueryReductionClause := ``
+
 	if config.Config.ReduceReplicationAnalysisCount {
 		analysisQueryReductionClause = `
 			HAVING
@@ -90,15 +91,18 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		    SELECT
 		        master_instance.hostname,
 		        master_instance.port,
-						MIN(master_instance.data_center) AS data_center,
-						MIN(master_instance.physical_environment) AS physical_environment,
+                        master_instance.read_only AS read_only,
+			MIN(master_instance.data_center) AS data_center,
+			MIN(master_instance.region) AS region,
+			MIN(master_instance.physical_environment) AS physical_environment,
 		        MIN(master_instance.master_host) AS master_host,
 		        MIN(master_instance.master_port) AS master_port,
 		        MIN(master_instance.cluster_name) AS cluster_name,
 		        MIN(IFNULL(cluster_alias.alias, master_instance.cluster_name)) AS cluster_alias,
+		        MIN(IFNULL(cluster_domain_name.domain_name, master_instance.cluster_name)) AS cluster_domain,
 		        MIN(
-							master_instance.last_checked <= master_instance.last_seen
-							and master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
+				master_instance.last_checked <= master_instance.last_seen
+				and master_instance.last_attempted_check <= master_instance.last_seen + interval ? second
 		        	) = 1 AS is_last_check_valid,
 						MIN(master_instance.last_check_partial_success) as last_check_partial_success,
 		        MIN(master_instance.master_host IN ('' , '_')
@@ -229,6 +233,8 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 							AND replica_downtime.downtime_active = 1)
         	LEFT JOIN
 		        cluster_alias ON (cluster_alias.cluster_name = master_instance.cluster_name)
+        	LEFT JOIN
+		        cluster_domain_name ON (cluster_domain_name.cluster_name = master_instance.cluster_name)
 		    WHERE
 		    	database_instance_maintenance.database_instance_maintenance_id IS NULL
 		    	AND ? IN ('', master_instance.cluster_name)
@@ -241,6 +247,7 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			    is_cluster_master DESC,
 			    count_replicas DESC
 	`, analysisQueryReductionClause)
+
 	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
 		a := ReplicationAnalysis{
 			Analysis:               NoProblem,
@@ -253,9 +260,11 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		a.AnalyzedInstanceKey = InstanceKey{Hostname: m.GetString("hostname"), Port: m.GetInt("port")}
 		a.AnalyzedInstanceMasterKey = InstanceKey{Hostname: m.GetString("master_host"), Port: m.GetInt("master_port")}
 		a.AnalyzedInstanceDataCenter = m.GetString("data_center")
+		a.AnalyzedInstanceRegion = m.GetString("region")
 		a.AnalyzedInstancePhysicalEnvironment = m.GetString("physical_environment")
 		a.ClusterDetails.ClusterName = m.GetString("cluster_name")
 		a.ClusterDetails.ClusterAlias = m.GetString("cluster_alias")
+		a.ClusterDetails.ClusterDomain = m.GetString("cluster_domain")
 		a.GTIDMode = m.GetString("gtid_mode")
 		a.LastCheckValid = m.GetBool("is_last_check_valid")
 		a.LastCheckPartialSuccess = m.GetBool("last_check_partial_success")
@@ -295,6 +304,8 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 
 		a.CountDelayedReplicas = m.GetUint("count_delayed_replicas")
 		a.CountLaggingReplicas = m.GetUint("count_lagging_replicas")
+
+		a.IsReadOnly = m.GetUint("read_only") == 1
 
 		if !a.LastCheckValid {
 			analysisMessage := fmt.Sprintf("analysis: IsMaster: %+v, LastCheckValid: %+v, LastCheckPartialSuccess: %+v, CountReplicas: %+v, CountValidReplicatingReplicas: %+v, CountLaggingReplicas: %+v, CountDelayedReplicas: %+v, ",
@@ -379,6 +390,10 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 		} else if !a.IsMaster && !a.LastCheckValid && a.CountReplicas > 0 && a.CountValidReplicas == 0 {
 			a.Analysis = DeadIntermediateMasterAndSlaves
 			a.Description = "Intermediate master cannot be reached by orchestrator and all of its replicas are unreachable"
+			//
+		} else if !a.IsMaster && !a.LastCheckValid && a.CountLaggingReplicas == a.CountReplicas && a.CountDelayedReplicas < a.CountReplicas && a.CountValidReplicatingReplicas > 0 {
+			a.Analysis = UnreachableIntermediateMasterWithLaggingReplicas
+			a.Description = "Intermediate master cannot be reached by orchestrator and all of its replicas are lagging"
 			//
 		} else if !a.IsMaster && !a.LastCheckValid && !a.LastCheckPartialSuccess && a.CountValidReplicas > 0 && a.CountValidReplicatingReplicas > 0 {
 			a.Analysis = UnreachableIntermediateMaster
@@ -477,6 +492,11 @@ func GetReplicationAnalysis(clusterName string, hints *ReplicationAnalysisHints)
 			if a.MaxReplicaGTIDErrant != "" {
 				a.StructureAnalysis = append(a.StructureAnalysis, ErrantGTIDStructureWarning)
 			}
+
+			if a.IsMaster && a.IsReadOnly {
+				a.StructureAnalysis = append(a.StructureAnalysis, NoWriteableMasterStructureWarning)
+			}
+
 		}
 		appendAnalysis(&a)
 
