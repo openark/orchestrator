@@ -18,6 +18,15 @@ user=orchestrator
 password=orc_topology_password
 ```
 
+Or, you may choose to use plaintext credentials:
+
+```json
+{
+  "MySQLTopologyUser": "orchestrator",
+  "MySQLTopologyPassword": "orc_topology_password"
+}
+```
+
 `orchestrator` will probe each server once per `InstancePollSeconds` seconds.
 
 On all your MySQL topologies, grant the following:
