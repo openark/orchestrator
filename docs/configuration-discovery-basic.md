@@ -23,7 +23,7 @@ Or, you may choose to use plaintext credentials:
 ```json
 {
   "MySQLTopologyUser": "orchestrator",
-  "MySQLTopologyPassword": "orc_topology_password"
+  "MySQLTopologyPassword": "orc_topology_password",
 }
 ```
 
