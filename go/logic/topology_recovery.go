@@ -950,8 +950,8 @@ func checkAndRecoverDeadMaster(analysisEntry inst.ReplicationAnalysis, candidate
 	return true, topologyRecovery, err
 }
 
-// isGeneralyValidAsCandidateSiblingOfIntermediateMaster sees that basic server configuration and state are valid
-func isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instance) bool {
+// isGenerallyValidAsCandidateSiblingOfIntermediateMaster sees that basic server configuration and state are valid
+func isGenerallyValidAsCandidateSiblingOfIntermediateMaster(sibling *inst.Instance) bool {
 	if !sibling.LogBinEnabled {
 		return false
 	}
@@ -973,7 +973,7 @@ func isValidAsCandidateSiblingOfIntermediateMaster(intermediateMasterInstance *i
 		// same instance
 		return false
 	}
-	if !isGeneralyValidAsCandidateSiblingOfIntermediateMaster(sibling) {
+	if !isGenerallyValidAsCandidateSiblingOfIntermediateMaster(sibling) {
 		return false
 	}
 	if inst.IsBannedFromBeingCandidateReplica(sibling) {
