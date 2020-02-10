@@ -549,12 +549,32 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE
 			host_agent
-			ADD COLUMN seed_methods TEXT CHARACTER SET ascii NOT NULL AFTER count_mysql_snapshots
+			DROP COLUMN count_mysql_snapshots
 	`,
 	`
 		ALTER TABLE
-			agent_seed
-			ADD COLUMN seed_method varchar(32) CHARACTER SET ascii NOT NULL AFTER agent_seed_id
+			host_agent
+			DROP COLUMN last_submitted
+	`,
+	`
+		ALTER TABLE
+			host_agent
+			DROP INDEX last_submitted_idx_host_agent
+	`,
+	`
+		ALTER TABLE
+			host_agent
+			ADD COLUMN status varchar(16) CHARACTER SET ascii NOT NULL AFTER mysql_port
+	`,
+	`
+		ALTER TABLE
+			host_agent
+			ADD COLUMN data TEXT CHARACTER SET ascii NOT NULL AFTER status
+	`,
+	`
+		ALTER TABLE
+			host_agent
+			ADD COLUMN data TEXT CHARACTER SET ascii NOT NULL AFTER mysql_port
 	`,
 	`
 		ALTER TABLE
@@ -564,7 +584,7 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE
 			agent_seed
-			ADD COLUMN status ENUM('Started','Running','Completed','Error') NOT NULL, ADD COLUMN seed_method varchar(32) CHARACTER SET ascii NOT NULL AFTER agent_seed_id
+			ADD COLUMN seed_method varchar(32) CHARACTER SET ascii NOT NULL AFTER source_hostname, ADD COLUMN backup_side ENUM('Target','Source') NOT NULL AFTER seed_method, ADD COLUMN status ENUM('Started','Running','Completed','Error') NOT NULL AFTER  backup_side, ADD COLUMN retries int(10) unsigned NOT NULL AFTER status
 	`,
 	`
 		CREATE INDEX status ON agent_seed (status)

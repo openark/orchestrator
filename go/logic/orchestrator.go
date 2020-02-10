@@ -617,22 +617,6 @@ func ContinuousDiscovery() {
 	}
 }
 
-func pollAgent(hostname string) error {
-	polledAgent, err := agent.GetAgent(hostname)
-	agent.UpdateAgentLastChecked(hostname)
-
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	err = agent.UpdateAgentInfo(polledAgent)
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	return nil
-}
-
 // ContinuousAgentsPoll starts an asynchronuous infinite process where agents are
 // periodically investigated and their status captured, and long since unseen agents are
 // purged and forgotten.
@@ -641,13 +625,13 @@ func ContinuousAgentsPoll() {
 
 	go discoverSeededAgents()
 
-	tick := time.Tick(config.HealthPollSeconds * time.Second)
+	tick := time.Tick(time.Duration(config.Config.AgentPollMinutes) * time.Minute)
 	caretakingTick := time.Tick(time.Hour)
 	for range tick {
-		agentsHosts, _ := agent.ReadOutdatedAgentsHosts()
-		log.Debugf("outdated agents hosts: %+v", agentsHosts)
-		for _, hostname := range agentsHosts {
-			go pollAgent(hostname)
+		outdatedAgents, _ := agent.ReadOutdatedAgents()
+
+		for _, agent := range outdatedAgents {
+			go agent.UpdateAgent()
 		}
 		// See if we should also forget agents (lower frequency)
 		select {
@@ -661,7 +645,7 @@ func ContinuousAgentsPoll() {
 
 func discoverSeededAgents() {
 	for seededAgent := range agent.SeededAgents {
-		instanceKey := &inst.InstanceKey{Hostname: seededAgent.Params.Hostname, Port: int(seededAgent.Params.MySQLPort)}
+		instanceKey := &inst.InstanceKey{Hostname: seededAgent.Info.Hostname, Port: int(seededAgent.Info.MySQLPort)}
 		go inst.ReadTopologyInstance(instanceKey)
 	}
 }

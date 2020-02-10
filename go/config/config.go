@@ -208,6 +208,7 @@ type Configuration struct {
 	StatusEndpoint                             string            // Override the status endpoint.  Defaults to '/api/status'
 	StatusOUVerify                             bool              // If true, try to verify OUs when Mutual TLS is on.  Defaults to false
 	AgentPollMinutes                           uint              // Minutes between agent polling
+	AgentCacheTTLSeconds                       int32             // TTL for cache with agents data
 	UnseenAgentForgetHours                     uint              // Number of hours after which an unseen agent is forgotten
 	StaleSeedFailMinutes                       uint              // Number of minutes after which a stale (no progress) seed is considered failed.
 	SeedAcceptableBytesDiff                    int64             // Difference in bytes between seed source & target data size that is still considered as successful copy
@@ -367,6 +368,7 @@ func newConfiguration() *Configuration {
 		AgentSSLPrivateKeyFile:                     "",
 		AgentSSLCertFile:                           "",
 		AgentSSLCAFile:                             "",
+		AgentCacheTTLSeconds:                       600,
 		UseSSL:                                     false,
 		UseMutualTLS:                               false,
 		SSLValidOUs:                                []string{},
@@ -374,7 +376,7 @@ func newConfiguration() *Configuration {
 		SSLPrivateKeyFile:                          "",
 		SSLCertFile:                                "",
 		SSLCAFile:                                  "",
-		AgentPollMinutes:                           60,
+		AgentPollMinutes:                           30,
 		UnseenAgentForgetHours:                     6,
 		StaleSeedFailMinutes:                       60,
 		SeedAcceptableBytesDiff:                    8192,

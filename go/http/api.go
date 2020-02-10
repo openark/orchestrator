@@ -2460,7 +2460,7 @@ func (this *HttpAPI) Agent(params martini.Params, r render.Render, req *http.Req
 		return
 	}
 
-	agent, err := agent.GetAgent(params["host"])
+	agent, err := agent.ReadAgent(params["host"])
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -2628,7 +2628,7 @@ func (this *HttpAPI) AgentSeed(params martini.Params, r render.Render, req *http
 		return
 	}
 
-	output, err := agent.RegisterSeed(params["seedMethod"], params["targetHost"], params["sourceHost"])
+	output, err := agent.NewSeed(params["seedMethod"], params["targetHost"], params["sourceHost"])
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})

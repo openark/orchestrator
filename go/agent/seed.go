@@ -3,8 +3,14 @@ package agent
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"sync"
 	"time"
+
+	"github.com/openark/golib/log"
 )
+
+var SeededAgents chan *Agent = make(chan *Agent)
 
 type SeedSide int
 
@@ -120,18 +126,6 @@ func (m SeedMethod) MarshalText() ([]byte, error) {
 	return []byte(m.String()), nil
 }
 
-type SeedMethodOpts struct {
-	BackupSide       SeedSide
-	SupportedEngines []Engine
-	BackupToDatadir  bool
-}
-
-type BackupMetadata struct {
-	LogFile      string
-	LogPos       int64
-	GtidExecuted string
-}
-
 type SeedStatus int
 
 const (
@@ -139,6 +133,7 @@ const (
 	Running
 	Completed
 	Error
+	Failed
 )
 
 func (s SeedStatus) String() string {
@@ -152,19 +147,147 @@ func (s SeedStatus) MarshalJSON() ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-var toStatus = map[string]SeedStatus{
+var toSeedStatus = map[string]SeedStatus{
 	"Started":   Started,
 	"Running":   Running,
 	"Completed": Completed,
 	"Error":     Error,
+	"Failed":    Failed,
 }
 
-// SeedOperation makes for the high level data & state of a seed operation
-type SeedOperation struct {
+type SeedStage int
+
+const (
+	Prepare SeedStage = iota
+	Backup
+	Restore
+	GetMetadata
+	Cleanup
+)
+
+func (s SeedStage) String() string {
+	return [...]string{"Prepare", "Backup", "Restore", "GetMetadata", "Cleanup"}[s]
+}
+
+func (s SeedStage) MarshalJSON() ([]byte, error) {
+	buffer := bytes.NewBufferString(`"`)
+	buffer.WriteString(s.String())
+	buffer.WriteString(`"`)
+	return buffer.Bytes(), nil
+}
+
+// Seed makes for the high level data & state of a seed operation
+type Seed struct {
 	SeedId         int64
 	TargetHostname string
 	SourceHostname string
+	SeedMethod     SeedMethod
+	BackupSide     SeedSide
+	Status         SeedStatus
+	Retries        int
 	StartTimestamp time.Time
 	EndTimestamp   time.Time
-	Status         SeedStatus
+}
+
+// SeedStageState represents a single stage in a seed operation
+type SeedStageState struct {
+	SeedStageId int64
+	SeedId      int64
+	Stage       SeedStage
+	Hostname    string
+	StartedAt   time.Time
+	Status      SeedStatus
+	Details     string
+}
+
+// NewSeed is the entry point for making a seed. It's registers seed in db, so it can be later processed asynchronously
+func NewSeed(targetHostname string, sourceHostname string, seedMethodName string) (int64, error) {
+	var seedMethod SeedMethod
+	var ok bool
+	if seedMethod, ok = toSeedMethod["seedMethodName"]; !ok {
+		return 0, log.Errorf("SeedMethod %s not found", seedMethodName)
+	}
+	if targetHostname == sourceHostname {
+		return 0, log.Errorf("Cannot seed %s onto itself", targetHostname)
+	}
+	targetAgent, err := ReadAgent(targetHostname)
+	if err != nil {
+		return 0, log.Errorf("Unable to get information from agent on taget host %s", targetHostname)
+	}
+	sourceAgent, err := ReadAgent(sourceHostname)
+	if err != nil {
+		return 0, log.Errorf("Unable to get information from agent on source host %s", sourceHostname)
+	}
+	if _, ok = targetAgent.Data.AvailiableSeedMethods[seedMethod]; !ok {
+		return 0, log.Errorf("Seed method %s not supported on target host %s", seedMethod.String(), targetHostname)
+	}
+	if _, ok = sourceAgent.Data.AvailiableSeedMethods[seedMethod]; !ok {
+		return 0, log.Errorf("Seed method %s not supported on source host %s", seedMethod.String(), sourceHostname)
+	}
+	for db, opts := range sourceAgent.Data.MySQLDatabases {
+		if !enginesSupported(opts.Engines, sourceAgent.Data.AvailiableSeedMethods[seedMethod].SupportedEngines) {
+			return 0, log.Errorf("Database %s had a table with engine unsupported by seed method %s", db, seedMethod.String())
+		}
+	}
+	if sourceAgent.Data.MySQLDatadirDiskUsed > targetAgent.Data.MySQLDatadirDiskFree {
+		return 0, log.Errorf("Not enough disk space on target host %s. Required: %d, available: %d", targetHostname, sourceAgent.Data.MySQLDatadirDiskUsed, targetAgent.Data.MySQLDatadirDiskFree)
+	}
+	// do we need to check this? logical backup usually less than actual data size, so let's use 0.6 multiplier
+	if !sourceAgent.Data.AvailiableSeedMethods[seedMethod].BackupToDatadir {
+		if int64(float64(sourceAgent.Data.MySQLDatadirDiskUsed)*0.6) > targetAgent.Data.BackupDirDiskFree {
+			return 0, log.Errorf("Not enough disk space on target host backup directory %s. Database size: %d, available: %d", targetHostname, sourceAgent.Data.MySQLDatadirDiskUsed, targetAgent.Data.BackupDirDiskFree)
+		}
+	}
+	seed := &Seed{
+		TargetHostname: targetHostname,
+		SourceHostname: sourceHostname,
+		SeedMethod:     seedMethod,
+		BackupSide:     sourceAgent.Data.AvailiableSeedMethods[seedMethod].BackupSide,
+		Status:         Started,
+		Retries:        0,
+		StartTimestamp: time.Now(),
+	}
+	registeredSeed, err := registerSeedEntry(seed)
+	if err != nil {
+		return 0, log.Errore(err)
+	}
+	SeededAgents <- targetAgent
+
+	log.Infof("Registered new seed with seedID %d. Target host: %s, source host: %s, seed method: %s", registeredSeed.SeedId, registeredSeed.TargetHostname, registeredSeed.SourceHostname, registeredSeed.SeedMethod.String())
+	auditAgentOperation("agent-seed", sourceAgent, fmt.Sprintf("starting seed to host %s using seed method %s", registeredSeed.TargetHostname, registeredSeed.SeedMethod.String()))
+	auditAgentOperation("agent-seed", targetAgent, fmt.Sprintf("starting seed from host %s using seed method %s", registeredSeed.SourceHostname, registeredSeed.SeedMethod.String()))
+	return registeredSeed.SeedId, nil
+}
+
+func enginesSupported(first, second []Engine) bool {
+	hashmap := make(map[Engine]int)
+	for _, value := range first {
+		hashmap[value]++
+	}
+
+	for _, value := range second {
+		if count, found := hashmap[value]; !found {
+			return false
+		} else if count < 1 {
+			return false
+		} else {
+			hashmap[value] = count - 1
+		}
+	}
+	return true
+}
+
+func (s *Seed) ProcessStarted(wg *sync.WaitGroup) {
+	defer wg.Done()
+
+}
+
+func (s *Seed) ProcessRunning(wg *sync.WaitGroup) {
+	defer wg.Done()
+
+}
+
+func (s *Seed) ProcessErrored(wg *sync.WaitGroup) {
+	defer wg.Done()
+
 }
