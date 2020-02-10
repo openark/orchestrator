@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/github/orchestrator/go/config"
+	"github.com/github/orchestrator/go/ssl"
 
 	"github.com/openark/golib/log"
 )
@@ -37,8 +38,30 @@ func setupHttpClient() error {
 	dialTimeout := func(network, addr string) (net.Conn, error) {
 		return net.DialTimeout(network, addr, httpTimeout)
 	}
+
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: config.Config.MySQLOrchestratorSSLSkipVerify,
+	}
+	if config.Config.UseSSL {
+		caPool, err := ssl.ReadCAFile(config.Config.SSLCAFile)
+		if err != nil {
+			return err
+		}
+		tlsConfig.RootCAs = caPool
+
+		if config.Config.UseMutualTLS {
+			var sslPEMPassword []byte
+			if ssl.IsEncryptedPEM(config.Config.SSLPrivateKeyFile) {
+				sslPEMPassword = ssl.GetPEMPassword(config.Config.SSLPrivateKeyFile)
+			}
+			if err := ssl.AppendKeyPairWithPassword(tlsConfig, config.Config.SSLCertFile, config.Config.SSLPrivateKeyFile, sslPEMPassword); err != nil {
+				return err
+			}
+		}
+	}
+
 	httpTransport := &http.Transport{
-		TLSClientConfig:       &tls.Config{InsecureSkipVerify: config.Config.MySQLOrchestratorSSLSkipVerify},
+		TLSClientConfig:       tlsConfig,
 		Dial:                  dialTimeout,
 		ResponseHeaderTimeout: httpTimeout,
 	}
