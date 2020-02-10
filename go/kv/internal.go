@@ -69,7 +69,7 @@ func (this *internalKVStore) DistributePairs(kvPairs [](*KVPair)) (err error) {
 }
 
 func (this *internalKVStore) DeleteRecursive(key string) (err error) {
-	query := fmt.Sprintf("DELETE FROM kv_store WHERE store_key LIKE '%s%%'", key)
+	query := fmt.Sprintf("DELETE FROM kv_store WHERE store_key = '%s' OR store_key LIKE '%s/%%'", key, key)
 	_, err = db.ExecOrchestrator(query)
 	return log.Errore(err)
 }
