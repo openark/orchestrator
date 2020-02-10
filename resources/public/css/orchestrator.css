@@ -320,6 +320,12 @@ body {
     color: #ffffff;
 }
 
+#instance_problems ul.dropdown-menu {
+    height: auto;
+    max-height: 600px;
+    overflow: auto;
+}
+
 .instance.instance-problem {
     font: 10px sans-serif;
     display: block;
