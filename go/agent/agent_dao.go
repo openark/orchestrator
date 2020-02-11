@@ -26,12 +26,6 @@ import (
 	"github.com/openark/golib/sqlutils"
 )
 
-/***************************************************************************************************************************************/
-/***************************************************************************************************************************************/
-/************************************************************** NEW FUNCS **************************************************************/
-/***************************************************************************************************************************************/
-/***************************************************************************************************************************************/
-
 // readAgentsInfo reads agents information from backend table
 func readAgentsInfo(whereCondition string, args []interface{}, limit string) ([]*Agent, error) {
 	res := []*Agent{}
@@ -49,8 +43,8 @@ func readAgentsInfo(whereCondition string, args []interface{}, limit string) ([]
 			hostname desc
 		%s
 		`, whereCondition, limit)
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
-		agent := &Agent{Info: &Info{}}
+	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
+		agent := &Agent{Info: &Info{}, Data: &Data{}}
 		agent.Info.Hostname = m.GetString("hostname")
 		agent.Info.Port = m.GetInt("port")
 		agent.Info.MySQLPort = m.GetInt("mysql_port")
@@ -88,20 +82,18 @@ func readAgents(whereCondition string, args []interface{}, limit string) ([]*Age
 			di.suggested_cluster_alias ASC, ha.hostname ASC
 		%s
 		`, whereCondition, limit)
-	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
-		agent := &Agent{Info: &Info{}}
-		agentData := &Data{}
+	err := db.QueryOrchestrator(query, args, func(m sqlutils.RowMap) error {
+		agent := &Agent{Info: &Info{}, Data: &Data{}}
 		agent.Info.Hostname = m.GetString("hostname")
 		agent.Info.Port = m.GetInt("port")
 		agent.Info.MySQLPort = m.GetInt("mysql_port")
 		agent.Info.Token = m.GetString("token")
 		agent.LastSeen = m.GetTime("last_seen")
 		agent.ClusterName = m.GetString("suggested_cluster_alias")
-		err := json.Unmarshal([]byte(m.GetString("data")), agentData)
+		err := json.Unmarshal([]byte(m.GetString("data")), agent.Data)
 		if err != nil {
 			return log.Errore(err)
 		}
-		agent.Data = agentData
 		res = append(res, agent)
 		return nil
 	})
@@ -130,7 +122,7 @@ func (agent *Agent) registerAgent() error {
 		agent.Info.Port,
 		agent.Info.Token,
 		agent.Info.MySQLPort,
-		Active,
+		Active.String(),
 		agentData,
 	)
 	return err
@@ -177,7 +169,8 @@ func (agent *Agent) updateAgentData() error {
         		host_agent
         	set
 				data = ?,
-				status = ?
+				status = ?,
+				last_seen = NOW()
 			where
 				hostname = ?`,
 		agentData,
@@ -187,55 +180,14 @@ func (agent *Agent) updateAgentData() error {
 	return err
 }
 
-/***************************************************************************************************************************************/
-/***************************************************************************************************************************************/
-/************************************************************** OLD FUNCS **************************************************************/
-/***************************************************************************************************************************************/
-/***************************************************************************************************************************************/
-
 // ForgetLongUnseenAgents will remove entries of all agents that have long since been last seen.
 func ForgetLongUnseenAgents() error {
 	_, err := db.ExecOrchestrator(`
 			delete
 				from host_agent
 			where
-				last_submitted < NOW() - interval ? hour`,
+				last_seen < NOW() - interval ? hour`,
 		config.Config.UnseenAgentForgetHours,
 	)
 	return err
-}
-
-// readAgentBasicInfo returns the basic data for an agent directly from backend table (no agent access)
-func readAgentBasicInfo(hostname string) (Agent, string, error) {
-	agent := Agent{Info: &Info{}}
-	token := ""
-	query := `
-		select
-			hostname,
-			port,
-			token,
-			last_seen,
-			mysql_port
-		from
-			host_agent
-		where
-			hostname = ?
-		`
-	err := db.QueryOrchestrator(query, sqlutils.Args(hostname), func(m sqlutils.RowMap) error {
-		agent.Info.Hostname = m.GetString("hostname")
-		agent.Info.Port = m.GetInt("port")
-		agent.LastSeen = m.GetTime("last_seen")
-		agent.Info.MySQLPort = m.GetInt("mysql_port")
-		token = m.GetString("token")
-
-		return nil
-	})
-	if err != nil {
-		return agent, "", err
-	}
-
-	if token == "" {
-		return agent, "", log.Errorf("Cannot get agent/token: %s", hostname)
-	}
-	return agent, token, nil
 }

@@ -7,8 +7,10 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/github/orchestrator/go/db"
 	"github.com/github/orchestrator/go/inst"
 	"github.com/openark/golib/log"
+	"github.com/openark/golib/sqlutils"
 )
 
 /***************************************************************************************************************************************/
@@ -23,11 +25,6 @@ import (
 /***************************************************************************************************************************************/
 /***************************************************************************************************************************************/
 
-// httpPost is a convenience method for posting text data
-func httpPost(url string, bodyType string, content string) (resp *http.Response, err error) {
-	return httpClient.Post(url, bodyType, strings.NewReader(content))
-}
-
 func RelaylogContentsTail(hostname string, startCoordinates *inst.BinlogCoordinates, onResponse *func([]byte)) (Agent, error) {
 	return executeAgentCommand(hostname, fmt.Sprintf("mysql-relaylog-contents-tail/%s/%d", startCoordinates.LogFile, startCoordinates.LogPos), onResponse)
 }
@@ -36,10 +33,12 @@ func ApplyRelaylogContents(hostname string, content string) (Agent, error) {
 	return executeAgentPostCommand(hostname, "apply-relaylog-contents", content, nil)
 }
 
+/*
 // Unmount unmounts the designated snapshot mount point
 func Unmount(hostname string) (Agent, error) {
 	return executeAgentCommand(hostname, "umount", nil)
 }
+*/
 
 // MountLV requests an agent to mount the given volume on the designated mount point
 func MountLV(hostname string, lv string) (Agent, error) {
@@ -96,16 +95,6 @@ func CustomCommand(hostname string, cmd string) (output string, err error) {
 	return output, err
 }
 
-// seedCommandCompleted checks an agent to see if it thinks a seed was completed.
-func seedCommandCompleted(hostname string, seedId int64) (Agent, bool, error) {
-	result := false
-	onResponse := func(body []byte) {
-		json.Unmarshal(body, &result)
-	}
-	agent, err := executeAgentCommand(hostname, fmt.Sprintf("seed-command-completed/%d", seedId), &onResponse)
-	return agent, result, err
-}
-
 // seedCommandCompleted checks an agent to see if it thinks a seed was successful.
 func seedCommandSucceeded(hostname string, seedId int64) (Agent, bool, error) {
 	result := false
@@ -113,6 +102,16 @@ func seedCommandSucceeded(hostname string, seedId int64) (Agent, bool, error) {
 		json.Unmarshal(body, &result)
 	}
 	agent, err := executeAgentCommand(hostname, fmt.Sprintf("seed-command-succeeded/%d", seedId), &onResponse)
+	return agent, result, err
+}
+
+// seedCommandCompleted checks an agent to see if it thinks a seed was completed.
+func seedCommandCompleted(hostname string, seedId int64) (Agent, bool, error) {
+	result := false
+	onResponse := func(body []byte) {
+		json.Unmarshal(body, &result)
+	}
+	agent, err := executeAgentCommand(hostname, fmt.Sprintf("seed-command-completed/%d", seedId), &onResponse)
 	return agent, result, err
 }
 
@@ -136,10 +135,85 @@ func PostCopy(hostname, sourceHostname string) (Agent, error) {
 	return executeAgentCommand(hostname, fmt.Sprintf("post-copy/?sourceHost=%s", sourceHostname), nil)
 }
 
+// executeAgentCommand requests an agent to execute a command via HTTP api
+func executeAgentCommand(hostname string, command string, onResponse *func([]byte)) (Agent, error) {
+	httpFunc := func(uri string) (resp *http.Response, err error) {
+		return httpGet(uri)
+	}
+	return executeAgentCommandWithMethodFunc(hostname, command, httpFunc, onResponse)
+}
+
 // executeAgentPostCommand requests an agent to execute a command via HTTP POST
 func executeAgentPostCommand(hostname string, command string, content string, onResponse *func([]byte)) (Agent, error) {
 	httpFunc := func(uri string) (resp *http.Response, err error) {
 		return httpPost(uri, "text/plain", content)
 	}
 	return executeAgentCommandWithMethodFunc(hostname, command, httpFunc, onResponse)
+}
+
+// executeAgentCommandWithMethodFunc requests an agent to execute a command via HTTP api, either GET or POST,
+// with specific http method implementation by the caller
+func executeAgentCommandWithMethodFunc(hostname string, command string, methodFunc httpMethodFunc, onResponse *func([]byte)) (Agent, error) {
+	agent, token, err := readAgentBasicInfo(hostname)
+	if err != nil {
+		return agent, err
+	}
+
+	// All seems to be in order. Now make some inquiries from orchestrator-agent service:
+	uri := baseAgentURI(agent.Info.Hostname, agent.Info.Port)
+
+	var fullCommand string
+	if strings.Contains(command, "?") {
+		fullCommand = fmt.Sprintf("%s&token=%s", command, token)
+	} else {
+		fullCommand = fmt.Sprintf("%s?token=%s", command, token)
+	}
+	log.Debugf("orchestrator-agent command: %s", fullCommand)
+	agentCommandUri := fmt.Sprintf("%s/%s", uri, fullCommand)
+
+	body, err := readResponse(methodFunc(agentCommandUri))
+	if err != nil {
+		return agent, log.Errore(err)
+	}
+	if onResponse != nil {
+		(*onResponse)(body)
+	}
+	auditAgentOperation("agent-command", &agent, command)
+
+	return agent, err
+}
+
+// readAgentBasicInfo returns the basic data for an agent directly from backend table (no agent access)
+func readAgentBasicInfo(hostname string) (Agent, string, error) {
+	agent := Agent{Info: &Info{}}
+	token := ""
+	query := `
+		select
+			hostname,
+			port,
+			token,
+			last_seen,
+			mysql_port
+		from
+			host_agent
+		where
+			hostname = ?
+		`
+	err := db.QueryOrchestrator(query, sqlutils.Args(hostname), func(m sqlutils.RowMap) error {
+		agent.Info.Hostname = m.GetString("hostname")
+		agent.Info.Port = m.GetInt("port")
+		agent.LastSeen = m.GetTime("last_seen")
+		agent.Info.MySQLPort = m.GetInt("mysql_port")
+		token = m.GetString("token")
+
+		return nil
+	})
+	if err != nil {
+		return agent, "", err
+	}
+
+	if token == "" {
+		return agent, "", log.Errorf("Cannot get agent/token: %s", hostname)
+	}
+	return agent, token, nil
 }

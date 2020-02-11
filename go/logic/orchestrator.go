@@ -630,8 +630,12 @@ func ContinuousAgentsPoll() {
 	for range tick {
 		outdatedAgents, _ := agent.ReadOutdatedAgents()
 
-		for _, agent := range outdatedAgents {
-			go agent.UpdateAgent()
+		for _, outdatedAgent := range outdatedAgents {
+			go func(agent *agent.Agent) {
+				if err := agent.UpdateAgent(); err != nil {
+					log.Errore(fmt.Errorf("Unable to update agent data for agent %s: %+v", agent.Info.Hostname, err))
+				}
+			}(outdatedAgent)
 		}
 		// See if we should also forget agents (lower frequency)
 		select {

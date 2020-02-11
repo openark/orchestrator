@@ -2481,14 +2481,18 @@ func (this *HttpAPI) AgentUnmount(params martini.Params, r render.Render, req *h
 		return
 	}
 
-	output, err := agent.Unmount(params["host"])
-
+	agent, err := agent.ReadAgentInfo(params["host"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, output)
+	if err := agent.Unmount(); err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, agent)
 }
 
 // AgentMountLV instructs an agent to mount a given volume on the designated mount point

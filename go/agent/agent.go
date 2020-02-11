@@ -18,25 +18,16 @@ package agent
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io/ioutil"
-	"net"
 	"net/http"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/inst"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
-	"github.com/patrickmn/go-cache"
 )
-
-var agentsCache = cache.New(time.Duration(config.Config.AgentCacheTTLSeconds)*time.Second, time.Duration(config.Config.AgentCacheTTLSeconds*2)*time.Second)
 
 type Agent struct {
 	Info        *Info
@@ -65,7 +56,6 @@ type Data struct {
 	MySQLDatadirDiskFree  int64
 	MySQLVersion          string
 	MySQLDatabases        map[string]*MySQLDatabase
-	MySQLErrorLogTail     []string
 	AvailiableSeedMethods map[SeedMethod]SeedMethodOpts
 }
 
@@ -129,107 +119,6 @@ var toAgentStatus = map[string]AgentStatus{
 	"Inactive": Inactive,
 }
 
-type httpMethodFunc func(uri string) (resp *http.Response, err error)
-
-var httpClient *http.Client
-var httpClientMutex = &sync.Mutex{}
-
-// InitHttpClient gets called once, and initializes httpClient according to config.Config
-func InitHttpClient() {
-	httpClientMutex.Lock()
-	defer httpClientMutex.Unlock()
-
-	if httpClient != nil {
-		return
-	}
-
-	httpTimeout := time.Duration(time.Duration(config.AgentHttpTimeoutSeconds) * time.Second)
-	dialTimeout := func(network, addr string) (net.Conn, error) {
-		return net.DialTimeout(network, addr, httpTimeout)
-	}
-	httpTransport := &http.Transport{
-		TLSClientConfig:       &tls.Config{InsecureSkipVerify: config.Config.AgentSSLSkipVerify},
-		Dial:                  dialTimeout,
-		ResponseHeaderTimeout: httpTimeout,
-	}
-	httpClient = &http.Client{Transport: httpTransport}
-}
-
-// httpGet is a convenience method for getting http response from URL, optionaly skipping SSL cert verification
-func httpGet(url string) (resp *http.Response, err error) {
-	return httpClient.Get(url)
-}
-
-// executeAgentCommand requests an agent to execute a command via HTTP api
-func executeAgentCommand(hostname string, command string, onResponse *func([]byte)) (Agent, error) {
-	httpFunc := func(uri string) (resp *http.Response, err error) {
-		return httpGet(uri)
-	}
-	return executeAgentCommandWithMethodFunc(hostname, command, httpFunc, onResponse)
-}
-
-// executeAgentCommandWithMethodFunc requests an agent to execute a command via HTTP api, either GET or POST,
-// with specific http method implementation by the caller
-func executeAgentCommandWithMethodFunc(hostname string, command string, methodFunc httpMethodFunc, onResponse *func([]byte)) (Agent, error) {
-	agent, token, err := readAgentBasicInfo(hostname)
-	if err != nil {
-		return agent, err
-	}
-
-	// All seems to be in order. Now make some inquiries from orchestrator-agent service:
-	uri := baseAgentUri(agent.Info.Hostname, agent.Info.Port)
-
-	var fullCommand string
-	if strings.Contains(command, "?") {
-		fullCommand = fmt.Sprintf("%s&token=%s", command, token)
-	} else {
-		fullCommand = fmt.Sprintf("%s?token=%s", command, token)
-	}
-	log.Debugf("orchestrator-agent command: %s", fullCommand)
-	agentCommandURI := fmt.Sprintf("%s/%s", uri, fullCommand)
-
-	body, err := readResponse(methodFunc(agentCommandURI))
-	if err != nil {
-		return agent, log.Errore(err)
-	}
-	if onResponse != nil {
-		(*onResponse)(body)
-	}
-	auditAgentOperation("agent-command", &agent, command)
-
-	return agent, err
-}
-
-// readResponse returns the body of an HTTP response
-func readResponse(res *http.Response, err error) ([]byte, error) {
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if res.Status == "500" {
-		return body, errors.New("Response Status 500")
-	}
-
-	return body, nil
-}
-
-// baseAgentUri returns the base URI for accessing an agent
-func baseAgentUri(agentHostname string, agentPort int) string {
-	protocol := "http"
-	if config.Config.AgentsUseSSL {
-		protocol = "https"
-	}
-	uri := fmt.Sprintf("%s://%s:%d/api", protocol, agentHostname, agentPort)
-	log.Debugf("orchestrator-agent uri: %s", uri)
-	return uri
-}
-
 // AuditAgentOperation creates and writes a new audit entry by given agent
 func auditAgentOperation(auditType string, agent *Agent, message string) error {
 	instanceKey := &inst.InstanceKey{}
@@ -238,27 +127,6 @@ func auditAgentOperation(auditType string, agent *Agent, message string) error {
 	}
 	return inst.AuditOperation(auditType, instanceKey, message)
 }
-
-// GetAgent gets a single agent status from the agent service
-
-/*
-func GetAgent(hostname string) (Agent, error) {
-	agent, token, err := readAgentBasicInfo(hostname)
-	if err != nil {
-		return agent, log.Errore(err)
-	}
-	uri := fmt.Sprintf("%s/get-agent?token=%s", baseAgentUri(agent.Info.Hostname, agent.Info.Port), token)
-	log.Debugf("orchestrator-agent uri: %s", uri)
-	body, err := readResponse(httpGet(uri))
-	if err == nil {
-		err = json.Unmarshal(body, &agent.Info)
-	}
-	if err != nil {
-		log.Errore(err)
-	}
-	return agent, err
-}
-*/
 
 // RegisterAgent registers a new agent
 func RegisterAgent(agentInfo *Info) (string, error) {
@@ -299,6 +167,9 @@ func ReadAgent(hostname string) (*Agent, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(res) == 0 {
+		return nil, fmt.Errorf("Agent %s not found", hostname)
+	}
 	return res[0], nil
 }
 
@@ -312,6 +183,9 @@ func ReadAgentInfo(hostname string) (*Agent, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(res) == 0 {
+		return nil, fmt.Errorf("Agent %s not found", hostname)
+	}
 	return res[0], nil
 }
 
@@ -324,15 +198,22 @@ func ReadOutdatedAgents() ([]*Agent, error) {
 	return readAgentsInfo(whereCondition, sqlutils.Args(config.Config.AgentPollMinutes), "")
 }
 
-func (agent *Agent) GetAgentData() (*Data, error) {
-	agentData := &Data{}
-	uri := fmt.Sprintf("%s/get-agent?token=%s", baseAgentUri(agent.Info.Hostname, agent.Info.Port), agent.Info.Token)
-	log.Debugf("orchestrator-agent uri: %s", uri)
-	body, err := readResponse(httpGet(uri))
-	if err == nil {
-		err = json.Unmarshal(body, agentData)
+// executeAgentCommand requests an agent to execute a command via HTTP api
+func (agent *Agent) executeAgentCommand(command string, onResponse *func([]byte)) error {
+	httpFunc := func(uri string) (resp *http.Response, err error) {
+		return httpGet(uri)
 	}
-	return agentData, err
+	auditAgentOperation("agent-command", agent, command)
+	return executeCommandWithMethodFunc(agent.Info.Hostname, agent.Info.Port, agent.Info.Token, command, httpFunc, onResponse)
+}
+
+// executeAgentPostCommand requests an agent to execute a command via HTTP POST
+func (agent *Agent) executeAgentPostCommand(hostname string, command string, content string, onResponse *func([]byte)) error {
+	httpFunc := func(uri string) (resp *http.Response, err error) {
+		return httpPost(uri, "text/plain", content)
+	}
+	auditAgentOperation("agent-command", agent, command)
+	return executeCommandWithMethodFunc(agent.Info.Hostname, agent.Info.Port, agent.Info.Token, command, httpFunc, onResponse)
 }
 
 // If a mysql port is available, try to discover against it
@@ -351,22 +232,44 @@ func (agent *Agent) discoverAgentInstance() error {
 	return nil
 }
 
+// GetAgentData gets information about MySQL\LVM from agent
+func (agent *Agent) GetAgentData() (*Data, error) {
+	agentData := &Data{}
+	onResponse := func(body []byte) {
+		json.Unmarshal(body, &agentData)
+	}
+	err := agent.executeAgentCommand("get-agent-data", &onResponse)
+	return agentData, err
+}
+
+// Unmount unmounts the designated snapshot mount point
+func (agent *Agent) Unmount() error {
+	onResponse := func(body []byte) {
+		err := json.Unmarshal(body, agent.Data)
+		if err != nil {
+			log.Errore(err)
+		}
+	}
+	if err := agent.executeAgentCommand("umount", &onResponse); err != nil {
+		return err
+	}
+	return agent.updateAgentData()
+}
+
 // UpdateAgent reads information from agent API and updates orchestrator database
 func (agent *Agent) UpdateAgent() error {
-	log.Debugf("Updating information for agent %s", agent.Info.Hostname)
-	err := agent.updateAgentLastChecked()
-	if err != nil {
-		return log.Errore(fmt.Errorf("Unable to update last_checked field for agent %s: %+v", agent.Info.Hostname, err))
+	log.Debugf("Updating information for agent %+v", agent.Info.Hostname)
+	if err := agent.updateAgentLastChecked(); err != nil {
+		return fmt.Errorf("Unable to update last_checked field for agent %s: %+v", agent.Info.Hostname, err)
 	}
 	agentData, err := agent.GetAgentData()
 	if err != nil {
 		statusUpdateErr := agent.updateAgentStatus(Inactive)
-		if err != nil {
-			log.Errore(fmt.Errorf("Unable to update status for agent %s: %+v", agent.Info.Hostname, statusUpdateErr))
+		if statusUpdateErr != nil {
+			return fmt.Errorf("Unable to update status for agent %s: %+v", agent.Info.Hostname, statusUpdateErr)
 		}
-		return log.Errore(fmt.Errorf("Unable to get agent data for agent %s: %+v", agent.Info.Hostname, err))
+		return err
 	}
 	agent.Data = agentData
-	err = agent.updateAgentData()
-	return log.Errore(fmt.Errorf("Unable to update agent data for agent %s: %+v", agent.Info.Hostname, err))
+	return agent.updateAgentData()
 }
