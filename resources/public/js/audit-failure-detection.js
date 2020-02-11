@@ -74,7 +74,7 @@ $(document).ready(function() {
       }
       moreInfo += '<div><a href="' + appUrl('/web/audit-recovery/id/' + audit.RelatedRecoveryId) + '">Related recovery</a></div>';
 
-      moreInfo += "<div>Proccessed by <code>" + audit.ProcessingNodeHostname + "</code></div>";
+      moreInfo += "<div>Processed by <code>" + audit.ProcessingNodeHostname + "</code></div>";
       row.appendTo('#audit tbody');
 
       var row = $('<tr/>');
