@@ -37,7 +37,7 @@ recovery itself.
 - Web API (HTTP GET access)
 - Web interface, a _slick_ one.
 
-![Orcehstrator screenshot](https://github.com/github/orchestrator/raw/master/docs/images/orchestrator-topology-8-screenshot.png)
+![Orcehstrator screenshot](docs/images/orchestrator-topology-8-screenshot.png)
 
 #### Additional perks
 
