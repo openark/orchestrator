@@ -2631,8 +2631,17 @@ func (this *HttpAPI) AgentSeed(params martini.Params, r render.Render, req *http
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
-
-	output, err := agent.NewSeed(params["seedMethod"], params["targetHost"], params["sourceHost"])
+	targetAgent, err := agent.ReadAgent(params["targetHost"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	sourceAgent, err := agent.ReadAgent(params["sourceHost"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	output, err := agent.NewSeed(params["seedMethod"], targetAgent, sourceAgent)
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})

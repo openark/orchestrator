@@ -90,12 +90,6 @@ type SeedMethodOpts struct {
 	BackupToDatadir  bool
 }
 
-type BackupMetadata struct {
-	LogFile      string
-	LogPos       int64
-	GtidExecuted string
-}
-
 type AgentStatus int
 
 const (
@@ -130,12 +124,11 @@ func auditAgentOperation(auditType string, agent *Agent, message string) error {
 
 // RegisterAgent registers a new agent
 func RegisterAgent(agentInfo *Info) (string, error) {
-	agent := &Agent{Info: agentInfo}
-	agentData, err := agent.GetAgentData()
+	agent := &Agent{Info: agentInfo, Data: &Data{}}
+	err := agent.GetAgentData()
 	if err != nil {
 		return "", log.Errore(fmt.Errorf("Unable to get agent data: %+v", err))
 	}
-	agent.Data = agentData
 	err = agent.registerAgent()
 	if err != nil {
 		return "", log.Errore(fmt.Errorf("Unable to save agent to database: %+v", err))
@@ -232,14 +225,33 @@ func (agent *Agent) discoverAgentInstance() error {
 	return nil
 }
 
-// GetAgentData gets information about MySQL\LVM from agent
-func (agent *Agent) GetAgentData() (*Data, error) {
-	agentData := &Data{}
-	onResponse := func(body []byte) {
-		json.Unmarshal(body, &agentData)
+// UpdateAgent reads information from agent API and updates orchestrator database
+func (agent *Agent) UpdateAgent() error {
+	log.Debugf("Updating information for agent %+v", agent.Info.Hostname)
+	if err := agent.updateAgentLastChecked(); err != nil {
+		return fmt.Errorf("Unable to update last_checked field for agent %s: %+v", agent.Info.Hostname, err)
 	}
-	err := agent.executeAgentCommand("get-agent-data", &onResponse)
-	return agentData, err
+	err := agent.GetAgentData()
+	if err != nil {
+		if statusUpdateErr := agent.updateAgentStatus(Inactive); statusUpdateErr != nil {
+			return fmt.Errorf("Unable to update status for agent %s: %+v", agent.Info.Hostname, statusUpdateErr)
+		}
+	}
+	return err
+}
+
+// GetAgentData gets information about MySQL\LVM from agent
+func (agent *Agent) GetAgentData() error {
+	onResponse := func(body []byte) {
+		err := json.Unmarshal(body, agent.Data)
+		if err != nil {
+			log.Errore(err)
+		}
+	}
+	if err := agent.executeAgentCommand("get-agent-data", &onResponse); err != nil {
+		return err
+	}
+	return agent.updateAgentData()
 }
 
 // Unmount unmounts the designated snapshot mount point
@@ -256,20 +268,57 @@ func (agent *Agent) Unmount() error {
 	return agent.updateAgentData()
 }
 
-// UpdateAgent reads information from agent API and updates orchestrator database
-func (agent *Agent) UpdateAgent() error {
-	log.Debugf("Updating information for agent %+v", agent.Info.Hostname)
-	if err := agent.updateAgentLastChecked(); err != nil {
-		return fmt.Errorf("Unable to update last_checked field for agent %s: %+v", agent.Info.Hostname, err)
-	}
-	agentData, err := agent.GetAgentData()
-	if err != nil {
-		statusUpdateErr := agent.updateAgentStatus(Inactive)
-		if statusUpdateErr != nil {
-			return fmt.Errorf("Unable to update status for agent %s: %+v", agent.Info.Hostname, statusUpdateErr)
+// prepare starts prepare stage for seed on agent
+func (agent *Agent) prepare(seedID int64, seedMethod SeedMethod, seedSide SeedSide) error {
+	return agent.executeAgentCommand(fmt.Sprintf("prepare/%d/%s/%s", seedID, seedMethod.String(), seedSide.String()), nil)
+}
+
+// backup starts backup stage for seed on agent
+func (agent *Agent) backup(seedID int64, seedMethod SeedMethod, seedHost string, mysqlPort int) error {
+	return agent.executeAgentCommand(fmt.Sprintf("backup/%d/%s/%s/%d", seedID, seedMethod.String(), seedHost, mysqlPort), nil)
+}
+
+// restore starts restore stage for seed on agent
+func (agent *Agent) restore(seedID int64, seedMethod SeedMethod) error {
+	return agent.executeAgentCommand(fmt.Sprintf("restore/%d/%s", seedID, seedMethod.String()), nil)
+}
+
+// cleanup starts cleanup stage for seed on agent
+func (agent *Agent) cleanup(seedID int64, seedMethod SeedMethod, seedSide SeedSide) error {
+	return agent.executeAgentCommand(fmt.Sprintf("cleanup/%d/%s/%s", seedID, seedMethod.String(), seedSide.String()), nil)
+}
+
+// AbortSeed stops seed on agent
+func (agent *Agent) AbortSeed(seedID int64) error {
+	return agent.executeAgentCommand(fmt.Sprintf("abort-seed/%d", seedID), nil)
+}
+
+// getMetdata returns SeedMetadata for seed
+func (agent *Agent) getMetdata(seedID int64, seedMethod SeedMethod) (*SeedMetadata, error) {
+	seedMetadata := &SeedMetadata{}
+	onResponse := func(body []byte) {
+		err := json.Unmarshal(body, seedMetadata)
+		if err != nil {
+			log.Errore(err)
 		}
-		return err
 	}
-	agent.Data = agentData
-	return agent.updateAgentData()
+	if err := agent.executeAgentCommand(fmt.Sprintf("get-metadata/%d/%s", seedID, seedMethod.String()), &onResponse); err != nil {
+		return nil, err
+	}
+	return seedMetadata, nil
+}
+
+// SeedStageState gets current state for seed stage for seedID
+func (agent *Agent) SeedStageState(seedID int64, seedStage SeedStage) (*SeedStageState, error) {
+	seedStageState := &SeedStageState{}
+	onResponse := func(body []byte) {
+		err := json.Unmarshal(body, seedStageState)
+		if err != nil {
+			log.Errore(err)
+		}
+	}
+	if err := agent.executeAgentCommand(fmt.Sprintf("seed-stage-state/%d/%s", seedID, seedStage.String()), &onResponse); err != nil {
+		return nil, err
+	}
+	return seedStageState, nil
 }

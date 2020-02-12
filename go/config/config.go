@@ -210,6 +210,7 @@ type Configuration struct {
 	AgentPollMinutes                           uint              // Minutes between agent polling
 	AgentCacheTTLSeconds                       int32             // TTL for cache with agents data
 	UnseenAgentForgetHours                     uint              // Number of hours after which an unseen agent is forgotten
+	MaxRetriesForSeedStage                     int               // Number of maximum retries for each of the seed stages, after which seed will be marked as failed
 	StaleSeedFailMinutes                       uint              // Number of minutes after which a stale (no progress) seed is considered failed.
 	SeedAcceptableBytesDiff                    int64             // Difference in bytes between seed source & target data size that is still considered as successful copy
 	SeedWaitSecondsBeforeSend                  int64             // Number of seconds for waiting before start send data command on agent
@@ -378,6 +379,7 @@ func newConfiguration() *Configuration {
 		SSLCAFile:                                  "",
 		AgentPollMinutes:                           30,
 		UnseenAgentForgetHours:                     6,
+		MaxRetriesForSeedStage:                     3,
 		StaleSeedFailMinutes:                       60,
 		SeedAcceptableBytesDiff:                    8192,
 		SeedWaitSecondsBeforeSend:                  2,

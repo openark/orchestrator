@@ -579,12 +579,52 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE
 			agent_seed
-			DROP COLUMN is_complete, DROP COLUMN is_successful, DROP KEY is_complete_idx_agent_seed, DROP KEY is_successful_idx_agent_seed
+			DROP KEY is_complete_idx_agent_seed
 	`,
 	`
 		ALTER TABLE
 			agent_seed
-			ADD COLUMN seed_method varchar(32) CHARACTER SET ascii NOT NULL AFTER source_hostname, ADD COLUMN backup_side ENUM('Target','Source') NOT NULL AFTER seed_method, ADD COLUMN status ENUM('Started','Running','Completed','Error') NOT NULL AFTER  backup_side, ADD COLUMN retries int(10) unsigned NOT NULL AFTER status
+			DROP KEY is_successful_idx_agent_seed
+	`,
+	`
+		ALTER TABLE
+			agent_seed
+			DROP COLUMN is_successful
+	`,
+	`
+		ALTER TABLE
+			agent_seed
+			DROP COLUMN is_complete
+	`,
+	`
+		ALTER TABLE
+			agent_seed
+			ADD COLUMN seed_method varchar(32) CHARACTER SET ascii NOT NULL AFTER source_hostname
+	`,
+	`
+		ALTER TABLE
+			agent_seed
+			ADD COLUMN backup_side varchar(8) NOT NULL AFTER seed_method
+	`,
+	`
+		ALTER TABLE
+			agent_seed
+			ADD COLUMN stage varchar(16) NOT NULL AFTER backup_side
+	`,
+	`
+		ALTER TABLE
+			agent_seed
+			ADD COLUMN status varchar(16) NOT NULL AFTER stage
+	`,
+	`
+		ALTER TABLE
+			agent_seed
+			ADD COLUMN retries int(10) unsigned NOT NULL AFTER status
+	`,
+	`
+		ALTER TABLE
+			agent_seed
+			ADD COLUMN updated_at timestamp NOT NULL DEFAULT '1971-01-01 00:00:00' AFTER end_timestamp
 	`,
 	`
 		CREATE INDEX status ON agent_seed (status)
