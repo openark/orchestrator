@@ -119,6 +119,24 @@ function toHumanFormat(bytes) {
   return (bytes / Math.pow(1024, e)).toFixed(2) + " " + s[e];
 }
 
+function secondsToString(time_s) {
+  let seconds = Math.floor(time_s) % 60;
+  let minutes = Math.floor(time_s / 60) % 60;
+  let hours   = Math.floor(time_s / 3600) % 24;
+  let days    = Math.floor(time_s / 86400);
+  let message = '';
+  if (days > 0)
+    message = days + 'd ' + hours + 'h ' + minutes + 'm ' + seconds + 's';
+  else if (hours > 0)
+    message = hours + 'h ' + minutes + 'm ' + seconds + 's';
+  else if (minutes > 0)
+    message = minutes + 'm ' + seconds + 's';
+  else
+    message = seconds + 's';
+
+  return message;
+}
+
 function getInstanceId(host, port) {
   return "instance__" + host.replace(/[.]/g, "_") + "__" + port
 }
@@ -826,9 +844,9 @@ function renderInstanceElement(popoverElement, instance, renderType) {
     if (instance.renderHint != "") {
       popoverElement.find("h3").addClass("label-" + instance.renderHint);
     }
-    var statusMessage = instance.SlaveLagSeconds.Int64 + ' seconds lag';
+    var statusMessage = secondsToString(instance.SlaveLagSeconds.Int64) + ' lag';
     if (indicateLastSeenInStatus) {
-      statusMessage = 'seen ' + instance.SecondsSinceLastSeen.Int64 + ' seconds ago';
+      statusMessage = 'seen ' + secondsToString(instance.SecondsSinceLastSeen.Int64) + ' ago';
     }
     var identityHtml = '' + instance.Version;
     if (instance.LogBinEnabled) {
