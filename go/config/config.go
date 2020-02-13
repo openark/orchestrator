@@ -259,6 +259,7 @@ type Configuration struct {
 	DiscoveryIgnoreMasterHostnameFilters       []string          // Regexp filters to apply to prevent auto-discovering a master. Usage: pointing your master temporarily to replicate seom data from external host
 	DiscoveryIgnoreHostnameFilters             []string          // Regexp filters to apply to prevent discovering instances of any kind
 	ConsulAddress                              string            // Address where Consul HTTP api is found. Example: 127.0.0.1:8500
+	ConsulScheme                               string            // Scheme (http or https) for Consul
 	ConsulAclToken                             string            // ACL token used to write to Consul KV
 	ConsulCrossDataCenterDistribution          bool              // should orchestrator automatically auto-deduce all consul DCs and write KVs in all DCs
 	ZkAddress                                  string            // UNSUPPERTED YET. Address where (single or multiple) ZooKeeper servers are found, in `srv1[:port1][,srv2[:port2]...]` format. Default port is 2181. Example: srv-a,srv-b:12181,srv-c
@@ -422,6 +423,7 @@ func newConfiguration() *Configuration {
 		URLPrefix:                                  "",
 		DiscoveryIgnoreReplicaHostnameFilters:      []string{},
 		ConsulAddress:                              "",
+		ConsulScheme:                               "http",
 		ConsulAclToken:                             "",
 		ConsulCrossDataCenterDistribution:          false,
 		ZkAddress:                                  "",
