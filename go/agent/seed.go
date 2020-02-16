@@ -140,7 +140,7 @@ const (
 )
 
 func (s SeedStatus) String() string {
-	return [...]string{"Started", "Running", "Completed", "Error"}[s]
+	return [...]string{"Started", "Running", "Completed", "Error", "Failed"}[s]
 }
 
 func (s SeedStatus) MarshalJSON() ([]byte, error) {
@@ -148,6 +148,16 @@ func (s SeedStatus) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(s.String())
 	buffer.WriteString(`"`)
 	return buffer.Bytes(), nil
+}
+
+func (s *SeedStatus) UnmarshalJSON(b []byte) error {
+	var value string
+	err := json.Unmarshal(b, &value)
+	if err != nil {
+		return err
+	}
+	*s = toSeedStatus[value]
+	return nil
 }
 
 var toSeedStatus = map[string]SeedStatus{
@@ -164,12 +174,12 @@ const (
 	Prepare SeedStage = iota
 	Backup
 	Restore
-	GetMetadata
 	Cleanup
+	ConnectSlave
 )
 
 func (s SeedStage) String() string {
-	return [...]string{"Prepare", "Backup", "Restore", "GetMetadata", "Cleanup"}[s]
+	return [...]string{"Prepare", "Backup", "Restore", "Cleanup", "ConnectSlave"}[s]
 }
 
 func (s SeedStage) MarshalJSON() ([]byte, error) {
@@ -177,6 +187,24 @@ func (s SeedStage) MarshalJSON() ([]byte, error) {
 	buffer.WriteString(s.String())
 	buffer.WriteString(`"`)
 	return buffer.Bytes(), nil
+}
+
+func (s *SeedStage) UnmarshalJSON(b []byte) error {
+	var value string
+	err := json.Unmarshal(b, &value)
+	if err != nil {
+		return err
+	}
+	*s = toSeedStage[value]
+	return nil
+}
+
+var toSeedStage = map[string]SeedStage{
+	"Prepare":      Prepare,
+	"Backup":       Backup,
+	"Restore":      Restore,
+	"Cleanup":      Cleanup,
+	"ConnectSlave": ConnectSlave,
 }
 
 // Seed makes for the high level data & state of a seed operation
@@ -212,18 +240,28 @@ type SeedMetadata struct {
 	GtidExecuted string
 }
 
+func auditSeedOperation(agent *Agent, message string) error {
+	instanceKey := &inst.InstanceKey{}
+	if agent != nil {
+		instanceKey = &inst.InstanceKey{Hostname: agent.Info.Hostname, Port: agent.Info.MySQLPort}
+	}
+	return inst.AuditOperation("seed", instanceKey, message)
+}
+
 // NewSeed is the entry point for making a seed. It's registers seed in db, so it can be later processed asynchronously
 // CHECK THAT AGENT DOESN'T HAVE ALREADY ACTIVE SEEDS
+// CHECK THAT TARGET AGENT VERSION >= SOURCE AGENT VERSION
+// AGENT VERSION FUNCTIONS MAY BE TAKEN FROM ORCHESTARTOR CORE
 func NewSeed(seedMethodName string, targetAgent *Agent, sourceAgent *Agent) (int64, error) {
 	var seedMethod SeedMethod
 	var ok bool
-	if seedMethod, ok = toSeedMethod["seedMethodName"]; !ok {
+	if seedMethod, ok = toSeedMethod[seedMethodName]; !ok {
 		return 0, log.Errorf("SeedMethod %s not found", seedMethodName)
 	}
-	if err := targetAgent.GetAgentData(); err != nil {
+	if err := targetAgent.getAgentData(); err != nil {
 		return 0, log.Errorf("Unable to get information from agent on taget host %s", targetAgent.Info.Hostname)
 	}
-	if err := sourceAgent.GetAgentData(); err != nil {
+	if err := sourceAgent.getAgentData(); err != nil {
 		return 0, log.Errorf("Unable to get information from agent on source host %s", sourceAgent.Info.Hostname)
 	}
 	if targetAgent.Info.Hostname == sourceAgent.Info.Hostname {
@@ -236,7 +274,7 @@ func NewSeed(seedMethodName string, targetAgent *Agent, sourceAgent *Agent) (int
 		return 0, log.Errorf("Seed method %s not supported on source host %s", seedMethod.String(), sourceAgent.Info.Hostname)
 	}
 	for db, opts := range sourceAgent.Data.MySQLDatabases {
-		if !enginesSupported(opts.Engines, sourceAgent.Data.AvailiableSeedMethods[seedMethod].SupportedEngines) {
+		if !enginesSupported(sourceAgent.Data.AvailiableSeedMethods[seedMethod].SupportedEngines, opts.Engines) {
 			return 0, log.Errorf("Database %s had a table with engine unsupported by seed method %s", db, seedMethod.String())
 		}
 	}
@@ -255,6 +293,7 @@ func NewSeed(seedMethodName string, targetAgent *Agent, sourceAgent *Agent) (int
 		SeedMethod:     seedMethod,
 		BackupSide:     sourceAgent.Data.AvailiableSeedMethods[seedMethod].BackupSide,
 		Status:         Started,
+		Stage:          Prepare,
 		Retries:        0,
 		StartTimestamp: time.Now(),
 		UpdatedAt:      time.Now(),
@@ -264,9 +303,7 @@ func NewSeed(seedMethodName string, targetAgent *Agent, sourceAgent *Agent) (int
 	}
 	SeededAgents <- targetAgent
 
-	log.Infof("Registered new seed with seedID %d. Target host: %s, source host: %s, seed method: %s", seed.SeedID, seed.TargetHostname, seed.SourceHostname, seed.SeedMethod.String())
-	auditAgentOperation("agent-seed", sourceAgent, fmt.Sprintf("starting seed to host %s using seed method %s", seed.TargetHostname, seed.SeedMethod.String()))
-	auditAgentOperation("agent-seed", targetAgent, fmt.Sprintf("starting seed from host %s using seed method %s", seed.SourceHostname, seed.SeedMethod.String()))
+	auditSeedOperation(nil, fmt.Sprintf("Registered new seed. SeedID: %d, source host: %s, target host: %s, seed method: %s", seed.SeedID, seed.SourceHostname, seed.TargetHostname, seed.SeedMethod.String()))
 	return seed.SeedID, nil
 }
 
@@ -290,20 +327,67 @@ func enginesSupported(first, second []Engine) bool {
 
 // ReadActiveSeeds reads active seeds (where status != Completed or Failed)
 func ReadActiveSeeds() ([]*Seed, error) {
-	whereCondition := fmt.Sprintf(`
+	whereCondition := `
 		where
-			status not in (%s, %s)
-		`, Completed.String(), Failed.String())
-	return readSeeds(whereCondition, sqlutils.Args(), "")
+			status not in (?, ?)
+		`
+	return readSeeds(whereCondition, sqlutils.Args(Completed.String(), Failed.String()), "")
 }
 
-func ProcessSeeds() {
-	log.Info("Processing active seeds")
+// ReadRecentSeeds reads recent seeds from backend table.
+func ReadRecentSeeds() ([]*Seed, error) {
+	return readSeeds(``, sqlutils.Args(), "limit 100")
+}
+
+// ReadSeed returns an information about seed from database
+func ReadSeed(seedID int64) (*Seed, error) {
+	whereCondition := `
+		where
+			agent_seed_id = ?
+		`
+	res, err := readSeeds(whereCondition, sqlutils.Args(seedID), "")
+	if err != nil {
+		return nil, err
+	}
+	if len(res) == 0 {
+		return nil, fmt.Errorf("Seed %d not found", seedID)
+	}
+	return res[0], nil
+}
+
+// ReadRecentSeedsForAgentInStatus reads active seeds where agent participates either as source or target in given status
+func ReadRecentSeedsForAgentInStatus(agent *Agent, status SeedStatus, limit string) ([]*Seed, error) {
+	whereCondition := `
+		where
+			status = ?
+			and (
+				target_hostname = ?
+				or source_hostname = ?
+			)
+		`
+	return readSeeds(whereCondition, sqlutils.Args(Completed.String(), agent.Info.Hostname, agent.Info.Hostname), "limit 10")
+}
+
+// ReadActiveSeedsForAgent reads active seeds where agent participates either as source or target
+func ReadActiveSeedsForAgent(agent *Agent) ([]*Seed, error) {
+	whereCondition := `
+		where
+			status not in (?, ?)
+			and (
+				target_hostname = ?
+				or source_hostname = ?
+			)
+		`
+	return readSeeds(whereCondition, sqlutils.Args(Completed.String(), Failed.String(), agent.Info.Hostname, agent.Info.Hostname), "")
+}
+
+func ProcessSeeds() []*Seed {
 	activeSeeds, err := ReadActiveSeeds()
 	if err != nil {
 		log.Errore(fmt.Errorf("Unable to read active seeds: %+v", err))
-		return
+		return nil
 	}
+	inst.AuditOperation("process-seeds", nil, fmt.Sprintf("Will process %d active seeds", len(activeSeeds)))
 	var wg sync.WaitGroup
 	for _, seed := range activeSeeds {
 		wg.Add(1)
@@ -317,134 +401,112 @@ func ProcessSeeds() {
 		}
 	}
 	wg.Wait()
-	log.Info("All active seeds processed")
-	return
+	inst.AuditOperation("process-seeds", nil, "All active seeds processed")
+	return activeSeeds
 }
 
-func (s *Seed) getSeedAgents() (targetAgent *Agent, sourceAgent *Agent, err error) {
+func (s *Seed) GetSeedAgents() (targetAgent *Agent, sourceAgent *Agent, err error) {
 	targetAgent, err = ReadAgentInfo(s.TargetHostname)
 	if err != nil {
-		if err = s.setSeedStatusFailed(); err != nil {
-			log.Errore(err)
-		}
-		return nil, nil, err
+		s.Status = Failed
+		s.Retries++
+		s.updateSeed(targetAgent, fmt.Sprintf("Unable to read target agent info: %+v", err))
+		return nil, nil, log.Errore(err)
 	}
 	sourceAgent, err = ReadAgentInfo(s.SourceHostname)
 	if err != nil {
-		if err = s.setSeedStatusFailed(); err != nil {
-			log.Errore(err)
-		}
-		return nil, nil, err
+		s.Status = Failed
+		s.Retries++
+		s.updateSeed(sourceAgent, fmt.Sprintf("Unable to read source agent info: %+v", err))
+		return nil, nil, log.Errore(err)
 	}
 	return targetAgent, sourceAgent, nil
 }
 
-// add additional log and debug
 func (s *Seed) processStarted(wg *sync.WaitGroup) {
 	defer wg.Done()
-	targetAgent, sourceAgent, err := s.getSeedAgents()
+	targetAgent, sourceAgent, err := s.GetSeedAgents()
 	if err != nil {
-		log.Errore(err)
 		return
 	}
 	switch s.Stage {
 	case Prepare:
-		if err := targetAgent.prepare(s.SeedID, s.SeedMethod, Target); err != nil {
-			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
+		agents := make(map[*Agent]SeedSide)
+		agents[targetAgent] = Target
+		agents[sourceAgent] = Source
+		for agent, seedSide := range agents {
+			if err := agent.prepare(s.SeedID, s.SeedMethod, seedSide); err != nil {
+				s.Status = Failed
+				s.Retries++
+				s.updateSeed(agent, fmt.Sprintf("Error calling prepare API on agent: %+v", err))
+				return
 			}
-			return
-		}
-		if err := s.updateSeedState(Target, "Started prepare stage"); err != nil {
-			log.Errore(err)
-		}
-		if err := sourceAgent.prepare(s.SeedID, s.SeedMethod, Source); err != nil {
-			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
-			return
-		}
-		if err := s.updateSeedState(Source, "Started prepare stage"); err != nil {
-			log.Errore(err)
+			s.Status = Running
+			s.updateSeed(agent, "Started prepare stage")
 		}
 	case Backup:
 		agent := targetAgent
-		seedSide := Target
 		if s.BackupSide == Source {
 			agent = sourceAgent
-			seedSide = Source
 		}
-		if err := agent.backup(s.SeedID, s.SeedMethod, sourceAgent.Info.Hostname, sourceAgent.Info.Port); err != nil {
-			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
+		if err := agent.backup(s.SeedID, s.SeedMethod, sourceAgent.Info.Hostname, sourceAgent.Info.MySQLPort); err != nil {
+			s.Status = Failed
+			s.Retries++
+			s.updateSeed(agent, fmt.Sprintf("Error calling backup API on agent: %+v", err))
 			return
 		}
-		if err := s.updateSeedState(seedSide, "Started backup stage"); err != nil {
-			log.Errore(err)
-		}
+		s.Status = Running
+		s.updateSeed(agent, "Started backup stage")
 	case Restore:
 		if err := targetAgent.restore(s.SeedID, s.SeedMethod); err != nil {
-			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
+			s.Status = Failed
+			s.Retries++
+			s.updateSeed(targetAgent, fmt.Sprintf("Error calling restore API on agent: %+v", err))
 			return
 		}
-		if err := s.updateSeedState(Target, "Started restore stage"); err != nil {
-			log.Errore(err)
-		}
+		s.Status = Running
+		s.updateSeed(targetAgent, "Started restore stage")
 	case Cleanup:
-		if err := targetAgent.cleanup(s.SeedID, s.SeedMethod, Target); err != nil {
-			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
+		agents := make(map[*Agent]SeedSide)
+		agents[targetAgent] = Target
+		agents[sourceAgent] = Source
+		for agent, seedSide := range agents {
+			if err := agent.cleanup(s.SeedID, s.SeedMethod, seedSide); err != nil {
+				s.Status = Failed
+				s.Retries++
+				s.updateSeed(targetAgent, fmt.Sprintf("Error calling prepare API on agent: %+v", err))
+				return
 			}
-			return
-		}
-		if err := s.updateSeedState(Target, "Started cleanup stage"); err != nil {
-			log.Errore(err)
-		}
-		if err := sourceAgent.cleanup(s.SeedID, s.SeedMethod, Source); err != nil {
-			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
-			return
-		}
-		if err := s.updateSeedState(Source, "Started cleanup stage"); err != nil {
-			log.Errore(err)
+			s.Status = Running
+			s.updateSeed(agent, "Started prepare stage")
 		}
 	// also will connect targetHost as slave
-	case GetMetadata:
+	case ConnectSlave:
 		var gtidHint inst.OperationGTIDHint = inst.GTIDHintNeutral
-		seedMetadata, err := targetAgent.getMetdata(s.SeedID, s.SeedMethod)
+		s.updateSeedState(targetAgent.Info.Hostname, "Started connect slave stage")
+		seedMetadata, err := targetAgent.getMetadata(s.SeedID, s.SeedMethod)
 		if err != nil {
-			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
+			s.Status = Failed
+			s.Retries++
+			s.updateSeed(targetAgent, fmt.Sprintf("Error calling getMetadata API on agent: %+v", err))
 			return
 		}
-		slaveInstanceKey := &inst.InstanceKey{Hostname: targetAgent.Info.Hostname, Port: targetAgent.Info.Port}
-		masterInstanceKey := &inst.InstanceKey{Hostname: sourceAgent.Info.Hostname, Port: sourceAgent.Info.Port}
+		slaveInstanceKey := &inst.InstanceKey{Hostname: targetAgent.Info.Hostname, Port: targetAgent.Info.MySQLPort}
+		masterInstanceKey := &inst.InstanceKey{Hostname: sourceAgent.Info.Hostname, Port: sourceAgent.Info.MySQLPort}
 		slave, err := inst.ReadTopologyInstance(slaveInstanceKey)
 		if err != nil {
 			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
+			s.Status = Failed
+			s.Retries++
+			s.updateSeed(targetAgent, fmt.Sprintf("Error reading topology instance: %+v", err))
 			return
 		}
 		master, err := inst.ReadTopologyInstance(masterInstanceKey)
 		if err != nil {
 			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
+			s.Status = Failed
+			s.Retries++
+			s.updateSeed(sourceAgent, fmt.Sprintf("Error reading topology instance: %+v", err))
 			return
 		}
 		if s.Retries > 0 && slave.IsReplicaOf(master) && slave.Slave_SQL_Running {
@@ -454,25 +516,25 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 		slave, err = inst.ResetSlave(&slave.Key)
 		if err != nil {
 			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
+			s.Status = Failed
+			s.Retries++
+			s.updateSeed(targetAgent, fmt.Sprintf("Error executing RESET SLAVE: %+v", err))
 			return
 		}
 		slave, err = inst.ResetMaster(&slave.Key)
 		if err != nil {
 			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
+			s.Status = Failed
+			s.Retries++
+			s.updateSeed(targetAgent, fmt.Sprintf("Error executing RESET MASTER: %+v", err))
 			return
 		}
 		if len(seedMetadata.GtidExecuted) > 0 {
 			if err = inst.SetGTIDPurged(slave, seedMetadata.GtidExecuted); err != nil {
 				log.Errore(err)
-				if err = s.setSeedStatusFailed(); err != nil {
-					log.Errore(err)
-				}
+				s.Status = Failed
+				s.Retries++
+				s.updateSeed(targetAgent, fmt.Sprintf("Error setting GTID_PURGED: %+v", err))
 				return
 			}
 			gtidHint = inst.GTIDHintForce
@@ -485,67 +547,54 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 		slave, err = inst.ChangeMasterTo(&slave.Key, &master.Key, binlogCoordinates, false, gtidHint)
 		if err != nil {
 			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
+			s.Status = Failed
+			s.Retries++
+			s.updateSeed(targetAgent, fmt.Sprintf("Error executing CHANGE MASTER TO: %+v", err))
 			return
 		}
 		replicationUser, replicationPassword, err := inst.ReadReplicationCredentials(&slave.Key)
 		if err != nil {
 			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
+			s.Status = Failed
+			s.Retries++
+			s.updateSeed(targetAgent, fmt.Sprintf("Error getting replication credentials: %+v", err))
 			return
 		}
 		slave, err = inst.ChangeMasterCredentials(&slave.Key, replicationUser, replicationPassword)
 		if err != nil {
 			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
+			s.Status = Failed
+			s.Retries++
+			s.updateSeed(targetAgent, fmt.Sprintf("Error executing CHANGE MASTER TO with replication credentials: %+v", err))
 			return
 		}
 		if slave.AllowTLS {
 			if _, err := inst.EnableMasterSSL(&slave.Key); err != nil {
 				log.Errore(err)
-				if err = s.setSeedStatusFailed(); err != nil {
-					log.Errore(err)
-				}
+				s.Status = Failed
+				s.Retries++
+				s.updateSeed(targetAgent, fmt.Sprintf("Error executing CHANGE MASTER TO enable SSL: %+v", err))
 				return
 			}
 		}
 		slave, err = inst.StartSlave(&slave.Key)
 		if err != nil {
 			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
+			s.Status = Failed
+			s.Retries++
+			s.updateSeed(targetAgent, fmt.Sprintf("Error executing START SLAVE: %+v", err))
 			return
 		}
+		s.Status = Completed
+		s.EndTimestamp = time.Now()
+		s.updateSeed(targetAgent, fmt.Sprintf("Seed completed"))
 	}
-	if s.Stage != GetMetadata {
-		if err := s.updateSeedStageAndStatus(s.Stage, Running); err != nil {
-			log.Errore(err)
-			return
-		}
-	} else {
-		if err := s.finishSeed(); err != nil {
-			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
-			return
-		}
-	}
-	return
 }
 
 func (s *Seed) processRunning(wg *sync.WaitGroup) {
 	defer wg.Done()
-	targetAgent, sourceAgent, err := s.getSeedAgents()
+	targetAgent, sourceAgent, err := s.GetSeedAgents()
 	if err != nil {
-		log.Errore(err)
 		return
 	}
 	switch s.Stage {
@@ -554,164 +603,120 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 		agents[targetAgent] = false
 		agents[sourceAgent] = false
 		for agent := range agents {
-			agentSeedStageState, err := agent.SeedStageState(s.SeedID, s.Stage)
-			if err != nil {
-				log.Errore(err)
-				if err = s.setSeedStatusFailed(); err != nil {
-					log.Errore(err)
-				}
-				return
-			}
 			stageAlreadyCompleted, err := s.isSeedStageCompletedForAgent(agent)
 			if err != nil {
-				log.Errore(err)
-				if err = s.setSeedStatusFailed(); err != nil {
-					log.Errore(err)
-				}
+				s.Status = Failed
+				s.Retries++
+				s.updateSeed(agent, fmt.Sprintf("Error getting information about completed stages from Orchestrator: %+v", err))
 				return
 			}
 			if !stageAlreadyCompleted {
-				if err := submitSeedStageState(agentSeedStageState); err != nil {
-					log.Errore(err)
-					if err = s.setSeedStatusFailed(); err != nil {
-						log.Errore(err)
-					}
+				agentSeedStageState, err := agent.getSeedStageState(s.SeedID, s.Stage)
+				if err != nil {
+					s.Status = Failed
+					s.Retries++
+					s.updateSeed(targetAgent, fmt.Sprintf("Error getting seed stage state information from agent: %+v", err))
 					return
 				}
+				submitSeedStageState(agentSeedStageState)
 				if agentSeedStageState.Status == Completed {
 					agents[agent] = true
+					auditSeedOperation(agent, fmt.Sprintf("SeedID: %d, Stage: %s, Status: %s, Retries: %d", s.SeedID, s.Stage.String(), s.Status.String(), s.Retries))
+				}
+				if agentSeedStageState.Status == Error {
+					s.Status = Error
+					s.Retries++
+					s.updateSeed(agent, "")
+					return
 				}
 			} else {
 				agents[agent] = true
 			}
 		}
 		if agents[targetAgent] && agents[sourceAgent] {
-			if s.Stage == Prepare {
-				if err := s.startNewStage(Backup); err != nil {
-					log.Errore(err)
-					return
-				}
-			}
-			if s.Stage == Cleanup {
-				if err := s.startNewStage(GetMetadata); err != nil {
-					log.Errore(err)
-					return
-				}
-			}
+			s.Stage = s.Stage + 1
+			s.Status = Started
+			s.Retries = 0
+			s.updateSeed(nil, "")
 		}
-	case Backup:
+	case Backup, Restore:
 		agent := targetAgent
-		if s.BackupSide == Source {
+		if s.Stage == Backup && s.BackupSide == Source {
 			agent = sourceAgent
 		}
-		agentSeedStageState, err := agent.SeedStageState(s.SeedID, s.Stage)
+		agentSeedStageState, err := agent.getSeedStageState(s.SeedID, s.Stage)
 		if err != nil {
-			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
+			s.Status = Failed
+			s.Retries++
+			s.updateSeed(targetAgent, fmt.Sprintf("Error getting seed stage state information from agent: %+v", err))
 			return
 		}
-		if err := submitSeedStageState(agentSeedStageState); err != nil {
-			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
-			return
-		}
+		submitSeedStageState(agentSeedStageState)
 		if agentSeedStageState.Status == Completed {
-			if err := s.startNewStage(Restore); err != nil {
-				log.Errore(err)
-				return
-			}
+			s.Stage = s.Stage + 1
+			s.Status = Started
+			s.Retries = 0
+			s.updateSeed(agent, "")
 		}
-	case Restore:
-		agentSeedStageState, err := targetAgent.SeedStageState(s.SeedID, s.Stage)
-		if err != nil {
-			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
-			return
-		}
-		if err := submitSeedStageState(agentSeedStageState); err != nil {
-			log.Errore(err)
-			if err = s.setSeedStatusFailed(); err != nil {
-				log.Errore(err)
-			}
-			return
-		}
-		if agentSeedStageState.Status == Completed {
-			if err := s.startNewStage(Cleanup); err != nil {
-				log.Errore(err)
-				return
-			}
+		if agentSeedStageState.Status == Error {
+			s.Status = Error
+			s.Retries++
+			s.updateSeed(agent, "")
 		}
 	}
-	return
 }
 
 func (s *Seed) processErrored(wg *sync.WaitGroup) {
 	defer wg.Done()
 	if s.Retries >= config.Config.MaxRetriesForSeedStage {
-		if err := s.failSeed(); err != nil {
-			log.Errore(err)
-		}
+		s.Status = Failed
+		s.EndTimestamp = time.Now()
+		s.updateSeed(nil, fmt.Sprintf("Seed failed. Seed stage retries: %d, MaxRetriesForSeedStage: %d", s.Retries, config.Config.MaxRetriesForSeedStage))
 		return
 	}
 	// prepare and cleanup stages are executed on both agents, so we need to check them and if it's running - stop it.
 	if s.Stage == Prepare || s.Stage == Cleanup {
-		targetAgent, sourceAgent, err := s.getSeedAgents()
+		targetAgent, sourceAgent, err := s.GetSeedAgents()
 		if err != nil {
-			log.Errore(err)
 			return
 		}
-		agents := make(map[*Agent]SeedSide)
-		agents[targetAgent] = Target
-		agents[sourceAgent] = Source
-		for agent, seedSide := range agents {
-			agentSeedStageState, err := agent.SeedStageState(s.SeedID, s.Stage)
+		agents := []*Agent{}
+		agents = append(agents, targetAgent, sourceAgent)
+
+		for _, agent := range agents {
+			agentSeedStageState, err := agent.getSeedStageState(s.SeedID, s.Stage)
 			if err != nil {
-				log.Errore(err)
-				s.setSeedStatusFailed()
+				s.Retries++
+				s.updateSeed(agent, fmt.Sprintf("Error getting seed stage state information from agent: %+v", err))
 				return
 			}
 			if agentSeedStageState.Status == Running {
 				if err := agent.AbortSeed(s.SeedID); err != nil {
-					log.Errore(err)
-					s.setSeedStatusFailed()
+					s.Retries++
+					s.updateSeed(agent, fmt.Sprintf("Error aborting seed on agent: %+v", err))
 					return
 				}
-				if err := s.updateSeedState(seedSide, "aborted seed stage due to error on another agent"); err != nil {
-					log.Errore(err)
-				}
-				return
+				s.updateSeedState(agent.Info.Hostname, fmt.Sprintf("Aborted %s seed stage due to error on another agent", s.Stage.String()))
 			}
 		}
 	}
 	// if stage is backup we need to restart from prepare stage (because we can have operations like stating netcat\socat on target in prepare stage)
+	s.Status = Started
 	if s.Stage == Backup {
-		if err := s.updateSeedStageAndStatus(Prepare, Started); err != nil {
-			log.Errore(err)
-			return
-		}
-	} else {
-		if err := s.updateSeedStageAndStatus(s.Stage, Started); err != nil {
-			log.Errore(err)
-			return
-		}
+		s.Stage = Prepare
 	}
-	return
+	s.updateSeed(nil, fmt.Sprintf("Seed will be restarted from % stage", s.Stage.String()))
 }
 
-func (s *Seed) updateSeedState(seedSide SeedSide, details string) error {
-	var hostname string
-	switch seedSide {
-	case Target:
-		hostname = s.TargetHostname
-	case Source:
-		hostname = s.SourceHostname
+func (s *Seed) updateSeed(agent *Agent, seedStateDetails string) {
+	s.updateSeedData()
+	auditSeedOperation(agent, fmt.Sprintf("SeedID: %d, Stage: %s, Status: %s, Retries: %d", s.SeedID, s.Stage.String(), s.Status.String(), s.Retries))
+	if seedStateDetails != "" {
+		s.updateSeedState(agent.Info.Hostname, seedStateDetails)
 	}
+}
+
+func (s *Seed) updateSeedState(hostname string, details string) error {
 	seedStageState := &SeedStageState{
 		SeedID:    s.SeedID,
 		Stage:     s.Stage,

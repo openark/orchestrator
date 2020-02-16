@@ -181,6 +181,7 @@ func agentsHttp() {
 
 	agent.InitHttpClient()
 	go logic.ContinuousAgentsPoll()
+	go logic.ContinuousSeedProcess()
 
 	http.AgentsAPI.URLPrefix = config.Config.URLPrefix
 	http.AgentsAPI.RegisterRequests(m)

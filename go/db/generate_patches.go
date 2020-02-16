@@ -629,4 +629,34 @@ var generateSQLPatches = []string{
 	`
 		CREATE INDEX status ON agent_seed (status)
 	`,
+	`
+		ALTER TABLE
+			agent_seed_state
+			DROP COLUMN state_action
+	`,
+	`
+		ALTER TABLE
+			agent_seed_state
+			DROP COLUMN error_message
+	`,
+	`
+		ALTER TABLE
+			agent_seed_state
+			ADD COLUMN agent_hostname varchar(128) NOT NULL DEFAULT '' AFTER agent_seed_id
+	`,
+	`
+		ALTER TABLE
+			agent_seed_state
+			ADD COLUMN stage varchar(16) NOT NULL AFTER agent_hostname
+	`,
+	`
+		ALTER TABLE
+			agent_seed_state
+			ADD COLUMN status varchar(16) NOT NULL AFTER state_timestamp
+	`,
+	`
+		ALTER TABLE
+			agent_seed_state
+			ADD COLUMN details varchar(800) NOT NULL AFTER status
+	`,
 }

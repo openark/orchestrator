@@ -2662,7 +2662,13 @@ func (this *HttpAPI) AgentActiveSeeds(params martini.Params, r render.Render, re
 		return
 	}
 
-	output, err := agent.ReadActiveSeedsForHost(params["host"])
+	hostAgent, err := agent.ReadAgent(params["host"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	output, err := agent.ReadActiveSeedsForAgent(hostAgent)
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -2683,8 +2689,14 @@ func (this *HttpAPI) AgentRecentSeeds(params martini.Params, r render.Render, re
 		return
 	}
 
-	output, err := agent.ReadRecentCompletedSeedsForHost(params["host"])
+	hostAgent, err := agent.ReadAgent(params["host"])
 
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	output, err := agent.ReadRecentSeedsForAgentInStatus(hostAgent, agent.Completed, "limit 10")
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -2704,15 +2716,19 @@ func (this *HttpAPI) AgentSeedDetails(params martini.Params, r render.Render, re
 		return
 	}
 
-	seedId, err := strconv.ParseInt(params["seedId"], 10, 0)
-	output, err := agent.AgentSeedDetails(seedId)
+	seedID, err := strconv.ParseInt(params["seedId"], 10, 0)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	seed, err := agent.ReadSeed(seedID)
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, output)
+	r.JSON(http.StatusOK, seed)
 }
 
 // AgentSeedStates returns the breakdown of states (steps) of a given seed
@@ -2726,9 +2742,18 @@ func (this *HttpAPI) AgentSeedStates(params martini.Params, r render.Render, req
 		return
 	}
 
-	seedId, err := strconv.ParseInt(params["seedId"], 10, 0)
-	output, err := agent.ReadSeedStates(seedId)
+	seedID, err := strconv.ParseInt(params["seedId"], 10, 0)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	seed, err := agent.ReadSeed(seedID)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
 
+	output, err := seed.ReadSeedStates()
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -2758,7 +2783,7 @@ func (this *HttpAPI) Seeds(params martini.Params, r render.Render, req *http.Req
 	r.JSON(http.StatusOK, output)
 }
 
-// AbortSeed instructs agents to abort an active seed
+// AbortSeed instructs agents to abort a running seed
 func (this *HttpAPI) AbortSeed(params martini.Params, r render.Render, req *http.Request, user auth.User) {
 	if !isAuthorizedForAction(req, user) {
 		Respond(r, &APIResponse{Code: ERROR, Message: "Unauthorized"})
@@ -2769,14 +2794,29 @@ func (this *HttpAPI) AbortSeed(params martini.Params, r render.Render, req *http
 		return
 	}
 
-	seedId, err := strconv.ParseInt(params["seedId"], 10, 0)
-	err = agent.AbortSeed(seedId)
-
+	seedID, err := strconv.ParseInt(params["seedId"], 10, 0)
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
-
+	seed, err := agent.ReadSeed(seedID)
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+	agents := []*agent.Agent{}
+	targetAgent, sourceAgent, err := seed.GetSeedAgents()
+	if err != nil {
+		return
+	}
+	agents = append(agents, targetAgent, sourceAgent)
+	for _, seedAgent := range agents {
+		err := seedAgent.AbortSeed(seedID)
+		if err != nil {
+			Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+			return
+		}
+	}
 	r.JSON(http.StatusOK, err == nil)
 }
 

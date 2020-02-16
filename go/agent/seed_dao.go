@@ -3,7 +3,6 @@ package agent
 import (
 	"fmt"
 
-	"github.com/github/orchestrator/go/config"
 	"github.com/github/orchestrator/go/db"
 	"github.com/openark/golib/log"
 	"github.com/openark/golib/sqlutils"
@@ -23,9 +22,9 @@ func (seed *Seed) registerSeedEntry() error {
 	res, err := db.ExecOrchestrator(`
 			insert
 				into agent_seed (
-					seed_method, target_hostname, source_hostname, start_timestamp, updated_at, status, backup_side, retries
+					seed_method, target_hostname, source_hostname, start_timestamp, updated_at, status, backup_side, retries, stage
 				) VALUES (
-					?, ?, ?, ?, ?, ?, ?
+					?, ?, ?, ?, ?, ?, ?, 0, ?
 				)
 			`,
 		seed.SeedMethod.String(),
@@ -35,7 +34,7 @@ func (seed *Seed) registerSeedEntry() error {
 		seed.UpdatedAt,
 		seed.Status.String(),
 		seed.BackupSide.String(),
-		seed.Retries,
+		seed.Stage.String(),
 	)
 	if err != nil {
 		return err
@@ -48,147 +47,27 @@ func (seed *Seed) registerSeedEntry() error {
 	return nil
 }
 
-func (seed *Seed) finishSeed() error {
+func (seed *Seed) updateSeedData() error {
 	_, err := db.ExecOrchestrator(`
 			update
 				agent_seed
-					set 
+					set
+					stage = ?,
 					status = ?,
+					retries = ?
 					updated_at = NOW(),
-					EndTimestamp = NOW()
+					EndTimestamp = ?
 				where
 					agent_seed_id = ?
 			`,
-		Completed.String(),
+		seed.Stage.String(),
+		seed.Status.String(),
+		seed.Retries,
+		seed.EndTimestamp,
 		seed.SeedID,
 	)
 	if err != nil {
-		return log.Errore(err)
-	}
-	return nil
-}
-
-func (seed *Seed) failSeed() error {
-	_, err := db.ExecOrchestrator(`
-			update
-				agent_seed
-					set 
-					status = ?,
-					updated_at = NOW(),
-					EndTimestamp = NOW()
-				where
-					agent_seed_id = ?
-			`,
-		Failed.String(),
-		seed.SeedID,
-	)
-	if err != nil {
-		return log.Errore(err)
-	}
-	return nil
-}
-
-// updateSeedStatus updates status for seed
-func (seed *Seed) updateSeedStatus(status SeedStatus) error {
-	_, err := db.ExecOrchestrator(`
-			update
-				agent_seed
-					set 
-					status = ?,
-					updated_at = NOW()
-				where
-					agent_seed_id = ?
-			`,
-		status.String(),
-		seed.SeedID,
-	)
-	if err != nil {
-		return log.Errore(err)
-	}
-	return nil
-}
-
-// updateSeedStage updates status for seed
-func (seed *Seed) updateSeedStage(stage SeedStage) error {
-	_, err := db.ExecOrchestrator(`
-			update
-				agent_seed
-					set 
-					stage = ?,
-					updated_at = NOW()
-				where
-					agent_seed_id = ?
-			`,
-		stage.String(),
-		seed.SeedID,
-	)
-	if err != nil {
-		return log.Errore(err)
-	}
-	return nil
-}
-
-// updateSeedStage updates status for seed
-func (seed *Seed) updateSeedStageAndStatus(stage SeedStage, status SeedStatus) error {
-	_, err := db.ExecOrchestrator(`
-			update
-				agent_seed
-					set 
-					stage = ?,
-					status = ?,
-					updated_at = NOW()
-				where
-					agent_seed_id = ?
-			`,
-		stage.String(),
-		status.String(),
-		seed.SeedID,
-	)
-	if err != nil {
-		return log.Errore(err)
-	}
-	return nil
-}
-
-// updateSeedStage updates status for seed
-func (seed *Seed) startNewStage(stage SeedStage) error {
-	_, err := db.ExecOrchestrator(`
-			update
-				agent_seed
-					set 
-					stage = ?,
-					status = ?,
-					retries = 0
-					updated_at = NOW()
-				where
-					agent_seed_id = ?
-			`,
-		stage.String(),
-		Started.String(),
-		seed.SeedID,
-	)
-	if err != nil {
-		return log.Errore(err)
-	}
-	return nil
-}
-
-// setSeedStatusFailed sets status Failed for seed and increase retries counter
-func (seed *Seed) setSeedStatusFailed() error {
-	_, err := db.ExecOrchestrator(`
-			update
-				agent_seed
-					set 
-					status = ?,
-					retries = retries + 1
-					updated_at = NOW()
-				where
-					agent_seed_id = ?
-			`,
-		seed.SeedID,
-	)
-	if err != nil {
-		return log.Errore(err)
+		return log.Errore(fmt.Errorf("Unable to update seed: %+v", err))
 	}
 	return nil
 }
@@ -211,7 +90,7 @@ func (seed *Seed) isSeedStageCompletedForAgent(agent *Agent) (bool, error) {
 		cnt = m.GetInt("cnt")
 		return nil
 	}); err != nil {
-		return false, log.Errore(err)
+		return false, log.Errore(fmt.Errorf("Unable to get information about completed stages for seed: %+v", err))
 	}
 	if cnt > 0 {
 		return true, nil
@@ -237,7 +116,7 @@ func submitSeedStageState(seedStageState *SeedStageState) error {
 		seedStageState.Details,
 	)
 	if err != nil {
-		return log.Errore(err)
+		return log.Errore(fmt.Errorf("Unable to submit seed stage to database: %+v", err))
 	}
 	return nil
 }
@@ -252,6 +131,7 @@ func readSeeds(whereCondition string, args []interface{}, limit string) ([]*Seed
 			source_hostname,
 			seed_method,
 			backup_side,
+			stage,
 			status,
 			retries,
 			start_timestamp,
@@ -271,6 +151,7 @@ func readSeeds(whereCondition string, args []interface{}, limit string) ([]*Seed
 		seed.SourceHostname = m.GetString("source_hostname")
 		seed.SeedMethod = toSeedMethod[m.GetString("seed_method")]
 		seed.BackupSide = toSeedSide[m.GetString("backup_side")]
+		seed.Stage = toSeedStage[m.GetString("stage")]
 		seed.Status = toSeedStatus[m.GetString("status")]
 		seed.Retries = m.GetInt("retries")
 		seed.StartTimestamp = m.GetTime("start_timestamp")
@@ -287,70 +168,18 @@ func readSeeds(whereCondition string, args []interface{}, limit string) ([]*Seed
 	return res, err
 }
 
-/***************************************************************************************************************************************/
-/***************************************************************************************************************************************/
-/************************************************************** OLD FUNCS **************************************************************/
-/***************************************************************************************************************************************/
-/***************************************************************************************************************************************/
-
-// ReadRecentSeeds reads seeds from backend table.
-func ReadRecentSeeds() ([]*Seed, error) {
-	return readSeeds(``, sqlutils.Args(), "limit 100")
-}
-
-// AgentSeedDetails reads details from backend table
-func AgentSeedDetails(seedId int64) ([]*Seed, error) {
-	whereCondition := `
-		where
-			agent_seed_id = ?
-		`
-	return readSeeds(whereCondition, sqlutils.Args(seedId), "")
-}
-
-// ReadRecentCompletedSeedsForHost reads active seeds where host participates either as source or target
-func ReadRecentCompletedSeedsForHost(hostname string) ([]*Seed, error) {
-	whereCondition := `
-		where
-			status = "Completed"
-			and (
-				target_hostname = ?
-				or source_hostname = ?
-			)
-		`
-	return readSeeds(whereCondition, sqlutils.Args(hostname, hostname), "limit 10")
-}
-
-// updateSeedComplete updates the seed entry, signing for completion
-func updateSeedComplete(seedId int64, seedError error) error {
-	_, err := db.ExecOrchestrator(`
-			update
-				agent_seed
-					set end_timestamp = NOW(),
-					is_complete = 1,
-					is_successful = ?
-				where
-					agent_seed_id = ?
-			`,
-		(seedError == nil),
-		seedId,
-	)
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	return nil
-}
-
-// SeedOperationState reads states for a given seed operation
-func ReadSeedStates(seedId int64) ([]SeedStageState, error) {
+// ReadSeedStates reads states for a given seed operation
+func (seed *Seed) ReadSeedStates() ([]SeedStageState, error) {
 	res := []SeedStageState{}
 	query := `
 		select
 			agent_seed_state_id,
 			agent_seed_id,
+			stage,
+			hostname,
 			state_timestamp,
-			state_action,
-			error_message
+			status,
+			details
 		from
 			agent_seed_state
 		where
@@ -358,13 +187,14 @@ func ReadSeedStates(seedId int64) ([]SeedStageState, error) {
 		order by
 			agent_seed_state_id desc
 		`
-	err := db.QueryOrchestrator(query, sqlutils.Args(seedId), func(m sqlutils.RowMap) error {
+	err := db.QueryOrchestrator(query, sqlutils.Args(seed.SeedID), func(m sqlutils.RowMap) error {
 		seedState := SeedStageState{}
-		seedState.SeedStageId = m.GetInt64("agent_seed_state_id")
-		seedState.SeedId = m.GetInt64("agent_seed_id")
-		seedState.StartedAt = m.GetTime("state_timestamp")
-		//seedState.Action = m.GetString("state_action")
-		//seedState.ErrorMessage = m.GetString("error_message")
+		seedState.SeedStageID = m.GetInt64("agent_seed_state_id")
+		seedState.SeedID = m.GetInt64("agent_seed_id")
+		seedState.Stage = toSeedStage[m.GetString("stage")]
+		seedState.Timestamp = m.GetTime("state_timestamp")
+		seedState.Status = toSeedStatus[m.GetString("status")]
+		seedState.Details = m.GetString("details")
 
 		res = append(res, seedState)
 		return nil
@@ -376,82 +206,11 @@ func ReadSeedStates(seedId int64) ([]SeedStageState, error) {
 	return res, err
 }
 
-// submitSeedStateEntry submits a seed state: a single step in the overall seed process
-func submitSeedStateEntry(seedId int64, action string, errorMessage string) (int64, error) {
-	res, err := db.ExecOrchestrator(`
-			insert
-				into agent_seed_state (
-					agent_seed_id, state_timestamp, state_action, error_message
-				) VALUES (
-					?, NOW(), ?, ?
-				)
-			`,
-		seedId,
-		action,
-		errorMessage,
-	)
-	if err != nil {
-		return 0, log.Errore(err)
-	}
-	id, err := res.LastInsertId()
-
-	return id, err
-}
-
-// updateSeedStateEntry updates seed step state
-func updateSeedStateEntry(seedStateId int64, reason error) error {
-	_, err := db.ExecOrchestrator(`
-			update
-				agent_seed_state
-					set error_message = ?
-				where
-					agent_seed_state_id = ?
-			`,
-		reason.Error(),
-		seedStateId,
-	)
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	return reason
-}
-
-// FailStaleSeeds marks as failed seeds where no progress have been seen recently
-func FailStaleSeeds() error {
-	_, err := db.ExecOrchestrator(`
-				update
-						agent_seed
-					set
-						is_complete=1,
-						is_successful=0
-					where
-						is_complete=0
-						and (
-							select
-									max(state_timestamp) as last_state_timestamp
-								from
-									agent_seed_state
-								where
-									agent_seed.agent_seed_id = agent_seed_state.agent_seed_id
-						) < now() - interval ? minute`,
-		config.Config.StaleSeedFailMinutes,
-	)
-	return err
-}
-
-// ReadActiveSeedsForHost reads active seeds where host participates either as source or target
-func ReadActiveSeedsForHost(hostname string) ([]*Seed, error) {
-	whereCondition := `
-		where
-			is_complete = 0
-			and (
-				target_hostname = ?
-				or source_hostname = ?
-			)
-		`
-	return readSeeds(whereCondition, sqlutils.Args(hostname, hostname), "")
-}
+/***************************************************************************************************************************************/
+/***************************************************************************************************************************************/
+/************************************************************** OLD FUNCS **************************************************************/
+/***************************************************************************************************************************************/
+/***************************************************************************************************************************************/
 
 /*
 

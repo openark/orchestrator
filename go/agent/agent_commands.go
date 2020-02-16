@@ -2,7 +2,6 @@ package agent
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -113,21 +112,6 @@ func seedCommandCompleted(hostname string, seedId int64) (Agent, bool, error) {
 	}
 	agent, err := executeAgentCommand(hostname, fmt.Sprintf("seed-command-completed/%d", seedId), &onResponse)
 	return agent, result, err
-}
-
-// AbortSeed will contact agents associated with a seed and request abort.
-func AbortSeed(seedId int64) error {
-	seedOperations, err := AgentSeedDetails(seedId)
-	if err != nil {
-		return log.Errore(err)
-	}
-
-	for _, seedOperation := range seedOperations {
-		AbortSeedCommand(seedOperation.TargetHostname, seedId)
-		AbortSeedCommand(seedOperation.SourceHostname, seedId)
-	}
-	updateSeedComplete(seedId, errors.New("Aborted"))
-	return nil
 }
 
 // PostCopy will request an agent to invoke post-copy commands

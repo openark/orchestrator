@@ -35,7 +35,8 @@ func readAgentsInfo(whereCondition string, args []interface{}, limit string) ([]
 			port,
 			token,
 			last_seen,
-			mysql_port
+			mysql_port,
+			status
 		from
 			host_agent
 		%s
@@ -50,15 +51,15 @@ func readAgentsInfo(whereCondition string, args []interface{}, limit string) ([]
 		agent.Info.MySQLPort = m.GetInt("mysql_port")
 		agent.Info.Token = m.GetString("token")
 		agent.LastSeen = m.GetTime("last_seen")
+		agent.Status = toAgentStatus[m.GetString("status")]
 		// add to cache
 		res = append(res, agent)
 		return nil
 	})
-
 	if err != nil {
-		log.Errore(err)
+		return res, fmt.Errorf("Unable to read agents info: %+v", err)
 	}
-	return res, err
+	return res, nil
 }
 
 // readAgentsInfo reads agent information with agent data from backend table
@@ -89,6 +90,7 @@ func readAgents(whereCondition string, args []interface{}, limit string) ([]*Age
 		agent.Info.MySQLPort = m.GetInt("mysql_port")
 		agent.Info.Token = m.GetString("token")
 		agent.LastSeen = m.GetTime("last_seen")
+		agent.Status = toAgentStatus[m.GetString("status")]
 		agent.ClusterName = m.GetString("suggested_cluster_alias")
 		err := json.Unmarshal([]byte(m.GetString("data")), agent.Data)
 		if err != nil {
@@ -115,14 +117,15 @@ func (agent *Agent) registerAgent() error {
 				into host_agent (
 					hostname, port, token, last_seen, mysql_port, status, data
 				) VALUES (
-					?, ?, ?, NOW(), ?, ?, ?
+					?, ?, ?, ?, ?, ?, ?
 				)
 			`,
 		agent.Info.Hostname,
 		agent.Info.Port,
 		agent.Info.Token,
+		agent.LastSeen,
 		agent.Info.MySQLPort,
-		Active.String(),
+		agent.Status.String(),
 		agentData,
 	)
 	return err
@@ -143,7 +146,7 @@ func (agent *Agent) updateAgentLastChecked() error {
 	return err
 }
 
-func (agent *Agent) updateAgentStatus(status AgentStatus) error {
+func (agent *Agent) updateAgentStatus() error {
 	_, err := db.ExecOrchestrator(`
         	update
         		host_agent
@@ -151,7 +154,7 @@ func (agent *Agent) updateAgentStatus(status AgentStatus) error {
         		status = ?
 			where
 				hostname = ?`,
-		status.String(),
+		agent.Status.String(),
 		agent.Info.Hostname,
 	)
 	return err
@@ -170,11 +173,12 @@ func (agent *Agent) updateAgentData() error {
         	set
 				data = ?,
 				status = ?,
-				last_seen = NOW()
+				last_seen = ?
 			where
 				hostname = ?`,
 		agentData,
-		Active.String(),
+		agent.Status.String(),
+		agent.LastSeen,
 		agent.Info.Hostname,
 	)
 	return err

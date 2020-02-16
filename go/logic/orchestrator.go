@@ -72,6 +72,8 @@ var recentDiscoveryOperationKeys *cache.Cache
 var pseudoGTIDPublishCache = cache.New(time.Minute, time.Second)
 var kvFoundCache = cache.New(10*time.Minute, time.Minute)
 
+var continuousSeedProcessRunning uint32
+
 func init() {
 	snapshotDiscoveryKeys = make(chan inst.InstanceKey, 10)
 
@@ -617,6 +619,20 @@ func ContinuousDiscovery() {
 	}
 }
 
+func ContinuousSeedProcess() {
+	log.Infof("Starting continuous seed processing")
+
+	tick := time.Tick(time.Duration(config.Config.SeedProcessIntervalMinutes) * time.Minute)
+	for range tick {
+		if atomic.CompareAndSwapUint32(&continuousSeedProcessRunning, 0, 1) {
+			agent.ProcessSeeds()
+			atomic.StoreUint32(&continuousSeedProcessRunning, 0)
+		} else {
+			inst.AuditOperation("process-seeds", nil, "Unable to start seed processing as it is already running")
+		}
+	}
+}
+
 // ContinuousAgentsPoll starts an asynchronuous infinite process where agents are
 // periodically investigated and their status captured, and long since unseen agents are
 // purged and forgotten.
@@ -641,7 +657,6 @@ func ContinuousAgentsPoll() {
 		select {
 		case <-caretakingTick:
 			agent.ForgetLongUnseenAgents()
-			agent.FailStaleSeeds()
 		default:
 		}
 	}

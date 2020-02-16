@@ -33,6 +33,7 @@ type Agent struct {
 	Info        *Info
 	Data        *Data
 	LastSeen    time.Time
+	Status      AgentStatus
 	ClusterName string
 }
 
@@ -125,10 +126,12 @@ func auditAgentOperation(auditType string, agent *Agent, message string) error {
 // RegisterAgent registers a new agent
 func RegisterAgent(agentInfo *Info) (string, error) {
 	agent := &Agent{Info: agentInfo, Data: &Data{}}
-	err := agent.GetAgentData()
+	err := agent.getAgentData()
 	if err != nil {
 		return "", log.Errore(fmt.Errorf("Unable to get agent data: %+v", err))
 	}
+	agent.Status = Active
+	agent.LastSeen = time.Now()
 	err = agent.registerAgent()
 	if err != nil {
 		return "", log.Errore(fmt.Errorf("Unable to save agent to database: %+v", err))
@@ -231,9 +234,10 @@ func (agent *Agent) UpdateAgent() error {
 	if err := agent.updateAgentLastChecked(); err != nil {
 		return fmt.Errorf("Unable to update last_checked field for agent %s: %+v", agent.Info.Hostname, err)
 	}
-	err := agent.GetAgentData()
+	err := agent.getAgentData()
 	if err != nil {
-		if statusUpdateErr := agent.updateAgentStatus(Inactive); statusUpdateErr != nil {
+		agent.Status = Inactive
+		if statusUpdateErr := agent.updateAgentStatus(); statusUpdateErr != nil {
 			return fmt.Errorf("Unable to update status for agent %s: %+v", agent.Info.Hostname, statusUpdateErr)
 		}
 	}
@@ -241,7 +245,7 @@ func (agent *Agent) UpdateAgent() error {
 }
 
 // GetAgentData gets information about MySQL\LVM from agent
-func (agent *Agent) GetAgentData() error {
+func (agent *Agent) getAgentData() error {
 	onResponse := func(body []byte) {
 		err := json.Unmarshal(body, agent.Data)
 		if err != nil {
@@ -251,6 +255,8 @@ func (agent *Agent) GetAgentData() error {
 	if err := agent.executeAgentCommand("get-agent-data", &onResponse); err != nil {
 		return err
 	}
+	agent.Status = Active
+	agent.LastSeen = time.Now()
 	return agent.updateAgentData()
 }
 
@@ -294,7 +300,7 @@ func (agent *Agent) AbortSeed(seedID int64) error {
 }
 
 // getMetdata returns SeedMetadata for seed
-func (agent *Agent) getMetdata(seedID int64, seedMethod SeedMethod) (*SeedMetadata, error) {
+func (agent *Agent) getMetadata(seedID int64, seedMethod SeedMethod) (*SeedMetadata, error) {
 	seedMetadata := &SeedMetadata{}
 	onResponse := func(body []byte) {
 		err := json.Unmarshal(body, seedMetadata)
@@ -309,7 +315,7 @@ func (agent *Agent) getMetdata(seedID int64, seedMethod SeedMethod) (*SeedMetada
 }
 
 // SeedStageState gets current state for seed stage for seedID
-func (agent *Agent) SeedStageState(seedID int64, seedStage SeedStage) (*SeedStageState, error) {
+func (agent *Agent) getSeedStageState(seedID int64, seedStage SeedStage) (*SeedStageState, error) {
 	seedStageState := &SeedStageState{}
 	onResponse := func(body []byte) {
 		err := json.Unmarshal(body, seedStageState)
