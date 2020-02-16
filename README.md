@@ -4,7 +4,7 @@
 
 ![Orchestrator logo](https://github.com/github/orchestrator/raw/master/docs/images/orchestrator-logo-wide.png)
 
-`orchestrator` is a MySQL high availability and replication management tool, allowing for:
+`orchestrator` is a MySQL high availability and replication management tool, runs as a service and provides command line access, HTTP API and Web interface. `orchestrator` supports:
 
 #### Discovery
 
@@ -50,7 +50,6 @@ recovery itself.
 - Datacenter/physical location awareness
 - MySQL-Pool association
 - HTTP security/authentication methods
-- Coupled with [orchestrator-agent](https://github.com/github/orchestrator-agent), seed new/corrupt instances
 - There is also an [orchestrator-mysql](https://groups.google.com/forum/#!forum/orchestrator-mysql) Google groups forum to discuss topics related to orchestrator
 - More...
 
@@ -58,10 +57,10 @@ Read the [Orchestrator documentation](https://github.com/github/orchestrator/tre
 
 Authored by [Shlomi Noach](https://github.com/shlomi-noach):
 
-2020- as https://github.com/openark/orchestrator
-2016-2020 at [GitHub](http://github.com) as https://github.com/github/orchestrator
-2015 at [Booking.com](http://booking.com) as https://github.com/outbrain/orchestrator
-2014 at [Outbrain](http://outbrain.com) as https://github.com/outbrain/orchestrator
+- 2020- as https://github.com/openark/orchestrator
+- 2016-2020 at [GitHub](http://github.com) as https://github.com/github/orchestrator
+- 2015 at [Booking.com](http://booking.com) as https://github.com/outbrain/orchestrator
+- 2014 at [Outbrain](http://outbrain.com) as https://github.com/outbrain/orchestrator
 
 #### Related projects
 
