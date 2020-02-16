@@ -1,6 +1,6 @@
 # orchestrator [[Documentation]](https://github.com/github/orchestrator/tree/master/docs)
 
-[![build status](https://travis-ci.org/github/orchestrator.svg)](https://travis-ci.org/github/orchestrator) [![downloads](https://img.shields.io/github/downloads/github/orchestrator/total.svg)](https://github.com/github/orchestrator/releases) [![release](https://img.shields.io/github/release/github/orchestrator.svg)](https://github.com/github/orchestrator/releases)
+[![downloads](https://img.shields.io/github/downloads/github/orchestrator/total.svg)](https://github.com/github/orchestrator/releases) [![release](https://img.shields.io/github/release/github/orchestrator.svg)](https://github.com/github/orchestrator/releases)
 
 ![Orchestrator logo](https://github.com/github/orchestrator/raw/master/docs/images/orchestrator-logo-wide.png)
 
@@ -56,7 +56,12 @@ recovery itself.
 
 Read the [Orchestrator documentation](https://github.com/github/orchestrator/tree/master/docs)
 
-Authored by [Shlomi Noach](https://github.com/shlomi-noach) at [GitHub](http://github.com). Previously at [Booking.com](http://booking.com) and [Outbrain](http://outbrain.com)
+Authored by [Shlomi Noach](https://github.com/shlomi-noach):
+
+2020- as https://github.com/openark/orchestrator
+2016-2020 at [GitHub](http://github.com) as https://github.com/github/orchestrator
+2015 at [Booking.com](http://booking.com) as https://github.com/outbrain/orchestrator
+2014 at [Outbrain](http://outbrain.com) as https://github.com/outbrain/orchestrator
 
 #### Related projects
 
