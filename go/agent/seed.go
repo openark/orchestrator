@@ -249,9 +249,6 @@ func auditSeedOperation(agent *Agent, message string) error {
 }
 
 // NewSeed is the entry point for making a seed. It's registers seed in db, so it can be later processed asynchronously
-// CHECK THAT AGENT DOESN'T HAVE ALREADY ACTIVE SEEDS
-// CHECK THAT TARGET AGENT VERSION >= SOURCE AGENT VERSION
-// AGENT VERSION FUNCTIONS MAY BE TAKEN FROM ORCHESTARTOR CORE
 func NewSeed(seedMethodName string, targetAgent *Agent, sourceAgent *Agent) (int64, error) {
 	var seedMethod SeedMethod
 	var ok bool
@@ -277,6 +274,17 @@ func NewSeed(seedMethodName string, targetAgent *Agent, sourceAgent *Agent) (int
 		if !enginesSupported(sourceAgent.Data.AvailiableSeedMethods[seedMethod].SupportedEngines, opts.Engines) {
 			return 0, log.Errorf("Database %s had a table with engine unsupported by seed method %s", db, seedMethod.String())
 		}
+	}
+	if inst.IsSmallerMajorVersion(targetAgent.Data.MySQLVersion, sourceAgent.Data.MySQLVersion) {
+		return 0, log.Errorf("MySQL version on target agent is smaller that on source. Source agent MySQL version: %s, target agent MySQL version: %s", sourceAgent.Data.MySQLVersion, targetAgent.Data.MySQLVersion)
+	}
+	activeSourceSeeds, _ := ReadActiveSeedsForAgent(sourceAgent)
+	activeTargetSeeds, _ := ReadActiveSeedsForAgent(targetAgent)
+	if len(activeSourceSeeds) > 0 {
+		return 0, log.Errorf("Source agent has active seeds")
+	}
+	if len(activeTargetSeeds) > 0 {
+		return 0, log.Errorf("Target agent has active seeds")
 	}
 	if sourceAgent.Data.MySQLDatadirDiskUsed > targetAgent.Data.MySQLDatadirDiskFree {
 		return 0, log.Errorf("Not enough disk space on target host %s. Required: %d, available: %d", targetAgent.Info.Hostname, sourceAgent.Data.MySQLDatadirDiskUsed, targetAgent.Data.MySQLDatadirDiskFree)
@@ -365,7 +373,7 @@ func ReadRecentSeedsForAgentInStatus(agent *Agent, status SeedStatus, limit stri
 				or source_hostname = ?
 			)
 		`
-	return readSeeds(whereCondition, sqlutils.Args(Completed.String(), agent.Info.Hostname, agent.Info.Hostname), "limit 10")
+	return readSeeds(whereCondition, sqlutils.Args(status.String(), agent.Info.Hostname, agent.Info.Hostname), "limit 10")
 }
 
 // ReadActiveSeedsForAgent reads active seeds where agent participates either as source or target
@@ -621,7 +629,7 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 				submitSeedStageState(agentSeedStageState)
 				if agentSeedStageState.Status == Completed {
 					agents[agent] = true
-					auditSeedOperation(agent, fmt.Sprintf("SeedID: %d, Stage: %s, Status: %s, Retries: %d", s.SeedID, s.Stage.String(), s.Status.String(), s.Retries))
+					auditSeedOperation(agent, fmt.Sprintf("SeedID: %d, Stage: %s, Status: %s, Retries: %d", s.SeedID, s.Stage.String(), Completed.String(), s.Retries))
 				}
 				if agentSeedStageState.Status == Error {
 					s.Status = Error
@@ -653,6 +661,7 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 		}
 		submitSeedStageState(agentSeedStageState)
 		if agentSeedStageState.Status == Completed {
+			auditSeedOperation(agent, fmt.Sprintf("SeedID: %d, Stage: %s, Status: %s, Retries: %d", s.SeedID, s.Stage.String(), Completed.String(), s.Retries))
 			s.Stage = s.Stage + 1
 			s.Status = Started
 			s.Retries = 0
@@ -709,8 +718,9 @@ func (s *Seed) processErrored(wg *sync.WaitGroup) {
 }
 
 func (s *Seed) updateSeed(agent *Agent, seedStateDetails string) {
-	s.updateSeedData()
-	auditSeedOperation(agent, fmt.Sprintf("SeedID: %d, Stage: %s, Status: %s, Retries: %d", s.SeedID, s.Stage.String(), s.Status.String(), s.Retries))
+	if err := s.updateSeedData(); err == nil {
+		auditSeedOperation(agent, fmt.Sprintf("SeedID: %d, Stage: %s, Status: %s, Retries: %d", s.SeedID, s.Stage.String(), s.Status.String(), s.Retries))
+	}
 	if seedStateDetails != "" {
 		s.updateSeedState(agent.Info.Hostname, seedStateDetails)
 	}

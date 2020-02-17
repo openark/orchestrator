@@ -54,9 +54,9 @@ func (seed *Seed) updateSeedData() error {
 					set
 					stage = ?,
 					status = ?,
-					retries = ?
+					retries = ?,
 					updated_at = NOW(),
-					EndTimestamp = ?
+					end_timestamp = ?
 				where
 					agent_seed_id = ?
 			`,
@@ -83,10 +83,10 @@ func (seed *Seed) isSeedStageCompletedForAgent(agent *Agent) (bool, error) {
 			WHERE
 				agent_seed_id = ?
 				AND stage = ?
-				AND hostname = ?
+				AND agent_hostname = ?
 				AND status = ?
 			`
-	if err := db.QueryOrchestrator(query, sqlutils.Args(seed.SeedID, seed.Stage, agent.Info.Hostname, Completed), func(m sqlutils.RowMap) error {
+	if err := db.QueryOrchestrator(query, sqlutils.Args(seed.SeedID, seed.Stage.String(), agent.Info.Hostname, Completed.String()), func(m sqlutils.RowMap) error {
 		cnt = m.GetInt("cnt")
 		return nil
 	}); err != nil {
@@ -103,7 +103,7 @@ func submitSeedStageState(seedStageState *SeedStageState) error {
 	_, err := db.ExecOrchestrator(`
 			insert
 				into agent_seed_state (
-					agent_seed_id, stage, hostname, state_timestamp, status, details
+					agent_seed_id, stage, agent_hostname, state_timestamp, status, details
 				) VALUES (
 					?, ?, ?, ?, ?, ?
 				)
@@ -169,14 +169,14 @@ func readSeeds(whereCondition string, args []interface{}, limit string) ([]*Seed
 }
 
 // ReadSeedStates reads states for a given seed operation
-func (seed *Seed) ReadSeedStates() ([]SeedStageState, error) {
+func (seed *Seed) ReadSeedStageStates() ([]SeedStageState, error) {
 	res := []SeedStageState{}
 	query := `
 		select
 			agent_seed_state_id,
 			agent_seed_id,
 			stage,
-			hostname,
+			agent_hostname,
 			state_timestamp,
 			status,
 			details
@@ -192,6 +192,7 @@ func (seed *Seed) ReadSeedStates() ([]SeedStageState, error) {
 		seedState.SeedStageID = m.GetInt64("agent_seed_state_id")
 		seedState.SeedID = m.GetInt64("agent_seed_id")
 		seedState.Stage = toSeedStage[m.GetString("stage")]
+		seedState.Hostname = m.GetString("agent_hostname")
 		seedState.Timestamp = m.GetTime("state_timestamp")
 		seedState.Status = toSeedStatus[m.GetString("status")]
 		seedState.Details = m.GetString("details")

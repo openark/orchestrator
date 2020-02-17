@@ -2753,7 +2753,7 @@ func (this *HttpAPI) AgentSeedStates(params martini.Params, r render.Render, req
 		return
 	}
 
-	output, err := seed.ReadSeedStates()
+	output, err := seed.ReadSeedStageStates()
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
