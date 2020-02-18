@@ -521,7 +521,7 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 			//everything is already good, seems like we do not mark seed as completed so just exit switch
 			break
 		}
-		slave, err = inst.ResetSlave(&slave.Key)
+		slave, err = inst.ResetSlave(slaveInstanceKey)
 		if err != nil {
 			log.Errore(err)
 			s.Status = Failed
@@ -529,7 +529,7 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 			s.updateSeed(targetAgent, fmt.Sprintf("Error executing RESET SLAVE: %+v", err))
 			return
 		}
-		slave, err = inst.ResetMaster(&slave.Key)
+		slave, err = inst.ResetMaster(slaveInstanceKey)
 		if err != nil {
 			log.Errore(err)
 			s.Status = Failed
@@ -552,7 +552,7 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 			LogPos:  seedMetadata.LogPos,
 			Type:    inst.BinaryLog,
 		}
-		slave, err = inst.ChangeMasterTo(&slave.Key, &master.Key, binlogCoordinates, false, gtidHint)
+		slave, err = inst.ChangeMasterTo(slaveInstanceKey, masterInstanceKey, binlogCoordinates, false, gtidHint)
 		if err != nil {
 			log.Errore(err)
 			s.Status = Failed
@@ -560,7 +560,7 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 			s.updateSeed(targetAgent, fmt.Sprintf("Error executing CHANGE MASTER TO: %+v", err))
 			return
 		}
-		replicationUser, replicationPassword, err := inst.ReadReplicationCredentials(&slave.Key)
+		replicationUser, replicationPassword, err := inst.ReadReplicationCredentials(slaveInstanceKey)
 		if err != nil {
 			log.Errore(err)
 			s.Status = Failed
@@ -568,7 +568,7 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 			s.updateSeed(targetAgent, fmt.Sprintf("Error getting replication credentials: %+v", err))
 			return
 		}
-		slave, err = inst.ChangeMasterCredentials(&slave.Key, replicationUser, replicationPassword)
+		slave, err = inst.ChangeMasterCredentials(slaveInstanceKey, replicationUser, replicationPassword)
 		if err != nil {
 			log.Errore(err)
 			s.Status = Failed
@@ -577,7 +577,7 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 			return
 		}
 		if slave.AllowTLS {
-			if _, err := inst.EnableMasterSSL(&slave.Key); err != nil {
+			if _, err := inst.EnableMasterSSL(slaveInstanceKey); err != nil {
 				log.Errore(err)
 				s.Status = Failed
 				s.Retries++
@@ -585,7 +585,7 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 				return
 			}
 		}
-		slave, err = inst.StartSlave(&slave.Key)
+		slave, err = inst.StartSlave(slaveInstanceKey)
 		if err != nil {
 			log.Errore(err)
 			s.Status = Failed
