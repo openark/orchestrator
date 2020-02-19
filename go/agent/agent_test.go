@@ -2,6 +2,7 @@ package agent
 
 import (
 	"database/sql"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -16,7 +17,6 @@ import (
 	logger "log"
 
 	"github.com/go-martini/martini"
-	"github.com/google/go-cmp/cmp"
 	"github.com/martini-contrib/render"
 	"github.com/openark/golib/log"
 
@@ -25,8 +25,8 @@ import (
 	"github.com/github/orchestrator/go/inst"
 	mysqldrv "github.com/go-sql-driver/mysql"
 	"github.com/openark/golib/sqlutils"
-	test "github.com/openark/golib/tests"
 	"github.com/ory/dockertest"
+	. "gopkg.in/check.v1"
 )
 
 // before running add following to your /etc/hosts file depending on number of agents you plan to use
@@ -44,6 +44,18 @@ func init() {
 	log.SetLevel(log.DEBUG)
 }
 
+var testname = flag.String("testname", "TestProcessSeeds", "test names to run")
+
+func Test(t *testing.T) { TestingT(t) }
+
+type AgentTestSuite struct {
+	testAgents map[string]*testAgent
+	pool       *dockertest.Pool
+	containers []*dockertest.Resource
+}
+
+var _ = Suite(&AgentTestSuite{})
+
 type testAgent struct {
 	agent                 *Agent
 	agentSeedStageStatus  *SeedStageState
@@ -54,21 +66,31 @@ type testAgent struct {
 	agentMySQLContainerID string
 }
 
-var testAgents = make(map[int]*testAgent)
-
-func prepareTestData(t *testing.T, agentsNumber int) func(t *testing.T) {
+func (s *AgentTestSuite) SetUpTest(c *C) {
+	if len(*testname) > 0 {
+		if c.TestName() != fmt.Sprintf("AgentTestSuite.%s", *testname) {
+			c.Skip("skipping test due to not matched testname")
+		}
+	}
 	log.Info("Setting up test data")
+	var testAgents = make(map[string]*testAgent)
+	s.testAgents = testAgents
 	pool, err := dockertest.NewPool("")
 	if err != nil {
 		log.Fatalf("Could not connect to docker: %s", err)
 	}
+	s.pool = pool
 
-	log.Info("Creating docker container for Orchestrator DB")
 	// pulls an image, creates a container based on it and runs it
+	log.Info("Creating docker container for Orchestrator DB")
 	resource, err := pool.Run("mysql", "5.7", []string{"MYSQL_ROOT_PASSWORD=secret"})
 	if err != nil {
 		log.Fatalf("Could not start resource: %s", err)
 	}
+
+	s.containers = append(s.containers, resource)
+
+	// configure Orchestrator
 	config.Config.MySQLOrchestratorHost = "127.0.0.1"
 	port, _ := strconv.Atoi(resource.GetPort("3306/tcp"))
 	config.Config.MySQLOrchestratorPort = uint(port)
@@ -92,7 +114,6 @@ func prepareTestData(t *testing.T, agentsNumber int) func(t *testing.T) {
 	config.RuntimeCLIFlags.Noop = &falseFlag
 	config.RuntimeCLIFlags.SkipUnresolve = &trueFlag
 	config.Config.SkipMaxScaleCheck = true
-
 	config.MarkConfigurationLoaded()
 
 	// exponential backoff-retry, because the application in the container might not be ready to accept connections yet
@@ -109,15 +130,16 @@ func prepareTestData(t *testing.T, agentsNumber int) func(t *testing.T) {
 		log.Fatalf("Could not connect to docker: %s", err)
 	}
 
+	// create Orchestrator DB
 	log.Info("Creating Orchestrator DB")
 	_, err = db.OpenOrchestrator()
-	//inst.initializeInstanceDao()
 	if err != nil {
 		log.Fatalf("Unable to create orchestrator DB: %s", err)
 	}
+
+	// init few functions nessesary for test process
 	inst.InitializeInstanceDao()
 	InitHttpClient()
-
 	go func() {
 		for seededAgent := range SeededAgents {
 			instanceKey := &inst.InstanceKey{Hostname: seededAgent.Info.Hostname, Port: int(seededAgent.Info.MySQLPort)}
@@ -125,8 +147,9 @@ func prepareTestData(t *testing.T, agentsNumber int) func(t *testing.T) {
 		}
 	}()
 
+	// create mocks for agents
 	log.Info("Creating Orchestrator agents mocks")
-	for i := 1; i <= agentsNumber; i++ {
+	for i := 1; i <= 4; i++ {
 		mysqlDatabases := map[string]*MySQLDatabase{
 			"sakila": &MySQLDatabase{
 				Engines: []Engine{InnoDB},
@@ -168,22 +191,11 @@ func prepareTestData(t *testing.T, agentsNumber int) func(t *testing.T) {
 				AvailiableSeedMethods: availiableSeedMethods,
 			},
 		}
-		testAgent := createTestAgent(t, agent)
-		testAgents[i] = testAgent
-	}
-
-	return func(t *testing.T) {
-		log.Info("Teardown test data")
-		if err := pool.Purge(resource); err != nil {
-			log.Fatalf("Could not purge resource: %s", err)
-		}
-		for _, testAgent := range testAgents {
-			testAgent.agentServer.Close()
-		}
+		s.createTestAgent(agent)
 	}
 }
 
-func createTestAgent(t *testing.T, agent *Agent) *testAgent {
+func (s *AgentTestSuite) createTestAgent(agent *Agent) {
 	agentAddress := fmt.Sprintf("%s:%d", agent.Info.Hostname, agent.Info.Port)
 	m := martini.Classic()
 	m.Use(render.Renderer())
@@ -222,709 +234,41 @@ func createTestAgent(t *testing.T, agent *Agent) *testAgent {
 	testServer.Start()
 	testAgent.agentServer = testServer
 	testAgent.agentMux = m
-	return testAgent
+	s.testAgents[agent.Info.Hostname] = testAgent
 }
 
-func registerAgent(t *testing.T, testAgent *testAgent) (string, error) {
-	hostname, err := RegisterAgent(testAgent.agent.Info)
-	if err != nil {
-		return "", err
-	}
-	return hostname, nil
-}
-
-func expectStructsEquals(t *testing.T, actual, value interface{}) {
-	if cmp.Equal(actual, value) {
-		return
-	}
-	t.Errorf("Expected:\n[[[%+v]]]\n- got:\n[[[%+v]]]", value, actual)
-}
-
-func TestAgentRegistration(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 1)
-	defer teardownTestCase(t)
-
-	hostname, err := registerAgent(t, testAgents[1])
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(hostname, testAgents[1].agent.Info.Hostname)
-}
-
-func TestReadAgents(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 2)
-	defer teardownTestCase(t)
-
-	_, err := registerAgent(t, testAgents[1])
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, testAgents[2])
-	test.S(t).ExpectNil(err)
-
-	registeredAgents, err := ReadAgents()
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(2, len(registeredAgents))
-
-	testAgents := []*Agent{testAgents[1].agent, testAgents[2].agent}
-	for _, testAgent := range testAgents {
-		for _, registeredAgent := range registeredAgents {
-			if registeredAgent.Info.Port == testAgent.Info.Port && registeredAgent.Info.Hostname == testAgent.Info.Hostname {
-				expectStructsEquals(t, registeredAgent.Info, testAgent.Info)
-				expectStructsEquals(t, registeredAgent.Data, testAgent.Data)
-			}
-		}
-	}
-}
-
-func TestReadAgentsInfo(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 2)
-	defer teardownTestCase(t)
-
-	_, err := registerAgent(t, testAgents[1])
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, testAgents[2])
-	test.S(t).ExpectNil(err)
-
-	registeredAgents, err := ReadAgentsInfo()
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(2, len(registeredAgents))
-
-	testAgents := []*Agent{testAgents[1].agent, testAgents[2].agent}
-	for _, testAgent := range testAgents {
-		for _, registeredAgent := range registeredAgents {
-			if registeredAgent.Info.Port == testAgent.Info.Port && registeredAgent.Info.Hostname == testAgent.Info.Hostname {
-				expectStructsEquals(t, registeredAgent.Info, testAgent.Info)
-				expectStructsEquals(t, registeredAgent.Data, &Data{})
-			}
-		}
-	}
-}
-
-func TestReadAgent(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 1)
-	defer teardownTestCase(t)
-
-	testAgent := testAgents[1]
-
-	_, err := registerAgent(t, testAgent)
-	test.S(t).ExpectNil(err)
-
-	registeredAgent, err := ReadAgent(testAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-	expectStructsEquals(t, registeredAgent.Info, testAgent.agent.Info)
-	expectStructsEquals(t, registeredAgent.Data, testAgent.agent.Data)
-}
-
-func TestReadAgentInfo(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 1)
-	defer teardownTestCase(t)
-
-	testAgent := testAgents[1]
-
-	_, err := registerAgent(t, testAgent)
-	test.S(t).ExpectNil(err)
-
-	registeredAgent, err := ReadAgentInfo(testAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-	expectStructsEquals(t, registeredAgent.Info, testAgent.agent.Info)
-	expectStructsEquals(t, registeredAgent.Data, &Data{})
-}
-
-func TestReadOutdatedAgents(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 2)
-	defer teardownTestCase(t)
-
-	config.Config.AgentPollMinutes = 2
-
-	targetTestAgent := testAgents[1]
-	sourceTestAgent := testAgents[2]
-
-	_, err := registerAgent(t, targetTestAgent)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, sourceTestAgent)
-	test.S(t).ExpectNil(err)
-
-	db.ExecOrchestrator(fmt.Sprintf("UPDATE host_agent SET last_checked = NOW() WHERE hostname='%s'", sourceTestAgent.agent.Info.Hostname))
-	db.ExecOrchestrator(fmt.Sprintf("UPDATE host_agent SET last_checked = NOW() - interval 60 minute WHERE hostname='%s'", targetTestAgent.agent.Info.Hostname))
-
-	outdatedAgents, err := ReadOutdatedAgents()
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(1, len(outdatedAgents))
-	expectStructsEquals(t, outdatedAgents[0].Info, targetTestAgent.agent.Info)
-	expectStructsEquals(t, outdatedAgents[0].Data, &Data{})
-}
-
-func TestUpdateAgent(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 1)
-	defer teardownTestCase(t)
-
-	testAgent := testAgents[1]
-
-	_, err := registerAgent(t, testAgent)
-	test.S(t).ExpectNil(err)
-
-	registeredAgent, err := ReadAgentInfo(testAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	testAgent.agent.Data.LocalSnapshotsHosts = []string{"127.0.0.10", "127.0.0.12"}
-	registeredAgent.Status = Inactive
-	registeredAgent.updateAgentStatus()
-
-	err = registeredAgent.UpdateAgent()
-	test.S(t).ExpectNil(err)
-
-	expectStructsEquals(t, registeredAgent.Info, testAgent.agent.Info)
-	expectStructsEquals(t, registeredAgent.Data, testAgent.agent.Data)
-	test.S(t).ExpectEquals(registeredAgent.Status, Active)
-}
-
-func TestUpdateAgentFailed(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 1)
-	defer teardownTestCase(t)
-
-	testAgent := testAgents[1]
-
-	_, err := registerAgent(t, testAgent)
-	test.S(t).ExpectNil(err)
-
-	testAgent.agentServer.Close()
-
-	registeredAgent, err := ReadAgentInfo(testAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	err = registeredAgent.UpdateAgent()
-	test.S(t).ExpectNotNil(err)
-
-	registeredAgent, err = ReadAgentInfo(testAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(registeredAgent.Status, Inactive)
-}
-
-func TestForgetLongUnseenAgents(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 1)
-	defer teardownTestCase(t)
-
-	testAgent := testAgents[1]
-	config.Config.UnseenAgentForgetHours = 1
-	_, err := registerAgent(t, testAgent)
-	test.S(t).ExpectNil(err)
-
-	db.ExecOrchestrator(fmt.Sprintf("UPDATE host_agent SET last_seen = last_seen - interval 2 hour WHERE hostname='%s'", testAgent.agent.Info.Hostname))
-
-	err = ForgetLongUnseenAgents()
-	test.S(t).ExpectNil(err)
-
-	_, err = ReadAgentInfo(testAgent.agent.Info.Hostname)
-	test.S(t).ExpectNotNil(err)
-}
-
-func TestNewSeed(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 2)
-	defer teardownTestCase(t)
-
-	targetTestAgent := testAgents[1]
-	sourceTestAgent := testAgents[2]
-
-	_, err := registerAgent(t, targetTestAgent)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, sourceTestAgent)
-	test.S(t).ExpectNil(err)
-
-	targetAgent, err := ReadAgent(targetTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	sourceAgent, err := ReadAgent(sourceTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seedID, int64(1))
-}
-
-func TestNewSeedWrongSeedMethod(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 2)
-	defer teardownTestCase(t)
-
-	targetTestAgent := testAgents[1]
-	sourceTestAgent := testAgents[2]
-
-	_, err := registerAgent(t, targetTestAgent)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, sourceTestAgent)
-	test.S(t).ExpectNil(err)
-
-	targetAgent, err := ReadAgent(targetTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	sourceAgent, err := ReadAgent(sourceTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	_, err = NewSeed("test", targetAgent, sourceAgent)
-	test.S(t).ExpectNotNil(err)
-}
-
-func TestNewSeedSeedItself(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 1)
-	defer teardownTestCase(t)
-
-	targetTestAgent := testAgents[1]
-
-	_, err := registerAgent(t, targetTestAgent)
-	test.S(t).ExpectNil(err)
-
-	targetAgent, err := ReadAgent(targetTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	sourceAgent, err := ReadAgent(targetTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	_, err = NewSeed("Mydumper", targetAgent, sourceAgent)
-	test.S(t).ExpectNotNil(err)
-}
-
-func TestNewSeedUnsupportedSeedMethod(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 2)
-	defer teardownTestCase(t)
-
-	targetTestAgent := testAgents[1]
-	sourceTestAgent := testAgents[2]
-
-	_, err := registerAgent(t, targetTestAgent)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, sourceTestAgent)
-	test.S(t).ExpectNil(err)
-
-	targetAgent, err := ReadAgent(targetTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	sourceAgent, err := ReadAgent(sourceTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	_, err = NewSeed("Mysqldump", targetAgent, sourceAgent)
-	test.S(t).ExpectNotNil(err)
-}
-
-func TestNewSeedUnsupportedSeedMethodForDB(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 2)
-	defer teardownTestCase(t)
-
-	targetTestAgent := testAgents[1]
-	sourceTestAgent := testAgents[2]
-
-	sourceTestAgent.agent.Data.AvailiableSeedMethods[Xtrabackup] = &SeedMethodOpts{
-		BackupSide:       Target,
-		SupportedEngines: []Engine{MRG_MYISAM, CSV, BLACKHOLE, InnoDB, MEMORY, ARCHIVE, MyISAM, FEDERATED, TokuDB},
-	}
-	sourceTestAgent.agent.Data.MySQLDatabases["test"] = &MySQLDatabase{
-		Engines: []Engine{ROCKSDB},
-		Size:    0,
-	}
-	_, err := registerAgent(t, targetTestAgent)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, sourceTestAgent)
-	test.S(t).ExpectNil(err)
-
-	targetAgent, err := ReadAgent(targetTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	sourceAgent, err := ReadAgent(sourceTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	_, err = NewSeed("Xtrabackup", targetAgent, sourceAgent)
-	test.S(t).ExpectNotNil(err)
-}
-
-func TestNewSeedSourceAgentMySQLVersionLessThanTarget(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 2)
-	defer teardownTestCase(t)
-
-	targetTestAgent := testAgents[1]
-	sourceTestAgent := testAgents[2]
-
-	targetTestAgent.agent.Data.MySQLVersion = "5.6.40"
-	_, err := registerAgent(t, targetTestAgent)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, sourceTestAgent)
-	test.S(t).ExpectNil(err)
-
-	targetAgent, err := ReadAgent(targetTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	sourceAgent, err := ReadAgent(sourceTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	_, err = NewSeed("Mydumper", targetAgent, sourceAgent)
-	test.S(t).ExpectNotNil(err)
-}
-
-func TestNewSeedAgentHadActiveSeed(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 2)
-	defer teardownTestCase(t)
-
-	targetTestAgent := testAgents[1]
-	sourceTestAgent := testAgents[2]
-
-	_, err := registerAgent(t, targetTestAgent)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, sourceTestAgent)
-	test.S(t).ExpectNil(err)
-
-	targetAgent, err := ReadAgent(targetTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	sourceAgent, err := ReadAgent(sourceTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	_, err = NewSeed("Mydumper", targetAgent, sourceAgent)
-	test.S(t).ExpectNil(err)
-
-	_, err = NewSeed("Mydumper", targetAgent, sourceAgent)
-	test.S(t).ExpectNotNil(err)
-}
-func TestNewSeedNotEnoughSpaceInMySQLDatadir(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 2)
-	defer teardownTestCase(t)
-
-	targetTestAgent := testAgents[1]
-	sourceTestAgent := testAgents[2]
-
-	targetTestAgent.agent.Data.MySQLDatadirDiskFree = 10
-	sourceTestAgent.agent.Data.MySQLDatadirDiskUsed = 1000
-
-	_, err := registerAgent(t, targetTestAgent)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, sourceTestAgent)
-	test.S(t).ExpectNil(err)
-
-	targetAgent, err := ReadAgent(targetTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	sourceAgent, err := ReadAgent(sourceTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	_, err = NewSeed("Mydumper", targetAgent, sourceAgent)
-	test.S(t).ExpectNotNil(err)
-}
-
-func TestReadActiveSeeds(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 4)
-	defer teardownTestCase(t)
-
-	targetTestAgent1 := testAgents[1]
-	sourceTestAgent1 := testAgents[2]
-	targetTestAgent2 := testAgents[3]
-	sourceTestAgent2 := testAgents[4]
-
-	_, err := registerAgent(t, targetTestAgent1)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, sourceTestAgent1)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, targetTestAgent2)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, sourceTestAgent2)
-	test.S(t).ExpectNil(err)
-
-	targetAgent1, err := ReadAgent(targetTestAgent1.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	sourceAgent1, err := ReadAgent(sourceTestAgent1.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	targetAgent2, err := ReadAgent(targetTestAgent2.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	sourceAgent2, err := ReadAgent(sourceTestAgent2.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	seedID, err := NewSeed("Mydumper", targetAgent1, sourceAgent1)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seedID, int64(1))
-
-	seedID, err = NewSeed("Mydumper", targetAgent2, sourceAgent2)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seedID, int64(2))
-
-	seeds, err := ReadActiveSeeds()
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(len(seeds), 2)
-
-	for _, seed := range seeds {
-		if seed.SeedID == 1 {
-			test.S(t).ExpectEquals(seed.TargetHostname, targetTestAgent1.agent.Info.Hostname)
-			test.S(t).ExpectEquals(seed.SourceHostname, sourceTestAgent1.agent.Info.Hostname)
-		} else {
-			test.S(t).ExpectEquals(seed.TargetHostname, targetTestAgent2.agent.Info.Hostname)
-			test.S(t).ExpectEquals(seed.SourceHostname, sourceTestAgent2.agent.Info.Hostname)
-		}
-		test.S(t).ExpectEquals(seed.SeedMethod, Mydumper)
-		test.S(t).ExpectEquals(seed.BackupSide, Target)
-		test.S(t).ExpectEquals(seed.Status, Started)
-		test.S(t).ExpectEquals(seed.Stage, Prepare)
-		test.S(t).ExpectEquals(seed.Retries, 0)
-	}
-}
-
-func TestReadRecentSeeds(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 4)
-	defer teardownTestCase(t)
-
-	targetTestAgent1 := testAgents[1]
-	sourceTestAgent1 := testAgents[2]
-	targetTestAgent2 := testAgents[3]
-	sourceTestAgent2 := testAgents[4]
-
-	_, err := registerAgent(t, targetTestAgent1)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, sourceTestAgent1)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, targetTestAgent2)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, sourceTestAgent2)
-	test.S(t).ExpectNil(err)
-
-	targetAgent1, err := ReadAgent(targetTestAgent1.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	sourceAgent1, err := ReadAgent(sourceTestAgent1.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	targetAgent2, err := ReadAgent(targetTestAgent2.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	sourceAgent2, err := ReadAgent(sourceTestAgent2.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	seedID, err := NewSeed("Mydumper", targetAgent1, sourceAgent1)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seedID, int64(1))
-
-	seedID, err = NewSeed("Mydumper", targetAgent2, sourceAgent2)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seedID, int64(2))
-
-	seeds, err := ReadRecentSeeds()
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(len(seeds), 2)
-
-	for _, seed := range seeds {
-		if seed.SeedID == 1 {
-			test.S(t).ExpectEquals(seed.TargetHostname, targetTestAgent1.agent.Info.Hostname)
-			test.S(t).ExpectEquals(seed.SourceHostname, sourceTestAgent1.agent.Info.Hostname)
-		} else {
-			test.S(t).ExpectEquals(seed.TargetHostname, targetTestAgent2.agent.Info.Hostname)
-			test.S(t).ExpectEquals(seed.SourceHostname, sourceTestAgent2.agent.Info.Hostname)
-		}
-		test.S(t).ExpectEquals(seed.SeedMethod, Mydumper)
-		test.S(t).ExpectEquals(seed.BackupSide, Target)
-		test.S(t).ExpectEquals(seed.Status, Started)
-		test.S(t).ExpectEquals(seed.Stage, Prepare)
-		test.S(t).ExpectEquals(seed.Retries, 0)
-	}
-}
-
-func TestReadSeed(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 2)
-	defer teardownTestCase(t)
-
-	targetTestAgent := testAgents[1]
-	sourceTestAgent := testAgents[2]
-
-	_, err := registerAgent(t, targetTestAgent)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, sourceTestAgent)
-	test.S(t).ExpectNil(err)
-
-	targetAgent, err := ReadAgent(targetTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	sourceAgent, err := ReadAgent(sourceTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seedID, int64(1))
-
-	seed, err := ReadSeed(seedID)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seed.TargetHostname, targetTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectEquals(seed.SourceHostname, sourceTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectEquals(seed.SeedMethod, Mydumper)
-	test.S(t).ExpectEquals(seed.BackupSide, Target)
-	test.S(t).ExpectEquals(seed.Status, Started)
-	test.S(t).ExpectEquals(seed.Stage, Prepare)
-	test.S(t).ExpectEquals(seed.Retries, 0)
-}
-
-func TestReadRecentSeedsForAgentInStatus(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 2)
-	defer teardownTestCase(t)
-
-	targetTestAgent := testAgents[1]
-	sourceTestAgent := testAgents[2]
-
-	_, err := registerAgent(t, targetTestAgent)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, sourceTestAgent)
-	test.S(t).ExpectNil(err)
-
-	targetAgent, err := ReadAgent(targetTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	sourceAgent, err := ReadAgent(sourceTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seedID, int64(1))
-
-	for _, agent := range testAgents {
-		seeds, err := ReadRecentSeedsForAgentInStatus(agent.agent, Started, "limit 1")
-		test.S(t).ExpectNil(err)
-		test.S(t).ExpectEquals(len(seeds), 1)
-		test.S(t).ExpectEquals(seeds[0].TargetHostname, targetTestAgent.agent.Info.Hostname)
-		test.S(t).ExpectEquals(seeds[0].SourceHostname, sourceTestAgent.agent.Info.Hostname)
-		test.S(t).ExpectEquals(seeds[0].SeedMethod, Mydumper)
-		test.S(t).ExpectEquals(seeds[0].BackupSide, Target)
-		test.S(t).ExpectEquals(seeds[0].Status, Started)
-		test.S(t).ExpectEquals(seeds[0].Stage, Prepare)
-		test.S(t).ExpectEquals(seeds[0].Retries, 0)
-	}
-
-	for _, agent := range testAgents {
-		seeds, err := ReadRecentSeedsForAgentInStatus(agent.agent, Running, "limit 1")
-		test.S(t).ExpectNil(err)
-		test.S(t).ExpectEquals(len(seeds), 0)
-	}
-
-}
-
-func TestReadActiveSeedsForAgent(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 2)
-	defer teardownTestCase(t)
-
-	targetTestAgent := testAgents[1]
-	sourceTestAgent := testAgents[2]
-
-	_, err := registerAgent(t, targetTestAgent)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, sourceTestAgent)
-	test.S(t).ExpectNil(err)
-
-	targetAgent, err := ReadAgent(targetTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	sourceAgent, err := ReadAgent(sourceTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seedID, int64(1))
-
-	for _, agent := range testAgents {
-		seeds, err := ReadActiveSeedsForAgent(agent.agent)
-		test.S(t).ExpectNil(err)
-		test.S(t).ExpectEquals(len(seeds), 1)
-		test.S(t).ExpectEquals(seeds[0].TargetHostname, targetTestAgent.agent.Info.Hostname)
-		test.S(t).ExpectEquals(seeds[0].SourceHostname, sourceTestAgent.agent.Info.Hostname)
-		test.S(t).ExpectEquals(seeds[0].SeedMethod, Mydumper)
-		test.S(t).ExpectEquals(seeds[0].BackupSide, Target)
-		test.S(t).ExpectEquals(seeds[0].Status, Started)
-		test.S(t).ExpectEquals(seeds[0].Stage, Prepare)
-		test.S(t).ExpectEquals(seeds[0].Retries, 0)
-	}
-
-}
-
-func TestGetSeedAgents(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 2)
-	defer teardownTestCase(t)
-
-	targetTestAgent := testAgents[1]
-	sourceTestAgent := testAgents[2]
-
-	_, err := registerAgent(t, targetTestAgent)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, sourceTestAgent)
-	test.S(t).ExpectNil(err)
-
-	targetAgent, err := ReadAgent(targetTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	sourceAgent, err := ReadAgent(sourceTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
-
-	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seedID, int64(1))
-
-	seed, err := ReadSeed(seedID)
-	test.S(t).ExpectNil(err)
-
-	targetAgent, sourceAgent, err = seed.GetSeedAgents()
-	test.S(t).ExpectNil(err)
-	expectStructsEquals(t, targetAgent.Info, targetTestAgent.agent.Info)
-	expectStructsEquals(t, sourceAgent.Info, sourceTestAgent.agent.Info)
-}
-
-func createAgentsMySQLServers(t *testing.T, agent *testAgent, useGTID bool, createSlaveUser bool) (func(t *testing.T), error) {
+func (s *AgentTestSuite) createTestAgentMySQLServer(agent *testAgent, useGTID bool, createSlaveUser bool) error {
 	log.Info("Setting agents MySQL")
 	var testdb *sql.DB
 	rand.Seed(time.Now().UnixNano())
 	serverID := rand.Intn(100000000)
-	pool, err := dockertest.NewPool("")
 
 	dockerCmd := []string{"mysqld", fmt.Sprintf("--server-id=%d", serverID), "--log-bin=/var/lib/mysql/mysql-bin"}
-	if err != nil {
-		log.Fatalf("Could not connect to docker: %s", err)
-	}
-
 	log.Info("Creating docker container for agent")
-	// pulls an image, creates a container based on it and runs it
+
 	if useGTID {
 		dockerCmd = append(dockerCmd, "--enforce-gtid-consistency=ON", "--gtid-mode=ON")
 	}
-	resource, err := pool.RunWithOptions(&dockertest.RunOptions{Repository: "mysql", Tag: "5.7", Env: []string{"MYSQL_ROOT_PASSWORD=secret"}, Cmd: dockerCmd, CapAdd: []string{"NET_ADMIN", "NET_RAW"}})
+	resource, err := s.pool.RunWithOptions(&dockertest.RunOptions{Repository: "mysql", Tag: "5.7", Env: []string{"MYSQL_ROOT_PASSWORD=secret"}, Cmd: dockerCmd, CapAdd: []string{"NET_ADMIN", "NET_RAW"}})
 	if err != nil {
-		log.Fatalf("Could not start resource: %s", err)
+		return fmt.Errorf("Could not connect to docker: %s", err)
 	}
 
 	agent.agentMySQLContainerIP = resource.Container.NetworkSettings.Networks["bridge"].IPAddress
 	agent.agentMySQLContainerID = resource.Container.ID
 
-	teardownFunc := func(t *testing.T) {
-		log.Info("Teardown MySQL for agent")
-		if err := pool.Purge(resource); err != nil {
-			log.Fatalf("Could not purge resource: %s", err)
-		}
-	}
+	s.containers = append(s.containers, resource)
 
 	cmd := exec.Command("docker", "exec", "-i", agent.agentMySQLContainerID, "apt-get", "update")
 	if err := cmd.Run(); err != nil {
-		return teardownFunc, err
+		return err
 	}
 	cmd = exec.Command("docker", "exec", "-i", agent.agentMySQLContainerID, "apt-get", "install", "-y", "iptables")
 	if err := cmd.Run(); err != nil {
-		return teardownFunc, err
+		return err
 	}
 
-	if err := pool.Retry(func() error {
+	if err := s.pool.Retry(func() error {
 		var err error
 		testdb, _, err = sqlutils.GetDB(fmt.Sprintf("root:secret@(localhost:%s)/mysql", resource.GetPort("3306/tcp")))
 		mysqldrv.SetLogger(logger.New(ioutil.Discard, "discard", 1))
@@ -933,41 +277,41 @@ func createAgentsMySQLServers(t *testing.T, agent *testAgent, useGTID bool, crea
 		}
 		return testdb.Ping()
 	}); err != nil {
-		return teardownFunc, fmt.Errorf("Could not connect to docker: %s", err)
+		return fmt.Errorf("Could not connect to docker: %s", err)
 	}
 
 	if createSlaveUser {
 		if _, err = testdb.Exec("Create database orchestrator_meta;"); err != nil {
-			return teardownFunc, err
+			return err
 		}
 		if _, err = testdb.Exec("Create table orchestrator_meta.replication (`username` varchar(128) CHARACTER SET ascii NOT NULL DEFAULT '',`password` varchar(128) CHARACTER SET ascii NOT NULL DEFAULT '',PRIMARY KEY (`username`,`password`)) ENGINE=InnoDB DEFAULT CHARSET=utf8;"); err != nil {
-			return teardownFunc, err
+			return err
 		}
 		if _, err = testdb.Exec("CREATE USER `slave`@`%` IDENTIFIED BY 'slavepassword@';"); err != nil {
-			return teardownFunc, err
+			return err
 		}
 		if _, err = testdb.Exec("GRANT REPLICATION SLAVE ON *.* TO `slave`@`%`"); err != nil {
-			return teardownFunc, err
+			return err
 		}
 		if _, err = testdb.Exec("CREATE USER `orc_topology`@`%` IDENTIFIED BY 'orc_topologypassword@';"); err != nil {
-			return teardownFunc, err
+			return err
 		}
 		if _, err = testdb.Exec("GRANT ALL PRIVILEGES ON *.* TO `orc_topology`@`%`"); err != nil {
-			return teardownFunc, err
+			return err
 		}
 		if _, err = testdb.Exec("Insert into orchestrator_meta.replication(username, password) VALUES ('slave', 'slavepassword@');"); err != nil {
-			return teardownFunc, err
+			return err
 		}
 	}
 
 	if _, err = testdb.Exec("Create database test_repl"); err != nil {
-		return teardownFunc, err
+		return err
 	}
 	if _, err = testdb.Exec("Create table test_repl.test(id int);"); err != nil {
-		return teardownFunc, err
+		return err
 	}
 	if _, err = testdb.Exec("insert into test_repl.test(id) VALUES (1), (2), (3), (4);"); err != nil {
-		return teardownFunc, err
+		return err
 	}
 
 	if err = sqlutils.QueryRowsMap(testdb, "show master status", func(m sqlutils.RowMap) error {
@@ -977,31 +321,24 @@ func createAgentsMySQLServers(t *testing.T, agent *testAgent, useGTID bool, crea
 		agent.agentSeedMetadata.GtidExecuted = m.GetString("Executed_Gtid_Set")
 		return err
 	}); err != nil {
-		return teardownFunc, err
+		return err
 	}
 
 	mysqlPort, err := strconv.Atoi(resource.GetPort("3306/tcp"))
 	if err != nil {
-		return teardownFunc, err
+		return err
 	}
 	agent.agent.Info.MySQLPort = mysqlPort
-
-	return func(t *testing.T) {
-		log.Info("Teardown MySQL for agent")
-		if err := pool.Purge(resource); err != nil {
-			log.Fatalf("Could not purge resource: %s", err)
-		}
-	}, nil
+	return nil
 }
 
 // this is needed in order to redirect from host machine ip 172.0.0.x to container ip for replication to work
-func createIPTablesRulesForReplication(t *testing.T, targetAgent *testAgent, sourceAgent *testAgent) error {
+func (s *AgentTestSuite) createIPTablesRulesForReplication(targetAgent *testAgent, sourceAgent *testAgent) error {
 	cmd := exec.Command("docker", "exec", "-i", targetAgent.agentMySQLContainerID, "iptables", "-t", "nat", "-I", "OUTPUT", "-p", "tcp", "-o", "eth0", "--dport", fmt.Sprintf("%d", sourceAgent.agent.Info.MySQLPort), "-j", "DNAT", "--to-destination", fmt.Sprintf("%s:3306", sourceAgent.agentMySQLContainerIP))
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%s", string(out))
 	}
-	// iptables -t nat -I OUTPUT -p tcp -o eth0 --dport 33447 -j DNAT --to-destination 172.17.0.4:3306
 	cmd = exec.Command("docker", "exec", "-i", targetAgent.agentMySQLContainerID, "/bin/sh", "-c", fmt.Sprintf("echo %s %s >> /etc/hosts", sourceAgent.agentMySQLContainerIP, sourceAgent.agent.Info.Hostname))
 	out, err = cmd.CombinedOutput()
 	if err != nil {
@@ -1010,340 +347,658 @@ func createIPTablesRulesForReplication(t *testing.T, targetAgent *testAgent, sou
 	return nil
 }
 
-func TestProcessSeeds(t *testing.T) {
-	teardownTestCase := prepareTestData(t, 2)
-	defer teardownTestCase(t)
+func (s *AgentTestSuite) TearDownTest(c *C) {
+	log.Info("Teardown test data")
+	for _, container := range s.containers {
+		if err := s.pool.Purge(container); err != nil {
+			log.Fatalf("Could not purge resource: %s", err)
+		}
+	}
+	for _, testAgent := range s.testAgents {
+		testAgent.agentServer.Close()
+	}
+}
 
-	targetTestAgent := testAgents[1]
-	sourceTestAgent := testAgents[2]
+func (s *AgentTestSuite) registerAgents(c *C) {
+	for _, testAgent := range s.testAgents {
+		hostname, err := RegisterAgent(testAgent.agent.Info)
+		c.Assert(err, IsNil)
+		c.Assert(hostname, Equals, testAgent.agent.Info.Hostname)
+	}
+}
 
-	_, err := registerAgent(t, targetTestAgent)
-	test.S(t).ExpectNil(err)
-
-	_, err = registerAgent(t, sourceTestAgent)
-	test.S(t).ExpectNil(err)
-
+func (s *AgentTestSuite) getSeedAgents(c *C, targetTestAgent *testAgent, sourceTestAgent *testAgent) (targetAgent *Agent, sourceAgent *Agent) {
+	s.registerAgents(c)
 	targetAgent, err := ReadAgent(targetTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
+	c.Assert(err, IsNil)
 
-	sourceAgent, err := ReadAgent(sourceTestAgent.agent.Info.Hostname)
-	test.S(t).ExpectNil(err)
+	sourceAgent, err = ReadAgent(sourceTestAgent.agent.Info.Hostname)
+	c.Assert(err, IsNil)
 
-	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seedID, int64(1))
+	return targetAgent, sourceAgent
+}
 
-	ProcessSeeds()
+func (s *AgentTestSuite) readSeed(c *C, seedID int64, targetHostname string, sourceHostname string, seedMethod SeedMethod, backupSide SeedSide, status SeedStatus, stage SeedStage, retries int) *Seed {
 	seed, err := ReadSeed(seedID)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seed.Status, Running)
-	test.S(t).ExpectEquals(seed.Stage, Prepare)
-	test.S(t).ExpectEquals(seed.Retries, 0)
+	c.Assert(err, IsNil)
+	c.Assert(seed.TargetHostname, Equals, targetHostname)
+	c.Assert(seed.SourceHostname, Equals, sourceHostname)
+	c.Assert(seed.SeedMethod, Equals, seedMethod)
+	c.Assert(seed.BackupSide, Equals, backupSide)
+	c.Assert(seed.Status, Equals, status)
+	c.Assert(seed.Stage, Equals, stage)
+	c.Assert(seed.Retries, Equals, retries)
+	return seed
+}
+
+func (s *AgentTestSuite) readSeedStageStates(c *C, seed *Seed, stateRecords int, targetTestAgent *testAgent, sourceTestAgent *testAgent) {
 	seedStates, err := seed.ReadSeedStageStates()
-	test.S(t).ExpectNil(err)
-	for _, seedState := range seedStates {
-		test.S(t).ExpectEquals(seedState.SeedID, int64(1))
-		test.S(t).ExpectEquals(seedState.Stage, Prepare)
-		test.S(t).ExpectEquals(seedState.Status, Running)
+	c.Assert(err, IsNil)
+	for _, seedState := range seedStates[:stateRecords] {
+		for _, agent := range []*testAgent{targetTestAgent, sourceTestAgent} {
+			if seedState.Hostname == agent.agent.Info.Hostname {
+				c.Assert(seedState.SeedID, Equals, agent.agentSeedStageStatus.SeedID)
+				c.Assert(seedState.Stage, Equals, agent.agentSeedStageStatus.Stage)
+				c.Assert(seedState.Status, Equals, agent.agentSeedStageStatus.Status)
+			}
+		}
+	}
+}
+
+func (s *AgentTestSuite) TestAgentRegistration(c *C) {
+	s.registerAgents(c)
+}
+
+func (s *AgentTestSuite) TestReadAgents(c *C) {
+	s.registerAgents(c)
+
+	registeredAgents, err := ReadAgents()
+	c.Assert(err, IsNil)
+	c.Assert(registeredAgents, HasLen, 4)
+
+	for _, testAgent := range s.testAgents {
+		for _, registeredAgent := range registeredAgents {
+			if registeredAgent.Info.Port == testAgent.agent.Info.Port && registeredAgent.Info.Hostname == testAgent.agent.Info.Hostname {
+				c.Assert(registeredAgent.Info, DeepEquals, testAgent.agent.Info)
+				c.Assert(registeredAgent.Data, DeepEquals, testAgent.agent.Data)
+			}
+		}
+	}
+}
+
+func (s *AgentTestSuite) TestReadAgentsInfo(c *C) {
+	s.registerAgents(c)
+
+	registeredAgents, err := ReadAgentsInfo()
+	c.Assert(err, IsNil)
+	c.Assert(registeredAgents, HasLen, 4)
+
+	for _, testAgent := range s.testAgents {
+		for _, registeredAgent := range registeredAgents {
+			if registeredAgent.Info.Port == testAgent.agent.Info.Port && registeredAgent.Info.Hostname == testAgent.agent.Info.Hostname {
+				c.Assert(registeredAgent.Info, DeepEquals, testAgent.agent.Info)
+				c.Assert(registeredAgent.Data, DeepEquals, &Data{})
+			}
+		}
+	}
+}
+
+func (s *AgentTestSuite) TestReadAgent(c *C) {
+	testAgent := s.testAgents["agent1"]
+
+	s.registerAgents(c)
+
+	registeredAgent, err := ReadAgent(testAgent.agent.Info.Hostname)
+	c.Assert(err, IsNil)
+	c.Assert(registeredAgent.Info, DeepEquals, testAgent.agent.Info)
+	c.Assert(registeredAgent.Data, DeepEquals, testAgent.agent.Data)
+}
+
+func (s *AgentTestSuite) TestReadAgentInfo(c *C) {
+	testAgent := s.testAgents["agent1"]
+
+	s.registerAgents(c)
+
+	registeredAgent, err := ReadAgentInfo(testAgent.agent.Info.Hostname)
+	c.Assert(err, IsNil)
+	c.Assert(registeredAgent.Info, DeepEquals, testAgent.agent.Info)
+	c.Assert(registeredAgent.Data, DeepEquals, &Data{})
+}
+
+func (s *AgentTestSuite) TestReadOutdatedAgents(c *C) {
+	config.Config.AgentPollMinutes = 2
+
+	s.registerAgents(c)
+
+	outdatedAgents := []*testAgent{s.testAgents["agent1"]}
+	upToDateAgents := []*testAgent{s.testAgents["agent2"], s.testAgents["agent3"], s.testAgents["agent4"]}
+
+	for _, outdatedAgent := range outdatedAgents {
+		db.ExecOrchestrator(fmt.Sprintf("UPDATE host_agent SET last_checked = NOW() - interval 60 minute WHERE hostname='%s'", outdatedAgent.agent.Info.Hostname))
 	}
 
-	for _, agent := range testAgents {
-		agent.agentSeedStageStatus.SeedID = int64(seedID)
+	for _, upToDateAgent := range upToDateAgents {
+		db.ExecOrchestrator(fmt.Sprintf("UPDATE host_agent SET last_checked = NOW() WHERE hostname='%s'", upToDateAgent.agent.Info.Hostname))
+	}
+
+	outdatedOrchestratorAgents, err := ReadOutdatedAgents()
+	c.Assert(err, IsNil)
+	c.Assert(outdatedOrchestratorAgents, HasLen, 1)
+	c.Assert(outdatedOrchestratorAgents[0].Info, DeepEquals, outdatedAgents[0].agent.Info)
+	c.Assert(outdatedOrchestratorAgents[0].Data, DeepEquals, &Data{})
+}
+
+func (s *AgentTestSuite) TestUpdateAgent(c *C) {
+	testAgent := s.testAgents["agent1"]
+
+	s.registerAgents(c)
+
+	registeredAgent, err := ReadAgentInfo(testAgent.agent.Info.Hostname)
+	c.Assert(err, IsNil)
+
+	testAgent.agent.Data.LocalSnapshotsHosts = []string{"127.0.0.10", "127.0.0.12"}
+	registeredAgent.Status = Inactive
+
+	err = registeredAgent.updateAgentStatus()
+	c.Assert(err, IsNil)
+
+	err = registeredAgent.UpdateAgent()
+	c.Assert(err, IsNil)
+
+	c.Assert(registeredAgent.Info, DeepEquals, testAgent.agent.Info)
+	c.Assert(registeredAgent.Data, DeepEquals, testAgent.agent.Data)
+	c.Assert(registeredAgent.Status, Equals, Active)
+}
+
+func (s *AgentTestSuite) TestUpdateAgentFailed(c *C) {
+	testAgent := s.testAgents["agent1"]
+
+	s.registerAgents(c)
+	testAgent.agentServer.Close()
+
+	registeredAgent, err := ReadAgentInfo(testAgent.agent.Info.Hostname)
+	c.Assert(err, IsNil)
+
+	err = registeredAgent.UpdateAgent()
+	c.Assert(err, NotNil)
+
+	registeredAgent, err = ReadAgentInfo(testAgent.agent.Info.Hostname)
+	c.Assert(err, IsNil)
+	c.Assert(registeredAgent.Status, Equals, Inactive)
+}
+
+func (s *AgentTestSuite) TestForgetLongUnseenAgents(c *C) {
+	config.Config.UnseenAgentForgetHours = 1
+	testAgent := s.testAgents["agent1"]
+
+	s.registerAgents(c)
+	db.ExecOrchestrator(fmt.Sprintf("UPDATE host_agent SET last_seen = last_seen - interval 2 hour WHERE hostname='%s'", testAgent.agent.Info.Hostname))
+
+	err := ForgetLongUnseenAgents()
+	c.Assert(err, IsNil)
+
+	_, err = ReadAgentInfo(testAgent.agent.Info.Hostname)
+	c.Assert(err, NotNil)
+}
+
+func (s *AgentTestSuite) TestNewSeed(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	s.registerAgents(c)
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(1))
+}
+
+func (s *AgentTestSuite) TestNewSeedWrongSeedMethod(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	s.registerAgents(c)
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	_, err := NewSeed("test", targetAgent, sourceAgent)
+	c.Assert(err, NotNil)
+}
+
+func (s *AgentTestSuite) TestNewSeedSeedItself(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent1"]
+
+	s.registerAgents(c)
+
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	_, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, NotNil)
+}
+
+func (s *AgentTestSuite) TestNewSeedUnsupportedSeedMethod(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	s.registerAgents(c)
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	_, err := NewSeed("Mysqldump", targetAgent, sourceAgent)
+	c.Assert(err, NotNil)
+}
+
+func (s *AgentTestSuite) TestNewSeedUnsupportedSeedMethodForDB(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	sourceTestAgent.agent.Data.AvailiableSeedMethods[Xtrabackup] = &SeedMethodOpts{
+		BackupSide:       Target,
+		SupportedEngines: []Engine{MRG_MYISAM, CSV, BLACKHOLE, InnoDB, MEMORY, ARCHIVE, MyISAM, FEDERATED, TokuDB},
+	}
+	sourceTestAgent.agent.Data.MySQLDatabases["test"] = &MySQLDatabase{
+		Engines: []Engine{ROCKSDB},
+		Size:    0,
+	}
+
+	s.registerAgents(c)
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	_, err := NewSeed("Xtrabackup", targetAgent, sourceAgent)
+	c.Assert(err, NotNil)
+}
+
+func (s *AgentTestSuite) TestNewSeedSourceAgentMySQLVersionLessThanTarget(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	targetTestAgent.agent.Data.MySQLVersion = "5.6.40"
+
+	s.registerAgents(c)
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	_, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, NotNil)
+}
+
+func (s *AgentTestSuite) TestNewSeedAgentHadActiveSeed(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	s.registerAgents(c)
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	_, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+
+	_, err = NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, NotNil)
+}
+
+func (s *AgentTestSuite) TestNewSeedNotEnoughSpaceInMySQLDatadir(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+	targetTestAgent.agent.Data.MySQLDatadirDiskFree = 10
+	sourceTestAgent.agent.Data.MySQLDatadirDiskUsed = 1000
+
+	s.registerAgents(c)
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	_, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, NotNil)
+}
+
+func (s *AgentTestSuite) TestReadSeed(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	s.registerAgents(c)
+
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(1))
+
+	s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Started, Prepare, 0)
+}
+
+func (s *AgentTestSuite) TestReadActiveSeeds(c *C) {
+	targetTestAgent1 := s.testAgents["agent1"]
+	sourceTestAgent1 := s.testAgents["agent2"]
+	targetTestAgent2 := s.testAgents["agent3"]
+	sourceTestAgent2 := s.testAgents["agent4"]
+
+	s.registerAgents(c)
+
+	targetAgent1, sourceAgent1 := s.getSeedAgents(c, targetTestAgent1, sourceTestAgent1)
+	targetAgent2, sourceAgent2 := s.getSeedAgents(c, targetTestAgent2, sourceTestAgent2)
+
+	seedID, err := NewSeed("Mydumper", targetAgent1, sourceAgent1)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(1))
+
+	seedID, err = NewSeed("Mydumper", targetAgent2, sourceAgent2)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(2))
+
+	completedSeed := s.readSeed(c, seedID, targetAgent2.Info.Hostname, sourceAgent2.Info.Hostname, Mydumper, Target, Started, Prepare, 0)
+	completedSeed.Status = Completed
+	completedSeed.updateSeedData()
+
+	seeds, err := ReadActiveSeeds()
+	c.Assert(err, IsNil)
+	c.Assert(seeds, HasLen, 1)
+
+	c.Assert(seeds[0].TargetHostname, Equals, targetTestAgent1.agent.Info.Hostname)
+	c.Assert(seeds[0].SourceHostname, Equals, sourceTestAgent1.agent.Info.Hostname)
+	c.Assert(seeds[0].SeedMethod, Equals, Mydumper)
+	c.Assert(seeds[0].BackupSide, Equals, Target)
+	c.Assert(seeds[0].Status, Equals, Started)
+	c.Assert(seeds[0].Stage, Equals, Prepare)
+	c.Assert(seeds[0].Retries, Equals, 0)
+}
+
+func (s *AgentTestSuite) TestReadRecentSeeds(c *C) {
+	targetTestAgent1 := s.testAgents["agent1"]
+	sourceTestAgent1 := s.testAgents["agent2"]
+	targetTestAgent2 := s.testAgents["agent3"]
+	sourceTestAgent2 := s.testAgents["agent4"]
+
+	s.registerAgents(c)
+
+	targetAgent1, sourceAgent1 := s.getSeedAgents(c, targetTestAgent1, sourceTestAgent1)
+	targetAgent2, sourceAgent2 := s.getSeedAgents(c, targetTestAgent2, sourceTestAgent2)
+
+	seedID, err := NewSeed("Mydumper", targetAgent1, sourceAgent1)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(1))
+
+	seedID, err = NewSeed("Mydumper", targetAgent2, sourceAgent2)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(2))
+
+	seeds, err := ReadRecentSeeds()
+	c.Assert(err, IsNil)
+	c.Assert(seeds, HasLen, 2)
+
+	for _, seed := range seeds {
+		if seed.SeedID == 1 {
+			c.Assert(seed.TargetHostname, Equals, targetTestAgent1.agent.Info.Hostname)
+			c.Assert(seed.SourceHostname, Equals, sourceTestAgent1.agent.Info.Hostname)
+		} else {
+			c.Assert(seed.TargetHostname, Equals, targetTestAgent2.agent.Info.Hostname)
+			c.Assert(seed.SourceHostname, Equals, sourceTestAgent2.agent.Info.Hostname)
+		}
+		c.Assert(seed.SeedMethod, Equals, Mydumper)
+		c.Assert(seed.BackupSide, Equals, Target)
+		c.Assert(seed.Status, Equals, Started)
+		c.Assert(seed.Stage, Equals, Prepare)
+		c.Assert(seed.Retries, Equals, 0)
+	}
+}
+
+func (s *AgentTestSuite) TestReadRecentSeedsForAgentInStatus(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	s.registerAgents(c)
+
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(1))
+
+	for _, agent := range []*Agent{targetAgent, sourceAgent} {
+		seeds, err := ReadRecentSeedsForAgentInStatus(agent, Started, "limit 1")
+		c.Assert(err, IsNil)
+		c.Assert(seeds, HasLen, 1)
+		c.Assert(seeds[0].TargetHostname, Equals, targetTestAgent.agent.Info.Hostname)
+		c.Assert(seeds[0].SourceHostname, Equals, sourceTestAgent.agent.Info.Hostname)
+		c.Assert(seeds[0].SeedMethod, Equals, Mydumper)
+		c.Assert(seeds[0].BackupSide, Equals, Target)
+		c.Assert(seeds[0].Status, Equals, Started)
+		c.Assert(seeds[0].Stage, Equals, Prepare)
+		c.Assert(seeds[0].Retries, Equals, 0)
+	}
+
+	for _, agent := range []*Agent{targetAgent, sourceAgent} {
+		seeds, err := ReadRecentSeedsForAgentInStatus(agent, Running, "limit 1")
+		c.Assert(err, IsNil)
+		c.Assert(seeds, HasLen, 0)
+	}
+}
+
+func (s *AgentTestSuite) TestReadActiveSeedsForAgent(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	s.registerAgents(c)
+
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(1))
+
+	for _, agent := range []*Agent{targetAgent, sourceAgent} {
+		seeds, err := ReadActiveSeedsForAgent(agent)
+		c.Assert(err, IsNil)
+		c.Assert(seeds, HasLen, 1)
+		c.Assert(seeds[0].TargetHostname, Equals, targetTestAgent.agent.Info.Hostname)
+		c.Assert(seeds[0].SourceHostname, Equals, sourceTestAgent.agent.Info.Hostname)
+		c.Assert(seeds[0].SeedMethod, Equals, Mydumper)
+		c.Assert(seeds[0].BackupSide, Equals, Target)
+		c.Assert(seeds[0].Status, Equals, Started)
+		c.Assert(seeds[0].Stage, Equals, Prepare)
+		c.Assert(seeds[0].Retries, Equals, 0)
+	}
+
+	activeSeed := s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Started, Prepare, 0)
+	activeSeed.Status = Completed
+	activeSeed.updateSeedData()
+
+	for _, agent := range []*Agent{targetAgent, sourceAgent} {
+		seeds, err := ReadActiveSeedsForAgent(agent)
+		c.Assert(err, IsNil)
+		c.Assert(seeds, HasLen, 0)
+	}
+
+}
+
+func (s *AgentTestSuite) TestGetSeedAgents(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	s.registerAgents(c)
+
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(1))
+
+	seed := s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Started, Prepare, 0)
+
+	seedTargetAgent, seedSourceAgent, err := seed.GetSeedAgents()
+	c.Assert(err, IsNil)
+	c.Assert(targetAgent.Info, DeepEquals, seedTargetAgent.Info)
+	c.Assert(sourceAgent.Info, DeepEquals, seedSourceAgent.Info)
+}
+
+func (s *AgentTestSuite) TestProcessSeeds(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	s.registerAgents(c)
+
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(1))
+
+	// Orchestrator registered seed. It's will have first stage - Prepare and status Started
+	seed := s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Started, Prepare, 0)
+
+	// ProcessSeeds. Orchestrator will ask agents to start Prepare stage. So it's state would change from Started to Running
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Running, Prepare, 0)
+
+	// simulate that prepare stage is running on both agents
+	for _, agent := range []*testAgent{targetTestAgent, sourceTestAgent} {
+		agent.agentSeedStageStatus.SeedID = seedID
 		agent.agentSeedStageStatus.Stage = Prepare
 		agent.agentSeedStageStatus.Hostname = agent.agent.Info.Hostname
 		agent.agentSeedStageStatus.Timestamp = time.Now()
 		agent.agentSeedStageStatus.Status = Running
 		agent.agentSeedStageStatus.Details = "processing prepare stage"
 	}
-	ProcessSeeds()
-	seed, err = ReadSeed(seedID)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seed.Status, Running)
-	test.S(t).ExpectEquals(seed.Stage, Prepare)
-	test.S(t).ExpectEquals(seed.Retries, 0)
-	seedStates, err = seed.ReadSeedStageStates()
-	test.S(t).ExpectNil(err)
-	for _, seedState := range seedStates[:2] {
-		test.S(t).ExpectEquals(seedState.SeedID, int64(1))
-		test.S(t).ExpectEquals(seedState.Stage, Prepare)
-		test.S(t).ExpectEquals(seedState.Status, Running)
-		test.S(t).ExpectEquals(seedState.Details, "processing prepare stage")
-	}
 
+	// check that SeedStageStates in Orchestator DB are the same, that were read from agents
+	s.readSeedStageStates(c, seed, 2, targetTestAgent, sourceTestAgent)
+
+	// ProcessSeeds. As seed is in status Running, Orchestrator will ask agent about seed stage status. As it's not Completed or Errored, it will just record SeedStageState in DB.
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Running, Prepare, 0)
+	s.readSeedStageStates(c, seed, 2, targetTestAgent, sourceTestAgent)
+
+	// now simulate that target agent completed Prepare stage
 	targetTestAgent.agentSeedStageStatus.Status = Completed
 	targetTestAgent.agentSeedStageStatus.Timestamp = time.Now()
 	targetTestAgent.agentSeedStageStatus.Details = "completed prepare stage"
-	ProcessSeeds()
-	seed, err = ReadSeed(seedID)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seed.Status, Running)
-	test.S(t).ExpectEquals(seed.Stage, Prepare)
-	test.S(t).ExpectEquals(seed.Retries, 0)
-	seedStates, err = seed.ReadSeedStageStates()
-	test.S(t).ExpectNil(err)
-	for _, seedState := range seedStates[:2] {
-		test.S(t).ExpectEquals(seedState.SeedID, int64(1))
-		test.S(t).ExpectEquals(seedState.Stage, Prepare)
-		if seedState.Hostname == targetTestAgent.agent.Info.Hostname {
-			test.S(t).ExpectEquals(seedState.Status, Completed)
-			test.S(t).ExpectEquals(seedState.Details, "completed prepare stage")
-		}
-		if seedState.Hostname == sourceTestAgent.agent.Info.Hostname {
-			test.S(t).ExpectEquals(seedState.Status, Running)
-			test.S(t).ExpectEquals(seedState.Details, "processing prepare stage")
-		}
-	}
 
+	// ProcessSeeds. We have stage: Prepare and status: Running as only target agent completed Prepare stage, but in SeedStageStates we will have one Completed record and one Running
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Running, Prepare, 0)
+	s.readSeedStageStates(c, seed, 2, targetTestAgent, sourceTestAgent)
+
+	// now simulate that source agent completed Prepare stage
 	sourceTestAgent.agentSeedStageStatus.Status = Completed
 	sourceTestAgent.agentSeedStageStatus.Timestamp = time.Now()
 	sourceTestAgent.agentSeedStageStatus.Details = "completed prepare stage"
-	ProcessSeeds()
-	seed, err = ReadSeed(seedID)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seed.Status, Started)
-	test.S(t).ExpectEquals(seed.Stage, Backup)
-	test.S(t).ExpectEquals(seed.Retries, 0)
-	seedStates, err = seed.ReadSeedStageStates()
-	test.S(t).ExpectNil(err)
-	for _, seedState := range seedStates[:1] {
-		test.S(t).ExpectEquals(seedState.SeedID, int64(1))
-		test.S(t).ExpectEquals(seedState.Stage, Prepare)
-		test.S(t).ExpectEquals(seedState.Status, Completed)
-		test.S(t).ExpectEquals(seedState.Details, "completed prepare stage")
-	}
 
+	// ProcessSeeds. Now both agents completed Prepare stage, so Orchestrator will move Seed to Backup stage with status Started. And we will have SeedStageState records with stage Prepare and status Completed
 	ProcessSeeds()
-	seed, err = ReadSeed(seedID)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seed.Status, Running)
-	test.S(t).ExpectEquals(seed.Stage, Backup)
-	test.S(t).ExpectEquals(seed.Retries, 0)
-	seedStates, err = seed.ReadSeedStageStates()
-	test.S(t).ExpectNil(err)
-	for _, seedState := range seedStates[:1] {
-		test.S(t).ExpectEquals(seedState.SeedID, int64(1))
-		test.S(t).ExpectEquals(seedState.Stage, Backup)
-		test.S(t).ExpectEquals(seedState.Status, Running)
-	}
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Started, Backup, 0)
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
 
+	// ProcessSeeds. Orchestrator will ask agent to start Backup stage. So it's state would change from Started to Running
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Running, Backup, 0)
+
+	// simulate that Backup stage is running on target agent(as seedSide for Mydumper method is Target)
 	targetTestAgent.agentSeedStageStatus.Stage = Backup
 	targetTestAgent.agentSeedStageStatus.Timestamp = time.Now()
 	targetTestAgent.agentSeedStageStatus.Status = Running
 	targetTestAgent.agentSeedStageStatus.Details = "running backup stage"
-	ProcessSeeds()
-	seed, err = ReadSeed(seedID)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seed.Status, Running)
-	test.S(t).ExpectEquals(seed.Stage, Backup)
-	test.S(t).ExpectEquals(seed.Retries, 0)
-	seedStates, err = seed.ReadSeedStageStates()
-	test.S(t).ExpectNil(err)
-	for _, seedState := range seedStates[:1] {
-		test.S(t).ExpectEquals(seedState.SeedID, int64(1))
-		test.S(t).ExpectEquals(seedState.Stage, Backup)
-		test.S(t).ExpectEquals(seedState.Status, Running)
-		test.S(t).ExpectEquals(seedState.Details, "running backup stage")
-	}
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
 
-	targetTestAgent.agentSeedStageStatus.Stage = Backup
-	targetTestAgent.agentSeedStageStatus.Timestamp = time.Now()
+	// ProcessSeeds. TargetAgent is still running Backup Stage, so seed state won't change and we will have one SeedStageState record from target agent
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Running, Backup, 0)
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
+
+	// now simulate that target agent completed Backup stage
 	targetTestAgent.agentSeedStageStatus.Status = Completed
 	targetTestAgent.agentSeedStageStatus.Details = "completed backup stage"
-	ProcessSeeds()
-	seed, err = ReadSeed(seedID)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seed.Status, Started)
-	test.S(t).ExpectEquals(seed.Stage, Restore)
-	test.S(t).ExpectEquals(seed.Retries, 0)
-	seedStates, err = seed.ReadSeedStageStates()
-	test.S(t).ExpectNil(err)
-	for _, seedState := range seedStates[:1] {
-		test.S(t).ExpectEquals(seedState.SeedID, int64(1))
-		test.S(t).ExpectEquals(seedState.Stage, Backup)
-		test.S(t).ExpectEquals(seedState.Status, Completed)
-		test.S(t).ExpectEquals(seedState.Details, "completed backup stage")
-	}
 
+	// ProcessSeeds. Target agent had completed Backup stage, so Orchestrator will move Seed to Restore stage with status Started. And we will have one SeedStageState record with stage Backup and status Completed
 	ProcessSeeds()
-	seed, err = ReadSeed(seedID)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seed.Status, Running)
-	test.S(t).ExpectEquals(seed.Stage, Restore)
-	test.S(t).ExpectEquals(seed.Retries, 0)
-	seedStates, err = seed.ReadSeedStageStates()
-	test.S(t).ExpectNil(err)
-	for _, seedState := range seedStates[:1] {
-		test.S(t).ExpectEquals(seedState.SeedID, int64(1))
-		test.S(t).ExpectEquals(seedState.Stage, Restore)
-		test.S(t).ExpectEquals(seedState.Status, Running)
-	}
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Started, Restore, 0)
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
 
+	// ProcessSeeds. Orchestrator will ask agent to start Restore stage. So it's state would change from Started to Running
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Running, Restore, 0)
+
+	// simulate that Backup stage is running on target agent(as restore is always processed by targetAgent)
 	targetTestAgent.agentSeedStageStatus.Stage = Restore
 	targetTestAgent.agentSeedStageStatus.Timestamp = time.Now()
 	targetTestAgent.agentSeedStageStatus.Status = Running
 	targetTestAgent.agentSeedStageStatus.Details = "running restore stage"
-	ProcessSeeds()
-	seed, err = ReadSeed(seedID)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seed.Status, Running)
-	test.S(t).ExpectEquals(seed.Stage, Restore)
-	test.S(t).ExpectEquals(seed.Retries, 0)
-	seedStates, err = seed.ReadSeedStageStates()
-	test.S(t).ExpectNil(err)
-	for _, seedState := range seedStates[:1] {
-		test.S(t).ExpectEquals(seedState.SeedID, int64(1))
-		test.S(t).ExpectEquals(seedState.Stage, Restore)
-		test.S(t).ExpectEquals(seedState.Status, Running)
-		test.S(t).ExpectEquals(seedState.Details, "running restore stage")
-	}
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
 
-	targetTestAgent.agentSeedStageStatus.Stage = Restore
-	targetTestAgent.agentSeedStageStatus.Timestamp = time.Now()
+	// ProcessSeeds. TargetAgent is still running Restore Stage, so seed state won't change and we will have one SeedStageState record from target agent
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Running, Restore, 0)
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
+
+	// now simulate that target agent completed Restore stage
 	targetTestAgent.agentSeedStageStatus.Status = Completed
 	targetTestAgent.agentSeedStageStatus.Details = "completed restore stage"
-	ProcessSeeds()
-	seed, err = ReadSeed(seedID)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seed.Status, Started)
-	test.S(t).ExpectEquals(seed.Stage, Cleanup)
-	test.S(t).ExpectEquals(seed.Retries, 0)
-	seedStates, err = seed.ReadSeedStageStates()
-	test.S(t).ExpectNil(err)
-	for _, seedState := range seedStates[:1] {
-		test.S(t).ExpectEquals(seedState.SeedID, int64(1))
-		test.S(t).ExpectEquals(seedState.Stage, Restore)
-		test.S(t).ExpectEquals(seedState.Status, Completed)
-		test.S(t).ExpectEquals(seedState.Details, "completed restore stage")
-	}
 
+	// ProcessSeeds. Target agent had completed Restore stage, so Orchestrator will move Seed to Cleanup stage with status Started. And we will have one SeedStageState record with stage Restore and status Completed
 	ProcessSeeds()
-	seed, err = ReadSeed(seedID)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seed.Status, Running)
-	test.S(t).ExpectEquals(seed.Stage, Cleanup)
-	test.S(t).ExpectEquals(seed.Retries, 0)
-	seedStates, err = seed.ReadSeedStageStates()
-	test.S(t).ExpectNil(err)
-	for _, seedState := range seedStates[:2] {
-		test.S(t).ExpectEquals(seedState.SeedID, int64(1))
-		test.S(t).ExpectEquals(seedState.Stage, Cleanup)
-		test.S(t).ExpectEquals(seedState.Status, Running)
-	}
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Started, Cleanup, 0)
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
 
-	for _, agent := range testAgents {
+	// ProcessSeeds. Orchestrator will ask agents to start Cleanup stage. So it's state would change from Started to Running
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Running, Cleanup, 0)
+
+	// simulate that cleanup stage is running on both agents
+	for _, agent := range []*testAgent{targetTestAgent, sourceTestAgent} {
 		agent.agentSeedStageStatus.Stage = Cleanup
 		agent.agentSeedStageStatus.Timestamp = time.Now()
 		agent.agentSeedStageStatus.Status = Running
 		agent.agentSeedStageStatus.Details = "processing cleanup stage"
 	}
-	ProcessSeeds()
-	seed, err = ReadSeed(seedID)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seed.Status, Running)
-	test.S(t).ExpectEquals(seed.Stage, Cleanup)
-	test.S(t).ExpectEquals(seed.Retries, 0)
-	seedStates, err = seed.ReadSeedStageStates()
-	test.S(t).ExpectNil(err)
-	for _, seedState := range seedStates[:2] {
-		test.S(t).ExpectEquals(seedState.SeedID, int64(1))
-		test.S(t).ExpectEquals(seedState.Stage, Cleanup)
-		test.S(t).ExpectEquals(seedState.Status, Running)
-		test.S(t).ExpectEquals(seedState.Details, "processing cleanup stage")
-	}
 
+	// check that SeedStageStates in Orchestator DB are the same, that were read from agents
+	s.readSeedStageStates(c, seed, 2, targetTestAgent, sourceTestAgent)
+
+	// ProcessSeeds. Both agents are still running Cleanup Stage, so seed state won't change and we will have 2 SeedStageState record from each agent
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Running, Cleanup, 0)
+	s.readSeedStageStates(c, seed, 2, targetTestAgent, sourceTestAgent)
+
+	// now simulate that source agent completed Prepare stage
 	sourceTestAgent.agentSeedStageStatus.Status = Completed
 	sourceTestAgent.agentSeedStageStatus.Timestamp = time.Now()
-	sourceTestAgent.agentSeedStageStatus.Details = "completed cleanup stage"
-	ProcessSeeds()
-	seed, err = ReadSeed(seedID)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seed.Status, Running)
-	test.S(t).ExpectEquals(seed.Stage, Cleanup)
-	test.S(t).ExpectEquals(seed.Retries, 0)
-	seedStates, err = seed.ReadSeedStageStates()
-	test.S(t).ExpectNil(err)
-	for _, seedState := range seedStates[:2] {
-		test.S(t).ExpectEquals(seedState.SeedID, int64(1))
-		test.S(t).ExpectEquals(seedState.Stage, Cleanup)
-		if seedState.Hostname == targetTestAgent.agent.Info.Hostname {
-			test.S(t).ExpectEquals(seedState.Status, Running)
-			test.S(t).ExpectEquals(seedState.Details, "processing cleanup stage")
-		}
-		if seedState.Hostname == sourceTestAgent.agent.Info.Hostname {
-			test.S(t).ExpectEquals(seedState.Status, Completed)
-			test.S(t).ExpectEquals(seedState.Details, "completed cleanup stage")
-		}
-	}
+	sourceTestAgent.agentSeedStageStatus.Details = "completed prepare stage"
 
+	// ProcessSeeds. We have stage: Prepare and status: Running as only source agent completed Prepare stage, but in SeedStageStates we will have one Completed record and one Running
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Running, Cleanup, 0)
+	s.readSeedStageStates(c, seed, 2, targetTestAgent, sourceTestAgent)
+
+	// now simulate that target agent completed Prepare stage
 	targetTestAgent.agentSeedStageStatus.Status = Completed
 	targetTestAgent.agentSeedStageStatus.Timestamp = time.Now()
-	targetTestAgent.agentSeedStageStatus.Details = "completed cleanup stage"
+	targetTestAgent.agentSeedStageStatus.Details = "completed prepare stage"
+
+	// ProcessSeeds. Now both agents completed Cleanup stage, so Orchestrator will move Seed to ConnectSlave stage with status Started. And we will have 2 SeedStageState records with stage Cleanup and status Completed
 	ProcessSeeds()
-	seed, err = ReadSeed(seedID)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seed.Status, Started)
-	test.S(t).ExpectEquals(seed.Stage, ConnectSlave)
-	test.S(t).ExpectEquals(seed.Retries, 0)
-	seedStates, err = seed.ReadSeedStageStates()
-	test.S(t).ExpectNil(err)
-	for _, seedState := range seedStates[:1] {
-		test.S(t).ExpectEquals(seedState.SeedID, int64(1))
-		test.S(t).ExpectEquals(seedState.Stage, Cleanup)
-		test.S(t).ExpectEquals(seedState.Status, Completed)
-		test.S(t).ExpectEquals(seedState.Details, "completed cleanup stage")
-	}
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Started, ConnectSlave, 0)
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
 
-	// create mysql containers for agents
-	teardownTargetAgent, err := createAgentsMySQLServers(t, targetTestAgent, true, true)
-	if err != nil {
-		teardownTargetAgent(t)
-		log.Fatale(err)
-	}
-	defer teardownTargetAgent(t)
+	// create containers with MySQL for ConnectSlave stage
+	err = s.createTestAgentMySQLServer(sourceTestAgent, true, true)
+	c.Assert(err, IsNil)
+	err = s.createTestAgentMySQLServer(targetTestAgent, true, true)
+	c.Assert(err, IsNil)
+	err = s.createIPTablesRulesForReplication(targetTestAgent, sourceTestAgent)
+	c.Assert(err, IsNil)
 
-	teardownSourceAgent, err := createAgentsMySQLServers(t, sourceTestAgent, true, true)
-	if err != nil {
-		teardownSourceAgent(t)
-		log.Fatale(err)
-	}
-	defer teardownSourceAgent(t)
+	//register agents one more time to update mysqlport
+	s.registerAgents(c)
 
-	err = createIPTablesRulesForReplication(t, targetTestAgent, sourceTestAgent)
-	if err != nil {
-		log.Errore(err)
-		return
-	}
+	// update targetAgent with source agent replication pos\gtid
+	targetTestAgent.agentSeedMetadata = sourceTestAgent.agentSeedMetadata
 
-	//register then one more time to update mysqlport
-	_, err = RegisterAgent(targetTestAgent.agent.Info)
-	test.S(t).ExpectNil(err)
-	_, err = RegisterAgent(sourceTestAgent.agent.Info)
-	test.S(t).ExpectNil(err)
-
+	// update Orchestrator config
 	config.Config.MySQLTopologyUser = "orc_topology"
 	config.Config.MySQLTopologyPassword = "orc_topologypassword@"
 	config.Config.ReplicationCredentialsQuery = "select username, password from orchestrator_meta.replication;"
+
+	// ProcessSeeds. This is the last stage, so we will have seed in completed Status.
 	ProcessSeeds()
-	seed, err = ReadSeed(seedID)
-	test.S(t).ExpectNil(err)
-	test.S(t).ExpectEquals(seed.Status, Completed)
-	test.S(t).ExpectEquals(seed.Stage, ConnectSlave)
-	test.S(t).ExpectEquals(seed.Retries, 0)
-	seedStates, err = seed.ReadSeedStageStates()
-	test.S(t).ExpectNil(err)
-	for _, seedState := range seedStates[:1] {
-		test.S(t).ExpectEquals(seedState.SeedID, int64(1))
-		test.S(t).ExpectEquals(seedState.Stage, ConnectSlave)
-		test.S(t).ExpectEquals(seedState.Status, Completed)
-		test.S(t).ExpectEquals(seedState.Details, "Seed completed")
-	}
-
-}
-
-func TestProcessSeeds2(t *testing.T) {
-	fnc, err := createAgentsMySQLServers(t, &testAgent{}, true, true)
-	defer fnc(t)
-	if err != nil {
-		log.Errore(err)
-	}
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Completed, ConnectSlave, 0)
+	// simulate that Backup stage is running on target agent(as restore is always processed by targetAgent)
+	targetTestAgent.agentSeedStageStatus.Stage = ConnectSlave
+	targetTestAgent.agentSeedStageStatus.Timestamp = time.Now()
+	targetTestAgent.agentSeedStageStatus.Status = Completed
+	targetTestAgent.agentSeedStageStatus.Details = "completed connectSlave stage"
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
 }
