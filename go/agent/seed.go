@@ -132,7 +132,7 @@ func (m SeedMethod) MarshalText() ([]byte, error) {
 type SeedStatus int
 
 const (
-	Started SeedStatus = iota
+	Scheduled SeedStatus = iota
 	Running
 	Completed
 	Error
@@ -140,7 +140,7 @@ const (
 )
 
 func (s SeedStatus) String() string {
-	return [...]string{"Started", "Running", "Completed", "Error", "Failed"}[s]
+	return [...]string{"Scheduled", "Running", "Completed", "Error", "Failed"}[s]
 }
 
 func (s SeedStatus) MarshalJSON() ([]byte, error) {
@@ -161,7 +161,7 @@ func (s *SeedStatus) UnmarshalJSON(b []byte) error {
 }
 
 var toSeedStatus = map[string]SeedStatus{
-	"Started":   Started,
+	"Scheduled": Scheduled,
 	"Running":   Running,
 	"Completed": Completed,
 	"Error":     Error,
@@ -300,7 +300,7 @@ func NewSeed(seedMethodName string, targetAgent *Agent, sourceAgent *Agent) (int
 		SourceHostname: sourceAgent.Info.Hostname,
 		SeedMethod:     seedMethod,
 		BackupSide:     sourceAgent.Data.AvailiableSeedMethods[seedMethod].BackupSide,
-		Status:         Started,
+		Status:         Scheduled,
 		Stage:          Prepare,
 		Retries:        0,
 		StartTimestamp: time.Now(),
@@ -400,8 +400,8 @@ func ProcessSeeds() []*Seed {
 	for _, seed := range activeSeeds {
 		wg.Add(1)
 		switch seed.Status {
-		case Started:
-			go seed.processStarted(&wg)
+		case Scheduled:
+			go seed.processScheduled(&wg)
 		case Running:
 			go seed.processRunning(&wg)
 		case Error:
@@ -417,21 +417,19 @@ func (s *Seed) GetSeedAgents() (targetAgent *Agent, sourceAgent *Agent, err erro
 	targetAgent, err = ReadAgentInfo(s.TargetHostname)
 	if err != nil {
 		s.Status = Failed
-		s.Retries++
 		s.updateSeed(targetAgent, fmt.Sprintf("Unable to read target agent info: %+v", err))
 		return nil, nil, log.Errore(err)
 	}
 	sourceAgent, err = ReadAgentInfo(s.SourceHostname)
 	if err != nil {
 		s.Status = Failed
-		s.Retries++
 		s.updateSeed(sourceAgent, fmt.Sprintf("Unable to read source agent info: %+v", err))
 		return nil, nil, log.Errore(err)
 	}
 	return targetAgent, sourceAgent, nil
 }
 
-func (s *Seed) processStarted(wg *sync.WaitGroup) {
+func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 	defer wg.Done()
 	targetAgent, sourceAgent, err := s.GetSeedAgents()
 	if err != nil {
@@ -445,7 +443,6 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 		for agent, seedSide := range agents {
 			if err := agent.prepare(s.SeedID, s.SeedMethod, seedSide); err != nil {
 				s.Status = Failed
-				s.Retries++
 				s.updateSeed(agent, fmt.Sprintf("Error calling prepare API on agent: %+v", err))
 				return
 			}
@@ -459,7 +456,6 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 		}
 		if err := agent.backup(s.SeedID, s.SeedMethod, sourceAgent.Info.Hostname, sourceAgent.Info.MySQLPort); err != nil {
 			s.Status = Failed
-			s.Retries++
 			s.updateSeed(agent, fmt.Sprintf("Error calling backup API on agent: %+v", err))
 			return
 		}
@@ -468,7 +464,6 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 	case Restore:
 		if err := targetAgent.restore(s.SeedID, s.SeedMethod); err != nil {
 			s.Status = Failed
-			s.Retries++
 			s.updateSeed(targetAgent, fmt.Sprintf("Error calling restore API on agent: %+v", err))
 			return
 		}
@@ -481,7 +476,6 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 		for agent, seedSide := range agents {
 			if err := agent.cleanup(s.SeedID, s.SeedMethod, seedSide); err != nil {
 				s.Status = Failed
-				s.Retries++
 				s.updateSeed(targetAgent, fmt.Sprintf("Error calling prepare API on agent: %+v", err))
 				return
 			}
@@ -495,7 +489,6 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 		seedMetadata, err := targetAgent.getMetadata(s.SeedID, s.SeedMethod)
 		if err != nil {
 			s.Status = Failed
-			s.Retries++
 			s.updateSeed(targetAgent, fmt.Sprintf("Error calling getMetadata API on agent: %+v", err))
 			return
 		}
@@ -505,7 +498,6 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 		if err != nil {
 			log.Errore(err)
 			s.Status = Failed
-			s.Retries++
 			s.updateSeed(targetAgent, fmt.Sprintf("Error reading topology instance: %+v", err))
 			return
 		}
@@ -513,7 +505,6 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 		if err != nil {
 			log.Errore(err)
 			s.Status = Failed
-			s.Retries++
 			s.updateSeed(sourceAgent, fmt.Sprintf("Error reading topology instance: %+v", err))
 			return
 		}
@@ -525,7 +516,6 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 		if err != nil {
 			log.Errore(err)
 			s.Status = Failed
-			s.Retries++
 			s.updateSeed(targetAgent, fmt.Sprintf("Error executing RESET SLAVE: %+v", err))
 			return
 		}
@@ -533,7 +523,6 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 		if err != nil {
 			log.Errore(err)
 			s.Status = Failed
-			s.Retries++
 			s.updateSeed(targetAgent, fmt.Sprintf("Error executing RESET MASTER: %+v", err))
 			return
 		}
@@ -541,7 +530,6 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 			if err = inst.SetGTIDPurged(slave, seedMetadata.GtidExecuted); err != nil {
 				log.Errore(err)
 				s.Status = Failed
-				s.Retries++
 				s.updateSeed(targetAgent, fmt.Sprintf("Error setting GTID_PURGED: %+v", err))
 				return
 			}
@@ -556,7 +544,6 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 		if err != nil {
 			log.Errore(err)
 			s.Status = Failed
-			s.Retries++
 			s.updateSeed(targetAgent, fmt.Sprintf("Error executing CHANGE MASTER TO: %+v", err))
 			return
 		}
@@ -564,7 +551,6 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 		if err != nil {
 			log.Errore(err)
 			s.Status = Failed
-			s.Retries++
 			s.updateSeed(targetAgent, fmt.Sprintf("Error getting replication credentials: %+v", err))
 			return
 		}
@@ -572,7 +558,6 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 		if err != nil {
 			log.Errore(err)
 			s.Status = Failed
-			s.Retries++
 			s.updateSeed(targetAgent, fmt.Sprintf("Error executing CHANGE MASTER TO with replication credentials: %+v", err))
 			return
 		}
@@ -580,7 +565,6 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 			if _, err := inst.EnableMasterSSL(slaveInstanceKey); err != nil {
 				log.Errore(err)
 				s.Status = Failed
-				s.Retries++
 				s.updateSeed(targetAgent, fmt.Sprintf("Error executing CHANGE MASTER TO enable SSL: %+v", err))
 				return
 			}
@@ -589,7 +573,6 @@ func (s *Seed) processStarted(wg *sync.WaitGroup) {
 		if err != nil {
 			log.Errore(err)
 			s.Status = Failed
-			s.Retries++
 			s.updateSeed(targetAgent, fmt.Sprintf("Error executing START SLAVE: %+v", err))
 			return
 		}
@@ -614,7 +597,6 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 			stageAlreadyCompleted, err := s.isSeedStageCompletedForAgent(agent)
 			if err != nil {
 				s.Status = Failed
-				s.Retries++
 				s.updateSeed(agent, fmt.Sprintf("Error getting information about completed stages from Orchestrator: %+v", err))
 				return
 			}
@@ -622,7 +604,6 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 				agentSeedStageState, err := agent.getSeedStageState(s.SeedID, s.Stage)
 				if err != nil {
 					s.Status = Failed
-					s.Retries++
 					s.updateSeed(targetAgent, fmt.Sprintf("Error getting seed stage state information from agent: %+v", err))
 					return
 				}
@@ -633,7 +614,6 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 				}
 				if agentSeedStageState.Status == Error {
 					s.Status = Error
-					s.Retries++
 					s.updateSeed(agent, "")
 					return
 				}
@@ -643,7 +623,7 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 		}
 		if agents[targetAgent] && agents[sourceAgent] {
 			s.Stage = s.Stage + 1
-			s.Status = Started
+			s.Status = Scheduled
 			s.Retries = 0
 			s.updateSeed(nil, "")
 		}
@@ -655,7 +635,6 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 		agentSeedStageState, err := agent.getSeedStageState(s.SeedID, s.Stage)
 		if err != nil {
 			s.Status = Failed
-			s.Retries++
 			s.updateSeed(targetAgent, fmt.Sprintf("Error getting seed stage state information from agent: %+v", err))
 			return
 		}
@@ -663,13 +642,12 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 		if agentSeedStageState.Status == Completed {
 			auditSeedOperation(agent, fmt.Sprintf("SeedID: %d, Stage: %s, Status: %s, Retries: %d", s.SeedID, s.Stage.String(), Completed.String(), s.Retries))
 			s.Stage = s.Stage + 1
-			s.Status = Started
+			s.Status = Scheduled
 			s.Retries = 0
 			s.updateSeed(agent, "")
 		}
 		if agentSeedStageState.Status == Error {
 			s.Status = Error
-			s.Retries++
 			s.updateSeed(agent, "")
 		}
 	}
@@ -677,22 +655,34 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 
 func (s *Seed) processErrored(wg *sync.WaitGroup) {
 	defer wg.Done()
+	targetAgent, sourceAgent, err := s.GetSeedAgents()
+	if err != nil {
+		return
+	}
 	if s.Retries >= config.Config.MaxRetriesForSeedStage {
 		s.Status = Failed
 		s.EndTimestamp = time.Now()
-		s.updateSeed(nil, fmt.Sprintf("Seed failed. Seed stage retries: %d, MaxRetriesForSeedStage: %d", s.Retries, config.Config.MaxRetriesForSeedStage))
+		if s.Stage == Prepare || s.Stage == Cleanup {
+			for _, agent := range []*Agent{targetAgent, sourceAgent} {
+				s.updateSeed(agent, fmt.Sprintf("Seed failed. Seed stage retries: %d, MaxRetriesForSeedStage: %d", s.Retries, config.Config.MaxRetriesForSeedStage))
+			}
+		}
+		if s.Stage == Restore || s.Stage == ConnectSlave {
+			s.updateSeed(targetAgent, fmt.Sprintf("Seed failed. Seed stage retries: %d, MaxRetriesForSeedStage: %d", s.Retries, config.Config.MaxRetriesForSeedStage))
+		}
+		if s.Stage == Backup {
+			s.Stage = Prepare
+			if s.BackupSide == Target {
+				s.updateSeed(targetAgent, fmt.Sprintf("Seed failed. Seed stage retries: %d, MaxRetriesForSeedStage: %d", s.Retries, config.Config.MaxRetriesForSeedStage))
+			} else {
+				s.updateSeed(sourceAgent, fmt.Sprintf("Seed failed. Seed stage retries: %d, MaxRetriesForSeedStage: %d", s.Retries, config.Config.MaxRetriesForSeedStage))
+			}
+		}
 		return
 	}
 	// prepare and cleanup stages are executed on both agents, so we need to check them and if it's running - stop it.
 	if s.Stage == Prepare || s.Stage == Cleanup {
-		targetAgent, sourceAgent, err := s.GetSeedAgents()
-		if err != nil {
-			return
-		}
-		agents := []*Agent{}
-		agents = append(agents, targetAgent, sourceAgent)
-
-		for _, agent := range agents {
+		for _, agent := range []*Agent{targetAgent, sourceAgent} {
 			agentSeedStageState, err := agent.getSeedStageState(s.SeedID, s.Stage)
 			if err != nil {
 				s.Retries++
@@ -700,7 +690,7 @@ func (s *Seed) processErrored(wg *sync.WaitGroup) {
 				return
 			}
 			if agentSeedStageState.Status == Running {
-				if err := agent.AbortSeed(s.SeedID); err != nil {
+				if err := agent.AbortSeed(s.SeedID, s.Stage); err != nil {
 					s.Retries++
 					s.updateSeed(agent, fmt.Sprintf("Error aborting seed on agent: %+v", err))
 					return
@@ -709,12 +699,25 @@ func (s *Seed) processErrored(wg *sync.WaitGroup) {
 			}
 		}
 	}
+	// update set SeedStatus Scheduled and update seed according to stage
+	s.Status = Scheduled
+	s.Retries++
+	switch s.Stage {
+	case Prepare, Cleanup:
+		for _, agent := range []*Agent{targetAgent, sourceAgent} {
+			s.updateSeed(agent, fmt.Sprintf("Seed will be restarted from %s stage", s.Stage.String()))
+		}
+	case Restore, ConnectSlave:
+		s.updateSeed(targetAgent, fmt.Sprintf("Seed will be restarted from %s stage", s.Stage.String()))
 	// if stage is backup we need to restart from prepare stage (because we can have operations like stating netcat\socat on target in prepare stage)
-	s.Status = Started
-	if s.Stage == Backup {
+	case Backup:
 		s.Stage = Prepare
+		if s.BackupSide == Target {
+			s.updateSeed(targetAgent, fmt.Sprintf("Seed will be restarted from %s stage", s.Stage.String()))
+		} else {
+			s.updateSeed(sourceAgent, fmt.Sprintf("Seed will be restarted from %s stage", s.Stage.String()))
+		}
 	}
-	s.updateSeed(nil, fmt.Sprintf("Seed will be restarted from % stage", s.Stage.String()))
 }
 
 func (s *Seed) updateSeed(agent *Agent, seedStateDetails string) {

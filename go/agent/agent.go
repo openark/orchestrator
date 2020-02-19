@@ -295,8 +295,8 @@ func (agent *Agent) cleanup(seedID int64, seedMethod SeedMethod, seedSide SeedSi
 }
 
 // AbortSeed stops seed on agent
-func (agent *Agent) AbortSeed(seedID int64) error {
-	return agent.executeAgentCommand(fmt.Sprintf("abort-seed/%d", seedID), nil)
+func (agent *Agent) AbortSeed(seedID int64, seedStage SeedStage) error {
+	return agent.executeAgentCommand(fmt.Sprintf("abort-seed-stage/%d/%s", seedID, seedStage), nil)
 }
 
 // getMetdata returns SeedMetadata for seed
