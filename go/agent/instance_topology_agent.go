@@ -41,6 +41,16 @@ func SyncReplicaRelayLogs(instance, otherInstance *inst.Instance) (*inst.Instanc
 		return instance, log.Errorf("SyncReplicaRelayLogs: replication on %+v must not run", otherInstance.Key)
 	}
 
+	agent, err := ReadAgent(instance.Key.Hostname)
+	if err != nil {
+		return instance, log.Errore(err)
+	}
+
+	otherAgent, err := ReadAgent(otherInstance.Key.Hostname)
+	if err != nil {
+		return otherInstance, log.Errore(err)
+	}
+
 	log.Debugf("SyncReplicaRelayLogs: correlating coordinates of %+v on %+v", instance.Key, otherInstance.Key)
 	_, _, nextCoordinates, found, err = inst.CorrelateRelaylogCoordinates(instance, nil, otherInstance)
 	if err != nil {
@@ -52,12 +62,13 @@ func SyncReplicaRelayLogs(instance, otherInstance *inst.Instance) (*inst.Instanc
 	log.Debugf("SyncReplicaRelayLogs: correlated next-coordinates are %+v", *nextCoordinates)
 
 	InitHttpClient()
-	if _, err := RelaylogContentsTail(otherInstance.Key.Hostname, nextCoordinates, &onResponse); err != nil {
+
+	if err := otherAgent.relaylogContentsTail(nextCoordinates, &onResponse); err != nil {
 		goto Cleanup
 	}
 	log.Debugf("SyncReplicaRelayLogs: got content (%d bytes)", len(content))
 
-	if _, err := ApplyRelaylogContents(instance.Key.Hostname, content); err != nil {
+	if err := agent.applyRelaylogContents(content); err != nil {
 		goto Cleanup
 	}
 	log.Debugf("SyncReplicaRelayLogs: applied content (%d bytes)", len(content))

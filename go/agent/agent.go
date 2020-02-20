@@ -203,7 +203,7 @@ func (agent *Agent) executeAgentCommand(command string, onResponse *func([]byte)
 }
 
 // executeAgentPostCommand requests an agent to execute a command via HTTP POST
-func (agent *Agent) executeAgentPostCommand(hostname string, command string, content string, onResponse *func([]byte)) error {
+func (agent *Agent) executeAgentPostCommand(command string, content string, onResponse *func([]byte)) error {
 	httpFunc := func(uri string) (resp *http.Response, err error) {
 		return httpPost(uri, "text/plain", content)
 	}
@@ -259,18 +259,12 @@ func (agent *Agent) getAgentData() error {
 	return agent.updateAgentData()
 }
 
-// Unmount unmounts the designated snapshot mount point
-func (agent *Agent) Unmount() error {
-	onResponse := func(body []byte) {
-		err := json.Unmarshal(body, agent.Data)
-		if err != nil {
-			log.Errore(err)
-		}
-	}
-	if err := agent.executeAgentCommand("umount", &onResponse); err != nil {
-		return err
-	}
-	return agent.updateAgentData()
+func (agent *Agent) relaylogContentsTail(startCoordinates *inst.BinlogCoordinates, onResponse *func([]byte)) error {
+	return agent.executeAgentCommand(fmt.Sprintf("mysql-relaylog-contents-tail/%s/%d", startCoordinates.LogFile, startCoordinates.LogPos), onResponse)
+}
+
+func (agent *Agent) applyRelaylogContents(content string) error {
+	return agent.executeAgentPostCommand("apply-relaylog-contents", content, nil)
 }
 
 // prepare starts prepare stage for seed on agent
@@ -301,6 +295,102 @@ func (agent *Agent) postSeedCmd(seedID int64) error {
 // AbortSeed stops seed on agent
 func (agent *Agent) AbortSeed(seedID int64, seedStage SeedStage) error {
 	return agent.executeAgentCommand(fmt.Sprintf("abort-seed-stage/%d/%s", seedID, seedStage), nil)
+}
+
+// CustomCommand executes specified command on agent
+func (agent *Agent) CustomCommand(cmd string) (output string, err error) {
+	onResponse := func(body []byte) {
+		output = string(body)
+		log.Debugf("output: %v", output)
+	}
+	if err := agent.executeAgentCommand(fmt.Sprintf("custom-commands/%s", cmd), &onResponse); err != nil {
+		return "", err
+	}
+	return output, err
+}
+
+// Unmount unmounts the designated snapshot mount point
+func (agent *Agent) Unmount() error {
+	onResponse := func(body []byte) {
+		err := json.Unmarshal(body, agent.Data)
+		if err != nil {
+			log.Errore(err)
+		}
+	}
+	if err := agent.executeAgentCommand("umount", &onResponse); err != nil {
+		return err
+	}
+	return agent.updateAgentData()
+}
+
+// MountLV requests an agent to mount the given volume on the designated mount point
+func (agent *Agent) MountLV(lv string) error {
+	onResponse := func(body []byte) {
+		err := json.Unmarshal(body, agent.Data)
+		if err != nil {
+			log.Errore(err)
+		}
+	}
+	if err := agent.executeAgentCommand(fmt.Sprintf("mountlv?lv=%s", lv), &onResponse); err != nil {
+		return err
+	}
+	return agent.updateAgentData()
+}
+
+// RemoveLV requests an agent to remove a snapshot
+func (agent *Agent) RemoveLV(lv string) error {
+	onResponse := func(body []byte) {
+		err := json.Unmarshal(body, agent.Data)
+		if err != nil {
+			log.Errore(err)
+		}
+	}
+	if err := agent.executeAgentCommand(fmt.Sprintf("emovelv?lv=%s", lv), &onResponse); err != nil {
+		return err
+	}
+	return agent.updateAgentData()
+}
+
+// CreateSnapshot requests an agent to create a new snapshot -- a DIY implementation
+func (agent *Agent) CreateSnapshot() error {
+	onResponse := func(body []byte) {
+		err := json.Unmarshal(body, agent.Data)
+		if err != nil {
+			log.Errore(err)
+		}
+	}
+	if err := agent.executeAgentCommand("create-snapshot", &onResponse); err != nil {
+		return err
+	}
+	return agent.updateAgentData()
+}
+
+// MySQLStart requests an agent to start the MySQL service
+func (agent *Agent) MySQLStart() error {
+	onResponse := func(body []byte) {
+		err := json.Unmarshal(body, agent.Data)
+		if err != nil {
+			log.Errore(err)
+		}
+	}
+	if err := agent.executeAgentCommand("mysql-start", &onResponse); err != nil {
+		return err
+	}
+	return agent.updateAgentData()
+}
+
+// MySQLStop requests an agent to stop MySQL service
+func (agent *Agent) MySQLStop() error {
+	onResponse := func(body []byte) {
+		err := json.Unmarshal(body, agent.Data)
+		if err != nil {
+			log.Errore(err)
+		}
+	}
+	if err := agent.executeAgentCommand("mysql-stop", &onResponse); err != nil {
+		return err
+	}
+	return agent.updateAgentData()
 }
 
 // getMetdata returns SeedMetadata for seed
