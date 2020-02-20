@@ -44,7 +44,7 @@ func init() {
 	log.SetLevel(log.DEBUG)
 }
 
-var testname = flag.String("testname", "TestProcessSeedsErrorOnBackup", "test names to run")
+var testname = flag.String("testname", "TestProcessSeeds", "test names to run")
 
 func Test(t *testing.T) { TestingT(t) }
 
@@ -218,6 +218,9 @@ func (s *AgentTestSuite) createTestAgent(agent *Agent) {
 	})
 	m.Get("/api/cleanup/:seedID/:seedMethod/:seedSide", func(r render.Render, res http.ResponseWriter, req *http.Request) {
 		r.Text(202, "Started")
+	})
+	m.Get("/api/post-seed-cmd/:seedID", func(r render.Render, res http.ResponseWriter, req *http.Request) {
+		r.Text(202, "Done")
 	})
 	m.Get("/api/get-metadata/:seedID/:seedMethod", func(r render.Render, res http.ResponseWriter, req *http.Request) {
 		r.JSON(200, testAgent.agentSeedMetadata)
@@ -1078,7 +1081,7 @@ func (s *AgentTestSuite) TestProcessSeedsErrorOnBackup(c *C) {
 	targetTestAgent.agentSeedStageStatus.Hostname = targetTestAgent.agent.Info.Hostname
 	targetTestAgent.agentSeedStageStatus.Timestamp = time.Now()
 	targetTestAgent.agentSeedStageStatus.Status = Error
-	targetTestAgent.agentSeedStageStatus.Details = "error processing prepare stage"
+	targetTestAgent.agentSeedStageStatus.Details = "error processing backup stage"
 
 	ProcessSeeds()
 	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Error, Backup, 0)
@@ -1091,4 +1094,193 @@ func (s *AgentTestSuite) TestProcessSeedsErrorOnBackup(c *C) {
 	// so our SeedStage should also be in Scheduled status
 	targetTestAgent.agentSeedStageStatus.Status = Scheduled
 	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
+}
+
+func (s *AgentTestSuite) TestProcessSeedsErrorOnRestore(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	config.Config.MaxRetriesForSeedStage = 2
+
+	s.registerAgents(c)
+
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(1))
+
+	// Orchestrator registered seed. It's will have first stage - Prepare and status Scheduled
+	seed := s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Scheduled, Prepare, 0)
+
+	// change seed status to Running and stage to Restore
+	seed.Status = Running
+	seed.Stage = Restore
+	seed.updateSeedData()
+
+	// As Restore is always executed on target, set in status to Error
+	targetTestAgent.agentSeedStageStatus.SeedID = seedID
+	targetTestAgent.agentSeedStageStatus.Stage = Restore
+	targetTestAgent.agentSeedStageStatus.Hostname = targetTestAgent.agent.Info.Hostname
+	targetTestAgent.agentSeedStageStatus.Timestamp = time.Now()
+	targetTestAgent.agentSeedStageStatus.Status = Error
+	targetTestAgent.agentSeedStageStatus.Details = "error processing restore stage"
+
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Error, Restore, 0)
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
+
+	// ProcessSeeds. After error our seed will be moved back to Restore stage Scheduled status and retries increased (due to backup stage is always moved to scheduled)
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Scheduled, Restore, 1)
+
+	// so our SeedStage should also be in Scheduled status
+	targetTestAgent.agentSeedStageStatus.Status = Scheduled
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
+}
+
+func (s *AgentTestSuite) TestProcessSeedsErrorOnCleanup(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	config.Config.MaxRetriesForSeedStage = 2
+
+	s.registerAgents(c)
+
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(1))
+
+	// Orchestrator registered seed. It's will have first stage - Prepare and status Scheduled
+	seed := s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Scheduled, Prepare, 0)
+
+	// change seed status to Running and stage to Cleanup
+	seed.Status = Running
+	seed.Stage = Cleanup
+	seed.updateSeedData()
+
+	// One agent is OK, another had error
+	for _, agent := range []*testAgent{targetTestAgent, sourceTestAgent} {
+		agent.agentSeedStageStatus.SeedID = seedID
+		agent.agentSeedStageStatus.Stage = Cleanup
+		agent.agentSeedStageStatus.Hostname = agent.agent.Info.Hostname
+		agent.agentSeedStageStatus.Timestamp = time.Now()
+	}
+	targetTestAgent.agentSeedStageStatus.Status = Running
+	targetTestAgent.agentSeedStageStatus.Details = "processing cleanup stage"
+	sourceTestAgent.agentSeedStageStatus.Status = Error
+	sourceTestAgent.agentSeedStageStatus.Details = "error processing cleanup stage"
+
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Error, Cleanup, 0)
+	s.readSeedStageStates(c, seed, 2, targetTestAgent, sourceTestAgent)
+
+	// ProcessSeeds. After error our seed will be moved back to Cleanup stage Scheduled status and retries increased
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Scheduled, Cleanup, 1)
+
+	// so our SeedStages should also be in Scheduled status
+	sourceTestAgent.agentSeedStageStatus.Status = Scheduled
+	targetTestAgent.agentSeedStageStatus.Status = Scheduled
+	s.readSeedStageStates(c, seed, 2, targetTestAgent, sourceTestAgent)
+}
+
+func (s *AgentTestSuite) TestProcessSeedsErrorOnConnectSlave(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	config.Config.MaxRetriesForSeedStage = 2
+
+	s.registerAgents(c)
+
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(1))
+
+	// Orchestrator registered seed. It's will have first stage - Prepare and status Scheduled
+	seed := s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Scheduled, Prepare, 0)
+
+	// change seed status to Scheduled and stage to ConnectSlave
+	seed.Status = Scheduled
+	seed.Stage = ConnectSlave
+	seed.updateSeedData()
+
+	targetTestAgent.agentSeedStageStatus.SeedID = seedID
+	targetTestAgent.agentSeedStageStatus.Stage = ConnectSlave
+	targetTestAgent.agentSeedStageStatus.Hostname = targetTestAgent.agent.Info.Hostname
+	targetTestAgent.agentSeedStageStatus.Timestamp = time.Now()
+	targetTestAgent.agentSeedStageStatus.Status = Error
+	targetTestAgent.agentSeedStageStatus.Details = "error processing restore stage"
+
+	// As ConnectSlave requires agent metadata, set it
+	targetTestAgent.agentSeedMetadata = &SeedMetadata{
+		LogFile:      "mysql.bin1",
+		LogPos:       190,
+		GtidExecuted: "",
+	}
+
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Error, ConnectSlave, 0)
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
+
+	// ProcessSeeds. After error our seed will be moved back to Restore stage Scheduled status and retries increased (due to backup stage is always moved to scheduled)
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Scheduled, ConnectSlave, 1)
+
+	// so our SeedStage should also be in Scheduled status
+	targetTestAgent.agentSeedStageStatus.Status = Scheduled
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
+}
+
+func (s *AgentTestSuite) TestProcessSeedsFailed(c *C) {
+	targetTestAgent := s.testAgents["agent1"]
+	sourceTestAgent := s.testAgents["agent2"]
+
+	// MaxRetriesForStage set to 0, so it will be failed after first error
+	config.Config.MaxRetriesForSeedStage = 0
+
+	s.registerAgents(c)
+
+	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
+
+	seedID, err := NewSeed("Mydumper", targetAgent, sourceAgent)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(1))
+
+	// Orchestrator registered seed. It's will have first stage - Prepare and status Scheduled
+	seed := s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Scheduled, Prepare, 0)
+
+	// change seed status to Running and stage to Restore
+	seed.Status = Running
+	seed.Stage = Restore
+	seed.updateSeedData()
+
+	// As Restore is always executed on target, set in status to Error
+	targetTestAgent.agentSeedStageStatus.SeedID = seedID
+	targetTestAgent.agentSeedStageStatus.Stage = Restore
+	targetTestAgent.agentSeedStageStatus.Hostname = targetTestAgent.agent.Info.Hostname
+	targetTestAgent.agentSeedStageStatus.Timestamp = time.Now()
+	targetTestAgent.agentSeedStageStatus.Status = Error
+	targetTestAgent.agentSeedStageStatus.Details = "error processing restore stage"
+
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Error, Restore, 0)
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
+
+	// ProcessSeeds. After error our seed will be Failed
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Failed, Restore, 0)
+
+	// so our SeedStage should also be in Scheduled status
+	targetTestAgent.agentSeedStageStatus.Status = Failed
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
+
+	activeSeeds, err := ReadActiveSeeds()
+	c.Assert(err, IsNil)
+	c.Assert(activeSeeds, HasLen, 0)
+
 }

@@ -442,7 +442,7 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 		agents[sourceAgent] = Source
 		for agent, seedSide := range agents {
 			if err := agent.prepare(s.SeedID, s.SeedMethod, seedSide); err != nil {
-				s.Status = Failed
+				s.Status = Error
 				s.updateSeed(agent, fmt.Sprintf("Error calling prepare API on agent: %+v", err))
 				return
 			}
@@ -455,7 +455,7 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 			agent = sourceAgent
 		}
 		if err := agent.backup(s.SeedID, s.SeedMethod, sourceAgent.Info.Hostname, sourceAgent.Info.MySQLPort); err != nil {
-			s.Status = Failed
+			s.Status = Error
 			s.updateSeed(agent, fmt.Sprintf("Error calling backup API on agent: %+v", err))
 			return
 		}
@@ -463,7 +463,7 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 		s.updateSeed(agent, "Started backup stage")
 	case Restore:
 		if err := targetAgent.restore(s.SeedID, s.SeedMethod); err != nil {
-			s.Status = Failed
+			s.Status = Error
 			s.updateSeed(targetAgent, fmt.Sprintf("Error calling restore API on agent: %+v", err))
 			return
 		}
@@ -475,7 +475,7 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 		agents[sourceAgent] = Source
 		for agent, seedSide := range agents {
 			if err := agent.cleanup(s.SeedID, s.SeedMethod, seedSide); err != nil {
-				s.Status = Failed
+				s.Status = Error
 				s.updateSeed(targetAgent, fmt.Sprintf("Error calling prepare API on agent: %+v", err))
 				return
 			}
@@ -488,7 +488,7 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 		s.updateSeedState(targetAgent.Info.Hostname, "Started connect slave stage")
 		seedMetadata, err := targetAgent.getMetadata(s.SeedID, s.SeedMethod)
 		if err != nil {
-			s.Status = Failed
+			s.Status = Error
 			s.updateSeed(targetAgent, fmt.Sprintf("Error calling getMetadata API on agent: %+v", err))
 			return
 		}
@@ -497,14 +497,14 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 		slave, err := inst.ReadTopologyInstance(slaveInstanceKey)
 		if err != nil {
 			log.Errore(err)
-			s.Status = Failed
+			s.Status = Error
 			s.updateSeed(targetAgent, fmt.Sprintf("Error reading topology instance: %+v", err))
 			return
 		}
 		master, err := inst.ReadTopologyInstance(masterInstanceKey)
 		if err != nil {
 			log.Errore(err)
-			s.Status = Failed
+			s.Status = Error
 			s.updateSeed(sourceAgent, fmt.Sprintf("Error reading topology instance: %+v", err))
 			return
 		}
@@ -515,21 +515,21 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 		slave, err = inst.ResetSlave(slaveInstanceKey)
 		if err != nil {
 			log.Errore(err)
-			s.Status = Failed
+			s.Status = Error
 			s.updateSeed(targetAgent, fmt.Sprintf("Error executing RESET SLAVE: %+v", err))
 			return
 		}
 		slave, err = inst.ResetMaster(slaveInstanceKey)
 		if err != nil {
 			log.Errore(err)
-			s.Status = Failed
+			s.Status = Error
 			s.updateSeed(targetAgent, fmt.Sprintf("Error executing RESET MASTER: %+v", err))
 			return
 		}
 		if len(seedMetadata.GtidExecuted) > 0 {
 			if err = inst.SetGTIDPurged(slave, seedMetadata.GtidExecuted); err != nil {
 				log.Errore(err)
-				s.Status = Failed
+				s.Status = Error
 				s.updateSeed(targetAgent, fmt.Sprintf("Error setting GTID_PURGED: %+v", err))
 				return
 			}
@@ -543,28 +543,28 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 		slave, err = inst.ChangeMasterTo(slaveInstanceKey, masterInstanceKey, binlogCoordinates, false, gtidHint)
 		if err != nil {
 			log.Errore(err)
-			s.Status = Failed
+			s.Status = Error
 			s.updateSeed(targetAgent, fmt.Sprintf("Error executing CHANGE MASTER TO: %+v", err))
 			return
 		}
 		replicationUser, replicationPassword, err := inst.ReadReplicationCredentials(slaveInstanceKey)
 		if err != nil {
 			log.Errore(err)
-			s.Status = Failed
+			s.Status = Error
 			s.updateSeed(targetAgent, fmt.Sprintf("Error getting replication credentials: %+v", err))
 			return
 		}
 		slave, err = inst.ChangeMasterCredentials(slaveInstanceKey, replicationUser, replicationPassword)
 		if err != nil {
 			log.Errore(err)
-			s.Status = Failed
+			s.Status = Error
 			s.updateSeed(targetAgent, fmt.Sprintf("Error executing CHANGE MASTER TO with replication credentials: %+v", err))
 			return
 		}
 		if slave.AllowTLS {
 			if _, err := inst.EnableMasterSSL(slaveInstanceKey); err != nil {
 				log.Errore(err)
-				s.Status = Failed
+				s.Status = Error
 				s.updateSeed(targetAgent, fmt.Sprintf("Error executing CHANGE MASTER TO enable SSL: %+v", err))
 				return
 			}
@@ -572,9 +572,16 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 		slave, err = inst.StartSlave(slaveInstanceKey)
 		if err != nil {
 			log.Errore(err)
-			s.Status = Failed
+			s.Status = Error
 			s.updateSeed(targetAgent, fmt.Sprintf("Error executing START SLAVE: %+v", err))
 			return
+		}
+		for _, agent := range []*Agent{targetAgent, sourceAgent} {
+			if err := agent.postSeedCmd(s.SeedID); err != nil {
+				s.updateSeedState(agent.Info.Hostname, fmt.Sprintf("Failed to execute post seed command on agent: %+v", err))
+			} else {
+				s.updateSeedState(agent.Info.Hostname, "Executed post-seed command")
+			}
 		}
 		s.Status = Completed
 		s.EndTimestamp = time.Now()
