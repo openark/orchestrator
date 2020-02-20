@@ -55,7 +55,6 @@ type Data struct {
 	MySQLDatadir          string
 	MySQLDatadirDiskUsed  int64
 	MySQLDatadirDiskFree  int64
-	MySQLVersion          string
 	MySQLDatabases        map[string]*MySQLDatabase
 	AvailiableSeedMethods map[SeedMethod]*SeedMethodOpts
 }
