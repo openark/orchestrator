@@ -294,6 +294,11 @@ func (agent *Agent) cleanup(seedID int64, seedMethod SeedMethod, seedSide SeedSi
 	return agent.executeAgentCommand(fmt.Sprintf("cleanup/%d/%s/%s", seedID, seedMethod.String(), seedSide.String()), nil)
 }
 
+// cleanup starts cleanup stage for seed on agent
+func (agent *Agent) postSeedCmd(seedID int64) error {
+	return agent.executeAgentCommand(fmt.Sprintf("post-seed-cmd/%d", seedID), nil)
+}
+
 // AbortSeed stops seed on agent
 func (agent *Agent) AbortSeed(seedID int64, seedStage SeedStage) error {
 	return agent.executeAgentCommand(fmt.Sprintf("abort-seed-stage/%d/%s", seedID, seedStage), nil)
