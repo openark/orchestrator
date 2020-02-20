@@ -19,6 +19,7 @@ package inst
 import (
 	"bytes"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -65,6 +66,10 @@ func (this InstancesByCountSlaveHosts) Len() int      { return len(this) }
 func (this InstancesByCountSlaveHosts) Swap(i, j int) { this[i], this[j] = this[j], this[i] }
 func (this InstancesByCountSlaveHosts) Less(i, j int) bool {
 	return len(this[i].SlaveHosts) < len(this[j].SlaveHosts)
+}
+
+type agentSnapshots struct {
+	LogicalVolumes []struct{} `json:"LogicalVolumes"`
 }
 
 // instanceKeyInformativeClusterName is a non-authoritative cache; used for auditing or general purpose.
@@ -1979,7 +1984,9 @@ func ResolveUnknownMasterHostnameResolves() error {
 }
 
 // ReadCountMySQLSnapshots is a utility method to return registered number of snapshots for a given list of hosts
+// as json funcs are only on MySQL 5.7+, so we will unmarshall result into a struct
 func ReadCountMySQLSnapshots(hostnames []string) (map[string]int, error) {
+	agentLogicalVolumes := &agentSnapshots{}
 	res := make(map[string]int)
 	if !config.Config.ServeAgentsHttp {
 		return res, nil
@@ -1987,7 +1994,7 @@ func ReadCountMySQLSnapshots(hostnames []string) (map[string]int, error) {
 	query := fmt.Sprintf(`
 		select
 			hostname,
-			count_mysql_snapshots
+			data
 		from
 			host_agent
 		where
@@ -1997,7 +2004,11 @@ func ReadCountMySQLSnapshots(hostnames []string) (map[string]int, error) {
 		`, sqlutils.InClauseStringValues(hostnames))
 
 	err := db.QueryOrchestratorRowsMap(query, func(m sqlutils.RowMap) error {
-		res[m.GetString("hostname")] = m.GetInt("count_mysql_snapshots")
+		err := json.Unmarshal([]byte(m.GetString("data")), agentLogicalVolumes)
+		if err != nil {
+			return log.Errore(err)
+		}
+		res[m.GetString("hostname")] = len(agentLogicalVolumes.LogicalVolumes)
 		return nil
 	})
 
