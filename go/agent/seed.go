@@ -275,8 +275,24 @@ func NewSeed(seedMethodName string, targetAgent *Agent, sourceAgent *Agent) (int
 			return 0, log.Errorf("Database %s had a table with engine unsupported by seed method %s", db, seedMethod.String())
 		}
 	}
-	if inst.IsSmallerMajorVersion(targetAgent.Data.MySQLVersion, sourceAgent.Data.MySQLVersion) {
-		return 0, log.Errorf("MySQL version on target agent is smaller that on source. Source agent MySQL version: %s, target agent MySQL version: %s", sourceAgent.Data.MySQLVersion, targetAgent.Data.MySQLVersion)
+	targetInstance, err := inst.ReadTopologyInstance(&inst.InstanceKey{Hostname: targetAgent.Info.Hostname, Port: targetAgent.Info.MySQLPort})
+	if err != nil {
+		return 0, log.Errorf("Unable to read target agent instance %s", targetAgent.Info.Hostname)
+	}
+	sourceInstance, err := inst.ReadTopologyInstance(&inst.InstanceKey{Hostname: sourceAgent.Info.Hostname, Port: sourceAgent.Info.MySQLPort})
+	if err != nil {
+		return 0, log.Errorf("Unable to read source agent instance %s", targetAgent.Info.Hostname)
+	}
+	if targetInstance.IsSmallerMajorVersion(sourceInstance) {
+		return 0, log.Errorf("MySQL version on target agent is smaller that on source. Source agent MySQL version: %s, target agent MySQL version: %s", sourceInstance.Version, targetInstance.Version)
+	}
+	if !sourceInstance.LogBinEnabled {
+		return 0, log.Errorf("Binlog is not enabled on MySQL source agent host %s", sourceAgent.Info.Hostname)
+	}
+	if sourceInstance.IsReplica() {
+		if !sourceInstance.LogSlaveUpdatesEnabled {
+			return 0, log.Errorf("log-slave-updates is not enabled on MySQL source agent host %s, but the host is a replica", sourceAgent.Info.Hostname)
+		}
 	}
 	activeSourceSeeds, _ := ReadActiveSeedsForAgent(sourceAgent)
 	activeTargetSeeds, _ := ReadActiveSeedsForAgent(targetAgent)
@@ -746,4 +762,44 @@ func (s *Seed) updateSeedState(hostname string, details string) error {
 		Details:   details,
 	}
 	return submitSeedStageState(seedStageState)
+}
+
+func (s *Seed) AbortSeed() error {
+	targetAgent, sourceAgent, err := s.GetSeedAgents()
+	if err != nil {
+		return err
+	}
+	s.Status = Failed
+	s.EndTimestamp = time.Now()
+	switch s.Stage {
+	case Prepare, Cleanup:
+		for _, agent := range []*Agent{targetAgent, sourceAgent} {
+			agentSeedStageState, err := agent.getSeedStageState(s.SeedID, s.Stage)
+			if err != nil {
+				return err
+			}
+			if agentSeedStageState.Status == Running {
+				if err := agent.AbortSeed(s.SeedID, s.Stage); err != nil {
+					return err
+				}
+				s.updateSeedState(agent.Info.Hostname, fmt.Sprintf("Aborted %s seed stage", s.Stage.String()))
+			}
+		}
+	case Backup, Restore:
+		agent := targetAgent
+		if s.BackupSide == Source && s.Stage == Backup {
+			agent = sourceAgent
+		}
+		agentSeedStageState, err := agent.getSeedStageState(s.SeedID, s.Stage)
+		if err != nil {
+			return err
+		}
+		if agentSeedStageState.Status == Running {
+			if err := agent.AbortSeed(s.SeedID, s.Stage); err != nil {
+				return err
+			}
+			s.updateSeedState(agent.Info.Hostname, fmt.Sprintf("Aborted %s seed stage", s.Stage.String()))
+		}
+	}
+	return s.updateSeedData()
 }

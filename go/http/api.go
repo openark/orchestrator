@@ -2804,18 +2804,10 @@ func (this *HttpAPI) AbortSeed(params martini.Params, r render.Render, req *http
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
-	agents := []*agent.Agent{}
-	targetAgent, sourceAgent, err := seed.GetSeedAgents()
+	err = seed.AbortSeed()
 	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
-	}
-	agents = append(agents, targetAgent, sourceAgent)
-	for _, seedAgent := range agents {
-		err := seedAgent.AbortSeed(seedID)
-		if err != nil {
-			Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
-			return
-		}
 	}
 	r.JSON(http.StatusOK, err == nil)
 }
