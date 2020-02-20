@@ -95,10 +95,10 @@ func init() {
 	writeBufferLatency.AddMany([]string{"wait", "write"})
 	writeBufferLatency.Start("wait")
 
-	go initializeInstanceDao()
+	go InitializeInstanceDao()
 }
 
-func initializeInstanceDao() {
+func InitializeInstanceDao() {
 	config.WaitForConfigurationToBeLoaded()
 	instanceWriteBuffer = make(chan instanceUpdateObject, config.Config.InstanceWriteBufferSize)
 	instanceKeyInformativeClusterName = cache.New(time.Duration(config.Config.InstancePollSeconds/2)*time.Second, time.Second)
