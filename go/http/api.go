@@ -2506,14 +2506,18 @@ func (this *HttpAPI) AgentMountLV(params martini.Params, r render.Render, req *h
 		return
 	}
 
-	output, err := agent.MountLV(params["host"], req.URL.Query().Get("lv"))
-
+	agent, err := agent.ReadAgentInfo(params["host"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, output)
+	if err := agent.MountLV(req.URL.Query().Get("lv")); err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, agent)
 }
 
 // AgentCreateSnapshot instructs an agent to create a new snapshot. Agent's DIY implementation.
@@ -2527,14 +2531,18 @@ func (this *HttpAPI) AgentCreateSnapshot(params martini.Params, r render.Render,
 		return
 	}
 
-	output, err := agent.CreateSnapshot(params["host"])
-
+	agent, err := agent.ReadAgentInfo(params["host"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, output)
+	if err := agent.CreateSnapshot(); err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, agent)
 }
 
 // AgentRemoveLV instructs an agent to remove a logical volume
@@ -2548,14 +2556,18 @@ func (this *HttpAPI) AgentRemoveLV(params martini.Params, r render.Render, req *
 		return
 	}
 
-	output, err := agent.RemoveLV(params["host"], req.URL.Query().Get("lv"))
-
+	agent, err := agent.ReadAgentInfo(params["host"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, output)
+	if err := agent.RemoveLV(req.URL.Query().Get("lv")); err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, agent)
 }
 
 // AgentMySQLStop stops MySQL service on agent
@@ -2569,14 +2581,18 @@ func (this *HttpAPI) AgentMySQLStop(params martini.Params, r render.Render, req 
 		return
 	}
 
-	output, err := agent.MySQLStop(params["host"])
-
+	agent, err := agent.ReadAgentInfo(params["host"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, output)
+	if err := agent.MySQLStop(); err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, agent)
 }
 
 // AgentMySQLStart starts MySQL service on agent
@@ -2590,14 +2606,18 @@ func (this *HttpAPI) AgentMySQLStart(params martini.Params, r render.Render, req
 		return
 	}
 
-	output, err := agent.MySQLStart(params["host"])
-
+	agent, err := agent.ReadAgentInfo(params["host"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
 
-	r.JSON(http.StatusOK, output)
+	if err := agent.MySQLStart(); err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	r.JSON(http.StatusOK, agent)
 }
 
 func (this *HttpAPI) AgentCustomCommand(params martini.Params, r render.Render, req *http.Request, user auth.User) {
@@ -2610,7 +2630,13 @@ func (this *HttpAPI) AgentCustomCommand(params martini.Params, r render.Render, 
 		return
 	}
 
-	output, err := agent.CustomCommand(params["host"], params["command"])
+	agent, err := agent.ReadAgentInfo(params["host"])
+	if err != nil {
+		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
+		return
+	}
+
+	output, err := agent.CustomCommand(params["command"])
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
@@ -2631,12 +2657,12 @@ func (this *HttpAPI) AgentSeed(params martini.Params, r render.Render, req *http
 		Respond(r, &APIResponse{Code: ERROR, Message: "Agents not served"})
 		return
 	}
-	targetAgent, err := agent.ReadAgent(params["targetHost"])
+	targetAgent, err := agent.ReadAgentInfo(params["targetHost"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
 	}
-	sourceAgent, err := agent.ReadAgent(params["sourceHost"])
+	sourceAgent, err := agent.ReadAgentInfo(params["sourceHost"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -2662,7 +2688,7 @@ func (this *HttpAPI) AgentActiveSeeds(params martini.Params, r render.Render, re
 		return
 	}
 
-	hostAgent, err := agent.ReadAgent(params["host"])
+	hostAgent, err := agent.ReadAgentInfo(params["host"])
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
 		return
@@ -2689,7 +2715,7 @@ func (this *HttpAPI) AgentRecentSeeds(params martini.Params, r render.Render, re
 		return
 	}
 
-	hostAgent, err := agent.ReadAgent(params["host"])
+	hostAgent, err := agent.ReadAgentInfo(params["host"])
 
 	if err != nil {
 		Respond(r, &APIResponse{Code: ERROR, Message: fmt.Sprintf("%+v", err)})
