@@ -349,20 +349,6 @@ func enginesSupported(first, second []Engine) bool {
 	return true
 }
 
-// ReadActiveSeeds reads active seeds (where status != Completed or Failed)
-func ReadActiveSeeds() ([]*Seed, error) {
-	whereCondition := `
-		where
-			status not in (?, ?)
-		`
-	return readSeeds(whereCondition, sqlutils.Args(Completed.String(), Failed.String()), "")
-}
-
-// ReadRecentSeeds reads recent seeds from backend table.
-func ReadRecentSeeds() ([]*Seed, error) {
-	return readSeeds(``, sqlutils.Args(), "limit 100")
-}
-
 // ReadSeed returns an information about seed from database
 func ReadSeed(seedID int64) (*Seed, error) {
 	whereCondition := `
@@ -377,6 +363,38 @@ func ReadSeed(seedID int64) (*Seed, error) {
 		return nil, fmt.Errorf("Seed %d not found", seedID)
 	}
 	return res[0], nil
+}
+
+// ReadActiveSeeds reads active seeds (where status != Completed or Failed)
+func ReadActiveSeeds() ([]*Seed, error) {
+	whereCondition := `
+		where
+			status not in (?, ?)
+		`
+	return readSeeds(whereCondition, sqlutils.Args(Completed.String(), Failed.String()), "")
+}
+
+// ReadFailedSeeds reads failed seeds
+func ReadFailedSeeds() ([]*Seed, error) {
+	whereCondition := `
+		where
+			status = ?
+		`
+	return readSeeds(whereCondition, sqlutils.Args(Failed.String()), "")
+}
+
+// ReadErroredSeeds reads seeds in status error
+func ReadErroredSeeds() ([]*Seed, error) {
+	whereCondition := `
+		where
+			status = ?
+		`
+	return readSeeds(whereCondition, sqlutils.Args(Error.String()), "")
+}
+
+// ReadRecentSeeds reads recent seeds from backend table.
+func ReadRecentSeeds() ([]*Seed, error) {
+	return readSeeds(``, sqlutils.Args(), "limit 100")
 }
 
 // ReadRecentSeedsForAgentInStatus reads active seeds where agent participates either as source or target in given status
@@ -405,6 +423,7 @@ func ReadActiveSeedsForAgent(agent *Agent) ([]*Seed, error) {
 	return readSeeds(whereCondition, sqlutils.Args(Completed.String(), Failed.String(), agent.Info.Hostname, agent.Info.Hostname), "")
 }
 
+// ProcessSeeds is the main function in seed process
 func ProcessSeeds() []*Seed {
 	activeSeeds, err := ReadActiveSeeds()
 	if err != nil {
@@ -429,6 +448,7 @@ func ProcessSeeds() []*Seed {
 	return activeSeeds
 }
 
+// GetSeedAgents returns target and source agent associated with seed
 func (s *Seed) GetSeedAgents() (targetAgent *Agent, sourceAgent *Agent, err error) {
 	targetAgent, err = ReadAgentInfo(s.TargetHostname)
 	if err != nil {

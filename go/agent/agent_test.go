@@ -40,11 +40,13 @@ import (
 // sudo ifconfig lo0 alias 127.0.0.3 up
 // for each agent
 
+var agentsCount = 4
+
 func init() {
 	log.SetLevel(log.DEBUG)
 }
 
-var testname = flag.String("testname", "TestAbortSeedCleanup", "test names to run")
+var testname = flag.String("testname", "TestReadErroredSeedss", "test names to run")
 
 func Test(t *testing.T) { TestingT(t) }
 
@@ -153,7 +155,7 @@ func (s *AgentTestSuite) SetUpTest(c *C) {
 
 	// create mocks for agents
 	log.Info("Creating Orchestrator agents mocks")
-	for i := 1; i <= 4; i++ {
+	for i := 1; i <= agentsCount; i++ {
 		mysqlDatabases := map[string]*MySQLDatabase{
 			"sakila": &MySQLDatabase{
 				Engines: []Engine{InnoDB},
@@ -724,6 +726,86 @@ func (s *AgentTestSuite) TestReadActiveSeeds(c *C) {
 	c.Assert(seeds[0].SeedMethod, Equals, Mydumper)
 	c.Assert(seeds[0].BackupSide, Equals, Target)
 	c.Assert(seeds[0].Status, Equals, Scheduled)
+	c.Assert(seeds[0].Stage, Equals, Prepare)
+	c.Assert(seeds[0].Retries, Equals, 0)
+}
+
+func (s *AgentTestSuite) TestReadFailedSeeds(c *C) {
+	targetTestAgent1 := s.testAgents["agent1"]
+	sourceTestAgent1 := s.testAgents["agent2"]
+	targetTestAgent2 := s.testAgents["agent3"]
+	sourceTestAgent2 := s.testAgents["agent4"]
+
+	// create containers with MySQL for agents
+	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent1, sourceTestAgent1, targetTestAgent2, sourceTestAgent2})
+	c.Assert(err, IsNil)
+
+	s.registerAgents(c)
+
+	targetAgent1, sourceAgent1 := s.getSeedAgents(c, targetTestAgent1, sourceTestAgent1)
+	targetAgent2, sourceAgent2 := s.getSeedAgents(c, targetTestAgent2, sourceTestAgent2)
+
+	errorSeedID, err := NewSeed("Mydumper", targetAgent1, sourceAgent1)
+	c.Assert(err, IsNil)
+	c.Assert(errorSeedID, Equals, int64(1))
+
+	seedID, err := NewSeed("Mydumper", targetAgent2, sourceAgent2)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(2))
+
+	failedSeeds := s.readSeed(c, errorSeedID, targetAgent1.Info.Hostname, sourceAgent1.Info.Hostname, Mydumper, Target, Scheduled, Prepare, 0)
+	failedSeeds.Status = Failed
+	failedSeeds.updateSeedData()
+
+	seeds, err := ReadFailedSeeds()
+	c.Assert(err, IsNil)
+	c.Assert(seeds, HasLen, 1)
+
+	c.Assert(seeds[0].TargetHostname, Equals, targetTestAgent1.agent.Info.Hostname)
+	c.Assert(seeds[0].SourceHostname, Equals, sourceTestAgent1.agent.Info.Hostname)
+	c.Assert(seeds[0].SeedMethod, Equals, Mydumper)
+	c.Assert(seeds[0].BackupSide, Equals, Target)
+	c.Assert(seeds[0].Status, Equals, Failed)
+	c.Assert(seeds[0].Stage, Equals, Prepare)
+	c.Assert(seeds[0].Retries, Equals, 0)
+}
+
+func (s *AgentTestSuite) TestReadErroredSeedss(c *C) {
+	targetTestAgent1 := s.testAgents["agent1"]
+	sourceTestAgent1 := s.testAgents["agent2"]
+	targetTestAgent2 := s.testAgents["agent3"]
+	sourceTestAgent2 := s.testAgents["agent4"]
+
+	// create containers with MySQL for agents
+	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent1, sourceTestAgent1, targetTestAgent2, sourceTestAgent2})
+	c.Assert(err, IsNil)
+
+	s.registerAgents(c)
+
+	targetAgent1, sourceAgent1 := s.getSeedAgents(c, targetTestAgent1, sourceTestAgent1)
+	targetAgent2, sourceAgent2 := s.getSeedAgents(c, targetTestAgent2, sourceTestAgent2)
+
+	erroredSeedID, err := NewSeed("Mydumper", targetAgent1, sourceAgent1)
+	c.Assert(err, IsNil)
+	c.Assert(erroredSeedID, Equals, int64(1))
+
+	seedID, err := NewSeed("Mydumper", targetAgent2, sourceAgent2)
+	c.Assert(err, IsNil)
+	c.Assert(seedID, Equals, int64(2))
+
+	erroredSeeds := s.readSeed(c, erroredSeedID, targetAgent1.Info.Hostname, sourceAgent1.Info.Hostname, Mydumper, Target, Scheduled, Prepare, 0)
+	erroredSeeds.Status = Error
+	erroredSeeds.updateSeedData()
+
+	seeds, err := ReadErroredSeeds()
+	c.Assert(err, IsNil)
+	c.Assert(seeds, HasLen, 1)
+
+	c.Assert(seeds[0].TargetHostname, Equals, targetTestAgent1.agent.Info.Hostname)
+	c.Assert(seeds[0].SourceHostname, Equals, sourceTestAgent1.agent.Info.Hostname)
+	c.Assert(seeds[0].SeedMethod, Equals, Mydumper)
+	c.Assert(seeds[0].BackupSide, Equals, Target)
+	c.Assert(seeds[0].Status, Equals, Error)
 	c.Assert(seeds[0].Stage, Equals, Prepare)
 	c.Assert(seeds[0].Retries, Equals, 0)
 }
