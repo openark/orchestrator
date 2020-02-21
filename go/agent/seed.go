@@ -294,6 +294,12 @@ func NewSeed(seedMethodName string, targetAgent *Agent, sourceAgent *Agent) (int
 			return 0, log.Errorf("log-slave-updates is not enabled on MySQL source agent host %s, but the host is a replica", sourceAgent.Info.Hostname)
 		}
 	}
+	if targetInstance.IsReplica() {
+		return 0, log.Errorf("Cannot seed on target agent host %s, because it is replica. Please reset slave before starting seed", sourceAgent.Info.Hostname)
+	}
+	if targetInstance.IsMaster() {
+		return 0, log.Errorf("Cannot seed on target agent host %s, because it is master. Please disconnect all slaves before seed", sourceAgent.Info.Hostname)
+	}
 	activeSourceSeeds, _ := ReadActiveSeedsForAgent(sourceAgent)
 	activeTargetSeeds, _ := ReadActiveSeedsForAgent(targetAgent)
 	if len(activeSourceSeeds) > 0 {
