@@ -61,7 +61,7 @@ $(document).ready(function() {
       moreInfo += "</ul>";
     }
     moreInfo += '<div><a href="' + appUrl('/web/audit-failure-detection/id/' + audit.LastDetectionId) + '">Related detection</a></div>';
-    moreInfo += '<div>Proccessed by <code>' + audit.ProcessingNodeHostname + '</code></div>';
+    moreInfo += '<div>Processed by <code>' + audit.ProcessingNodeHostname + '</code></div>';
     return moreInfo;
   }
   function displaySingleAudit(audit) {
