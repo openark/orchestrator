@@ -19,6 +19,7 @@ package http
 import (
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"github.com/martini-contrib/auth"
@@ -27,8 +28,11 @@ import (
 	"github.com/github/orchestrator/go/inst"
 	"github.com/github/orchestrator/go/os"
 	"github.com/github/orchestrator/go/process"
-	"github.com/github/orchestrator/go/raft"
+	orcraft "github.com/github/orchestrator/go/raft"
+	"github.com/openark/golib/log"
 )
+
+var regexURI = regexp.MustCompile(`^(/[^/]+)?/web/.*`)
 
 func getProxyAuthUser(req *http.Request) string {
 	for _, user := range req.Header[config.Config.AuthUserHeader] {
@@ -37,10 +41,20 @@ func getProxyAuthUser(req *http.Request) string {
 	return ""
 }
 
+// isForcedReadOnly checks config to see if the WebInterfaceReadOnly flag is set
+// This is independent of any authentication mechanisms
+func isForcedReadOnly(uri string) bool {
+	if config.Config.WebInterfaceReadOnly && regexURI.MatchString(uri) {
+		log.Debugf("Read-only applied to %v", uri)
+		return true
+	}
+	return false
+}
+
 // isAuthorizedForAction checks req to see whether authenticated user has write-privileges.
 // This depends on configured authentication method.
 func isAuthorizedForAction(req *http.Request, user auth.User) bool {
-	if config.Config.ReadOnly {
+	if config.Config.ReadOnly || isForcedReadOnly(req.RequestURI) {
 		return false
 	}
 

@@ -1,6 +1,7 @@
 package http
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/openark/golib/log"
 	test "github.com/openark/golib/tests"
 )
+
+var pathEvaluate = "relocate-slaves"
 
 func init() {
 	config.Config.HostnameResolveMethod = "none"
@@ -21,12 +24,12 @@ func TestGetSynonymPath(t *testing.T) {
 	api := HttpAPI{}
 
 	{
-		path := "relocate-slaves"
+		path := pathEvaluate
 		synonym := api.getSynonymPath(path)
 		test.S(t).ExpectEquals(synonym, "relocate-replicas")
 	}
 	{
-		path := "relocate-slaves/:host/:port"
+		path := pathEvaluate + "/:host/:port"
 		synonym := api.getSynonymPath(path)
 		test.S(t).ExpectEquals(synonym, "relocate-replicas/:host/:port")
 	}
@@ -52,4 +55,7 @@ func TestKnownPaths(t *testing.T) {
 		test.S(t).ExpectTrue(pathsMap[path])
 		test.S(t).ExpectTrue(pathsMap[synonym])
 	}
+
+	config.Config.WebInterfaceReadOnly = true
+	test.S(t).ExpectEquals(isForcedReadOnly(fmt.Sprintf("%s/api/%s", config.Config.URLPrefix, api.getSynonymPath(pathEvaluate))), false)
 }

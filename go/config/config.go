@@ -164,6 +164,7 @@ type Configuration struct {
 	AuditToBackendDB                           bool     // If true, audit messages are written to the backend DB's `audit` table (default: true)
 	RemoveTextFromHostnameDisplay              string   // Text to strip off the hostname on cluster/clusters pages
 	ReadOnly                                   bool
+	WebInterfaceReadOnly                       bool   // Restrict the GUI frontend to be read-only, even when authenticating with one of the PowerUsers
 	AuthenticationMethod                       string // Type of autherntication to use, if any. "" for none, "basic" for BasicAuth, "multi" for advanced BasicAuth, "proxy" for forwarded credentials via reverse proxy, "token" for token based access
 	OAuthClientId                              string
 	OAuthClientSecret                          string
@@ -419,13 +420,13 @@ func newConfiguration() *Configuration {
 		GraphiteConvertHostnameDotsToUnderscores:   true,
 		GraphitePollSeconds:                        60,
 		URLPrefix:                                  "",
-		DiscoveryIgnoreReplicaHostnameFilters:      []string{},
-		ConsulAddress:                              "",
-		ConsulAclToken:                             "",
-		ConsulCrossDataCenterDistribution:          false,
-		ZkAddress:                                  "",
-		KVClusterMasterPrefix:                      "mysql/master",
-		WebMessage:                                 "",
+		DiscoveryIgnoreReplicaHostnameFilters: []string{},
+		ConsulAddress:                         "",
+		ConsulAclToken:                        "",
+		ConsulCrossDataCenterDistribution:     false,
+		ZkAddress:                             "",
+		KVClusterMasterPrefix:                 "mysql/master",
+		WebMessage:                            "",
 	}
 }
 

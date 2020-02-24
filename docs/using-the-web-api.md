@@ -43,6 +43,7 @@ This sample is followed by a field breakdown:
     "Uptime": 45,
     "ServerID": 101,
     "Version": "5.6.22-log",
+    "WebInterfaceReadOnly": false,
     "ReadOnly": false,
     "Binlog_format": "ROW",
     "LogBinEnabled": true,
@@ -114,6 +115,7 @@ The structure of an Instance evolves and documentation will always fall behind. 
 * `Key`: unique indicator for the instance: a combination of host & port
 * `ServerID`: the MySQL `server_id` param
 * `Version`: MySQL version
+* `WebInterfaceReadOnly`: the global `read_only` boolean value for the web interface
 * `ReadOnly`: the global `read_only` boolean value
 * `Binlog_format`: the global `binlog_format` MySQL param
 * `LogBinEnabled`: whether binary logs are enabled
