@@ -32,7 +32,9 @@ import (
 	"github.com/openark/golib/log"
 )
 
-var regexURI = regexp.MustCompile(`^(/[^/]+)?/web/.*`)
+const regexInitRequired = "#needscompile"
+
+var regexURI = regexp.MustCompile(regexInitRequired)
 
 func getProxyAuthUser(req *http.Request) string {
 	for _, user := range req.Header[config.Config.AuthUserHeader] {
@@ -44,6 +46,10 @@ func getProxyAuthUser(req *http.Request) string {
 // isForcedReadOnly checks config to see if the WebInterfaceReadOnly flag is set
 // This is independent of any authentication mechanisms
 func isForcedReadOnly(uri string) bool {
+	if fmt.Sprintf("%v", regexURI) == regexInitRequired {
+		log.Debug("Compiling regexp for isForcedReadOnly")
+		regexURI = regexp.MustCompile(fmt.Sprintf("^%s/web/.*", config.Config.URLPrefix))
+	}
 	if config.Config.WebInterfaceReadOnly && regexURI.MatchString(uri) {
 		log.Debugf("Read-only applied to %v", uri)
 		return true
