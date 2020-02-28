@@ -548,18 +548,16 @@ var generateSQLPatches = []string{
 	`,
 	`
 		ALTER TABLE
-			host_agent
+			host_agent /* sqlite3-skip */
 			DROP COLUMN count_mysql_snapshots
 	`,
 	`
 		ALTER TABLE
-			host_agent
+			host_agent /* sqlite3-skip */
 			DROP COLUMN last_submitted
 	`,
 	`
-		ALTER TABLE
-			host_agent
-			DROP INDEX last_submitted_idx_host_agent
+		DROP INDEX last_submitted_idx_host_agent ON host_agent
 	`,
 	`
 		ALTER TABLE
@@ -577,23 +575,19 @@ var generateSQLPatches = []string{
 			ADD COLUMN data TEXT CHARACTER SET ascii NOT NULL AFTER mysql_port
 	`,
 	`
-		ALTER TABLE
-			agent_seed
-			DROP KEY is_complete_idx_agent_seed
+		DROP INDEX is_complete_idx_agent_seed ON agent_seed
+	`,
+	`
+		DROP INDEX is_successful_idx_agent_seed ON agent_seed
 	`,
 	`
 		ALTER TABLE
-			agent_seed
-			DROP KEY is_successful_idx_agent_seed
-	`,
-	`
-		ALTER TABLE
-			agent_seed
+			agent_seed /* sqlite3-skip */
 			DROP COLUMN is_successful
 	`,
 	`
 		ALTER TABLE
-			agent_seed
+			agent_seed /* sqlite3-skip */
 			DROP COLUMN is_complete
 	`,
 	`
@@ -631,12 +625,12 @@ var generateSQLPatches = []string{
 	`,
 	`
 		ALTER TABLE
-			agent_seed_state
+			agent_seed_state /* sqlite3-skip */
 			DROP COLUMN state_action
 	`,
 	`
 		ALTER TABLE
-			agent_seed_state
+			agent_seed_state /* sqlite3-skip */
 			DROP COLUMN error_message
 	`,
 	`
