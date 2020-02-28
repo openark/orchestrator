@@ -489,7 +489,7 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 				return
 			}
 			s.Status = Running
-			s.updateSeed(agent, "Started prepare stage")
+			s.updateSeed(agent, fmt.Sprintf("Started %s stage", s.Stage.String()))
 		}
 	case Backup:
 		agent := targetAgent
@@ -502,7 +502,7 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 			return
 		}
 		s.Status = Running
-		s.updateSeed(agent, "Started backup stage")
+		s.updateSeed(agent, fmt.Sprintf("Started %s stage", s.Stage.String()))
 	case Restore:
 		if err := targetAgent.restore(s.SeedID, s.SeedMethod); err != nil {
 			s.Status = Error
@@ -510,7 +510,7 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 			return
 		}
 		s.Status = Running
-		s.updateSeed(targetAgent, "Started restore stage")
+		s.updateSeed(targetAgent, fmt.Sprintf("Started %s stage", s.Stage.String()))
 	case Cleanup:
 		agents := make(map[*Agent]SeedSide)
 		agents[targetAgent] = Target
@@ -522,7 +522,7 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 				return
 			}
 			s.Status = Running
-			s.updateSeed(agent, "Started prepare stage")
+			s.updateSeed(agent, fmt.Sprintf("Started %s stage", s.Stage.String()))
 		}
 	// also will connect targetHost as slave
 	case ConnectSlave:
@@ -534,6 +534,7 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 			s.updateSeed(targetAgent, fmt.Sprintf("Error calling getMetadata API on agent: %+v", err))
 			return
 		}
+		log.Debugf("Seed metadata: +%v", seedMetadata)
 		slaveInstanceKey := &inst.InstanceKey{Hostname: targetAgent.Info.Hostname, Port: targetAgent.Info.MySQLPort}
 		masterInstanceKey := &inst.InstanceKey{Hostname: sourceAgent.Info.Hostname, Port: sourceAgent.Info.MySQLPort}
 		slave, err := inst.ReadTopologyInstance(slaveInstanceKey)
