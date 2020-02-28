@@ -213,7 +213,7 @@ func (agent *Agent) executeAgentPostCommand(command string, content string, onRe
 
 // If a mysql port is available, try to discover against it
 func (agent *Agent) discoverAgentInstance() error {
-	instanceKey := &inst.InstanceKey{Hostname: agent.Info.Hostname, Port: agent.Info.Port}
+	instanceKey := &inst.InstanceKey{Hostname: agent.Info.Hostname, Port: agent.Info.MySQLPort}
 	instance, err := inst.ReadTopologyInstance(instanceKey)
 	if err != nil {
 		log.Errorf("Failed to read topology for %v. err=%+v", instanceKey, err)
