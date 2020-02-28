@@ -295,10 +295,10 @@ func NewSeed(seedMethodName string, targetAgent *Agent, sourceAgent *Agent) (int
 		}
 	}
 	if targetInstance.IsReplica() {
-		return 0, log.Errorf("Cannot seed on target agent host %s, because it is replica. Please reset slave before starting seed", sourceAgent.Info.Hostname)
+		return 0, log.Errorf("Cannot seed on target agent host %s, because it is replica. Please reset slave before starting seed", targetAgent.Info.Hostname)
 	}
-	if targetInstance.IsMaster() {
-		return 0, log.Errorf("Cannot seed on target agent host %s, because it is master. Please disconnect all slaves before seed", sourceAgent.Info.Hostname)
+	if len(targetInstance.SlaveHosts) > 0 {
+		return 0, log.Errorf("Cannot seed on target agent host %s, because it has slave attached. Please disconnect all slaves before seed", targetAgent.Info.Hostname)
 	}
 	activeSourceSeeds, _ := ReadActiveSeedsForAgent(sourceAgent)
 	activeTargetSeeds, _ := ReadActiveSeedsForAgent(targetAgent)
