@@ -2,7 +2,7 @@ package agent
 
 import (
 	"crypto/tls"
-	"errors"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -19,6 +19,36 @@ type httpMethodFunc func(uri string) (resp *http.Response, err error)
 
 var httpClient *http.Client
 var httpClientMutex = &sync.Mutex{}
+
+// APIResponseCode is an OK/ERROR response code
+type APIResponseCode int
+
+const (
+	ERROR APIResponseCode = iota
+	OK
+)
+
+func (a *APIResponseCode) UnmarshalJSON(b []byte) error {
+	var value string
+	err := json.Unmarshal(b, &value)
+	if err != nil {
+		return err
+	}
+	*a = toAPIResponseCode[value]
+	return nil
+}
+
+var toAPIResponseCode = map[string]APIResponseCode{
+	"ERROR": ERROR,
+	"OK":    OK,
+}
+
+// APIResponse is a response returned as JSON to various requests.
+type APIResponse struct {
+	Code    APIResponseCode
+	Message string
+	Details string
+}
 
 // InitHttpClient gets called once, and initializes httpClient according to config.Config
 func InitHttpClient() {
@@ -67,7 +97,7 @@ func executeCommandWithMethodFunc(hostname string, port int, token string, comma
 
 	body, err := readResponse(methodFunc(agentCommandURI))
 	if err != nil {
-		log.Errore(err)
+		return err
 	}
 	if onResponse != nil {
 		(*onResponse)(body)
@@ -88,8 +118,13 @@ func readResponse(res *http.Response, err error) ([]byte, error) {
 		return nil, err
 	}
 
-	if res.Status == "500" {
-		return body, errors.New("Response Status 500")
+	if res.StatusCode == http.StatusInternalServerError {
+		apiResponse := &APIResponse{}
+		err := json.Unmarshal(body, apiResponse)
+		if err != nil {
+			return nil, fmt.Errorf("response %s. Unable to unmarshall error message from agent", res.Status)
+		}
+		return nil, fmt.Errorf("message: %s, details: %s", apiResponse.Message, apiResponse.Details)
 	}
 
 	return body, nil
