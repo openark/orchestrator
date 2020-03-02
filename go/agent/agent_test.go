@@ -46,7 +46,7 @@ func init() {
 	log.SetLevel(log.DEBUG)
 }
 
-var testname = flag.String("testname", "TestReadErroredSeedss", "test names to run")
+var testname = flag.String("testname", "", "test names to run")
 
 func Test(t *testing.T) { TestingT(t) }
 
@@ -59,25 +59,120 @@ type AgentTestSuite struct {
 var _ = Suite(&AgentTestSuite{})
 
 type testAgent struct {
-	agent                 *Agent
-	agentSeedStageStatus  *SeedStageState
-	agentSeedMetadata     *SeedMetadata
-	agentServer           *httptest.Server
-	agentMux              *martini.ClassicMartini
-	agentMySQLUseGTID     bool
-	agentMySQLContainerIP string
-	agentMySQLContainerID string
+	agent                  *Agent
+	agentSeedStageStatus   *SeedStageState
+	agentSeedMetadata      *SeedMetadata
+	agentServer            *httptest.Server
+	agentMux               *martini.ClassicMartini
+	agentMySQLUseGTID      bool
+	agentMySQLContainerIP  string
+	agentMySQLContainerID  string
+	agentContainerResource *dockertest.Resource
 }
 
 func (s *AgentTestSuite) SetUpTest(c *C) {
 	if len(*testname) > 0 {
 		if c.TestName() != fmt.Sprintf("AgentTestSuite.%s", *testname) {
 			c.Skip("skipping test due to not matched testname")
+			log.Info("skipping test due to not matched testname")
 		}
 	}
-	log.Info("Setting up test data")
+	log.Infof("Setting up test data for test %s", c.TestName())
+	if _, err := db.ExecOrchestrator("TRUNCATE TABLE host_agent;"); err != nil {
+		log.Fatalf("Unable to truncate host_agent table: %s", err)
+	}
+	if _, err := db.ExecOrchestrator("TRUNCATE TABLE agent_seed;"); err != nil {
+		log.Fatalf("Unable to truncate agent_seed table: %s", err)
+	}
+	if _, err := db.ExecOrchestrator("TRUNCATE TABLE agent_seed_state;"); err != nil {
+		log.Fatalf("Unable to truncate agent_seed_state table: %s", err)
+	}
+
+	for _, testAgent := range s.testAgents {
+		agentdb, _, err := sqlutils.GetDB(fmt.Sprintf("root:secret@(localhost:%s)/mysql", testAgent.agentContainerResource.GetPort("3306/tcp")))
+		if err != nil {
+			log.Fatalf("Unable get agent container: %s", err)
+		}
+		if _, err = agentdb.Exec("DROP database if exists test_repl"); err != nil {
+			log.Fatalf("Unable to drop agent test DB: %s", err)
+		}
+		if _, err = agentdb.Exec("STOP SLAVE;"); err != nil {
+			log.Fatalf("Unable to execute stop slave: %s", err)
+		}
+		if _, err = agentdb.Exec("RESET SLAVE ALL;"); err != nil {
+			log.Fatalf("Unable to execute RESET SLAVE: %s", err)
+		}
+		if _, err = agentdb.Exec("RESET MASTER;"); err != nil {
+			log.Fatalf("Unable to execute RESET MASTER: %s", err)
+		}
+		if _, err = agentdb.Exec("Create database test_repl"); err != nil {
+			log.Fatalf("Unable to create agent test DB: %s", err)
+		}
+		if _, err = agentdb.Exec("Create table test_repl.test(id int);"); err != nil {
+			log.Fatalf("Unable create agent test table: %s", err)
+		}
+		if _, err = agentdb.Exec("insert into test_repl.test(id) VALUES (1), (2), (3), (4);"); err != nil {
+			log.Fatalf("Unable to insert data to agent test table: %s", err)
+		}
+
+		if err = sqlutils.QueryRowsMap(agentdb, "show master status", func(m sqlutils.RowMap) error {
+			var err error
+			testAgent.agentSeedMetadata.LogFile = m.GetString("File")
+			testAgent.agentSeedMetadata.LogPos = m.GetInt64("Position")
+			testAgent.agentSeedMetadata.GtidExecuted = m.GetString("Executed_Gtid_Set")
+			return err
+		}); err != nil {
+			log.Fatalf("Unable to get agent binlog position: %s", err)
+		}
+
+		mysqlDatabases := map[string]*MySQLDatabase{
+			"sakila": &MySQLDatabase{
+				Engines: []Engine{InnoDB},
+				Size:    0,
+			},
+		}
+		availiableSeedMethods := map[SeedMethod]*SeedMethodOpts{
+			Mydumper: &SeedMethodOpts{
+				BackupSide:       Target,
+				SupportedEngines: []Engine{ROCKSDB, MRG_MYISAM, CSV, BLACKHOLE, InnoDB, MEMORY, ARCHIVE, MyISAM, FEDERATED, TokuDB},
+			},
+		}
+		testAgent.agent = &Agent{
+			Info: &Info{
+				Hostname:  testAgent.agent.Info.Hostname,
+				Port:      testAgent.agent.Info.Port,
+				MySQLPort: testAgent.agent.Info.MySQLPort,
+				Token:     "token",
+			},
+			Data: &Data{
+				LocalSnapshotsHosts: testAgent.agent.Data.LocalSnapshotsHosts,
+				SnaphostHosts:       testAgent.agent.Data.SnaphostHosts,
+				LogicalVolumes:      []*LogicalVolume{},
+				MountPoint: &Mount{
+					Path:       "/tmp",
+					Device:     "",
+					LVPath:     "",
+					FileSystem: "",
+					IsMounted:  false,
+					DiskUsage:  0,
+				},
+				BackupDir:             "/tmp/bkp",
+				BackupDirDiskFree:     10000,
+				MySQLRunning:          true,
+				MySQLDatadir:          "/var/lib/mysql",
+				MySQLDatadirDiskUsed:  10,
+				MySQLDatadirDiskFree:  10000,
+				MySQLDatabases:        mysqlDatabases,
+				AvailiableSeedMethods: availiableSeedMethods,
+			},
+		}
+	}
+}
+
+func (s *AgentTestSuite) SetUpSuite(c *C) {
 	var testAgents = make(map[string]*testAgent)
 	s.testAgents = testAgents
+	s.containers = []*dockertest.Resource{}
 	pool, err := dockertest.NewPool("")
 	if err != nil {
 		log.Fatalf("Could not connect to docker: %s", err)
@@ -136,7 +231,6 @@ func (s *AgentTestSuite) SetUpTest(c *C) {
 		log.Fatalf("Could not connect to docker: %s", err)
 	}
 
-	// create Orchestrator DB
 	log.Info("Creating Orchestrator DB")
 	_, err = db.OpenOrchestrator()
 	if err != nil {
@@ -196,11 +290,13 @@ func (s *AgentTestSuite) SetUpTest(c *C) {
 				AvailiableSeedMethods: availiableSeedMethods,
 			},
 		}
-		s.createTestAgent(agent)
+		if err := s.createTestAgent(agent); err != nil {
+			log.Fatalf("unable to create test agent: %s", err)
+		}
 	}
 }
 
-func (s *AgentTestSuite) createTestAgent(agent *Agent) {
+func (s *AgentTestSuite) createTestAgent(agent *Agent) error {
 	agentAddress := fmt.Sprintf("%s:%d", agent.Info.Hostname, agent.Info.Port)
 	m := martini.Classic()
 	m.Use(render.Renderer())
@@ -211,7 +307,7 @@ func (s *AgentTestSuite) createTestAgent(agent *Agent) {
 		agentMySQLUseGTID:    true,
 	}
 	m.Get("/api/get-agent-data", func(r render.Render, res http.ResponseWriter, req *http.Request) {
-		r.JSON(200, agent.Data)
+		r.JSON(200, testAgent.agent.Data)
 	})
 	m.Get("/api/prepare/:seedID/:seedMethod/:seedSide", func(r render.Render, res http.ResponseWriter, req *http.Request) {
 		r.Text(202, "Started")
@@ -244,100 +340,100 @@ func (s *AgentTestSuite) createTestAgent(agent *Agent) {
 	testAgent.agentServer = testServer
 	testAgent.agentMux = m
 	s.testAgents[agent.Info.Hostname] = testAgent
+	return s.createTestAgentsMySQLServers(testAgent)
 }
 
-func (s *AgentTestSuite) createTestAgentsMySQLServers(testAgents []*testAgent) error {
-	for _, agent := range testAgents {
-		log.Info("Setting agents MySQL")
-		var testdb *sql.DB
-		rand.Seed(time.Now().UnixNano())
-		serverID := rand.Intn(100000000)
+func (s *AgentTestSuite) createTestAgentsMySQLServers(agent *testAgent) error {
+	var testdb *sql.DB
+	rand.Seed(time.Now().UnixNano())
+	serverID := rand.Intn(100000000)
 
-		dockerCmd := []string{"mysqld", fmt.Sprintf("--server-id=%d", serverID), "--log-bin=/var/lib/mysql/mysql-bin"}
-		log.Infof("Creating docker container for agent %s", agent.agent.Info.Hostname)
+	dockerCmd := []string{"mysqld", fmt.Sprintf("--server-id=%d", serverID), "--log-bin=/var/lib/mysql/mysql-bin"}
+	log.Infof("Creating docker container for agent %s", agent.agent.Info.Hostname)
 
-		if agent.agentMySQLUseGTID {
-			dockerCmd = append(dockerCmd, "--enforce-gtid-consistency=ON", "--gtid-mode=ON")
-		}
-		resource, err := s.pool.RunWithOptions(&dockertest.RunOptions{Repository: "mysql", Tag: "5.7", Env: []string{"MYSQL_ROOT_PASSWORD=secret"}, Cmd: dockerCmd, CapAdd: []string{"NET_ADMIN", "NET_RAW"}})
-		if err != nil {
-			return fmt.Errorf("Could not connect to docker: %s", err)
-		}
-
-		agent.agentMySQLContainerIP = resource.Container.NetworkSettings.Networks["bridge"].IPAddress
-		agent.agentMySQLContainerID = resource.Container.ID
-
-		s.containers = append(s.containers, resource)
-
-		cmd := exec.Command("docker", "exec", "-i", agent.agentMySQLContainerID, "apt-get", "update")
-		if err := cmd.Run(); err != nil {
-			return err
-		}
-		cmd = exec.Command("docker", "exec", "-i", agent.agentMySQLContainerID, "apt-get", "install", "-y", "iptables")
-		if err := cmd.Run(); err != nil {
-			return err
-		}
-
-		if err := s.pool.Retry(func() error {
-			var err error
-			testdb, _, err = sqlutils.GetDB(fmt.Sprintf("root:secret@(localhost:%s)/mysql", resource.GetPort("3306/tcp")))
-			mysqldrv.SetLogger(logger.New(ioutil.Discard, "discard", 1))
-			if err != nil {
-				return err
-			}
-			return testdb.Ping()
-		}); err != nil {
-			return fmt.Errorf("Could not connect to docker: %s", err)
-		}
-
-		if _, err = testdb.Exec("Create database orchestrator_meta;"); err != nil {
-			return err
-		}
-		if _, err = testdb.Exec("Create table orchestrator_meta.replication (`username` varchar(128) CHARACTER SET ascii NOT NULL DEFAULT '',`password` varchar(128) CHARACTER SET ascii NOT NULL DEFAULT '',PRIMARY KEY (`username`,`password`)) ENGINE=InnoDB DEFAULT CHARSET=utf8;"); err != nil {
-			return err
-		}
-		if _, err = testdb.Exec("CREATE USER `slave`@`%` IDENTIFIED BY 'slavepassword@';"); err != nil {
-			return err
-		}
-		if _, err = testdb.Exec("GRANT REPLICATION SLAVE ON *.* TO `slave`@`%`"); err != nil {
-			return err
-		}
-		if _, err = testdb.Exec("CREATE USER `orc_topology`@`%` IDENTIFIED BY 'orc_topologypassword@';"); err != nil {
-			return err
-		}
-		if _, err = testdb.Exec("GRANT ALL PRIVILEGES ON *.* TO `orc_topology`@`%`"); err != nil {
-			return err
-		}
-		if _, err = testdb.Exec("Insert into orchestrator_meta.replication(username, password) VALUES ('slave', 'slavepassword@');"); err != nil {
-			return err
-		}
-
-		if _, err = testdb.Exec("Create database test_repl"); err != nil {
-			return err
-		}
-		if _, err = testdb.Exec("Create table test_repl.test(id int);"); err != nil {
-			return err
-		}
-		if _, err = testdb.Exec("insert into test_repl.test(id) VALUES (1), (2), (3), (4);"); err != nil {
-			return err
-		}
-
-		if err = sqlutils.QueryRowsMap(testdb, "show master status", func(m sqlutils.RowMap) error {
-			var err error
-			agent.agentSeedMetadata.LogFile = m.GetString("File")
-			agent.agentSeedMetadata.LogPos = m.GetInt64("Position")
-			agent.agentSeedMetadata.GtidExecuted = m.GetString("Executed_Gtid_Set")
-			return err
-		}); err != nil {
-			return err
-		}
-
-		mysqlPort, err := strconv.Atoi(resource.GetPort("3306/tcp"))
-		if err != nil {
-			return err
-		}
-		agent.agent.Info.MySQLPort = mysqlPort
+	if agent.agentMySQLUseGTID {
+		dockerCmd = append(dockerCmd, "--enforce-gtid-consistency=ON", "--gtid-mode=ON")
 	}
+	resource, err := s.pool.RunWithOptions(&dockertest.RunOptions{Repository: "mysql", Tag: "5.7", Env: []string{"MYSQL_ROOT_PASSWORD=secret"}, Cmd: dockerCmd, CapAdd: []string{"NET_ADMIN", "NET_RAW"}})
+	if err != nil {
+		return fmt.Errorf("Could not connect to docker: %s", err)
+	}
+
+	agent.agentMySQLContainerIP = resource.Container.NetworkSettings.Networks["bridge"].IPAddress
+	agent.agentMySQLContainerID = resource.Container.ID
+	agent.agentContainerResource = resource
+
+	s.containers = append(s.containers, resource)
+
+	cmd := exec.Command("docker", "exec", "-i", agent.agentMySQLContainerID, "apt-get", "update")
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	cmd = exec.Command("docker", "exec", "-i", agent.agentMySQLContainerID, "apt-get", "install", "-y", "iptables")
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+
+	if err := s.pool.Retry(func() error {
+		var err error
+		testdb, _, err = sqlutils.GetDB(fmt.Sprintf("root:secret@(localhost:%s)/mysql", resource.GetPort("3306/tcp")))
+		mysqldrv.SetLogger(logger.New(ioutil.Discard, "discard", 1))
+		if err != nil {
+			return err
+		}
+		return testdb.Ping()
+	}); err != nil {
+		return fmt.Errorf("Could not connect to docker: %s", err)
+	}
+
+	if _, err = testdb.Exec("Create database orchestrator_meta;"); err != nil {
+		return err
+	}
+	if _, err = testdb.Exec("Create table orchestrator_meta.replication (`username` varchar(128) CHARACTER SET ascii NOT NULL DEFAULT '',`password` varchar(128) CHARACTER SET ascii NOT NULL DEFAULT '',PRIMARY KEY (`username`,`password`)) ENGINE=InnoDB DEFAULT CHARSET=utf8;"); err != nil {
+		return err
+	}
+	if _, err = testdb.Exec("CREATE USER `slave`@`%` IDENTIFIED BY 'slavepassword@';"); err != nil {
+		return err
+	}
+	if _, err = testdb.Exec("GRANT REPLICATION SLAVE ON *.* TO `slave`@`%`"); err != nil {
+		return err
+	}
+	if _, err = testdb.Exec("CREATE USER `orc_topology`@`%` IDENTIFIED BY 'orc_topologypassword@';"); err != nil {
+		return err
+	}
+	if _, err = testdb.Exec("GRANT ALL PRIVILEGES ON *.* TO `orc_topology`@`%`"); err != nil {
+		return err
+	}
+	if _, err = testdb.Exec("Insert into orchestrator_meta.replication(username, password) VALUES ('slave', 'slavepassword@');"); err != nil {
+		return err
+	}
+
+	if _, err = testdb.Exec("Create database test_repl"); err != nil {
+		return err
+	}
+	if _, err = testdb.Exec("Create table test_repl.test(id int);"); err != nil {
+		return err
+	}
+	if _, err = testdb.Exec("insert into test_repl.test(id) VALUES (1), (2), (3), (4);"); err != nil {
+		return err
+	}
+
+	if err = sqlutils.QueryRowsMap(testdb, "show master status", func(m sqlutils.RowMap) error {
+		var err error
+		agent.agentSeedMetadata.LogFile = m.GetString("File")
+		agent.agentSeedMetadata.LogPos = m.GetInt64("Position")
+		agent.agentSeedMetadata.GtidExecuted = m.GetString("Executed_Gtid_Set")
+		return err
+	}); err != nil {
+		return err
+	}
+
+	mysqlPort, err := strconv.Atoi(resource.GetPort("3306/tcp"))
+	if err != nil {
+		return err
+	}
+	agent.agent.Info.MySQLPort = mysqlPort
+
 	return nil
 }
 
@@ -356,7 +452,7 @@ func (s *AgentTestSuite) createIPTablesRulesForReplication(targetAgent *testAgen
 	return nil
 }
 
-func (s *AgentTestSuite) TearDownTest(c *C) {
+func (s *AgentTestSuite) TearDownSuite(c *C) {
 	log.Info("Teardown test data")
 	for _, container := range s.containers {
 		if err := s.pool.Purge(container); err != nil {
@@ -554,10 +650,7 @@ func (s *AgentTestSuite) TestNewSeed(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
+	// register agents to Orchestrator
 	s.registerAgents(c)
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
 
@@ -570,14 +663,11 @@ func (s *AgentTestSuite) TestNewSeedWrongSeedMethod(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
+	// register agents to Orchestrator
 	s.registerAgents(c)
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
 
-	_, err = NewSeed("test", targetAgent, sourceAgent)
+	_, err := NewSeed("test", targetAgent, sourceAgent)
 	c.Assert(err, NotNil)
 }
 
@@ -585,15 +675,12 @@ func (s *AgentTestSuite) TestNewSeedSeedItself(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent1"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent})
-	c.Assert(err, IsNil)
-
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
 
-	_, err = NewSeed("Mydumper", targetAgent, sourceAgent)
+	_, err := NewSeed("Mydumper", targetAgent, sourceAgent)
 	c.Assert(err, NotNil)
 }
 
@@ -601,24 +688,17 @@ func (s *AgentTestSuite) TestNewSeedUnsupportedSeedMethod(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
+	// register agents to Orchestrator
 	s.registerAgents(c)
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
 
-	_, err = NewSeed("Mysqldump", targetAgent, sourceAgent)
+	_, err := NewSeed("Mysqldump", targetAgent, sourceAgent)
 	c.Assert(err, NotNil)
 }
 
 func (s *AgentTestSuite) TestNewSeedUnsupportedSeedMethodForDB(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
-
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
 
 	sourceTestAgent.agent.Data.AvailiableSeedMethods[Xtrabackup] = &SeedMethodOpts{
 		BackupSide:       Target,
@@ -629,10 +709,11 @@ func (s *AgentTestSuite) TestNewSeedUnsupportedSeedMethodForDB(c *C) {
 		Size:    0,
 	}
 
+	// register agents to Orchestrator
 	s.registerAgents(c)
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
 
-	_, err = NewSeed("Xtrabackup", targetAgent, sourceAgent)
+	_, err := NewSeed("Xtrabackup", targetAgent, sourceAgent)
 	c.Assert(err, NotNil)
 }
 
@@ -640,14 +721,11 @@ func (s *AgentTestSuite) TestNewSeedAgentHadActiveSeed(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
+	// register agents to Orchestrator
 	s.registerAgents(c)
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
 
-	_, err = NewSeed("Mydumper", targetAgent, sourceAgent)
+	_, err := NewSeed("Mydumper", targetAgent, sourceAgent)
 	c.Assert(err, IsNil)
 
 	_, err = NewSeed("Mydumper", targetAgent, sourceAgent)
@@ -660,14 +738,11 @@ func (s *AgentTestSuite) TestNewSeedNotEnoughSpaceInMySQLDatadir(c *C) {
 	targetTestAgent.agent.Data.MySQLDatadirDiskFree = 10
 	sourceTestAgent.agent.Data.MySQLDatadirDiskUsed = 1000
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
+	// register agents to Orchestrator
 	s.registerAgents(c)
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
 
-	_, err = NewSeed("Mydumper", targetAgent, sourceAgent)
+	_, err := NewSeed("Mydumper", targetAgent, sourceAgent)
 	c.Assert(err, NotNil)
 }
 
@@ -675,10 +750,7 @@ func (s *AgentTestSuite) TestReadSeed(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
@@ -696,10 +768,7 @@ func (s *AgentTestSuite) TestReadActiveSeeds(c *C) {
 	targetTestAgent2 := s.testAgents["agent3"]
 	sourceTestAgent2 := s.testAgents["agent4"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent1, sourceTestAgent1, targetTestAgent2, sourceTestAgent2})
-	c.Assert(err, IsNil)
-
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent1, sourceAgent1 := s.getSeedAgents(c, targetTestAgent1, sourceTestAgent1)
@@ -736,10 +805,7 @@ func (s *AgentTestSuite) TestReadFailedSeeds(c *C) {
 	targetTestAgent2 := s.testAgents["agent3"]
 	sourceTestAgent2 := s.testAgents["agent4"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent1, sourceTestAgent1, targetTestAgent2, sourceTestAgent2})
-	c.Assert(err, IsNil)
-
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent1, sourceAgent1 := s.getSeedAgents(c, targetTestAgent1, sourceTestAgent1)
@@ -776,10 +842,7 @@ func (s *AgentTestSuite) TestReadErroredSeedss(c *C) {
 	targetTestAgent2 := s.testAgents["agent3"]
 	sourceTestAgent2 := s.testAgents["agent4"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent1, sourceTestAgent1, targetTestAgent2, sourceTestAgent2})
-	c.Assert(err, IsNil)
-
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent1, sourceAgent1 := s.getSeedAgents(c, targetTestAgent1, sourceTestAgent1)
@@ -816,10 +879,7 @@ func (s *AgentTestSuite) TestReadRecentSeeds(c *C) {
 	targetTestAgent2 := s.testAgents["agent3"]
 	sourceTestAgent2 := s.testAgents["agent4"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent1, sourceTestAgent1, targetTestAgent2, sourceTestAgent2})
-	c.Assert(err, IsNil)
-
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent1, sourceAgent1 := s.getSeedAgents(c, targetTestAgent1, sourceTestAgent1)
@@ -857,10 +917,7 @@ func (s *AgentTestSuite) TestReadRecentSeedsForAgentInStatus(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
@@ -893,10 +950,7 @@ func (s *AgentTestSuite) TestReadActiveSeedsForAgent(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
@@ -934,10 +988,7 @@ func (s *AgentTestSuite) TestGetSeedAgents(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
@@ -958,14 +1009,11 @@ func (s *AgentTestSuite) TestProcessSeeds(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
 	// create iptables rules for replication
-	err = s.createIPTablesRulesForReplication(targetTestAgent, sourceTestAgent)
+	err := s.createIPTablesRulesForReplication(targetTestAgent, sourceTestAgent)
 	c.Assert(err, IsNil)
 
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
@@ -1064,7 +1112,30 @@ func (s *AgentTestSuite) TestProcessSeeds(c *C) {
 	targetTestAgent.agentSeedStageStatus.Status = Completed
 	targetTestAgent.agentSeedStageStatus.Details = "completed restore stage"
 
-	// ProcessSeeds. Target agent had completed Restore stage, so Orchestrator will move Seed to Cleanup stage with status Scheduled. And we will have one SeedStageState record with stage Restore and status Completed
+	//register agents one more time to update mysqlport
+	s.registerAgents(c)
+
+	// update targetAgent with source agent replication pos\gtid
+	targetTestAgent.agentSeedMetadata = sourceTestAgent.agentSeedMetadata
+
+	// ProcessSeeds. Target agent had completed Restore stage, so Orchestrator will move Seed to ConnectSlave stage with status Scheduled. And we will have one SeedStageState record with stage Restore and status Completed
+	ProcessSeeds()
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Scheduled, ConnectSlave, 0)
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
+
+	// ProcessSeeds. Orchestrator will ask agents to start ConnectSlave stage. So it's state would change from Scheduled to Running
+	ProcessSeeds()
+	targetTestAgent.agentSeedStageStatus.Stage = ConnectSlave
+	targetTestAgent.agentSeedStageStatus.Timestamp = time.Now()
+	targetTestAgent.agentSeedStageStatus.Status = Running
+	targetTestAgent.agentSeedStageStatus.Details = "running connectSlave stage"
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Running, ConnectSlave, 0)
+
+	// targetAgent completed ConnectSlave stage
+	targetTestAgent.agentSeedStageStatus.Status = Completed
+	targetTestAgent.agentSeedStageStatus.Details = "completed connectSlave stage"
+
+	// Read seed one more time. It's state should be cleanup and status Scheduled and we should have one SeedStageState record with stage ConnectSlave and status Completed
 	ProcessSeeds()
 	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Scheduled, Cleanup, 0)
 	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
@@ -1089,12 +1160,12 @@ func (s *AgentTestSuite) TestProcessSeeds(c *C) {
 	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Running, Cleanup, 0)
 	s.readSeedStageStates(c, seed, 2, targetTestAgent, sourceTestAgent)
 
-	// now simulate that source agent completed Prepare stage
+	// now simulate that source agent completed Cleanup stage
 	sourceTestAgent.agentSeedStageStatus.Status = Completed
 	sourceTestAgent.agentSeedStageStatus.Timestamp = time.Now()
-	sourceTestAgent.agentSeedStageStatus.Details = "completed prepare stage"
+	sourceTestAgent.agentSeedStageStatus.Details = "completed cleanup stage"
 
-	// ProcessSeeds. We have stage: Prepare and status: Running as only source agent completed Prepare stage, but in SeedStageStates we will have one Completed record and one Running
+	// ProcessSeeds. We have stage: Cleanup and status: Running as only source agent completed Cleanup stage, but in SeedStageStates we will have one Completed record and one Running
 	ProcessSeeds()
 	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Running, Cleanup, 0)
 	s.readSeedStageStates(c, seed, 2, targetTestAgent, sourceTestAgent)
@@ -1102,27 +1173,11 @@ func (s *AgentTestSuite) TestProcessSeeds(c *C) {
 	// now simulate that target agent completed Prepare stage
 	targetTestAgent.agentSeedStageStatus.Status = Completed
 	targetTestAgent.agentSeedStageStatus.Timestamp = time.Now()
-	targetTestAgent.agentSeedStageStatus.Details = "completed prepare stage"
-
-	// ProcessSeeds. Now both agents completed Cleanup stage, so Orchestrator will move Seed to ConnectSlave stage with status Scheduled. And we will have 2 SeedStageState records with stage Cleanup and status Completed
-	ProcessSeeds()
-	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Scheduled, ConnectSlave, 0)
-	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
-
-	//register agents one more time to update mysqlport
-	s.registerAgents(c)
-
-	// update targetAgent with source agent replication pos\gtid
-	targetTestAgent.agentSeedMetadata = sourceTestAgent.agentSeedMetadata
+	targetTestAgent.agentSeedStageStatus.Details = "completed cleanup stage"
 
 	// ProcessSeeds. This is the last stage, so we will have seed in completed Status.
 	ProcessSeeds()
-	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Completed, ConnectSlave, 0)
-	// simulate that Backup stage is running on target agent(as restore is always processed by targetAgent)
-	targetTestAgent.agentSeedStageStatus.Stage = ConnectSlave
-	targetTestAgent.agentSeedStageStatus.Timestamp = time.Now()
-	targetTestAgent.agentSeedStageStatus.Status = Completed
-	targetTestAgent.agentSeedStageStatus.Details = "completed connectSlave stage"
+	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Completed, Cleanup, 0)
 	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
 }
 
@@ -1130,12 +1185,9 @@ func (s *AgentTestSuite) TestProcessSeedsErrorOnPrepare(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
 	config.Config.MaxRetriesForSeedStage = 2
 
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
@@ -1165,7 +1217,7 @@ func (s *AgentTestSuite) TestProcessSeedsErrorOnPrepare(c *C) {
 
 	ProcessSeeds()
 	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Error, Prepare, 0)
-	s.readSeedStageStates(c, seed, 2, targetTestAgent, sourceTestAgent)
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
 
 	// ProcessSeeds. After error our seed will be moved back to Prepare stage Scheduled status and retries increased
 	ProcessSeeds()
@@ -1181,12 +1233,9 @@ func (s *AgentTestSuite) TestProcessSeedsErrorOnBackup(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
 	config.Config.MaxRetriesForSeedStage = 2
 
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
@@ -1228,12 +1277,9 @@ func (s *AgentTestSuite) TestProcessSeedsErrorOnRestore(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
 	config.Config.MaxRetriesForSeedStage = 2
 
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
@@ -1275,12 +1321,9 @@ func (s *AgentTestSuite) TestProcessSeedsErrorOnCleanup(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
 	config.Config.MaxRetriesForSeedStage = 2
 
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
@@ -1311,7 +1354,7 @@ func (s *AgentTestSuite) TestProcessSeedsErrorOnCleanup(c *C) {
 
 	ProcessSeeds()
 	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Error, Cleanup, 0)
-	s.readSeedStageStates(c, seed, 2, targetTestAgent, sourceTestAgent)
+	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
 
 	// ProcessSeeds. After error our seed will be moved back to Cleanup stage Scheduled status and retries increased
 	ProcessSeeds()
@@ -1327,12 +1370,9 @@ func (s *AgentTestSuite) TestProcessSeedsErrorOnConnectSlave(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
 	config.Config.MaxRetriesForSeedStage = 2
 
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
@@ -1345,7 +1385,7 @@ func (s *AgentTestSuite) TestProcessSeedsErrorOnConnectSlave(c *C) {
 	seed := s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Scheduled, Prepare, 0)
 
 	// change seed status to Scheduled and stage to ConnectSlave
-	seed.Status = Scheduled
+	seed.Status = Running
 	seed.Stage = ConnectSlave
 	seed.updateSeedData()
 
@@ -1354,12 +1394,12 @@ func (s *AgentTestSuite) TestProcessSeedsErrorOnConnectSlave(c *C) {
 	targetTestAgent.agentSeedStageStatus.Hostname = targetTestAgent.agent.Info.Hostname
 	targetTestAgent.agentSeedStageStatus.Timestamp = time.Now()
 	targetTestAgent.agentSeedStageStatus.Status = Error
-	targetTestAgent.agentSeedStageStatus.Details = "error processing restore stage"
+	targetTestAgent.agentSeedStageStatus.Details = "error processing ConnectSlave stage"
 
 	// As ConnectSlave requires agent metadata, set it
 	targetTestAgent.agentSeedMetadata = &SeedMetadata{
-		LogFile:      "mysql.bin1",
-		LogPos:       190,
+		LogFile:      "",
+		LogPos:       10,
 		GtidExecuted: "",
 	}
 
@@ -1367,7 +1407,7 @@ func (s *AgentTestSuite) TestProcessSeedsErrorOnConnectSlave(c *C) {
 	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Error, ConnectSlave, 0)
 	s.readSeedStageStates(c, seed, 1, targetTestAgent, sourceTestAgent)
 
-	// ProcessSeeds. After error our seed will be moved back to Restore stage Scheduled status and retries increased (due to backup stage is always moved to scheduled)
+	// ProcessSeeds. After error our seed will be moved back to ConnectSlave stage
 	ProcessSeeds()
 	seed = s.readSeed(c, seedID, targetAgent.Info.Hostname, sourceAgent.Info.Hostname, Mydumper, Target, Scheduled, ConnectSlave, 1)
 
@@ -1380,13 +1420,10 @@ func (s *AgentTestSuite) TestProcessSeedsFailed(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
 	// MaxRetriesForStage set to 0, so it will be failed after first error
 	config.Config.MaxRetriesForSeedStage = 0
 
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
@@ -1432,13 +1469,10 @@ func (s *AgentTestSuite) TestAbortSeedRestore(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
 	// MaxRetriesForStage set to 0, so it will be failed after first error
 	config.Config.MaxRetriesForSeedStage = 0
 
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
@@ -1478,12 +1512,9 @@ func (s *AgentTestSuite) TestAbortSeedCleanup(c *C) {
 	targetTestAgent := s.testAgents["agent1"]
 	sourceTestAgent := s.testAgents["agent2"]
 
-	// create containers with MySQL for agents
-	err := s.createTestAgentsMySQLServers([]*testAgent{targetTestAgent, sourceTestAgent})
-	c.Assert(err, IsNil)
-
 	config.Config.MaxRetriesForSeedStage = 2
 
+	// register agents to Orchestrator
 	s.registerAgents(c)
 
 	targetAgent, sourceAgent := s.getSeedAgents(c, targetTestAgent, sourceTestAgent)
