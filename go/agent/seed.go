@@ -640,13 +640,22 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 			s.updateSeed(sourceAgent, fmt.Sprintf("Error reading topology instance: %+v", err))
 			return
 		}
-		if s.Retries > 0 && slave.IsReplicaOf(master) && slave.Slave_SQL_Running {
+		if s.Retries > 0 && slave.IsReplicaOf(master) && slave.Slave_SQL_Running && slave.Slave_IO_Running {
 			//everything is already good, seems like we do not mark seed stage as completed so just do it
 			auditSeedOperation(targetAgent, fmt.Sprintf("SeedID: %d, Stage: %s, Status: %s, Retries: %d", s.SeedID, s.Stage.String(), Completed.String(), s.Retries))
 			s.Stage = s.Stage + 1
 			s.Status = Scheduled
 			s.Retries = 0
 			s.updateSeed(targetAgent, "")
+		}
+		if slave.ReplicationThreadsExist() && !slave.ReplicationThreadsStopped() {
+			slave, err = inst.StopSlave(slaveInstanceKey)
+			if err != nil {
+				log.Errore(err)
+				s.Status = Error
+				s.updateSeed(targetAgent, fmt.Sprintf("Error stopping slave threads: %+v", err))
+				return
+			}
 		}
 		slave, err = inst.ResetSlave(slaveInstanceKey)
 		if err != nil {
