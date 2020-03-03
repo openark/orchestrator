@@ -202,6 +202,7 @@ type Configuration struct {
 	AgentPollMinutes                           uint              // Minutes between agent polling
 	MaxRetriesForSeedStage                     int               // Number of maximum retries for each of the seed stages, after which seed will be marked as failed
 	SeedProcessIntervalSeconds                 uint              // Interval in seconds between processing active seeds
+	SeedBackupStaleFailMinutes                 uint              // Number of minutes after which a stale (no progress) seed in Backup stage is considered failed
 	UseSSL                                     bool              // Use SSL on the server web port
 	UseMutualTLS                               bool              // When "true" Use mutual TLS for the server's web and API connections
 	SSLSkipVerify                              bool              // When using SSL, should we ignore SSL certification error
@@ -374,6 +375,7 @@ func newConfiguration() *Configuration {
 		SSLCertFile:                                "",
 		SSLCAFile:                                  "",
 		AgentPollMinutes:                           30,
+		SeedBackupStaleFailMinutes:                 60,
 		UnseenAgentForgetHours:                     6,
 		MaxRetriesForSeedStage:                     3,
 		SeedProcessIntervalSeconds:                 60,

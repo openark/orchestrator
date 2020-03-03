@@ -15,6 +15,13 @@ import (
 
 var SeededAgents chan *Agent = make(chan *Agent)
 
+type backupProgress struct {
+	bytesCopied int64
+	updatedAt   time.Time
+}
+
+var seedBackupProgress = make(map[int64]*backupProgress)
+
 type SeedSide int
 
 const (
@@ -240,6 +247,20 @@ type SeedMetadata struct {
 	GtidExecuted string
 }
 
+func byteCount(b int64) string {
+	const unit = 1000
+	if b < unit {
+		return fmt.Sprintf("%d B", b)
+	}
+	div, exp := int64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB",
+		float64(b)/float64(div), "kMGTPE"[exp])
+}
+
 func auditSeedOperation(agent *Agent, message string) error {
 	instanceKey := &inst.InstanceKey{}
 	if agent != nil {
@@ -454,13 +475,20 @@ func ProcessSeeds() []*Seed {
 	return activeSeeds
 }
 
-// GetSeedAgents returns target and source agent associated with seed
-func (s *Seed) GetSeedAgents() (targetAgent *Agent, sourceAgent *Agent, err error) {
+// readSeadAgents returns target and source agents associated with seed from db. If updateAgentData is specified, it will use agent API in order to update agent data
+func (s *Seed) readSeadAgents(updateAgentsData bool) (targetAgent *Agent, sourceAgent *Agent, err error) {
 	targetAgent, err = ReadAgentInfo(s.TargetHostname)
 	if err != nil {
 		s.Status = Failed
 		s.updateSeed(targetAgent, fmt.Sprintf("Unable to read target agent info: %+v", err))
 		return nil, nil, log.Errore(err)
+	}
+	if updateAgentsData {
+		if err = targetAgent.getAgentData(); err != nil {
+			s.Status = Failed
+			s.updateSeed(targetAgent, fmt.Sprintf("Unable to update agent data: %+v", err))
+			return nil, nil, log.Errore(err)
+		}
 	}
 	sourceAgent, err = ReadAgentInfo(s.SourceHostname)
 	if err != nil {
@@ -468,12 +496,19 @@ func (s *Seed) GetSeedAgents() (targetAgent *Agent, sourceAgent *Agent, err erro
 		s.updateSeed(sourceAgent, fmt.Sprintf("Unable to read source agent info: %+v", err))
 		return nil, nil, log.Errore(err)
 	}
+	if updateAgentsData {
+		if err = sourceAgent.getAgentData(); err != nil {
+			s.Status = Failed
+			s.updateSeed(sourceAgent, fmt.Sprintf("Unable to update agent data: %+v", err))
+			return nil, nil, log.Errore(err)
+		}
+	}
 	return targetAgent, sourceAgent, nil
 }
 
 func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 	defer wg.Done()
-	targetAgent, sourceAgent, err := s.GetSeedAgents()
+	targetAgent, sourceAgent, err := s.readSeadAgents(false)
 	if err != nil {
 		return
 	}
@@ -532,12 +567,12 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 
 func (s *Seed) processRunning(wg *sync.WaitGroup) {
 	defer wg.Done()
-	targetAgent, sourceAgent, err := s.GetSeedAgents()
-	if err != nil {
-		return
-	}
 	switch s.Stage {
 	case Prepare, Cleanup:
+		targetAgent, sourceAgent, err := s.readSeadAgents(false)
+		if err != nil {
+			return
+		}
 		agents := make(map[*Agent]bool)
 		agents[targetAgent] = false
 		agents[sourceAgent] = false
@@ -593,7 +628,74 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 				}
 			}
 		}
-	case Backup, Restore:
+	case Backup:
+		targetAgent, sourceAgent, err := s.readSeadAgents(true)
+		if err != nil {
+			return
+		}
+		agent := targetAgent
+		if s.BackupSide == Source {
+			agent = sourceAgent
+		}
+		agentSeedStageState, err := agent.getSeedStageState(s.SeedID, s.Stage)
+		if err != nil {
+			s.Status = Failed
+			s.updateSeed(agent, fmt.Sprintf("Error getting seed stage state information from agent: %+v", err))
+			return
+		}
+		if agentSeedStageState.Status == Running {
+			// check that seed is not stale
+			bytesCopied := targetAgent.Data.BackupDirDiskUsed
+			if agent.Data.AvailiableSeedMethods[s.SeedMethod].BackupToDatadir == true {
+				bytesCopied = targetAgent.Data.MySQLDatadirDiskUsed
+			}
+			// if we do not have information about backup progress for this SeedID = add it
+			if _, ok := seedBackupProgress[s.SeedID]; !ok {
+				seedBackupProgress[s.SeedID] = &backupProgress{
+					bytesCopied: bytesCopied,
+					updatedAt:   agentSeedStageState.Timestamp,
+				}
+			} else {
+				// if bytesCopied increased - just update info for this SeedID
+				if bytesCopied > seedBackupProgress[s.SeedID].bytesCopied {
+					seedBackupProgress[s.SeedID].bytesCopied = bytesCopied
+					seedBackupProgress[s.SeedID].updatedAt = agentSeedStageState.Timestamp
+					agentSeedStageState.Details = fmt.Sprintf("Copied: %s. MySQL datadir size: %s", byteCount(bytesCopied), byteCount(agent.Data.MySQLDatadirDiskUsed))
+				} else {
+					// else check diff between agentSeedStageState.Timestamp and seedBackupProgress[s.SeedID].updatedAt. If it is more than config.Config.StaleSeedFailMinutes - abort seed and mark it as failed
+					if agentSeedStageState.Timestamp.Sub(seedBackupProgress[s.SeedID].updatedAt).Minutes() >= float64(config.Config.SeedBackupStaleFailMinutes) {
+						if err := agent.AbortSeed(s.SeedID, s.Stage); err != nil {
+							s.Retries++
+							s.updateSeed(agent, fmt.Sprintf("Error aborting stale seed on agent: %+v", err))
+							return
+						}
+						s.Status = Error
+						s.updateSeed(agent, fmt.Sprintf("No data copied in SeedBackupStaleFailMinutes interval (%d minutes). Aborting seed", config.Config.SeedBackupStaleFailMinutes))
+						return
+					}
+				}
+			}
+			submitSeedStageState(agentSeedStageState)
+		}
+		if agentSeedStageState.Status == Completed {
+			submitSeedStageState(agentSeedStageState)
+			auditSeedOperation(agent, fmt.Sprintf("SeedID: %d, Stage: %s, Status: %s, Retries: %d", s.SeedID, s.Stage.String(), Completed.String(), s.Retries))
+			s.Stage = s.Stage + 1
+			s.Status = Scheduled
+			s.Retries = 0
+			delete(seedBackupProgress, s.SeedID)
+			s.updateSeed(agent, "")
+		}
+		if agentSeedStageState.Status == Error {
+			submitSeedStageState(agentSeedStageState)
+			s.Status = Error
+			s.updateSeed(agent, "")
+		}
+	case Restore:
+		targetAgent, sourceAgent, err := s.readSeadAgents(false)
+		if err != nil {
+			return
+		}
 		agent := targetAgent
 		if s.Stage == Backup && s.BackupSide == Source {
 			agent = sourceAgent
@@ -601,7 +703,7 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 		agentSeedStageState, err := agent.getSeedStageState(s.SeedID, s.Stage)
 		if err != nil {
 			s.Status = Failed
-			s.updateSeed(targetAgent, fmt.Sprintf("Error getting seed stage state information from agent: %+v", err))
+			s.updateSeed(agent, fmt.Sprintf("Error getting seed stage state information from agent: %+v", err))
 			return
 		}
 		submitSeedStageState(agentSeedStageState)
@@ -617,6 +719,10 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 			s.updateSeed(agent, "")
 		}
 	case ConnectSlave:
+		targetAgent, sourceAgent, err := s.readSeadAgents(false)
+		if err != nil {
+			return
+		}
 		var gtidHint inst.OperationGTIDHint = inst.GTIDHintNeutral
 		seedMetadata, err := targetAgent.getMetadata(s.SeedID, s.SeedMethod)
 		if err != nil {
@@ -740,7 +846,7 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 
 func (s *Seed) processErrored(wg *sync.WaitGroup) {
 	defer wg.Done()
-	targetAgent, sourceAgent, err := s.GetSeedAgents()
+	targetAgent, sourceAgent, err := s.readSeadAgents(false)
 	if err != nil {
 		return
 	}
@@ -827,7 +933,7 @@ func (s *Seed) updateSeedState(hostname string, details string) error {
 }
 
 func (s *Seed) AbortSeed() error {
-	targetAgent, sourceAgent, err := s.GetSeedAgents()
+	targetAgent, sourceAgent, err := s.readSeadAgents(false)
 	if err != nil {
 		return err
 	}

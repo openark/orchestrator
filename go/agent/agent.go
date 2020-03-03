@@ -51,6 +51,7 @@ type Data struct {
 	MountPoint            *Mount           // pass by reference ??
 	BackupDir             string
 	BackupDirDiskFree     int64
+	BackupDirDiskUsed     int64
 	MySQLRunning          bool
 	MySQLDatadir          string
 	MySQLDatadirDiskUsed  int64
