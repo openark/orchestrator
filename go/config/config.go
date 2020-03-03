@@ -201,7 +201,7 @@ type Configuration struct {
 	UnseenAgentForgetHours                     uint              // Number of hours after which an unseen agent is forgotten
 	AgentPollMinutes                           uint              // Minutes between agent polling
 	MaxRetriesForSeedStage                     int               // Number of maximum retries for each of the seed stages, after which seed will be marked as failed
-	SeedProcessIntervalMinutes                 uint              // Interval in minutes between processing active seeds
+	SeedProcessIntervalSeconds                 uint              // Interval in seconds between processing active seeds
 	UseSSL                                     bool              // Use SSL on the server web port
 	UseMutualTLS                               bool              // When "true" Use mutual TLS for the server's web and API connections
 	SSLSkipVerify                              bool              // When using SSL, should we ignore SSL certification error
@@ -376,7 +376,7 @@ func newConfiguration() *Configuration {
 		AgentPollMinutes:                           30,
 		UnseenAgentForgetHours:                     6,
 		MaxRetriesForSeedStage:                     3,
-		SeedProcessIntervalMinutes:                 1,
+		SeedProcessIntervalSeconds:                 60,
 		AutoPseudoGTID:                             false,
 		PseudoGTIDPattern:                          "",
 		PseudoGTIDPatternIsFixedSubstring:          false,

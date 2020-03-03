@@ -621,7 +621,7 @@ func ContinuousDiscovery() {
 
 // ContinuousSeedProcess starts an asynchronuous infinite process of active seeds processing
 func ContinuousSeedProcess() {
-	tick := time.Tick(time.Duration(config.Config.SeedProcessIntervalMinutes) * time.Minute)
+	tick := time.Tick(time.Duration(config.Config.SeedProcessIntervalSeconds) * time.Second)
 	for range tick {
 		if IsLeader() {
 			if atomic.CompareAndSwapUint32(&continuousSeedProcessRunning, 0, 1) {
