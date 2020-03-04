@@ -16,8 +16,9 @@ import (
 var SeededAgents chan *Agent = make(chan *Agent)
 
 type backupProgress struct {
-	bytesCopied int64
-	updatedAt   time.Time
+	bytesCopied   int64
+	databasesSize int64
+	updatedAt     time.Time
 }
 
 var seedBackupProgress = make(map[int64]*backupProgress)
@@ -639,7 +640,7 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 		}
 		agentSeedStageState, err := agent.getSeedStageState(s.SeedID, s.Stage)
 		if err != nil {
-			s.Status = Failed
+			s.Status = Error
 			s.updateSeed(agent, fmt.Sprintf("Error getting seed stage state information from agent: %+v", err))
 			return
 		}
@@ -651,16 +652,21 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 			}
 			// if we do not have information about backup progress for this SeedID = add it
 			if _, ok := seedBackupProgress[s.SeedID]; !ok {
+				var databasesSize int64
+				for _, dbProps := range sourceAgent.Data.MySQLDatabases {
+					databasesSize += dbProps.Size
+				}
 				seedBackupProgress[s.SeedID] = &backupProgress{
-					bytesCopied: bytesCopied,
-					updatedAt:   agentSeedStageState.Timestamp,
+					bytesCopied:   bytesCopied,
+					databasesSize: databasesSize,
+					updatedAt:     agentSeedStageState.Timestamp,
 				}
 			} else {
 				// if bytesCopied increased - just update info for this SeedID
 				if bytesCopied > seedBackupProgress[s.SeedID].bytesCopied {
 					seedBackupProgress[s.SeedID].bytesCopied = bytesCopied
 					seedBackupProgress[s.SeedID].updatedAt = agentSeedStageState.Timestamp
-					agentSeedStageState.Details = fmt.Sprintf("Copied: %s. MySQL datadir size: %s", byteCount(bytesCopied), byteCount(agent.Data.MySQLDatadirDiskUsed))
+					agentSeedStageState.Details = fmt.Sprintf("Copied: %s. MySQL databases size: %s", byteCount(bytesCopied), byteCount(seedBackupProgress[s.SeedID].databasesSize))
 				} else {
 					// else check diff between agentSeedStageState.Timestamp and seedBackupProgress[s.SeedID].updatedAt. If it is more than config.Config.StaleSeedFailMinutes - abort seed and mark it as failed
 					if agentSeedStageState.Timestamp.Sub(seedBackupProgress[s.SeedID].updatedAt).Minutes() >= float64(config.Config.SeedBackupStaleFailMinutes) {
@@ -692,14 +698,11 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 			s.updateSeed(agent, "")
 		}
 	case Restore:
-		targetAgent, sourceAgent, err := s.readSeadAgents(false)
+		targetAgent, _, err := s.readSeadAgents(false)
 		if err != nil {
 			return
 		}
 		agent := targetAgent
-		if s.Stage == Backup && s.BackupSide == Source {
-			agent = sourceAgent
-		}
 		agentSeedStageState, err := agent.getSeedStageState(s.SeedID, s.Stage)
 		if err != nil {
 			s.Status = Failed
@@ -772,7 +775,7 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 			s.updateSeed(targetAgent, fmt.Sprintf("Error executing RESET SLAVE: %+v", err))
 			return
 		}
-		s.updateSeedState(targetAgent.Info.Hostname, "RESET SLAVE executed")
+		s.updateSeedState(targetAgent.Info.Hostname, "Executed RESET SLAVE")
 		slave, err = inst.ResetMaster(slaveInstanceKey)
 		if err != nil {
 			log.Errore(err)
@@ -780,7 +783,7 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 			s.updateSeed(targetAgent, fmt.Sprintf("Error executing RESET MASTER: %+v", err))
 			return
 		}
-		s.updateSeedState(targetAgent.Info.Hostname, "RESET MASTER executed")
+		s.updateSeedState(targetAgent.Info.Hostname, "Executed RESET MASTER")
 		if len(seedMetadata.GtidExecuted) > 0 {
 			if err = inst.SetGTIDPurged(slave, seedMetadata.GtidExecuted); err != nil {
 				log.Errore(err)
@@ -802,7 +805,7 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 			s.updateSeed(targetAgent, fmt.Sprintf("Error executing CHANGE MASTER TO: %+v", err))
 			return
 		}
-		s.updateSeedState(targetAgent.Info.Hostname, "CHANGE MASTER TO binlog position executed")
+		s.updateSeedState(targetAgent.Info.Hostname, "Executed CHANGE MASTER TO binlog position")
 		replicationUser, replicationPassword, err := inst.ReadReplicationCredentials(slaveInstanceKey)
 		if err != nil {
 			log.Errore(err)
@@ -817,7 +820,7 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 			s.updateSeed(targetAgent, fmt.Sprintf("Error executing CHANGE MASTER TO with replication credentials: %+v", err))
 			return
 		}
-		s.updateSeedState(targetAgent.Info.Hostname, "CHANGE MASTER TO master credentials executed")
+		s.updateSeedState(targetAgent.Info.Hostname, "Executed CHANGE MASTER TO master credentials")
 		if slave.AllowTLS {
 			if _, err := inst.EnableMasterSSL(slaveInstanceKey); err != nil {
 				log.Errore(err)
@@ -833,7 +836,7 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 			s.updateSeed(targetAgent, fmt.Sprintf("Error executing START SLAVE: %+v", err))
 			return
 		}
-		s.updateSeedState(targetAgent.Info.Hostname, "START SLAVE executed")
+		s.updateSeedState(targetAgent.Info.Hostname, "Executed START SLAVE")
 		s.Status = Completed
 		auditSeedOperation(targetAgent, fmt.Sprintf("SeedID: %d, Stage: %s, Status: %s, Retries: %d", s.SeedID, s.Stage.String(), Completed.String(), s.Retries))
 		s.updateSeedState(targetAgent.Info.Hostname, "Completed connect slave stage")
