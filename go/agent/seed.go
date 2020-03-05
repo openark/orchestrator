@@ -459,21 +459,23 @@ func ProcessSeeds() []*Seed {
 		log.Errore(fmt.Errorf("Unable to read active seeds: %+v", err))
 		return nil
 	}
-	inst.AuditOperation("process-seeds", nil, fmt.Sprintf("Will process %d active seeds", len(activeSeeds)))
-	var wg sync.WaitGroup
-	for _, seed := range activeSeeds {
-		wg.Add(1)
-		switch seed.Status {
-		case Scheduled:
-			go seed.processScheduled(&wg)
-		case Running:
-			go seed.processRunning(&wg)
-		case Error:
-			go seed.processErrored(&wg)
+	if len(activeSeeds) > 0 {
+		inst.AuditOperation("process-seeds", nil, fmt.Sprintf("Will process %d active seeds", len(activeSeeds)))
+		var wg sync.WaitGroup
+		for _, seed := range activeSeeds {
+			wg.Add(1)
+			switch seed.Status {
+			case Scheduled:
+				go seed.processScheduled(&wg)
+			case Running:
+				go seed.processRunning(&wg)
+			case Error:
+				go seed.processErrored(&wg)
+			}
 		}
+		wg.Wait()
+		inst.AuditOperation("process-seeds", nil, "All active seeds processed")
 	}
-	wg.Wait()
-	inst.AuditOperation("process-seeds", nil, "All active seeds processed")
 	return activeSeeds
 }
 
