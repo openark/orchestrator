@@ -15,13 +15,14 @@ import (
 
 var SeededAgents chan *Agent = make(chan *Agent)
 
-type backupProgress struct {
-	bytesCopied   int64
-	databasesSize int64
-	updatedAt     time.Time
+type seedProgress struct {
+	bytesCopied       int64
+	initialFolderUsed int64
+	databasesSize     int64
+	updatedAt         time.Time
 }
 
-var seedBackupProgress = make(map[int64]*backupProgress)
+var seedOperationProgress = make(map[int64]*seedProgress)
 
 type SeedSide int
 
@@ -509,12 +510,12 @@ func (s *Seed) readSeadAgents(updateAgentsData bool) (targetAgent *Agent, source
 
 func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 	defer wg.Done()
-	targetAgent, sourceAgent, err := s.readSeadAgents(false)
-	if err != nil {
-		return
-	}
 	switch s.Stage {
 	case Prepare:
+		targetAgent, sourceAgent, err := s.readSeadAgents(false)
+		if err != nil {
+			return
+		}
 		agents := make(map[*Agent]SeedSide)
 		agents[targetAgent] = Target
 		agents[sourceAgent] = Source
@@ -528,6 +529,10 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 			s.updateSeed(agent, "Stage started")
 		}
 	case Backup:
+		targetAgent, sourceAgent, err := s.readSeadAgents(true)
+		if err != nil {
+			return
+		}
 		agent := targetAgent
 		if s.BackupSide == Source {
 			agent = sourceAgent
@@ -539,7 +544,29 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 		}
 		s.Status = Running
 		s.updateSeed(agent, "Stage started")
+		// create structs for monitoring stage progress
+		if _, ok := seedOperationProgress[s.SeedID]; ok {
+			delete(seedOperationProgress, s.SeedID)
+		}
+		var databasesSize int64
+		for _, dbProps := range sourceAgent.Data.MySQLDatabases {
+			databasesSize += dbProps.Size
+		}
+		initialFolderUsed := targetAgent.Data.BackupDirDiskUsed
+		if targetAgent.Data.AvailiableSeedMethods[s.SeedMethod].BackupToDatadir == true {
+			initialFolderUsed = targetAgent.Data.MySQLDatadirDiskUsed
+		}
+		seedOperationProgress[s.SeedID] = &seedProgress{
+			bytesCopied:       0,
+			databasesSize:     databasesSize,
+			initialFolderUsed: initialFolderUsed,
+			updatedAt:         time.Now(),
+		}
 	case Restore:
+		targetAgent, sourceAgent, err := s.readSeadAgents(true)
+		if err != nil {
+			return
+		}
 		if err := targetAgent.restore(s.SeedID, s.SeedMethod); err != nil {
 			s.Status = Error
 			s.updateSeed(targetAgent, fmt.Sprintf("Error calling restore API on agent: %+v", err))
@@ -547,7 +574,27 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 		}
 		s.Status = Running
 		s.updateSeed(targetAgent, "Stage started")
+		// we will monitor progress only for seeds, that do not have backupToDatadir, because only they will have explcit restore (like mysqldump\mydumper)
+		if targetAgent.Data.AvailiableSeedMethods[s.SeedMethod].BackupToDatadir == false {
+			if _, ok := seedOperationProgress[s.SeedID]; ok {
+				delete(seedOperationProgress, s.SeedID)
+			}
+			var databasesSize int64
+			for _, dbProps := range sourceAgent.Data.MySQLDatabases {
+				databasesSize += dbProps.Size
+			}
+			seedOperationProgress[s.SeedID] = &seedProgress{
+				bytesCopied:       0,
+				databasesSize:     databasesSize,
+				initialFolderUsed: targetAgent.Data.MySQLDatadirDiskUsed,
+				updatedAt:         time.Now(),
+			}
+		}
 	case Cleanup:
+		targetAgent, sourceAgent, err := s.readSeadAgents(true)
+		if err != nil {
+			return
+		}
 		agents := make(map[*Agent]SeedSide)
 		agents[targetAgent] = Target
 		agents[sourceAgent] = Source
@@ -561,6 +608,10 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 			s.updateSeed(agent, "Stage started")
 		}
 	case ConnectSlave:
+		targetAgent, _, err := s.readSeadAgents(true)
+		if err != nil {
+			return
+		}
 		s.Status = Running
 		s.updateSeed(targetAgent, "Stage started")
 	}
@@ -650,35 +701,22 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 			if agent.Data.AvailiableSeedMethods[s.SeedMethod].BackupToDatadir == true {
 				bytesCopied = targetAgent.Data.MySQLDatadirDiskUsed
 			}
-			// if we do not have information about backup progress for this SeedID = add it
-			if _, ok := seedBackupProgress[s.SeedID]; !ok {
-				var databasesSize int64
-				for _, dbProps := range sourceAgent.Data.MySQLDatabases {
-					databasesSize += dbProps.Size
-				}
-				seedBackupProgress[s.SeedID] = &backupProgress{
-					bytesCopied:   bytesCopied,
-					databasesSize: databasesSize,
-					updatedAt:     agentSeedStageState.Timestamp,
-				}
+			// if bytesCopied increased - just update info for this SeedID
+			if bytesCopied > seedOperationProgress[s.SeedID].bytesCopied {
+				seedOperationProgress[s.SeedID].bytesCopied = bytesCopied
+				seedOperationProgress[s.SeedID].updatedAt = agentSeedStageState.Timestamp
+				agentSeedStageState.Details = fmt.Sprintf("Copied: %s. MySQL databases size: %s", byteCount(bytesCopied), byteCount(seedOperationProgress[s.SeedID].databasesSize))
 			} else {
-				// if bytesCopied increased - just update info for this SeedID
-				if bytesCopied > seedBackupProgress[s.SeedID].bytesCopied {
-					seedBackupProgress[s.SeedID].bytesCopied = bytesCopied
-					seedBackupProgress[s.SeedID].updatedAt = agentSeedStageState.Timestamp
-					agentSeedStageState.Details = fmt.Sprintf("Copied: %s. MySQL databases size: %s", byteCount(bytesCopied), byteCount(seedBackupProgress[s.SeedID].databasesSize))
-				} else {
-					// else check diff between agentSeedStageState.Timestamp and seedBackupProgress[s.SeedID].updatedAt. If it is more than config.Config.StaleSeedFailMinutes - abort seed and mark it as failed
-					if agentSeedStageState.Timestamp.Sub(seedBackupProgress[s.SeedID].updatedAt).Minutes() >= float64(config.Config.SeedBackupStaleFailMinutes) {
-						if err := agent.AbortSeed(s.SeedID, s.Stage); err != nil {
-							s.Retries++
-							s.updateSeed(agent, fmt.Sprintf("Error aborting stale seed on agent: %+v", err))
-							return
-						}
-						s.Status = Error
-						s.updateSeed(agent, fmt.Sprintf("No data copied in SeedBackupStaleFailMinutes interval (%d minutes). Aborting seed", config.Config.SeedBackupStaleFailMinutes))
+				// else check diff between agentSeedStageState.Timestamp and seedOperationProgress[s.SeedID].updatedAt. If it is more than config.Config.StaleSeedFailMinutes - abort seed and mark it as failed
+				if agentSeedStageState.Timestamp.Sub(seedOperationProgress[s.SeedID].updatedAt).Minutes() >= float64(config.Config.SeedBackupStaleFailMinutes) {
+					if err := agent.AbortSeed(s.SeedID, s.Stage); err != nil {
+						s.Retries++
+						s.updateSeed(agent, fmt.Sprintf("Error aborting stale seed on agent: %+v", err))
 						return
 					}
+					s.Status = Error
+					s.updateSeed(agent, fmt.Sprintf("No data copied in SeedBackupStaleFailMinutes interval (%d minutes). Aborting seed", config.Config.SeedBackupStaleFailMinutes))
+					return
 				}
 			}
 			submitSeedStageState(agentSeedStageState)
@@ -689,35 +727,62 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 			s.Stage = s.Stage + 1
 			s.Status = Scheduled
 			s.Retries = 0
-			delete(seedBackupProgress, s.SeedID)
 			s.updateSeed(agent, "")
+			delete(seedOperationProgress, s.SeedID)
 		}
 		if agentSeedStageState.Status == Error {
 			submitSeedStageState(agentSeedStageState)
 			s.Status = Error
 			s.updateSeed(agent, "")
+			delete(seedOperationProgress, s.SeedID)
 		}
 	case Restore:
-		targetAgent, _, err := s.readSeadAgents(false)
+		targetAgent, _, err := s.readSeadAgents(true)
 		if err != nil {
 			return
 		}
 		agent := targetAgent
 		agentSeedStageState, err := agent.getSeedStageState(s.SeedID, s.Stage)
 		if err != nil {
-			s.Status = Failed
+			s.Status = Error
 			s.updateSeed(agent, fmt.Sprintf("Error getting seed stage state information from agent: %+v", err))
 			return
 		}
-		submitSeedStageState(agentSeedStageState)
+		if agentSeedStageState.Status == Running && targetAgent.Data.AvailiableSeedMethods[s.SeedMethod].BackupToDatadir == false {
+			// check that seed is not stale
+			bytesCopied := targetAgent.Data.MySQLDatadirDiskUsed - seedOperationProgress[s.SeedID].initialFolderUsed
+			// if bytesCopied increased - just update info for this SeedID
+			if bytesCopied > seedOperationProgress[s.SeedID].bytesCopied {
+				seedOperationProgress[s.SeedID].bytesCopied = bytesCopied
+				seedOperationProgress[s.SeedID].updatedAt = agentSeedStageState.Timestamp
+				agentSeedStageState.Details = fmt.Sprintf("Restored: %s. MySQL databases size: %s", byteCount(bytesCopied), byteCount(seedOperationProgress[s.SeedID].databasesSize))
+			} else {
+				// else check diff between agentSeedStageState.Timestamp and seedBackupProgress[s.SeedID].updatedAt. If it is more than config.Config.StaleSeedFailMinutes - abort seed and mark it as failed
+				if agentSeedStageState.Timestamp.Sub(seedOperationProgress[s.SeedID].updatedAt).Minutes() >= float64(config.Config.SeedBackupStaleFailMinutes) {
+					if err := agent.AbortSeed(s.SeedID, s.Stage); err != nil {
+						s.Retries++
+						s.updateSeed(agent, fmt.Sprintf("Error aborting stale seed on agent: %+v", err))
+						return
+					}
+					s.Status = Error
+					s.updateSeed(agent, fmt.Sprintf("No data restored in SeedBackupStaleFailMinutes interval (%d minutes). Aborting seed", config.Config.SeedBackupStaleFailMinutes))
+					return
+				}
+			}
+			submitSeedStageState(agentSeedStageState)
+		}
 		if agentSeedStageState.Status == Completed {
+			submitSeedStageState(agentSeedStageState)
 			auditSeedOperation(agent, fmt.Sprintf("SeedID: %d, Stage: %s, Status: %s, Retries: %d", s.SeedID, s.Stage.String(), Completed.String(), s.Retries))
 			s.Stage = s.Stage + 1
 			s.Status = Scheduled
 			s.Retries = 0
+			delete(seedOperationProgress, s.SeedID)
 			s.updateSeed(agent, "")
 		}
 		if agentSeedStageState.Status == Error {
+			delete(seedOperationProgress, s.SeedID)
+			submitSeedStageState(agentSeedStageState)
 			s.Status = Error
 			s.updateSeed(agent, "")
 		}
