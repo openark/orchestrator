@@ -750,12 +750,15 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 		}
 		if agentSeedStageState.Status == Running && targetAgent.Data.AvailiableSeedMethods[s.SeedMethod].BackupToDatadir == false {
 			// check that seed is not stale
-			bytesCopied := targetAgent.Data.MySQLDatadirDiskUsed - seedOperationProgress[s.SeedID].initialFolderUsed
+			var databasesSize int64
+			for _, dbProps := range targetAgent.Data.MySQLDatabases {
+				databasesSize += dbProps.Size
+			}
 			// if bytesCopied increased - just update info for this SeedID
-			if bytesCopied > seedOperationProgress[s.SeedID].bytesCopied {
-				seedOperationProgress[s.SeedID].bytesCopied = bytesCopied
+			if databasesSize > seedOperationProgress[s.SeedID].bytesCopied {
+				seedOperationProgress[s.SeedID].bytesCopied = databasesSize
 				seedOperationProgress[s.SeedID].updatedAt = agentSeedStageState.Timestamp
-				agentSeedStageState.Details = fmt.Sprintf("Restored: %s. MySQL databases size: %s", byteCount(bytesCopied), byteCount(seedOperationProgress[s.SeedID].databasesSize))
+				agentSeedStageState.Details = fmt.Sprintf("Restored: %s. MySQL databases size: %s", byteCount(databasesSize), byteCount(seedOperationProgress[s.SeedID].databasesSize))
 			} else {
 				// else check diff between agentSeedStageState.Timestamp and seedBackupProgress[s.SeedID].updatedAt. If it is more than config.Config.StaleSeedFailMinutes - abort seed and mark it as failed
 				if agentSeedStageState.Timestamp.Sub(seedOperationProgress[s.SeedID].updatedAt).Minutes() >= float64(config.Config.SeedBackupStaleFailMinutes) {
