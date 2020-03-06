@@ -708,6 +708,7 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 				seedOperationProgress[s.SeedID].bytesCopied = bytesCopied
 				seedOperationProgress[s.SeedID].updatedAt = agentSeedStageState.Timestamp
 				agentSeedStageState.Details = fmt.Sprintf("Copied: %s. MySQL databases size: %s", byteCount(bytesCopied), byteCount(seedOperationProgress[s.SeedID].databasesSize))
+				agentSeedStageState.Timestamp = time.Now()
 			} else {
 				// else check diff between agentSeedStageState.Timestamp and seedOperationProgress[s.SeedID].updatedAt. If it is more than config.Config.StaleSeedFailMinutes - abort seed and mark it as failed
 				if agentSeedStageState.Timestamp.Sub(seedOperationProgress[s.SeedID].updatedAt).Minutes() >= float64(config.Config.SeedBackupStaleFailMinutes) {
@@ -761,6 +762,7 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 				seedOperationProgress[s.SeedID].bytesCopied = databasesSize
 				seedOperationProgress[s.SeedID].updatedAt = agentSeedStageState.Timestamp
 				agentSeedStageState.Details = fmt.Sprintf("Restored: %s. MySQL databases size: %s", byteCount(databasesSize), byteCount(seedOperationProgress[s.SeedID].databasesSize))
+				agentSeedStageState.Timestamp = time.Now()
 			} else {
 				// else check diff between agentSeedStageState.Timestamp and seedBackupProgress[s.SeedID].updatedAt. If it is more than config.Config.StaleSeedFailMinutes - abort seed and mark it as failed
 				if agentSeedStageState.Timestamp.Sub(seedOperationProgress[s.SeedID].updatedAt).Minutes() >= float64(config.Config.SeedBackupStaleFailMinutes) {
