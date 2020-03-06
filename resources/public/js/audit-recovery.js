@@ -2,8 +2,11 @@ $(document).ready(function() {
   $("#audit_recovery_steps").hide();
   showLoader();
   var apiUri = "/api/audit-recovery/" + currentPage();
-  if (auditCluster()) {
-    apiUri = "/api/audit-recovery/cluster/" + auditCluster() + "/" + currentPage();
+  if (clusterName()) {
+    apiUri = "/api/audit-recovery/cluster/" + clusterName() + "/" + currentPage();
+  }
+  if (clusterAlias()) {
+    apiUri = "/api/audit-recovery/alias/" + clusterAlias() + "/" + currentPage();
   }
   if (recoveryId() > 0) {
     apiUri = "/api/audit-recovery/id/" + recoveryId();
@@ -114,8 +117,11 @@ $(document).ready(function() {
 
   function displayAudit(auditEntries) {
     var baseWebUri = appUrl("/web/audit-recovery/");
-    if (auditCluster()) {
-      baseWebUri += "cluster/" + auditCluster() + "/";
+    if (clusterName()) {
+      baseWebUri += "cluster/" + clusterName() + "/";
+    }
+    if (clusterAlias()) {
+      baseWebUri += "alias/" + clusterAlias() + "/";
     }
     var singleRecoveryAudit = (auditEntries.length == 1);
 
