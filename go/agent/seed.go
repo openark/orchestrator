@@ -279,7 +279,7 @@ func NewSeed(seedMethodName string, targetAgent *Agent, sourceAgent *Agent) (int
 		return 0, log.Errorf("SeedMethod %s not found", seedMethodName)
 	}
 	if err := targetAgent.getAgentData(); err != nil {
-		return 0, log.Errorf("Unable to get information from agent on taget host %s", targetAgent.Info.Hostname)
+		return 0, log.Errorf("Unable to get information from agent on target host %s", targetAgent.Info.Hostname)
 	}
 	if err := sourceAgent.getAgentData(); err != nil {
 		return 0, log.Errorf("Unable to get information from agent on source host %s", sourceAgent.Info.Hostname)
