@@ -1,6 +1,6 @@
 # Configuration: discovery, classifying servers
 
-`orchestrator` will figure out the name of the cluster, data center, and more.
+`orchestrator` will figure out the name of the cluster, data center, region, environment, and more.
 
 ```json
 {
@@ -52,10 +52,28 @@ Perhaps your host naming conventions will disclose the cluster name and you only
 
 `orchestrator` is data-center aware. Not only will it color them nicely on the web interface; but it will take DC into consideration when running failovers.
 
-You will configure data center awareness in one of two methods:
+You will configure data center awareness using one of three methods:
 
 - `DataCenterPattern`: a regular expression to be used on the fqdn. e.g.: `"db-.*?-.*?[.](.*?)[.].myservice[.]com"`
+- `DataCenterMap`: a mapping to be used on the hostname (with optional port), IP address (with optional port, or CIDR network. e.g.:
+  ```json
+  {
+    "db-foo-bar.myservice.com": "dc1",
+    "192.168.123.123:3307": "dc2",
+    "192.168.0.0/24": "dc1",
+    "192.168.1.0/24": "dc2",
+    "192.168.3.0/24": "dc3"
+  }
+  ```
 - `DetectDataCenterQuery`: a query that returns the data center name
+
+### Region
+
+`orchestrator` can maintain metadata about each server's region using the `RegionPattern`, `RegionMap`, and `DetectRegionQuery` configuration settings that correspond to those described under [Data center](#data-center) above.
+
+### Environment
+
+`orchestrator` can maintain metadata about each server's environment using the `PhysicalEnvironmentPattern`, `PhysicalEnvironmentMap`, and `DetectPhysicalEnvironmentQuery` configuration settings that correspond to those described under [Data center](#data-center) above.
 
 ### Cluster domain
 

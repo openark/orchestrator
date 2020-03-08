@@ -110,17 +110,27 @@ Read more on the [Pseudo-GTID](pseudo-gtid.md) documentation page.
 `orchestrator` extracts some metadata from servers:
 - What's the alias for the cluster this instance belongs to?
 - What's the data center a server belongs to?
+- What's the region a server's data center belongs to?
+- What's the environment a server belongs to?
 - Is semi-sync enforced on this server?
 
 These details are extracted by queries such as:
 - `DetectClusterAliasQuery`
 - `DetectClusterDomainQuery`
 - `DetectDataCenterQuery`
+- `DetectRegionQuery`
+- `DetectPhysicalEnvironmentQuery`
 - `DetectSemiSyncEnforcedQuery`
 
 or by regular expressions acting on the hostnames:
 - `DataCenterPattern`
+- `RegionPattern`
 - `PhysicalEnvironmentPattern`
+
+or by mappings acting on the hostnames (with or without ports), IP addresses (with or without ports), or CIDR network specifications (e.g. `192.168.0.1/24`):
+- `DataCenterMap`
+- `RegionMap`
+- `PhysicalEnvironmentMap`
 
 Queries can be satisfied by injecting data into metadata tables on your master. For example, you may:
 

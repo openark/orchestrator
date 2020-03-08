@@ -63,7 +63,30 @@
   "DetectInstanceAliasQuery": "",
   "DetectPromotionRuleQuery": "",
   "DataCenterPattern": "[.]([^.]+)[.][^.]+[.]mydomain[.]com",
+  "DataCenterMap": {
+    "db-foo-bar.myservice.com": "dc1",
+    "192.168.123.123:3307": "dc2",
+    "192.168.0.0/24": "dc1",
+    "192.168.1.0/24": "dc2",
+    "192.168.3.0/24": "dc3"
+  },
+  "RegionPattern": "[.]([^-.]+)-[^.]+[.][^.]+[.]mydomain[.]com",
+  "RegionMap": {
+    "db-foo-bar.myservice.com": "west",
+    "192.168.123.123:3307": "south",
+    "192.168.0.0/22": "east",
+    "192.168.4.0/22": "west",
+    "192.168.8.0/22": "south",
+    "192.168.12.0/22": "north"
+  },
   "PhysicalEnvironmentPattern": "[.]([^.]+[.][^.]+)[.]mydomain[.]com",
+  "PhysicalEnvironmentMap": {
+    "db-foo-bar.myservice.com": "qa",
+    "192.168.123.123:3307": "prod",
+    "192.168.0.0/24": "qa",
+    "192.168.1.0/24": "stage",
+    "192.168.3.0/24": "prod"
+  },
   "PromotionIgnoreHostnameFilters": [],
   "DetectSemiSyncEnforcedQuery": "",
   "ServeAgentsHttp": false,
