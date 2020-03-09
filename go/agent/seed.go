@@ -753,29 +753,31 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 			s.updateSeed(agent, fmt.Sprintf("Error getting seed stage state information from agent: %+v", err))
 			return
 		}
-		if agentSeedStageState.Status == Running && targetAgent.Data.AvailiableSeedMethods[s.SeedMethod].BackupToDatadir == false {
-			// check that seed is not stale
-			var databasesSize int64
-			for _, dbProps := range targetAgent.Data.MySQLDatabases {
-				databasesSize += dbProps.Size
-			}
-			// if bytesCopied increased - just update info for this SeedID
-			if databasesSize > seedOperationProgress[s.SeedID].bytesCopied {
-				seedOperationProgress[s.SeedID].bytesCopied = databasesSize
-				seedOperationProgress[s.SeedID].updatedAt = agentSeedStageState.Timestamp
-				agentSeedStageState.Details = fmt.Sprintf("Restored: %s. MySQL databases size: %s", byteCount(databasesSize), byteCount(seedOperationProgress[s.SeedID].databasesSize))
-				agentSeedStageState.Timestamp = time.Now()
-			} else {
-				// else check diff between agentSeedStageState.Timestamp and seedBackupProgress[s.SeedID].updatedAt. If it is more than config.Config.StaleSeedFailMinutes - abort seed and mark it as failed
-				if agentSeedStageState.Timestamp.Sub(seedOperationProgress[s.SeedID].updatedAt).Minutes() >= float64(config.Config.SeedBackupStaleFailMinutes) {
-					if err := agent.AbortSeed(s.SeedID, s.Stage); err != nil {
-						s.Retries++
-						s.updateSeed(agent, fmt.Sprintf("Error aborting stale seed on agent: %+v", err))
+		if agentSeedStageState.Status == Running {
+			if targetAgent.Data.AvailiableSeedMethods[s.SeedMethod].BackupToDatadir == false {
+				// check that seed is not stale
+				var databasesSize int64
+				for _, dbProps := range targetAgent.Data.MySQLDatabases {
+					databasesSize += dbProps.Size
+				}
+				// if bytesCopied increased - just update info for this SeedID
+				if databasesSize > seedOperationProgress[s.SeedID].bytesCopied {
+					seedOperationProgress[s.SeedID].bytesCopied = databasesSize
+					seedOperationProgress[s.SeedID].updatedAt = agentSeedStageState.Timestamp
+					agentSeedStageState.Details = fmt.Sprintf("Restored: %s. MySQL databases size: %s", byteCount(databasesSize), byteCount(seedOperationProgress[s.SeedID].databasesSize))
+					agentSeedStageState.Timestamp = time.Now()
+				} else {
+					// else check diff between agentSeedStageState.Timestamp and seedBackupProgress[s.SeedID].updatedAt. If it is more than config.Config.StaleSeedFailMinutes - abort seed and mark it as failed
+					if agentSeedStageState.Timestamp.Sub(seedOperationProgress[s.SeedID].updatedAt).Minutes() >= float64(config.Config.SeedBackupStaleFailMinutes) {
+						if err := agent.AbortSeed(s.SeedID, s.Stage); err != nil {
+							s.Retries++
+							s.updateSeed(agent, fmt.Sprintf("Error aborting stale seed on agent: %+v", err))
+							return
+						}
+						s.Status = Error
+						s.updateSeed(agent, fmt.Sprintf("No data restored in SeedBackupStaleFailMinutes interval (%d minutes). Aborting seed", config.Config.SeedBackupStaleFailMinutes))
 						return
 					}
-					s.Status = Error
-					s.updateSeed(agent, fmt.Sprintf("No data restored in SeedBackupStaleFailMinutes interval (%d minutes). Aborting seed", config.Config.SeedBackupStaleFailMinutes))
-					return
 				}
 			}
 			submitSeedStageState(agentSeedStageState)
@@ -786,11 +788,15 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 			s.Stage = s.Stage + 1
 			s.Status = Scheduled
 			s.Retries = 0
-			delete(seedOperationProgress, s.SeedID)
+			if targetAgent.Data.AvailiableSeedMethods[s.SeedMethod].BackupToDatadir == false {
+				delete(seedOperationProgress, s.SeedID)
+			}
 			s.updateSeed(agent, "")
 		}
 		if agentSeedStageState.Status == Error {
-			delete(seedOperationProgress, s.SeedID)
+			if targetAgent.Data.AvailiableSeedMethods[s.SeedMethod].BackupToDatadir == false {
+				delete(seedOperationProgress, s.SeedID)
+			}
 			submitSeedStageState(agentSeedStageState)
 			s.Status = Error
 			s.updateSeed(agent, "")
