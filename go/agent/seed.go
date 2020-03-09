@@ -536,10 +536,12 @@ func (s *Seed) processScheduled(wg *sync.WaitGroup) {
 			return
 		}
 		agent := targetAgent
+		seedHost := sourceAgent.Info.Hostname
 		if s.BackupSide == Source {
 			agent = sourceAgent
+			seedHost = targetAgent.Info.Hostname
 		}
-		if err := agent.backup(s.SeedID, s.SeedMethod, sourceAgent.Info.Hostname, sourceAgent.Info.MySQLPort); err != nil {
+		if err := agent.backup(s.SeedID, s.SeedMethod, seedHost, sourceAgent.Info.MySQLPort); err != nil {
 			s.Status = Error
 			s.updateSeed(agent, fmt.Sprintf("Error calling backup API on agent: %+v", err))
 			return
