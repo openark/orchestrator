@@ -652,7 +652,7 @@ var generateSQLPatches = []string{
 	`
 		ALTER TABLE
 			agent_seed_state /* sqlite3-skip */
-			ADD COLUMN details varchar(800) NOT NULL AFTER status
+			ADD COLUMN details text NOT NULL AFTER status
 	`,
 	`
 		DROP TABLE host_agent; /* mysql-skip */
@@ -700,7 +700,7 @@ var generateSQLPatches = []string{
 			stage varchar(16) NOT NULL,
 			state_timestamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			status varchar(16) NOT NULL,
-			details varchar(800) NOT NULL,
+			details text NOT NULL,
 			PRIMARY KEY (agent_seed_state_id)
 		) ENGINE=InnoDB DEFAULT CHARSET=ascii
 	`,
