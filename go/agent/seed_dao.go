@@ -2,6 +2,7 @@ package agent
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/github/orchestrator/go/db"
 	"github.com/openark/golib/log"
@@ -111,7 +112,7 @@ func submitSeedStageState(seedStageState *SeedStageState) error {
 		seedStageState.SeedID,
 		seedStageState.Stage.String(),
 		seedStageState.Hostname,
-		seedStageState.Timestamp,
+		time.Now(),
 		seedStageState.Status.String(),
 		seedStageState.Details,
 	)
