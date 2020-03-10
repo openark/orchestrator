@@ -669,7 +669,10 @@ func moveReplicasViaGTID(replicas [](*Instance), other *Instance, postponedFunct
 		return movedReplicas, unmovedReplicas, nil, errs
 	}
 
-	log.Infof("moveReplicasViaGTID: Will move %+v replicas below %+v via GTID", len(replicas), other.Key)
+	log.Infof("moveReplicasViaGTID: Will move %+v replicas below %+v via GTID, max concurrency: %v",
+		len(replicas),
+		other.Key,
+		config.Config.MaxConcurrentReplicaOperations)
 
 	var waitGroup sync.WaitGroup
 	var replicaMutex sync.Mutex
