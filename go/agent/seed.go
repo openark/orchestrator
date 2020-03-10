@@ -483,26 +483,26 @@ func ProcessSeeds() []*Seed {
 func (s *Seed) readSeadAgents(updateAgentsData bool) (targetAgent *Agent, sourceAgent *Agent, err error) {
 	targetAgent, err = ReadAgentInfo(s.TargetHostname)
 	if err != nil {
-		s.Status = Failed
+		s.Status = Error
 		s.updateSeed(targetAgent, fmt.Sprintf("Unable to read target agent info: %+v", err))
 		return nil, nil, log.Errore(err)
 	}
 	if updateAgentsData {
 		if err = targetAgent.getAgentData(); err != nil {
-			s.Status = Failed
+			s.Status = Error
 			s.updateSeed(targetAgent, fmt.Sprintf("Unable to update agent data: %+v", err))
 			return nil, nil, log.Errore(err)
 		}
 	}
 	sourceAgent, err = ReadAgentInfo(s.SourceHostname)
 	if err != nil {
-		s.Status = Failed
+		s.Status = Error
 		s.updateSeed(sourceAgent, fmt.Sprintf("Unable to read source agent info: %+v", err))
 		return nil, nil, log.Errore(err)
 	}
 	if updateAgentsData {
 		if err = sourceAgent.getAgentData(); err != nil {
-			s.Status = Failed
+			s.Status = Error
 			s.updateSeed(sourceAgent, fmt.Sprintf("Unable to update agent data: %+v", err))
 			return nil, nil, log.Errore(err)
 		}
@@ -635,14 +635,14 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 		for agent := range agents {
 			stageAlreadyCompleted, err := s.isSeedStageCompletedForAgent(agent)
 			if err != nil {
-				s.Status = Failed
+				s.Status = Error
 				s.updateSeed(agent, fmt.Sprintf("Error getting information about completed stages from Orchestrator: %+v", err))
 				return
 			}
 			if !stageAlreadyCompleted {
 				agentSeedStageState, err := agent.getSeedStageState(s.SeedID, s.Stage)
 				if err != nil {
-					s.Status = Failed
+					s.Status = Error
 					s.updateSeed(targetAgent, fmt.Sprintf("Error getting seed stage state information from agent: %+v", err))
 					return
 				}
@@ -669,7 +669,7 @@ func (s *Seed) processRunning(wg *sync.WaitGroup) {
 			} else {
 				for _, agent := range []*Agent{targetAgent, sourceAgent} {
 					if err := agent.postSeedCmd(s.SeedID); err != nil {
-						s.Status = Failed
+						s.Status = Error
 						s.updateSeedState(agent.Info.Hostname, fmt.Sprintf("Failed to execute post seed command on agent: %+v", err))
 					} else {
 						s.Status = Completed
