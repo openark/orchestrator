@@ -906,6 +906,16 @@ body {
     z-index: 50;
 }
 
+#dc_legend {
+    margin-top: 20px;
+}
+
+#dc_legend span {
+    margin-right: 10px;
+    padding: 3px 5px;
+    white-space: nowrap;
+}
+
 #clusters_analysis .popover {
     width: 430px;
     max-width: 430px;

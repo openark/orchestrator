@@ -368,6 +368,9 @@ function openNodeModal(node) {
     '<a href="' + appUrl('/web/audit/instance/' + node.Key.Hostname + '/' + node.Key.Port) + '">' + node.title + '</a>');
   addNodeModalDataAttribute("Agent",
     '<a href="' + appUrl('/web/agent/' + node.Key.Hostname) + '">' + node.Key.Hostname + '</a>');
+  addNodeModalDataAttribute("Region", node.Region);
+  addNodeModalDataAttribute("Data center", node.DataCenter);
+  addNodeModalDataAttribute("Physical environment", node.PhysicalEnvironment);
 
   $('#node_modal [data-btn]').unbind("click");
 
@@ -811,7 +814,13 @@ function renderInstanceElement(popoverElement, instance, renderType) {
   // $(this).find("h3").attr("title", anonymizeInstanceId(instanceId));
   var anonymizedInstanceId = anonymizeInstanceId(instance.id);
   popoverElement.attr("data-nodeid", instance.id);
-  popoverElement.find("h3").attr('title', (isAnonymized() ? anonymizedInstanceId : isAliased() ? instance.InstanceAlias : instance.title));
+  popoverElement.find("h3").attr(
+    'title',
+    (isAnonymized() ? anonymizedInstanceId : isAliased() ? instance.InstanceAlias : instance.title)
+      + "\nRegion: " + instance.Region
+      + "\nData center: " + instance.DataCenter
+      + "\nPhysical environment: " + instance.PhysicalEnvironment
+  );
   popoverElement.find("h3").html('&nbsp;<div class="pull-left">' +
     (isAnonymized() ? anonymizedInstanceId : isAliased() ? instance.InstanceAlias : instance.canonicalTitle) +
     '</div><div class="pull-right instance-glyphs"><span class="glyphicon glyphicon-cog" title="Open config dialog"></span></div>');
