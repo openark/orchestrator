@@ -340,9 +340,14 @@ func NewSeed(seedMethodName string, targetAgent *Agent, sourceAgent *Agent) (int
 			return 0, log.Errorf("Not enough disk space on target host backup directory %s. Database size: %d, available: %d", targetAgent.Info.Hostname, sourceAgent.Data.MySQLDatadirDiskUsed, targetAgent.Data.BackupDirDiskFree)
 		}
 	}
-	// special check for LVM seed method
-	if seedMethod == LVM && sourceAgent.Data.MountPoint.IsMounted {
-		return 0, log.Errorf("Volume already mounted on source host. Please unmount")
+	// special checks for LVM seed method
+	if seedMethod == LVM {
+		if sourceAgent.Data.MountPoint.IsMounted {
+			return 0, log.Errorf("Volume already mounted on source host %s. Please unmount", sourceAgent.Info.Hostname)
+		}
+		if len(sourceAgent.Data.LogicalVolumes) == 0 {
+			return 0, log.Errorf("No logical volumes found on source host %s", sourceAgent.Info.Hostname)
+		}
 	}
 	seed := &Seed{
 		TargetHostname: targetAgent.Info.Hostname,
