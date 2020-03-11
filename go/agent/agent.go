@@ -73,6 +73,7 @@ type LogicalVolume struct {
 	Path            string
 	IsSnapshot      bool
 	SnapshotPercent float64
+	CreatedAt       time.Time
 }
 
 // Mount describes a file system mount point
