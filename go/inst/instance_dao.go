@@ -609,7 +609,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 
 				replicaKey, err := NewResolveInstanceKey(host, port)
 				if err == nil && replicaKey.IsValid() {
-					instance.AddReplicaKey(replicaKey)
+					if !RegexpMatchPatterns(replicaKey.StringCode(), config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
+						instance.AddReplicaKey(replicaKey)
+					}
 					foundByShowSlaveHosts = true
 				}
 				return err
@@ -637,7 +639,9 @@ func ReadTopologyInstanceBufferable(instanceKey *InstanceKey, bufferWrites bool,
 						logReadTopologyInstanceError(instanceKey, "ResolveHostname: processlist", resolveErr)
 					}
 					replicaKey := InstanceKey{Hostname: cname, Port: instance.Key.Port}
-					instance.AddReplicaKey(&replicaKey)
+					if !RegexpMatchPatterns(replicaKey.StringCode(), config.Config.DiscoveryIgnoreReplicaHostnameFilters) {
+						instance.AddReplicaKey(&replicaKey)
+					}
 					return err
 				})
 
