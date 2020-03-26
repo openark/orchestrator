@@ -3196,14 +3196,12 @@ func (this *HttpAPI) AuditFailureDetection(params martini.Params, r render.Rende
 
 	if detectionId, derr := strconv.ParseInt(params["id"], 10, 0); derr == nil && detectionId > 0 {
 		audits, err = logic.ReadFailureDetection(detectionId)
-	} else if clusterAlias := params["clusterAlias"]; clusterAlias != "" {
-		audits, err = logic.ReadFailureDetectionsForClusterAlias(clusterAlias)
 	} else {
 		page, derr := strconv.Atoi(params["page"])
 		if derr != nil || page < 0 {
 			page = 0
 		}
-		audits, err = logic.ReadRecentFailureDetections(page)
+		audits, err = logic.ReadRecentFailureDetections(params["clusterAlias"], page)
 	}
 
 	if err != nil {
@@ -3248,15 +3246,14 @@ func (this *HttpAPI) AuditRecovery(params martini.Params, r render.Render, req *
 		audits, err = logic.ReadRecoveryByUID(recoveryUID)
 	} else if recoveryId, derr := strconv.ParseInt(params["id"], 10, 0); derr == nil && recoveryId > 0 {
 		audits, err = logic.ReadRecovery(recoveryId)
-	} else if clusterAlias := params["clusterAlias"]; clusterAlias != "" {
-		audits, err = logic.ReadRecoveriesForClusterAlias(clusterAlias)
 	} else {
 		page, derr := strconv.Atoi(params["page"])
 		if derr != nil || page < 0 {
 			page = 0
 		}
 		unacknowledgedOnly := (req.URL.Query().Get("unacknowledged") == "true")
-		audits, err = logic.ReadRecentRecoveries(params["clusterName"], unacknowledgedOnly, page)
+
+		audits, err = logic.ReadRecentRecoveries(params["clusterName"], params["clusterAlias"], unacknowledgedOnly, page)
 	}
 
 	if err != nil {
@@ -3746,6 +3743,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "audit-failure-detection/:page", this.AuditFailureDetection)
 	this.registerAPIRequest(m, "audit-failure-detection/id/:id", this.AuditFailureDetection)
 	this.registerAPIRequest(m, "audit-failure-detection/alias/:clusterAlias", this.AuditFailureDetection)
+	this.registerAPIRequest(m, "audit-failure-detection/alias/:clusterAlias/:page", this.AuditFailureDetection)
 	this.registerAPIRequest(m, "replication-analysis-changelog", this.ReadReplicationAnalysisChangelog)
 	this.registerAPIRequest(m, "audit-recovery", this.AuditRecovery)
 	this.registerAPIRequest(m, "audit-recovery/:page", this.AuditRecovery)
@@ -3754,6 +3752,7 @@ func (this *HttpAPI) RegisterRequests(m *martini.ClassicMartini) {
 	this.registerAPIRequest(m, "audit-recovery/cluster/:clusterName", this.AuditRecovery)
 	this.registerAPIRequest(m, "audit-recovery/cluster/:clusterName/:page", this.AuditRecovery)
 	this.registerAPIRequest(m, "audit-recovery/alias/:clusterAlias", this.AuditRecovery)
+	this.registerAPIRequest(m, "audit-recovery/alias/:clusterAlias/:page", this.AuditRecovery)
 	this.registerAPIRequest(m, "audit-recovery-steps/:uid", this.AuditRecoverySteps)
 	this.registerAPIRequest(m, "active-cluster-recovery/:clusterName", this.ActiveClusterRecovery)
 	this.registerAPIRequest(m, "recently-active-cluster-recovery/:clusterName", this.RecentlyActiveClusterRecovery)
